@@ -13,16 +13,21 @@ import (
 const SchemaV1 = "tetra.actors.distributed-runtime.v1"
 
 type Report struct {
-	Schema      string          `json:"schema"`
-	Status      string          `json:"status"`
-	Target      string          `json:"target"`
-	Host        string          `json:"host"`
-	Runtime     string          `json:"runtime"`
-	Transport   string          `json:"transport"`
-	Broker      BrokerReport    `json:"broker"`
-	Processes   []ProcessReport `json:"processes"`
-	FrameCounts FrameCounts     `json:"frame_counts"`
-	Cases       []CaseReport    `json:"cases"`
+	Schema         string          `json:"schema"`
+	Status         string          `json:"status"`
+	Target         string          `json:"target"`
+	Host           string          `json:"host"`
+	Runtime        string          `json:"runtime"`
+	Transport      string          `json:"transport"`
+	GitHead        string          `json:"git_head"`
+	ArtifactHashes string          `json:"artifact_hashes"`
+	Claims         []string        `json:"claims,omitempty"`
+	NonClaims      []string        `json:"nonclaims"`
+	Broker         BrokerReport    `json:"broker"`
+	Processes      []ProcessReport `json:"processes"`
+	FrameCounts    FrameCounts     `json:"frame_counts"`
+	FrameOrder     []string        `json:"frame_order"`
+	Cases          []CaseReport    `json:"cases"`
 }
 
 type BrokerReport struct {
@@ -90,9 +95,18 @@ func ValidateReport(raw []byte) error {
 	if report.Transport != "loopback-tcp" {
 		issues = append(issues, fmt.Sprintf("transport is %q, want loopback-tcp", report.Transport))
 	}
+	if !isHexGitHead(report.GitHead) {
+		issues = append(issues, fmt.Sprintf("git_head is %q, want 40 hex characters", report.GitHead))
+	}
+	if report.ArtifactHashes != "artifact-hashes.json" {
+		issues = append(issues, fmt.Sprintf("artifact_hashes is %q, want artifact-hashes.json", report.ArtifactHashes))
+	}
+	issues = append(issues, validateClaims(report.Claims)...)
+	issues = append(issues, validateNonClaims(report.NonClaims)...)
 	issues = append(issues, validateBroker(report.Broker)...)
 	issues = append(issues, validateProcesses(report.Processes)...)
 	issues = append(issues, validateFrameCounts(report.FrameCounts)...)
+	issues = append(issues, validateFrameOrder(report.FrameOrder)...)
 	issues = append(issues, validateCases(report.Cases)...)
 	if len(issues) > 0 {
 		return errors.New(strings.Join(issues, "; "))
@@ -128,6 +142,46 @@ func validateBroker(b BrokerReport) []string {
 	}
 	if strings.TrimSpace(b.LastError) != "" {
 		issues = append(issues, "broker last_error must be empty for passing evidence")
+	}
+	return issues
+}
+
+func isHexGitHead(value string) bool {
+	if len(value) != 40 {
+		return false
+	}
+	for _, ch := range value {
+		if (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func validateNonClaims(nonclaims []string) []string {
+	if len(nonclaims) == 0 {
+		return []string{"nonclaims must include cluster, reconnect/retry, and non-linux scope boundaries"}
+	}
+	joined := strings.ToLower(strings.Join(nonclaims, "\n"))
+	var issues []string
+	for _, required := range []string{"cluster", "reconnect", "retry", "non-linux"} {
+		if !strings.Contains(joined, required) {
+			issues = append(issues, fmt.Sprintf("nonclaims missing %q boundary", required))
+		}
+	}
+	return issues
+}
+
+func validateClaims(claims []string) []string {
+	var issues []string
+	for _, claim := range claims {
+		lower := strings.ToLower(claim)
+		for _, forbidden := range []string{"cluster", "reconnect", "retry", "non-linux"} {
+			if strings.Contains(lower, forbidden) {
+				issues = append(issues, fmt.Sprintf("forbidden distributed actor claim %q mentions %q", claim, forbidden))
+			}
+		}
 	}
 	return issues
 }
@@ -198,6 +252,42 @@ func validateFrameCounts(counts FrameCounts) []string {
 		if item.got < 1 {
 			issues = append(issues, fmt.Sprintf("%s = %d, want at least 1", item.name, item.got))
 		}
+	}
+	return issues
+}
+
+func validateFrameOrder(order []string) []string {
+	if len(order) == 0 {
+		return []string{"frame_order is required"}
+	}
+	var issues []string
+	allowed := map[string]bool{
+		"hello":      true,
+		"hello_ack":  true,
+		"spawn_req":  true,
+		"spawn_ack":  true,
+		"send_i32":   true,
+		"send_msg":   true,
+		"send_typed": true,
+		"node_down":  true,
+	}
+	for i, name := range order {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			issues = append(issues, fmt.Sprintf("frame_order[%d] is empty", i))
+		} else if !allowed[name] {
+			issues = append(issues, fmt.Sprintf("frame_order[%d] = %q is not a known actorwire frame", i, name))
+		}
+	}
+	required := []string{"hello", "hello_ack", "spawn_req", "spawn_ack", "send_i32", "send_msg", "send_typed", "node_down"}
+	next := 0
+	for _, name := range order {
+		if next < len(required) && strings.TrimSpace(name) == required[next] {
+			next++
+		}
+	}
+	if next < len(required) {
+		issues = append(issues, fmt.Sprintf("frame_order missing ordered loopback sequence at %q", required[next]))
 	}
 	return issues
 }

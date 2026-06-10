@@ -523,6 +523,74 @@ func TestReleaseSurfaceSmokeScriptsDocumentHeadlessAndPendingLinuxX64Gates(t *te
 		}
 	}
 
+	blockSystemScripts := []struct {
+		path string
+		want []string
+	}{
+		{
+			path: filepath.Join(root, "scripts", "release", "surface", "surface-headless-block-system-smoke.sh"),
+			want: []string{
+				"Usage: bash scripts/release/surface/surface-headless-block-system-smoke.sh [--report-dir DIR]",
+				"surface-headless-block-system.json",
+				"go run ./tools/cmd/surface-runtime-smoke --mode headless-block-system",
+				"--source examples/surface_block_system.tetra",
+				"go run ./tools/cmd/validate-surface-runtime",
+				"go run ./tools/cmd/validate-surface-block-examples",
+				"surface-block-examples.json",
+				"examples/surface_block_command_palette.tetra",
+				"examples/surface_block_project_dashboard.tetra",
+				"examples/surface_block_settings.tetra",
+				"examples/surface_block_editor_shell.tetra",
+				"examples/surface_block_glass_panel.tetra",
+				"tetra.surface.block-system.v1",
+				"golden/checksum",
+			},
+		},
+		{
+			path: filepath.Join(root, "scripts", "release", "surface", "surface-linux-x64-real-window-block-system-smoke.sh"),
+			want: []string{
+				"Usage: bash scripts/release/surface/surface-linux-x64-real-window-block-system-smoke.sh [--report-dir DIR]",
+				"surface-block-system-linux-x64.json",
+				"go run ./tools/cmd/surface-runtime-smoke --mode linux-x64-real-window-block-system",
+				"--source examples/surface_block_system.tetra",
+				"go run ./tools/cmd/validate-surface-block-report",
+				"real Linux window",
+				"tetra.surface.block-system.v1",
+				"WAYLAND_DISPLAY",
+				"blocked",
+			},
+		},
+		{
+			path: filepath.Join(root, "scripts", "release", "surface", "surface-wasm32-web-browser-canvas-block-system-smoke.sh"),
+			want: []string{
+				"Usage: bash scripts/release/surface/surface-wasm32-web-browser-canvas-block-system-smoke.sh [--report-dir DIR]",
+				"surface-block-system-wasm32-web.json",
+				"go run ./tools/cmd/surface-runtime-smoke --mode wasm32-web-browser-canvas-block-system",
+				"--source examples/surface_block_system.tetra",
+				"go run ./tools/cmd/validate-wasm-imports",
+				"go run ./tools/cmd/validate-surface-block-report",
+				"browser canvas",
+				"RGBA readback",
+				"compiler-owned loader",
+				"no user JS",
+				"no DOM UI",
+				"Node-only",
+			},
+		},
+	}
+	for _, script := range blockSystemScripts {
+		raw, err := os.ReadFile(script.path)
+		if err != nil {
+			t.Fatalf("read Surface Block-system smoke script %s: %v", script.path, err)
+		}
+		text := string(raw)
+		for _, want := range script.want {
+			if !strings.Contains(text, want) {
+				t.Fatalf("Surface Block-system smoke script %s missing %q", script.path, want)
+			}
+		}
+	}
+
 	minimalToolkitScripts := []struct {
 		path string
 		want []string
@@ -972,10 +1040,15 @@ func TestReleaseSurfaceFinalReleaseGateRunsCurrentSurfaceV1Evidence(t *testing.T
 		"surface-wasm32-web-release-text-input.json",
 		"surface-wasm32-web-release-toolkit.json",
 		"surface-wasm32-web-release-accessibility.json",
+		"morph/surface-morph-gate-summary.json",
+		"morph/headless/surface-headless-morph.json",
 		"surface-release-summary.json",
 		"artifact-hashes.json",
 		"source \"$script_dir/report-dir-guard.sh\"",
 		"surface_release_require_fresh_report_dir \"$report_dir\" \"$repo_root\" \"surface_release_gate:\"",
+		"morph-gate.sh --report-dir \"$morph_report_dir\"",
+		"\"morph\": \"morph-capsule\"",
+		"\"morph_gate\": \"tetra.surface.morph.gate.v1\"",
 		"\"git_head\":",
 		"\"git_dirty\":",
 		"\"host_os\":",
@@ -1302,6 +1375,9 @@ func TestReleaseSurfaceScriptsNormalizeReportDirBeforeHashValidation(t *testing.
 		filepath.Join("scripts", "release", "surface", "surface-headless-component-tree-api-smoke.sh"),
 		filepath.Join("scripts", "release", "surface", "surface-linux-x64-real-window-component-tree-api-smoke.sh"),
 		filepath.Join("scripts", "release", "surface", "surface-wasm32-web-browser-canvas-component-tree-api-smoke.sh"),
+		filepath.Join("scripts", "release", "surface", "surface-headless-block-system-smoke.sh"),
+		filepath.Join("scripts", "release", "surface", "surface-linux-x64-real-window-block-system-smoke.sh"),
+		filepath.Join("scripts", "release", "surface", "surface-wasm32-web-browser-canvas-block-system-smoke.sh"),
 		filepath.Join("scripts", "release", "surface", "surface-headless-minimal-toolkit-smoke.sh"),
 		filepath.Join("scripts", "release", "surface", "surface-linux-x64-real-window-minimal-toolkit-smoke.sh"),
 		filepath.Join("scripts", "release", "surface", "surface-wasm32-web-browser-canvas-minimal-toolkit-smoke.sh"),

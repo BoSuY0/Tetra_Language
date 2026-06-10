@@ -1,0 +1,82 @@
+// Block-first text measurement/rendering smoke.
+module examples.surface_block_text
+
+import lib.core.surface as surface
+import lib.core.draw as draw
+import lib.core.block as block
+import lib.core.text as text
+
+struct BlockTextApp:
+    focused_id: Int
+    quality: Int
+
+struct TextSurfaceBlock:
+    id: Int
+    rect: surface.Rect
+    spec: block.TextSpec
+    measured: surface.Size
+
+struct EditableTextBlock:
+    id: Int
+    rect: surface.Rect
+    spec: block.TextSpec
+    state: text.EditableText
+
+func main() -> Int
+uses alloc, mem:
+    let bg: surface.Color = surface.Color(r: 16, g: 20, b: 24, a: 255)
+    let fg: surface.Color = surface.Color(r: 237, g: 242, b: 247, a: 255)
+    let panel: surface.Color = surface.Color(r: 32, g: 40, b: 48, a: 255)
+    let accent: surface.Color = surface.Color(r: 244, g: 205, b: 92, a: 255)
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 320, h: 200)
+    let text_rect: surface.Rect = surface.Rect(x: 12, y: 10, w: 96, h: 40)
+    let input_rect: surface.Rect = surface.Rect(x: 12, y: 58, w: 144, h: 36)
+    let title_spec: block.TextSpec = block.text_styled(28, fg, block.text_family_ui(), 16, 600, 20, block.text_align_start(), block.text_wrap_word(), block.text_overflow_ellipsis(), 255)
+    let measured: surface.Size = block.text_measure(title_spec, text_rect.w)
+    let line_count: Int = block.text_wrap_line_count(title_spec, text_rect.w)
+    let ellipsis_len: Int = block.text_ellipsized_len(title_spec, text_rect.w)
+    let fallback_len: Int = block.text_font_fallback_chain_len(title_spec)
+    let cache_status: Int = block.text_glyph_cache_validate(block.text_glyph_cache_budget_bytes(), 4096, 12)
+    var storage: []u8 = core.make_u8(32)
+    var input_state: text.EditableText = text.editable_empty(storage, 3)
+    let focus_status: Int = text.editable_set_focus(input_state, true)
+    var payload: []u8 = core.make_u8(4)
+    payload[0] = 79
+    payload[1] = 75
+    payload[2] = 208
+    payload[3] = 162
+    let edit: text.TextEditResult = text.editable_text_input(input_state, payload)
+    let input_spec: block.TextSpec = block.text_editable_styled(text.editable_len(input_state), 8, fg, block.text_family_ui(), 14, 400, 18, block.text_align_start(), block.text_wrap_none(), block.text_overflow_clip(), 255)
+    let app: BlockTextApp = BlockTextApp(focused_id: 3, quality: fallback_len)
+    let text_block: TextSurfaceBlock = TextSurfaceBlock(id: 2, rect: text_rect, spec: title_spec, measured: measured)
+    let input_block: EditableTextBlock = EditableTextBlock(id: 3, rect: input_rect, spec: input_spec, state: input_state)
+    let root_props: block.BlockProps = block.props(block.layout_fixed(root_rect), block.paint_empty(), block.text_none(), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_none(), block.asset_none())
+    let text_props: block.BlockProps = block.props(block.layout_fixed(text_rect), block.paint_empty(), title_spec, block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_text(28), block.asset_none())
+    let input_props: block.BlockProps = block.props(block.layout_fixed(input_rect), block.paint_empty(), input_spec, block.image_none(), block.input_text(), block.event_text(block.action_primary()), block.state_interactive(), block.motion_fast(), block.accessibility_text(8), block.asset_none())
+    let root: block.Block = block.make(block.id(1), block.id_none(), root_props)
+    let title: block.Block = block.make(block.id(text_block.id), block.id(1), text_props)
+    let input: block.Block = block.make(block.id(input_block.id), block.id(1), input_props)
+
+    var pixels: []u8 = core.make_u8(root_rect.w * root_rect.h * 4)
+    let surface_ref: surface.Surface = surface.Surface(handle: 0, width: root_rect.w, height: root_rect.h)
+    var frame: surface.Frame = surface.Frame(surface: surface_ref, width: root_rect.w, height: root_rect.h, stride: root_rect.w * 4, pixels: pixels)
+    var ctx: draw.DrawContext = draw.DrawContext(frame: frame)
+    let clear_ok: Int = draw.clear(ctx, bg)
+    let panel_ok: Int = draw.rect(ctx, surface.Rect(x: 10, y: 8, w: 150, h: 96), panel)
+    let render_ok: Int = draw.text_glyph_run(ctx, text_rect, title_spec.text_len, block.text_char_width(title_spec), block.text_effective_line_height(title_spec), fg)
+    let input_render_ok: Int = draw.text_glyph_run(ctx, surface.Rect(x: input_rect.x + 10, y: input_rect.y + 8, w: 100, h: 18), input_spec.text_len, block.text_char_width(input_spec), block.text_effective_line_height(input_spec), fg)
+    let caret_ok: Int = draw.text_caret(ctx, input_rect.x + 10 + text.editable_caret(input_block.state) * 6, input_rect.y + 6, 22, accent)
+
+    if block.id_value(root.id) == 1 && block.id_value(title.parent_id) == 1 &&
+       block.id_value(input.parent_id) == 1 && title.props.text_len == 28 &&
+       input.props.text_len == text.editable_len(input_block.state) &&
+       measured.w == text_rect.w && measured.h >= 20 && line_count >= 2 &&
+       ellipsis_len > 0 && ellipsis_len < title_spec.text_len &&
+       fallback_len >= 2 && cache_status == block.text_cache_error_ok() &&
+       edit.ok && text.editable_validate(input_block.state) == text.error_none() &&
+       block.text_is_editable(input_block.spec) && focus_status == 1 &&
+       clear_ok == 0 && panel_ok == 0 && render_ok == draw.text_command_render() &&
+       input_render_ok == draw.text_command_render() && caret_ok == draw.text_command_caret() &&
+       app.focused_id == 3:
+        return 0
+    return 1

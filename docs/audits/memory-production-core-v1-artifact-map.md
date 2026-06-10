@@ -69,8 +69,8 @@ Observed quick output:
 - validated by `go run ./tools/cmd/validate-test-all-summary --summary reports/memory-production-core-v1/test-all-quick/summary.json --report-dir reports/memory-production-core-v1/test-all-quick`
 
 Quick mode is evidence for the required MPC-16 command. It is not the full
-`full` or `stabilization` mode. The final audit must not use quick output as an
-official benchmark result or as target parity evidence.
+`full` or `stabilization` mode. The final audit records no official benchmark
+result and no target parity evidence from quick output.
 
 The script rejects unsafe report directories: `reports/memory-production-core-v1/test-all-quick`
 must not be a symlink, must stay under the workspace, and must be empty or absent

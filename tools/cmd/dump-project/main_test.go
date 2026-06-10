@@ -62,6 +62,11 @@ func TestCollectRelPathsFailsWhenGitFilteringCannotRun(t *testing.T) {
 	}
 
 	root := t.TempDir()
+	ceiling, err := filepath.Abs(filepath.Dir(root))
+	if err != nil {
+		t.Fatalf("resolve git ceiling: %v", err)
+	}
+	t.Setenv("GIT_CEILING_DIRECTORIES", ceiling)
 	writeTestFile(t, root, ".gitignore", "ignored/\n")
 	writeTestFile(t, root, "compiler/kept.tetra", "fn main() -> i32 { 0 }\n")
 	writeTestFile(t, root, "ignored/secret.txt", "secret\n")

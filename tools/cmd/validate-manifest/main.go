@@ -533,6 +533,7 @@ func validateFeatures(features []featureManifest) error {
 		"language.lifetime-ssa":                   "current",
 		"safety.production-core":                  "current",
 		"language.callable-level2":                "current",
+		"compiler.ram-contracts":                  "current",
 		"ui.metadata-v1":                          "current",
 		"ui.toolkit-core":                         "current",
 		"wasm.runtime-execution":                  "current",
@@ -563,6 +564,9 @@ func validateFeatures(features []featureManifest) error {
 		}
 		if len(feature.Docs) == 0 {
 			return fmt.Errorf("feature %s missing docs", feature.ID)
+		}
+		if claims := forbiddenPersistentObjectMemoryClaims(feature.Scope + " " + feature.Stability); len(claims) > 0 {
+			return fmt.Errorf("feature %s forbidden persistent/object memory claim %q", feature.ID, strings.Join(claims, ", "))
 		}
 		for _, doc := range feature.Docs {
 			docPath := filepath.ToSlash(doc)
@@ -649,7 +653,43 @@ func validateFeatureTruthBoundaries(features map[string]featureManifest) error {
 			"memory cost model",
 			"memory fuzz oracle",
 			"memory production final audit",
+			"validate-island-proof",
+			"--islands-debug sanitizer smoke",
+			"island-proof-fuzz-summary",
+			"leak/resource finalization evidence",
+			"integrated Memory/Islands/Surface release gate",
+			"memory-islands-surface-production-manifest.json",
+			"artifact-hashes.json",
+			"no Memory 100% claim",
+			"no production object memory",
+			"production persistent memory claim",
 			"explicit diagnostics",
+		},
+		"compiler.ram-contracts": {
+			"RAM Contract Compiler report evidence",
+			"tetra.ram-contract-report.v1",
+			"tetra.memory-grade-report.v1",
+			"tetra.proof-store-summary.v1",
+			"tetra.validation-pipeline-coverage.v1",
+			"heap-blockers.json",
+			"copy-blockers.json",
+			"ram-contract-fuzz-oracle.json",
+			"--emit-ram-contract-report",
+			"--fail-if-heap",
+			"--fail-if-copy",
+			"--fail-if-unbounded",
+			"--memory-budget",
+			"--ram-contract",
+			"TETRA4100",
+			"validate-ram-contract-release",
+			"ram-contract-linux-x64-smoke.sh",
+			"no zero heap for all programs claim",
+			"no zero-copy for all programs claim",
+			"no full formal proof claim",
+			"no all-target RAM parity claim",
+			"no production object memory claim",
+			"no production persistent memory claim",
+			"no performance claim",
 		},
 		"language.enum-payload-match": {
 			"positional enum payload constructors",
@@ -689,7 +729,8 @@ func validateFeatureTruthBoundaries(features map[string]featureManifest) error {
 		"language.resource-lifetime-mvp":          {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
 		"actors.task-transfer-safety":             {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
 		"language.lifetime-ssa":                   {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
-		"safety.production-core":                  {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/effects_capabilities_privacy_v1.md", "docs/design/memory_cost_model.md", "docs/audits/memory-fuzz-oracle-v1.md", "docs/audits/memory-production-core-v1-final.md", "docs/audits/memory-production-core-v1-artifact-map.md", "docs/audits/memory-production-core-v1-nonclaims.md", "docs/audits/memory-ideal-vslice-v0-baseline.md", "docs/audits/memory-ideal-vslice-v0-correlation.md", "docs/audits/memory-ideal-vslice-v0-final.md", "docs/audits/memory-ideal-vslice-v1-correlation.md", "docs/audits/memory-ideal-vslice-v1-final.md", "docs/audits/memory-ideal-vslice-v2-correlation.md", "docs/audits/memory-ideal-vslice-v2-final.md", "docs/audits/memory-ideal-vslice-v3-correlation.md", "docs/audits/memory-ideal-vslice-v3-final.md"},
+		"safety.production-core":                  {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/effects_capabilities_privacy_v1.md", "docs/spec/unsafe.md", "docs/spec/memory_report_schema_v1.md", "docs/spec/islands.md", "docs/design/memory_production_core_v1.md", "docs/design/memory_cost_model.md", "docs/audits/memory-fuzz-oracle-v1.md", "docs/audits/memory-production-core-v1-final.md", "docs/audits/memory-production-core-v1-artifact-map.md", "docs/audits/memory-production-core-v1-nonclaims.md", "docs/release/memory_islands_surface_scope.md", "docs/audits/memory-ideal-vslice-v0-baseline.md", "docs/audits/memory-ideal-vslice-v0-correlation.md", "docs/audits/memory-ideal-vslice-v0-final.md", "docs/audits/memory-ideal-vslice-v1-correlation.md", "docs/audits/memory-ideal-vslice-v1-final.md", "docs/audits/memory-ideal-vslice-v2-correlation.md", "docs/audits/memory-ideal-vslice-v2-final.md", "docs/audits/memory-ideal-vslice-v3-correlation.md", "docs/audits/memory-ideal-vslice-v3-final.md"},
+		"compiler.ram-contracts":                  {"docs/design/ram_contract_compiler.md", "docs/spec/ram_contract_report_schema.md", "docs/user/ram_contracts.md", "docs/audits/ram-contract-compiler-readiness.md", "docs/audits/ram-contract-compiler-handoff.md"},
 		"language.enum-payload-match":             {"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v0_3_scope.md"},
 		"language.protocol-bound-generics-static": {"docs/spec/current_supported_surface.md", "docs/spec/v0_3_scope.md", "docs/spec/flow_syntax_v1.md"},
 		"ui.toolkit-core":                         {"docs/spec/current_supported_surface.md", "docs/spec/ui_toolkit_core.md", "docs/spec/ui_v0.4.0.md"},
@@ -720,6 +761,8 @@ func validateSurfaceFeatureRows(features map[string]featureManifest) error {
 	}
 	requiredStatus := map[string]string{
 		"ui.surface-core":             "current",
+		"ui.surface-block-system":     "experimental",
+		"ui.surface-morph-capsule":    "experimental",
 		"ui.surface-headless":         "current",
 		"ui.surface-linux-x64":        "current",
 		"ui.surface-web-wasm":         "current",
@@ -733,6 +776,8 @@ func validateSurfaceFeatureRows(features map[string]featureManifest) error {
 	}
 	docChecks := map[string][]string{
 		"ui.surface-core":             {"docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/release/surface_v1_release_contract.md"},
+		"ui.surface-block-system":     {"docs/spec/current_supported_surface.md", "docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/user/examples_index.md", "docs/release/surface_v1_release_contract.md", "docs/release/surface_v1_release_notes.md", "docs/release/surface_v1_release_audit.md"},
+		"ui.surface-morph-capsule":    {"docs/spec/surface_morph.md", "docs/spec/current_supported_surface.md", "docs/user/surface_guide.md", "docs/user/examples_index.md", "docs/user/standard_library_guide.md", "docs/release/surface_v1_release_contract.md", "docs/release/surface_v1_release_notes.md"},
 		"ui.surface-headless":         {"docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/release/surface_v1_release_contract.md"},
 		"ui.surface-linux-x64":        {"docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/release/surface_v1_release_contract.md"},
 		"ui.surface-web-wasm":         {"docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/release/surface_v1_release_contract.md"},
@@ -746,6 +791,8 @@ func validateSurfaceFeatureRows(features map[string]featureManifest) error {
 	}
 	phraseChecks := map[string][]string{
 		"ui.surface-core":             {"surface-v1-linux-web", "headless, linux-x64 real-window, and wasm32-web browser-canvas", "unsupported or future work"},
+		"ui.surface-block-system":     {"Block-first Surface architecture", "core Surface primitive", "recipes/compatibility", "tetra.surface.block-system.gate.v1", "block_system.memory_budget", "reports/surface-block/p18-budget", "same-commit target evidence", "not current", "not production support", "no production Block claim"},
+		"ui.surface-morph-capsule":    {"Morph Capsule", "lib.core.morph", "expands into Block", "tetra.surface.morph.gate.v1", "deterministic headless", "not Surface v1 production support", "does not add core widget primitives"},
 		"ui.surface-headless":         {"release evidence target", "not as an end-user platform claim"},
 		"ui.surface-linux-x64":        {"linux-x64-release-window-v1", "no GTK, Qt, platform widget, metadata sidecar playback, macOS, or Windows production claim"},
 		"ui.surface-web-wasm":         {"wasm32-web-browser-canvas-release-v1", "DOM UI", "Node-only evidence"},
@@ -787,6 +834,143 @@ func containsString(values []string, want string) bool {
 		}
 	}
 	return false
+}
+
+func forbiddenPersistentObjectMemoryClaims(text string) []string {
+	lower := strings.ToLower(text)
+	var claims []string
+	for _, phrase := range []string{
+		"object memory",
+		"persistent memory",
+		"persistent/object memory",
+		"object/persistent memory",
+		"production object memory",
+		"object memory production",
+		"production persistent memory",
+		"persistent memory production",
+		"todium",
+		"memoryfield",
+		"memoryruntime",
+		"memoryeval",
+		"false memory",
+		"stale memory",
+		"wal-backed object memory",
+		"wal backed object memory",
+		"fts-backed object memory",
+		"fts backed object memory",
+		"vacuum-backed object memory",
+		"retention-backed object memory",
+	} {
+		searchFrom := 0
+		for {
+			index := strings.Index(lower[searchFrom:], phrase)
+			if index < 0 {
+				break
+			}
+			absolute := searchFrom + index
+			clause := claimClauseAround(lower, absolute, len(phrase), 260)
+			if !explicitNonClaimContext(clause) && persistentObjectMemoryClaimContext(phrase, clause) {
+				claims = append(claims, phrase)
+			}
+			searchFrom = absolute + len(phrase)
+		}
+	}
+	sort.Strings(claims)
+	return compactStrings(claims)
+}
+
+func persistentObjectMemoryClaimContext(phrase string, clause string) bool {
+	switch phrase {
+	case "object memory", "persistent memory", "persistent/object memory", "object/persistent memory":
+		for _, qualifier := range []string{
+			"production",
+			"prod_ready",
+			"release-ready",
+			"release ready",
+			"supported",
+			"current",
+			"ships",
+			"backed by",
+		} {
+			if strings.Contains(clause, qualifier) {
+				return true
+			}
+		}
+		return false
+	default:
+		return true
+	}
+}
+
+func explicitNonClaimContext(lower string) bool {
+	normalized := strings.NewReplacer(`"`, "", "`", "", "'", "").Replace(lower)
+	for _, marker := range []string{
+		"does not claim",
+		"do not claim",
+		"does not prove",
+		"do not prove",
+		"does not promote",
+		"do not promote",
+		"not production",
+		"no production",
+		"makes no",
+		"non-goal",
+		"non goal",
+		"non-claim",
+		"nonclaim",
+		"out of scope",
+		"not included",
+		"does not include",
+		"absent",
+		"no todium",
+		"no memoryfield",
+		"without",
+		"forbid",
+		"forbidden",
+	} {
+		if strings.Contains(lower, marker) || strings.Contains(normalized, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func claimClauseAround(text string, index int, length int, maxSide int) string {
+	start := index
+	for start > 0 && !claimClauseBoundary(text[start-1]) {
+		start--
+		if index-start >= maxSide {
+			break
+		}
+	}
+	end := index + length
+	for end < len(text) && !claimClauseBoundary(text[end]) {
+		end++
+		if end-(index+length) >= maxSide {
+			break
+		}
+	}
+	return text[start:end]
+}
+
+func claimClauseBoundary(b byte) bool {
+	return b == '\n' || b == '.' || b == '!' || b == '?' || b == ';'
+}
+
+func compactStrings(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	out := values[:0]
+	var previous string
+	for _, value := range values {
+		if value == previous {
+			continue
+		}
+		out = append(out, value)
+		previous = value
+	}
+	return out
 }
 
 func validateRuntimeABI(abi runtimeABIManifest, targets map[string]bool) error {

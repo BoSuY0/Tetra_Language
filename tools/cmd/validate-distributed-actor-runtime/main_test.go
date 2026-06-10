@@ -42,6 +42,14 @@ func validDistributedActorRuntimeReportJSON() []byte {
   "host": "linux-x64",
   "runtime": "actornet",
   "transport": "loopback-tcp",
+  "git_head": "e2c19b8ee276158f8eb2c54cf61e11bd84952893",
+  "artifact_hashes": "artifact-hashes.json",
+  "claims": ["linux-x64 loopback tcp distributed actor runtime evidence"],
+  "nonclaims": [
+    "no cluster membership",
+    "no reconnect/retry production",
+    "no non-linux distributed actor runtime support"
+  ],
   "broker": {
     "runtime": "actornet",
     "transport": "loopback-tcp",
@@ -65,6 +73,7 @@ func validDistributedActorRuntimeReportJSON() []byte {
     "send_typed": 1,
     "node_down": 1
   },
+  "frame_order": ["hello","hello_ack","spawn_req","spawn_ack","send_i32","send_msg","send_typed","node_down"],
   "cases": [
     {"name":"cross-node i32 send/receive","ran":true,"pass":true,"expected_exit":0,"actual_exit":0,"node_processes":2},
     {"name":"cross-node tagged send/receive","ran":true,"pass":true,"expected_exit":0,"actual_exit":0,"node_processes":2},

@@ -24,6 +24,54 @@ release gate validates the required target evidence and artifact hashes.
 - accessibility metadata plus platform bridge for supported targets
 - release validators and artifact hashes
 
+## Block System Status
+
+`ui.surface-block-system` is experimental in this release contract. It records
+the Block-first Surface architecture direction: Block as the core Surface
+primitive for visual composition. Button/Card/TextField-like shapes are
+recipes/compatibility rather than required core widget classes. It is not
+current release support and is not production support. The current same-commit
+evidence is scoped to `tetra.surface.block-system.gate.v1` reports for
+headless, linux-x64 real-window, and wasm32-web browser-canvas targets,
+validated artifact hashes, and `reports/surface-block/p18-budget`. That
+evidence keeps the no production Block claim boundary.
+
+The Block gate now requires each Block-system runtime report to include
+`block_system.memory_budget` evidence. The budget is scoped to the reported
+scene and records Block count, stress count, render/state loop counts,
+framebuffer bytes, bounded paint/text/asset caches, and explicit nonclaims.
+This budget evidence does not promote Block to production support and does not
+stand in for an Electron comparison benchmark.
+
+Gate command:
+
+```sh
+bash scripts/release/surface/block-system-gate.sh \
+  --report-dir reports/surface-block/p18-budget
+```
+
+## Morph Capsule Status
+
+`ui.surface-morph-capsule` is experimental in this release contract. It records
+the Morph authoring layer over Block: scoped tokens, materials, affordances,
+state lenses, motion presets, and recipes in `lib.core.morph` that expand into
+Block graph evidence. It is not current release support and is not production
+support.
+
+The current gate is deterministic headless evidence only:
+
+```sh
+bash scripts/release/surface/morph-gate.sh \
+  --report-dir reports/surface-morph/gate
+```
+
+The gate writes `tetra.surface.morph.v1` and
+`tetra.surface.morph.gate.v1` evidence for
+`examples/surface_morph_command_palette.tetra`, validates same-commit report
+state, and checks artifact hashes. The final Surface release gate records this
+Morph gate as an experimental evidence dependency without promoting Morph to a
+production Surface API.
+
 ## Unsupported
 
 - macOS real-window Surface

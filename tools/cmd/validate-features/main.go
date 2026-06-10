@@ -92,6 +92,7 @@ func validateFeatures(features []featureEntry) error {
 	requiredStatuses := []string{"current", "planned", "post-v1"}
 	seenStatus := map[string]bool{}
 	seenID := map[string]string{}
+	featureByID := map[string]featureEntry{}
 	for _, feature := range features {
 		if feature.ID == "" {
 			return fmt.Errorf("feature missing id")
@@ -106,6 +107,7 @@ func validateFeatures(features []featureEntry) error {
 			return fmt.Errorf("duplicate feature %s (%s and %s)", feature.ID, previousStatus, feature.Status)
 		}
 		seenID[feature.ID] = feature.Status
+		featureByID[feature.ID] = feature
 		seenStatus[feature.Status] = true
 		if feature.Status == "current" && feature.Since == "" {
 			return fmt.Errorf("current feature %s missing since", feature.ID)
@@ -117,6 +119,64 @@ func validateFeatures(features []featureEntry) error {
 	for _, status := range requiredStatuses {
 		if !seenStatus[status] {
 			return fmt.Errorf("features missing %s status", status)
+		}
+	}
+	if err := validateSurfaceBlockSystemFeature(featureByID); err != nil {
+		return err
+	}
+	if err := validateSurfaceMorphCapsuleFeature(featureByID); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateSurfaceBlockSystemFeature(features map[string]featureEntry) error {
+	if _, ok := features["ui.surface-core"]; !ok {
+		return nil
+	}
+	feature, ok := features["ui.surface-block-system"]
+	if !ok {
+		return fmt.Errorf("features missing ui.surface-block-system")
+	}
+	if feature.Status != "experimental" && feature.Status != "planned" {
+		return fmt.Errorf("feature ui.surface-block-system status = %s, want experimental or planned until Block evidence lands", feature.Status)
+	}
+	haystack := feature.Scope + " " + feature.Stability
+	for _, want := range []string{
+		"Block-first",
+		"core Surface primitive",
+		"recipes/compatibility",
+		"not current",
+		"no production Block claim",
+	} {
+		if !strings.Contains(haystack, want) {
+			return fmt.Errorf("feature ui.surface-block-system missing truth-boundary phrase %q", want)
+		}
+	}
+	return nil
+}
+
+func validateSurfaceMorphCapsuleFeature(features map[string]featureEntry) error {
+	if _, ok := features["ui.surface-core"]; !ok {
+		return nil
+	}
+	feature, ok := features["ui.surface-morph-capsule"]
+	if !ok {
+		return fmt.Errorf("features missing ui.surface-morph-capsule")
+	}
+	if feature.Status != "experimental" && feature.Status != "planned" {
+		return fmt.Errorf("feature ui.surface-morph-capsule status = %s, want experimental or planned until Morph evidence lands", feature.Status)
+	}
+	haystack := feature.Scope + " " + feature.Stability
+	for _, want := range []string{
+		"Morph Capsule",
+		"expands into Block",
+		"tetra.surface.morph.gate.v1",
+		"not Surface v1 production support",
+		"does not add core widget primitives",
+	} {
+		if !strings.Contains(haystack, want) {
+			return fmt.Errorf("feature ui.surface-morph-capsule missing truth-boundary phrase %q", want)
 		}
 	}
 	return nil

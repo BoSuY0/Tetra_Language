@@ -1,0 +1,96 @@
+// Polished project dashboard scene composed only from Block configuration.
+module examples.surface_block_project_dashboard
+
+import lib.core.surface as surface
+import lib.core.block as block
+
+func theme_dark() -> surface.Color:
+    return surface.Color(r: 18, g: 22, b: 28, a: 255)
+
+func theme_light() -> surface.Color:
+    return surface.Color(r: 245, g: 248, b: 251, a: 255)
+
+func green() -> surface.Color:
+    return surface.Color(r: 96, g: 180, b: 132, a: 255)
+
+func amber() -> surface.Color:
+    return surface.Color(r: 244, g: 205, b: 92, a: 255)
+
+func panel_paint() -> block.PaintSpec:
+    return block.paint_stack4(
+        block.paint_layer_fill_radius(surface.Color(r: 28, g: 34, b: 42, a: 255), 14),
+        block.paint_layer_border(surface.Color(r: 72, g: 86, b: 102, a: 255), 1, 14),
+        block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 88), 16, 0, 6),
+        block.paint_layer_outline(surface.Color(r: 96, g: 174, b: 244, a: 255), 1, 16)
+    )
+
+func metric_paint(accent_color: surface.Color) -> block.PaintSpec:
+    return block.paint_stack5(
+        block.paint_layer_fill_radius(surface.Color(r: 32, g: 40, b: 48, a: 255), 12),
+        block.paint_layer_linear_gradient(surface.Color(r: 36, g: 46, b: 56, a: 255), surface.Color(r: 28, g: 34, b: 42, a: 255), 12),
+        block.paint_layer_border(surface.Color(r: 76, g: 92, b: 108, a: 255), 1, 12),
+        block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 64), 10, 0, 4),
+        block.paint_layer_outline(accent_color, 1, 14)
+    )
+
+func make_metric(id_value: Int, parent_value: Int, x: Int, y: Int, w: Int, h: Int, label_len: Int, accent_color: surface.Color, hash: Int) -> block.Block:
+    let rect: surface.Rect = surface.Rect(x: x, y: y, w: w, h: h)
+    let icon: block.AssetRef = block.asset_icon(id_value, 18, 18, hash)
+    let image: block.ImageSpec = block.image_asset_tinted_scaled(icon, 18, 18, accent_color, 1)
+    let text: block.TextSpec = block.text_styled(label_len, theme_light(), block.text_family_ui(), 15, 700, 20, block.text_align_start(), block.text_wrap_word(), block.text_overflow_ellipsis(), 255)
+    let motion: block.MotionSpec = block.motion_transition(140, 0, block.motion_ease_standard(), true, true, true, 0, -3, 103)
+    let props: block.BlockProps = block.props(block.layout_column(rect, 8), metric_paint(accent_color), text, image, block.input_clickable(), block.event_click(block.action_primary()), block.state_interactive(), motion, block.accessibility_button(label_len), icon)
+    return block.make(block.id(id_value), block.id(parent_value), props)
+
+func scene_frame_checksum() -> Int:
+    let hover: block.StateSelector = block.state_selector_hover()
+    let focus: block.StateSelector = block.state_selector_focused()
+    let pressed: block.StateSelector = block.state_selector_pressed()
+    let motion: block.MotionSpec = block.motion_transition(140, 0, block.motion_ease_standard(), true, true, true, 0, -3, 103)
+    let paint: block.PaintSpec = metric_paint(green())
+    let hover_fill: Int = block.state_resolve_int(32, 42, hover, hover)
+    let focus_ring: Int = block.state_resolve_int(1, 3, focus, focus)
+    let press_scale: Int = block.motion_resolve_scale(motion, 70)
+    if block.state_selector_matches(pressed, pressed):
+        return block.paint_feature_flags(paint) + hover_fill + focus_ring + press_scale
+    return 0
+
+func scene_checksum() -> Int:
+    return scene_frame_checksum()
+
+func main() -> Int
+uses alloc, mem:
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 520, h: 300)
+    let sidebar_rect: surface.Rect = surface.Rect(x: 16, y: 16, w: 128, h: 268)
+    let content_rect: surface.Rect = surface.Rect(x: 156, y: 16, w: 348, h: 268)
+    let header_rect: surface.Rect = surface.Rect(x: 176, y: 34, w: 220, h: 30)
+    let action_rect: surface.Rect = surface.Rect(x: 388, y: 34, w: 82, h: 30)
+
+    var tree: block.BlockTree = block.tree_init(9)
+    let root_props: block.BlockProps = block.props(block.layout_dock(root_rect, block.layout_dock_fill(), 0), block.paint_stack2(block.paint_layer_fill_radius(theme_dark(), 0), block.paint_layer_overlay(surface.Color(r: 96, g: 180, b: 132, a: 28), 28, 0)), block.text_none(), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_text(17), block.asset_none())
+    let sidebar_props: block.BlockProps = block.props(block.layout_column(sidebar_rect, 10), panel_paint(), block.text_styled(11, theme_light(), block.text_family_ui(), 14, 700, 18, block.text_align_start(), block.text_wrap_word(), block.text_overflow_ellipsis(), 255), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_fast(), block.accessibility_text(11), block.asset_font(1, 4101))
+    let content_props: block.BlockProps = block.props(block.layout_column(content_rect, 14), panel_paint(), block.text_none(), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_fast(), block.accessibility_text(14), block.asset_none())
+    let header_props: block.BlockProps = block.props(block.layout_row(header_rect, 8), block.paint_empty(), block.text_styled(18, theme_light(), block.text_family_ui(), 20, 800, 24, block.text_align_start(), block.text_wrap_none(), block.text_overflow_ellipsis(), 255), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_text(18), block.asset_none())
+    let action_icon: block.AssetRef = block.asset_icon(8, 16, 16, 502)
+    let action_props: block.BlockProps = block.props(block.layout_row(action_rect, 6), block.paint_stack3(block.paint_layer_fill_radius(surface.Color(r: 64, g: 112, b: 148, a: 255), 9), block.paint_layer_border(surface.Color(r: 134, g: 196, b: 255, a: 255), 1, 9), block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 72), 8, 0, 3)), block.text_styled(6, theme_light(), block.text_family_ui(), 13, 700, 18, block.text_align_center(), block.text_wrap_none(), block.text_overflow_ellipsis(), 255), block.image_asset(action_icon, 16, 16), block.input_clickable(), block.event_click(block.action_secondary()), block.state_interactive(), block.motion_transition(100, 0, block.motion_ease_standard(), true, true, true, 0, 0, 98), block.accessibility_button(6), action_icon)
+
+    let root: Int = block.tree_add_root(tree, block.make(block.id(1), block.id_none(), root_props), root_rect)
+    let sidebar: Int = block.tree_add_child(tree, block.id(1), block.make(block.id(2), block.id(1), sidebar_props), sidebar_rect)
+    let content: Int = block.tree_add_child(tree, block.id(1), block.make(block.id(3), block.id(1), content_props), content_rect)
+    let header: Int = block.tree_add_child(tree, block.id(3), block.make(block.id(4), block.id(3), header_props), header_rect)
+    let builds: Int = block.tree_add_child(tree, block.id(3), make_metric(5, 3, 176, 76, 132, 82, 13, green(), 501), surface.Rect(x: 176, y: 76, w: 132, h: 82))
+    let latency: Int = block.tree_add_child(tree, block.id(3), make_metric(6, 3, 320, 76, 132, 82, 12, amber(), 502), surface.Rect(x: 320, y: 76, w: 132, h: 82))
+    let activity: Int = block.tree_add_child(tree, block.id(3), make_metric(7, 3, 176, 172, 276, 66, 12, surface.Color(r: 96, g: 174, b: 244, a: 255), 503), surface.Rect(x: 176, y: 172, w: 276, h: 66))
+    let action: Int = block.tree_add_child(tree, block.id(3), block.make(block.id(8), block.id(3), action_props), action_rect)
+    let valid: Int = block.tree_validate(tree)
+    let focus0: Int = block.id_value(block.focus_order_at(tree, 0))
+    let focus3: Int = block.id_value(block.focus_order_at(tree, 3))
+    let next_focus: Int = block.id_value(block.focus_next(tree, block.id(5)))
+
+    if root == 1 && sidebar == 2 && content == 3 && header == 4 && builds == 5 && latency == 6 && activity == 7 && action == 8 &&
+       valid == block.tree_error_ok() &&
+       focus0 == 5 && focus3 == 8 && next_focus == 6 &&
+       block.paint_validate_visual_grammar(metric_paint(green())) == block.paint_error_ok() &&
+       scene_checksum() > 0:
+        return 0
+    return 1

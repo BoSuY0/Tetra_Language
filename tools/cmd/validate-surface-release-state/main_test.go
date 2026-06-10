@@ -87,6 +87,31 @@ func TestValidateSurfaceReleaseStateRejectsMissingLinuxReport(t *testing.T) {
 	}
 }
 
+func TestValidateSurfaceReleaseStateRejectsMissingMorphReport(t *testing.T) {
+	dir := t.TempDir()
+	writeSurfaceReleaseStateFixture(t, dir)
+	if err := os.Remove(filepath.Join(dir, "morph", "headless", "surface-headless-morph.json")); err != nil {
+		t.Fatalf("remove morph report: %v", err)
+	}
+	manifestPath := filepath.Join(dir, "manifest.json")
+	if err := os.WriteFile(manifestPath, []byte(surfaceReleaseStateManifestJSON()), 0o644); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+
+	err := validateSurfaceReleaseState(surfaceReleaseStateOptions{
+		ReportDir:      dir,
+		ExpectedStatus: "current",
+		Scope:          "surface-v1-linux-web",
+		ManifestPath:   manifestPath,
+	})
+	if err == nil {
+		t.Fatalf("expected missing morph report to fail")
+	}
+	if !strings.Contains(err.Error(), "surface-headless-morph.json") {
+		t.Fatalf("error = %v, want missing morph report diagnostic", err)
+	}
+}
+
 func surfaceReleaseStateManifestJSON() string {
 	return `{
   "surface_release": {
@@ -107,6 +132,7 @@ func surfaceReleaseStateManifestJSON() string {
     {"id":"ui.surface-toolkit-v1","status":"current"},
     {"id":"ui.surface-text-input-v1","status":"current"},
     {"id":"ui.surface-accessibility-v1","status":"current"},
+    {"id":"ui.surface-morph-capsule","status":"current"},
     {"id":"ui.surface-macos-x64","status":"unsupported"},
     {"id":"ui.surface-windows-x64","status":"unsupported"},
     {"id":"ui.surface-wasm32-wasi","status":"unsupported"}
@@ -144,11 +170,45 @@ func writeSurfaceReleaseStateFixture(t *testing.T, dir string) {
   "accessibility": "platform-bridge-v1",
   "browser_surface": "browser-canvas-release-v1",
   "linux_surface": "linux-x64-release-window-v1",
+  "block_system": "block-system",
+  "block_system_gate": "tetra.surface.block-system.gate.v1",
+  "morph": "morph-capsule",
+  "morph_gate": "tetra.surface.morph.gate.v1",
   "artifact_hashes_validated": true,
   "legacy_sidecars": false,
   "dom_ui": false,
   "user_js": false,
   "platform_widgets": false
+}`,
+		"morph/surface-morph-gate-summary.json": `{
+  "schema": "tetra.surface.morph.gate.v1",
+  "status": "current",
+  "release_scope": "surface-morph-experimental-linux-web",
+  "producer": "scripts/release/surface/morph-gate.sh",
+  "source": "examples/surface_morph_command_palette.tetra",
+  "module": "lib.core.morph",
+  "schema_under_test": "tetra.surface.morph.v1",
+  "dependency_gate": "tetra.surface.block-system.gate.v1",
+  "same_commit_validated": true,
+  "headless_report": "headless/surface-headless-morph.json",
+  "target_evidence": ["headless"],
+  "core_primitives": ["Block"],
+  "forbidden_core_primitives": ["Button", "Card", "TextField", "TextBox", "Sidebar", "Modal"],
+  "artifact_hashes_validated": true
+}`,
+		"morph/headless/surface-headless-morph.json": `{
+  "schema": "tetra.surface.runtime.v1",
+  "status": "pass",
+  "target": "headless",
+  "source": "examples/surface_morph_command_palette.tetra",
+  "morph": {
+    "schema": "tetra.surface.morph.v1",
+    "quality_level": "deterministic-headless-morph-capsule-v1",
+    "source": "examples/surface_morph_command_palette.tetra",
+    "module": "lib.core.morph",
+    "surface_scope": "surface-morph-experimental-linux-web",
+    "production_claim": false
+  }
 }`,
 		"surface-headless-release-text-input.json": `{
   "schema": "tetra.surface.text-input.v1",
@@ -212,6 +272,9 @@ func writeSurfaceReleaseStateFixture(t *testing.T, dir string) {
 		"surface-linux-x64-release-window.json":   `{"schema":"tetra.surface.runtime.v1","status":"pass","target":"linux-x64","host_evidence":{"level":"linux-x64-release-window-v1","backend":"wayland-shm-rgba-release-v1","framebuffer":true,"real_window":true,"native_input":true,"text_input":true,"clipboard":true,"composition":true,"accessibility_bridge":true,"user_facing_platform_widgets":false},"source":"examples/surface_release_form.tetra"}`,
 	}
 	for name, raw := range files {
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(dir, name)), 0o755); err != nil {
+			t.Fatalf("mkdir for %s: %v", name, err)
+		}
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(raw+"\n"), 0o644); err != nil {
 			t.Fatalf("write %s: %v", name, err)
 		}

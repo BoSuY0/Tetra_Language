@@ -16,6 +16,10 @@ Actors are supported on x64 targets:
 **Build vs run:** the toolchain can always *build* these targets, but executing produced binaries is only supported when
 `host == target` (for example, `windows-x64` binaries are run only on Windows hosts).
 
+The scoped production foundation claim below is narrower than the build matrix:
+it is Linux-x64 actor/task runtime foundation evidence, not a Windows/macOS
+runtime production claim and not a non-Linux distributed actor runtime claim.
+
 ## Goals
 
 - Provide a simple concurrency story without GC or shared mutable state.
@@ -123,6 +127,14 @@ Returns the handle of the current actor.
   and wakes due actors.
 - `core.send()` wakes actors blocked in `core.recv()`; sleeping actors wake only
   through their deadline or task-group cancellation.
+- Task-group cancellation wakes actors in that group when they are blocked in
+  timed receive APIs. `core.recv_until(deadline)` returns
+  `actor.recv_result_i32 { value: 0, error: 1 }`, and
+  `core.recv_msg_until(deadline)` returns
+  `actor.recv_msg_result { value: 0, tag: 0, error: 1 }`, before the original
+  receive deadline. This is a scoped timed-receive cancellation guarantee, not
+  full actor supervision or a full structured-concurrency model for every
+  blocking API.
 
 ## Message Model
 
@@ -178,6 +190,22 @@ Typed actor messages are supported as an enum-only MVP:
 - Actor/task handle transfer in typed actor payloads is outside the current
   transfer contract and remains a stable rejection boundary under the same
   value-only payload rule.
+- The race-safety rejection matrix is conservative: local immutable payloads
+  copy, owned moved payloads consume sender access, borrowed views require an
+  explicit `.copy()`, mutable global targets are rejected across actor/task
+  boundaries, unsafe pointer payloads require an audited unsafe contract and
+  remain rejected in safe typed actor payloads, and island region transfer is
+  handled by the scoped actor/island proof track. This provides no formal race
+  proof and no lock/atomic shared-memory model.
+- Linux-x64 parallel production evidence requires an `actor island boundary
+  proof` case. That case exercises the Memory/Island handoff facts for
+  actor/task/island boundaries and is validator-gated by `parallelprod`; it is
+  not a request-island production claim.
+- The same Linux-x64 parallel production report emits top-level
+  `diagnostics[]` evidence for every negative actor/task case. Each row carries
+  stable machine fields `case`, `code`, `severity`, `category`, `position`, and
+  `expected_error`; the stable contract is the machine taxonomy and presence of
+  scoped substring evidence, not frozen human diagnostic prose.
 - Distributed typed actor frames still serialize fixed wire values. The P6.1
   zero-copy region-slice path is a local typed mailbox guarantee, not a
   cross-node pointer transfer guarantee.
@@ -196,16 +224,29 @@ isolation guarantees.
 - Built-in x64 runtime actor table: `maxActors = 128`, including the main
   actor. This leaves capacity for 127 child actors. When the table is full,
   `__tetra_actor_spawn` returns the raw handle value `-1` and does not create a
-  runnable actor. The public `actor` type is still opaque; sending to an
-  invalid handle is outside the current guarantee.
+  runnable actor. The public `actor` type is still opaque. A local legacy,
+  tagged, or typed send to an invalid actor handle returns checked failure
+  `-3` before allocating a message node.
+- Built-in x64 done actor send behavior: once a local actor has completed and
+  its runtime status is `done`, later local legacy, tagged, or typed sends to
+  that actor return checked failure `-4` before allocating a message node. This
+  is a bounded shutdown diagnostic, not supervision, restart, linking, or
+  mailbox-drain lifecycle management.
+- Built-in x64 per-actor mailbox depth: `maxActorMailboxMsgs = 256`. A local
+  send to a full mailbox returns checked backpressure `-2` before allocating a
+  message node. Receiving a message decrements the mailbox depth, so this
+  backpressure is recoverable when the receiver drains messages. This is a
+  bounded local mailbox policy, not a generic unbounded mailbox or distributed
+  delivery guarantee.
 - Built-in x64 runtime message pool: 64 KiB, bump-allocated, with no message
   reclamation during a run. The current message node size is 88 bytes because
   typed mailbox payload slots are stored as local 64-bit slots; this gives room
   for pointer-like local slice fields while keeping typed payloads capped at 8
-  value slots by the checker. With the fixed 64 KiB pool, 744 single-slot messages
-  fit in the pool. Message pool overflow is not a checked runtime error in the
-  current built-in runtime; behavior after the bump pointer passes the pool is
-  unspecified and must not be treated as a recoverable capacity signal.
+  value slots by the checker. With the fixed 64 KiB pool, 744 single-slot
+  messages fit in the pool. When a later local send would advance the bump
+  pointer past the pool end, the built-in runtime returns checked failure
+  `-1` and does not enqueue an overflow message. Draining the mailbox does not
+  reclaim message-pool capacity in the current runtime.
 - Built-in x64 runtime actor state: 8 state slots per actor, each one `i32`
   storage cell. The checker enforces this limit for actor declarations and
   rejects programs that require more than 8 actor-state slots before lowering
@@ -257,13 +298,53 @@ Promotion evidence is executable, not report-only:
 CLI, starts `tetra actor-net`, compiles Linux-x64 actor nodes, runs cross-node
 send/receive and failure cases over TCP, writes
 `tetra.actors.distributed-runtime.v1`, and validates it through
-`tools/cmd/validate-distributed-actor-runtime`. Negative evidence rejects
-transport-only, fake, incomplete, and docs-only reports.
+`tools/cmd/validate-distributed-actor-runtime`. The report records `git_head`,
+`artifact_hashes`, and `frame_order`, and the release script writes and
+validates `artifact-hashes.json` for the same report directory. Negative
+evidence rejects transport-only, fake, stale-metadata, bad-frame-order,
+incomplete, and docs-only reports.
+
+Actor-runtime foundation leak/race evidence is scoped and release-gated by the
+Linux-x64 actor slice: `go test -race` covers `actornet`, `actorsrt`,
+`parallelrt`, and `actorsafety`, and parallel production evidence requires the
+`actor broker leak cleanup` case. This is bounded cleanup/soak evidence, not an
+exhaustive liveness proof.
+
+## Actor Runtime Foundation Gate
+
+Actor runtime foundation scoped release truth is
+`tetra.actor.production_foundation.v1`, produced by
+`scripts/release/post_v0_4/actor-runtime-foundation-linux-x64-gate.sh`.
+The gate composes the Linux-x64 distributed actor runtime smoke, the
+Linux-x64 parallel production smoke, focused actor/task tests, a race-enabled
+actor slice, docs verification, artifact hash validation, and the
+`tools/cmd/validate-actor-runtime-foundation` validator.
+
+CI and package publishing must keep that gate in front of actor foundation
+claims. `.github/workflows/ci.yml` runs `actor-runtime-foundation-linux` and
+uploads `reports/actor-runtime-foundation/final/actor-runtime-foundation-manifest.json`,
+`reports/actor-runtime-foundation/final/artifact-hashes.json`,
+`distributed-actors-linux-x64/distributed-actors-linux-x64.json`, and
+`parallel-production-linux-x64/parallel-production-linux-x64.json`.
+`.github/workflows/release-packages.yml` runs the same gate before package
+artifact upload, GitHub Release publishing, container publishing, and Homebrew
+tap updates.
+
+Foundation nonclaims are part of the contract:
+
+- no full Erlang/OTP actor runtime claim;
+- no cluster membership or reconnect/retry production claim;
+- no non-Linux distributed actor runtime support claim;
+- no distributed zero-copy pointer or region transfer claim;
+- no formal race proof claim.
 
 The current claim is deliberately platform-bounded. Non-Linux-x64 distributed
 actor runtimes, multi-threaded actor scheduling, and broader structured
 concurrency guarantees beyond the current cooperative task group handles require
-separate promotion evidence.
+separate promotion evidence. The distributed runtime report also carries
+explicit nonclaims for cluster membership, reconnect/retry production, and
+non-Linux distributed actor runtime support; validators reject positive claims
+for those capabilities in this slice.
 
 ## Transport Evidence Contract
 
@@ -276,8 +357,8 @@ ordered trace that must contain a source `send` followed by a destination
 
 This validator is release-gate evidence for transport artifact shape and
 integrity only. It is not a distributed runtime implementation, network mailbox
-ABI, retry protocol, ordering guarantee beyond the single recorded envelope, or
-cluster membership protocol.
+ABI, retry protocol, or ordering guarantee beyond the single recorded envelope.
+It provides no cluster membership protocol.
 
 ## Runtime ABI surface (internal)
 

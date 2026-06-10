@@ -120,8 +120,8 @@ explicit view copies, and zero-copy island-backed slice moves.
 The P6.3 per-core scheduler work is currently a checked prototype model in
 `compiler/internal/parallelrt`, validated by the parallel production smoke
 report. It covers single-core compatibility, two-core work stealing, bounded
-typed mailboxes, and actor transfer benchmark rows, but it is not a claim that
-the production actor runtime is now a general multi-threaded scheduler.
+typed mailboxes, and actor transfer benchmark rows, but it does not claim a
+general production actor runtime or production multi-threaded scheduler.
 
 Distributed actors are supported for the Linux-x64 runtime path. The current
 production surface covers the builtin Linux-x64 runtime with the `actornet`
@@ -142,7 +142,36 @@ required.
 transport shape. It validates a `tetra.actors.transport.v1` JSON
 envelope/trace/hash report, but distributed actor runtime support is proven by
 `scripts/release/v0_4_0/distributed-actors-linux-x64-smoke.sh` plus
-`tools/cmd/validate-distributed-actor-runtime`.
+`tools/cmd/validate-distributed-actor-runtime`. The distributed runtime report
+must carry same-commit `git_head`, `artifact_hashes`, ordered frame evidence,
+and explicit nonclaims for cluster membership, reconnect/retry production, and
+non-Linux distributed actor runtime support.
+
+The scoped actor foundation gate also runs a race-enabled actor slice and
+requires `actor broker leak cleanup` in parallel production evidence. Treat that
+as bounded broker/runtime cleanup evidence, not as a full liveness or cluster
+availability guarantee.
+
+The authoritative actor runtime foundation gate is
+`scripts/release/post_v0_4/actor-runtime-foundation-linux-x64-gate.sh`. It
+writes `tetra.actor.production_foundation.v1` evidence at
+`reports/actor-runtime-foundation/final/actor-runtime-foundation-manifest.json`
+and validates `reports/actor-runtime-foundation/final/artifact-hashes.json`,
+`distributed-actors-linux-x64/distributed-actors-linux-x64.json`, and
+`parallel-production-linux-x64/parallel-production-linux-x64.json`. CI records
+that through `.github/workflows/ci.yml`; package publishing records it through
+`.github/workflows/release-packages.yml` before upload/release/container/Homebrew
+publish steps.
+
+Actor foundation nonclaims remain explicit: no full Erlang/OTP actor runtime
+claim, no cluster membership or reconnect/retry production claim, no non-Linux
+distributed actor runtime support claim, no distributed zero-copy pointer or
+region transfer claim, and no formal race proof claim.
+
+The parallel production JSON report also carries top-level `diagnostics[]`
+entries for negative actor/task cases. Those rows stabilize machine-readable
+`code`, `severity`, `category`, `position`, and matching `expected_error`
+evidence without promising byte-for-byte stable human diagnostic wording.
 
 Runtime parity means builtin and self-host runtime modes must agree for the
 documented actor/task smokes where both modes are applicable. It does not claim

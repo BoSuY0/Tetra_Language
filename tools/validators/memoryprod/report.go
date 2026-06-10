@@ -131,6 +131,18 @@ func rejectPaperEvidence(raw []byte) []string {
 }
 
 func validateProcesses(processes []ProcessReport) []string {
+	requiredProcesses := map[string][]string{
+		"actornet close-without-cancel leak coverage": {
+			"./cli/internal/actornet",
+			"TestBrokerCloseWithoutCancelStopsServeWatcher",
+		},
+		"compiler resource finalization diagnostics": {
+			"./compiler/tests/runtime",
+			"TestTaskHandleFinalization",
+			"TestTaskGroupFinalization",
+			"TestIslandFinalization",
+		},
+	}
 	var issues []string
 	if len(processes) < 3 {
 		issues = append(issues, fmt.Sprintf("process evidence has %d entries, want build, app, and stress processes", len(processes)))
@@ -138,14 +150,24 @@ func validateProcesses(processes []ProcessReport) []string {
 	seenBuild := false
 	seenApp := false
 	seenStress := false
+	seenRequired := map[string]bool{}
 	names := map[string]bool{}
 	for _, p := range processes {
-		if strings.TrimSpace(p.Name) == "" {
+		name := strings.TrimSpace(p.Name)
+		if name == "" {
 			issues = append(issues, "process name is required")
-		} else if names[p.Name] {
-			issues = append(issues, fmt.Sprintf("duplicate process %s", p.Name))
+		} else if names[name] {
+			issues = append(issues, fmt.Sprintf("duplicate process %s", name))
 		}
-		names[p.Name] = true
+		names[name] = true
+		if requiredMarkers, ok := requiredProcesses[name]; ok {
+			seenRequired[name] = true
+			for _, marker := range requiredMarkers {
+				if !strings.Contains(p.Path, marker) {
+					issues = append(issues, fmt.Sprintf("process %s path must mention %s", name, marker))
+				}
+			}
+		}
 		switch p.Kind {
 		case "build":
 			seenBuild = true
@@ -180,6 +202,11 @@ func validateProcesses(processes []ProcessReport) []string {
 	}
 	if !seenStress {
 		issues = append(issues, "process evidence missing memory stress process")
+	}
+	for name := range requiredProcesses {
+		if !seenRequired[name] {
+			issues = append(issues, fmt.Sprintf("missing required memory process %q", name))
+		}
 	}
 	return issues
 }
@@ -332,13 +359,14 @@ func explicitPerformanceNonClaimContext(lower string) bool {
 
 func validateContracts(contracts []ContractReport) []string {
 	required := map[string]bool{
-		"allocator runtime model":         false,
-		"allocator failure semantics":     false,
-		"ownership escape model":          false,
-		"unsafe cap.mem raw memory rules": false,
-		"runtime bounds diagnostics":      false,
-		"raw pointer bounds metadata":     false,
-		"actor task transfer rules":       false,
+		"allocator runtime model":                    false,
+		"allocator failure semantics":                false,
+		"ownership escape model":                     false,
+		"unsafe cap.mem raw memory rules":            false,
+		"runtime bounds diagnostics":                 false,
+		"raw pointer bounds metadata":                false,
+		"host resource leak and finalization checks": false,
+		"actor task transfer rules":                  false,
 	}
 	var issues []string
 	for _, c := range contracts {
@@ -390,6 +418,8 @@ func validateCases(cases []CaseReport) []string {
 		"heap closure handle coverage":                          false,
 		"slice struct borrow escape coverage":                   false,
 		"function-typed slice aggregate borrow escape coverage": false,
+		"actornet broker close-without-cancel leak smoke":       false,
+		"compiler resource finalization diagnostics":            false,
 		"real memory examples":                                  false,
 		"stress allocator reuse":                                false,
 		"deterministic memcpy/memset fuzz":                      false,
@@ -459,6 +489,7 @@ func validateAudit(audit []AuditReport) []string {
 		"measured memory benchmark improvement":                           false,
 		"use-after-free, double-free, borrow escape, and aliasing safety": false,
 		"actor/task transfer safety":                                      false,
+		"leak/resource finalization evidence":                             false,
 		"real memory examples":                                            false,
 		"safe memory documentation":                                       false,
 		"release-gate entrypoint":                                         false,

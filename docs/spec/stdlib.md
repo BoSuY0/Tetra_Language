@@ -78,7 +78,7 @@ Callers allocate slices through the existing `core.make_*` or
 allocation-plan reports for those constructors. The v1 generic collection
 surface does not claim a production allocator-backed vector/map runtime,
 generic hashing/equality protocols, resizing, collision handling, C++/Rust
-performance parity, or an official benchmark result. The P19.1 benchmark gate
+performance parity, and makes no official benchmark result claim. The P19.1 benchmark gate
 is covered by a checked dry-run `truth-bench-harness` artifact for scope
 `p19.1_generic_collections`, with hash-table Tetra/C++/Rust rows and Tetra
 proof/allocation/bounds/performance report paths; it records source-equivalent
@@ -96,7 +96,7 @@ It also records internal per-server UTC-second Date cache evidence and Linux
 report. It does not promote a production HTTP server, source-level cached-date
 API, cross-worker Date cache, `webrt.flush` scatter/gather integration, HTTP
 static-file sendfile path, zero-copy production file-serving, C++/Rust parity,
-P20 performance matrix, or official TechEmpower result.
+or P20 performance matrix. It makes no official TechEmpower result claim.
 
 P19.3 closure evidence adds a source-first PostgreSQL gate for
 `lib.core.postgres` and the internal runtime driver/pool layer. The checked
@@ -110,9 +110,10 @@ borrowed DataRow decode, and local `/db`, `/queries`, `/updates`, and
 SCRAM/PostgreSQL reports for all six endpoints, the `/db` matrix, and the
 `/queries`/`/updates`/`/fortunes` matrix through
 `tools/cmd/validate-techempower-report`. It does not promote a full
-source-level PostgreSQL driver API, external production database deployment,
-official TechEmpower result, production database benchmark, C++/Rust parity,
-P20 performance matrix, measured speed comparison, or runtime behavior change.
+source-level PostgreSQL driver API or external production database deployment.
+It makes no official TechEmpower result claim, no production database benchmark
+claim, no C++/Rust parity claim, no P20 performance matrix claim, no measured
+speed comparison claim, and no runtime behavior change claim.
 
 ## Stable Core Function Matrix
 
@@ -527,9 +528,9 @@ P19.3 records that higher-level runtime layer through
 `docs/benchmarks/techempower_scram_single_query_matrix_local_report.json`, and
 `docs/benchmarks/techempower_scram_endpoint_matrix_local_report.json`. The gate
 proves source-first DB endpoint rows and honest local runtime/PostgreSQL
-measurement evidence only; it is not an official TechEmpower result, an
-external production database claim, production database benchmark, measured
-speed comparison, or a source-level full driver API promotion.
+measurement evidence only; it records no official TechEmpower result, no
+external production database claim, no production database benchmark claim, no
+measured speed comparison claim, and no source-level full driver API promotion.
 
 ## Generated Docs Rendering Policy
 

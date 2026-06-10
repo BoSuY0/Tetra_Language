@@ -1,0 +1,104 @@
+// Polished editor shell scene composed only from Block configuration.
+module examples.surface_block_editor_shell
+
+import lib.core.surface as surface
+import lib.core.block as block
+
+func theme_dark() -> surface.Color:
+    return surface.Color(r: 16, g: 19, b: 24, a: 255)
+
+func theme_light() -> surface.Color:
+    return surface.Color(r: 235, g: 240, b: 246, a: 255)
+
+func violet() -> surface.Color:
+    return surface.Color(r: 144, g: 126, b: 244, a: 255)
+
+func cyan() -> surface.Color:
+    return surface.Color(r: 96, g: 190, b: 220, a: 255)
+
+func chrome_paint() -> block.PaintSpec:
+    return block.paint_stack5(
+        block.paint_layer_fill_radius(surface.Color(r: 22, g: 27, b: 34, a: 255), 10),
+        block.paint_layer_linear_gradient(surface.Color(r: 30, g: 36, b: 44, a: 255), surface.Color(r: 20, g: 24, b: 30, a: 255), 10),
+        block.paint_layer_border(surface.Color(r: 64, g: 76, b: 92, a: 255), 1, 10),
+        block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 82), 14, 0, 4),
+        block.paint_layer_outline(violet(), 1, 12)
+    )
+
+func tab_paint(active: Bool) -> block.PaintSpec:
+    if active:
+        return block.paint_stack4(block.paint_layer_fill_radius(surface.Color(r: 44, g: 46, b: 68, a: 255), 8), block.paint_layer_border(violet(), 1, 8), block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 52), 8, 0, 2), block.paint_layer_outline(cyan(), 1, 10))
+    return block.paint_stack3(block.paint_layer_fill_radius(surface.Color(r: 26, g: 31, b: 38, a: 255), 8), block.paint_layer_border(surface.Color(r: 52, g: 64, b: 78, a: 255), 1, 8), block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 40), 6, 0, 1))
+
+func make_tab(id_value: Int, parent_value: Int, x: Int, label_len: Int, active: Bool, hash: Int) -> block.Block:
+    let rect: surface.Rect = surface.Rect(x: x, y: 24, w: 112, h: 34)
+    let icon: block.AssetRef = block.asset_icon(id_value, 14, 14, hash)
+    let text: block.TextSpec = block.text_styled(label_len, theme_light(), block.text_family_ui(), 13, 700, 18, block.text_align_start(), block.text_wrap_none(), block.text_overflow_ellipsis(), 255)
+    var state: block.StateSpec = block.state_interactive()
+    if active:
+        state = block.state_with_selector(block.state_selector_selected(), 3)
+    let motion: block.MotionSpec = block.motion_transition(130, 0, block.motion_ease_standard(), true, true, true, 0, -1, 101)
+    let props: block.BlockProps = block.props(block.layout_row(rect, 8), tab_paint(active), text, block.image_asset_tinted_scaled(icon, 14, 14, cyan(), 1), block.input_clickable(), block.event_click(block.action_primary()), state, motion, block.accessibility_button(label_len), icon)
+    return block.make(block.id(id_value), block.id(parent_value), props)
+
+func make_code_line(id_value: Int, parent_value: Int, y: Int, text_len: Int, selected: Bool) -> block.Block:
+    let rect: surface.Rect = surface.Rect(x: 178, y: y, w: 286, h: 22)
+    var line_color: surface.Color = surface.Color(r: 122, g: 166, b: 210, a: 255)
+    if selected:
+        line_color = cyan()
+    let text: block.TextSpec = block.text_styled(text_len, line_color, block.text_family_monospace(), 13, 500, 18, block.text_align_start(), block.text_wrap_none(), block.text_overflow_ellipsis(), 255)
+    let paint: block.PaintSpec = block.paint_stack3(block.paint_layer_fill_radius(surface.Color(r: 18, g: 22, b: 28, a: 255), 4), block.paint_layer_border(surface.Color(r: 40, g: 50, b: 62, a: 255), 1, 4), block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 20), 4, 0, 1))
+    let props: block.BlockProps = block.props(block.layout_row(rect, 6), paint, text, block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_text(text_len), block.asset_font(3, 8303))
+    return block.make(block.id(id_value), block.id(parent_value), props)
+
+func scene_frame_checksum() -> Int:
+    let hover: block.StateSelector = block.state_selector_hover()
+    let focus: block.StateSelector = block.state_selector_focused()
+    let pressed: block.StateSelector = block.state_selector_pressed()
+    let motion: block.MotionSpec = block.motion_transition(130, 0, block.motion_ease_standard(), true, true, true, 0, -1, 101)
+    let paint: block.PaintSpec = tab_paint(true)
+    let hover_tint: Int = block.state_resolve_int(122, 160, hover, hover)
+    let focus_outline: Int = block.state_resolve_int(1, 2, focus, focus)
+    let pressed_y: Int = block.motion_resolve_translate_y(motion, 65)
+    if block.state_selector_matches(pressed, pressed):
+        return block.paint_feature_flags(paint) + hover_tint + focus_outline + pressed_y
+    return 0
+
+func scene_checksum() -> Int:
+    return scene_frame_checksum()
+
+func main() -> Int
+uses alloc, mem:
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 500, h: 300)
+    let rail_rect: surface.Rect = surface.Rect(x: 16, y: 16, w: 126, h: 268)
+    let editor_rect: surface.Rect = surface.Rect(x: 154, y: 16, w: 330, h: 268)
+    let code_rect: surface.Rect = surface.Rect(x: 170, y: 72, w: 298, h: 194)
+
+    var tree: block.BlockTree = block.tree_init(12)
+    let root_props: block.BlockProps = block.props(block.layout_row(root_rect, 12), block.paint_stack2(block.paint_layer_fill_radius(theme_dark(), 0), block.paint_layer_overlay(violet(), 24, 0)), block.text_none(), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_text(12), block.asset_none())
+    let rail_props: block.BlockProps = block.props(block.layout_column(rail_rect, 8), chrome_paint(), block.text_styled(8, theme_light(), block.text_family_ui(), 14, 800, 18, block.text_align_start(), block.text_wrap_word(), block.text_overflow_ellipsis(), 255), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_fast(), block.accessibility_text(8), block.asset_none())
+    let editor_props: block.BlockProps = block.props(block.layout_column(editor_rect, 10), chrome_paint(), block.text_none(), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_fast(), block.accessibility_text(12), block.asset_none())
+    let code_props: block.BlockProps = block.props(block.layout_scroll(code_rect, 298, 360, 24), block.paint_stack3(block.paint_layer_fill_radius(surface.Color(r: 14, g: 18, b: 23, a: 255), 8), block.paint_layer_border(surface.Color(r: 48, g: 58, b: 72, a: 255), 1, 8), block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 64), 12, 0, 4)), block.text_none(), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_text(10), block.asset_none())
+
+    let root: Int = block.tree_add_root(tree, block.make(block.id(1), block.id_none(), root_props), root_rect)
+    let rail: Int = block.tree_add_child(tree, block.id(1), block.make(block.id(2), block.id(1), rail_props), rail_rect)
+    let editor: Int = block.tree_add_child(tree, block.id(1), block.make(block.id(3), block.id(1), editor_props), editor_rect)
+    let tab_a: Int = block.tree_add_child(tree, block.id(3), make_tab(4, 3, 170, 10, true, 801), surface.Rect(x: 170, y: 24, w: 112, h: 34))
+    let tab_b: Int = block.tree_add_child(tree, block.id(3), make_tab(5, 3, 290, 9, false, 802), surface.Rect(x: 290, y: 24, w: 112, h: 34))
+    let code: Int = block.tree_add_child(tree, block.id(3), block.make(block.id(6), block.id(3), code_props), code_rect)
+    let line1: Int = block.tree_add_child(tree, block.id(6), make_code_line(7, 6, 86, 24, false), surface.Rect(x: 178, y: 86, w: 286, h: 22))
+    let line2: Int = block.tree_add_child(tree, block.id(6), make_code_line(8, 6, 112, 32, true), surface.Rect(x: 178, y: 112, w: 286, h: 22))
+    let line3: Int = block.tree_add_child(tree, block.id(6), make_code_line(9, 6, 138, 18, false), surface.Rect(x: 178, y: 138, w: 286, h: 22))
+    let valid: Int = block.tree_validate(tree)
+    let focus0: Int = block.id_value(block.focus_order_at(tree, 0))
+    let focus1: Int = block.id_value(block.focus_order_at(tree, 1))
+    let scroll_offset: Int = block.layout_scroll_offset_y(block.layout_scroll(code_rect, 298, 360, 24))
+
+    if root == 1 && rail == 2 && editor == 3 && tab_a == 4 && tab_b == 5 && code == 6 && line1 == 7 && line2 == 8 && line3 == 9 &&
+       valid == block.tree_error_ok() &&
+       focus0 == 4 && focus1 == 5 &&
+       scroll_offset == 24 &&
+       block.paint_validate_visual_grammar(chrome_paint()) == block.paint_error_ok() &&
+       scene_checksum() > 0:
+        return 0
+    return 1

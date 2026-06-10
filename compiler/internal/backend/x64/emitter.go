@@ -1412,6 +1412,11 @@ func (e *Emitter) CmpR9R8() {
 	e.Emit(0x4D, 0x39, 0xC1)
 }
 
+func (e *Emitter) CmpRaxR8() {
+	// cmp rax, r8
+	e.Emit(0x4C, 0x39, 0xC0)
+}
+
 func (e *Emitter) MovMem32RaxPtrFromR9d() {
 	// mov [rax], r9d
 	e.Emit(0x44, 0x89, 0x08)

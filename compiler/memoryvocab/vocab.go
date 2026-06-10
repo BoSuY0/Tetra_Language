@@ -670,6 +670,19 @@ func UnsafeUnknownRow(provenanceClass string, unsafeClass string) bool {
 	return provenanceClass == ProvenanceUnsafeUnknown || unsafeClass == UnsafeUnknown
 }
 
+func UnsafeExternalRoot(provenanceClass string, unsafeClass string) bool {
+	switch provenanceClass {
+	case ProvenanceUnsafeUnknown, ProvenanceUnsafeChecked, ProvenanceUnsafeVerifiedRoot:
+		return true
+	}
+	switch unsafeClass {
+	case UnsafeUnknown, UnsafeChecked, UnsafeVerifiedRoot:
+		return true
+	default:
+		return false
+	}
+}
+
 func UnsafeUnknownOptimizationClaim(claim string, aliasState string) bool {
 	claim = normalizeClaim(claim)
 	if containsClaim(unsafeUnknownOptimizationClaims, claim) {
@@ -754,6 +767,10 @@ func ValidatedNoAliasState(value string) bool {
 
 func UnsafeUnknownTrustedStorage(planned string, actual string) bool {
 	return contains(trustedStorageClasses, planned) || contains(trustedStorageClasses, actual)
+}
+
+func UnsafeExternalRootTrustedStorage(provenanceClass string, unsafeClass string, planned string, actual string) bool {
+	return UnsafeExternalRoot(provenanceClass, unsafeClass) && UnsafeUnknownTrustedStorage(planned, actual)
 }
 
 func ValidatedTrustedStorageHeapFallback(planned string, actual string) bool {

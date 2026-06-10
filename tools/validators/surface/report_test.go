@@ -128,6 +128,13 @@ func TestValidateSurfaceReleaseSummaryAcceptsScopedLinuxWebCurrent(t *testing.T)
 	}
 }
 
+func TestValidateSurfaceReleaseSummaryAcceptsBlockSystemAndMorphGateMetadata(t *testing.T) {
+	raw := validSurfaceReleaseSummaryJSON()
+	if err := ValidateReleaseSummary(raw); err != nil {
+		t.Fatalf("ValidateReleaseSummary failed with Block-system/Morph gate metadata: %v\n%s", err, raw)
+	}
+}
+
 func TestValidateSurfaceReleaseSummaryRejectsFakePromotionClaims(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
@@ -176,6 +183,36 @@ func TestValidateSurfaceReleaseSummaryRejectsFakePromotionClaims(t *testing.T) {
 				return strings.Replace(raw, `"platform_widgets": false`, `"platform_widgets": true`, 1)
 			},
 			want: "platform_widgets",
+		},
+		{
+			name: "missing block system",
+			mutate: func(raw string) string {
+				return strings.Replace(raw, `  "block_system": "block-system",
+`, ``, 1)
+			},
+			want: "block_system",
+		},
+		{
+			name: "wrong block system gate",
+			mutate: func(raw string) string {
+				return strings.Replace(raw, `"block_system_gate": "tetra.surface.block-system.gate.v1"`, `"block_system_gate": "tetra.surface.block-system.fake"`, 1)
+			},
+			want: "block_system_gate",
+		},
+		{
+			name: "missing morph",
+			mutate: func(raw string) string {
+				return strings.Replace(raw, `  "morph": "morph-capsule",
+`, ``, 1)
+			},
+			want: "morph",
+		},
+		{
+			name: "wrong morph gate",
+			mutate: func(raw string) string {
+				return strings.Replace(raw, `"morph_gate": "tetra.surface.morph.gate.v1"`, `"morph_gate": "tetra.surface.morph.invalid"`, 1)
+			},
+			want: "morph_gate",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1296,6 +1333,1073 @@ func TestValidateReportRejectsComponentTreeAPISourceMismatch(t *testing.T) {
 	}
 }
 
+func TestValidateReportAcceptsBlockGraphEvidence(t *testing.T) {
+	raw := validHeadlessBlockGraphSurfaceReportJSON(t, nil)
+	if err := ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
+	}
+}
+
+func TestValidateReportRejectsIncompleteBlockGraphEvidence(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(*Report)
+		want   string
+	}{
+		{
+			name: "manual bookkeeping",
+			mutate: func(report *Report) {
+				report.BlockGraph.ManualBookkeeping = true
+			},
+			want: "manual_bookkeeping",
+		},
+		{
+			name: "missing duplicate guard",
+			mutate: func(report *Report) {
+				report.BlockGraph.Invariants.DuplicateIDRejected = false
+			},
+			want: "duplicate_id",
+		},
+		{
+			name: "missing parent",
+			mutate: func(report *Report) {
+				report.BlockGraph.Nodes[4].ParentID = 99
+			},
+			want: "parent_id",
+		},
+		{
+			name: "cycle",
+			mutate: func(report *Report) {
+				report.BlockGraph.Nodes[1].ParentID = 5
+			},
+			want: "cycle",
+		},
+		{
+			name: "child order",
+			mutate: func(report *Report) {
+				report.BlockGraph.ChildOrders[1].Children = []int{3, 5, 4}
+			},
+			want: "child_orders",
+		},
+		{
+			name: "focus order",
+			mutate: func(report *Report) {
+				report.BlockGraph.FocusOrder = []int{5, 4}
+			},
+			want: "focus_order",
+		},
+		{
+			name: "hit path",
+			mutate: func(report *Report) {
+				report.BlockGraph.HitTests[0].Path = []int{1, 5}
+			},
+			want: "hit_tests",
+		},
+		{
+			name: "accessibility order",
+			mutate: func(report *Report) {
+				report.BlockGraph.AccessibilityOrder = []int{4, 5}
+			},
+			want: "accessibility_order",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := validHeadlessBlockGraphSurfaceReportJSON(t, tc.mutate)
+			err := ValidateReport(raw)
+			if err == nil {
+				t.Fatalf("expected block graph %s evidence to fail", tc.name)
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want %q diagnostic", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestValidateReportAcceptsBlockPaintEvidence(t *testing.T) {
+	raw := validHeadlessBlockPaintSurfaceReportJSON(t, nil)
+	if err := ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
+	}
+}
+
+func TestValidateReportRejectsIncompleteBlockPaintEvidence(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(*Report)
+		want   string
+	}{
+		{
+			name: "missing fill",
+			mutate: func(report *Report) {
+				report.VisualFeatures = removeString(report.VisualFeatures, "fill")
+			},
+			want: "fill",
+		},
+		{
+			name: "missing border",
+			mutate: func(report *Report) {
+				report.PaintLayers = removePaintLayerKind(report.PaintLayers, "border")
+			},
+			want: "border",
+		},
+		{
+			name: "missing radius",
+			mutate: func(report *Report) {
+				report.PaintLayers[0].Radius = 0
+				report.PaintLayers[1].Radius = 0
+				report.PaintLayers[2].Radius = 0
+				report.PaintLayers[4].Radius = 0
+			},
+			want: "radius",
+		},
+		{
+			name: "missing shadow",
+			mutate: func(report *Report) {
+				report.PaintCommands = removePaintCommand(report.PaintCommands, "shadow")
+			},
+			want: "shadow",
+		},
+		{
+			name: "missing outline",
+			mutate: func(report *Report) {
+				report.VisualFeatures = removeString(report.VisualFeatures, "outline")
+			},
+			want: "outline",
+		},
+		{
+			name: "unsupported blur",
+			mutate: func(report *Report) {
+				report.PaintUnsupportedBlur = true
+				report.VisualFeatures = append(report.VisualFeatures, "blur")
+			},
+			want: "unsupported blur",
+		},
+		{
+			name: "command order",
+			mutate: func(report *Report) {
+				report.PaintCommands[0], report.PaintCommands[1] = report.PaintCommands[1], report.PaintCommands[0]
+			},
+			want: "paint_commands",
+		},
+		{
+			name: "unchanged frames",
+			mutate: func(report *Report) {
+				report.Frames[1].Checksum = report.Frames[0].Checksum
+			},
+			want: "paint frame",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := validHeadlessBlockPaintSurfaceReportJSON(t, tc.mutate)
+			err := ValidateReport(raw)
+			if err == nil {
+				t.Fatalf("expected block paint %s evidence to fail", tc.name)
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want %q diagnostic", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestValidateReportAcceptsBlockTextEvidence(t *testing.T) {
+	raw := validHeadlessBlockTextSurfaceReportJSON(t, nil)
+	if err := ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
+	}
+}
+
+func TestValidateReportRejectsIncompleteBlockTextEvidence(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(*Report)
+		want   string
+	}{
+		{
+			name: "missing measurement",
+			mutate: func(report *Report) {
+				report.TextMeasurements = nil
+			},
+			want: "text_measurements",
+		},
+		{
+			name: "wrap ellipsis mismatch",
+			mutate: func(report *Report) {
+				report.TextMeasurements[0].EllipsizedTextLen = report.TextMeasurements[0].TextLen
+			},
+			want: "ellipsis",
+		},
+		{
+			name: "missing fallback chain",
+			mutate: func(report *Report) {
+				report.FontFallbacks = nil
+			},
+			want: "font_fallback",
+		},
+		{
+			name: "unbounded glyph cache",
+			mutate: func(report *Report) {
+				report.GlyphCaches[0].Bounded = false
+			},
+			want: "glyph cache",
+		},
+		{
+			name: "missing render command",
+			mutate: func(report *Report) {
+				report.TextRenderCommands = nil
+			},
+			want: "text render",
+		},
+		{
+			name: "unchanged frames",
+			mutate: func(report *Report) {
+				report.Frames[1].Checksum = report.Frames[0].Checksum
+			},
+			want: "text frame",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := validHeadlessBlockTextSurfaceReportJSON(t, tc.mutate)
+			err := ValidateReport(raw)
+			if err == nil {
+				t.Fatalf("expected block text %s evidence to fail", tc.name)
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want %q diagnostic", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestValidateReportAcceptsBlockLayoutEvidence(t *testing.T) {
+	raw := validHeadlessBlockLayoutSurfaceReportJSON(t, nil)
+	if err := ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
+	}
+}
+
+func TestValidateReportRejectsIncompleteBlockLayoutEvidence(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(*Report)
+		want   string
+	}{
+		{
+			name: "missing grid",
+			mutate: func(report *Report) {
+				report.LayoutPasses = removeBlockLayoutPassMode(report.LayoutPasses, "grid")
+				report.LayoutFeatures = removeString(report.LayoutFeatures, "grid")
+			},
+			want: "grid",
+		},
+		{
+			name: "missing dock",
+			mutate: func(report *Report) {
+				report.LayoutPasses = removeBlockLayoutPassMode(report.LayoutPasses, "dock")
+				report.LayoutFeatures = removeString(report.LayoutFeatures, "dock")
+			},
+			want: "dock",
+		},
+		{
+			name: "missing scroll",
+			mutate: func(report *Report) {
+				report.LayoutScrolls = nil
+				report.LayoutFeatures = removeString(report.LayoutFeatures, "scroll")
+			},
+			want: "scroll",
+		},
+		{
+			name: "missing resize",
+			mutate: func(report *Report) {
+				for i := range report.LayoutPasses {
+					report.LayoutPasses[i].Resize = false
+				}
+				report.LayoutFeatures = removeString(report.LayoutFeatures, "resize")
+			},
+			want: "resize",
+		},
+		{
+			name: "unsupported css flexbox",
+			mutate: func(report *Report) {
+				report.LayoutUnsupportedCSSFlexbox = true
+			},
+			want: "CSS flexbox",
+		},
+		{
+			name: "missing min max",
+			mutate: func(report *Report) {
+				report.LayoutConstraints[0].Min = SizeReport{}
+				report.LayoutConstraints[0].Max = SizeReport{}
+				report.LayoutFeatures = removeString(removeString(report.LayoutFeatures, "min"), "max")
+			},
+			want: "min",
+		},
+		{
+			name: "unchanged frames",
+			mutate: func(report *Report) {
+				report.Frames[1].Checksum = report.Frames[0].Checksum
+			},
+			want: "layout frame",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := validHeadlessBlockLayoutSurfaceReportJSON(t, tc.mutate)
+			err := ValidateReport(raw)
+			if err == nil {
+				t.Fatalf("expected block layout %s evidence to fail", tc.name)
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want %q diagnostic", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestValidateReportAcceptsBlockEventFocusEvidence(t *testing.T) {
+	raw := validHeadlessBlockEventSurfaceReportJSON(t, nil)
+	if err := ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
+	}
+}
+
+func TestValidateReportRejectsIncompleteBlockEventFocusEvidence(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(*Report)
+		want   string
+	}{
+		{
+			name: "missing nested hit path",
+			mutate: func(report *Report) {
+				report.BlockEventRoutes[0].HitTestPath = []int{1, 4}
+			},
+			want: "hit_test_path",
+		},
+		{
+			name: "disabled click delivered",
+			mutate: func(report *Report) {
+				report.BlockEventRoutes[1].Delivered = true
+				report.BlockEventRoutes[1].Rejected = false
+				report.BlockEventRoutes[1].RejectReason = ""
+			},
+			want: "disabled",
+		},
+		{
+			name: "unfocused text accepted",
+			mutate: func(report *Report) {
+				report.BlockEventRoutes[2].Delivered = true
+				report.BlockEventRoutes[2].Rejected = false
+				report.BlockEventRoutes[2].FocusedID = 5
+				report.BlockEventRoutes[2].RejectReason = ""
+			},
+			want: "unfocused",
+		},
+		{
+			name: "missing tab wrap",
+			mutate: func(report *Report) {
+				report.BlockFocusTransitions[1].Wrapped = false
+			},
+			want: "wrap",
+		},
+		{
+			name: "unsupported drag drop",
+			mutate: func(report *Report) {
+				report.BlockEventUnsupportedDragDrop = true
+			},
+			want: "drag",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := validHeadlessBlockEventSurfaceReportJSON(t, tc.mutate)
+			err := ValidateReport(raw)
+			if err == nil {
+				t.Fatalf("expected block event/focus %s evidence to fail", tc.name)
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want %q diagnostic", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestValidateReportAcceptsBlockStateSelectorEvidence(t *testing.T) {
+	raw := validHeadlessBlockStateSurfaceReportJSON(t, nil)
+	if err := ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
+	}
+}
+
+func TestValidateReportRejectsIncompleteBlockStateSelectorEvidence(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(*Report)
+		want   string
+	}{
+		{
+			name: "wrong resolver order",
+			mutate: func(report *Report) {
+				report.BlockStateResolverOrder = []string{"base", "hover", "variant", "pressed", "focused", "selected", "disabled", "error", "loading", "motion"}
+			},
+			want: "resolver order",
+		},
+		{
+			name: "missing hover selector",
+			mutate: func(report *Report) {
+				report.BlockStateSelectors = report.BlockStateSelectors[1:]
+			},
+			want: "hover",
+		},
+		{
+			name: "pressed scale not applied",
+			mutate: func(report *Report) {
+				for i := range report.BlockStateResolutions {
+					if report.BlockStateResolutions[i].Selector == "pressed" && report.BlockStateResolutions[i].Property == "layout.scale" {
+						report.BlockStateResolutions[i].Applied = false
+						report.BlockStateResolutions[i].After = report.BlockStateResolutions[i].Before
+					}
+				}
+			},
+			want: "pressed",
+		},
+		{
+			name: "disabled transition missing",
+			mutate: func(report *Report) {
+				filtered := report.StateTransitions[:0]
+				for _, transition := range report.StateTransitions {
+					if transition.Component != "StateBlock" || transition.Field != "disabled" {
+						filtered = append(filtered, transition)
+					}
+				}
+				report.StateTransitions = filtered
+			},
+			want: "disabled",
+		},
+		{
+			name: "unsupported css pseudo claim",
+			mutate: func(report *Report) {
+				report.BlockStateUnsupportedCSSPseudos = true
+			},
+			want: "css",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := validHeadlessBlockStateSurfaceReportJSON(t, tc.mutate)
+			err := ValidateReport(raw)
+			if err == nil {
+				t.Fatalf("expected block state %s evidence to fail", tc.name)
+			}
+			if !strings.Contains(strings.ToLower(err.Error()), strings.ToLower(tc.want)) {
+				t.Fatalf("error = %v, want %q diagnostic", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestValidateReportAcceptsBlockMotionEvidence(t *testing.T) {
+	raw := validHeadlessBlockMotionSurfaceReportJSON(t, nil)
+	if err := ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
+	}
+}
+
+func TestValidateReportRejectsIncompleteBlockMotionEvidence(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(*Report)
+		want   string
+	}{
+		{
+			name: "missing motion frames",
+			mutate: func(report *Report) {
+				report.MotionFrames = nil
+			},
+			want: "motion_frames",
+		},
+		{
+			name: "reduced motion keeps scheduling",
+			mutate: func(report *Report) {
+				for i := range report.MotionFrames {
+					if report.MotionFrames[i].ReducedMotion {
+						report.MotionFrames[i].Scheduled = true
+						report.MotionFrames[i].Settled = false
+					}
+				}
+			},
+			want: "reduced",
+		},
+		{
+			name: "completion keeps scheduling",
+			mutate: func(report *Report) {
+				report.MotionFrames[len(report.MotionFrames)-2].Scheduled = true
+				report.MotionFrames[len(report.MotionFrames)-2].Settled = false
+			},
+			want: "settled",
+		},
+		{
+			name: "opacity not interpolated",
+			mutate: func(report *Report) {
+				for i := range report.MotionFrames {
+					report.MotionFrames[i].Opacity = 80
+				}
+			},
+			want: "opacity",
+		},
+		{
+			name: "unsupported css animations",
+			mutate: func(report *Report) {
+				report.MotionUnsupportedCSSAnimations = true
+			},
+			want: "css",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := validHeadlessBlockMotionSurfaceReportJSON(t, tc.mutate)
+			err := ValidateReport(raw)
+			if err == nil {
+				t.Fatalf("expected block motion %s evidence to fail", tc.name)
+			}
+			if !strings.Contains(strings.ToLower(err.Error()), strings.ToLower(tc.want)) {
+				t.Fatalf("error = %v, want %q diagnostic", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestValidateReportAcceptsBlockAssetEvidence(t *testing.T) {
+	raw := validHeadlessBlockAssetSurfaceReportJSON(t, nil)
+	if err := ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
+	}
+}
+
+func TestValidateReportAcceptsBlockAccessibilityEvidence(t *testing.T) {
+	raw := validHeadlessBlockAccessibilitySurfaceReportJSON(t, nil)
+	if err := ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
+	}
+}
+
+func TestValidateReportAcceptsHeadlessBlockSystemGoldenChecksumEvidence(t *testing.T) {
+	raw := validHeadlessBlockSystemSurfaceReportJSON(t, nil)
+	if err := ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
+	}
+}
+
+func TestValidateReportAcceptsMorphCapsuleEvidence(t *testing.T) {
+	raw := validHeadlessMorphSurfaceReportJSON(t, nil)
+	if err := ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed with Morph evidence: %v\n%s", err, raw)
+	}
+}
+
+func TestValidateReportRejectsIncompleteMorphCapsuleEvidence(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(map[string]any)
+		want   string
+	}{
+		{
+			name: "missing token graph",
+			mutate: func(morph map[string]any) {
+				delete(morph, "token_graph")
+			},
+			want: "token_graph",
+		},
+		{
+			name: "fake core primitive recipe",
+			mutate: func(morph map[string]any) {
+				recipes := morph["recipes"].([]any)
+				recipe := recipes[0].(map[string]any)
+				recipe["output"] = "Button"
+				recipe["core_primitive_promotion"] = true
+			},
+			want: "Button",
+		},
+		{
+			name: "dirty production signoff",
+			mutate: func(morph map[string]any) {
+				morph["production_claim"] = true
+				morph["git_dirty"] = true
+			},
+			want: "dirty checkout",
+		},
+		{
+			name: "missing recipe expansion",
+			mutate: func(morph map[string]any) {
+				morph["recipe_expansions"] = []any{}
+			},
+			want: "recipe_expansions",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := validHeadlessMorphSurfaceReportJSON(t, tc.mutate)
+			err := ValidateReport(raw)
+			if err == nil {
+				t.Fatalf("expected incomplete Morph evidence to fail")
+			}
+			if !strings.Contains(strings.ToLower(err.Error()), strings.ToLower(tc.want)) {
+				t.Fatalf("error = %v, want %q diagnostic", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestValidateReportAcceptsLinuxX64RealWindowBlockSystemEvidence(t *testing.T) {
+	raw := validLinuxX64RealWindowBlockSystemSurfaceReportJSON(t, nil)
+	if err := ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
+	}
+}
+
+func TestValidateReportAcceptsWASM32WebBrowserCanvasBlockSystemEvidence(t *testing.T) {
+	raw := validWASM32WebBrowserCanvasBlockSystemSurfaceReportJSON(t, nil)
+	if err := ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
+	}
+}
+
+func TestValidateReportRejectsLinuxX64BlockSystemHeadlessPromotion(t *testing.T) {
+	raw := validLinuxX64RealWindowBlockSystemSurfaceReportJSON(t, func(report *Report) {
+		report.Target = "headless"
+		report.Runtime = "surface-headless"
+		report.HostEvidence = HostEvidenceReport{Level: "deterministic-headless", Backend: "software-rgba", Framebuffer: true}
+	})
+	err := ValidateReport(raw)
+	if err == nil {
+		t.Fatalf("expected linux-x64 Block system report promoted from headless evidence to fail")
+	}
+	for _, want := range []string{"linux-x64", "real-window"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error = %v, want %q diagnostic", err, want)
+		}
+	}
+}
+
+func TestValidateReportRejectsLinuxX64BlockSystemMissingRealWindowPresentation(t *testing.T) {
+	raw := validLinuxX64RealWindowBlockSystemSurfaceReportJSON(t, func(report *Report) {
+		report.Frames = nil
+		report.BlockSystem.Frames[0].Order = 2
+	})
+	err := ValidateReport(raw)
+	if err == nil {
+		t.Fatalf("expected linux-x64 Block system report without real-window frame presentation to fail")
+	}
+	for _, want := range []string{"real-window", "frame"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error = %v, want %q diagnostic", err, want)
+		}
+	}
+}
+
+func TestValidateReportRejectsWASM32WebBlockSystemFakeBrowserClaims(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(*Report)
+		want   string
+	}{
+		{
+			name: "node-only browser promotion",
+			mutate: func(report *Report) {
+				report.HostEvidence = HostEvidenceReport{Level: "wasm32-web-compiler-owned-loader", Backend: "node-surface-host", Framebuffer: true}
+			},
+			want: "browser-canvas",
+		},
+		{
+			name: "missing browser canvas RGBA readback",
+			mutate: func(report *Report) {
+				report.Frames = report.Frames[:1]
+				report.BlockSystem.Frames = report.BlockSystem.Frames[:1]
+				report.BlockSystem.FrameCount = 1
+				filtered := report.Cases[:0]
+				for _, tc := range report.Cases {
+					if tc.Name == "wasm32-web browser canvas RGBA readback" {
+						continue
+					}
+					filtered = append(filtered, tc)
+				}
+				report.Cases = filtered
+			},
+			want: "RGBA readback",
+		},
+		{
+			name: "user JS artifact",
+			mutate: func(report *Report) {
+				report.Artifacts = append(report.Artifacts, ArtifactReport{
+					Kind:   "user-js",
+					Path:   "/tmp/surface-artifacts/surface-block-system.user.js",
+					SHA256: "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+					Size:   128,
+				})
+				report.ArtifactScan.FilesChecked++
+			},
+			want: "user JS",
+		},
+		{
+			name: "DOM UI artifact",
+			mutate: func(report *Report) {
+				report.Artifacts = append(report.Artifacts, ArtifactReport{
+					Kind:   "dom-ui",
+					Path:   "/tmp/surface-artifacts/surface-block-system.dom.html",
+					SHA256: "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+					Size:   256,
+				})
+				report.ArtifactScan.FilesChecked++
+			},
+			want: "DOM UI",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := validWASM32WebBrowserCanvasBlockSystemSurfaceReportJSON(t, tc.mutate)
+			err := ValidateReport(raw)
+			if err == nil {
+				t.Fatalf("expected wasm32-web browser-canvas Block system fake claim to fail")
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want %q diagnostic", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestValidateReportRejectsIncompleteHeadlessBlockSystemGoldenChecksumEvidence(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(*Report)
+		want   string
+	}{
+		{
+			name: "missing frame checksum",
+			mutate: func(report *Report) {
+				report.BlockSystem.Frames[0].Checksum = ""
+			},
+			want: "checksum",
+		},
+		{
+			name: "nondeterministic repeat checksum",
+			mutate: func(report *Report) {
+				report.BlockSystem.Frames[1].RepeatChecksum = "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+			},
+			want: "nondeterministic",
+		},
+		{
+			name: "missing paint evidence",
+			mutate: func(report *Report) {
+				report.PaintLayers = nil
+				report.PaintCommands = nil
+				report.BlockSystem.Frames[0].PaintEvidence = false
+			},
+			want: "paint",
+		},
+		{
+			name: "missing layout evidence",
+			mutate: func(report *Report) {
+				report.LayoutPasses = nil
+				report.LayoutConstraints = nil
+				report.BlockSystem.Frames[0].LayoutEvidence = false
+			},
+			want: "layout",
+		},
+		{
+			name: "missing accessibility evidence",
+			mutate: func(report *Report) {
+				report.BlockAccessibilityTree = nil
+				report.BlockSystem.Frames[0].AccessibilityEvidence = false
+			},
+			want: "accessibility",
+		},
+		{
+			name: "golden mismatch",
+			mutate: func(report *Report) {
+				report.BlockSystem.Frames[0].GoldenChecksum = "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+			},
+			want: "golden",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := validHeadlessBlockSystemSurfaceReportJSON(t, tc.mutate)
+			err := ValidateReport(raw)
+			if err == nil {
+				t.Fatalf("expected headless Block system %s evidence to fail", tc.name)
+			}
+			if !strings.Contains(strings.ToLower(err.Error()), strings.ToLower(tc.want)) {
+				t.Fatalf("error = %v, want %q diagnostic", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestValidateReportRejectsIncompleteBlockSystemReadinessEvidence(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(*Report)
+		want   string
+	}{
+		{
+			name: "missing text measurement",
+			mutate: func(report *Report) {
+				report.TextMeasurements = nil
+				report.FontFallbacks = nil
+				report.GlyphCaches = nil
+				report.TextRenderCommands = nil
+				report.TextQualityLevel = ""
+				report.TextCacheBudgetBytes = 0
+			},
+			want: "text",
+		},
+		{
+			name: "missing state selector",
+			mutate: func(report *Report) {
+				report.BlockStateSelectors = nil
+				report.BlockStateResolutions = nil
+				report.BlockStateResolverOrder = nil
+				report.BlockStateQualityLevel = ""
+			},
+			want: "state",
+		},
+		{
+			name: "missing motion frames",
+			mutate: func(report *Report) {
+				report.MotionFrames = nil
+				report.MotionQualityLevel = ""
+				report.MotionClock = ""
+				report.MotionFrameBudget = 0
+			},
+			want: "motion",
+		},
+		{
+			name: "missing asset cache",
+			mutate: func(report *Report) {
+				report.BlockAssetManifest = nil
+				report.BlockAssetQualityLevel = ""
+				report.BlockAssetCache = BlockAssetCacheReport{}
+				report.BlockAssetDiagnostics = nil
+				report.BlockAssetRenderCommands = nil
+			},
+			want: "asset",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := validHeadlessBlockSystemSurfaceReportJSON(t, tc.mutate)
+			err := ValidateReport(raw)
+			if err == nil {
+				t.Fatalf("expected Block system %s to fail", tc.name)
+			}
+			if !strings.Contains(strings.ToLower(err.Error()), strings.ToLower(tc.want)) {
+				t.Fatalf("error = %v, want %q diagnostic", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestValidateReportRejectsIncompleteBlockSystemMemoryBudget(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(*Report)
+		want   string
+	}{
+		{
+			name: "missing memory budget",
+			mutate: func(report *Report) {
+				report.BlockSystem.MemoryBudget = nil
+			},
+			want: "block_system memory_budget is required",
+		},
+		{
+			name: "unbounded caches",
+			mutate: func(report *Report) {
+				report.BlockSystem.MemoryBudget = blockMemoryBudgetForTest(report)
+				report.BlockSystem.MemoryBudget.BoundedCaches = false
+			},
+			want: "bounded_caches",
+		},
+		{
+			name: "mismatched framebuffer total",
+			mutate: func(report *Report) {
+				report.BlockSystem.MemoryBudget = blockMemoryBudgetForTest(report)
+				report.BlockSystem.MemoryBudget.TotalFramebufferBytes++
+			},
+			want: "total_framebuffer_bytes",
+		},
+		{
+			name: "broad electron claim",
+			mutate: func(report *Report) {
+				report.BlockSystem.MemoryBudget = blockMemoryBudgetForTest(report)
+				report.BlockSystem.MemoryBudget.PerformanceClaim = "faster than " + "Electron"
+			},
+			want: "Electron",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := validHeadlessBlockSystemSurfaceReportJSON(t, tc.mutate)
+			err := ValidateReport(raw)
+			if err == nil {
+				t.Fatalf("expected incomplete Block memory budget report to fail")
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want %q diagnostic", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestValidateReportAcceptsBlockSystemMemoryBudgetEvidence(t *testing.T) {
+	raw := validHeadlessBlockSystemSurfaceReportJSON(t, func(report *Report) {
+		report.BlockSystem.MemoryBudget = blockMemoryBudgetForTest(report)
+	})
+	if err := ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed with Block memory budget evidence: %v\n%s", err, raw)
+	}
+}
+
+func TestValidateReportRejectsFakeBlockCorePrimitiveClaims(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(*Report)
+		want   string
+	}{
+		{
+			name: "Button component type",
+			mutate: func(report *Report) {
+				report.Components[3].Type = "examples.surface_block_system.Button"
+			},
+			want: "Button",
+		},
+		{
+			name: "Card block graph node",
+			mutate: func(report *Report) {
+				report.BlockGraph.Nodes[1].Name = "Card"
+			},
+			want: "Card",
+		},
+		{
+			name: "TextField accessibility node",
+			mutate: func(report *Report) {
+				report.BlockAccessibilityTree.Nodes[0].Name = "TextField"
+			},
+			want: "TextField",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := validHeadlessBlockSystemSurfaceReportJSON(t, tc.mutate)
+			err := ValidateReport(raw)
+			if err == nil {
+				t.Fatalf("expected fake Block core primitive claim %s to fail", tc.name)
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want %q diagnostic", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestValidateReportRejectsIncompleteBlockAccessibilityEvidence(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(*Report)
+		want   string
+	}{
+		{
+			name: "missing name for actionable focusable block",
+			mutate: func(report *Report) {
+				report.BlockAccessibilityTree.Nodes[1].Name = ""
+			},
+			want: "name",
+		},
+		{
+			name: "label relationship mismatch",
+			mutate: func(report *Report) {
+				report.BlockAccessibilityTree.Nodes[1].LabelledBy = "WrongLabel"
+			},
+			want: "label",
+		},
+		{
+			name: "reading order not from block graph",
+			mutate: func(report *Report) {
+				report.BlockAccessibilityTree.ReadingOrder = []int{4, 3, 5}
+			},
+			want: "reading",
+		},
+		{
+			name: "fake screen-reader claim",
+			mutate: func(report *Report) {
+				report.BlockAccessibilityTree.ScreenReaderEvidence = true
+			},
+			want: "screen_reader",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := validHeadlessBlockAccessibilitySurfaceReportJSON(t, tc.mutate)
+			err := ValidateReport(raw)
+			if err == nil {
+				t.Fatalf("expected block accessibility %s evidence to fail", tc.name)
+			}
+			if !strings.Contains(strings.ToLower(err.Error()), strings.ToLower(tc.want)) {
+				t.Fatalf("error = %v, want %q diagnostic", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestValidateReportRejectsIncompleteBlockAssetEvidence(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(*Report)
+		want   string
+	}{
+		{
+			name: "missing asset hashes",
+			mutate: func(report *Report) {
+				report.BlockAssetManifest.Assets[1].SHA256 = ""
+			},
+			want: "sha256",
+		},
+		{
+			name: "missing diagnostic",
+			mutate: func(report *Report) {
+				report.BlockAssetDiagnostics = nil
+			},
+			want: "diagnostic",
+		},
+		{
+			name: "unbounded cache",
+			mutate: func(report *Report) {
+				report.BlockAssetCache.Bounded = false
+				report.BlockAssetCache.BudgetBytes = 0
+			},
+			want: "cache",
+		},
+		{
+			name: "network asset url",
+			mutate: func(report *Report) {
+				report.BlockAssetManifest.Assets[0].Path = "https://assets.example.test/tetra-ui.woff2"
+				report.BlockAssetManifest.Assets[0].Local = false
+				report.BlockAssetManifest.RemoteCount = 1
+			},
+			want: "network",
+		},
+		{
+			name: "missing tint command",
+			mutate: func(report *Report) {
+				report.BlockAssetRenderCommands = removeBlockAssetRenderCommand(report.BlockAssetRenderCommands, "tint_icon")
+			},
+			want: "tint",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := validHeadlessBlockAssetSurfaceReportJSON(t, tc.mutate)
+			err := ValidateReport(raw)
+			if err == nil {
+				t.Fatalf("expected block asset %s evidence to fail", tc.name)
+			}
+			if !strings.Contains(strings.ToLower(err.Error()), strings.ToLower(tc.want)) {
+				t.Fatalf("error = %v, want %q diagnostic", err, tc.want)
+			}
+		})
+	}
+}
+
 func TestValidateReportRejectsComponentTreeMissingEvidence(t *testing.T) {
 	raw := validHeadlessComponentTreeSurfaceReportJSON(t, func(report *Report) {
 		report.ComponentTree = nil
@@ -2331,6 +3435,10 @@ func validSurfaceReleaseSummaryJSON() []byte {
   "accessibility": "platform-bridge-v1",
   "browser_surface": "browser-canvas-release-v1",
   "linux_surface": "linux-x64-release-window-v1",
+  "block_system": "block-system",
+  "block_system_gate": "tetra.surface.block-system.gate.v1",
+  "morph": "morph-capsule",
+  "morph_gate": "tetra.surface.morph.gate.v1",
   "artifact_hashes_validated": true,
   "legacy_sidecars": false,
   "dom_ui": false,
@@ -2657,6 +3765,1687 @@ func componentTreeAPIReportForTest() *ComponentTreeAPIReport {
 			{Helper: "tree_build_dispatch_path", Target: "TextBox", Path: []int{0, 1, 3}},
 			{Helper: "tree_build_dispatch_path", Target: "SubmitButton", Path: []int{0, 1, 4, 5}},
 			{Helper: "tree_build_dispatch_path", Target: "ResetButton", Path: []int{0, 1, 4, 6}},
+		},
+	}
+}
+
+func validHeadlessBlockGraphSurfaceReportJSON(t *testing.T, mutate func(*Report)) []byte {
+	t.Helper()
+	var report Report
+	if err := json.Unmarshal(validHeadlessComponentTreeSurfaceReportJSON(t, nil), &report); err != nil {
+		t.Fatalf("decode component tree report: %v", err)
+	}
+	report.BlockGraph = blockGraphReportForTest(report.Source)
+	report.Cases = append(report.Cases,
+		CaseReport{Name: "block graph duplicate id rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "duplicate Block ID"},
+		CaseReport{Name: "block graph missing parent rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "missing parent"},
+		CaseReport{Name: "block graph cycle rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "cycle"},
+		CaseReport{Name: "block graph child order", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block graph focus order", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block graph hit-test path", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block graph accessibility order", Kind: "positive", Ran: true, Pass: true},
+	)
+	if mutate != nil {
+		mutate(&report)
+	}
+	raw, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal block graph report: %v", err)
+	}
+	return raw
+}
+
+func validHeadlessBlockPaintSurfaceReportJSON(t *testing.T, mutate func(*Report)) []byte {
+	t.Helper()
+	var report Report
+	if err := json.Unmarshal(validHeadlessBlockGraphSurfaceReportJSON(t, nil), &report); err != nil {
+		t.Fatalf("decode block graph report: %v", err)
+	}
+	report.PaintQualityLevel = "deterministic-software-paint-v1"
+	report.PaintCacheBudgetBytes = 65536
+	report.PaintUnsupportedBlur = false
+	report.PaintLayers = blockPaintLayersForTest()
+	report.PaintCommands = blockPaintCommandsForTest()
+	report.VisualFeatures = []string{"fill", "gradient", "border", "radius", "shadow", "outline"}
+	report.Cases = append(report.Cases,
+		CaseReport{Name: "block paint fill border radius shadow outline", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block paint deterministic command order", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block paint frame checksum changed", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block paint unsupported blur rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "unsupported blur"},
+	)
+	if mutate != nil {
+		mutate(&report)
+	}
+	raw, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal block paint report: %v", err)
+	}
+	return raw
+}
+
+func validHeadlessBlockTextSurfaceReportJSON(t *testing.T, mutate func(*Report)) []byte {
+	t.Helper()
+	var report Report
+	if err := json.Unmarshal(validHeadlessSurfaceReportJSON(), &report); err != nil {
+		t.Fatalf("decode headless report: %v", err)
+	}
+	report.Source = "examples/surface_block_text.tetra"
+	report.Processes = []ProcessReport{
+		{Name: "tetra build", Kind: "build", Path: "tetra build --target linux-x64 examples/surface_block_text.tetra -o /tmp/surface-artifacts/surface-block-text", Ran: true, Pass: true, ExitCode: intPtrForTest(0)},
+		{Name: "surface component app", Kind: "app", Path: "/tmp/surface-artifacts/surface-block-text", Ran: true, Pass: true, ExitCode: intPtrForTest(1), ExpectedExitCode: intPtrForTest(1)},
+		{Name: "surface headless runtime", Kind: "runtime", Path: "tools/cmd/surface-runtime-smoke --mode headless-block-text", Ran: true, Pass: true, ExitCode: intPtrForTest(0)},
+	}
+	report.Artifacts = []ArtifactReport{
+		{Kind: "component-app", Path: "/tmp/surface-artifacts/surface-block-text", SHA256: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Size: 49172},
+		{Kind: "runner-trace", Path: "/tmp/surface-artifacts/surface-runner-trace.json", SHA256: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", Size: 409},
+	}
+	report.ArtifactScan = ArtifactScanReport{Root: "/tmp/surface-artifacts", FilesChecked: 2, ForbiddenPaths: nil, Pass: true}
+	report.Components = blockTextComponentsForTest()
+	report.TextQualityLevel = "deterministic-fallback-text-v1"
+	report.TextCacheBudgetBytes = 65536
+	report.TextMeasurements = blockTextMeasurementsForTest()
+	report.FontFallbacks = blockFontFallbacksForTest()
+	report.GlyphCaches = blockGlyphCachesForTest()
+	report.TextRenderCommands = blockTextRenderCommandsForTest()
+	report.Events = blockTextEventsForTest()
+	report.Frames = []FrameReport{
+		{Order: 1, Width: 320, Height: 200, Stride: 1280, Checksum: "1111111111111111111111111111111111111111111111111111111111111111", Presented: true},
+		{Order: 2, Width: 320, Height: 200, Stride: 1280, Checksum: "2222222222222222222222222222222222222222222222222222222222222222", Presented: true},
+	}
+	report.StateTransitions = []StateTransitionReport{
+		{Order: 1, Component: "BlockTextApp", Field: "focused_id", Before: "0", After: "3", Cause: "mouse_up"},
+		{Order: 2, Component: "InputBlock", Field: "buffer", Before: "", After: "OKd0a2", Cause: "text_input"},
+		{Order: 3, Component: "InputBlock", Field: "caret", Before: "0", After: "4", Cause: "text_input"},
+	}
+	report.Cases = append(report.Cases,
+		CaseReport{Name: "block text deterministic measurement", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block text wrap ellipsis layout", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block text font fallback chain", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block text bounded glyph cache", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block text render command evidence", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block text editable lifetime", Kind: "positive", Ran: true, Pass: true},
+	)
+	if mutate != nil {
+		mutate(&report)
+	}
+	raw, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal block text report: %v", err)
+	}
+	return raw
+}
+
+func validHeadlessBlockLayoutSurfaceReportJSON(t *testing.T, mutate func(*Report)) []byte {
+	t.Helper()
+	var report Report
+	if err := json.Unmarshal(validHeadlessSurfaceReportJSON(), &report); err != nil {
+		t.Fatalf("decode headless report: %v", err)
+	}
+	report.Source = "examples/surface_block_layout.tetra"
+	report.Processes = []ProcessReport{
+		{Name: "tetra build", Kind: "build", Path: "tetra build --target linux-x64 examples/surface_block_layout.tetra -o /tmp/surface-artifacts/surface-block-layout", Ran: true, Pass: true, ExitCode: intPtrForTest(0)},
+		{Name: "surface component app", Kind: "app", Path: "/tmp/surface-artifacts/surface-block-layout", Ran: true, Pass: true, ExitCode: intPtrForTest(1), ExpectedExitCode: intPtrForTest(1)},
+		{Name: "surface headless runtime", Kind: "runtime", Path: "tools/cmd/surface-runtime-smoke --mode headless-block-layout", Ran: true, Pass: true, ExitCode: intPtrForTest(0)},
+	}
+	report.Artifacts = []ArtifactReport{
+		{Kind: "component-app", Path: "/tmp/surface-artifacts/surface-block-layout", SHA256: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Size: 49172},
+		{Kind: "runner-trace", Path: "/tmp/surface-artifacts/surface-runner-trace.json", SHA256: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", Size: 409},
+	}
+	report.ArtifactScan = ArtifactScanReport{Root: "/tmp/surface-artifacts", FilesChecked: 2, ForbiddenPaths: nil, Pass: true}
+	report.Components = blockLayoutComponentsForTest()
+	report.LayoutQualityLevel = "deterministic-block-layout-v1"
+	report.LayoutUnsupportedCSSFlexbox = false
+	report.LayoutFeatures = []string{"stack", "row", "column", "absolute", "overlay", "grid", "dock", "scroll", "fit", "fill", "fixed", "min", "max", "spacing", "alignment", "z-order", "clipping", "resize"}
+	report.LayoutConstraints = blockLayoutConstraintsForTest()
+	report.LayoutPasses = blockLayoutPassesForTest()
+	report.LayoutScrolls = blockLayoutScrollsForTest()
+	report.Frames = []FrameReport{
+		{Order: 1, Width: 320, Height: 200, Stride: 1280, Checksum: "1111111111111111111111111111111111111111111111111111111111111111", Presented: true},
+		{Order: 2, Width: 320, Height: 200, Stride: 1280, Checksum: "2222222222222222222222222222222222222222222222222222222222222222", Presented: true},
+		{Order: 3, Width: 480, Height: 260, Stride: 1920, Checksum: "3333333333333333333333333333333333333333333333333333333333333333", Presented: true},
+	}
+	report.StateTransitions = []StateTransitionReport{
+		{Order: 1, Component: "RowBlock", Field: "pressed", Before: "false", After: "true", Cause: "mouse_up"},
+		{Order: 2, Component: "RowBlock", Field: "text_len_seen", Before: "0", After: "2", Cause: "text_input"},
+		{Order: 3, Component: "BlockLayoutApp", Field: "width", Before: "320", After: "480", Cause: "resize"},
+		{Order: 4, Component: "ScrollBlock", Field: "scroll_y", Before: "0", After: "32", Cause: "scroll"},
+	}
+	report.Events = []EventReport{
+		{Order: 1, Kind: "mouse_up", TargetComponent: "RowBlock", DispatchPath: []string{"BlockLayoutApp", "ColumnBlock", "RowBlock"}, Handled: true, Pass: true, X: 32, Y: 32, Width: 320, Height: 200, BufferSlots: []int{5, 32, 32, 1, 0, 320, 200, 0, 0}, BeforeState: map[string]string{"RowBlock.pressed": "false"}, AfterState: map[string]string{"RowBlock.pressed": "true"}},
+		{Order: 2, Kind: "text_input", TargetComponent: "RowBlock", DispatchPath: []string{"BlockLayoutApp", "ColumnBlock", "RowBlock"}, Handled: true, Pass: true, Width: 320, Height: 200, TimestampMS: 1, TextLen: 2, TextBytesHex: "4f4b", BufferSlots: []int{8, 0, 0, 0, 0, 320, 200, 1, 2}, BeforeState: map[string]string{"RowBlock.text_len_seen": "0"}, AfterState: map[string]string{"RowBlock.text_len_seen": "2"}},
+		{Order: 3, Kind: "resize", TargetComponent: "BlockLayoutApp", DispatchPath: []string{"BlockLayoutApp"}, Handled: true, Pass: true, Width: 480, Height: 260, TimestampMS: 2, BufferSlots: []int{6, 0, 0, 0, 0, 480, 260, 2, 0}, BeforeState: map[string]string{"BlockLayoutApp.width": "320"}, AfterState: map[string]string{"BlockLayoutApp.width": "480"}},
+		{Order: 4, Kind: "scroll", TargetComponent: "ScrollBlock", DispatchPath: []string{"BlockLayoutApp", "ScrollBlock"}, Handled: true, Pass: true, X: 260, Y: 80, Width: 480, Height: 260, TimestampMS: 3, BufferSlots: []int{7, 260, 80, 0, 0, 480, 260, 3, 0}, BeforeState: map[string]string{"ScrollBlock.scroll_y": "0"}, AfterState: map[string]string{"ScrollBlock.scroll_y": "32"}},
+	}
+	report.Cases = append(report.Cases,
+		CaseReport{Name: "block layout nested row column", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block layout fit fill fixed min max", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block layout grid dock overlay scroll", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block layout clipping z-order", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block layout resize constraints", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block layout no css flexbox parity", Kind: "negative", Ran: true, Pass: true, ExpectedError: "CSS flexbox parity nonclaim"},
+	)
+	if mutate != nil {
+		mutate(&report)
+	}
+	raw, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal block layout report: %v", err)
+	}
+	return raw
+}
+
+func validHeadlessBlockEventSurfaceReportJSON(t *testing.T, mutate func(*Report)) []byte {
+	t.Helper()
+	var report Report
+	if err := json.Unmarshal(validHeadlessSurfaceReportJSON(), &report); err != nil {
+		t.Fatalf("decode headless report: %v", err)
+	}
+	report.Source = "examples/surface_block_events.tetra"
+	report.Processes = []ProcessReport{
+		{Name: "tetra build", Kind: "build", Path: "tetra build --target linux-x64 examples/surface_block_events.tetra -o /tmp/surface-artifacts/surface-block-events", Ran: true, Pass: true, ExitCode: intPtrForTest(0)},
+		{Name: "surface component app", Kind: "app", Path: "/tmp/surface-artifacts/surface-block-events", Ran: true, Pass: true, ExitCode: intPtrForTest(1), ExpectedExitCode: intPtrForTest(1)},
+		{Name: "surface headless runtime", Kind: "runtime", Path: "tools/cmd/surface-runtime-smoke --mode headless-block-events", Ran: true, Pass: true, ExitCode: intPtrForTest(0)},
+	}
+	report.Artifacts = []ArtifactReport{
+		{Kind: "component-app", Path: "/tmp/surface-artifacts/surface-block-events", SHA256: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Size: 49172},
+		{Kind: "runner-trace", Path: "/tmp/surface-artifacts/surface-runner-trace.json", SHA256: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", Size: 409},
+	}
+	report.ArtifactScan = ArtifactScanReport{Root: "/tmp/surface-artifacts", FilesChecked: 2, ForbiddenPaths: nil, Pass: true}
+	report.Components = blockEventComponentsForTest()
+	report.BlockGraph = blockEventGraphReportForTest(report.Source)
+	report.BlockEventQualityLevel = "deterministic-block-events-v1"
+	report.BlockEventPolicy = "capture-bubble-direct-v1"
+	report.BlockEventUnsupportedDragDrop = false
+	report.BlockEventKinds = []string{"pointer_enter", "pointer_leave", "pointer_move", "pointer_down", "pointer_up", "click", "double_click", "key", "text", "focus", "blur", "scroll", "resize", "close", "frame"}
+	report.BlockEventRoutes = blockEventRoutesForTest()
+	report.BlockFocusTransitions = blockFocusTransitionsForTest()
+	report.Events = blockEventRuntimeEventsForTest()
+	report.Frames = []FrameReport{
+		{Order: 1, Width: 320, Height: 200, Stride: 1280, Checksum: "1111111111111111111111111111111111111111111111111111111111111111", Presented: true},
+		{Order: 2, Width: 320, Height: 200, Stride: 1280, Checksum: "2222222222222222222222222222222222222222222222222222222222222222", Presented: true},
+	}
+	report.StateTransitions = []StateTransitionReport{
+		{Order: 1, Component: "BlockEventApp", Field: "focused_id", Before: "0", After: "4", Cause: "click"},
+		{Order: 2, Component: "InputBlock", Field: "buffer", Before: "", After: "OK", Cause: "text_input"},
+		{Order: 3, Component: "BlockEventApp", Field: "focused_id", Before: "4", After: "6", Cause: "tab"},
+		{Order: 4, Component: "BlockEventApp", Field: "focused_id", Before: "6", After: "4", Cause: "tab"},
+	}
+	report.Cases = append(report.Cases,
+		CaseReport{Name: "block graph duplicate id rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "duplicate Block ID"},
+		CaseReport{Name: "block graph missing parent rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "missing parent"},
+		CaseReport{Name: "block graph cycle rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "cycle"},
+		CaseReport{Name: "block graph child order", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block graph focus order", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block graph hit-test path", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block graph accessibility order", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block event nested hit-test path", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block event capture bubble direct policy", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block event disabled click rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "disabled Block"},
+		CaseReport{Name: "block event text input focused only", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block focus tab order graph-derived", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block event no complex drag claim", Kind: "negative", Ran: true, Pass: true, ExpectedError: "drag-and-drop nonclaim"},
+	)
+	if mutate != nil {
+		mutate(&report)
+	}
+	raw, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal block event report: %v", err)
+	}
+	return raw
+}
+
+func validHeadlessBlockStateSurfaceReportJSON(t *testing.T, mutate func(*Report)) []byte {
+	t.Helper()
+	var report Report
+	if err := json.Unmarshal(validHeadlessSurfaceReportJSON(), &report); err != nil {
+		t.Fatalf("decode headless report: %v", err)
+	}
+	report.Source = "examples/surface_block_states.tetra"
+	report.Processes = []ProcessReport{
+		{Name: "tetra build", Kind: "build", Path: "tetra build --target linux-x64 examples/surface_block_states.tetra -o /tmp/surface-artifacts/surface-block-states", Ran: true, Pass: true, ExitCode: intPtrForTest(0)},
+		{Name: "surface component app", Kind: "app", Path: "/tmp/surface-artifacts/surface-block-states", Ran: true, Pass: true, ExitCode: intPtrForTest(1), ExpectedExitCode: intPtrForTest(1)},
+		{Name: "surface headless runtime", Kind: "runtime", Path: "tools/cmd/surface-runtime-smoke --mode headless-block-states", Ran: true, Pass: true, ExitCode: intPtrForTest(0)},
+	}
+	report.Artifacts = []ArtifactReport{
+		{Kind: "component-app", Path: "/tmp/surface-artifacts/surface-block-states", SHA256: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Size: 49172},
+		{Kind: "runner-trace", Path: "/tmp/surface-artifacts/surface-runner-trace.json", SHA256: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", Size: 409},
+	}
+	report.ArtifactScan = ArtifactScanReport{Root: "/tmp/surface-artifacts", FilesChecked: 2, ForbiddenPaths: nil, Pass: true}
+	report.Components = blockStateComponentsForTest()
+	report.BlockStateQualityLevel = "deterministic-block-state-resolver-v1"
+	report.BlockStateResolverOrder = []string{"base", "variant", "hover", "pressed", "focused", "selected", "disabled", "error", "loading", "motion"}
+	report.BlockStateUnsupportedCSSPseudos = false
+	report.BlockStateSelectors = blockStateSelectorsForTest()
+	report.BlockStateResolutions = blockStateResolutionsForTest()
+	report.Events = blockStateEventsForTest()
+	report.Frames = []FrameReport{
+		{Order: 1, Width: 320, Height: 200, Stride: 1280, Checksum: "1111111111111111111111111111111111111111111111111111111111111111", Presented: true},
+		{Order: 2, Width: 320, Height: 200, Stride: 1280, Checksum: "2222222222222222222222222222222222222222222222222222222222222222", Presented: true},
+	}
+	report.StateTransitions = []StateTransitionReport{
+		{Order: 1, Component: "StateBlock", Field: "selector_flags", Before: "0", After: "127", Cause: "pointer/key/state input"},
+		{Order: 2, Component: "StateBlock", Field: "resolved_fill", Before: "#20262eff", After: "#2d9bf0ff", Cause: "hover"},
+		{Order: 3, Component: "StateBlock", Field: "resolved_scale", Before: "100", After: "97", Cause: "pressed"},
+		{Order: 4, Component: "StateBlock", Field: "disabled", Before: "false", After: "true", Cause: "disabled selector"},
+		{Order: 5, Component: "StateBlock", Field: "error", Before: "false", After: "true", Cause: "error selector"},
+		{Order: 6, Component: "StateBlock", Field: "loading", Before: "false", After: "true", Cause: "loading selector"},
+	}
+	report.Cases = append(report.Cases,
+		CaseReport{Name: "block state selector resolver order", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block state hover fill override", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block state pressed scale override", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block state focus selected metadata", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block state disabled error loading overrides", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block state frame checksum changed", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block state no css pseudo parity", Kind: "negative", Ran: true, Pass: true, ExpectedError: "css pseudo nonclaim"},
+	)
+	if mutate != nil {
+		mutate(&report)
+	}
+	raw, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal block state report: %v", err)
+	}
+	return raw
+}
+
+func validHeadlessBlockMotionSurfaceReportJSON(t *testing.T, mutate func(*Report)) []byte {
+	t.Helper()
+	var report Report
+	if err := json.Unmarshal(validHeadlessSurfaceReportJSON(), &report); err != nil {
+		t.Fatalf("decode headless report: %v", err)
+	}
+	report.Source = "examples/surface_block_motion.tetra"
+	report.Processes = []ProcessReport{
+		{Name: "tetra build", Kind: "build", Path: "tetra build --target linux-x64 examples/surface_block_motion.tetra -o /tmp/surface-artifacts/surface-block-motion", Ran: true, Pass: true, ExitCode: intPtrForTest(0)},
+		{Name: "surface component app", Kind: "app", Path: "/tmp/surface-artifacts/surface-block-motion", Ran: true, Pass: true, ExitCode: intPtrForTest(1), ExpectedExitCode: intPtrForTest(1)},
+		{Name: "surface headless runtime", Kind: "runtime", Path: "tools/cmd/surface-runtime-smoke --mode headless-block-motion", Ran: true, Pass: true, ExitCode: intPtrForTest(0)},
+	}
+	report.Artifacts = []ArtifactReport{
+		{Kind: "component-app", Path: "/tmp/surface-artifacts/surface-block-motion", SHA256: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Size: 49172},
+		{Kind: "runner-trace", Path: "/tmp/surface-artifacts/surface-runner-trace.json", SHA256: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", Size: 409},
+	}
+	report.ArtifactScan = ArtifactScanReport{Root: "/tmp/surface-artifacts", FilesChecked: 2, ForbiddenPaths: nil, Pass: true}
+	report.Components = blockMotionComponentsForTest()
+	report.MotionQualityLevel = "deterministic-block-motion-v1"
+	report.MotionClock = "deterministic-test-clock-v1"
+	report.MotionFrameBudget = 4
+	report.MotionUnsupportedCSSAnimations = false
+	report.MotionFrames = blockMotionFramesForTest()
+	report.Events = blockMotionEventsForTest()
+	report.Frames = []FrameReport{
+		{Order: 1, Width: 320, Height: 200, Stride: 1280, Checksum: "1111111111111111111111111111111111111111111111111111111111111111", Presented: true},
+		{Order: 2, Width: 320, Height: 200, Stride: 1280, Checksum: "2222222222222222222222222222222222222222222222222222222222222222", Presented: true},
+		{Order: 3, Width: 320, Height: 200, Stride: 1280, Checksum: "3333333333333333333333333333333333333333333333333333333333333333", Presented: true},
+	}
+	report.StateTransitions = []StateTransitionReport{
+		{Order: 1, Component: "MotionBlock", Field: "opacity", Before: "80", After: "200", Cause: "motion frame"},
+		{Order: 2, Component: "MotionBlock", Field: "color", Before: "#203040ff", After: "#60aef4ff", Cause: "motion frame"},
+		{Order: 3, Component: "MotionBlock", Field: "scale", Before: "100", After: "108", Cause: "motion frame"},
+		{Order: 4, Component: "MotionBlock", Field: "translate_x", Before: "0", After: "12", Cause: "motion frame"},
+		{Order: 5, Component: "MotionBlock", Field: "motion_complete", Before: "false", After: "true", Cause: "duration elapsed"},
+		{Order: 6, Component: "MotionBlock", Field: "reduced_motion", Before: "false", After: "true", Cause: "accessibility setting"},
+	}
+	report.Cases = append(report.Cases,
+		CaseReport{Name: "block motion deterministic test clock", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block motion opacity color transform frames", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block motion reduced motion instant settle", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block motion completion stops scheduling", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block motion frame checksum changed", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block motion no css animation parity", Kind: "negative", Ran: true, Pass: true, ExpectedError: "css animation nonclaim"},
+	)
+	if mutate != nil {
+		mutate(&report)
+	}
+	raw, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal block motion report: %v", err)
+	}
+	return raw
+}
+
+func validHeadlessBlockAssetSurfaceReportJSON(t *testing.T, mutate func(*Report)) []byte {
+	t.Helper()
+	var report Report
+	if err := json.Unmarshal(validHeadlessSurfaceReportJSON(), &report); err != nil {
+		t.Fatalf("decode headless report: %v", err)
+	}
+	report.Source = "examples/surface_block_assets.tetra"
+	report.Processes = []ProcessReport{
+		{Name: "tetra build", Kind: "build", Path: "tetra build --target linux-x64 examples/surface_block_assets.tetra -o /tmp/surface-artifacts/surface-block-assets", Ran: true, Pass: true, ExitCode: intPtrForTest(0)},
+		{Name: "surface component app", Kind: "app", Path: "/tmp/surface-artifacts/surface-block-assets", Ran: true, Pass: true, ExitCode: intPtrForTest(1), ExpectedExitCode: intPtrForTest(1)},
+		{Name: "surface headless runtime", Kind: "runtime", Path: "tools/cmd/surface-runtime-smoke --mode headless-block-assets", Ran: true, Pass: true, ExitCode: intPtrForTest(0)},
+	}
+	report.Artifacts = []ArtifactReport{
+		{Kind: "component-app", Path: "/tmp/surface-artifacts/surface-block-assets", SHA256: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Size: 49172},
+		{Kind: "runner-trace", Path: "/tmp/surface-artifacts/surface-runner-trace.json", SHA256: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", Size: 409},
+	}
+	report.ArtifactScan = ArtifactScanReport{Root: "/tmp/surface-artifacts", FilesChecked: 2, ForbiddenPaths: nil, Pass: true}
+	report.Components = blockAssetComponentsForTest()
+	report.BlockAssetQualityLevel = "deterministic-local-block-assets-v1"
+	report.BlockAssetNetworkFetchAllowed = false
+	report.BlockAssetManifest = blockAssetManifestForTest(report.Source)
+	report.BlockAssetCache = blockAssetCacheForTest()
+	report.BlockAssetDiagnostics = blockAssetDiagnosticsForTest()
+	report.BlockAssetRenderCommands = blockAssetRenderCommandsForTest()
+	report.Events = blockAssetEventsForTest()
+	report.Frames = []FrameReport{
+		{Order: 1, Width: 320, Height: 200, Stride: 1280, Checksum: "1111111111111111111111111111111111111111111111111111111111111111", Presented: true},
+		{Order: 2, Width: 320, Height: 200, Stride: 1280, Checksum: "2222222222222222222222222222222222222222222222222222222222222222", Presented: true},
+	}
+	report.StateTransitions = []StateTransitionReport{
+		{Order: 1, Component: "IconBlock", Field: "tint", Before: "#ffffffff", After: "#60aef4ff", Cause: "asset tint"},
+		{Order: 2, Component: "ImageBlock", Field: "scale", Before: "1x", After: "2x", Cause: "asset scale"},
+		{Order: 3, Component: "MissingAssetBlock", Field: "fallback", Before: "missing", After: "fallback-raster", Cause: "missing asset"},
+	}
+	report.Cases = append(report.Cases,
+		CaseReport{Name: "block asset deterministic manifest hashes", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block asset local embedded only", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block asset bounded cache", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block asset icon tint evidence", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block asset image scale evidence", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block asset missing fallback diagnostic", Kind: "negative", Ran: true, Pass: true, ExpectedError: "missing asset"},
+		CaseReport{Name: "block asset network url rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "network assets disabled"},
+	)
+	if mutate != nil {
+		mutate(&report)
+	}
+	raw, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal block asset report: %v", err)
+	}
+	return raw
+}
+
+func validHeadlessBlockAccessibilitySurfaceReportJSON(t *testing.T, mutate func(*Report)) []byte {
+	t.Helper()
+	var report Report
+	if err := json.Unmarshal(validHeadlessSurfaceReportJSON(), &report); err != nil {
+		t.Fatalf("decode headless report: %v", err)
+	}
+	report.Source = "examples/surface_block_accessibility.tetra"
+	report.Processes = []ProcessReport{
+		{Name: "tetra build", Kind: "build", Path: "tetra build --target linux-x64 examples/surface_block_accessibility.tetra -o /tmp/surface-artifacts/surface-block-accessibility", Ran: true, Pass: true, ExitCode: intPtrForTest(0)},
+		{Name: "surface component app", Kind: "app", Path: "/tmp/surface-artifacts/surface-block-accessibility", Ran: true, Pass: true, ExitCode: intPtrForTest(1), ExpectedExitCode: intPtrForTest(1)},
+		{Name: "surface headless runtime", Kind: "runtime", Path: "tools/cmd/surface-runtime-smoke --mode headless-block-accessibility", Ran: true, Pass: true, ExitCode: intPtrForTest(0)},
+	}
+	report.Artifacts = []ArtifactReport{
+		{Kind: "component-app", Path: "/tmp/surface-artifacts/surface-block-accessibility", SHA256: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Size: 49172},
+		{Kind: "runner-trace", Path: "/tmp/surface-artifacts/surface-runner-trace.json", SHA256: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", Size: 409},
+	}
+	report.ArtifactScan = ArtifactScanReport{Root: "/tmp/surface-artifacts", FilesChecked: 2, ForbiddenPaths: nil, Pass: true}
+	report.Components = blockAccessibilityComponentsForTest()
+	report.BlockGraph = blockGraphReportForTest(report.Source)
+	report.BlockAccessibilityTree = blockAccessibilityTreeForTest(report.Source)
+	report.Events = blockAccessibilityEventsForTest()
+	report.Frames = []FrameReport{
+		{Order: 1, Width: 320, Height: 200, Stride: 1280, Checksum: "1111111111111111111111111111111111111111111111111111111111111111", Presented: true},
+		{Order: 2, Width: 320, Height: 200, Stride: 1280, Checksum: "2222222222222222222222222222222222222222222222222222222222222222", Presented: true},
+	}
+	report.StateTransitions = []StateTransitionReport{
+		{Order: 1, Component: "SubmitBlock", Field: "focused", Before: "false", After: "true", Cause: "tab"},
+		{Order: 2, Component: "ResetBlock", Field: "focused", Before: "false", After: "true", Cause: "tab"},
+		{Order: 3, Component: "BlockAccessibilityApp", Field: "reading_order_checked", Before: "false", After: "true", Cause: "block_graph"},
+	}
+	report.Cases = append(report.Cases,
+		CaseReport{Name: "block graph duplicate id rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "duplicate Block ID"},
+		CaseReport{Name: "block graph missing parent rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "missing parent"},
+		CaseReport{Name: "block graph cycle rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "cycle"},
+		CaseReport{Name: "block graph child order", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block graph focus order", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block graph hit-test path", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block graph accessibility order", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block accessibility tree derived from block graph", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block accessibility focusable actionable name required", Kind: "negative", Ran: true, Pass: true, ExpectedError: "missing accessible name"},
+		CaseReport{Name: "block accessibility label relationship mismatch rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "label relationship mismatch"},
+		CaseReport{Name: "block accessibility reading order graph mismatch rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "reading order mismatch"},
+		CaseReport{Name: "block accessibility screen-reader claim without platform proof rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "screen reader proof required"},
+		CaseReport{Name: "block accessibility platform claim scoped metadata only", Kind: "positive", Ran: true, Pass: true},
+	)
+	if mutate != nil {
+		mutate(&report)
+	}
+	raw, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal block accessibility report: %v", err)
+	}
+	return raw
+}
+
+func validHeadlessBlockSystemSurfaceReportJSON(t *testing.T, mutate func(*Report)) []byte {
+	t.Helper()
+	var report Report
+	if err := json.Unmarshal(validHeadlessSurfaceReportJSON(), &report); err != nil {
+		t.Fatalf("decode headless report: %v", err)
+	}
+	report.Source = "examples/surface_block_system.tetra"
+	report.Processes = []ProcessReport{
+		{Name: "tetra build", Kind: "build", Path: "tetra build --target linux-x64 examples/surface_block_system.tetra -o /tmp/surface-artifacts/surface-block-system", Ran: true, Pass: true, ExitCode: intPtrForTest(0)},
+		{Name: "surface component app", Kind: "app", Path: "/tmp/surface-artifacts/surface-block-system", Ran: true, Pass: true, ExitCode: intPtrForTest(1), ExpectedExitCode: intPtrForTest(1)},
+		{Name: "surface headless runtime", Kind: "runtime", Path: "tools/cmd/surface-runtime-smoke --mode headless-block-system", Ran: true, Pass: true, ExitCode: intPtrForTest(0)},
+	}
+	report.Artifacts = []ArtifactReport{
+		{Kind: "component-app", Path: "/tmp/surface-artifacts/surface-block-system", SHA256: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Size: 49172},
+		{Kind: "runner-trace", Path: "/tmp/surface-artifacts/surface-runner-trace.json", SHA256: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", Size: 409},
+	}
+	report.ArtifactScan = ArtifactScanReport{Root: "/tmp/surface-artifacts", FilesChecked: 2, ForbiddenPaths: nil, Pass: true}
+	report.Components = blockSystemComponentsForTest()
+	report.Components = append(report.Components, retargetBlockSystemComponentsForTest(blockTextComponentsForTest())...)
+	report.Components = append(report.Components, retargetBlockSystemComponentsForTest(blockStateComponentsForTest())...)
+	report.Components = append(report.Components, retargetBlockSystemComponentsForTest(blockMotionComponentsForTest())...)
+	report.Components = append(report.Components, retargetBlockSystemComponentsForTest(blockAssetComponentsForTest())...)
+	report.BlockGraph = blockGraphReportForTest(report.Source)
+	report.PaintQualityLevel = "deterministic-software-paint-v1"
+	report.PaintCacheBudgetBytes = 65536
+	report.PaintUnsupportedBlur = false
+	report.PaintLayers = blockPaintLayersForTest()
+	report.PaintCommands = blockPaintCommandsForTest()
+	report.VisualFeatures = []string{"fill", "gradient", "border", "radius", "shadow", "outline"}
+	report.TextQualityLevel = "deterministic-fallback-text-v1"
+	report.TextCacheBudgetBytes = 65536
+	report.TextMeasurements = blockTextMeasurementsForTest()
+	report.FontFallbacks = blockFontFallbacksForTest()
+	report.GlyphCaches = blockGlyphCachesForTest()
+	report.TextRenderCommands = blockTextRenderCommandsForTest()
+	report.LayoutQualityLevel = "deterministic-block-layout-v1"
+	report.LayoutUnsupportedCSSFlexbox = false
+	report.LayoutFeatures = []string{"stack", "row", "column", "absolute", "overlay", "grid", "dock", "scroll", "fit", "fill", "fixed", "min", "max", "spacing", "alignment", "z-order", "clipping", "resize"}
+	report.LayoutConstraints = blockLayoutConstraintsForTest()
+	report.LayoutPasses = blockLayoutPassesForTest()
+	report.LayoutScrolls = blockLayoutScrollsForTest()
+	report.BlockStateQualityLevel = "deterministic-block-state-resolver-v1"
+	report.BlockStateUnsupportedCSSPseudos = false
+	report.BlockStateResolverOrder = []string{"base", "variant", "hover", "pressed", "focused", "selected", "disabled", "error", "loading", "motion"}
+	report.BlockStateSelectors = blockStateSelectorsForTest()
+	report.BlockStateResolutions = blockStateResolutionsForTest()
+	report.MotionQualityLevel = "deterministic-block-motion-v1"
+	report.MotionClock = "deterministic-test-clock-v1"
+	report.MotionFrameBudget = 4
+	report.MotionUnsupportedCSSAnimations = false
+	report.MotionFrames = blockMotionFramesForTest()
+	report.BlockAssetQualityLevel = "deterministic-local-block-assets-v1"
+	report.BlockAssetNetworkFetchAllowed = false
+	report.BlockAssetManifest = blockAssetManifestForTest(report.Source)
+	report.BlockAssetCache = blockAssetCacheForTest()
+	report.BlockAssetDiagnostics = blockAssetDiagnosticsForTest()
+	report.BlockAssetRenderCommands = blockAssetRenderCommandsForTest()
+	report.BlockAccessibilityTree = blockAccessibilityTreeForTest(report.Source)
+	report.Events = blockSystemEventsForTest()
+	report.Events = appendEventReportsWithNextOrder(report.Events,
+		blockTextEventsForTest(),
+		blockStateEventsForTest(),
+		blockMotionEventsForTest(),
+		blockAssetEventsForTest(),
+	)
+	report.Frames = []FrameReport{
+		{Order: 1, Width: 320, Height: 200, Stride: 1280, Checksum: "1111111111111111111111111111111111111111111111111111111111111111", Presented: true},
+		{Order: 2, Width: 320, Height: 200, Stride: 1280, Checksum: "2222222222222222222222222222222222222222222222222222222222222222", Presented: true},
+		{Order: 3, Width: 320, Height: 200, Stride: 1280, Checksum: "3333333333333333333333333333333333333333333333333333333333333333", Presented: true},
+	}
+	report.StateTransitions = []StateTransitionReport{
+		{Order: 1, Component: "SubmitBlock", Field: "focused", Before: "false", After: "true", Cause: "tab"},
+		{Order: 2, Component: "ResetBlock", Field: "focused", Before: "false", After: "true", Cause: "tab"},
+		{Order: 3, Component: "BlockSystemApp", Field: "reading_order_checked", Before: "false", After: "true", Cause: "block_graph"},
+		{Order: 4, Component: "BlockLayoutApp", Field: "width", Before: "320", After: "480", Cause: "resize"},
+		{Order: 5, Component: "ScrollBlock", Field: "scroll_y", Before: "0", After: "32", Cause: "scroll"},
+	}
+	report.StateTransitions = appendStateTransitionReportsWithNextOrder(report.StateTransitions, blockSystemReadinessTransitionsForTest())
+	report.BlockSystem = &BlockSystemReport{
+		Schema:       "tetra.surface.block-system.v1",
+		QualityLevel: "deterministic-headless-block-system-v1",
+		Source:       report.Source,
+		Renderer:     "software-rgba-headless",
+		GoldenSet:    "surface-block-system-golden-v1",
+		FrameCount:   3,
+		GoldenHash:   "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+		Frames: []BlockSystemFrameReport{
+			{Order: 1, Label: "initial", Width: 320, Height: 200, Stride: 1280, Checksum: "1111111111111111111111111111111111111111111111111111111111111111", RepeatChecksum: "1111111111111111111111111111111111111111111111111111111111111111", GoldenChecksum: "1111111111111111111111111111111111111111111111111111111111111111", PaintEvidence: true, LayoutEvidence: true, AccessibilityEvidence: true},
+			{Order: 2, Label: "focused", Width: 320, Height: 200, Stride: 1280, Checksum: "2222222222222222222222222222222222222222222222222222222222222222", RepeatChecksum: "2222222222222222222222222222222222222222222222222222222222222222", GoldenChecksum: "2222222222222222222222222222222222222222222222222222222222222222", PaintEvidence: true, LayoutEvidence: true, AccessibilityEvidence: true},
+			{Order: 3, Label: "motion", Width: 320, Height: 200, Stride: 1280, Checksum: "3333333333333333333333333333333333333333333333333333333333333333", RepeatChecksum: "3333333333333333333333333333333333333333333333333333333333333333", GoldenChecksum: "3333333333333333333333333333333333333333333333333333333333333333", PaintEvidence: true, LayoutEvidence: true, AccessibilityEvidence: true},
+		},
+		NegativeGuards: BlockSystemNegativeGuardsReport{
+			MissingFrameChecksumRejected:         true,
+			NondeterministicChecksumRejected:     true,
+			MissingPaintEvidenceRejected:         true,
+			MissingLayoutEvidenceRejected:        true,
+			MissingAccessibilityEvidenceRejected: true,
+		},
+	}
+	report.BlockSystem.MemoryBudget = blockMemoryBudgetForTest(&report)
+	report.Cases = append(report.Cases, blockSystemCasesForTest()...)
+	if mutate != nil {
+		mutate(&report)
+	}
+	raw, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal block system report: %v", err)
+	}
+	return raw
+}
+
+func validHeadlessMorphSurfaceReportJSON(t *testing.T, mutate func(map[string]any)) []byte {
+	t.Helper()
+	var report map[string]any
+	if err := json.Unmarshal(validHeadlessBlockSystemSurfaceReportJSON(t, nil), &report); err != nil {
+		t.Fatalf("decode headless Block system report: %v", err)
+	}
+	morph := validMorphEvidenceMap()
+	if mutate != nil {
+		mutate(morph)
+	}
+	report["morph"] = morph
+	raw, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal Morph report: %v", err)
+	}
+	return raw
+}
+
+func validMorphEvidenceMap() map[string]any {
+	return map[string]any{
+		"schema":            "tetra.surface.morph.v1",
+		"quality_level":     "deterministic-headless-morph-capsule-v1",
+		"source":            "examples/surface_morph_command_palette.tetra",
+		"module":            "lib.core.morph",
+		"surface_scope":     "surface-morph-experimental-linux-web",
+		"experimental":      true,
+		"production_claim":  false,
+		"git_head":          "e2c19b8ee276158f8eb2c54cf61e11bd84952893",
+		"git_dirty":         true,
+		"capsule_hash":      "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		"token_graph_hash":  "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		"capsule":           validMorphCapsuleMap(),
+		"token_graph":       validMorphTokenGraphMap(),
+		"materials":         validMorphMaterials(),
+		"layout_modes":      []any{"row", "column", "stack", "grid", "dock", "absolute", "overlay", "scroll"},
+		"typography_roles":  []any{"title", "body", "label", "code"},
+		"asset_refs":        validMorphAssetRefs(),
+		"affordances":       validMorphAffordances(),
+		"state_lenses":      validMorphStateLenses(),
+		"motion_presets":    validMorphMotionPresets(),
+		"recipes":           validMorphRecipes(),
+		"recipe_expansions": validMorphRecipeExpansions(),
+		"accessibility":     validMorphAccessibilityProjectionMap(),
+		"evidence_contract": validMorphEvidenceContractMap(),
+		"memory_budget":     validMorphMemoryBudgetMap(),
+		"negative_guards":   validMorphNegativeGuardsMap(),
+		"nonclaims":         []any{"DOM runtime absent", "React runtime absent", "Electron claim absent", "platform-native widgets absent", "full screen-reader production absent", "CSS cascade absent"},
+	}
+}
+
+func validMorphCapsuleMap() map[string]any {
+	return map[string]any{
+		"namespace":         "tetra.surface.morph.app",
+		"version":           "1",
+		"capsule_hash":      "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		"imports":           []any{"lib.core.block", "lib.core.morph"},
+		"explicit_imports":  true,
+		"no_global_cascade": true,
+	}
+}
+
+func validMorphTokenGraphMap() map[string]any {
+	return map[string]any{
+		"schema":                       "tetra.surface.morph.token-graph.v1",
+		"namespace":                    "tetra.surface.morph.app",
+		"version":                      "1",
+		"hash":                         "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		"categories":                   []any{"color", "space", "radius", "border", "elevation", "opacity", "typography", "motion", "z", "assets", "density"},
+		"tokens":                       validMorphTokens(),
+		"alias_cycle_rejected":         true,
+		"duplicate_source_rejected":    true,
+		"raw_literals_in_app_code":     false,
+		"unresolved_fallback_rejected": true,
+		"fallback_to_random_default":   false,
+	}
+}
+
+func validMorphTokens() []any {
+	return []any{
+		map[string]any{"id": "color.bg", "category": "color", "kind": "rgba", "value": "#0b0f14ff", "source": "capsule", "hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"},
+		map[string]any{"id": "space.3", "category": "space", "kind": "px", "value": "12", "source": "capsule", "hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"},
+		map[string]any{"id": "radius.md", "category": "radius", "kind": "px", "value": "10", "source": "capsule", "hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"},
+		map[string]any{"id": "type.label", "category": "typography", "kind": "font", "value": "Tetra UI 13 600 18", "source": "capsule", "hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"},
+		map[string]any{"id": "motion.fast", "category": "motion", "kind": "transition", "value": "120 ease.out", "source": "capsule", "hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"},
+	}
+}
+
+func validMorphMaterials() []any {
+	return []any{
+		map[string]any{"name": "surface.base", "paint_stack": []any{"fill", "border", "radius"}, "fill": "color.surface", "border": "border.subtle", "radius": "radius.md", "shadow": "", "overlay": "", "unsupported_blur": false, "unsupported_blur_rejected": true},
+		map[string]any{"name": "surface.elevated", "paint_stack": []any{"fill", "border", "radius", "shadow"}, "fill": "color.surface", "border": "border.subtle", "radius": "radius.md", "shadow": "elevation.2", "overlay": "", "unsupported_blur": false, "unsupported_blur_rejected": true},
+		map[string]any{"name": "control.primary", "paint_stack": []any{"fill", "radius"}, "fill": "color.accent", "border": "", "radius": "radius.sm", "shadow": "", "overlay": "", "unsupported_blur": false, "unsupported_blur_rejected": true},
+		map[string]any{"name": "translucent.panel", "paint_stack": []any{"fill", "border", "radius", "shadow", "overlay"}, "fill": "color.surfaceAlpha", "border": "border.glass", "radius": "radius.lg", "shadow": "elevation.3", "overlay": "gradient.vertical", "unsupported_blur": false, "unsupported_blur_rejected": true},
+	}
+}
+
+func validMorphAssetRefs() []any {
+	return []any{
+		map[string]any{"id": "project.new", "kind": "icon", "sha256": "sha256:6666666666666666666666666666666666666666666666666666666666666666", "local": true, "fallback_id": "icon.fallback", "tint_token": "color.accent"},
+		map[string]any{"id": "command.search", "kind": "icon", "sha256": "sha256:7777777777777777777777777777777777777777777777777777777777777777", "local": true, "fallback_id": "icon.fallback", "tint_token": "color.muted"},
+		map[string]any{"id": "status.warning", "kind": "icon", "sha256": "sha256:8888888888888888888888888888888888888888888888888888888888888888", "local": true, "fallback_id": "icon.fallback", "tint_token": "color.warning"},
+	}
+}
+
+func validMorphAffordances() []any {
+	return []any{
+		map[string]any{"name": "action", "role": "button", "focusable": true, "action": "activate", "input": "", "projects_accessibility": true},
+		map[string]any{"name": "field.text", "role": "textbox", "focusable": true, "action": "edit", "input": "editable_text", "projects_accessibility": true},
+		map[string]any{"name": "toggle", "role": "checkbox", "focusable": true, "action": "toggle", "input": "toggle", "projects_accessibility": true},
+		map[string]any{"name": "navigation", "role": "navigation", "focusable": false, "action": "", "input": "", "projects_accessibility": true},
+		map[string]any{"name": "region", "role": "region", "focusable": false, "action": "", "input": "", "projects_accessibility": true},
+		map[string]any{"name": "overlay", "role": "dialog", "focusable": true, "action": "dismiss", "input": "focus_trap", "projects_accessibility": true},
+		map[string]any{"name": "status", "role": "status", "focusable": false, "action": "", "input": "", "projects_accessibility": true},
+	}
+}
+
+func validMorphStateLenses() []any {
+	return []any{
+		map[string]any{"selector": "hover", "property": "paint.overlay", "deterministic": true},
+		map[string]any{"selector": "pressed", "property": "transform.scale", "deterministic": true},
+		map[string]any{"selector": "focusVisible", "property": "paint.outline", "deterministic": true},
+		map[string]any{"selector": "selected", "property": "accessibility.selected", "deterministic": true},
+		map[string]any{"selector": "disabled", "property": "input.disabled", "deterministic": true},
+		map[string]any{"selector": "error", "property": "paint.outline_color", "deterministic": true},
+		map[string]any{"selector": "loading", "property": "text.content", "deterministic": true},
+	}
+}
+
+func validMorphMotionPresets() []any {
+	return []any{
+		map[string]any{"name": "motion.fast", "duration_ms": 120, "curve": "ease.out", "properties": []any{"fill", "opacity", "transform"}, "reduced_motion": true, "deterministic_time": true},
+		map[string]any{"name": "motion.soft", "duration_ms": 180, "curve": "ease.inOut", "properties": []any{"fill", "opacity", "transform"}, "reduced_motion": true, "deterministic_time": true},
+	}
+}
+
+func validMorphRecipes() []any {
+	return []any{
+		map[string]any{"name": "control.action@1", "output": "Block", "slots": []any{"label", "icon"}, "inputs": []any{"text", "action", "variant"}, "expands_to_block_graph": true, "hidden_app_state": false, "platform_widgets": false, "core_primitive_promotion": false},
+		map[string]any{"name": "field.text@1", "output": "Block", "slots": []any{"label", "control"}, "inputs": []any{"value", "on_text"}, "expands_to_block_graph": true, "hidden_app_state": false, "platform_widgets": false, "core_primitive_promotion": false},
+		map[string]any{"name": "command.item@1", "output": "Block", "slots": []any{"icon", "title", "subtitle"}, "inputs": []any{"title", "subtitle", "icon", "selected"}, "expands_to_block_graph": true, "hidden_app_state": false, "platform_widgets": false, "core_primitive_promotion": false},
+		map[string]any{"name": "region.panel@1", "output": "Block", "slots": []any{"header", "body", "actions"}, "inputs": []any{"title"}, "expands_to_block_graph": true, "hidden_app_state": false, "platform_widgets": false, "core_primitive_promotion": false},
+	}
+}
+
+func validMorphRecipeExpansions() []any {
+	return []any{
+		map[string]any{"recipe": "control.action@1", "block_ids": []any{4}, "slot_bindings": []any{"label", "icon"}, "variant": "primary", "reported": true},
+		map[string]any{"recipe": "field.text@1", "block_ids": []any{3}, "slot_bindings": []any{"label", "control"}, "variant": "default", "reported": true},
+		map[string]any{"recipe": "command.item@1", "block_ids": []any{4, 5}, "slot_bindings": []any{"icon", "title", "subtitle"}, "variant": "selected", "reported": true},
+		map[string]any{"recipe": "region.panel@1", "block_ids": []any{2}, "slot_bindings": []any{"header", "body", "actions"}, "variant": "elevated", "reported": true},
+	}
+}
+
+func validMorphAccessibilityProjectionMap() map[string]any {
+	return map[string]any{
+		"schema":                   "tetra.surface.morph.accessibility-projection.v1",
+		"derived_from_block_graph": true,
+		"safety_overrides_win":     true,
+		"snapshot_evidence":        true,
+		"required_fields":          []any{"role", "name", "description", "action", "state", "bounds", "focus_order", "reading_order", "labelled_by", "label_for"},
+		"roles":                    []any{"button", "textbox", "checkbox", "navigation", "region", "dialog", "status"},
+	}
+}
+
+func validMorphEvidenceContractMap() map[string]any {
+	return map[string]any{
+		"capsule_hash":       "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		"token_graph_hash":   "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		"recipe_expansions":  true,
+		"block_tree":         true,
+		"resolved_layout":    true,
+		"paint_layers":       true,
+		"text_runs":          true,
+		"motion_frames":      true,
+		"asset_hashes":       true,
+		"accessibility_tree": true,
+		"memory_budget":      true,
+		"frame_checksums":    true,
+		"artifact_hashes":    true,
+	}
+}
+
+func validMorphMemoryBudgetMap() map[string]any {
+	return map[string]any{
+		"schema":                   "tetra.surface.morph-memory-budget.v1",
+		"expanded_recipe_count":    4,
+		"block_count":              24,
+		"paint_command_count":      6,
+		"layout_pass_count":        8,
+		"text_run_count":           3,
+		"motion_active_count":      1,
+		"glyph_cache_bytes":        4096,
+		"asset_cache_bytes":        5376,
+		"layout_cache_bytes":       8192,
+		"framebuffer_bytes":        256000,
+		"peak_rss_bytes":           0,
+		"alloc_count":              0,
+		"frame_count":              3,
+		"bounded_caches":           true,
+		"unbounded_cache_rejected": true,
+	}
+}
+
+func validMorphNegativeGuardsMap() map[string]any {
+	return map[string]any{
+		"no_core_widget_primitives":          true,
+		"no_dom_ui":                          true,
+		"no_react":                           true,
+		"no_electron":                        true,
+		"no_user_js":                         true,
+		"no_platform_widgets":                true,
+		"missing_token_rejected":             true,
+		"alias_cycle_rejected":               true,
+		"duplicate_token_source_rejected":    true,
+		"duplicate_recipe_name_rejected":     true,
+		"missing_recipe_expansion_rejected":  true,
+		"unresolved_token_rejected":          true,
+		"missing_asset_rejected":             true,
+		"unbounded_cache_rejected":           true,
+		"fake_motion_rejected":               true,
+		"fake_accessibility_rejected":        true,
+		"unsupported_target_rejected":        true,
+		"dirty_checkout_production_rejected": true,
+	}
+}
+
+func validLinuxX64RealWindowBlockSystemSurfaceReportJSON(t *testing.T, mutate func(*Report)) []byte {
+	t.Helper()
+	var report Report
+	if err := json.Unmarshal(validHeadlessBlockSystemSurfaceReportJSON(t, nil), &report); err != nil {
+		t.Fatalf("decode headless Block system report: %v", err)
+	}
+	report.Target = "linux-x64"
+	report.Runtime = "surface-linux-x64"
+	report.HostEvidence = HostEvidenceReport{
+		Level:       "linux-x64-real-window",
+		Backend:     "wayland-shm-rgba",
+		Framebuffer: true,
+		RealWindow:  true,
+		NativeInput: true,
+	}
+	report.Processes = []ProcessReport{
+		{Name: "tetra build", Kind: "build", Path: "tetra build --target linux-x64 examples/surface_block_system.tetra -o /tmp/surface-artifacts/surface-block-system", Ran: true, Pass: true, ExitCode: intPtrForTest(0)},
+		{Name: "surface component app", Kind: "app", Path: "/tmp/surface-artifacts/surface-block-system", Ran: true, Pass: true, ExitCode: intPtrForTest(1), ExpectedExitCode: intPtrForTest(1)},
+		{Name: "surface linux-x64 real-window probe", Kind: "app", Path: "/tmp/surface-artifacts/surface-block-system-real-window-probe", Ran: true, Pass: true, ExitCode: intPtrForTest(42), ExpectedExitCode: intPtrForTest(42)},
+		{Name: "surface linux-x64 runtime", Kind: "runtime", Path: "tools/cmd/surface-runtime-smoke --mode linux-x64-real-window-block-system", Ran: true, Pass: true, ExitCode: intPtrForTest(0)},
+	}
+	report.Artifacts = []ArtifactReport{
+		{Kind: "component-app", Path: "/tmp/surface-artifacts/surface-block-system", SHA256: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Size: 49172},
+	}
+	report.ArtifactScan = ArtifactScanReport{Root: "/tmp/surface-artifacts", FilesChecked: 1, ForbiddenPaths: nil, Pass: true}
+	report.Frames = []FrameReport{
+		{Order: 1, Width: 320, Height: 200, Stride: 1280, Checksum: "1111111111111111111111111111111111111111111111111111111111111111", Presented: true},
+		{Order: 2, Width: 320, Height: 200, Stride: 1280, Checksum: "2222222222222222222222222222222222222222222222222222222222222222", Presented: true},
+		{Order: 3, Width: 320, Height: 200, Stride: 1280, Checksum: "3333333333333333333333333333333333333333333333333333333333333333", Presented: true},
+		{Order: 5, Width: 400, Height: 240, Stride: 1600, Checksum: "5555555555555555555555555555555555555555555555555555555555555555", Presented: true},
+	}
+	report.BlockSystem.QualityLevel = "linux-x64-real-window-block-system-v1"
+	report.BlockSystem.Renderer = "wayland-shm-rgba"
+	report.BlockSystem.GoldenSet = "surface-block-system-linux-x64-real-window-v1"
+	report.BlockSystem.FrameCount = 4
+	report.BlockSystem.GoldenHash = "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+	report.BlockSystem.Frames = []BlockSystemFrameReport{
+		{Order: 1, Label: "initial", Width: 320, Height: 200, Stride: 1280, Checksum: "1111111111111111111111111111111111111111111111111111111111111111", RepeatChecksum: "1111111111111111111111111111111111111111111111111111111111111111", GoldenChecksum: "1111111111111111111111111111111111111111111111111111111111111111", PaintEvidence: true, LayoutEvidence: true, AccessibilityEvidence: true},
+		{Order: 2, Label: "focused", Width: 320, Height: 200, Stride: 1280, Checksum: "2222222222222222222222222222222222222222222222222222222222222222", RepeatChecksum: "2222222222222222222222222222222222222222222222222222222222222222", GoldenChecksum: "2222222222222222222222222222222222222222222222222222222222222222", PaintEvidence: true, LayoutEvidence: true, AccessibilityEvidence: true},
+		{Order: 3, Label: "motion", Width: 320, Height: 200, Stride: 1280, Checksum: "3333333333333333333333333333333333333333333333333333333333333333", RepeatChecksum: "3333333333333333333333333333333333333333333333333333333333333333", GoldenChecksum: "3333333333333333333333333333333333333333333333333333333333333333", PaintEvidence: true, LayoutEvidence: true, AccessibilityEvidence: true},
+		{Order: 5, Label: "real-window-focused", Width: 400, Height: 240, Stride: 1600, Checksum: "5555555555555555555555555555555555555555555555555555555555555555", RepeatChecksum: "5555555555555555555555555555555555555555555555555555555555555555", GoldenChecksum: "5555555555555555555555555555555555555555555555555555555555555555", PaintEvidence: true, LayoutEvidence: true, AccessibilityEvidence: true},
+	}
+	report.Events = appendEventReportsWithNextOrder(report.Events, []EventReport{
+		{Kind: "resize", TargetComponent: "BlockSystemApp", DispatchPath: []string{"BlockSystemApp"}, Handled: true, Pass: true, Width: 400, Height: 240, TimestampMS: 4, BufferSlots: []int{2, 0, 0, 0, 0, 400, 240, 4, 0}, BeforeState: map[string]string{"BlockSystemApp.width": "320"}, AfterState: map[string]string{"BlockSystemApp.width": "400"}},
+		{Kind: "close", TargetComponent: "BlockSystemApp", DispatchPath: []string{"BlockSystemApp"}, Handled: true, Pass: true, Width: 400, Height: 240, TimestampMS: 5, BufferSlots: []int{1, 0, 0, 0, 0, 400, 240, 5, 0}, BeforeState: map[string]string{"BlockSystemApp.closed": "false"}, AfterState: map[string]string{"BlockSystemApp.closed": "true"}},
+	})
+	report.StateTransitions = appendStateTransitionReportsWithNextOrder(report.StateTransitions, []StateTransitionReport{
+		{Component: "SubmitBlock", Field: "pressed", Before: "false", After: "true", Cause: "key_down"},
+		{Component: "BlockSystemApp", Field: "width", Before: "320", After: "400", Cause: "resize"},
+		{Component: "BlockSystemApp", Field: "closed", Before: "false", After: "true", Cause: "close"},
+	})
+	report.Cases = blockSystemLinuxX64RealWindowCasesForTest()
+	report.BlockSystem.MemoryBudget = blockMemoryBudgetForTest(&report)
+	if mutate != nil {
+		mutate(&report)
+	}
+	raw, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal linux-x64 real-window Block system report: %v", err)
+	}
+	return raw
+}
+
+func validWASM32WebBrowserCanvasBlockSystemSurfaceReportJSON(t *testing.T, mutate func(*Report)) []byte {
+	t.Helper()
+	var report Report
+	if err := json.Unmarshal(validHeadlessBlockSystemSurfaceReportJSON(t, nil), &report); err != nil {
+		t.Fatalf("decode headless Block system report: %v", err)
+	}
+	report.Target = "wasm32-web"
+	report.Runtime = "surface-wasm32-web"
+	report.HostEvidence = HostEvidenceReport{
+		Level:         "wasm32-web-browser-canvas-input",
+		Backend:       "browser-canvas-rgba",
+		Framebuffer:   true,
+		NativeInput:   true,
+		BrowserCanvas: true,
+		BrowserInput:  true,
+	}
+	report.Processes = []ProcessReport{
+		{Name: "tetra build", Kind: "build", Path: "tetra build --target wasm32-web examples/surface_block_system.tetra -o /tmp/surface-artifacts/surface-block-system.wasm", Ran: true, Pass: true, ExitCode: intPtrForTest(0)},
+		{Name: "surface wasm32-web browser canvas component app", Kind: "app", Path: "/usr/bin/chromium --headless <surface-browser-canvas-runner> scenario=block-system wasm=/tmp/surface-artifacts/surface-block-system.wasm", Ran: true, Pass: true, ExitCode: intPtrForTest(0), ExpectedExitCode: intPtrForTest(0)},
+		{Name: "surface wasm32-web import validator", Kind: "runtime", Path: "go run ./tools/cmd/validate-wasm-imports --target wasm32-web /tmp/surface-artifacts/surface-block-system.wasm", Ran: true, Pass: true, ExitCode: intPtrForTest(0)},
+		{Name: "surface wasm32-web browser canvas runtime", Kind: "runtime", Path: "Chromium Block-system fixture", Ran: true, Pass: true, ExitCode: intPtrForTest(0)},
+		{Name: "surface wasm32-web browser canvas trace", Kind: "runtime", Path: "/usr/bin/chromium --headless --dump-dom <surface-browser-canvas-file-runner scenario=block-system>", Ran: true, Pass: true, ExitCode: intPtrForTest(0)},
+	}
+	report.Artifacts = []ArtifactReport{
+		{Kind: "component-app", Path: "/tmp/surface-artifacts/surface-block-system.wasm", SHA256: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Size: 8604},
+		{Kind: "compiler-owned-loader", Path: "/tmp/surface-artifacts/surface-block-system.mjs", SHA256: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", Size: 4939},
+		{Kind: "runner-trace", Path: "/tmp/surface-artifacts/surface-runner-trace.json", SHA256: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", Size: 1184},
+	}
+	report.ArtifactScan = ArtifactScanReport{Root: "/tmp/surface-artifacts", FilesChecked: 3, ForbiddenPaths: nil, Pass: true}
+	report.Frames = []FrameReport{
+		{Order: 1, Width: 320, Height: 200, Stride: 1280, Checksum: "1111111111111111111111111111111111111111111111111111111111111111", Presented: true},
+		{Order: 3, Width: 320, Height: 200, Stride: 1280, Checksum: "3333333333333333333333333333333333333333333333333333333333333333", Presented: true},
+		{Order: 5, Width: 400, Height: 240, Stride: 1600, Checksum: "5555555555555555555555555555555555555555555555555555555555555555", Presented: true},
+	}
+	report.BlockSystem.QualityLevel = "wasm32-web-browser-canvas-block-system-v1"
+	report.BlockSystem.Renderer = "browser-canvas-rgba"
+	report.BlockSystem.GoldenSet = "surface-block-system-wasm32-web-browser-canvas-v1"
+	report.BlockSystem.FrameCount = 3
+	report.BlockSystem.GoldenHash = "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+	report.BlockSystem.Frames = []BlockSystemFrameReport{
+		{Order: 1, Label: "initial", Width: 320, Height: 200, Stride: 1280, Checksum: "1111111111111111111111111111111111111111111111111111111111111111", RepeatChecksum: "1111111111111111111111111111111111111111111111111111111111111111", GoldenChecksum: "1111111111111111111111111111111111111111111111111111111111111111", PaintEvidence: true, LayoutEvidence: true, AccessibilityEvidence: true},
+		{Order: 3, Label: "motion", Width: 320, Height: 200, Stride: 1280, Checksum: "3333333333333333333333333333333333333333333333333333333333333333", RepeatChecksum: "3333333333333333333333333333333333333333333333333333333333333333", GoldenChecksum: "3333333333333333333333333333333333333333333333333333333333333333", PaintEvidence: true, LayoutEvidence: true, AccessibilityEvidence: true},
+		{Order: 5, Label: "browser-canvas-focused", Width: 400, Height: 240, Stride: 1600, Checksum: "5555555555555555555555555555555555555555555555555555555555555555", RepeatChecksum: "5555555555555555555555555555555555555555555555555555555555555555", GoldenChecksum: "5555555555555555555555555555555555555555555555555555555555555555", PaintEvidence: true, LayoutEvidence: true, AccessibilityEvidence: true},
+	}
+	report.Events = appendEventReportsWithNextOrder(report.Events, []EventReport{
+		{Kind: "resize", TargetComponent: "BlockSystemApp", DispatchPath: []string{"BlockSystemApp"}, Handled: true, Pass: true, Width: 400, Height: 240, TimestampMS: 4, BufferSlots: []int{2, 0, 0, 0, 0, 400, 240, 4, 0}, BeforeState: map[string]string{"BlockSystemApp.width": "320"}, AfterState: map[string]string{"BlockSystemApp.width": "400"}},
+	})
+	report.StateTransitions = appendStateTransitionReportsWithNextOrder(report.StateTransitions, []StateTransitionReport{
+		{Component: "SubmitBlock", Field: "pressed", Before: "false", After: "true", Cause: "key_down"},
+		{Component: "BlockSystemApp", Field: "width", Before: "320", After: "400", Cause: "resize"},
+	})
+	report.Cases = blockSystemWASM32WebBrowserCanvasCasesForTest()
+	report.BlockSystem.MemoryBudget = blockMemoryBudgetForTest(&report)
+	if mutate != nil {
+		mutate(&report)
+	}
+	raw, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal wasm32-web browser-canvas Block system report: %v", err)
+	}
+	return raw
+}
+
+func blockSystemComponentsForTest() []ComponentReport {
+	abilities := []string{"measure", "layout", "draw", "event", "focus", "text", "accessibility"}
+	return []ComponentReport{
+		{ID: "BlockSystemApp", Type: "examples.surface_block_system.BlockSystemApp", Bounds: RectReport{X: 0, Y: 0, W: 320, H: 200}, Abilities: abilities, State: map[string]string{"focused_id": "4", "quality": "deterministic-headless-block-system-v1"}},
+		{ID: "PanelBlock", Type: "examples.surface_block_system.PanelBlock", Parent: "BlockSystemApp", Bounds: RectReport{X: 16, Y: 16, W: 288, H: 168}, Abilities: abilities, State: map[string]string{"paint_layers": "5"}},
+		{ID: "LabelBlock", Type: "examples.surface_block_system.LabelBlock", Parent: "PanelBlock", Bounds: RectReport{X: 24, Y: 24, W: 200, H: 24}, Abilities: abilities, State: map[string]string{"text_len": "4", "label_for": "4"}},
+		{ID: "SubmitBlock", Type: "examples.surface_block_system.ActionBlock", Parent: "PanelBlock", Bounds: RectReport{X: 24, Y: 64, W: 120, H: 44}, Abilities: abilities, State: map[string]string{"focused": "true", "action": "submit"}},
+		{ID: "ResetBlock", Type: "examples.surface_block_system.ActionBlock", Parent: "PanelBlock", Bounds: RectReport{X: 152, Y: 64, W: 120, H: 44}, Abilities: abilities, State: map[string]string{"focused": "false", "action": "reset"}},
+		{ID: "BlockLayoutApp", Type: "examples.surface_block_system.BlockLayoutApp", Bounds: RectReport{X: 0, Y: 0, W: 320, H: 200}, Abilities: abilities, State: map[string]string{"width": "480", "layout_quality": "deterministic-block-layout-v1"}},
+		{ID: "ScrollBlock", Type: "examples.surface_block_system.ScrollBlock", Parent: "BlockLayoutApp", Bounds: RectReport{X: 236, Y: 72, W: 72, H: 80}, Abilities: abilities, State: map[string]string{"scroll_y": "32"}},
+	}
+}
+
+func blockSystemEventsForTest() []EventReport {
+	return []EventReport{
+		{Order: 1, Kind: "mouse_up", TargetComponent: "SubmitBlock", DispatchPath: []string{"BlockSystemApp", "PanelBlock", "SubmitBlock"}, Handled: true, Pass: true, X: 40, Y: 80, Width: 320, Height: 200, BufferSlots: []int{5, 40, 80, 1, 0, 320, 200, 0, 0}, BeforeState: map[string]string{"SubmitBlock.focused": "false"}, AfterState: map[string]string{"SubmitBlock.focused": "true"}},
+		{Order: 2, Kind: "text_input", TargetComponent: "SubmitBlock", DispatchPath: []string{"BlockSystemApp", "PanelBlock", "SubmitBlock"}, Handled: true, Pass: true, Width: 320, Height: 200, TimestampMS: 1, TextLen: 2, TextBytesHex: "4f4b", BufferSlots: []int{8, 0, 0, 0, 0, 320, 200, 1, 2}, BeforeState: map[string]string{"SubmitBlock.value_len": "0"}, AfterState: map[string]string{"SubmitBlock.value_len": "2"}},
+		{Order: 3, Kind: "key_down", TargetComponent: "SubmitBlock", DispatchPath: []string{"BlockSystemApp", "PanelBlock", "SubmitBlock"}, Handled: true, Pass: true, Key: 13, Width: 320, Height: 200, TimestampMS: 2, BufferSlots: []int{3, 0, 0, 0, 13, 320, 200, 2, 0}, BeforeState: map[string]string{"SubmitBlock.pressed": "false"}, AfterState: map[string]string{"SubmitBlock.pressed": "true"}},
+		{Order: 4, Kind: "scroll", TargetComponent: "ScrollBlock", DispatchPath: []string{"BlockLayoutApp", "ScrollBlock"}, Handled: true, Pass: true, Width: 320, Height: 200, TimestampMS: 3, BufferSlots: []int{7, 0, 0, 0, 0, 320, 200, 3, 0}, BeforeState: map[string]string{"ScrollBlock.scroll_y": "0"}, AfterState: map[string]string{"ScrollBlock.scroll_y": "32"}},
+	}
+}
+
+func retargetBlockSystemComponentsForTest(components []ComponentReport) []ComponentReport {
+	retargeted := make([]ComponentReport, len(components))
+	for i, component := range components {
+		component.Type = "examples.surface_block_system." + typeBaseName(component.Type)
+		retargeted[i] = component
+	}
+	return retargeted
+}
+
+func typeBaseName(value string) string {
+	index := strings.LastIndex(value, ".")
+	if index < 0 {
+		return value
+	}
+	return value[index+1:]
+}
+
+func appendEventReportsWithNextOrder(events []EventReport, additions ...[]EventReport) []EventReport {
+	nextOrder := 0
+	if len(events) > 0 {
+		nextOrder = events[len(events)-1].Order
+	}
+	for _, group := range additions {
+		for _, event := range group {
+			nextOrder++
+			event.Order = nextOrder
+			events = append(events, event)
+		}
+	}
+	return events
+}
+
+func appendStateTransitionReportsWithNextOrder(transitions []StateTransitionReport, additions ...[]StateTransitionReport) []StateTransitionReport {
+	nextOrder := 0
+	if len(transitions) > 0 {
+		nextOrder = transitions[len(transitions)-1].Order
+	}
+	for _, group := range additions {
+		for _, transition := range group {
+			nextOrder++
+			transition.Order = nextOrder
+			transitions = append(transitions, transition)
+		}
+	}
+	return transitions
+}
+
+func blockSystemReadinessTransitionsForTest() []StateTransitionReport {
+	return []StateTransitionReport{
+		{Order: 1, Component: "InputBlock", Field: "buffer", Before: "", After: "OKd0a2", Cause: "text_input"},
+		{Order: 2, Component: "InputBlock", Field: "caret", Before: "0", After: "4", Cause: "text_input"},
+		{Order: 3, Component: "StateBlock", Field: "selector_flags", Before: "0", After: "127", Cause: "pointer/key/state input"},
+		{Order: 4, Component: "StateBlock", Field: "resolved_fill", Before: "#20262eff", After: "#2d9bf0ff", Cause: "hover"},
+		{Order: 5, Component: "StateBlock", Field: "resolved_scale", Before: "100", After: "97", Cause: "pressed"},
+		{Order: 6, Component: "StateBlock", Field: "disabled", Before: "false", After: "true", Cause: "disabled selector"},
+		{Order: 7, Component: "StateBlock", Field: "error", Before: "false", After: "true", Cause: "error selector"},
+		{Order: 8, Component: "StateBlock", Field: "loading", Before: "false", After: "true", Cause: "loading selector"},
+		{Order: 9, Component: "MotionBlock", Field: "opacity", Before: "80", After: "200", Cause: "motion frame"},
+		{Order: 10, Component: "MotionBlock", Field: "color", Before: "#203040ff", After: "#60aef4ff", Cause: "motion frame"},
+		{Order: 11, Component: "MotionBlock", Field: "scale", Before: "100", After: "108", Cause: "motion frame"},
+		{Order: 12, Component: "MotionBlock", Field: "translate_x", Before: "0", After: "12", Cause: "motion frame"},
+		{Order: 13, Component: "MotionBlock", Field: "motion_complete", Before: "false", After: "true", Cause: "duration elapsed"},
+		{Order: 14, Component: "MotionBlock", Field: "reduced_motion", Before: "false", After: "true", Cause: "accessibility setting"},
+		{Order: 15, Component: "IconBlock", Field: "tint", Before: "#ffffffff", After: "#60aef4ff", Cause: "asset tint"},
+		{Order: 16, Component: "ImageBlock", Field: "scale", Before: "1x", After: "2x", Cause: "asset scale"},
+		{Order: 17, Component: "MissingAssetBlock", Field: "fallback", Before: "missing", After: "fallback-raster", Cause: "missing asset"},
+	}
+}
+
+func blockSystemCasesForTest() []CaseReport {
+	return []CaseReport{
+		{Name: "block graph duplicate id rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "duplicate Block ID"},
+		{Name: "block graph missing parent rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "missing parent"},
+		{Name: "block graph cycle rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "cycle"},
+		{Name: "block graph child order", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block graph focus order", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block graph hit-test path", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block graph accessibility order", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block paint fill border radius shadow outline", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block paint deterministic command order", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block paint frame checksum changed", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block paint unsupported blur rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "unsupported blur"},
+		{Name: "block text deterministic measurement", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block text wrap ellipsis layout", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block text font fallback chain", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block text bounded glyph cache", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block text render command evidence", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block text editable lifetime", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block layout nested row column", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block layout fit fill fixed min max", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block layout grid dock overlay scroll", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block layout clipping z-order", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block layout resize constraints", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block layout no css flexbox parity", Kind: "negative", Ran: true, Pass: true, ExpectedError: "CSS flexbox parity nonclaim"},
+		{Name: "block state selector resolver order", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block state hover fill override", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block state pressed scale override", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block state focus selected metadata", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block state disabled error loading overrides", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block state frame checksum changed", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block state no css pseudo parity", Kind: "negative", Ran: true, Pass: true, ExpectedError: "css pseudo nonclaim"},
+		{Name: "block motion deterministic test clock", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block motion opacity color transform frames", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block motion reduced motion instant settle", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block motion completion stops scheduling", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block motion frame checksum changed", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block motion no css animation parity", Kind: "negative", Ran: true, Pass: true, ExpectedError: "css animation nonclaim"},
+		{Name: "block asset deterministic manifest hashes", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block asset local embedded only", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block asset bounded cache", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block asset icon tint evidence", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block asset image scale evidence", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block asset missing fallback diagnostic", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block asset network url rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "network asset rejected"},
+		{Name: "block accessibility tree derived from block graph", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block accessibility focusable actionable name required", Kind: "negative", Ran: true, Pass: true, ExpectedError: "missing accessible name"},
+		{Name: "block accessibility label relationship mismatch rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "label relationship mismatch"},
+		{Name: "block accessibility reading order graph mismatch rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "reading order mismatch"},
+		{Name: "block accessibility screen-reader claim without platform proof rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "screen reader proof required"},
+		{Name: "block accessibility platform claim scoped metadata only", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block system headless golden checksums", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block system deterministic repeat checksum", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block system missing frame checksum rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "frame checksum required"},
+		{Name: "block system nondeterministic checksum rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "repeat checksum mismatch"},
+		{Name: "block system missing paint evidence rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "paint evidence required"},
+		{Name: "block system missing layout evidence rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "layout evidence required"},
+		{Name: "block system missing accessibility evidence rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "accessibility evidence required"},
+		{Name: "block system bounded memory budget", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block system stress render loop budget", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block system performance nonclaim", Kind: "negative", Ran: true, Pass: true, ExpectedError: "Electron comparison benchmark not claimed"},
+	}
+}
+
+func blockSystemLinuxX64RealWindowCasesForTest() []CaseReport {
+	cases := []CaseReport{
+		{Name: "pure Tetra component app", Kind: "positive", Ran: true, Pass: true},
+		{Name: "host-provided pointer event dispatch", Kind: "positive", Ran: true, Pass: true},
+		{Name: "host event buffer poll_event", Kind: "positive", Ran: true, Pass: true},
+		{Name: "pre/post event frame sequence", Kind: "positive", Ran: true, Pass: true},
+		{Name: "component hierarchy dispatch", Kind: "positive", Ran: true, Pass: true},
+		{Name: "component text input scalar dispatch", Kind: "positive", Ran: true, Pass: true},
+		{Name: "host text payload buffer", Kind: "positive", Ran: true, Pass: true},
+		{Name: "component focus dispatch", Kind: "positive", Ran: true, Pass: true},
+		{Name: "component accessibility metadata", Kind: "positive", Ran: true, Pass: true},
+		{Name: "no legacy UI sidecar artifacts", Kind: "positive", Ran: true, Pass: true},
+		{Name: "state transition", Kind: "positive", Ran: true, Pass: true},
+	}
+	for _, tc := range blockSystemCasesForTest() {
+		name := strings.ToLower(tc.Name)
+		if strings.Contains(name, "headless") {
+			continue
+		}
+		if strings.Contains(name, "deterministic repeat checksum") {
+			continue
+		}
+		cases = append(cases, tc)
+	}
+	cases = append(cases,
+		CaseReport{Name: "linux-x64 real-window surface", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "linux-x64 native input event pump", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "linux-x64 real-window resize event", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "linux-x64 real-window close event", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block system linux-x64 real-window frame presentation", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block system linux-x64 native input state transition", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block system linux-x64 real-window checksum", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block system missing real-window presentation rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "real-window presentation required"},
+		CaseReport{Name: "block system missing native input state transition rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "native input required"},
+	)
+	return cases
+}
+
+func blockSystemWASM32WebBrowserCanvasCasesForTest() []CaseReport {
+	cases := []CaseReport{
+		{Name: "pure Tetra component app", Kind: "positive", Ran: true, Pass: true},
+		{Name: "host-provided pointer event dispatch", Kind: "positive", Ran: true, Pass: true},
+		{Name: "host event buffer poll_event", Kind: "positive", Ran: true, Pass: true},
+		{Name: "pre/post event frame sequence", Kind: "positive", Ran: true, Pass: true},
+		{Name: "component hierarchy dispatch", Kind: "positive", Ran: true, Pass: true},
+		{Name: "component text input scalar dispatch", Kind: "positive", Ran: true, Pass: true},
+		{Name: "host text payload buffer", Kind: "positive", Ran: true, Pass: true},
+		{Name: "component focus dispatch", Kind: "positive", Ran: true, Pass: true},
+		{Name: "component accessibility metadata", Kind: "positive", Ran: true, Pass: true},
+		{Name: "no legacy UI sidecar artifacts", Kind: "positive", Ran: true, Pass: true},
+		{Name: "state transition", Kind: "positive", Ran: true, Pass: true},
+	}
+	for _, tc := range blockSystemCasesForTest() {
+		name := strings.ToLower(tc.Name)
+		if strings.Contains(name, "headless") {
+			continue
+		}
+		if strings.Contains(name, "deterministic repeat checksum") {
+			continue
+		}
+		cases = append(cases, tc)
+	}
+	cases = append(cases,
+		CaseReport{Name: "wasm32-web browser canvas surface", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "wasm32-web browser canvas RGBA readback", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "wasm32-web browser canvas pointer input", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "wasm32-web browser canvas keyboard input", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "wasm32-web browser canvas resize input", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "wasm32-web browser canvas text input", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "wasm32-web Surface Host ABI imports", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "compiler-owned wasm Surface loader", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "compiler-owned browser canvas Surface host", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block system wasm32-web browser-canvas frame readback", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block system wasm32-web browser-canvas native input state transition", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block system wasm32-web browser-canvas checksum", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block system browser-canvas node runtime substitution rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "browser evidence required"},
+		CaseReport{Name: "block system browser-canvas missing RGBA readback rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "RGBA readback required"},
+		CaseReport{Name: "block system browser-canvas script sidecar artifact rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "script artifact rejected"},
+		CaseReport{Name: "block system browser-canvas html visual sidecar artifact rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "html artifact rejected"},
+	)
+	return cases
+}
+
+func blockAccessibilityComponentsForTest() []ComponentReport {
+	abilities := []string{"measure", "layout", "draw", "event", "focus", "text", "accessibility"}
+	return []ComponentReport{
+		{ID: "BlockAccessibilityApp", Type: "examples.surface_block_accessibility.BlockAccessibilityApp", Bounds: RectReport{X: 0, Y: 0, W: 320, H: 200}, Abilities: abilities, State: map[string]string{"focused_id": "4", "a11y_quality": "block-derived-accessibility-metadata-v1"}},
+		{ID: "LabelBlock", Type: "examples.surface_block_accessibility.LabelBlock", Parent: "BlockAccessibilityApp", Bounds: RectReport{X: 24, Y: 24, W: 200, H: 24}, Abilities: abilities, State: map[string]string{"text_len": "4", "label_for": "4"}},
+		{ID: "SubmitBlock", Type: "examples.surface_block_accessibility.ActionBlock", Parent: "BlockAccessibilityApp", Bounds: RectReport{X: 24, Y: 64, W: 120, H: 44}, Abilities: abilities, State: map[string]string{"focused": "true", "action": "submit"}},
+		{ID: "ResetBlock", Type: "examples.surface_block_accessibility.ActionBlock", Parent: "BlockAccessibilityApp", Bounds: RectReport{X: 152, Y: 64, W: 120, H: 44}, Abilities: abilities, State: map[string]string{"focused": "false", "action": "reset"}},
+	}
+}
+
+func blockAccessibilityTreeForTest(source string) *BlockAccessibilityTreeReport {
+	return &BlockAccessibilityTreeReport{
+		Schema:                  "tetra.surface.block-accessibility-tree.v1",
+		AccessibilityLevel:      "block-metadata-tree-v1",
+		Source:                  source,
+		Module:                  "lib.core.block",
+		QualityLevel:            "block-derived-accessibility-metadata-v1",
+		BlockGraphSchema:        "tetra.surface.block-graph.v1",
+		DerivedFromBlockGraph:   true,
+		ManualBookkeeping:       false,
+		PlatformHostIntegration: false,
+		DOMARIAIntegration:      false,
+		ScreenReaderEvidence:    false,
+		NoDOMUI:                 true,
+		NoUserJS:                true,
+		NoPlatformWidgets:       true,
+		NodeCount:               3,
+		FocusableCount:          2,
+		RolesPresent:            []string{"text", "button"},
+		FocusOrder:              []int{4, 5},
+		ReadingOrder:            []int{3, 4, 5},
+		Nodes: []BlockAccessibilityNodeReport{
+			{ID: 3, BlockID: 3, ParentBlockID: 2, Name: "LabelBlock", Role: "text", Bounds: RectReport{X: 24, Y: 24, W: 200, H: 24}, Visible: true, Enabled: true, Focusable: false, LabelFor: "SubmitBlock", FocusIndex: -1, ReadingIndex: 0},
+			{ID: 4, BlockID: 4, ParentBlockID: 2, Name: "SubmitBlock", Role: "button", Description: "primary action", Bounds: RectReport{X: 24, Y: 64, W: 120, H: 44}, Visible: true, Enabled: true, Focusable: true, Focused: true, LabelledBy: "LabelBlock", Actions: []string{"focus", "press", "submit"}, FocusIndex: 0, ReadingIndex: 1},
+			{ID: 5, BlockID: 5, ParentBlockID: 2, Name: "ResetBlock", Role: "button", Description: "secondary action", Bounds: RectReport{X: 152, Y: 64, W: 120, H: 44}, Visible: true, Enabled: true, Focusable: true, Actions: []string{"focus", "press", "reset"}, FocusIndex: 1, ReadingIndex: 2},
+		},
+		Relationships: []AccessibilityRelationshipReport{
+			{Kind: "label_for", From: "LabelBlock", To: "SubmitBlock"},
+			{Kind: "labelled_by", From: "SubmitBlock", To: "LabelBlock"},
+		},
+		Actions: []AccessibilityActionReport{
+			{Target: "SubmitBlock", Action: "press", Semantic: "submit"},
+			{Target: "ResetBlock", Action: "press", Semantic: "reset"},
+		},
+		NegativeGuards: BlockAccessibilityNegativeGuardsReport{
+			FocusableActionNameChecked:    true,
+			LabelRelationshipsChecked:     true,
+			ReadingOrderGraphChecked:      true,
+			BoundsAlignmentChecked:        true,
+			FakeScreenReaderClaimRejected: true,
+			ScopedPlatformClaimChecked:    true,
+		},
+	}
+}
+
+func blockAccessibilityEventsForTest() []EventReport {
+	return []EventReport{
+		{Order: 1, Kind: "mouse_up", TargetComponent: "SubmitBlock", DispatchPath: []string{"BlockAccessibilityApp", "SubmitBlock"}, Handled: true, Pass: true, X: 40, Y: 80, Width: 320, Height: 200, BufferSlots: []int{5, 40, 80, 1, 0, 320, 200, 0, 0}, BeforeState: map[string]string{"SubmitBlock.focused": "false"}, AfterState: map[string]string{"SubmitBlock.focused": "true"}},
+		{Order: 2, Kind: "text_input", TargetComponent: "SubmitBlock", DispatchPath: []string{"BlockAccessibilityApp", "SubmitBlock"}, Handled: true, Pass: true, Width: 320, Height: 200, TimestampMS: 1, TextLen: 2, TextBytesHex: "4f4b", BufferSlots: []int{8, 0, 0, 0, 0, 320, 200, 1, 2}, BeforeState: map[string]string{"SubmitBlock.value_len": "0"}, AfterState: map[string]string{"SubmitBlock.value_len": "2"}},
+		{Order: 3, Kind: "key_down", TargetComponent: "SubmitBlock", DispatchPath: []string{"BlockAccessibilityApp", "SubmitBlock"}, Handled: true, Pass: true, Key: 13, Width: 320, Height: 200, TimestampMS: 2, BufferSlots: []int{3, 0, 0, 0, 13, 320, 200, 2, 0}, BeforeState: map[string]string{"SubmitBlock.pressed": "false"}, AfterState: map[string]string{"SubmitBlock.pressed": "true"}},
+	}
+}
+
+func blockTextComponentsForTest() []ComponentReport {
+	abilities := []string{"measure", "layout", "draw", "event", "focus", "text", "accessibility"}
+	return []ComponentReport{
+		{ID: "BlockTextApp", Type: "examples.surface_block_text.BlockTextApp", Bounds: RectReport{X: 0, Y: 0, W: 320, H: 200}, Abilities: abilities, State: map[string]string{"focused_id": "3", "text_quality": "deterministic-fallback-text-v1"}},
+		{ID: "TextBlock", Type: "examples.surface_block_text.TextSurfaceBlock", Parent: "BlockTextApp", Bounds: RectReport{X: 12, Y: 10, W: 96, H: 40}, Abilities: abilities, State: map[string]string{"text_len": "28", "line_count": "2", "ellipsis": "true"}},
+		{ID: "InputBlock", Type: "examples.surface_block_text.EditableTextBlock", Parent: "BlockTextApp", Bounds: RectReport{X: 12, Y: 58, W: 144, H: 36}, Abilities: abilities, State: map[string]string{"buffer": "OKd0a2", "caret": "4", "editable": "true"}},
+	}
+}
+
+func blockEventComponentsForTest() []ComponentReport {
+	abilities := []string{"measure", "layout", "draw", "event", "focus", "text", "accessibility"}
+	return []ComponentReport{
+		{ID: "BlockEventApp", Type: "examples.surface_block_events.BlockEventApp", Bounds: RectReport{X: 0, Y: 0, W: 320, H: 200}, Abilities: abilities, State: map[string]string{"focused_id": "4", "event_quality": "deterministic-block-events-v1"}},
+		{ID: "PanelBlock", Type: "examples.surface_block_events.PanelBlock", Parent: "BlockEventApp", Bounds: RectReport{X: 16, Y: 16, W: 288, H: 168}, Abilities: abilities, State: map[string]string{"role": "panel"}},
+		{ID: "LabelBlock", Type: "examples.surface_block_events.LabelBlock", Parent: "PanelBlock", Bounds: RectReport{X: 24, Y: 24, W: 200, H: 24}, Abilities: abilities, State: map[string]string{"text_len": "10"}},
+		{ID: "InputBlock", Type: "examples.surface_block_events.InputBlock", Parent: "PanelBlock", Bounds: RectReport{X: 24, Y: 64, W: 120, H: 44}, Abilities: abilities, State: map[string]string{"editable": "true", "focused": "true", "buffer": "OK"}},
+		{ID: "DisabledBlock", Type: "examples.surface_block_events.DisabledBlock", Parent: "PanelBlock", Bounds: RectReport{X: 152, Y: 64, W: 120, H: 44}, Abilities: abilities, State: map[string]string{"disabled": "true"}},
+		{ID: "ActionBlock", Type: "examples.surface_block_events.ActionBlock", Parent: "PanelBlock", Bounds: RectReport{X: 24, Y: 120, W: 120, H: 44}, Abilities: abilities, State: map[string]string{"focused": "false"}},
+	}
+}
+
+func blockStateComponentsForTest() []ComponentReport {
+	abilities := []string{"measure", "layout", "draw", "event", "focus", "text", "accessibility", "state"}
+	return []ComponentReport{
+		{ID: "BlockStateApp", Type: "examples.surface_block_states.BlockStateApp", Bounds: RectReport{X: 0, Y: 0, W: 320, H: 200}, Abilities: abilities, State: map[string]string{"state_quality": "deterministic-block-state-resolver-v1"}},
+		{ID: "StateBlock", Type: "examples.surface_block_states.StateBlock", Parent: "BlockStateApp", Bounds: RectReport{X: 24, Y: 40, W: 168, H: 56}, Abilities: abilities, State: map[string]string{"selector_flags": "127", "variant": "2", "disabled": "true", "error": "true", "loading": "true"}},
+		{ID: "StatusBlock", Type: "examples.surface_block_states.StatusBlock", Parent: "BlockStateApp", Bounds: RectReport{X: 24, Y: 112, W: 168, H: 32}, Abilities: abilities, State: map[string]string{"selected": "true", "focused": "true"}},
+	}
+}
+
+func blockMotionComponentsForTest() []ComponentReport {
+	abilities := []string{"measure", "layout", "draw", "event", "focus", "text", "accessibility", "state", "motion"}
+	return []ComponentReport{
+		{ID: "BlockMotionApp", Type: "examples.surface_block_motion.BlockMotionApp", Bounds: RectReport{X: 0, Y: 0, W: 320, H: 200}, Abilities: abilities, State: map[string]string{"motion_quality": "deterministic-block-motion-v1"}},
+		{ID: "MotionBlock", Type: "examples.surface_block_motion.MotionBlock", Parent: "BlockMotionApp", Bounds: RectReport{X: 24, Y: 44, W: 176, H: 64}, Abilities: abilities, State: map[string]string{"opacity": "200", "scale": "108", "translate_x": "12", "complete": "true"}},
+	}
+}
+
+func blockAssetComponentsForTest() []ComponentReport {
+	abilities := []string{"measure", "layout", "draw", "event", "focus", "text", "accessibility", "asset"}
+	return []ComponentReport{
+		{ID: "BlockAssetApp", Type: "examples.surface_block_assets.BlockAssetApp", Bounds: RectReport{X: 0, Y: 0, W: 320, H: 200}, Abilities: abilities, State: map[string]string{"asset_quality": "deterministic-local-block-assets-v1"}},
+		{ID: "IconBlock", Type: "examples.surface_block_assets.IconBlock", Parent: "BlockAssetApp", Bounds: RectReport{X: 24, Y: 36, W: 32, H: 32}, Abilities: abilities, State: map[string]string{"asset_id": "icon-settings", "tint": "#60aef4ff"}},
+		{ID: "ImageBlock", Type: "examples.surface_block_assets.ImageBlock", Parent: "BlockAssetApp", Bounds: RectReport{X: 72, Y: 32, W: 96, H: 64}, Abilities: abilities, State: map[string]string{"asset_id": "image-hero", "scale": "2x"}},
+		{ID: "MissingAssetBlock", Type: "examples.surface_block_assets.MissingAssetBlock", Parent: "BlockAssetApp", Bounds: RectReport{X: 24, Y: 112, W: 96, H: 32}, Abilities: abilities, State: map[string]string{"asset_id": "missing-logo", "fallback": "fallback-raster"}},
+	}
+}
+
+func blockAssetManifestForTest(source string) *BlockAssetManifestReport {
+	return &BlockAssetManifestReport{
+		Schema:        "tetra.surface.block-assets.v1",
+		Source:        source,
+		Quality:       "deterministic-local-block-assets-v1",
+		HashAlgorithm: "sha256",
+		ManifestHash:  "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+		LocalOnly:     true,
+		FontCount:     1,
+		IconCount:     1,
+		ImageCount:    1,
+		EmbeddedCount: 3,
+		RemoteCount:   0,
+		Assets: []BlockAssetReport{
+			{ID: "font-ui", Kind: "font", Path: "embedded://surface/font-ui", Embedded: true, Local: true, SHA256: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Size: 2048, Family: "Tetra UI", CacheKey: "font-ui"},
+			{ID: "icon-settings", Kind: "icon", Path: "embedded://surface/icon-settings", Embedded: true, Local: true, SHA256: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", Size: 256, Width: 16, Height: 16, CacheKey: "icon-settings"},
+			{ID: "image-hero", Kind: "image", Path: "embedded://surface/image-hero", Embedded: true, Local: true, SHA256: "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", Size: 1024, Width: 48, Height: 32, CacheKey: "image-hero"},
+		},
+	}
+}
+
+func blockAssetCacheForTest() BlockAssetCacheReport {
+	return BlockAssetCacheReport{ID: "asset-cache", Strategy: "bounded-lru", BudgetBytes: 65536, UsedBytes: 5376, EntryCount: 3, MaxEntries: 16, RepeatedLoads: 6, Eviction: "lru", Bounded: true}
+}
+
+func blockAssetDiagnosticsForTest() []BlockAssetDiagnosticReport {
+	return []BlockAssetDiagnosticReport{
+		{Order: 1, AssetID: "missing-logo", Kind: "image", Code: "missing_asset_fallback", Message: "missing local asset resolved to fallback raster", FallbackID: "fallback-raster-image", Pass: true},
+		{Order: 2, AssetID: "https://assets.example.test/logo.png", Kind: "image", Code: "network_asset_rejected", Message: "network assets are disabled for Surface Block v1", RejectedURL: "https://assets.example.test/logo.png", Pass: true},
+	}
+}
+
+func blockAssetRenderCommandsForTest() []BlockAssetRenderCommandReport {
+	return []BlockAssetRenderCommandReport{
+		{Order: 1, Command: "load_font", AssetID: "font-ui", BlockID: 1, Rect: RectReport{X: 0, Y: 0, W: 320, H: 200}, Quality: "font-manifest-metadata-v1", Checksum: "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"},
+		{Order: 2, Command: "tint_icon", AssetID: "icon-settings", BlockID: 2, Rect: RectReport{X: 24, Y: 36, W: 32, H: 32}, Tint: "#60aef4ff", Scale: 1, Quality: "icon-tint-software-v1", Checksum: "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"},
+		{Order: 3, Command: "scale_image", AssetID: "image-hero", BlockID: 3, Rect: RectReport{X: 72, Y: 32, W: 96, H: 64}, Scale: 2, Quality: "nearest-scale-v1", Checksum: "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"},
+		{Order: 4, Command: "fallback_missing", AssetID: "missing-logo", BlockID: 4, Rect: RectReport{X: 24, Y: 112, W: 96, H: 32}, Quality: "fallback-raster-v1", Checksum: "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"},
+	}
+}
+
+func blockMemoryBudgetForTest(report *Report) *BlockMemoryBudgetReport {
+	peakFramebufferBytes, totalFramebufferBytes := blockFramebufferByteTotals(report.Frames)
+	cacheUsedBytes := len(report.PaintCommands)*2048 + 4096 + report.BlockAssetCache.UsedBytes
+	return &BlockMemoryBudgetReport{
+		Schema:                   "tetra.surface.block-memory-budget.v1",
+		Scope:                    "surface-block-system-local-budget-v1",
+		BlockCount:               len(report.Components),
+		StressBlockCount:         128,
+		RenderLoopCount:          32,
+		StateLoopCount:           len(report.StateTransitions),
+		MotionFrameCount:         len(report.MotionFrames),
+		InputEventCount:          len(report.Events),
+		PaintCommandCount:        len(report.PaintCommands),
+		TextRenderCommandCount:   len(report.TextRenderCommands),
+		AssetRenderCommandCount:  len(report.BlockAssetRenderCommands),
+		PeakFramebufferBytes:     peakFramebufferBytes,
+		TotalFramebufferBytes:    totalFramebufferBytes,
+		FramebufferBudgetBytes:   1048576,
+		PaintCacheUsedBytes:      len(report.PaintCommands) * 2048,
+		PaintCacheBudgetBytes:    report.PaintCacheBudgetBytes,
+		TextCacheUsedBytes:       4096,
+		TextCacheBudgetBytes:     report.TextCacheBudgetBytes,
+		AssetCacheUsedBytes:      report.BlockAssetCache.UsedBytes,
+		AssetCacheBudgetBytes:    report.BlockAssetCache.BudgetBytes,
+		TotalCacheUsedBytes:      cacheUsedBytes,
+		TotalCacheBudgetBytes:    report.PaintCacheBudgetBytes + report.TextCacheBudgetBytes + report.BlockAssetCache.BudgetBytes,
+		EstimatedAllocationBytes: totalFramebufferBytes + cacheUsedBytes,
+		RSSMeasured:              false,
+		PeakRSSBytes:             0,
+		BoundedCaches:            true,
+		UnboundedCacheRejected:   true,
+		StressScene:              "deterministic-block-stress-128",
+		PerformanceClaim:         "none",
+		NonClaims: []string{
+			"no Electron comparison benchmark",
+			"no broad performance superiority claim",
+			"RSS is optional host evidence and not required for this local budget",
+		},
+	}
+}
+
+func blockAssetEventsForTest() []EventReport {
+	return []EventReport{
+		{Order: 1, Kind: "mouse_up", TargetComponent: "IconBlock", DispatchPath: []string{"BlockAssetApp", "IconBlock"}, Handled: true, Pass: true, X: 32, Y: 44, Width: 320, Height: 200, TimestampMS: 0, BufferSlots: []int{5, 32, 44, 1, 0, 320, 200, 0, 0}, BeforeState: map[string]string{"IconBlock.tint": "#ffffffff"}, AfterState: map[string]string{"IconBlock.tint": "#60aef4ff"}},
+		{Order: 2, Kind: "text_input", TargetComponent: "IconBlock", DispatchPath: []string{"BlockAssetApp", "IconBlock"}, Handled: true, Pass: true, Width: 320, Height: 200, TimestampMS: 1, TextLen: 2, TextBytesHex: "4f4b", BufferSlots: []int{8, 0, 0, 0, 0, 320, 200, 1, 2}, BeforeState: map[string]string{"IconBlock.label": ""}, AfterState: map[string]string{"IconBlock.label": "OK"}},
+	}
+}
+
+func blockLayoutComponentsForTest() []ComponentReport {
+	abilities := []string{"measure", "layout", "draw", "event", "focus", "text", "accessibility"}
+	return []ComponentReport{
+		{ID: "BlockLayoutApp", Type: "examples.surface_block_layout.BlockLayoutApp", Bounds: RectReport{X: 0, Y: 0, W: 320, H: 200}, Abilities: abilities, State: map[string]string{"layout_quality": "deterministic-block-layout-v1"}},
+		{ID: "ColumnBlock", Type: "examples.surface_block_layout.ColumnBlock", Parent: "BlockLayoutApp", Bounds: RectReport{X: 12, Y: 12, W: 296, H: 176}, Abilities: abilities, State: map[string]string{"mode": "column", "gap": "8"}},
+		{ID: "RowBlock", Type: "examples.surface_block_layout.RowBlock", Parent: "ColumnBlock", Bounds: RectReport{X: 24, Y: 24, W: 272, H: 48}, Abilities: abilities, State: map[string]string{"mode": "row", "gap": "6"}},
+		{ID: "GridBlock", Type: "examples.surface_block_layout.GridBlock", Parent: "ColumnBlock", Bounds: RectReport{X: 24, Y: 80, W: 132, H: 72}, Abilities: abilities, State: map[string]string{"mode": "grid", "columns": "2"}},
+		{ID: "DockBlock", Type: "examples.surface_block_layout.DockBlock", Parent: "ColumnBlock", Bounds: RectReport{X: 164, Y: 80, W: 132, H: 72}, Abilities: abilities, State: map[string]string{"mode": "dock"}},
+		{ID: "OverlayBlock", Type: "examples.surface_block_layout.OverlayBlock", Parent: "BlockLayoutApp", Bounds: RectReport{X: 220, Y: 20, W: 72, H: 40}, Abilities: abilities, State: map[string]string{"mode": "overlay", "z": "4"}},
+		{ID: "ScrollBlock", Type: "examples.surface_block_layout.ScrollBlock", Parent: "BlockLayoutApp", Bounds: RectReport{X: 236, Y: 72, W: 72, H: 80}, Abilities: abilities, State: map[string]string{"mode": "scroll", "clipped": "true"}},
+	}
+}
+
+func blockMotionFramesForTest() []MotionFrameReport {
+	return []MotionFrameReport{
+		{Order: 1, BlockID: 2, Trigger: "hover", TimestampMS: 0, DurationMS: 120, DelayMS: 0, Progress: 0, Easing: "linear", Opacity: 80, Color: "#203040ff", TranslateX: 0, TranslateY: 0, Scale: 100, ReducedMotion: false, Scheduled: true, Settled: false, Checksum: "sha256:1111111111111111111111111111111111111111111111111111111111111111"},
+		{Order: 2, BlockID: 2, Trigger: "hover", TimestampMS: 60, DurationMS: 120, DelayMS: 0, Progress: 500, Easing: "linear", Opacity: 140, Color: "#407094ff", TranslateX: 6, TranslateY: 0, Scale: 104, ReducedMotion: false, Scheduled: true, Settled: false, Checksum: "sha256:2222222222222222222222222222222222222222222222222222222222222222"},
+		{Order: 3, BlockID: 2, Trigger: "hover", TimestampMS: 120, DurationMS: 120, DelayMS: 0, Progress: 1000, Easing: "linear", Opacity: 200, Color: "#60aef4ff", TranslateX: 12, TranslateY: 0, Scale: 108, ReducedMotion: false, Scheduled: false, Settled: true, Checksum: "sha256:3333333333333333333333333333333333333333333333333333333333333333"},
+		{Order: 4, BlockID: 2, Trigger: "reduced_motion", TimestampMS: 121, DurationMS: 120, DelayMS: 0, Progress: 1000, Easing: "linear", Opacity: 200, Color: "#60aef4ff", TranslateX: 12, TranslateY: 0, Scale: 108, ReducedMotion: true, Scheduled: false, Settled: true, Checksum: "sha256:4444444444444444444444444444444444444444444444444444444444444444"},
+	}
+}
+
+func blockMotionEventsForTest() []EventReport {
+	return []EventReport{
+		{Order: 1, Kind: "mouse_up", TargetComponent: "MotionBlock", DispatchPath: []string{"BlockMotionApp", "MotionBlock"}, Handled: true, Pass: true, X: 48, Y: 72, Width: 320, Height: 200, TimestampMS: 0, BufferSlots: []int{5, 48, 72, 1, 0, 320, 200, 0, 0}, BeforeState: map[string]string{"MotionBlock.hovered": "false"}, AfterState: map[string]string{"MotionBlock.hovered": "true"}},
+		{Order: 2, Kind: "text_input", TargetComponent: "MotionBlock", DispatchPath: []string{"BlockMotionApp", "MotionBlock"}, Handled: true, Pass: true, Width: 320, Height: 200, TimestampMS: 1, TextLen: 2, TextBytesHex: "4f4b", BufferSlots: []int{8, 0, 0, 0, 0, 320, 200, 1, 2}, BeforeState: map[string]string{"MotionBlock.buffer": ""}, AfterState: map[string]string{"MotionBlock.buffer": "OK"}},
+	}
+}
+
+func blockStateSelectorsForTest() []BlockStateSelectorReport {
+	return []BlockStateSelectorReport{
+		{Order: 1, Name: "hover", BlockID: 2, Flags: 1, Hovered: true},
+		{Order: 2, Name: "pressed", BlockID: 2, Flags: 2, Pressed: true},
+		{Order: 3, Name: "focused", BlockID: 2, Flags: 4, Focused: true},
+		{Order: 4, Name: "selected", BlockID: 2, Flags: 8, Selected: true},
+		{Order: 5, Name: "disabled", BlockID: 2, Flags: 16, Disabled: true},
+		{Order: 6, Name: "error", BlockID: 2, Flags: 32, Error: true},
+		{Order: 7, Name: "loading", BlockID: 2, Flags: 64, Loading: true},
+	}
+}
+
+func blockStateResolutionsForTest() []BlockStateResolutionReport {
+	return []BlockStateResolutionReport{
+		{Order: 1, BlockID: 2, Selector: "hover", ResolverStep: "hover", Property: "paint.fill", Before: "#20262eff", After: "#2d9bf0ff", Applied: true},
+		{Order: 2, BlockID: 2, Selector: "pressed", ResolverStep: "pressed", Property: "layout.scale", Before: "100", After: "97", Applied: true},
+		{Order: 3, BlockID: 2, Selector: "focused", ResolverStep: "focused", Property: "paint.outline", Before: "none", After: "focus-ring", Applied: true},
+		{Order: 4, BlockID: 2, Selector: "selected", ResolverStep: "selected", Property: "accessibility.selected", Before: "false", After: "true", Applied: true},
+		{Order: 5, BlockID: 2, Selector: "disabled", ResolverStep: "disabled", Property: "input.disabled", Before: "false", After: "true", Applied: true},
+		{Order: 6, BlockID: 2, Selector: "disabled", ResolverStep: "disabled", Property: "text.opacity", Before: "255", After: "112", Applied: true},
+		{Order: 7, BlockID: 2, Selector: "error", ResolverStep: "error", Property: "paint.outline_color", Before: "#7aa2f7ff", After: "#ff5f57ff", Applied: true},
+		{Order: 8, BlockID: 2, Selector: "loading", ResolverStep: "loading", Property: "text.content", Before: "Run", After: "Loading", Applied: true},
+		{Order: 9, BlockID: 2, Selector: "motion", ResolverStep: "motion", Property: "motion.transition_ms", Before: "0", After: "120", Applied: true},
+	}
+}
+
+func blockStateEventsForTest() []EventReport {
+	return []EventReport{
+		{Order: 1, Kind: "mouse_up", TargetComponent: "StateBlock", DispatchPath: []string{"BlockStateApp", "StateBlock"}, Handled: true, Pass: true, X: 40, Y: 56, Width: 320, Height: 200, TimestampMS: 0, BufferSlots: []int{5, 40, 56, 1, 0, 320, 200, 0, 0}, BeforeState: map[string]string{"StateBlock.selected": "false"}, AfterState: map[string]string{"StateBlock.selected": "true"}},
+		{Order: 2, Kind: "mouse_move", TargetComponent: "StateBlock", DispatchPath: []string{"BlockStateApp", "StateBlock"}, Handled: true, Pass: true, X: 40, Y: 56, Width: 320, Height: 200, TimestampMS: 1, BufferSlots: []int{2, 40, 56, 0, 0, 320, 200, 1, 0}, BeforeState: map[string]string{"StateBlock.hovered": "false"}, AfterState: map[string]string{"StateBlock.hovered": "true"}},
+		{Order: 3, Kind: "mouse_down", TargetComponent: "StateBlock", DispatchPath: []string{"BlockStateApp", "StateBlock"}, Handled: true, Pass: true, X: 40, Y: 56, Width: 320, Height: 200, TimestampMS: 2, BufferSlots: []int{4, 40, 56, 1, 0, 320, 200, 2, 0}, BeforeState: map[string]string{"StateBlock.pressed": "false"}, AfterState: map[string]string{"StateBlock.pressed": "true"}},
+		{Order: 4, Kind: "text_input", TargetComponent: "StateBlock", DispatchPath: []string{"BlockStateApp", "StateBlock"}, Handled: true, Pass: true, Width: 320, Height: 200, TimestampMS: 3, TextLen: 2, TextBytesHex: "4f4b", BufferSlots: []int{8, 0, 0, 0, 0, 320, 200, 3, 2}, BeforeState: map[string]string{"StateBlock.buffer": ""}, AfterState: map[string]string{"StateBlock.buffer": "OK"}},
+		{Order: 5, Kind: "key_down", TargetComponent: "StateBlock", DispatchPath: []string{"BlockStateApp", "StateBlock"}, Handled: true, Pass: true, Key: 9, Width: 320, Height: 200, TimestampMS: 4, BufferSlots: []int{3, 0, 0, 0, 9, 320, 200, 4, 0}, BeforeState: map[string]string{"StateBlock.focused": "false"}, AfterState: map[string]string{"StateBlock.focused": "true"}},
+	}
+}
+
+func blockEventGraphReportForTest(source string) *BlockGraphReport {
+	return &BlockGraphReport{
+		Schema:            "tetra.surface.block-graph.v1",
+		APILevel:          "block-tree-builder-v1",
+		Source:            source,
+		ManualBookkeeping: false,
+		Builder: BlockGraphBuilderReport{
+			RootCreatedBy:     "tree_add_root",
+			ChildrenCreatedBy: "tree_add_child",
+			NodeCount:         6,
+			Capacity:          8,
+			OverflowChecked:   true,
+		},
+		Invariants: BlockGraphInvariantReport{
+			TreeValidateRan:         true,
+			TreeValidateStatus:      0,
+			DuplicateIDRejected:     true,
+			MissingParentRejected:   true,
+			CycleRejected:           true,
+			ParentChildLinksChecked: true,
+			ChildOrderChecked:       true,
+			FocusOrderChecked:       true,
+			HitTestPathChecked:      true,
+			AccessibilityChecked:    true,
+		},
+		RootID:    1,
+		NodeCount: 6,
+		Nodes: []BlockGraphNodeReport{
+			{ID: 1, Name: "BlockEventApp", ParentID: -1, ChildIndex: 0, FirstChild: 2, ChildCount: 1, Focusable: false, AccessibilityRole: "none", Bounds: RectReport{X: 0, Y: 0, W: 320, H: 200}},
+			{ID: 2, Name: "PanelBlock", ParentID: 1, ChildIndex: 0, FirstChild: 3, ChildCount: 4, Focusable: false, AccessibilityRole: "none", Bounds: RectReport{X: 16, Y: 16, W: 288, H: 168}},
+			{ID: 3, Name: "LabelBlock", ParentID: 2, ChildIndex: 0, FirstChild: -1, ChildCount: 0, Focusable: false, AccessibilityRole: "text", Bounds: RectReport{X: 24, Y: 24, W: 200, H: 24}},
+			{ID: 4, Name: "InputBlock", ParentID: 2, ChildIndex: 1, FirstChild: -1, ChildCount: 0, Focusable: true, AccessibilityRole: "textbox", Bounds: RectReport{X: 24, Y: 64, W: 120, H: 44}},
+			{ID: 5, Name: "DisabledBlock", ParentID: 2, ChildIndex: 2, FirstChild: -1, ChildCount: 0, Focusable: false, AccessibilityRole: "button", Bounds: RectReport{X: 152, Y: 64, W: 120, H: 44}},
+			{ID: 6, Name: "ActionBlock", ParentID: 2, ChildIndex: 3, FirstChild: -1, ChildCount: 0, Focusable: true, AccessibilityRole: "button", Bounds: RectReport{X: 24, Y: 120, W: 120, H: 44}},
+		},
+		ChildOrders: []BlockGraphChildOrderReport{
+			{ParentID: 1, Children: []int{2}},
+			{ParentID: 2, Children: []int{3, 4, 5, 6}},
+		},
+		LayoutOrder:        []int{1, 2, 3, 4, 5, 6},
+		DrawOrder:          []int{1, 2, 3, 4, 5, 6},
+		FocusOrder:         []int{4, 6},
+		AccessibilityOrder: []int{3, 4, 5, 6},
+		HitTests: []BlockGraphPathReport{
+			{Helper: "tree_hit_test_path", Event: "click", TargetID: 4, X: 40, Y: 80, Path: []int{1, 2, 4}},
+			{Helper: "tree_hit_test_path", Event: "click", TargetID: 5, X: 180, Y: 80, Path: []int{1, 2, 5}},
+		},
+		DispatchPaths: []BlockGraphPathReport{
+			{Helper: "tree_build_dispatch_path", Event: "click", TargetID: 4, Path: []int{1, 2, 4}},
+			{Helper: "tree_build_dispatch_path", Event: "click", TargetID: 5, Path: []int{1, 2, 5}},
+			{Helper: "tree_build_dispatch_path", Event: "key", TargetID: 6, Path: []int{1, 2, 6}},
+		},
+	}
+}
+
+func blockLayoutConstraintsForTest() []BlockLayoutConstraintReport {
+	return []BlockLayoutConstraintReport{
+		{ID: "root-column", BlockID: 1, Mode: "column", WidthPolicy: "fixed", HeightPolicy: "fixed", Min: SizeReport{W: 320, H: 200}, Max: SizeReport{W: 480, H: 260}, Padding: 12, Margin: 0, Gap: 8, Align: "stretch", Justify: "start", Overflow: "clip", ZIndex: 0, Clip: true},
+		{ID: "row-fill", BlockID: 3, Mode: "row", WidthPolicy: "fill", HeightPolicy: "fixed", Min: SizeReport{W: 160, H: 40}, Max: SizeReport{W: 296, H: 64}, Padding: 6, Margin: 0, Gap: 6, Align: "center", Justify: "space-between", Overflow: "visible", ZIndex: 1, Clip: false},
+		{ID: "text-fit", BlockID: 8, Mode: "absolute", WidthPolicy: "fit", HeightPolicy: "fit", Min: SizeReport{W: 32, H: 18}, Max: SizeReport{W: 160, H: 40}, Padding: 4, Margin: 0, Gap: 0, Align: "start", Justify: "start", Overflow: "clip", ZIndex: 2, Clip: true},
+		{ID: "overlay-z", BlockID: 6, Mode: "overlay", WidthPolicy: "fixed", HeightPolicy: "fixed", Min: SizeReport{W: 72, H: 40}, Max: SizeReport{W: 72, H: 40}, Padding: 0, Margin: 0, Gap: 0, Align: "end", Justify: "start", Overflow: "visible", ZIndex: 4, Clip: false},
+	}
+}
+
+func blockLayoutPassesForTest() []BlockLayoutPassReport {
+	return []BlockLayoutPassReport{
+		{Order: 1, ParentID: 0, BlockID: 1, Mode: "column", Input: RectReport{X: 0, Y: 0, W: 320, H: 200}, Resolved: RectReport{X: 12, Y: 12, W: 296, H: 176}, Measured: SizeReport{W: 296, H: 176}, Pass: "initial", Resize: false, Clip: true, ZIndex: 0, Checksum: "sha256:1111111111111111111111111111111111111111111111111111111111111111"},
+		{Order: 2, ParentID: 1, BlockID: 2, Mode: "stack", Input: RectReport{X: 12, Y: 12, W: 296, H: 176}, Resolved: RectReport{X: 12, Y: 12, W: 296, H: 176}, Measured: SizeReport{W: 296, H: 176}, Pass: "initial", Resize: false, Clip: false, ZIndex: 0, Checksum: "sha256:2222222222222222222222222222222222222222222222222222222222222222"},
+		{Order: 3, ParentID: 2, BlockID: 3, Mode: "row", Input: RectReport{X: 24, Y: 24, W: 272, H: 48}, Resolved: RectReport{X: 24, Y: 24, W: 272, H: 48}, Measured: SizeReport{W: 272, H: 48}, Pass: "nested", Resize: false, Clip: false, ZIndex: 1, Checksum: "sha256:3333333333333333333333333333333333333333333333333333333333333333"},
+		{Order: 4, ParentID: 2, BlockID: 4, Mode: "grid", Input: RectReport{X: 24, Y: 80, W: 132, H: 72}, Resolved: RectReport{X: 24, Y: 80, W: 63, H: 34}, Measured: SizeReport{W: 63, H: 34}, Pass: "grid-cell", Resize: false, Clip: true, ZIndex: 1, Checksum: "sha256:4444444444444444444444444444444444444444444444444444444444444444"},
+		{Order: 5, ParentID: 2, BlockID: 5, Mode: "dock", Input: RectReport{X: 164, Y: 80, W: 132, H: 72}, Resolved: RectReport{X: 164, Y: 80, W: 132, H: 24}, Measured: SizeReport{W: 132, H: 24}, Pass: "dock-top", Resize: false, Clip: true, ZIndex: 1, Checksum: "sha256:5555555555555555555555555555555555555555555555555555555555555555"},
+		{Order: 6, ParentID: 1, BlockID: 6, Mode: "overlay", Input: RectReport{X: 220, Y: 20, W: 72, H: 40}, Resolved: RectReport{X: 220, Y: 20, W: 72, H: 40}, Measured: SizeReport{W: 72, H: 40}, Pass: "overlay-z-order", Resize: false, Clip: false, ZIndex: 4, Checksum: "sha256:6666666666666666666666666666666666666666666666666666666666666666"},
+		{Order: 7, ParentID: 1, BlockID: 7, Mode: "scroll", Input: RectReport{X: 236, Y: 72, W: 72, H: 80}, Resolved: RectReport{X: 236, Y: 72, W: 72, H: 80}, Measured: SizeReport{W: 72, H: 160}, Pass: "scroll-clip", Resize: false, Clip: true, ZIndex: 2, Checksum: "sha256:7777777777777777777777777777777777777777777777777777777777777777"},
+		{Order: 8, ParentID: 1, BlockID: 8, Mode: "absolute", Input: RectReport{X: 32, Y: 152, W: 0, H: 0}, Resolved: RectReport{X: 32, Y: 152, W: 96, H: 20}, Measured: SizeReport{W: 96, H: 20}, Pass: "fit-text", Resize: false, Clip: true, ZIndex: 2, Checksum: "sha256:8888888888888888888888888888888888888888888888888888888888888888"},
+		{Order: 9, ParentID: 0, BlockID: 1, Mode: "column", Input: RectReport{X: 0, Y: 0, W: 480, H: 260}, Resolved: RectReport{X: 12, Y: 12, W: 456, H: 236}, Measured: SizeReport{W: 456, H: 236}, Pass: "resize", Resize: true, Clip: true, ZIndex: 0, Checksum: "sha256:9999999999999999999999999999999999999999999999999999999999999999"},
+	}
+}
+
+func blockLayoutScrollsForTest() []BlockLayoutScrollReport {
+	return []BlockLayoutScrollReport{
+		{BlockID: 7, Viewport: RectReport{X: 236, Y: 72, W: 72, H: 80}, Content: SizeReport{W: 72, H: 160}, OffsetY: 32, MaxOffsetY: 80, Clipped: true, Checksum: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+	}
+}
+
+func blockEventRoutesForTest() []BlockEventRouteReport {
+	return []BlockEventRouteReport{
+		{Order: 1, Kind: "click", Policy: "capture-bubble-direct-v1", TargetID: 4, TargetName: "InputBlock", HitTestPath: []int{1, 2, 4}, DispatchPath: []int{1, 2, 4}, CapturePath: []int{1, 2}, BubblePath: []int{2, 1}, DirectTargetID: 4, Delivered: true, Rejected: false, FocusedID: 4, Editable: true, Disabled: false},
+		{Order: 2, Kind: "click", Policy: "capture-bubble-direct-v1", TargetID: 5, TargetName: "DisabledBlock", HitTestPath: []int{1, 2, 5}, DispatchPath: []int{1, 2, 5}, CapturePath: []int{1, 2}, BubblePath: []int{2, 1}, DirectTargetID: 5, Delivered: false, Rejected: true, RejectReason: "disabled", FocusedID: 4, Editable: false, Disabled: true},
+		{Order: 3, Kind: "text", Policy: "direct-to-focused-editable-v1", TargetID: 4, TargetName: "InputBlock", DispatchPath: []int{1, 2, 4}, DirectTargetID: 4, Delivered: false, Rejected: true, RejectReason: "unfocused", FocusedID: 6, Editable: true, TextLen: 2, TextBytesHex: "4f4b"},
+		{Order: 4, Kind: "text", Policy: "direct-to-focused-editable-v1", TargetID: 4, TargetName: "InputBlock", DispatchPath: []int{1, 2, 4}, DirectTargetID: 4, Delivered: true, Rejected: false, FocusedID: 4, Editable: true, TextLen: 2, TextBytesHex: "4f4b"},
+		{Order: 5, Kind: "key", Policy: "direct-to-focused-v1", TargetID: 6, TargetName: "ActionBlock", DispatchPath: []int{1, 2, 6}, DirectTargetID: 6, Delivered: true, Rejected: false, FocusedID: 6, Editable: false, Disabled: false},
+	}
+}
+
+func blockFocusTransitionsForTest() []BlockFocusTransitionReport {
+	return []BlockFocusTransitionReport{
+		{Order: 1, Helper: "tree_focus_next", BeforeID: 4, AfterID: 6, Direction: "tab", GraphDerived: true, Wrapped: false},
+		{Order: 2, Helper: "tree_focus_next", BeforeID: 6, AfterID: 4, Direction: "tab", GraphDerived: true, Wrapped: true},
+	}
+}
+
+func blockTextEventsForTest() []EventReport {
+	return []EventReport{
+		{Order: 1, Kind: "mouse_up", TargetComponent: "InputBlock", DispatchPath: []string{"BlockTextApp", "InputBlock"}, Handled: true, Pass: true, X: 20, Y: 64, Width: 320, Height: 200, BufferSlots: []int{5, 20, 64, 1, 0, 320, 200, 0, 0}, BeforeState: map[string]string{"BlockTextApp.focused_id": "0", "InputBlock.focused": "false"}, AfterState: map[string]string{"BlockTextApp.focused_id": "3", "InputBlock.focused": "true"}},
+		{Order: 2, Kind: "text_input", TargetComponent: "InputBlock", DispatchPath: []string{"BlockTextApp", "InputBlock"}, Handled: true, Pass: true, Width: 320, Height: 200, TimestampMS: 1, TextLen: 4, TextBytesHex: "4f4bd0a2", BufferSlots: []int{8, 0, 0, 0, 0, 320, 200, 1, 4}, BeforeState: map[string]string{"InputBlock.buffer": "", "InputBlock.caret": "0"}, AfterState: map[string]string{"InputBlock.buffer": "OKd0a2", "InputBlock.caret": "4"}},
+	}
+}
+
+func blockEventRuntimeEventsForTest() []EventReport {
+	return []EventReport{
+		{Order: 1, Kind: "mouse_up", TargetComponent: "InputBlock", DispatchPath: []string{"BlockEventApp", "PanelBlock", "InputBlock"}, Handled: true, Pass: true, X: 40, Y: 80, Width: 320, Height: 200, BufferSlots: []int{5, 40, 80, 1, 0, 320, 200, 0, 0}, BeforeState: map[string]string{"BlockEventApp.focused_id": "0", "InputBlock.focused": "false"}, AfterState: map[string]string{"BlockEventApp.focused_id": "4", "InputBlock.focused": "true"}},
+		{Order: 2, Kind: "text_input", TargetComponent: "InputBlock", DispatchPath: []string{"BlockEventApp", "PanelBlock", "InputBlock"}, Handled: true, Pass: true, Width: 320, Height: 200, TimestampMS: 1, TextLen: 2, TextBytesHex: "4f4b", BufferSlots: []int{8, 0, 0, 0, 0, 320, 200, 1, 2}, BeforeState: map[string]string{"InputBlock.buffer": "", "InputBlock.caret": "0"}, AfterState: map[string]string{"InputBlock.buffer": "OK", "InputBlock.caret": "2"}},
+		{Order: 3, Kind: "key_down", TargetComponent: "BlockEventApp", DispatchPath: []string{"BlockEventApp"}, Handled: true, Pass: true, Key: 9, Width: 320, Height: 200, TimestampMS: 2, BufferSlots: []int{3, 0, 0, 0, 9, 320, 200, 2, 0}, BeforeState: map[string]string{"BlockEventApp.focused_id": "4"}, AfterState: map[string]string{"BlockEventApp.focused_id": "6"}},
+		{Order: 4, Kind: "key_down", TargetComponent: "BlockEventApp", DispatchPath: []string{"BlockEventApp"}, Handled: true, Pass: true, Key: 9, Width: 320, Height: 200, TimestampMS: 3, BufferSlots: []int{3, 0, 0, 0, 9, 320, 200, 3, 0}, BeforeState: map[string]string{"BlockEventApp.focused_id": "6"}, AfterState: map[string]string{"BlockEventApp.focused_id": "4"}},
+	}
+}
+
+func blockPaintLayersForTest() []PaintLayerReport {
+	return []PaintLayerReport{
+		{ID: "root-fill", BlockID: 1, Kind: "fill", Color: "#346ecfff", Radius: 8, Opacity: 255},
+		{ID: "root-gradient", BlockID: 1, Kind: "gradient", Color: "#54b484ff", Radius: 8, Opacity: 255},
+		{ID: "root-border", BlockID: 1, Kind: "border", Color: "#e2eaf2ff", Radius: 8, Width: 1, Opacity: 255},
+		{ID: "root-shadow", BlockID: 1, Kind: "shadow", Color: "#00000058", Blur: 12, OffsetX: 0, OffsetY: 4, Opacity: 88},
+		{ID: "root-outline", BlockID: 1, Kind: "outline", Color: "#f4cd5cff", Radius: 10, Width: 2, Opacity: 255},
+	}
+}
+
+func blockPaintCommandsForTest() []PaintCommandReport {
+	return []PaintCommandReport{
+		{Order: 1, Command: "fill", LayerID: "root-fill", BlockID: 1, Rect: RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Quality: "rounded-rect-v1", Checksum: "sha256:1111111111111111111111111111111111111111111111111111111111111111"},
+		{Order: 2, Command: "gradient", LayerID: "root-gradient", BlockID: 1, Rect: RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Quality: "two-stop-linear-v1", Checksum: "sha256:2222222222222222222222222222222222222222222222222222222222222222"},
+		{Order: 3, Command: "border", LayerID: "root-border", BlockID: 1, Rect: RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Quality: "rounded-outline-v1", Checksum: "sha256:3333333333333333333333333333333333333333333333333333333333333333"},
+		{Order: 4, Command: "shadow", LayerID: "root-shadow", BlockID: 1, Rect: RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Quality: "box-shadow-approx-v1", Checksum: "sha256:4444444444444444444444444444444444444444444444444444444444444444"},
+		{Order: 5, Command: "outline", LayerID: "root-outline", BlockID: 1, Rect: RectReport{X: 10, Y: 8, W: 68, H: 32}, Radius: 10, Quality: "rounded-outline-v1", Checksum: "sha256:5555555555555555555555555555555555555555555555555555555555555555"},
+	}
+}
+
+func blockTextMeasurementsForTest() []TextMeasurementReport {
+	return []TextMeasurementReport{
+		{ID: "title-measure", BlockID: 2, TextLen: 28, FontFamily: "Tetra UI", FontWeight: 600, FontSize: 16, LineHeight: 20, MaxWidth: 96, Measured: SizeReport{W: 96, H: 40}, LineCount: 2, Wrap: "word", Overflow: "ellipsis", Ellipsis: true, EllipsizedTextLen: 16, Align: "start", Quality: "deterministic-metrics-v1", Checksum: "sha256:6666666666666666666666666666666666666666666666666666666666666666"},
+		{ID: "input-measure", BlockID: 6, TextLen: 4, FontFamily: "Tetra UI", FontWeight: 400, FontSize: 14, LineHeight: 18, MaxWidth: 120, Measured: SizeReport{W: 34, H: 18}, LineCount: 1, Wrap: "none", Overflow: "clip", Ellipsis: false, EllipsizedTextLen: 4, Align: "start", Quality: "deterministic-metrics-v1", Checksum: "sha256:7777777777777777777777777777777777777777777777777777777777777777"},
+	}
+}
+
+func blockFontFallbacksForTest() []FontFallbackReport {
+	return []FontFallbackReport{
+		{ID: "ui-fallback", RequestedFamily: "Tetra UI", ResolvedFamily: "Tetra UI Fallback", Chain: []string{"Tetra UI", "Noto Sans", "monospace"}, MissingGlyphs: 0, Coverage: "ascii-plus-basic-utf8-smoke"},
+	}
+}
+
+func blockGlyphCachesForTest() []GlyphCacheReport {
+	return []GlyphCacheReport{
+		{ID: "glyph-cache", Strategy: "bounded-lru", BudgetBytes: 65536, UsedBytes: 4096, EntryCount: 12, Eviction: "lru", Bounded: true},
+	}
+}
+
+func blockTextRenderCommandsForTest() []TextRenderCommandReport {
+	return []TextRenderCommandReport{
+		{Order: 1, Command: "measure", MeasurementID: "title-measure", BlockID: 2, Rect: RectReport{X: 12, Y: 10, W: 96, H: 40}, Clip: RectReport{X: 12, Y: 10, W: 96, H: 40}, Color: "#edf2f7ff", Opacity: 255, Quality: "deterministic-text-measure-v1", Checksum: "sha256:8888888888888888888888888888888888888888888888888888888888888888"},
+		{Order: 2, Command: "render_glyphs", MeasurementID: "title-measure", BlockID: 2, Rect: RectReport{X: 12, Y: 10, W: 96, H: 40}, Clip: RectReport{X: 12, Y: 10, W: 96, H: 40}, Color: "#edf2f7ff", Opacity: 255, Quality: "deterministic-glyph-markers-v1", Checksum: "sha256:9999999999999999999999999999999999999999999999999999999999999999"},
+		{Order: 3, Command: "render_caret", MeasurementID: "input-measure", BlockID: 6, Rect: RectReport{X: 12, Y: 48, W: 120, H: 18}, Clip: RectReport{X: 12, Y: 48, W: 144, H: 36}, Color: "#f4cd5cff", Opacity: 255, Quality: "deterministic-caret-v1", Checksum: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+	}
+}
+
+func removeString(values []string, value string) []string {
+	filtered := values[:0]
+	for _, current := range values {
+		if current == value {
+			continue
+		}
+		filtered = append(filtered, current)
+	}
+	return filtered
+}
+
+func removePaintLayerKind(layers []PaintLayerReport, kind string) []PaintLayerReport {
+	filtered := layers[:0]
+	for _, layer := range layers {
+		if layer.Kind == kind {
+			continue
+		}
+		filtered = append(filtered, layer)
+	}
+	return filtered
+}
+
+func removePaintCommand(commands []PaintCommandReport, command string) []PaintCommandReport {
+	filtered := commands[:0]
+	for _, current := range commands {
+		if current.Command == command {
+			continue
+		}
+		filtered = append(filtered, current)
+	}
+	return filtered
+}
+
+func removeBlockAssetRenderCommand(commands []BlockAssetRenderCommandReport, command string) []BlockAssetRenderCommandReport {
+	filtered := commands[:0]
+	for _, current := range commands {
+		if current.Command == command {
+			continue
+		}
+		filtered = append(filtered, current)
+	}
+	return filtered
+}
+
+func removeBlockLayoutPassMode(passes []BlockLayoutPassReport, mode string) []BlockLayoutPassReport {
+	filtered := passes[:0]
+	for _, current := range passes {
+		if normalizeLayoutToken(current.Mode) == normalizeLayoutToken(mode) {
+			continue
+		}
+		filtered = append(filtered, current)
+	}
+	return filtered
+}
+
+func blockGraphReportForTest(source string) *BlockGraphReport {
+	return &BlockGraphReport{
+		Schema:            "tetra.surface.block-graph.v1",
+		APILevel:          "block-tree-builder-v1",
+		Source:            source,
+		ManualBookkeeping: false,
+		Builder: BlockGraphBuilderReport{
+			RootCreatedBy:     "tree_add_root",
+			ChildrenCreatedBy: "tree_add_child",
+			NodeCount:         5,
+			Capacity:          8,
+			OverflowChecked:   true,
+		},
+		Invariants: BlockGraphInvariantReport{
+			TreeValidateRan:         true,
+			TreeValidateStatus:      0,
+			DuplicateIDRejected:     true,
+			MissingParentRejected:   true,
+			CycleRejected:           true,
+			ParentChildLinksChecked: true,
+			ChildOrderChecked:       true,
+			FocusOrderChecked:       true,
+			HitTestPathChecked:      true,
+			AccessibilityChecked:    true,
+		},
+		RootID:    1,
+		NodeCount: 5,
+		Nodes: []BlockGraphNodeReport{
+			{ID: 1, Name: "RootBlock", ParentID: -1, ChildIndex: 0, FirstChild: 2, ChildCount: 1, Focusable: false, AccessibilityRole: "none", Bounds: RectReport{X: 0, Y: 0, W: 320, H: 200}},
+			{ID: 2, Name: "PanelBlock", ParentID: 1, ChildIndex: 0, FirstChild: 3, ChildCount: 3, Focusable: false, AccessibilityRole: "none", Bounds: RectReport{X: 16, Y: 16, W: 288, H: 168}},
+			{ID: 3, Name: "LabelBlock", ParentID: 2, ChildIndex: 0, FirstChild: -1, ChildCount: 0, Focusable: false, AccessibilityRole: "text", Bounds: RectReport{X: 24, Y: 24, W: 200, H: 24}},
+			{ID: 4, Name: "SubmitBlock", ParentID: 2, ChildIndex: 1, FirstChild: -1, ChildCount: 0, Focusable: true, AccessibilityRole: "button", Bounds: RectReport{X: 24, Y: 64, W: 120, H: 44}},
+			{ID: 5, Name: "ResetBlock", ParentID: 2, ChildIndex: 2, FirstChild: -1, ChildCount: 0, Focusable: true, AccessibilityRole: "button", Bounds: RectReport{X: 152, Y: 64, W: 120, H: 44}},
+		},
+		ChildOrders: []BlockGraphChildOrderReport{
+			{ParentID: 1, Children: []int{2}},
+			{ParentID: 2, Children: []int{3, 4, 5}},
+		},
+		LayoutOrder:        []int{1, 2, 3, 4, 5},
+		DrawOrder:          []int{1, 2, 3, 4, 5},
+		FocusOrder:         []int{4, 5},
+		AccessibilityOrder: []int{3, 4, 5},
+		HitTests: []BlockGraphPathReport{
+			{Helper: "tree_hit_test_path", Event: "click", TargetID: 5, X: 180, Y: 80, Path: []int{1, 2, 5}},
+		},
+		DispatchPaths: []BlockGraphPathReport{
+			{Helper: "tree_build_dispatch_path", Event: "click", TargetID: 4, Path: []int{1, 2, 4}},
+			{Helper: "tree_build_dispatch_path", Event: "click", TargetID: 5, Path: []int{1, 2, 5}},
 		},
 	}
 }

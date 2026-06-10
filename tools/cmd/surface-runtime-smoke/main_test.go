@@ -197,6 +197,453 @@ func TestHeadlessCounterScenarioFrameChecksumComesFromRGBAFramebuffer(t *testing
 	}
 }
 
+func TestBlockPaintScenarioProducesVisualPaintEvidence(t *testing.T) {
+	scenario := runBlockPaintScenario()
+	report := buildReport(smokeOptions{
+		Mode:       "headless-block-paint",
+		SourcePath: "examples/surface_block_paint_layers.tetra",
+	}, "linux-x64", []surface.ProcessReport{
+		{Name: "tetra build", Kind: "build", Path: "tetra build --target linux-x64 examples/surface_block_paint_layers.tetra -o /tmp/surface-artifacts/surface-block-paint", Ran: true, Pass: true, ExitCode: intPtr(0)},
+		{Name: "surface component app", Kind: "app", Path: "/tmp/surface-artifacts/surface-block-paint", Ran: true, Pass: true, ExitCode: intPtr(1), ExpectedExitCode: intPtr(1)},
+		{Name: "surface headless runtime", Kind: "runtime", Path: "tools/cmd/surface-runtime-smoke --mode headless-block-paint", Ran: true, Pass: true, ExitCode: intPtr(0)},
+	}, headlessSurfaceArtifacts("/tmp/surface-artifacts/surface-block-paint"), cleanArtifactScan(2), scenario)
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := surface.ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
+	}
+	if len(report.PaintLayers) < 5 || len(report.PaintCommands) < 5 {
+		t.Fatalf("paint evidence = layers %#v commands %#v, want layered paint commands", report.PaintLayers, report.PaintCommands)
+	}
+	if !caseNamesContain(scenario.Cases, "block paint deterministic command order") || !caseNamesContain(scenario.Cases, "block paint unsupported blur rejected") {
+		t.Fatalf("scenario cases = %#v, want paint command order and unsupported blur evidence", scenario.Cases)
+	}
+	if len(scenario.Frames) < 2 || scenario.Frames[0].Checksum == scenario.Frames[1].Checksum {
+		t.Fatalf("paint scenario frames = %#v, want visual checksum change across hover/pressed paint state", scenario.Frames)
+	}
+}
+
+func TestBlockTextScenarioProducesTextMeasurementEvidence(t *testing.T) {
+	scenario := runBlockTextScenario()
+	report := buildReport(smokeOptions{
+		Mode:       "headless-block-text",
+		SourcePath: "examples/surface_block_text.tetra",
+	}, "linux-x64", []surface.ProcessReport{
+		{Name: "tetra build", Kind: "build", Path: "tetra build --target linux-x64 examples/surface_block_text.tetra -o /tmp/surface-artifacts/surface-block-text", Ran: true, Pass: true, ExitCode: intPtr(0)},
+		{Name: "surface component app", Kind: "app", Path: "/tmp/surface-artifacts/surface-block-text", Ran: true, Pass: true, ExitCode: intPtr(1), ExpectedExitCode: intPtr(1)},
+		{Name: "surface headless runtime", Kind: "runtime", Path: "tools/cmd/surface-runtime-smoke --mode headless-block-text", Ran: true, Pass: true, ExitCode: intPtr(0)},
+	}, headlessSurfaceArtifacts("/tmp/surface-artifacts/surface-block-text"), cleanArtifactScan(2), scenario)
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := surface.ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
+	}
+	if len(report.TextMeasurements) < 2 || len(report.FontFallbacks) == 0 || len(report.GlyphCaches) == 0 || len(report.TextRenderCommands) < 2 {
+		t.Fatalf("text evidence = measurements %#v fallback %#v cache %#v commands %#v, want text engine evidence", report.TextMeasurements, report.FontFallbacks, report.GlyphCaches, report.TextRenderCommands)
+	}
+	if !caseNamesContain(scenario.Cases, "block text wrap ellipsis layout") || !caseNamesContain(scenario.Cases, "block text editable lifetime") {
+		t.Fatalf("scenario cases = %#v, want wrap/ellipsis and editable lifetime evidence", scenario.Cases)
+	}
+	if len(scenario.Frames) < 2 || scenario.Frames[0].Checksum == scenario.Frames[1].Checksum {
+		t.Fatalf("text scenario frames = %#v, want text render checksum change", scenario.Frames)
+	}
+}
+
+func TestBlockLayoutScenarioProducesLayoutConstraintEvidence(t *testing.T) {
+	scenario := runBlockLayoutScenario()
+	report := buildReport(smokeOptions{
+		Mode:       "headless-block-layout",
+		SourcePath: "examples/surface_block_layout.tetra",
+	}, "linux-x64", []surface.ProcessReport{
+		{Name: "tetra build", Kind: "build", Path: "tetra build --target linux-x64 examples/surface_block_layout.tetra -o /tmp/surface-artifacts/surface-block-layout", Ran: true, Pass: true, ExitCode: intPtr(0)},
+		{Name: "surface component app", Kind: "app", Path: "/tmp/surface-artifacts/surface-block-layout", Ran: true, Pass: true, ExitCode: intPtr(1), ExpectedExitCode: intPtr(1)},
+		{Name: "surface headless runtime", Kind: "runtime", Path: "tools/cmd/surface-runtime-smoke --mode headless-block-layout", Ran: true, Pass: true, ExitCode: intPtr(0)},
+	}, headlessSurfaceArtifacts("/tmp/surface-artifacts/surface-block-layout"), cleanArtifactScan(2), scenario)
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := surface.ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
+	}
+	if len(report.LayoutConstraints) < 4 || len(report.LayoutPasses) < 8 || len(report.LayoutScrolls) == 0 {
+		t.Fatalf("layout evidence = constraints %#v passes %#v scrolls %#v, want constraint resolver evidence", report.LayoutConstraints, report.LayoutPasses, report.LayoutScrolls)
+	}
+	if !caseNamesContain(scenario.Cases, "block layout grid dock overlay scroll") || !caseNamesContain(scenario.Cases, "block layout resize constraints") {
+		t.Fatalf("scenario cases = %#v, want grid/dock/overlay/scroll and resize evidence", scenario.Cases)
+	}
+	if len(scenario.Frames) < 2 || scenario.Frames[0].Checksum == scenario.Frames[1].Checksum {
+		t.Fatalf("layout scenario frames = %#v, want responsive layout checksum change", scenario.Frames)
+	}
+}
+
+func TestBlockEventScenarioProducesEventFocusEvidence(t *testing.T) {
+	scenario := runBlockEventScenario()
+	report := buildReport(smokeOptions{
+		Mode:       "headless-block-events",
+		SourcePath: "examples/surface_block_events.tetra",
+	}, "linux-x64", []surface.ProcessReport{
+		{Name: "tetra build", Kind: "build", Path: "tetra build --target linux-x64 examples/surface_block_events.tetra -o /tmp/surface-artifacts/surface-block-events", Ran: true, Pass: true, ExitCode: intPtr(0)},
+		{Name: "surface component app", Kind: "app", Path: "/tmp/surface-artifacts/surface-block-events", Ran: true, Pass: true, ExitCode: intPtr(1), ExpectedExitCode: intPtr(1)},
+		{Name: "surface headless runtime", Kind: "runtime", Path: "tools/cmd/surface-runtime-smoke --mode headless-block-events", Ran: true, Pass: true, ExitCode: intPtr(0)},
+	}, headlessSurfaceArtifacts("/tmp/surface-artifacts/surface-block-events"), cleanArtifactScan(2), scenario)
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := surface.ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
+	}
+	if len(report.BlockEventRoutes) < 5 || len(report.BlockFocusTransitions) < 2 {
+		t.Fatalf("event evidence = routes %#v focus %#v, want routed Block event/focus evidence", report.BlockEventRoutes, report.BlockFocusTransitions)
+	}
+	if !caseNamesContain(scenario.Cases, "block event disabled click rejected") || !caseNamesContain(scenario.Cases, "block focus tab order graph-derived") {
+		t.Fatalf("scenario cases = %#v, want disabled click and graph-derived focus evidence", scenario.Cases)
+	}
+}
+
+func TestBlockStateScenarioProducesSelectorResolverEvidence(t *testing.T) {
+	scenario := runBlockStateScenario()
+	report := buildReport(smokeOptions{
+		Mode:       "headless-block-states",
+		SourcePath: "examples/surface_block_states.tetra",
+	}, "linux-x64", []surface.ProcessReport{
+		{Name: "tetra build", Kind: "build", Path: "tetra build --target linux-x64 examples/surface_block_states.tetra -o /tmp/surface-artifacts/surface-block-states", Ran: true, Pass: true, ExitCode: intPtr(0)},
+		{Name: "surface component app", Kind: "app", Path: "/tmp/surface-artifacts/surface-block-states", Ran: true, Pass: true, ExitCode: intPtr(1), ExpectedExitCode: intPtr(1)},
+		{Name: "surface headless runtime", Kind: "runtime", Path: "tools/cmd/surface-runtime-smoke --mode headless-block-states", Ran: true, Pass: true, ExitCode: intPtr(0)},
+	}, headlessSurfaceArtifacts("/tmp/surface-artifacts/surface-block-states"), cleanArtifactScan(2), scenario)
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := surface.ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
+	}
+	if len(report.BlockStateSelectors) < 7 || len(report.BlockStateResolutions) < 8 {
+		t.Fatalf("state evidence = selectors %#v resolutions %#v, want generic selector resolver evidence", report.BlockStateSelectors, report.BlockStateResolutions)
+	}
+	if !caseNamesContain(scenario.Cases, "block state hover fill override") || !caseNamesContain(scenario.Cases, "block state disabled error loading overrides") {
+		t.Fatalf("scenario cases = %#v, want hover and disabled/error/loading state evidence", scenario.Cases)
+	}
+	if len(scenario.Frames) < 2 || scenario.Frames[0].Checksum == scenario.Frames[1].Checksum {
+		t.Fatalf("state scenario frames = %#v, want state-driven checksum change", scenario.Frames)
+	}
+}
+
+func TestBlockMotionScenarioProducesTransitionEvidence(t *testing.T) {
+	scenario := runBlockMotionScenario()
+	report := buildReport(smokeOptions{
+		Mode:       "headless-block-motion",
+		SourcePath: "examples/surface_block_motion.tetra",
+	}, "linux-x64", []surface.ProcessReport{
+		{Name: "tetra build", Kind: "build", Path: "tetra build --target linux-x64 examples/surface_block_motion.tetra -o /tmp/surface-artifacts/surface-block-motion", Ran: true, Pass: true, ExitCode: intPtr(0)},
+		{Name: "surface component app", Kind: "app", Path: "/tmp/surface-artifacts/surface-block-motion", Ran: true, Pass: true, ExitCode: intPtr(1), ExpectedExitCode: intPtr(1)},
+		{Name: "surface headless runtime", Kind: "runtime", Path: "tools/cmd/surface-runtime-smoke --mode headless-block-motion", Ran: true, Pass: true, ExitCode: intPtr(0)},
+	}, headlessSurfaceArtifacts("/tmp/surface-artifacts/surface-block-motion"), cleanArtifactScan(2), scenario)
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := surface.ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
+	}
+	if len(report.MotionFrames) < 4 {
+		t.Fatalf("motion frames = %#v, want deterministic transition and reduced-motion evidence", report.MotionFrames)
+	}
+	last := report.MotionFrames[len(report.MotionFrames)-1]
+	if !last.ReducedMotion || last.Scheduled || !last.Settled {
+		t.Fatalf("last motion frame = %#v, want reduced motion settled without scheduling", last)
+	}
+	if !caseNamesContain(scenario.Cases, "block motion opacity color transform frames") || !caseNamesContain(scenario.Cases, "block motion completion stops scheduling") {
+		t.Fatalf("scenario cases = %#v, want transition and completion evidence", scenario.Cases)
+	}
+}
+
+func TestBlockAssetScenarioProducesLocalAssetEvidence(t *testing.T) {
+	scenario := runBlockAssetScenario()
+	report := buildReport(smokeOptions{
+		Mode:       "headless-block-assets",
+		SourcePath: "examples/surface_block_assets.tetra",
+	}, "linux-x64", []surface.ProcessReport{
+		{Name: "tetra build", Kind: "build", Path: "tetra build --target linux-x64 examples/surface_block_assets.tetra -o /tmp/surface-artifacts/surface-block-assets", Ran: true, Pass: true, ExitCode: intPtr(0)},
+		{Name: "surface component app", Kind: "app", Path: "/tmp/surface-artifacts/surface-block-assets", Ran: true, Pass: true, ExitCode: intPtr(1), ExpectedExitCode: intPtr(1)},
+		{Name: "surface headless runtime", Kind: "runtime", Path: "tools/cmd/surface-runtime-smoke --mode headless-block-assets", Ran: true, Pass: true, ExitCode: intPtr(0)},
+	}, headlessSurfaceArtifacts("/tmp/surface-artifacts/surface-block-assets"), cleanArtifactScan(2), scenario)
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := surface.ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
+	}
+	if report.BlockAssetManifest == nil || len(report.BlockAssetManifest.Assets) < 3 {
+		t.Fatalf("asset manifest = %#v, want font/icon/image asset hashes", report.BlockAssetManifest)
+	}
+	if report.BlockAssetNetworkFetchAllowed {
+		t.Fatalf("network fetch allowed, want local/embedded-only asset evidence")
+	}
+	if !report.BlockAssetCache.Bounded || report.BlockAssetCache.UsedBytes <= 0 {
+		t.Fatalf("asset cache = %#v, want bounded cache use evidence", report.BlockAssetCache)
+	}
+	if len(report.BlockAssetDiagnostics) == 0 {
+		t.Fatalf("asset diagnostics = %#v, want missing asset fallback and network rejection evidence", report.BlockAssetDiagnostics)
+	}
+	for _, want := range []string{"block asset icon tint evidence", "block asset image scale evidence", "block asset network url rejected"} {
+		if !caseNamesContain(scenario.Cases, want) {
+			t.Fatalf("scenario cases = %#v, want %q", scenario.Cases, want)
+		}
+	}
+	if len(scenario.Frames) < 2 || scenario.Frames[0].Checksum == scenario.Frames[1].Checksum {
+		t.Fatalf("asset scenario frames = %#v, want asset-driven checksum change", scenario.Frames)
+	}
+}
+
+func TestBlockAccessibilityScenarioProducesGraphDerivedMetadataEvidence(t *testing.T) {
+	scenario := runBlockAccessibilityScenario()
+	report := buildReport(smokeOptions{
+		Mode:       "headless-block-accessibility",
+		SourcePath: "examples/surface_block_accessibility.tetra",
+	}, "linux-x64", []surface.ProcessReport{
+		{Name: "tetra build", Kind: "build", Path: "tetra build --target linux-x64 examples/surface_block_accessibility.tetra -o /tmp/surface-artifacts/surface-block-accessibility", Ran: true, Pass: true, ExitCode: intPtr(0)},
+		{Name: "surface component app", Kind: "app", Path: "/tmp/surface-artifacts/surface-block-accessibility", Ran: true, Pass: true, ExitCode: intPtr(1), ExpectedExitCode: intPtr(1)},
+		{Name: "surface headless runtime", Kind: "runtime", Path: "tools/cmd/surface-runtime-smoke --mode headless-block-accessibility", Ran: true, Pass: true, ExitCode: intPtr(0)},
+	}, headlessSurfaceArtifacts("/tmp/surface-artifacts/surface-block-accessibility"), cleanArtifactScan(2), scenario)
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := surface.ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
+	}
+	if report.BlockAccessibilityTree == nil {
+		t.Fatalf("block accessibility tree is nil, want Block-derived metadata evidence")
+	}
+	if report.BlockAccessibilityTree.PlatformHostIntegration || report.BlockAccessibilityTree.ScreenReaderEvidence != false {
+		t.Fatalf("block accessibility claims = platform %t screen-reader %#v, want metadata-only scoped claims", report.BlockAccessibilityTree.PlatformHostIntegration, report.BlockAccessibilityTree.ScreenReaderEvidence)
+	}
+	if !intSlicesEqual(report.BlockAccessibilityTree.ReadingOrder, report.BlockGraph.AccessibilityOrder) {
+		t.Fatalf("reading order = %#v, want block graph accessibility order %#v", report.BlockAccessibilityTree.ReadingOrder, report.BlockGraph.AccessibilityOrder)
+	}
+	for _, want := range []string{"block accessibility tree derived from block graph", "block accessibility screen-reader claim without platform proof rejected"} {
+		if !caseNamesContain(scenario.Cases, want) {
+			t.Fatalf("scenario cases = %#v, want %q", scenario.Cases, want)
+		}
+	}
+}
+
+func TestBlockSystemScenarioProducesHeadlessGoldenChecksumEvidence(t *testing.T) {
+	if err := validateSmokeMode("headless-block-system"); err != nil {
+		t.Fatalf("validateSmokeMode(headless-block-system) failed: %v", err)
+	}
+	if got := defaultSurfaceSourcePath(smokeOptions{Mode: "headless-block-system", SourcePath: "examples/surface_counter.tetra"}); got != "examples/surface_block_system.tetra" {
+		t.Fatalf("defaultSurfaceSourcePath(headless-block-system) = %q, want examples/surface_block_system.tetra", got)
+	}
+
+	scenario := runBlockSystemScenario()
+	report := buildReport(smokeOptions{
+		Mode:       "headless-block-system",
+		SourcePath: "examples/surface_block_system.tetra",
+	}, "linux-x64", []surface.ProcessReport{
+		{Name: "tetra build", Kind: "build", Path: "tetra build --target linux-x64 examples/surface_block_system.tetra -o /tmp/surface-artifacts/surface-block-system", Ran: true, Pass: true, ExitCode: intPtr(0)},
+		{Name: "surface component app", Kind: "app", Path: "/tmp/surface-artifacts/surface-block-system", Ran: true, Pass: true, ExitCode: intPtr(1), ExpectedExitCode: intPtr(1)},
+		{Name: "surface headless runtime", Kind: "runtime", Path: "tools/cmd/surface-runtime-smoke --mode headless-block-system", Ran: true, Pass: true, ExitCode: intPtr(0)},
+	}, headlessSurfaceArtifacts("/tmp/surface-artifacts/surface-block-system"), cleanArtifactScan(2), scenario)
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := surface.ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
+	}
+	if report.BlockSystem == nil {
+		t.Fatalf("block_system is nil, want headless Block golden/checksum evidence")
+	}
+	if report.BlockSystem.Schema != "tetra.surface.block-system.v1" || report.BlockSystem.QualityLevel != "deterministic-headless-block-system-v1" {
+		t.Fatalf("block_system = %#v, want deterministic headless Block system schema", report.BlockSystem)
+	}
+	if len(report.BlockSystem.Frames) != len(report.Frames) {
+		t.Fatalf("block_system frames = %d, report frames = %d", len(report.BlockSystem.Frames), len(report.Frames))
+	}
+	for i, frame := range report.BlockSystem.Frames {
+		if frame.Checksum != report.Frames[i].Checksum || frame.GoldenChecksum != report.Frames[i].Checksum {
+			t.Fatalf("block_system frame %d checksums = %#v, report frame = %#v", i, frame, report.Frames[i])
+		}
+		if frame.RepeatChecksum != frame.Checksum {
+			t.Fatalf("block_system frame %d repeat checksum = %q, want %q", i, frame.RepeatChecksum, frame.Checksum)
+		}
+		if !frame.PaintEvidence || !frame.LayoutEvidence || !frame.AccessibilityEvidence {
+			t.Fatalf("block_system frame %d = %#v, want paint/layout/accessibility evidence flags", i, frame)
+		}
+	}
+	for _, want := range []string{
+		"block system headless golden checksums",
+		"block system deterministic repeat checksum",
+		"block system missing frame checksum rejected",
+		"block system nondeterministic checksum rejected",
+		"block system missing paint evidence rejected",
+		"block system missing layout evidence rejected",
+		"block system missing accessibility evidence rejected",
+	} {
+		if !caseNamesContain(scenario.Cases, want) {
+			t.Fatalf("scenario cases = %#v, want %q", scenario.Cases, want)
+		}
+	}
+}
+
+func TestMorphScenarioProducesHeadlessCapsuleEvidence(t *testing.T) {
+	const mode = "headless-morph"
+	const source = "examples/surface_morph_command_palette.tetra"
+	if err := validateSmokeMode(mode); err != nil {
+		t.Fatalf("validateSmokeMode(%s) failed: %v", mode, err)
+	}
+	if got := defaultSurfaceSourcePath(smokeOptions{Mode: mode, SourcePath: "examples/surface_counter.tetra"}); got != source {
+		t.Fatalf("defaultSurfaceSourcePath(%s) = %q, want %s", mode, got, source)
+	}
+	scenario := runMorphScenario()
+	report := buildReport(smokeOptions{
+		Mode:       mode,
+		SourcePath: source,
+	}, "linux-x64", []surface.ProcessReport{
+		{Name: "tetra build", Kind: "build", Path: "tetra build --target linux-x64 examples/surface_morph_command_palette.tetra -o /tmp/surface-artifacts/surface-morph-command-palette", Ran: true, Pass: true, ExitCode: intPtr(0)},
+		{Name: "surface component app", Kind: "app", Path: "/tmp/surface-artifacts/surface-morph-command-palette", Ran: true, Pass: true, ExitCode: intPtr(1), ExpectedExitCode: intPtr(1)},
+		{Name: "surface headless runtime", Kind: "runtime", Path: "tools/cmd/surface-runtime-smoke --mode headless-morph", Ran: true, Pass: true, ExitCode: intPtr(0)},
+	}, headlessSurfaceArtifacts("/tmp/surface-artifacts/surface-morph-command-palette"), cleanArtifactScan(2), scenario)
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := surface.ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
+	}
+	if report.Morph == nil {
+		t.Fatalf("morph is nil, want Morph capsule evidence")
+	}
+	if report.Morph.Schema != "tetra.surface.morph.v1" || report.Morph.QualityLevel != "deterministic-headless-morph-capsule-v1" {
+		t.Fatalf("morph = %#v, want Morph v1 deterministic headless capsule evidence", report.Morph)
+	}
+	if report.BlockSystem == nil || report.BlockSystem.Source != source || report.BlockGraph.Source != source {
+		t.Fatalf("Block evidence sources = block_system %#v block_graph %#v, want Morph source %s", report.BlockSystem, report.BlockGraph, source)
+	}
+	if !caseNamesContain(report.Cases, "morph recipes expand to Block graph") {
+		t.Fatalf("cases = %#v, want Morph recipe expansion evidence", report.Cases)
+	}
+}
+
+func TestBlockSystemScenarioProducesMemoryBudgetEvidence(t *testing.T) {
+	scenario := runBlockSystemScenario()
+	report := buildReport(smokeOptions{
+		Mode:       "headless-block-system",
+		SourcePath: "examples/surface_block_system.tetra",
+	}, "linux-x64", []surface.ProcessReport{
+		{Name: "tetra build", Kind: "build", Path: "tetra build --target linux-x64 examples/surface_block_system.tetra -o /tmp/surface-artifacts/surface-block-system", Ran: true, Pass: true, ExitCode: intPtr(0)},
+		{Name: "surface component app", Kind: "app", Path: "/tmp/surface-artifacts/surface-block-system", Ran: true, Pass: true, ExitCode: intPtr(1), ExpectedExitCode: intPtr(1)},
+		{Name: "surface headless runtime", Kind: "runtime", Path: "tools/cmd/surface-runtime-smoke --mode headless-block-system", Ran: true, Pass: true, ExitCode: intPtr(0)},
+	}, headlessSurfaceArtifacts("/tmp/surface-artifacts/surface-block-system"), cleanArtifactScan(2), scenario)
+
+	if report.BlockSystem == nil || report.BlockSystem.MemoryBudget == nil {
+		t.Fatalf("block_system.memory_budget is nil, want bounded memory/cache evidence")
+	}
+	budget := report.BlockSystem.MemoryBudget
+	if budget.BlockCount != len(report.Components) || budget.StressBlockCount < 128 {
+		t.Fatalf("memory budget block counts = %#v, components=%d", budget, len(report.Components))
+	}
+	if budget.PeakFramebufferBytes != 256000 || budget.TotalFramebufferBytes != 768000 || budget.FramebufferBudgetBytes < budget.PeakFramebufferBytes {
+		t.Fatalf("memory budget framebuffer bytes = %#v", budget)
+	}
+	if !budget.BoundedCaches || !budget.UnboundedCacheRejected || budget.PerformanceClaim != "none" {
+		t.Fatalf("memory budget cache/nonclaim evidence = %#v", budget)
+	}
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatalf("marshal report: %v", err)
+	}
+	if err := surface.ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed: %v", err)
+	}
+}
+
+func TestLinuxX64RealWindowBlockSystemScenarioProducesRealWindowEvidence(t *testing.T) {
+	const mode = "linux-x64-real-window-block-system"
+	if err := validateSmokeMode(mode); err != nil {
+		t.Fatalf("validateSmokeMode(%s) failed: %v", mode, err)
+	}
+	if got := defaultSurfaceSourcePath(smokeOptions{Mode: mode, SourcePath: "examples/surface_counter.tetra"}); got != "examples/surface_block_system.tetra" {
+		t.Fatalf("defaultSurfaceSourcePath(%s) = %q, want examples/surface_block_system.tetra", mode, got)
+	}
+
+	scenario := runLinuxX64RealWindowBlockSystemScenario()
+	windowFrame := renderBlockSystemFrameSizedRGBA(400, 240, true)
+	scenario.Frames = append(scenario.Frames, surface.FrameReport{
+		Order:     5,
+		Width:     windowFrame.Width,
+		Height:    windowFrame.Height,
+		Stride:    windowFrame.Stride,
+		Checksum:  checksumRGBA(windowFrame.Pixels),
+		Presented: true,
+	})
+	scenario.BlockSystem = blockSystemReportForLinuxX64RealWindowScenario("examples/surface_block_system.tetra", scenario.Frames)
+	attachBlockSystemMemoryBudget(&scenario)
+	report := buildReport(smokeOptions{
+		Mode:       mode,
+		SourcePath: "examples/surface_block_system.tetra",
+	}, "linux-x64", []surface.ProcessReport{
+		{Name: "tetra build", Kind: "build", Path: "tetra build --target linux-x64 examples/surface_block_system.tetra -o /tmp/surface-artifacts/surface-block-system", Ran: true, Pass: true, ExitCode: intPtr(0)},
+		{Name: "surface component app", Kind: "app", Path: "/tmp/surface-artifacts/surface-block-system", Ran: true, Pass: true, ExitCode: intPtr(1), ExpectedExitCode: intPtr(1)},
+		{Name: "surface linux-x64 real-window probe", Kind: "app", Path: "/tmp/surface-artifacts/surface-block-system-real-window-probe", Ran: true, Pass: true, ExitCode: intPtr(42), ExpectedExitCode: intPtr(42)},
+		{Name: "surface linux-x64 runtime", Kind: "runtime", Path: "tools/cmd/surface-runtime-smoke --mode linux-x64-real-window-block-system", Ran: true, Pass: true, ExitCode: intPtr(0)},
+	}, componentAppArtifacts("/tmp/surface-artifacts/surface-block-system"), cleanArtifactScan(1), scenario)
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := surface.ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
+	}
+	if report.Target != "linux-x64" || report.Runtime != "surface-linux-x64" {
+		t.Fatalf("target/runtime = %s/%s, want linux-x64/surface-linux-x64", report.Target, report.Runtime)
+	}
+	if report.HostEvidence.Level != "linux-x64-real-window" || !report.HostEvidence.RealWindow || !report.HostEvidence.NativeInput {
+		t.Fatalf("host evidence = %#v, want linux-x64 real-window native-input evidence", report.HostEvidence)
+	}
+	if report.BlockSystem == nil {
+		t.Fatalf("block_system is nil, want linux-x64 real-window Block evidence")
+	}
+	if report.BlockSystem.QualityLevel != "linux-x64-real-window-block-system-v1" || report.BlockSystem.Renderer != "wayland-shm-rgba" {
+		t.Fatalf("block_system = %#v, want linux-x64 real-window quality and renderer", report.BlockSystem)
+	}
+	var blockWindowFrame *surface.BlockSystemFrameReport
+	for i := range report.BlockSystem.Frames {
+		if report.BlockSystem.Frames[i].Order == 5 {
+			blockWindowFrame = &report.BlockSystem.Frames[i]
+			break
+		}
+	}
+	var runtimeWindowFrame *surface.FrameReport
+	for i := range report.Frames {
+		if report.Frames[i].Order == 5 {
+			runtimeWindowFrame = &report.Frames[i]
+			break
+		}
+	}
+	if blockWindowFrame == nil || runtimeWindowFrame == nil || blockWindowFrame.Checksum != runtimeWindowFrame.Checksum {
+		t.Fatalf("block_system frames = %#v, report frames = %#v", report.BlockSystem.Frames, report.Frames)
+	}
+	for _, want := range []string{
+		"linux-x64 real-window surface",
+		"linux-x64 native input event pump",
+		"block system linux-x64 real-window frame presentation",
+		"block system linux-x64 native input state transition",
+	} {
+		if !caseNamesContain(scenario.Cases, want) {
+			t.Fatalf("scenario cases = %#v, want %q", scenario.Cases, want)
+		}
+	}
+}
+
 func TestLinuxX64ModeProducesTargetSpecificRuntimeEvidence(t *testing.T) {
 	if err := validateSmokeMode("linux-x64"); err != nil {
 		t.Fatalf("validateSmokeMode(linux-x64) failed: %v", err)
@@ -404,6 +851,68 @@ func TestWASM32WebBrowserCanvasModeProducesTargetSpecificRuntimeEvidence(t *test
 	}
 	if len(scenario.StateTransitions) != 4 {
 		t.Fatalf("browser canvas state transitions = %#v, want click/key/resize/text transitions", scenario.StateTransitions)
+	}
+}
+
+func TestWASM32WebBrowserCanvasBlockSystemScenarioProducesBrowserEvidence(t *testing.T) {
+	const mode = "wasm32-web-browser-canvas-block-system"
+	if err := validateSmokeMode(mode); err != nil {
+		t.Fatalf("validateSmokeMode(%s) failed: %v", mode, err)
+	}
+	if got := defaultSurfaceSourcePath(smokeOptions{Mode: mode, SourcePath: "examples/surface_counter.tetra"}); got != "examples/surface_block_system.tetra" {
+		t.Fatalf("defaultSurfaceSourcePath(%s) = %q, want examples/surface_block_system.tetra", mode, got)
+	}
+
+	scenario := runWASM32WebBrowserCanvasBlockSystemScenario()
+	browserFrame := renderBlockSystemFrameSizedRGBA(400, 240, true)
+	scenario.Frames = append(scenario.Frames, surface.FrameReport{
+		Order:     5,
+		Width:     browserFrame.Width,
+		Height:    browserFrame.Height,
+		Stride:    browserFrame.Stride,
+		Checksum:  checksumRGBA(browserFrame.Pixels),
+		Presented: true,
+	})
+	scenario.BlockSystem = blockSystemReportForWASM32WebBrowserCanvasScenario("examples/surface_block_system.tetra", scenario.Frames)
+	attachBlockSystemMemoryBudget(&scenario)
+	report := buildReport(smokeOptions{
+		Mode:       mode,
+		SourcePath: "examples/surface_block_system.tetra",
+	}, "linux-x64", []surface.ProcessReport{
+		{Name: "tetra build", Kind: "build", Path: "tetra build --target wasm32-web examples/surface_block_system.tetra -o /tmp/surface-artifacts/surface-block-system.wasm", Ran: true, Pass: true, ExitCode: intPtr(0)},
+		{Name: "surface wasm32-web browser canvas component app", Kind: "app", Path: "/usr/bin/chromium --headless <surface-browser-canvas-runner> scenario=block-system wasm=/tmp/surface-artifacts/surface-block-system.wasm", Ran: true, Pass: true, ExitCode: intPtr(0), ExpectedExitCode: intPtr(0)},
+		{Name: "surface wasm32-web import validator", Kind: "runtime", Path: "go run ./tools/cmd/validate-wasm-imports --target wasm32-web /tmp/surface-artifacts/surface-block-system.wasm", Ran: true, Pass: true, ExitCode: intPtr(0)},
+		{Name: "surface wasm32-web browser canvas runtime", Kind: "runtime", Path: "Chromium Block-system fixture", Ran: true, Pass: true, ExitCode: intPtr(0)},
+		{Name: "surface wasm32-web browser canvas trace", Kind: "runtime", Path: "/usr/bin/chromium --headless --dump-dom <surface-browser-canvas-file-runner scenario=block-system>", Ran: true, Pass: true, ExitCode: intPtr(0)},
+	}, []surface.ArtifactReport{
+		{Kind: "component-app", Path: "/tmp/surface-artifacts/surface-block-system.wasm", SHA256: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Size: 8604},
+		{Kind: "compiler-owned-loader", Path: "/tmp/surface-artifacts/surface-block-system.mjs", SHA256: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", Size: 4939},
+		{Kind: "runner-trace", Path: "/tmp/surface-artifacts/surface-runner-trace.json", SHA256: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", Size: 1184},
+	}, cleanArtifactScan(3), scenario)
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := surface.ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
+	}
+	if report.BlockSystem == nil || report.BlockSystem.QualityLevel != "wasm32-web-browser-canvas-block-system-v1" {
+		t.Fatalf("block_system = %#v, want wasm32-web browser-canvas Block system evidence", report.BlockSystem)
+	}
+	if report.HostEvidence.Level != "wasm32-web-browser-canvas-input" || !report.HostEvidence.BrowserCanvas || !report.HostEvidence.BrowserInput || report.HostEvidence.RealWindow {
+		t.Fatalf("host evidence = %#v, want browser-canvas input without OS real-window claim", report.HostEvidence)
+	}
+	for _, want := range []string{
+		"wasm32-web browser canvas surface",
+		"wasm32-web browser canvas RGBA readback",
+		"block system wasm32-web browser-canvas frame readback",
+		"block system wasm32-web browser-canvas native input state transition",
+		"block system browser-canvas script sidecar artifact rejected",
+		"block system browser-canvas html visual sidecar artifact rejected",
+	} {
+		if !caseNamesContain(report.Cases, want) {
+			t.Fatalf("scenario cases = %#v, want %q", report.Cases, want)
+		}
 	}
 }
 

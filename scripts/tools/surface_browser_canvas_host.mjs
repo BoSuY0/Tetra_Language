@@ -639,6 +639,31 @@ export async function runSurfaceBrowserCanvas({ wasmURL, canvas, scenario = 'cou
     }
   }
 
+  function dispatchBlockSystemBrowserInput(surface) {
+    canvas.focus();
+    canvas.dispatchEvent(new PointerEvent('pointerup', {
+      bubbles: true,
+      clientX: 40,
+      clientY: 80,
+      button: 0,
+      pointerType: 'mouse',
+    }));
+    canvas.dispatchEvent(new InputEvent('beforeinput', {
+      bubbles: true,
+      inputType: 'insertText',
+      data: 'OK',
+    }));
+    canvas.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true,
+      key: 'Enter',
+      code: 'Enter',
+      keyCode: 13,
+    }));
+    canvas.width = 400;
+    canvas.height = 240;
+    window.dispatchEvent(new Event('resize'));
+  }
+
   function dispatchDeterministicBrowserInput(surface) {
     if (scenario === 'text-focus-input' || scenario === 'release-text-input') {
       dispatchTextFocusInputBrowserInput(surface);
@@ -666,6 +691,10 @@ export async function runSurfaceBrowserCanvas({ wasmURL, canvas, scenario = 'cou
     }
     if (scenario === 'accessibility-metadata' || scenario === 'release-accessibility') {
       dispatchAccessibilityMetadataBrowserInput(surface);
+      return;
+    }
+    if (scenario === 'block-system') {
+      dispatchBlockSystemBrowserInput(surface);
       return;
     }
     dispatchCounterBrowserInput(surface);

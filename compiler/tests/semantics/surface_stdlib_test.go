@@ -1,6 +1,8 @@
 package compiler_test
 
 import (
+	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -8,6 +10,16 @@ import (
 	compiler "tetra_language/compiler"
 	"tetra_language/compiler/internal/testkit"
 )
+
+func surfaceBlockBeautyExamplePaths() []string {
+	return []string{
+		"examples/surface_block_command_palette.tetra",
+		"examples/surface_block_project_dashboard.tetra",
+		"examples/surface_block_settings.tetra",
+		"examples/surface_block_editor_shell.tetra",
+		"examples/surface_block_glass_panel.tetra",
+	}
+}
 
 func TestSurfaceCounterExampleLoadsCoreSurfaceAndDrawModules(t *testing.T) {
 	entry := testkit.RepoPath(t, "examples", "surface_counter.tetra")
@@ -178,6 +190,949 @@ uses alloc, mem:
 	}
 	if _, err := compiler.CheckWorld(world); err != nil {
 		t.Fatalf("CheckWorld(lib.core.style/widgets production toolkit consumer): %v", err)
+	}
+}
+
+func TestSurfaceBlockMinimalExampleLoadsBlockModel(t *testing.T) {
+	entry := testkit.RepoPath(t, "examples", "surface_block_minimal.tetra")
+	world, err := compiler.LoadWorld(entry)
+	if err != nil {
+		t.Fatalf("LoadWorld(%s): %v", filepath.ToSlash(entry), err)
+	}
+
+	for _, module := range []string{"lib.core.surface", "lib.core.block"} {
+		if _, ok := world.ByModule[module]; !ok {
+			t.Fatalf("surface block minimal did not load module %s; modules=%v", module, world.ByModule)
+		}
+	}
+
+	if _, err := compiler.CheckWorld(world); err != nil {
+		t.Fatalf("CheckWorld(surface block minimal): %v", err)
+	}
+}
+
+func TestSurfaceBlockModuleDefinesCorePropertySchema(t *testing.T) {
+	tmp := t.TempDir()
+	testkit.WriteFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.core.surface as surface
+import lib.core.block as block
+
+func main() -> Int:
+    let rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 320, h: 200)
+    let id: block.BlockID = block.id(7)
+    let layout: block.LayoutSpec = block.layout_fixed(rect)
+    let fill: block.PaintLayer = block.paint_layer_fill(surface.Color(r: 32, g: 48, b: 64, a: 255))
+    let paint: block.PaintSpec = block.paint_from_layer(fill)
+    let text: block.TextSpec = block.text_label(12, surface.Color(r: 240, g: 244, b: 248, a: 255))
+    let image: block.ImageSpec = block.image_none()
+    let input: block.InputSpec = block.input_clickable()
+    let event: block.EventSpec = block.event_click(block.action_primary())
+    let state: block.StateSpec = block.state_interactive()
+    let motion: block.MotionSpec = block.motion_fast()
+    let a11y: block.AccessibilitySpec = block.accessibility_button(12)
+    let asset: block.AssetRef = block.asset_none()
+    let props: block.BlockProps = block.props(layout, paint, text, image, input, event, state, motion, a11y, asset)
+    let root: block.Block = block.make(id, block.id_none(), props)
+
+    if block.id_value(root.id) == 7 && root.props.paint_layers == 1 && root.props.text_len == 12 && root.props.interaction_flags > 0 && root.props.motion_ms > 0:
+        return 0
+    return 1
+`,
+	})
+
+	entry := filepath.Join(tmp, "app", "main.t4")
+	world, err := compiler.LoadWorldOpt(entry, compiler.WorldOptions{
+		DependencyRoots: []compiler.ModuleRoot{{
+			Root: testkit.RepoRoot(t),
+		}},
+	})
+	if err != nil {
+		t.Fatalf("LoadWorldOpt: %v", err)
+	}
+	if _, err := compiler.CheckWorld(world); err != nil {
+		t.Fatalf("CheckWorld(lib.core.block consumer): %v", err)
+	}
+}
+
+func TestSurfaceBlockTreeExampleLoadsBlockGraphModel(t *testing.T) {
+	entry := testkit.RepoPath(t, "examples", "surface_block_tree.tetra")
+	world, err := compiler.LoadWorld(entry)
+	if err != nil {
+		t.Fatalf("LoadWorld(%s): %v", filepath.ToSlash(entry), err)
+	}
+
+	for _, module := range []string{"lib.core.surface", "lib.core.block"} {
+		if _, ok := world.ByModule[module]; !ok {
+			t.Fatalf("surface block tree did not load module %s; modules=%v", module, world.ByModule)
+		}
+	}
+
+	if _, err := compiler.CheckWorld(world); err != nil {
+		t.Fatalf("CheckWorld(surface block tree): %v", err)
+	}
+}
+
+func TestSurfaceBlockTreeExampleRunsGraphValidation(t *testing.T) {
+	entry := testkit.RepoPath(t, "examples", "surface_block_tree.tetra")
+	out := filepath.Join(t.TempDir(), "surface-block-tree")
+	if _, err := compiler.BuildFileWithStatsOpt(entry, out, "linux-x64", compiler.BuildOptions{Jobs: 1}); err != nil {
+		t.Fatalf("BuildFileWithStatsOpt(surface block tree): %v", err)
+	}
+	cmd := exec.Command(out)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("surface block tree exited with %v\n%s", err, output)
+	}
+}
+
+func TestSurfaceBlockPaintLayersExampleLoadsPaintModel(t *testing.T) {
+	entry := testkit.RepoPath(t, "examples", "surface_block_paint_layers.tetra")
+	world, err := compiler.LoadWorld(entry)
+	if err != nil {
+		t.Fatalf("LoadWorld(%s): %v", filepath.ToSlash(entry), err)
+	}
+
+	for _, module := range []string{"lib.core.surface", "lib.core.draw", "lib.core.block"} {
+		if _, ok := world.ByModule[module]; !ok {
+			t.Fatalf("surface block paint layers did not load module %s; modules=%v", module, world.ByModule)
+		}
+	}
+
+	if _, err := compiler.CheckWorld(world); err != nil {
+		t.Fatalf("CheckWorld(surface block paint layers): %v", err)
+	}
+}
+
+func TestSurfaceBlockPaintLayersExampleRunsPaintValidation(t *testing.T) {
+	entry := testkit.RepoPath(t, "examples", "surface_block_paint_layers.tetra")
+	out := filepath.Join(t.TempDir(), "surface-block-paint-layers")
+	if _, err := compiler.BuildFileWithStatsOpt(entry, out, "linux-x64", compiler.BuildOptions{Jobs: 1}); err != nil {
+		t.Fatalf("BuildFileWithStatsOpt(surface block paint layers): %v", err)
+	}
+	cmd := exec.Command(out)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("surface block paint layers exited with %v\n%s", err, output)
+	}
+}
+
+func TestSurfaceBlockTextExampleLoadsTextModel(t *testing.T) {
+	entry := testkit.RepoPath(t, "examples", "surface_block_text.tetra")
+	world, err := compiler.LoadWorld(entry)
+	if err != nil {
+		t.Fatalf("LoadWorld(%s): %v", filepath.ToSlash(entry), err)
+	}
+
+	for _, module := range []string{"lib.core.surface", "lib.core.draw", "lib.core.block", "lib.core.text"} {
+		if _, ok := world.ByModule[module]; !ok {
+			t.Fatalf("surface block text did not load module %s; modules=%v", module, world.ByModule)
+		}
+	}
+
+	if _, err := compiler.CheckWorld(world); err != nil {
+		t.Fatalf("CheckWorld(surface block text): %v", err)
+	}
+}
+
+func TestSurfaceBlockTextExampleRunsTextValidation(t *testing.T) {
+	entry := testkit.RepoPath(t, "examples", "surface_block_text.tetra")
+	out := filepath.Join(t.TempDir(), "surface-block-text")
+	if _, err := compiler.BuildFileWithStatsOpt(entry, out, "linux-x64", compiler.BuildOptions{Jobs: 1}); err != nil {
+		t.Fatalf("BuildFileWithStatsOpt(surface block text): %v", err)
+	}
+	cmd := exec.Command(out)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("surface block text exited with %v\n%s", err, output)
+	}
+}
+
+func TestSurfaceBlockInputExampleLoadsEditableTextModel(t *testing.T) {
+	entry := testkit.RepoPath(t, "examples", "surface_block_input.tetra")
+	world, err := compiler.LoadWorld(entry)
+	if err != nil {
+		t.Fatalf("LoadWorld(%s): %v", filepath.ToSlash(entry), err)
+	}
+
+	for _, module := range []string{"lib.core.surface", "lib.core.block", "lib.core.text"} {
+		if _, ok := world.ByModule[module]; !ok {
+			t.Fatalf("surface block input did not load module %s; modules=%v", module, world.ByModule)
+		}
+	}
+
+	if _, err := compiler.CheckWorld(world); err != nil {
+		t.Fatalf("CheckWorld(surface block input): %v", err)
+	}
+}
+
+func TestSurfaceBlockTextSpecDefinesMeasurementFallbackAndCacheAPI(t *testing.T) {
+	tmp := t.TempDir()
+	testkit.WriteFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.core.surface as surface
+import lib.core.draw as draw
+import lib.core.block as block
+import lib.core.text as text
+
+func main() -> Int
+uses alloc, mem:
+    let fg: surface.Color = surface.Color(r: 238, g: 242, b: 247, a: 255)
+    let spec: block.TextSpec = block.text_styled(28, fg, block.text_family_ui(), 16, 600, 20, block.text_align_start(), block.text_wrap_word(), block.text_overflow_ellipsis(), 255)
+    let editable: block.TextSpec = block.text_editable_styled(4, 8, fg, block.text_family_ui(), 14, 400, 18, block.text_align_start(), block.text_wrap_none(), block.text_overflow_clip(), 255)
+    let measured: surface.Size = block.text_measure(spec, 96)
+    let lines: Int = block.text_wrap_line_count(spec, 96)
+    let ellipsis_len: Int = block.text_ellipsized_len(spec, 96)
+    let fallback_len: Int = block.text_font_fallback_chain_len(spec)
+    let cache_status: Int = block.text_glyph_cache_validate(block.text_glyph_cache_budget_bytes(), 4096, 12)
+    var pixels: []u8 = core.make_u8(128 * 64 * 4)
+    let surface_ref: surface.Surface = surface.Surface(handle: 0, width: 128, height: 64)
+    var frame: surface.Frame = surface.Frame(surface: surface_ref, width: 128, height: 64, stride: 128 * 4, pixels: pixels)
+    var ctx: draw.DrawContext = draw.DrawContext(frame: frame)
+    let render: Int = draw.text_glyph_run(ctx, surface.Rect(x: 8, y: 8, w: measured.w, h: measured.h), spec.text_len, block.text_char_width(spec), block.text_effective_line_height(spec), fg)
+    var storage: []u8 = core.make_u8(16)
+    var input: text.EditableText = text.editable_empty(storage, 6)
+
+    if measured.w == 96 && measured.h >= 20 && lines >= 2 &&
+       ellipsis_len > 0 && ellipsis_len < spec.text_len &&
+       fallback_len >= 2 && cache_status == block.text_cache_error_ok() &&
+       block.text_is_editable(editable) && text.editable_len(input) == 0 &&
+       render == draw.text_command_render():
+        return 0
+    return 1
+`,
+	})
+
+	entry := filepath.Join(tmp, "app", "main.t4")
+	world, err := compiler.LoadWorldOpt(entry, compiler.WorldOptions{
+		DependencyRoots: []compiler.ModuleRoot{{
+			Root: testkit.RepoRoot(t),
+		}},
+	})
+	if err != nil {
+		t.Fatalf("LoadWorldOpt: %v", err)
+	}
+	if _, err := compiler.CheckWorld(world); err != nil {
+		t.Fatalf("CheckWorld(lib.core.block text consumer): %v", err)
+	}
+}
+
+func TestSurfaceBlockLayoutExampleLoadsLayoutModel(t *testing.T) {
+	entry := testkit.RepoPath(t, "examples", "surface_block_layout.tetra")
+	world, err := compiler.LoadWorld(entry)
+	if err != nil {
+		t.Fatalf("LoadWorld(%s): %v", filepath.ToSlash(entry), err)
+	}
+
+	for _, module := range []string{"lib.core.surface", "lib.core.block"} {
+		if _, ok := world.ByModule[module]; !ok {
+			t.Fatalf("surface block layout did not load module %s; modules=%v", module, world.ByModule)
+		}
+	}
+
+	if _, err := compiler.CheckWorld(world); err != nil {
+		t.Fatalf("CheckWorld(surface block layout): %v", err)
+	}
+}
+
+func TestSurfaceBlockLayoutExampleRunsLayoutValidation(t *testing.T) {
+	entry := testkit.RepoPath(t, "examples", "surface_block_layout.tetra")
+	out := filepath.Join(t.TempDir(), "surface-block-layout")
+	if _, err := compiler.BuildFileWithStatsOpt(entry, out, "linux-x64", compiler.BuildOptions{Jobs: 1}); err != nil {
+		t.Fatalf("BuildFileWithStatsOpt(surface block layout): %v", err)
+	}
+	cmd := exec.Command(out)
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("surface block layout exited with 0, want Surface smoke success exit 1\n%s", output)
+	}
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 1 {
+		t.Fatalf("surface block layout exited with %v, want exit 1\n%s", err, output)
+	}
+}
+
+func TestSurfaceBlockLayoutSpecDefinesConstraintsAPI(t *testing.T) {
+	tmp := t.TempDir()
+	testkit.WriteFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.core.surface as surface
+import lib.core.block as block
+
+func main() -> Int:
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 320, h: 200)
+    let child_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 0, h: 40)
+    let root: block.LayoutSpec = block.layout_constrained(block.layout_mode_column(), root_rect, block.layout_size_fixed(), block.layout_size_fixed(), 240, 160, 480, 260, 12, 8, block.layout_align_stretch(), block.layout_justify_start(), block.layout_overflow_clip(), 0)
+    let child: block.LayoutSpec = block.layout_constrained(block.layout_mode_row(), child_rect, block.layout_size_fill(), block.layout_size_fixed(), 80, 32, 280, 64, 4, 6, block.layout_align_center(), block.layout_justify_space_between(), block.layout_overflow_visible(), 1)
+    let measured: surface.Size = surface.Size(w: 96, h: 20)
+    let resolved: surface.Rect = block.layout_resolve_child(root, child, 0, 2, measured)
+    let grid: block.LayoutSpec = block.layout_grid(root_rect, 2, 2, 6)
+    let grid_cell: surface.Rect = block.layout_resolve_child(root, grid, 1, 4, measured)
+    let dock: block.LayoutSpec = block.layout_dock(root_rect, block.layout_dock_top(), 32)
+    let docked: surface.Rect = block.layout_resolve_child(root, dock, 0, 1, measured)
+    let scroll: block.LayoutSpec = block.layout_scroll(surface.Rect(x: 0, y: 0, w: 120, h: 80), 120, 180, 32)
+    let max_offset: Int = block.layout_scroll_max_offset(scroll)
+    let resized: block.LayoutSpec = block.layout_resize(root, 480, 260)
+
+    if resolved.w > 0 && grid_cell.w > 0 && docked.h == 32 && max_offset == 100 && resized.w == 480 && block.layout_validate_constraints(child) == block.layout_error_ok():
+        return 0
+    return 1
+`,
+	})
+
+	entry := filepath.Join(tmp, "app", "main.t4")
+	world, err := compiler.LoadWorldOpt(entry, compiler.WorldOptions{
+		DependencyRoots: []compiler.ModuleRoot{{
+			Root: testkit.RepoRoot(t),
+		}},
+	})
+	if err != nil {
+		t.Fatalf("LoadWorldOpt: %v", err)
+	}
+	if _, err := compiler.CheckWorld(world); err != nil {
+		t.Fatalf("CheckWorld(lib.core.block layout consumer): %v", err)
+	}
+}
+
+func TestSurfaceBlockEventsExampleLoadsEventFocusModel(t *testing.T) {
+	entry := testkit.RepoPath(t, "examples", "surface_block_events.tetra")
+	world, err := compiler.LoadWorld(entry)
+	if err != nil {
+		t.Fatalf("LoadWorld(%s): %v", filepath.ToSlash(entry), err)
+	}
+
+	for _, module := range []string{"lib.core.surface", "lib.core.block"} {
+		if _, ok := world.ByModule[module]; !ok {
+			t.Fatalf("surface block events did not load module %s; modules=%v", module, world.ByModule)
+		}
+	}
+
+	if _, err := compiler.CheckWorld(world); err != nil {
+		t.Fatalf("CheckWorld(surface block events): %v", err)
+	}
+}
+
+func TestSurfaceBlockEventsExampleRunsEventFocusValidation(t *testing.T) {
+	entry := testkit.RepoPath(t, "examples", "surface_block_events.tetra")
+	out := filepath.Join(t.TempDir(), "surface-block-events")
+	if _, err := compiler.BuildFileWithStatsOpt(entry, out, "linux-x64", compiler.BuildOptions{Jobs: 1}); err != nil {
+		t.Fatalf("BuildFileWithStatsOpt(surface block events): %v", err)
+	}
+	cmd := exec.Command(out)
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("surface block events exited with 0, want Surface smoke success exit 1\n%s", output)
+	}
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 1 {
+		t.Fatalf("surface block events exited with %v, want exit 1\n%s", err, output)
+	}
+}
+
+func TestSurfaceBlockEventFocusDefinesRoutingAPI(t *testing.T) {
+	tmp := t.TempDir()
+	testkit.WriteFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.core.surface as surface
+import lib.core.block as block
+
+func main() -> Int
+uses alloc, mem:
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 320, h: 200)
+    let panel_rect: surface.Rect = surface.Rect(x: 16, y: 16, w: 288, h: 168)
+    let input_rect: surface.Rect = surface.Rect(x: 24, y: 64, w: 120, h: 44)
+    let disabled_rect: surface.Rect = surface.Rect(x: 152, y: 64, w: 120, h: 44)
+    let action_rect: surface.Rect = surface.Rect(x: 24, y: 120, w: 120, h: 44)
+
+    var tree: block.BlockTree = block.tree_init(8)
+    let root: block.Block = block.make(block.id(1), block.id_none(), block.props_default(root_rect))
+    let panel: block.Block = block.make(block.id(2), block.id(1), block.props_default(panel_rect))
+    let input: block.Block = block.make(block.id(4), block.id(2), block.props(block.layout_fixed(input_rect), block.paint_empty(), block.text_label(4, surface.Color(r: 240, g: 244, b: 248, a: 255)), block.image_none(), block.input_text(), block.event_text(block.action_primary()), block.state_interactive(), block.motion_fast(), block.accessibility_text(4), block.asset_none()))
+    let disabled: block.Block = block.make(block.id(5), block.id(2), block.props(block.layout_fixed(disabled_rect), block.paint_empty(), block.text_label(8, surface.Color(r: 160, g: 170, b: 180, a: 255)), block.image_none(), block.input_disabled(block.input_clickable()), block.event_click(block.action_primary()), block.state_interactive(), block.motion_none(), block.accessibility_button(8), block.asset_none()))
+    let action: block.Block = block.make(block.id(6), block.id(2), block.props(block.layout_fixed(action_rect), block.paint_empty(), block.text_label(6, surface.Color(r: 240, g: 244, b: 248, a: 255)), block.image_none(), block.input_clickable(), block.event_click(block.action_secondary()), block.state_interactive(), block.motion_fast(), block.accessibility_button(6), block.asset_none()))
+
+    let _root_id: Int = block.tree_add_root(tree, root, root_rect)
+    let _panel_id: Int = block.tree_add_child(tree, block.id(1), panel, panel_rect)
+    let _input_id: Int = block.tree_add_child(tree, block.id(2), input, input_rect)
+    let _disabled_id: Int = block.tree_add_child(tree, block.id(2), disabled, disabled_rect)
+    let _action_id: Int = block.tree_add_child(tree, block.id(2), action, action_rect)
+
+    var hit_path: []i32 = core.make_i32(8)
+    let hit_len: Int = block.event_hit_test_path(tree, 40, 80, hit_path)
+    var dispatch_path: []i32 = core.make_i32(8)
+    let dispatch_len: Int = block.event_build_dispatch_path(tree, block.id(4), dispatch_path)
+    let focus0: Int = block.id_value(block.focus_order_at(tree, 0))
+    let focus1: Int = block.id_value(block.focus_next(tree, block.id(4)))
+    let focus_wrap: Int = block.id_value(block.focus_next(tree, block.id(6)))
+    let disabled_status: Int = block.event_dispatch_status(block.input_disabled(block.input_clickable()), block.event_kind_click(), true)
+    let unfocused_text: Int = block.event_dispatch_status(block.input_text(), block.event_kind_text(), false)
+    let focused_text: Int = block.event_dispatch_status(block.input_text(), block.event_kind_text(), true)
+
+    if block.event_policy_capture_bubble_direct() > 0 &&
+       block.event_kind_pointer_enter() > 0 && block.event_kind_frame() > 0 &&
+       hit_len == 3 && hit_path[0] == 1 && hit_path[1] == 2 && hit_path[2] == 4 &&
+       dispatch_len == 3 && dispatch_path[0] == 1 && dispatch_path[1] == 2 && dispatch_path[2] == 4 &&
+       focus0 == 4 && focus1 == 6 && focus_wrap == 4 &&
+       disabled_status == block.event_route_rejected_disabled() &&
+       unfocused_text == block.event_route_rejected_unfocused() &&
+       focused_text == block.event_route_delivered():
+        return 0
+    return 1
+`,
+	})
+
+	entry := filepath.Join(tmp, "app", "main.t4")
+	world, err := compiler.LoadWorldOpt(entry, compiler.WorldOptions{
+		DependencyRoots: []compiler.ModuleRoot{{
+			Root: testkit.RepoRoot(t),
+		}},
+	})
+	if err != nil {
+		t.Fatalf("LoadWorldOpt(lib.core.block event/focus consumer): %v", err)
+	}
+	if _, err := compiler.CheckWorld(world); err != nil {
+		t.Fatalf("CheckWorld(lib.core.block event/focus consumer): %v", err)
+	}
+}
+
+func TestSurfaceBlockStatesExampleLoadsSelectorResolver(t *testing.T) {
+	entry := testkit.RepoPath(t, "examples", "surface_block_states.tetra")
+	world, err := compiler.LoadWorld(entry)
+	if err != nil {
+		t.Fatalf("LoadWorld(%s): %v", filepath.ToSlash(entry), err)
+	}
+
+	for _, module := range []string{"lib.core.surface", "lib.core.block"} {
+		if _, ok := world.ByModule[module]; !ok {
+			t.Fatalf("surface block states did not load module %s; modules=%v", module, world.ByModule)
+		}
+	}
+
+	if _, err := compiler.CheckWorld(world); err != nil {
+		t.Fatalf("CheckWorld(surface block states): %v", err)
+	}
+}
+
+func TestSurfaceBlockStatesExampleRunsStateValidation(t *testing.T) {
+	entry := testkit.RepoPath(t, "examples", "surface_block_states.tetra")
+	out := filepath.Join(t.TempDir(), "surface-block-states")
+	if _, err := compiler.BuildFileWithStatsOpt(entry, out, "linux-x64", compiler.BuildOptions{Jobs: 1}); err != nil {
+		t.Fatalf("BuildFileWithStatsOpt(surface block states): %v", err)
+	}
+	cmd := exec.Command(out)
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("surface block states exited with 0, want Surface smoke success exit 1\n%s", output)
+	}
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 1 {
+		t.Fatalf("surface block states exited with %v, want exit 1\n%s", err, output)
+	}
+}
+
+func TestSurfaceBlockStateResolverDefinesGenericAPI(t *testing.T) {
+	tmp := t.TempDir()
+	testkit.WriteFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.core.block as block
+
+func main() -> Int:
+    let active: block.StateSelector = block.state_selector(true, true, true, true, true, true, true)
+    let hover: block.StateSelector = block.state_selector_hover()
+    let pressed: block.StateSelector = block.state_selector_pressed()
+    let disabled: block.StateSelector = block.state_selector_disabled()
+    let base: block.StateSpec = block.state_variant(1)
+    let pressed_spec: block.StateSpec = block.state_with_selector(pressed, 2)
+    let disabled_spec: block.StateSpec = block.state_with_selector(disabled, 3)
+    let resolved_pressed: block.StateSpec = block.state_resolve(base, pressed_spec, active)
+    let resolved_disabled: block.StateSpec = block.state_resolve(resolved_pressed, disabled_spec, active)
+    let resolved_fill: Int = block.state_resolve_int(10, 20, active, hover)
+    let skipped_fill: Int = block.state_resolve_int(10, 30, block.state_selector_none(), hover)
+
+    if block.state_flags(active) == 127 &&
+       block.state_selector_matches(active, hover) &&
+       block.state_selector_matches(active, pressed) &&
+       !block.state_selector_matches(block.state_selector_none(), hover) &&
+       block.state_resolver_order_base() == 1 &&
+       block.state_resolver_order_variant() == 2 &&
+       block.state_resolver_order_hover() == 3 &&
+       block.state_resolver_order_pressed() == 4 &&
+       block.state_resolver_order_focused() == 5 &&
+       block.state_resolver_order_selected() == 6 &&
+       block.state_resolver_order_disabled() == 7 &&
+       block.state_resolver_order_error() == 8 &&
+       block.state_resolver_order_loading() == 9 &&
+       block.state_resolver_order_motion() == 10 &&
+       resolved_pressed.variant == 2 &&
+       resolved_disabled.variant == 3 &&
+       resolved_disabled.disabled &&
+       resolved_fill == 20 &&
+       skipped_fill == 10:
+        return 0
+    return 1
+`,
+	})
+
+	entry := filepath.Join(tmp, "app", "main.t4")
+	world, err := compiler.LoadWorldOpt(entry, compiler.WorldOptions{
+		DependencyRoots: []compiler.ModuleRoot{{
+			Root: testkit.RepoRoot(t),
+		}},
+	})
+	if err != nil {
+		t.Fatalf("LoadWorldOpt(lib.core.block state resolver consumer): %v", err)
+	}
+	if _, err := compiler.CheckWorld(world); err != nil {
+		t.Fatalf("CheckWorld(lib.core.block state resolver consumer): %v", err)
+	}
+}
+
+func TestSurfaceBlockMotionExampleLoadsTransitionModel(t *testing.T) {
+	entry := testkit.RepoPath(t, "examples", "surface_block_motion.tetra")
+	world, err := compiler.LoadWorld(entry)
+	if err != nil {
+		t.Fatalf("LoadWorld(%s): %v", filepath.ToSlash(entry), err)
+	}
+
+	for _, module := range []string{"lib.core.surface", "lib.core.block"} {
+		if _, ok := world.ByModule[module]; !ok {
+			t.Fatalf("surface block motion did not load module %s; modules=%v", module, world.ByModule)
+		}
+	}
+
+	if _, err := compiler.CheckWorld(world); err != nil {
+		t.Fatalf("CheckWorld(surface block motion): %v", err)
+	}
+}
+
+func TestSurfaceBlockMotionExampleRunsTransitionValidation(t *testing.T) {
+	entry := testkit.RepoPath(t, "examples", "surface_block_motion.tetra")
+	out := filepath.Join(t.TempDir(), "surface-block-motion")
+	if _, err := compiler.BuildFileWithStatsOpt(entry, out, "linux-x64", compiler.BuildOptions{Jobs: 1}); err != nil {
+		t.Fatalf("BuildFileWithStatsOpt(surface block motion): %v", err)
+	}
+	cmd := exec.Command(out)
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("surface block motion exited with 0, want Surface smoke success exit 1\n%s", output)
+	}
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 1 {
+		t.Fatalf("surface block motion exited with %v, want exit 1\n%s", err, output)
+	}
+}
+
+func TestSurfaceBlockMotionDefinesTransitionAPI(t *testing.T) {
+	tmp := t.TempDir()
+	testkit.WriteFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.core.block as block
+
+func main() -> Int:
+    let motion: block.MotionSpec = block.motion_transition(120, 0, block.motion_ease_linear(), true, true, true, 12, 0, 108)
+    let reduced: block.MotionSpec = block.motion_reduced(motion)
+    let progress0: Int = block.motion_progress(motion, 0)
+    let progress_mid: Int = block.motion_progress(motion, 60)
+    let progress_done: Int = block.motion_progress(motion, 120)
+    let opacity_mid: Int = block.motion_resolve_opacity(80, 200, motion, 60)
+    let color_mid: Int = block.motion_resolve_color_channel(32, 96, motion, 60)
+    let tx_mid: Int = block.motion_resolve_translate_x(motion, 60)
+    let scale_mid: Int = block.motion_resolve_scale(motion, 60)
+    let reduced_progress: Int = block.motion_progress(reduced, 0)
+
+    if block.motion_duration(motion) == 120 &&
+       block.motion_delay(motion) == 0 &&
+       block.motion_easing(motion) == block.motion_ease_linear() &&
+       progress0 == 0 && progress_mid == 500 && progress_done == 1000 &&
+       opacity_mid == 140 && color_mid == 64 &&
+       tx_mid == 6 && scale_mid == 104 &&
+       block.motion_should_schedule(motion, 60) &&
+       !block.motion_should_schedule(motion, 120) &&
+       block.motion_is_complete(motion, 120) &&
+       reduced.reduced && reduced_progress == 1000 &&
+       !block.motion_should_schedule(reduced, 0):
+        return 0
+    return 1
+`,
+	})
+
+	entry := filepath.Join(tmp, "app", "main.t4")
+	world, err := compiler.LoadWorldOpt(entry, compiler.WorldOptions{
+		DependencyRoots: []compiler.ModuleRoot{{
+			Root: testkit.RepoRoot(t),
+		}},
+	})
+	if err != nil {
+		t.Fatalf("LoadWorldOpt(lib.core.block motion consumer): %v", err)
+	}
+	if _, err := compiler.CheckWorld(world); err != nil {
+		t.Fatalf("CheckWorld(lib.core.block motion consumer): %v", err)
+	}
+}
+
+func TestSurfaceBlockAssetsExampleLoadsAssetPipeline(t *testing.T) {
+	entry := testkit.RepoPath(t, "examples", "surface_block_assets.tetra")
+	world, err := compiler.LoadWorld(entry)
+	if err != nil {
+		t.Fatalf("LoadWorld(%s): %v", filepath.ToSlash(entry), err)
+	}
+
+	for _, module := range []string{"lib.core.surface", "lib.core.block"} {
+		if _, ok := world.ByModule[module]; !ok {
+			t.Fatalf("surface block assets did not load module %s; modules=%v", module, world.ByModule)
+		}
+	}
+
+	if _, err := compiler.CheckWorld(world); err != nil {
+		t.Fatalf("CheckWorld(surface block assets): %v", err)
+	}
+}
+
+func TestSurfaceBlockAssetsExampleRunsAssetValidation(t *testing.T) {
+	entry := testkit.RepoPath(t, "examples", "surface_block_assets.tetra")
+	out := filepath.Join(t.TempDir(), "surface-block-assets")
+	if _, err := compiler.BuildFileWithStatsOpt(entry, out, "linux-x64", compiler.BuildOptions{Jobs: 1}); err != nil {
+		t.Fatalf("BuildFileWithStatsOpt(surface block assets): %v", err)
+	}
+	cmd := exec.Command(out)
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("surface block assets exited with 0, want Surface smoke success exit 1\n%s", output)
+	}
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 1 {
+		t.Fatalf("surface block assets exited with %v, want exit 1\n%s", err, output)
+	}
+}
+
+func TestSurfaceBlockAssetsDefinesManifestAPI(t *testing.T) {
+	tmp := t.TempDir()
+	testkit.WriteFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.core.surface as surface
+import lib.core.block as block
+
+func main() -> Int:
+    let font: block.AssetRef = block.asset_embedded(block.asset_kind_font(), 1, 0, 0, 101)
+    let icon: block.AssetRef = block.asset_icon(2, 16, 16, 202)
+    let image: block.AssetRef = block.asset_image(3, 48, 32, 303)
+    let missing: block.AssetRef = block.asset_missing(block.asset_kind_image(), 9)
+    let remote: block.AssetRef = block.asset_remote_url(block.asset_kind_image(), 10)
+    let manifest: block.AssetManifest = block.asset_manifest(font, icon, image, block.asset_cache_budget_bytes(), block.asset_cache_entry_limit())
+    let tinted: block.ImageSpec = block.image_asset_tinted_scaled(icon, 32, 32, surface.Color(r: 96, g: 174, b: 244, a: 255), 1)
+    let scaled: block.ImageSpec = block.image_asset_tinted_scaled(image, 96, 64, surface.Color(r: 255, g: 255, b: 255, a: 255), 2)
+
+    if block.asset_manifest_validate(manifest) == block.asset_error_ok() &&
+       block.asset_manifest_hash(manifest) > 0 &&
+       block.asset_is_embedded(font) &&
+       block.asset_is_local(icon) &&
+       block.asset_hash(icon) == 202 &&
+       block.asset_width(image) == 48 && block.asset_height(image) == 32 &&
+       block.asset_cache_validate(block.asset_cache_budget_bytes(), 4096, 3, 6) == block.asset_error_ok() &&
+       block.asset_cache_validate(0, 0, 0, 0) == block.asset_error_unbounded_cache() &&
+       block.asset_resolve_status(missing) == block.asset_error_missing_fallback() &&
+       block.asset_resolve_status(remote) == block.asset_error_network_rejected() &&
+       block.asset_diagnostic_missing_asset() > 0 &&
+       block.asset_diagnostic_network_rejected() > 0 &&
+       tinted.asset_kind == block.asset_kind_icon() &&
+       tinted.tint_b == 244 &&
+       scaled.width == 96 && scaled.height == 64 && scaled.fit == 2:
+        return 0
+    return 1
+`,
+	})
+
+	entry := filepath.Join(tmp, "app", "main.t4")
+	world, err := compiler.LoadWorldOpt(entry, compiler.WorldOptions{
+		DependencyRoots: []compiler.ModuleRoot{{
+			Root: testkit.RepoRoot(t),
+		}},
+	})
+	if err != nil {
+		t.Fatalf("LoadWorldOpt(lib.core.block asset consumer): %v", err)
+	}
+	if _, err := compiler.CheckWorld(world); err != nil {
+		t.Fatalf("CheckWorld(lib.core.block asset consumer): %v", err)
+	}
+}
+
+func TestSurfaceBlockAccessibilityExampleLoadsMetadataModel(t *testing.T) {
+	entry := testkit.RepoPath(t, "examples", "surface_block_accessibility.tetra")
+	world, err := compiler.LoadWorld(entry)
+	if err != nil {
+		t.Fatalf("LoadWorld(%s): %v", filepath.ToSlash(entry), err)
+	}
+
+	for _, module := range []string{"lib.core.surface", "lib.core.block"} {
+		if _, ok := world.ByModule[module]; !ok {
+			t.Fatalf("surface block accessibility did not load module %s; modules=%v", module, world.ByModule)
+		}
+	}
+
+	if _, err := compiler.CheckWorld(world); err != nil {
+		t.Fatalf("CheckWorld(surface block accessibility): %v", err)
+	}
+}
+
+func TestSurfaceBlockAccessibilityExampleRunsMetadataValidation(t *testing.T) {
+	entry := testkit.RepoPath(t, "examples", "surface_block_accessibility.tetra")
+	out := filepath.Join(t.TempDir(), "surface-block-accessibility")
+	if _, err := compiler.BuildFileWithStatsOpt(entry, out, "linux-x64", compiler.BuildOptions{Jobs: 1}); err != nil {
+		t.Fatalf("BuildFileWithStatsOpt(surface block accessibility): %v", err)
+	}
+	cmd := exec.Command(out)
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("surface block accessibility exited with 0, want Surface smoke success exit 1\n%s", output)
+	}
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 1 {
+		t.Fatalf("surface block accessibility exited with %v, want exit 1\n%s", err, output)
+	}
+}
+
+func TestSurfaceBlockSystemExampleLoadsHeadlessGoldenModel(t *testing.T) {
+	entry := testkit.RepoPath(t, "examples", "surface_block_system.tetra")
+	world, err := compiler.LoadWorld(entry)
+	if err != nil {
+		t.Fatalf("LoadWorld(%s): %v", filepath.ToSlash(entry), err)
+	}
+
+	for _, module := range []string{"lib.core.surface", "lib.core.block"} {
+		if _, ok := world.ByModule[module]; !ok {
+			t.Fatalf("surface block system did not load module %s; modules=%v", module, world.ByModule)
+		}
+	}
+
+	if _, err := compiler.CheckWorld(world); err != nil {
+		t.Fatalf("CheckWorld(surface block system): %v", err)
+	}
+}
+
+func TestSurfaceBlockSystemExampleRunsHeadlessGoldenValidation(t *testing.T) {
+	entry := testkit.RepoPath(t, "examples", "surface_block_system.tetra")
+	out := filepath.Join(t.TempDir(), "surface-block-system")
+	if _, err := compiler.BuildFileWithStatsOpt(entry, out, "linux-x64", compiler.BuildOptions{Jobs: 1}); err != nil {
+		t.Fatalf("BuildFileWithStatsOpt(surface block system): %v", err)
+	}
+	cmd := exec.Command(out)
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("surface block system exited with 0, want Surface smoke success exit 1\n%s", output)
+	}
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 1 {
+		t.Fatalf("surface block system exited with %v, want exit 1\n%s", err, output)
+	}
+}
+
+func TestSurfaceBlockExamplesAreBlockOnlyBeautifulScenes(t *testing.T) {
+	for _, rel := range surfaceBlockBeautyExamplePaths() {
+		rel := rel
+		t.Run(filepath.Base(rel), func(t *testing.T) {
+			entry := testkit.RepoPath(t, strings.Split(rel, "/")...)
+			raw, err := os.ReadFile(entry)
+			if err != nil {
+				t.Fatalf("read %s: %v", rel, err)
+			}
+			text := string(raw)
+			lower := strings.ToLower(text)
+			for _, want := range []string{
+				"import lib.core.surface as surface",
+				"import lib.core.block as block",
+				"theme_dark",
+				"theme_light",
+				"block.layout_",
+				"block.paint_stack",
+				"block.text_",
+				"block.asset_",
+				"block.accessibility_",
+				"block.state_selector_hover()",
+				"block.state_selector_focused()",
+				"block.state_selector_pressed()",
+				"block.motion_",
+				"scene_checksum",
+			} {
+				if !strings.Contains(text, want) {
+					t.Fatalf("%s missing Block beauty evidence marker %q", rel, want)
+				}
+			}
+			for _, forbidden := range []string{
+				"import lib.core.widgets",
+				"widgets.",
+				"widgets.Button",
+				"widgets.TextBox",
+				"Button(",
+				"TextBox(",
+				"Card(",
+				"Modal(",
+				"react",
+				"electron",
+				"dom ui",
+				"user js",
+			} {
+				if strings.Contains(text, forbidden) || strings.Contains(lower, forbidden) {
+					t.Fatalf("%s contains forbidden non-Block marker %q", rel, forbidden)
+				}
+			}
+
+			world, err := compiler.LoadWorld(entry)
+			if err != nil {
+				t.Fatalf("LoadWorld(%s): %v", rel, err)
+			}
+			for _, module := range []string{"lib.core.surface", "lib.core.block"} {
+				if _, ok := world.ByModule[module]; !ok {
+					t.Fatalf("%s did not load module %s; modules=%v", rel, module, world.ByModule)
+				}
+			}
+			if _, err := compiler.CheckWorld(world); err != nil {
+				t.Fatalf("CheckWorld(%s): %v", rel, err)
+			}
+
+			out := filepath.Join(t.TempDir(), strings.TrimSuffix(filepath.Base(rel), ".tetra"))
+			if _, err := compiler.BuildFileWithStatsOpt(entry, out, "linux-x64", compiler.BuildOptions{Jobs: 1}); err != nil {
+				t.Fatalf("BuildFileWithStatsOpt(%s): %v", rel, err)
+			}
+			cmd := exec.Command(out)
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				t.Fatalf("%s exited with %v\n%s", rel, err, output)
+			}
+		})
+	}
+}
+
+func TestSurfaceBlockAccessibilityDefinesMetadataAPI(t *testing.T) {
+	tmp := t.TempDir()
+	testkit.WriteFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.core.block as block
+
+func main() -> Int:
+    let label_id: block.BlockID = block.id(3)
+    let submit_id: block.BlockID = block.id(4)
+    let label: block.AccessibilitySpec = block.accessibility_label_for(4, submit_id)
+    let submit: block.AccessibilitySpec = block.accessibility_button_labelled_by(6, label_id, block.action_primary())
+    let unnamed: block.AccessibilitySpec = block.accessibility_button(0)
+
+    if block.accessibility_focusable_has_name(submit) &&
+       !block.accessibility_focusable_has_name(unnamed) &&
+       block.accessibility_relationship_matches(label, submit, label_id, submit_id) &&
+       block.accessibility_reading_order_matches(0, 1) &&
+       block.accessibility_metadata_claim_scoped(false, false, false) &&
+       !block.accessibility_metadata_claim_scoped(true, false, false) &&
+       !block.accessibility_screen_reader_claim_allowed(false, true) &&
+       block.accessibility_screen_reader_claim_allowed(true, true):
+        return 0
+    return 1
+`,
+	})
+
+	entry := filepath.Join(tmp, "app", "main.t4")
+	world, err := compiler.LoadWorldOpt(entry, compiler.WorldOptions{
+		DependencyRoots: []compiler.ModuleRoot{{
+			Root: testkit.RepoRoot(t),
+		}},
+	})
+	if err != nil {
+		t.Fatalf("LoadWorldOpt(lib.core.block accessibility consumer): %v", err)
+	}
+	if _, err := compiler.CheckWorld(world); err != nil {
+		t.Fatalf("CheckWorld(lib.core.block accessibility consumer): %v", err)
+	}
+}
+
+func TestSurfaceBlockEditableTextRejectsBorrowedStorage(t *testing.T) {
+	requireSurfaceCheckErrorContains(t, map[string]string{
+		"app/main.t4": `module app.main
+import lib.core.text as text
+
+func bad_editable(xs: borrow []u8) -> text.EditableText:
+    return text.editable_empty(xs.window(0, 2).borrow(), 6)
+
+func main() -> Int:
+    return 0
+`,
+	}, "borrowed value derived from 'xs' cannot be passed to non-borrow parameter 1 of 'lib.core.text.editable_empty'")
+}
+
+func TestSurfaceBlockModuleDefinesPaintLayerGrammar(t *testing.T) {
+	tmp := t.TempDir()
+	testkit.WriteFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.core.surface as surface
+import lib.core.draw as draw
+import lib.core.block as block
+
+func main() -> Int
+uses alloc, mem:
+    let rect: surface.Rect = surface.Rect(x: 4, y: 4, w: 32, h: 20)
+    let bg: surface.Color = surface.Color(r: 20, g: 28, b: 36, a: 255)
+    let fill_color: surface.Color = surface.Color(r: 42, g: 108, b: 214, a: 255)
+    let hi_color: surface.Color = surface.Color(r: 88, g: 180, b: 132, a: 255)
+    let border_color: surface.Color = surface.Color(r: 225, g: 232, b: 240, a: 255)
+    let shadow_color: surface.Color = surface.Color(r: 0, g: 0, b: 0, a: 96)
+    let outline_color: surface.Color = surface.Color(r: 246, g: 205, b: 92, a: 255)
+
+    let fill: block.PaintLayer = block.paint_layer_fill_radius(fill_color, 8)
+    let gradient: block.PaintLayer = block.paint_layer_linear_gradient(fill_color, hi_color, 8)
+    let border: block.PaintLayer = block.paint_layer_border(border_color, 1, 8)
+    let shadow: block.PaintLayer = block.paint_layer_shadow(shadow_color, 12, 0, 4)
+    let outline: block.PaintLayer = block.paint_layer_outline(outline_color, 2, 10)
+    let paint: block.PaintSpec = block.paint_stack5(fill, gradient, border, shadow, outline)
+    let flags: Int = block.paint_feature_flags(paint)
+    let command0: Int = block.paint_resolve_command(paint, 0)
+    let command1: Int = block.paint_resolve_command(paint, 1)
+    let command2: Int = block.paint_resolve_command(paint, 2)
+    let command3: Int = block.paint_resolve_command(paint, 3)
+    let command4: Int = block.paint_resolve_command(paint, 4)
+    let valid: Int = block.paint_validate_visual_grammar(paint)
+
+    var pixels: []u8 = core.make_u8(32 * 24 * 4)
+    let surface_ref: surface.Surface = surface.Surface(handle: 0, width: 32, height: 24)
+    var frame: surface.Frame = surface.Frame(surface: surface_ref, width: 32, height: 24, stride: 128, pixels: pixels)
+    var ctx: draw.DrawContext = draw.DrawContext(frame: frame)
+    let clear_ok: Int = draw.clear(ctx, bg)
+    let shadow_ok: Int = draw.box_shadow_approx(ctx, rect, 8, 12, 0, 4, shadow_color)
+    let gradient_ok: Int = draw.linear_gradient_rect(ctx, rect, fill_color, hi_color)
+    let fill_ok: Int = draw.rounded_rect(ctx, rect, 8, fill_color)
+    let border_ok: Int = draw.rounded_rect_outline(ctx, rect, 8, 1, border_color)
+
+    let blur: block.PaintLayer = block.paint_layer_blur(16)
+    let invalid_blur: block.PaintSpec = block.paint_from_layer(blur)
+    let blur_status: Int = block.paint_validate(invalid_blur)
+
+    if valid == block.paint_error_ok() &&
+       blur_status == block.paint_error_unsupported_blur() &&
+       block.paint_has_feature(flags, block.paint_feature_fill()) &&
+       block.paint_has_feature(flags, block.paint_feature_border()) &&
+       block.paint_has_feature(flags, block.paint_feature_radius()) &&
+       block.paint_has_feature(flags, block.paint_feature_shadow()) &&
+       block.paint_has_feature(flags, block.paint_feature_outline()) &&
+       block.paint_has_feature(flags, block.paint_feature_gradient()) &&
+       command0 == block.paint_command_fill() &&
+       command1 == block.paint_command_gradient() &&
+       command2 == block.paint_command_border() &&
+       command3 == block.paint_command_shadow() &&
+       command4 == block.paint_command_outline() &&
+       clear_ok == 0 && shadow_ok == draw.paint_command_shadow() && gradient_ok == draw.paint_command_gradient() &&
+       fill_ok == draw.paint_command_fill() && border_ok == draw.paint_command_border():
+        return 0
+    return 1
+`,
+	})
+
+	entry := filepath.Join(tmp, "app", "main.t4")
+	world, err := compiler.LoadWorldOpt(entry, compiler.WorldOptions{
+		DependencyRoots: []compiler.ModuleRoot{{
+			Root: testkit.RepoRoot(t),
+		}},
+	})
+	if err != nil {
+		t.Fatalf("LoadWorldOpt: %v", err)
+	}
+	if _, err := compiler.CheckWorld(world); err != nil {
+		t.Fatalf("CheckWorld(lib.core.block paint consumer): %v", err)
 	}
 }
 

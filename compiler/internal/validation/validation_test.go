@@ -215,6 +215,156 @@ func TestCheckBoundsProofsWithPLIRRejectsTypedProofBaseMismatch(t *testing.T) {
 	}
 }
 
+func TestCheckBoundsProofsWithPLIRRejectsProofWithoutUse(t *testing.T) {
+	irProg := &ir.IRProgram{Funcs: []ir.IRFunc{{
+		Name: "main",
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRIndexLoadI32Unchecked, ProofID: "proof:while:i:xs:1:1"},
+		},
+	}}}
+	plirProg := &plir.Program{Funcs: []plir.Function{{
+		Name: "main",
+		Values: []plir.Value{{
+			ID:         "local:i",
+			Type:       "i32",
+			Provenance: plir.Provenance{Kind: plir.ProvenanceStack, Root: "i"},
+		}},
+		Blocks: []plir.BasicBlock{{ID: "body", Kind: "while_body", Entry: true, Exit: true, Ops: []string{"op0"}}},
+		Ops:    []plir.Operation{{ID: "op0", Kind: plir.OpIndexLoad, Block: "body"}},
+		Facts: []plir.Fact{{
+			ID:      "f0",
+			Kind:    plir.FactIndexInRange,
+			ValueID: "local:i",
+			Range:   "0..xs.len",
+			ProofID: "proof:while:i:xs:1:1",
+			Source:  "test:1:1",
+		}},
+		ProofGuards: []plir.ProofGuard{{
+			ID:        "proof:while:i:xs:1:1",
+			Kind:      "range",
+			Block:     "body",
+			OpID:      "op0",
+			Condition: "i < xs.len",
+		}},
+		ProofTerms: []plir.ProofTerm{{
+			ID:            "proof:while:i:xs:1:1",
+			Kind:          "bounds_check",
+			SubjectBaseID: "xs",
+			IndexValueID:  "local:i",
+			Operation:     "index_load",
+			Range:         "0..xs.len",
+		}},
+	}}}
+	_, err := CheckBoundsProofsWithPLIR(irProg, plirProg)
+	if err == nil || !strings.Contains(err.Error(), "proof use") {
+		t.Fatalf("CheckBoundsProofsWithPLIR error = %v, want missing proof use rejection", err)
+	}
+}
+
+func TestCheckBoundsProofsWithPLIRRejectsTypedProofOperationMismatch(t *testing.T) {
+	irProg := &ir.IRProgram{Funcs: []ir.IRFunc{{
+		Name: "main",
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRIndexLoadI32Unchecked, ProofID: "proof:while:i:xs:1:1"},
+		},
+	}}}
+	plirProg := &plir.Program{Funcs: []plir.Function{{
+		Name: "main",
+		Values: []plir.Value{{
+			ID:         "local:i",
+			Type:       "i32",
+			Provenance: plir.Provenance{Kind: plir.ProvenanceStack, Root: "i"},
+		}},
+		Blocks: []plir.BasicBlock{{ID: "body", Kind: "while_body", Entry: true, Exit: true, Ops: []string{"op0"}}},
+		Ops:    []plir.Operation{{ID: "op0", Kind: plir.OpIndexLoad, Block: "body"}},
+		Facts: []plir.Fact{{
+			ID:      "f0",
+			Kind:    plir.FactIndexInRange,
+			ValueID: "local:i",
+			Range:   "0..xs.len",
+			ProofID: "proof:while:i:xs:1:1",
+			Source:  "test:1:1",
+		}},
+		ProofGuards: []plir.ProofGuard{{
+			ID:        "proof:while:i:xs:1:1",
+			Kind:      "range",
+			Block:     "body",
+			OpID:      "op0",
+			Condition: "i < xs.len",
+		}},
+		ProofUses: []plir.ProofUse{{
+			ProofID: "proof:while:i:xs:1:1",
+			Block:   "body",
+			OpID:    "op0",
+			UseKind: "bounds_check",
+		}},
+		ProofTerms: []plir.ProofTerm{{
+			ID:            "proof:while:i:xs:1:1",
+			Kind:          "bounds_check",
+			SubjectBaseID: "xs",
+			IndexValueID:  "local:i",
+			Operation:     "index_store",
+			Range:         "0..xs.len",
+		}},
+	}}}
+	_, err := CheckBoundsProofsWithPLIR(irProg, plirProg)
+	if err == nil || !strings.Contains(err.Error(), "operation") {
+		t.Fatalf("CheckBoundsProofsWithPLIR error = %v, want operation mismatch rejection", err)
+	}
+}
+
+func TestCheckBoundsProofsWithPLIRRejectsProofUseOperationMismatch(t *testing.T) {
+	irProg := &ir.IRProgram{Funcs: []ir.IRFunc{{
+		Name: "main",
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRIndexLoadI32Unchecked, ProofID: "proof:while:i:xs:1:1"},
+		},
+	}}}
+	plirProg := &plir.Program{Funcs: []plir.Function{{
+		Name: "main",
+		Values: []plir.Value{{
+			ID:         "local:i",
+			Type:       "i32",
+			Provenance: plir.Provenance{Kind: plir.ProvenanceStack, Root: "i"},
+		}},
+		Blocks: []plir.BasicBlock{{ID: "body", Kind: "while_body", Entry: true, Exit: true, Ops: []string{"op0"}}},
+		Ops:    []plir.Operation{{ID: "op0", Kind: plir.OpIndexStore, Block: "body"}},
+		Facts: []plir.Fact{{
+			ID:      "f0",
+			Kind:    plir.FactIndexInRange,
+			ValueID: "local:i",
+			Range:   "0..xs.len",
+			ProofID: "proof:while:i:xs:1:1",
+			Source:  "test:1:1",
+		}},
+		ProofGuards: []plir.ProofGuard{{
+			ID:        "proof:while:i:xs:1:1",
+			Kind:      "range",
+			Block:     "body",
+			OpID:      "op0",
+			Condition: "i < xs.len",
+		}},
+		ProofUses: []plir.ProofUse{{
+			ProofID: "proof:while:i:xs:1:1",
+			Block:   "body",
+			OpID:    "op0",
+			UseKind: "bounds_check",
+		}},
+		ProofTerms: []plir.ProofTerm{{
+			ID:            "proof:while:i:xs:1:1",
+			Kind:          "bounds_check",
+			SubjectBaseID: "xs",
+			IndexValueID:  "local:i",
+			Operation:     "index_load",
+			Range:         "0..xs.len",
+		}},
+	}}}
+	_, err := CheckBoundsProofsWithPLIR(irProg, plirProg)
+	if err == nil || !strings.Contains(err.Error(), "proof use operation") {
+		t.Fatalf("CheckBoundsProofsWithPLIR error = %v, want proof use operation mismatch rejection", err)
+	}
+}
+
 func TestCheckBoundsProofsWithPLIRAcceptsExpandedBCEProofIDs(t *testing.T) {
 	irProg, proofProg := lowerAndPLIRForProofValidation(t, `
 func guarded(xs: []i32, i: Int) -> Int
@@ -913,6 +1063,63 @@ func TestValidateAllocationLoweringRejectsExplicitIslandUseAfterReset(t *testing
 	err := ValidateAllocationLowering(plan, prog)
 	if err == nil || !strings.Contains(err.Error(), "use after free") {
 		t.Fatalf("ValidateAllocationLowering error = %v, want reset invalidation rejection", err)
+	}
+}
+
+func TestValidateAllocationLoweringRejectsExplicitIslandResetWhileSliceLive(t *testing.T) {
+	plan := explicitIslandValidationPlan("bad")
+	prog := &ir.IRProgram{Funcs: []ir.IRFunc{{
+		Name:       "bad",
+		LocalSlots: 3,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 64},
+			{Kind: ir.IRIslandNew},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 4},
+			{Kind: ir.IRIslandMakeSliceI32, Name: "xs"},
+			{Kind: ir.IRStoreLocal, Local: 2},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRIslandReset},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRIslandFree},
+			{Kind: ir.IRReturn},
+		},
+	}}}
+	err := ValidateAllocationLowering(plan, prog)
+	if err == nil || !strings.Contains(err.Error(), "reset while live slice") {
+		t.Fatalf("ValidateAllocationLowering error = %v, want reset while live slice rejection", err)
+	}
+}
+
+func TestValidateAllocationLoweringAcceptsExplicitIslandResetAfterSliceLocalCleared(t *testing.T) {
+	plan := explicitIslandValidationPlan("main")
+	prog := &ir.IRProgram{Funcs: []ir.IRFunc{{
+		Name:       "main",
+		LocalSlots: 3,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 64},
+			{Kind: ir.IRIslandNew},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 4},
+			{Kind: ir.IRIslandMakeSliceI32, Name: "xs"},
+			{Kind: ir.IRStoreLocal, Local: 2},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRIslandReset},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRIslandFree},
+			{Kind: ir.IRReturn},
+		},
+	}}}
+	if err := ValidateAllocationLowering(plan, prog); err != nil {
+		t.Fatalf("ValidateAllocationLowering: %v", err)
 	}
 }
 

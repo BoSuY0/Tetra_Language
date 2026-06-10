@@ -43,12 +43,12 @@ func TestActorRuntimeProductionBoundaryAuditCoversP18PlanList(t *testing.T) {
 	if limits.Status != ActorRuntimeBoundaryDocumentedLimit {
 		t.Fatalf("current limits status = %q, want %q", limits.Status, ActorRuntimeBoundaryDocumentedLimit)
 	}
-	for _, want := range []string{"maxActors=128", "msgPoolSize=65536", "actor_state_slots=8", "single-thread cooperative scheduler", "linux-x64 distributed runtime only", "non-linux actor net pump is no-op", "message pool overflow is not a checked runtime error"} {
+	for _, want := range []string{"maxActors=128", "msgPoolSize=65536", "maxActorMailboxMsgs=256", "actor_state_slots=8", "single-thread cooperative scheduler", "linux-x64 distributed runtime only", "non-linux actor net pump is no-op", "mailbox full returns checked -2", "message pool exhaustion returns checked -1", "invalid actor handle sends return checked -3", "done actor sends return checked -4", "task-group cancellation wakes timed actor receive waiters", "message pool entries are not reclaimed"} {
 		if !hasActorBoundaryText(limits.RequiredFacts, want) {
 			t.Fatalf("current limits row missing fact %q: %#v", want, limits.RequiredFacts)
 		}
 	}
-	for _, want := range []string{"compiler/internal/actorsrt/linux_x64.go", "docs/spec/actors.md", "TestActorNetPumpIsExportedButOnlyLinuxHasRuntimePump"} {
+	for _, want := range []string{"compiler/internal/actorsrt/linux_x64.go", "emitMailboxFullCheckForReceiverInEcx", "emitCheckedMessagePoolAlloc", "emitInvalidActorHandleReturn", "emitActorDoneReturn", "emitBlockedDeadlineWakeCheck", "emitCurrentTaskGroupCanceledCheck", "TestActorMailboxFullReturnsCheckedBackpressure", "TestActorMessagePoolExhaustionReturnsCheckedFailure", "TestActorInvalidHandleSendReturnsCheckedFailure", "TestActorSendToDoneActorReturnsCheckedFailure", "TestTaskGroupCancelWakesActorRecvUntilBeforeDeadlineBuildAndRun", "docs/spec/actors.md", "TestActorNetPumpIsExportedButOnlyLinuxHasRuntimePump"} {
 		if !strings.Contains(limits.Evidence, want) {
 			t.Fatalf("current limits evidence missing %q: %s", want, limits.Evidence)
 		}
@@ -81,7 +81,7 @@ func TestActorRuntimeProductionBoundaryAuditCoversP18PlanList(t *testing.T) {
 	if blockers.Status != ActorRuntimeBoundaryBlocked {
 		t.Fatalf("blockers status = %q, want %q", blockers.Status, ActorRuntimeBoundaryBlocked)
 	}
-	for _, want := range []string{"production multi-threaded actor scheduler", "message pool checked failure or reclamation", "non-Linux-x64 distributed actor runtime", "full cancellation and structured concurrency", "full race-safety proof"} {
+	for _, want := range []string{"production multi-threaded actor scheduler", "non-Linux-x64 distributed actor runtime", "full cancellation and structured concurrency", "full race-safety proof"} {
 		if !hasActorBoundaryText(blockers.MissingFacts, want) {
 			t.Fatalf("blockers row missing fact %q: %#v", want, blockers.MissingFacts)
 		}

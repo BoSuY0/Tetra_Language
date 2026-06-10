@@ -129,6 +129,32 @@ if [[ "${1:-}" == "run" && "${2:-}" == "./tools/cmd/memory-fuzz-short" ]]; then
   fi
   exit 0
 fi
+if [[ "${1:-}" == "run" && "${2:-}" == "./tools/cmd/ram-contract-fuzz-short" ]]; then
+  report_dir=""
+  shift 2
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --report-dir)
+        report_dir="$2"
+        shift 2
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+  if [[ -n "$report_dir" ]]; then
+    mkdir -p -- "$report_dir"
+    printf '{"schema":"tetra.ram-contract-fuzz-oracle.v1","status":"pass","artifact_dir":"%s"}\n' "$report_dir" >"$report_dir/ram-contract-fuzz-oracle.json"
+    printf '{"schema_version":"tetra.ram-contract-report.v1","entrypoint":"main","target":"linux-x64","git_head":"e2c19b8ee276158f8eb2c54cf61e11bd84952893","rows":[],"blockers":[],"summary":{"total_heap_bytes":0,"total_copy_bytes":0,"unbounded_rows":0,"heap_blockers":0,"copy_blockers":0}}\n' >"$report_dir/ram-contract-report.json"
+    printf '{"schema_version":"tetra.memory-grade-report.v1","grade":"M0","reasons":["no heap or copy blockers"],"ram_contract_report":"ram-contract-report.json"}\n' >"$report_dir/memory-grade-report.json"
+    printf '{"schema_version":"tetra.proof-store-summary.v1","proofs":[],"invalid_references":[]}\n' >"$report_dir/proof-store-summary.json"
+    printf '{"schema_version":"tetra.validation-pipeline-coverage.v1","stages":[{"name":"ram-contract","status":"pass"}]}\n' >"$report_dir/validation-pipeline-coverage.json"
+    printf '{"schema_version":"tetra.ram-blockers.v1","kind":"heap","blockers":[]}\n' >"$report_dir/heap-blockers.json"
+    printf '{"schema_version":"tetra.ram-blockers.v1","kind":"copy","blockers":[]}\n' >"$report_dir/copy-blockers.json"
+  fi
+  exit 0
+fi
 if [[ "${1:-}" == "test" ]]; then
   pkg="${2:-}"
   shift 2 || true
@@ -162,6 +188,9 @@ if [[ "${1:-}" == "test" ]]; then
 			exit 0
 		fi
 		if [[ "${TETRA_FAKE_SKIP_HOST_LEAK_LIST:-}" == "1" && "$pkg" == "./cli/internal/actornet" ]]; then
+			exit 0
+		fi
+		if [[ "${TETRA_FAKE_SKIP_RAM_CONTRACT_LIST:-}" == "1" && "$pkg" == "./tools/cmd/ram-contract-fuzz-short" ]]; then
 			exit 0
 		fi
     case "$pkg" in
@@ -234,6 +263,27 @@ if [[ "${1:-}" == "test" ]]; then
           TestRunMemoryFuzzShortWritesValidatedArtifacts \
           TestRunMemoryFuzzShortRejectsUnsupportedTier \
           TestRunMemoryFuzzShortRejectsStaleReportDir
+        ;;
+      ./tools/cmd/ram-contract-fuzz-short)
+        printf '%s\n' \
+          TestRunRAMContractFuzzShortWritesValidatedArtifacts \
+          TestRunRAMContractFuzzShortRejectsStaleReportDir
+        ;;
+      ./tools/cmd/validate-ram-contract-fuzz-oracle)
+        printf '%s\n' \
+          TestValidateRAMContractFuzzOracleAcceptsArtifactBundle \
+          TestValidateRAMContractFuzzOracleRejectsMissingReport
+        ;;
+      ./tools/cmd/validate-ram-contract-report)
+        printf '%s\n' \
+          TestValidateRAMContractReportFileAcceptsCompilerReport \
+          TestValidateRAMContractReportRejectsMissingBlocker
+        ;;
+      ./compiler/internal/ramcontract)
+        printf '%s\n' \
+          TestRAMContractFromAllocPlanTracksRowsAndBlockers \
+          TestRAMContractRejectsMissingBlockerExplanation \
+          TestRAMContractEnforcementFailsForHeap
         ;;
       ./cli/internal/actornet)
         printf '%s\n' \

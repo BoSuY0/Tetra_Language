@@ -817,12 +817,20 @@ func readinessDistributedActorRuntimeJSON() []byte {
 		})
 	}
 	raw, err := json.Marshal(map[string]any{
-		"schema":    "tetra.actors.distributed-runtime.v1",
-		"status":    "pass",
-		"target":    "linux-x64",
-		"host":      "linux-x64",
-		"runtime":   "actornet",
-		"transport": "loopback-tcp",
+		"schema":          "tetra.actors.distributed-runtime.v1",
+		"status":          "pass",
+		"target":          "linux-x64",
+		"host":            "linux-x64",
+		"runtime":         "actornet",
+		"transport":       "loopback-tcp",
+		"git_head":        "e2c19b8ee276158f8eb2c54cf61e11bd84952893",
+		"artifact_hashes": "artifact-hashes.json",
+		"claims":          []string{"linux-x64 loopback tcp distributed actor runtime evidence"},
+		"nonclaims": []string{
+			"no cluster membership",
+			"no reconnect/retry production",
+			"no non-linux distributed actor runtime support",
+		},
 		"broker": map[string]any{
 			"runtime":              "actornet",
 			"transport":            "loopback-tcp",
@@ -846,7 +854,8 @@ func readinessDistributedActorRuntimeJSON() []byte {
 			"send_typed": 1,
 			"node_down":  1,
 		},
-		"cases": cases,
+		"frame_order": []string{"hello", "hello_ack", "spawn_req", "spawn_ack", "send_i32", "send_msg", "send_typed", "node_down"},
+		"cases":       cases,
 	})
 	if err != nil {
 		panic(err)

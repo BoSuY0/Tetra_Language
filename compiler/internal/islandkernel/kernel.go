@@ -198,6 +198,7 @@ func CanResetIsland(req TokenRequest) Result {
 		return reject("token.reset_live_borrows", "cannot reset an island while live borrows exist")
 	}
 	res := accept("token.reset_epoch_advanced", "reset advances the island epoch and invalidates old references")
+	res.ConsumesToken = true
 	res.NextEpoch = req.Token.Epoch + 1
 	return res
 }
@@ -220,6 +221,9 @@ func CanEliminateBoundsCheck(req ProofRequest) Result {
 }
 
 func CanLowerAsExplicitIsland(req StorageRequest) Result {
+	if unsafeOrExternal(req.Ref) {
+		return reject("storage.unsafe_external", "unsafe or external memory cannot authorize trusted storage")
+	}
 	if req.EscapesLifetime {
 		return reject("storage.explicit_island_escape", "explicit island storage cannot be trusted for escaping values")
 	}
@@ -243,6 +247,9 @@ func CanPromoteUnsafeRoot(req UnsafeRequest) Result {
 }
 
 func CanTrustStorage(req StorageRequest) Result {
+	if unsafeOrExternal(req.Ref) {
+		return reject("storage.unsafe_external", "unsafe or external memory cannot authorize trusted storage")
+	}
 	if req.ActualStorage == StorageHeap && req.PlannedStorage != StorageHeap {
 		return reject("storage.heap_fallback_not_trusted", "heap fallback cannot satisfy a trusted storage claim")
 	}

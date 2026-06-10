@@ -19,6 +19,7 @@ const (
 	scopeP19HTTPJSONSourceFirst = "p19.2_http_json_source_first"
 	scopeP19PostgresSourceFirst = "p19.3_postgres_source_first"
 	scopeP20BenchmarkMatrix     = "p20.0_benchmark_matrix"
+	scopeP15ActorBenchmarkPrep  = "p15_actor_benchmark_prep"
 	p19GenericCollectionsAlgoID = "p19.1.generic_collections.hash_table.parallel_slice_linear_lookup_i32"
 )
 
@@ -479,6 +480,15 @@ func policyForBenchmarkScope(scope string) (benchmarkMatrixPolicy, error) {
 			RequireTetraReports:        true,
 			RequireRawOutputArtifacts:  true,
 		}, nil
+	case scopeP15ActorBenchmarkPrep:
+		return benchmarkMatrixPolicy{
+			Scope:                      scopeP15ActorBenchmarkPrep,
+			Categories:                 P15ActorBenchmarkPrepCategories(),
+			Languages:                  []string{"tetra"},
+			RequireEquivalenceMetadata: true,
+			RequireTetraReports:        true,
+			RequireRawOutputArtifacts:  true,
+		}, nil
 	default:
 		return benchmarkMatrixPolicy{}, fmt.Errorf("unsupported benchmark scope %q", scope)
 	}
@@ -533,6 +543,18 @@ var p20BenchmarkCategories = []string{
 	"startup time",
 	"binary size",
 	"compile time",
+}
+
+func P15ActorBenchmarkPrepCategories() []string {
+	return append([]string(nil), p15ActorBenchmarkPrepCategories...)
+}
+
+var p15ActorBenchmarkPrepCategories = []string{
+	"actor ping-pong",
+	"actor fanout/fanin",
+	"actor mailbox throughput",
+	"actor backpressure latency",
+	"zero_copy_move local typed mailbox",
 }
 
 func policyCategory(policy benchmarkMatrixPolicy, category string) bool {

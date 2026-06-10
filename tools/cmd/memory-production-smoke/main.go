@@ -114,6 +114,9 @@ func runSmoke(ctx context.Context, opt smokeOptions) error {
 	if err := r.runMemoryShapeCoverageCases(ctx); err != nil {
 		return err
 	}
+	if err := r.runResourceFinalizationCoverage(ctx); err != nil {
+		return err
+	}
 	if err := r.runSmallHeapAllocationBenchmark(ctx); err != nil {
 		return err
 	}
@@ -372,6 +375,47 @@ func (r *smokeRunner) runMemoryShapeCoverageCases(ctx context.Context) error {
 	}
 	for _, tc := range tests {
 		res := runCommand(ctx, 60*time.Second, "go", "test", tc.pkg, "-run", tc.pattern, "-count=1")
+		if res.err != nil || res.exitCode != 0 {
+			r.cases = append(r.cases, failedCase(tc.name, tc.kind, tc.expectedError, res.output))
+			return fmt.Errorf("%s evidence failed: %s", tc.name, res.output)
+		}
+		r.cases = append(r.cases, memoryprod.CaseReport{Name: tc.name, Kind: tc.kind, Ran: true, Pass: true, ExpectedError: tc.expectedError})
+	}
+	return nil
+}
+
+func (r *smokeRunner) runResourceFinalizationCoverage(ctx context.Context) error {
+	tests := []struct {
+		name          string
+		processName   string
+		pkg           string
+		pattern       string
+		kind          string
+		expectedError string
+		timeout       time.Duration
+	}{
+		{
+			name:        "actornet broker close-without-cancel leak smoke",
+			processName: "actornet close-without-cancel leak coverage",
+			pkg:         "./cli/internal/actornet",
+			pattern:     "TestBrokerCloseWithoutCancelStopsServeWatcher",
+			kind:        "stress",
+			timeout:     30 * time.Second,
+		},
+		{
+			name:          "compiler resource finalization diagnostics",
+			processName:   "compiler resource finalization diagnostics",
+			pkg:           "./compiler/tests/runtime",
+			pattern:       "^(TestTaskHandleFinalization|TestTaskGroupFinalization|TestIslandFinalization)",
+			kind:          "negative",
+			expectedError: "resource finalization",
+			timeout:       180 * time.Second,
+		},
+	}
+	for _, tc := range tests {
+		args := []string{"test", "-buildvcs=false", tc.pkg, "-run", tc.pattern, "-count=1"}
+		res := runCommand(ctx, tc.timeout, "go", args...)
+		r.recordProcess(tc.processName, "stress", "go "+strings.Join(args, " "), res)
 		if res.err != nil || res.exitCode != 0 {
 			r.cases = append(r.cases, failedCase(tc.name, tc.kind, tc.expectedError, res.output))
 			return fmt.Errorf("%s evidence failed: %s", tc.name, res.output)
@@ -1124,6 +1168,7 @@ func buildReport(source string, processes []memoryprod.ProcessReport, benchmarks
 			{Name: "runtime bounds diagnostics", Status: "pass", Evidence: "linux-x64 raw pointer and slice bounds negative cases"},
 			{Name: "raw pointer bounds metadata", Status: "pass", Evidence: "allocation report schema v2 includes allocation_base_metadata; memory report is validated against paired allocation report lowered_artifact_id evidence and includes derived_allocation_offset, rejected_negative_offset, rejected_upper_bound, rejected_access_width_overflow, checked_external_unknown, external_unknown, raw_slice_verified_allocation_root, rejected_negative_length, and rejected_length_overflow"},
 			{Name: "allocation length contracts", Status: "pass", Evidence: "linux-x64 AllocationLength runtime tests plus paired allocation/memory report evidence for core.alloc_bytes, core.make_*, and core.island_make_* zero, negative, and byte-size overflow contracts"},
+			{Name: "host resource leak and finalization checks", Status: "pass", Evidence: "actornet TestBrokerCloseWithoutCancelStopsServeWatcher plus compiler resource_finalization_test.go selectors prove close-without-cancel goroutine watcher cleanup and resource finalization diagnostics"},
 			{Name: "actor task transfer rules", Status: "pass", Evidence: "compiler safety diagnostics for actor/task transfer boundaries"},
 		},
 		Cases: append([]memoryprod.CaseReport(nil), cases...),
@@ -1200,6 +1245,12 @@ func memoryProductionAudit() []memoryprod.AuditReport {
 			Result:      "pass",
 		},
 		{
+			Requirement: "leak/resource finalization evidence",
+			Artifact:    "cli/internal/actornet/broker_test.go; compiler/tests/runtime/resource_finalization_test.go; tools/cmd/memory-production-smoke",
+			Evidence:    "release smoke runs actornet close-without-cancel watcher leak coverage and compiler TaskHandle/TaskGroup/Island resource finalization diagnostics for optional, enum, function-typed, branch, loop, match, join, close, and free paths",
+			Result:      "pass",
+		},
+		{
 			Requirement: "real memory examples",
 			Artifact:    "examples/core_memory_smoke.tetra; examples/ownership_smoke.tetra; examples/flow_unsafe_cap_mem_smoke.tetra",
 			Evidence:    "checked-in memory, ownership, and unsafe cap.mem examples build and run under the memory production release gate",
@@ -1254,6 +1305,8 @@ func requiredPassingCases() []memoryprod.CaseReport {
 		{Name: "heap closure handle coverage", Kind: "positive", Ran: true, Pass: true},
 		{Name: "slice struct borrow escape coverage", Kind: "negative", Ran: true, Pass: true, ExpectedError: "borrow escape"},
 		{Name: "function-typed slice aggregate borrow escape coverage", Kind: "negative", Ran: true, Pass: true, ExpectedError: "borrow escape"},
+		{Name: "actornet broker close-without-cancel leak smoke", Kind: "stress", Ran: true, Pass: true},
+		{Name: "compiler resource finalization diagnostics", Kind: "negative", Ran: true, Pass: true, ExpectedError: "resource finalization"},
 		{Name: "real memory examples", Kind: "positive", Ran: true, Pass: true},
 		{Name: "stress allocator reuse", Kind: "stress", Ran: true, Pass: true},
 		{Name: "deterministic memcpy/memset fuzz", Kind: "stress", Ran: true, Pass: true},

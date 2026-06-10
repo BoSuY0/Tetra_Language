@@ -45,6 +45,23 @@ type surfaceReleaseRuntimeEnvelope struct {
 	HostEvidence surface.HostEvidenceReport `json:"host_evidence"`
 }
 
+type surfaceMorphGateSummary struct {
+	Schema                  string   `json:"schema"`
+	Status                  string   `json:"status"`
+	ReleaseScope            string   `json:"release_scope"`
+	Producer                string   `json:"producer"`
+	Source                  string   `json:"source"`
+	Module                  string   `json:"module"`
+	SchemaUnderTest         string   `json:"schema_under_test"`
+	DependencyGate          string   `json:"dependency_gate"`
+	SameCommitValidated     bool     `json:"same_commit_validated"`
+	HeadlessReport          string   `json:"headless_report"`
+	TargetEvidence          []string `json:"target_evidence"`
+	CorePrimitives          []string `json:"core_primitives"`
+	ForbiddenCorePrimitives []string `json:"forbidden_core_primitives"`
+	ArtifactHashesValidated bool     `json:"artifact_hashes_validated"`
+}
+
 func main() {
 	var opt surfaceReleaseStateOptions
 	flag.StringVar(&opt.ReportDir, "report-dir", "", "Surface release report directory")
@@ -86,6 +103,8 @@ func validateSurfaceReleaseState(opt surfaceReleaseStateOptions) error {
 	issues = append(issues, validateReleaseTextInputFile(filepath.Join(reportDir, "surface-headless-release-text-input.json"))...)
 	issues = append(issues, validateReleaseRuntimeEnvelopeFile(filepath.Join(reportDir, "surface-wasm32-web-release-browser.json"), "wasm32-web")...)
 	issues = append(issues, validateReleaseRuntimeEnvelopeFile(filepath.Join(reportDir, "surface-linux-x64-release-window.json"), "linux-x64")...)
+	issues = append(issues, validateReleaseMorphGateFile(filepath.Join(reportDir, "morph", "surface-morph-gate-summary.json"))...)
+	issues = append(issues, validateReleaseMorphReportFile(filepath.Join(reportDir, "morph", "headless", "surface-headless-morph.json"))...)
 	issues = append(issues, validateSurfaceArtifactHashes(filepath.Join(reportDir, "artifact-hashes.json"))...)
 	issues = append(issues, validateSurfaceReleaseManifest(opt.ManifestPath, scope, expectedStatus)...)
 	if len(issues) > 0 {
@@ -112,6 +131,97 @@ func validateReleaseSummaryFile(path string, scope string, expectedStatus string
 	}
 	if report.Status != expectedStatus {
 		issues = append(issues, fmt.Sprintf("%s status is %q, want %q", filepath.Base(path), report.Status, expectedStatus))
+	}
+	return issues
+}
+
+func validateReleaseMorphGateFile(path string) []string {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return []string{fmt.Sprintf("%s read failed: %v", filepath.Base(path), err)}
+	}
+	var report surfaceMorphGateSummary
+	if err := json.Unmarshal(raw, &report); err != nil {
+		return []string{fmt.Sprintf("%s decode failed: %v", filepath.Base(path), err)}
+	}
+	var issues []string
+	for _, check := range []struct {
+		field string
+		got   string
+		want  string
+	}{
+		{field: "schema", got: report.Schema, want: "tetra.surface.morph.gate.v1"},
+		{field: "status", got: report.Status, want: "current"},
+		{field: "release_scope", got: report.ReleaseScope, want: "surface-morph-experimental-linux-web"},
+		{field: "producer", got: report.Producer, want: "scripts/release/surface/morph-gate.sh"},
+		{field: "source", got: report.Source, want: "examples/surface_morph_command_palette.tetra"},
+		{field: "module", got: report.Module, want: "lib.core.morph"},
+		{field: "schema_under_test", got: report.SchemaUnderTest, want: "tetra.surface.morph.v1"},
+		{field: "dependency_gate", got: report.DependencyGate, want: "tetra.surface.block-system.gate.v1"},
+		{field: "headless_report", got: report.HeadlessReport, want: "headless/surface-headless-morph.json"},
+	} {
+		if check.got != check.want {
+			issues = append(issues, fmt.Sprintf("%s %s is %q, want %q", filepath.Base(path), check.field, check.got, check.want))
+		}
+	}
+	if !report.SameCommitValidated {
+		issues = append(issues, fmt.Sprintf("%s same_commit_validated must be true", filepath.Base(path)))
+	}
+	if !report.ArtifactHashesValidated {
+		issues = append(issues, fmt.Sprintf("%s artifact_hashes_validated must be true", filepath.Base(path)))
+	}
+	if !stringListEqual(report.TargetEvidence, []string{"headless"}) {
+		issues = append(issues, fmt.Sprintf("%s target_evidence must be [headless]", filepath.Base(path)))
+	}
+	if !stringListEqual(report.CorePrimitives, []string{"Block"}) {
+		issues = append(issues, fmt.Sprintf("%s core_primitives must be [Block]", filepath.Base(path)))
+	}
+	if len(report.ForbiddenCorePrimitives) == 0 {
+		issues = append(issues, fmt.Sprintf("%s forbidden_core_primitives must not be empty", filepath.Base(path)))
+	}
+	return issues
+}
+
+func validateReleaseMorphReportFile(path string) []string {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return []string{fmt.Sprintf("%s read failed: %v", filepath.Base(path), err)}
+	}
+	var report surface.Report
+	if err := json.Unmarshal(raw, &report); err != nil {
+		return []string{fmt.Sprintf("%s decode failed: %v", filepath.Base(path), err)}
+	}
+	var issues []string
+	if report.Schema != surface.SchemaV1 {
+		issues = append(issues, fmt.Sprintf("%s schema is %q, want %q", filepath.Base(path), report.Schema, surface.SchemaV1))
+	}
+	if report.Status != "pass" {
+		issues = append(issues, fmt.Sprintf("%s status is %q, want pass", filepath.Base(path), report.Status))
+	}
+	if report.Target != "headless" {
+		issues = append(issues, fmt.Sprintf("%s target is %q, want headless", filepath.Base(path), report.Target))
+	}
+	if report.Source != "examples/surface_morph_command_palette.tetra" {
+		issues = append(issues, fmt.Sprintf("%s source is %q, want examples/surface_morph_command_palette.tetra", filepath.Base(path), report.Source))
+	}
+	if report.Morph == nil {
+		issues = append(issues, fmt.Sprintf("%s requires morph evidence", filepath.Base(path)))
+		return issues
+	}
+	if report.Morph.Schema != "tetra.surface.morph.v1" {
+		issues = append(issues, fmt.Sprintf("%s morph schema is %q, want tetra.surface.morph.v1", filepath.Base(path), report.Morph.Schema))
+	}
+	if report.Morph.QualityLevel != "deterministic-headless-morph-capsule-v1" {
+		issues = append(issues, fmt.Sprintf("%s morph quality_level is %q, want deterministic-headless-morph-capsule-v1", filepath.Base(path), report.Morph.QualityLevel))
+	}
+	if report.Morph.Module != "lib.core.morph" {
+		issues = append(issues, fmt.Sprintf("%s morph module is %q, want lib.core.morph", filepath.Base(path), report.Morph.Module))
+	}
+	if report.Morph.SurfaceScope != "surface-morph-experimental-linux-web" {
+		issues = append(issues, fmt.Sprintf("%s morph surface_scope is %q, want surface-morph-experimental-linux-web", filepath.Base(path), report.Morph.SurfaceScope))
+	}
+	if report.Morph.ProductionClaim {
+		issues = append(issues, fmt.Sprintf("%s morph production_claim must be false", filepath.Base(path)))
 	}
 	return issues
 }
@@ -278,6 +388,7 @@ func validateSurfaceReleaseManifest(path string, scope string, expectedStatus st
 		"ui.surface-toolkit-v1":       expectedStatus,
 		"ui.surface-text-input-v1":    expectedStatus,
 		"ui.surface-accessibility-v1": expectedStatus,
+		"ui.surface-morph-capsule":    expectedStatus,
 		"ui.surface-macos-x64":        "unsupported",
 		"ui.surface-windows-x64":      "unsupported",
 		"ui.surface-wasm32-wasi":      "unsupported",
@@ -296,6 +407,18 @@ func validateSurfaceReleaseManifest(path string, scope string, expectedStatus st
 		}
 	}
 	return issues
+}
+
+func stringListEqual(got []string, want []string) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func hashFile(path string) (int64, string, error) {

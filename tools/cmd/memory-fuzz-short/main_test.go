@@ -64,10 +64,13 @@ func TestRunMemoryFuzzShortWritesValidatedArtifacts(t *testing.T) {
 	if summaryJSON.SchemaVersion != "tetra.memory-fuzz-short.summary.v1" || summaryJSON.Kind != "tier1_short_ci_smoke" || summaryJSON.Tier != "tier1_short_ci_smoke" || summaryJSON.Status != "pass" {
 		t.Fatalf("summary json identity/status = %#v", summaryJSON)
 	}
-	for _, want := range []string{"oracle_report", "summary_md", "summary_json"} {
+	for _, want := range []string{"oracle_report", "summary_md", "summary_json", "artifact_hashes"} {
 		if summaryJSON.Artifacts[want] == "" {
 			t.Fatalf("summary json missing artifact %q: %#v", want, summaryJSON.Artifacts)
 		}
+	}
+	if _, err := os.Stat(filepath.Join(dir, "artifact-hashes.json")); err != nil {
+		t.Fatalf("memory fuzz artifact hashes missing: %v", err)
 	}
 	var sawRunner, sawValidator bool
 	for _, command := range summaryJSON.Commands {
@@ -80,6 +83,42 @@ func TestRunMemoryFuzzShortWritesValidatedArtifacts(t *testing.T) {
 	}
 	if !sawRunner || !sawValidator {
 		t.Fatalf("summary json commands missing runner/validator provenance: %#v", summaryJSON.Commands)
+	}
+	proofSummaryRaw, err := os.ReadFile(filepath.Join(dir, "island-proof-fuzz-summary.json"))
+	if err != nil {
+		t.Fatalf("read island proof fuzz summary: %v", err)
+	}
+	var proofSummary struct {
+		SchemaVersion string `json:"schema_version"`
+		Status        string `json:"status"`
+		Total         int    `json:"total"`
+		Rejected      int    `json:"rejected"`
+		Accepted      int    `json:"accepted"`
+		Cases         []struct {
+			Name   string `json:"name"`
+			Status string `json:"status"`
+		} `json:"cases"`
+	}
+	if err := json.Unmarshal(proofSummaryRaw, &proofSummary); err != nil {
+		t.Fatalf("parse island proof fuzz summary: %v\n%s", err, proofSummaryRaw)
+	}
+	if proofSummary.SchemaVersion != "tetra.island-proof-fuzz-summary.v1" || proofSummary.Status != "pass" {
+		t.Fatalf("island proof fuzz identity/status = %#v", proofSummary)
+	}
+	if proofSummary.Total < 10 || proofSummary.Rejected != proofSummary.Total || proofSummary.Accepted != 0 {
+		t.Fatalf("island proof fuzz counts = total %d rejected %d accepted %d", proofSummary.Total, proofSummary.Rejected, proofSummary.Accepted)
+	}
+	seenCases := map[string]bool{}
+	for _, c := range proofSummary.Cases {
+		if c.Status != "rejected" {
+			t.Fatalf("island proof fuzz case %s status = %q", c.Name, c.Status)
+		}
+		seenCases[c.Name] = true
+	}
+	for _, want := range []string{"storage_heap_fallback", "transform_lost_metadata"} {
+		if !seenCases[want] {
+			t.Fatalf("island proof fuzz summary missing case %s: %#v", want, proofSummary.Cases)
+		}
 	}
 }
 

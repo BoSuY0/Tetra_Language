@@ -1007,7 +1007,39 @@ uses alloc, islands, mem:
         return old[0]
     }
     return 0
-`, "cannot use consumed value 'old'")
+`, "cannot reset island 'isl' while borrowed slice 'old' is alive")
+}
+
+func TestIslandResetRejectsWhilePreviousSliceBorrowAlive(t *testing.T) {
+	testkit.RequireFileSemanticCheckErrorContains(t, `
+func main() -> Int
+uses alloc, islands, mem:
+    unsafe {
+        let isl: island = core.island_new(16)
+        let old: []u8 = core.island_make_u8(isl, 1)
+        let next: island = core.island_reset(isl)
+        free(next)
+    }
+    return 0
+`, "cannot reset island 'isl' while borrowed slice 'old' is alive")
+}
+
+func TestIslandResetAllowsAfterPreviousSliceOwnerCleared(t *testing.T) {
+	testkit.RequireFileSemanticCheckOK(t, `
+func main() -> Int
+uses alloc, islands, mem:
+    unsafe {
+        let isl: island = core.island_new(16)
+        var old: []u8 = core.island_make_u8(isl, 1)
+        old = make_u8(1)
+        let next: island = core.island_reset(isl)
+        let fresh: []u8 = core.island_make_u8(next, 1)
+        let value: Int = old[0] + fresh[0]
+        free(next)
+        return value
+    }
+    return 0
+`)
 }
 
 func TestIslandResetReturnedTokenCanAllocateAndFree(t *testing.T) {
@@ -1603,6 +1635,21 @@ uses alloc, islands, mem:
 `,
 	}
 	requireCheckWorldFilesErrorContains(t, files, "app/main.t4", "cannot use freed resource 'returned.$elem'")
+}
+
+func TestIslandFinalizationRejectsClosureCaptureBeforeFree(t *testing.T) {
+	testkit.RequireFileCheckErrorContains(t, `
+func main() -> Int
+uses alloc, islands, mem:
+    unsafe {
+        let isl: island = core.island_new(16)
+        let cb: fn(Int) -> Int = fn(x: Int) -> Int:
+            let alias: island = isl
+            return x
+        free(isl)
+    }
+    return 0
+`, "function-typed storage 'cb' captures unsupported local 'isl' of type 'island'")
 }
 
 func TestIslandFinalizationRejectsInterproceduralOptionalPayloadAliasDoubleFree(t *testing.T) {
@@ -2549,4 +2596,43 @@ func main() -> Int:
         value
     return result + value
 `, "cannot use consumed value 'value'")
+}
+
+func TestMemoryBoundaryHandoffRejectsStaleIslandAfterResetAcrossActorBoundary(t *testing.T) {
+	testkit.RequireFileCheckErrorContains(t, `
+enum MoveMsg:
+    case take(island)
+
+func worker() -> Int:
+    return 0
+
+func main() -> Int
+uses actors, alloc, islands, mem:
+    let peer: actor = core.spawn("worker")
+    unsafe {
+        let isl: island = core.island_new(16)
+        let next: island = core.island_reset(isl)
+        let _: Int = core.send_typed(peer, MoveMsg.take(isl))
+        free(next)
+    }
+    return 0
+`, "cannot use consumed value 'isl'")
+}
+
+func TestMemoryBoundaryHandoffRejectsUnsafePointerAsSafeActorMessage(t *testing.T) {
+	testkit.RequireFileCheckErrorContains(t, `
+enum Msg:
+    case raw(ptr)
+
+func worker() -> Int:
+    return 0
+
+func main() -> Int
+uses actors, alloc, mem:
+    let peer: actor = core.spawn("worker")
+    unsafe {
+        let raw: ptr = core.alloc_bytes(4)
+        return core.send_typed(peer, Msg.raw(raw))
+    }
+`, "typed actor message payload must be value-only")
 }

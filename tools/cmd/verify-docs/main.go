@@ -142,6 +142,21 @@ func main() {
 	if err := verifySurfaceReleaseDocs(surfaceReleaseDocPaths()); err != nil {
 		errs = append(errs, err.Error())
 	}
+	if err := verifyMemoryIslandsSurfaceReleaseDocs(memoryIslandsSurfaceReleaseDocPaths()); err != nil {
+		errs = append(errs, err.Error())
+	}
+	if err := verifyMemoryIslandsFinalProductionReadinessAudit(memoryIslandsFinalProductionReadinessAuditDocPaths()); err != nil {
+		errs = append(errs, err.Error())
+	}
+	if err := verifyMemoryIslandsFinalActorBenchmarkHandoff(memoryIslandsFinalActorBenchmarkHandoffDocPaths()); err != nil {
+		errs = append(errs, err.Error())
+	}
+	if err := verifyActorRuntimeFoundationDocs(defaultActorRuntimeFoundationDocPaths(), m.Features); err != nil {
+		errs = append(errs, err.Error())
+	}
+	if err := verifyFinalMemoryIslandsSurfaceProductionAudit(finalMemoryIslandsSurfaceProductionAuditDocPaths()); err != nil {
+		errs = append(errs, err.Error())
+	}
 	if err := verifyFeatureRegistry(m.Features); err != nil {
 		errs = append(errs, err.Error())
 	}
@@ -154,6 +169,9 @@ func main() {
 	if err := verifyMemoryProductionContractDocs(defaultMemoryProductionContractDocPaths()); err != nil {
 		errs = append(errs, err.Error())
 	}
+	if err := verifyRAMContractCompilerDocs(defaultRAMContractCompilerDocPaths(), m.Features); err != nil {
+		errs = append(errs, err.Error())
+	}
 
 	if len(errs) > 0 {
 		for _, e := range errs {
@@ -161,6 +179,248 @@ func main() {
 		}
 		os.Exit(1)
 	}
+}
+
+type ramContractCompilerDocPaths struct {
+	Design    string
+	Spec      string
+	User      string
+	Readiness string
+	Handoff   string
+}
+
+type ramContractCompilerRequirement struct {
+	Name     string
+	Path     string
+	Required []string
+}
+
+func defaultRAMContractCompilerDocPaths() ramContractCompilerDocPaths {
+	return ramContractCompilerDocPaths{
+		Design:    filepath.FromSlash("docs/design/ram_contract_compiler.md"),
+		Spec:      filepath.FromSlash("docs/spec/ram_contract_report_schema.md"),
+		User:      filepath.FromSlash("docs/user/ram_contracts.md"),
+		Readiness: filepath.FromSlash("docs/audits/ram-contract-compiler-readiness.md"),
+		Handoff:   filepath.FromSlash("docs/audits/ram-contract-compiler-handoff.md"),
+	}
+}
+
+func ramContractCompilerRequirements(paths ramContractCompilerDocPaths) []ramContractCompilerRequirement {
+	return []ramContractCompilerRequirement{
+		{
+			Name: "design",
+			Path: paths.Design,
+			Required: []string{
+				"RAM Contract Compiler",
+				"tetra.ram-contract-report.v1",
+				"tetra.memory-grade-report.v1",
+				"tetra.proof-store-summary.v1",
+				"tetra.validation-pipeline-coverage.v1",
+				"compiler-owned facts",
+				"MemoryFactGraph",
+				"AllocPlan",
+				"ProofStore",
+				"heap-blockers.json",
+				"copy-blockers.json",
+				"TETRA4100",
+				"no zero heap for all programs claim",
+			},
+		},
+		{
+			Name: "schema",
+			Path: paths.Spec,
+			Required: []string{
+				"RAM Contract Report Schema",
+				"tetra.ram-contract-report.v1",
+				"tetra.memory-grade-report.v1",
+				"tetra.proof-store-summary.v1",
+				"tetra.validation-pipeline-coverage.v1",
+				"tetra.ram-blockers.v1",
+				"ram-contract-fuzz-oracle.json",
+				"validate-ram-contract-report",
+				"validate-memory-grade-report",
+				"validate-proof-store-summary",
+				"validate-validation-pipeline-coverage",
+				"validate-heap-blockers",
+				"validate-copy-blockers",
+				"validate-ram-contract-fuzz-oracle",
+			},
+		},
+		{
+			Name: "user guide",
+			Path: paths.User,
+			Required: []string{
+				"Using RAM Contracts",
+				"--emit-ram-contract-report",
+				"--fail-if-heap",
+				"--fail-if-copy",
+				"--fail-if-unbounded",
+				"--memory-budget",
+				"--ram-contract",
+				"TETRA4100",
+				"validate-ram-contract-release",
+				"no zero-copy for all programs claim",
+			},
+		},
+		{
+			Name: "readiness audit",
+			Path: paths.Readiness,
+			Required: []string{
+				"RAM Contract Compiler Readiness Audit",
+				"Git head:",
+				"Working tree:",
+				"dirty working tree",
+				"Verdict: `SCOPED_READY`",
+				"scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh",
+				".github/workflows/ci.yml",
+				".github/workflows/release-packages.yml",
+				"go test -buildvcs=false",
+				"go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json",
+				"git diff --check",
+				"reports/ram-contract-release",
+				"no full formal proof claim",
+			},
+		},
+		{
+			Name: "handoff",
+			Path: paths.Handoff,
+			Required: []string{
+				"RAM Contract Compiler Handoff",
+				"Release gate:",
+				"scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh",
+				"CI job:",
+				"ram-contract-release-readiness-linux",
+				"Package workflow:",
+				"ram-contract-linux-x64",
+				"Required artifacts:",
+				"ram-contract-report.json",
+				"memory-grade-report.json",
+				"proof-store-summary.json",
+				"validation-pipeline-coverage.json",
+				"heap-blockers.json",
+				"copy-blockers.json",
+				"ram-contract-fuzz-oracle.json",
+				"no all-target RAM parity claim",
+			},
+		},
+	}
+}
+
+func verifyRAMContractCompilerDocs(paths ramContractCompilerDocPaths, features []featureManifest) error {
+	var errs []string
+	for _, requirement := range ramContractCompilerRequirements(paths) {
+		raw, err := os.ReadFile(requirement.Path)
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("%s: %v", requirement.Path, err))
+			continue
+		}
+		text := string(raw)
+		for _, want := range requirement.Required {
+			if !strings.Contains(text, want) {
+				errs = append(errs, fmt.Sprintf("%s: missing %q for %s RAM contract docs", requirement.Path, want, requirement.Name))
+			}
+		}
+		for _, claim := range forbiddenRAMContractClaims(text) {
+			errs = append(errs, fmt.Sprintf("%s: forbidden RAM contract claim %q", requirement.Path, claim))
+		}
+	}
+	if err := verifyRAMContractManifestFeature(features); err != nil {
+		errs = append(errs, err.Error())
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("%s", strings.Join(errs, "; "))
+	}
+	return nil
+}
+
+func verifyRAMContractManifestFeature(features []featureManifest) error {
+	var feature *featureManifest
+	for i := range features {
+		if features[i].ID == "compiler.ram-contracts" {
+			feature = &features[i]
+			break
+		}
+	}
+	if feature == nil {
+		return fmt.Errorf("feature registry missing compiler.ram-contracts")
+	}
+	if feature.Status != "current" {
+		return fmt.Errorf("feature registry compiler.ram-contracts status = %s, want current", feature.Status)
+	}
+	haystack := feature.Scope + " " + feature.Stability + " " + strings.Join(feature.Docs, " ")
+	for _, required := range []string{
+		"RAM Contract Compiler report evidence",
+		"tetra.ram-contract-report.v1",
+		"tetra.memory-grade-report.v1",
+		"tetra.proof-store-summary.v1",
+		"tetra.validation-pipeline-coverage.v1",
+		"heap-blockers.json",
+		"copy-blockers.json",
+		"ram-contract-fuzz-oracle.json",
+		"--emit-ram-contract-report",
+		"--fail-if-heap",
+		"--fail-if-copy",
+		"--fail-if-unbounded",
+		"--memory-budget",
+		"--ram-contract",
+		"TETRA4100",
+		"validate-ram-contract-release",
+		"ram-contract-linux-x64-smoke.sh",
+		"no zero heap for all programs claim",
+		"no zero-copy for all programs claim",
+		"no full formal proof claim",
+		"no all-target RAM parity claim",
+		"docs/design/ram_contract_compiler.md",
+		"docs/spec/ram_contract_report_schema.md",
+		"docs/user/ram_contracts.md",
+		"docs/audits/ram-contract-compiler-readiness.md",
+		"docs/audits/ram-contract-compiler-handoff.md",
+	} {
+		if !strings.Contains(haystack, required) {
+			return fmt.Errorf("feature registry compiler.ram-contracts missing RAM contract phrase %q", required)
+		}
+	}
+	for _, claim := range forbiddenRAMContractClaims(feature.Scope + " " + feature.Stability) {
+		return fmt.Errorf("feature registry compiler.ram-contracts forbidden RAM contract claim %q", claim)
+	}
+	return nil
+}
+
+func forbiddenRAMContractClaims(text string) []string {
+	lower := strings.ToLower(text)
+	claims := forbiddenPublicPerformanceClaims(text)
+	for _, phrase := range []string{
+		"zero heap for all programs",
+		"zero-heap for all programs",
+		"zero copy for all programs",
+		"zero-copy for all programs",
+		"heap-free for all programs",
+		"copy-free for all programs",
+		"all-target ram parity",
+		"all target ram parity",
+		"ram parity across all targets",
+		"full formal proof",
+		"proof complete",
+		"proof-complete",
+		"prod_ready_proven",
+	} {
+		searchFrom := 0
+		for {
+			index := strings.Index(lower[searchFrom:], phrase)
+			if index < 0 {
+				break
+			}
+			absolute := searchFrom + index
+			clause := clauseAround(lower, absolute, len(phrase), 260)
+			sentence := sentenceAround(lower, absolute, len(phrase), 320)
+			if !explicitNonClaimContext(clause) && !explicitNonClaimContext(sentence) {
+				claims = append(claims, phrase)
+			}
+			searchFrom = absolute + len(phrase)
+		}
+	}
+	sort.Strings(claims)
+	return compactStrings(claims)
 }
 
 func verifyWASMBackendPlan(path string, plannedTargets []string) error {
@@ -440,6 +700,8 @@ func memoryProductionContractRequirements(paths memoryProductionContractDocPaths
 				"full derived-pointer provenance for every raw address",
 				"full production actor runtime",
 				"full target runtime parity",
+				"production object memory",
+				"production persistent memory",
 				"fastest language",
 				"official benchmark result",
 			},
@@ -463,6 +725,9 @@ func verifyMemoryProductionContractDocs(paths memoryProductionContractDocPaths) 
 		}
 		if requirement.Path != paths.MemoryProductionClaims {
 			for _, claim := range forbiddenPublicPerformanceClaims(text) {
+				errs = append(errs, fmt.Sprintf("%s: forbidden %s claim in %s memory production contract", requirement.Path, claim, requirement.Name))
+			}
+			for _, claim := range forbiddenPersistentObjectMemoryClaims(text) {
 				errs = append(errs, fmt.Sprintf("%s: forbidden %s claim in %s memory production contract", requirement.Path, claim, requirement.Name))
 			}
 		}
@@ -508,7 +773,7 @@ func forbiddenPublicPerformanceClaims(text string) []string {
 				break
 			}
 			absolute := searchFrom + index
-			if !explicitNonClaimContext(sentenceAround(lower, absolute, len(phrase), 640)) {
+			if !explicitNonClaimContext(clauseAround(lower, absolute, len(phrase), 240)) {
 				claims = append(claims, phrase)
 			}
 			searchFrom = absolute + len(phrase)
@@ -516,6 +781,72 @@ func forbiddenPublicPerformanceClaims(text string) []string {
 	}
 	sort.Strings(claims)
 	return compactStrings(claims)
+}
+
+func forbiddenPersistentObjectMemoryClaims(text string) []string {
+	lower := strings.ToLower(text)
+	var claims []string
+	for _, phrase := range []string{
+		"object memory",
+		"persistent memory",
+		"persistent/object memory",
+		"object/persistent memory",
+		"production object memory",
+		"object memory production",
+		"production persistent memory",
+		"persistent memory production",
+		"todium",
+		"memoryfield",
+		"memoryruntime",
+		"memoryeval",
+		"false memory",
+		"stale memory",
+		"wal-backed object memory",
+		"wal backed object memory",
+		"fts-backed object memory",
+		"fts backed object memory",
+		"vacuum-backed object memory",
+		"retention-backed object memory",
+	} {
+		searchFrom := 0
+		for {
+			index := strings.Index(lower[searchFrom:], phrase)
+			if index < 0 {
+				break
+			}
+			absolute := searchFrom + index
+			clause := clauseAround(lower, absolute, len(phrase), 260)
+			if !explicitNonClaimContext(clause) && persistentObjectMemoryClaimContext(phrase, clause) {
+				claims = append(claims, phrase)
+			}
+			searchFrom = absolute + len(phrase)
+		}
+	}
+	sort.Strings(claims)
+	return compactStrings(claims)
+}
+
+func persistentObjectMemoryClaimContext(phrase string, clause string) bool {
+	switch phrase {
+	case "object memory", "persistent memory", "persistent/object memory", "object/persistent memory":
+		for _, qualifier := range []string{
+			"production",
+			"prod_ready",
+			"release-ready",
+			"release ready",
+			"supported",
+			"current",
+			"ships",
+			"backed by",
+		} {
+			if strings.Contains(clause, qualifier) {
+				return true
+			}
+		}
+		return false
+	default:
+		return true
+	}
 }
 
 func excerptAround(text string, index int, length int, radius int) string {
@@ -580,17 +911,39 @@ func explicitNonClaimContext(lower string) bool {
 		"not leak-free",
 		"not leak free",
 		"not memory 100",
+		"not a clean release-candidate",
+		"not clean release-candidate",
 		"no official",
 		"no fastest",
 		"no target parity",
 		"no leak-free",
 		"no leak free",
 		"no memory 100",
+		"no arbitrary unsafe",
 		"no broad memory",
 		"no full",
 		"makes no",
 		"model-only",
 		"model only",
+		"non-goal",
+		"non goal",
+		"out of scope",
+		"not included",
+		"does not include",
+		"absent",
+		"no production object memory",
+		"no production persistent memory",
+		"no production actor runtime",
+		"no actor production gate passed",
+		"no performance superiority",
+		"no c++/rust parity",
+		"no measured speed comparison",
+		"no todium",
+		"no memoryfield",
+		"no prod_ready",
+		"not prod_ready",
+		"no prod_ready_proven",
+		"not prod_ready_proven",
 		"without an official",
 		"without official",
 		"forbid",
@@ -828,6 +1181,7 @@ func verifyFeatureRegistry(features []featureManifest) error {
 		"language.resource-lifetime-mvp":          "current",
 		"actors.task-transfer-safety":             "current",
 		"language.lifetime-ssa":                   "current",
+		"safety.production-core":                  "current",
 		"language.callable-level2":                "current",
 		"ui.metadata-v1":                          "current",
 		"wasm.runtime-execution":                  "current",
@@ -900,6 +1254,63 @@ func verifyFeatureRegistry(features []featureManifest) error {
 	if err := verifyFeatureTruthBoundaries(featureByID); err != nil {
 		return err
 	}
+	if err := verifySurfaceBlockSystemFeatureBoundary(featureByID); err != nil {
+		return err
+	}
+	return nil
+}
+
+func verifySurfaceBlockSystemFeatureBoundary(features map[string]featureManifest) error {
+	if _, ok := features["ui.surface-core"]; !ok {
+		return nil
+	}
+	feature, ok := features["ui.surface-block-system"]
+	if !ok {
+		return fmt.Errorf("feature registry missing ui.surface-block-system")
+	}
+	if feature.Status != "experimental" {
+		return fmt.Errorf("feature registry ui.surface-block-system status = %s, want experimental with scoped P18 evidence and no production support", feature.Status)
+	}
+	haystack := feature.Scope + " " + feature.Stability
+	var missing []string
+	for _, want := range []string{
+		"Block-first",
+		"core Surface primitive",
+		"recipes/compatibility",
+		"tetra.surface.block-system.gate.v1",
+		"block_system.memory_budget",
+		"reports/surface-block/p18-budget",
+		"same-commit target evidence",
+		"not production support",
+		"no production Block claim",
+	} {
+		if !strings.Contains(haystack, want) {
+			missing = append(missing, want)
+		}
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("feature registry ui.surface-block-system missing truth-boundary phrase(s): %s", strings.Join(missing, ", "))
+	}
+	for _, doc := range []string{
+		"docs/spec/current_supported_surface.md",
+		"docs/spec/surface_v1.md",
+		"docs/user/surface_guide.md",
+		"docs/user/examples_index.md",
+		"docs/release/surface_v1_release_contract.md",
+		"docs/release/surface_v1_release_notes.md",
+		"docs/release/surface_v1_release_audit.md",
+	} {
+		found := false
+		for _, got := range feature.Docs {
+			if got == doc {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("feature registry ui.surface-block-system missing doc reference %s", doc)
+		}
+	}
 	return nil
 }
 
@@ -945,6 +1356,18 @@ func verifyFeatureTruthBoundaries(features map[string]featureManifest) error {
 			"maybe-consumed diagnostics",
 			"richer interprocedural lifetime proofs",
 		},
+		"safety.production-core": {
+			"production local safety model",
+			"Memory Production Core v1",
+			"validate-island-proof",
+			"--islands-debug sanitizer smoke",
+			"island-proof-fuzz-summary",
+			"leak/resource finalization evidence",
+			"integrated Memory/Islands/Surface release gate",
+			"memory-islands-surface-production-manifest.json",
+			"artifact-hashes.json",
+			"no Memory 100% claim",
+		},
 		"language.enum-payload-match": {
 			"positional enum payload constructors",
 			"match/catch/if-let",
@@ -987,6 +1410,7 @@ func verifyFeatureTruthBoundaries(features map[string]featureManifest) error {
 		"language.resource-lifetime-mvp":          {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
 		"actors.task-transfer-safety":             {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
 		"language.lifetime-ssa":                   {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
+		"safety.production-core":                  {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/effects_capabilities_privacy_v1.md", "docs/spec/unsafe.md", "docs/spec/memory_report_schema_v1.md", "docs/spec/islands.md", "docs/design/memory_production_core_v1.md", "docs/design/memory_cost_model.md", "docs/audits/memory-fuzz-oracle-v1.md", "docs/audits/memory-production-core-v1-final.md", "docs/audits/memory-production-core-v1-artifact-map.md", "docs/audits/memory-production-core-v1-nonclaims.md", "docs/release/memory_islands_surface_scope.md"},
 		"language.enum-payload-match":             {"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v0_3_scope.md"},
 		"language.protocol-bound-generics-static": {"docs/spec/current_supported_surface.md", "docs/spec/v0_3_scope.md", "docs/spec/flow_syntax_v1.md"},
 		"ui.native-runtime":                       {"docs/spec/current_supported_surface.md", "docs/spec/ui_v1.md", "docs/user/wasm_ui_guide.md"},
@@ -1071,6 +1495,9 @@ func verifyReleaseTruthDocs(paths []string) error {
 			}
 		}
 		for _, claim := range forbiddenPublicPerformanceClaims(text) {
+			errs = append(errs, fmt.Sprintf("%s: forbidden %s claim in release truth docs", path, claim))
+		}
+		for _, claim := range forbiddenPersistentObjectMemoryClaims(text) {
 			errs = append(errs, fmt.Sprintf("%s: forbidden %s claim in release truth docs", path, claim))
 		}
 	}
@@ -1167,6 +1594,7 @@ func currentReleaseTruthDocPaths() []string {
 	return []string{
 		"README.md",
 		filepath.FromSlash("docs/spec/current_supported_surface.md"),
+		filepath.FromSlash("docs/spec/islands.md"),
 		filepath.FromSlash("docs/spec/surface_v1.md"),
 		filepath.FromSlash("docs/spec/v0_2_scope.md"),
 		filepath.FromSlash("docs/spec/v1_feature_status.md"),
@@ -1181,6 +1609,7 @@ func currentReleaseTruthDocPaths() []string {
 		filepath.FromSlash("docs/user/surface_guide.md"),
 		filepath.FromSlash("docs/user/troubleshooting.md"),
 		filepath.FromSlash("docs/user/wasm_ui_guide.md"),
+		filepath.FromSlash("docs/release/memory_islands_surface_scope.md"),
 	}
 }
 
@@ -1194,6 +1623,581 @@ func surfaceReleaseDocPaths() []string {
 		filepath.FromSlash("docs/user/examples_index.md"),
 		filepath.FromSlash("docs/user/surface_guide.md"),
 	}
+}
+
+func memoryIslandsSurfaceReleaseDocPaths() []string {
+	return []string{
+		"README.md",
+		filepath.FromSlash("docs/spec/current_supported_surface.md"),
+		filepath.FromSlash("docs/spec/islands.md"),
+		filepath.FromSlash("docs/release/memory_islands_surface_scope.md"),
+	}
+}
+
+func finalMemoryIslandsSurfaceProductionAuditDocPaths() []string {
+	return []string{
+		filepath.FromSlash("docs/audits/memory-islands-surface-final-production-readiness.md"),
+	}
+}
+
+func memoryIslandsFinalProductionReadinessAuditDocPaths() []string {
+	return []string{
+		filepath.FromSlash("docs/audits/memory-islands-final-production-readiness.md"),
+	}
+}
+
+func memoryIslandsFinalActorBenchmarkHandoffDocPaths() []string {
+	return []string{
+		filepath.FromSlash("docs/audits/memory-islands-final-production-handoff.md"),
+	}
+}
+
+func defaultActorRuntimeFoundationDocPaths() []string {
+	return []string{
+		filepath.FromSlash("docs/spec/actors.md"),
+		filepath.FromSlash("docs/user/async_actors_guide.md"),
+		filepath.FromSlash("docs/design/actor_region_transfer.md"),
+		filepath.FromSlash("docs/audits/actor-runtime-production-boundary-v1.md"),
+		filepath.FromSlash("docs/checklists/actors_linux_smoke.md"),
+		filepath.FromSlash("docs/checklists/actors_platform_smoke.md"),
+	}
+}
+
+func verifyActorRuntimeFoundationDocs(paths []string, features []featureManifest) error {
+	var errs []string
+	var combined strings.Builder
+	for _, path := range paths {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("%s: %v", path, err))
+			continue
+		}
+		text := string(raw)
+		combined.WriteString(text)
+		combined.WriteByte('\n')
+		for _, claim := range forbiddenActorRuntimeFoundationClaims(text) {
+			errs = append(errs, fmt.Sprintf("%s: forbidden actor runtime foundation claim %q", path, claim))
+		}
+	}
+	combinedText := combined.String()
+	for _, required := range []string{
+		"Actor runtime foundation scoped release truth",
+		"tetra.actor.production_foundation.v1",
+		"scripts/release/post_v0_4/actor-runtime-foundation-linux-x64-gate.sh",
+		".github/workflows/ci.yml",
+		".github/workflows/release-packages.yml",
+		"reports/actor-runtime-foundation/final/actor-runtime-foundation-manifest.json",
+		"reports/actor-runtime-foundation/final/artifact-hashes.json",
+		"distributed-actors-linux-x64/distributed-actors-linux-x64.json",
+		"parallel-production-linux-x64/parallel-production-linux-x64.json",
+		"no full Erlang/OTP actor runtime claim",
+		"no cluster membership or reconnect/retry production claim",
+		"no non-Linux distributed actor runtime support claim",
+		"no distributed zero-copy pointer or region transfer claim",
+		"no formal race proof claim",
+	} {
+		if !strings.Contains(combinedText, required) {
+			errs = append(errs, fmt.Sprintf("actor runtime foundation docs missing %q", required))
+		}
+	}
+	if err := verifyActorRuntimeFoundationManifestFeature(features); err != nil {
+		errs = append(errs, err.Error())
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("%s", strings.Join(errs, "; "))
+	}
+	return nil
+}
+
+func verifyActorRuntimeFoundationManifestFeature(features []featureManifest) error {
+	var feature *featureManifest
+	for i := range features {
+		if features[i].ID == "actors.distributed-runtime" {
+			feature = &features[i]
+			break
+		}
+	}
+	if feature == nil {
+		return fmt.Errorf("feature registry missing actors.distributed-runtime")
+	}
+	haystack := feature.Scope + " " + feature.Stability + " " + strings.Join(feature.Docs, " ")
+	for _, required := range []string{
+		"tetra.actor.production_foundation.v1",
+		"actor-runtime-foundation-linux-x64-gate.sh",
+		"non-Linux distributed",
+		"distributed zero-copy",
+		"cluster membership",
+		"reconnect/retry production",
+		"formal race proof",
+		"docs/design/actor_region_transfer.md",
+		"docs/audits/actor-runtime-production-boundary-v1.md",
+		"docs/checklists/actors_linux_smoke.md",
+		"docs/checklists/actors_platform_smoke.md",
+	} {
+		if !strings.Contains(haystack, required) {
+			return fmt.Errorf("feature registry actors.distributed-runtime missing actor foundation phrase %q", required)
+		}
+	}
+	return nil
+}
+
+func forbiddenActorRuntimeFoundationClaims(text string) []string {
+	lower := strings.ToLower(text)
+	var claims []string
+	for _, phrase := range []string{
+		"full production actor runtime",
+		"full production actor-runtime",
+		"production actor runtime",
+		"production actor-runtime",
+		"actor runtime production ready",
+		"actor runtime is production ready",
+		"actor production gate passed",
+		"actor production gate is passed",
+		"production actor gate passed",
+		"production actor gate is passed",
+		"full erlang/otp actor runtime",
+		"erlang/otp actor runtime",
+		"windows distributed actor runtime",
+		"macos distributed actor runtime",
+		"non-linux distributed actor runtime support",
+		"non-linux distributed actor runtime target",
+		"non-linux distributed actor targets",
+		"distributed zero-copy",
+		"distributed zero copy",
+		"cluster membership",
+		"reconnect/retry production",
+		"formal race proof",
+	} {
+		searchFrom := 0
+		for {
+			index := strings.Index(lower[searchFrom:], phrase)
+			if index < 0 {
+				break
+			}
+			absolute := searchFrom + index
+			clause := clauseAround(lower, absolute, len(phrase), 260)
+			sentence := sentenceAround(lower, absolute, len(phrase), 320)
+			if !explicitActorFoundationNonClaimContext(clause) && !explicitActorFoundationNonClaimContext(sentence) {
+				claims = append(claims, phrase)
+			}
+			searchFrom = absolute + len(phrase)
+		}
+	}
+	sort.Strings(claims)
+	return compactStrings(claims)
+}
+
+func explicitActorFoundationNonClaimContext(lower string) bool {
+	if explicitNonClaimContext(lower) {
+		return true
+	}
+	for _, marker := range []string{
+		"no cluster membership",
+		"no reconnect/retry",
+		"no non-linux distributed",
+		"no distributed zero-copy",
+		"no distributed zero copy",
+		"no formal race proof",
+		"does not implement",
+		"does not mark",
+		"not claimed",
+		"not made",
+		"remain rejected",
+		"remains rejected",
+		"rejected by",
+		"requires separate promotion evidence",
+		"require separate promotion evidence",
+		"outside this claim",
+		"outside the current",
+		"outside this transfer contract",
+		"outside the current transfer contract",
+		"block a full",
+		"blockers",
+		"blocked",
+	} {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func verifyMemoryIslandsSurfaceReleaseDocs(paths []string) error {
+	var errs []string
+	var combined strings.Builder
+	for _, path := range paths {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("%s: %v", path, err))
+			continue
+		}
+		text := string(raw)
+		combined.WriteString(text)
+		combined.WriteByte('\n')
+		for _, claim := range forbiddenMemoryIslandsSurfaceReleaseClaims(text) {
+			errs = append(errs, fmt.Sprintf("%s: forbidden Memory/Islands/Surface release claim %q", path, claim))
+		}
+	}
+	combinedLower := strings.ToLower(combined.String())
+	for _, required := range []string{
+		"memory/islands/surface scoped release truth",
+		"memory-islands-surface-production-gate.sh",
+		"validate-memory-islands-surface-production",
+		"validate-island-proof",
+		"--islands-debug",
+		"islands-debug-smoke.json",
+		"island-proof-verifier.json",
+		"island-proof-fuzz-summary.json",
+		"memory-islands-surface-production-manifest.json",
+		"artifact-hashes.json",
+		"leak/resource finalization evidence",
+		"surface-v1-linux-web",
+		"no memory 100% claim",
+		"no arbitrary unsafe external pointer safety",
+		"no full formal proof",
+		"no full target parity",
+		"no all-target surface claim",
+		"no production object memory claim",
+		"no production persistent memory claim",
+		"not a clean release-candidate checkout claim",
+	} {
+		if !strings.Contains(combinedLower, required) {
+			errs = append(errs, fmt.Sprintf("Memory/Islands/Surface release docs missing %q", required))
+		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("%s", strings.Join(errs, "; "))
+	}
+	return nil
+}
+
+func forbiddenMemoryIslandsSurfaceReleaseClaims(text string) []string {
+	lower := strings.ToLower(text)
+	claims := forbiddenPublicPerformanceClaims(text)
+	for _, phrase := range []string{
+		"fully production-ready",
+		"100% production-ready",
+		"production-ready across all targets",
+		"arbitrary unsafe external pointer safety",
+		"full formal proof",
+		"full target parity",
+		"all-platform surface",
+		"clean release-candidate checkout",
+	} {
+		searchFrom := 0
+		for {
+			index := strings.Index(lower[searchFrom:], phrase)
+			if index < 0 {
+				break
+			}
+			absolute := searchFrom + index
+			if !explicitNonClaimContext(clauseAround(lower, absolute, len(phrase), 240)) {
+				claims = append(claims, phrase)
+			}
+			searchFrom = absolute + len(phrase)
+		}
+	}
+	sort.Strings(claims)
+	return compactStrings(claims)
+}
+
+var (
+	finalAuditGitHeadPattern = regexp.MustCompile(`(?i)\b[0-9a-f]{40}\b`)
+	finalAuditSHA256Pattern  = regexp.MustCompile(`(?i)\b[0-9a-f]{64}\b`)
+)
+
+func verifyFinalMemoryIslandsSurfaceProductionAudit(paths []string) error {
+	var errs []string
+	var combined strings.Builder
+	for _, path := range paths {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("%s: %v", path, err))
+			continue
+		}
+		text := string(raw)
+		combined.WriteString(text)
+		combined.WriteByte('\n')
+		for _, claim := range forbiddenFinalMemoryIslandsSurfaceProductionAuditClaims(text) {
+			errs = append(errs, fmt.Sprintf("%s: forbidden final Memory/Islands/Surface audit claim %q", path, claim))
+		}
+	}
+	combinedText := combined.String()
+	combinedLower := strings.ToLower(combinedText)
+	for _, required := range []string{
+		"memory/islands/surface final production readiness audit",
+		"git head:",
+		"dirty working tree",
+		"memory verdict: `prod_stable_scoped`",
+		"islands verdict: `prod_stable_scoped`",
+		"surface verdict: `prod_stable_scoped`",
+		"integrated verdict: `prod_stable_scoped`",
+		"go test -buildvcs=false ./tools/cmd/verify-docs -run 'final|production|audit|overclaim' -count=1",
+		"git diff --check",
+		"git status --short",
+		"go run -buildvcs=false ./tools/cmd/verify-docs --manifest docs/generated/manifest.json",
+		"reports/mis-ideal/p13/integrated",
+		"reports/mis-ideal/p15/docs-manifest-overclaim.md",
+		"changed files",
+		".github/workflows/ci.yml",
+		"docs/generated/manifest.json",
+		"docs/release/memory_islands_surface_scope.md",
+		"scripts/release/post_v0_4/memory-islands-surface-production-gate.sh",
+		"tools/cmd/validate-island-proof",
+		"tools/cmd/validate-memory-islands-surface-production",
+		"residual risks",
+		"remote github actions",
+		"tools/cmd/dump-project",
+		"tools/validators/postv04prod",
+		"no memory 100% claim",
+		"no arbitrary unsafe external pointer safety",
+		"no full formal proof",
+		"no full target parity",
+		"no all-target surface claim",
+	} {
+		if !strings.Contains(combinedLower, required) {
+			errs = append(errs, fmt.Sprintf("final Memory/Islands/Surface audit missing %q", required))
+		}
+	}
+	if !finalAuditGitHeadPattern.MatchString(combinedText) {
+		errs = append(errs, "final Memory/Islands/Surface audit missing 40-character git head")
+	}
+	if !finalAuditSHA256Pattern.MatchString(combinedText) {
+		errs = append(errs, "final Memory/Islands/Surface audit missing sha256 evidence")
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("%s", strings.Join(errs, "; "))
+	}
+	return nil
+}
+
+func verifyMemoryIslandsFinalProductionReadinessAudit(paths []string) error {
+	var errs []string
+	var combined strings.Builder
+	for _, path := range paths {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			errs = append(errs, fmt.Sprintf("%s: %v", path, err))
+			continue
+		}
+		text := string(raw)
+		combined.WriteString(text)
+		combined.WriteByte('\n')
+		for _, claim := range forbiddenFinalMemoryIslandsSurfaceProductionAuditClaims(text) {
+			errs = append(errs, fmt.Sprintf("%s: forbidden final Memory/Islands audit claim %q", path, claim))
+		}
+	}
+	combinedText := combined.String()
+	if combinedText == "" {
+		if len(errs) > 0 {
+			return fmt.Errorf("%s", strings.Join(errs, "; "))
+		}
+		return nil
+	}
+	combinedLower := strings.ToLower(combinedText)
+	for _, required := range []string{
+		"memory/islands final production readiness audit",
+		"git head:",
+		"working tree:",
+		"dirty working tree",
+		"memory verdict: `prod_stable_scoped`",
+		"islands verdict: `prod_stable_scoped`",
+		"integrated gate verdict: `prod_stable_scoped`",
+		"memory/islands scope:",
+		"integrated gate scope:",
+		"## command log",
+		"git status --short",
+		"git rev-parse head",
+		"go test -buildvcs=false ./compiler/... ./cli/... ./tools/... -count=1",
+		"go test -race -buildvcs=false ./compiler/internal/islandkernel ./compiler/internal/memoryfacts ./compiler/internal/memorymodel ./compiler/internal/semantics ./compiler/internal/plir ./compiler/internal/validation ./cli/internal/actornet -count=1",
+		"memory-production-linux-x64-smoke.sh --report-dir reports/memory-islands-ideal/final/memory-production",
+		"memory-islands-surface-production-gate.sh --report-dir reports/memory-islands-ideal/final/integrated",
+		"go run ./tools/cmd/validate-manifest --manifest docs/generated/manifest.json",
+		"go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json",
+		"git diff --check",
+		"## artifact log",
+		"reports/memory-islands-ideal/final/memory-production",
+		"reports/memory-islands-ideal/final/integrated",
+		"reports/memory-islands-ideal/final/artifact-sha256.txt",
+		"## artifact hashes",
+		"## residual risks",
+		"remote github actions",
+		"## nonclaims",
+		"no memory 100% claim",
+		"no arbitrary unsafe external pointer safety",
+		"no full formal proof",
+		"no full target parity",
+		"no production actor runtime",
+		"no official benchmark result",
+		"not a clean release-candidate checkout claim",
+	} {
+		if !strings.Contains(combinedLower, required) {
+			errs = append(errs, fmt.Sprintf("final Memory/Islands audit missing %q", required))
+		}
+	}
+	if !finalAuditGitHeadPattern.MatchString(combinedText) {
+		errs = append(errs, "final Memory/Islands audit missing 40-character git head")
+	}
+	if !finalAuditSHA256Pattern.MatchString(combinedText) {
+		errs = append(errs, "final Memory/Islands audit missing sha256 evidence")
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("%s", strings.Join(errs, "; "))
+	}
+	return nil
+}
+
+func verifyMemoryIslandsFinalActorBenchmarkHandoff(paths []string) error {
+	var errs []string
+	var combined strings.Builder
+	for _, path := range paths {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("%s: %v", path, err))
+			continue
+		}
+		text := string(raw)
+		combined.WriteString(text)
+		combined.WriteByte('\n')
+		for _, claim := range forbiddenFinalActorBenchmarkHandoffClaims(text) {
+			errs = append(errs, fmt.Sprintf("%s: forbidden final actor/benchmark handoff claim %q", path, claim))
+		}
+	}
+	combinedText := combined.String()
+	combinedLower := strings.ToLower(combinedText)
+	for _, required := range []string{
+		"memory/islands final production audit and actor handoff",
+		"final verdict: `prod_stable_scoped`",
+		"memory/islands baseline:",
+		"docs/audits/memory-islands-final-production-readiness.md",
+		"reports/memory-islands-ideal/final/artifact-sha256.txt",
+		"actor handoff readiness:",
+		"actor phase may start",
+		"separate actor runtime production foundation plan",
+		"actor runtime production status:",
+		"not started in this plan",
+		"actor phase preconditions:",
+		"production actor gate must prove",
+		"scheduler",
+		"mailbox backpressure",
+		"message exhaustion/reclamation",
+		"race-safety",
+		"cross-target distributed runtime gates",
+		"structured concurrency",
+		"fake-evidence rejection",
+		"docs/audits/actor-runtime-production-boundary-v1.md",
+		"memisl-p10",
+		"memory-boundary handoff evidence",
+		"benchmark preconditions:",
+		"tier 0/tier 1",
+		"measured evidence",
+		"no official benchmark result",
+		"no performance superiority",
+		"no c++/rust parity",
+		"no measured speed comparison",
+		"nonclaims:",
+		"no production actor runtime",
+		"no actor production gate passed",
+		"no `prod_ready_proven` claim",
+	} {
+		if !strings.Contains(combinedLower, required) {
+			errs = append(errs, fmt.Sprintf("final actor/benchmark handoff missing %q", required))
+		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("%s", strings.Join(errs, "; "))
+	}
+	return nil
+}
+
+func forbiddenFinalMemoryIslandsSurfaceProductionAuditClaims(text string) []string {
+	lower := strings.ToLower(text)
+	claims := forbiddenMemoryIslandsSurfaceReleaseClaims(text)
+	for _, phrase := range []string{
+		"prod_ready_proven",
+		"prod_ready",
+		"all gates passed",
+		"no residual risks",
+		"no blockers",
+	} {
+		searchFrom := 0
+		for {
+			index := strings.Index(lower[searchFrom:], phrase)
+			if index < 0 {
+				break
+			}
+			absolute := searchFrom + index
+			if !explicitNonClaimContext(clauseAround(lower, absolute, len(phrase), 240)) {
+				claims = append(claims, phrase)
+			}
+			searchFrom = absolute + len(phrase)
+		}
+	}
+	sort.Strings(claims)
+	return compactStrings(claims)
+}
+
+func forbiddenFinalActorBenchmarkHandoffClaims(text string) []string {
+	lower := strings.ToLower(text)
+	claims := forbiddenPublicPerformanceClaims(text)
+	for _, phrase := range []string{
+		"production actor runtime",
+		"full production actor runtime",
+		"actor runtime production ready",
+		"actor runtime is production ready",
+		"actor production gate passed",
+		"actor production gate is passed",
+		"production actor gate passed",
+		"production actor gate is passed",
+		"benchmark phase may claim",
+		"performance superiority",
+		"measured speed comparison",
+		"c++/rust parity",
+		"c++ and rust parity",
+		"rust/c++ parity",
+		"prod_ready_proven",
+		"prod_ready",
+	} {
+		searchFrom := 0
+		for {
+			index := strings.Index(lower[searchFrom:], phrase)
+			if index < 0 {
+				break
+			}
+			absolute := searchFrom + index
+			if !explicitNonClaimContext(clauseAround(lower, absolute, len(phrase), 240)) {
+				claims = append(claims, phrase)
+			}
+			searchFrom = absolute + len(phrase)
+		}
+	}
+	sort.Strings(claims)
+	return compactStrings(claims)
+}
+
+func clauseAround(text string, index int, length int, maxSide int) string {
+	start := index
+	for start > 0 && !claimClauseBoundary(text[start-1]) {
+		start--
+		if index-start >= maxSide {
+			break
+		}
+	}
+	end := index + length
+	for end < len(text) && !claimClauseBoundary(text[end]) {
+		end++
+		if end-(index+length) >= maxSide {
+			break
+		}
+	}
+	return text[start:end]
+}
+
+func claimClauseBoundary(b byte) bool {
+	return b == '\n' || b == '.' || b == '!' || b == '?' || b == ';'
 }
 
 func verifySurfaceReleaseDocs(paths []string) error {
@@ -1255,6 +2259,10 @@ func verifySurfaceReleaseDocs(paths []string) error {
 			}
 			if strings.Contains(lower, "react") && surfaceReleaseClaimPromotes(lower) {
 				errs = append(errs, fmt.Sprintf("%s: React Surface fake production claim: %q", path, strings.TrimSpace(clause)))
+			}
+			if containsAnySubstring(lower, []string{"core surface primitive", "surface core primitive", "core primitive"}) &&
+				containsAnySubstring(lower, []string{"button", "textfield", "text field", "card", "sidebar", "modal"}) {
+				errs = append(errs, fmt.Sprintf("%s: core widget primitive fake Surface claim: %q", path, strings.TrimSpace(clause)))
 			}
 			if containsAnySubstring(lower, []string{"user js", "user javascript"}) &&
 				containsAnySubstring(lower, []string{"allowed", "may use", "can use"}) {

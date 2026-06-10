@@ -98,6 +98,13 @@ func DiagnosticFromError(err error) Diagnostic {
 	if err == nil {
 		return Diagnostic{}
 	}
+	if coded, ok := err.(interface{ DiagnosticCode() string }); ok {
+		return Diagnostic{
+			Code:     defaultString(coded.DiagnosticCode(), DiagnosticCodeParse),
+			Message:  err.Error(),
+			Severity: "error",
+		}
+	}
 	if info, ok := frontend.DiagnosticForError(err); ok {
 		return Diagnostic{
 			Code:     defaultString(info.Code, "TETRA0001"),

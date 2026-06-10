@@ -450,8 +450,8 @@ func validateReportRow(index int, row ReportRow) []string {
 	if capMemDisallowedProofClaim(row.Claim, row.ValidatorName, row.Reason) {
 		issues = append(issues, fmt.Sprintf("%s: cap.mem authorization cannot claim %q; cap.mem authorizes raw operations only and does not prove pointer validity, bounds, ownership, noalias, or safe provenance", prefix, row.Claim))
 	}
-	if hasUnsafeUnknownClass(row.ProvenanceClass, row.UnsafeClass) && row.ClaimLevel == ClaimValidated && unsafeUnknownTrustedStorage(row.PlannedStorage, row.ActualLoweringStorage) {
-		issues = append(issues, fmt.Sprintf("%s: unsafe_unknown cannot validate trusted storage lowering %q/%q", prefix, row.PlannedStorage, row.ActualLoweringStorage))
+	if row.ClaimLevel == ClaimValidated && unsafeExternalRootTrustedStorage(row.ProvenanceClass, row.UnsafeClass, row.PlannedStorage, row.ActualLoweringStorage) {
+		issues = append(issues, fmt.Sprintf("%s: unsafe/external root %s/%s cannot validate trusted storage lowering %q/%q", prefix, row.ProvenanceClass, row.UnsafeClass, row.PlannedStorage, row.ActualLoweringStorage))
 	}
 	if row.ClaimLevel == ClaimValidated && strings.Contains(row.Claim, "no_alias") && !validatedNoAliasState(row.AliasState) {
 		issues = append(issues, fmt.Sprintf("%s: validated no_alias requires unique or mutable_exclusive alias_state, got %q", prefix, row.AliasState))
@@ -469,8 +469,8 @@ func validateReportRow(index int, row ReportRow) []string {
 	if row.ClaimLevel == ClaimValidated && runtimeProofRequiredStorage(row.PlannedStorage, row.ActualLoweringStorage) {
 		issues = append(issues, fmt.Sprintf("%s: validated runtime boundary storage %q/%q requires production runtime proof", prefix, row.PlannedStorage, row.ActualLoweringStorage))
 	}
-	if trustedStorageHeapFallback(row.PlannedStorage, row.ActualLoweringStorage) && strings.TrimSpace(row.Reason) == "" {
-		issues = append(issues, prefix+": heap/conservative fallback requires reason")
+	if storageFallbackRequiresReason(row.PlannedStorage, row.ActualLoweringStorage, row.CostClass) && strings.TrimSpace(row.Reason) == "" {
+		issues = append(issues, prefix+": storage/conservative fallback requires reason")
 	}
 	return issues
 }

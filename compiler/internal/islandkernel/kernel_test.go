@@ -1,6 +1,12 @@
 package islandkernel
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"testing"
+)
 
 func TestIslandKernelRequiredDecisionQuestions(t *testing.T) {
 	liveRef := MemoryRef{
@@ -197,11 +203,114 @@ func TestIslandKernelDecisionMetadata(t *testing.T) {
 		t.Fatalf("CanMoveIsland() = %+v, want ConsumesToken", move)
 	}
 
+	free := CanFreeIsland(TokenRequest{Token: token})
+	requireDecision(t, free, Accept, "token.free_consumes_source")
+	if !free.ConsumesToken {
+		t.Fatalf("CanFreeIsland() = %+v, want ConsumesToken", free)
+	}
+
 	reset := CanResetIsland(TokenRequest{Token: token})
 	requireDecision(t, reset, Accept, "token.reset_epoch_advanced")
+	if !reset.ConsumesToken {
+		t.Fatalf("CanResetIsland() = %+v, want ConsumesToken", reset)
+	}
 	if reset.NextEpoch != 8 {
 		t.Fatalf("CanResetIsland() = %+v, want NextEpoch 8", reset)
 	}
+}
+
+func TestIslandKernelRejectsExternalUnsafeTrustedStoragePromotion(t *testing.T) {
+	externalRef := MemoryRef{
+		BaseID:      "raw",
+		IslandID:    ExternalUnsafeIsland,
+		Epoch:       1,
+		Provenance:  ProvenanceUnsafeUnknown,
+		UnsafeClass: UnsafeUnknown,
+	}
+	storageProof := Proof{
+		ID:            "proof:storage:external",
+		Kind:          ProofStorage,
+		SubjectBaseID: "raw",
+		IslandID:      ExternalUnsafeIsland,
+		Epoch:         1,
+		Operation:     OperationExplicitIslandStorage,
+		Verified:      true,
+	}
+
+	lowerAsIsland := CanLowerAsExplicitIsland(StorageRequest{
+		Ref:            externalRef,
+		PlannedStorage: StorageExplicitIsland,
+		ActualStorage:  StorageExplicitIsland,
+		Proof:          storageProof,
+	})
+	requireDecision(t, lowerAsIsland, Reject, "storage.unsafe_external")
+
+	trustedStorage := CanTrustStorage(StorageRequest{
+		Ref:            externalRef,
+		PlannedStorage: StorageExplicitIsland,
+		ActualStorage:  StorageExplicitIsland,
+		Proof:          storageProof,
+	})
+	requireDecision(t, trustedStorage, Reject, "storage.unsafe_external")
+}
+
+func TestIslandKernelDangerousDecisionRouteCoverage(t *testing.T) {
+	routes := DangerousDecisionRoutes()
+	if err := ValidateDangerousDecisionRoutes(routes, fileExistsFromRepoRoot(t), fileContainsTokenFromRepoRoot(t)); err != nil {
+		t.Fatalf("ValidateDangerousDecisionRoutes: %v", err)
+	}
+	t.Logf("validated %d IslandKernel dangerous decision routes", len(routes))
+
+	seen := map[string]DangerousDecisionRoute{}
+	for _, route := range routes {
+		if _, exists := seen[route.Decision]; exists {
+			t.Fatalf("duplicate route for decision %q", route.Decision)
+		}
+		seen[route.Decision] = route
+	}
+
+	for _, decision := range RequiredDangerousDecisions() {
+		route, exists := seen[decision]
+		if !exists {
+			t.Fatalf("missing route for required dangerous decision %q", decision)
+		}
+		if !slices.Contains(route.EvidenceTokens, decision) && route.KernelFunction != decision {
+			t.Fatalf("route %q does not name its kernel decision in evidence: %+v", decision, route)
+		}
+	}
+}
+
+func fileExistsFromRepoRoot(t *testing.T) func(string) bool {
+	t.Helper()
+	root := repoRootFromIslandKernelTest(t)
+	return func(path string) bool {
+		if strings.TrimSpace(path) == "" || filepath.IsAbs(path) {
+			return false
+		}
+		info, err := os.Stat(filepath.Join(root, filepath.Clean(path)))
+		return err == nil && !info.IsDir()
+	}
+}
+
+func fileContainsTokenFromRepoRoot(t *testing.T) func(string, string) bool {
+	t.Helper()
+	root := repoRootFromIslandKernelTest(t)
+	return func(path string, token string) bool {
+		if strings.TrimSpace(token) == "" {
+			return false
+		}
+		data, err := os.ReadFile(filepath.Join(root, filepath.Clean(path)))
+		return err == nil && strings.Contains(string(data), token)
+	}
+}
+
+func repoRootFromIslandKernelTest(t *testing.T) string {
+	t.Helper()
+	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
+	if err != nil {
+		t.Fatalf("resolve repo root: %v", err)
+	}
+	return root
 }
 
 func requireDecision(t *testing.T, got Result, want Decision, code string) {

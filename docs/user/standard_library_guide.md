@@ -62,6 +62,8 @@ generated docs run.
 | Planned Tetra Surface software draw helpers | `import lib.core.draw as draw` | `examples/core_draw_smoke.tetra` | `mem` |
 | Stable Surface v1 widget style and theme helpers | `import lib.core.style as style` | `examples/core_style_smoke.tetra` | none |
 | Planned Tetra Surface static component helpers | `import lib.core.component as component` | `examples/core_component_smoke.tetra` | none |
+| Experimental Surface Block System data model | `import lib.core.block as block` | `examples/core_block_smoke.tetra` | alloc, mem |
+| Experimental Surface Morph Capsule recipe layer | `import lib.core.morph as morph` | `examples/surface_morph_command_palette.tetra` | alloc, mem in consuming scenes |
 | Experimental Tetra Surface accessibility metadata helpers | `import lib.core.accessibility as accessibility` | `examples/core_accessibility_smoke.tetra` | none |
 | Experimental Tetra Surface minimal widget helpers | `import lib.core.widgets as widgets` | `examples/core_widgets_smoke.tetra` | none |
 
@@ -119,7 +121,8 @@ the `_at` helpers for each request window.
 pure path-shape helpers. `lib.core.crypto` is a stable crypto interface-helper
 surface. `lib.core.networking` is a stable endpoint policy-helper surface.
 `lib.core.surface`, `lib.core.draw`, `lib.core.style`,
-`lib.core.component`, and `lib.core.widgets` are experimental Tetra Surface modules for the pure-Tetra UI
+`lib.core.component`, `lib.core.block`, `lib.core.morph`, and
+`lib.core.widgets` are experimental Tetra Surface modules for the pure-Tetra UI
 direction. The current evidence covers headless
 frame/event/checksum reports and Linux-x64 starter Host ABI open/present/close
 probe reports plus Linux-x64 real-window Wayland shm evidence for
@@ -161,9 +164,10 @@ P19.3 additionally records bounded internal driver/pool evidence through
 queries, updates, and fortunes source rows. The closure links that source gate
 to checked local SCRAM/PostgreSQL reports accepted by
 `validate-techempower-report`. This does not promote a full source-level
-PostgreSQL driver API, measured speed comparison, official TechEmpower result,
-production database benchmark, external production database deployment,
-C++/Rust parity, or P20 performance matrix.
+PostgreSQL driver API or measured speed comparison. It makes no official
+TechEmpower result claim, no production database benchmark claim, no external
+production database deployment claim, no C++/Rust parity claim, and no P20
+performance matrix claim.
 `lib.core.json` is a stable executable byte-buffer helper surface for compact
 JSON response bodies. The runtime package used by backend services also has a
 generic deterministic JSON value parser/writer for objects, arrays, strings,
@@ -273,7 +277,7 @@ The P19.1 benchmark gate has a checked dry-run truth-bench-harness artifact
 for `p19.1_generic_collections`: a hash-table-equivalent Tetra/C++/Rust source
 shape with matching algorithm/input metadata and Tetra proof/allocation/bounds
 and performance report paths. It is not a runtime measurement, C++/Rust parity
-claim, or official benchmark result.
+claim, and makes no official benchmark result claim.
 
 - `collections.vec_from_slice(values)` creates a generic `Vec<T>` view over a
   caller-owned slice and records the logical length by scanning it.

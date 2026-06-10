@@ -31,6 +31,12 @@ Supported manifest scopes:
   for Tetra-only `DB single query`, `DB multiple queries`, `DB updates`, and
   `DB fortunes` rows with proof/allocation/bounds and P19.3 coverage
   artifacts.
+- `p15_actor_benchmark_prep`: checked dry-run ACTOR-P15 actor benchmark prep
+  gate for Tetra-only actor ping-pong, fanout/fanin, mailbox throughput,
+  backpressure latency, and `zero_copy_move` local typed mailbox rows. This
+  scope requires raw output artifact references, proof/allocation/bounds
+  reports, and Tetra report artifacts. Rows remain `ran=false` unless a
+  separate Tier 1 local run exists.
 - `p20.0_benchmark_matrix`: checked dry-run P20.0 master-plan matrix gate with
   Tetra, C, C++, and Rust rows for every P20 category. This scope requires
   matching `algorithm_id` and `input_description` for equivalent rows, raw
@@ -81,6 +87,14 @@ The P20.0 benchmark-matrix categories are:
 - startup time
 - binary size
 - compile time
+
+The P15 actor benchmark prep categories are:
+
+- actor ping-pong
+- actor fanout/fanin
+- actor mailbox throughput
+- actor backpressure latency
+- `zero_copy_move` local typed mailbox
 
 The generated `tetra.truth.benchmark.v1` report records:
 
@@ -151,6 +165,12 @@ Named bounded scopes can be used before the full P20 matrix is ready:
   artifacts. It is source-first gate evidence only; it does not record database
   throughput, C++/Rust parity, a production database benchmark, or an official
   TechEmpower result.
+- `p15_actor_benchmark_prep`: checked dry-run ACTOR-P15 actor benchmark prep
+  rows for local Linux-x64 actor/task workload candidates. It records raw
+  artifact references and Tier 0 scope only. It does not record measured speed,
+  actor benchmark superiority, official benchmark status, a production
+  throughput guarantee, real-world SLA evidence, distributed actor runtime
+  promotion, or distributed/network zero-copy.
 - `p20.0_benchmark_matrix`: checked dry-run P20.0 benchmark matrix across 17
   master-plan categories and the four required languages. The checked artifact
   is
@@ -181,6 +201,13 @@ rejects local-benchmark, cross-machine, independent-reproduction,
 official/upstream/TechEmpower, measured-speed, throughput/latency advantage, and
 C++/Rust parity wording unless the report carries the matching tier evidence or
 the text is explicitly a non-claim.
+
+ACTOR-P15 actor benchmark prep also validates only Tier 0 wording unless a
+separate Tier 1 local benchmark report is produced. Its claim-tier nonclaims
+include production throughput guarantees, distributed zero-copy, and actor
+benchmark superiority. The `zero_copy_move` local typed mailbox row is local
+owned-region metadata only; it is not distributed/network zero-copy and is not a
+production runtime promotion.
 
 Compiler `--explain` performance reports also include P20.1 blocker diagnostics
 in `.perf.json` schema version 3: `left bounds check: missing dominance`,

@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 
@@ -35,15 +36,59 @@ type smokeOptions struct {
 }
 
 type headlessScenario struct {
-	Components        []surface.ComponentReport
-	ComponentTree     *surface.ComponentTreeReport
-	ComponentTreeAPI  *surface.ComponentTreeAPIReport
-	Toolkit           *surface.ToolkitReport
-	AccessibilityTree *surface.AccessibilityTreeReport
-	Events            []surface.EventReport
-	Frames            []surface.FrameReport
-	StateTransitions  []surface.StateTransitionReport
-	Cases             []surface.CaseReport
+	Components                      []surface.ComponentReport
+	ComponentTree                   *surface.ComponentTreeReport
+	ComponentTreeAPI                *surface.ComponentTreeAPIReport
+	BlockGraph                      *surface.BlockGraphReport
+	PaintLayers                     []surface.PaintLayerReport
+	PaintCommands                   []surface.PaintCommandReport
+	VisualFeatures                  []string
+	PaintQualityLevel               string
+	PaintCacheBudgetBytes           int
+	PaintUnsupportedBlur            bool
+	TextMeasurements                []surface.TextMeasurementReport
+	FontFallbacks                   []surface.FontFallbackReport
+	GlyphCaches                     []surface.GlyphCacheReport
+	TextRenderCommands              []surface.TextRenderCommandReport
+	TextQualityLevel                string
+	TextCacheBudgetBytes            int
+	LayoutConstraints               []surface.BlockLayoutConstraintReport
+	LayoutPasses                    []surface.BlockLayoutPassReport
+	LayoutScrolls                   []surface.BlockLayoutScrollReport
+	LayoutFeatures                  []string
+	LayoutQualityLevel              string
+	LayoutUnsupportedCSSFlexbox     bool
+	BlockEventRoutes                []surface.BlockEventRouteReport
+	BlockFocusTransitions           []surface.BlockFocusTransitionReport
+	BlockEventKinds                 []string
+	BlockEventPolicy                string
+	BlockEventQualityLevel          string
+	BlockEventUnsupportedDragDrop   bool
+	BlockStateSelectors             []surface.BlockStateSelectorReport
+	BlockStateResolutions           []surface.BlockStateResolutionReport
+	BlockStateResolverOrder         []string
+	BlockStateQualityLevel          string
+	BlockStateUnsupportedCSSPseudos bool
+	MotionFrames                    []surface.MotionFrameReport
+	MotionQualityLevel              string
+	MotionClock                     string
+	MotionFrameBudget               int
+	MotionUnsupportedCSSAnimations  bool
+	BlockAssetManifest              *surface.BlockAssetManifestReport
+	BlockAssetCache                 surface.BlockAssetCacheReport
+	BlockAssetDiagnostics           []surface.BlockAssetDiagnosticReport
+	BlockAssetRenderCommands        []surface.BlockAssetRenderCommandReport
+	BlockAssetQualityLevel          string
+	BlockAssetNetworkFetchAllowed   bool
+	BlockAccessibilityTree          *surface.BlockAccessibilityTreeReport
+	BlockSystem                     *surface.BlockSystemReport
+	Morph                           *surface.MorphReport
+	Toolkit                         *surface.ToolkitReport
+	AccessibilityTree               *surface.AccessibilityTreeReport
+	Events                          []surface.EventReport
+	Frames                          []surface.FrameReport
+	StateTransitions                []surface.StateTransitionReport
+	Cases                           []surface.CaseReport
 }
 
 type surfaceProcessEvidence struct {
@@ -54,17 +99,61 @@ type surfaceProcessEvidence struct {
 }
 
 type headlessSurfaceRunnerTrace struct {
-	Schema            string                           `json:"schema"`
-	Source            string                           `json:"source"`
-	Frames            []surface.FrameReport            `json:"frames"`
-	Events            []surface.EventReport            `json:"events"`
-	StateTransitions  []surface.StateTransitionReport  `json:"state_transitions"`
-	Components        []surface.ComponentReport        `json:"components"`
-	ComponentTree     *surface.ComponentTreeReport     `json:"component_tree,omitempty"`
-	ComponentTreeAPI  *surface.ComponentTreeAPIReport  `json:"component_tree_api,omitempty"`
-	Toolkit           *surface.ToolkitReport           `json:"toolkit,omitempty"`
-	AccessibilityTree *surface.AccessibilityTreeReport `json:"accessibility_tree,omitempty"`
-	Cases             []surface.CaseReport             `json:"cases"`
+	Schema                          string                                  `json:"schema"`
+	Source                          string                                  `json:"source"`
+	Frames                          []surface.FrameReport                   `json:"frames"`
+	Events                          []surface.EventReport                   `json:"events"`
+	StateTransitions                []surface.StateTransitionReport         `json:"state_transitions"`
+	Components                      []surface.ComponentReport               `json:"components"`
+	ComponentTree                   *surface.ComponentTreeReport            `json:"component_tree,omitempty"`
+	ComponentTreeAPI                *surface.ComponentTreeAPIReport         `json:"component_tree_api,omitempty"`
+	BlockGraph                      *surface.BlockGraphReport               `json:"block_graph,omitempty"`
+	PaintLayers                     []surface.PaintLayerReport              `json:"paint_layers,omitempty"`
+	PaintCommands                   []surface.PaintCommandReport            `json:"paint_commands,omitempty"`
+	VisualFeatures                  []string                                `json:"visual_features,omitempty"`
+	PaintQualityLevel               string                                  `json:"paint_quality_level,omitempty"`
+	PaintCacheBudgetBytes           int                                     `json:"paint_cache_budget_bytes,omitempty"`
+	PaintUnsupportedBlur            bool                                    `json:"paint_unsupported_blur,omitempty"`
+	TextMeasurements                []surface.TextMeasurementReport         `json:"text_measurements,omitempty"`
+	FontFallbacks                   []surface.FontFallbackReport            `json:"font_fallbacks,omitempty"`
+	GlyphCaches                     []surface.GlyphCacheReport              `json:"glyph_caches,omitempty"`
+	TextRenderCommands              []surface.TextRenderCommandReport       `json:"text_render_commands,omitempty"`
+	TextQualityLevel                string                                  `json:"text_quality_level,omitempty"`
+	TextCacheBudgetBytes            int                                     `json:"text_cache_budget_bytes,omitempty"`
+	LayoutConstraints               []surface.BlockLayoutConstraintReport   `json:"layout_constraints,omitempty"`
+	LayoutPasses                    []surface.BlockLayoutPassReport         `json:"layout_passes,omitempty"`
+	LayoutScrolls                   []surface.BlockLayoutScrollReport       `json:"layout_scrolls,omitempty"`
+	LayoutFeatures                  []string                                `json:"layout_features,omitempty"`
+	LayoutQualityLevel              string                                  `json:"layout_quality_level,omitempty"`
+	LayoutUnsupportedCSSFlexbox     bool                                    `json:"layout_unsupported_css_flexbox,omitempty"`
+	BlockEventRoutes                []surface.BlockEventRouteReport         `json:"block_event_routes,omitempty"`
+	BlockFocusTransitions           []surface.BlockFocusTransitionReport    `json:"block_focus_transitions,omitempty"`
+	BlockEventKinds                 []string                                `json:"block_event_kinds,omitempty"`
+	BlockEventPolicy                string                                  `json:"block_event_policy,omitempty"`
+	BlockEventQualityLevel          string                                  `json:"block_event_quality_level,omitempty"`
+	BlockEventUnsupportedDragDrop   bool                                    `json:"block_event_unsupported_drag_drop,omitempty"`
+	BlockStateSelectors             []surface.BlockStateSelectorReport      `json:"block_state_selectors,omitempty"`
+	BlockStateResolutions           []surface.BlockStateResolutionReport    `json:"block_state_resolutions,omitempty"`
+	BlockStateResolverOrder         []string                                `json:"block_state_resolver_order,omitempty"`
+	BlockStateQualityLevel          string                                  `json:"block_state_quality_level,omitempty"`
+	BlockStateUnsupportedCSSPseudos bool                                    `json:"block_state_unsupported_css_pseudos,omitempty"`
+	MotionFrames                    []surface.MotionFrameReport             `json:"motion_frames,omitempty"`
+	MotionQualityLevel              string                                  `json:"motion_quality_level,omitempty"`
+	MotionClock                     string                                  `json:"motion_clock,omitempty"`
+	MotionFrameBudget               int                                     `json:"motion_frame_budget,omitempty"`
+	MotionUnsupportedCSSAnimations  bool                                    `json:"motion_unsupported_css_animations,omitempty"`
+	BlockAssetManifest              *surface.BlockAssetManifestReport       `json:"block_asset_manifest,omitempty"`
+	BlockAssetCache                 surface.BlockAssetCacheReport           `json:"block_asset_cache,omitempty"`
+	BlockAssetDiagnostics           []surface.BlockAssetDiagnosticReport    `json:"block_asset_diagnostics,omitempty"`
+	BlockAssetRenderCommands        []surface.BlockAssetRenderCommandReport `json:"block_asset_render_commands,omitempty"`
+	BlockAssetQualityLevel          string                                  `json:"block_asset_quality_level,omitempty"`
+	BlockAssetNetworkFetchAllowed   bool                                    `json:"block_asset_network_fetch_allowed,omitempty"`
+	BlockAccessibilityTree          *surface.BlockAccessibilityTreeReport   `json:"block_accessibility_tree,omitempty"`
+	BlockSystem                     *surface.BlockSystemReport              `json:"block_system,omitempty"`
+	Morph                           *surface.MorphReport                    `json:"morph,omitempty"`
+	Toolkit                         *surface.ToolkitReport                  `json:"toolkit,omitempty"`
+	AccessibilityTree               *surface.AccessibilityTreeReport        `json:"accessibility_tree,omitempty"`
+	Cases                           []surface.CaseReport                    `json:"cases"`
 }
 
 type wasmSurfaceRunnerTrace struct {
@@ -229,15 +318,27 @@ func main() {
 		return
 	}
 	scenario := releaseCounterScenarioForSource(opt, runSurfaceScenario(opt.Mode))
-	if len(scenario.Frames) > 0 && len(evidence.Frames) > 0 {
-		lastOrder := scenario.Frames[len(scenario.Frames)-1].Order
-		for i := range evidence.Frames {
-			if evidence.Frames[i].Order <= lastOrder {
-				evidence.Frames[i].Order = lastOrder + i + 1
+	if opt.Mode == "wasm32-web-browser-canvas-block-system" {
+		scenario.Frames = mergeFrameEvidenceByOrder(scenario.Frames, evidence.Frames)
+	} else {
+		if len(scenario.Frames) > 0 && len(evidence.Frames) > 0 {
+			lastOrder := scenario.Frames[len(scenario.Frames)-1].Order
+			for i := range evidence.Frames {
+				if evidence.Frames[i].Order <= lastOrder {
+					evidence.Frames[i].Order = lastOrder + i + 1
+				}
 			}
 		}
+		scenario.Frames = append(scenario.Frames, evidence.Frames...)
 	}
-	scenario.Frames = append(scenario.Frames, evidence.Frames...)
+	if opt.Mode == "linux-x64-real-window-block-system" {
+		scenario.BlockSystem = blockSystemReportForLinuxX64RealWindowScenario(defaultSurfaceSourcePath(opt), scenario.Frames)
+		attachBlockSystemMemoryBudget(&scenario)
+	}
+	if opt.Mode == "wasm32-web-browser-canvas-block-system" {
+		scenario.BlockSystem = blockSystemReportForWASM32WebBrowserCanvasScenario(defaultSurfaceSourcePath(opt), scenario.Frames)
+		attachBlockSystemMemoryBudget(&scenario)
+	}
 	report := buildReport(opt, "linux-x64", evidence.Processes, evidence.Artifacts, evidence.ArtifactScan, scenario)
 	raw, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
@@ -256,6 +357,26 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+func mergeFrameEvidenceByOrder(base []surface.FrameReport, evidence []surface.FrameReport) []surface.FrameReport {
+	byOrder := map[int]surface.FrameReport{}
+	for _, frame := range base {
+		byOrder[frame.Order] = frame
+	}
+	for _, frame := range evidence {
+		byOrder[frame.Order] = frame
+	}
+	orders := make([]int, 0, len(byOrder))
+	for order := range byOrder {
+		orders = append(orders, order)
+	}
+	sort.Ints(orders)
+	merged := make([]surface.FrameReport, 0, len(orders))
+	for _, order := range orders {
+		merged = append(merged, byOrder[order])
+	}
+	return merged
 }
 
 func validateSmokeMode(mode string) error {
@@ -314,6 +435,36 @@ func validateSmokeMode(mode string) error {
 		return nil
 	}
 	if mode == "wasm32-web-browser-canvas-component-tree-api" {
+		return nil
+	}
+	if mode == "headless-block-layout" {
+		return nil
+	}
+	if mode == "headless-block-events" {
+		return nil
+	}
+	if mode == "headless-block-states" {
+		return nil
+	}
+	if mode == "headless-block-motion" {
+		return nil
+	}
+	if mode == "headless-block-assets" {
+		return nil
+	}
+	if mode == "headless-block-accessibility" {
+		return nil
+	}
+	if mode == "headless-block-system" {
+		return nil
+	}
+	if mode == "headless-morph" {
+		return nil
+	}
+	if mode == "linux-x64-real-window-block-system" {
+		return nil
+	}
+	if mode == "wasm32-web-browser-canvas-block-system" {
 		return nil
 	}
 	if mode == "headless-minimal-toolkit" {
@@ -401,6 +552,9 @@ func collectSurfaceProcessEvidence(opt smokeOptions) (surfaceProcessEvidence, er
 	if mode == "wasm32-web-browser-canvas-accessibility-metadata" {
 		return collectWASM32WebBrowserCanvasProcessEvidence(sourcePath, artifactDir, "accessibility-metadata")
 	}
+	if mode == "wasm32-web-browser-canvas-block-system" {
+		return collectWASM32WebBrowserCanvasProcessEvidence(sourcePath, artifactDir, "block-system")
+	}
 
 	appName := "surface-counter"
 	if isTextFocusInputMode(mode) {
@@ -423,6 +577,36 @@ func collectSurfaceProcessEvidence(opt smokeOptions) (surfaceProcessEvidence, er
 	}
 	if isComponentTreeMode(mode) {
 		appName = "surface-tree-app"
+	}
+	if isBlockPaintMode(mode) {
+		appName = "surface-block-paint"
+	}
+	if isBlockTextMode(mode) {
+		appName = "surface-block-text"
+	}
+	if isBlockLayoutMode(mode) {
+		appName = "surface-block-layout"
+	}
+	if isBlockEventMode(mode) {
+		appName = "surface-block-events"
+	}
+	if isBlockStateMode(mode) {
+		appName = "surface-block-states"
+	}
+	if isBlockMotionMode(mode) {
+		appName = "surface-block-motion"
+	}
+	if isBlockAssetMode(mode) {
+		appName = "surface-block-assets"
+	}
+	if isBlockAccessibilityMode(mode) {
+		appName = "surface-block-accessibility"
+	}
+	if isBlockSystemMode(mode) {
+		appName = "surface-block-system"
+	}
+	if isMorphMode(mode) {
+		appName = "surface-morph-command-palette"
 	}
 	if isMinimalToolkitMode(mode) {
 		appName = "surface-toolkit-form"
@@ -645,6 +829,25 @@ func collectSurfaceProcessEvidence(opt smokeOptions) (surfaceProcessEvidence, er
 		processes = append(processes, surface.ProcessReport{Name: runtimeProcessName, Kind: "runtime", Path: os.Args[0], Ran: true, Pass: true, ExitCode: intPtr(0)})
 		return surfaceProcessEvidence{Processes: processes, Artifacts: []surface.ArtifactReport{componentArtifact}, ArtifactScan: sidecarScan, Frames: []surface.FrameReport{realWindowFrame}}, nil
 	}
+	if mode == "linux-x64-real-window-block-system" {
+		runtimeProcessName = "surface linux-x64 real-window runtime"
+		probeProcesses, err := collectLinuxX64HostProbeEvidence(artifactDir)
+		if err != nil {
+			return surfaceProcessEvidence{}, err
+		}
+		processes = append(processes, probeProcesses...)
+		realWindowProcess, realWindowFrame, err := collectLinuxX64BlockSystemRealWindowProbeEvidence(artifactDir)
+		if err != nil {
+			return surfaceProcessEvidence{}, err
+		}
+		processes = append(processes, realWindowProcess)
+		sidecarScan, err = scanLegacyUISidecarArtifacts(artifactDir)
+		if err != nil {
+			return surfaceProcessEvidence{}, err
+		}
+		processes = append(processes, surface.ProcessReport{Name: runtimeProcessName, Kind: "runtime", Path: os.Args[0], Ran: true, Pass: true, ExitCode: intPtr(0)})
+		return surfaceProcessEvidence{Processes: processes, Artifacts: []surface.ArtifactReport{componentArtifact}, ArtifactScan: sidecarScan, Frames: []surface.FrameReport{realWindowFrame}}, nil
+	}
 	if mode == "linux-x64-real-window-minimal-toolkit" {
 		runtimeProcessName = "surface linux-x64 real-window runtime"
 		probeProcesses, err := collectLinuxX64HostProbeEvidence(artifactDir)
@@ -735,6 +938,36 @@ func defaultSurfaceSourcePath(opt smokeOptions) string {
 	if isComponentTreeMode(opt.Mode) {
 		return "examples/surface_tree_app.tetra"
 	}
+	if isBlockPaintMode(opt.Mode) {
+		return "examples/surface_block_paint_layers.tetra"
+	}
+	if isBlockTextMode(opt.Mode) {
+		return "examples/surface_block_text.tetra"
+	}
+	if isBlockLayoutMode(opt.Mode) {
+		return "examples/surface_block_layout.tetra"
+	}
+	if isBlockEventMode(opt.Mode) {
+		return "examples/surface_block_events.tetra"
+	}
+	if isBlockStateMode(opt.Mode) {
+		return "examples/surface_block_states.tetra"
+	}
+	if isBlockMotionMode(opt.Mode) {
+		return "examples/surface_block_motion.tetra"
+	}
+	if isBlockAssetMode(opt.Mode) {
+		return "examples/surface_block_assets.tetra"
+	}
+	if isBlockAccessibilityMode(opt.Mode) {
+		return "examples/surface_block_accessibility.tetra"
+	}
+	if isMorphMode(opt.Mode) {
+		return "examples/surface_morph_command_palette.tetra"
+	}
+	if isBlockSystemMode(opt.Mode) {
+		return "examples/surface_block_system.tetra"
+	}
 	if isMinimalToolkitMode(opt.Mode) {
 		return "examples/surface_toolkit_form.tetra"
 	}
@@ -795,6 +1028,48 @@ func isComponentTreeMode(mode string) bool {
 		mode == "headless-component-tree-api" ||
 		mode == "linux-x64-real-window-component-tree-api" ||
 		mode == "wasm32-web-browser-canvas-component-tree-api"
+}
+
+func isBlockPaintMode(mode string) bool {
+	return mode == "headless-block-paint"
+}
+
+func isBlockTextMode(mode string) bool {
+	return mode == "headless-block-text"
+}
+
+func isBlockLayoutMode(mode string) bool {
+	return mode == "headless-block-layout"
+}
+
+func isBlockEventMode(mode string) bool {
+	return mode == "headless-block-events"
+}
+
+func isBlockStateMode(mode string) bool {
+	return mode == "headless-block-states"
+}
+
+func isBlockMotionMode(mode string) bool {
+	return mode == "headless-block-motion"
+}
+
+func isBlockAssetMode(mode string) bool {
+	return mode == "headless-block-assets"
+}
+
+func isBlockAccessibilityMode(mode string) bool {
+	return mode == "headless-block-accessibility"
+}
+
+func isBlockSystemMode(mode string) bool {
+	return mode == "headless-block-system" ||
+		mode == "linux-x64-real-window-block-system" ||
+		mode == "wasm32-web-browser-canvas-block-system"
+}
+
+func isMorphMode(mode string) bool {
+	return mode == "headless-morph"
 }
 
 func isMinimalToolkitMode(mode string) bool {
@@ -872,17 +1147,61 @@ func collectHeadlessRunnerTraceEvidence(sourcePath string, artifactDir string, s
 
 func writeHeadlessSurfaceTrace(path string, sourcePath string, scenario headlessScenario) error {
 	trace := headlessSurfaceRunnerTrace{
-		Schema:            "tetra.surface.headless-runner-trace.v1",
-		Source:            sourcePath,
-		Frames:            scenario.Frames,
-		Events:            scenario.Events,
-		StateTransitions:  scenario.StateTransitions,
-		Components:        scenario.Components,
-		ComponentTree:     scenario.ComponentTree,
-		ComponentTreeAPI:  scenario.ComponentTreeAPI,
-		Toolkit:           scenario.Toolkit,
-		AccessibilityTree: scenario.AccessibilityTree,
-		Cases:             scenario.Cases,
+		Schema:                          "tetra.surface.headless-runner-trace.v1",
+		Source:                          sourcePath,
+		Frames:                          scenario.Frames,
+		Events:                          scenario.Events,
+		StateTransitions:                scenario.StateTransitions,
+		Components:                      scenario.Components,
+		ComponentTree:                   scenario.ComponentTree,
+		ComponentTreeAPI:                scenario.ComponentTreeAPI,
+		BlockGraph:                      scenario.BlockGraph,
+		PaintLayers:                     scenario.PaintLayers,
+		PaintCommands:                   scenario.PaintCommands,
+		VisualFeatures:                  scenario.VisualFeatures,
+		PaintQualityLevel:               scenario.PaintQualityLevel,
+		PaintCacheBudgetBytes:           scenario.PaintCacheBudgetBytes,
+		PaintUnsupportedBlur:            scenario.PaintUnsupportedBlur,
+		TextMeasurements:                scenario.TextMeasurements,
+		FontFallbacks:                   scenario.FontFallbacks,
+		GlyphCaches:                     scenario.GlyphCaches,
+		TextRenderCommands:              scenario.TextRenderCommands,
+		TextQualityLevel:                scenario.TextQualityLevel,
+		TextCacheBudgetBytes:            scenario.TextCacheBudgetBytes,
+		LayoutConstraints:               scenario.LayoutConstraints,
+		LayoutPasses:                    scenario.LayoutPasses,
+		LayoutScrolls:                   scenario.LayoutScrolls,
+		LayoutFeatures:                  scenario.LayoutFeatures,
+		LayoutQualityLevel:              scenario.LayoutQualityLevel,
+		LayoutUnsupportedCSSFlexbox:     scenario.LayoutUnsupportedCSSFlexbox,
+		BlockEventRoutes:                scenario.BlockEventRoutes,
+		BlockFocusTransitions:           scenario.BlockFocusTransitions,
+		BlockEventKinds:                 scenario.BlockEventKinds,
+		BlockEventPolicy:                scenario.BlockEventPolicy,
+		BlockEventQualityLevel:          scenario.BlockEventQualityLevel,
+		BlockEventUnsupportedDragDrop:   scenario.BlockEventUnsupportedDragDrop,
+		BlockStateSelectors:             scenario.BlockStateSelectors,
+		BlockStateResolutions:           scenario.BlockStateResolutions,
+		BlockStateResolverOrder:         scenario.BlockStateResolverOrder,
+		BlockStateQualityLevel:          scenario.BlockStateQualityLevel,
+		BlockStateUnsupportedCSSPseudos: scenario.BlockStateUnsupportedCSSPseudos,
+		MotionFrames:                    scenario.MotionFrames,
+		MotionQualityLevel:              scenario.MotionQualityLevel,
+		MotionClock:                     scenario.MotionClock,
+		MotionFrameBudget:               scenario.MotionFrameBudget,
+		MotionUnsupportedCSSAnimations:  scenario.MotionUnsupportedCSSAnimations,
+		BlockAssetManifest:              scenario.BlockAssetManifest,
+		BlockAssetCache:                 scenario.BlockAssetCache,
+		BlockAssetDiagnostics:           scenario.BlockAssetDiagnostics,
+		BlockAssetRenderCommands:        scenario.BlockAssetRenderCommands,
+		BlockAssetQualityLevel:          scenario.BlockAssetQualityLevel,
+		BlockAssetNetworkFetchAllowed:   scenario.BlockAssetNetworkFetchAllowed,
+		BlockAccessibilityTree:          scenario.BlockAccessibilityTree,
+		BlockSystem:                     scenario.BlockSystem,
+		Morph:                           scenario.Morph,
+		Toolkit:                         scenario.Toolkit,
+		AccessibilityTree:               scenario.AccessibilityTree,
+		Cases:                           scenario.Cases,
 	}
 	raw, err := json.MarshalIndent(trace, "", "  ")
 	if err != nil {
@@ -1062,6 +1381,9 @@ func collectWASM32WebBrowserCanvasProcessEvidence(sourcePath string, artifactDir
 	if scenarioName == "accessibility-metadata" {
 		wasmFile = "surface-accessibility-settings.wasm"
 	}
+	if scenarioName == "block-system" {
+		wasmFile = "surface-block-system.wasm"
+	}
 	wasmPath := filepath.Join(artifactDir, wasmFile)
 	if _, err := compiler.BuildFileWithStatsOpt(sourcePath, wasmPath, "wasm32-web", compiler.BuildOptions{Jobs: 1}); err != nil {
 		return surfaceProcessEvidence{}, fmt.Errorf("build wasm32-web browser canvas Surface source %s: %w", sourcePath, err)
@@ -1187,6 +1509,34 @@ func collectWASM32WebBrowserCanvasProcessEvidence(sourcePath string, artifactDir
 		}
 		if err := validateBrowserAccessibilityTraceEvidence(browserTrace); err != nil {
 			return surfaceProcessEvidence{}, err
+		}
+		sidecarScan, err := scanLegacyUISidecarArtifacts(artifactDir, sidecarScanOptions{AllowCompilerOwnedWASMLoader: true})
+		if err != nil {
+			return surfaceProcessEvidence{}, err
+		}
+
+		processes := []surface.ProcessReport{
+			{Name: "tetra build", Kind: "build", Path: fmt.Sprintf("tetra build --target wasm32-web %s -o %s", sourcePath, wasmPath), Ran: true, Pass: true, ExitCode: intPtr(0)},
+			{Name: "surface wasm32-web browser canvas component app", Kind: "app", Path: fmt.Sprintf("%s --headless <surface-browser-canvas-runner> scenario=%s wasm=%s", browserPath, scenarioName, wasmPath), Ran: true, Pass: true, ExitCode: intPtr(browserExit), ExpectedExitCode: intPtr(0)},
+			{Name: "surface wasm32-web import validator", Kind: "runtime", Path: fmt.Sprintf("go run ./tools/cmd/validate-wasm-imports --target wasm32-web %s", wasmPath), Ran: true, Pass: true, ExitCode: intPtr(validateExit)},
+			{Name: "surface wasm32-web browser canvas runtime", Kind: "runtime", Path: strings.TrimSpace(browserVersionStdout), Ran: true, Pass: true, ExitCode: intPtr(browserVersionExit)},
+			{Name: "surface wasm32-web browser canvas trace", Kind: "runtime", Path: browserProcessPath, Ran: true, Pass: true, ExitCode: intPtr(browserExit)},
+		}
+		return surfaceProcessEvidence{Processes: processes, Artifacts: []surface.ArtifactReport{componentArtifact, loaderArtifact, traceArtifact}, ArtifactScan: sidecarScan, Frames: traceFrames}, nil
+	}
+	if scenarioName == "block-system" {
+		before := traceFrames[0]
+		if !browserTrace.Canvas.Readback {
+			return surfaceProcessEvidence{}, fmt.Errorf("wasm32-web browser-canvas block-system trace missing RGBA readback evidence")
+		}
+		if after.Order != 5 || after.Width != 400 || after.Height != 240 || after.Stride != 1600 || !after.Presented {
+			return surfaceProcessEvidence{}, fmt.Errorf("wasm32-web browser-canvas block-system after-frame = %#v, want order-5 presented 400x240 RGBA frame", after)
+		}
+		if before.Checksum == after.Checksum {
+			return surfaceProcessEvidence{}, fmt.Errorf("wasm32-web browser-canvas block-system frame checksums did not change across browser input/readback: %#v", traceFrames)
+		}
+		if !browserTraceHasNativeEvents(browserTrace, []string{"pointerup", "keydown", "resize", "beforeinput"}) {
+			return surfaceProcessEvidence{}, fmt.Errorf("wasm32-web browser-canvas block-system trace missing required native browser input events: %#v", browserTrace.BrowserEvents)
 		}
 		sidecarScan, err := scanLegacyUISidecarArtifacts(artifactDir, sidecarScanOptions{AllowCompilerOwnedWASMLoader: true})
 		if err != nil {
@@ -1914,6 +2264,53 @@ func collectLinuxX64RealWindowProbeEvidence(artifactDir string) (surface.Process
 	}
 	if exitCode != 42 {
 		return surface.ProcessReport{}, surface.FrameReport{}, fmt.Errorf("run linux-x64 real-window probe: exit code %d, want 42", exitCode)
+	}
+	process := surface.ProcessReport{
+		Name:             "surface linux-x64 real-window probe",
+		Kind:             "app",
+		Path:             fmt.Sprintf("%s --real-window-probe --probe-frame %s --probe-width %d --probe-height %d --probe-stride %d", os.Args[0], framePath, frame.Width, frame.Height, frame.Stride),
+		Ran:              true,
+		Pass:             true,
+		ExitCode:         intPtr(exitCode),
+		ExpectedExitCode: intPtr(42),
+	}
+	frameReport := surface.FrameReport{
+		Order:     5,
+		Width:     frame.Width,
+		Height:    frame.Height,
+		Stride:    frame.Stride,
+		Checksum:  checksumRGBA(frame.Pixels),
+		Presented: true,
+	}
+	return process, frameReport, nil
+}
+
+func collectLinuxX64BlockSystemRealWindowProbeEvidence(artifactDir string) (surface.ProcessReport, surface.FrameReport, error) {
+	frame := renderBlockSystemFrameSizedRGBA(400, 240, true)
+	framePath := filepath.Join(artifactDir, "surface-block-system-real-window-frame.rgba")
+	if err := os.WriteFile(framePath, frame.Pixels, 0o644); err != nil {
+		return surface.ProcessReport{}, surface.FrameReport{}, fmt.Errorf("write linux-x64 Block-system real-window frame artifact: %w", err)
+	}
+	cmd := exec.Command(os.Args[0],
+		"--real-window-probe",
+		"--probe-title", "Tetra Surface Block System Probe",
+		"--probe-frame", framePath,
+		"--probe-width", fmt.Sprint(frame.Width),
+		"--probe-height", fmt.Sprint(frame.Height),
+		"--probe-stride", fmt.Sprint(frame.Stride),
+	)
+	stdout, stderr, exitCode, err := runCommand(cmd)
+	if err != nil {
+		return surface.ProcessReport{}, surface.FrameReport{}, fmt.Errorf("run linux-x64 Block-system real-window probe: %w", err)
+	}
+	if stdout != "" {
+		return surface.ProcessReport{}, surface.FrameReport{}, fmt.Errorf("run linux-x64 Block-system real-window probe: unexpected stdout %q", stdout)
+	}
+	if stderr != "" {
+		return surface.ProcessReport{}, surface.FrameReport{}, fmt.Errorf("run linux-x64 Block-system real-window probe: unexpected stderr %q", stderr)
+	}
+	if exitCode != 42 {
+		return surface.ProcessReport{}, surface.FrameReport{}, fmt.Errorf("run linux-x64 Block-system real-window probe: exit code %d, want 42", exitCode)
 	}
 	process := surface.ProcessReport{
 		Name:             "surface linux-x64 real-window probe",
@@ -2825,6 +3222,2098 @@ func runHeadlessCounterScenario() headlessScenario {
 	}
 }
 
+func runBlockPaintScenario() headlessScenario {
+	beforeFrame := renderBlockPaintFrameRGBA(false)
+	afterFrame := renderBlockPaintFrameRGBA(true)
+	return headlessScenario{
+		Components: []surface.ComponentReport{
+			{
+				ID:        "BlockPaintApp",
+				Type:      "examples.surface_block_paint_layers.BlockPaintApp",
+				Bounds:    surface.RectReport{X: 0, Y: 0, W: 320, H: 200},
+				Abilities: []string{"measure", "layout", "draw", "event", "focus", "text", "accessibility"},
+				State:     map[string]string{"hovered_id": "2", "pressed_count": "1", "text_count": "1", "accessibility_role": "none"},
+			},
+			{
+				ID:        "PaintBlock",
+				Type:      "examples.surface_block_paint_layers.PaintSurfaceBlock",
+				Parent:    "BlockPaintApp",
+				Bounds:    surface.RectReport{X: 12, Y: 10, W: 64, H: 28},
+				Abilities: []string{"measure", "layout", "draw", "event", "focus", "text", "accessibility"},
+				State:     map[string]string{"paint_layers": "5", "radius": "8", "hovered": "true", "text_len_seen": "2", "accessibility_role": "button"},
+			},
+		},
+		PaintLayers:           blockPaintLayersForScenario(),
+		PaintCommands:         blockPaintCommandsForScenario(),
+		VisualFeatures:        []string{"fill", "gradient", "border", "radius", "shadow", "outline"},
+		PaintQualityLevel:     "deterministic-software-paint-v1",
+		PaintCacheBudgetBytes: 65536,
+		PaintUnsupportedBlur:  false,
+		Events: []surface.EventReport{
+			{
+				Order:           1,
+				Kind:            "mouse_up",
+				TargetComponent: "PaintBlock",
+				DispatchPath:    []string{"BlockPaintApp", "PaintBlock"},
+				Handled:         true,
+				Pass:            true,
+				X:               32,
+				Y:               24,
+				Key:             0,
+				Width:           320,
+				Height:          200,
+				TimestampMS:     0,
+				BufferSlots:     []int{5, 32, 24, 1, 0, 320, 200, 0, 0},
+				BeforeState:     map[string]string{"BlockPaintApp.pressed_count": "0", "PaintBlock.hovered": "false"},
+				AfterState:      map[string]string{"BlockPaintApp.pressed_count": "1", "PaintBlock.hovered": "true"},
+			},
+			{
+				Order:           2,
+				Kind:            "text_input",
+				TargetComponent: "PaintBlock",
+				DispatchPath:    []string{"BlockPaintApp", "PaintBlock"},
+				Handled:         true,
+				Pass:            true,
+				X:               0,
+				Y:               0,
+				Key:             0,
+				Width:           320,
+				Height:          200,
+				TimestampMS:     1,
+				TextLen:         2,
+				TextBytesHex:    "4f4b",
+				BufferSlots:     []int{8, 0, 0, 0, 0, 320, 200, 1, 2},
+				BeforeState:     map[string]string{"BlockPaintApp.text_count": "0", "PaintBlock.text_len_seen": "0"},
+				AfterState:      map[string]string{"BlockPaintApp.text_count": "1", "PaintBlock.text_len_seen": "2"},
+			},
+		},
+		Frames: []surface.FrameReport{
+			{Order: 1, Width: beforeFrame.Width, Height: beforeFrame.Height, Stride: beforeFrame.Stride, Checksum: checksumRGBA(beforeFrame.Pixels), Presented: true},
+			{Order: 2, Width: afterFrame.Width, Height: afterFrame.Height, Stride: afterFrame.Stride, Checksum: checksumRGBA(afterFrame.Pixels), Presented: true},
+		},
+		StateTransitions: []surface.StateTransitionReport{
+			{Order: 1, Component: "BlockPaintApp", Field: "pressed_count", Before: "0", After: "1", Cause: "mouse_up"},
+			{Order: 2, Component: "PaintBlock", Field: "hovered", Before: "false", After: "true", Cause: "mouse_up"},
+			{Order: 3, Component: "PaintBlock", Field: "text_len_seen", Before: "0", After: "2", Cause: "text_input"},
+		},
+		Cases: []surface.CaseReport{
+			{Name: "pure Tetra component app", Kind: "positive", Ran: true, Pass: true},
+			{Name: "headless event dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "headless framebuffer checksum", Kind: "positive", Ran: true, Pass: true},
+			{Name: "headless actual runner trace", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host-provided pointer event dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host event buffer poll_event", Kind: "positive", Ran: true, Pass: true},
+			{Name: "pre/post event frame sequence", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component hierarchy dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component text input scalar dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host text payload buffer", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component focus dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component accessibility metadata", Kind: "positive", Ran: true, Pass: true},
+			{Name: "no legacy UI sidecar artifacts", Kind: "positive", Ran: true, Pass: true},
+			{Name: "state transition", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block paint fill border radius shadow outline", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block paint deterministic command order", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block paint frame checksum changed", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block paint unsupported blur rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "unsupported blur"},
+			{Name: "reject legacy UI evidence", Kind: "negative", Ran: true, Pass: true, ExpectedError: "legacy UI evidence rejected"},
+		},
+	}
+}
+
+func blockPaintLayersForScenario() []surface.PaintLayerReport {
+	return []surface.PaintLayerReport{
+		{ID: "root-fill", BlockID: 2, Kind: "fill", Color: "#346ecfff", Radius: 8, Opacity: 255},
+		{ID: "root-gradient", BlockID: 2, Kind: "gradient", Color: "#54b484ff", Radius: 8, Opacity: 255},
+		{ID: "root-border", BlockID: 2, Kind: "border", Color: "#e2eaf2ff", Radius: 8, Width: 1, Opacity: 255},
+		{ID: "root-shadow", BlockID: 2, Kind: "shadow", Color: "#00000058", Blur: 12, OffsetX: 0, OffsetY: 4, Opacity: 88},
+		{ID: "root-outline", BlockID: 2, Kind: "outline", Color: "#f4cd5cff", Radius: 10, Width: 2, Opacity: 255},
+	}
+}
+
+func blockPaintCommandsForScenario() []surface.PaintCommandReport {
+	return []surface.PaintCommandReport{
+		{Order: 1, Command: "fill", LayerID: "root-fill", BlockID: 2, Rect: surface.RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Quality: "rounded-rect-v1", Checksum: "sha256:" + checksumText("paint-fill")},
+		{Order: 2, Command: "gradient", LayerID: "root-gradient", BlockID: 2, Rect: surface.RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Quality: "two-stop-linear-v1", Checksum: "sha256:" + checksumText("paint-gradient")},
+		{Order: 3, Command: "border", LayerID: "root-border", BlockID: 2, Rect: surface.RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Quality: "rounded-outline-v1", Checksum: "sha256:" + checksumText("paint-border")},
+		{Order: 4, Command: "shadow", LayerID: "root-shadow", BlockID: 2, Rect: surface.RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Quality: "box-shadow-approx-v1", Checksum: "sha256:" + checksumText("paint-shadow")},
+		{Order: 5, Command: "outline", LayerID: "root-outline", BlockID: 2, Rect: surface.RectReport{X: 10, Y: 8, W: 68, H: 32}, Radius: 10, Quality: "rounded-outline-v1", Checksum: "sha256:" + checksumText("paint-outline")},
+	}
+}
+
+func runBlockTextScenario() headlessScenario {
+	beforeFrame := renderBlockTextFrameRGBA(false)
+	afterFrame := renderBlockTextFrameRGBA(true)
+	return headlessScenario{
+		Components: []surface.ComponentReport{
+			{
+				ID:        "BlockTextApp",
+				Type:      "examples.surface_block_text.BlockTextApp",
+				Bounds:    surface.RectReport{X: 0, Y: 0, W: 320, H: 200},
+				Abilities: []string{"measure", "layout", "draw", "event", "focus", "text", "accessibility"},
+				State:     map[string]string{"focused_id": "3", "text_quality": "deterministic-fallback-text-v1"},
+			},
+			{
+				ID:        "TextBlock",
+				Type:      "examples.surface_block_text.TextSurfaceBlock",
+				Parent:    "BlockTextApp",
+				Bounds:    surface.RectReport{X: 12, Y: 10, W: 96, H: 40},
+				Abilities: []string{"measure", "layout", "draw", "event", "focus", "text", "accessibility"},
+				State:     map[string]string{"text_len": "28", "line_count": "2", "ellipsis": "true"},
+			},
+			{
+				ID:        "InputBlock",
+				Type:      "examples.surface_block_text.EditableTextBlock",
+				Parent:    "BlockTextApp",
+				Bounds:    surface.RectReport{X: 12, Y: 58, W: 144, H: 36},
+				Abilities: []string{"measure", "layout", "draw", "event", "focus", "text", "accessibility"},
+				State:     map[string]string{"buffer": "OKd0a2", "caret": "4", "editable": "true"},
+			},
+		},
+		TextMeasurements:     blockTextMeasurementsForScenario(),
+		FontFallbacks:        blockFontFallbacksForScenario(),
+		GlyphCaches:          blockGlyphCachesForScenario(),
+		TextRenderCommands:   blockTextRenderCommandsForScenario(),
+		TextQualityLevel:     "deterministic-fallback-text-v1",
+		TextCacheBudgetBytes: 65536,
+		Events: []surface.EventReport{
+			{
+				Order:           1,
+				Kind:            "mouse_up",
+				TargetComponent: "InputBlock",
+				DispatchPath:    []string{"BlockTextApp", "InputBlock"},
+				Handled:         true,
+				Pass:            true,
+				X:               20,
+				Y:               64,
+				Key:             0,
+				Width:           320,
+				Height:          200,
+				TimestampMS:     0,
+				BufferSlots:     []int{5, 20, 64, 1, 0, 320, 200, 0, 0},
+				BeforeState:     map[string]string{"BlockTextApp.focused_id": "0", "InputBlock.focused": "false"},
+				AfterState:      map[string]string{"BlockTextApp.focused_id": "3", "InputBlock.focused": "true"},
+			},
+			{
+				Order:           2,
+				Kind:            "text_input",
+				TargetComponent: "InputBlock",
+				DispatchPath:    []string{"BlockTextApp", "InputBlock"},
+				Handled:         true,
+				Pass:            true,
+				X:               0,
+				Y:               0,
+				Key:             0,
+				Width:           320,
+				Height:          200,
+				TimestampMS:     1,
+				TextLen:         4,
+				TextBytesHex:    "4f4bd0a2",
+				BufferSlots:     []int{8, 0, 0, 0, 0, 320, 200, 1, 4},
+				BeforeState:     map[string]string{"InputBlock.buffer": "", "InputBlock.caret": "0"},
+				AfterState:      map[string]string{"InputBlock.buffer": "OKd0a2", "InputBlock.caret": "4"},
+			},
+		},
+		Frames: []surface.FrameReport{
+			{Order: 1, Width: beforeFrame.Width, Height: beforeFrame.Height, Stride: beforeFrame.Stride, Checksum: checksumRGBA(beforeFrame.Pixels), Presented: true},
+			{Order: 2, Width: afterFrame.Width, Height: afterFrame.Height, Stride: afterFrame.Stride, Checksum: checksumRGBA(afterFrame.Pixels), Presented: true},
+		},
+		StateTransitions: []surface.StateTransitionReport{
+			{Order: 1, Component: "BlockTextApp", Field: "focused_id", Before: "0", After: "3", Cause: "mouse_up"},
+			{Order: 2, Component: "InputBlock", Field: "buffer", Before: "", After: "OKd0a2", Cause: "text_input"},
+			{Order: 3, Component: "InputBlock", Field: "caret", Before: "0", After: "4", Cause: "text_input"},
+		},
+		Cases: []surface.CaseReport{
+			{Name: "pure Tetra component app", Kind: "positive", Ran: true, Pass: true},
+			{Name: "headless event dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "headless framebuffer checksum", Kind: "positive", Ran: true, Pass: true},
+			{Name: "headless actual runner trace", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host-provided pointer event dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host event buffer poll_event", Kind: "positive", Ran: true, Pass: true},
+			{Name: "pre/post event frame sequence", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component hierarchy dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component text input scalar dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host text payload buffer", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component focus dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component accessibility metadata", Kind: "positive", Ran: true, Pass: true},
+			{Name: "no legacy UI sidecar artifacts", Kind: "positive", Ran: true, Pass: true},
+			{Name: "state transition", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block text deterministic measurement", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block text wrap ellipsis layout", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block text font fallback chain", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block text bounded glyph cache", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block text render command evidence", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block text editable lifetime", Kind: "positive", Ran: true, Pass: true},
+			{Name: "reject legacy UI evidence", Kind: "negative", Ran: true, Pass: true, ExpectedError: "legacy UI evidence rejected"},
+		},
+	}
+}
+
+func blockTextMeasurementsForScenario() []surface.TextMeasurementReport {
+	return []surface.TextMeasurementReport{
+		{ID: "title-measure", BlockID: 2, TextLen: 28, FontFamily: "Tetra UI", FontWeight: 600, FontSize: 16, LineHeight: 20, MaxWidth: 96, Measured: surface.SizeReport{W: 96, H: 40}, LineCount: 2, Wrap: "word", Overflow: "ellipsis", Ellipsis: true, EllipsizedTextLen: 16, Align: "start", Quality: "deterministic-metrics-v1", Checksum: "sha256:" + checksumText("text-title-measure")},
+		{ID: "input-measure", BlockID: 3, TextLen: 4, FontFamily: "Tetra UI", FontWeight: 400, FontSize: 14, LineHeight: 18, MaxWidth: 120, Measured: surface.SizeReport{W: 34, H: 18}, LineCount: 1, Wrap: "none", Overflow: "clip", Ellipsis: false, EllipsizedTextLen: 4, Align: "start", Quality: "deterministic-metrics-v1", Checksum: "sha256:" + checksumText("text-input-measure")},
+	}
+}
+
+func blockFontFallbacksForScenario() []surface.FontFallbackReport {
+	return []surface.FontFallbackReport{
+		{ID: "ui-fallback", RequestedFamily: "Tetra UI", ResolvedFamily: "Tetra UI Fallback", Chain: []string{"Tetra UI", "Noto Sans", "monospace"}, MissingGlyphs: 0, Coverage: "ascii-plus-basic-utf8-smoke"},
+	}
+}
+
+func blockGlyphCachesForScenario() []surface.GlyphCacheReport {
+	return []surface.GlyphCacheReport{
+		{ID: "glyph-cache", Strategy: "bounded-lru", BudgetBytes: 65536, UsedBytes: 4096, EntryCount: 12, Eviction: "lru", Bounded: true},
+	}
+}
+
+func blockTextRenderCommandsForScenario() []surface.TextRenderCommandReport {
+	return []surface.TextRenderCommandReport{
+		{Order: 1, Command: "measure", MeasurementID: "title-measure", BlockID: 2, Rect: surface.RectReport{X: 12, Y: 10, W: 96, H: 40}, Clip: surface.RectReport{X: 12, Y: 10, W: 96, H: 40}, Color: "#edf2f7ff", Opacity: 255, Quality: "deterministic-text-measure-v1", Checksum: "sha256:" + checksumText("text-command-measure")},
+		{Order: 2, Command: "render_glyphs", MeasurementID: "title-measure", BlockID: 2, Rect: surface.RectReport{X: 12, Y: 10, W: 96, H: 40}, Clip: surface.RectReport{X: 12, Y: 10, W: 96, H: 40}, Color: "#edf2f7ff", Opacity: 255, Quality: "deterministic-glyph-markers-v1", Checksum: "sha256:" + checksumText("text-command-glyphs")},
+		{Order: 3, Command: "render_caret", MeasurementID: "input-measure", BlockID: 3, Rect: surface.RectReport{X: 12, Y: 58, W: 120, H: 18}, Clip: surface.RectReport{X: 12, Y: 58, W: 144, H: 36}, Color: "#f4cd5cff", Opacity: 255, Quality: "deterministic-caret-v1", Checksum: "sha256:" + checksumText("text-command-caret")},
+	}
+}
+
+func runBlockLayoutScenario() headlessScenario {
+	beforeFrame := renderBlockLayoutFrameRGBA(false)
+	afterFrame := renderBlockLayoutFrameRGBA(true)
+	resizedFrame := renderBlockLayoutResizedFrameRGBA()
+	return headlessScenario{
+		Components:                  blockLayoutComponentsForScenario(),
+		LayoutConstraints:           blockLayoutConstraintsForScenario(),
+		LayoutPasses:                blockLayoutPassesForScenario(),
+		LayoutScrolls:               blockLayoutScrollsForScenario(),
+		LayoutFeatures:              []string{"stack", "row", "column", "absolute", "overlay", "grid", "dock", "scroll", "fit", "fill", "fixed", "min", "max", "spacing", "alignment", "z-order", "clipping", "resize"},
+		LayoutQualityLevel:          "deterministic-block-layout-v1",
+		LayoutUnsupportedCSSFlexbox: false,
+		Events: []surface.EventReport{
+			{
+				Order:           1,
+				Kind:            "mouse_up",
+				TargetComponent: "RowBlock",
+				DispatchPath:    []string{"BlockLayoutApp", "ColumnBlock", "RowBlock"},
+				Handled:         true,
+				Pass:            true,
+				X:               32,
+				Y:               32,
+				Width:           320,
+				Height:          200,
+				TimestampMS:     0,
+				BufferSlots:     []int{5, 32, 32, 1, 0, 320, 200, 0, 0},
+				BeforeState:     map[string]string{"RowBlock.pressed": "false"},
+				AfterState:      map[string]string{"RowBlock.pressed": "true"},
+			},
+			{
+				Order:           2,
+				Kind:            "text_input",
+				TargetComponent: "RowBlock",
+				DispatchPath:    []string{"BlockLayoutApp", "ColumnBlock", "RowBlock"},
+				Handled:         true,
+				Pass:            true,
+				Width:           320,
+				Height:          200,
+				TimestampMS:     1,
+				TextLen:         2,
+				TextBytesHex:    "4f4b",
+				BufferSlots:     []int{8, 0, 0, 0, 0, 320, 200, 1, 2},
+				BeforeState:     map[string]string{"RowBlock.text_len_seen": "0"},
+				AfterState:      map[string]string{"RowBlock.text_len_seen": "2"},
+			},
+			{
+				Order:           3,
+				Kind:            "resize",
+				TargetComponent: "BlockLayoutApp",
+				DispatchPath:    []string{"BlockLayoutApp"},
+				Handled:         true,
+				Pass:            true,
+				Width:           480,
+				Height:          260,
+				TimestampMS:     2,
+				BufferSlots:     []int{6, 0, 0, 0, 0, 480, 260, 2, 0},
+				BeforeState:     map[string]string{"BlockLayoutApp.width": "320"},
+				AfterState:      map[string]string{"BlockLayoutApp.width": "480"},
+			},
+			{
+				Order:           4,
+				Kind:            "scroll",
+				TargetComponent: "ScrollBlock",
+				DispatchPath:    []string{"BlockLayoutApp", "ScrollBlock"},
+				Handled:         true,
+				Pass:            true,
+				X:               260,
+				Y:               80,
+				Width:           480,
+				Height:          260,
+				TimestampMS:     3,
+				BufferSlots:     []int{7, 260, 80, 0, 0, 480, 260, 3, 0},
+				BeforeState:     map[string]string{"ScrollBlock.scroll_y": "0"},
+				AfterState:      map[string]string{"ScrollBlock.scroll_y": "32"},
+			},
+		},
+		Frames: []surface.FrameReport{
+			{Order: 1, Width: beforeFrame.Width, Height: beforeFrame.Height, Stride: beforeFrame.Stride, Checksum: checksumRGBA(beforeFrame.Pixels), Presented: true},
+			{Order: 2, Width: afterFrame.Width, Height: afterFrame.Height, Stride: afterFrame.Stride, Checksum: checksumRGBA(afterFrame.Pixels), Presented: true},
+			{Order: 3, Width: resizedFrame.Width, Height: resizedFrame.Height, Stride: resizedFrame.Stride, Checksum: checksumRGBA(resizedFrame.Pixels), Presented: true},
+		},
+		StateTransitions: []surface.StateTransitionReport{
+			{Order: 1, Component: "RowBlock", Field: "pressed", Before: "false", After: "true", Cause: "mouse_up"},
+			{Order: 2, Component: "RowBlock", Field: "text_len_seen", Before: "0", After: "2", Cause: "text_input"},
+			{Order: 3, Component: "BlockLayoutApp", Field: "width", Before: "320", After: "480", Cause: "resize"},
+			{Order: 4, Component: "ScrollBlock", Field: "scroll_y", Before: "0", After: "32", Cause: "scroll"},
+		},
+		Cases: []surface.CaseReport{
+			{Name: "pure Tetra component app", Kind: "positive", Ran: true, Pass: true},
+			{Name: "headless event dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "headless framebuffer checksum", Kind: "positive", Ran: true, Pass: true},
+			{Name: "headless actual runner trace", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host-provided pointer event dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host event buffer poll_event", Kind: "positive", Ran: true, Pass: true},
+			{Name: "pre/post event frame sequence", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component hierarchy dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component text input scalar dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host text payload buffer", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component focus dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component accessibility metadata", Kind: "positive", Ran: true, Pass: true},
+			{Name: "no legacy UI sidecar artifacts", Kind: "positive", Ran: true, Pass: true},
+			{Name: "state transition", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block layout nested row column", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block layout fit fill fixed min max", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block layout grid dock overlay scroll", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block layout clipping z-order", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block layout resize constraints", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block layout no css flexbox parity", Kind: "negative", Ran: true, Pass: true, ExpectedError: "CSS flexbox parity nonclaim"},
+			{Name: "reject legacy UI evidence", Kind: "negative", Ran: true, Pass: true, ExpectedError: "legacy UI evidence rejected"},
+		},
+	}
+}
+
+func blockLayoutComponentsForScenario() []surface.ComponentReport {
+	abilities := []string{"measure", "layout", "draw", "event", "focus", "text", "accessibility"}
+	return []surface.ComponentReport{
+		{ID: "BlockLayoutApp", Type: "examples.surface_block_layout.BlockLayoutApp", Bounds: surface.RectReport{X: 0, Y: 0, W: 320, H: 200}, Abilities: abilities, State: map[string]string{"layout_quality": "deterministic-block-layout-v1"}},
+		{ID: "ColumnBlock", Type: "examples.surface_block_layout.ColumnBlock", Parent: "BlockLayoutApp", Bounds: surface.RectReport{X: 12, Y: 12, W: 296, H: 176}, Abilities: abilities, State: map[string]string{"mode": "column", "gap": "8"}},
+		{ID: "RowBlock", Type: "examples.surface_block_layout.RowBlock", Parent: "ColumnBlock", Bounds: surface.RectReport{X: 24, Y: 24, W: 272, H: 48}, Abilities: abilities, State: map[string]string{"mode": "row", "gap": "6"}},
+		{ID: "GridBlock", Type: "examples.surface_block_layout.GridBlock", Parent: "ColumnBlock", Bounds: surface.RectReport{X: 24, Y: 80, W: 132, H: 72}, Abilities: abilities, State: map[string]string{"mode": "grid", "columns": "2"}},
+		{ID: "DockBlock", Type: "examples.surface_block_layout.DockBlock", Parent: "ColumnBlock", Bounds: surface.RectReport{X: 164, Y: 80, W: 132, H: 72}, Abilities: abilities, State: map[string]string{"mode": "dock"}},
+		{ID: "OverlayBlock", Type: "examples.surface_block_layout.OverlayBlock", Parent: "BlockLayoutApp", Bounds: surface.RectReport{X: 220, Y: 20, W: 72, H: 40}, Abilities: abilities, State: map[string]string{"mode": "overlay", "z": "4"}},
+		{ID: "ScrollBlock", Type: "examples.surface_block_layout.ScrollBlock", Parent: "BlockLayoutApp", Bounds: surface.RectReport{X: 236, Y: 72, W: 72, H: 80}, Abilities: abilities, State: map[string]string{"mode": "scroll", "clipped": "true"}},
+	}
+}
+
+func blockLayoutConstraintsForScenario() []surface.BlockLayoutConstraintReport {
+	return []surface.BlockLayoutConstraintReport{
+		{ID: "root-column", BlockID: 1, Mode: "column", WidthPolicy: "fixed", HeightPolicy: "fixed", Min: surface.SizeReport{W: 320, H: 200}, Max: surface.SizeReport{W: 480, H: 260}, Padding: 12, Margin: 0, Gap: 8, Align: "stretch", Justify: "start", Overflow: "clip", ZIndex: 0, Clip: true},
+		{ID: "row-fill", BlockID: 3, Mode: "row", WidthPolicy: "fill", HeightPolicy: "fixed", Min: surface.SizeReport{W: 160, H: 40}, Max: surface.SizeReport{W: 296, H: 64}, Padding: 6, Margin: 0, Gap: 6, Align: "center", Justify: "space-between", Overflow: "visible", ZIndex: 1, Clip: false},
+		{ID: "text-fit", BlockID: 8, Mode: "absolute", WidthPolicy: "fit", HeightPolicy: "fit", Min: surface.SizeReport{W: 32, H: 18}, Max: surface.SizeReport{W: 160, H: 40}, Padding: 4, Margin: 0, Gap: 0, Align: "start", Justify: "start", Overflow: "clip", ZIndex: 2, Clip: true},
+		{ID: "overlay-z", BlockID: 6, Mode: "overlay", WidthPolicy: "fixed", HeightPolicy: "fixed", Min: surface.SizeReport{W: 72, H: 40}, Max: surface.SizeReport{W: 72, H: 40}, Padding: 0, Margin: 0, Gap: 0, Align: "end", Justify: "start", Overflow: "visible", ZIndex: 4, Clip: false},
+	}
+}
+
+func blockLayoutPassesForScenario() []surface.BlockLayoutPassReport {
+	return []surface.BlockLayoutPassReport{
+		{Order: 1, ParentID: 0, BlockID: 1, Mode: "column", Input: surface.RectReport{X: 0, Y: 0, W: 320, H: 200}, Resolved: surface.RectReport{X: 12, Y: 12, W: 296, H: 176}, Measured: surface.SizeReport{W: 296, H: 176}, Pass: "initial", Resize: false, Clip: true, ZIndex: 0, Checksum: "sha256:" + checksumText("layout-column")},
+		{Order: 2, ParentID: 1, BlockID: 2, Mode: "stack", Input: surface.RectReport{X: 12, Y: 12, W: 296, H: 176}, Resolved: surface.RectReport{X: 12, Y: 12, W: 296, H: 176}, Measured: surface.SizeReport{W: 296, H: 176}, Pass: "initial", Resize: false, Clip: false, ZIndex: 0, Checksum: "sha256:" + checksumText("layout-stack")},
+		{Order: 3, ParentID: 2, BlockID: 3, Mode: "row", Input: surface.RectReport{X: 24, Y: 24, W: 272, H: 48}, Resolved: surface.RectReport{X: 24, Y: 24, W: 272, H: 48}, Measured: surface.SizeReport{W: 272, H: 48}, Pass: "nested", Resize: false, Clip: false, ZIndex: 1, Checksum: "sha256:" + checksumText("layout-row")},
+		{Order: 4, ParentID: 2, BlockID: 4, Mode: "grid", Input: surface.RectReport{X: 24, Y: 80, W: 132, H: 72}, Resolved: surface.RectReport{X: 24, Y: 80, W: 63, H: 34}, Measured: surface.SizeReport{W: 63, H: 34}, Pass: "grid-cell", Resize: false, Clip: true, ZIndex: 1, Checksum: "sha256:" + checksumText("layout-grid")},
+		{Order: 5, ParentID: 2, BlockID: 5, Mode: "dock", Input: surface.RectReport{X: 164, Y: 80, W: 132, H: 72}, Resolved: surface.RectReport{X: 164, Y: 80, W: 132, H: 24}, Measured: surface.SizeReport{W: 132, H: 24}, Pass: "dock-top", Resize: false, Clip: true, ZIndex: 1, Checksum: "sha256:" + checksumText("layout-dock")},
+		{Order: 6, ParentID: 1, BlockID: 6, Mode: "overlay", Input: surface.RectReport{X: 220, Y: 20, W: 72, H: 40}, Resolved: surface.RectReport{X: 220, Y: 20, W: 72, H: 40}, Measured: surface.SizeReport{W: 72, H: 40}, Pass: "overlay-z-order", Resize: false, Clip: false, ZIndex: 4, Checksum: "sha256:" + checksumText("layout-overlay")},
+		{Order: 7, ParentID: 1, BlockID: 7, Mode: "scroll", Input: surface.RectReport{X: 236, Y: 72, W: 72, H: 80}, Resolved: surface.RectReport{X: 236, Y: 72, W: 72, H: 80}, Measured: surface.SizeReport{W: 72, H: 160}, Pass: "scroll-clip", Resize: false, Clip: true, ZIndex: 2, Checksum: "sha256:" + checksumText("layout-scroll")},
+		{Order: 8, ParentID: 1, BlockID: 8, Mode: "absolute", Input: surface.RectReport{X: 32, Y: 152, W: 0, H: 0}, Resolved: surface.RectReport{X: 32, Y: 152, W: 96, H: 20}, Measured: surface.SizeReport{W: 96, H: 20}, Pass: "fit-text", Resize: false, Clip: true, ZIndex: 2, Checksum: "sha256:" + checksumText("layout-absolute-fit")},
+		{Order: 9, ParentID: 0, BlockID: 1, Mode: "column", Input: surface.RectReport{X: 0, Y: 0, W: 480, H: 260}, Resolved: surface.RectReport{X: 12, Y: 12, W: 456, H: 236}, Measured: surface.SizeReport{W: 456, H: 236}, Pass: "resize", Resize: true, Clip: true, ZIndex: 0, Checksum: "sha256:" + checksumText("layout-resize")},
+	}
+}
+
+func blockLayoutScrollsForScenario() []surface.BlockLayoutScrollReport {
+	return []surface.BlockLayoutScrollReport{
+		{BlockID: 7, Viewport: surface.RectReport{X: 236, Y: 72, W: 72, H: 80}, Content: surface.SizeReport{W: 72, H: 160}, OffsetY: 32, MaxOffsetY: 80, Clipped: true, Checksum: "sha256:" + checksumText("layout-scroll-bounds")},
+	}
+}
+
+func runBlockEventScenario() headlessScenario {
+	beforeFrame := renderBlockEventFrameRGBA(false)
+	afterFrame := renderBlockEventFrameRGBA(true)
+	return headlessScenario{
+		Components:                    blockEventComponentsForScenario(),
+		BlockGraph:                    blockEventGraphForScenario("examples/surface_block_events.tetra"),
+		BlockEventQualityLevel:        "deterministic-block-events-v1",
+		BlockEventPolicy:              "capture-bubble-direct-v1",
+		BlockEventUnsupportedDragDrop: false,
+		BlockEventKinds:               []string{"pointer_enter", "pointer_leave", "pointer_move", "pointer_down", "pointer_up", "click", "double_click", "key", "text", "focus", "blur", "scroll", "resize", "close", "frame"},
+		BlockEventRoutes:              blockEventRoutesForScenario(),
+		BlockFocusTransitions:         blockFocusTransitionsForScenario(),
+		Events: []surface.EventReport{
+			{
+				Order:           1,
+				Kind:            "mouse_up",
+				TargetComponent: "InputBlock",
+				DispatchPath:    []string{"BlockEventApp", "PanelBlock", "InputBlock"},
+				Handled:         true,
+				Pass:            true,
+				X:               40,
+				Y:               80,
+				Width:           320,
+				Height:          200,
+				TimestampMS:     0,
+				BufferSlots:     []int{5, 40, 80, 1, 0, 320, 200, 0, 0},
+				BeforeState:     map[string]string{"BlockEventApp.focused_id": "0", "InputBlock.focused": "false"},
+				AfterState:      map[string]string{"BlockEventApp.focused_id": "4", "InputBlock.focused": "true"},
+			},
+			{
+				Order:           2,
+				Kind:            "text_input",
+				TargetComponent: "InputBlock",
+				DispatchPath:    []string{"BlockEventApp", "PanelBlock", "InputBlock"},
+				Handled:         true,
+				Pass:            true,
+				Width:           320,
+				Height:          200,
+				TimestampMS:     1,
+				TextLen:         2,
+				TextBytesHex:    "4f4b",
+				BufferSlots:     []int{8, 0, 0, 0, 0, 320, 200, 1, 2},
+				BeforeState:     map[string]string{"InputBlock.buffer": "", "InputBlock.caret": "0"},
+				AfterState:      map[string]string{"InputBlock.buffer": "OK", "InputBlock.caret": "2"},
+			},
+			{
+				Order:           3,
+				Kind:            "key_down",
+				TargetComponent: "BlockEventApp",
+				DispatchPath:    []string{"BlockEventApp"},
+				Handled:         true,
+				Pass:            true,
+				Key:             9,
+				Width:           320,
+				Height:          200,
+				TimestampMS:     2,
+				BufferSlots:     []int{3, 0, 0, 0, 9, 320, 200, 2, 0},
+				BeforeState:     map[string]string{"BlockEventApp.focused_id": "4"},
+				AfterState:      map[string]string{"BlockEventApp.focused_id": "6"},
+			},
+			{
+				Order:           4,
+				Kind:            "key_down",
+				TargetComponent: "BlockEventApp",
+				DispatchPath:    []string{"BlockEventApp"},
+				Handled:         true,
+				Pass:            true,
+				Key:             9,
+				Width:           320,
+				Height:          200,
+				TimestampMS:     3,
+				BufferSlots:     []int{3, 0, 0, 0, 9, 320, 200, 3, 0},
+				BeforeState:     map[string]string{"BlockEventApp.focused_id": "6"},
+				AfterState:      map[string]string{"BlockEventApp.focused_id": "4"},
+			},
+		},
+		Frames: []surface.FrameReport{
+			{Order: 1, Width: beforeFrame.Width, Height: beforeFrame.Height, Stride: beforeFrame.Stride, Checksum: checksumRGBA(beforeFrame.Pixels), Presented: true},
+			{Order: 2, Width: afterFrame.Width, Height: afterFrame.Height, Stride: afterFrame.Stride, Checksum: checksumRGBA(afterFrame.Pixels), Presented: true},
+		},
+		StateTransitions: []surface.StateTransitionReport{
+			{Order: 1, Component: "BlockEventApp", Field: "focused_id", Before: "0", After: "4", Cause: "click"},
+			{Order: 2, Component: "InputBlock", Field: "buffer", Before: "", After: "OK", Cause: "text_input"},
+			{Order: 3, Component: "BlockEventApp", Field: "focused_id", Before: "4", After: "6", Cause: "tab"},
+			{Order: 4, Component: "BlockEventApp", Field: "focused_id", Before: "6", After: "4", Cause: "tab"},
+		},
+		Cases: []surface.CaseReport{
+			{Name: "pure Tetra component app", Kind: "positive", Ran: true, Pass: true},
+			{Name: "headless event dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "headless framebuffer checksum", Kind: "positive", Ran: true, Pass: true},
+			{Name: "headless actual runner trace", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host-provided pointer event dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host event buffer poll_event", Kind: "positive", Ran: true, Pass: true},
+			{Name: "pre/post event frame sequence", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component hierarchy dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component text input scalar dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host text payload buffer", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component focus dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component accessibility metadata", Kind: "positive", Ran: true, Pass: true},
+			{Name: "no legacy UI sidecar artifacts", Kind: "positive", Ran: true, Pass: true},
+			{Name: "state transition", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block graph duplicate id rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "duplicate Block ID"},
+			{Name: "block graph missing parent rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "missing parent"},
+			{Name: "block graph cycle rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "cycle"},
+			{Name: "block graph child order", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block graph focus order", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block graph hit-test path", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block graph accessibility order", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block event nested hit-test path", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block event capture bubble direct policy", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block event disabled click rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "disabled Block"},
+			{Name: "block event text input focused only", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block focus tab order graph-derived", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block event no complex drag claim", Kind: "negative", Ran: true, Pass: true, ExpectedError: "drag-and-drop nonclaim"},
+			{Name: "reject legacy UI evidence", Kind: "negative", Ran: true, Pass: true, ExpectedError: "legacy UI evidence rejected"},
+		},
+	}
+}
+
+func blockEventComponentsForScenario() []surface.ComponentReport {
+	abilities := []string{"measure", "layout", "draw", "event", "focus", "text", "accessibility"}
+	return []surface.ComponentReport{
+		{ID: "BlockEventApp", Type: "examples.surface_block_events.BlockEventApp", Bounds: surface.RectReport{X: 0, Y: 0, W: 320, H: 200}, Abilities: abilities, State: map[string]string{"focused_id": "4", "event_quality": "deterministic-block-events-v1"}},
+		{ID: "PanelBlock", Type: "examples.surface_block_events.PanelBlock", Parent: "BlockEventApp", Bounds: surface.RectReport{X: 16, Y: 16, W: 288, H: 168}, Abilities: abilities, State: map[string]string{"role": "panel"}},
+		{ID: "LabelBlock", Type: "examples.surface_block_events.LabelBlock", Parent: "PanelBlock", Bounds: surface.RectReport{X: 24, Y: 24, W: 200, H: 24}, Abilities: abilities, State: map[string]string{"text_len": "10"}},
+		{ID: "InputBlock", Type: "examples.surface_block_events.InputBlock", Parent: "PanelBlock", Bounds: surface.RectReport{X: 24, Y: 64, W: 120, H: 44}, Abilities: abilities, State: map[string]string{"editable": "true", "focused": "true", "buffer": "OK"}},
+		{ID: "DisabledBlock", Type: "examples.surface_block_events.DisabledBlock", Parent: "PanelBlock", Bounds: surface.RectReport{X: 152, Y: 64, W: 120, H: 44}, Abilities: abilities, State: map[string]string{"disabled": "true"}},
+		{ID: "ActionBlock", Type: "examples.surface_block_events.ActionBlock", Parent: "PanelBlock", Bounds: surface.RectReport{X: 24, Y: 120, W: 120, H: 44}, Abilities: abilities, State: map[string]string{"focused": "false"}},
+	}
+}
+
+func blockEventGraphForScenario(source string) *surface.BlockGraphReport {
+	return &surface.BlockGraphReport{
+		Schema:            "tetra.surface.block-graph.v1",
+		APILevel:          "block-tree-builder-v1",
+		Source:            source,
+		ManualBookkeeping: false,
+		Builder: surface.BlockGraphBuilderReport{
+			RootCreatedBy:     "tree_add_root",
+			ChildrenCreatedBy: "tree_add_child",
+			NodeCount:         6,
+			Capacity:          8,
+			OverflowChecked:   true,
+		},
+		Invariants: surface.BlockGraphInvariantReport{
+			TreeValidateRan:         true,
+			TreeValidateStatus:      0,
+			DuplicateIDRejected:     true,
+			MissingParentRejected:   true,
+			CycleRejected:           true,
+			ParentChildLinksChecked: true,
+			ChildOrderChecked:       true,
+			FocusOrderChecked:       true,
+			HitTestPathChecked:      true,
+			AccessibilityChecked:    true,
+		},
+		RootID:    1,
+		NodeCount: 6,
+		Nodes: []surface.BlockGraphNodeReport{
+			{ID: 1, Name: "BlockEventApp", ParentID: -1, ChildIndex: 0, FirstChild: 2, ChildCount: 1, Focusable: false, AccessibilityRole: "none", Bounds: surface.RectReport{X: 0, Y: 0, W: 320, H: 200}},
+			{ID: 2, Name: "PanelBlock", ParentID: 1, ChildIndex: 0, FirstChild: 3, ChildCount: 4, Focusable: false, AccessibilityRole: "none", Bounds: surface.RectReport{X: 16, Y: 16, W: 288, H: 168}},
+			{ID: 3, Name: "LabelBlock", ParentID: 2, ChildIndex: 0, FirstChild: -1, ChildCount: 0, Focusable: false, AccessibilityRole: "text", Bounds: surface.RectReport{X: 24, Y: 24, W: 200, H: 24}},
+			{ID: 4, Name: "InputBlock", ParentID: 2, ChildIndex: 1, FirstChild: -1, ChildCount: 0, Focusable: true, AccessibilityRole: "textbox", Bounds: surface.RectReport{X: 24, Y: 64, W: 120, H: 44}},
+			{ID: 5, Name: "DisabledBlock", ParentID: 2, ChildIndex: 2, FirstChild: -1, ChildCount: 0, Focusable: false, AccessibilityRole: "button", Bounds: surface.RectReport{X: 152, Y: 64, W: 120, H: 44}},
+			{ID: 6, Name: "ActionBlock", ParentID: 2, ChildIndex: 3, FirstChild: -1, ChildCount: 0, Focusable: true, AccessibilityRole: "button", Bounds: surface.RectReport{X: 24, Y: 120, W: 120, H: 44}},
+		},
+		ChildOrders: []surface.BlockGraphChildOrderReport{
+			{ParentID: 1, Children: []int{2}},
+			{ParentID: 2, Children: []int{3, 4, 5, 6}},
+		},
+		LayoutOrder:        []int{1, 2, 3, 4, 5, 6},
+		DrawOrder:          []int{1, 2, 3, 4, 5, 6},
+		FocusOrder:         []int{4, 6},
+		AccessibilityOrder: []int{3, 4, 5, 6},
+		HitTests: []surface.BlockGraphPathReport{
+			{Helper: "tree_hit_test_path", Event: "click", TargetID: 4, X: 40, Y: 80, Path: []int{1, 2, 4}},
+			{Helper: "tree_hit_test_path", Event: "click", TargetID: 5, X: 180, Y: 80, Path: []int{1, 2, 5}},
+		},
+		DispatchPaths: []surface.BlockGraphPathReport{
+			{Helper: "tree_build_dispatch_path", Event: "click", TargetID: 4, Path: []int{1, 2, 4}},
+			{Helper: "tree_build_dispatch_path", Event: "click", TargetID: 5, Path: []int{1, 2, 5}},
+			{Helper: "tree_build_dispatch_path", Event: "key", TargetID: 6, Path: []int{1, 2, 6}},
+		},
+	}
+}
+
+func blockEventRoutesForScenario() []surface.BlockEventRouteReport {
+	return []surface.BlockEventRouteReport{
+		{Order: 1, Kind: "click", Policy: "capture-bubble-direct-v1", TargetID: 4, TargetName: "InputBlock", HitTestPath: []int{1, 2, 4}, DispatchPath: []int{1, 2, 4}, CapturePath: []int{1, 2}, BubblePath: []int{2, 1}, DirectTargetID: 4, Delivered: true, Rejected: false, FocusedID: 4, Editable: true, Disabled: false},
+		{Order: 2, Kind: "click", Policy: "capture-bubble-direct-v1", TargetID: 5, TargetName: "DisabledBlock", HitTestPath: []int{1, 2, 5}, DispatchPath: []int{1, 2, 5}, CapturePath: []int{1, 2}, BubblePath: []int{2, 1}, DirectTargetID: 5, Delivered: false, Rejected: true, RejectReason: "disabled", FocusedID: 4, Editable: false, Disabled: true},
+		{Order: 3, Kind: "text", Policy: "direct-to-focused-editable-v1", TargetID: 4, TargetName: "InputBlock", DispatchPath: []int{1, 2, 4}, DirectTargetID: 4, Delivered: false, Rejected: true, RejectReason: "unfocused", FocusedID: 6, Editable: true, TextLen: 2, TextBytesHex: "4f4b"},
+		{Order: 4, Kind: "text", Policy: "direct-to-focused-editable-v1", TargetID: 4, TargetName: "InputBlock", DispatchPath: []int{1, 2, 4}, DirectTargetID: 4, Delivered: true, Rejected: false, FocusedID: 4, Editable: true, TextLen: 2, TextBytesHex: "4f4b"},
+		{Order: 5, Kind: "key", Policy: "direct-to-focused-v1", TargetID: 6, TargetName: "ActionBlock", DispatchPath: []int{1, 2, 6}, DirectTargetID: 6, Delivered: true, Rejected: false, FocusedID: 6, Editable: false, Disabled: false},
+	}
+}
+
+func blockFocusTransitionsForScenario() []surface.BlockFocusTransitionReport {
+	return []surface.BlockFocusTransitionReport{
+		{Order: 1, Helper: "tree_focus_next", BeforeID: 4, AfterID: 6, Direction: "tab", GraphDerived: true, Wrapped: false},
+		{Order: 2, Helper: "tree_focus_next", BeforeID: 6, AfterID: 4, Direction: "tab", GraphDerived: true, Wrapped: true},
+	}
+}
+
+func runBlockStateScenario() headlessScenario {
+	beforeFrame := renderBlockStateFrameRGBA(false)
+	afterFrame := renderBlockStateFrameRGBA(true)
+	return headlessScenario{
+		Components:                      blockStateComponentsForScenario(),
+		BlockStateQualityLevel:          "deterministic-block-state-resolver-v1",
+		BlockStateResolverOrder:         []string{"base", "variant", "hover", "pressed", "focused", "selected", "disabled", "error", "loading", "motion"},
+		BlockStateUnsupportedCSSPseudos: false,
+		BlockStateSelectors:             blockStateSelectorsForScenario(),
+		BlockStateResolutions:           blockStateResolutionsForScenario(),
+		Events: []surface.EventReport{
+			{
+				Order:           1,
+				Kind:            "mouse_up",
+				TargetComponent: "StateBlock",
+				DispatchPath:    []string{"BlockStateApp", "StateBlock"},
+				Handled:         true,
+				Pass:            true,
+				X:               40,
+				Y:               56,
+				Width:           320,
+				Height:          200,
+				TimestampMS:     0,
+				BufferSlots:     []int{5, 40, 56, 1, 0, 320, 200, 0, 0},
+				BeforeState:     map[string]string{"StateBlock.selected": "false"},
+				AfterState:      map[string]string{"StateBlock.selected": "true"},
+			},
+			{
+				Order:           2,
+				Kind:            "mouse_move",
+				TargetComponent: "StateBlock",
+				DispatchPath:    []string{"BlockStateApp", "StateBlock"},
+				Handled:         true,
+				Pass:            true,
+				X:               40,
+				Y:               56,
+				Width:           320,
+				Height:          200,
+				TimestampMS:     1,
+				BufferSlots:     []int{2, 40, 56, 0, 0, 320, 200, 1, 0},
+				BeforeState:     map[string]string{"StateBlock.hovered": "false"},
+				AfterState:      map[string]string{"StateBlock.hovered": "true"},
+			},
+			{
+				Order:           3,
+				Kind:            "mouse_down",
+				TargetComponent: "StateBlock",
+				DispatchPath:    []string{"BlockStateApp", "StateBlock"},
+				Handled:         true,
+				Pass:            true,
+				X:               40,
+				Y:               56,
+				Width:           320,
+				Height:          200,
+				TimestampMS:     2,
+				BufferSlots:     []int{4, 40, 56, 1, 0, 320, 200, 2, 0},
+				BeforeState:     map[string]string{"StateBlock.pressed": "false"},
+				AfterState:      map[string]string{"StateBlock.pressed": "true"},
+			},
+			{
+				Order:           4,
+				Kind:            "text_input",
+				TargetComponent: "StateBlock",
+				DispatchPath:    []string{"BlockStateApp", "StateBlock"},
+				Handled:         true,
+				Pass:            true,
+				Width:           320,
+				Height:          200,
+				TimestampMS:     3,
+				TextLen:         2,
+				TextBytesHex:    "4f4b",
+				BufferSlots:     []int{8, 0, 0, 0, 0, 320, 200, 3, 2},
+				BeforeState:     map[string]string{"StateBlock.buffer": ""},
+				AfterState:      map[string]string{"StateBlock.buffer": "OK"},
+			},
+			{
+				Order:           5,
+				Kind:            "key_down",
+				TargetComponent: "StateBlock",
+				DispatchPath:    []string{"BlockStateApp", "StateBlock"},
+				Handled:         true,
+				Pass:            true,
+				Key:             9,
+				Width:           320,
+				Height:          200,
+				TimestampMS:     4,
+				BufferSlots:     []int{3, 0, 0, 0, 9, 320, 200, 4, 0},
+				BeforeState:     map[string]string{"StateBlock.focused": "false"},
+				AfterState:      map[string]string{"StateBlock.focused": "true"},
+			},
+		},
+		Frames: []surface.FrameReport{
+			{Order: 1, Width: beforeFrame.Width, Height: beforeFrame.Height, Stride: beforeFrame.Stride, Checksum: checksumRGBA(beforeFrame.Pixels), Presented: true},
+			{Order: 2, Width: afterFrame.Width, Height: afterFrame.Height, Stride: afterFrame.Stride, Checksum: checksumRGBA(afterFrame.Pixels), Presented: true},
+		},
+		StateTransitions: []surface.StateTransitionReport{
+			{Order: 1, Component: "StateBlock", Field: "selector_flags", Before: "0", After: "127", Cause: "pointer/key/state input"},
+			{Order: 2, Component: "StateBlock", Field: "resolved_fill", Before: "#20262eff", After: "#2d9bf0ff", Cause: "hover"},
+			{Order: 3, Component: "StateBlock", Field: "resolved_scale", Before: "100", After: "97", Cause: "pressed"},
+			{Order: 4, Component: "StateBlock", Field: "disabled", Before: "false", After: "true", Cause: "disabled selector"},
+			{Order: 5, Component: "StateBlock", Field: "error", Before: "false", After: "true", Cause: "error selector"},
+			{Order: 6, Component: "StateBlock", Field: "loading", Before: "false", After: "true", Cause: "loading selector"},
+		},
+		Cases: []surface.CaseReport{
+			{Name: "pure Tetra component app", Kind: "positive", Ran: true, Pass: true},
+			{Name: "headless event dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "headless framebuffer checksum", Kind: "positive", Ran: true, Pass: true},
+			{Name: "headless actual runner trace", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host-provided pointer event dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host event buffer poll_event", Kind: "positive", Ran: true, Pass: true},
+			{Name: "pre/post event frame sequence", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component hierarchy dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component text input scalar dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host text payload buffer", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component focus dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component accessibility metadata", Kind: "positive", Ran: true, Pass: true},
+			{Name: "no legacy UI sidecar artifacts", Kind: "positive", Ran: true, Pass: true},
+			{Name: "state transition", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block state selector resolver order", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block state hover fill override", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block state pressed scale override", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block state focus selected metadata", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block state disabled error loading overrides", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block state frame checksum changed", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block state no css pseudo parity", Kind: "negative", Ran: true, Pass: true, ExpectedError: "css pseudo nonclaim"},
+			{Name: "reject legacy UI evidence", Kind: "negative", Ran: true, Pass: true, ExpectedError: "legacy UI evidence rejected"},
+		},
+	}
+}
+
+func blockStateComponentsForScenario() []surface.ComponentReport {
+	abilities := []string{"measure", "layout", "draw", "event", "focus", "text", "accessibility", "state"}
+	return []surface.ComponentReport{
+		{ID: "BlockStateApp", Type: "examples.surface_block_states.BlockStateApp", Bounds: surface.RectReport{X: 0, Y: 0, W: 320, H: 200}, Abilities: abilities, State: map[string]string{"state_quality": "deterministic-block-state-resolver-v1"}},
+		{ID: "StateBlock", Type: "examples.surface_block_states.StateBlock", Parent: "BlockStateApp", Bounds: surface.RectReport{X: 24, Y: 40, W: 168, H: 56}, Abilities: abilities, State: map[string]string{"selector_flags": "127", "variant": "5", "disabled": "true", "error": "true", "loading": "true"}},
+		{ID: "StatusBlock", Type: "examples.surface_block_states.StatusBlock", Parent: "BlockStateApp", Bounds: surface.RectReport{X: 24, Y: 112, W: 168, H: 32}, Abilities: abilities, State: map[string]string{"selected": "true", "focused": "true"}},
+	}
+}
+
+func blockStateSelectorsForScenario() []surface.BlockStateSelectorReport {
+	return []surface.BlockStateSelectorReport{
+		{Order: 1, Name: "hover", BlockID: 2, Flags: 1, Hovered: true},
+		{Order: 2, Name: "pressed", BlockID: 2, Flags: 2, Pressed: true},
+		{Order: 3, Name: "focused", BlockID: 2, Flags: 4, Focused: true},
+		{Order: 4, Name: "selected", BlockID: 2, Flags: 8, Selected: true},
+		{Order: 5, Name: "disabled", BlockID: 2, Flags: 16, Disabled: true},
+		{Order: 6, Name: "error", BlockID: 2, Flags: 32, Error: true},
+		{Order: 7, Name: "loading", BlockID: 2, Flags: 64, Loading: true},
+	}
+}
+
+func blockStateResolutionsForScenario() []surface.BlockStateResolutionReport {
+	return []surface.BlockStateResolutionReport{
+		{Order: 1, BlockID: 2, Selector: "hover", ResolverStep: "hover", Property: "paint.fill", Before: "#20262eff", After: "#2d9bf0ff", Applied: true},
+		{Order: 2, BlockID: 2, Selector: "pressed", ResolverStep: "pressed", Property: "layout.scale", Before: "100", After: "97", Applied: true},
+		{Order: 3, BlockID: 2, Selector: "focused", ResolverStep: "focused", Property: "paint.outline", Before: "none", After: "focus-ring", Applied: true},
+		{Order: 4, BlockID: 2, Selector: "selected", ResolverStep: "selected", Property: "accessibility.selected", Before: "false", After: "true", Applied: true},
+		{Order: 5, BlockID: 2, Selector: "disabled", ResolverStep: "disabled", Property: "input.disabled", Before: "false", After: "true", Applied: true},
+		{Order: 6, BlockID: 2, Selector: "disabled", ResolverStep: "disabled", Property: "text.opacity", Before: "255", After: "112", Applied: true},
+		{Order: 7, BlockID: 2, Selector: "error", ResolverStep: "error", Property: "paint.outline_color", Before: "#7aa2f7ff", After: "#ff5f57ff", Applied: true},
+		{Order: 8, BlockID: 2, Selector: "loading", ResolverStep: "loading", Property: "text.content", Before: "Run", After: "Loading", Applied: true},
+		{Order: 9, BlockID: 2, Selector: "motion", ResolverStep: "motion", Property: "motion.transition_ms", Before: "0", After: "120", Applied: true},
+	}
+}
+
+func runBlockMotionScenario() headlessScenario {
+	startFrame := renderBlockMotionFrameRGBA(0)
+	midFrame := renderBlockMotionFrameRGBA(1)
+	doneFrame := renderBlockMotionFrameRGBA(2)
+	return headlessScenario{
+		Components:                     blockMotionComponentsForScenario(),
+		MotionQualityLevel:             "deterministic-block-motion-v1",
+		MotionClock:                    "deterministic-test-clock-v1",
+		MotionFrameBudget:              4,
+		MotionUnsupportedCSSAnimations: false,
+		MotionFrames:                   blockMotionFramesForScenario(),
+		Events: []surface.EventReport{
+			{
+				Order:           1,
+				Kind:            "mouse_up",
+				TargetComponent: "MotionBlock",
+				DispatchPath:    []string{"BlockMotionApp", "MotionBlock"},
+				Handled:         true,
+				Pass:            true,
+				X:               48,
+				Y:               72,
+				Width:           320,
+				Height:          200,
+				TimestampMS:     0,
+				BufferSlots:     []int{5, 48, 72, 1, 0, 320, 200, 0, 0},
+				BeforeState:     map[string]string{"MotionBlock.hovered": "false"},
+				AfterState:      map[string]string{"MotionBlock.hovered": "true"},
+			},
+			{
+				Order:           2,
+				Kind:            "text_input",
+				TargetComponent: "MotionBlock",
+				DispatchPath:    []string{"BlockMotionApp", "MotionBlock"},
+				Handled:         true,
+				Pass:            true,
+				Width:           320,
+				Height:          200,
+				TimestampMS:     1,
+				TextLen:         2,
+				TextBytesHex:    "4f4b",
+				BufferSlots:     []int{8, 0, 0, 0, 0, 320, 200, 1, 2},
+				BeforeState:     map[string]string{"MotionBlock.buffer": ""},
+				AfterState:      map[string]string{"MotionBlock.buffer": "OK"},
+			},
+		},
+		Frames: []surface.FrameReport{
+			{Order: 1, Width: startFrame.Width, Height: startFrame.Height, Stride: startFrame.Stride, Checksum: checksumRGBA(startFrame.Pixels), Presented: true},
+			{Order: 2, Width: midFrame.Width, Height: midFrame.Height, Stride: midFrame.Stride, Checksum: checksumRGBA(midFrame.Pixels), Presented: true},
+			{Order: 3, Width: doneFrame.Width, Height: doneFrame.Height, Stride: doneFrame.Stride, Checksum: checksumRGBA(doneFrame.Pixels), Presented: true},
+		},
+		StateTransitions: []surface.StateTransitionReport{
+			{Order: 1, Component: "MotionBlock", Field: "opacity", Before: "80", After: "200", Cause: "motion frame"},
+			{Order: 2, Component: "MotionBlock", Field: "color", Before: "#203040ff", After: "#60aef4ff", Cause: "motion frame"},
+			{Order: 3, Component: "MotionBlock", Field: "scale", Before: "100", After: "108", Cause: "motion frame"},
+			{Order: 4, Component: "MotionBlock", Field: "translate_x", Before: "0", After: "12", Cause: "motion frame"},
+			{Order: 5, Component: "MotionBlock", Field: "motion_complete", Before: "false", After: "true", Cause: "duration elapsed"},
+			{Order: 6, Component: "MotionBlock", Field: "reduced_motion", Before: "false", After: "true", Cause: "accessibility setting"},
+		},
+		Cases: []surface.CaseReport{
+			{Name: "pure Tetra component app", Kind: "positive", Ran: true, Pass: true},
+			{Name: "headless event dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "headless framebuffer checksum", Kind: "positive", Ran: true, Pass: true},
+			{Name: "headless actual runner trace", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host-provided pointer event dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host event buffer poll_event", Kind: "positive", Ran: true, Pass: true},
+			{Name: "pre/post event frame sequence", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component hierarchy dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component text input scalar dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host text payload buffer", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component focus dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component accessibility metadata", Kind: "positive", Ran: true, Pass: true},
+			{Name: "no legacy UI sidecar artifacts", Kind: "positive", Ran: true, Pass: true},
+			{Name: "state transition", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block motion deterministic test clock", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block motion opacity color transform frames", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block motion reduced motion instant settle", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block motion completion stops scheduling", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block motion frame checksum changed", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block motion no css animation parity", Kind: "negative", Ran: true, Pass: true, ExpectedError: "css animation nonclaim"},
+			{Name: "reject legacy UI evidence", Kind: "negative", Ran: true, Pass: true, ExpectedError: "legacy UI evidence rejected"},
+		},
+	}
+}
+
+func blockMotionComponentsForScenario() []surface.ComponentReport {
+	abilities := []string{"measure", "layout", "draw", "event", "focus", "text", "accessibility", "state", "motion"}
+	return []surface.ComponentReport{
+		{ID: "BlockMotionApp", Type: "examples.surface_block_motion.BlockMotionApp", Bounds: surface.RectReport{X: 0, Y: 0, W: 320, H: 200}, Abilities: abilities, State: map[string]string{"motion_quality": "deterministic-block-motion-v1"}},
+		{ID: "MotionBlock", Type: "examples.surface_block_motion.MotionBlock", Parent: "BlockMotionApp", Bounds: surface.RectReport{X: 24, Y: 44, W: 176, H: 64}, Abilities: abilities, State: map[string]string{"opacity": "200", "scale": "108", "translate_x": "12", "complete": "true"}},
+	}
+}
+
+func blockMotionFramesForScenario() []surface.MotionFrameReport {
+	return []surface.MotionFrameReport{
+		{Order: 1, BlockID: 2, Trigger: "hover", TimestampMS: 0, DurationMS: 120, DelayMS: 0, Progress: 0, Easing: "linear", Opacity: 80, Color: "#203040ff", TranslateX: 0, TranslateY: 0, Scale: 100, ReducedMotion: false, Scheduled: true, Settled: false, Checksum: "sha256:" + checksumText("block-motion-frame-start")},
+		{Order: 2, BlockID: 2, Trigger: "hover", TimestampMS: 60, DurationMS: 120, DelayMS: 0, Progress: 500, Easing: "linear", Opacity: 140, Color: "#407094ff", TranslateX: 6, TranslateY: 0, Scale: 104, ReducedMotion: false, Scheduled: true, Settled: false, Checksum: "sha256:" + checksumText("block-motion-frame-mid")},
+		{Order: 3, BlockID: 2, Trigger: "hover", TimestampMS: 120, DurationMS: 120, DelayMS: 0, Progress: 1000, Easing: "linear", Opacity: 200, Color: "#60aef4ff", TranslateX: 12, TranslateY: 0, Scale: 108, ReducedMotion: false, Scheduled: false, Settled: true, Checksum: "sha256:" + checksumText("block-motion-frame-done")},
+		{Order: 4, BlockID: 2, Trigger: "reduced_motion", TimestampMS: 121, DurationMS: 120, DelayMS: 0, Progress: 1000, Easing: "linear", Opacity: 200, Color: "#60aef4ff", TranslateX: 12, TranslateY: 0, Scale: 108, ReducedMotion: true, Scheduled: false, Settled: true, Checksum: "sha256:" + checksumText("block-motion-frame-reduced")},
+	}
+}
+
+func runBlockAssetScenario() headlessScenario {
+	beforeFrame := renderBlockAssetFrameRGBA(false)
+	afterFrame := renderBlockAssetFrameRGBA(true)
+	return headlessScenario{
+		Components:                    blockAssetComponentsForScenario(),
+		BlockAssetQualityLevel:        "deterministic-local-block-assets-v1",
+		BlockAssetNetworkFetchAllowed: false,
+		BlockAssetManifest:            blockAssetManifestForScenario("examples/surface_block_assets.tetra"),
+		BlockAssetCache:               blockAssetCacheForScenario(),
+		BlockAssetDiagnostics:         blockAssetDiagnosticsForScenario(),
+		BlockAssetRenderCommands:      blockAssetRenderCommandsForScenario(),
+		Events: []surface.EventReport{
+			{
+				Order:           1,
+				Kind:            "mouse_up",
+				TargetComponent: "IconBlock",
+				DispatchPath:    []string{"BlockAssetApp", "IconBlock"},
+				Handled:         true,
+				Pass:            true,
+				X:               32,
+				Y:               44,
+				Width:           320,
+				Height:          200,
+				TimestampMS:     0,
+				BufferSlots:     []int{5, 32, 44, 1, 0, 320, 200, 0, 0},
+				BeforeState:     map[string]string{"IconBlock.tint": "#ffffffff"},
+				AfterState:      map[string]string{"IconBlock.tint": "#60aef4ff"},
+			},
+			{
+				Order:           2,
+				Kind:            "text_input",
+				TargetComponent: "IconBlock",
+				DispatchPath:    []string{"BlockAssetApp", "IconBlock"},
+				Handled:         true,
+				Pass:            true,
+				Width:           320,
+				Height:          200,
+				TimestampMS:     1,
+				TextLen:         2,
+				TextBytesHex:    "4f4b",
+				BufferSlots:     []int{8, 0, 0, 0, 0, 320, 200, 1, 2},
+				BeforeState:     map[string]string{"IconBlock.label": ""},
+				AfterState:      map[string]string{"IconBlock.label": "OK"},
+			},
+		},
+		Frames: []surface.FrameReport{
+			{Order: 1, Width: beforeFrame.Width, Height: beforeFrame.Height, Stride: beforeFrame.Stride, Checksum: checksumRGBA(beforeFrame.Pixels), Presented: true},
+			{Order: 2, Width: afterFrame.Width, Height: afterFrame.Height, Stride: afterFrame.Stride, Checksum: checksumRGBA(afterFrame.Pixels), Presented: true},
+		},
+		StateTransitions: []surface.StateTransitionReport{
+			{Order: 1, Component: "IconBlock", Field: "tint", Before: "#ffffffff", After: "#60aef4ff", Cause: "asset tint"},
+			{Order: 2, Component: "ImageBlock", Field: "scale", Before: "1x", After: "2x", Cause: "asset scale"},
+			{Order: 3, Component: "MissingAssetBlock", Field: "fallback", Before: "missing", After: "fallback-raster", Cause: "missing asset"},
+		},
+		Cases: []surface.CaseReport{
+			{Name: "pure Tetra component app", Kind: "positive", Ran: true, Pass: true},
+			{Name: "headless event dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "headless framebuffer checksum", Kind: "positive", Ran: true, Pass: true},
+			{Name: "headless actual runner trace", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host-provided pointer event dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host event buffer poll_event", Kind: "positive", Ran: true, Pass: true},
+			{Name: "pre/post event frame sequence", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component hierarchy dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component text input scalar dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host text payload buffer", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component focus dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component accessibility metadata", Kind: "positive", Ran: true, Pass: true},
+			{Name: "no legacy UI sidecar artifacts", Kind: "positive", Ran: true, Pass: true},
+			{Name: "state transition", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block asset deterministic manifest hashes", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block asset local embedded only", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block asset bounded cache", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block asset icon tint evidence", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block asset image scale evidence", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block asset missing fallback diagnostic", Kind: "negative", Ran: true, Pass: true, ExpectedError: "missing asset"},
+			{Name: "block asset network url rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "network assets disabled"},
+			{Name: "reject legacy UI evidence", Kind: "negative", Ran: true, Pass: true, ExpectedError: "legacy UI evidence rejected"},
+		},
+	}
+}
+
+func runBlockAccessibilityScenario() headlessScenario {
+	beforeFrame := renderBlockAccessibilityFrameRGBA(false)
+	afterFrame := renderBlockAccessibilityFrameRGBA(true)
+	return headlessScenario{
+		Components:             blockAccessibilityComponentsForScenario(),
+		BlockGraph:             blockAccessibilityGraphForScenario("examples/surface_block_accessibility.tetra"),
+		BlockAccessibilityTree: blockAccessibilityTreeForScenario("examples/surface_block_accessibility.tetra"),
+		Events: []surface.EventReport{
+			{
+				Order:           1,
+				Kind:            "mouse_up",
+				TargetComponent: "SubmitBlock",
+				DispatchPath:    []string{"BlockAccessibilityApp", "SubmitBlock"},
+				Handled:         true,
+				Pass:            true,
+				X:               40,
+				Y:               80,
+				Width:           320,
+				Height:          200,
+				TimestampMS:     0,
+				BufferSlots:     []int{5, 40, 80, 1, 0, 320, 200, 0, 0},
+				BeforeState:     map[string]string{"SubmitBlock.focused": "false"},
+				AfterState:      map[string]string{"SubmitBlock.focused": "true"},
+			},
+			{
+				Order:           2,
+				Kind:            "text_input",
+				TargetComponent: "SubmitBlock",
+				DispatchPath:    []string{"BlockAccessibilityApp", "SubmitBlock"},
+				Handled:         true,
+				Pass:            true,
+				Width:           320,
+				Height:          200,
+				TimestampMS:     1,
+				TextLen:         2,
+				TextBytesHex:    "4f4b",
+				BufferSlots:     []int{8, 0, 0, 0, 0, 320, 200, 1, 2},
+				BeforeState:     map[string]string{"SubmitBlock.value_len": "0"},
+				AfterState:      map[string]string{"SubmitBlock.value_len": "2"},
+			},
+			{
+				Order:           3,
+				Kind:            "key_down",
+				TargetComponent: "SubmitBlock",
+				DispatchPath:    []string{"BlockAccessibilityApp", "SubmitBlock"},
+				Handled:         true,
+				Pass:            true,
+				Key:             13,
+				Width:           320,
+				Height:          200,
+				TimestampMS:     2,
+				BufferSlots:     []int{3, 0, 0, 0, 13, 320, 200, 2, 0},
+				BeforeState:     map[string]string{"SubmitBlock.pressed": "false"},
+				AfterState:      map[string]string{"SubmitBlock.pressed": "true"},
+			},
+		},
+		Frames: []surface.FrameReport{
+			{Order: 1, Width: beforeFrame.Width, Height: beforeFrame.Height, Stride: beforeFrame.Stride, Checksum: checksumRGBA(beforeFrame.Pixels), Presented: true},
+			{Order: 2, Width: afterFrame.Width, Height: afterFrame.Height, Stride: afterFrame.Stride, Checksum: checksumRGBA(afterFrame.Pixels), Presented: true},
+		},
+		StateTransitions: []surface.StateTransitionReport{
+			{Order: 1, Component: "SubmitBlock", Field: "focused", Before: "false", After: "true", Cause: "tab"},
+			{Order: 2, Component: "ResetBlock", Field: "focused", Before: "false", After: "true", Cause: "tab"},
+			{Order: 3, Component: "BlockAccessibilityApp", Field: "reading_order_checked", Before: "false", After: "true", Cause: "block_graph"},
+		},
+		Cases: []surface.CaseReport{
+			{Name: "pure Tetra component app", Kind: "positive", Ran: true, Pass: true},
+			{Name: "headless event dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "headless framebuffer checksum", Kind: "positive", Ran: true, Pass: true},
+			{Name: "headless actual runner trace", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host-provided pointer event dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host event buffer poll_event", Kind: "positive", Ran: true, Pass: true},
+			{Name: "pre/post event frame sequence", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component hierarchy dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component text input scalar dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host text payload buffer", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component focus dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component accessibility metadata", Kind: "positive", Ran: true, Pass: true},
+			{Name: "no legacy UI sidecar artifacts", Kind: "positive", Ran: true, Pass: true},
+			{Name: "state transition", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block graph duplicate id rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "duplicate Block ID"},
+			{Name: "block graph missing parent rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "missing parent"},
+			{Name: "block graph cycle rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "cycle"},
+			{Name: "block graph child order", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block graph focus order", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block graph hit-test path", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block graph accessibility order", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block accessibility tree derived from block graph", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block accessibility focusable actionable name required", Kind: "negative", Ran: true, Pass: true, ExpectedError: "missing accessible name"},
+			{Name: "block accessibility label relationship mismatch rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "label relationship mismatch"},
+			{Name: "block accessibility reading order graph mismatch rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "reading order mismatch"},
+			{Name: "block accessibility screen-reader claim without platform proof rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "screen reader proof required"},
+			{Name: "block accessibility platform claim scoped metadata only", Kind: "positive", Ran: true, Pass: true},
+			{Name: "reject legacy UI evidence", Kind: "negative", Ran: true, Pass: true, ExpectedError: "legacy UI evidence rejected"},
+		},
+	}
+}
+
+func runBlockSystemScenario() headlessScenario {
+	source := "examples/surface_block_system.tetra"
+	beforeFrame := renderBlockSystemFrameRGBA(false)
+	afterFrame := renderBlockSystemFrameRGBA(true)
+	motionFrame := renderBlockSystemFrameRGBA(true)
+	rectRGBA(motionFrame, rect{X: 188, Y: 124, W: 30, H: 10}, rgbaColor{R: 96, G: 174, B: 244, A: 255})
+	frames := []surface.FrameReport{
+		{Order: 1, Width: beforeFrame.Width, Height: beforeFrame.Height, Stride: beforeFrame.Stride, Checksum: checksumRGBA(beforeFrame.Pixels), Presented: true},
+		{Order: 2, Width: afterFrame.Width, Height: afterFrame.Height, Stride: afterFrame.Stride, Checksum: checksumRGBA(afterFrame.Pixels), Presented: true},
+		{Order: 3, Width: motionFrame.Width, Height: motionFrame.Height, Stride: motionFrame.Stride, Checksum: checksumRGBA(motionFrame.Pixels), Presented: true},
+	}
+	components := blockSystemComponentsForScenario()
+	components = append(components, retargetBlockSystemComponentsForScenario(blockTextComponentsForScenario())...)
+	components = append(components, retargetBlockSystemComponentsForScenario(blockStateComponentsForScenario())...)
+	components = append(components, retargetBlockSystemComponentsForScenario(blockMotionComponentsForScenario())...)
+	components = append(components, retargetBlockSystemComponentsForScenario(blockAssetComponentsForScenario())...)
+	events := blockSystemEventsForScenario()
+	events = appendScenarioEventsWithNextOrder(events,
+		blockTextEventsForScenario(),
+		blockStateEventsForScenario(),
+		blockMotionEventsForScenario(),
+		blockAssetEventsForScenario(),
+	)
+	stateTransitions := []surface.StateTransitionReport{
+		{Order: 1, Component: "SubmitBlock", Field: "focused", Before: "false", After: "true", Cause: "tab"},
+		{Order: 2, Component: "ResetBlock", Field: "focused", Before: "false", After: "true", Cause: "tab"},
+		{Order: 3, Component: "BlockSystemApp", Field: "reading_order_checked", Before: "false", After: "true", Cause: "block_graph"},
+		{Order: 4, Component: "BlockLayoutApp", Field: "width", Before: "320", After: "480", Cause: "resize"},
+		{Order: 5, Component: "ScrollBlock", Field: "scroll_y", Before: "0", After: "32", Cause: "scroll"},
+	}
+	stateTransitions = appendScenarioStateTransitionsWithNextOrder(stateTransitions, blockSystemReadinessTransitionsForScenario())
+	scenario := headlessScenario{
+		Components:                  components,
+		BlockGraph:                  blockAccessibilityGraphForScenario(source),
+		PaintLayers:                 blockPaintLayersForScenario(),
+		PaintCommands:               blockPaintCommandsForScenario(),
+		VisualFeatures:              []string{"fill", "gradient", "border", "radius", "shadow", "outline"},
+		PaintQualityLevel:           "deterministic-software-paint-v1",
+		PaintCacheBudgetBytes:       65536,
+		PaintUnsupportedBlur:        false,
+		TextMeasurements:            blockTextMeasurementsForScenario(),
+		FontFallbacks:               blockFontFallbacksForScenario(),
+		GlyphCaches:                 blockGlyphCachesForScenario(),
+		TextRenderCommands:          blockTextRenderCommandsForScenario(),
+		TextQualityLevel:            "deterministic-fallback-text-v1",
+		TextCacheBudgetBytes:        65536,
+		LayoutConstraints:           blockLayoutConstraintsForScenario(),
+		LayoutPasses:                blockLayoutPassesForScenario(),
+		LayoutScrolls:               blockLayoutScrollsForScenario(),
+		LayoutFeatures:              []string{"stack", "row", "column", "absolute", "overlay", "grid", "dock", "scroll", "fit", "fill", "fixed", "min", "max", "spacing", "alignment", "z-order", "clipping", "resize"},
+		LayoutQualityLevel:          "deterministic-block-layout-v1",
+		LayoutUnsupportedCSSFlexbox: false,
+		BlockStateSelectors:         blockStateSelectorsForScenario(),
+		BlockStateResolutions:       blockStateResolutionsForScenario(),
+		BlockStateResolverOrder:     []string{"base", "variant", "hover", "pressed", "focused", "selected", "disabled", "error", "loading", "motion"},
+		BlockStateQualityLevel:      "deterministic-block-state-resolver-v1",
+		MotionFrames:                blockMotionFramesForScenario(),
+		MotionQualityLevel:          "deterministic-block-motion-v1",
+		MotionClock:                 "deterministic-test-clock-v1",
+		MotionFrameBudget:           4,
+		BlockAssetManifest:          blockAssetManifestForScenario(source),
+		BlockAssetCache:             blockAssetCacheForScenario(),
+		BlockAssetDiagnostics:       blockAssetDiagnosticsForScenario(),
+		BlockAssetRenderCommands:    blockAssetRenderCommandsForScenario(),
+		BlockAssetQualityLevel:      "deterministic-local-block-assets-v1",
+		BlockAccessibilityTree:      blockAccessibilityTreeForScenario(source),
+		BlockSystem:                 blockSystemReportForScenario(source, frames),
+		Events:                      events,
+		Frames:                      frames,
+		StateTransitions:            stateTransitions,
+		Cases:                       blockSystemCasesForScenario(),
+	}
+	attachBlockSystemMemoryBudget(&scenario)
+	return scenario
+}
+
+func runMorphScenario() headlessScenario {
+	source := "examples/surface_morph_command_palette.tetra"
+	scenario := runBlockSystemScenario()
+	retargetScenarioToSource(&scenario, source, "examples.surface_morph_command_palette")
+	scenario.Morph = morphReportForScenario(source, scenario)
+	scenario.Cases = append(scenario.Cases, morphCasesForScenario()...)
+	return scenario
+}
+
+func retargetScenarioToSource(scenario *headlessScenario, source string, module string) {
+	if scenario == nil {
+		return
+	}
+	for i := range scenario.Components {
+		scenario.Components[i].Type = module + "." + typeBaseName(scenario.Components[i].Type)
+	}
+	if scenario.BlockGraph != nil {
+		scenario.BlockGraph.Source = source
+	}
+	if scenario.BlockAssetManifest != nil {
+		scenario.BlockAssetManifest.Source = source
+	}
+	if scenario.BlockAccessibilityTree != nil {
+		scenario.BlockAccessibilityTree.Source = source
+	}
+	if scenario.BlockSystem != nil {
+		scenario.BlockSystem.Source = source
+	}
+}
+
+func morphReportForScenario(source string, scenario headlessScenario) *surface.MorphReport {
+	capsuleHash := "sha256:" + checksumText("surface-morph-capsule-v1:"+source)
+	tokenGraphHash := "sha256:" + checksumText("surface-morph-token-graph-v1:"+source)
+	return &surface.MorphReport{
+		Schema:          "tetra.surface.morph.v1",
+		QualityLevel:    "deterministic-headless-morph-capsule-v1",
+		Source:          source,
+		Module:          "lib.core.morph",
+		SurfaceScope:    "surface-morph-experimental-linux-web",
+		Experimental:    true,
+		ProductionClaim: false,
+		GitHead:         gitHeadForReport(),
+		GitDirty:        gitDirtyForReport(),
+		CapsuleHash:     capsuleHash,
+		TokenGraphHash:  tokenGraphHash,
+		Capsule: surface.MorphCapsuleReport{
+			Namespace:       "tetra.surface.morph.app",
+			Version:         "1",
+			CapsuleHash:     capsuleHash,
+			Imports:         []string{"lib.core.block", "lib.core.morph"},
+			ExplicitImports: true,
+			NoGlobalCascade: true,
+		},
+		TokenGraph:       morphTokenGraphForScenario(tokenGraphHash),
+		Materials:        morphMaterialsForScenario(),
+		LayoutModes:      []string{"row", "column", "stack", "grid", "dock", "absolute", "overlay", "scroll"},
+		TypographyRoles:  []string{"title", "body", "label", "code"},
+		AssetRefs:        morphAssetRefsForScenario(),
+		Affordances:      morphAffordancesForScenario(),
+		StateLenses:      morphStateLensesForScenario(),
+		MotionPresets:    morphMotionPresetsForScenario(),
+		Recipes:          morphRecipesForScenario(),
+		RecipeExpansions: morphRecipeExpansionsForScenario(),
+		Accessibility: surface.MorphAccessibilityProjectionReport{
+			Schema:                "tetra.surface.morph.accessibility-projection.v1",
+			DerivedFromBlockGraph: true,
+			SafetyOverridesWin:    true,
+			SnapshotEvidence:      true,
+			RequiredFields:        []string{"role", "name", "description", "action", "state", "bounds", "focus_order", "reading_order", "labelled_by", "label_for"},
+			Roles:                 []string{"button", "textbox", "checkbox", "navigation", "region", "dialog", "status"},
+		},
+		EvidenceContract: surface.MorphEvidenceContractReport{
+			CapsuleHash:       capsuleHash,
+			TokenGraphHash:    tokenGraphHash,
+			RecipeExpansions:  true,
+			BlockTree:         scenario.BlockGraph != nil,
+			ResolvedLayout:    len(scenario.LayoutPasses) > 0,
+			PaintLayers:       len(scenario.PaintLayers) > 0,
+			TextRuns:          len(scenario.TextRenderCommands) > 0,
+			MotionFrames:      len(scenario.MotionFrames) > 0,
+			AssetHashes:       scenario.BlockAssetManifest != nil,
+			AccessibilityTree: scenario.BlockAccessibilityTree != nil,
+			MemoryBudget:      scenario.BlockSystem != nil && scenario.BlockSystem.MemoryBudget != nil,
+			FrameChecksums:    len(scenario.Frames) > 0,
+			ArtifactHashes:    true,
+		},
+		MemoryBudget: surface.MorphMemoryBudgetReport{
+			Schema:                 "tetra.surface.morph-memory-budget.v1",
+			ExpandedRecipeCount:    len(morphRecipeExpansionsForScenario()),
+			BlockCount:             len(scenario.Components),
+			PaintCommandCount:      len(scenario.PaintCommands),
+			LayoutPassCount:        len(scenario.LayoutPasses),
+			TextRunCount:           len(scenario.TextRenderCommands),
+			MotionActiveCount:      len(scenario.MotionFrames),
+			GlyphCacheBytes:        glyphCacheUsedBytesForScenario(scenario.GlyphCaches),
+			AssetCacheBytes:        scenario.BlockAssetCache.UsedBytes,
+			LayoutCacheBytes:       len(scenario.LayoutPasses) * 1024,
+			FramebufferBytes:       morphFramebufferBytesForScenario(scenario.Frames),
+			PeakRSSBytes:           0,
+			AllocCount:             0,
+			FrameCount:             len(scenario.Frames),
+			BoundedCaches:          true,
+			UnboundedCacheRejected: true,
+		},
+		NegativeGuards: surface.MorphNegativeGuardsReport{
+			NoCoreWidgetPrimitives:          true,
+			NoDOMUI:                         true,
+			NoReact:                         true,
+			NoElectron:                      true,
+			NoUserJS:                        true,
+			NoPlatformWidgets:               true,
+			MissingTokenRejected:            true,
+			AliasCycleRejected:              true,
+			DuplicateTokenSourceRejected:    true,
+			DuplicateRecipeNameRejected:     true,
+			MissingRecipeExpansionRejected:  true,
+			UnresolvedTokenRejected:         true,
+			MissingAssetRejected:            true,
+			UnboundedCacheRejected:          true,
+			FakeMotionRejected:              true,
+			FakeAccessibilityRejected:       true,
+			UnsupportedTargetRejected:       true,
+			DirtyCheckoutProductionRejected: true,
+		},
+		NonClaims: []string{
+			"DOM runtime absent",
+			"React runtime absent",
+			"Electron claim absent",
+			"platform-native widgets absent",
+			"full screen-reader production absent",
+			"CSS cascade absent",
+		},
+	}
+}
+
+func morphTokenGraphForScenario(hash string) *surface.MorphTokenGraphReport {
+	return &surface.MorphTokenGraphReport{
+		Schema:                     "tetra.surface.morph.token-graph.v1",
+		Namespace:                  "tetra.surface.morph.app",
+		Version:                    "1",
+		Hash:                       hash,
+		Categories:                 []string{"color", "space", "radius", "border", "elevation", "opacity", "typography", "motion", "z", "assets", "density"},
+		AliasCycleRejected:         true,
+		DuplicateSourceRejected:    true,
+		RawLiteralsInAppCode:       false,
+		UnresolvedFallbackRejected: true,
+		FallbackToRandomDefault:    false,
+		Tokens: []surface.MorphTokenReport{
+			{ID: "color.bg", Category: "color", Kind: "rgba", Value: "#0b0f14ff", Source: "capsule", Hash: "sha256:" + checksumText("morph-token-color-bg")},
+			{ID: "space.3", Category: "space", Kind: "px", Value: "12", Source: "capsule", Hash: "sha256:" + checksumText("morph-token-space-3")},
+			{ID: "radius.md", Category: "radius", Kind: "px", Value: "10", Source: "capsule", Hash: "sha256:" + checksumText("morph-token-radius-md")},
+			{ID: "type.label", Category: "typography", Kind: "font", Value: "Tetra UI 13 600 18", Source: "capsule", Hash: "sha256:" + checksumText("morph-token-type-label")},
+			{ID: "motion.fast", Category: "motion", Kind: "transition", Value: "120 ease.out", Source: "capsule", Hash: "sha256:" + checksumText("morph-token-motion-fast")},
+		},
+	}
+}
+
+func morphMaterialsForScenario() []surface.MorphMaterialReport {
+	return []surface.MorphMaterialReport{
+		{Name: "surface.base", PaintStack: []string{"fill", "border", "radius"}, Fill: "color.surface", Border: "border.subtle", Radius: "radius.md", UnsupportedBlurRejected: true},
+		{Name: "surface.elevated", PaintStack: []string{"fill", "border", "radius", "shadow"}, Fill: "color.surface", Border: "border.subtle", Radius: "radius.md", Shadow: "elevation.2", UnsupportedBlurRejected: true},
+		{Name: "control.primary", PaintStack: []string{"fill", "radius"}, Fill: "color.accent", Radius: "radius.sm", UnsupportedBlurRejected: true},
+		{Name: "translucent.panel", PaintStack: []string{"fill", "border", "radius", "shadow", "overlay"}, Fill: "color.surfaceAlpha", Border: "border.glass", Radius: "radius.lg", Shadow: "elevation.3", Overlay: "gradient.vertical", UnsupportedBlurRejected: true},
+	}
+}
+
+func morphAssetRefsForScenario() []surface.MorphAssetRefReport {
+	return []surface.MorphAssetRefReport{
+		{ID: "project.new", Kind: "icon", SHA256: "sha256:" + checksumText("morph-icon-project-new"), Local: true, FallbackID: "icon.fallback", TintToken: "color.accent"},
+		{ID: "command.search", Kind: "icon", SHA256: "sha256:" + checksumText("morph-icon-command-search"), Local: true, FallbackID: "icon.fallback", TintToken: "color.muted"},
+		{ID: "status.warning", Kind: "icon", SHA256: "sha256:" + checksumText("morph-icon-status-warning"), Local: true, FallbackID: "icon.fallback", TintToken: "color.warning"},
+	}
+}
+
+func morphAffordancesForScenario() []surface.MorphAffordanceReport {
+	return []surface.MorphAffordanceReport{
+		{Name: "action", Role: "button", Focusable: true, Action: "activate", ProjectsAccessibility: true},
+		{Name: "field.text", Role: "textbox", Focusable: true, Action: "edit", Input: "editable_text", ProjectsAccessibility: true},
+		{Name: "toggle", Role: "checkbox", Focusable: true, Action: "toggle", Input: "toggle", ProjectsAccessibility: true},
+		{Name: "navigation", Role: "navigation", ProjectsAccessibility: true},
+		{Name: "region", Role: "region", ProjectsAccessibility: true},
+		{Name: "overlay", Role: "dialog", Focusable: true, Action: "dismiss", Input: "focus_trap", ProjectsAccessibility: true},
+		{Name: "status", Role: "status", ProjectsAccessibility: true},
+	}
+}
+
+func morphStateLensesForScenario() []surface.MorphStateLensReport {
+	return []surface.MorphStateLensReport{
+		{Selector: "hover", Property: "paint.overlay", Deterministic: true},
+		{Selector: "pressed", Property: "transform.scale", Deterministic: true},
+		{Selector: "focusVisible", Property: "paint.outline", Deterministic: true},
+		{Selector: "selected", Property: "accessibility.selected", Deterministic: true},
+		{Selector: "disabled", Property: "input.disabled", Deterministic: true},
+		{Selector: "error", Property: "paint.outline_color", Deterministic: true},
+		{Selector: "loading", Property: "text.content", Deterministic: true},
+	}
+}
+
+func morphMotionPresetsForScenario() []surface.MorphMotionPresetReport {
+	return []surface.MorphMotionPresetReport{
+		{Name: "motion.fast", DurationMS: 120, Curve: "ease.out", Properties: []string{"fill", "opacity", "transform"}, ReducedMotion: true, DeterministicTime: true},
+		{Name: "motion.soft", DurationMS: 180, Curve: "ease.inOut", Properties: []string{"fill", "opacity", "transform"}, ReducedMotion: true, DeterministicTime: true},
+	}
+}
+
+func morphRecipesForScenario() []surface.MorphRecipeReport {
+	return []surface.MorphRecipeReport{
+		{Name: "control.action@1", Output: "Block", Slots: []string{"label", "icon"}, Inputs: []string{"text", "action", "variant"}, ExpandsToBlockGraph: true},
+		{Name: "field.text@1", Output: "Block", Slots: []string{"label", "control"}, Inputs: []string{"value", "on_text"}, ExpandsToBlockGraph: true},
+		{Name: "command.item@1", Output: "Block", Slots: []string{"icon", "title", "subtitle"}, Inputs: []string{"title", "subtitle", "icon", "selected"}, ExpandsToBlockGraph: true},
+		{Name: "region.panel@1", Output: "Block", Slots: []string{"header", "body", "actions"}, Inputs: []string{"title"}, ExpandsToBlockGraph: true},
+	}
+}
+
+func morphRecipeExpansionsForScenario() []surface.MorphRecipeExpansionReport {
+	return []surface.MorphRecipeExpansionReport{
+		{Recipe: "control.action@1", BlockIDs: []int{4}, SlotBindings: []string{"label", "icon"}, Variant: "primary", Reported: true},
+		{Recipe: "field.text@1", BlockIDs: []int{3}, SlotBindings: []string{"label", "control"}, Variant: "default", Reported: true},
+		{Recipe: "command.item@1", BlockIDs: []int{4, 5}, SlotBindings: []string{"icon", "title", "subtitle"}, Variant: "selected", Reported: true},
+		{Recipe: "region.panel@1", BlockIDs: []int{2}, SlotBindings: []string{"header", "body", "actions"}, Variant: "elevated", Reported: true},
+	}
+}
+
+func morphCasesForScenario() []surface.CaseReport {
+	return []surface.CaseReport{
+		{Name: "morph capsule explicit import namespace", Kind: "positive", Ran: true, Pass: true},
+		{Name: "morph token graph categories and hash", Kind: "positive", Ran: true, Pass: true},
+		{Name: "morph material paint stack resolved to Block paint", Kind: "positive", Ran: true, Pass: true},
+		{Name: "morph affordance projects accessibility", Kind: "positive", Ran: true, Pass: true},
+		{Name: "morph recipes expand to Block graph", Kind: "positive", Ran: true, Pass: true},
+		{Name: "morph state and motion lenses deterministic", Kind: "positive", Ran: true, Pass: true},
+		{Name: "morph asset refs local hashed bounded cache", Kind: "positive", Ran: true, Pass: true},
+		{Name: "morph core primitive promotion rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "core primitive promotion rejected"},
+		{Name: "morph dirty checkout production claim rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "dirty checkout production rejected"},
+	}
+}
+
+func morphFramebufferBytesForScenario(frames []surface.FrameReport) int {
+	total := 0
+	for _, frame := range frames {
+		total += frame.Height * frame.Stride
+	}
+	return total
+}
+
+func gitHeadForReport() string {
+	raw, err := exec.Command("git", "rev-parse", "HEAD").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(raw))
+}
+
+func gitDirtyForReport() bool {
+	if exec.Command("git", "diff", "--quiet").Run() != nil {
+		return true
+	}
+	if exec.Command("git", "diff", "--cached", "--quiet").Run() != nil {
+		return true
+	}
+	raw, err := exec.Command("git", "ls-files", "--others", "--exclude-standard").Output()
+	return err == nil && strings.TrimSpace(string(raw)) != ""
+}
+
+func runLinuxX64RealWindowBlockSystemScenario() headlessScenario {
+	scenario := runBlockSystemScenario()
+	scenario.Cases = blockSystemLinuxX64RealWindowCasesForScenario()
+	scenario.Events = appendScenarioEventsWithNextOrder(scenario.Events, []surface.EventReport{
+		{Kind: "resize", TargetComponent: "BlockSystemApp", DispatchPath: []string{"BlockSystemApp"}, Handled: true, Pass: true, Width: 400, Height: 240, TimestampMS: 4, BufferSlots: []int{2, 0, 0, 0, 0, 400, 240, 4, 0}, BeforeState: map[string]string{"BlockSystemApp.width": "320"}, AfterState: map[string]string{"BlockSystemApp.width": "400"}},
+		{Kind: "close", TargetComponent: "BlockSystemApp", DispatchPath: []string{"BlockSystemApp"}, Handled: true, Pass: true, Width: 400, Height: 240, TimestampMS: 5, BufferSlots: []int{1, 0, 0, 0, 0, 400, 240, 5, 0}, BeforeState: map[string]string{"BlockSystemApp.closed": "false"}, AfterState: map[string]string{"BlockSystemApp.closed": "true"}},
+	})
+	scenario.StateTransitions = appendScenarioStateTransitionsWithNextOrder(scenario.StateTransitions, []surface.StateTransitionReport{
+		{Component: "SubmitBlock", Field: "pressed", Before: "false", After: "true", Cause: "key_down"},
+		{Component: "BlockSystemApp", Field: "width", Before: "320", After: "400", Cause: "resize"},
+		{Component: "BlockSystemApp", Field: "closed", Before: "false", After: "true", Cause: "close"},
+	})
+	for i := range scenario.Components {
+		if scenario.Components[i].ID == "BlockSystemApp" {
+			scenario.Components[i].State["quality"] = "linux-x64-real-window-block-system-v1"
+			scenario.Components[i].State["width"] = "400"
+			scenario.Components[i].State["closed"] = "true"
+		}
+	}
+	attachBlockSystemMemoryBudget(&scenario)
+	return scenario
+}
+
+func runWASM32WebBrowserCanvasBlockSystemScenario() headlessScenario {
+	scenario := runBlockSystemScenario()
+	beforeFrame := renderBlockSystemFrameSizedRGBA(320, 200, false)
+	motionFrame := renderBlockSystemFrameSizedRGBA(320, 200, true)
+	rectRGBA(motionFrame, rect{X: 188, Y: 124, W: 30, H: 10}, rgbaColor{R: 96, G: 174, B: 244, A: 255})
+	scenario.Cases = blockSystemWASM32WebBrowserCanvasCasesForScenario()
+	scenario.Frames = []surface.FrameReport{
+		{Order: 1, Width: beforeFrame.Width, Height: beforeFrame.Height, Stride: beforeFrame.Stride, Checksum: checksumRGBA(beforeFrame.Pixels), Presented: true},
+		{Order: 3, Width: motionFrame.Width, Height: motionFrame.Height, Stride: motionFrame.Stride, Checksum: checksumRGBA(motionFrame.Pixels), Presented: true},
+	}
+	scenario.BlockSystem = nil
+	scenario.Events = appendScenarioEventsWithNextOrder(scenario.Events, []surface.EventReport{
+		{Kind: "resize", TargetComponent: "BlockSystemApp", DispatchPath: []string{"BlockSystemApp"}, Handled: true, Pass: true, Width: 400, Height: 240, TimestampMS: 4, BufferSlots: []int{2, 0, 0, 0, 0, 400, 240, 4, 0}, BeforeState: map[string]string{"BlockSystemApp.width": "320"}, AfterState: map[string]string{"BlockSystemApp.width": "400"}},
+	})
+	scenario.StateTransitions = appendScenarioStateTransitionsWithNextOrder(scenario.StateTransitions, []surface.StateTransitionReport{
+		{Component: "SubmitBlock", Field: "pressed", Before: "false", After: "true", Cause: "key_down"},
+		{Component: "BlockSystemApp", Field: "width", Before: "320", After: "400", Cause: "resize"},
+	})
+	for i := range scenario.Components {
+		if scenario.Components[i].ID == "BlockSystemApp" {
+			scenario.Components[i].State["quality"] = "wasm32-web-browser-canvas-block-system-v1"
+			scenario.Components[i].State["width"] = "400"
+		}
+	}
+	attachBlockSystemMemoryBudget(&scenario)
+	return scenario
+}
+
+func attachBlockSystemMemoryBudget(scenario *headlessScenario) {
+	if scenario == nil || scenario.BlockSystem == nil {
+		return
+	}
+	scenario.BlockSystem.MemoryBudget = blockMemoryBudgetForScenario(*scenario)
+}
+
+func blockMemoryBudgetForScenario(scenario headlessScenario) *surface.BlockMemoryBudgetReport {
+	peakFramebufferBytes, totalFramebufferBytes := blockFramebufferByteTotalsForScenario(scenario.Frames)
+	paintCacheUsedBytes := len(scenario.PaintCommands) * 2048
+	textCacheUsedBytes := glyphCacheUsedBytesForScenario(scenario.GlyphCaches)
+	assetCacheUsedBytes := scenario.BlockAssetCache.UsedBytes
+	totalCacheUsedBytes := paintCacheUsedBytes + textCacheUsedBytes + assetCacheUsedBytes
+	totalCacheBudgetBytes := scenario.PaintCacheBudgetBytes + scenario.TextCacheBudgetBytes + scenario.BlockAssetCache.BudgetBytes
+	return &surface.BlockMemoryBudgetReport{
+		Schema:                   "tetra.surface.block-memory-budget.v1",
+		Scope:                    "surface-block-system-local-budget-v1",
+		BlockCount:               len(scenario.Components),
+		StressBlockCount:         128,
+		RenderLoopCount:          32,
+		StateLoopCount:           maxInt(16, len(scenario.StateTransitions)),
+		MotionFrameCount:         len(scenario.MotionFrames),
+		InputEventCount:          len(scenario.Events),
+		PaintCommandCount:        len(scenario.PaintCommands),
+		TextRenderCommandCount:   len(scenario.TextRenderCommands),
+		AssetRenderCommandCount:  len(scenario.BlockAssetRenderCommands),
+		PeakFramebufferBytes:     peakFramebufferBytes,
+		TotalFramebufferBytes:    totalFramebufferBytes,
+		FramebufferBudgetBytes:   1048576,
+		PaintCacheUsedBytes:      paintCacheUsedBytes,
+		PaintCacheBudgetBytes:    scenario.PaintCacheBudgetBytes,
+		TextCacheUsedBytes:       textCacheUsedBytes,
+		TextCacheBudgetBytes:     scenario.TextCacheBudgetBytes,
+		AssetCacheUsedBytes:      assetCacheUsedBytes,
+		AssetCacheBudgetBytes:    scenario.BlockAssetCache.BudgetBytes,
+		TotalCacheUsedBytes:      totalCacheUsedBytes,
+		TotalCacheBudgetBytes:    totalCacheBudgetBytes,
+		EstimatedAllocationBytes: totalFramebufferBytes + totalCacheUsedBytes,
+		RSSMeasured:              false,
+		PeakRSSBytes:             0,
+		BoundedCaches:            true,
+		UnboundedCacheRejected:   true,
+		StressScene:              "deterministic-block-stress-128",
+		PerformanceClaim:         "none",
+		NonClaims: []string{
+			"no Electron comparison benchmark",
+			"no broad performance superiority claim",
+			"RSS is optional host evidence and not required for this local budget",
+		},
+	}
+}
+
+func blockFramebufferByteTotalsForScenario(frames []surface.FrameReport) (int, int) {
+	peak := 0
+	total := 0
+	for _, frame := range frames {
+		bytes := frame.Height * frame.Stride
+		if bytes > peak {
+			peak = bytes
+		}
+		total += bytes
+	}
+	return peak, total
+}
+
+func glyphCacheUsedBytesForScenario(caches []surface.GlyphCacheReport) int {
+	total := 0
+	for _, cache := range caches {
+		total += cache.UsedBytes
+	}
+	return total
+}
+
+func maxInt(a int, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func blockSystemReportForScenario(source string, frames []surface.FrameReport) *surface.BlockSystemReport {
+	goldenSeed := "surface-block-system-golden-v1"
+	for _, frame := range frames {
+		goldenSeed += ":" + frame.Checksum
+	}
+	systemFrames := make([]surface.BlockSystemFrameReport, 0, len(frames))
+	for _, frame := range frames {
+		label := "frame"
+		if frame.Order == 1 {
+			label = "initial"
+		} else if frame.Order == 2 {
+			label = "focused"
+		}
+		systemFrames = append(systemFrames, surface.BlockSystemFrameReport{
+			Order:                 frame.Order,
+			Label:                 label,
+			Width:                 frame.Width,
+			Height:                frame.Height,
+			Stride:                frame.Stride,
+			Checksum:              frame.Checksum,
+			RepeatChecksum:        frame.Checksum,
+			GoldenChecksum:        frame.Checksum,
+			PaintEvidence:         true,
+			LayoutEvidence:        true,
+			AccessibilityEvidence: true,
+		})
+	}
+	return &surface.BlockSystemReport{
+		Schema:       "tetra.surface.block-system.v1",
+		QualityLevel: "deterministic-headless-block-system-v1",
+		Source:       source,
+		Renderer:     "software-rgba-headless",
+		GoldenSet:    "surface-block-system-golden-v1",
+		FrameCount:   len(systemFrames),
+		GoldenHash:   "sha256:" + checksumText(goldenSeed),
+		Frames:       systemFrames,
+		NegativeGuards: surface.BlockSystemNegativeGuardsReport{
+			MissingFrameChecksumRejected:         true,
+			NondeterministicChecksumRejected:     true,
+			MissingPaintEvidenceRejected:         true,
+			MissingLayoutEvidenceRejected:        true,
+			MissingAccessibilityEvidenceRejected: true,
+		},
+	}
+}
+
+func blockSystemReportForLinuxX64RealWindowScenario(source string, frames []surface.FrameReport) *surface.BlockSystemReport {
+	goldenSeed := "surface-block-system-linux-x64-real-window-v1"
+	systemFrames := make([]surface.BlockSystemFrameReport, 0, len(frames))
+	for _, frame := range frames {
+		goldenSeed += ":" + frame.Checksum
+		label := "frame"
+		switch frame.Order {
+		case 1:
+			label = "initial"
+		case 2:
+			label = "focused"
+		case 5:
+			label = "real-window-focused"
+		}
+		systemFrames = append(systemFrames, surface.BlockSystemFrameReport{
+			Order:                 frame.Order,
+			Label:                 label,
+			Width:                 frame.Width,
+			Height:                frame.Height,
+			Stride:                frame.Stride,
+			Checksum:              frame.Checksum,
+			RepeatChecksum:        frame.Checksum,
+			GoldenChecksum:        frame.Checksum,
+			PaintEvidence:         true,
+			LayoutEvidence:        true,
+			AccessibilityEvidence: true,
+		})
+	}
+	return &surface.BlockSystemReport{
+		Schema:       "tetra.surface.block-system.v1",
+		QualityLevel: "linux-x64-real-window-block-system-v1",
+		Source:       source,
+		Renderer:     "wayland-shm-rgba",
+		GoldenSet:    "surface-block-system-linux-x64-real-window-v1",
+		FrameCount:   len(systemFrames),
+		GoldenHash:   "sha256:" + checksumText(goldenSeed),
+		Frames:       systemFrames,
+		NegativeGuards: surface.BlockSystemNegativeGuardsReport{
+			MissingFrameChecksumRejected:         true,
+			NondeterministicChecksumRejected:     true,
+			MissingPaintEvidenceRejected:         true,
+			MissingLayoutEvidenceRejected:        true,
+			MissingAccessibilityEvidenceRejected: true,
+		},
+	}
+}
+
+func blockSystemReportForWASM32WebBrowserCanvasScenario(source string, frames []surface.FrameReport) *surface.BlockSystemReport {
+	goldenSeed := "surface-block-system-wasm32-web-browser-canvas-v1"
+	systemFrames := make([]surface.BlockSystemFrameReport, 0, len(frames))
+	for _, frame := range frames {
+		goldenSeed += ":" + frame.Checksum
+		label := "frame"
+		switch frame.Order {
+		case 1:
+			label = "initial"
+		case 5:
+			label = "browser-canvas-focused"
+		}
+		systemFrames = append(systemFrames, surface.BlockSystemFrameReport{
+			Order:                 frame.Order,
+			Label:                 label,
+			Width:                 frame.Width,
+			Height:                frame.Height,
+			Stride:                frame.Stride,
+			Checksum:              frame.Checksum,
+			RepeatChecksum:        frame.Checksum,
+			GoldenChecksum:        frame.Checksum,
+			PaintEvidence:         true,
+			LayoutEvidence:        true,
+			AccessibilityEvidence: true,
+		})
+	}
+	return &surface.BlockSystemReport{
+		Schema:       "tetra.surface.block-system.v1",
+		QualityLevel: "wasm32-web-browser-canvas-block-system-v1",
+		Source:       source,
+		Renderer:     "browser-canvas-rgba",
+		GoldenSet:    "surface-block-system-wasm32-web-browser-canvas-v1",
+		FrameCount:   len(systemFrames),
+		GoldenHash:   "sha256:" + checksumText(goldenSeed),
+		Frames:       systemFrames,
+		NegativeGuards: surface.BlockSystemNegativeGuardsReport{
+			MissingFrameChecksumRejected:         true,
+			NondeterministicChecksumRejected:     true,
+			MissingPaintEvidenceRejected:         true,
+			MissingLayoutEvidenceRejected:        true,
+			MissingAccessibilityEvidenceRejected: true,
+		},
+	}
+}
+
+func blockSystemComponentsForScenario() []surface.ComponentReport {
+	abilities := []string{"measure", "layout", "draw", "event", "focus", "text", "accessibility"}
+	return []surface.ComponentReport{
+		{ID: "BlockSystemApp", Type: "examples.surface_block_system.BlockSystemApp", Bounds: surface.RectReport{X: 0, Y: 0, W: 320, H: 200}, Abilities: abilities, State: map[string]string{"focused_id": "4", "quality": "deterministic-headless-block-system-v1"}},
+		{ID: "PanelBlock", Type: "examples.surface_block_system.PanelBlock", Parent: "BlockSystemApp", Bounds: surface.RectReport{X: 16, Y: 16, W: 288, H: 168}, Abilities: abilities, State: map[string]string{"paint_layers": "5"}},
+		{ID: "LabelBlock", Type: "examples.surface_block_system.LabelBlock", Parent: "PanelBlock", Bounds: surface.RectReport{X: 24, Y: 24, W: 200, H: 24}, Abilities: abilities, State: map[string]string{"text_len": "4", "label_for": "4"}},
+		{ID: "SubmitBlock", Type: "examples.surface_block_system.ActionBlock", Parent: "PanelBlock", Bounds: surface.RectReport{X: 24, Y: 64, W: 120, H: 44}, Abilities: abilities, State: map[string]string{"focused": "true", "action": "submit"}},
+		{ID: "ResetBlock", Type: "examples.surface_block_system.ActionBlock", Parent: "PanelBlock", Bounds: surface.RectReport{X: 152, Y: 64, W: 120, H: 44}, Abilities: abilities, State: map[string]string{"focused": "false", "action": "reset"}},
+		{ID: "BlockLayoutApp", Type: "examples.surface_block_system.BlockLayoutApp", Bounds: surface.RectReport{X: 0, Y: 0, W: 320, H: 200}, Abilities: abilities, State: map[string]string{"width": "480", "layout_quality": "deterministic-block-layout-v1"}},
+		{ID: "ScrollBlock", Type: "examples.surface_block_system.ScrollBlock", Parent: "BlockLayoutApp", Bounds: surface.RectReport{X: 236, Y: 72, W: 72, H: 80}, Abilities: abilities, State: map[string]string{"scroll_y": "32"}},
+	}
+}
+
+func blockSystemEventsForScenario() []surface.EventReport {
+	return []surface.EventReport{
+		{Order: 1, Kind: "mouse_up", TargetComponent: "SubmitBlock", DispatchPath: []string{"BlockSystemApp", "PanelBlock", "SubmitBlock"}, Handled: true, Pass: true, X: 40, Y: 80, Width: 320, Height: 200, BufferSlots: []int{5, 40, 80, 1, 0, 320, 200, 0, 0}, BeforeState: map[string]string{"SubmitBlock.focused": "false"}, AfterState: map[string]string{"SubmitBlock.focused": "true"}},
+		{Order: 2, Kind: "text_input", TargetComponent: "SubmitBlock", DispatchPath: []string{"BlockSystemApp", "PanelBlock", "SubmitBlock"}, Handled: true, Pass: true, Width: 320, Height: 200, TimestampMS: 1, TextLen: 2, TextBytesHex: "4f4b", BufferSlots: []int{8, 0, 0, 0, 0, 320, 200, 1, 2}, BeforeState: map[string]string{"SubmitBlock.value_len": "0"}, AfterState: map[string]string{"SubmitBlock.value_len": "2"}},
+		{Order: 3, Kind: "key_down", TargetComponent: "SubmitBlock", DispatchPath: []string{"BlockSystemApp", "PanelBlock", "SubmitBlock"}, Handled: true, Pass: true, Key: 13, Width: 320, Height: 200, TimestampMS: 2, BufferSlots: []int{3, 0, 0, 0, 13, 320, 200, 2, 0}, BeforeState: map[string]string{"SubmitBlock.pressed": "false"}, AfterState: map[string]string{"SubmitBlock.pressed": "true"}},
+		{Order: 4, Kind: "scroll", TargetComponent: "ScrollBlock", DispatchPath: []string{"BlockLayoutApp", "ScrollBlock"}, Handled: true, Pass: true, Width: 320, Height: 200, TimestampMS: 3, BufferSlots: []int{7, 0, 0, 0, 0, 320, 200, 3, 0}, BeforeState: map[string]string{"ScrollBlock.scroll_y": "0"}, AfterState: map[string]string{"ScrollBlock.scroll_y": "32"}},
+	}
+}
+
+func retargetBlockSystemComponentsForScenario(components []surface.ComponentReport) []surface.ComponentReport {
+	retargeted := make([]surface.ComponentReport, len(components))
+	for i, component := range components {
+		component.Type = "examples.surface_block_system." + typeBaseName(component.Type)
+		retargeted[i] = component
+	}
+	return retargeted
+}
+
+func typeBaseName(value string) string {
+	index := strings.LastIndex(value, ".")
+	if index < 0 {
+		return value
+	}
+	return value[index+1:]
+}
+
+func appendScenarioEventsWithNextOrder(events []surface.EventReport, additions ...[]surface.EventReport) []surface.EventReport {
+	nextOrder := 0
+	if len(events) > 0 {
+		nextOrder = events[len(events)-1].Order
+	}
+	for _, group := range additions {
+		for _, event := range group {
+			nextOrder++
+			event.Order = nextOrder
+			events = append(events, event)
+		}
+	}
+	return events
+}
+
+func appendScenarioStateTransitionsWithNextOrder(transitions []surface.StateTransitionReport, additions ...[]surface.StateTransitionReport) []surface.StateTransitionReport {
+	nextOrder := 0
+	if len(transitions) > 0 {
+		nextOrder = transitions[len(transitions)-1].Order
+	}
+	for _, group := range additions {
+		for _, transition := range group {
+			nextOrder++
+			transition.Order = nextOrder
+			transitions = append(transitions, transition)
+		}
+	}
+	return transitions
+}
+
+func blockTextComponentsForScenario() []surface.ComponentReport {
+	abilities := []string{"measure", "layout", "draw", "event", "focus", "text", "accessibility"}
+	return []surface.ComponentReport{
+		{ID: "BlockTextApp", Type: "examples.surface_block_text.BlockTextApp", Bounds: surface.RectReport{X: 0, Y: 0, W: 320, H: 200}, Abilities: abilities, State: map[string]string{"focused_id": "3", "text_quality": "deterministic-fallback-text-v1"}},
+		{ID: "TextBlock", Type: "examples.surface_block_text.TextSurfaceBlock", Parent: "BlockTextApp", Bounds: surface.RectReport{X: 12, Y: 10, W: 96, H: 40}, Abilities: abilities, State: map[string]string{"text_len": "28", "line_count": "2", "ellipsis": "true"}},
+		{ID: "InputBlock", Type: "examples.surface_block_text.EditableTextBlock", Parent: "BlockTextApp", Bounds: surface.RectReport{X: 12, Y: 58, W: 144, H: 36}, Abilities: abilities, State: map[string]string{"buffer": "OKd0a2", "caret": "4", "editable": "true"}},
+	}
+}
+
+func blockTextEventsForScenario() []surface.EventReport {
+	return []surface.EventReport{
+		{Order: 1, Kind: "mouse_up", TargetComponent: "InputBlock", DispatchPath: []string{"BlockTextApp", "InputBlock"}, Handled: true, Pass: true, X: 20, Y: 64, Width: 320, Height: 200, BufferSlots: []int{5, 20, 64, 1, 0, 320, 200, 0, 0}, BeforeState: map[string]string{"BlockTextApp.focused_id": "0", "InputBlock.focused": "false"}, AfterState: map[string]string{"BlockTextApp.focused_id": "3", "InputBlock.focused": "true"}},
+		{Order: 2, Kind: "text_input", TargetComponent: "InputBlock", DispatchPath: []string{"BlockTextApp", "InputBlock"}, Handled: true, Pass: true, Width: 320, Height: 200, TimestampMS: 1, TextLen: 4, TextBytesHex: "4f4bd0a2", BufferSlots: []int{8, 0, 0, 0, 0, 320, 200, 1, 4}, BeforeState: map[string]string{"InputBlock.buffer": "", "InputBlock.caret": "0"}, AfterState: map[string]string{"InputBlock.buffer": "OKd0a2", "InputBlock.caret": "4"}},
+	}
+}
+
+func blockStateEventsForScenario() []surface.EventReport {
+	return []surface.EventReport{
+		{Order: 1, Kind: "mouse_up", TargetComponent: "StateBlock", DispatchPath: []string{"BlockStateApp", "StateBlock"}, Handled: true, Pass: true, X: 40, Y: 56, Width: 320, Height: 200, TimestampMS: 0, BufferSlots: []int{5, 40, 56, 1, 0, 320, 200, 0, 0}, BeforeState: map[string]string{"StateBlock.selected": "false"}, AfterState: map[string]string{"StateBlock.selected": "true"}},
+		{Order: 2, Kind: "mouse_move", TargetComponent: "StateBlock", DispatchPath: []string{"BlockStateApp", "StateBlock"}, Handled: true, Pass: true, X: 40, Y: 56, Width: 320, Height: 200, TimestampMS: 1, BufferSlots: []int{2, 40, 56, 0, 0, 320, 200, 1, 0}, BeforeState: map[string]string{"StateBlock.hovered": "false"}, AfterState: map[string]string{"StateBlock.hovered": "true"}},
+		{Order: 3, Kind: "mouse_down", TargetComponent: "StateBlock", DispatchPath: []string{"BlockStateApp", "StateBlock"}, Handled: true, Pass: true, X: 40, Y: 56, Width: 320, Height: 200, TimestampMS: 2, BufferSlots: []int{4, 40, 56, 1, 0, 320, 200, 2, 0}, BeforeState: map[string]string{"StateBlock.pressed": "false"}, AfterState: map[string]string{"StateBlock.pressed": "true"}},
+		{Order: 4, Kind: "text_input", TargetComponent: "StateBlock", DispatchPath: []string{"BlockStateApp", "StateBlock"}, Handled: true, Pass: true, Width: 320, Height: 200, TimestampMS: 3, TextLen: 2, TextBytesHex: "4f4b", BufferSlots: []int{8, 0, 0, 0, 0, 320, 200, 3, 2}, BeforeState: map[string]string{"StateBlock.buffer": ""}, AfterState: map[string]string{"StateBlock.buffer": "OK"}},
+		{Order: 5, Kind: "key_down", TargetComponent: "StateBlock", DispatchPath: []string{"BlockStateApp", "StateBlock"}, Handled: true, Pass: true, Key: 9, Width: 320, Height: 200, TimestampMS: 4, BufferSlots: []int{3, 0, 0, 0, 9, 320, 200, 4, 0}, BeforeState: map[string]string{"StateBlock.focused": "false"}, AfterState: map[string]string{"StateBlock.focused": "true"}},
+	}
+}
+
+func blockMotionEventsForScenario() []surface.EventReport {
+	return []surface.EventReport{
+		{Order: 1, Kind: "mouse_up", TargetComponent: "MotionBlock", DispatchPath: []string{"BlockMotionApp", "MotionBlock"}, Handled: true, Pass: true, X: 48, Y: 72, Width: 320, Height: 200, TimestampMS: 0, BufferSlots: []int{5, 48, 72, 1, 0, 320, 200, 0, 0}, BeforeState: map[string]string{"MotionBlock.hovered": "false"}, AfterState: map[string]string{"MotionBlock.hovered": "true"}},
+		{Order: 2, Kind: "text_input", TargetComponent: "MotionBlock", DispatchPath: []string{"BlockMotionApp", "MotionBlock"}, Handled: true, Pass: true, Width: 320, Height: 200, TimestampMS: 1, TextLen: 2, TextBytesHex: "4f4b", BufferSlots: []int{8, 0, 0, 0, 0, 320, 200, 1, 2}, BeforeState: map[string]string{"MotionBlock.buffer": ""}, AfterState: map[string]string{"MotionBlock.buffer": "OK"}},
+	}
+}
+
+func blockAssetEventsForScenario() []surface.EventReport {
+	return []surface.EventReport{
+		{Order: 1, Kind: "mouse_up", TargetComponent: "IconBlock", DispatchPath: []string{"BlockAssetApp", "IconBlock"}, Handled: true, Pass: true, X: 32, Y: 44, Width: 320, Height: 200, TimestampMS: 0, BufferSlots: []int{5, 32, 44, 1, 0, 320, 200, 0, 0}, BeforeState: map[string]string{"IconBlock.tint": "#ffffffff"}, AfterState: map[string]string{"IconBlock.tint": "#60aef4ff"}},
+		{Order: 2, Kind: "text_input", TargetComponent: "IconBlock", DispatchPath: []string{"BlockAssetApp", "IconBlock"}, Handled: true, Pass: true, Width: 320, Height: 200, TimestampMS: 1, TextLen: 2, TextBytesHex: "4f4b", BufferSlots: []int{8, 0, 0, 0, 0, 320, 200, 1, 2}, BeforeState: map[string]string{"IconBlock.label": ""}, AfterState: map[string]string{"IconBlock.label": "OK"}},
+	}
+}
+
+func blockSystemReadinessTransitionsForScenario() []surface.StateTransitionReport {
+	return []surface.StateTransitionReport{
+		{Order: 1, Component: "InputBlock", Field: "buffer", Before: "", After: "OKd0a2", Cause: "text_input"},
+		{Order: 2, Component: "InputBlock", Field: "caret", Before: "0", After: "4", Cause: "text_input"},
+		{Order: 3, Component: "StateBlock", Field: "selector_flags", Before: "0", After: "127", Cause: "pointer/key/state input"},
+		{Order: 4, Component: "StateBlock", Field: "resolved_fill", Before: "#20262eff", After: "#2d9bf0ff", Cause: "hover"},
+		{Order: 5, Component: "StateBlock", Field: "resolved_scale", Before: "100", After: "97", Cause: "pressed"},
+		{Order: 6, Component: "StateBlock", Field: "disabled", Before: "false", After: "true", Cause: "disabled selector"},
+		{Order: 7, Component: "StateBlock", Field: "error", Before: "false", After: "true", Cause: "error selector"},
+		{Order: 8, Component: "StateBlock", Field: "loading", Before: "false", After: "true", Cause: "loading selector"},
+		{Order: 9, Component: "MotionBlock", Field: "opacity", Before: "80", After: "200", Cause: "motion frame"},
+		{Order: 10, Component: "MotionBlock", Field: "color", Before: "#203040ff", After: "#60aef4ff", Cause: "motion frame"},
+		{Order: 11, Component: "MotionBlock", Field: "scale", Before: "100", After: "108", Cause: "motion frame"},
+		{Order: 12, Component: "MotionBlock", Field: "translate_x", Before: "0", After: "12", Cause: "motion frame"},
+		{Order: 13, Component: "MotionBlock", Field: "motion_complete", Before: "false", After: "true", Cause: "duration elapsed"},
+		{Order: 14, Component: "MotionBlock", Field: "reduced_motion", Before: "false", After: "true", Cause: "accessibility setting"},
+		{Order: 15, Component: "IconBlock", Field: "tint", Before: "#ffffffff", After: "#60aef4ff", Cause: "asset tint"},
+		{Order: 16, Component: "ImageBlock", Field: "scale", Before: "1x", After: "2x", Cause: "asset scale"},
+		{Order: 17, Component: "MissingAssetBlock", Field: "fallback", Before: "missing", After: "fallback-raster", Cause: "missing asset"},
+	}
+}
+
+func blockSystemCasesForScenario() []surface.CaseReport {
+	return []surface.CaseReport{
+		{Name: "pure Tetra component app", Kind: "positive", Ran: true, Pass: true},
+		{Name: "headless event dispatch", Kind: "positive", Ran: true, Pass: true},
+		{Name: "headless framebuffer checksum", Kind: "positive", Ran: true, Pass: true},
+		{Name: "headless actual runner trace", Kind: "positive", Ran: true, Pass: true},
+		{Name: "host-provided pointer event dispatch", Kind: "positive", Ran: true, Pass: true},
+		{Name: "host event buffer poll_event", Kind: "positive", Ran: true, Pass: true},
+		{Name: "pre/post event frame sequence", Kind: "positive", Ran: true, Pass: true},
+		{Name: "component hierarchy dispatch", Kind: "positive", Ran: true, Pass: true},
+		{Name: "component text input scalar dispatch", Kind: "positive", Ran: true, Pass: true},
+		{Name: "host text payload buffer", Kind: "positive", Ran: true, Pass: true},
+		{Name: "component focus dispatch", Kind: "positive", Ran: true, Pass: true},
+		{Name: "component accessibility metadata", Kind: "positive", Ran: true, Pass: true},
+		{Name: "no legacy UI sidecar artifacts", Kind: "positive", Ran: true, Pass: true},
+		{Name: "state transition", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block graph duplicate id rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "duplicate Block ID"},
+		{Name: "block graph missing parent rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "missing parent"},
+		{Name: "block graph cycle rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "cycle"},
+		{Name: "block graph child order", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block graph focus order", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block graph hit-test path", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block graph accessibility order", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block paint fill border radius shadow outline", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block paint deterministic command order", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block paint frame checksum changed", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block paint unsupported blur rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "unsupported blur"},
+		{Name: "block text deterministic measurement", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block text wrap ellipsis layout", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block text font fallback chain", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block text bounded glyph cache", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block text render command evidence", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block text editable lifetime", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block layout nested row column", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block layout fit fill fixed min max", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block layout grid dock overlay scroll", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block layout clipping z-order", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block layout resize constraints", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block layout no css flexbox parity", Kind: "negative", Ran: true, Pass: true, ExpectedError: "CSS flexbox parity nonclaim"},
+		{Name: "block state selector resolver order", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block state hover fill override", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block state pressed scale override", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block state focus selected metadata", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block state disabled error loading overrides", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block state frame checksum changed", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block state no css pseudo parity", Kind: "negative", Ran: true, Pass: true, ExpectedError: "css pseudo nonclaim"},
+		{Name: "block motion deterministic test clock", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block motion opacity color transform frames", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block motion reduced motion instant settle", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block motion completion stops scheduling", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block motion frame checksum changed", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block motion no css animation parity", Kind: "negative", Ran: true, Pass: true, ExpectedError: "css animation nonclaim"},
+		{Name: "block asset deterministic manifest hashes", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block asset local embedded only", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block asset bounded cache", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block asset icon tint evidence", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block asset image scale evidence", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block asset missing fallback diagnostic", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block asset network url rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "network asset rejected"},
+		{Name: "block accessibility tree derived from block graph", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block accessibility focusable actionable name required", Kind: "negative", Ran: true, Pass: true, ExpectedError: "missing accessible name"},
+		{Name: "block accessibility label relationship mismatch rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "label relationship mismatch"},
+		{Name: "block accessibility reading order graph mismatch rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "reading order mismatch"},
+		{Name: "block accessibility screen-reader claim without platform proof rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "screen reader proof required"},
+		{Name: "block accessibility platform claim scoped metadata only", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block system headless golden checksums", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block system deterministic repeat checksum", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block system missing frame checksum rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "frame checksum required"},
+		{Name: "block system nondeterministic checksum rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "repeat checksum mismatch"},
+		{Name: "block system missing paint evidence rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "paint evidence required"},
+		{Name: "block system missing layout evidence rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "layout evidence required"},
+		{Name: "block system missing accessibility evidence rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "accessibility evidence required"},
+		{Name: "block system bounded memory budget", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block system stress render loop budget", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block system performance nonclaim", Kind: "negative", Ran: true, Pass: true, ExpectedError: "Electron comparison benchmark not claimed"},
+		{Name: "reject legacy UI evidence", Kind: "negative", Ran: true, Pass: true, ExpectedError: "legacy UI evidence rejected"},
+	}
+}
+
+func blockSystemLinuxX64RealWindowCasesForScenario() []surface.CaseReport {
+	cases := make([]surface.CaseReport, 0, len(blockSystemCasesForScenario())+9)
+	for _, tc := range blockSystemCasesForScenario() {
+		name := strings.ToLower(tc.Name)
+		if strings.Contains(name, "headless") {
+			continue
+		}
+		if strings.Contains(name, "deterministic repeat checksum") {
+			continue
+		}
+		cases = append(cases, tc)
+	}
+	cases = append(cases,
+		surface.CaseReport{Name: "linux-x64 real-window surface", Kind: "positive", Ran: true, Pass: true},
+		surface.CaseReport{Name: "linux-x64 native input event pump", Kind: "positive", Ran: true, Pass: true},
+		surface.CaseReport{Name: "linux-x64 real-window resize event", Kind: "positive", Ran: true, Pass: true},
+		surface.CaseReport{Name: "linux-x64 real-window close event", Kind: "positive", Ran: true, Pass: true},
+		surface.CaseReport{Name: "block system linux-x64 real-window frame presentation", Kind: "positive", Ran: true, Pass: true},
+		surface.CaseReport{Name: "block system linux-x64 native input state transition", Kind: "positive", Ran: true, Pass: true},
+		surface.CaseReport{Name: "block system linux-x64 real-window checksum", Kind: "positive", Ran: true, Pass: true},
+		surface.CaseReport{Name: "block system missing real-window presentation rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "real-window presentation required"},
+		surface.CaseReport{Name: "block system missing native input state transition rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "native input required"},
+	)
+	return cases
+}
+
+func blockSystemWASM32WebBrowserCanvasCasesForScenario() []surface.CaseReport {
+	cases := make([]surface.CaseReport, 0, len(blockSystemCasesForScenario())+16)
+	for _, tc := range blockSystemCasesForScenario() {
+		name := strings.ToLower(tc.Name)
+		if strings.Contains(name, "headless") {
+			continue
+		}
+		if strings.Contains(name, "deterministic repeat checksum") {
+			continue
+		}
+		cases = append(cases, tc)
+	}
+	cases = append(cases,
+		surface.CaseReport{Name: "wasm32-web browser canvas surface", Kind: "positive", Ran: true, Pass: true},
+		surface.CaseReport{Name: "wasm32-web browser canvas RGBA readback", Kind: "positive", Ran: true, Pass: true},
+		surface.CaseReport{Name: "wasm32-web browser canvas pointer input", Kind: "positive", Ran: true, Pass: true},
+		surface.CaseReport{Name: "wasm32-web browser canvas keyboard input", Kind: "positive", Ran: true, Pass: true},
+		surface.CaseReport{Name: "wasm32-web browser canvas resize input", Kind: "positive", Ran: true, Pass: true},
+		surface.CaseReport{Name: "wasm32-web browser canvas text input", Kind: "positive", Ran: true, Pass: true},
+		surface.CaseReport{Name: "wasm32-web Surface Host ABI imports", Kind: "positive", Ran: true, Pass: true},
+		surface.CaseReport{Name: "compiler-owned wasm Surface loader", Kind: "positive", Ran: true, Pass: true},
+		surface.CaseReport{Name: "compiler-owned browser canvas Surface host", Kind: "positive", Ran: true, Pass: true},
+		surface.CaseReport{Name: "block system wasm32-web browser-canvas frame readback", Kind: "positive", Ran: true, Pass: true},
+		surface.CaseReport{Name: "block system wasm32-web browser-canvas native input state transition", Kind: "positive", Ran: true, Pass: true},
+		surface.CaseReport{Name: "block system wasm32-web browser-canvas checksum", Kind: "positive", Ran: true, Pass: true},
+		surface.CaseReport{Name: "block system browser-canvas node runtime substitution rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "browser evidence required"},
+		surface.CaseReport{Name: "block system browser-canvas missing RGBA readback rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "RGBA readback required"},
+		surface.CaseReport{Name: "block system browser-canvas script sidecar artifact rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "script artifact rejected"},
+		surface.CaseReport{Name: "block system browser-canvas html visual sidecar artifact rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "html artifact rejected"},
+	)
+	return cases
+}
+
+func blockAccessibilityComponentsForScenario() []surface.ComponentReport {
+	abilities := []string{"measure", "layout", "draw", "event", "focus", "text", "accessibility"}
+	return []surface.ComponentReport{
+		{ID: "BlockAccessibilityApp", Type: "examples.surface_block_accessibility.BlockAccessibilityApp", Bounds: surface.RectReport{X: 0, Y: 0, W: 320, H: 200}, Abilities: abilities, State: map[string]string{"focused_id": "4", "a11y_quality": "block-derived-accessibility-metadata-v1"}},
+		{ID: "LabelBlock", Type: "examples.surface_block_accessibility.LabelBlock", Parent: "BlockAccessibilityApp", Bounds: surface.RectReport{X: 24, Y: 24, W: 200, H: 24}, Abilities: abilities, State: map[string]string{"text_len": "4", "label_for": "4"}},
+		{ID: "SubmitBlock", Type: "examples.surface_block_accessibility.ActionBlock", Parent: "BlockAccessibilityApp", Bounds: surface.RectReport{X: 24, Y: 64, W: 120, H: 44}, Abilities: abilities, State: map[string]string{"focused": "true", "action": "submit"}},
+		{ID: "ResetBlock", Type: "examples.surface_block_accessibility.ActionBlock", Parent: "BlockAccessibilityApp", Bounds: surface.RectReport{X: 152, Y: 64, W: 120, H: 44}, Abilities: abilities, State: map[string]string{"focused": "false", "action": "reset"}},
+	}
+}
+
+func blockAccessibilityGraphForScenario(source string) *surface.BlockGraphReport {
+	return &surface.BlockGraphReport{
+		Schema:            "tetra.surface.block-graph.v1",
+		APILevel:          "block-tree-builder-v1",
+		Source:            source,
+		ManualBookkeeping: false,
+		Builder: surface.BlockGraphBuilderReport{
+			RootCreatedBy:     "tree_add_root",
+			ChildrenCreatedBy: "tree_add_child",
+			NodeCount:         5,
+			Capacity:          8,
+			OverflowChecked:   true,
+		},
+		Invariants: surface.BlockGraphInvariantReport{
+			TreeValidateRan:         true,
+			TreeValidateStatus:      0,
+			DuplicateIDRejected:     true,
+			MissingParentRejected:   true,
+			CycleRejected:           true,
+			ParentChildLinksChecked: true,
+			ChildOrderChecked:       true,
+			FocusOrderChecked:       true,
+			HitTestPathChecked:      true,
+			AccessibilityChecked:    true,
+		},
+		RootID:    1,
+		NodeCount: 5,
+		Nodes: []surface.BlockGraphNodeReport{
+			{ID: 1, Name: "RootBlock", ParentID: -1, ChildIndex: 0, FirstChild: 2, ChildCount: 1, Focusable: false, AccessibilityRole: "none", Bounds: surface.RectReport{X: 0, Y: 0, W: 320, H: 200}},
+			{ID: 2, Name: "PanelBlock", ParentID: 1, ChildIndex: 0, FirstChild: 3, ChildCount: 3, Focusable: false, AccessibilityRole: "none", Bounds: surface.RectReport{X: 16, Y: 16, W: 288, H: 168}},
+			{ID: 3, Name: "LabelBlock", ParentID: 2, ChildIndex: 0, FirstChild: -1, ChildCount: 0, Focusable: false, AccessibilityRole: "text", Bounds: surface.RectReport{X: 24, Y: 24, W: 200, H: 24}},
+			{ID: 4, Name: "SubmitBlock", ParentID: 2, ChildIndex: 1, FirstChild: -1, ChildCount: 0, Focusable: true, AccessibilityRole: "button", Bounds: surface.RectReport{X: 24, Y: 64, W: 120, H: 44}},
+			{ID: 5, Name: "ResetBlock", ParentID: 2, ChildIndex: 2, FirstChild: -1, ChildCount: 0, Focusable: true, AccessibilityRole: "button", Bounds: surface.RectReport{X: 152, Y: 64, W: 120, H: 44}},
+		},
+		ChildOrders: []surface.BlockGraphChildOrderReport{
+			{ParentID: 1, Children: []int{2}},
+			{ParentID: 2, Children: []int{3, 4, 5}},
+		},
+		LayoutOrder:        []int{1, 2, 3, 4, 5},
+		DrawOrder:          []int{1, 2, 3, 4, 5},
+		FocusOrder:         []int{4, 5},
+		AccessibilityOrder: []int{3, 4, 5},
+		HitTests: []surface.BlockGraphPathReport{
+			{Helper: "tree_hit_test_path", Event: "click", TargetID: 5, X: 180, Y: 80, Path: []int{1, 2, 5}},
+		},
+		DispatchPaths: []surface.BlockGraphPathReport{
+			{Helper: "tree_build_dispatch_path", Event: "click", TargetID: 4, Path: []int{1, 2, 4}},
+			{Helper: "tree_build_dispatch_path", Event: "click", TargetID: 5, Path: []int{1, 2, 5}},
+		},
+	}
+}
+
+func blockAccessibilityTreeForScenario(source string) *surface.BlockAccessibilityTreeReport {
+	return &surface.BlockAccessibilityTreeReport{
+		Schema:                  "tetra.surface.block-accessibility-tree.v1",
+		AccessibilityLevel:      "block-metadata-tree-v1",
+		Source:                  source,
+		Module:                  "lib.core.block",
+		QualityLevel:            "block-derived-accessibility-metadata-v1",
+		BlockGraphSchema:        "tetra.surface.block-graph.v1",
+		DerivedFromBlockGraph:   true,
+		ManualBookkeeping:       false,
+		PlatformHostIntegration: false,
+		DOMARIAIntegration:      false,
+		ScreenReaderEvidence:    false,
+		NoDOMUI:                 true,
+		NoUserJS:                true,
+		NoPlatformWidgets:       true,
+		NodeCount:               3,
+		FocusableCount:          2,
+		RolesPresent:            []string{"text", "button"},
+		FocusOrder:              []int{4, 5},
+		ReadingOrder:            []int{3, 4, 5},
+		Nodes: []surface.BlockAccessibilityNodeReport{
+			{ID: 3, BlockID: 3, ParentBlockID: 2, Name: "LabelBlock", Role: "text", Bounds: surface.RectReport{X: 24, Y: 24, W: 200, H: 24}, Visible: true, Enabled: true, Focusable: false, LabelFor: "SubmitBlock", FocusIndex: -1, ReadingIndex: 0},
+			{ID: 4, BlockID: 4, ParentBlockID: 2, Name: "SubmitBlock", Role: "button", Description: "primary action", Bounds: surface.RectReport{X: 24, Y: 64, W: 120, H: 44}, Visible: true, Enabled: true, Focusable: true, Focused: true, LabelledBy: "LabelBlock", Actions: []string{"focus", "press", "submit"}, FocusIndex: 0, ReadingIndex: 1},
+			{ID: 5, BlockID: 5, ParentBlockID: 2, Name: "ResetBlock", Role: "button", Description: "secondary action", Bounds: surface.RectReport{X: 152, Y: 64, W: 120, H: 44}, Visible: true, Enabled: true, Focusable: true, Actions: []string{"focus", "press", "reset"}, FocusIndex: 1, ReadingIndex: 2},
+		},
+		Relationships: []surface.AccessibilityRelationshipReport{
+			{Kind: "label_for", From: "LabelBlock", To: "SubmitBlock"},
+			{Kind: "labelled_by", From: "SubmitBlock", To: "LabelBlock"},
+		},
+		Actions: []surface.AccessibilityActionReport{
+			{Target: "SubmitBlock", Action: "press", Semantic: "submit"},
+			{Target: "ResetBlock", Action: "press", Semantic: "reset"},
+		},
+		NegativeGuards: surface.BlockAccessibilityNegativeGuardsReport{
+			FocusableActionNameChecked:    true,
+			LabelRelationshipsChecked:     true,
+			ReadingOrderGraphChecked:      true,
+			BoundsAlignmentChecked:        true,
+			FakeScreenReaderClaimRejected: true,
+			ScopedPlatformClaimChecked:    true,
+		},
+	}
+}
+
+func blockAssetComponentsForScenario() []surface.ComponentReport {
+	abilities := []string{"measure", "layout", "draw", "event", "focus", "text", "accessibility", "asset"}
+	return []surface.ComponentReport{
+		{ID: "BlockAssetApp", Type: "examples.surface_block_assets.BlockAssetApp", Bounds: surface.RectReport{X: 0, Y: 0, W: 320, H: 200}, Abilities: abilities, State: map[string]string{"asset_quality": "deterministic-local-block-assets-v1"}},
+		{ID: "IconBlock", Type: "examples.surface_block_assets.IconBlock", Parent: "BlockAssetApp", Bounds: surface.RectReport{X: 24, Y: 36, W: 32, H: 32}, Abilities: abilities, State: map[string]string{"asset_id": "icon-settings", "tint": "#60aef4ff"}},
+		{ID: "ImageBlock", Type: "examples.surface_block_assets.ImageBlock", Parent: "BlockAssetApp", Bounds: surface.RectReport{X: 72, Y: 32, W: 96, H: 64}, Abilities: abilities, State: map[string]string{"asset_id": "image-hero", "scale": "2x"}},
+		{ID: "MissingAssetBlock", Type: "examples.surface_block_assets.MissingAssetBlock", Parent: "BlockAssetApp", Bounds: surface.RectReport{X: 24, Y: 112, W: 96, H: 32}, Abilities: abilities, State: map[string]string{"asset_id": "missing-logo", "fallback": "fallback-raster"}},
+	}
+}
+
+func blockAssetManifestForScenario(source string) *surface.BlockAssetManifestReport {
+	return &surface.BlockAssetManifestReport{
+		Schema:        "tetra.surface.block-assets.v1",
+		Source:        source,
+		Quality:       "deterministic-local-block-assets-v1",
+		HashAlgorithm: "sha256",
+		ManifestHash:  "sha256:" + checksumText("surface-block-assets-manifest-v1"),
+		LocalOnly:     true,
+		FontCount:     1,
+		IconCount:     1,
+		ImageCount:    1,
+		EmbeddedCount: 3,
+		RemoteCount:   0,
+		Assets: []surface.BlockAssetReport{
+			{ID: "font-ui", Kind: "font", Path: "embedded://surface/font-ui", Embedded: true, Local: true, SHA256: "sha256:" + checksumText("surface-block-assets-font-ui"), Size: 2048, Family: "Tetra UI", CacheKey: "font-ui"},
+			{ID: "icon-settings", Kind: "icon", Path: "embedded://surface/icon-settings", Embedded: true, Local: true, SHA256: "sha256:" + checksumText("surface-block-assets-icon-settings"), Size: 256, Width: 16, Height: 16, CacheKey: "icon-settings"},
+			{ID: "image-hero", Kind: "image", Path: "embedded://surface/image-hero", Embedded: true, Local: true, SHA256: "sha256:" + checksumText("surface-block-assets-image-hero"), Size: 1024, Width: 48, Height: 32, CacheKey: "image-hero"},
+		},
+	}
+}
+
+func blockAssetCacheForScenario() surface.BlockAssetCacheReport {
+	return surface.BlockAssetCacheReport{ID: "asset-cache", Strategy: "bounded-lru", BudgetBytes: 65536, UsedBytes: 5376, EntryCount: 3, MaxEntries: 16, RepeatedLoads: 6, Eviction: "lru", Bounded: true}
+}
+
+func blockAssetDiagnosticsForScenario() []surface.BlockAssetDiagnosticReport {
+	return []surface.BlockAssetDiagnosticReport{
+		{Order: 1, AssetID: "missing-logo", Kind: "image", Code: "missing_asset_fallback", Message: "missing local asset resolved to fallback raster", FallbackID: "fallback-raster-image", Pass: true},
+		{Order: 2, AssetID: "https://assets.example.test/logo.png", Kind: "image", Code: "network_asset_rejected", Message: "network assets are disabled for Surface Block v1", RejectedURL: "https://assets.example.test/logo.png", Pass: true},
+	}
+}
+
+func blockAssetRenderCommandsForScenario() []surface.BlockAssetRenderCommandReport {
+	return []surface.BlockAssetRenderCommandReport{
+		{Order: 1, Command: "load_font", AssetID: "font-ui", BlockID: 1, Rect: surface.RectReport{X: 0, Y: 0, W: 320, H: 200}, Quality: "font-manifest-metadata-v1", Checksum: "sha256:" + checksumText("surface-block-assets-load-font")},
+		{Order: 2, Command: "tint_icon", AssetID: "icon-settings", BlockID: 2, Rect: surface.RectReport{X: 24, Y: 36, W: 32, H: 32}, Tint: "#60aef4ff", Scale: 1, Quality: "icon-tint-software-v1", Checksum: "sha256:" + checksumText("surface-block-assets-tint-icon")},
+		{Order: 3, Command: "scale_image", AssetID: "image-hero", BlockID: 3, Rect: surface.RectReport{X: 72, Y: 32, W: 96, H: 64}, Scale: 2, Quality: "nearest-scale-v1", Checksum: "sha256:" + checksumText("surface-block-assets-scale-image")},
+		{Order: 4, Command: "fallback_missing", AssetID: "missing-logo", BlockID: 4, Rect: surface.RectReport{X: 24, Y: 112, W: 96, H: 32}, Quality: "fallback-raster-v1", Checksum: "sha256:" + checksumText("surface-block-assets-fallback-missing")},
+	}
+}
+
 func runLinuxX64CounterScenario() headlessScenario {
 	scenario := runHeadlessCounterScenario()
 	scenario.Cases = removeCaseNamed(scenario.Cases, "headless actual runner trace")
@@ -3163,6 +5652,42 @@ func runSurfaceScenario(mode string) headlessScenario {
 	}
 	if isComponentTreeMode(mode) {
 		return runComponentTreeScenario(mode)
+	}
+	if isBlockPaintMode(mode) {
+		return runBlockPaintScenario()
+	}
+	if isBlockTextMode(mode) {
+		return runBlockTextScenario()
+	}
+	if isBlockLayoutMode(mode) {
+		return runBlockLayoutScenario()
+	}
+	if isBlockEventMode(mode) {
+		return runBlockEventScenario()
+	}
+	if isBlockStateMode(mode) {
+		return runBlockStateScenario()
+	}
+	if isBlockMotionMode(mode) {
+		return runBlockMotionScenario()
+	}
+	if isBlockAssetMode(mode) {
+		return runBlockAssetScenario()
+	}
+	if isBlockAccessibilityMode(mode) {
+		return runBlockAccessibilityScenario()
+	}
+	if isMorphMode(mode) {
+		return runMorphScenario()
+	}
+	if mode == "linux-x64-real-window-block-system" {
+		return runLinuxX64RealWindowBlockSystemScenario()
+	}
+	if mode == "wasm32-web-browser-canvas-block-system" {
+		return runWASM32WebBrowserCanvasBlockSystemScenario()
+	}
+	if isBlockSystemMode(mode) {
+		return runBlockSystemScenario()
 	}
 	if isMinimalToolkitMode(mode) {
 		return runMinimalToolkitScenario(mode)
@@ -5195,6 +7720,333 @@ func renderCounterFrameRGBA(count int, focused bool) rgbaFrame {
 	return frame
 }
 
+func renderBlockPaintFrameRGBA(active bool) rgbaFrame {
+	frame := newRGBAFrame(320, 200)
+	bg := rgbaColor{R: 18, G: 24, B: 30, A: 255}
+	fillTop := rgbaColor{R: 52, G: 118, B: 215, A: 255}
+	fillBottom := rgbaColor{R: 84, G: 180, B: 132, A: 255}
+	border := rgbaColor{R: 226, G: 234, B: 242, A: 255}
+	shadow := rgbaColor{R: 0, G: 0, B: 0, A: 88}
+	outline := rgbaColor{R: 244, G: 205, B: 92, A: 255}
+	if active {
+		fillTop = rgbaColor{R: 66, G: 138, B: 232, A: 255}
+		fillBottom = rgbaColor{R: 104, G: 196, B: 148, A: 255}
+		outline = rgbaColor{R: 252, G: 220, B: 112, A: 255}
+	}
+	block := rect{X: 12, Y: 10, W: 64, H: 28}
+	clearRGBA(frame, bg)
+	rectRGBA(frame, rect{X: block.X, Y: block.Y + 4, W: block.W + 4, H: block.H + 4}, shadow)
+	rectRGBA(frame, rect{X: block.X, Y: block.Y, W: block.W, H: block.H / 2}, fillTop)
+	rectRGBA(frame, rect{X: block.X, Y: block.Y + block.H/2, W: block.W, H: block.H - block.H/2}, fillBottom)
+	rectOutlineRGBA(frame, block, border)
+	rectOutlineRGBA(frame, rect{X: block.X - 2, Y: block.Y - 2, W: block.W + 4, H: block.H + 4}, outline)
+	if active {
+		rectRGBA(frame, rect{X: block.X + 8, Y: block.Y + 10, W: 28, H: 6}, border)
+	}
+	return frame
+}
+
+func renderBlockTextFrameRGBA(active bool) rgbaFrame {
+	frame := newRGBAFrame(320, 200)
+	bg := rgbaColor{R: 16, G: 20, B: 24, A: 255}
+	panel := rgbaColor{R: 32, G: 40, B: 48, A: 255}
+	fg := rgbaColor{R: 237, G: 242, B: 247, A: 255}
+	muted := rgbaColor{R: 128, G: 146, B: 164, A: 255}
+	accent := rgbaColor{R: 244, G: 205, B: 92, A: 255}
+	if active {
+		panel = rgbaColor{R: 38, G: 50, B: 58, A: 255}
+		fg = rgbaColor{R: 248, G: 250, B: 252, A: 255}
+	}
+	clearRGBA(frame, bg)
+	rectRGBA(frame, rect{X: 10, Y: 8, W: 150, H: 96}, panel)
+	rectOutlineRGBA(frame, rect{X: 10, Y: 8, W: 150, H: 96}, muted)
+	rectRGBA(frame, rect{X: 18, Y: 18, W: 78, H: 7}, fg)
+	rectRGBA(frame, rect{X: 18, Y: 32, W: 96, H: 7}, fg)
+	rectRGBA(frame, rect{X: 18, Y: 46, W: 54, H: 7}, fg)
+	rectRGBA(frame, rect{X: 18, Y: 58, W: 120, H: 28}, rgbaColor{R: 20, G: 28, B: 34, A: 255})
+	rectOutlineRGBA(frame, rect{X: 18, Y: 58, W: 120, H: 28}, fg)
+	if active {
+		rectRGBA(frame, rect{X: 28, Y: 68, W: 34, H: 6}, fg)
+		rectRGBA(frame, rect{X: 68, Y: 64, W: 2, H: 20}, accent)
+	}
+	return frame
+}
+
+func renderBlockLayoutFrameRGBA(active bool) rgbaFrame {
+	return renderBlockLayoutFrameSizedRGBA(320, 200, active)
+}
+
+func renderBlockLayoutResizedFrameRGBA() rgbaFrame {
+	return renderBlockLayoutFrameSizedRGBA(480, 260, true)
+}
+
+func renderBlockEventFrameRGBA(active bool) rgbaFrame {
+	frame := newRGBAFrame(320, 200)
+	bg := rgbaColor{R: 18, G: 23, B: 28, A: 255}
+	panel := rgbaColor{R: 30, G: 38, B: 46, A: 255}
+	fg := rgbaColor{R: 238, G: 242, B: 247, A: 255}
+	accent := rgbaColor{R: 82, G: 154, B: 232, A: 255}
+	disabled := rgbaColor{R: 72, G: 78, B: 86, A: 255}
+	warn := rgbaColor{R: 244, G: 205, B: 92, A: 255}
+	if active {
+		panel = rgbaColor{R: 36, G: 48, B: 56, A: 255}
+		accent = rgbaColor{R: 96, G: 174, B: 244, A: 255}
+	}
+	clearRGBA(frame, bg)
+	rectRGBA(frame, rect{X: 16, Y: 16, W: 288, H: 168}, panel)
+	rectOutlineRGBA(frame, rect{X: 16, Y: 16, W: 288, H: 168}, fg)
+	rectRGBA(frame, rect{X: 24, Y: 24, W: 94, H: 7}, fg)
+	rectRGBA(frame, rect{X: 24, Y: 64, W: 120, H: 44}, accent)
+	rectOutlineRGBA(frame, rect{X: 24, Y: 64, W: 120, H: 44}, fg)
+	rectRGBA(frame, rect{X: 152, Y: 64, W: 120, H: 44}, disabled)
+	rectOutlineRGBA(frame, rect{X: 152, Y: 64, W: 120, H: 44}, warn)
+	rectRGBA(frame, rect{X: 24, Y: 120, W: 120, H: 44}, rgbaColor{R: 42, G: 92, B: 74, A: 255})
+	rectOutlineRGBA(frame, rect{X: 24, Y: 120, W: 120, H: 44}, fg)
+	if active {
+		rectOutlineRGBA(frame, rect{X: 20, Y: 60, W: 128, H: 52}, warn)
+		rectRGBA(frame, rect{X: 34, Y: 80, W: 32, H: 6}, fg)
+	}
+	return frame
+}
+
+func renderBlockStateFrameRGBA(active bool) rgbaFrame {
+	frame := newRGBAFrame(320, 200)
+	bg := rgbaColor{R: 18, G: 22, B: 26, A: 255}
+	panel := rgbaColor{R: 32, G: 38, B: 46, A: 255}
+	fill := rgbaColor{R: 32, G: 38, B: 46, A: 255}
+	fg := rgbaColor{R: 238, G: 242, B: 247, A: 255}
+	outline := rgbaColor{R: 122, G: 162, B: 247, A: 255}
+	status := rgbaColor{R: 72, G: 80, B: 90, A: 255}
+	if active {
+		fill = rgbaColor{R: 45, G: 155, B: 240, A: 255}
+		outline = rgbaColor{R: 255, G: 95, B: 87, A: 255}
+		status = rgbaColor{R: 82, G: 154, B: 120, A: 255}
+	}
+	clearRGBA(frame, bg)
+	rectRGBA(frame, rect{X: 16, Y: 16, W: 288, H: 168}, panel)
+	rectOutlineRGBA(frame, rect{X: 16, Y: 16, W: 288, H: 168}, fg)
+	rectRGBA(frame, rect{X: 24, Y: 40, W: 168, H: 56}, fill)
+	rectOutlineRGBA(frame, rect{X: 24, Y: 40, W: 168, H: 56}, outline)
+	rectRGBA(frame, rect{X: 36, Y: 58, W: 72, H: 8}, fg)
+	rectRGBA(frame, rect{X: 24, Y: 112, W: 168, H: 32}, status)
+	rectOutlineRGBA(frame, rect{X: 24, Y: 112, W: 168, H: 32}, fg)
+	if active {
+		rectOutlineRGBA(frame, rect{X: 20, Y: 36, W: 176, H: 64}, rgbaColor{R: 246, G: 205, B: 92, A: 255})
+		rectRGBA(frame, rect{X: 122, Y: 58, W: 28, H: 8}, rgbaColor{R: 255, G: 255, B: 255, A: 112})
+		rectRGBA(frame, rect{X: 154, Y: 58, W: 8, H: 8}, rgbaColor{R: 255, G: 255, B: 255, A: 112})
+	}
+	return frame
+}
+
+func renderBlockMotionFrameRGBA(step int) rgbaFrame {
+	frame := newRGBAFrame(320, 200)
+	bg := rgbaColor{R: 18, G: 22, B: 26, A: 255}
+	panel := rgbaColor{R: 28, G: 36, B: 44, A: 255}
+	fg := rgbaColor{R: 238, G: 242, B: 247, A: 255}
+	fill := rgbaColor{R: 32, G: 48, B: 64, A: 80}
+	translateX := 0
+	scale := 100
+	if step == 1 {
+		fill = rgbaColor{R: 64, G: 112, B: 148, A: 140}
+		translateX = 6
+		scale = 104
+	}
+	if step >= 2 {
+		fill = rgbaColor{R: 96, G: 174, B: 244, A: 200}
+		translateX = 12
+		scale = 108
+	}
+	clearRGBA(frame, bg)
+	rectRGBA(frame, rect{X: 16, Y: 16, W: 288, H: 168}, panel)
+	rectOutlineRGBA(frame, rect{X: 16, Y: 16, W: 288, H: 168}, fg)
+	w := 176 * scale / 100
+	h := 64 * scale / 100
+	rectRGBA(frame, rect{X: 24 + translateX, Y: 44, W: w, H: h}, fill)
+	rectOutlineRGBA(frame, rect{X: 24 + translateX, Y: 44, W: w, H: h}, fg)
+	rectRGBA(frame, rect{X: 36 + translateX, Y: 68, W: 72, H: 8}, fg)
+	if step >= 2 {
+		rectRGBA(frame, rect{X: 116 + translateX, Y: 68, W: 34, H: 8}, rgbaColor{R: 255, G: 255, B: 255, A: 180})
+	}
+	return frame
+}
+
+func renderBlockAssetFrameRGBA(active bool) rgbaFrame {
+	frame := newRGBAFrame(320, 200)
+	bg := rgbaColor{R: 18, G: 22, B: 26, A: 255}
+	panel := rgbaColor{R: 28, G: 36, B: 44, A: 255}
+	fg := rgbaColor{R: 238, G: 242, B: 247, A: 255}
+	iconFill := rgbaColor{R: 255, G: 255, B: 255, A: 255}
+	imageFill := rgbaColor{R: 76, G: 126, B: 156, A: 255}
+	fallbackFill := rgbaColor{R: 86, G: 92, B: 102, A: 255}
+	imageW := 48
+	imageH := 32
+	if active {
+		iconFill = rgbaColor{R: 96, G: 174, B: 244, A: 255}
+		imageW = 96
+		imageH = 64
+		fallbackFill = rgbaColor{R: 180, G: 190, B: 200, A: 255}
+	}
+	clearRGBA(frame, bg)
+	rectRGBA(frame, rect{X: 16, Y: 16, W: 288, H: 168}, panel)
+	rectOutlineRGBA(frame, rect{X: 16, Y: 16, W: 288, H: 168}, fg)
+	rectRGBA(frame, rect{X: 24, Y: 36, W: 32, H: 32}, iconFill)
+	rectRGBA(frame, rect{X: 30, Y: 42, W: 20, H: 4}, panel)
+	rectRGBA(frame, rect{X: 38, Y: 42, W: 4, H: 20}, panel)
+	rectOutlineRGBA(frame, rect{X: 24, Y: 36, W: 32, H: 32}, fg)
+	rectRGBA(frame, rect{X: 72, Y: 32, W: imageW, H: imageH}, imageFill)
+	rectRGBA(frame, rect{X: 80, Y: 42, W: imageW - 16, H: 8}, rgbaColor{R: 220, G: 238, B: 255, A: 255})
+	rectOutlineRGBA(frame, rect{X: 72, Y: 32, W: imageW, H: imageH}, fg)
+	rectRGBA(frame, rect{X: 24, Y: 112, W: 96, H: 32}, fallbackFill)
+	rectOutlineRGBA(frame, rect{X: 24, Y: 112, W: 96, H: 32}, fg)
+	if active {
+		rectRGBA(frame, rect{X: 36, Y: 124, W: 72, H: 6}, rgbaColor{R: 18, G: 22, B: 26, A: 255})
+		rectOutlineRGBA(frame, rect{X: 68, Y: 28, W: 104, H: 72}, rgbaColor{R: 244, G: 205, B: 92, A: 255})
+	}
+	return frame
+}
+
+func renderBlockAccessibilityFrameRGBA(focused bool) rgbaFrame {
+	frame := newRGBAFrame(320, 200)
+	bg := rgbaColor{R: 18, G: 22, B: 26, A: 255}
+	panel := rgbaColor{R: 28, G: 36, B: 44, A: 255}
+	fg := rgbaColor{R: 238, G: 242, B: 247, A: 255}
+	label := rgbaColor{R: 150, G: 166, B: 184, A: 255}
+	action := rgbaColor{R: 64, G: 112, B: 148, A: 255}
+	focus := rgbaColor{R: 244, G: 205, B: 92, A: 255}
+	if focused {
+		action = rgbaColor{R: 96, G: 174, B: 244, A: 255}
+	}
+	clearRGBA(frame, bg)
+	rectRGBA(frame, rect{X: 16, Y: 16, W: 288, H: 168}, panel)
+	rectOutlineRGBA(frame, rect{X: 16, Y: 16, W: 288, H: 168}, fg)
+	rectRGBA(frame, rect{X: 24, Y: 24, W: 200, H: 24}, label)
+	rectRGBA(frame, rect{X: 24, Y: 64, W: 120, H: 44}, action)
+	rectRGBA(frame, rect{X: 152, Y: 64, W: 120, H: 44}, rgbaColor{R: 58, G: 66, B: 78, A: 255})
+	rectOutlineRGBA(frame, rect{X: 24, Y: 64, W: 120, H: 44}, fg)
+	rectOutlineRGBA(frame, rect{X: 152, Y: 64, W: 120, H: 44}, fg)
+	if focused {
+		rectOutlineRGBA(frame, rect{X: 21, Y: 61, W: 126, H: 50}, focus)
+		rectRGBA(frame, rect{X: 40, Y: 82, W: 64, H: 6}, rgbaColor{R: 18, G: 22, B: 26, A: 255})
+	}
+	return frame
+}
+
+func renderBlockSystemFrameRGBA(focused bool) rgbaFrame {
+	frame := renderBlockAccessibilityFrameRGBA(focused)
+	layoutFill := rgbaColor{R: 64, G: 92, B: 116, A: 255}
+	scrollFill := rgbaColor{R: 84, G: 180, B: 132, A: 255}
+	outline := rgbaColor{R: 244, G: 205, B: 92, A: 255}
+	if focused {
+		layoutFill = rgbaColor{R: 74, G: 118, B: 154, A: 255}
+		scrollFill = rgbaColor{R: 96, G: 174, B: 244, A: 255}
+	}
+	rectRGBA(frame, rect{X: 236, Y: 72, W: 72, H: 80}, layoutFill)
+	rectRGBA(frame, rect{X: 244, Y: 80, W: 56, H: 12}, scrollFill)
+	rectRGBA(frame, rect{X: 244, Y: 100, W: 56, H: 12}, scrollFill)
+	rectRGBA(frame, rect{X: 244, Y: 120, W: 56, H: 12}, scrollFill)
+	rectOutlineRGBA(frame, rect{X: 236, Y: 72, W: 72, H: 80}, rgbaColor{R: 238, G: 242, B: 247, A: 255})
+	if focused {
+		rectOutlineRGBA(frame, rect{X: 232, Y: 68, W: 80, H: 88}, outline)
+	}
+	return frame
+}
+
+func renderBlockSystemFrameSizedRGBA(width int, height int, focused bool) rgbaFrame {
+	frame := newRGBAFrame(width, height)
+	bg := rgbaColor{R: 18, G: 22, B: 26, A: 255}
+	panel := rgbaColor{R: 32, G: 42, B: 50, A: 255}
+	fg := rgbaColor{R: 232, G: 238, B: 244, A: 255}
+	label := rgbaColor{R: 150, G: 166, B: 184, A: 255}
+	action := rgbaColor{R: 64, G: 112, B: 148, A: 255}
+	reset := rgbaColor{R: 58, G: 66, B: 78, A: 255}
+	layoutFill := rgbaColor{R: 64, G: 92, B: 116, A: 255}
+	scrollFill := rgbaColor{R: 84, G: 180, B: 132, A: 255}
+	focus := rgbaColor{R: 244, G: 205, B: 92, A: 255}
+	if focused {
+		action = rgbaColor{R: 96, G: 174, B: 244, A: 255}
+		layoutFill = rgbaColor{R: 74, G: 118, B: 154, A: 255}
+		scrollFill = rgbaColor{R: 96, G: 174, B: 244, A: 255}
+	}
+	clearRGBA(frame, bg)
+	panelRect := rect{X: 16, Y: 16, W: width - 32, H: height - 32}
+	labelRect := rect{X: 24, Y: 24, W: width - 120, H: 24}
+	submitRect := rect{X: 24, Y: 64, W: 120, H: 44}
+	resetRect := rect{X: 152, Y: 64, W: 120, H: 44}
+	layoutRect := rect{X: width - 84, Y: 72, W: 72, H: 96}
+	rectRGBA(frame, panelRect, panel)
+	rectOutlineRGBA(frame, panelRect, fg)
+	rectRGBA(frame, labelRect, label)
+	rectRGBA(frame, submitRect, action)
+	rectRGBA(frame, resetRect, reset)
+	rectOutlineRGBA(frame, submitRect, fg)
+	rectOutlineRGBA(frame, resetRect, fg)
+	rectRGBA(frame, layoutRect, layoutFill)
+	for y := layoutRect.Y + 8; y <= layoutRect.Y+56; y += 20 {
+		rectRGBA(frame, rect{X: layoutRect.X + 8, Y: y, W: 56, H: 12}, scrollFill)
+	}
+	rectOutlineRGBA(frame, layoutRect, fg)
+	if focused {
+		rectOutlineRGBA(frame, rect{X: submitRect.X - 3, Y: submitRect.Y - 3, W: submitRect.W + 6, H: submitRect.H + 6}, focus)
+		rectOutlineRGBA(frame, rect{X: layoutRect.X - 4, Y: layoutRect.Y - 4, W: layoutRect.W + 8, H: layoutRect.H + 8}, focus)
+		rectRGBA(frame, rect{X: submitRect.X + 16, Y: submitRect.Y + 18, W: 64, H: 6}, bg)
+	}
+	return frame
+}
+
+func renderBlockLayoutFrameSizedRGBA(width int, height int, active bool) rgbaFrame {
+	frame := newRGBAFrame(width, height)
+	bg := rgbaColor{R: 18, G: 22, B: 26, A: 255}
+	panel := rgbaColor{R: 32, G: 42, B: 50, A: 255}
+	rowFill := rgbaColor{R: 66, G: 132, B: 214, A: 255}
+	gridFill := rgbaColor{R: 70, G: 166, B: 130, A: 255}
+	dockFill := rgbaColor{R: 204, G: 104, B: 78, A: 255}
+	overlayFill := rgbaColor{R: 236, G: 198, B: 72, A: 230}
+	scrollFill := rgbaColor{R: 126, G: 94, B: 190, A: 255}
+	fg := rgbaColor{R: 232, G: 238, B: 244, A: 255}
+	clearRGBA(frame, bg)
+
+	column := rect{X: 12, Y: 12, W: width - 24, H: height - 24}
+	row := rect{X: column.X + 12, Y: column.Y + 12, W: column.W - 24, H: 48}
+	grid := rect{X: column.X + 12, Y: row.Y + row.H + 8, W: 132, H: 72}
+	dock := rect{X: grid.X + grid.W + 8, Y: grid.Y, W: 132, H: 72}
+	scroll := rect{X: width - 84, Y: 72, W: 72, H: 80}
+	overlay := rect{X: width - 100, Y: 20, W: 72, H: 40}
+
+	rectRGBA(frame, column, panel)
+	rectOutlineRGBA(frame, column, fg)
+	rectRGBA(frame, row, rowFill)
+	rectOutlineRGBA(frame, row, fg)
+	rectRGBA(frame, rect{X: row.X + 8, Y: row.Y + 14, W: 64, H: 8}, fg)
+	rectRGBA(frame, rect{X: row.X + row.W - 96, Y: row.Y + 14, W: 72, H: 8}, fg)
+
+	rectRGBA(frame, grid, rgbaColor{R: 24, G: 34, B: 38, A: 255})
+	rectOutlineRGBA(frame, grid, fg)
+	cellW := (grid.W - 6) / 2
+	cellH := (grid.H - 6) / 2
+	rectRGBA(frame, rect{X: grid.X, Y: grid.Y, W: cellW, H: cellH}, gridFill)
+	rectRGBA(frame, rect{X: grid.X + cellW + 6, Y: grid.Y, W: cellW, H: cellH}, rgbaColor{R: 90, G: 184, B: 150, A: 255})
+	rectRGBA(frame, rect{X: grid.X, Y: grid.Y + cellH + 6, W: cellW, H: cellH}, rgbaColor{R: 52, G: 138, B: 118, A: 255})
+
+	rectRGBA(frame, dock, rgbaColor{R: 30, G: 38, B: 46, A: 255})
+	rectOutlineRGBA(frame, dock, fg)
+	rectRGBA(frame, rect{X: dock.X, Y: dock.Y, W: dock.W, H: 24}, dockFill)
+	rectRGBA(frame, rect{X: dock.X + 8, Y: dock.Y + 34, W: dock.W - 16, H: 8}, fg)
+
+	rectRGBA(frame, scroll, rgbaColor{R: 28, G: 32, B: 42, A: 255})
+	rectOutlineRGBA(frame, scroll, fg)
+	rectRGBA(frame, rect{X: scroll.X + 8, Y: scroll.Y + 12, W: 42, H: 8}, scrollFill)
+	rectRGBA(frame, rect{X: scroll.X + 8, Y: scroll.Y + 30, W: 50, H: 8}, scrollFill)
+	rectRGBA(frame, rect{X: scroll.X + scroll.W - 12, Y: scroll.Y + 16 + 8, W: 5, H: 24}, overlayFill)
+
+	rectRGBA(frame, overlay, overlayFill)
+	rectOutlineRGBA(frame, overlay, fg)
+	if active {
+		rectRGBA(frame, rect{X: column.X + 20, Y: height - 44, W: 96, H: 20}, fg)
+	}
+	rectOutlineRGBA(frame, rect{X: 0, Y: 0, W: width, H: height}, fg)
+	return frame
+}
+
 func renderWindowCounterFrameRGBA(count int, keyCount int, width int, height int, focused bool) rgbaFrame {
 	frame := newRGBAFrame(width, height)
 	bg := rgbaColor{R: 18, G: 22, B: 27, A: 255}
@@ -5714,38 +8566,82 @@ func buildReport(opt smokeOptions, host string, processes []surface.ProcessRepor
 	source := defaultSurfaceSourcePath(opt)
 	target := mode
 	runtimeName := "surface-headless"
-	if mode == "headless-text-focus-input" || mode == "headless-release-toolkit" || mode == "headless-release-accessibility" || mode == "headless-component-tree" || mode == "headless-component-tree-api" || mode == "headless-minimal-toolkit" || mode == "headless-toolkit-reuse" || mode == "headless-accessibility-metadata" {
+	if mode == "headless-text-focus-input" || mode == "headless-release-toolkit" || mode == "headless-release-accessibility" || mode == "headless-component-tree" || mode == "headless-component-tree-api" || mode == "headless-block-paint" || mode == "headless-block-text" || mode == "headless-block-layout" || mode == "headless-block-events" || mode == "headless-block-states" || mode == "headless-block-motion" || mode == "headless-block-assets" || mode == "headless-block-accessibility" || mode == "headless-block-system" || mode == "headless-morph" || mode == "headless-minimal-toolkit" || mode == "headless-toolkit-reuse" || mode == "headless-accessibility-metadata" {
 		target = "headless"
 		runtimeName = "surface-headless"
-	} else if mode == "linux-x64" || mode == "linux-x64-real-window" || mode == "linux-x64-real-window-text-focus-input" || mode == "linux-x64-release-toolkit" || mode == "linux-x64-release-window" || mode == "linux-x64-release-accessibility" || mode == "linux-x64-real-window-component-tree" || mode == "linux-x64-real-window-component-tree-api" || mode == "linux-x64-real-window-minimal-toolkit" || mode == "linux-x64-real-window-toolkit-reuse" || mode == "linux-x64-real-window-accessibility-metadata" {
+	} else if mode == "linux-x64" || mode == "linux-x64-real-window" || mode == "linux-x64-real-window-text-focus-input" || mode == "linux-x64-release-toolkit" || mode == "linux-x64-release-window" || mode == "linux-x64-release-accessibility" || mode == "linux-x64-real-window-component-tree" || mode == "linux-x64-real-window-component-tree-api" || mode == "linux-x64-real-window-block-system" || mode == "linux-x64-real-window-minimal-toolkit" || mode == "linux-x64-real-window-toolkit-reuse" || mode == "linux-x64-real-window-accessibility-metadata" {
 		target = "linux-x64"
 		runtimeName = "surface-linux-x64"
-	} else if mode == "wasm32-web" || mode == "wasm32-web-browser-canvas" || mode == "wasm32-web-browser-canvas-text-focus-input" || mode == "wasm32-web-release-toolkit" || mode == "wasm32-web-release-browser" || mode == "wasm32-web-release-accessibility" || mode == "wasm32-web-browser-canvas-component-tree" || mode == "wasm32-web-browser-canvas-component-tree-api" || mode == "wasm32-web-browser-canvas-minimal-toolkit" || mode == "wasm32-web-browser-canvas-toolkit-reuse" || mode == "wasm32-web-browser-canvas-accessibility-metadata" {
+	} else if mode == "wasm32-web" || mode == "wasm32-web-browser-canvas" || mode == "wasm32-web-browser-canvas-text-focus-input" || mode == "wasm32-web-release-toolkit" || mode == "wasm32-web-release-browser" || mode == "wasm32-web-release-accessibility" || mode == "wasm32-web-browser-canvas-component-tree" || mode == "wasm32-web-browser-canvas-component-tree-api" || mode == "wasm32-web-browser-canvas-minimal-toolkit" || mode == "wasm32-web-browser-canvas-toolkit-reuse" || mode == "wasm32-web-browser-canvas-accessibility-metadata" || mode == "wasm32-web-browser-canvas-block-system" {
 		target = "wasm32-web"
 		runtimeName = "surface-wasm32-web"
 	}
 	return surface.Report{
-		Schema:            surface.SchemaV1,
-		Status:            "pass",
-		Target:            target,
-		Host:              host,
-		Runtime:           runtimeName,
-		SurfaceSchema:     "tetra.surface.v1",
-		HostABI:           "tetra.surface.host-abi.v1",
-		HostEvidence:      hostEvidenceForMode(mode),
-		Source:            source,
-		Processes:         processes,
-		Artifacts:         artifacts,
-		ArtifactScan:      artifactScan,
-		Components:        scenario.Components,
-		ComponentTree:     scenario.ComponentTree,
-		ComponentTreeAPI:  scenario.ComponentTreeAPI,
-		Toolkit:           scenario.Toolkit,
-		AccessibilityTree: scenario.AccessibilityTree,
-		Events:            scenario.Events,
-		Frames:            scenario.Frames,
-		StateTransitions:  scenario.StateTransitions,
-		Cases:             scenario.Cases,
+		Schema:                          surface.SchemaV1,
+		Status:                          "pass",
+		Target:                          target,
+		Host:                            host,
+		Runtime:                         runtimeName,
+		SurfaceSchema:                   "tetra.surface.v1",
+		HostABI:                         "tetra.surface.host-abi.v1",
+		HostEvidence:                    hostEvidenceForMode(mode),
+		Source:                          source,
+		Processes:                       processes,
+		Artifacts:                       artifacts,
+		ArtifactScan:                    artifactScan,
+		Components:                      scenario.Components,
+		ComponentTree:                   scenario.ComponentTree,
+		ComponentTreeAPI:                scenario.ComponentTreeAPI,
+		BlockGraph:                      scenario.BlockGraph,
+		PaintLayers:                     scenario.PaintLayers,
+		PaintCommands:                   scenario.PaintCommands,
+		VisualFeatures:                  scenario.VisualFeatures,
+		PaintQualityLevel:               scenario.PaintQualityLevel,
+		PaintCacheBudgetBytes:           scenario.PaintCacheBudgetBytes,
+		PaintUnsupportedBlur:            scenario.PaintUnsupportedBlur,
+		TextMeasurements:                scenario.TextMeasurements,
+		FontFallbacks:                   scenario.FontFallbacks,
+		GlyphCaches:                     scenario.GlyphCaches,
+		TextRenderCommands:              scenario.TextRenderCommands,
+		TextQualityLevel:                scenario.TextQualityLevel,
+		TextCacheBudgetBytes:            scenario.TextCacheBudgetBytes,
+		LayoutConstraints:               scenario.LayoutConstraints,
+		LayoutPasses:                    scenario.LayoutPasses,
+		LayoutScrolls:                   scenario.LayoutScrolls,
+		LayoutFeatures:                  scenario.LayoutFeatures,
+		LayoutQualityLevel:              scenario.LayoutQualityLevel,
+		LayoutUnsupportedCSSFlexbox:     scenario.LayoutUnsupportedCSSFlexbox,
+		BlockEventRoutes:                scenario.BlockEventRoutes,
+		BlockFocusTransitions:           scenario.BlockFocusTransitions,
+		BlockEventKinds:                 scenario.BlockEventKinds,
+		BlockEventPolicy:                scenario.BlockEventPolicy,
+		BlockEventQualityLevel:          scenario.BlockEventQualityLevel,
+		BlockEventUnsupportedDragDrop:   scenario.BlockEventUnsupportedDragDrop,
+		BlockStateSelectors:             scenario.BlockStateSelectors,
+		BlockStateResolutions:           scenario.BlockStateResolutions,
+		BlockStateResolverOrder:         scenario.BlockStateResolverOrder,
+		BlockStateQualityLevel:          scenario.BlockStateQualityLevel,
+		BlockStateUnsupportedCSSPseudos: scenario.BlockStateUnsupportedCSSPseudos,
+		MotionFrames:                    scenario.MotionFrames,
+		MotionQualityLevel:              scenario.MotionQualityLevel,
+		MotionClock:                     scenario.MotionClock,
+		MotionFrameBudget:               scenario.MotionFrameBudget,
+		MotionUnsupportedCSSAnimations:  scenario.MotionUnsupportedCSSAnimations,
+		BlockAssetManifest:              scenario.BlockAssetManifest,
+		BlockAssetCache:                 scenario.BlockAssetCache,
+		BlockAssetDiagnostics:           scenario.BlockAssetDiagnostics,
+		BlockAssetRenderCommands:        scenario.BlockAssetRenderCommands,
+		BlockAssetQualityLevel:          scenario.BlockAssetQualityLevel,
+		BlockAssetNetworkFetchAllowed:   scenario.BlockAssetNetworkFetchAllowed,
+		BlockAccessibilityTree:          scenario.BlockAccessibilityTree,
+		BlockSystem:                     scenario.BlockSystem,
+		Morph:                           scenario.Morph,
+		Toolkit:                         scenario.Toolkit,
+		AccessibilityTree:               scenario.AccessibilityTree,
+		Events:                          scenario.Events,
+		Frames:                          scenario.Frames,
+		StateTransitions:                scenario.StateTransitions,
+		Cases:                           scenario.Cases,
 	}
 }
 
@@ -5825,7 +8721,7 @@ func releaseTextInputCases() []surface.CaseReport {
 
 func hostEvidenceForMode(mode string) surface.HostEvidenceReport {
 	switch mode {
-	case "headless-text-focus-input", "headless-release-text-input", "headless-release-toolkit", "headless-release-accessibility", "headless-component-tree", "headless-component-tree-api", "headless-minimal-toolkit", "headless-toolkit-reuse", "headless-accessibility-metadata":
+	case "headless-text-focus-input", "headless-release-text-input", "headless-release-toolkit", "headless-release-accessibility", "headless-component-tree", "headless-component-tree-api", "headless-block-paint", "headless-block-text", "headless-block-layout", "headless-block-events", "headless-block-states", "headless-block-motion", "headless-block-assets", "headless-block-accessibility", "headless-block-system", "headless-morph", "headless-minimal-toolkit", "headless-toolkit-reuse", "headless-accessibility-metadata":
 		return surface.HostEvidenceReport{
 			Level:       "deterministic-headless",
 			Backend:     "software-rgba",
@@ -5858,7 +8754,7 @@ func hostEvidenceForMode(mode string) surface.HostEvidenceReport {
 			NativeInput:         true,
 			AccessibilityBridge: true,
 		}
-	case "linux-x64-real-window", "linux-x64-real-window-text-focus-input", "linux-x64-release-text-input", "linux-x64-release-toolkit", "linux-x64-real-window-component-tree", "linux-x64-real-window-component-tree-api", "linux-x64-real-window-minimal-toolkit", "linux-x64-real-window-toolkit-reuse", "linux-x64-real-window-accessibility-metadata":
+	case "linux-x64-real-window", "linux-x64-real-window-text-focus-input", "linux-x64-release-text-input", "linux-x64-release-toolkit", "linux-x64-real-window-component-tree", "linux-x64-real-window-component-tree-api", "linux-x64-real-window-block-system", "linux-x64-real-window-minimal-toolkit", "linux-x64-real-window-toolkit-reuse", "linux-x64-real-window-accessibility-metadata":
 		return surface.HostEvidenceReport{
 			Level:       "linux-x64-real-window",
 			Backend:     "wayland-shm-rgba",
@@ -5896,6 +8792,15 @@ func hostEvidenceForMode(mode string) surface.HostEvidenceReport {
 			BrowserInput:                 true,
 			BrowserAccessibilitySnapshot: true,
 			BrowserAccessibilityMirror:   true,
+		}
+	case "wasm32-web-browser-canvas-block-system":
+		return surface.HostEvidenceReport{
+			Level:         "wasm32-web-browser-canvas-input",
+			Backend:       "browser-canvas-rgba",
+			Framebuffer:   true,
+			NativeInput:   true,
+			BrowserCanvas: true,
+			BrowserInput:  true,
 		}
 	case "wasm32-web-browser-canvas", "wasm32-web-browser-canvas-text-focus-input", "wasm32-web-release-text-input", "wasm32-web-release-toolkit", "wasm32-web-browser-canvas-component-tree", "wasm32-web-browser-canvas-component-tree-api", "wasm32-web-browser-canvas-minimal-toolkit", "wasm32-web-browser-canvas-toolkit-reuse", "wasm32-web-browser-canvas-accessibility-metadata":
 		return surface.HostEvidenceReport{

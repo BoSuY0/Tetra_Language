@@ -10,70 +10,11 @@ import (
 )
 
 func TestValidateManifestAcceptsGeneratedShape(t *testing.T) {
-	manifest := `{
-  "compiler_version": "v0.6.0",
-  "formats": [
-    {"name":"T4 Source Format","extension":".t4","role":"source","description":"Tetra source file","primary":true},
-    {"name":"Legacy Tetra Source Format","extension":".tetra","role":"source","description":"Legacy Tetra source file","legacy":true},
-    {"name":"Todex Fragment","extension":".tdx","role":"todex-fragment","description":"Todex encrypted semantic fragment"},
-    {"name":"T4 Seed","extension":".t4s","role":"offline-seed","description":"Tetra Seed offline bundle"},
-    {"name":"T4 Interface","extension":".t4i","role":"interface","description":"T4 interface file"},
-    {"name":"T4 Proof","extension":".t4p","role":"proof","description":"T4 proof file"},
-    {"name":"T4 Replay","extension":".t4r","role":"replay","description":"T4 replay file"},
-    {"name":"T4 Quest","extension":".t4q","role":"quest","description":"T4 executable quest file"},
-    {"name":"Tetra NeedMap","extension":".tneed","role":"needmap","description":"NeedMap file"},
-    {"name":"Tetra Semantic Lock","file_name":"Tetra.lock","role":"semantic-lock","description":"Tetra semantic lockfile"}
-  ],
-  "targets": [
-    {"triple":"linux-x64","os":"linux","arch":"x64","abi":"sysv","format":"elf","exe_ext":"","collect_imports":false},
-    {"triple":"windows-x64","os":"windows","arch":"x64","abi":"win64","format":"pe","exe_ext":".exe","collect_imports":true},
-    {"triple":"macos-x64","os":"macos","arch":"x64","abi":"sysv","format":"macho","exe_ext":"","collect_imports":false},
-    {"triple":"wasm32-wasi","os":"wasi","arch":"wasm32","abi":"wasi","format":"wasm","exe_ext":".wasm","collect_imports":false},
-    {"triple":"wasm32-web","os":"web","arch":"wasm32","abi":"web","format":"wasm","exe_ext":".wasm","collect_imports":false}
-  ],
-  "builtins": [
-    {"name":"core.load_i32","param_types":["ptr","cap.mem"],"return_type":"i32","effects":["mem"],"unsafe_policy":"always"},
-    {"name":"core.print","aliases":["print"],"param_types":["str"],"return_type":"i32","effects":["io"],"unsafe_policy":"never"}
-  ],
-	  "runtime_abi": {
-	    "reserved_prefix": "__tetra_",
-	    "actors_supported_targets": ["linux-x64","macos-x64","windows-x64"],
-	    "actors_required_symbols": ["__tetra_entry","__tetra_actor_spawn","__tetra_actor_send","__tetra_actor_send_msg","__tetra_actor_send_begin","__tetra_actor_send_slot","__tetra_actor_send_commit","__tetra_actor_recv","__tetra_actor_recv_msg","__tetra_actor_recv_poll","__tetra_actor_recv_until","__tetra_actor_recv_msg_until","__tetra_actor_recv_begin","__tetra_actor_recv_slot","__tetra_actor_recv_count","__tetra_actor_self","__tetra_actor_sender","__tetra_actor_yield_now"],
-	    "actor_state_required_symbols": ["__tetra_actor_state_load","__tetra_actor_state_store"],
-	    "task_required_symbols": ["__tetra_task_spawn_i32","__tetra_task_join_i32","__tetra_task_join_result_i32","__tetra_task_join_until_i32","__tetra_task_poll_i32","__tetra_task_is_canceled","__tetra_task_checkpoint"],
-	    "task_group_required_symbols": ["__tetra_task_group_open","__tetra_task_group_close","__tetra_task_group_cancel","__tetra_task_group_current","__tetra_task_group_status","__tetra_task_spawn_group_i32"],
-	    "typed_task_required_symbols": ["__tetra_task_result_begin","__tetra_task_result_slot","__tetra_task_result_get","__tetra_task_join_typed_2","__tetra_task_join_typed_3","__tetra_task_join_typed_4","__tetra_task_join_typed_5","__tetra_task_join_typed_6","__tetra_task_join_typed_7","__tetra_task_join_typed_8"],
-	    "time_required_symbols": ["__tetra_time_now_ms","__tetra_sleep_ms","__tetra_sleep_until_ms","__tetra_deadline_ms","__tetra_timer_ready_ms"],
-    "filesystem_required_symbols": ["__tetra_fs_exists"],
-	    "surface_required_symbols": ["__tetra_surface_open","__tetra_surface_close","__tetra_surface_poll_event_kind","__tetra_surface_poll_event_x","__tetra_surface_poll_event_y","__tetra_surface_poll_event_button","__tetra_surface_poll_event_into","__tetra_surface_poll_event_text_len","__tetra_surface_poll_event_text_into","__tetra_surface_clipboard_write_text","__tetra_surface_clipboard_read_text_into","__tetra_surface_poll_composition_into","__tetra_surface_begin_frame","__tetra_surface_present_rgba","__tetra_surface_now_ms","__tetra_surface_request_redraw"],
-	    "actors_program_glue_symbols": ["__tetra_actor_dispatch","__tetra_actor_main_entry_id"]
-	  },
-  "features": [
-    {"id":"cli.core","name":"CLI","status":"current","since":"v0.2.0","scope":"core CLI","stability":"supported","docs":["docs/spec/current_supported_surface.md"]},
-    {"id":"language.flow","name":"Flow","status":"current","since":"v0.2.0","scope":"flow syntax","stability":"supported","docs":["docs/spec/flow_syntax_v1.md"]},
-    {"id":"language.generics-mvp","name":"Generics MVP","status":"current","since":"v0.2.0","scope":"statically monomorphized generic functions with no runtime generic values or dynamic dispatch","stability":"supported static MVP; generic structs remain future/post-v1","docs":["docs/spec/current_supported_surface.md","docs/spec/flow_syntax_v1.md","docs/spec/v1_scope.md"]},
-    {"id":"language.protocol-conformance-mvp","name":"Protocol conformance MVP","status":"current","since":"v0.2.0","scope":"checked statically with generic requirement signature shape and no witness tables","stability":"dynamic dispatch remain post-v1","docs":["docs/spec/current_supported_surface.md","docs/spec/flow_syntax_v1.md","docs/spec/v1_scope.md"]},
-    {"id":"language.callable-mvp","name":"Callable MVP","status":"current","since":"v0.2.0","scope":"Level 0 callable surface","stability":"current constrained MVP","docs":["docs/spec/current_supported_surface.md","docs/spec/flow_syntax_v1.md"]},
-    {"id":"targets.wasm-artifact-preflight","name":"WASM artifact/import preflight","status":"current","since":"v0.2.0","scope":"artifact/import smoke","stability":"supported","docs":["docs/backend/wasm_backend_plan.md"]},
-    {"id":"stdlib.experimental-mirrors","name":"Standard-library compatibility mirrors","status":"current","since":"v0.4.0","scope":"production compatibility mirrors forward to lib.core modules","stability":"stable callers should import lib.core directly","docs":["docs/spec/stdlib.md","docs/spec/stdlib_naming_versioning.md","docs/user/standard_library_guide.md"]},
-    {"id":"language.callable-level1","name":"Callable Level 1","status":"current","since":"v0.4.0","scope":"production non-capturing symbol-backed callable Level 1 with function-typed locals, aliases, callbacks, and symbol-backed returns","stability":"captured closure escape and full first-class function values remain out of scope","docs":["docs/spec/current_supported_surface.md","docs/spec/flow_syntax_v1.md","docs/spec/v1_feature_status.md"]},
-    {"id":"language.enum-payload-match","name":"Enum payload constructors and exhaustive match/catch","status":"current","since":"v0.3.0","scope":"positional enum payload constructors and payload bindings for match/catch/if-let, with exhaustive unguarded enum match/catch","stability":"nested destructuring patterns and guard expansion remain future/post-v1","docs":["docs/spec/current_supported_surface.md","docs/spec/flow_syntax_v1.md","docs/spec/v0_3_scope.md"]},
-    {"id":"language.protocol-bound-generics-static","name":"Static protocol-bound generics","status":"current","since":"v0.3.0","scope":"validated statically during monomorphization with same-module and cross-module impl conformance plus visibility diagnostics","stability":"calling protocol requirements through generic bounds and dynamic dispatch remain unsupported","docs":["docs/spec/current_supported_surface.md","docs/spec/v0_3_scope.md","docs/spec/flow_syntax_v1.md"]},
-    {"id":"language.ownership-markers-mvp","name":"Ownership markers MVP","status":"current","since":"v0.2.0","scope":"conservative borrow/inout/consume marker checks with use-after-consume and borrow escape diagnostics","stability":"supported conservative MVP; not a full SSA lifetime solver","docs":["docs/spec/current_supported_surface.md","docs/spec/ownership_v1.md","docs/spec/v1_scope.md"]},
-    {"id":"language.resource-lifetime-mvp","name":"Resource lifetime MVP","status":"current","since":"v0.2.0","scope":"conservative resource finalization checks for task handles, task groups, island handles, region-backed slices, and structs containing them, including double-use and ambiguous provenance diagnostics","stability":"supported conservative MVP; tracks common local scope and control-flow merge cases, but is not a full SSA lifetime solver","docs":["docs/spec/current_supported_surface.md","docs/spec/ownership_v1.md","docs/spec/v1_scope.md"]},
-    {"id":"actors.task-transfer-safety","name":"Actor/task transfer safety MVP","status":"current","since":"v0.2.0","scope":"conservative actor/task ownership transfer checks for worker entrypoints and use-after-transfer diagnostics","stability":"supported conservative local MVP; distributed actors remain outside current support","docs":["docs/spec/current_supported_surface.md","docs/spec/ownership_v1.md","docs/spec/v1_scope.md"]},
-    {"id":"language.lifetime-ssa","name":"Lifetime SSA local join solver","status":"current","since":"v0.4.0","scope":"production SSA-like local lifetime join analysis for ownership consume state, resource finalization state, branch/match/loop flow snapshots, and maybe-consumed diagnostics","stability":"current local/control-flow solver; richer interprocedural lifetime proofs, broad alias modeling, race proofs, and full formal lifetime guarantees remain under full-v1 scope","docs":["docs/spec/current_supported_surface.md","docs/spec/ownership_v1.md","docs/spec/v1_scope.md"]},
-    {"id":"safety.production-core","name":"Production safety core","status":"current","since":"v0.4.0","scope":"production local safety model for ownership/lifetime/borrow/consume/inout checks, resource finalization, callable escape diagnostics, effects/capabilities/privacy/consent/budget policy, unsafe boundaries, actor/task transfer safety, and pointer/MMIO/memory capability gates, and a memory cost model with zero_cost_proven, dynamic_check_required, instrumentation_only, unsupported_rejected, and conservative_fallback report classes, and a memory fuzz oracle with Tier 1 short CI smoke, Tier 2 nightly fuzz, Tier 3 release-blocking focused memory fuzz, explicit oracle categories, and no unsupported unsafe pointer safety claim, and a memory production final audit with artifact map and explicit nonclaims","stability":"release-gated current profile with explicit diagnostics for unsupported distributed, cryptographic, formal-proof, and runtime-wide guarantees","docs":["docs/spec/current_supported_surface.md","docs/spec/ownership_v1.md","docs/spec/effects_capabilities_privacy_v1.md","docs/design/memory_cost_model.md","docs/audits/memory-fuzz-oracle-v1.md","docs/audits/memory-production-core-v1-final.md","docs/audits/memory-production-core-v1-artifact-map.md","docs/audits/memory-production-core-v1-nonclaims.md","docs/audits/memory-ideal-vslice-v0-baseline.md","docs/audits/memory-ideal-vslice-v0-correlation.md","docs/audits/memory-ideal-vslice-v0-final.md","docs/audits/memory-ideal-vslice-v1-correlation.md","docs/audits/memory-ideal-vslice-v1-final.md","docs/audits/memory-ideal-vslice-v2-correlation.md","docs/audits/memory-ideal-vslice-v2-final.md","docs/audits/memory-ideal-vslice-v3-correlation.md","docs/audits/memory-ideal-vslice-v3-final.md"]},
-    {"id":"language.callable-level2","name":"Callable Level 2","status":"current","since":"v0.4.0","scope":"production captured closure Level 2 slice with function-typed locals called directly","stability":"captured callback passing and full first-class callable semantics remain out of scope","docs":["docs/spec/current_supported_surface.md","docs/spec/flow_syntax_v1.md","docs/spec/v1_feature_status.md"]},
-    {"id":"ui.metadata-v1","name":"UI metadata v0.4.0","status":"current","since":"v0.4.0","scope":"production UI metadata contract with deterministic tetra.ui.v0.4.0 JSON","stability":"web command dispatch; native widgets remain post-v1","docs":["docs/spec/current_supported_surface.md","docs/spec/ui_v0.4.0.md","docs/user/wasm_ui_guide.md"]},
-    {"id":"ui.toolkit-core","name":"UI Toolkit Core","status":"current","since":"v0.4.0","scope":"production platform-independent UI Toolkit Core contract for tetra.ui.toolkit.v1 with widget model, layout model, accessibility model, event dispatch, state binding/update, and runtime trace artifacts","stability":"rejects metadata-only, runtime-less, native-shell sidecar-only, web-only evidence; no GTK/Qt/OS platform backend production or full cross-platform UI claim","docs":["docs/spec/current_supported_surface.md","docs/spec/ui_toolkit_core.md","docs/spec/ui_v0.4.0.md"]},
-    {"id":"wasm.runtime-execution","name":"WASM runtime execution","status":"current","since":"v0.4.0","scope":"production WASI runner and browser-backed wasm32-web execution","stability":"supported with runner/browser availability diagnostics","docs":["docs/spec/current_supported_surface.md","docs/backend/wasm_backend_plan.md","docs/user/wasm_ui_guide.md"]},
-    {"id":"language.full-v1-guarantees","name":"v1","status":"planned","scope":"v1","stability":"planned","docs":["docs/spec/v1_scope.md"]},
-    {"id":"eco.distributed-network","name":"EcoNet","status":"post-v1","scope":"network","stability":"deferred","docs":["docs/release/post_v1_promotion_checklist.md"]},
-    {"id":"language.full-first-class-callables","name":"Callables","status":"current","since":"v0.4.0","scope":"safe by-value first-class callable semantics","stability":"current safe-capture model","docs":["docs/spec/v1_feature_status.md"]}
-  ]
-}`
-	out, err := runManifestValidator(t, manifest)
+	raw, err := os.ReadFile(filepath.FromSlash("../../../docs/generated/manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := runManifestValidator(t, string(raw))
 	if err != nil {
 		t.Fatalf("validator failed: %v\n%s", err, out)
 	}
@@ -95,7 +36,8 @@ func TestValidateFeaturesAcceptsMachineReadableCurrentFutureClaims(t *testing.T)
 		{ID: "language.resource-lifetime-mvp", Name: "Resource lifetime MVP", Status: "current", Since: "v0.2.0", Scope: "conservative resource finalization checks for task handles, task groups, island handles, region-backed slices, and structs containing them, including double-use and ambiguous provenance diagnostics", Stability: "supported conservative MVP; tracks common local scope and control-flow merge cases, but is not a full SSA lifetime solver", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"}},
 		{ID: "actors.task-transfer-safety", Name: "Actor/task transfer safety MVP", Status: "current", Since: "v0.2.0", Scope: "conservative actor/task ownership transfer checks for worker entrypoints and use-after-transfer diagnostics", Stability: "supported conservative local MVP; distributed actors remain outside current support", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"}},
 		{ID: "language.lifetime-ssa", Name: "Lifetime SSA local join solver", Status: "current", Since: "v0.4.0", Scope: "production SSA-like local lifetime join analysis for ownership consume state, resource finalization state, branch/match/loop flow snapshots, and maybe-consumed diagnostics", Stability: "current local/control-flow solver; richer interprocedural lifetime proofs, broad alias modeling, race proofs, and full formal lifetime guarantees remain under full-v1 scope", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"}},
-		{ID: "safety.production-core", Name: "Production safety core", Status: "current", Since: "v0.4.0", Scope: "production local safety model for ownership/lifetime/borrow/consume/inout checks, resource finalization, callable escape diagnostics, effects/capabilities/privacy/consent/budget policy, unsafe boundaries, actor/task transfer safety, and pointer/MMIO/memory capability gates, and a memory cost model with zero_cost_proven, dynamic_check_required, instrumentation_only, unsupported_rejected, and conservative_fallback report classes, and a memory fuzz oracle with Tier 1 short CI smoke, Tier 2 nightly fuzz, Tier 3 release-blocking focused memory fuzz, explicit oracle categories, and no unsupported unsafe pointer safety claim, and a memory production final audit with artifact map and explicit nonclaims", Stability: "release-gated current profile with explicit diagnostics for unsupported distributed, cryptographic, formal-proof, and runtime-wide guarantees", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/effects_capabilities_privacy_v1.md", "docs/design/memory_cost_model.md", "docs/audits/memory-fuzz-oracle-v1.md", "docs/audits/memory-production-core-v1-final.md", "docs/audits/memory-production-core-v1-artifact-map.md", "docs/audits/memory-production-core-v1-nonclaims.md", "docs/audits/memory-ideal-vslice-v0-baseline.md", "docs/audits/memory-ideal-vslice-v0-correlation.md", "docs/audits/memory-ideal-vslice-v0-final.md", "docs/audits/memory-ideal-vslice-v1-correlation.md", "docs/audits/memory-ideal-vslice-v1-final.md", "docs/audits/memory-ideal-vslice-v2-correlation.md", "docs/audits/memory-ideal-vslice-v2-final.md", "docs/audits/memory-ideal-vslice-v3-correlation.md", "docs/audits/memory-ideal-vslice-v3-final.md"}},
+		validSafetyProductionCoreFeature(),
+		validRAMContractFeature(),
 		{ID: "language.callable-level2", Name: "Callable Level 2", Status: "current", Since: "v0.4.0", Scope: "production captured closure Level 2 slice with function-typed locals called directly", Stability: "captured callback passing and full first-class callable semantics remain out of scope", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_feature_status.md"}},
 		{ID: "ui.metadata-v1", Name: "UI metadata v0.4.0", Status: "current", Since: "v0.4.0", Scope: "production UI metadata contract with deterministic tetra.ui.v0.4.0 JSON", Stability: "web command dispatch; native widgets remain post-v1", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ui_v0.4.0.md", "docs/user/wasm_ui_guide.md"}},
 		{ID: "ui.toolkit-core", Name: "UI Toolkit Core", Status: "current", Since: "v0.4.0", Scope: "production platform-independent UI Toolkit Core contract for tetra.ui.toolkit.v1 with widget model, layout model, accessibility model, event dispatch, state binding/update, and runtime trace artifacts", Stability: "rejects metadata-only, runtime-less, native-shell sidecar-only, web-only evidence; no GTK/Qt/OS platform backend production or full cross-platform UI claim", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ui_toolkit_core.md", "docs/spec/ui_v0.4.0.md"}},
@@ -109,6 +51,59 @@ func TestValidateFeaturesAcceptsMachineReadableCurrentFutureClaims(t *testing.T)
 	}
 	if err := validateFeatures(features); err != nil {
 		t.Fatalf("validateFeatures: %v", err)
+	}
+}
+
+func validSafetyProductionCoreFeature() featureManifest {
+	return featureManifest{
+		ID:        "safety.production-core",
+		Name:      "Production safety core",
+		Status:    "current",
+		Since:     "v0.4.0",
+		Scope:     "production local safety model for ownership/lifetime/borrow/consume/inout checks, resource finalization, callable escape diagnostics, effects/capabilities/privacy/consent/budget policy, unsafe boundaries, actor/task transfer safety, and pointer/MMIO/memory capability gates, Memory Production Core v1 report evidence through compiler-owned facts rather than report-reconstructed truth, a memory cost model with zero_cost_proven, dynamic_check_required, instrumentation_only, unsupported_rejected, and conservative_fallback report classes, a memory fuzz oracle with Tier 1 short CI smoke, Tier 2 nightly fuzz, Tier 3 release-blocking focused memory fuzz, explicit oracle categories, memory production final audit with artifact map and explicit nonclaims, validate-island-proof independent-ish verifier evidence, --islands-debug sanitizer smoke, island-proof-fuzz-summary deterministic mutation evidence, leak/resource finalization evidence, and an integrated Memory/Islands/Surface release gate with memory-islands-surface-production-manifest.json and artifact-hashes.json, and no Memory 100% claim",
+		Stability: "release-gated current profile with explicit diagnostics for unsupported distributed, cryptographic, formal-proof, runtime-wide guarantees, arbitrary unsafe external pointer safety, full target parity, all-target Surface support, clean release-candidate checkout claims, and no production object memory or production persistent memory claim",
+		Docs: []string{
+			"docs/spec/current_supported_surface.md",
+			"docs/spec/ownership_v1.md",
+			"docs/spec/effects_capabilities_privacy_v1.md",
+			"docs/spec/unsafe.md",
+			"docs/spec/memory_report_schema_v1.md",
+			"docs/spec/islands.md",
+			"docs/design/memory_production_core_v1.md",
+			"docs/design/memory_cost_model.md",
+			"docs/audits/memory-fuzz-oracle-v1.md",
+			"docs/audits/memory-production-core-v1-final.md",
+			"docs/audits/memory-production-core-v1-artifact-map.md",
+			"docs/audits/memory-production-core-v1-nonclaims.md",
+			"docs/release/memory_islands_surface_scope.md",
+			"docs/audits/memory-ideal-vslice-v0-baseline.md",
+			"docs/audits/memory-ideal-vslice-v0-correlation.md",
+			"docs/audits/memory-ideal-vslice-v0-final.md",
+			"docs/audits/memory-ideal-vslice-v1-correlation.md",
+			"docs/audits/memory-ideal-vslice-v1-final.md",
+			"docs/audits/memory-ideal-vslice-v2-correlation.md",
+			"docs/audits/memory-ideal-vslice-v2-final.md",
+			"docs/audits/memory-ideal-vslice-v3-correlation.md",
+			"docs/audits/memory-ideal-vslice-v3-final.md",
+		},
+	}
+}
+
+func validRAMContractFeature() featureManifest {
+	return featureManifest{
+		ID:        "compiler.ram-contracts",
+		Name:      "RAM Contract Compiler reports",
+		Status:    "current",
+		Since:     "v0.4.0",
+		Scope:     "RAM Contract Compiler report evidence with tetra.ram-contract-report.v1, tetra.memory-grade-report.v1, tetra.proof-store-summary.v1, tetra.validation-pipeline-coverage.v1, heap-blockers.json, copy-blockers.json, ram-contract-fuzz-oracle.json, --emit-ram-contract-report, --fail-if-heap, --fail-if-copy, --fail-if-unbounded, --memory-budget, --ram-contract, TETRA4100, validate-ram-contract-release, and ram-contract-linux-x64-smoke.sh",
+		Stability: "current report/gate contract only; no zero heap for all programs claim, no zero-copy for all programs claim, no full formal proof claim, no all-target RAM parity claim, no production object memory claim, no production persistent memory claim, and no performance claim",
+		Docs: []string{
+			"docs/design/ram_contract_compiler.md",
+			"docs/spec/ram_contract_report_schema.md",
+			"docs/user/ram_contracts.md",
+			"docs/audits/ram-contract-compiler-readiness.md",
+			"docs/audits/ram-contract-compiler-handoff.md",
+		},
 	}
 }
 
@@ -150,6 +145,100 @@ func TestValidateFeaturesRequiresMemoryProductionFinalAuditDocs(t *testing.T) {
 	}
 }
 
+func TestValidateFeaturesRequiresIntegratedMemoryIslandsSurfaceEvidence(t *testing.T) {
+	raw, err := os.ReadFile(filepath.FromSlash("../../../docs/generated/manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest struct {
+		Features []featureManifest `json:"features"`
+	}
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	for i := range manifest.Features {
+		if manifest.Features[i].ID != "safety.production-core" {
+			continue
+		}
+		manifest.Features[i].Scope = strings.ReplaceAll(manifest.Features[i].Scope, "validate-island-proof", "producer-only proof")
+		manifest.Features[i].Scope = strings.ReplaceAll(manifest.Features[i].Scope, "memory-islands-surface-production-manifest.json", "combined-report.json")
+		manifest.Features[i].Scope = strings.ReplaceAll(manifest.Features[i].Scope, "island-proof-fuzz-summary", "proof fuzz")
+		filtered := manifest.Features[i].Docs[:0]
+		for _, doc := range manifest.Features[i].Docs {
+			if doc == "docs/spec/islands.md" || doc == "docs/release/memory_islands_surface_scope.md" {
+				continue
+			}
+			filtered = append(filtered, doc)
+		}
+		manifest.Features[i].Docs = filtered
+		break
+	}
+
+	err = validateFeatures(manifest.Features)
+	if err == nil {
+		t.Fatalf("expected integrated Memory/Islands/Surface evidence requirement failure")
+	}
+	for _, want := range []string{"safety.production-core", "validate-island-proof"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("unexpected error: %v, missing %q", err, want)
+		}
+	}
+}
+
+func TestValidateFeaturesRejectsProductionPersistentObjectMemoryClaim(t *testing.T) {
+	raw, err := os.ReadFile(filepath.FromSlash("../../../docs/generated/manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest struct {
+		Features []featureManifest `json:"features"`
+	}
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	for i := range manifest.Features {
+		if manifest.Features[i].ID != "safety.production-core" {
+			continue
+		}
+		manifest.Features[i].Scope += " Production object memory is backed by persistent memory, Todium, memoryfield, WAL, FTS, vacuum, retention, stale memory, and false memory gates."
+		break
+	}
+
+	err = validateFeatures(manifest.Features)
+	if err == nil {
+		t.Fatalf("expected production persistent/object memory claim failure")
+	}
+	for _, want := range []string{"production object memory", "persistent memory", "todium", "memoryfield"} {
+		if !strings.Contains(strings.ToLower(err.Error()), want) {
+			t.Fatalf("expected %q in error, got %v", want, err)
+		}
+	}
+}
+
+func TestValidateFeaturesAllowsPersistentObjectMemoryNonGoal(t *testing.T) {
+	raw, err := os.ReadFile(filepath.FromSlash("../../../docs/generated/manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest struct {
+		Features []featureManifest `json:"features"`
+	}
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	for i := range manifest.Features {
+		if manifest.Features[i].ID != "safety.production-core" {
+			continue
+		}
+		manifest.Features[i].Stability += " Persistent/object memory is an explicit non-goal: no production object memory, no production persistent memory, and no Todium or memoryfield production claim exists until retention/WAL/FTS/vacuum/stale/false-memory gates exist."
+		break
+	}
+
+	if err := validateFeatures(manifest.Features); err != nil {
+		t.Fatalf("validateFeatures: %v", err)
+	}
+}
+
 func TestManifestSurfaceRequiresCurrentAndUnsupportedSurfaceRows(t *testing.T) {
 	raw, err := os.ReadFile(filepath.FromSlash("../../../docs/generated/manifest.json"))
 	if err != nil {
@@ -179,6 +268,64 @@ func TestManifestSurfaceRequiresCurrentAndUnsupportedSurfaceRows(t *testing.T) {
 	}
 }
 
+func TestManifestSurfaceRequiresBlockSystemRow(t *testing.T) {
+	raw, err := os.ReadFile(filepath.FromSlash("../../../docs/generated/manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest struct {
+		Features []featureManifest `json:"features"`
+	}
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	filtered := manifest.Features[:0]
+	for _, feature := range manifest.Features {
+		if feature.ID == "ui.surface-block-system" {
+			continue
+		}
+		filtered = append(filtered, feature)
+	}
+	manifest.Features = filtered
+
+	err = validateFeatures(manifest.Features)
+	if err == nil {
+		t.Fatalf("expected missing Surface Block System row failure")
+	}
+	if !strings.Contains(err.Error(), "ui.surface-block-system") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestManifestSurfaceRequiresMorphCapsuleRow(t *testing.T) {
+	raw, err := os.ReadFile(filepath.FromSlash("../../../docs/generated/manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest struct {
+		Features []featureManifest `json:"features"`
+	}
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	filtered := manifest.Features[:0]
+	for _, feature := range manifest.Features {
+		if feature.ID == "ui.surface-morph-capsule" {
+			continue
+		}
+		filtered = append(filtered, feature)
+	}
+	manifest.Features = filtered
+
+	err = validateFeatures(manifest.Features)
+	if err == nil {
+		t.Fatalf("expected missing Surface Morph Capsule row failure")
+	}
+	if !strings.Contains(err.Error(), "ui.surface-morph-capsule") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestValidateFeaturesRejectsFutureStatusPromotionWithoutRegistryUpdate(t *testing.T) {
 	features := []featureManifest{
 		{ID: "cli.core", Name: "CLI", Status: "current", Since: "v0.2.0", Scope: "core CLI", Stability: "supported", Docs: []string{"docs/spec/current_supported_surface.md"}},
@@ -194,7 +341,8 @@ func TestValidateFeaturesRejectsFutureStatusPromotionWithoutRegistryUpdate(t *te
 		{ID: "language.ownership-markers-mvp", Name: "Ownership markers MVP", Status: "current", Since: "v0.2.0", Scope: "conservative borrow/inout/consume marker checks with use-after-consume and borrow escape diagnostics", Stability: "supported conservative MVP; not a full SSA lifetime solver", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"}},
 		{ID: "language.resource-lifetime-mvp", Name: "Resource lifetime MVP", Status: "current", Since: "v0.2.0", Scope: "conservative resource finalization checks for task handles, task groups, island handles, region-backed slices, and structs containing them, including double-use and ambiguous provenance diagnostics", Stability: "supported conservative MVP; tracks common local scope and control-flow merge cases, but is not a full SSA lifetime solver", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"}},
 		{ID: "actors.task-transfer-safety", Name: "Actor/task transfer safety MVP", Status: "current", Since: "v0.2.0", Scope: "conservative actor/task ownership transfer checks for worker entrypoints and use-after-transfer diagnostics", Stability: "supported conservative local MVP; distributed actors remain outside current support", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"}},
-		{ID: "safety.production-core", Name: "Production safety core", Status: "current", Since: "v0.4.0", Scope: "production local safety model for ownership/lifetime/borrow/consume/inout checks, resource finalization, callable escape diagnostics, effects/capabilities/privacy/consent/budget policy, unsafe boundaries, actor/task transfer safety, and pointer/MMIO/memory capability gates, and a memory cost model with zero_cost_proven, dynamic_check_required, instrumentation_only, unsupported_rejected, and conservative_fallback report classes, and a memory fuzz oracle with Tier 1 short CI smoke, Tier 2 nightly fuzz, Tier 3 release-blocking focused memory fuzz, explicit oracle categories, and no unsupported unsafe pointer safety claim, and a memory production final audit with artifact map and explicit nonclaims", Stability: "release-gated current profile with explicit diagnostics for unsupported distributed, cryptographic, formal-proof, and runtime-wide guarantees", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/effects_capabilities_privacy_v1.md", "docs/design/memory_cost_model.md", "docs/audits/memory-fuzz-oracle-v1.md", "docs/audits/memory-production-core-v1-final.md", "docs/audits/memory-production-core-v1-artifact-map.md", "docs/audits/memory-production-core-v1-nonclaims.md", "docs/audits/memory-ideal-vslice-v0-baseline.md", "docs/audits/memory-ideal-vslice-v0-correlation.md", "docs/audits/memory-ideal-vslice-v0-final.md", "docs/audits/memory-ideal-vslice-v1-correlation.md", "docs/audits/memory-ideal-vslice-v1-final.md", "docs/audits/memory-ideal-vslice-v2-correlation.md", "docs/audits/memory-ideal-vslice-v2-final.md", "docs/audits/memory-ideal-vslice-v3-correlation.md", "docs/audits/memory-ideal-vslice-v3-final.md"}},
+		validSafetyProductionCoreFeature(),
+		validRAMContractFeature(),
 		{ID: "language.lifetime-ssa", Name: "Lifetime SSA solver", Status: "planned", Scope: "stale planned lifetime solver fixture", Stability: "unsupported stale fixture", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"}},
 		{ID: "language.callable-level2", Name: "Callable Level 2", Status: "current", Since: "v0.4.0", Scope: "production captured closure Level 2 slice with function-typed locals called directly", Stability: "captured callback passing and full first-class callable semantics remain out of scope", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_feature_status.md"}},
 		{ID: "ui.metadata-v1", Name: "UI metadata v0.4.0", Status: "current", Since: "v0.4.0", Scope: "production UI metadata contract with deterministic tetra.ui.v0.4.0 JSON", Stability: "web command dispatch; native widgets remain post-v1", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ui_v0.4.0.md", "docs/user/wasm_ui_guide.md"}},

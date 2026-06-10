@@ -2052,6 +2052,11 @@ func checkCallExprWithEffects(
 				return "", regionNone, ownershipDiagnosticf(e.Args[i].Pos(), "value '%s' consumed more than once in %s", name, ownershipCallPhrase)
 			}
 		}
+		if resolved == "core.island_reset" {
+			if slicePath, live := state.liveOwnedRegionSliceForOwner(name); live {
+				return "", regionNone, ownershipDiagnosticf(e.Args[i].Pos(), "cannot reset island '%s' while borrowed slice '%s' is alive", name, slicePath)
+			}
+		}
 		markConsumedResourceValue(name, consumeArgTypes[i], types, state, e.Args[i].Pos())
 		if resolved == "core.island_reset" {
 			state.markOwnedRegionSlicesConsumedByOwner(name, e.Args[i].Pos())

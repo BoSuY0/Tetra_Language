@@ -42,6 +42,46 @@ These examples remain useful regression evidence, but the public release docs
 point new work to `ui.surface-toolkit-v1`, `ui.surface-text-input-v1`, and
 `ui.surface-accessibility-v1`.
 
+## Experimental Block-First Beauty Examples
+
+These examples are P15-P18 evidence for polished UI built from `Block`
+configuration only. The complete Block-system gate is
+`scripts/release/surface/block-system-gate.sh --report-dir reports/surface-block/p18-budget`;
+it writes same-commit headless,
+linux-x64 real-window, and wasm32-web browser-canvas Block reports plus
+artifact hashes and `block_system.memory_budget` evidence. The headless smoke
+also writes `surface-block-examples.json`. These examples do not introduce core
+Button/Card/TextField/Sidebar/Modal abstractions and do not promote Block to
+production support.
+
+- `examples/surface_block_command_palette.tetra`: command palette overlay,
+  editable query field, and command rows using Block layout, layered paint,
+  text, assets, accessibility, state selectors, motion, and scene checksum
+  evidence.
+- `examples/surface_block_project_dashboard.tetra`: sidebar-like shell, metric
+  panels, activity card, and action affordance built as Block configurations.
+- `examples/surface_block_settings.tetra`: settings form with labels, editable
+  fields, save/reset actions, focus order, and label relationships through
+  Block metadata.
+- `examples/surface_block_editor_shell.tetra`: editor shell with rail, tabs,
+  scrollable code panel, selected line styling, and deterministic state/motion
+  evidence.
+- `examples/surface_block_glass_panel.tetra`: glass overlay/control panel with
+  image/icon assets, overlay paint, rounded capsules, focus order, and
+  motion-backed interaction evidence.
+
+## Experimental Morph Capsule Example
+
+`examples/surface_morph_command_palette.tetra` is the current
+`ui.surface-morph-capsule` evidence source. It imports `lib.core.morph`, uses
+capsule recipes for a panel, editable field, label, and command rows, and then
+validates the resulting `BlockTree`. The gate is
+`scripts/release/surface/morph-gate.sh --report-dir reports/surface-morph/gate`.
+It writes `tetra.surface.morph.v1` headless evidence plus a
+`tetra.surface.morph.gate.v1` summary. This example is not Surface v1
+production support and does not introduce core Button/Card/TextField/Sidebar
+or Modal primitives.
+
 ## Legacy Metadata UI Examples
 
 Legacy `tetra.ui.v1` metadata examples are compatibility evidence for
@@ -113,6 +153,8 @@ Legacy `tetra.ui.v1` metadata examples are compatibility evidence for
 | `examples/core_async_smoke.tetra` | Current core async helper smoke for `select_or`, with `pair_sum` probe coverage kept compile-visible. | native | exits 42 through the deterministic `select_or` path; does not claim broader async runtime coverage |
 | `examples/core_accessibility_smoke.tetra` | Experimental Tetra Surface accessibility metadata smoke for role, action, value, and validation helper counts through `lib.core.accessibility`. | native | exits 42 through pure metadata helper calls; does not claim production accessibility tree runtime support |
 | `examples/core_capability_smoke.tetra` | Current core capability token acquisition smoke for `cap.mem` and `cap.io`. | native | exits 42 using only caller-owned heap memory and local MMIO storage; does not imply host permission grant |
+| `examples/core_block_smoke.tetra` | Current Block primitive data model smoke for fixed layout, paint, text, input, event, state, motion, accessibility, and asset metadata through `lib.core.block`. | native | exits 0 |
+| `examples/surface_morph_command_palette.tetra` | Experimental Morph Capsule command palette over `lib.core.morph`, expanding capsule recipes into Block graph evidence. | native headless | exits 0 through Morph self-checks, recipe expansions, BlockTree validation, accessibility projection, and memory-budget checks; release evidence comes from `surface-headless-morph-smoke.sh` |
 | `examples/core_collections_smoke.tetra` | Current core collections smoke for stable generic `Vec<T>`/`HashMap<K,V>` source views plus legacy `[]i32` length, contains, count, and first-or helpers. | native | exits 42 |
 | `examples/core_component_smoke.tetra` | Planned Tetra Surface static component helper smoke for `clamp_size`, `inset_rect`, and `center_rect`. | native | exits 42 through pure measurement/layout helpers; does not claim dynamic component lists or runtime widget dispatch |
 | `examples/core_widgets_smoke.tetra` | Experimental Tetra Surface minimal widget helper smoke for `Panel` initialization and content bounds through `lib.core.widgets`. | native | exits 42 through pure widget helper calls; does not claim production widget toolkit support |

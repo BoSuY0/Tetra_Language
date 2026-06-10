@@ -259,8 +259,8 @@ func (g *Graph) validateFact(f Fact) error {
 	if capMemDisallowedProofClaim(f.Claim, f.ValidatorName, f.Reason) {
 		return fmt.Errorf("memoryfacts: cap.mem authorization fact %q cannot claim %q; cap.mem authorizes raw operations only and does not prove pointer validity, bounds, ownership, noalias, or safe provenance", f.ID, f.Claim)
 	}
-	if isUnsafeUnknown(f) && f.ValidationState == ValidationPass && unsafeUnknownTrustedStorage(f.StoragePlan, f.ActualLoweringStorage) {
-		return fmt.Errorf("memoryfacts: unsafe_unknown fact %q cannot validate trusted storage lowering %q/%q", f.ID, f.StoragePlan, f.ActualLoweringStorage)
+	if f.ValidationState == ValidationPass && unsafeExternalRootTrustedStorage(f.ProvenanceClass, f.UnsafeClass, f.StoragePlan, f.ActualLoweringStorage) {
+		return fmt.Errorf("memoryfacts: unsafe/external root %s/%s fact %q cannot validate trusted storage lowering %q/%q", f.ProvenanceClass, f.UnsafeClass, f.ID, f.StoragePlan, f.ActualLoweringStorage)
 	}
 	if f.ValidationState == ValidationPass && validatedTrustedStorageHeapFallback(f.StoragePlan, f.ActualLoweringStorage) {
 		return fmt.Errorf("memoryfacts: validated %s claim cannot lower as Heap for fact %q", f.StoragePlan, f.ID)
@@ -279,6 +279,9 @@ func (g *Graph) validateFact(f Fact) error {
 	}
 	if (f.StoragePlan == "") != (f.ActualLoweringStorage == "") {
 		return fmt.Errorf("memoryfacts: fact %q requires planned_storage and actual_lowering_storage together", f.ID)
+	}
+	if storageFallbackRequiresReason(f.StoragePlan, f.ActualLoweringStorage, f.CostClass) && strings.TrimSpace(f.Reason) == "" {
+		return fmt.Errorf("memoryfacts: storage/conservative fallback fact %q requires reason", f.ID)
 	}
 	if f.ParamIndex != nil && *f.ParamIndex < 0 {
 		return fmt.Errorf("memoryfacts: fact %q has negative param_index %d", f.ID, *f.ParamIndex)

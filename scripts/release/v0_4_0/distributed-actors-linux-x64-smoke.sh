@@ -42,5 +42,8 @@ report_path="$report_dir/distributed-actors-linux-x64.json"
 
 go run ./tools/cmd/distributed-actor-runtime-smoke --report "$report_path"
 go run ./tools/cmd/validate-distributed-actor-runtime --report "$report_path"
+go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"
+go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-hashes.json"
 
 echo "distributed actors linux-x64 smoke report: $report_path"
+echo "distributed actors linux-x64 artifact hashes: $report_dir/artifact-hashes.json"

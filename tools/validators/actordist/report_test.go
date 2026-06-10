@@ -39,6 +39,103 @@ func TestValidateReportRejectsMissingFailureCase(t *testing.T) {
 	}
 }
 
+func TestValidateReportRejectsMissingSameCommitArtifactMetadata(t *testing.T) {
+	var report map[string]any
+	if err := json.Unmarshal(validDistributedActorRuntimeReport(t), &report); err != nil {
+		t.Fatal(err)
+	}
+	delete(report, "git_head")
+	delete(report, "artifact_hashes")
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = ValidateReport(raw)
+	if err == nil {
+		t.Fatalf("expected missing same-commit artifact metadata to fail")
+	}
+	if !strings.Contains(err.Error(), "git_head") {
+		t.Fatalf("error = %v, want missing git_head", err)
+	}
+	if !strings.Contains(err.Error(), "artifact_hashes") {
+		t.Fatalf("error = %v, want missing artifact_hashes", err)
+	}
+}
+
+func TestValidateReportRejectsMissingFrameOrder(t *testing.T) {
+	var report map[string]any
+	if err := json.Unmarshal(validDistributedActorRuntimeReport(t), &report); err != nil {
+		t.Fatal(err)
+	}
+	delete(report, "frame_order")
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = ValidateReport(raw)
+	if err == nil {
+		t.Fatalf("expected missing frame_order to fail")
+	}
+	if !strings.Contains(err.Error(), "frame_order") {
+		t.Fatalf("error = %v, want missing frame_order", err)
+	}
+}
+
+func TestValidateReportRejectsBadFrameOrder(t *testing.T) {
+	raw := validDistributedActorRuntimeReportFrom(t, func(report *Report) {
+		report.FrameOrder = []string{"send_typed", "send_msg", "send_i32", "spawn_ack", "spawn_req", "hello_ack", "hello", "node_down"}
+	})
+	err := ValidateReport(raw)
+	if err == nil {
+		t.Fatalf("expected bad frame_order to fail")
+	}
+	if !strings.Contains(err.Error(), "frame_order") {
+		t.Fatalf("error = %v, want frame_order rejection", err)
+	}
+}
+
+func TestValidateReportRejectsMissingScopedNonClaims(t *testing.T) {
+	var report map[string]any
+	if err := json.Unmarshal(validDistributedActorRuntimeReport(t), &report); err != nil {
+		t.Fatal(err)
+	}
+	delete(report, "nonclaims")
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = ValidateReport(raw)
+	if err == nil {
+		t.Fatalf("expected missing nonclaims to fail")
+	}
+	if !strings.Contains(err.Error(), "nonclaims") {
+		t.Fatalf("error = %v, want missing nonclaims", err)
+	}
+}
+
+func TestValidateReportRejectsClusterRetryReconnectClaims(t *testing.T) {
+	var report map[string]any
+	if err := json.Unmarshal(validDistributedActorRuntimeReport(t), &report); err != nil {
+		t.Fatal(err)
+	}
+	report["claims"] = []string{"cluster reconnect retry production for non-linux actors"}
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = ValidateReport(raw)
+	if err == nil {
+		t.Fatalf("expected forbidden distributed actor claim to fail")
+	}
+	if !strings.Contains(err.Error(), "forbidden distributed actor claim") {
+		t.Fatalf("error = %v, want forbidden distributed actor claim", err)
+	}
+}
+
 func validDistributedActorRuntimeReport(t *testing.T) []byte {
 	t.Helper()
 	return validDistributedActorRuntimeReportFrom(t, func(*Report) {})
@@ -48,12 +145,20 @@ func validDistributedActorRuntimeReportFrom(t *testing.T, mutate func(*Report)) 
 	t.Helper()
 	zero := 0
 	report := Report{
-		Schema:    SchemaV1,
-		Status:    "pass",
-		Target:    "linux-x64",
-		Host:      "linux-x64",
-		Runtime:   "actornet",
-		Transport: "loopback-tcp",
+		Schema:         SchemaV1,
+		Status:         "pass",
+		Target:         "linux-x64",
+		Host:           "linux-x64",
+		Runtime:        "actornet",
+		Transport:      "loopback-tcp",
+		GitHead:        "e2c19b8ee276158f8eb2c54cf61e11bd84952893",
+		ArtifactHashes: "artifact-hashes.json",
+		Claims:         []string{"linux-x64 loopback tcp distributed actor runtime evidence"},
+		NonClaims: []string{
+			"no cluster membership",
+			"no reconnect/retry production",
+			"no non-linux distributed actor runtime support",
+		},
 		Broker: BrokerReport{
 			Runtime:             "actornet",
 			Transport:           "loopback-tcp",
@@ -77,6 +182,7 @@ func validDistributedActorRuntimeReportFrom(t *testing.T, mutate func(*Report)) 
 			SendTyped: 1,
 			NodeDown:  1,
 		},
+		FrameOrder: []string{"hello", "hello_ack", "spawn_req", "spawn_ack", "send_i32", "send_msg", "send_typed", "node_down"},
 		Cases: []CaseReport{
 			validCase("cross-node i32 send/receive", 2),
 			validCase("cross-node tagged send/receive", 2),

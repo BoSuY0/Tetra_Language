@@ -29,6 +29,14 @@ uses actors:
 			wantMessage: "actors runtime not supported on %s",
 		},
 		{
+			name: "distributed-actors",
+			src: `func main() -> Int
+uses actors, runtime:
+    return core.actor_node_status(2)
+`,
+			wantMessage: "distributed actors runtime not supported on %s",
+		},
+		{
 			name: "task",
 			src: `func worker() -> Int:
     return 42

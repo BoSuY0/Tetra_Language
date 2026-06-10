@@ -15,6 +15,8 @@ func TestBuildReportProducesValidMemoryProductionEvidence(t *testing.T) {
 		{Name: "memory smoke app", Kind: "app", Path: "/tmp/memory-smoke", Ran: true, Pass: true, ExitCode: intPtr(0)},
 		{Name: "memory stress", Kind: "stress", Path: "/tmp/memory-stress", Ran: true, Pass: true, ExitCode: intPtr(0)},
 		{Name: "memory fuzz", Kind: "stress", Path: "/tmp/memory-fuzz", Ran: true, Pass: true, ExitCode: intPtr(0)},
+		{Name: "actornet close-without-cancel leak coverage", Kind: "stress", Path: "go test -buildvcs=false ./cli/internal/actornet -run TestBrokerCloseWithoutCancelStopsServeWatcher -count=1", Ran: true, Pass: true, ExitCode: intPtr(0)},
+		{Name: "compiler resource finalization diagnostics", Kind: "stress", Path: "go test -buildvcs=false ./compiler/tests/runtime -run ^(TestTaskHandleFinalization|TestTaskGroupFinalization|TestIslandFinalization) -count=1", Ran: true, Pass: true, ExitCode: intPtr(0)},
 	}, requiredPassingBenchmarks(), requiredPassingCases())
 	raw, err := json.Marshal(report)
 	if err != nil {
@@ -61,9 +63,36 @@ func TestRequiredPassingCasesIncludeMemoryProductionEdgeCases(t *testing.T) {
 		"allocation island negative length",
 		"allocation island byte-size overflow",
 		"allocation length contract report",
+		"actornet broker close-without-cancel leak smoke",
+		"compiler resource finalization diagnostics",
 	} {
 		if !hasCase(cases, want) {
 			t.Fatalf("requiredPassingCases missing %q", want)
+		}
+	}
+}
+
+func TestResourceFinalizationCoverageIsReleaseBlocking(t *testing.T) {
+	exit0 := 0
+	report := buildReport("tools/cmd/memory-production-smoke", []memoryprod.ProcessReport{
+		{Name: "tetra build", Kind: "build", Path: "go build ./cli/cmd/tetra", Ran: true, Pass: true, ExitCode: &exit0},
+		{Name: "memory smoke app", Kind: "app", Path: "examples/core_memory_smoke", Ran: true, Pass: true, ExitCode: &exit0},
+		{Name: "memory stress", Kind: "stress", Path: "tools/cmd/memory-production-smoke", Ran: true, Pass: true, ExitCode: &exit0},
+	}, requiredPassingBenchmarks(), requiredPassingCases())
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = memoryprod.ValidateReport(raw)
+	if err == nil {
+		t.Fatalf("ValidateReport accepted release evidence without leak/resource process rows")
+	}
+	for _, want := range []string{
+		"actornet close-without-cancel leak coverage",
+		"compiler resource finalization diagnostics",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("ValidateReport error missing %q:\n%v", want, err)
 		}
 	}
 }

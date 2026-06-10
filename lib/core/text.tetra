@@ -32,6 +32,14 @@ struct TextComposition:
     len: Int
     preview_len: Int
 
+struct EditableText:
+    bytes: []u8
+    len: Int
+    capacity: Int
+    caret: Int
+    focused: Bool
+    block_id: Int
+
 func error_none() -> Int:
     return 0
 
@@ -49,6 +57,45 @@ func make_result(ok: Bool, bytes_written: Int, caret: Int, changed: Bool, error:
 
 func buffer_init(storage: []u8) -> TextBuffer:
     return TextBuffer(bytes: storage, len: 0, capacity: storage.len)
+
+func editable_empty(storage: []u8, block_id: Int) -> EditableText:
+    return EditableText(bytes: storage, len: 0, capacity: storage.len, caret: 0, focused: false, block_id: block_id)
+
+func editable_len(editable: borrow EditableText) -> Int:
+    return editable.len
+
+func editable_caret(editable: borrow EditableText) -> Int:
+    return editable.caret
+
+func editable_set_focus(editable: inout EditableText, focused: Bool) -> Int:
+    editable.focused = focused
+    if focused:
+        return 1
+    return 0
+
+func editable_validate(editable: borrow EditableText) -> Int:
+    if editable.len < 0 || editable.len > editable.capacity:
+        return error_invalid_range()
+    if !validate_utf8(editable.bytes.window(0, editable.len).borrow()):
+        return error_invalid_utf8()
+    return error_none()
+
+func editable_text_input(editable: inout EditableText, bytes: borrow []u8) -> TextEditResult:
+    var buf: TextBuffer = TextBuffer(bytes: editable.bytes, len: editable.len, capacity: editable.capacity)
+    var cursor: TextCursor = TextCursor(byte_index: editable.caret)
+    let result: TextEditResult = insert_bytes(buf, cursor, bytes)
+    editable.len = buf.len
+    editable.caret = cursor.byte_index
+    return result
+
+func editable_backspace(editable: inout EditableText) -> TextEditResult:
+    var buf: TextBuffer = TextBuffer(bytes: editable.bytes, len: editable.len, capacity: editable.capacity)
+    var cursor: TextCursor = TextCursor(byte_index: editable.caret)
+    var selection: TextSelection = clear_selection()
+    let result: TextEditResult = backspace(buf, cursor, selection)
+    editable.len = buf.len
+    editable.caret = cursor.byte_index
+    return result
 
 func buffer_clear(buf: inout TextBuffer) -> TextEditResult:
     let changed: Bool = buf.len > 0

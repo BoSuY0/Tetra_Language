@@ -387,6 +387,28 @@ func (s *regionState) markOwnedRegionSlicesConsumedByOwner(owner string, pos fro
 	}
 }
 
+func (s *regionState) liveOwnedRegionSliceForOwner(owner string) (string, bool) {
+	if s == nil || owner == "" {
+		return "", false
+	}
+	paths := make([]string, 0, len(s.ownedRegionSliceOwners))
+	for path := range s.ownedRegionSliceOwners {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	for _, path := range paths {
+		pathOwner := s.ownedRegionSliceOwners[path]
+		if pathOwner == "" || !s.resourcePathsAlias(owner, pathOwner) {
+			continue
+		}
+		if _, _, _, _, consumed := s.consumedPath(path); consumed {
+			continue
+		}
+		return path, true
+	}
+	return "", false
+}
+
 func (s *regionState) resourcePathsAlias(left string, right string) bool {
 	if s == nil || left == "" || right == "" {
 		return false

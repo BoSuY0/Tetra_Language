@@ -5,6 +5,26 @@ Target version: linux-x64
 Git HEAD:
 Compiler version (compilerVersion): v0.6.0
 
+## Actor Runtime Foundation Gate
+
+Actor runtime foundation scoped release truth is
+`tetra.actor.production_foundation.v1`, produced by
+`scripts/release/post_v0_4/actor-runtime-foundation-linux-x64-gate.sh`.
+The final evidence is uploaded from
+`reports/actor-runtime-foundation/final/actor-runtime-foundation-manifest.json`,
+`reports/actor-runtime-foundation/final/artifact-hashes.json`,
+`distributed-actors-linux-x64/distributed-actors-linux-x64.json`, and
+`parallel-production-linux-x64/parallel-production-linux-x64.json` through
+`.github/workflows/ci.yml`; `.github/workflows/release-packages.yml` runs the
+same gate before package upload, release publish, container publish, and
+Homebrew tap update.
+
+Windows and macOS rows below remain build smoke rows unless separate target-host
+runtime evidence is added. Nonclaims: no full Erlang/OTP actor runtime claim,
+no cluster membership or reconnect/retry production claim, no non-Linux
+distributed actor runtime support claim, no distributed zero-copy pointer or
+region transfer claim, and no formal race proof claim.
+
 ## Prereqs
 
 - Go 1.20+

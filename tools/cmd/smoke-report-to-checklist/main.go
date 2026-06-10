@@ -27,19 +27,29 @@ type smokeCaseReport struct {
 	Error              string `json:"error,omitempty"`
 }
 
+type islandsDebugScopeRow struct {
+	Name     string `json:"name"`
+	Status   string `json:"status"`
+	CaseName string `json:"case_name,omitempty"`
+	SrcPath  string `json:"src_path,omitempty"`
+	Evidence string `json:"evidence"`
+	Reason   string `json:"reason"`
+}
+
 type smokeReport struct {
-	Timestamp    string            `json:"timestamp"`
-	Target       string            `json:"target"`
-	BuildOnly    bool              `json:"build_only,omitempty"`
-	Runner       string            `json:"runner,omitempty"`
-	Host         string            `json:"host"`
-	Version      string            `json:"version"`
-	GitHead      string            `json:"git_head,omitempty"`
-	IslandsDebug bool              `json:"islands_debug"`
-	Total        *int              `json:"total,omitempty"`
-	Passed       *int              `json:"passed,omitempty"`
-	Failed       *int              `json:"failed,omitempty"`
-	Cases        []smokeCaseReport `json:"cases"`
+	Timestamp         string                 `json:"timestamp"`
+	Target            string                 `json:"target"`
+	BuildOnly         bool                   `json:"build_only,omitempty"`
+	Runner            string                 `json:"runner,omitempty"`
+	Host              string                 `json:"host"`
+	Version           string                 `json:"version"`
+	GitHead           string                 `json:"git_head,omitempty"`
+	IslandsDebug      bool                   `json:"islands_debug"`
+	IslandsDebugScope []islandsDebugScopeRow `json:"islands_debug_scope,omitempty"`
+	Total             *int                   `json:"total,omitempty"`
+	Passed            *int                   `json:"passed,omitempty"`
+	Failed            *int                   `json:"failed,omitempty"`
+	Cases             []smokeCaseReport      `json:"cases"`
 }
 
 const smokeReportArtifact = "tetra.release.v0_2_0.smoke-report.v1"
@@ -294,6 +304,119 @@ func validateSmokeReport(report *smokeReport) error {
 	}
 	if err := validateRequiredSmokeCases(report.Target, seenNames); err != nil {
 		return err
+	}
+	if report.IslandsDebug {
+		if err := validateIslandsDebugTrapEvidence(report.Cases); err != nil {
+			return err
+		}
+		if err := validateIslandsDebugScopeEvidence(report.Cases, report.IslandsDebugScope); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateIslandsDebugTrapEvidence(cases []smokeCaseReport) error {
+	const trapName = "islands_overflow"
+	for _, c := range cases {
+		if c.Name != trapName {
+			continue
+		}
+		if c.SrcPath != "examples/islands_overflow.tetra" {
+			return fmt.Errorf("islands_debug trap case %s src_path = %q, want examples/islands_overflow.tetra", trapName, c.SrcPath)
+		}
+		if c.ExpectedExit == 0 {
+			return fmt.Errorf("islands_debug trap case %s expected_exit must be non-zero", trapName)
+		}
+		if !c.Ran {
+			return fmt.Errorf("islands_debug trap case %s did not run", trapName)
+		}
+		if c.ActualExit == nil {
+			return fmt.Errorf("islands_debug trap case %s missing actual_exit", trapName)
+		}
+		if !c.Pass {
+			return fmt.Errorf("islands_debug trap case %s did not pass", trapName)
+		}
+		if *c.ActualExit != c.ExpectedExit {
+			return fmt.Errorf("islands_debug trap case %s actual_exit = %d, want %d", trapName, *c.ActualExit, c.ExpectedExit)
+		}
+		return nil
+	}
+	return fmt.Errorf("islands_debug smoke report missing runtime trap case %s", trapName)
+}
+
+type requiredIslandsDebugScope struct {
+	status   string
+	caseName string
+	srcPath  string
+}
+
+var requiredIslandsDebugScopes = map[string]requiredIslandsDebugScope{
+	"double_free":    {status: "static_only_nonclaim"},
+	"use_after_free": {status: "static_only_nonclaim"},
+	"stale_epoch":    {status: "static_only_nonclaim"},
+	"wrong_island":   {status: "static_only_nonclaim"},
+	"overflow_trap":  {status: "live_trap", caseName: "islands_overflow", srcPath: "examples/islands_overflow.tetra"},
+}
+
+var requiredIslandsDebugScopeOrder = []string{
+	"double_free",
+	"use_after_free",
+	"stale_epoch",
+	"wrong_island",
+	"overflow_trap",
+}
+
+func validateIslandsDebugScopeEvidence(cases []smokeCaseReport, rows []islandsDebugScopeRow) error {
+	byCase := make(map[string]smokeCaseReport, len(cases))
+	for _, c := range cases {
+		byCase[c.Name] = c
+	}
+	seen := make(map[string]islandsDebugScopeRow, len(rows))
+	for _, row := range rows {
+		if strings.TrimSpace(row.Name) == "" {
+			return fmt.Errorf("islands_debug scope row missing name")
+		}
+		spec, ok := requiredIslandsDebugScopes[row.Name]
+		if !ok {
+			return fmt.Errorf("islands_debug scope row %q is not a supported scoped sanitizer evidence row", row.Name)
+		}
+		if _, exists := seen[row.Name]; exists {
+			return fmt.Errorf("duplicate islands_debug scope row %s", row.Name)
+		}
+		if row.Status != spec.status {
+			return fmt.Errorf("islands_debug scope row %s status = %q, want %q", row.Name, row.Status, spec.status)
+		}
+		if strings.TrimSpace(row.Evidence) == "" {
+			return fmt.Errorf("islands_debug scope row %s missing evidence", row.Name)
+		}
+		if strings.TrimSpace(row.Reason) == "" {
+			return fmt.Errorf("islands_debug scope row %s missing reason", row.Name)
+		}
+		switch spec.status {
+		case "live_trap":
+			if row.CaseName != spec.caseName || row.SrcPath != spec.srcPath {
+				return fmt.Errorf("islands_debug live scope row %s must reference %s at %s", row.Name, spec.caseName, spec.srcPath)
+			}
+			c, ok := byCase[spec.caseName]
+			if !ok {
+				return fmt.Errorf("islands_debug live scope row %s references missing case %s", row.Name, spec.caseName)
+			}
+			if !c.Ran || c.ActualExit == nil || !c.Pass || *c.ActualExit == 0 {
+				return fmt.Errorf("islands_debug live scope row %s requires ran/pass/non-zero trap evidence from %s", row.Name, spec.caseName)
+			}
+		case "static_only_nonclaim":
+			reason := strings.ToLower(row.Reason)
+			if !strings.Contains(reason, "static") || !strings.Contains(reason, "no live") || !strings.Contains(reason, "claimed") {
+				return fmt.Errorf("islands_debug static-only scope row %s must explain static-only nonclaim status", row.Name)
+			}
+		}
+		seen[row.Name] = row
+	}
+	for _, name := range requiredIslandsDebugScopeOrder {
+		if _, ok := seen[name]; !ok {
+			return fmt.Errorf("islands_debug scope missing %s evidence row", name)
+		}
 	}
 	return nil
 }

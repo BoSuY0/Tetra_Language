@@ -437,6 +437,93 @@ func TestValidateSmokeReportShapeRejectsInvalidExitCode(t *testing.T) {
 	}
 }
 
+func TestValidateSmokeReportRejectsIslandsDebugWithoutTrapCase(t *testing.T) {
+	report := nativeSmokeReportForTest("")
+	report.IslandsDebug = true
+	err := validateSmokeReport(report)
+	if err == nil || !strings.Contains(err.Error(), "islands_debug") || !strings.Contains(err.Error(), "trap") {
+		t.Fatalf("expected islands_debug trap-case error, got %v", err)
+	}
+}
+
+func TestValidateSmokeReportRejectsIslandsDebugTrapCaseWithoutScopeRows(t *testing.T) {
+	report := nativeSmokeReportForTest("")
+	report.IslandsDebug = true
+	report.Cases = append(report.Cases, smokeCaseReport{
+		Name:         "islands_overflow",
+		SrcPath:      "examples/islands_overflow.tetra",
+		ExpectedExit: 1,
+		ActualExit:   intPtr(1),
+		Ran:          true,
+		Pass:         true,
+	})
+	total := len(report.Cases)
+	passed := total
+	failed := 0
+	report.Total = &total
+	report.Passed = &passed
+	report.Failed = &failed
+
+	err := validateSmokeReport(report)
+	if err == nil || !strings.Contains(err.Error(), "double_free") {
+		t.Fatalf("validate islands_debug smoke report error = %v, want missing double_free scope row rejection", err)
+	}
+}
+
+func TestValidateSmokeReportAcceptsIslandsDebugTrapCaseWithScopeRows(t *testing.T) {
+	report := nativeSmokeReportForTest("")
+	report.IslandsDebug = true
+	report.Cases = append(report.Cases, smokeCaseReport{
+		Name:         "islands_overflow",
+		SrcPath:      "examples/islands_overflow.tetra",
+		ExpectedExit: 1,
+		ActualExit:   intPtr(1),
+		Ran:          true,
+		Pass:         true,
+	})
+	report.IslandsDebugScope = validIslandsDebugScopeRows()
+	total := len(report.Cases)
+	passed := total
+	failed := 0
+	report.Total = &total
+	report.Passed = &passed
+	report.Failed = &failed
+
+	if err := validateSmokeReport(report); err != nil {
+		t.Fatalf("validate islands_debug smoke report: %v", err)
+	}
+}
+
+func TestValidateSmokeReportRejectsIslandsDebugStaticScopeOverclaim(t *testing.T) {
+	report := nativeSmokeReportForTest("")
+	report.IslandsDebug = true
+	report.Cases = append(report.Cases, smokeCaseReport{
+		Name:         "islands_overflow",
+		SrcPath:      "examples/islands_overflow.tetra",
+		ExpectedExit: 1,
+		ActualExit:   intPtr(1),
+		Ran:          true,
+		Pass:         true,
+	})
+	report.IslandsDebugScope = validIslandsDebugScopeRows()
+	for i := range report.IslandsDebugScope {
+		if report.IslandsDebugScope[i].Name == "double_free" {
+			report.IslandsDebugScope[i].Status = "live_trap"
+		}
+	}
+	total := len(report.Cases)
+	passed := total
+	failed := 0
+	report.Total = &total
+	report.Passed = &passed
+	report.Failed = &failed
+
+	err := validateSmokeReport(report)
+	if err == nil || !strings.Contains(err.Error(), "double_free") || !strings.Contains(err.Error(), "static_only_nonclaim") {
+		t.Fatalf("validate islands_debug overclaim error = %v, want static-only rejection", err)
+	}
+}
+
 func TestValidateSmokeReportShapeRejectsPassedRunWithWrongExit(t *testing.T) {
 	total := 1
 	passed := 1
@@ -547,6 +634,45 @@ func smokeReportToolDir(t *testing.T) string {
 		t.Fatal("runtime.Caller failed")
 	}
 	return filepath.Dir(file)
+}
+
+func validIslandsDebugScopeRows() []islandsDebugScopeRow {
+	return []islandsDebugScopeRow{
+		{
+			Name:     "overflow_trap",
+			Status:   "live_trap",
+			CaseName: "islands_overflow",
+			SrcPath:  "examples/islands_overflow.tetra",
+			Evidence: "tetra smoke --islands-debug executes islands_overflow and observes non-zero trap exit",
+			Reason:   "live sanitizer trap row for bounded island allocation overflow",
+		},
+		{
+			Name:     "double_free",
+			Status:   "static_only_nonclaim",
+			CaseName: "islands_double_free",
+			SrcPath:  "examples/islands_double_free.tetra",
+			Evidence: "compiler/tests/runtime/resource_finalization_test.go; compiler/compiler_test.go; compiler/internal/backend/x64abi/abi_test.go",
+			Reason:   "static semantics reject double-free before runtime; backend freed-marker trap is covered, but no live double-free bypass is claimed",
+		},
+		{
+			Name:     "use_after_free",
+			Status:   "static_only_nonclaim",
+			Evidence: "compiler/internal/validation/validation_test.go; compiler/tests/runtime/resource_finalization_test.go",
+			Reason:   "static validation rejects island use-after-free before runtime; no live UAF sanitizer row is claimed",
+		},
+		{
+			Name:     "stale_epoch",
+			Status:   "static_only_nonclaim",
+			Evidence: "compiler/tests/runtime/resource_finalization_test.go; compiler/internal/islandkernel/kernel_test.go; compiler/internal/memoryfacts/report_test.go",
+			Reason:   "reset/stale-epoch misuse is covered by static/kernel/report validators; no live stale-epoch sanitizer row is claimed",
+		},
+		{
+			Name:     "wrong_island",
+			Status:   "static_only_nonclaim",
+			Evidence: "compiler/internal/islandkernel/kernel_test.go; tools/validators/islandproof/proof_test.go",
+			Reason:   "wrong-island proof/report misuse is covered by static verifier evidence; no live wrong-island sanitizer row is claimed",
+		},
+	}
 }
 
 func intPtr(v int) *int {

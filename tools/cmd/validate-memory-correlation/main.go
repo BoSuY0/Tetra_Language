@@ -77,6 +77,7 @@ var requiredV8RequirementIDs = map[string]bool{
 	"MEM-REPORT-003": true,
 	"MEM-REPORT-004": true,
 	"MEM-REPORT-005": true,
+	"MEM-REPORT-006": true,
 }
 
 var requiredV9RequirementIDs = map[string]bool{
@@ -108,6 +109,7 @@ var expectedV8Statuses = map[string]string{
 	"MEM-REPORT-003": "validated_narrow",
 	"MEM-REPORT-004": "validated_narrow",
 	"MEM-REPORT-005": "rejected",
+	"MEM-REPORT-006": "validated_narrow",
 }
 
 var expectedV9Statuses = map[string]string{
@@ -115,6 +117,13 @@ var expectedV9Statuses = map[string]string{
 	"MEM-STORAGE-002": "validated_narrow",
 	"MEM-STORAGE-003": "validated_narrow",
 	"MEM-STORAGE-004": "conservative",
+}
+
+var requiredV9NegativeTests = map[string][]string{
+	"MEM-STORAGE-001": {"TestVerifyPlanRejectsEscapedActualTrustedLowering"},
+	"MEM-STORAGE-002": {"TestVerifyPlanRejectsTrustedStorageWithoutNoEscapeProof"},
+	"MEM-STORAGE-003": {"TestFromPLIRAndAllocPlanRejectsHeapFallbackWithoutReason", "TestValidateMemoryReportRejectsHeapFallbackWithoutReason"},
+	"MEM-STORAGE-004": {"TestVerifyPlanRejectsEscapedActualTrustedLowering", "TestMiniMemoryModelV9StorageCases"},
 }
 
 var expectedV10Statuses = map[string]string{
@@ -250,6 +259,11 @@ func validateCorrelationRows(rows []map[string]string) error {
 		if want, ok := expectedV9Statuses[id]; ok && status != "" && status != want {
 			issues = append(issues, fmt.Sprintf("%s: widened v9 status %q, want %q", prefix, status, want))
 		}
+		if want, ok := requiredV9NegativeTests[id]; ok {
+			if missing := missingRequiredNegativeTests(row["negative_test"], want); len(missing) > 0 {
+				issues = append(issues, fmt.Sprintf("%s: negative_test missing required v9 evidence: %s", prefix, strings.Join(missing, ",")))
+			}
+		}
 		if want, ok := expectedV10Statuses[id]; ok && status != "" && status != want {
 			issues = append(issues, fmt.Sprintf("%s: widened v10 status %q, want %q", prefix, status, want))
 		}
@@ -356,6 +370,23 @@ func hasNegativeTest(value string) bool {
 		}
 	}
 	return false
+}
+
+func missingRequiredNegativeTests(value string, required []string) []string {
+	present := map[string]bool{}
+	for _, part := range strings.Split(value, ",") {
+		name := strings.TrimSpace(part)
+		if name != "" {
+			present[name] = true
+		}
+	}
+	var missing []string
+	for _, name := range required {
+		if !present[name] {
+			missing = append(missing, name)
+		}
+	}
+	return missing
 }
 
 func splitMarkdownRow(line string) []string {

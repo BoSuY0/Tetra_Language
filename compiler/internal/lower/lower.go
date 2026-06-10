@@ -4340,8 +4340,15 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 			l.emit(ir.IRInstr{Kind: ir.IRAddI32, Pos: e.At})
 			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: int32(info.SlotCount - 1), Pos: e.At})
 			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_actor_send_begin", ArgSlots: 3, RetSlots: 1, Pos: e.At})
+			beginResult := l.allocScratchSlots(1)
+			beginFailedLabel := l.newLabel()
+			endLabel := l.newLabel()
+			l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: beginResult, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: beginResult, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRCmpEqI32, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRJmpIfZero, Label: beginFailedLabel, Pos: e.At})
 			discard := l.ensureDiscardLocal()
-			l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: discard, Pos: e.At})
 			for slot := 0; slot < info.SlotCount-1; slot++ {
 				l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: int32(slot), Pos: e.At})
 				l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: msgBase + 1 + slot, Pos: e.At})
@@ -4349,6 +4356,10 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 				l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: discard, Pos: e.At})
 			}
 			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_actor_send_commit", ArgSlots: 0, RetSlots: 1, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRJmp, Label: endLabel, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRLabel, Label: beginFailedLabel, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: beginResult, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRLabel, Label: endLabel, Pos: e.At})
 			return 1, nil
 		case "core.self":
 			if len(e.Args) != 0 {

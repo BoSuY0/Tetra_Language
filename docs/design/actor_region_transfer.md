@@ -2,6 +2,21 @@
 
 Status: P6.3 typed mailbox transfer model plus scheduler prototype evidence.
 
+Actor runtime foundation scoped release truth is
+`tetra.actor.production_foundation.v1`, produced by
+`scripts/release/post_v0_4/actor-runtime-foundation-linux-x64-gate.sh` and
+published through `.github/workflows/ci.yml` and
+`.github/workflows/release-packages.yml`. Its final evidence includes
+`reports/actor-runtime-foundation/final/actor-runtime-foundation-manifest.json`,
+`reports/actor-runtime-foundation/final/artifact-hashes.json`,
+`distributed-actors-linux-x64/distributed-actors-linux-x64.json`, and
+`parallel-production-linux-x64/parallel-production-linux-x64.json`.
+
+This design keeps the transfer claim local: no full Erlang/OTP actor runtime
+claim, no cluster membership or reconnect/retry production claim, no non-Linux
+distributed actor runtime support claim, no distributed zero-copy pointer or
+region transfer claim, and no formal race proof claim.
+
 Actor zero-copy work now has a narrow local runtime slice. The safe sendability
 model defines the payload matrix:
 

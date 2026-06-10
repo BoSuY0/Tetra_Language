@@ -10,6 +10,100 @@ wrapper over React, the HTML DOM, Qt, GTK, WinUI, Cocoa, or generated metadata
 sidecars. A Surface app is written as Tetra structs and methods that measure,
 lay out, draw, and handle events.
 
+## Block-First Direction
+
+The next Surface authoring direction is the experimental Block System. Its goal
+is a Block-first Surface architecture where `Block` is the core Surface
+primitive and polished UI shapes are ordinary Block configurations. A
+button-like control is a Block with text, paint, state, click handling, motion,
+and accessibility metadata; it is not a special core widget class.
+
+This is an implementation track, not current release support. The current
+Block-system evidence is scoped to the same-commit
+`tetra.surface.block-system.gate.v1` reports, artifact hashes, validators, and
+`block_system.memory_budget` records under `reports/surface-block/p18-budget`.
+`lib.core.widgets` remains the current release helper layer. Those helpers must
+move toward recipes/compatibility over Block rather than becoming a larger
+built-in widget kit.
+
+The first available slice is the `lib.core.block` data model:
+
+```text
+import lib.core.surface as surface
+import lib.core.block as block
+
+let rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 320, h: 200)
+let root_id: block.BlockID = block.id(1)
+let props: block.BlockProps =
+    block.props(block.layout_fixed(rect), block.paint_from_layer(block.paint_layer_fill(surface.Color(r: 24, g: 32, b: 40, a: 255))), block.text_label(18, surface.Color(r: 238, g: 242, b: 246, a: 255)), block.image_none(), block.input_clickable(), block.event_click(block.action_primary()), block.state_interactive(), block.motion_fast(), block.accessibility_button(18), block.asset_none())
+let root: block.Block = block.make(root_id, block.id_none(), props)
+```
+
+That creates a Block model value only. The separate Block-system gate now
+proves scoped Block graph, rendering, state/motion/input, accessibility, target
+runtime report, and memory-budget evidence for the current scenes. It still
+does not promote Block to production support.
+
+The current polished Block-only example set is release-gated by
+`scripts/release/surface/surface-headless-block-system-smoke.sh`, which now also
+writes `surface-block-examples.json`. These examples show visual grammar, not a
+new widget layer:
+
+- `examples/surface_block_command_palette.tetra`: command-center overlay,
+  editable query field, and command rows as configured Blocks.
+- `examples/surface_block_project_dashboard.tetra`: sidebar-like navigation,
+  metric panels, and action affordances as Block layout/paint/state recipes.
+- `examples/surface_block_settings.tetra`: label relationships, editable
+  fields, and action controls as Block input/accessibility metadata.
+- `examples/surface_block_editor_shell.tetra`: editor shell, tabs, scrollable
+  code area, and selected line treatment as Block composition.
+- `examples/surface_block_glass_panel.tetra`: glass overlay/control-center
+  treatment through layered paint, assets, state, and motion.
+
+Each scene uses `lib.core.block` directly, includes dark/light theme tokens,
+paint/layout/text/asset/accessibility/state/motion evidence, and keeps
+button-like, card-like, input-like, command-item-like, and overlay-like shapes
+as Block configurations rather than core `Button`, `Card`, `TextField`,
+`Sidebar`, or `Modal` abstractions.
+
+Block-system runtime reports include bounded local memory/cache facts under
+`block_system.memory_budget`: component count, deterministic stress count,
+render/state/motion/input loop counts, framebuffer byte totals, paint/text/asset
+cache usage, cache budgets, and explicit nonclaims. Treat that section as
+evidence that the current Block scene is budgeted and cache-bounded. It is not
+an Electron comparison benchmark, and RSS is recorded only when host evidence is
+available.
+
+Run the complete Block-system gate with:
+
+```sh
+bash scripts/release/surface/block-system-gate.sh \
+  --report-dir reports/surface-block/p18-budget
+```
+
+## Morph Capsule Layer
+
+Morph Capsule is the next experimental authoring layer over Block. It gathers
+scoped design tokens, materials, affordances, state lenses, motion presets, and
+recipes in `lib.core.morph`, then expands those recipes into `Block` values.
+It does not add new core widget primitives or a separate runtime.
+
+The current Morph example is
+`examples/surface_morph_command_palette.tetra`. It builds the same kind of
+command-palette scene as the Block example, but routes panel, field, label, and
+action rows through Morph recipes before they become a `BlockTree`.
+
+Run the Morph evidence gate with:
+
+```sh
+bash scripts/release/surface/morph-gate.sh \
+  --report-dir reports/surface-morph/gate
+```
+
+The gate writes a deterministic headless `tetra.surface.morph.v1` report and a
+`tetra.surface.morph.gate.v1` summary. It is experimental evidence only and
+does not change the Surface v1 production support boundary.
+
 ## What Changes
 
 Legacy UI uses `state` and `view` declarations that lower to `tetra.ui.v1`

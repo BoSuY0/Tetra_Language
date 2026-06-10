@@ -185,8 +185,12 @@ only with validator tests and manifest-visible schema notes.
 - `unsafe_verified_root` rows that claim generic provenance/lifetime facts
   instead of bounded raw metadata such as `allocation_base_metadata` or
   `unsafe_verified_root_allocation_base`;
-- validated `unsafe_unknown` rows that claim trusted stack/region/island,
-  register, or eliminated storage lowering;
+- validated `unsafe_unknown`, `unsafe_checked`, or `unsafe_verified_root` rows
+  that claim trusted stack/region/island, register, or eliminated storage
+  lowering; bounded unsafe-root metadata may describe a heap allocation base,
+  but it does not promote the raw root to trusted storage;
+- `cap.mem` authorization rows that are used as pointer validity, bounds,
+  ownership, noalias, safe-provenance, or bounds-check-elimination proof;
 - storage rows missing either `planned_storage` or `actual_lowering_storage`;
 - storage or lowering claims without `lowered_artifact_id`;
 - heap or conservative trusted-storage fallback rows without a reviewable
@@ -848,6 +852,9 @@ does not authorize zero-cost check elimination.
 The v7 FFI rows keep external pointers, borrow retention, safe-wrapper
 promotion, and noalias evidence conservative or rejected at external-call
 boundaries unless a compiler-owned proof exists.
+`cap.mem` authorizes raw operations only. It is not a proof of pointer
+validity, bounds, ownership, noalias, safe provenance, or trusted storage
+lowering.
 
 ## Validation Command
 

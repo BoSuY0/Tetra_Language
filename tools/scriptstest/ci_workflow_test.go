@@ -76,6 +76,9 @@ func TestCIWorkflowHasLeastPrivilegeConcurrencyAndTimeouts(t *testing.T) {
 		"fuzz-nightly-linux:",
 		"release-v0-4-0-readiness-linux:",
 		"surface-release-readiness-linux:",
+		"memory-islands-surface-release-readiness-linux:",
+		"actor-runtime-foundation-linux:",
+		"ram-contract-release-readiness-linux:",
 		"techempower-report-schemas-linux:",
 		"lint-workflows-and-shell-linux:",
 	} {
@@ -101,6 +104,8 @@ func TestCIWorkflowIncludesSurfaceReleaseReadinessJob(t *testing.T) {
 		"go-version: \"1.20.x\"",
 		"name: Bootstrap",
 		"bash scripts/dev/bootstrap.sh",
+		"name: Surface Morph gate",
+		"bash scripts/release/surface/morph-gate.sh --report-dir reports/surface-morph-gate",
 		"name: Surface release gate",
 		"bash scripts/release/surface/release-gate.sh --report-dir reports/surface-release-v1",
 		"name: Surface experimental regression gate",
@@ -124,6 +129,8 @@ func TestCIWorkflowIncludesSurfaceReleaseReadinessJob(t *testing.T) {
 		"name: tetra-surface-release-v1-${{ github.sha }}",
 		"path: |",
 		"reports/surface-release-v1",
+		"reports/surface-release-v1/morph",
+		"reports/surface-morph-gate",
 		"reports/surface-experimental-regression",
 		"reports/safe-view-lifetime",
 		"reports/surface-api-stability-v1",
@@ -134,6 +141,118 @@ func TestCIWorkflowIncludesSurfaceReleaseReadinessJob(t *testing.T) {
 	}
 	if strings.Contains(text, "continue-on-error: true") {
 		t.Fatalf("Surface release readiness job must not silently continue after missing production dependencies")
+	}
+}
+
+func TestCIWorkflowIncludesIntegratedMemoryIslandsSurfaceReadinessJob(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "ci.yml"))
+	if err != nil {
+		t.Fatalf("read ci workflow: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		"memory-islands-surface-release-readiness-linux:",
+		"github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'",
+		"runs-on: ubuntu-latest",
+		"timeout-minutes: 120",
+		"actions/checkout@v4",
+		"actions/setup-go@v5",
+		"go-version: \"1.20.x\"",
+		"name: Bootstrap",
+		"bash scripts/dev/bootstrap.sh",
+		"name: Integrated Memory/Islands/Surface release gate",
+		"bash scripts/release/post_v0_4/memory-islands-surface-production-gate.sh --report-dir reports/memory-islands-surface-production",
+		"name: Upload integrated Memory/Islands/Surface release reports",
+		"if: always()",
+		"uses: actions/upload-artifact@v4",
+		"name: tetra-memory-islands-surface-${{ github.sha }}",
+		"path: reports/memory-islands-surface-production",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("ci workflow missing integrated release readiness detail %q", want)
+		}
+	}
+	if strings.Contains(text, "continue-on-error: true") {
+		t.Fatalf("integrated Memory/Islands/Surface readiness job must not silently continue after missing production dependencies")
+	}
+}
+
+func TestCIWorkflowIncludesActorRuntimeFoundationGateJob(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "ci.yml"))
+	if err != nil {
+		t.Fatalf("read ci workflow: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		"actor-runtime-foundation-linux:",
+		"github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'",
+		"runs-on: ubuntu-latest",
+		"timeout-minutes: 120",
+		"actions/checkout@v4",
+		"actions/setup-go@v5",
+		"go-version: \"1.20.x\"",
+		"name: Bootstrap",
+		"bash scripts/dev/bootstrap.sh",
+		"name: Actor runtime foundation gate",
+		"bash scripts/release/post_v0_4/actor-runtime-foundation-linux-x64-gate.sh --report-dir reports/actor-runtime-foundation/final",
+		"name: Upload actor runtime foundation reports",
+		"if: always()",
+		"uses: actions/upload-artifact@v4",
+		"name: tetra-actor-runtime-foundation-${{ github.sha }}-linux-x64",
+		"reports/actor-runtime-foundation/final/actor-runtime-foundation-manifest.json",
+		"reports/actor-runtime-foundation/final/artifact-hashes.json",
+		"reports/actor-runtime-foundation/final/distributed-actors-linux-x64/distributed-actors-linux-x64.json",
+		"reports/actor-runtime-foundation/final/distributed-actors-linux-x64/artifact-hashes.json",
+		"reports/actor-runtime-foundation/final/parallel-production-linux-x64/parallel-production-linux-x64.json",
+		"reports/actor-runtime-foundation/final/parallel-production-linux-x64/artifact-hashes.json",
+		"reports/actor-runtime-foundation/final/logs/*.log",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("ci workflow missing actor runtime foundation detail %q", want)
+		}
+	}
+	section := workflowJobSection(text, "actor-runtime-foundation-linux:")
+	assertOrderedFragments(t, section,
+		"name: Actor runtime foundation gate",
+		"bash scripts/release/post_v0_4/actor-runtime-foundation-linux-x64-gate.sh --report-dir reports/actor-runtime-foundation/final",
+		"name: Upload actor runtime foundation reports",
+		"uses: actions/upload-artifact@v4",
+	)
+	if strings.Contains(section, "continue-on-error") {
+		t.Fatalf("actor runtime foundation CI gate must not use continue-on-error")
+	}
+}
+
+func TestCIWorkflowIncludesRAMContractReleaseReadinessJob(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "ci.yml"))
+	if err != nil {
+		t.Fatalf("read ci workflow: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		"ram-contract-release-readiness-linux:",
+		"github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'",
+		"runs-on: ubuntu-latest",
+		"timeout-minutes: 60",
+		"actions/checkout@v4",
+		"actions/setup-go@v5",
+		"go-version: \"1.20.x\"",
+		"name: Bootstrap",
+		"bash scripts/dev/bootstrap.sh",
+		"name: RAM contract release gate",
+		"bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir reports/ram-contract-release",
+		"name: Upload RAM contract release reports",
+		"uses: actions/upload-artifact@v4",
+		"name: tetra-ram-contract-${{ github.sha }}-linux-x64",
+		"path: reports/ram-contract-release",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("ci workflow missing RAM contract release readiness detail %q", want)
+		}
+	}
+	section := workflowJobSection(text, "ram-contract-release-readiness-linux:")
+	if strings.Contains(section, "continue-on-error") {
+		t.Fatalf("RAM contract CI gate must not use continue-on-error")
 	}
 }
 
@@ -269,6 +388,9 @@ func TestCIWorkflowArtifactNamesAreReleaseAware(t *testing.T) {
 		"tetra-v0.4.0-${{ github.sha }}-test-all-stabilization-linux",
 		"tetra-v0.4.0-${{ github.sha }}-release-readiness-linux",
 		"tetra-surface-release-v1-${{ github.sha }}",
+		"tetra-memory-islands-surface-${{ github.sha }}",
+		"tetra-actor-runtime-foundation-${{ github.sha }}-linux-x64",
+		"tetra-ram-contract-${{ github.sha }}-linux-x64",
 		"tetra-full-platform-ui-runtime-${{ github.sha }}-${{ matrix.target }}",
 		"tetra-full-platform-ui-runtime-${{ github.sha }}-gate",
 		"tetra-v0.4.0-${{ github.sha }}-coverage-linux",
@@ -289,6 +411,9 @@ func TestCIWorkflowArtifactNamesAreReleaseAware(t *testing.T) {
 		}
 		if !strings.Contains(name, "v0.4.0") &&
 			!strings.Contains(name, "surface-release-v1") &&
+			!strings.Contains(name, "memory-islands-surface") &&
+			!strings.Contains(name, "actor-runtime-foundation") &&
+			!strings.Contains(name, "ram-contract") &&
 			!strings.Contains(name, "full-platform-ui-runtime") {
 			t.Fatalf("ci workflow artifact name %q missing release-aware scope", name)
 		}
@@ -379,6 +504,24 @@ func workflowUploadArtifactNames(workflow string) []string {
 		}
 	}
 	return names
+}
+
+func workflowJobSection(workflow, job string) string {
+	lines := strings.Split(workflow, "\n")
+	var section []string
+	inJob := false
+	for _, line := range lines {
+		if strings.HasPrefix(line, "  ") && !strings.HasPrefix(line, "    ") {
+			if inJob {
+				break
+			}
+			inJob = line == "  "+job
+		}
+		if inJob {
+			section = append(section, line)
+		}
+	}
+	return strings.Join(section, "\n")
 }
 
 func stringSliceContains(values []string, want string) bool {

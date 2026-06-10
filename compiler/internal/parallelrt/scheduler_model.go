@@ -43,16 +43,19 @@ type Stats struct {
 }
 
 type PrototypeBenchmark struct {
-	Name             string  `json:"name"`
-	Kind             string  `json:"kind"`
-	Metric           string  `json:"metric"`
-	Unit             string  `json:"unit"`
-	BaselineValue    int     `json:"baseline_value"`
-	MeasuredValue    int     `json:"measured_value"`
-	ImprovementRatio float64 `json:"improvement_ratio"`
-	Evidence         string  `json:"evidence"`
-	Ran              bool    `json:"ran"`
-	Pass             bool    `json:"pass"`
+	Name               string   `json:"name"`
+	Kind               string   `json:"kind"`
+	Metric             string   `json:"metric"`
+	Unit               string   `json:"unit"`
+	BaselineValue      int      `json:"baseline_value"`
+	MeasuredValue      int      `json:"measured_value"`
+	ImprovementRatio   float64  `json:"improvement_ratio"`
+	Evidence           string   `json:"evidence"`
+	ClaimTier          string   `json:"claim_tier"`
+	Claim              string   `json:"claim"`
+	RawOutputArtifacts []string `json:"raw_output_artifacts"`
+	Ran                bool     `json:"ran"`
+	Pass               bool     `json:"pass"`
 }
 
 type Region struct {
@@ -197,38 +200,73 @@ func (m *SchedulerModel) rememberQueueDepth(depth int) {
 }
 
 func PrototypeBenchmarks() ([]PrototypeBenchmark, error) {
-	fanoutBaseline, fanoutMeasured, err := actorPingPongFanoutQueueDepths()
-	if err != nil {
+	if _, _, err := actorPingPongFanoutQueueDepths(); err != nil {
 		return nil, err
 	}
-	copyBaseline, zeroCopyMeasured, err := zeroCopyRegionBytesCopied()
-	if err != nil {
+	if _, _, err := zeroCopyRegionBytesCopied(); err != nil {
 		return nil, err
 	}
+	rawArtifact := "reports/actor-runtime-foundation/P15/parallelrt-evidence.raw.json"
 	return []PrototypeBenchmark{
 		{
-			Name:             "actor ping-pong fanout scheduler prototype",
-			Kind:             "scheduler",
-			Metric:           "max_queue_depth",
-			Unit:             "work_items",
-			BaselineValue:    fanoutBaseline,
-			MeasuredValue:    fanoutMeasured,
-			ImprovementRatio: improvementRatio(fanoutBaseline, fanoutMeasured),
-			Evidence:         "compiler/internal/parallelrt two-core work stealing model ran actor ping-pong fanout comparison",
-			Ran:              true,
-			Pass:             true,
+			Name:               "actor ping-pong benchmark prep",
+			Kind:               "actor_benchmark_prep",
+			Metric:             "messages_round_trip",
+			Unit:               "prep_only",
+			Evidence:           "compiler/actors_test.go::TestActorsPingPongBuildAndRun and examples/actors_pingpong.tetra define the local Linux-x64 actor ping-pong workload candidate",
+			ClaimTier:          "tier0_local_smoke_only",
+			Claim:              "Actor ping-pong benchmark prep row exists as Tier 0 local smoke only; no measured result is published and cross-runtime comparison is out of scope.",
+			RawOutputArtifacts: []string{rawArtifact},
+			Ran:                false,
+			Pass:               true,
 		},
 		{
-			Name:             "zero-copy region message scheduler prototype",
-			Kind:             "transfer",
-			Metric:           "bytes_copied",
-			Unit:             "bytes",
-			BaselineValue:    copyBaseline,
-			MeasuredValue:    zeroCopyMeasured,
-			ImprovementRatio: improvementRatio(copyBaseline, zeroCopyMeasured),
-			Evidence:         "compiler/internal/parallelrt owned-region transfer report emitted zero_copy_move with bytes_copied=0",
-			Ran:              true,
-			Pass:             true,
+			Name:               "actor fanout/fanin benchmark prep",
+			Kind:               "actor_benchmark_prep",
+			Metric:             "fanout_fanin_messages",
+			Unit:               "prep_only",
+			Evidence:           "compiler/internal/parallelrt two-core work stealing model checks actor fanout/fanin scheduling shape without publishing throughput",
+			ClaimTier:          "tier0_local_smoke_only",
+			Claim:              "Actor fanout/fanin benchmark prep row exists as Tier 0 local smoke only; it records local workload shape and leaves public benchmark publication out of scope.",
+			RawOutputArtifacts: []string{rawArtifact},
+			Ran:                false,
+			Pass:               true,
+		},
+		{
+			Name:               "actor mailbox throughput benchmark prep",
+			Kind:               "actor_benchmark_prep",
+			Metric:             "mailbox_messages",
+			Unit:               "prep_only",
+			Evidence:           "compiler/internal/parallelrt TypedMailbox and parallel production actor mailbox cases define the local mailbox throughput workload candidate",
+			ClaimTier:          "tier0_local_smoke_only",
+			Claim:              "Actor mailbox throughput benchmark prep row exists as Tier 0 local smoke only; it publishes no measured result and no throughput guarantee.",
+			RawOutputArtifacts: []string{rawArtifact},
+			Ran:                false,
+			Pass:               true,
+		},
+		{
+			Name:               "actor backpressure latency benchmark prep",
+			Kind:               "actor_benchmark_prep",
+			Metric:             "backpressure_wait",
+			Unit:               "prep_only",
+			Evidence:           "compiler/internal/parallelrt ErrMailboxFull and blocking_recv_yield metadata define the local backpressure latency diagnostic candidate",
+			ClaimTier:          "tier0_local_smoke_only",
+			Claim:              "Actor backpressure latency benchmark prep row exists as Tier 0 local smoke only; no real-world SLA or latency advantage is claimed.",
+			RawOutputArtifacts: []string{rawArtifact},
+			Ran:                false,
+			Pass:               true,
+		},
+		{
+			Name:               "zero_copy_move local typed mailbox benchmark prep",
+			Kind:               "actor_transfer_prep",
+			Metric:             "owned_region_transfer",
+			Unit:               "prep_only",
+			Evidence:           "compiler/internal/parallelrt owned-region transfer report emits zero_copy_move for local typed mailbox metadata only",
+			ClaimTier:          "tier0_local_smoke_only",
+			Claim:              "zero_copy_move local typed mailbox benchmark prep row exists as Tier 0 local smoke only; it records local owned-region metadata and leaves distributed or network transfer behavior out of scope.",
+			RawOutputArtifacts: []string{rawArtifact},
+			Ran:                false,
+			Pass:               true,
 		},
 	}, nil
 }
@@ -296,13 +334,6 @@ func zeroCopyRegionBytesCopied() (int, int, error) {
 		return 0, 0, err
 	}
 	return copyReport.BytesCopied, moveReport.BytesCopied, nil
-}
-
-func improvementRatio(baseline int, measured int) float64 {
-	if measured == 0 {
-		return float64(baseline)
-	}
-	return float64(baseline) / float64(measured)
 }
 
 type PayloadKind string

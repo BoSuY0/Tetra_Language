@@ -30,14 +30,15 @@ type smokeOptions struct {
 }
 
 type smokeRunner struct {
-	opt       smokeOptions
-	workDir   string
-	tetraPath string
-	broker    *brokerProcess
-	counts    actordist.FrameCounts
-	processes []actordist.ProcessReport
-	cases     []actordist.CaseReport
-	nextPeer  uint16
+	opt        smokeOptions
+	workDir    string
+	tetraPath  string
+	broker     *brokerProcess
+	counts     actordist.FrameCounts
+	processes  []actordist.ProcessReport
+	cases      []actordist.CaseReport
+	frameOrder []string
+	nextPeer   uint16
 }
 
 type brokerProcess struct {
@@ -146,7 +147,7 @@ func runSmoke(ctx context.Context, opt smokeOptions) error {
 	if err := r.stopBroker(); err != nil {
 		return err
 	}
-	return r.writeReport()
+	return r.writeReport(ctx)
 }
 
 func (r *smokeRunner) startBroker(ctx context.Context) error {
@@ -542,9 +543,10 @@ func (r *smokeRunner) countFrame(typ actorwire.FrameType) {
 	case actorwire.FrameNodeDown:
 		r.counts.NodeDown++
 	}
+	r.frameOrder = append(r.frameOrder, frameTypeName(typ))
 }
 
-func (r *smokeRunner) writeReport() error {
+func (r *smokeRunner) writeReport(ctx context.Context) error {
 	broker := actordist.BrokerReport{}
 	rawBroker, err := os.ReadFile(filepath.Join(r.workDir, "actornet-broker.json"))
 	if err != nil {
@@ -553,16 +555,29 @@ func (r *smokeRunner) writeReport() error {
 	if err := json.Unmarshal(rawBroker, &broker); err != nil {
 		return err
 	}
+	head, err := currentGitHead(ctx)
+	if err != nil {
+		return err
+	}
 	report := actordist.Report{
-		Schema:      actordist.SchemaV1,
-		Status:      "pass",
-		Target:      "linux-x64",
-		Host:        "linux-x64",
-		Runtime:     "actornet",
-		Transport:   "loopback-tcp",
+		Schema:         actordist.SchemaV1,
+		Status:         "pass",
+		Target:         "linux-x64",
+		Host:           "linux-x64",
+		Runtime:        "actornet",
+		Transport:      "loopback-tcp",
+		GitHead:        head,
+		ArtifactHashes: "artifact-hashes.json",
+		Claims:         []string{"linux-x64 loopback tcp distributed actor runtime evidence"},
+		NonClaims: []string{
+			"no cluster membership",
+			"no reconnect/retry production",
+			"no non-linux distributed actor runtime support",
+		},
 		Broker:      broker,
 		Processes:   r.processes,
 		FrameCounts: r.counts,
+		FrameOrder:  append([]string(nil), r.frameOrder...),
 		Cases:       r.cases,
 	}
 	raw, err := json.MarshalIndent(report, "", "  ")
@@ -573,6 +588,24 @@ func (r *smokeRunner) writeReport() error {
 		return err
 	}
 	return os.WriteFile(r.opt.ReportPath, append(raw, '\n'), 0o644)
+}
+
+func currentGitHead(ctx context.Context) (string, error) {
+	cctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(cctx, "git", "rev-parse", "HEAD")
+	output, err := cmd.Output()
+	if cctx.Err() == context.DeadlineExceeded {
+		return "", errors.New("git rev-parse HEAD timed out")
+	}
+	if err != nil {
+		return "", fmt.Errorf("git rev-parse HEAD: %w", err)
+	}
+	head := strings.TrimSpace(string(output))
+	if len(head) != 40 {
+		return "", fmt.Errorf("git rev-parse HEAD returned %q, want 40 hex characters", head)
+	}
+	return head, nil
 }
 
 func runCommand(ctx context.Context, name string, args ...string) error {

@@ -26,3 +26,27 @@ func TestIslandKernelClaimVocabularyRegistered(t *testing.T) {
 		t.Fatalf("IslandKernelClaimValidatorMismatch should accept validate-island-proof")
 	}
 }
+
+func TestUnsafeExternalRootTrustedStorageVocabulary(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		provenance string
+		unsafe     string
+	}{
+		{name: "unsafe unknown", provenance: ProvenanceUnsafeUnknown, unsafe: UnsafeUnknown},
+		{name: "unsafe checked", provenance: ProvenanceUnsafeChecked, unsafe: UnsafeChecked},
+		{name: "unsafe verified root", provenance: ProvenanceUnsafeVerifiedRoot, unsafe: UnsafeVerifiedRoot},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if !UnsafeExternalRootTrustedStorage(tc.provenance, tc.unsafe, StorageStack, StorageStack) {
+				t.Fatalf("UnsafeExternalRootTrustedStorage(%q, %q, Stack, Stack) = false, want true", tc.provenance, tc.unsafe)
+			}
+			if UnsafeExternalRootTrustedStorage(tc.provenance, tc.unsafe, StorageHeap, StorageHeap) {
+				t.Fatalf("UnsafeExternalRootTrustedStorage(%q, %q, Heap, Heap) = true, want false", tc.provenance, tc.unsafe)
+			}
+		})
+	}
+	if UnsafeExternalRootTrustedStorage(ProvenanceSafeOwned, UnsafeSafe, StorageStack, StorageStack) {
+		t.Fatalf("safe owned storage should not be classified as unsafe external root trusted storage")
+	}
+}

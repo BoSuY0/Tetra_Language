@@ -219,6 +219,73 @@ func TestTestAllQuickReportsMemoryFuzzOracleGate(t *testing.T) {
 	}
 }
 
+func TestTestAllRunsRAMContractFuzzOracleGate(t *testing.T) {
+	raw, err := readTestAllScript(t)
+	if err != nil {
+		t.Fatalf("read test-all script: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		`run_step "RAM contract fuzz oracle artifact gate" check_ram_contract_fuzz_oracle_gate`,
+		`local fuzz_dir="$report_dir/ram-contract-fuzz"`,
+		`go run ./tools/cmd/ram-contract-fuzz-short --report-dir "$fuzz_dir"`,
+		`go run ./tools/cmd/validate-ram-contract-fuzz-oracle --report "$fuzz_dir/ram-contract-fuzz-oracle.json" --artifact-dir "$fuzz_dir"`,
+		`go run ./tools/cmd/validate-ram-contract-report --report "$fuzz_dir/ram-contract-report.json"`,
+		`TestRunRAMContractFuzzShortWritesValidatedArtifacts`,
+		`TestValidateRAMContractFuzzOracleAcceptsArtifactBundle`,
+		`TestRAMContractEnforcementFailsForHeap`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("scripts/ci/test-all.sh missing RAM contract fuzz oracle gate requirement %q", want)
+		}
+	}
+}
+
+func TestTestAllQuickReportsRAMContractFuzzOracleGate(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	reportDir := filepath.Join(root, "report")
+	out, err := runTestAll(t, root, nil, "--quick", "--json-only", "--report-dir", reportDir)
+	if err != nil {
+		t.Fatalf("test_all quick failed: %v\n%s", err, out)
+	}
+	summary := decodeTestAllSummary(t, out)
+	if !hasTestAllStep(summary, "RAM contract fuzz oracle artifact gate") {
+		t.Fatalf("summary missing passing RAM contract fuzz oracle artifact gate step: %#v", summary.Steps)
+	}
+}
+
+func TestTestAllQuickFailsWhenRAMContractFuzzOracleGateTestsMissing(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	reportDir := filepath.Join(root, "report")
+	out, err := runTestAll(t, root, []string{"TETRA_FAKE_SKIP_RAM_CONTRACT_LIST=1"}, "--quick", "--keep-going", "--json-only", "--report-dir", reportDir)
+	if err == nil {
+		t.Fatalf("expected RAM contract fuzz oracle gate failure\n%s", out)
+	}
+	summary := decodeTestAllSummary(t, out)
+	if summary.Status != "fail" || summary.FailedCount != 1 {
+		t.Fatalf("summary status/counts = %q/%d, want fail/1: %#v", summary.Status, summary.FailedCount, summary.Steps)
+	}
+	var fuzzLog string
+	for _, step := range summary.Steps {
+		if step.Name == "RAM contract fuzz oracle artifact gate" {
+			if step.Status != "fail" || step.ExitCode == nil || *step.ExitCode == 0 {
+				t.Fatalf("RAM contract fuzz oracle gate step = %#v", step)
+			}
+			fuzzLog = step.Log
+		}
+	}
+	if fuzzLog == "" {
+		t.Fatalf("summary missing failing RAM contract fuzz oracle artifact gate step: %#v", summary.Steps)
+	}
+	logRaw, err := os.ReadFile(filepath.Join(reportDir, fuzzLog))
+	if err != nil {
+		t.Fatalf("read RAM contract fuzz oracle gate log: %v", err)
+	}
+	if !strings.Contains(string(logRaw), "missing required RAM contract fuzz oracle gate test") {
+		t.Fatalf("RAM contract fuzz oracle gate log missing required-test failure:\n%s", logRaw)
+	}
+}
+
 func TestTestAllQuickFailsWhenMemoryFuzzOracleGateTestsMissing(t *testing.T) {
 	root := testAllFakeRepo(t, false)
 	reportDir := filepath.Join(root, "report")

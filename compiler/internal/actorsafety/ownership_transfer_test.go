@@ -39,6 +39,7 @@ func TestTypedActorOwnershipTransferCoverageCoversP18PlanList(t *testing.T) {
 		TypedActorOwnershipRuntimeMailboxRepresentation,
 		TypedActorOwnershipActorTransferReport,
 		TypedActorOwnershipStressDiagnostics,
+		TypedActorOwnershipRaceSafetyRejectionMatrix,
 	}
 	for _, id := range expected {
 		row, ok := byID[id]
@@ -119,6 +120,44 @@ func TestTypedActorOwnershipTransferCoverageRejectsFakeClaims(t *testing.T) {
 	noNonClaim.NonClaims = nil
 	if err := ValidateTypedActorOwnershipTransferCoverage(noNonClaim); err == nil || !strings.Contains(err.Error(), "non-claim") {
 		t.Fatalf("missing non-claim error = %v", err)
+	}
+}
+
+func TestTypedActorOwnershipTransferCoverageRequiresRaceSafetyMatrix(t *testing.T) {
+	report := TypedActorOwnershipTransferCoverage()
+	var matrix *TypedActorOwnershipTransferRow
+	for i := range report.Rows {
+		if report.Rows[i].ID == TypedActorOwnershipTransferID("race_safety_rejection_matrix") {
+			matrix = &report.Rows[i]
+			break
+		}
+	}
+	if matrix == nil {
+		t.Fatalf("missing race_safety_rejection_matrix row")
+	}
+	for _, want := range []string{
+		"local immutable payloads copy safely",
+		"owned moved payloads consume sender access",
+		"borrowed views rejected unless explicitly copied",
+		"mutable global targets rejected across actor/task boundaries",
+		"unsafe pointer payloads rejected without audited contract",
+		"island region transfer deferred to actor/island proof",
+	} {
+		if !hasOwnershipTransferText(matrix.RequiredFacts, want) {
+			t.Fatalf("race-safety matrix row missing fact %q: %#v", want, matrix.RequiredFacts)
+		}
+	}
+	for _, want := range []string{
+		"compiler/tests/ownership/actor_task_ownership_test.go",
+		"compiler/internal/actorsafety/sendability_test.go",
+		"compiler/internal/semantics/memory_boundary_handoff_test.go",
+	} {
+		if !strings.Contains(matrix.Evidence, want) {
+			t.Fatalf("race-safety matrix evidence missing %q: %s", want, matrix.Evidence)
+		}
+	}
+	if !strings.Contains(matrix.Boundary, "not a lock/atomic shared-memory model") {
+		t.Fatalf("race-safety matrix boundary missing nonclaim: %s", matrix.Boundary)
 	}
 }
 

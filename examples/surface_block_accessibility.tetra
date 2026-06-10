@@ -1,0 +1,80 @@
+// Block-first accessibility metadata smoke.
+module examples.surface_block_accessibility
+
+import lib.core.surface as surface
+import lib.core.block as block
+
+struct BlockAccessibilityApp:
+    focused_id: Int
+    reading_order_checked: Bool
+    platform_claim: Bool
+
+struct LabelBlock:
+    id: Int
+    text_len: Int
+    label_for: Int
+
+struct ActionBlock:
+    id: Int
+    label_len: Int
+    labelled_by: Int
+    action: Int
+
+func make_block(id_value: Int, parent_value: Int, rect: surface.Rect, a11y: block.AccessibilitySpec, clickable: Bool) -> block.Block:
+    var input: block.InputSpec = block.input_none()
+    var event: block.EventSpec = block.event_none()
+    if clickable:
+        input = block.input_clickable()
+        event = block.event_click(a11y.actions)
+    let props: block.BlockProps = block.props(block.layout_fixed(rect), block.paint_empty(), block.text_label(a11y.label_len, surface.Color(r: 238, g: 242, b: 247, a: 255)), block.image_none(), input, event, block.state_interactive(), block.motion_fast(), a11y, block.asset_none())
+    return block.make(block.id(id_value), block.id(parent_value), props)
+
+func main() -> Int
+uses alloc, mem:
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 320, h: 200)
+    let panel_rect: surface.Rect = surface.Rect(x: 16, y: 16, w: 288, h: 168)
+    let label_rect: surface.Rect = surface.Rect(x: 24, y: 24, w: 200, h: 24)
+    let submit_rect: surface.Rect = surface.Rect(x: 24, y: 64, w: 120, h: 44)
+    let reset_rect: surface.Rect = surface.Rect(x: 152, y: 64, w: 120, h: 44)
+
+    let label_a11y: block.AccessibilitySpec = block.accessibility_label_for(4, block.id(4))
+    let submit_a11y: block.AccessibilitySpec = block.accessibility_button_labelled_by(6, block.id(3), block.action_primary())
+    let reset_a11y: block.AccessibilitySpec = block.accessibility_button(5)
+    let unnamed_a11y: block.AccessibilitySpec = block.accessibility_button(0)
+
+    var tree: block.BlockTree = block.tree_init(8)
+    let root_props: block.BlockProps = block.props(block.layout_fixed(root_rect), block.paint_empty(), block.text_none(), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_none(), block.asset_none())
+    let panel_props: block.BlockProps = block.props(block.layout_fixed(panel_rect), block.paint_empty(), block.text_none(), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_none(), block.asset_none())
+    let root_block: block.Block = block.make(block.id(1), block.id_none(), root_props)
+    let panel_block: block.Block = block.make(block.id(2), block.id(1), panel_props)
+
+    let root: Int = block.tree_add_root(tree, root_block, root_rect)
+    let panel: Int = block.tree_add_child(tree, block.id(1), panel_block, panel_rect)
+    let label: Int = block.tree_add_child(tree, block.id(2), make_block(3, 2, label_rect, label_a11y, false), label_rect)
+    let submit: Int = block.tree_add_child(tree, block.id(2), make_block(4, 2, submit_rect, submit_a11y, true), submit_rect)
+    let reset: Int = block.tree_add_child(tree, block.id(2), make_block(5, 2, reset_rect, reset_a11y, true), reset_rect)
+
+    let valid: Int = block.tree_validate(tree)
+    let focus0: Int = block.id_value(block.tree_focus_order_at(tree, 0))
+    let focus1: Int = block.id_value(block.tree_focus_order_at(tree, 1))
+    let a11y0: Int = block.id_value(block.tree_accessibility_order_at(tree, 0))
+    let a11y1: Int = block.id_value(block.tree_accessibility_order_at(tree, 1))
+    let a11y2: Int = block.id_value(block.tree_accessibility_order_at(tree, 2))
+    let app: BlockAccessibilityApp = BlockAccessibilityApp(focused_id: focus0, reading_order_checked: block.accessibility_reading_order_matches(0, 1), platform_claim: block.accessibility_metadata_claim_scoped(false, false, false))
+    let label_state: LabelBlock = LabelBlock(id: label, text_len: label_a11y.label_len, label_for: block.id_value(label_a11y.described_by))
+    let submit_state: ActionBlock = ActionBlock(id: submit, label_len: submit_a11y.label_len, labelled_by: block.id_value(submit_a11y.labelled_by), action: submit_a11y.actions)
+
+    if root == 1 && panel == 2 && label == 3 && submit == 4 && reset == 5 &&
+       valid == block.tree_error_ok() &&
+       focus0 == 4 && focus1 == 5 &&
+       a11y0 == 3 && a11y1 == 4 && a11y2 == 5 &&
+       app.focused_id == 4 && app.reading_order_checked && app.platform_claim &&
+       label_state.id == 3 && label_state.text_len == 4 && label_state.label_for == 4 &&
+       submit_state.id == 4 && submit_state.label_len == 6 && submit_state.labelled_by == 3 && submit_state.action == block.action_primary() &&
+       block.accessibility_focusable_has_name(submit_a11y) &&
+       !block.accessibility_focusable_has_name(unnamed_a11y) &&
+       block.accessibility_relationship_matches(label_a11y, submit_a11y, block.id(3), block.id(4)) &&
+       block.accessibility_screen_reader_claim_allowed(true, true) &&
+       !block.accessibility_screen_reader_claim_allowed(false, true):
+        return 1
+    return 0

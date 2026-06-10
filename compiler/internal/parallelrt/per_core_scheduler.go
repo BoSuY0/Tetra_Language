@@ -182,7 +182,7 @@ func ValidatePerCoreSchedulerCoverage(report PerCoreSchedulerCoverageReport) err
 	if err := requirePerCoreSchedulerFacts(rows[PerCoreSchedulerActorPingPong], "actor ping-pong", "actors_pingpong.tetra", "task actor mailbox handoff"); err != nil {
 		return err
 	}
-	if err := requirePerCoreSchedulerFacts(rows[PerCoreSchedulerFanoutFanin], "fanout/fanin", "actor ping-pong fanout scheduler prototype", "work stealing"); err != nil {
+	if err := requirePerCoreSchedulerFacts(rows[PerCoreSchedulerFanoutFanin], "fanout/fanin", "actor fanout/fanin benchmark prep", "work stealing"); err != nil {
 		return err
 	}
 	if err := requirePerCoreSchedulerFacts(rows[PerCoreSchedulerTaskGroupCancel], "task group cancel", "cancel wakes deadline join", "cancellation storm"); err != nil {
@@ -332,8 +332,8 @@ func fanoutFaninRow(benchmarks []PrototypeBenchmark) PerCoreSchedulerEvidenceRow
 		Name:   "Fanout/fanin",
 		Status: PerCoreSchedulerImplementedNarrow,
 		RequiredFacts: []string{
-			"fanout/fanin evidence includes actor ping-pong fanout scheduler prototype",
-			"work stealing reduces max_queue_depth in the prototype comparison",
+			"fanout/fanin evidence includes actor fanout/fanin benchmark prep",
+			"work stealing model coverage exists without publishing throughput or improvement claims",
 			"prototype benchmark rows passed: " + strings.Join(names, "; "),
 		},
 		Evidence: "compiler/internal/parallelrt/scheduler_model.go::PrototypeBenchmarks; compiler/internal/parallelrt/scheduler_model_test.go::TestPrototypeBenchmarksReportFanoutAndZeroCopyRows; tools/cmd/parallel-production-smoke/main.go::runSchedulerPrototypeEvidence",

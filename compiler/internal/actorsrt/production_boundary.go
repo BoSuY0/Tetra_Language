@@ -130,15 +130,21 @@ func currentActorRuntimeLimitsRow() ActorRuntimeBoundaryRow {
 		RequiredFacts: []string{
 			fmt.Sprintf("maxActors=%d", maxActors),
 			fmt.Sprintf("msgPoolSize=%d", msgPoolSize),
+			fmt.Sprintf("maxActorMailboxMsgs=%d", maxActorMailboxMsgs),
 			fmt.Sprintf("actor_state_slots=%d", maxActorStateSlots),
 			"single-thread cooperative scheduler documented for current actor runtime",
 			"linux-x64 distributed runtime only; non-Linux-x64 targets keep distributed actor symbols out of the built-in runtime",
 			"non-linux actor net pump is no-op",
-			"message pool overflow is not a checked runtime error",
+			"mailbox full returns checked -2 backpressure without allocating a message",
+			"message pool exhaustion returns checked -1 without enqueueing an overflow message",
+			"invalid actor handle sends return checked -3 without allocating a message",
+			"done actor sends return checked -4 without allocating a message",
+			"task-group cancellation wakes timed actor receive waiters with checked error 1",
+			"message pool entries are not reclaimed during a run",
 			"typed actor message payloads are capped at 8 value slots",
 		},
-		Evidence: "compiler/internal/actorsrt/linux_x64.go::BuildLinuxX64; compiler/internal/actorsrt/actor_state_symbols_test.go::TestActorNetPumpIsExportedButOnlyLinuxHasRuntimePump; compiler/internal/actorsrt/actor_state_symbols_test.go::TestNonLinuxRuntimesDoNotExportDistributedActorSymbols; docs/spec/actors.md::Runtime Capacity Limits",
-		Boundary: "current evidence covers fixed-capacity x64 built-in actor runtime behavior, Linux-x64 distributed actor runtime symbols, and documented capacity limits; it does not provide a checked recoverable message-pool overflow path, production multi-threaded scheduling, non-Linux distributed runtime support, or a full production actor runtime claim",
+		Evidence: "compiler/internal/actorsrt/linux_x64.go::BuildLinuxX64; compiler/internal/actorsrt/linux_x64_emit.go::emitMailboxFullCheckForReceiverInEcx; compiler/internal/actorsrt/linux_x64_emit.go::emitCheckedMessagePoolAlloc; compiler/internal/actorsrt/linux_x64_emit.go::emitInvalidActorHandleReturn; compiler/internal/actorsrt/linux_x64_emit.go::emitActorDoneReturn; compiler/internal/actorsrt/linux_x64_emit.go::emitBlockedDeadlineWakeCheck; compiler/internal/actorsrt/linux_x64_emit.go::emitCurrentTaskGroupCanceledCheck; compiler/actors_test.go::TestActorMailboxFullReturnsCheckedBackpressure; compiler/actors_test.go::TestActorMessagePoolExhaustionReturnsCheckedFailure; compiler/actors_test.go::TestActorInvalidHandleSendReturnsCheckedFailure; compiler/actors_test.go::TestActorSendToDoneActorReturnsCheckedFailure; compiler/task_runtime_test.go::TestTaskGroupCancelWakesActorRecvUntilBeforeDeadlineBuildAndRun; compiler/internal/actorsrt/actor_state_symbols_test.go::TestActorNetPumpIsExportedButOnlyLinuxHasRuntimePump; compiler/internal/actorsrt/actor_state_symbols_test.go::TestNonLinuxRuntimesDoNotExportDistributedActorSymbols; docs/spec/actors.md::Runtime Capacity Limits; docs/spec/actors.md::Scheduling semantics",
+		Boundary: "current evidence covers fixed-capacity x64 built-in actor runtime behavior, checked per-actor mailbox backpressure, checked bounded message-pool exhaustion, checked invalid-handle and done-actor send failures, scoped timed actor receive cancellation wake, Linux-x64 distributed actor runtime symbols, and documented capacity limits; it does not provide message reclamation, production multi-threaded scheduling, non-Linux distributed runtime support, supervision/restart, a full structured-concurrency model, or a full production actor runtime claim",
 	}
 }
 
@@ -192,7 +198,6 @@ func fullClaimBlockersRow() ActorRuntimeBoundaryRow {
 		Status: ActorRuntimeBoundaryBlocked,
 		MissingFacts: []string{
 			"production multi-threaded actor scheduler integrated into the runtime",
-			"message pool checked failure or reclamation semantics for built-in x64 runtime exhaustion",
 			"non-Linux-x64 distributed actor runtime executable smoke and validator gates",
 			"full cancellation and structured concurrency guarantees beyond cooperative task group handles",
 			"full race-safety proof or audited conservative rejection matrix for shared mutable actor/task/thread boundaries",
@@ -207,7 +212,7 @@ func validateCurrentLimitsRow(row ActorRuntimeBoundaryRow) error {
 	if row.Status != ActorRuntimeBoundaryDocumentedLimit {
 		return fmt.Errorf("actor runtime boundary audit: current limits status = %q", row.Status)
 	}
-	for _, fact := range []string{"maxActors=128", "msgPoolSize=65536", "actor_state_slots=8", "single-thread cooperative scheduler", "linux-x64 distributed runtime only", "non-linux actor net pump is no-op", "message pool overflow is not a checked runtime error"} {
+	for _, fact := range []string{"maxActors=128", "msgPoolSize=65536", "maxActorMailboxMsgs=256", "actor_state_slots=8", "single-thread cooperative scheduler", "linux-x64 distributed runtime only", "non-linux actor net pump is no-op", "mailbox full returns checked -2", "message pool exhaustion returns checked -1", "invalid actor handle sends return checked -3", "done actor sends return checked -4", "task-group cancellation wakes timed actor receive waiters", "message pool entries are not reclaimed"} {
 		if !containsBoundaryText(row.RequiredFacts, fact) {
 			return fmt.Errorf("actor runtime boundary audit: current limits missing fact %q", fact)
 		}
@@ -252,7 +257,7 @@ func validateFullClaimBlockersRow(row ActorRuntimeBoundaryRow) error {
 	if len(row.MissingFacts) == 0 {
 		return fmt.Errorf("actor runtime boundary audit: blockers row must record missing facts")
 	}
-	for _, fact := range []string{"production multi-threaded actor scheduler", "message pool checked failure or reclamation", "non-Linux-x64 distributed actor runtime", "full cancellation and structured concurrency", "full race-safety proof"} {
+	for _, fact := range []string{"production multi-threaded actor scheduler", "non-Linux-x64 distributed actor runtime", "full cancellation and structured concurrency", "full race-safety proof"} {
 		if !containsBoundaryText(row.MissingFacts, fact) {
 			return fmt.Errorf("actor runtime boundary audit: blockers missing fact %q", fact)
 		}

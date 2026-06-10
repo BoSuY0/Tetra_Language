@@ -420,6 +420,10 @@ require_memory_fuzz_go_test_names() {
   require_named_go_test_names "memory fuzz oracle gate" "$@"
 }
 
+require_ram_contract_go_test_names() {
+  require_named_go_test_names "RAM contract fuzz oracle gate" "$@"
+}
+
 require_host_leak_go_test_names() {
   require_named_go_test_names "host leak blocker" "$@"
 }
@@ -523,6 +527,36 @@ check_memory_fuzz_oracle_gate() {
   test -s "$fuzz_dir/memory-fuzz-oracle.json" || return 1
   test -s "$fuzz_dir/summary.md" || return 1
   test -s "$fuzz_dir/summary.json"
+}
+
+check_ram_contract_fuzz_oracle_gate() {
+  local fuzz_dir="$report_dir/ram-contract-fuzz"
+
+  require_ram_contract_go_test_names ./tools/cmd/ram-contract-fuzz-short 'RAMContract|Fuzz|ReportDir' \
+    TestRunRAMContractFuzzShortWritesValidatedArtifacts \
+    TestRunRAMContractFuzzShortRejectsStaleReportDir || return 1
+  require_ram_contract_go_test_names ./tools/cmd/validate-ram-contract-fuzz-oracle 'RAMContract|Fuzz|Oracle' \
+    TestValidateRAMContractFuzzOracleAcceptsArtifactBundle \
+    TestValidateRAMContractFuzzOracleRejectsMissingReport || return 1
+  require_ram_contract_go_test_names ./tools/cmd/validate-ram-contract-report 'RAMContract|Blocker|Missing' \
+    TestValidateRAMContractReportFileAcceptsCompilerReport \
+    TestValidateRAMContractReportRejectsMissingBlocker || return 1
+  require_ram_contract_go_test_names ./compiler/internal/ramcontract 'RAMContract|Enforce|Report' \
+    TestRAMContractFromAllocPlanTracksRowsAndBlockers \
+    TestRAMContractRejectsMissingBlockerExplanation \
+    TestRAMContractEnforcementFailsForHeap || return 1
+
+  go test ./compiler/internal/ramcontract ./tools/cmd/validate-ram-contract-report ./tools/cmd/ram-contract-fuzz-short ./tools/cmd/validate-ram-contract-fuzz-oracle -run 'RAMContract|Fuzz|Blocker|Enforce' -count=1 || return 1
+  go run ./tools/cmd/ram-contract-fuzz-short --report-dir "$fuzz_dir" || return 1
+  go run ./tools/cmd/validate-ram-contract-fuzz-oracle --report "$fuzz_dir/ram-contract-fuzz-oracle.json" --artifact-dir "$fuzz_dir" || return 1
+  go run ./tools/cmd/validate-ram-contract-report --report "$fuzz_dir/ram-contract-report.json" || return 1
+  go run ./tools/cmd/validate-memory-grade-report --report "$fuzz_dir/memory-grade-report.json" || return 1
+  go run ./tools/cmd/validate-proof-store-summary --report "$fuzz_dir/proof-store-summary.json" || return 1
+  go run ./tools/cmd/validate-validation-pipeline-coverage --report "$fuzz_dir/validation-pipeline-coverage.json" || return 1
+  go run ./tools/cmd/validate-heap-blockers --report "$fuzz_dir/heap-blockers.json" || return 1
+  go run ./tools/cmd/validate-copy-blockers --report "$fuzz_dir/copy-blockers.json" || return 1
+  test -s "$fuzz_dir/ram-contract-fuzz-oracle.json" || return 1
+  test -s "$fuzz_dir/ram-contract-report.json"
 }
 
 check_host_leak_blockers() {
@@ -807,6 +841,7 @@ run_step "go test all packages" env -u TETRA_TEST_ALL_RELEASE_VERSION -u TETRA_T
 run_step "unsafe promotion blocker suite" check_unsafe_promotion_blockers
 run_step "bounds proof blocker suite" check_bounds_proof_blockers
 run_step "memory fuzz oracle artifact gate" check_memory_fuzz_oracle_gate
+run_step "RAM contract fuzz oracle artifact gate" check_ram_contract_fuzz_oracle_gate
 run_step "host leak blocker suite" check_host_leak_blockers
 
 if [[ "$mode" == "full" || "$mode" == "stabilization" ]]; then

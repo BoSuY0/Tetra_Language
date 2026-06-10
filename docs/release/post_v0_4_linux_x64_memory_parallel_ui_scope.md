@@ -45,7 +45,7 @@ It writes `memory-production-linux-x64.json` and runs
 and
 `go run ./tools/cmd/validate-artifact-hashes --manifest <dir>/artifact-hashes.json`,
 then
-`go run ./tools/cmd/validate-memory-production --report <dir>/memory-production-linux-x64.json --manifest <dir>/memory-release-manifest.json --report-dir <dir>`.
+`go run ./tools/cmd/validate-memory-production --report <dir>/memory-production-linux-x64.json --manifest <dir>/memory-release-manifest.json --report-dir <dir> --current-git-head <head>`.
 The `<dir>` value must be a fresh --report-dir: the gate refuses symlink,
 non-directory, and non-empty report directories before it writes memory
 evidence, so stale artifacts cannot be promoted as same-run proof. Local triage

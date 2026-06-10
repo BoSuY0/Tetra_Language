@@ -487,8 +487,8 @@ func validateRow(index int, row memoryReportRow) []string {
 	if capMemDisallowedProofClaim(row.Claim, row.ValidatorName, row.Reason) {
 		issues = append(issues, fmt.Sprintf("%s: cap.mem authorization cannot claim %q; cap.mem authorizes raw operations only and does not prove pointer validity, bounds, ownership, noalias, or safe provenance", prefix, row.Claim))
 	}
-	if unsafeUnknownRow(row) && row.ClaimLevel == "validated" && unsafeUnknownTrustedStorage(row.PlannedStorage, row.ActualLoweringStorage) {
-		issues = append(issues, fmt.Sprintf("%s: unsafe_unknown cannot validate trusted storage lowering %q/%q", prefix, row.PlannedStorage, row.ActualLoweringStorage))
+	if row.ClaimLevel == "validated" && unsafeExternalRootTrustedStorage(row.ProvenanceClass, row.UnsafeClass, row.PlannedStorage, row.ActualLoweringStorage) {
+		issues = append(issues, fmt.Sprintf("%s: unsafe/external root %s/%s cannot validate trusted storage lowering %q/%q", prefix, row.ProvenanceClass, row.UnsafeClass, row.PlannedStorage, row.ActualLoweringStorage))
 	}
 	if row.ClaimLevel == "validated" && strings.Contains(row.Claim, "no_alias") && !validatedNoAliasState(row.AliasState) {
 		issues = append(issues, fmt.Sprintf("%s: validated no_alias requires unique or mutable_exclusive alias_state, got %q", prefix, row.AliasState))
@@ -617,6 +617,10 @@ func unsafeVerifiedRootDisallowedClaim(provenanceClass string, unsafeClass strin
 
 func unsafeUnknownTrustedStorage(planned string, actual string) bool {
 	return memoryvocab.UnsafeUnknownTrustedStorage(planned, actual)
+}
+
+func unsafeExternalRootTrustedStorage(provenanceClass string, unsafeClass string, planned string, actual string) bool {
+	return memoryvocab.UnsafeExternalRootTrustedStorage(provenanceClass, unsafeClass, planned, actual)
 }
 
 func validatedTrustedStorageHeapFallback(planned string, actual string) bool {

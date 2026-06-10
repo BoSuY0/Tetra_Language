@@ -61,6 +61,8 @@ func TestValidateFeaturesReportAcceptsSurfaceReleaseStatusVocabulary(t *testing.
   "features": [
     {"id":"cli.core","name":"Core CLI workflows","status":"current","since":"v0.2.0","scope":"local workflows","stability":"supported","docs":["docs/spec/cli_contracts.md"]},
     {"id":"ui.surface-core","name":"Tetra Surface core","status":"release_candidate","scope":"surface-v1-linux-web","stability":"release gate candidate","docs":["docs/spec/surface_v1.md"]},
+    {"id":"ui.surface-block-system","name":"Tetra Surface Block System","status":"experimental","scope":"Block-first Surface architecture with Block as the core Surface primitive and widgets as recipes/compatibility","stability":"implementation track; not current; no production Block claim","docs":["docs/spec/surface_v1.md"]},
+    {"id":"ui.surface-morph-capsule","name":"Tetra Surface Morph Capsule","status":"experimental","scope":"Morph Capsule layer that expands into Block evidence and is validated by tetra.surface.morph.gate.v1","stability":"experimental; not Surface v1 production support; does not add core widget primitives","docs":["docs/spec/surface_morph.md"]},
     {"id":"ui.surface-macos-x64","name":"macOS Surface host","status":"unsupported","scope":"not in Surface v1","stability":"no release evidence","docs":["docs/spec/surface_v1.md"]},
     {"id":"ui.metadata-v1","name":"UI metadata v1 surface","status":"legacy_compatibility","scope":"legacy metadata compatibility","stability":"compatibility bridge","docs":["docs/spec/ui_v1.md"]},
     {"id":"language.full-v1-guarantees","name":"Full v1.0 language guarantees","status":"planned","scope":"complete release contract","stability":"planned","docs":["docs/spec/v1_scope.md"]},
@@ -69,6 +71,47 @@ func TestValidateFeaturesReportAcceptsSurfaceReleaseStatusVocabulary(t *testing.
 }`)
 	if err := validateFeaturesReport(raw); err != nil {
 		t.Fatalf("validate release status vocabulary: %v", err)
+	}
+}
+
+func TestValidateFeaturesReportRequiresSurfaceBlockSystemWhenSurfaceCorePresent(t *testing.T) {
+	raw := []byte(`{
+  "schema": "tetra.features.v1",
+  "version": "surface-v1",
+  "features": [
+    {"id":"cli.core","name":"Core CLI workflows","status":"current","since":"v0.2.0","scope":"local workflows","stability":"supported","docs":["docs/spec/cli_contracts.md"]},
+    {"id":"ui.surface-core","name":"Tetra Surface core","status":"current","since":"surface-v1","scope":"surface-v1-linux-web","stability":"current bounded Surface release","docs":["docs/spec/surface_v1.md"]},
+    {"id":"language.full-v1-guarantees","name":"Full v1.0 language guarantees","status":"planned","scope":"complete release contract","stability":"planned","docs":["docs/spec/v1_scope.md"]},
+    {"id":"eco.distributed-network","name":"Distributed EcoNet","status":"post-v1","scope":"distributed publishing","stability":"deferred","docs":["docs/release/post_v1_promotion_checklist.md"]}
+  ]
+}`)
+	err := validateFeaturesReport(raw)
+	if err == nil {
+		t.Fatalf("expected missing Surface Block System feature failure")
+	}
+	if !strings.Contains(err.Error(), "ui.surface-block-system") {
+		t.Fatalf("error = %v, want ui.surface-block-system", err)
+	}
+}
+
+func TestValidateFeaturesReportRequiresSurfaceMorphCapsuleWhenSurfaceCorePresent(t *testing.T) {
+	raw := []byte(`{
+  "schema": "tetra.features.v1",
+  "version": "surface-v1",
+  "features": [
+    {"id":"cli.core","name":"Core CLI workflows","status":"current","since":"v0.2.0","scope":"local workflows","stability":"supported","docs":["docs/spec/cli_contracts.md"]},
+    {"id":"ui.surface-core","name":"Tetra Surface core","status":"current","since":"surface-v1","scope":"surface-v1-linux-web","stability":"current bounded Surface release","docs":["docs/spec/surface_v1.md"]},
+    {"id":"ui.surface-block-system","name":"Tetra Surface Block System","status":"experimental","scope":"Block-first Surface architecture with Block as the core Surface primitive and widgets as recipes/compatibility","stability":"implementation track; not current; no production Block claim","docs":["docs/spec/surface_v1.md"]},
+    {"id":"language.full-v1-guarantees","name":"Full v1.0 language guarantees","status":"planned","scope":"complete release contract","stability":"planned","docs":["docs/spec/v1_scope.md"]},
+    {"id":"eco.distributed-network","name":"Distributed EcoNet","status":"post-v1","scope":"distributed publishing","stability":"deferred","docs":["docs/release/post_v1_promotion_checklist.md"]}
+  ]
+}`)
+	err := validateFeaturesReport(raw)
+	if err == nil {
+		t.Fatalf("expected missing Surface Morph Capsule feature failure")
+	}
+	if !strings.Contains(err.Error(), "ui.surface-morph-capsule") {
+		t.Fatalf("error = %v, want ui.surface-morph-capsule", err)
 	}
 }
 

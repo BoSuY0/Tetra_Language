@@ -252,6 +252,26 @@ func TestMemoryFactsRejectsUnvalidatedStorageLoweringZeroCost(t *testing.T) {
 	}
 }
 
+func TestMemoryFactsRejectsHeapHeapConservativeFallbackWithoutReason(t *testing.T) {
+	graph := NewGraph("program")
+	_, err := graph.AddFact(Fact{
+		ID:                    "storage-heap-conservative-fallback-without-reason",
+		FunctionID:            "main",
+		SiteID:                "alloc:main:heap",
+		SourceStage:           StageAllocPlan,
+		ProvenanceClass:       ProvenanceSafeOwned,
+		UnsafeClass:           UnsafeSafe,
+		StoragePlan:           StorageHeap,
+		ActualLoweringStorage: StorageHeap,
+		LoweredArtifactID:     "ir:main:heap",
+		Claim:                 "storage_lowering",
+		CostClass:             CostConservativeFallback,
+	})
+	if err == nil || !strings.Contains(err.Error(), "reason") {
+		t.Fatalf("AddFact error = %v, want heap/heap conservative fallback reason rejection", err)
+	}
+}
+
 func TestMemoryFactsRejectsValidatedCapMemAsProof(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
@@ -339,6 +359,31 @@ func TestMemoryFactsRejectsValidatedUnsafeUnknownTrustedStorage(t *testing.T) {
 			})
 			if err == nil || !strings.Contains(err.Error(), "unsafe_unknown") {
 				t.Fatalf("AddFact error = %v, want unsafe_unknown storage rejection", err)
+			}
+		})
+	}
+}
+
+func TestMemoryFactsRejectsValidatedUnsafeVerifiedRootTrustedStorage(t *testing.T) {
+	for _, storage := range []StorageClass{StorageStack, StorageRegion, StorageFunctionTempRegion} {
+		t.Run(string(storage), func(t *testing.T) {
+			graph := NewGraph("program")
+			_, err := graph.AddFact(Fact{
+				ID:                    FactID("unsafe-verified-root-storage-" + storage),
+				FunctionID:            "main",
+				SiteID:                "ffi:root:1",
+				SourceStage:           StageAllocPlan,
+				ProvenanceClass:       ProvenanceUnsafeVerifiedRoot,
+				UnsafeClass:           UnsafeVerifiedRoot,
+				StoragePlan:           storage,
+				ActualLoweringStorage: storage,
+				ValidationState:       ValidationPass,
+				ValidatorName:         "allocation_lowering_validator",
+				LoweredArtifactID:     "ir:main:ffi:" + string(storage),
+				Claim:                 "allocation_base_metadata",
+			})
+			if err == nil || !strings.Contains(err.Error(), "unsafe_verified_root") || !strings.Contains(err.Error(), "trusted storage") {
+				t.Fatalf("AddFact error = %v, want unsafe_verified_root trusted-storage rejection", err)
 			}
 		})
 	}

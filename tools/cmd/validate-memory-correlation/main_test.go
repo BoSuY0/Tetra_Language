@@ -244,6 +244,15 @@ func TestValidateMemoryCorrelationRejectsV8MissingClaimDriftRow(t *testing.T) {
 	}
 }
 
+func TestValidateMemoryCorrelationRejectsV8MissingSafetyMutationRow(t *testing.T) {
+	raw := strings.Replace(validV8CorrelationMarkdown(), "| MEM-REPORT-006 | projection preserves provenance island epoch storage noalias and fake normal-build safety fields | report:v8:safety-mutation-corpus | report_projection_safety_mutation_validator | report_projection_safety_field_preservation | TestValidateReportProjectionRejectsSafetyFieldMutationCorpus | all:report | validated_narrow |\n", "", 1)
+	path := writeCorrelationFixture(t, raw)
+	err := validateCorrelationFile(path)
+	if err == nil || !strings.Contains(err.Error(), "MEM-REPORT-006") {
+		t.Fatalf("validateCorrelationFile error = %v, want missing MEM-REPORT-006", err)
+	}
+}
+
 func TestValidateMemoryCorrelationRejectsV8ExtraRow(t *testing.T) {
 	raw := strings.Replace(validV8CorrelationMarkdown(), "| MEM-REPORT-005 |", "| MEM-REPORT-999 | future report row | report:v8:future | future_validator | future_report_row | future_negative | future | future |\n| MEM-REPORT-005 |", 1)
 	path := writeCorrelationFixture(t, raw)
@@ -286,6 +295,15 @@ func TestValidateMemoryCorrelationRejectsV9WidenedBoundaryStatus(t *testing.T) {
 	err := validateCorrelationFile(path)
 	if err == nil || !strings.Contains(err.Error(), "widened v9 status") {
 		t.Fatalf("validateCorrelationFile error = %v, want widened v9 status rejection", err)
+	}
+}
+
+func TestValidateMemoryCorrelationRejectsV9WrongNegativeTestEvidence(t *testing.T) {
+	raw := strings.Replace(validV9CorrelationMarkdown(), "TestVerifyPlanRejectsTrustedStorageWithoutNoEscapeProof", "UnrelatedTest", 1)
+	path := writeCorrelationFixture(t, raw)
+	err := validateCorrelationFile(path)
+	if err == nil || !strings.Contains(err.Error(), "negative_test") || !strings.Contains(err.Error(), "TestVerifyPlanRejectsTrustedStorageWithoutNoEscapeProof") {
+		t.Fatalf("validateCorrelationFile error = %v, want missing exact v9 negative test rejection", err)
 	}
 }
 
@@ -435,6 +453,7 @@ func validV8CorrelationMarkdown() string {
 | MEM-REPORT-003 | report projection preserves cost_class and normal_build_check | report:v8:projection-fields | cost_class_preservation_validator,normal_build_check_preservation_validator | report_projection_field_preservation | TestValidateReportProjectionRejectsAlteredCostClass,TestValidateReportProjectionRejectsDroppedNormalBuildCheck | all:report | validated_narrow |
 | MEM-REPORT-004 | correlation docs reject extra missing or widened rows | report:v8:correlation-exact | correlation_exact_row_validator | correlation_exact_row_set | TestValidateMemoryCorrelationRejectsV8MissingClaimDriftRow,TestValidateMemoryCorrelationRejectsV8ExtraRow | all:docs | validated_narrow |
 | MEM-REPORT-005 | memory release or audit docs cannot claim broad safety from conservative or rejected rows | report:v8:claim-drift | memory_claim_drift_validator | memory_claim_drift | TestValidateMemoryCorrelationRejectsV8BroadSafetyClaimDrift | all:docs | rejected |
+| MEM-REPORT-006 | projection preserves provenance island epoch storage noalias and fake normal-build safety fields | report:v8:safety-mutation-corpus | report_projection_safety_mutation_validator | report_projection_safety_field_preservation | TestValidateReportProjectionRejectsSafetyFieldMutationCorpus | all:report | validated_narrow |
 `
 }
 

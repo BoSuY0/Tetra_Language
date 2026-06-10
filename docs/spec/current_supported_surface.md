@@ -45,6 +45,21 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
 - Historical gate: `scripts/release/v0_1_1/gate.sh` remains for the immutable
   `v0.1.1` tag.
 
+## Memory/Islands/Surface Scoped Release Truth
+
+The combined Memory/Islands/Surface claim is scoped by
+`docs/release/memory_islands_surface_scope.md` and requires the strict
+`scripts/release/post_v0_4/memory-islands-surface-production-gate.sh` path.
+That gate ties `MemoryFactGraph`-backed memory production reports,
+`validate-island-proof`, `--islands-debug` sanitizer smoke,
+`island-proof-fuzz-summary` mutation evidence, leak/resource finalization
+evidence, and `surface-v1-linux-web` Surface release evidence into
+`memory-islands-surface-production-manifest.json` plus `artifact-hashes.json`.
+This is no Memory 100% claim, no arbitrary unsafe external pointer safety
+claim, no full formal proof, no full target parity claim, no all-target Surface
+claim, and not a clean release-candidate checkout claim unless a final release
+audit proves that separate checkout state.
+
 ## Supported Now
 
 - Flow indentation syntax for the examples, standard library sources, runtime
@@ -759,8 +774,8 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
   `p19.1_generic_collections` hash-table artifact with Tetra/C++/Rust rows,
   matching algorithm/input metadata, and Tetra proof/allocation/bounds/perf
   report paths. This does not promote allocator-backed production
-  `Vec<T>`/`HashMap<K,V>` runtimes, generic hashing/equality, measured
-  C++/Rust speed parity, or an official TechEmpower benchmark claim. P21.2
+  `Vec<T>`/`HashMap<K,V>` runtimes, generic hashing/equality, or measured
+  C++/Rust speed parity. It makes no official benchmark claim for TechEmpower. P21.2
   specialization machine-code evidence may cite these rows only for
   caller-owned monomorphized collection helper evidence; it does not promote a
   broader collection runtime.
@@ -773,12 +788,12 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
   `p19.2_http_json_source_first`
   truth-bench-harness dry-run artifact. That artifact has Tetra-only
   `HTTP plaintext` and `HTTP JSON` rows and Tetra proof/allocation/bounds/P19.2
-  coverage paths. It is not a full production web-stack promotion, official
-  TechEmpower result, PostgreSQL production-stack claim, P20 performance
-  matrix, C++/Rust parity claim, source-level cached-date API, cross-worker
-  Date cache, `webrt.flush` scatter/gather integration, HTTP static-file
-  sendfile path, zero-copy production file-serving, non-Linux writev/sendfile
-  parity, or measured speed comparison.
+  coverage paths. It is not a full production web-stack promotion. It makes no official result claim for TechEmpower, no PostgreSQL production-stack claim, no
+  P20 performance matrix claim, no C++/Rust parity claim, no source-level
+  cached-date API claim, no cross-worker Date cache claim, no `webrt.flush`
+  scatter/gather integration claim, no HTTP static-file sendfile path claim, no
+  zero-copy production file-serving claim, no non-Linux writev/sendfile parity
+  claim, and no measured speed comparison claim.
 - P19.3 closure evidence adds
   `tetra.stdlib.postgresql.production_driver.v1` coverage for startup/SCRAM,
   prepared statements, binary int4 helpers, pooling/backpressure, borrowed
@@ -790,10 +805,11 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
   also requires `validate-techempower-report` to accept the checked local
   SCRAM semantic report, `/db` matrix report, and
   `/queries`/`/updates`/`/fortunes` matrix report. It is not a full
-  source-level PostgreSQL driver API, external production database deployment,
-  official TechEmpower result, production database benchmark, P20 performance
-  matrix, C++/Rust parity claim, measured speed comparison, or runtime behavior
-  change.
+  source-level PostgreSQL driver API or external production database
+  deployment. It makes no official result claim for TechEmpower, no production
+  database benchmark claim, no P20 performance matrix claim, no C++/Rust parity
+  claim, no measured speed comparison claim, and no runtime behavior change
+  claim.
 - P8 benchmark evidence is tooling-level claim discipline, not a new language
   semantic mode. `tools/cmd/truth-bench-harness` validates the default full
   local Tetra/C/C++/Rust benchmark matrix with compiler-version, target-CPU,
@@ -801,9 +817,9 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
   validates named bounded scopes such as `p19.1_generic_collections` and
   `p19.2_http_json_source_first` when a slice needs a checked artifact before
   the full P20 matrix. Compiler `.perf.json` reports list performance blockers,
-  and broad fastest-language, C++/Rust parity, production-web-stack, or
-  official-TechEmpower claims remain forbidden without matching official
-  evidence.
+  and no fastest-language claim, no C++/Rust parity claim, no
+  production-web-stack claim, and no official benchmark claim for TechEmpower may be made
+  without matching official evidence.
 - P11 verified-track evidence is intentionally internal. The stable scalar-i32
   subset lives in `compiler/internal/differential`; it interprets stack IR and
   Machine IR for small scalar/loop cases, compares them with a source
@@ -1208,6 +1224,8 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
   | Feature | Status | Scope |
   | --- | --- | --- |
   | Surface core | current | pure-Tetra UI, Host ABI |
+  | Surface Block System | experimental | Block-first Surface architecture; `lib.core.block` exists; Block is the core Surface primitive direction; helpers are recipes/compatibility; same-commit `tetra.surface.block-system.gate.v1` reports include `block_system.memory_budget` under `reports/surface-block/p18-budget`; not production support and no production Block claim |
+  | Surface Morph Capsule | experimental | `lib.core.morph` capsule/token/material/recipe layer over Block; recipes expand to Block evidence for `examples/surface_morph_command_palette.tetra`; `tetra.surface.morph.gate.v1` is deterministic headless evidence only; not production support |
   | Headless Surface | current/test | deterministic evidence target |
   | Linux-x64 Surface | current | Wayland shm real-window release path |
   | wasm32-web Surface | current | browser canvas release path |
@@ -1223,6 +1241,25 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
   `ui.surface-accessibility-metadata-tree-v1` remain experimental evidence
   layers absorbed by `ui.surface-toolkit-v1` and
   `ui.surface-accessibility-v1`; they are not separate current release APIs.
+  The experimental `ui.surface-block-system` row is the implementation track for
+  moving Surface from the current component/tree/widget helper layer to Block as
+  the core primitive. The current code slice is `lib.core.block` plus the
+  Block-system scenes and reports validated by
+  `scripts/release/surface/block-system-gate.sh --report-dir reports/surface-block/p18-budget`.
+  That gate emits same-commit headless,
+  linux-x64 real-window, and wasm32-web browser-canvas Block reports, artifact
+  hashes, and bounded `block_system.memory_budget` evidence. This is not
+  production support and carries no production Block claim. Existing widget
+  helpers remain release-scoped Surface v1 helpers and are documented as
+  recipes/compatibility over Block rather than required core primitives.
+  Button/Card/TextField/Sidebar/Modal are not core Surface primitives.
+  The experimental `ui.surface-morph-capsule` row sits one layer above Block:
+  `lib.core.morph` records scoped capsule tokens, materials, affordances,
+  state lenses, motion presets, and recipes that expand into Block graph
+  evidence for `examples/surface_morph_command_palette.tetra`. Its gate is
+  `scripts/release/surface/morph-gate.sh --report-dir reports/surface-morph/gate`
+  and writes `tetra.surface.morph.gate.v1` plus artifact hashes. This is
+  headless experimental evidence and carries no production Morph claim.
   The component-model slice now includes static component
   evidence plus experimental component-tree helper API evidence: runtime reports prove
   ordinary structs with `measure`, `layout`, `draw`, `event`, `focus`,

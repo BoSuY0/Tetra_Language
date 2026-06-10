@@ -134,6 +134,12 @@ func runBuild(args []string, stdout io.Writer, stderr io.Writer) int {
 	emitAllocReport := fs.Bool("emit-alloc-report", false, "write allocation report")
 	emitBoundsReport := fs.Bool("emit-bounds-report", false, "write bounds-check report")
 	emitMemoryReport := fs.Bool("emit-memory-report", false, "write schema-versioned memory fact report")
+	emitRAMContractReport := fs.Bool("emit-ram-contract-report", false, "write RAM contract, memory grade, proof-store, pipeline, and blocker reports")
+	failIfHeap := fs.Bool("fail-if-heap", false, "fail build if RAM contract evidence contains heap placement")
+	failIfCopy := fs.Bool("fail-if-copy", false, "fail build if RAM contract evidence contains a required copy")
+	failIfUnbounded := fs.Bool("fail-if-unbounded", false, "fail build if RAM contract evidence contains unbounded or unknown memory")
+	memoryBudget := fs.String("memory-budget", "", "fail build if RAM contract budget exceeds bytes; supports b, kb, mb, gb suffixes")
+	ramContractFile := fs.String("ram-contract", "", "optional JSON RAM contract file")
 	runtimeMode := fs.String("runtime", "auto", "actors runtime: auto, selfhost, or builtin")
 	runtimeObject := fs.String("runtime-object", "", "actors runtime object override")
 	jobs := fs.Int("jobs", 1, "parallel module build jobs")
@@ -204,7 +210,10 @@ func runBuild(args []string, stdout io.Writer, stderr io.Writer) int {
 			writeDiagnostic(stderr, *diagnostics, err)
 			return 2
 		}
-		applyBuildReportOptions(&opt, *explain, *emitPLIR, *emitProof, *emitAllocReport, *emitBoundsReport, *emitMemoryReport)
+		applyBuildReportOptions(&opt, *explain, *emitPLIR, *emitProof, *emitAllocReport, *emitBoundsReport, *emitMemoryReport, *emitRAMContractReport)
+		if !applyRAMContractOptions(&opt, *failIfHeap, *failIfCopy, *failIfUnbounded, *memoryBudget, *ramContractFile, *diagnostics, stderr) {
+			return 2
+		}
 		opt.ProjectRoot = worldOpt.Root
 		opt.SourceRoots = worldOpt.SourceRoots
 		opt.DependencyRoots = worldOpt.DependencyRoots
@@ -266,7 +275,10 @@ func runBuild(args []string, stdout io.Writer, stderr io.Writer) int {
 		writeDiagnostic(stderr, *diagnostics, err)
 		return 2
 	}
-	applyBuildReportOptions(&opt, *explain, *emitPLIR, *emitProof, *emitAllocReport, *emitBoundsReport, *emitMemoryReport)
+	applyBuildReportOptions(&opt, *explain, *emitPLIR, *emitProof, *emitAllocReport, *emitBoundsReport, *emitMemoryReport, *emitRAMContractReport)
+	if !applyRAMContractOptions(&opt, *failIfHeap, *failIfCopy, *failIfUnbounded, *memoryBudget, *ramContractFile, *diagnostics, stderr) {
+		return 2
+	}
 	opt.ProjectRoot = worldOpt.Root
 	opt.SourceRoots = worldOpt.SourceRoots
 	opt.DependencyRoots = worldOpt.DependencyRoots
@@ -283,13 +295,62 @@ func runBuild(args []string, stdout io.Writer, stderr io.Writer) int {
 	return 0
 }
 
-func applyBuildReportOptions(opt *compiler.BuildOptions, explain bool, emitPLIR bool, emitProof bool, emitAllocReport bool, emitBoundsReport bool, emitMemoryReport bool) {
+func applyBuildReportOptions(opt *compiler.BuildOptions, explain bool, emitPLIR bool, emitProof bool, emitAllocReport bool, emitBoundsReport bool, emitMemoryReport bool, emitRAMContractReport bool) {
 	opt.Explain = explain
 	opt.EmitPLIR = emitPLIR
 	opt.EmitProof = emitProof
 	opt.EmitAllocReport = emitAllocReport
 	opt.EmitBoundsReport = emitBoundsReport
 	opt.EmitMemoryReport = emitMemoryReport
+	opt.EmitRAMContractReport = emitRAMContractReport
+}
+
+func applyRAMContractOptions(opt *compiler.BuildOptions, failIfHeap bool, failIfCopy bool, failIfUnbounded bool, memoryBudget string, ramContractFile string, diagnostics string, stderr io.Writer) bool {
+	opt.FailIfHeap = failIfHeap
+	opt.FailIfCopy = failIfCopy
+	opt.FailIfUnbounded = failIfUnbounded
+	opt.RAMContractFile = ramContractFile
+	if strings.TrimSpace(memoryBudget) == "" {
+		return true
+	}
+	budget, err := parseMemoryBudgetBytes(memoryBudget)
+	if err != nil {
+		writeValidationDiagnostic(stderr, diagnostics, err.Error())
+		return false
+	}
+	opt.MemoryBudgetBytes = budget
+	return true
+}
+
+func parseMemoryBudgetBytes(raw string) (int64, error) {
+	value := strings.TrimSpace(strings.ToLower(raw))
+	if value == "" {
+		return 0, nil
+	}
+	multiplier := int64(1)
+	for _, suffix := range []struct {
+		suffix string
+		mul    int64
+	}{
+		{suffix: "gb", mul: 1024 * 1024 * 1024},
+		{suffix: "g", mul: 1024 * 1024 * 1024},
+		{suffix: "mb", mul: 1024 * 1024},
+		{suffix: "m", mul: 1024 * 1024},
+		{suffix: "kb", mul: 1024},
+		{suffix: "k", mul: 1024},
+		{suffix: "b", mul: 1},
+	} {
+		if strings.HasSuffix(value, suffix.suffix) {
+			multiplier = suffix.mul
+			value = strings.TrimSpace(strings.TrimSuffix(value, suffix.suffix))
+			break
+		}
+	}
+	n, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || n < 0 {
+		return 0, fmt.Errorf("build --memory-budget must be a non-negative byte count with optional kb/mb/gb suffix")
+	}
+	return n * multiplier, nil
 }
 
 func runRun(args []string, stdout io.Writer, stderr io.Writer) int {

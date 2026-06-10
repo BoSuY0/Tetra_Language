@@ -28,13 +28,18 @@ func TestReleasePostV04MemoryProductionSmokeScriptRunsExecutableValidator(t *tes
 		`memory_fuzz_dir="$report_dir/memory-fuzz-tier1"`,
 		`go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir "$memory_fuzz_dir"`,
 		`go run ./tools/cmd/validate-memory-fuzz-oracle --report "$memory_fuzz_dir/memory-fuzz-oracle.json" --artifact-dir "$memory_fuzz_dir"`,
+		`ram_contract_dir="$report_dir/ram-contract"`,
+		`bash "$script_dir/ram-contract-linux-x64-smoke.sh" --report-dir "$ram_contract_dir"`,
+		`ram-contract/ram-contract-report.json`,
+		`tetra.ram-contract-report.v1`,
+		`ram-contract/fuzz/ram-contract-fuzz-oracle.json`,
 		`memory_release_manifest_path="$report_dir/memory-release-manifest.json"`,
 		`git_head="$(git rev-parse --verify HEAD)"`,
 		`generated_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"`,
 		`memory-release-manifest.json`,
 		`go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"`,
 		`go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-hashes.json"`,
-		`go run ./tools/cmd/validate-memory-production --report "$report_path" --manifest "$memory_release_manifest_path" --report-dir "$report_dir"`,
+		`go run ./tools/cmd/validate-memory-production --report "$report_path" --manifest "$memory_release_manifest_path" --report-dir "$report_dir" --current-git-head "$git_head"`,
 		`targets.json`,
 		`$memory_fuzz_dir/memory-fuzz-oracle.json`,
 		`$memory_fuzz_dir/summary.json`,
@@ -55,12 +60,16 @@ func TestReleasePostV04MemoryProductionSmokeScriptRunsExecutableValidator(t *tes
 	if fuzzIdx < 0 || hashIdx < 0 || fuzzIdx > hashIdx {
 		t.Fatalf("memory production smoke script must validate memory fuzz Tier 1 artifacts before writing artifact hashes")
 	}
+	ramIdx := strings.Index(text, `bash "$script_dir/ram-contract-linux-x64-smoke.sh" --report-dir "$ram_contract_dir"`)
+	if ramIdx < 0 || hashIdx < 0 || ramIdx > hashIdx {
+		t.Fatalf("memory production smoke script must run RAM contract gate before writing artifact hashes")
+	}
 	manifestWriteIdx := strings.Index(text, `cat > "$memory_release_manifest_path" <<MANIFEST`)
 	if manifestWriteIdx < 0 || hashIdx < 0 || manifestWriteIdx > hashIdx {
 		t.Fatalf("memory production smoke script must write release manifest before writing artifact hashes")
 	}
 	hashValidateIdx := strings.Index(text, `go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-hashes.json"`)
-	manifestValidateIdx := strings.Index(text, `go run ./tools/cmd/validate-memory-production --report "$report_path" --manifest "$memory_release_manifest_path" --report-dir "$report_dir"`)
+	manifestValidateIdx := strings.Index(text, `go run ./tools/cmd/validate-memory-production --report "$report_path" --manifest "$memory_release_manifest_path" --report-dir "$report_dir" --current-git-head "$git_head"`)
 	if hashValidateIdx < 0 || manifestValidateIdx < 0 || hashValidateIdx > manifestValidateIdx {
 		t.Fatalf("memory production smoke script must validate artifact hashes before validating release manifest provenance")
 	}
@@ -153,7 +162,7 @@ func TestReleasePostV04ScopeDocsAdvertiseMemoryProductionSmokeScript(t *testing.
 		`go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir <dir>/memory-fuzz-tier1`,
 		`go run ./tools/cmd/validate-memory-fuzz-oracle --report <dir>/memory-fuzz-tier1/memory-fuzz-oracle.json --artifact-dir <dir>/memory-fuzz-tier1`,
 		`go run ./tools/cmd/validate-artifact-hashes --manifest <dir>/artifact-hashes.json`,
-		`go run ./tools/cmd/validate-memory-production --report <dir>/memory-production-linux-x64.json --manifest <dir>/memory-release-manifest.json --report-dir <dir>`,
+		`go run ./tools/cmd/validate-memory-production --report <dir>/memory-production-linux-x64.json --manifest <dir>/memory-release-manifest.json --report-dir <dir> --current-git-head <head>`,
 		`memory-release-manifest.json`,
 		`fresh --report-dir`,
 		`memory-fuzz-oracle.json`,

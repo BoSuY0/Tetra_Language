@@ -148,10 +148,50 @@ func TestValidateMemoryProductionReportRejectsMissingFunctionTypedSliceAggregate
 	}
 }
 
+func TestValidateMemoryProductionReportRejectsMissingLeakResourceEvidence(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "memory.json")
+	raw := validMemoryProductionReport()
+	for _, row := range []string{
+		`    {"name":"host resource leak and finalization checks","status":"pass","evidence":"actornet TestBrokerCloseWithoutCancelStopsServeWatcher plus compiler resource_finalization_test.go selectors prove close-without-cancel goroutine watcher cleanup and resource finalization diagnostics"},
+`,
+		`    {"name":"actornet broker close-without-cancel leak smoke","kind":"stress","ran":true,"pass":true},
+`,
+		`    {"name":"compiler resource finalization diagnostics","kind":"negative","ran":true,"pass":true,"expected_error":"resource finalization"},
+`,
+		`    {"requirement":"leak/resource finalization evidence","artifact":"cli/internal/actornet/broker_test.go; compiler/tests/runtime/resource_finalization_test.go; tools/cmd/memory-production-smoke","evidence":"release smoke runs actornet close-without-cancel watcher leak coverage and compiler TaskHandle/TaskGroup/Island resource finalization diagnostics for optional, enum, function-typed, branch, loop, match, join, close, and free paths","result":"pass"},
+`,
+	} {
+		raw = strings.Replace(raw, row, "", 1)
+	}
+	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err := validateMemoryProductionReport(path)
+	if err == nil {
+		t.Fatalf("expected missing leak/resource evidence to fail")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "leak") {
+		t.Fatalf("error = %v, want leak/resource rejection", err)
+	}
+}
+
 func TestValidateMemoryProductionReleaseManifestAcceptsFreshProvenance(t *testing.T) {
 	reportDir, reportPath, manifestPath := writeMemoryProductionReleaseFixture(t, nil)
-	if err := validateMemoryProductionReleaseManifest(reportPath, manifestPath, reportDir); err != nil {
+	if err := validateMemoryProductionReleaseManifest(reportPath, manifestPath, reportDir, "0123456789abcdef0123456789abcdef01234567"); err != nil {
 		t.Fatalf("validateMemoryProductionReleaseManifest failed: %v", err)
+	}
+}
+
+func TestValidateMemoryProductionReleaseManifestRejectsMismatchedCurrentGitHead(t *testing.T) {
+	reportDir, reportPath, manifestPath := writeMemoryProductionReleaseFixture(t, nil)
+	currentHead := "abcdefabcdefabcdefabcdefabcdefabcdefabcd"
+	err := validateMemoryProductionReleaseManifest(reportPath, manifestPath, reportDir, currentHead)
+	if err == nil {
+		t.Fatalf("expected release manifest from stale git head to fail")
+	}
+	got := strings.ToLower(err.Error())
+	if !strings.Contains(got, "current git head") || !strings.Contains(got, currentHead) {
+		t.Fatalf("error = %v, want current git head mismatch", err)
 	}
 }
 
@@ -161,7 +201,7 @@ func TestValidateMemoryProductionReleaseManifestRejectsHashMismatchedArtifact(t 
 	if err := os.WriteFile(summaryPath, []byte(`{"schema_version":"tetra.memory-fuzz-short.summary.v1","tier":1,"status":"tampered"}`+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	err := validateMemoryProductionReleaseManifest(reportPath, manifestPath, reportDir)
+	err := validateMemoryProductionReleaseManifest(reportPath, manifestPath, reportDir, "")
 	if err == nil {
 		t.Fatalf("expected hash-mismatched release artifact to fail")
 	}
@@ -178,12 +218,26 @@ func TestValidateMemoryProductionReleaseManifestRejectsMissingGeneratorCommand(t
 			}
 		}
 	})
-	err := validateMemoryProductionReleaseManifest(reportPath, manifestPath, reportDir)
+	err := validateMemoryProductionReleaseManifest(reportPath, manifestPath, reportDir, "")
 	if err == nil {
 		t.Fatalf("expected missing generator command to fail")
 	}
 	if !strings.Contains(err.Error(), "memory_production_report command is required") {
 		t.Fatalf("error = %v, want generator command rejection", err)
+	}
+}
+
+func TestValidateMemoryProductionReleaseManifestRejectsMissingIslandProofVerifier(t *testing.T) {
+	reportDir, reportPath, manifestPath := writeMemoryProductionReleaseFixture(t, func(manifest *memoryReleaseTestManifest) {
+		manifest.Commands = removeMemoryReleaseTestCommand(manifest.Commands, "island-proof-verifier")
+		manifest.Artifacts = removeMemoryReleaseTestArtifact(manifest.Artifacts, "island_proof_verifier_report")
+	})
+	err := validateMemoryProductionReleaseManifest(reportPath, manifestPath, reportDir, "")
+	if err == nil {
+		t.Fatalf("expected missing island proof verifier artifact to fail")
+	}
+	if got := err.Error(); !strings.Contains(got, "island-proof-verifier") && !strings.Contains(got, "island_proof_verifier_report") {
+		t.Fatalf("expected island proof verifier error, got %v", err)
 	}
 }
 
@@ -195,12 +249,30 @@ func TestValidateMemoryProductionReleaseManifestRejectsMissingHashEntry(t *testi
 		"memory-fuzz-tier1/summary.json",
 		"memory-release-manifest.json",
 	})
-	err := validateMemoryProductionReleaseManifest(reportPath, manifestPath, reportDir)
+	err := validateMemoryProductionReleaseManifest(reportPath, manifestPath, reportDir, "")
 	if err == nil {
 		t.Fatalf("expected missing hash manifest entry to fail")
 	}
 	if !strings.Contains(err.Error(), "missing hash manifest entry for targets.json") {
 		t.Fatalf("error = %v, want missing targets hash entry", err)
+	}
+}
+
+func TestValidateMemoryProductionReleaseManifestRejectsInvalidIslandProofVerifier(t *testing.T) {
+	reportDir, reportPath, manifestPath := writeMemoryProductionReleaseFixture(t, nil)
+	proofPath := filepath.Join(reportDir, "island-proof-verifier.json")
+	proof := strings.Replace(validIslandProofVerifierReport(), `"operation": "island_borrow"`, `"operation": "island_reset"`, 1)
+	if err := os.WriteFile(proofPath, []byte(proof), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeMemoryReleaseTestHashManifest(t, reportDir, memoryReleaseTestHashPaths())
+
+	err := validateMemoryProductionReleaseManifest(reportPath, manifestPath, reportDir, "")
+	if err == nil {
+		t.Fatalf("expected invalid island proof verifier artifact to fail")
+	}
+	if got := err.Error(); !strings.Contains(got, "island proof verifier") || !strings.Contains(got, "operation mismatch") {
+		t.Fatalf("expected island proof verifier mismatch, got %v", err)
 	}
 }
 
@@ -215,7 +287,9 @@ func validMemoryProductionReport() string {
   "processes": [
     {"name":"tetra build","kind":"build","path":"/tmp/tetra","ran":true,"pass":true,"exit_code":0},
     {"name":"memory smoke app","kind":"app","path":"/tmp/memory-smoke","ran":true,"pass":true,"exit_code":0},
-    {"name":"memory stress","kind":"stress","path":"tools/cmd/memory-production-smoke","ran":true,"pass":true,"exit_code":0}
+    {"name":"memory stress","kind":"stress","path":"tools/cmd/memory-production-smoke","ran":true,"pass":true,"exit_code":0},
+    {"name":"actornet close-without-cancel leak coverage","kind":"stress","path":"go test -buildvcs=false ./cli/internal/actornet -run TestBrokerCloseWithoutCancelStopsServeWatcher -count=1","ran":true,"pass":true,"exit_code":0},
+    {"name":"compiler resource finalization diagnostics","kind":"stress","path":"go test -buildvcs=false ./compiler/tests/runtime -run ^(TestTaskHandleFinalization|TestTaskGroupFinalization|TestIslandFinalization) -count=1","ran":true,"pass":true,"exit_code":0}
   ],
   "benchmarks": [
     {"name":"small heap allocation syscall reduction","kind":"allocator","metric":"estimated_os_syscalls","unit":"syscalls","baseline_value":64,"measured_value":1,"improvement_ratio":64.0,"evidence":"allocation report schema v2 shows 64 per_core_small_heap rows with same_core_same_size_class_free_list reuse policy inside one 64KiB chunk refill","ran":true,"pass":true}
@@ -227,6 +301,7 @@ func validMemoryProductionReport() string {
     {"name":"unsafe cap.mem raw memory rules","status":"pass","evidence":"raw memory helpers require unsafe and explicit cap.mem"},
     {"name":"runtime bounds diagnostics","status":"pass","evidence":"out-of-bounds memory access reports deterministic runtime diagnostic"},
     {"name":"raw pointer bounds metadata","status":"pass","evidence":"allocation_base_metadata, derived_allocation_offset, checked_external_unknown, and external_unknown raw-slice policy"},
+    {"name":"host resource leak and finalization checks","status":"pass","evidence":"actornet TestBrokerCloseWithoutCancelStopsServeWatcher plus compiler resource_finalization_test.go selectors prove close-without-cancel goroutine watcher cleanup and resource finalization diagnostics"},
     {"name":"actor task transfer rules","status":"pass","evidence":"memory-bearing values cannot cross actor/task boundaries without checked transfer"}
   ],
   "cases": [
@@ -253,6 +328,8 @@ func validMemoryProductionReport() string {
     {"name":"heap closure handle coverage","kind":"positive","ran":true,"pass":true},
     {"name":"slice struct borrow escape coverage","kind":"negative","ran":true,"pass":true,"expected_error":"borrow escape"},
     {"name":"function-typed slice aggregate borrow escape coverage","kind":"negative","ran":true,"pass":true,"expected_error":"borrow escape"},
+    {"name":"actornet broker close-without-cancel leak smoke","kind":"stress","ran":true,"pass":true},
+    {"name":"compiler resource finalization diagnostics","kind":"negative","ran":true,"pass":true,"expected_error":"resource finalization"},
     {"name":"real memory examples","kind":"positive","ran":true,"pass":true},
     {"name":"stress allocator reuse","kind":"stress","ran":true,"pass":true},
     {"name":"deterministic memcpy/memset fuzz","kind":"stress","ran":true,"pass":true}
@@ -268,11 +345,99 @@ func validMemoryProductionReport() string {
     {"requirement":"measured memory benchmark improvement","artifact":"tools/cmd/memory-production-smoke; compiler allocation report schema v2","evidence":"small heap allocation syscall reduction benchmark reads the emitted allocation report, counts per_core_small_heap rows with same_core_same_size_class_free_list reuse policy, and compares estimated mmap-per-allocation baseline against 64KiB chunk refill calls","result":"pass"},
     {"requirement":"use-after-free, double-free, borrow escape, and aliasing safety","artifact":"compiler/tests/safety; compiler/tests/ownership; compiler","evidence":"required compiler safety cases reject use-after-free, double-free, borrow escape, and inout aliasing violations","result":"pass"},
     {"requirement":"actor/task transfer safety","artifact":"compiler/tests/ownership","evidence":"TestReleaseTraceabilityLifetimeAndRaceSafetyNegativeActorTaskOwnership rejects unsafe actor/task transfer boundaries","result":"pass"},
+    {"requirement":"leak/resource finalization evidence","artifact":"cli/internal/actornet/broker_test.go; compiler/tests/runtime/resource_finalization_test.go; tools/cmd/memory-production-smoke","evidence":"release smoke runs actornet close-without-cancel watcher leak coverage and compiler TaskHandle/TaskGroup/Island resource finalization diagnostics for optional, enum, function-typed, branch, loop, match, join, close, and free paths","result":"pass"},
     {"requirement":"real memory examples","artifact":"examples/core_memory_smoke.tetra; examples/ownership_smoke.tetra; examples/flow_unsafe_cap_mem_smoke.tetra","evidence":"checked-in memory, ownership, and unsafe cap.mem examples build and run under the memory production release gate","result":"pass"},
     {"requirement":"safe memory documentation","artifact":"docs/spec/runtime_abi.md; docs/spec/ownership_v1.md; docs/spec/unsafe.md; docs/user/standard_library_guide.md","evidence":"verify-docs requires the Memory Production ABI, ownership extension, unsafe boundary, and writing raw memory safely guide sections","result":"pass"},
     {"requirement":"release-gate entrypoint","artifact":"scripts/release/post_v0_4/memory-production-linux-x64-smoke.sh","evidence":"entrypoint writes memory-production-linux-x64.json and runs memory-production-smoke plus validate-memory-production","result":"pass"}
   ]
-}`
+	}`
+}
+
+func validIslandProofVerifierReport() string {
+	return `{
+  "schema": "tetra.island.proof.v1",
+  "producer": "tools/validators/islandproof/release-fixture",
+  "producer_command": "go run ./tools/cmd/validate-island-proof",
+  "git_head": "0123456789abcdef0123456789abcdef01234567",
+  "generated_at": "2026-06-07T20:15:00Z",
+  "proofs": [
+    {
+      "proof_id": "proof:release:island:borrow:1",
+      "operation": "island_borrow",
+      "proof_kind": "island_epoch",
+      "subject_base_id": "alloc:release:island:0",
+      "island_id": "island:release:0",
+      "epoch": 1,
+      "source_fact_id": "fact:release:island-proof:1",
+      "claim": "island_proof_verified",
+      "provenance_class": "safe_known",
+      "unsafe_class": "safe",
+      "validator_name": "validate-island-proof",
+      "validator_status": "pass",
+      "planned_storage": "ExplicitIsland",
+      "actual_lowering_storage": "ExplicitIsland",
+      "dominance": "entry dominates release island borrow",
+      "distinct_live_islands": ["island:release:0", "island:release:1"]
+    }
+  ]
+}` + "\n"
+}
+
+func validIslandProofMemoryReport() string {
+	return `{
+  "schema_version": "tetra.memory-report.v1",
+  "rows": [
+    {
+      "program_id": "release-memory-production",
+      "function_id": "island-proof-verifier-fixture",
+      "site_id": "island:release:borrow:1",
+      "source_fact_id": "fact:release:island-proof:1",
+      "source_stage": "validation",
+      "claim": "island_proof_verified",
+      "claim_level": "validated",
+      "provenance_class": "safe_known",
+      "unsafe_class": "safe",
+      "alias_state": "unique",
+      "island_id": "island:release:0",
+      "epoch": 1,
+      "base_id": "alloc:release:island:0",
+      "proof_id": "proof:release:island:borrow:1",
+      "proof_kind": "island_epoch",
+      "proof_subject_base_id": "alloc:release:island:0",
+      "proof_operation": "island_borrow",
+      "planned_storage": "ExplicitIsland",
+      "actual_lowering_storage": "ExplicitIsland",
+      "validator_name": "validate-island-proof",
+      "validator_status": "pass",
+      "cost_class": "instrumentation_only",
+      "reason": "release fixture proving independent island verifier gate"
+    }
+  ]
+}` + "\n"
+}
+
+func validIslandProofFuzzSummary() string {
+	return `{
+  "schema_version": "tetra.island-proof-fuzz-summary.v1",
+  "status": "pass",
+  "corpus": "deterministic-short",
+  "total": 11,
+  "rejected": 11,
+  "accepted": 0,
+  "cases": [
+    {"name": "malformed_proof_json", "status": "rejected"},
+    {"name": "stale_epoch", "status": "rejected"},
+    {"name": "mismatched_island_id", "status": "rejected"},
+    {"name": "wrong_base_allocation", "status": "rejected"},
+    {"name": "broken_dominance", "status": "rejected"},
+    {"name": "missing_proof_id", "status": "rejected"},
+    {"name": "wrong_operation", "status": "rejected"},
+    {"name": "unsafe_unknown_promotion", "status": "rejected"},
+    {"name": "noalias_broad_proof", "status": "rejected"},
+    {"name": "storage_heap_fallback", "status": "rejected"},
+    {"name": "transform_lost_metadata", "status": "rejected"}
+  ]
+}` + "\n"
 }
 
 type memoryReleaseTestManifest struct {
@@ -334,6 +499,15 @@ func writeMemoryProductionReleaseFixture(t *testing.T, mutate func(*memoryReleas
 	if err := os.WriteFile(filepath.Join(fuzzDir, "summary.json"), []byte(`{"schema_version":"tetra.memory-fuzz-short.summary.v1","tier":1,"status":"pass"}`+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(fuzzDir, "island-proof-fuzz-summary.json"), []byte(validIslandProofFuzzSummary()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(reportDir, "island-proof-verifier.json"), []byte(validIslandProofVerifierReport()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(reportDir, "island-proof-memory-report.json"), []byte(validIslandProofMemoryReport()), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	manifest := memoryReleaseTestManifest{
 		Schema:       "tetra.memory.release-manifest.v1",
 		Target:       "linux-x64",
@@ -347,6 +521,7 @@ func writeMemoryProductionReleaseFixture(t *testing.T, mutate func(*memoryReleas
 			{Name: "validate-targets", Command: "go run ./tools/cmd/validate-targets --report $targets_path"},
 			{Name: "memory-fuzz-short", Command: "go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir $memory_fuzz_dir"},
 			{Name: "validate-memory-fuzz-oracle", Command: "go run ./tools/cmd/validate-memory-fuzz-oracle --report $memory_fuzz_dir/memory-fuzz-oracle.json --artifact-dir $memory_fuzz_dir"},
+			{Name: "island-proof-verifier", Command: "go run ./tools/cmd/validate-island-proof --proof $report_dir/island-proof-verifier.json --memory-report $report_dir/island-proof-memory-report.json --current-git-head 0123456789abcdef0123456789abcdef01234567 --require-same-commit"},
 			{Name: "artifact-hashes-write", Command: "go run ./tools/cmd/validate-artifact-hashes --write --root $report_dir --out $report_dir/artifact-hashes.json"},
 			{Name: "artifact-hashes-validate", Command: "go run ./tools/cmd/validate-artifact-hashes --manifest $report_dir/artifact-hashes.json"},
 		},
@@ -355,6 +530,9 @@ func writeMemoryProductionReleaseFixture(t *testing.T, mutate func(*memoryReleas
 			{Path: "targets.json", Kind: "target_report", Target: "linux-x64", Command: "go run ./cli/cmd/tetra targets --format=json > $targets_path"},
 			{Path: "memory-fuzz-tier1/memory-fuzz-oracle.json", Kind: "memory_fuzz_oracle_report", Schema: "tetra.memory-fuzz.oracle.v1", Target: "linux-x64", Command: "go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir $memory_fuzz_dir"},
 			{Path: "memory-fuzz-tier1/summary.json", Kind: "memory_fuzz_summary", Schema: "tetra.memory-fuzz-short.summary.v1", Target: "linux-x64", Command: "go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir $memory_fuzz_dir"},
+			{Path: "memory-fuzz-tier1/island-proof-fuzz-summary.json", Kind: "memory_fuzz_island_proof_summary", Schema: "tetra.island-proof-fuzz-summary.v1", Target: "linux-x64", Command: "go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir $memory_fuzz_dir"},
+			{Path: "island-proof-verifier.json", Kind: "island_proof_verifier_report", Schema: "tetra.island.proof.v1", Target: "linux-x64", Command: "go run ./tools/cmd/validate-island-proof --proof $report_dir/island-proof-verifier.json --memory-report $report_dir/island-proof-memory-report.json --current-git-head 0123456789abcdef0123456789abcdef01234567 --require-same-commit"},
+			{Path: "island-proof-memory-report.json", Kind: "island_proof_memory_report", Schema: "tetra.memory-report.v1", Target: "linux-x64", Command: "go run ./tools/cmd/validate-island-proof --proof $report_dir/island-proof-verifier.json --memory-report $report_dir/island-proof-memory-report.json --current-git-head 0123456789abcdef0123456789abcdef01234567 --require-same-commit"},
 			{Path: "artifact-hashes.json", Kind: "artifact_hash_manifest", Schema: "tetra.release-artifact-hashes.v1alpha1", Target: "linux-x64", Command: "go run ./tools/cmd/validate-artifact-hashes --write --root $report_dir --out $report_dir/artifact-hashes.json"},
 		},
 	}
@@ -370,14 +548,43 @@ func writeMemoryProductionReleaseFixture(t *testing.T, mutate func(*memoryReleas
 	if err := os.WriteFile(manifestPath, raw, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	writeMemoryReleaseTestHashManifest(t, reportDir, []string{
-		"memory-production-linux-x64.json",
-		"targets.json",
+	writeMemoryReleaseTestHashManifest(t, reportDir, memoryReleaseTestHashPaths())
+	return reportDir, reportPath, manifestPath
+}
+
+func removeMemoryReleaseTestCommand(commands []memoryReleaseTestCommand, name string) []memoryReleaseTestCommand {
+	out := commands[:0]
+	for _, command := range commands {
+		if command.Name == name {
+			continue
+		}
+		out = append(out, command)
+	}
+	return out
+}
+
+func removeMemoryReleaseTestArtifact(artifacts []memoryReleaseTestArtifact, kind string) []memoryReleaseTestArtifact {
+	out := artifacts[:0]
+	for _, artifact := range artifacts {
+		if artifact.Kind == kind {
+			continue
+		}
+		out = append(out, artifact)
+	}
+	return out
+}
+
+func memoryReleaseTestHashPaths() []string {
+	return []string{
+		"island-proof-memory-report.json",
+		"island-proof-verifier.json",
+		"memory-fuzz-tier1/island-proof-fuzz-summary.json",
 		"memory-fuzz-tier1/memory-fuzz-oracle.json",
 		"memory-fuzz-tier1/summary.json",
+		"memory-production-linux-x64.json",
 		"memory-release-manifest.json",
-	})
-	return reportDir, reportPath, manifestPath
+		"targets.json",
+	}
 }
 
 func writeMemoryReleaseTestHashManifest(t *testing.T, root string, paths []string) {

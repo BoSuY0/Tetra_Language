@@ -262,7 +262,7 @@ func BuildP24RuntimeHardeningV1Report() (RuntimeHardeningV1Report, error) {
 			p24RuntimeHardeningRow(RuntimeHardeningActorMailboxOverflowPolicy, "Actor mailbox overflow policy", "reviewed_boundary_with_blocker",
 				[]string{
 					"parallelrt.NewTypedMailbox records bounded capacity, blocking_recv_yield backpressure metadata, FIFO receive, and recoverable ErrMailboxFull when the typed mailbox model is full.",
-					"actorsrt.ActorRuntimeProductionBoundaryAudit records that built-in message pool overflow is not a checked runtime error, preserving the production actor-runtime blocker.",
+					"actorsrt.ActorRuntimeProductionBoundaryAudit records that built-in message pool exhaustion returns checked -1 while message pool entries are not reclaimed during a run.",
 				},
 				[]string{
 					"go test ./compiler/internal/parallelrt ./compiler/internal/actorsrt -run 'Mailbox|ProductionBoundary|SchedulerModel' -count=1",
@@ -558,12 +558,19 @@ func buildP24RuntimeHardeningMailboxWitness() (RuntimeHardeningV1Witness, error)
 	if err := actorsrt.ValidateActorRuntimeProductionBoundaryAudit(audit); err != nil {
 		return RuntimeHardeningV1Witness{}, err
 	}
-	builtinOverflowChecked := true
+	builtinOverflowChecked := false
+	messagePoolNotReclaimed := false
+	oldUncheckedOverflowClaim := false
 	for _, row := range audit.Rows {
 		text := strings.Join(row.RequiredFacts, " ") + " " + row.Evidence + " " + row.Boundary
 		if strings.Contains(text, "message pool overflow is not a checked runtime error") {
-			builtinOverflowChecked = false
-			break
+			oldUncheckedOverflowClaim = true
+		}
+		if strings.Contains(text, "message pool exhaustion returns checked -1") {
+			builtinOverflowChecked = true
+		}
+		if strings.Contains(text, "message pool entries are not reclaimed") {
+			messagePoolNotReclaimed = true
 		}
 	}
 	return RuntimeHardeningV1Witness{
@@ -581,7 +588,9 @@ func buildP24RuntimeHardeningMailboxWitness() (RuntimeHardeningV1Witness, error)
 			errors.Is(overflowErr, parallelrt.ErrMailboxFull) &&
 			received && first.Name == "first" &&
 			len(audit.Rows) >= 4 &&
-			!builtinOverflowChecked,
+			builtinOverflowChecked &&
+			messagePoolNotReclaimed &&
+			!oldUncheckedOverflowClaim,
 	}, nil
 }
 
@@ -689,7 +698,7 @@ func p24RuntimeHardeningValidateRowsAndWitnesses(rows []RuntimeHardeningV1Row, w
 	if witness := byWitness[p24RuntimeHardeningRegionWitnessID]; !witness.RegionDoubleFreeUseAfterFreeReviewed || witness.RegionDebugHeaderBytes <= 0 || witness.RegionUseAfterFreeContracts < 1 || witness.RegionDoubleFreeContracts < 1 || witness.RegionResetContracts < 1 {
 		return fmt.Errorf("runtime hardening v1: region lifetime instrumentation witness incomplete")
 	}
-	if witness := byWitness[p24RuntimeHardeningMailboxWitnessID]; !witness.ActorMailboxOverflowPolicyReviewed || witness.MailboxCapacity != 1 || witness.BackpressureMode != "blocking_recv_yield" || !witness.MailboxOverflowRejected || !witness.MailboxFIFOReceive || witness.ActorBoundaryRows < 4 || witness.BuiltinMessagePoolOverflowChecked {
+	if witness := byWitness[p24RuntimeHardeningMailboxWitnessID]; !witness.ActorMailboxOverflowPolicyReviewed || witness.MailboxCapacity != 1 || witness.BackpressureMode != "blocking_recv_yield" || !witness.MailboxOverflowRejected || !witness.MailboxFIFOReceive || witness.ActorBoundaryRows < 4 || !witness.BuiltinMessagePoolOverflowChecked {
 		return fmt.Errorf("runtime hardening v1: actor mailbox overflow witness incomplete")
 	}
 	if witness := byWitness[p24RuntimeHardeningParserWitnessID]; !witness.NetworkParserLimitsReviewed || !witness.HTTPParserLimitsReviewed || !witness.HTTPRequestViewLimitsReviewed || !witness.PostgresFrameLimitsReviewed {

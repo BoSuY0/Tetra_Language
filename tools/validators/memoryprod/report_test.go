@@ -16,7 +16,9 @@ func TestValidateReportAcceptsLinuxX64MemoryProductionEvidence(t *testing.T) {
   "processes": [
     {"name":"tetra build","kind":"build","path":"/tmp/tetra","ran":true,"pass":true,"exit_code":0},
     {"name":"memory smoke app","kind":"app","path":"/tmp/memory-smoke","ran":true,"pass":true,"exit_code":0},
-    {"name":"memory stress","kind":"stress","path":"tools/cmd/memory-production-smoke","ran":true,"pass":true,"exit_code":0}
+    {"name":"memory stress","kind":"stress","path":"tools/cmd/memory-production-smoke","ran":true,"pass":true,"exit_code":0},
+    {"name":"actornet close-without-cancel leak coverage","kind":"stress","path":"go test -buildvcs=false ./cli/internal/actornet -run TestBrokerCloseWithoutCancelStopsServeWatcher -count=1","ran":true,"pass":true,"exit_code":0},
+    {"name":"compiler resource finalization diagnostics","kind":"stress","path":"go test -buildvcs=false ./compiler/tests/runtime -run ^(TestTaskHandleFinalization|TestTaskGroupFinalization|TestIslandFinalization) -count=1","ran":true,"pass":true,"exit_code":0}
   ],
   "benchmarks": [
     {"name":"small heap allocation syscall reduction","kind":"allocator","metric":"estimated_os_syscalls","unit":"syscalls","baseline_value":64,"measured_value":1,"improvement_ratio":64.0,"evidence":"allocation report schema v2 shows 64 per_core_small_heap rows with same_core_same_size_class_free_list reuse policy inside one 64KiB chunk refill","ran":true,"pass":true}
@@ -28,6 +30,7 @@ func TestValidateReportAcceptsLinuxX64MemoryProductionEvidence(t *testing.T) {
     {"name":"unsafe cap.mem raw memory rules","status":"pass","evidence":"raw memory helpers require unsafe and explicit cap.mem"},
     {"name":"runtime bounds diagnostics","status":"pass","evidence":"out-of-bounds memory access reports deterministic runtime diagnostic"},
     {"name":"raw pointer bounds metadata","status":"pass","evidence":"allocation_base_metadata, derived_allocation_offset, checked_external_unknown, and external_unknown raw-slice policy"},
+    {"name":"host resource leak and finalization checks","status":"pass","evidence":"actornet TestBrokerCloseWithoutCancelStopsServeWatcher plus compiler resource_finalization_test.go selectors prove close-without-cancel goroutine watcher cleanup and resource finalization diagnostics"},
     {"name":"actor task transfer rules","status":"pass","evidence":"memory-bearing values cannot cross actor/task boundaries without checked transfer"}
   ],
   "cases": [
@@ -54,6 +57,8 @@ func TestValidateReportAcceptsLinuxX64MemoryProductionEvidence(t *testing.T) {
     {"name":"heap closure handle coverage","kind":"positive","ran":true,"pass":true},
     {"name":"slice struct borrow escape coverage","kind":"negative","ran":true,"pass":true,"expected_error":"borrow escape"},
     {"name":"function-typed slice aggregate borrow escape coverage","kind":"negative","ran":true,"pass":true,"expected_error":"borrow escape"},
+    {"name":"actornet broker close-without-cancel leak smoke","kind":"stress","ran":true,"pass":true},
+    {"name":"compiler resource finalization diagnostics","kind":"negative","ran":true,"pass":true,"expected_error":"resource finalization"},
     {"name":"real memory examples","kind":"positive","ran":true,"pass":true},
     {"name":"stress allocator reuse","kind":"stress","ran":true,"pass":true},
     {"name":"deterministic memcpy/memset fuzz","kind":"stress","ran":true,"pass":true}
@@ -69,6 +74,7 @@ func TestValidateReportAcceptsLinuxX64MemoryProductionEvidence(t *testing.T) {
     {"requirement":"measured memory benchmark improvement","artifact":"tools/cmd/memory-production-smoke; compiler allocation report schema v2","evidence":"small heap allocation syscall reduction benchmark reads the emitted allocation report, counts per_core_small_heap rows with same_core_same_size_class_free_list reuse policy, and compares estimated mmap-per-allocation baseline against 64KiB chunk refill calls","result":"pass"},
     {"requirement":"use-after-free, double-free, borrow escape, and aliasing safety","artifact":"compiler/tests/safety; compiler/tests/ownership; compiler","evidence":"required compiler safety cases reject use-after-free, double-free, borrow escape, and inout aliasing violations","result":"pass"},
     {"requirement":"actor/task transfer safety","artifact":"compiler/tests/ownership","evidence":"TestReleaseTraceabilityLifetimeAndRaceSafetyNegativeActorTaskOwnership rejects unsafe actor/task transfer boundaries","result":"pass"},
+    {"requirement":"leak/resource finalization evidence","artifact":"cli/internal/actornet/broker_test.go; compiler/tests/runtime/resource_finalization_test.go; tools/cmd/memory-production-smoke","evidence":"release smoke runs actornet close-without-cancel watcher leak coverage and compiler TaskHandle/TaskGroup/Island resource finalization diagnostics for optional, enum, function-typed, branch, loop, match, join, close, and free paths","result":"pass"},
     {"requirement":"real memory examples","artifact":"examples/core_memory_smoke.tetra; examples/ownership_smoke.tetra; examples/flow_unsafe_cap_mem_smoke.tetra","evidence":"checked-in memory, ownership, and unsafe cap.mem examples build and run under the memory production release gate","result":"pass"},
     {"requirement":"safe memory documentation","artifact":"docs/spec/runtime_abi.md; docs/spec/ownership_v1.md; docs/spec/unsafe.md; docs/user/standard_library_guide.md","evidence":"verify-docs requires the Memory Production ABI, ownership extension, unsafe boundary, and writing raw memory safely guide sections","result":"pass"},
     {"requirement":"release-gate entrypoint","artifact":"scripts/release/post_v0_4/memory-production-linux-x64-smoke.sh","evidence":"entrypoint writes memory-production-linux-x64.json and runs memory-production-smoke plus validate-memory-production","result":"pass"}
@@ -227,6 +233,98 @@ func TestValidateReportRejectsMissingRawPointerBoundsMetadataEvidence(t *testing
 	joined = strings.ToLower(strings.Join(issues, "; "))
 	if !strings.Contains(joined, "raw pointer bounds metadata report") {
 		t.Fatalf("validateCases issues = %v, want missing raw pointer bounds metadata report", issues)
+	}
+}
+
+func TestValidateReportRejectsMissingLeakResourceEvidence(t *testing.T) {
+	issues := validateContracts([]ContractReport{
+		{Name: "allocator runtime model", Status: "pass", Evidence: "allocator lifecycle"},
+		{Name: "allocator failure semantics", Status: "pass", Evidence: "failure"},
+		{Name: "ownership escape model", Status: "pass", Evidence: "ownership"},
+		{Name: "unsafe cap.mem raw memory rules", Status: "pass", Evidence: "unsafe cap.mem"},
+		{Name: "runtime bounds diagnostics", Status: "pass", Evidence: "bounds diagnostics"},
+		{Name: "raw pointer bounds metadata", Status: "pass", Evidence: "allocation_base_metadata"},
+		{Name: "actor task transfer rules", Status: "pass", Evidence: "actor task"},
+	})
+	joined := strings.ToLower(strings.Join(issues, "; "))
+	if !strings.Contains(joined, "host resource leak and finalization checks") {
+		t.Fatalf("validateContracts issues = %v, want missing leak/resource contract", issues)
+	}
+
+	issues = validateCases([]CaseReport{
+		{Name: "allocator alloc/free lifecycle", Kind: "positive", Ran: true, Pass: true},
+		{Name: "allocator failure semantics", Kind: "negative", Ran: true, Pass: true, ExpectedError: "allocation failure"},
+		{Name: "allocator invalid size precondition", Kind: "negative", Ran: true, Pass: true, ExpectedError: "invalid allocation size"},
+		{Name: "cap.mem unsafe boundary", Kind: "negative", Ran: true, Pass: true, ExpectedError: "only allowed in unsafe blocks"},
+		{Name: "memcpy/memset capability path", Kind: "positive", Ran: true, Pass: true},
+		{Name: "runtime bounds check", Kind: "negative", Ran: true, Pass: true, ExpectedError: "bounds"},
+		{Name: "raw ptr_add negative offset bounds", Kind: "negative", Ran: true, Pass: true, ExpectedError: "negative ptr_add offset"},
+		{Name: "raw ptr_add allocation upper bound", Kind: "negative", Ran: true, Pass: true, ExpectedError: "allocation upper bound"},
+		{Name: "raw allocation-base i32 access width", Kind: "negative", Ran: true, Pass: true, ExpectedError: "i32 access width exceeds allocation"},
+		{Name: "raw allocation-base ptr access width", Kind: "negative", Ran: true, Pass: true, ExpectedError: "ptr access width exceeds allocation"},
+		{Name: "raw slice negative length", Kind: "negative", Ran: true, Pass: true, ExpectedError: "negative raw slice length"},
+		{Name: "raw slice i32 length byte overflow", Kind: "negative", Ran: true, Pass: true, ExpectedError: "raw slice length byte overflow"},
+		{Name: "raw pointer bounds metadata report", Kind: "positive", Ran: true, Pass: true},
+		{Name: "memcpy/memset negative length", Kind: "negative", Ran: true, Pass: true, ExpectedError: "negative helper length"},
+		{Name: "reject use-after-free", Kind: "negative", Ran: true, Pass: true, ExpectedError: "use-after-free"},
+		{Name: "reject double-free", Kind: "negative", Ran: true, Pass: true, ExpectedError: "double-free"},
+		{Name: "reject borrow escape", Kind: "negative", Ran: true, Pass: true, ExpectedError: "borrow escape"},
+		{Name: "reject aliasing violation", Kind: "negative", Ran: true, Pass: true, ExpectedError: "alias"},
+		{Name: "callable mutable capture heap escape", Kind: "negative", Ran: true, Pass: true, ExpectedError: "heap-escaped function value captures mutable local"},
+		{Name: "reject actor task transfer violation", Kind: "negative", Ran: true, Pass: true, ExpectedError: "transfer"},
+		{Name: "heap closure handle coverage", Kind: "positive", Ran: true, Pass: true},
+		{Name: "slice struct borrow escape coverage", Kind: "negative", Ran: true, Pass: true, ExpectedError: "borrow escape"},
+		{Name: "function-typed slice aggregate borrow escape coverage", Kind: "negative", Ran: true, Pass: true, ExpectedError: "borrow escape"},
+		{Name: "real memory examples", Kind: "positive", Ran: true, Pass: true},
+		{Name: "stress allocator reuse", Kind: "stress", Ran: true, Pass: true},
+		{Name: "deterministic memcpy/memset fuzz", Kind: "stress", Ran: true, Pass: true},
+	})
+	joined = strings.ToLower(strings.Join(issues, "; "))
+	for _, want := range []string{
+		"actornet broker close-without-cancel leak smoke",
+		"compiler resource finalization diagnostics",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("validateCases issues = %v, want missing %q", issues, want)
+		}
+	}
+
+	issues = validateAudit([]AuditReport{
+		{Requirement: "stable allocator/runtime memory model", Artifact: "runtime", Evidence: "allocator", Result: "pass"},
+		{Requirement: "ownership/borrow/consume escape model", Artifact: "ownership", Evidence: "ownership", Result: "pass"},
+		{Requirement: "heap, slices, structs, and closures memory coverage", Artifact: "compiler", Evidence: "heap", Result: "pass"},
+		{Requirement: "unsafe/cap.mem/raw memory/memcpy/memset rules", Artifact: "unsafe", Evidence: "cap.mem", Result: "pass"},
+		{Requirement: "runtime bounds checks and diagnostics", Artifact: "runtime", Evidence: "bounds", Result: "pass"},
+		{Requirement: "raw pointer bounds metadata", Artifact: "runtimeabi", Evidence: "metadata", Result: "pass"},
+		{Requirement: "stress/fuzz evidence", Artifact: "smoke", Evidence: "fuzz", Result: "pass"},
+		{Requirement: "measured memory benchmark improvement", Artifact: "smoke", Evidence: "benchmark", Result: "pass"},
+		{Requirement: "use-after-free, double-free, borrow escape, and aliasing safety", Artifact: "compiler", Evidence: "safety", Result: "pass"},
+		{Requirement: "actor/task transfer safety", Artifact: "compiler", Evidence: "actor task", Result: "pass"},
+		{Requirement: "real memory examples", Artifact: "examples", Evidence: "examples", Result: "pass"},
+		{Requirement: "safe memory documentation", Artifact: "docs", Evidence: "verify-docs", Result: "pass"},
+		{Requirement: "release-gate entrypoint", Artifact: "script", Evidence: "entrypoint", Result: "pass"},
+	})
+	joined = strings.ToLower(strings.Join(issues, "; "))
+	if !strings.Contains(joined, "leak/resource finalization evidence") {
+		t.Fatalf("validateAudit issues = %v, want missing leak/resource audit", issues)
+	}
+}
+
+func TestValidateReportRejectsMissingLeakResourceProcessEvidence(t *testing.T) {
+	exit0 := 0
+	issues := validateProcesses([]ProcessReport{
+		{Name: "tetra build", Kind: "build", Path: "go build ./cli/cmd/tetra", Ran: true, Pass: true, ExitCode: &exit0},
+		{Name: "memory smoke app", Kind: "app", Path: "examples/core_memory_smoke", Ran: true, Pass: true, ExitCode: &exit0},
+		{Name: "memory stress", Kind: "stress", Path: "tools/cmd/memory-production-smoke", Ran: true, Pass: true, ExitCode: &exit0},
+	})
+	joined := strings.ToLower(strings.Join(issues, "; "))
+	for _, want := range []string{
+		"actornet close-without-cancel leak coverage",
+		"compiler resource finalization diagnostics",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("validateProcesses issues = %v, want missing %q", issues, want)
+		}
 	}
 }
 

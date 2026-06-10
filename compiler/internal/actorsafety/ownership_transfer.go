@@ -19,6 +19,7 @@ const (
 	TypedActorOwnershipRuntimeMailboxRepresentation TypedActorOwnershipTransferID = "runtime_mailbox_representation"
 	TypedActorOwnershipActorTransferReport          TypedActorOwnershipTransferID = "actor_transfer_report"
 	TypedActorOwnershipStressDiagnostics            TypedActorOwnershipTransferID = "stress_use_after_move_diagnostics"
+	TypedActorOwnershipRaceSafetyRejectionMatrix    TypedActorOwnershipTransferID = "race_safety_rejection_matrix"
 )
 
 type TypedActorOwnershipTransferStatus string
@@ -61,6 +62,7 @@ func TypedActorOwnershipTransferCoverage() TypedActorOwnershipTransferReport {
 			runtimeMailboxRepresentationRow(),
 			actorTransferReportRow(),
 			stressDiagnosticsRow(),
+			raceSafetyRejectionMatrixRow(),
 		},
 		NonClaims: []string{
 			"distributed pointer or region zero-copy is not claimed",
@@ -102,6 +104,7 @@ func ValidateTypedActorOwnershipTransferCoverage(report TypedActorOwnershipTrans
 		TypedActorOwnershipRuntimeMailboxRepresentation: false,
 		TypedActorOwnershipActorTransferReport:          false,
 		TypedActorOwnershipStressDiagnostics:            false,
+		TypedActorOwnershipRaceSafetyRejectionMatrix:    false,
 	}
 	if len(report.Rows) != len(expected) {
 		return fmt.Errorf("typed actor ownership transfer: row count = %d, want %d", len(report.Rows), len(expected))
@@ -172,6 +175,9 @@ func ValidateTypedActorOwnershipTransferCoverage(report TypedActorOwnershipTrans
 	}
 	if err := requireOwnershipTransferFacts(rows[TypedActorOwnershipStressDiagnostics], "stress diagnostics", "use-after-move", "cannot use consumed value"); err != nil {
 		return fmt.Errorf("typed actor ownership transfer: stress diagnostics row invalid: %w", err)
+	}
+	if err := requireOwnershipTransferFacts(rows[TypedActorOwnershipRaceSafetyRejectionMatrix], "local immutable payloads copy safely", "owned moved payloads consume sender access", "borrowed views rejected unless explicitly copied", "mutable global targets rejected across actor/task boundaries", "unsafe pointer payloads rejected without audited contract", "island region transfer deferred to actor/island proof"); err != nil {
+		return fmt.Errorf("typed actor ownership transfer: race-safety rejection matrix row invalid: %w", err)
 	}
 	return nil
 }
@@ -338,6 +344,24 @@ func stressDiagnosticsRow() TypedActorOwnershipTransferRow {
 		},
 		Evidence: "compiler/tests/ownership/actor_task_ownership_test.go; compiler/tests/ownership/actor_task_stress_test.go::TestActorTaskBoundedStressExamples; compiler/actors_test.go::TestActorsTypedMessagesIslandTransferConsumesSource; compiler/actors_test.go::TestActorsTypedMessagesOwnedRegionSliceMoveConsumesSenderSlice",
 		Boundary: "stress evidence covers bounded compiler diagnostics and linux-x64 stress examples; it is not a full race-safety proof",
+	}
+}
+
+func raceSafetyRejectionMatrixRow() TypedActorOwnershipTransferRow {
+	return TypedActorOwnershipTransferRow{
+		ID:     TypedActorOwnershipRaceSafetyRejectionMatrix,
+		Name:   "Race-safety conservative rejection matrix",
+		Status: TypedActorOwnershipImplementedNarrow,
+		RequiredFacts: []string{
+			"local immutable payloads copy safely across actor/task boundaries",
+			"owned moved payloads consume sender access",
+			"borrowed views rejected unless explicitly copied",
+			"mutable global targets rejected across actor/task boundaries",
+			"unsafe pointer payloads rejected without audited contract",
+			"island region transfer deferred to actor/island proof",
+		},
+		Evidence: "compiler/tests/ownership/actor_task_ownership_test.go::TestReleaseTraceabilityLifetimeAndRaceSafetyNegativeActorTaskOwnership; compiler/internal/actorsafety/sendability_test.go::TestBorrowedSliceAcrossActorBoundaryRejectsUnlessCopied; compiler/internal/actorsafety/sendability_test.go::TestOwnedRegionMustMoveAndSenderUseAfterMoveRejects; compiler/internal/actorsafety/sendability_test.go::TestUnsafePointerRequiresAuditedContract; compiler/internal/semantics/memory_boundary_handoff_test.go::TestMemoryBoundaryHandoffCoverageRecordsActorTaskIslandFacts; tools/cmd/parallel-production-smoke/main.go::runCompilerEvidence",
+		Boundary: "matrix records conservative compiler/report evidence for race-prone actor/task/thread transfers; it is not a lock/atomic shared-memory model, not a formal race proof, and not an actor/island production transfer promotion",
 	}
 }
 

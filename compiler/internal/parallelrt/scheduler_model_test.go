@@ -3,6 +3,7 @@ package parallelrt
 import (
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 
 	"tetra_language/compiler/internal/stdlibrt"
@@ -140,20 +141,40 @@ func TestPrototypeBenchmarksReportFanoutAndZeroCopyRows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rows) != 2 {
-		t.Fatalf("PrototypeBenchmarks returned %d rows, want 2", len(rows))
+	if len(rows) != 5 {
+		t.Fatalf("PrototypeBenchmarks returned %d rows, want 5", len(rows))
 	}
 	byName := map[string]PrototypeBenchmark{}
 	for _, row := range rows {
 		byName[row.Name] = row
+		if row.ClaimTier != "tier0_local_smoke_only" || row.Ran || !row.Pass {
+			t.Fatalf("row %s tier/ran/pass = %q/%v/%v, want Tier 0 dry-run pass", row.Name, row.ClaimTier, row.Ran, row.Pass)
+		}
+		if row.ImprovementRatio != 0 || row.BaselineValue != 0 || row.MeasuredValue != 0 {
+			t.Fatalf("row %s recorded measured values in Tier 0 prep: %#v", row.Name, row)
+		}
+		if len(row.RawOutputArtifacts) == 0 {
+			t.Fatalf("row %s missing raw output artifact refs", row.Name)
+		}
 	}
-	fanout := byName["actor ping-pong fanout scheduler prototype"]
-	if fanout.Kind != "scheduler" || fanout.Metric != "max_queue_depth" || fanout.BaselineValue != 4 || fanout.MeasuredValue != 2 || fanout.ImprovementRatio != 2 {
-		t.Fatalf("fanout benchmark = %#v, want 4-to-2 work-stealing comparison", fanout)
+	for _, want := range []string{
+		"actor ping-pong benchmark prep",
+		"actor fanout/fanin benchmark prep",
+		"actor mailbox throughput benchmark prep",
+		"actor backpressure latency benchmark prep",
+		"zero_copy_move local typed mailbox benchmark prep",
+	} {
+		if _, ok := byName[want]; !ok {
+			t.Fatalf("missing benchmark prep row %q: %#v", want, rows)
+		}
 	}
-	zeroCopy := byName["zero-copy region message scheduler prototype"]
-	if zeroCopy.Kind != "transfer" || zeroCopy.Metric != "bytes_copied" || zeroCopy.BaselineValue != 4096 || zeroCopy.MeasuredValue != 0 || zeroCopy.ImprovementRatio != 4096 {
-		t.Fatalf("zero-copy benchmark = %#v, want 4096-to-0 bytes_copied comparison", zeroCopy)
+	fanout := byName["actor fanout/fanin benchmark prep"]
+	if fanout.Kind != "actor_benchmark_prep" || !strings.Contains(fanout.Evidence, "work stealing") {
+		t.Fatalf("fanout benchmark = %#v, want work-stealing Tier 0 prep row", fanout)
+	}
+	zeroCopy := byName["zero_copy_move local typed mailbox benchmark prep"]
+	if zeroCopy.Kind != "actor_transfer_prep" || !strings.Contains(zeroCopy.Evidence, "zero_copy_move") || strings.Contains(strings.ToLower(zeroCopy.Claim), "production runtime claim") {
+		t.Fatalf("zero-copy benchmark = %#v, want scoped zero_copy_move prep nonclaim", zeroCopy)
 	}
 }
 

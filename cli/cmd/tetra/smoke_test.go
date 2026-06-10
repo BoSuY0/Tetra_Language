@@ -256,6 +256,33 @@ func TestSmokeCommandKeepsInvalidDoubleFreeOutOfDebugList(t *testing.T) {
 	}
 }
 
+func TestSmokeCommandDefinesIslandsDebugScopeRows(t *testing.T) {
+	rows := islandsDebugScopeRows()
+	required := map[string]string{
+		"overflow_trap":  "live_trap",
+		"double_free":    "static_only_nonclaim",
+		"use_after_free": "static_only_nonclaim",
+		"stale_epoch":    "static_only_nonclaim",
+		"wrong_island":   "static_only_nonclaim",
+	}
+	for _, row := range rows {
+		wantStatus, ok := required[row.Name]
+		if !ok {
+			t.Fatalf("unexpected islands debug scope row: %#v", row)
+		}
+		if row.Status != wantStatus || row.Evidence == "" || row.Reason == "" {
+			t.Fatalf("islands debug scope row %s = %#v, want status %s with evidence/reason", row.Name, row, wantStatus)
+		}
+		if row.Status == "static_only_nonclaim" && !strings.Contains(row.Reason, "no live") {
+			t.Fatalf("static-only scope row %s reason missing no-live nonclaim: %q", row.Name, row.Reason)
+		}
+		delete(required, row.Name)
+	}
+	if len(required) != 0 {
+		t.Fatalf("missing islands debug scope rows: %#v", required)
+	}
+}
+
 func TestSmokeCommandListsWASMRuntimeTargets(t *testing.T) {
 	for _, target := range []string{"wasm32-wasi", "wasm32-web"} {
 		var report struct {

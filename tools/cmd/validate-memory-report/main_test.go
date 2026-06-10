@@ -734,6 +734,25 @@ func TestValidateMemoryReportRejectsUnsafeUnknownTrustedStorage(t *testing.T) {
 	}
 }
 
+func TestValidateMemoryReportRejectsUnsafeVerifiedRootTrustedStorage(t *testing.T) {
+	for _, storage := range []string{"Stack", "Region", "FunctionTempRegion"} {
+		t.Run(storage, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "memory-report.json")
+			raw := strings.Replace(validSchemaV1MemoryReport(), `"planned_storage": "Heap"`, `"planned_storage": "`+storage+`"`, 1)
+			raw = strings.Replace(raw, `"actual_lowering_storage": "Heap"`, `"actual_lowering_storage": "`+storage+`"`, 1)
+			raw = strings.Replace(raw, `"lowered_artifact_id": "ir:main:alloc_bytes:0"`, `"lowered_artifact_id": "ir:main:ffi:`+storage+`"`, 1)
+			raw = strings.Replace(raw, `"reason": "verified core.alloc_bytes root"`, `"reason": "raw FFI root must not become trusted storage"`, 1)
+			if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			err := validateMemoryReport(path)
+			if err == nil || !strings.Contains(err.Error(), "unsafe_verified_root") || !strings.Contains(err.Error(), "trusted storage") {
+				t.Fatalf("validateMemoryReport error = %v, want unsafe_verified_root trusted-storage rejection", err)
+			}
+		})
+	}
+}
+
 func TestValidateMemoryReportAcceptsConservativeUnknownRawPointer(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory-report.json")
 	if err := os.WriteFile(path, []byte(conservativeUnknownRawPointerReport()), 0o644); err != nil {

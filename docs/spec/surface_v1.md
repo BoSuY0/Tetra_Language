@@ -19,6 +19,78 @@ Tetra Surface replaces the metadata-first UI direction for new work. Existing
 `ui.metadata-v1` remains a legacy compatibility surface until Surface has
 strict validator evidence.
 
+## Block-First Surface System Direction
+
+The next Surface architecture track is the experimental
+`ui.surface-block-system`: a Block-first Surface architecture where `Block` is
+the core Surface primitive for layout, paint, text, images/assets,
+input/events, state selectors, motion, and accessibility metadata. This remains
+experimental and is not current Surface v1 production support. The current
+evidence is scoped to same-commit `tetra.surface.block-system.gate.v1` reports,
+validators, artifact hashes, and Block memory-budget evidence under
+`reports/surface-block/p18-budget`; it does not create a production Block
+claim.
+
+In that model, a button-like, card-like, input-like, sidebar-like, or modal-like
+control is a `Block` configuration with properties and behavior. `Button`,
+`TextBox`, `Panel`, `Row`, `Column`, `Stack`, `Scroll`, `Checkbox`, and similar
+helpers remain release-supported Surface v1 helpers today, but the Block System
+requires them to become recipes/compatibility over Block instead of primary
+architecture.
+
+Block System beauty comes from primitive composition rather than imported
+browser machinery: layered paint, rounded corners, borders, shadows, opacity,
+clips, typography, local assets, hover/pressed/focus/selected/disabled/error
+states, deterministic transitions, and accessibility metadata all resolve from
+the same Block graph. The Block System still forbids Electron, Chromium, React,
+DOM UI, a CSS runtime, user JavaScript app logic, Qt, GTK, Cocoa, WinUI, and
+platform-native widgets as user-facing UI dependencies.
+
+Current Block-system reports also carry a conservative
+`block_system.memory_budget` section. That section is local release evidence
+for the reported Block scene: Block count, stress Block count, render/state
+loop counts, frame buffer bytes, paint/text/asset cache usage, cache budgets,
+and an explicit performance nonclaim. RSS is optional host evidence and is not
+required for this scoped budget. This is not an official benchmark against
+Electron or any other desktop shell.
+
+The strict Block gate is:
+
+```sh
+bash scripts/release/surface/block-system-gate.sh \
+  --report-dir reports/surface-block/p18-budget
+```
+
+Passing that gate proves the scoped headless, linux-x64 real-window, and
+wasm32-web browser-canvas Block reports for the same commit. It does not promote
+Block to production support.
+
+### Experimental Block Data Model
+
+`lib.core.block` is the first Block System code slice. It is a copy-safe data
+model only: `BlockID`, `Block`, `BlockProps`, `LayoutSpec`, `PaintSpec`,
+`PaintLayer`, `TextSpec`, `ImageSpec`, `InputSpec`, `EventSpec`, `StateSpec`,
+`StateSelector`, `MotionSpec`, `AccessibilitySpec`, and `AssetRef`. By itself,
+this module remains a data model rather than a production widget toolkit. The
+separate Block-system gate now proves scoped graph/runtime/renderer/report
+evidence for the current Block scenes and targets, but that evidence is still
+experimental and bounded to the reported release artifacts.
+
+Builder-style authoring uses ordinary Tetra values:
+
+```text
+import lib.core.surface as surface
+import lib.core.block as block
+
+let rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 320, h: 200)
+let id: block.BlockID = block.id(1)
+let paint: block.PaintSpec =
+    block.paint_from_layer(block.paint_layer_fill(surface.Color(r: 24, g: 32, b: 40, a: 255)))
+let props: block.BlockProps =
+    block.props(block.layout_fixed(rect), paint, block.text_label(18, surface.Color(r: 238, g: 242, b: 246, a: 255)), block.image_none(), block.input_clickable(), block.event_click(block.action_primary()), block.state_interactive(), block.motion_fast(), block.accessibility_button(18), block.asset_none())
+let root: block.Block = block.make(id, block.id_none(), props)
+```
+
 ## Principles
 
 - User UI code is pure Tetra. No user JavaScript, HTML UI, React, DOM widget

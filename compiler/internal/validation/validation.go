@@ -60,6 +60,13 @@ type ProofTerm struct {
 	FactsUsed     []string `json:"facts_used,omitempty"`
 }
 
+type plirProofUseEvidence struct {
+	ProofID string
+	OpID    string
+	OpKind  plir.OperationKind
+	OpNote  string
+}
+
 type TranslationReport struct {
 	FunctionsCompared   int      `json:"functions_compared"`
 	Functions           []string `json:"functions,omitempty"`
@@ -168,6 +175,8 @@ func CheckBoundsProofsWithPLIR(prog *ir.IRProgram, proofProg *plir.Program) (Pro
 	}
 	guards := map[string]map[string]bool{}
 	terms := map[string]map[string]plir.ProofTerm{}
+	ops := map[string]map[string]plir.Operation{}
+	uses := map[string]map[string][]plirProofUseEvidence{}
 	for _, fn := range proofProg.Funcs {
 		if guards[fn.Name] == nil {
 			guards[fn.Name] = map[string]bool{}
@@ -175,11 +184,31 @@ func CheckBoundsProofsWithPLIR(prog *ir.IRProgram, proofProg *plir.Program) (Pro
 		if terms[fn.Name] == nil {
 			terms[fn.Name] = map[string]plir.ProofTerm{}
 		}
+		if ops[fn.Name] == nil {
+			ops[fn.Name] = map[string]plir.Operation{}
+		}
+		if uses[fn.Name] == nil {
+			uses[fn.Name] = map[string][]plirProofUseEvidence{}
+		}
 		for _, guard := range fn.ProofGuards {
 			guards[fn.Name][guard.ID] = true
 		}
+		for _, op := range fn.Ops {
+			ops[fn.Name][op.ID] = op
+		}
 		for _, term := range fn.ProofTerms {
 			terms[fn.Name][term.ID] = term
+		}
+		for _, use := range fn.ProofUses {
+			if use.UseKind == "bounds_check" {
+				evidence := plirProofUseEvidence{ProofID: use.ProofID, OpID: use.OpID}
+				if use.OpID != "" {
+					op := ops[fn.Name][use.OpID]
+					evidence.OpKind = op.Kind
+					evidence.OpNote = op.Note
+				}
+				uses[fn.Name][use.ProofID] = append(uses[fn.Name][use.ProofID], evidence)
+			}
 		}
 	}
 	for i := range report.RemovedChecks {
@@ -187,13 +216,63 @@ func CheckBoundsProofsWithPLIR(prog *ir.IRProgram, proofProg *plir.Program) (Pro
 		if !guards[removed.Function][removed.ProofID] {
 			return report, fmt.Errorf("proof checker: %s removed bounds check proof id %q not found in PLIR proof guards", removed.Function, removed.ProofID)
 		}
+		proofUses := uses[removed.Function][removed.ProofID]
+		if len(proofUses) == 0 {
+			return report, fmt.Errorf("proof checker: %s removed bounds check proof id %q has no dominated PLIR proof use", removed.Function, removed.ProofID)
+		}
 		term, ok := terms[removed.Function][removed.ProofID]
 		if !ok {
 			return report, fmt.Errorf("proof checker: %s removed bounds check proof id %q has no typed proof term", removed.Function, removed.ProofID)
 		}
+		if want := expectedProofOperationForRemovedCheck(*removed); want != "" && term.Operation != want {
+			return report, fmt.Errorf("proof checker: %s removed bounds check proof id %q operation %q does not match %q", removed.Function, removed.ProofID, term.Operation, want)
+		}
+		if want := expectedProofOperationForRemovedCheck(*removed); want != "" && !proofUsesContainOperation(proofUses, want) {
+			return report, fmt.Errorf("proof checker: %s removed bounds check proof id %q proof use operation does not match %q", removed.Function, removed.ProofID, want)
+		}
 		removed.ProofTerm = validationProofTermFromPLIR(term)
 	}
 	return report, nil
+}
+
+func expectedProofOperationForRemovedCheck(removed RemovedCheck) string {
+	switch {
+	case strings.HasSuffix(removed.Kind, ".load"):
+		return "index_load"
+	case strings.HasSuffix(removed.Kind, ".store"):
+		return "index_store"
+	default:
+		return ""
+	}
+}
+
+func proofUsesContainOperation(uses []plirProofUseEvidence, operation string) bool {
+	for _, use := range uses {
+		if proofUseOperationMatches(use, operation) {
+			return true
+		}
+	}
+	return false
+}
+
+func proofUseOperationMatches(use plirProofUseEvidence, operation string) bool {
+	switch operation {
+	case "index_load":
+		switch use.OpKind {
+		case plir.OpIndexLoad:
+			return true
+		case plir.OpForSlice:
+			return strings.HasPrefix(use.ProofID, "proof:for-collection")
+		case plir.OpAllocIntent, plir.OpCall:
+			return strings.HasPrefix(use.ProofID, "proof:copy-loop:") && strings.Contains(use.OpNote, "copy")
+		default:
+			return false
+		}
+	case "index_store":
+		return use.OpKind == plir.OpIndexStore
+	default:
+		return false
+	}
 }
 
 func validationProofTermFromPLIR(term plir.ProofTerm) *ProofTerm {
@@ -630,6 +709,9 @@ func stepExplicitIslandLifetimeState(fn ir.IRFunc, cur islandLifetimeState, labe
 		if freed[tag] {
 			return nil, fmt.Errorf("allocation lowering validation: %s instruction %d explicit island reset after free for %s", fn.Name, cur.idx, tag)
 		}
+		if live := firstLiveIslandSliceForHandle(stack, locals, tag); live != "" {
+			return nil, fmt.Errorf("allocation lowering validation: %s instruction %d explicit island reset while live slice %s still references %s", fn.Name, cur.idx, live, tag)
+		}
 		freed[tag] = true
 		stack = append(rest, explicitIslandHandleTag(fn.Name, cur.idx))
 	case ir.IRIslandMakeSliceU8, ir.IRIslandMakeSliceU16, ir.IRIslandMakeSliceI32:
@@ -990,6 +1072,18 @@ func firstEscapingTrackedExplicitIslandSlice(tags []string, expected map[string]
 			continue
 		}
 		return name
+	}
+	return ""
+}
+
+func firstLiveIslandSliceForHandle(stack []string, locals []string, handleTag string) string {
+	for _, tags := range [][]string{stack, locals} {
+		for _, tag := range tags {
+			name, tagHandle, ok := islandSliceTagParts(tag)
+			if ok && tagHandle == handleTag {
+				return name
+			}
+		}
 	}
 	return ""
 }

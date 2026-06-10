@@ -87,10 +87,141 @@ uses mem:
     let _: Int = rect(ctx, marker, color)
     return 0
 
+func text_command_measure() -> Int:
+    return 7
+
+func text_command_render() -> Int:
+    return 8
+
+func text_command_caret() -> Int:
+    return 9
+
+func text_glyph_run(ctx: inout DrawContext, bounds: surface.Rect, text_len: Int, char_width: Int, line_height: Int, color: surface.Color) -> Int
+uses mem:
+    var safe_char_width: Int = char_width
+    if safe_char_width <= 0:
+        safe_char_width = 8
+    var safe_line_height: Int = line_height
+    if safe_line_height <= 0:
+        safe_line_height = 16
+    var x: Int = bounds.x
+    var y: Int = bounds.y + safe_line_height / 2
+    var i: Int = 0
+    while i < text_len:
+        if x + safe_char_width > bounds.x + bounds.w:
+            x = bounds.x
+            y = y + safe_line_height
+        if y >= bounds.y + bounds.h:
+            let ellipsis_marker: surface.Rect = surface.Rect(x: bounds.x + bounds.w - safe_char_width, y: bounds.y + bounds.h - 6, w: safe_char_width, h: 4)
+            let _ellipsis: Int = rect(ctx, ellipsis_marker, color)
+            return text_command_render() + _ellipsis - _ellipsis
+        let glyph: surface.Rect = surface.Rect(x: x, y: y, w: safe_char_width - 1, h: 5)
+        let _glyph: Int = rect(ctx, glyph, color)
+        x = x + safe_char_width
+        i = i + 1
+    return text_command_render()
+
+func text_caret(ctx: inout DrawContext, x: Int, y: Int, height: Int, color: surface.Color) -> Int
+uses mem:
+    let caret: surface.Rect = surface.Rect(x: x, y: y, w: 2, h: height)
+    let _: Int = rect(ctx, caret, color)
+    return text_command_caret()
+
+func paint_command_none() -> Int:
+    return 0
+
+func paint_command_fill() -> Int:
+    return 1
+
+func paint_command_gradient() -> Int:
+    return 2
+
+func paint_command_border() -> Int:
+    return 3
+
+func paint_command_shadow() -> Int:
+    return 4
+
+func paint_command_outline() -> Int:
+    return 6
+
+func rounded_rect(ctx: inout DrawContext, r: surface.Rect, radius: Int, color: surface.Color) -> Int
+uses mem:
+    let clipped: Int = clamp_radius(radius, r.w, r.h)
+    if clipped <= 0:
+        let _: Int = rect(ctx, r, color)
+        return paint_command_fill()
+    let center: surface.Rect = surface.Rect(x: r.x + clipped, y: r.y, w: r.w - clipped * 2, h: r.h)
+    let middle: surface.Rect = surface.Rect(x: r.x, y: r.y + clipped, w: r.w, h: r.h - clipped * 2)
+    let left_top: surface.Rect = surface.Rect(x: r.x + clipped / 2, y: r.y + clipped / 2, w: clipped / 2 + 1, h: clipped / 2 + 1)
+    let right_top: surface.Rect = surface.Rect(x: r.x + r.w - clipped - 1, y: r.y + clipped / 2, w: clipped / 2 + 1, h: clipped / 2 + 1)
+    let left_bottom: surface.Rect = surface.Rect(x: r.x + clipped / 2, y: r.y + r.h - clipped - 1, w: clipped / 2 + 1, h: clipped / 2 + 1)
+    let right_bottom: surface.Rect = surface.Rect(x: r.x + r.w - clipped - 1, y: r.y + r.h - clipped - 1, w: clipped / 2 + 1, h: clipped / 2 + 1)
+    let _center: Int = rect(ctx, center, color)
+    let _middle: Int = rect(ctx, middle, color)
+    let _lt: Int = rect(ctx, left_top, color)
+    let _rt: Int = rect(ctx, right_top, color)
+    let _lb: Int = rect(ctx, left_bottom, color)
+    let _rb: Int = rect(ctx, right_bottom, color)
+    return paint_command_fill() + _center - _center + _middle - _middle + _lt - _lt + _rt - _rt + _lb - _lb + _rb - _rb
+
+func rounded_rect_outline(ctx: inout DrawContext, r: surface.Rect, radius: Int, width: Int, color: surface.Color) -> Int
+uses mem:
+    var i: Int = 0
+    var stroke_width: Int = width
+    if stroke_width <= 0:
+        stroke_width = 1
+    while i < stroke_width:
+        let rr: surface.Rect = surface.Rect(x: r.x + i, y: r.y + i, w: r.w - i * 2, h: r.h - i * 2)
+        let _: Int = rect_outline(ctx, rr, color)
+        i = i + 1
+    if radius > 0:
+        let marker: surface.Rect = surface.Rect(x: r.x + radius / 2, y: r.y + radius / 2, w: 1, h: 1)
+        let _corner: Int = rect(ctx, marker, color)
+    return paint_command_border()
+
+func rounded_rect_outer_outline(ctx: inout DrawContext, r: surface.Rect, radius: Int, width: Int, color: surface.Color) -> Int
+uses mem:
+    let _: Int = rounded_rect_outline(ctx, r, radius, width, color)
+    return paint_command_outline()
+
+func linear_gradient_rect(ctx: inout DrawContext, r: surface.Rect, start: surface.Color, end: surface.Color) -> Int
+uses mem:
+    let top_h: Int = r.h / 2
+    let top: surface.Rect = surface.Rect(x: r.x, y: r.y, w: r.w, h: top_h)
+    let bottom: surface.Rect = surface.Rect(x: r.x, y: r.y + top_h, w: r.w, h: r.h - top_h)
+    let _top: Int = rect(ctx, top, start)
+    let _bottom: Int = rect(ctx, bottom, end)
+    return paint_command_gradient() + _top - _top + _bottom - _bottom
+
+func box_shadow_approx(ctx: inout DrawContext, r: surface.Rect, radius: Int, blur: Int, offset_x: Int, offset_y: Int, color: surface.Color) -> Int
+uses mem:
+    var spread: Int = blur / 4
+    if spread < 1:
+        spread = 1
+    let outer: surface.Rect = surface.Rect(x: r.x + offset_x - spread, y: r.y + offset_y - spread, w: r.w + spread * 2, h: r.h + spread * 2)
+    let middle: surface.Rect = surface.Rect(x: r.x + offset_x - spread / 2, y: r.y + offset_y - spread / 2, w: r.w + spread, h: r.h + spread)
+    let _outer: Int = rounded_rect(ctx, outer, radius + spread, color)
+    let _middle: Int = rounded_rect(ctx, middle, radius + spread / 2, color)
+    return paint_command_shadow() + _outer - _outer + _middle - _middle
+
 func min_i32(a: Int, b: Int) -> Int:
     if a < b:
         return a
     return b
+
+func max_i32(a: Int, b: Int) -> Int:
+    if a > b:
+        return a
+    return b
+
+func clamp_radius(radius: Int, w: Int, h: Int) -> Int:
+    if radius <= 0:
+        return 0
+    let max_radius: Int = min_i32(w / 2, h / 2)
+    if radius > max_radius:
+        return max_i32(max_radius, 0)
+    return radius
 
 func abs_i32(value: Int) -> Int:
     if value < 0:

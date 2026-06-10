@@ -58,24 +58,30 @@ const (
 )
 
 type BuildOptions struct {
-	Jobs              int
-	IslandsDebug      bool
-	DebugInfo         bool
-	ReleaseOptimize   bool
-	Explain           bool
-	EmitPLIR          bool
-	EmitProof         bool
-	EmitAllocReport   bool
-	EmitBoundsReport  bool
-	EmitMemoryReport  bool
-	Emit              EmitMode
-	Runtime           RuntimeMode
-	RuntimeObjectPath string
-	LinkObjectPaths   []string
-	ProjectRoot       string
-	SourceRoots       []string
-	DependencyRoots   []ModuleRoot
-	InterfaceOnly     bool
+	Jobs                  int
+	IslandsDebug          bool
+	DebugInfo             bool
+	ReleaseOptimize       bool
+	Explain               bool
+	EmitPLIR              bool
+	EmitProof             bool
+	EmitAllocReport       bool
+	EmitBoundsReport      bool
+	EmitMemoryReport      bool
+	EmitRAMContractReport bool
+	FailIfHeap            bool
+	FailIfCopy            bool
+	FailIfUnbounded       bool
+	MemoryBudgetBytes     int64
+	RAMContractFile       string
+	Emit                  EmitMode
+	Runtime               RuntimeMode
+	RuntimeObjectPath     string
+	LinkObjectPaths       []string
+	ProjectRoot           string
+	SourceRoots           []string
+	DependencyRoots       []ModuleRoot
+	InterfaceOnly         bool
 }
 
 type BuildStats struct {
@@ -1653,6 +1659,8 @@ func rejectUnsupportedWASMRuntimeBuiltins(funcs []IRFunc, target string) error {
 
 func wasmRuntimeNameForBuiltin(name string, target string) (string, bool) {
 	switch {
+	case name == "__tetra_actor_node_connect", name == "__tetra_actor_spawn_remote", name == "__tetra_actor_node_status":
+		return "distributed actors", true
 	case strings.HasPrefix(name, "__tetra_actor_"):
 		return "actors", true
 	case strings.HasPrefix(name, "__tetra_task_"):

@@ -72,7 +72,7 @@ func TestPerCoreSchedulerCoverageCoversP18PlanList(t *testing.T) {
 	requirePerCoreFacts(t, byID[PerCoreSchedulerStructuredTaskGroups], "structured task groups", "__tetra_task_group_open", "__tetra_task_group_close")
 	requirePerCoreFacts(t, byID[PerCoreSchedulerCancellationCheckpoints], "cancellation checkpoints", "__tetra_task_checkpoint", "nested cancellation propagation")
 	requirePerCoreFacts(t, byID[PerCoreSchedulerActorPingPong], "actor ping-pong", "actors_pingpong.tetra", "task actor mailbox handoff")
-	requirePerCoreFacts(t, byID[PerCoreSchedulerFanoutFanin], "fanout/fanin", "actor ping-pong fanout scheduler prototype", "work stealing")
+	requirePerCoreFacts(t, byID[PerCoreSchedulerFanoutFanin], "fanout/fanin", "actor fanout/fanin benchmark prep", "work stealing")
 	requirePerCoreFacts(t, byID[PerCoreSchedulerTaskGroupCancel], "task group cancel", "cancel wakes deadline join", "cancellation storm")
 	requirePerCoreFacts(t, byID[PerCoreSchedulerBackpressureOverflow], "backpressure overflow", "ErrMailboxFull", "TestActorRuntimeBuiltinCapacityLimitReturnsNoExtraActor")
 	requirePerCoreFacts(t, byID[PerCoreSchedulerMailboxFairness], "mailbox fairness", "FIFO receive", "actor_self_mailbox_service")

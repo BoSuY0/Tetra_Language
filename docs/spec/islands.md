@@ -30,6 +30,16 @@ Target boundary (current profile):
 - **Double-free is undefined behavior** by default (the memory is already deallocated, so accessing the header is invalid)
 - With `--islands-debug`, double-free is detected and the data pages are protected to catch use-after-free
 
+### Release Evidence Boundary
+
+Current Memory/Islands release claims require `validate-island-proof`,
+`--islands-debug` sanitizer smoke, `island-proof-fuzz-summary` mutation
+evidence, and the integrated
+`memory-islands-surface-production-gate.sh` manifest/hash path documented in
+`docs/release/memory_islands_surface_scope.md`. Producer-only proof rows,
+missing verifier artifacts, missing sanitizer smoke, or missing proof-fuzz
+evidence are not release proof.
+
 ---
 
 ## 2. Type System

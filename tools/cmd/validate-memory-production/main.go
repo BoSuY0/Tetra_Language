@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"tetra_language/tools/validators/islandproof"
 	"tetra_language/tools/validators/memoryprod"
 )
 
@@ -72,6 +73,7 @@ func main() {
 	reportPath := flag.String("report", "", "path to tetra.memory.production.v1 JSON report")
 	manifestPath := flag.String("manifest", "", "path to tetra.memory.release-manifest.v1 JSON manifest")
 	reportDir := flag.String("report-dir", "", "memory release report directory")
+	currentGitHead := flag.String("current-git-head", "", "optional current git HEAD to require in release manifest provenance")
 	flag.Parse()
 	if *reportPath == "" {
 		fmt.Fprintln(os.Stderr, "error: --report is required")
@@ -87,7 +89,7 @@ func main() {
 		if root == "" {
 			root = filepath.Dir(*manifestPath)
 		}
-		err = validateMemoryProductionReleaseManifest(*reportPath, *manifestPath, root)
+		err = validateMemoryProductionReleaseManifest(*reportPath, *manifestPath, root, *currentGitHead)
 	} else {
 		err = validateMemoryProductionReport(*reportPath)
 	}
@@ -105,7 +107,7 @@ func validateMemoryProductionReport(path string) error {
 	return memoryprod.ValidateReport(raw)
 }
 
-func validateMemoryProductionReleaseManifest(reportPath string, manifestPath string, reportDir string) error {
+func validateMemoryProductionReleaseManifest(reportPath string, manifestPath string, reportDir string, currentGitHead string) error {
 	if strings.TrimSpace(manifestPath) == "" {
 		return fmt.Errorf("--manifest is required for release provenance validation")
 	}
@@ -145,18 +147,19 @@ func validateMemoryProductionReleaseManifest(reportPath string, manifestPath str
 	if err := decodeMemoryReleaseStrictJSON(raw, &manifest); err != nil {
 		return err
 	}
-	issues = append(issues, validateMemoryReleaseManifestEnvelope(manifest)...)
+	issues = append(issues, validateMemoryReleaseManifestEnvelope(manifest, currentGitHead)...)
 	issues = append(issues, validateMemoryReleaseCommands(manifest.Commands)...)
 	required := requiredMemoryReleaseArtifacts()
 	issues = append(issues, validateMemoryReleaseArtifacts(reportDirAbs, manifest, required)...)
 	issues = append(issues, validateMemoryReleaseHashManifest(reportDirAbs, manifest.HashManifest, required)...)
+	issues = append(issues, validateMemoryReleaseIslandProofVerifier(reportDirAbs, manifest)...)
 	if len(issues) > 0 {
 		return errors.New(strings.Join(issues, "; "))
 	}
 	return nil
 }
 
-func validateMemoryReleaseManifestEnvelope(manifest memoryReleaseManifest) []string {
+func validateMemoryReleaseManifestEnvelope(manifest memoryReleaseManifest, currentGitHead string) []string {
 	var issues []string
 	if manifest.Schema != memoryReleaseManifestSchema {
 		issues = append(issues, fmt.Sprintf("release manifest schema is %q, want %q", manifest.Schema, memoryReleaseManifestSchema))
@@ -166,6 +169,14 @@ func validateMemoryReleaseManifestEnvelope(manifest memoryReleaseManifest) []str
 	}
 	if !isMemoryReleaseGitHead(manifest.GitHead) {
 		issues = append(issues, "release manifest git_head must be a 40-character lowercase hex commit")
+	}
+	currentGitHead = strings.TrimSpace(currentGitHead)
+	if currentGitHead != "" {
+		if !isMemoryReleaseGitHead(currentGitHead) {
+			issues = append(issues, "current git head must be a 40-character lowercase hex commit")
+		} else if manifest.GitHead != currentGitHead {
+			issues = append(issues, fmt.Sprintf("release manifest git_head %s does not match current git head %s", manifest.GitHead, currentGitHead))
+		}
 	}
 	if _, err := time.Parse(time.RFC3339, manifest.GeneratedAt); err != nil {
 		issues = append(issues, fmt.Sprintf("release manifest generated_at must be RFC3339: %v", err))
@@ -186,6 +197,7 @@ func validateMemoryReleaseCommands(commands []memoryReleaseCommand) []string {
 		"validate-targets":            "go run ./tools/cmd/validate-targets",
 		"memory-fuzz-short":           "go run ./tools/cmd/memory-fuzz-short",
 		"validate-memory-fuzz-oracle": "go run ./tools/cmd/validate-memory-fuzz-oracle",
+		"island-proof-verifier":       "go run ./tools/cmd/validate-island-proof",
 		"artifact-hashes-write":       "go run ./tools/cmd/validate-artifact-hashes --write",
 		"artifact-hashes-validate":    "go run ./tools/cmd/validate-artifact-hashes --manifest",
 	}
@@ -397,6 +409,27 @@ func requiredMemoryReleaseArtifacts() []requiredMemoryReleaseArtifact {
 			RequireHash:     true,
 		},
 		{
+			Kind:            "memory_fuzz_island_proof_summary",
+			Path:            "memory-fuzz-tier1/island-proof-fuzz-summary.json",
+			Schema:          "tetra.island-proof-fuzz-summary.v1",
+			CommandFragment: "go run ./tools/cmd/memory-fuzz-short",
+			RequireHash:     true,
+		},
+		{
+			Kind:            "island_proof_verifier_report",
+			Path:            "island-proof-verifier.json",
+			Schema:          islandproof.SchemaV1,
+			CommandFragment: "go run ./tools/cmd/validate-island-proof",
+			RequireHash:     true,
+		},
+		{
+			Kind:            "island_proof_memory_report",
+			Path:            "island-proof-memory-report.json",
+			Schema:          "tetra.memory-report.v1",
+			CommandFragment: "go run ./tools/cmd/validate-island-proof",
+			RequireHash:     true,
+		},
+		{
 			Kind:            "artifact_hash_manifest",
 			Path:            "artifact-hashes.json",
 			Schema:          memoryReleaseHashSchema,
@@ -404,6 +437,32 @@ func requiredMemoryReleaseArtifacts() []requiredMemoryReleaseArtifact {
 			RequireHash:     false,
 		},
 	}
+}
+
+func validateMemoryReleaseIslandProofVerifier(reportDir string, manifest memoryReleaseManifest) []string {
+	proofPath := filepath.Join(reportDir, "island-proof-verifier.json")
+	memoryPath := filepath.Join(reportDir, "island-proof-memory-report.json")
+	proofRaw, err := os.ReadFile(proofPath)
+	if err != nil {
+		return []string{fmt.Sprintf("island proof verifier artifact island-proof-verifier.json is missing: %v", err)}
+	}
+	memoryRaw, err := os.ReadFile(memoryPath)
+	if err != nil {
+		return []string{fmt.Sprintf("island proof verifier memory report island-proof-memory-report.json is missing: %v", err)}
+	}
+	manifestRaw, err := json.Marshal(manifest)
+	if err != nil {
+		return []string{fmt.Sprintf("island proof verifier manifest metadata cannot be encoded: %v", err)}
+	}
+	if err := islandproof.Validate(proofRaw, islandproof.Options{
+		MemoryReport:      memoryRaw,
+		Manifest:          manifestRaw,
+		CurrentGitHead:    manifest.GitHead,
+		RequireSameCommit: true,
+	}); err != nil {
+		return []string{fmt.Sprintf("island proof verifier validation failed: %v", err)}
+	}
+	return nil
 }
 
 func decodeMemoryReleaseStrictJSON(raw []byte, out any) error {

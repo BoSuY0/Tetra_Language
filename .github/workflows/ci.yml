@@ -254,6 +254,10 @@ jobs:
         shell: bash
         run: bash scripts/dev/bootstrap.sh
 
+      - name: Surface Morph gate
+        shell: bash
+        run: bash scripts/release/surface/morph-gate.sh --report-dir reports/surface-morph-gate
+
       - name: Surface release gate
         shell: bash
         run: bash scripts/release/surface/release-gate.sh --report-dir reports/surface-release-v1
@@ -292,9 +296,109 @@ jobs:
           name: tetra-surface-release-v1-${{ github.sha }}
           path: |
             reports/surface-release-v1
+            reports/surface-release-v1/block-system
+            reports/surface-release-v1/morph
+            reports/surface-morph-gate
             reports/surface-experimental-regression
             reports/safe-view-lifetime
             reports/surface-api-stability-v1
+
+  memory-islands-surface-release-readiness-linux:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.20.x"
+
+      - name: Bootstrap
+        shell: bash
+        run: bash scripts/dev/bootstrap.sh
+
+      - name: Integrated Memory/Islands/Surface release gate
+        shell: bash
+        run: bash scripts/release/post_v0_4/memory-islands-surface-production-gate.sh --report-dir reports/memory-islands-surface-production
+
+      - name: Upload integrated Memory/Islands/Surface release reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tetra-memory-islands-surface-${{ github.sha }}
+          path: reports/memory-islands-surface-production
+
+  actor-runtime-foundation-linux:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.20.x"
+
+      - name: Bootstrap
+        shell: bash
+        run: bash scripts/dev/bootstrap.sh
+
+      - name: Actor runtime foundation gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          export GOTELEMETRY=off
+          export GOCACHE="${PWD}/.cache/go-build-actor-runtime-foundation-ci"
+          export GOTMPDIR="${PWD}/.cache/go-tmp-actor-runtime-foundation-ci"
+          mkdir -p "$GOCACHE" "$GOTMPDIR"
+          bash scripts/release/post_v0_4/actor-runtime-foundation-linux-x64-gate.sh --report-dir reports/actor-runtime-foundation/final
+
+      - name: Upload actor runtime foundation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tetra-actor-runtime-foundation-${{ github.sha }}-linux-x64
+          path: |
+            reports/actor-runtime-foundation/final/actor-runtime-foundation-manifest.json
+            reports/actor-runtime-foundation/final/artifact-hashes.json
+            reports/actor-runtime-foundation/final/distributed-actors-linux-x64/distributed-actors-linux-x64.json
+            reports/actor-runtime-foundation/final/distributed-actors-linux-x64/artifact-hashes.json
+            reports/actor-runtime-foundation/final/parallel-production-linux-x64/parallel-production-linux-x64.json
+            reports/actor-runtime-foundation/final/parallel-production-linux-x64/artifact-hashes.json
+            reports/actor-runtime-foundation/final/logs/*.log
+
+  ram-contract-release-readiness-linux:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.20.x"
+
+      - name: Bootstrap
+        shell: bash
+        run: bash scripts/dev/bootstrap.sh
+
+      - name: RAM contract release gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          export GOTELEMETRY=off
+          export GOCACHE="${PWD}/.cache/go-build-ram-contract-ci"
+          export GOTMPDIR="${PWD}/.cache/go-tmp-ram-contract-ci"
+          mkdir -p "$GOCACHE" "$GOTMPDIR"
+          bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir reports/ram-contract-release
+
+      - name: Upload RAM contract release reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tetra-ram-contract-${{ github.sha }}-linux-x64
+          path: reports/ram-contract-release
 
   techempower-report-schemas-linux:
     if: github.event_name != 'schedule'

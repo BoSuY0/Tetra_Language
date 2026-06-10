@@ -137,7 +137,7 @@ uses io:
 | Release truth | `docs/spec/current_supported_surface.md` |
 | Core CLI workflow | `check`, `build` |
 | Tooling commands | `run`, `fmt`, `test`, `doc`, `doctor`, `targets`, `features`, `formats`, `lsp`, `workspace`, `smoke`, `eco` |
-| Memory evidence | `MemoryFactGraph`, `tetra.memory-report.v1`, and `tetra.memory-fuzz.oracle.v1` evidence; no broad "Memory 100%" claim |
+| Memory/Islands evidence | `MemoryFactGraph`, `tetra.memory-report.v1`, `validate-island-proof`, `--islands-debug`, proof-fuzz, leak/resource, and integrated `memory-islands-surface-production-gate.sh` evidence; no broad "Memory 100%" claim |
 | Async/tasks/actors | current local async/task/actor behavior with explicit support boundaries |
 | Targets | `linux-x64` is the production Linux baseline; macOS/Windows are build-only unless target evidence says otherwise |
 | Standard library | release-covered `lib.core.*` helpers plus explicit experimental surfaces |
@@ -156,6 +156,7 @@ uses io:
 | Standard library | `docs/user/standard_library_guide.md` |
 | Examples | `docs/user/examples_index.md` |
 | Current surface | `docs/spec/current_supported_surface.md` |
+| Memory/Islands/Surface release scope | `docs/release/memory_islands_surface_scope.md` |
 | Release gate | `scripts/release/v0_4_0/gate.sh` |
 | v1.0 scope | `docs/spec/v1_scope.md` |
 

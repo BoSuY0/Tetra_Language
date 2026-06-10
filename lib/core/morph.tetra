@@ -1,0 +1,343 @@
+// Experimental Surface Morph Capsule layer.
+// Morph recipes project into lib.core.block Blocks; they do not add runtime primitives.
+module lib.core.morph
+
+import lib.core.surface as surface
+import lib.core.block as block
+
+struct Capsule:
+    schema: Int
+    version: Int
+    token_graph_hash: Int
+    recipe_count: Int
+    explicit_imports: Bool
+    isolated_scope: Bool
+    no_global_cascade: Bool
+    alias_cycle_rejected: Bool
+    duplicate_recipe_rejected: Bool
+    output_kind: Int
+
+struct TokenRef:
+    category: Int
+    index: Int
+    hash: Int
+
+struct Material:
+    fill_hash: Int
+    border_hash: Int
+    radius_hash: Int
+    shadow_hash: Int
+    overlay_hash: Int
+    layer_count: Int
+    unsupported_blur: Bool
+    unsupported_blur_rejected: Bool
+
+struct Affordance:
+    role: Int
+    focusable: Bool
+    accepts_action: Bool
+    accepts_text: Bool
+    projects_accessibility: Bool
+
+struct StateLens:
+    selector_flags: Int
+    variant: Int
+    deterministic: Bool
+
+struct MotionPreset:
+    duration_ms: Int
+    easing: Int
+    deterministic_clock: Bool
+    reduced_motion_supported: Bool
+
+struct Recipe:
+    name_hash: Int
+    output_kind: Int
+    slot_count: Int
+    input_count: Int
+    hidden_app_state: Bool
+    platform_widgets: Bool
+    core_primitive_promotion: Bool
+    deterministic: Bool
+
+struct RecipeExpansion:
+    recipe_hash: Int
+    block_id: block.BlockID
+    output_kind: Int
+    slot_count: Int
+    reported: Bool
+    deterministic: Bool
+    used_block_graph: Bool
+
+func schema_v1() -> Int:
+    return 1001
+
+func output_block() -> Int:
+    return 1
+
+func output_platform_widget() -> Int:
+    return 20
+
+func output_core_primitive() -> Int:
+    return 30
+
+func token_color() -> Int:
+    return 1
+
+func token_space() -> Int:
+    return 2
+
+func token_radius() -> Int:
+    return 3
+
+func token_border() -> Int:
+    return 4
+
+func token_elevation() -> Int:
+    return 5
+
+func token_opacity() -> Int:
+    return 6
+
+func token_typography() -> Int:
+    return 7
+
+func token_motion() -> Int:
+    return 8
+
+func token_z() -> Int:
+    return 9
+
+func token_asset() -> Int:
+    return 10
+
+func token_density() -> Int:
+    return 11
+
+func recipe_control_action_hash() -> Int:
+    return 1101
+
+func recipe_field_text_hash() -> Int:
+    return 1102
+
+func recipe_command_item_hash() -> Int:
+    return 1103
+
+func recipe_region_panel_hash() -> Int:
+    return 1104
+
+func token_ref(category: Int, index: Int, hash: Int) -> TokenRef:
+    return TokenRef(category: category, index: index, hash: hash)
+
+func token_category_supported(category: Int) -> Bool:
+    return category == token_color() || category == token_space() ||
+           category == token_radius() || category == token_border() ||
+           category == token_elevation() || category == token_opacity() ||
+           category == token_typography() || category == token_motion() ||
+           category == token_z() || category == token_asset() ||
+           category == token_density()
+
+func token_valid(token: TokenRef) -> Bool:
+    return token_category_supported(token.category) && token.index >= 0 && token.hash > 0
+
+func capsule_default() -> Capsule:
+    return Capsule(schema: schema_v1(), version: 1, token_graph_hash: 760031, recipe_count: 4, explicit_imports: true, isolated_scope: true, no_global_cascade: true, alias_cycle_rejected: true, duplicate_recipe_rejected: true, output_kind: output_block())
+
+func capsule_valid(capsule: Capsule) -> Bool:
+    return capsule.schema == schema_v1() &&
+           capsule.version == 1 &&
+           capsule.token_graph_hash > 0 &&
+           capsule.recipe_count == 4 &&
+           capsule.explicit_imports &&
+           capsule.isolated_scope &&
+           capsule.no_global_cascade &&
+           capsule.alias_cycle_rejected &&
+           capsule.duplicate_recipe_rejected &&
+           capsule.output_kind == output_block()
+
+func material_panel() -> Material:
+    return Material(fill_hash: 2011, border_hash: 2012, radius_hash: 2013, shadow_hash: 2014, overlay_hash: 2015, layer_count: 5, unsupported_blur: false, unsupported_blur_rejected: true)
+
+func material_control() -> Material:
+    return Material(fill_hash: 2021, border_hash: 2022, radius_hash: 2023, shadow_hash: 2024, overlay_hash: 2025, layer_count: 4, unsupported_blur: false, unsupported_blur_rejected: true)
+
+func material_field() -> Material:
+    return Material(fill_hash: 2031, border_hash: 2032, radius_hash: 2033, shadow_hash: 2034, overlay_hash: 2035, layer_count: 3, unsupported_blur: false, unsupported_blur_rejected: true)
+
+func material_valid(material: Material) -> Bool:
+    return material.fill_hash > 0 &&
+           material.border_hash > 0 &&
+           material.radius_hash > 0 &&
+           material.shadow_hash > 0 &&
+           material.overlay_hash > 0 &&
+           material.layer_count > 0 &&
+           !material.unsupported_blur &&
+           material.unsupported_blur_rejected
+
+func affordance_action() -> Affordance:
+    return Affordance(role: block.accessibility_role_button(), focusable: true, accepts_action: true, accepts_text: false, projects_accessibility: true)
+
+func affordance_text_field() -> Affordance:
+    return Affordance(role: block.accessibility_role_textbox(), focusable: true, accepts_action: false, accepts_text: true, projects_accessibility: true)
+
+func affordance_region() -> Affordance:
+    return Affordance(role: block.accessibility_role_text(), focusable: false, accepts_action: false, accepts_text: false, projects_accessibility: true)
+
+func affordance_valid(affordance: Affordance) -> Bool:
+    return affordance.projects_accessibility &&
+           (affordance.role == block.accessibility_role_button() ||
+            affordance.role == block.accessibility_role_textbox() ||
+            affordance.role == block.accessibility_role_text())
+
+func state_lens_base() -> StateLens:
+    return StateLens(selector_flags: 0, variant: 0, deterministic: true)
+
+func state_lens_focus() -> StateLens:
+    return StateLens(selector_flags: block.state_flags(block.state_selector_focused()), variant: 2, deterministic: true)
+
+func state_lens_valid(lens: StateLens) -> Bool:
+    return lens.selector_flags >= 0 && lens.variant >= 0 && lens.deterministic
+
+func motion_preset_fast() -> MotionPreset:
+    return MotionPreset(duration_ms: 120, easing: block.motion_ease_standard(), deterministic_clock: true, reduced_motion_supported: true)
+
+func motion_preset_panel() -> MotionPreset:
+    return MotionPreset(duration_ms: 180, easing: block.motion_ease_standard(), deterministic_clock: true, reduced_motion_supported: true)
+
+func motion_preset_valid(preset: MotionPreset) -> Bool:
+    return preset.duration_ms >= 0 && preset.easing == block.motion_ease_standard() && preset.deterministic_clock && preset.reduced_motion_supported
+
+func recipe_control_action() -> Recipe:
+    return Recipe(name_hash: recipe_control_action_hash(), output_kind: output_block(), slot_count: 8, input_count: 4, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
+
+func recipe_field_text() -> Recipe:
+    return Recipe(name_hash: recipe_field_text_hash(), output_kind: output_block(), slot_count: 8, input_count: 6, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
+
+func recipe_command_item() -> Recipe:
+    return Recipe(name_hash: recipe_command_item_hash(), output_kind: output_block(), slot_count: 8, input_count: 6, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
+
+func recipe_region_panel() -> Recipe:
+    return Recipe(name_hash: recipe_region_panel_hash(), output_kind: output_block(), slot_count: 8, input_count: 4, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
+
+func recipe_safe(recipe: Recipe) -> Bool:
+    return recipe.name_hash > 0 &&
+           recipe.output_kind == output_block() &&
+           recipe.slot_count <= 8 &&
+           recipe.input_count > 0 &&
+           !recipe.hidden_app_state &&
+           !recipe.platform_widgets &&
+           !recipe.core_primitive_promotion &&
+           recipe.deterministic
+
+func recipe_expansion(recipe: Recipe, block_id: block.BlockID) -> RecipeExpansion:
+    return RecipeExpansion(recipe_hash: recipe.name_hash, block_id: block_id, output_kind: recipe.output_kind, slot_count: recipe.slot_count, reported: true, deterministic: recipe.deterministic, used_block_graph: true)
+
+func recipe_expands_to_block(recipe: Recipe) -> Bool:
+    return recipe_safe(recipe) && recipe.output_kind == output_block()
+
+func expansion_valid(expansion: RecipeExpansion) -> Bool:
+    return expansion.recipe_hash > 0 &&
+           block.id_value(expansion.block_id) > 0 &&
+           expansion.output_kind == output_block() &&
+           expansion.slot_count <= 8 &&
+           expansion.reported &&
+           expansion.deterministic &&
+           expansion.used_block_graph
+
+func accent() -> surface.Color:
+    return surface.Color(r: 96, g: 174, b: 244, a: 255)
+
+func theme_dark() -> surface.Color:
+    return surface.Color(r: 14, g: 18, b: 22, a: 255)
+
+func theme_light() -> surface.Color:
+    return surface.Color(r: 244, g: 247, b: 250, a: 255)
+
+func muted() -> surface.Color:
+    return surface.Color(r: 126, g: 144, b: 163, a: 255)
+
+func panel_paint() -> block.PaintSpec:
+    return block.paint_stack5(
+        block.paint_layer_fill_radius(surface.Color(r: 24, g: 31, b: 38, a: 255), 18),
+        block.paint_layer_linear_gradient(surface.Color(r: 28, g: 38, b: 48, a: 255), surface.Color(r: 38, g: 54, b: 66, a: 255), 18),
+        block.paint_layer_border(surface.Color(r: 82, g: 104, b: 124, a: 255), 1, 18),
+        block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 128), 24, 0, 10),
+        block.paint_layer_outline(accent(), 1, 20)
+    )
+
+func control_paint(selected: Bool) -> block.PaintSpec:
+    if selected:
+        return block.paint_stack4(
+            block.paint_layer_fill_radius(surface.Color(r: 44, g: 70, b: 92, a: 255), 12),
+            block.paint_layer_linear_gradient(surface.Color(r: 52, g: 92, b: 126, a: 255), surface.Color(r: 44, g: 72, b: 96, a: 255), 12),
+            block.paint_layer_border(accent(), 1, 12),
+            block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 72), 10, 0, 3)
+        )
+    return block.paint_stack3(
+        block.paint_layer_fill_radius(surface.Color(r: 30, g: 38, b: 46, a: 255), 12),
+        block.paint_layer_border(surface.Color(r: 50, g: 62, b: 74, a: 255), 1, 12),
+        block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 48), 8, 0, 2)
+    )
+
+func field_paint() -> block.PaintSpec:
+    return block.paint_stack3(
+        block.paint_layer_fill_radius(surface.Color(r: 12, g: 16, b: 20, a: 255), 12),
+        block.paint_layer_border(surface.Color(r: 76, g: 92, b: 108, a: 255), 1, 12),
+        block.paint_layer_outline(accent(), 1, 14)
+    )
+
+func expand_region_panel(id_value: Int, parent_value: Int, rect: surface.Rect, label_len: Int) -> block.Block:
+    let props: block.BlockProps = block.props(block.layout_column(rect, 10), panel_paint(), block.text_none(), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_transition(180, 0, block.motion_ease_standard(), true, true, true, 0, 8, 100), block.accessibility_text(label_len), block.asset_none())
+    return block.make(block.id(id_value), block.id(parent_value), props)
+
+func expand_control_action(id_value: Int, parent_value: Int, rect: surface.Rect, label_len: Int, icon_hash: Int, selected: Bool) -> block.Block:
+    let icon: block.AssetRef = block.asset_icon(id_value, 16, 16, icon_hash)
+    let image: block.ImageSpec = block.image_asset_tinted_scaled(icon, 16, 16, accent(), 1)
+    let text: block.TextSpec = block.text_styled(label_len, theme_light(), block.text_family_ui(), 14, 600, 18, block.text_align_start(), block.text_wrap_none(), block.text_overflow_ellipsis(), 255)
+    var state: block.StateSpec = block.state_interactive()
+    if selected:
+        state = block.state_with_selector(block.state_selector_focused(), 2)
+    let motion: block.MotionSpec = block.motion_transition(120, 0, block.motion_ease_standard(), true, true, true, 0, -2, 102)
+    let props: block.BlockProps = block.props(block.layout_row(rect, 10), control_paint(selected), text, image, block.input_clickable(), block.event_click(block.action_primary()), state, motion, block.accessibility_button(label_len), icon)
+    return block.make(block.id(id_value), block.id(parent_value), props)
+
+func expand_field_text(id_value: Int, parent_value: Int, label_id_value: Int, rect: surface.Rect, text_len: Int, placeholder_len: Int) -> block.Block:
+    let label_id: block.BlockID = block.id(label_id_value)
+    let text: block.TextSpec = block.text_editable_styled(text_len, placeholder_len, theme_light(), block.text_family_ui(), 15, 500, 20, block.text_align_start(), block.text_wrap_none(), block.text_overflow_ellipsis(), 255)
+    let props: block.BlockProps = block.props(block.layout_row(rect, 8), field_paint(), text, block.image_none(), block.input_text(), block.event_text(block.action_primary()), block.state_interactive(), block.motion_fast(), block.accessibility_textbox_labelled_by(text_len, label_id), block.asset_font(1, 9001))
+    return block.make(block.id(id_value), block.id(parent_value), props)
+
+func expand_label(id_value: Int, parent_value: Int, target_id_value: Int, rect: surface.Rect, label_len: Int) -> block.Block:
+    let target_id: block.BlockID = block.id(target_id_value)
+    let text: block.TextSpec = block.text_styled(label_len, muted(), block.text_family_ui(), 12, 500, 16, block.text_align_start(), block.text_wrap_none(), block.text_overflow_ellipsis(), 255)
+    let props: block.BlockProps = block.props(block.layout_fixed(rect), block.paint_empty(), text, block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_label_for(label_len, target_id), block.asset_none())
+    return block.make(block.id(id_value), block.id(parent_value), props)
+
+func accessibility_projection_ok(label_id_value: Int, field_id_value: Int, label_len: Int) -> Bool:
+    let label_id: block.BlockID = block.id(label_id_value)
+    let field_id: block.BlockID = block.id(field_id_value)
+    let label: block.AccessibilitySpec = block.accessibility_label_for(label_len, field_id)
+    let field: block.AccessibilitySpec = block.accessibility_textbox_labelled_by(label_len, label_id)
+    return block.accessibility_focusable_has_name(field) &&
+           block.accessibility_relationship_matches(label, field, label_id, field_id)
+
+func memory_budget_ok(block_count: Int, asset_count: Int, framebuffer_bytes: Int) -> Bool:
+    return block_count <= 64 && asset_count <= block.asset_cache_entry_limit() && framebuffer_bytes <= block.asset_cache_budget_bytes()
+
+func capsule_self_check() -> Bool:
+    let capsule: Capsule = capsule_default()
+    return capsule_valid(capsule) &&
+           material_valid(material_panel()) &&
+           material_valid(material_control()) &&
+           material_valid(material_field()) &&
+           affordance_valid(affordance_action()) &&
+           affordance_valid(affordance_text_field()) &&
+           affordance_valid(affordance_region()) &&
+           state_lens_valid(state_lens_base()) &&
+           state_lens_valid(state_lens_focus()) &&
+           motion_preset_valid(motion_preset_fast()) &&
+           motion_preset_valid(motion_preset_panel()) &&
+           recipe_safe(recipe_control_action()) &&
+           recipe_safe(recipe_field_text()) &&
+           recipe_safe(recipe_command_item()) &&
+           recipe_safe(recipe_region_panel())

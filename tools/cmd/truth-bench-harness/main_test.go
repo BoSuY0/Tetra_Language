@@ -413,6 +413,72 @@ func TestP20BenchmarkMatrixScopeRejectsWeakEvidenceAndFakeClaims(t *testing.T) {
 	}
 }
 
+func TestP15ActorBenchmarkPrepScopeRequiresRowsRawArtifactsAndNoClaims(t *testing.T) {
+	dir := t.TempDir()
+	manifest := p15ActorBenchmarkPrepManifest(t, dir)
+	report, err := buildReport(manifest, false, time.Second)
+	if err != nil {
+		t.Fatalf("buildReport P15 actor benchmark prep: %v", err)
+	}
+	if report.Scope != "p15_actor_benchmark_prep" {
+		t.Fatalf("report scope = %q", report.Scope)
+	}
+	if len(report.Benchmarks) != 5 {
+		t.Fatalf("P15 actor benchmark rows = %d, want 5", len(report.Benchmarks))
+	}
+	for _, want := range []string{
+		"actor_ping_pong_tetra",
+		"actor_fanout_fanin_tetra",
+		"actor_mailbox_throughput_tetra",
+		"actor_backpressure_latency_tetra",
+		"zero_copy_move_local_typed_mailbox_tetra",
+	} {
+		row := findBenchmarkRow(t, report, want)
+		if row.Language != "tetra" || row.AlgorithmID == "" || row.InputDescription == "" {
+			t.Fatalf("row %s missing actor benchmark identity metadata: %+v", want, row)
+		}
+		if row.Ran {
+			t.Fatalf("row %s should remain dry-run Tier 0 prep until explicitly run", want)
+		}
+		if len(row.RawOutputArtifacts) != 1 || !row.RawOutputArtifacts[0].Exists {
+			t.Fatalf("row %s raw output artifacts = %+v, want existing raw artifact", want, row.RawOutputArtifacts)
+		}
+	}
+	if err := validateReport(report); err != nil {
+		t.Fatalf("validateReport P15 actor benchmark prep: %v", err)
+	}
+}
+
+func TestP15ActorBenchmarkPrepRejectsMissingRawArtifactsAndOverclaims(t *testing.T) {
+	dir := t.TempDir()
+	manifest := p15ActorBenchmarkPrepManifest(t, dir)
+	manifest.Benchmarks[0].RawOutputArtifacts = nil
+	err := validateManifest(manifest)
+	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "raw output") {
+		t.Fatalf("validateManifest accepted missing P15 actor raw output artifact: %v", err)
+	}
+
+	report, err := buildReport(p15ActorBenchmarkPrepManifest(t, dir), false, time.Second)
+	if err != nil {
+		t.Fatalf("buildReport P15 actor benchmark prep: %v", err)
+	}
+	report.Claims = []string{"Actor benchmark report proves Tetra actors are faster than Rust actors."}
+	err = validateReport(report)
+	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "actor benchmark") {
+		t.Fatalf("validateReport accepted actor benchmark superiority claim: %v", err)
+	}
+
+	report, err = buildReport(p15ActorBenchmarkPrepManifest(t, dir), false, time.Second)
+	if err != nil {
+		t.Fatalf("buildReport P15 actor benchmark prep: %v", err)
+	}
+	report.Claims = []string{"The zero_copy_move prototype benchmark proves production runtime zero-copy for actors."}
+	err = validateReport(report)
+	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "zero_copy_move") {
+		t.Fatalf("validateReport accepted zero_copy_move production runtime claim: %v", err)
+	}
+}
+
 func TestP20ClaimTierReportDefinesFiveTiersAndCurrentTierZeroClaims(t *testing.T) {
 	report := BuildP20ClaimTierReport()
 	if report.Schema != claimTierSchemaV1 || report.Scope != scopeP20ClaimTiers {
@@ -473,6 +539,37 @@ func TestP20ClaimTierReportDefinesFiveTiersAndCurrentTierZeroClaims(t *testing.T
 	}
 	if err := ValidateClaimTierReport(report); err != nil {
 		t.Fatalf("ValidateClaimTierReport: %v", err)
+	}
+}
+
+func TestP20ClaimTierReportIncludesActorBenchmarkPrepNonClaims(t *testing.T) {
+	report := BuildP20ClaimTierReport()
+	var actorClaim PublicPerformanceClaim
+	for _, claim := range report.Claims {
+		if claim.ID == "p15_actor_benchmark_prep_tier0" {
+			actorClaim = claim
+			break
+		}
+	}
+	if actorClaim.ID == "" {
+		t.Fatalf("claim-tier report missing P15 actor benchmark prep claim: %+v", report.Claims)
+	}
+	if actorClaim.Tier != "tier0_local_smoke_only" {
+		t.Fatalf("actor benchmark claim tier = %q, want tier0_local_smoke_only", actorClaim.Tier)
+	}
+	lower := strings.ToLower(actorClaim.Text)
+	for _, want := range []string{"actor ping-pong", "fanout/fanin", "mailbox throughput", "backpressure latency", "zero_copy_move", "no measured speed", "no official benchmark", "no distributed zero-copy"} {
+		if !strings.Contains(lower, want) {
+			t.Fatalf("actor benchmark Tier 0 claim missing %q: %q", want, actorClaim.Text)
+		}
+	}
+	for _, want := range []string{"production throughput guarantee", "distributed zero-copy", "actor benchmark superiority"} {
+		if !containsString(report.NonClaims, want) {
+			t.Fatalf("claim-tier non-claims = %+v, want %q", report.NonClaims, want)
+		}
+	}
+	if err := ValidateClaimTierReport(report); err != nil {
+		t.Fatalf("ValidateClaimTierReport with actor benchmark prep: %v", err)
 	}
 }
 
@@ -787,6 +884,73 @@ func p20BenchmarkMatrixManifest(t *testing.T, dir string) Manifest {
 			}
 			out.Benchmarks = append(out.Benchmarks, bench)
 		}
+	}
+	return out
+}
+
+func p15ActorBenchmarkPrepManifest(t *testing.T, dir string) Manifest {
+	t.Helper()
+	proofPath := writeFixture(t, dir, "p15-actor.proof.json", `{"kind":"proof","slice":"p15_actor_benchmark_prep"}`)
+	allocPath := writeFixture(t, dir, "p15-actor.allocation.json", `{"kind":"allocation","slice":"p15_actor_benchmark_prep"}`)
+	boundsPath := writeFixture(t, dir, "p15-actor.bounds.json", `{"kind":"bounds","slice":"p15_actor_benchmark_prep"}`)
+	perfPath := writeFixture(t, dir, "p15-actor.perf.json", `{"kind":"performance","slice":"p15_actor_benchmark_prep","claim":"Tier 0 prep only; no measured speed"}`)
+	categories := []struct {
+		name      string
+		category  string
+		algorithm string
+		input     string
+	}{
+		{
+			name:      "actor_ping_pong_tetra",
+			category:  "actor ping-pong",
+			algorithm: "p15.actor.ping_pong.local_mailbox",
+			input:     "dry-run actor ping-pong local Linux-x64 mailbox workload with raw artifact references only",
+		},
+		{
+			name:      "actor_fanout_fanin_tetra",
+			category:  "actor fanout/fanin",
+			algorithm: "p15.actor.fanout_fanin.local_mailbox",
+			input:     "dry-run actor fanout/fanin local Linux-x64 mailbox workload with raw artifact references only",
+		},
+		{
+			name:      "actor_mailbox_throughput_tetra",
+			category:  "actor mailbox throughput",
+			algorithm: "p15.actor.mailbox_throughput.local_mailbox",
+			input:     "dry-run actor mailbox throughput local Linux-x64 prep row without production throughput claim",
+		},
+		{
+			name:      "actor_backpressure_latency_tetra",
+			category:  "actor backpressure latency",
+			algorithm: "p15.actor.backpressure_latency.local_mailbox",
+			input:     "dry-run actor backpressure latency diagnostic prep row without real-world SLA claim",
+		},
+		{
+			name:      "zero_copy_move_local_typed_mailbox_tetra",
+			category:  "zero_copy_move local typed mailbox",
+			algorithm: "p15.actor.zero_copy_move.local_owned_region",
+			input:     "dry-run local owned-region typed mailbox transfer prep row without distributed zero-copy claim",
+		},
+	}
+	out := Manifest{Scope: "p15_actor_benchmark_prep"}
+	for _, category := range categories {
+		binary := writeFixture(t, dir, category.name, "binary")
+		rawOutput := writeFixture(t, dir, category.name+".raw.txt", "raw output for "+category.name+"\n")
+		out.Benchmarks = append(out.Benchmarks, BenchmarkSpec{
+			Name:                   category.name,
+			Category:               category.category,
+			Language:               "tetra",
+			CompilerVersion:        "tetra dev",
+			AlgorithmID:            category.algorithm,
+			InputDescription:       category.input,
+			BuildCommand:           []string{"tetra", "build", "examples/actors_pingpong.tetra", "--explain", "--out", binary},
+			RunCommand:             []string{binary},
+			Binary:                 binary,
+			TetraProofReports:      []string{proofPath},
+			TetraAllocationReports: []string{allocPath},
+			TetraBoundsReports:     []string{boundsPath},
+			TetraReports:           []string{perfPath},
+			RawOutputArtifacts:     []string{rawOutput},
+		})
 	}
 	return out
 }

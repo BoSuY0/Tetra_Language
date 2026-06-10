@@ -575,7 +575,7 @@ func TestFeatureRegistryCoversReleaseStatusesAndKeyBoundaries(t *testing.T) {
 	if distributedActors.Status != compiler.FeatureStatusCurrent || distributedActors.Since != "v0.4.0" {
 		t.Fatalf("distributed actors lifecycle = status %q since %q, want current since v0.4.0", distributedActors.Status, distributedActors.Since)
 	}
-	for _, want := range []string{"production Linux-x64 distributed actor runtime path", "actornet loopback TCP broker", "distributed node identity", "remote actor handles", "network mailbox send/receive", "i32, tagged, and typed frames", "missing-node failure/status propagation", "task cancel/join handles", "tetra.actors.distributed-runtime.v1 smoke evidence", "transport-only or fake reports", "non-Linux-x64 targets", "broader structured-concurrency guarantees"} {
+	for _, want := range []string{"production Linux-x64 distributed actor runtime path", "actornet loopback TCP broker", "distributed node identity", "remote actor handles", "network mailbox send/receive", "i32, tagged, and typed frames", "missing-node failure/status propagation", "task cancel/join handles", "tetra.actors.distributed-runtime.v1 smoke evidence", "tetra.actor.production_foundation.v1", "actor-runtime-foundation-linux-x64-gate.sh", "transport-only or fake reports", "non-Linux-x64 targets", "non-Linux distributed runtime", "distributed zero-copy", "cluster membership", "reconnect/retry production", "formal race proof", "broader structured-concurrency guarantees"} {
 		if !strings.Contains(distributedActors.Scope+" "+distributedActors.Stability, want) {
 			t.Fatalf("distributed actors feature missing %q boundary: %#v", want, distributedActors)
 		}
@@ -676,6 +676,25 @@ func TestFeatureRegistryDeclaresSurfaceDirectionAndLegacyMetadataBoundary(t *tes
 		}
 		if len(feature.Docs) == 0 || !hasFeatureDoc(feature.Docs, "docs/spec/surface_v1.md") {
 			t.Fatalf("feature %s docs = %#v, want docs/spec/surface_v1.md", id, feature.Docs)
+		}
+	}
+
+	blockSystem, ok := byID["ui.surface-block-system"]
+	if !ok {
+		t.Fatal("feature registry missing ui.surface-block-system")
+	}
+	if blockSystem.Status != compiler.FeatureStatusExperimental {
+		t.Fatalf("ui.surface-block-system status = %q, want experimental", blockSystem.Status)
+	}
+	for _, want := range []string{
+		"tetra.surface.block-system.gate.v1",
+		"block_system.memory_budget",
+		"reports/surface-block/p18-budget",
+		"same-commit target evidence",
+		"no production Block claim",
+	} {
+		if !strings.Contains(blockSystem.Scope+" "+blockSystem.Stability, want) {
+			t.Fatalf("ui.surface-block-system missing P19 truth-boundary phrase %q: %#v", want, blockSystem)
 		}
 	}
 

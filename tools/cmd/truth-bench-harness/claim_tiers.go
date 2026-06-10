@@ -75,6 +75,23 @@ func BuildP20ClaimTierReport() ClaimTierReport {
 					},
 				},
 			},
+			{
+				ID:   "p15_actor_benchmark_prep_tier0",
+				Tier: "tier0_local_smoke_only",
+				Text: "Current ACTOR-P15 actor benchmark evidence is Tier 0 local smoke/preparation only: harness rows exist for actor ping-pong, fanout/fanin, mailbox throughput, backpressure latency, and zero_copy_move local typed mailbox with raw artifact references; no measured speed, no production throughput guarantee, no official benchmark, no C++/Rust parity, and no distributed zero-copy claim is made.",
+				Evidence: []ClaimTierEvidence{
+					{
+						Class:       "local_smoke",
+						Artifact:    "tools/cmd/parallel-production-smoke",
+						Description: "parallel production smoke emits actor benchmark prep rows as dry-run Tier 0 evidence",
+					},
+					{
+						Class:       "dry_run_matrix",
+						Artifact:    "tools/cmd/truth-bench-harness",
+						Description: "P15 actor benchmark prep scope requires raw artifact references and rejects overclaims",
+					},
+				},
+			},
 		},
 		NonClaims: []string{
 			"measured speed",
@@ -85,6 +102,9 @@ func BuildP20ClaimTierReport() ClaimTierReport {
 			"independent reproduced",
 			"throughput advantage",
 			"latency advantage",
+			"production throughput guarantee",
+			"distributed zero-copy",
+			"actor benchmark superiority",
 		},
 	}
 }
@@ -202,6 +222,43 @@ func validatePerformanceClaimTextForTier(text string, maxTier int) error {
 		return fmt.Errorf("forbidden C++/Rust parity claim: %s", text)
 	case containsUnsafeClaimPhrase(lower, "production database benchmark"):
 		return fmt.Errorf("forbidden production database benchmark claim without measured evidence: %s", text)
+	}
+	if err := validateActorBenchmarkClaimText(lower, text); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateActorBenchmarkClaimText(lower string, text string) error {
+	actorBenchmarkContext := strings.Contains(lower, "actor") || strings.Contains(lower, "mailbox") || strings.Contains(lower, "zero_copy_move")
+	if actorBenchmarkContext {
+		for _, phrase := range []string{
+			"actor benchmark superiority",
+			"performance superiority",
+			"faster than",
+			"outperforms",
+			"beats rust",
+			"beats go",
+			"beats erlang",
+			"production throughput guarantee",
+			"real-world sla",
+		} {
+			if containsUnsafeClaimPhrase(lower, phrase) {
+				return fmt.Errorf("forbidden actor benchmark claim via %q: %s", phrase, text)
+			}
+		}
+	}
+	if strings.Contains(lower, "zero_copy_move") {
+		for _, phrase := range []string{
+			"production runtime",
+			"distributed zero-copy",
+			"network zero-copy",
+			"cross-machine zero-copy",
+		} {
+			if containsUnsafeClaimPhrase(lower, phrase) {
+				return fmt.Errorf("forbidden zero_copy_move production claim via %q: %s", phrase, text)
+			}
+		}
 	}
 	return nil
 }

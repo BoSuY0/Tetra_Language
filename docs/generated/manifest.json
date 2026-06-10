@@ -5732,14 +5732,15 @@
       "name": "Production safety core",
       "status": "current",
       "since": "v0.4.0",
-      "scope": "production local safety model for ownership/lifetime/borrow/consume/inout checks, resource finalization, callable escape diagnostics, effects/capabilities/privacy/consent/budget policy, unsafe boundaries, actor/task transfer safety, pointer/MMIO/memory capability gates, Memory Production Core v1 report evidence through compiler-owned facts rather than report-reconstructed truth, a memory cost model with zero_cost_proven, dynamic_check_required, instrumentation_only, unsupported_rejected, and conservative_fallback report classes, a memory fuzz oracle with Tier 1 short CI smoke, Tier 2 nightly fuzz, Tier 3 release-blocking focused memory fuzz, explicit oracle categories, MEM-FUZZ-012 deterministic v0-v11 release evidence rows, required crash/miscompile repro artifacts, release-blocking unsafe/bounds/storage/report classifications, and no unsupported unsafe pointer safety claim, and a memory production final audit with artifact map and explicit nonclaims",
-      "stability": "release-gated current profile with explicit diagnostics for unsupported distributed, cryptographic, formal-proof, runtime-wide guarantees, and arbitrary unsafe external pointer safety",
+      "scope": "production local safety model for ownership/lifetime/borrow/consume/inout checks, resource finalization, callable escape diagnostics, effects/capabilities/privacy/consent/budget policy, unsafe boundaries, actor/task transfer safety, pointer/MMIO/memory capability gates, Memory Production Core v1 report evidence through compiler-owned facts rather than report-reconstructed truth, a memory cost model with zero_cost_proven, dynamic_check_required, instrumentation_only, unsupported_rejected, and conservative_fallback report classes, a memory fuzz oracle with Tier 1 short CI smoke, Tier 2 nightly fuzz, Tier 3 release-blocking focused memory fuzz, explicit oracle categories, MEM-FUZZ-012 deterministic v0-v11 release evidence rows, required crash/miscompile repro artifacts, release-blocking unsafe/bounds/storage/report classifications, memory production final audit with artifact map and explicit nonclaims, validate-island-proof independent-ish verifier evidence, --islands-debug sanitizer smoke, island-proof-fuzz-summary deterministic mutation evidence, leak/resource finalization evidence, and an integrated Memory/Islands/Surface release gate with memory-islands-surface-production-manifest.json and artifact-hashes.json, and no Memory 100% claim or unsupported unsafe pointer safety claim",
+      "stability": "release-gated current profile with explicit diagnostics for unsupported distributed, cryptographic, formal-proof, runtime-wide guarantees, arbitrary unsafe external pointer safety, full target parity, all-target Surface support, clean release-candidate checkout claims, and no production object memory or production persistent memory claim",
       "docs": [
         "docs/spec/current_supported_surface.md",
         "docs/spec/ownership_v1.md",
         "docs/spec/effects_capabilities_privacy_v1.md",
         "docs/spec/unsafe.md",
         "docs/spec/memory_report_schema_v1.md",
+        "docs/spec/islands.md",
         "docs/design/memory_production_core_v1.md",
         "docs/design/memory_cost_model.md",
         "docs/audits/memory-fuzz-oracle-v1.md",
@@ -5751,6 +5752,7 @@
         "docs/audits/memory-production-core-v1-final.md",
         "docs/audits/memory-production-core-v1-artifact-map.md",
         "docs/audits/memory-production-core-v1-nonclaims.md",
+        "docs/release/memory_islands_surface_scope.md",
         "docs/audits/memory-ideal-vslice-v0-baseline.md",
         "docs/audits/memory-ideal-vslice-v0-correlation.md",
         "docs/audits/memory-ideal-vslice-v0-final.md",
@@ -5995,6 +5997,22 @@
       ]
     },
     {
+      "id": "ui.surface-block-system",
+      "name": "Tetra Surface Block System",
+      "status": "experimental",
+      "scope": "Block-first Surface architecture implementation track with `lib.core.block` data model support for Block as the core Surface primitive for layout, paint, text, assets, input/events, states, motion, and accessibility; existing Button/Card/TextField-like helpers are recipes/compatibility over Block rather than core widget primitives; scoped `tetra.surface.block-system.gate.v1` reports include `block_system.memory_budget` evidence under reports/surface-block/p18-budget",
+      "stability": "experimental and not current Surface v1 production support, with same-commit target evidence for headless, linux-x64 real-window, and wasm32-web browser-canvas Block-system reports, validators, artifact hashes, and release-gate integration; not production support and no production Block claim, Electron, React, DOM, CSS runtime, user JavaScript, Chromium, platform-native widget, GPU renderer, or cross-platform desktop replacement claim is implied",
+      "docs": [
+        "docs/spec/current_supported_surface.md",
+        "docs/spec/surface_v1.md",
+        "docs/user/surface_guide.md",
+        "docs/user/examples_index.md",
+        "docs/release/surface_v1_release_contract.md",
+        "docs/release/surface_v1_release_notes.md",
+        "docs/release/surface_v1_release_audit.md"
+      ]
+    },
+    {
       "id": "ui.surface-headless",
       "name": "Headless Tetra Surface runtime",
       "status": "current",
@@ -6210,12 +6228,16 @@
       "name": "Distributed actor runtime for Linux x64",
       "status": "current",
       "since": "v0.4.0",
-      "scope": "production Linux-x64 distributed actor runtime path with actornet loopback TCP broker, distributed node identity, remote actor handles, network mailbox send/receive for i32, tagged, and typed frames, missing-node failure/status propagation, and compatibility with existing task cancel/join handles",
-      "stability": "current Linux-x64 runtime/lowering slice with executable tetra.actors.distributed-runtime.v1 smoke evidence and strict validator rejection for transport-only or fake reports; non-Linux-x64 targets, multi-threaded scheduling, and broader structured-concurrency guarantees remain outside this claim",
+      "scope": "production Linux-x64 distributed actor runtime path with actornet loopback TCP broker, distributed node identity, remote actor handles, network mailbox send/receive for i32, tagged, and typed frames, missing-node failure/status propagation, compatibility with existing task cancel/join handles, and scoped actor runtime foundation gate evidence through tetra.actor.production_foundation.v1",
+      "stability": "current Linux-x64 runtime/lowering slice with executable tetra.actors.distributed-runtime.v1 smoke evidence, tetra.actor.production_foundation.v1 gate evidence from actor-runtime-foundation-linux-x64-gate.sh, and strict validator rejection for transport-only or fake reports; non-Linux-x64 targets, non-Linux distributed runtime, distributed zero-copy transfer, cluster membership, reconnect/retry production, formal race proof, multi-threaded scheduling, and broader structured-concurrency guarantees remain outside this claim",
       "docs": [
         "docs/spec/current_supported_surface.md",
         "docs/spec/actors.md",
-        "docs/user/async_actors_guide.md"
+        "docs/user/async_actors_guide.md",
+        "docs/design/actor_region_transfer.md",
+        "docs/audits/actor-runtime-production-boundary-v1.md",
+        "docs/checklists/actors_linux_smoke.md",
+        "docs/checklists/actors_platform_smoke.md"
       ]
     },
     {

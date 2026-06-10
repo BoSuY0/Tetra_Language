@@ -1,0 +1,116 @@
+// Polished settings scene composed only from Block configuration.
+module examples.surface_block_settings
+
+import lib.core.surface as surface
+import lib.core.block as block
+
+func theme_dark() -> surface.Color:
+    return surface.Color(r: 20, g: 24, b: 30, a: 255)
+
+func theme_light() -> surface.Color:
+    return surface.Color(r: 248, g: 250, b: 252, a: 255)
+
+func blue() -> surface.Color:
+    return surface.Color(r: 96, g: 174, b: 244, a: 255)
+
+func rose() -> surface.Color:
+    return surface.Color(r: 244, g: 118, b: 142, a: 255)
+
+func shell_paint() -> block.PaintSpec:
+    return block.paint_stack5(
+        block.paint_layer_fill_radius(surface.Color(r: 27, g: 32, b: 39, a: 255), 16),
+        block.paint_layer_linear_gradient(surface.Color(r: 32, g: 40, b: 50, a: 255), surface.Color(r: 24, g: 29, b: 36, a: 255), 16),
+        block.paint_layer_border(surface.Color(r: 74, g: 88, b: 104, a: 255), 1, 16),
+        block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 96), 18, 0, 8),
+        block.paint_layer_outline(blue(), 1, 18)
+    )
+
+func field_paint(focused: Bool) -> block.PaintSpec:
+    if focused:
+        return block.paint_stack4(
+            block.paint_layer_fill_radius(surface.Color(r: 14, g: 18, b: 22, a: 255), 10),
+            block.paint_layer_border(blue(), 2, 10),
+            block.paint_layer_shadow(surface.Color(r: 96, g: 174, b: 244, a: 42), 12, 0, 0),
+            block.paint_layer_outline(blue(), 1, 12)
+        )
+    return block.paint_stack3(
+        block.paint_layer_fill_radius(surface.Color(r: 16, g: 20, b: 26, a: 255), 10),
+        block.paint_layer_border(surface.Color(r: 68, g: 80, b: 94, a: 255), 1, 10),
+        block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 56), 8, 0, 2)
+    )
+
+func make_field(id_value: Int, parent_value: Int, label_id: block.BlockID, y: Int, label_len: Int, focused: Bool) -> block.Block:
+    let rect: surface.Rect = surface.Rect(x: 182, y: y, w: 254, h: 42)
+    let font: block.AssetRef = block.asset_font(2, 6202)
+    let text: block.TextSpec = block.text_editable_styled(label_len, 10, theme_light(), block.text_family_ui(), 14, 500, 20, block.text_align_start(), block.text_wrap_none(), block.text_overflow_ellipsis(), 255)
+    var state: block.StateSpec = block.state_interactive()
+    if focused:
+        state = block.state_with_selector(block.state_selector_focused(), 4)
+    let motion: block.MotionSpec = block.motion_transition(120, 0, block.motion_ease_standard(), true, true, true, 0, 0, 101)
+    let props: block.BlockProps = block.props(block.layout_row(rect, 8), field_paint(focused), text, block.image_none(), block.input_text(), block.event_text(block.action_primary()), state, motion, block.accessibility_textbox_labelled_by(label_len, label_id), font)
+    return block.make(block.id(id_value), block.id(parent_value), props)
+
+func make_action(id_value: Int, parent_value: Int, x: Int, label_len: Int, color: surface.Color, hash: Int) -> block.Block:
+    let rect: surface.Rect = surface.Rect(x: x, y: 220, w: 108, h: 38)
+    let icon: block.AssetRef = block.asset_icon(id_value, 16, 16, hash)
+    let text: block.TextSpec = block.text_styled(label_len, theme_light(), block.text_family_ui(), 13, 700, 18, block.text_align_center(), block.text_wrap_none(), block.text_overflow_ellipsis(), 255)
+    let paint: block.PaintSpec = block.paint_stack4(block.paint_layer_fill_radius(color, 10), block.paint_layer_linear_gradient(color, surface.Color(r: color.r - 14, g: color.g - 14, b: color.b - 14, a: 255), 10), block.paint_layer_border(theme_light(), 1, 10), block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 68), 10, 0, 4))
+    let motion: block.MotionSpec = block.motion_transition(110, 0, block.motion_ease_standard(), true, true, true, 0, 1, 98)
+    let props: block.BlockProps = block.props(block.layout_row(rect, 8), paint, text, block.image_asset_tinted_scaled(icon, 16, 16, theme_light(), 1), block.input_clickable(), block.event_click(block.action_primary()), block.state_interactive(), motion, block.accessibility_button(label_len), icon)
+    return block.make(block.id(id_value), block.id(parent_value), props)
+
+func scene_frame_checksum() -> Int:
+    let hover: block.StateSelector = block.state_selector_hover()
+    let focus: block.StateSelector = block.state_selector_focused()
+    let pressed: block.StateSelector = block.state_selector_pressed()
+    let motion: block.MotionSpec = block.motion_transition(110, 0, block.motion_ease_standard(), true, true, true, 0, 1, 98)
+    let paint: block.PaintSpec = field_paint(true)
+    let hover_border: Int = block.state_resolve_int(1, 2, hover, hover)
+    let focus_state: block.StateSpec = block.state_resolve(block.state_base(), block.state_with_selector(focus, 4), focus)
+    let focus_variant: Int = focus_state.variant
+    let pressed_scale: Int = block.motion_resolve_scale(motion, 55)
+    if block.state_selector_matches(pressed, pressed):
+        return block.paint_feature_flags(paint) + hover_border + focus_variant + pressed_scale
+    return 0
+
+func scene_checksum() -> Int:
+    return scene_frame_checksum()
+
+func main() -> Int
+uses alloc, mem:
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 480, h: 300)
+    let nav_rect: surface.Rect = surface.Rect(x: 20, y: 20, w: 126, h: 260)
+    let form_rect: surface.Rect = surface.Rect(x: 158, y: 20, w: 302, h: 260)
+    let name_label_rect: surface.Rect = surface.Rect(x: 182, y: 78, w: 120, h: 18)
+    let email_label_rect: surface.Rect = surface.Rect(x: 182, y: 142, w: 120, h: 18)
+    let name_id: block.BlockID = block.id(5)
+    let email_id: block.BlockID = block.id(7)
+
+    var tree: block.BlockTree = block.tree_init(10)
+    let root_props: block.BlockProps = block.props(block.layout_row(root_rect, 12), block.paint_stack2(block.paint_layer_fill_radius(theme_dark(), 0), block.paint_layer_overlay(blue(), 22, 0)), block.text_none(), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_text(14), block.asset_none())
+    let nav_props: block.BlockProps = block.props(block.layout_column(nav_rect, 8), shell_paint(), block.text_styled(8, theme_light(), block.text_family_ui(), 15, 700, 20, block.text_align_start(), block.text_wrap_word(), block.text_overflow_ellipsis(), 255), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_fast(), block.accessibility_text(8), block.asset_none())
+    let form_props: block.BlockProps = block.props(block.layout_column(form_rect, 12), shell_paint(), block.text_styled(15, theme_light(), block.text_family_ui(), 18, 800, 24, block.text_align_start(), block.text_wrap_none(), block.text_overflow_ellipsis(), 255), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_fast(), block.accessibility_text(15), block.asset_none())
+    let name_label_props: block.BlockProps = block.props(block.layout_fixed(name_label_rect), block.paint_empty(), block.text_styled(4, theme_light(), block.text_family_ui(), 12, 600, 16, block.text_align_start(), block.text_wrap_none(), block.text_overflow_ellipsis(), 220), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_label_for(4, name_id), block.asset_none())
+    let email_label_props: block.BlockProps = block.props(block.layout_fixed(email_label_rect), block.paint_empty(), block.text_styled(5, theme_light(), block.text_family_ui(), 12, 600, 16, block.text_align_start(), block.text_wrap_none(), block.text_overflow_ellipsis(), 220), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_label_for(5, email_id), block.asset_none())
+
+    let root: Int = block.tree_add_root(tree, block.make(block.id(1), block.id_none(), root_props), root_rect)
+    let nav: Int = block.tree_add_child(tree, block.id(1), block.make(block.id(2), block.id(1), nav_props), nav_rect)
+    let form: Int = block.tree_add_child(tree, block.id(1), block.make(block.id(3), block.id(1), form_props), form_rect)
+    let name_label: Int = block.tree_add_child(tree, block.id(3), block.make(block.id(4), block.id(3), name_label_props), name_label_rect)
+    let name_field: Int = block.tree_add_child(tree, block.id(3), make_field(5, 3, block.id(4), 100, 14, true), surface.Rect(x: 182, y: 100, w: 254, h: 42))
+    let email_label: Int = block.tree_add_child(tree, block.id(3), block.make(block.id(6), block.id(3), email_label_props), email_label_rect)
+    let email_field: Int = block.tree_add_child(tree, block.id(3), make_field(7, 3, block.id(6), 164, 17, false), surface.Rect(x: 182, y: 164, w: 254, h: 42))
+    let save: Int = block.tree_add_child(tree, block.id(3), make_action(8, 3, 208, 4, blue(), 701), surface.Rect(x: 208, y: 220, w: 108, h: 38))
+    let reset: Int = block.tree_add_child(tree, block.id(3), make_action(9, 3, 328, 5, rose(), 702), surface.Rect(x: 328, y: 220, w: 108, h: 38))
+    let valid: Int = block.tree_validate(tree)
+    let focus0: Int = block.id_value(block.focus_order_at(tree, 0))
+    let focus3: Int = block.id_value(block.focus_order_at(tree, 3))
+
+    if root == 1 && nav == 2 && form == 3 && name_label == 4 && name_field == 5 && email_label == 6 && email_field == 7 && save == 8 && reset == 9 &&
+       valid == block.tree_error_ok() &&
+       focus0 == 5 && focus3 == 9 &&
+       block.accessibility_relationship_matches(block.accessibility_label_for(4, name_id), block.accessibility_textbox_labelled_by(14, block.id(4)), block.id(4), name_id) &&
+       block.paint_validate_visual_grammar(shell_paint()) == block.paint_error_ok() &&
+       scene_checksum() > 0:
+        return 0
+    return 1

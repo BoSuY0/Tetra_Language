@@ -297,6 +297,26 @@ func TestValidateMemoryReportRejectsValidatedUnsafeUnknownTrustedStorage(t *test
 	}
 }
 
+func TestValidateMemoryReportRejectsValidatedUnsafeVerifiedRootTrustedStorage(t *testing.T) {
+	for _, storage := range []StorageClass{StorageStack, StorageRegion, StorageFunctionTempRegion} {
+		t.Run(string(storage), func(t *testing.T) {
+			report := validMemoryReport()
+			report.Rows[0].Claim = "allocation_base_metadata"
+			report.Rows[0].ProvenanceClass = ProvenanceUnsafeVerifiedRoot
+			report.Rows[0].UnsafeClass = UnsafeVerifiedRoot
+			report.Rows[0].PlannedStorage = storage
+			report.Rows[0].ActualLoweringStorage = storage
+			report.Rows[0].LoweredArtifactID = "ir:main:ffi:" + string(storage)
+			report.Rows[0].Reason = "raw FFI root must not become trusted storage"
+
+			err := ValidateReport(report)
+			if err == nil || !strings.Contains(err.Error(), "unsafe_verified_root") || !strings.Contains(err.Error(), "trusted storage") {
+				t.Fatalf("ValidateReport error = %v, want unsafe_verified_root trusted-storage rejection", err)
+			}
+		})
+	}
+}
+
 func TestValidateMemoryReportRejectsStorageClaimWithoutArtifact(t *testing.T) {
 	report := validMemoryReport()
 	report.Rows[0].Claim = "stack lowering claim"
@@ -379,6 +399,24 @@ func TestValidateMemoryReportRejectsHeapFallbackWithoutReason(t *testing.T) {
 	err := ValidateReport(report)
 	if err == nil || !strings.Contains(err.Error(), "reason") {
 		t.Fatalf("ValidateReport error = %v, want heap fallback reason rejection", err)
+	}
+}
+
+func TestValidateMemoryReportRejectsHeapHeapConservativeFallbackWithoutReason(t *testing.T) {
+	report := validMemoryReport()
+	report.Rows[0].Claim = "storage_lowering"
+	report.Rows[0].ClaimLevel = ClaimEvidenceOnly
+	report.Rows[0].PlannedStorage = StorageHeap
+	report.Rows[0].ActualLoweringStorage = StorageHeap
+	report.Rows[0].LoweredArtifactID = "ir:main:xs:Heap"
+	report.Rows[0].CostClass = CostConservativeFallback
+	report.Rows[0].ValidatorName = ""
+	report.Rows[0].ValidatorStatus = ValidatorNotRun
+	report.Rows[0].Reason = ""
+
+	err := ValidateReport(report)
+	if err == nil || !strings.Contains(err.Error(), "reason") {
+		t.Fatalf("ValidateReport error = %v, want heap/heap conservative fallback reason rejection", err)
 	}
 }
 
@@ -1044,6 +1082,113 @@ func TestValidateReportProjectionRejectsValidatedStaleIslandEpoch(t *testing.T) 
 	}
 }
 
+func TestValidateReportProjectionRejectsSafetyFieldMutationCorpus(t *testing.T) {
+	graph := projectionSafetyMutationGraph(t)
+	report := BuildReportFromGraph(graph)
+
+	for _, tc := range []struct {
+		name         string
+		sourceFactID FactID
+		field        string
+		mutate       func(*ReportRow)
+	}{
+		{
+			name:         "provenance",
+			sourceFactID: "fact:projection:safety-noalias",
+			field:        "provenance_class",
+			mutate: func(row *ReportRow) {
+				row.ProvenanceClass = ProvenanceSafeBorrowed
+			},
+		},
+		{
+			name:         "unsafe class",
+			sourceFactID: "fact:projection:safety-unsafe-root",
+			field:        "unsafe_class",
+			mutate: func(row *ReportRow) {
+				row.UnsafeClass = UnsafeSafe
+			},
+		},
+		{
+			name:         "noalias alias state",
+			sourceFactID: "fact:projection:safety-noalias",
+			field:        "alias_state",
+			mutate: func(row *ReportRow) {
+				row.AliasState = AliasUnique
+			},
+		},
+		{
+			name:         "fake normal build check",
+			sourceFactID: "fact:projection:safety-noalias",
+			field:        "normal_build_check",
+			mutate: func(row *ReportRow) {
+				row.NormalBuildCheck = true
+			},
+		},
+		{
+			name:         "cost class",
+			sourceFactID: "fact:projection:safety-noalias",
+			field:        "cost_class",
+			mutate: func(row *ReportRow) {
+				row.CostClass = CostConservativeFallback
+			},
+		},
+		{
+			name:         "island id",
+			sourceFactID: "fact:projection:safety-island",
+			field:        "island_id",
+			mutate: func(row *ReportRow) {
+				row.IslandID = "island:other:0"
+			},
+		},
+		{
+			name:         "epoch",
+			sourceFactID: "fact:projection:safety-island",
+			field:        "epoch",
+			mutate: func(row *ReportRow) {
+				row.Epoch = 2
+			},
+		},
+		{
+			name:         "base id",
+			sourceFactID: "fact:projection:safety-island",
+			field:        "base_id",
+			mutate: func(row *ReportRow) {
+				row.BaseID = "alloc:other:0"
+			},
+		},
+		{
+			name:         "planned storage",
+			sourceFactID: "fact:projection:safety-island",
+			field:        "planned_storage",
+			mutate: func(row *ReportRow) {
+				row.PlannedStorage = StorageHeap
+			},
+		},
+		{
+			name:         "actual lowering storage",
+			sourceFactID: "fact:projection:safety-island",
+			field:        "actual_lowering_storage",
+			mutate: func(row *ReportRow) {
+				row.ActualLoweringStorage = StorageStack
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mutated := cloneReport(report)
+			row := requireReportRowBySourceFactID(t, mutated, tc.sourceFactID)
+			tc.mutate(row)
+
+			if err := ValidateReport(mutated); err != nil {
+				t.Fatalf("mutated report should remain standalone-valid before projection check: %v", err)
+			}
+			err := ValidateReportProjection(graph, mutated)
+			if err == nil || !strings.Contains(err.Error(), tc.field) {
+				t.Fatalf("ValidateReportProjection error = %v, want %s projection rejection", err, tc.field)
+			}
+		})
+	}
+}
+
 func validMemoryReport() Report {
 	return Report{
 		SchemaVersion: ReportSchemaV1,
@@ -1125,6 +1270,84 @@ func islandProjectionGraph(t *testing.T, validation ValidationState) *Graph {
 		t.Fatalf("AddFact island projection fixture: %v", err)
 	}
 	return graph
+}
+
+func projectionSafetyMutationGraph(t *testing.T) *Graph {
+	t.Helper()
+	graph := NewGraph("program")
+	if _, err := graph.AddFact(Fact{
+		ID:              "fact:projection:safety-noalias",
+		FunctionID:      "main",
+		SiteID:          "projection:noalias:1",
+		SourceStage:     StagePLIR,
+		ProvenanceClass: ProvenanceSafeKnown,
+		UnsafeClass:     UnsafeSafe,
+		Claim:           "no_alias",
+		AliasState:      AliasMutableExclusive,
+		ValidationState: ValidationPass,
+		ValidatorName:   "no_alias_validator",
+		CostClass:       CostInstrumentationOnly,
+		Reason:          "fixture noalias safety identity",
+	}); err != nil {
+		t.Fatalf("AddFact noalias safety fixture: %v", err)
+	}
+	if _, err := graph.AddFact(Fact{
+		ID:                    "fact:projection:safety-unsafe-root",
+		FunctionID:            "main",
+		SiteID:                "projection:unsafe-root:1",
+		SourceStage:           StageUnsafeGatewayLowering,
+		ProvenanceClass:       ProvenanceUnsafeVerifiedRoot,
+		UnsafeClass:           UnsafeVerifiedRoot,
+		Claim:                 "allocation_base_metadata",
+		StoragePlan:           StorageHeap,
+		ActualLoweringStorage: StorageHeap,
+		LoweredArtifactID:     "ir:main:alloc-bytes:0",
+		ValidationState:       ValidationPass,
+		ValidatorName:         "raw_bounds_validator",
+		CostClass:             CostZeroCostProven,
+		Reason:                "fixture unsafe verified root identity",
+	}); err != nil {
+		t.Fatalf("AddFact unsafe-root safety fixture: %v", err)
+	}
+	if _, err := graph.AddFact(Fact{
+		ID:                    "fact:projection:safety-island",
+		FunctionID:            "main",
+		SiteID:                "projection:island-safety:1",
+		SourceStage:           StagePLIR,
+		ProvenanceClass:       ProvenanceSafeKnown,
+		UnsafeClass:           UnsafeSafe,
+		Claim:                 "island_epoch_validated",
+		IslandID:              "island:main:0",
+		Epoch:                 1,
+		BaseID:                "alloc:main:0",
+		StoragePlan:           StorageExplicitIsland,
+		ActualLoweringStorage: StorageExplicitIsland,
+		LoweredArtifactID:     "ir:main:island:0",
+		ValidationState:       ValidationPass,
+		ValidatorName:         "island_epoch_validator",
+		CostClass:             CostInstrumentationOnly,
+		Reason:                "fixture island storage identity",
+	}); err != nil {
+		t.Fatalf("AddFact island safety fixture: %v", err)
+	}
+	return graph
+}
+
+func cloneReport(report Report) Report {
+	clone := report
+	clone.Rows = append([]ReportRow(nil), report.Rows...)
+	return clone
+}
+
+func requireReportRowBySourceFactID(t *testing.T, report Report, sourceFactID FactID) *ReportRow {
+	t.Helper()
+	for i := range report.Rows {
+		if report.Rows[i].SourceFactID == sourceFactID {
+			return &report.Rows[i]
+		}
+	}
+	t.Fatalf("report row with source_fact_id %q not found in %+v", sourceFactID, report.Rows)
+	return nil
 }
 
 func reportSourceFactIDs(report Report) []FactID {

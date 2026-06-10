@@ -3130,6 +3130,53 @@ uses actors, runtime:
 	}
 }
 
+func TestTaskGroupCancelWakesActorRecvUntilBeforeDeadlineBuildAndRun(t *testing.T) {
+	src := `
+func actor_waiter() -> Int
+uses actors, runtime:
+    let result: actor.recv_result_i32 = core.recv_until(core.deadline_ms(100))
+    let _sent: Int = core.send(core.sender(), result.error)
+    return result.error
+
+func worker() -> Int
+uses actors:
+    let _actor: actor = core.spawn("actor_waiter")
+    return 1
+
+func main() -> Int
+uses actors, runtime:
+    var group: task.group = core.task_group_open()
+    let task: task.i32 = core.task_spawn_group_i32(group, "worker")
+    let launched: task.result_i32 = core.task_join_result_i32(task)
+    if launched.error != 0:
+        return 20 + launched.error
+    if launched.value != 1:
+        return 30 + launched.value
+    let _delay: Int = core.sleep_ms(2)
+    group = core.task_group_cancel(group)
+    let reply: actor.recv_result_i32 = core.recv_until(core.deadline_ms(5))
+    let _closed: Int = core.task_group_close(group)
+    if reply.error != 0:
+        return 40 + reply.error
+    if reply.value != 1:
+        return 60 + reply.value
+    let now: Int = core.time_now_ms()
+    if now != 2:
+        return 80 + now
+    return 0
+`
+	stdout, exitCode, timedOut := buildAndRunWithOptionsTimeout(t, src, BuildOptions{}, 250*time.Millisecond)
+	if timedOut {
+		t.Fatalf("program timed out; task group cancel should wake actor recv_until before the original deadline")
+	}
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, want actor recv_until canceled wake at logical time 2", exitCode)
+	}
+}
+
 func TestTaskGroupCurrentInheritedByChildTaskBuildAndRun(t *testing.T) {
 	src := `
 func leaf() -> Int:

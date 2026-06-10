@@ -11,6 +11,8 @@ Memory Production Core v1 intentionally does not claim:
 - full derived-pointer provenance for every raw address
 - full production actor runtime
 - full target runtime parity
+- production object memory
+- production persistent memory
 - fastest language
 - official benchmark result
 
@@ -27,6 +29,10 @@ Memory Production Core v1 intentionally does not claim:
 - Actor/task/request memory claims are conservative unless a row explicitly
   names validated runtime evidence. Evidence-only zero-copy rows are not full
   production actor runtime proof.
+- Object/persistent memory is an explicit non-goal for this release. No
+  production object memory, no production persistent memory, and no Todium,
+  memoryfield, memoryruntime, or memoryeval production claim exists until
+  separate retention/WAL/FTS/vacuum/stale/false-memory gates exist.
 - Fuzz/property/stress output is oracle-backed evidence, not exhaustive proof.
 - Performance reports and quick CI artifacts are evidence, not an official
   benchmark result and not a fastest language claim.

@@ -108,6 +108,10 @@ func unsafeUnknownTrustedStorage(planned, actual StorageClass) bool {
 	return memoryvocab.UnsafeUnknownTrustedStorage(string(planned), string(actual))
 }
 
+func unsafeExternalRootTrustedStorage(provenance ProvenanceClass, unsafe UnsafeClass, planned, actual StorageClass) bool {
+	return memoryvocab.UnsafeExternalRootTrustedStorage(string(provenance), string(unsafe), string(planned), string(actual))
+}
+
 func validatedTrustedStorageHeapFallback(planned, actual StorageClass) bool {
 	return memoryvocab.ValidatedTrustedStorageHeapFallback(string(planned), string(actual))
 }
@@ -118,6 +122,16 @@ func runtimeProofRequiredStorage(planned, actual StorageClass) bool {
 
 func trustedStorageHeapFallback(planned, actual StorageClass) bool {
 	return memoryvocab.ValidatedTrustedStorageHeapFallback(string(planned), string(actual))
+}
+
+func storageFallbackRequiresReason(planned, actual StorageClass, cost CostClass) bool {
+	if planned == "" && actual == "" {
+		return false
+	}
+	if trustedStorageHeapFallback(planned, actual) {
+		return true
+	}
+	return cost == CostConservativeFallback
 }
 
 func trustedStorageForUnsafeUnknown(class StorageClass) bool {

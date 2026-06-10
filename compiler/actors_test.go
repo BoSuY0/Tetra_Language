@@ -288,21 +288,27 @@ func TestActorMessagePoolBudgetAtDocumentedCapacityBuildAndRun(t *testing.T) {
 
 	src := `
 val MESSAGE_POOL_SAFE_MESSAGES: i32 = 744
+val MAILBOX_CAPACITY: i32 = 256
 
 func main() -> Int
 uses actors:
     let me: actor = core.self()
     var sent: Int = 0
-    while sent < MESSAGE_POOL_SAFE_MESSAGES:
-        let _sent: Int = core.send(me, sent)
-        sent = sent + 1
-
-    var received: Int = 0
     var drift: Int = 0
-    while received < MESSAGE_POOL_SAFE_MESSAGES:
-        let msg: Int = core.recv()
-        drift = drift + (msg - received)
-        received = received + 1
+    while sent < MESSAGE_POOL_SAFE_MESSAGES:
+        var batch: Int = 0
+        while batch < MAILBOX_CAPACITY && sent < MESSAGE_POOL_SAFE_MESSAGES:
+            let ack: Int = core.send(me, sent)
+            if ack != sent:
+                return 10
+            sent = sent + 1
+            batch = batch + 1
+
+        var received: Int = 0
+        while received < batch:
+            let msg: Int = core.recv()
+            drift = drift + (msg - ((sent - batch) + received))
+            received = received + 1
 
     if drift != 0:
         return 31
@@ -317,6 +323,276 @@ uses actors:
 	}
 }
 
+func TestActorMessagePoolExhaustionReturnsCheckedFailure(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+val MESSAGE_POOL_SAFE_MESSAGES: i32 = 744
+val MAILBOX_CAPACITY: i32 = 256
+
+func main() -> Int
+uses actors:
+    let me: actor = core.self()
+    var sent: Int = 0
+    var drift: Int = 0
+    while sent < MESSAGE_POOL_SAFE_MESSAGES:
+        var batch: Int = 0
+        while batch < MAILBOX_CAPACITY && sent < MESSAGE_POOL_SAFE_MESSAGES:
+            let ack: Int = core.send(me, sent)
+            if ack != sent:
+                return 10
+            sent = sent + 1
+            batch = batch + 1
+
+        var received: Int = 0
+        while received < batch:
+            let msg: actor.recv_result_i32 = core.recv_poll()
+            if msg.error != 0:
+                return 30 + msg.error
+            drift = drift + (msg.value - ((sent - batch) + received))
+            received = received + 1
+
+    let overflow: Int = core.send(me, 123)
+    if overflow != -1:
+        return 20
+
+    let empty: actor.recv_result_i32 = core.recv_poll()
+    if empty.error != 2:
+        return 40 + empty.error
+    if drift != 0:
+        return 50
+    return 0
+`
+	stdout, exitCode := buildAndRunWithOptions(t, src, BuildOptions{Runtime: RuntimeBuiltin})
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, want checked message pool exhaustion without corrupting mailbox", exitCode)
+	}
+}
+
+func TestActorMessagePoolExhaustionCoversTaggedMessages(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+val MESSAGE_POOL_SAFE_MESSAGES: i32 = 744
+val MAILBOX_CAPACITY: i32 = 256
+
+func main() -> Int
+uses actors, runtime:
+    let me: actor = core.self()
+    var sent: Int = 0
+    var drift: Int = 0
+    while sent < MESSAGE_POOL_SAFE_MESSAGES:
+        var batch: Int = 0
+        while batch < MAILBOX_CAPACITY && sent < MESSAGE_POOL_SAFE_MESSAGES:
+            let ack: Int = core.send_msg(me, sent, 7)
+            if ack != sent:
+                return 10
+            sent = sent + 1
+            batch = batch + 1
+
+        var received: Int = 0
+        while received < batch:
+            let msg: actor.recv_msg_result = core.recv_msg_until(core.deadline_ms(1))
+            if msg.error != 0:
+                return 30 + msg.error
+            if msg.tag != 7:
+                return 40
+            drift = drift + (msg.value - ((sent - batch) + received))
+            received = received + 1
+
+    let overflow: Int = core.send_msg(me, 123, 8)
+    if overflow != -1:
+        return 20
+
+    let empty: actor.recv_msg_result = core.recv_msg_until(core.deadline_ms(1))
+    if empty.error != 2:
+        return 50 + empty.error
+    if drift != 0:
+        return 60
+    return 0
+`
+	stdout, exitCode := buildAndRunWithOptions(t, src, BuildOptions{Runtime: RuntimeBuiltin})
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, want checked tagged message pool exhaustion", exitCode)
+	}
+}
+
+func TestActorMessagePoolExhaustionCoversTypedMessages(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+enum Telemetry:
+    case item(Int)
+
+val MESSAGE_POOL_SAFE_MESSAGES: i32 = 744
+val MAILBOX_CAPACITY: i32 = 256
+
+func main() -> Int
+uses actors:
+    let me: actor = core.self()
+    var sent: Int = 0
+    var drift: Int = 0
+    while sent < MESSAGE_POOL_SAFE_MESSAGES:
+        var batch: Int = 0
+        while batch < MAILBOX_CAPACITY && sent < MESSAGE_POOL_SAFE_MESSAGES:
+            let ack: Int = core.send_typed(me, Telemetry.item(sent))
+            if ack != 0:
+                return 10
+            sent = sent + 1
+            batch = batch + 1
+
+        var received: Int = 0
+        while received < batch:
+            let msg: Telemetry = core.recv_typed<Telemetry>()
+            match msg:
+            case Telemetry.item(value):
+                drift = drift + (value - ((sent - batch) + received))
+            received = received + 1
+
+    let overflow: Int = core.send_typed(me, Telemetry.item(123))
+    if overflow != -1:
+        return 20
+
+    if drift != 0:
+        return 30
+    return 0
+`
+	stdout, exitCode := buildAndRunWithOptions(t, src, BuildOptions{Runtime: RuntimeBuiltin})
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, want checked typed message pool exhaustion", exitCode)
+	}
+}
+
+func TestActorMailboxFullReturnsCheckedBackpressure(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+val MAILBOX_CAPACITY: i32 = 256
+
+func sleeper() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(100)
+    return 0
+
+func main() -> Int
+uses actors:
+    let peer: actor = core.spawn("sleeper")
+    var sent: Int = 0
+    while sent < MAILBOX_CAPACITY:
+        let ack: Int = core.send(peer, sent)
+        if ack != sent:
+            return 10
+        sent = sent + 1
+
+    let full: Int = core.send(peer, 777)
+    if full != -2:
+        return 20
+    return 0
+`
+	stdout, exitCode := buildAndRunWithOptions(t, src, BuildOptions{Runtime: RuntimeBuiltin})
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, want checked mailbox backpressure", exitCode)
+	}
+}
+
+func TestActorInvalidHandleSendReturnsCheckedFailure(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+enum Signal:
+    case item(Int)
+
+func sleeper() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(100)
+    return 0
+
+func main() -> Int
+uses actors:
+    var spawned: Int = 0
+    while spawned < 127:
+        let _peer: actor = core.spawn("sleeper")
+        spawned = spawned + 1
+
+    let failed: actor = core.spawn("sleeper")
+    let sent: Int = core.send(failed, 1)
+    if sent != -3:
+        return 20
+    let tagged: Int = core.send_msg(failed, 2, 7)
+    if tagged != -3:
+        return 30
+    let typed: Int = core.send_typed(failed, Signal.item(3))
+    if typed != -3:
+        return 40
+    return 0
+`
+	stdout, exitCode := buildAndRunWithOptions(t, src, BuildOptions{Runtime: RuntimeBuiltin})
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, want checked invalid actor handle send-path failures", exitCode)
+	}
+}
+
+func TestActorSendToDoneActorReturnsCheckedFailure(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+enum Signal:
+    case item(Int)
+
+func done() -> Int:
+    return 0
+
+func main() -> Int
+uses actors, runtime:
+    let peer: actor = core.spawn("done")
+    let _sleep: Int = core.sleep_ms(1)
+    let sent: Int = core.send(peer, 1)
+    if sent != -4:
+        return 20
+    let tagged: Int = core.send_msg(peer, 2, 7)
+    if tagged != -4:
+        return 30
+    let typed: Int = core.send_typed(peer, Signal.item(3))
+    if typed != -4:
+        return 40
+    return 0
+`
+	stdout, exitCode := buildAndRunWithOptions(t, src, BuildOptions{Runtime: RuntimeBuiltin})
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, want checked done actor send-path failures", exitCode)
+	}
+}
+
 func TestActorRuntimeCapacityLimitsDocumented(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "docs", "spec", "actors.md"))
 	if err != nil {
@@ -327,12 +603,22 @@ func TestActorRuntimeCapacityLimitsDocumented(t *testing.T) {
 		"## Runtime Capacity Limits",
 		"`maxActors = 128`",
 		"127 child actors",
+		"`maxActorMailboxMsgs = 256`",
+		"full mailbox",
+		"`-2`",
 		"64 KiB",
 		"744",
-		"single-slot messages",
+		"single-slot",
+		"checked failure",
+		"`-1`",
+		"does not enqueue an overflow message",
+		"reclaim message-pool capacity",
+		"invalid actor handle",
+		"`-3`",
+		"done actor",
+		"`-4`",
 		"8 state slots",
 		"rejects programs that require more than 8 actor-state slots before lowering",
-		"pool overflow is not a checked runtime error",
 	} {
 		if !strings.Contains(doc, want) {
 			t.Fatalf("actors spec missing capacity-limit text %q", want)

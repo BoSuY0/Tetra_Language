@@ -120,6 +120,59 @@ Current entrypoints:
   evidence, dispatch path helper output, matching source/host evidence, changed
   frame checksums, and no legacy sidecars.
 
+- `surface-headless-block-system-smoke.sh` writes and validates the
+  experimental headless Block-system golden/checksum milestone for
+  `examples/surface_block_system.tetra`. Reports keep Block graph, software
+  paint, deterministic layout, and Block-derived accessibility evidence in the
+  same `tetra.surface.runtime.v1` envelope and add
+  `block_system.schema = tetra.surface.block-system.v1` with deterministic
+  software RGBA frame goldens, repeat checksum equality, and explicit negative
+  guards for missing frame checksum, nondeterministic checksum, missing paint,
+  missing layout, and missing accessibility evidence. It remains headless-only
+  evidence, not host display/browser promotion. The same gate also runs
+  `validate-surface-block-examples` and writes `surface-block-examples.json`
+  for the five polished Block-only examples:
+  `examples/surface_block_command_palette.tetra`,
+  `examples/surface_block_project_dashboard.tetra`,
+  `examples/surface_block_settings.tetra`,
+  `examples/surface_block_editor_shell.tetra`, and
+  `examples/surface_block_glass_panel.tetra`.
+
+- `surface-headless-morph-smoke.sh` writes and validates the experimental
+  headless Morph Capsule milestone for
+  `examples/surface_morph_command_palette.tetra`. Reports keep the normal
+  `tetra.surface.runtime.v1` envelope, include Block System evidence, and add
+  `morph.schema = tetra.surface.morph.v1` with
+  `quality_level = deterministic-headless-morph-capsule-v1`. The smoke proves
+  scoped capsule tokens, materials, affordances, state lenses, motion presets,
+  recipes, recipe expansions, accessibility projection, memory-budget evidence,
+  and negative guards while keeping Morph as a recipe layer that expands into
+  Block.
+
+- `morph-gate.sh` runs the strict experimental Morph Capsule evidence gate. It
+  requires deterministic headless Morph evidence, same-commit report
+  validation through `validate-surface-morph-report`, Block System dependency
+  evidence in the same runtime envelope, final artifact hash integrity, and a
+  `tetra.surface.morph.gate.v1` summary. It is headless experimental evidence,
+  not Surface v1 production support.
+
+- `surface-linux-x64-real-window-block-system-smoke.sh` writes and validates
+  the experimental linux-x64 real-window Block-system milestone for
+  `examples/surface_block_system.tetra`. It uses the existing Wayland shm RGBA
+  real-window path, validates `block_system.schema =
+  tetra.surface.block-system.v1` through `validate-surface-block-report`,
+  records order-5 presented frame checksum evidence and native input/state
+  cases, and writes an explicit blocked status artifact when `WAYLAND_DISPLAY`
+  is unavailable instead of promoting headless evidence.
+
+- `surface-wasm32-web-browser-canvas-block-system-smoke.sh` writes and
+  validates the experimental wasm32-web browser-canvas Block-system milestone
+  for `examples/surface_block_system.tetra`. It requires a Chromium-compatible
+  browser runner, builds the wasm app with the compiler-owned loader, validates
+  wasm imports, reads back browser canvas RGBA pixels, records browser input
+  cases, rejects Node-only promotion, and keeps `no user JS` / `no DOM UI`
+  sidecar claims enforced through `validate-surface-block-report`.
+
 - `surface-headless-minimal-toolkit-smoke.sh`,
   `surface-linux-x64-real-window-minimal-toolkit-smoke.sh`, and
   `surface-wasm32-web-browser-canvas-minimal-toolkit-smoke.sh` write and

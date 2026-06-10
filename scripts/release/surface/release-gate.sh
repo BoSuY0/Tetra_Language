@@ -48,7 +48,11 @@ if [[ -z "${GOCACHE:-}" ]]; then
   export GOCACHE="$repo_root/.cache/go-build-surface-release"
 fi
 mkdir -p "$GOCACHE"
+report_dir_arg="${report_dir%/}"
+report_dir="$report_dir_arg"
 report_dir="$(surface_release_require_fresh_report_dir "$report_dir" "$repo_root" "surface_release_gate:")"
+block_system_report_dir="$report_dir_arg/block-system"
+morph_report_dir="$report_dir_arg/morph"
 
 format_command() {
   local formatted=""
@@ -87,6 +91,8 @@ bash scripts/release/surface/surface-wasm32-web-release-browser-smoke.sh --repor
 bash scripts/release/surface/surface-wasm32-web-release-text-input-smoke.sh --report-dir "$report_dir"
 bash scripts/release/surface/surface-wasm32-web-release-toolkit-smoke.sh --report-dir "$report_dir"
 bash scripts/release/surface/surface-wasm32-web-release-accessibility-smoke.sh --report-dir "$report_dir"
+bash scripts/release/surface/block-system-gate.sh --report-dir "$block_system_report_dir"
+bash scripts/release/surface/morph-gate.sh --report-dir "$morph_report_dir"
 
 summary_path="$report_dir/surface-release-summary.json"
 git_head="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
@@ -144,6 +150,10 @@ cat > "$summary_path" <<JSON
   "accessibility": "platform-bridge-v1",
   "browser_surface": "browser-canvas-release-v1",
   "linux_surface": "linux-x64-release-window-v1",
+  "block_system": "block-system",
+  "block_system_gate": "tetra.surface.block-system.gate.v1",
+  "morph": "morph-capsule",
+  "morph_gate": "tetra.surface.morph.gate.v1",
   "artifact_hashes_validated": true,
   "legacy_sidecars": false,
   "dom_ui": false,
@@ -165,6 +175,13 @@ required_reports=(
   "surface-wasm32-web-release-text-input.json"
   "surface-wasm32-web-release-toolkit.json"
   "surface-wasm32-web-release-accessibility.json"
+  "block-system/surface-block-system-gate-summary.json"
+  "block-system/headless/surface-headless-block-system.json"
+  "block-system/headless/surface-block-examples.json"
+  "block-system/linux-x64-real-window/surface-block-system-linux-x64.json"
+  "block-system/wasm32-web-browser-canvas/surface-block-system-wasm32-web.json"
+  "morph/surface-morph-gate-summary.json"
+  "morph/headless/surface-headless-morph.json"
   "surface-release-summary.json"
   "artifact-hashes.json"
 )

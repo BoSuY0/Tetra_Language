@@ -12,17 +12,18 @@ import (
 const SchemaV1 = "tetra.parallel.production.v1"
 
 type Report struct {
-	Schema     string            `json:"schema"`
-	Status     string            `json:"status"`
-	Target     string            `json:"target"`
-	Host       string            `json:"host"`
-	Runtime    string            `json:"runtime"`
-	Source     string            `json:"source"`
-	Processes  []ProcessReport   `json:"processes"`
-	Benchmarks []BenchmarkReport `json:"benchmarks"`
-	Contracts  []ContractReport  `json:"contracts"`
-	Cases      []CaseReport      `json:"cases"`
-	Audit      []AuditReport     `json:"audit"`
+	Schema      string             `json:"schema"`
+	Status      string             `json:"status"`
+	Target      string             `json:"target"`
+	Host        string             `json:"host"`
+	Runtime     string             `json:"runtime"`
+	Source      string             `json:"source"`
+	Processes   []ProcessReport    `json:"processes"`
+	Benchmarks  []BenchmarkReport  `json:"benchmarks"`
+	Contracts   []ContractReport   `json:"contracts"`
+	Cases       []CaseReport       `json:"cases"`
+	Diagnostics []DiagnosticReport `json:"diagnostics,omitempty"`
+	Audit       []AuditReport      `json:"audit"`
 }
 
 type ProcessReport struct {
@@ -41,16 +42,19 @@ type ContractReport struct {
 }
 
 type BenchmarkReport struct {
-	Name             string  `json:"name"`
-	Kind             string  `json:"kind"`
-	Metric           string  `json:"metric"`
-	Unit             string  `json:"unit"`
-	BaselineValue    int     `json:"baseline_value"`
-	MeasuredValue    int     `json:"measured_value"`
-	ImprovementRatio float64 `json:"improvement_ratio"`
-	Evidence         string  `json:"evidence"`
-	Ran              bool    `json:"ran"`
-	Pass             bool    `json:"pass"`
+	Name               string   `json:"name"`
+	Kind               string   `json:"kind"`
+	Metric             string   `json:"metric"`
+	Unit               string   `json:"unit"`
+	BaselineValue      int      `json:"baseline_value"`
+	MeasuredValue      int      `json:"measured_value"`
+	ImprovementRatio   float64  `json:"improvement_ratio"`
+	Evidence           string   `json:"evidence"`
+	ClaimTier          string   `json:"claim_tier"`
+	Claim              string   `json:"claim"`
+	RawOutputArtifacts []string `json:"raw_output_artifacts"`
+	Ran                bool     `json:"ran"`
+	Pass               bool     `json:"pass"`
 }
 
 type CaseReport struct {
@@ -60,6 +64,15 @@ type CaseReport struct {
 	Pass          bool   `json:"pass"`
 	ExpectedError string `json:"expected_error,omitempty"`
 	Error         string `json:"error,omitempty"`
+}
+
+type DiagnosticReport struct {
+	Case          string `json:"case"`
+	Code          string `json:"code"`
+	Severity      string `json:"severity"`
+	Category      string `json:"category"`
+	Position      string `json:"position"`
+	ExpectedError string `json:"expected_error"`
 }
 
 type AuditReport struct {
@@ -99,6 +112,7 @@ func ValidateReport(raw []byte) error {
 	issues = append(issues, validateBenchmarks(report.Benchmarks)...)
 	issues = append(issues, validateContracts(report.Contracts)...)
 	issues = append(issues, validateCases(report.Cases)...)
+	issues = append(issues, validateDiagnostics(report.Cases, report.Diagnostics)...)
 	issues = append(issues, validateAudit(report.Audit)...)
 	if len(issues) > 0 {
 		return errors.New(strings.Join(issues, "; "))
@@ -186,8 +200,11 @@ func validateProcesses(processes []ProcessReport) []string {
 
 func validateBenchmarks(benchmarks []BenchmarkReport) []string {
 	required := map[string]string{
-		"actor ping-pong fanout scheduler prototype":   "scheduler",
-		"zero-copy region message scheduler prototype": "transfer",
+		"actor ping-pong benchmark prep":                    "actor_benchmark_prep",
+		"actor fanout/fanin benchmark prep":                 "actor_benchmark_prep",
+		"actor mailbox throughput benchmark prep":           "actor_benchmark_prep",
+		"actor backpressure latency benchmark prep":         "actor_benchmark_prep",
+		"zero_copy_move local typed mailbox benchmark prep": "actor_transfer_prep",
 	}
 	var issues []string
 	if len(benchmarks) == 0 {
@@ -209,8 +226,8 @@ func validateBenchmarks(benchmarks []BenchmarkReport) []string {
 			if b.Kind != wantKind {
 				issues = append(issues, fmt.Sprintf("benchmark %s kind is %q, want %s", name, b.Kind, wantKind))
 			}
-		} else if b.Kind != "scheduler" && b.Kind != "transfer" {
-			issues = append(issues, fmt.Sprintf("benchmark %s kind is %q, want scheduler or transfer", name, b.Kind))
+		} else if b.Kind != "scheduler" && b.Kind != "transfer" && b.Kind != "actor_benchmark_prep" && b.Kind != "actor_transfer_prep" {
+			issues = append(issues, fmt.Sprintf("benchmark %s kind is %q, want scheduler, transfer, actor_benchmark_prep, or actor_transfer_prep", name, b.Kind))
 		}
 		if strings.TrimSpace(b.Metric) == "" {
 			issues = append(issues, fmt.Sprintf("benchmark %s metric is required", name))
@@ -218,32 +235,49 @@ func validateBenchmarks(benchmarks []BenchmarkReport) []string {
 		if strings.TrimSpace(b.Unit) == "" {
 			issues = append(issues, fmt.Sprintf("benchmark %s unit is required", name))
 		}
-		if !b.Ran {
-			issues = append(issues, fmt.Sprintf("benchmark %s did not run", name))
-		}
 		if !b.Pass {
 			issues = append(issues, fmt.Sprintf("benchmark %s did not pass", name))
 		}
-		if b.BaselineValue <= 0 {
-			issues = append(issues, fmt.Sprintf("benchmark %s baseline_value = %d, want positive", name, b.BaselineValue))
-		}
-		if b.MeasuredValue < 0 {
-			issues = append(issues, fmt.Sprintf("benchmark %s measured_value = %d, want non-negative", name, b.MeasuredValue))
-		}
-		if b.BaselineValue > 0 && b.MeasuredValue >= b.BaselineValue {
-			issues = append(issues, fmt.Sprintf("benchmark %s measured_value = %d, want less than baseline_value %d", name, b.MeasuredValue, b.BaselineValue))
-		}
-		if b.ImprovementRatio <= 1 {
-			issues = append(issues, fmt.Sprintf("benchmark %s improvement_ratio = %.3f, want > 1", name, b.ImprovementRatio))
+		switch b.ClaimTier {
+		case "tier0_local_smoke_only":
+			if b.Ran {
+				issues = append(issues, fmt.Sprintf("benchmark %s ran=true, want dry-run Tier 0 prep", name))
+			}
+			if b.BaselineValue != 0 || b.MeasuredValue != 0 || b.ImprovementRatio != 0 {
+				issues = append(issues, fmt.Sprintf("benchmark %s Tier 0 prep must not record measured improvement values", name))
+			}
+		case "tier1_local_benchmark_evidence":
+			if !b.Ran {
+				issues = append(issues, fmt.Sprintf("benchmark %s did not run for Tier 1 local evidence", name))
+			}
+			if b.BaselineValue <= 0 {
+				issues = append(issues, fmt.Sprintf("benchmark %s baseline_value = %d, want positive for Tier 1", name, b.BaselineValue))
+			}
+			if b.MeasuredValue < 0 {
+				issues = append(issues, fmt.Sprintf("benchmark %s measured_value = %d, want non-negative", name, b.MeasuredValue))
+			}
+		default:
+			issues = append(issues, fmt.Sprintf("benchmark %s claim_tier is %q, want tier0_local_smoke_only or tier1_local_benchmark_evidence", name, b.ClaimTier))
 		}
 		evidence := strings.TrimSpace(b.Evidence)
 		if evidence == "" {
 			issues = append(issues, fmt.Sprintf("benchmark %s evidence is required", name))
 		}
-		if name == "actor ping-pong fanout scheduler prototype" && !strings.Contains(strings.ToLower(evidence), "work stealing") {
+		if len(b.RawOutputArtifacts) == 0 {
+			issues = append(issues, fmt.Sprintf("benchmark %s raw output artifacts are required", name))
+		}
+		for _, artifact := range b.RawOutputArtifacts {
+			if strings.TrimSpace(artifact) == "" {
+				issues = append(issues, fmt.Sprintf("benchmark %s has empty raw output artifact path", name))
+			}
+		}
+		if err := validateBenchmarkClaim(name, b.Claim, evidence); err != nil {
+			issues = append(issues, err.Error())
+		}
+		if name == "actor fanout/fanin benchmark prep" && !strings.Contains(strings.ToLower(evidence), "work stealing") {
 			issues = append(issues, fmt.Sprintf("benchmark %s evidence must mention work stealing", name))
 		}
-		if name == "zero-copy region message scheduler prototype" && !strings.Contains(evidence, "zero_copy_move") {
+		if name == "zero_copy_move local typed mailbox benchmark prep" && !strings.Contains(evidence, "zero_copy_move") {
 			issues = append(issues, fmt.Sprintf("benchmark %s evidence must mention zero_copy_move", name))
 		}
 	}
@@ -253,6 +287,91 @@ func validateBenchmarks(benchmarks []BenchmarkReport) []string {
 		}
 	}
 	return issues
+}
+
+func validateBenchmarkClaim(name string, claim string, evidence string) error {
+	claim = strings.TrimSpace(claim)
+	if claim == "" {
+		return fmt.Errorf("benchmark %s claim is required", name)
+	}
+	lower := strings.ToLower(claim + "\n" + evidence)
+	actorBenchmarkContext := strings.Contains(lower, "actor") || strings.Contains(lower, "mailbox") || strings.Contains(lower, "zero_copy_move")
+	if actorBenchmarkContext {
+		for _, phrase := range []string{
+			"fastest",
+			"faster than",
+			"superiority",
+			"outperforms",
+			"beats rust",
+			"beats go",
+			"beats erlang",
+			"official benchmark",
+			"c++/rust parity",
+			"production throughput guarantee",
+			"real-world sla",
+		} {
+			if containsUnsafeBenchmarkPhrase(lower, phrase) {
+				return fmt.Errorf("benchmark %s actor benchmark claim uses forbidden wording %q", name, phrase)
+			}
+		}
+	}
+	if strings.Contains(lower, "zero_copy_move") {
+		for _, phrase := range []string{
+			"production runtime",
+			"distributed zero-copy",
+			"network zero-copy",
+			"cross-machine zero-copy",
+		} {
+			if containsUnsafeBenchmarkPhrase(lower, phrase) {
+				return fmt.Errorf("benchmark %s zero_copy_move claim uses forbidden wording %q", name, phrase)
+			}
+		}
+	}
+	return nil
+}
+
+func containsUnsafeBenchmarkPhrase(lower string, phrase string) bool {
+	start := 0
+	for {
+		idx := strings.Index(lower[start:], phrase)
+		if idx < 0 {
+			return false
+		}
+		idx += start
+		if !benchmarkPhraseContextIsSafeNonClaim(lower, idx, phrase) {
+			return true
+		}
+		start = idx + len(phrase)
+	}
+}
+
+func benchmarkPhraseContextIsSafeNonClaim(lower string, idx int, phrase string) bool {
+	prefixStart := idx - 56
+	if prefixStart < 0 {
+		prefixStart = 0
+	}
+	prefix := strings.TrimSpace(lower[prefixStart:idx])
+	for _, safePrefix := range []string{"no", "not", "without"} {
+		if strings.HasSuffix(prefix, safePrefix) {
+			return true
+		}
+	}
+	for _, safeBefore := range []string{"does not claim", "not claimed", "not proven", "not implied", "without claiming"} {
+		if strings.Contains(prefix, safeBefore) {
+			return true
+		}
+	}
+	suffixEnd := idx + len(phrase) + 96
+	if suffixEnd > len(lower) {
+		suffixEnd = len(lower)
+	}
+	suffix := lower[idx:suffixEnd]
+	for _, safeAfter := range []string{"not claimed", "not proven", "not implied", "is not claimed", "claim is made"} {
+		if strings.Contains(suffix, safeAfter) {
+			return true
+		}
+	}
+	return false
 }
 
 func validateContracts(contracts []ContractReport) []string {
@@ -298,9 +417,13 @@ func validateCases(cases []CaseReport) []string {
 		"select readiness":                         false,
 		"task group lifecycle":                     false,
 		"task group cancel wakes deadline join":    false,
+		"actor recv cancel wake":                   false,
 		"nested cancellation propagation":          false,
 		"task actor mailbox handoff":               false,
 		"actor mailbox backpressure":               false,
+		"message pool exhaustion":                  false,
+		"invalid actor handle send":                false,
+		"done actor send":                          false,
 		"actor failure handling":                   false,
 		"invalid handle diagnostics":               false,
 		"resource double join diagnostic":          false,
@@ -308,6 +431,9 @@ func validateCases(cases []CaseReport) []string {
 		"ownership transfer across task boundary":  false,
 		"ownership transfer across actor boundary": false,
 		"race-safety shared mutable rejection":     false,
+		"race-safety rejection matrix":             false,
+		"actor island boundary proof":              false,
+		"actor broker leak cleanup":                false,
 		"safe unsafe forbidden boundary coverage":  false,
 		"many tasks stress":                        false,
 		"many actor messages stress":               false,
@@ -367,6 +493,68 @@ func validateCases(cases []CaseReport) []string {
 	return issues
 }
 
+func validateDiagnostics(cases []CaseReport, diagnostics []DiagnosticReport) []string {
+	var issues []string
+	byCase := map[string]DiagnosticReport{}
+	for _, d := range diagnostics {
+		name := strings.TrimSpace(d.Case)
+		if name == "" {
+			issues = append(issues, "diagnostic case is required")
+			continue
+		}
+		if _, ok := byCase[name]; ok {
+			issues = append(issues, fmt.Sprintf("duplicate diagnostic for case %s", name))
+		}
+		byCase[name] = d
+	}
+	for _, c := range cases {
+		if c.Kind != "negative" {
+			continue
+		}
+		name := strings.TrimSpace(c.Name)
+		d, ok := byCase[name]
+		if !ok {
+			issues = append(issues, fmt.Sprintf("negative case %s diagnostic with code, severity, category, and position is required", name))
+			continue
+		}
+		code := strings.TrimSpace(d.Code)
+		if code == "" {
+			issues = append(issues, fmt.Sprintf("negative case %s diagnostic code is required", name))
+		}
+		lowerCode := strings.ToLower(code)
+		if strings.Contains(lowerCode, "generic") || strings.Contains(lowerCode, "placeholder") || strings.Contains(lowerCode, "backend") {
+			issues = append(issues, fmt.Sprintf("negative case %s diagnostic code %q is not stable", name, d.Code))
+		}
+		if strings.TrimSpace(d.Severity) != "error" {
+			issues = append(issues, fmt.Sprintf("negative case %s diagnostic severity is %q, want error", name, d.Severity))
+		}
+		if strings.TrimSpace(d.Category) == "" {
+			issues = append(issues, fmt.Sprintf("negative case %s diagnostic category is required", name))
+		}
+		if strings.TrimSpace(d.Position) == "" {
+			issues = append(issues, fmt.Sprintf("negative case %s diagnostic position is required", name))
+		}
+		if strings.TrimSpace(d.ExpectedError) == "" {
+			issues = append(issues, fmt.Sprintf("negative case %s diagnostic expected_error is required", name))
+		} else if d.ExpectedError != c.ExpectedError {
+			issues = append(issues, fmt.Sprintf("negative case %s diagnostic expected_error = %q, want %q", name, d.ExpectedError, c.ExpectedError))
+		}
+	}
+	for name := range byCase {
+		found := false
+		for _, c := range cases {
+			if c.Name == name && c.Kind == "negative" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			issues = append(issues, fmt.Sprintf("diagnostic for unknown negative case %s", name))
+		}
+	}
+	return issues
+}
+
 func validateAudit(audit []AuditReport) []string {
 	required := map[string]bool{
 		"production task scheduler":                                                    false,
@@ -377,7 +565,7 @@ func validateAudit(audit []AuditReport) []string {
 		"stress evidence for tasks, actor messages, cancellation storms, and timeouts": false,
 		"safe/unsafe/forbidden parallelism documentation":                              false,
 		"stable parallel diagnostics":                                                  false,
-		"per-core scheduler prototype and zero-copy transfer benchmarks":               false,
+		"actor benchmark Tier 0/Tier 1 preparation":                                    false,
 		"release-gate entrypoint":                                                      false,
 	}
 	var issues []string

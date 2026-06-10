@@ -29,19 +29,29 @@ type smokeCaseReport struct {
 	Error              string `json:"error,omitempty"`
 }
 
+type islandsDebugScopeRow struct {
+	Name     string `json:"name"`
+	Status   string `json:"status"`
+	CaseName string `json:"case_name,omitempty"`
+	SrcPath  string `json:"src_path,omitempty"`
+	Evidence string `json:"evidence"`
+	Reason   string `json:"reason"`
+}
+
 type smokeReport struct {
-	Timestamp    string            `json:"timestamp"`
-	Target       string            `json:"target"`
-	BuildOnly    bool              `json:"build_only"`
-	Runner       string            `json:"runner,omitempty"`
-	Host         string            `json:"host"`
-	Version      string            `json:"version"`
-	GitHead      string            `json:"git_head,omitempty"`
-	IslandsDebug bool              `json:"islands_debug"`
-	Total        int               `json:"total"`
-	Passed       int               `json:"passed"`
-	Failed       int               `json:"failed"`
-	Cases        []smokeCaseReport `json:"cases"`
+	Timestamp         string                 `json:"timestamp"`
+	Target            string                 `json:"target"`
+	BuildOnly         bool                   `json:"build_only"`
+	Runner            string                 `json:"runner,omitempty"`
+	Host              string                 `json:"host"`
+	Version           string                 `json:"version"`
+	GitHead           string                 `json:"git_head,omitempty"`
+	IslandsDebug      bool                   `json:"islands_debug"`
+	IslandsDebugScope []islandsDebugScopeRow `json:"islands_debug_scope,omitempty"`
+	Total             int                    `json:"total"`
+	Passed            int                    `json:"passed"`
+	Failed            int                    `json:"failed"`
+	Cases             []smokeCaseReport      `json:"cases"`
 }
 
 type smokeCase struct {
@@ -179,6 +189,9 @@ func runSmoke(args []string, stdout io.Writer, stderr io.Writer) int {
 		GitHead:      gitHead(repoRoot),
 		IslandsDebug: *islandsDebug,
 	}
+	if *islandsDebug {
+		report.IslandsDebugScope = islandsDebugScopeRows()
+	}
 	for _, c := range cases {
 		outPath := filepath.Join(outputDir, c.name+tgt.ExeExt)
 		srcAbs := filepath.Join(repoRoot, filepath.FromSlash(c.srcPath))
@@ -261,6 +274,45 @@ func runSmoke(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+func islandsDebugScopeRows() []islandsDebugScopeRow {
+	return []islandsDebugScopeRow{
+		{
+			Name:     "overflow_trap",
+			Status:   "live_trap",
+			CaseName: "islands_overflow",
+			SrcPath:  "examples/islands_overflow.tetra",
+			Evidence: "tetra smoke --islands-debug executes islands_overflow and observes non-zero trap exit",
+			Reason:   "live sanitizer trap row for bounded island allocation overflow",
+		},
+		{
+			Name:     "double_free",
+			Status:   "static_only_nonclaim",
+			CaseName: "islands_double_free",
+			SrcPath:  "examples/islands_double_free.tetra",
+			Evidence: "compiler/tests/runtime/resource_finalization_test.go; compiler/compiler_test.go; compiler/internal/backend/x64abi/abi_test.go",
+			Reason:   "static semantics reject double-free before runtime; backend freed-marker trap is covered, but no live double-free bypass is claimed",
+		},
+		{
+			Name:     "use_after_free",
+			Status:   "static_only_nonclaim",
+			Evidence: "compiler/internal/validation/validation_test.go; compiler/tests/runtime/resource_finalization_test.go",
+			Reason:   "static validation rejects island use-after-free before runtime; no live UAF sanitizer row is claimed",
+		},
+		{
+			Name:     "stale_epoch",
+			Status:   "static_only_nonclaim",
+			Evidence: "compiler/tests/runtime/resource_finalization_test.go; compiler/internal/islandkernel/kernel_test.go; compiler/internal/memoryfacts/report_test.go",
+			Reason:   "reset/stale-epoch misuse is covered by static/kernel/report validators; no live stale-epoch sanitizer row is claimed",
+		},
+		{
+			Name:     "wrong_island",
+			Status:   "static_only_nonclaim",
+			Evidence: "compiler/internal/islandkernel/kernel_test.go; tools/validators/islandproof/proof_test.go",
+			Reason:   "wrong-island proof/report misuse is covered by static verifier evidence; no live wrong-island sanitizer row is claimed",
+		},
+	}
 }
 
 func runnerName(names ...string) string {
