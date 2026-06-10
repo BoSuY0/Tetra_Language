@@ -1235,6 +1235,14 @@ func TestVerifyRAMContractCompilerDocsRejectsForbiddenClaim(t *testing.T) {
 	}
 }
 
+func TestVerifyRAMContractCompilerDocsAcceptsExplicitAllTargetParityNonclaim(t *testing.T) {
+	body := validRAMContractDocsBody() + "\nThis handoff does not claim production object memory, production persistent memory, zero heap for all programs, zero-copy for all programs, full formal proof, or all-target RAM parity. Explicitly: no all-target RAM parity claim.\n"
+	paths := writeRAMContractDocsSet(t, body)
+	if err := verifyRAMContractCompilerDocs(paths, []featureManifest{validVerifyDocsRAMContractFeature()}); err != nil {
+		t.Fatalf("verifyRAMContractCompilerDocs: %v", err)
+	}
+}
+
 func TestVerifyRAMContractCompilerDocsAcceptsScopedEvidence(t *testing.T) {
 	paths := writeRAMContractDocsSet(t, validRAMContractDocsBody())
 	if err := verifyRAMContractCompilerDocs(paths, []featureManifest{validVerifyDocsRAMContractFeature()}); err != nil {

@@ -6,6 +6,8 @@ Package workflow: `ram-contract-linux-x64`
 
 ## Required Artifacts
 
+Required artifacts:
+
 - `ram-contract-report.json`
 - `memory-grade-report.json`
 - `proof-store-summary.json`
@@ -21,4 +23,4 @@ Run the release gate with a fresh report directory. The gate runs the compiler w
 
 ## Handoff Boundaries
 
-This handoff gives downstream release packaging a scoped RAM contract evidence bundle. It does not claim production object memory, production persistent memory, zero heap for all programs, zero-copy for all programs, full formal proof, or all-target RAM parity.
+This handoff gives downstream release packaging a scoped RAM contract evidence bundle. It does not claim production object memory, production persistent memory, zero heap for all programs, zero-copy for all programs, full formal proof, or all-target RAM parity. Explicitly: no all-target RAM parity claim.

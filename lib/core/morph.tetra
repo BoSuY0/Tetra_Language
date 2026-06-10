@@ -1,5 +1,14 @@
 // Experimental Surface Morph Capsule layer.
 // Morph recipes project into lib.core.block Blocks; they do not add runtime primitives.
+// Effects: none
+// ```tetra doctest
+// func morph_doctest() -> Int:
+//     let capsule: lib.core.morph.Capsule = lib.core.morph.capsule_default()
+//     let recipe: lib.core.morph.Recipe = lib.core.morph.recipe_control_action()
+//     if lib.core.morph.capsule_valid(capsule) && lib.core.morph.recipe_expands_to_block(recipe):
+//         return lib.core.morph.schema_v1()
+//     return 0
+// ```
 module lib.core.morph
 
 import lib.core.surface as surface

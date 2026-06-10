@@ -419,7 +419,7 @@ func FeatureRegistry() []FeatureInfo {
 			ID:        "ui.surface-morph-capsule",
 			Name:      "Tetra Surface Morph Capsule",
 			Status:    FeatureStatusExperimental,
-			Scope:     "experimental Morph Capsule authoring layer over the Surface Block System; `lib.core.morph` defines scoped capsule tokens, materials, affordances, state lenses, motion presets, and recipes that expand into Block evidence for `examples/surface_morph_command_palette.tetra`; `tetra.surface.morph.gate.v1` records deterministic headless same-commit Morph reports plus artifact hashes",
+			Scope:     "experimental Morph Capsule authoring layer over the Surface Block System; `lib.core.morph` defines scoped capsule tokens, materials, affordances, state lenses, motion presets, and a recipe layer that expands into Block graph evidence for `examples/surface_morph_command_palette.tetra`; `tetra.surface.morph.gate.v1` records deterministic headless same-commit Morph reports plus artifact hashes",
 			Stability: "experimental evidence layer and not Surface v1 production support; Morph does not add core widget primitives, platform widgets, CSS cascade, DOM app logic, React/Electron runtime, GPU renderer, or cross-target desktop replacement support",
 			Docs:      []string{"docs/spec/surface_morph.md", "docs/spec/current_supported_surface.md", "docs/user/surface_guide.md", "docs/user/examples_index.md", "docs/user/standard_library_guide.md", "docs/release/surface_v1_release_contract.md", "docs/release/surface_v1_release_notes.md"},
 		},

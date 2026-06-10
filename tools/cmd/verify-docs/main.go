@@ -413,6 +413,15 @@ func forbiddenRAMContractClaims(text string) []string {
 			absolute := searchFrom + index
 			clause := clauseAround(lower, absolute, len(phrase), 260)
 			sentence := sentenceAround(lower, absolute, len(phrase), 320)
+			if explicitRAMContractPromotionContext(clause) && !explicitNonClaimContext(clause) {
+				claims = append(claims, phrase)
+				searchFrom = absolute + len(phrase)
+				continue
+			}
+			if ramContractPhraseAllowedAsExactNonClaim(phrase, clause, sentence) {
+				searchFrom = absolute + len(phrase)
+				continue
+			}
 			if !explicitNonClaimContext(clause) && !explicitNonClaimContext(sentence) {
 				claims = append(claims, phrase)
 			}
@@ -421,6 +430,37 @@ func forbiddenRAMContractClaims(text string) []string {
 	}
 	sort.Strings(claims)
 	return compactStrings(claims)
+}
+
+func explicitRAMContractPromotionContext(lower string) bool {
+	normalized := strings.NewReplacer(`"`, "", "`", "", "'", "").Replace(lower)
+	for _, marker := range []string{
+		"proves",
+		"prove",
+		"guarantees",
+		"guarantee",
+		"supports",
+		"support",
+		"delivers",
+		"deliver",
+	} {
+		if strings.Contains(normalized, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func ramContractPhraseAllowedAsExactNonClaim(phrase string, contexts ...string) bool {
+	normalizedPhrase := strings.ReplaceAll(phrase, " ", "-")
+	for _, context := range contexts {
+		normalized := strings.NewReplacer(`"`, "", "`", "", "'", "").Replace(context)
+		normalized = strings.ReplaceAll(normalized, " ", "-")
+		if strings.Contains(normalized, "no-"+normalizedPhrase+"-claim") {
+			return true
+		}
+	}
+	return false
 }
 
 func verifyWASMBackendPlan(path string, plannedTargets []string) error {
