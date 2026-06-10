@@ -17,6 +17,26 @@ func TestValidateDistributedActorRuntimeReportAcceptsExecutableEvidence(t *testi
 	}
 }
 
+func TestValidateDistributedActorRuntimeReportRequiresCurrentGitHeadMatch(t *testing.T) {
+	reportPath := filepath.Join(t.TempDir(), "distributed-actors.json")
+	if err := os.WriteFile(reportPath, validDistributedActorRuntimeReportJSON(), 0o644); err != nil {
+		t.Fatalf("write report: %v", err)
+	}
+	const reportHead = "e2c19b8ee276158f8eb2c54cf61e11bd84952893"
+	if err := validateDistributedActorRuntimeReportWithCurrentHead(reportPath, reportHead); err != nil {
+		t.Fatalf("validateDistributedActorRuntimeReportWithCurrentHead matching head failed: %v", err)
+	}
+	err := validateDistributedActorRuntimeReportWithCurrentHead(reportPath, "0000000000000000000000000000000000000000")
+	if err == nil {
+		t.Fatalf("expected current-git-head mismatch failure")
+	}
+	for _, want := range []string{"git_head", "current-git-head"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error missing %q:\n%v", want, err)
+		}
+	}
+}
+
 func TestValidateDistributedActorRuntimeReportRejectsThinPaperEvidence(t *testing.T) {
 	reportPath := filepath.Join(t.TempDir(), "distributed-actors.json")
 	raw := []byte(`{"schema":"tetra.actors.distributed-runtime.v1","status":"pass","runtime":"compiler/internal/actorsrt/distributed_runtime.go","cases":[{"name":"cross-node send/receive","pass":true}]}`)
