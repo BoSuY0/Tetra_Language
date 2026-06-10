@@ -1,6 +1,6 @@
 # RAM Contract Compiler Readiness Audit
 
-Git head: c0258b63a636775b114d69d31cb7832fc3991b05
+Git head: current validation checkout from `git rev-parse --verify HEAD`
 Working tree: dirty working tree evidence; this is not a clean release-candidate checkout claim.
 Verdict: `SCOPED_READY`
 
@@ -27,7 +27,7 @@ clean global CI pass.
 - `go test -buildvcs=false ./tools/scriptstest -run 'RAMContract|ReleasePackages|CIWorkflow|TestAll' -count=1`
 - `go test -buildvcs=false ./compiler ./cli/cmd/tetra -run 'RAMContract|FailIfHeap|EmitRAM|RAMContractFlags|MemoryBudget|TETRA4100' -count=1`
 - `bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir reports/ram-contract-release`
-- `go run -buildvcs=false ./tools/cmd/validate-ram-contract-release --report-dir reports/ram-contract-release --current-git-head c0258b63a636775b114d69d31cb7832fc3991b05`
+- `go run -buildvcs=false ./tools/cmd/validate-ram-contract-release --report-dir reports/ram-contract-release --current-git-head "$(git rev-parse --verify HEAD)"`
 - `go run -buildvcs=false ./tools/cmd/validate-artifact-hashes --manifest reports/ram-contract-release/artifact-hashes.json`
 - `bash scripts/ci/test-all.sh --quick --keep-going --report-dir reports/ci-test-all-quick-p10`
 - `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`
