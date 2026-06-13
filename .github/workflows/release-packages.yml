@@ -10,6 +10,11 @@ on:
         description: "Release version, e.g. v0.4.0"
         required: true
         default: "v0.4.0"
+      dry_run:
+        description: "Build packages and run release gates without creating releases, publishing containers, or updating taps"
+        required: true
+        type: boolean
+        default: false
       update_homebrew_tap:
         description: "Commit Formula/tetra.rb to the Homebrew tap repository"
         required: true
@@ -35,6 +40,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       HOMEBREW_TAP_REPOSITORY: ${{ inputs.homebrew_tap_repository || 'BoSuY0/homebrew-tetra' }}
+      DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
       UPDATE_HOMEBREW_TAP: ${{ inputs.update_homebrew_tap && 'true' || 'false' }}
     steps:
       - uses: actions/checkout@v4
@@ -184,7 +190,16 @@ jobs:
             ${{ steps.meta.outputs.out_dir }}/ram-contract-linux-x64/**
             ${{ steps.meta.outputs.out_dir }}/actor-runtime-foundation-linux-x64/**
 
+      - name: Dry-run summary
+        if: env.DRY_RUN == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Release package dry-run completed for ${{ steps.meta.outputs.version }} at ${{ github.sha }}"
+          echo "Publication steps were intentionally skipped."
+
       - name: Create or update GitHub Release
+        if: env.DRY_RUN != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -233,6 +248,7 @@ jobs:
           fi
 
       - name: Build container image
+        if: env.DRY_RUN != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -243,6 +259,7 @@ jobs:
             .
 
       - name: Publish GHCR image
+        if: env.DRY_RUN != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -253,7 +270,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
 
       - name: Update Homebrew tap
-        if: env.UPDATE_HOMEBREW_TAP == 'true'
+        if: env.DRY_RUN != 'true' && env.UPDATE_HOMEBREW_TAP == 'true'
         shell: bash
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}

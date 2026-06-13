@@ -254,6 +254,39 @@ func TestReleasePackagesWorkflowBindsPublishedArtifactsToCurrentCommit(t *testin
 	}
 }
 
+func TestReleasePackagesWorkflowSupportsDryRunWithoutPublication(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "release-packages.yml"))
+	if err != nil {
+		t.Fatalf("read release-packages workflow: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		"dry_run:",
+		"description: \"Build packages and run release gates without creating releases, publishing containers, or updating taps\"",
+		"DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}",
+		"name: Upload package artifacts",
+		"if: env.DRY_RUN != 'true'",
+		"name: Dry-run summary",
+		"Release package dry-run completed for ${{ steps.meta.outputs.version }} at ${{ github.sha }}",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("release-packages workflow missing dry-run guard %q", want)
+		}
+	}
+
+	for _, publishStep := range []string{
+		"name: Create or update GitHub Release",
+		"name: Build container image",
+		"name: Publish GHCR image",
+		"name: Update Homebrew tap",
+	} {
+		section := releaseStepWindow(text, publishStep, "\n      - name:")
+		if !strings.Contains(section, "if: env.DRY_RUN != 'true'") {
+			t.Fatalf("release-packages workflow publish step %q must be skipped in dry-run mode", publishStep)
+		}
+	}
+}
+
 func releaseStepWindow(workflow, start, end string) string {
 	startIdx := strings.Index(workflow, start)
 	if startIdx < 0 {
