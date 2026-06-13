@@ -1,7 +1,7 @@
 # RAM Contract Compiler Readiness Audit
 
-Git head: a563ddb16c2b513fc8cabd404831937c345e9f13
-Working tree: clean local evidence for the P15 RAM Contract slice; this is
+Git head: c642a7ee5888360912745f76db1f131c18282895
+Working tree: clean detached worktree evidence for the P21 RAM Contract refresh; this is
 not a remote release-candidate checkout claim and not a historical dirty working tree cleanup claim for older RAM audits.
 Verdict: `SCOPED_READY`
 
@@ -13,14 +13,19 @@ contract. The release gate is
 `.github/workflows/ci.yml`, and package workflow wiring lives in
 `.github/workflows/release-packages.yml`.
 
-The P15 Memory100 clean-local refresh produced current-head RAM Contract
-release evidence under
-`reports/memory-100/P15/ci-test-all-memory-100-clean-local-a563ddb-20260613_070601Z/memory-100-prod-stable/ram-contract/`.
+The P21 clean-worktree refresh produced current-head RAM Contract release
+evidence under
+`reports/surface-full-plan/P21-clean-worktree-ram-contract-c642/`.
 That RAM Contract slice was directly validated for
-`a563ddb16c2b513fc8cabd404831937c345e9f13`. This audit does not claim remote CI
-or package publication proof.
+`c642a7ee5888360912745f76db1f131c18282895` in detached clean worktree
+`/home/tetra/.codex/worktrees/Tetra_Language/surface-full-clean-c642`, then
+mirrored into this checkout's ignored `reports/` evidence directory. This audit
+does not claim remote CI or package publication proof.
 
 ## Command Evidence
+
+The broad P15 suite supplied the RAM Contract unit, integration, workflow, and
+quick CI coverage:
 
 - `go test -buildvcs=false ./tools/cmd/validate-ram-contract-release -run 'CrossFile|Heap|Copy|Grade|Row' -count=1`
 - `go test -buildvcs=false ./compiler/internal/ramcontract ./tools/cmd/validate-ram-contract-report -run 'RAMContract|Blocker|Enforce|Report' -count=1`
@@ -28,24 +33,29 @@ or package publication proof.
 - `go test -buildvcs=false ./tools/cmd/validate-ram-contract-report ./tools/cmd/validate-memory-grade-report ./tools/cmd/validate-proof-store-summary ./tools/cmd/validate-validation-pipeline-coverage ./tools/cmd/validate-heap-blockers ./tools/cmd/validate-copy-blockers ./tools/cmd/validate-ram-contract-release ./tools/cmd/ram-contract-fuzz-short ./tools/cmd/validate-ram-contract-fuzz-oracle -count=1`
 - `go test -buildvcs=false ./tools/scriptstest -run 'RAMContract|ReleasePackages|CIWorkflow|TestAll' -count=1`
 - `go test -buildvcs=false ./compiler ./cli/cmd/tetra -run 'RAMContract|FailIfHeap|EmitRAM|RAMContractFlags|MemoryBudget|TETRA4100' -count=1`
-- `bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir reports/ram-contract-release`
-- `go run -buildvcs=false ./tools/cmd/validate-ram-contract-release --report-dir reports/memory-100/P15/ci-test-all-memory-100-clean-local-a563ddb-20260613_070601Z/memory-100-prod-stable/ram-contract --current-git-head a563ddb16c2b513fc8cabd404831937c345e9f13`
-- `go run -buildvcs=false ./tools/cmd/validate-artifact-hashes --manifest reports/memory-100/P15/ci-test-all-memory-100-clean-local-a563ddb-20260613_070601Z/memory-100-prod-stable/ram-contract/artifact-hashes.json`
 - `bash scripts/ci/test-all.sh --quick --keep-going --report-dir reports/ci-test-all-quick-p10`
+
+The current-head P21 refresh reran the release smoke and validators. The default
+release report path remains `reports/ram-contract-release`; this refresh used a
+fresh scoped report directory to avoid stale artifact reuse:
+
+- `bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir reports/surface-full-plan/P21-clean-worktree-ram-contract-c642`
+- `go run -buildvcs=false ./tools/cmd/validate-ram-contract-release --report-dir reports/surface-full-plan/P21-clean-worktree-ram-contract-c642 --current-git-head c642a7ee5888360912745f76db1f131c18282895`
+- `go run -buildvcs=false ./tools/cmd/validate-artifact-hashes --manifest reports/surface-full-plan/P21-clean-worktree-ram-contract-c642/artifact-hashes.json`
 - `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`
 - `git diff --check`
 
 ## Artifact Evidence
 
-- `reports/memory-100/P15/ci-test-all-memory-100-clean-local-a563ddb-20260613_070601Z/memory-100-prod-stable/ram-contract/ram-contract-report.json`
-- `reports/memory-100/P15/ci-test-all-memory-100-clean-local-a563ddb-20260613_070601Z/memory-100-prod-stable/ram-contract/memory-grade-report.json`
-- `reports/memory-100/P15/ci-test-all-memory-100-clean-local-a563ddb-20260613_070601Z/memory-100-prod-stable/ram-contract/proof-store-summary.json`
-- `reports/memory-100/P15/ci-test-all-memory-100-clean-local-a563ddb-20260613_070601Z/memory-100-prod-stable/ram-contract/validation-pipeline-coverage.json`
-- `reports/memory-100/P15/ci-test-all-memory-100-clean-local-a563ddb-20260613_070601Z/memory-100-prod-stable/ram-contract/heap-blockers.json`
-- `reports/memory-100/P15/ci-test-all-memory-100-clean-local-a563ddb-20260613_070601Z/memory-100-prod-stable/ram-contract/copy-blockers.json`
-- `reports/memory-100/P15/ci-test-all-memory-100-clean-local-a563ddb-20260613_070601Z/memory-100-prod-stable/ram-contract/fuzz/ram-contract-fuzz-oracle.json`
-- `reports/memory-100/P15/ci-test-all-memory-100-clean-local-a563ddb-20260613_070601Z/memory-100-prod-stable/ram-contract/artifact-hashes.json`
-- `reports/memory-100/P15/ci-test-all-memory-100-clean-local-a563ddb-20260613_070601Z/memory-100-prod-stable/ram-contract/ram-contract-release-manifest.json`
+- `reports/surface-full-plan/P21-clean-worktree-ram-contract-c642/ram-contract-report.json`
+- `reports/surface-full-plan/P21-clean-worktree-ram-contract-c642/memory-grade-report.json`
+- `reports/surface-full-plan/P21-clean-worktree-ram-contract-c642/proof-store-summary.json`
+- `reports/surface-full-plan/P21-clean-worktree-ram-contract-c642/validation-pipeline-coverage.json`
+- `reports/surface-full-plan/P21-clean-worktree-ram-contract-c642/heap-blockers.json`
+- `reports/surface-full-plan/P21-clean-worktree-ram-contract-c642/copy-blockers.json`
+- `reports/surface-full-plan/P21-clean-worktree-ram-contract-c642/fuzz/ram-contract-fuzz-oracle.json`
+- `reports/surface-full-plan/P21-clean-worktree-ram-contract-c642/artifact-hashes.json`
+- `reports/surface-full-plan/P21-clean-worktree-ram-contract-c642/ram-contract-release-manifest.json`
 
 ## Nonclaims
 
