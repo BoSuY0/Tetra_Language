@@ -188,7 +188,7 @@ if [[ "${1:-}" == "test" ]]; then
         printf '%s\n' TestRAMContractFromAllocPlanTracksRowsAndBlockers TestRAMContractRejectsMissingBlockerExplanation TestRAMContractEnforcementFailsForHeap
         ;;
       ./cli/internal/actornet)
-        printf '%s\n' TestBrokerCloseWithoutCancelStopsServeWatcher TestBrokerRoutesFramesBetweenLoopbackNodesAndWritesReport TestBrokerReportsNodeDownForMissingDestination
+        printf '%s\n' TestBrokerCloseReopenWithoutGoroutineLeak TestBrokerCloseWithoutCancelStopsServeWatcher TestBrokerRoutesFramesBetweenLoopbackNodesAndWritesReport TestBrokerReportsNodeDownForMissingDestination
         ;;
     esac
     exit 0
