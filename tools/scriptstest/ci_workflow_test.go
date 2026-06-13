@@ -34,7 +34,7 @@ func TestCIWorkflowIncludesStabilizationAndRobustnessJobs(t *testing.T) {
 		"fuzz-short-linux:",
 		"bash scripts/dev/fuzz-nightly.sh --short --out-dir \"$RUNNER_TEMP/fuzz-short\"",
 		"fuzz-nightly-linux:",
-		"bash scripts/dev/fuzz-nightly.sh --fuzztime 10m --out-dir \"$RUNNER_TEMP/fuzz-nightly\"",
+			"bash scripts/dev/fuzz-nightly.sh --fuzztime 5m --out-dir \"$RUNNER_TEMP/fuzz-nightly\"",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("ci workflow missing %q", want)

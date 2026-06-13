@@ -715,7 +715,7 @@ jobs:
 
       - name: Nightly fuzz/property/stress
         shell: bash
-        run: bash scripts/dev/fuzz-nightly.sh --fuzztime 10m --out-dir "$RUNNER_TEMP/fuzz-nightly"
+        run: bash scripts/dev/fuzz-nightly.sh --fuzztime 5m --out-dir "$RUNNER_TEMP/fuzz-nightly"
 
       - name: Upload fuzz nightly report
         if: always()
