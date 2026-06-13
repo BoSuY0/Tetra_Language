@@ -93,6 +93,7 @@ func runSmoke(args []string, stdout io.Writer, stderr io.Writer) int {
 	target := fs.String("target", defaultTarget(), "target triple ("+supportedTargetsHelp+")")
 	runBuilt := fs.Bool("run", true, "run built binaries when host matches target")
 	reportPath := fs.String("report", "", "write JSON smoke report")
+	reportFormat := fs.String("report-format", "json", "smoke report format: json")
 	listCases := fs.Bool("list", false, "list smoke cases without building")
 	listFormat := fs.String("format", "text", "smoke list format: text or json")
 	islandsDebug := fs.Bool("islands-debug", false, "enable islands debug runtime checks")
@@ -117,6 +118,10 @@ func runSmoke(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 	if *listFormat != "text" {
 		fmt.Fprintln(stderr, "--format is only supported with --list")
+		return 2
+	}
+	if *reportFormat != "json" {
+		fmt.Fprintln(stderr, "unsupported --report-format")
 		return 2
 	}
 	tgt, ok := parseBuildTargetOrReport(*target, "text", stderr)

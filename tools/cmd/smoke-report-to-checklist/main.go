@@ -482,16 +482,22 @@ func main() {
 	var reportPath string
 	var islandsChecklist string
 	var actorsChecklist string
+	var reportFormat string
 	var validateOnly bool
 
 	flag.StringVar(&reportPath, "report", "", "path to tetra smoke JSON report")
 	flag.StringVar(&islandsChecklist, "islands-checklist", filepath.FromSlash("docs/checklists/islands_platform_smoke.md"), "path to islands platform checklist")
 	flag.StringVar(&actorsChecklist, "actors-checklist", filepath.FromSlash("docs/checklists/actors_platform_smoke.md"), "path to actors platform checklist")
+	flag.StringVar(&reportFormat, "format", "json", "smoke report format: json")
 	flag.BoolVar(&validateOnly, "validate-only", false, "validate smoke report JSON without updating checklists")
 	flag.Parse()
 
 	if reportPath == "" {
 		fmt.Fprintln(os.Stderr, "error: --report is required")
+		os.Exit(2)
+	}
+	if reportFormat != "json" {
+		fmt.Fprintf(os.Stderr, "error: unsupported --format %q\n", reportFormat)
 		os.Exit(2)
 	}
 	raw, err := os.ReadFile(reportPath)

@@ -1214,6 +1214,35 @@ func TestTestAllValidatesHostSmokeReport(t *testing.T) {
 	}
 }
 
+func TestTestAllDoesNotHideSmokeReportCommandFailure(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	reportDir := filepath.Join(root, "report")
+	out, err := runTestAll(t, root, []string{"TETRA_FAKE_SMOKE_REPORT_FAIL=1"}, "--quick", "--keep-going", "--json-only", "--report-dir", reportDir)
+	if err == nil {
+		t.Fatalf("expected quick gate to fail on smoke report command failure\n%s", out)
+	}
+	summary := decodeTestAllSummary(t, out)
+	if summary.Status != "fail" || summary.FailedCount != 1 {
+		t.Fatalf("summary = %#v", summary)
+	}
+	var sawHostSmokeFailure bool
+	for _, step := range summary.Steps {
+		if step.Name == "host smoke linux-x64" && step.Status == "fail" {
+			sawHostSmokeFailure = true
+		}
+	}
+	if !sawHostSmokeFailure {
+		t.Fatalf("summary missing failing host smoke step: %#v", summary.Steps)
+	}
+	logRaw, err := os.ReadFile(filepath.Join(reportDir, testAllStepLog(t, summary, "host smoke linux-x64")))
+	if err != nil {
+		t.Fatalf("read host smoke log: %v", err)
+	}
+	if !strings.Contains(string(logRaw), "smoke report failed") {
+		t.Fatalf("host smoke log missing fake smoke failure detail:\n%s", logRaw)
+	}
+}
+
 func TestTestAllFormatterCoversRuntimeSources(t *testing.T) {
 	raw, err := readTestAllScript(t)
 	if err != nil {

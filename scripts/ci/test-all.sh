@@ -703,11 +703,11 @@ run_tetra_smoke_target() {
   if wants_toon_summary; then
     smoke_report_format="both"
   fi
-  ./tetra smoke --target "$target" --run="$run_binaries" --report "$report_path" --report-format "$smoke_report_format"
-  go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$report_path" --format=json
+  ./tetra smoke --target "$target" --run="$run_binaries" --report "$report_path" --report-format "$smoke_report_format" || return 1
+  go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$report_path" --format=json || return 1
   if wants_toon_summary; then
     local toon_report_path="${report_path%.*}.toon"
-    go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$toon_report_path" --format=toon
+    go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$toon_report_path" --format=toon || return 1
   fi
 }
 
@@ -716,11 +716,11 @@ check_host_smoke() {
 }
 
 check_smoke_list() {
-  ./tetra smoke --list --target linux-x64 --format=json >"$report_dir/smoke-list.json"
-  go run ./tools/cmd/validate-smoke-list --report "$report_dir/smoke-list.json" --examples-root examples --format=json
+  ./tetra smoke --list --target linux-x64 --format=json >"$report_dir/smoke-list.json" || return 1
+  go run ./tools/cmd/validate-smoke-list --report "$report_dir/smoke-list.json" --examples-root examples --format=json || return 1
   if wants_toon_summary; then
-    ./tetra smoke --list --target linux-x64 --format=toon >"$report_dir/smoke-list.toon"
-    go run ./tools/cmd/validate-smoke-list --report "$report_dir/smoke-list.toon" --examples-root examples --format=toon
+    ./tetra smoke --list --target linux-x64 --format=toon >"$report_dir/smoke-list.toon" || return 1
+    go run ./tools/cmd/validate-smoke-list --report "$report_dir/smoke-list.toon" --examples-root examples --format=toon || return 1
   fi
 }
 

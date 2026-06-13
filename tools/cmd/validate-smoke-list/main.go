@@ -41,11 +41,17 @@ const smokeListArtifact = "tetra.release.v0_2_0.smoke-list.v1"
 func main() {
 	var path string
 	var examplesRoot string
+	var reportFormat string
 	flag.StringVar(&path, "report", "", "path to tetra smoke --list --format=json output")
 	flag.StringVar(&examplesRoot, "examples-root", "", "optional examples directory to require smoke coverage or documented exclusion")
+	flag.StringVar(&reportFormat, "format", "json", "smoke list report format: json")
 	flag.Parse()
 	if path == "" {
 		fmt.Fprintln(os.Stderr, "error: --report is required")
+		os.Exit(2)
+	}
+	if reportFormat != "json" {
+		fmt.Fprintf(os.Stderr, "error: unsupported --format %q\n", reportFormat)
 		os.Exit(2)
 	}
 	raw, err := os.ReadFile(path)

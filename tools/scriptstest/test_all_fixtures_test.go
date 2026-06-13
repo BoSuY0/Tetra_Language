@@ -421,6 +421,10 @@ shift || true
           ;;
       esac
     done
+    if [[ -n "$report" && "${TETRA_FAKE_SMOKE_REPORT_FAIL:-}" == "1" ]]; then
+      echo "smoke report failed" >&2
+      exit 23
+    fi
     if [[ -n "$report" ]]; then
       printf '{"target":"linux-x64","cases":[]}\n' >"$report"
     fi
