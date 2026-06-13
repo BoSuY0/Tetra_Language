@@ -1,6 +1,6 @@
 # RAM Contract Compiler Readiness Audit
 
-Git head: 5be23a6417b6aa1bdca888acb49a7431b9a07fa6
+Git head: ddbef83e97a5d640fef7264d74f7e269f68c8ab1
 Working tree: clean detached worktree evidence for the P34 RAM Contract refresh; this is
 not a remote release-candidate checkout claim and not a historical dirty working tree cleanup claim for older RAM audits.
 Verdict: `SCOPED_READY`
