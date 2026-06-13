@@ -121,7 +121,8 @@ jobs:
         run: |
           set -euo pipefail
           report_dir="${{ steps.meta.outputs.out_dir }}/surface-experimental-regression"
-          bash scripts/release/surface/gate.sh --report-dir "$report_dir"
+          bash scripts/ci/with-headless-wayland.sh --socket wayland-surface-experimental-release -- \
+            bash scripts/release/surface/gate.sh --report-dir "$report_dir"
 
       - name: Safe view lifetime gate
         shell: bash

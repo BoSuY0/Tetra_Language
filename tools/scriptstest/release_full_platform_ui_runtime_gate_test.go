@@ -19,6 +19,7 @@ func TestReleaseFullPlatformUIRuntimeGateRunsMandatoryEvidence(t *testing.T) {
 	for _, want := range []string{
 		"Usage: bash scripts/release/full_platform/ui-runtime-gate.sh [--report-dir DIR]",
 		"prepare_report_dir",
+		"go build -o ./tetra ./cli/cmd/tetra",
 		"go test ./compiler/... ./cli/... ./tools/... -count=1",
 		"go run ./tools/cmd/gen-manifest -o docs/generated/manifest.json",
 		"go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json",

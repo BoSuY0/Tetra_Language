@@ -132,6 +132,7 @@ write_gate_report() {
 
 prepare_report_dir
 
+run_step build-cli go build -o ./tetra ./cli/cmd/tetra
 run_step baseline-tests go test ./compiler/... ./cli/... ./tools/... -count=1
 run_step manifest-gen go run ./tools/cmd/gen-manifest -o docs/generated/manifest.json
 run_step docs-verify go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json

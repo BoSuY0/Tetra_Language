@@ -431,8 +431,8 @@ func productSummaryRequiredArtifacts() map[string]string {
 func productSummaryRequiredNonclaims() []string {
 	return []string{
 		"all-platform-surface-parity",
-		"macos-surface-production",
-		"windows-surface-production",
+		"macos-surface-production-nonclaim",
+		"windows-surface-production-nonclaim",
 		"wasm32-wasi-surface-ui-runtime",
 		"gpu-renderer",
 		"full-rich-text-editor",

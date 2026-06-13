@@ -407,25 +407,34 @@ write_security_review_detached_hash() {
 check_handoff_signoff_lint() {
   local review_path="$artifacts_dir/security-review.md"
   local lint_output
+  local lint_status
   if [[ ! -f "$review_path" ]]; then
     echo "release/v1_0/gate: missing security review for handoff/signoff lint: $review_path" >&2
     return 1
   fi
-  if ! command -v rg >/dev/null 2>&1; then
-    echo "release/v1_0/gate: rg is required for handoff/signoff lint" >&2
-    return 1
+  if command -v rg >/dev/null 2>&1; then
+    if lint_output="$(rg -n 'TODO|TBD|<[A-Za-z0-9_ ./:-]+>' docs/release/v1_0_final_handoff.md "$review_path" 2>&1)"; then
+      lint_status=0
+    else
+      lint_status="$?"
+    fi
+  else
+    if lint_output="$(grep -En 'TODO|TBD|<[A-Za-z0-9_ ./:-]+>' docs/release/v1_0_final_handoff.md "$review_path" 2>&1)"; then
+      lint_status=0
+    else
+      lint_status="$?"
+    fi
   fi
-  if lint_output="$(rg -n 'TODO|TBD|<[A-Za-z0-9_ ./:-]+>' docs/release/v1_0_final_handoff.md "$review_path" 2>&1)"; then
+  if [[ "$lint_status" -eq 0 ]]; then
     printf '%s\n' "$lint_output" >&2
     echo "release/v1_0/gate: handoff/signoff lint found unresolved placeholders" >&2
     return 1
   fi
-  local rc="$?"
-  if [[ "$rc" -eq 1 ]]; then
+  if [[ "$lint_status" -eq 1 ]]; then
     return 0
   fi
   printf '%s\n' "$lint_output" >&2
-  return "$rc"
+  return "$lint_status"
 }
 
 check_release_state() {

@@ -79,6 +79,8 @@ func TestFullPlatformUIRuntimeWorkflowAggregatesTargetHostReports(t *testing.T) 
 		"TETRA_WINDOWS_UI_RUNTIME_REPORT: reports/full-platform-ui-runtime-targets/tetra-full-platform-ui-runtime-${{ github.sha }}-windows-x64/windows-ui-runtime.json",
 		"TETRA_MACOS_UI_RUNTIME_REPORT: reports/full-platform-ui-runtime-targets/tetra-full-platform-ui-runtime-${{ github.sha }}-macos-x64/macos-ui-runtime.json",
 		"uses: actions/download-artifact@v4",
+		"Build CLI for aggregation gate",
+		"go build -o ./tetra ./cli/cmd/tetra",
 		"pattern: tetra-full-platform-ui-runtime-${{ github.sha }}-*",
 		"path: reports/full-platform-ui-runtime-targets",
 		"bash scripts/release/full_platform/ui-runtime-gate.sh --report-dir reports/full-platform-ui-runtime",
@@ -125,6 +127,8 @@ func TestMainCIWorkflowRunsFullPlatformUIRuntimeFanIn(t *testing.T) {
 		"go run ./tools/cmd/validate-macos-ui-runtime --report macos-ui-runtime.json --expected-version \"$expected_version\" --expected-git-head \"$expected_git_head\"",
 		"TETRA_WINDOWS_UI_RUNTIME_REPORT: reports/full-platform-ui-runtime-targets/tetra-full-platform-ui-runtime-${{ github.sha }}-windows-x64/windows-ui-runtime.json",
 		"TETRA_MACOS_UI_RUNTIME_REPORT: reports/full-platform-ui-runtime-targets/tetra-full-platform-ui-runtime-${{ github.sha }}-macos-x64/macos-ui-runtime.json",
+		"Build CLI for aggregation gate",
+		"go build -o ./tetra ./cli/cmd/tetra",
 		"bash scripts/release/full_platform/ui-runtime-gate.sh --report-dir reports/full-platform-ui-runtime",
 	} {
 		if !strings.Contains(text, want) {

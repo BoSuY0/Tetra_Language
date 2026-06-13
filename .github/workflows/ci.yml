@@ -273,7 +273,10 @@ jobs:
 
       - name: Surface experimental regression gate
         shell: bash
-        run: bash scripts/release/surface/gate.sh --report-dir reports/surface-experimental-regression
+        run: |
+          set -euo pipefail
+          bash scripts/ci/with-headless-wayland.sh --socket wayland-surface-experimental-ci -- \
+            bash scripts/release/surface/gate.sh --report-dir reports/surface-experimental-regression
 
       - name: Safe view lifetime gate
         shell: bash
@@ -571,6 +574,12 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.25.x"
+
+      - name: Build CLI for aggregation gate
+        shell: bash
+        run: |
+          go build -o ./tetra ./cli/cmd/tetra
+          ./tetra version
 
       - name: Download target-host UI runtime reports
         uses: actions/download-artifact@v4
