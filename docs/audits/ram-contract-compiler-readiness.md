@@ -1,6 +1,6 @@
 # RAM Contract Compiler Readiness Audit
 
-Git head: 544aabb58504ec711f95b8d60906fff601d6049d
+Git head: d2b95cd4b5641a3bcf88a271ddcb13481e084b31
 Working tree: clean detached worktree evidence for the P32 RAM Contract refresh; this is
 not a remote release-candidate checkout claim and not a historical dirty working tree cleanup claim for older RAM audits.
 Verdict: `SCOPED_READY`
@@ -13,13 +13,13 @@ contract. The release gate is
 `.github/workflows/ci.yml`, and package workflow wiring lives in
 `.github/workflows/release-packages.yml`.
 
-The P32 clean-worktree refresh produced direct-parent RAM Contract release
+The DW17 clean-proof refresh produced direct-parent RAM Contract release
 evidence under
-`reports/surface-full-plan/P32-clean-worktree-ram-contract-544aabb/`.
+`reports/actor-runtime-foundation/dw17-clean-ram-contract-d2b95cd4/`.
 That RAM Contract slice was directly validated for
-`544aabb58504ec711f95b8d60906fff601d6049d` in detached clean worktree
-`/home/tetra/.codex/worktrees/Tetra_Language/ram-contract-clean-544aabb`, then
-mirrored into this checkout's ignored `reports/` evidence directory. This audit
+`d2b95cd4b5641a3bcf88a271ddcb13481e084b31` in clean worktree
+`/home/tetra/.codex/worktrees/Tetra_Language/actor-runtime-dw17-clean-proof`,
+then kept in that checkout's ignored `reports/` evidence directory. This audit
 does not claim remote CI or package publication proof.
 
 ## Command Evidence
@@ -39,23 +39,23 @@ The direct-parent P32 refresh reran the release smoke and validators. The defaul
 release report path remains `reports/ram-contract-release`; this refresh used a
 fresh scoped report directory to avoid stale artifact reuse:
 
-- `bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir reports/surface-full-plan/P32-clean-worktree-ram-contract-544aabb`
-- `go run -buildvcs=false ./tools/cmd/validate-ram-contract-release --report-dir reports/surface-full-plan/P32-clean-worktree-ram-contract-544aabb --current-git-head 544aabb58504ec711f95b8d60906fff601d6049d`
-- `go run -buildvcs=false ./tools/cmd/validate-artifact-hashes --manifest reports/surface-full-plan/P32-clean-worktree-ram-contract-544aabb/artifact-hashes.json`
+- `bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir reports/actor-runtime-foundation/dw17-clean-ram-contract-d2b95cd4`
+- `go run -buildvcs=false ./tools/cmd/validate-ram-contract-release --report-dir reports/actor-runtime-foundation/dw17-clean-ram-contract-d2b95cd4 --current-git-head d2b95cd4b5641a3bcf88a271ddcb13481e084b31`
+- `go run -buildvcs=false ./tools/cmd/validate-artifact-hashes --manifest reports/actor-runtime-foundation/dw17-clean-ram-contract-d2b95cd4/artifact-hashes.json`
 - `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`
 - `git diff --check`
 
 ## Artifact Evidence
 
-- `reports/surface-full-plan/P32-clean-worktree-ram-contract-544aabb/ram-contract-report.json`
-- `reports/surface-full-plan/P32-clean-worktree-ram-contract-544aabb/memory-grade-report.json`
-- `reports/surface-full-plan/P32-clean-worktree-ram-contract-544aabb/proof-store-summary.json`
-- `reports/surface-full-plan/P32-clean-worktree-ram-contract-544aabb/validation-pipeline-coverage.json`
-- `reports/surface-full-plan/P32-clean-worktree-ram-contract-544aabb/heap-blockers.json`
-- `reports/surface-full-plan/P32-clean-worktree-ram-contract-544aabb/copy-blockers.json`
-- `reports/surface-full-plan/P32-clean-worktree-ram-contract-544aabb/fuzz/ram-contract-fuzz-oracle.json`
-- `reports/surface-full-plan/P32-clean-worktree-ram-contract-544aabb/artifact-hashes.json`
-- `reports/surface-full-plan/P32-clean-worktree-ram-contract-544aabb/ram-contract-release-manifest.json`
+- `reports/actor-runtime-foundation/dw17-clean-ram-contract-d2b95cd4/ram-contract-report.json`
+- `reports/actor-runtime-foundation/dw17-clean-ram-contract-d2b95cd4/memory-grade-report.json`
+- `reports/actor-runtime-foundation/dw17-clean-ram-contract-d2b95cd4/proof-store-summary.json`
+- `reports/actor-runtime-foundation/dw17-clean-ram-contract-d2b95cd4/validation-pipeline-coverage.json`
+- `reports/actor-runtime-foundation/dw17-clean-ram-contract-d2b95cd4/heap-blockers.json`
+- `reports/actor-runtime-foundation/dw17-clean-ram-contract-d2b95cd4/copy-blockers.json`
+- `reports/actor-runtime-foundation/dw17-clean-ram-contract-d2b95cd4/fuzz/ram-contract-fuzz-oracle.json`
+- `reports/actor-runtime-foundation/dw17-clean-ram-contract-d2b95cd4/artifact-hashes.json`
+- `reports/actor-runtime-foundation/dw17-clean-ram-contract-d2b95cd4/ram-contract-release-manifest.json`
 
 ## Nonclaims
 
