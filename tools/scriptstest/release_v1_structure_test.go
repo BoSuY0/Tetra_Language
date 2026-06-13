@@ -2,6 +2,7 @@ package scriptstest
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -344,6 +345,23 @@ func TestReleaseV1TestsAreSplitByFixtureDomain(t *testing.T) {
 	} {
 		if strings.Contains(text, "\nfunc "+symbol+"(") {
 			t.Fatalf("release_v1_test.go still contains %s", symbol)
+		}
+	}
+}
+
+func TestTestAllBehaviorFixtureIsCanonicalInScriptstest(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "cli", "cmd", "tetra", "test_all_script_test.go"))
+	if err != nil {
+		t.Fatalf("read cli test-all smoke test: %v", err)
+	}
+	text := string(raw)
+	for _, forbidden := range []string{
+		"func TestTestAllScriptKeepGoingJSONOnly(",
+		"./tools/cmd/ram-contract-fuzz-short",
+		"scripts/ci/test-all.sh\", scriptRaw",
+	} {
+		if strings.Contains(text, forbidden) {
+			t.Fatalf("cli/cmd/tetra/test_all_script_test.go must not duplicate test-all behavior fixture %q; keep it in tools/scriptstest", forbidden)
 		}
 	}
 }
