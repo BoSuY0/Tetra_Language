@@ -136,6 +136,26 @@ jobs:
           report_dir="${{ steps.meta.outputs.out_dir }}/surface-api-stability-v1"
           bash scripts/release/surface/api-stability-gate.sh --report-dir "$report_dir"
 
+      - name: Surface final readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          export GOTELEMETRY=off
+          export GOCACHE="${PWD}/.cache/go-build-surface-final-readiness-release"
+          export GOTMPDIR="${PWD}/.cache/go-tmp-surface-final-readiness-release"
+          mkdir -p "$GOCACHE" "$GOTMPDIR"
+          report_dir="${{ steps.meta.outputs.out_dir }}/surface-ui-production-final"
+          product_report_dir="${{ steps.meta.outputs.out_dir }}/surface-product-v1"
+          mkdir -p "$report_dir"
+          go run ./tools/cmd/validate-surface-final-readiness --write \
+            --report-dir "$report_dir" \
+            --product-report-dir "$product_report_dir" \
+            --expected-scope surface-v1-linux-web \
+            --current-git-head "${GITHUB_SHA}"
+          go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"
+          go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-hashes.json"
+          go run ./tools/cmd/validate-surface-final-readiness --report-dir "$report_dir" --expected-scope surface-v1-linux-web --require-clean --require-package
+
       - name: Integrated Memory/Islands/Surface release gate
         shell: bash
         run: |
@@ -191,6 +211,7 @@ jobs:
             ${{ steps.meta.outputs.out_dir }}/surface-experimental-regression/**
             ${{ steps.meta.outputs.out_dir }}/safe-view-lifetime/**
             ${{ steps.meta.outputs.out_dir }}/surface-api-stability-v1/**
+            ${{ steps.meta.outputs.out_dir }}/surface-ui-production-final/**
             ${{ steps.meta.outputs.out_dir }}/memory-islands-surface-production/**
             ${{ steps.meta.outputs.out_dir }}/ram-contract-linux-x64/**
             ${{ steps.meta.outputs.out_dir }}/actor-runtime-foundation-linux-x64/**
@@ -222,7 +243,7 @@ jobs:
           Package publishing for this workflow runs the Linux-x64 memory production release gate and uploads its `memory-production-linux-x64.json`, `targets.json`, and `artifact-hashes.json` evidence.
           RAM Contract Compiler evidence runs the strict Linux-x64 RAM contract release gate before publishing and uploads its `ram-contract-report.json`, `memory-grade-report.json`, `proof-store-summary.json`, `validation-pipeline-coverage.json`, `heap-blockers.json`, `copy-blockers.json`, and `ram-contract-fuzz-oracle.json` evidence.
           Memory production evidence remains Linux-x64 scoped unless a target-specific runtime gate says otherwise.
-          Surface v1 product evidence runs the Surface product gate, experimental regression gate, safe-view lifetime gate, and API stability gate before publishing.
+          Surface v1 product evidence runs the Surface product gate, experimental regression gate, safe-view lifetime gate, API stability gate, and final readiness validator before publishing.
           Integrated Memory/Islands/Surface evidence runs the strict integrated gate before publishing and uploads its `memory-islands-surface-production-manifest.json`, `artifact-hashes.json`, `islands-debug-smoke.json`, `island-proof-verifier.json`, and `island-proof-fuzz-summary.json` evidence.
           Actor runtime foundation evidence runs the strict Linux-x64 gate before publishing and uploads its `actor-runtime-foundation-manifest.json`, `artifact-hashes.json`, `distributed-actors-linux-x64/distributed-actors-linux-x64.json`, and `parallel-production-linux-x64/parallel-production-linux-x64.json` evidence.
           Memory100 scoped prod-stable evidence runs the strict aggregate gate before publishing and uploads its `memory-100-prod-stable-manifest.json`, `artifact-hashes.json`, `runtime-memory/runtime-memory-contract.json`, and `proof-transition/proof-transition-report.json` evidence.

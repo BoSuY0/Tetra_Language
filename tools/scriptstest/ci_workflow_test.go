@@ -124,6 +124,15 @@ func TestCIWorkflowIncludesSurfaceReleaseReadinessJob(t *testing.T) {
 		"go run ./tools/cmd/validate-manifest --manifest docs/generated/manifest.json",
 		"go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json",
 		"git diff --exit-code -- docs/generated/manifest.json",
+		"name: Surface final readiness",
+		"mkdir -p reports/surface-ui-production-final",
+		"go run ./tools/cmd/validate-surface-final-readiness --write",
+		"--report-dir reports/surface-ui-production-final",
+		"--product-report-dir reports/surface-product-v1",
+		"--current-git-head \"${GITHUB_SHA}\"",
+		"go run ./tools/cmd/validate-artifact-hashes --write --root reports/surface-ui-production-final --out reports/surface-ui-production-final/artifact-hashes.json",
+		"go run ./tools/cmd/validate-artifact-hashes --manifest reports/surface-ui-production-final/artifact-hashes.json",
+		"go run ./tools/cmd/validate-surface-final-readiness --report-dir reports/surface-ui-production-final --expected-scope surface-v1-linux-web --require-clean --require-package",
 		"name: Upload release reports",
 		"if: always()",
 		"uses: actions/upload-artifact@v4",
@@ -135,6 +144,7 @@ func TestCIWorkflowIncludesSurfaceReleaseReadinessJob(t *testing.T) {
 		"reports/surface-experimental-regression",
 		"reports/safe-view-lifetime",
 		"reports/surface-api-stability-v1",
+		"reports/surface-ui-production-final",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("ci workflow missing Surface release readiness detail %q", want)
@@ -315,10 +325,13 @@ func TestSurfaceReleaseReadinessWorkflowRunsNonOptionalSurfaceGates(t *testing.T
 		"bash scripts/release/surface/gate.sh --report-dir reports/surface-experimental-regression",
 		"bash scripts/release/safe-view-lifetime/gate.sh --report-dir reports/safe-view-lifetime",
 		"bash scripts/release/surface/api-stability-gate.sh --report-dir reports/surface-api-stability-v1",
+		"go run ./tools/cmd/validate-surface-final-readiness --write",
+		"go run ./tools/cmd/validate-surface-final-readiness --report-dir reports/surface-ui-production-final --expected-scope surface-v1-linux-web --require-clean --require-package",
 		"reports/surface-product-v1",
 		"reports/surface-experimental-regression",
 		"reports/safe-view-lifetime",
 		"reports/surface-api-stability-v1",
+		"reports/surface-ui-production-final",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("ci workflow missing non-optional Surface release readiness detail %q", want)
@@ -338,6 +351,9 @@ func TestSurfaceProductGateWorkflowWiringHasNoBypass(t *testing.T) {
 		"name: Surface product gate",
 		"bash scripts/release/surface/product-gate.sh --report-dir reports/surface-product-v1",
 		"name: Surface experimental regression gate",
+		"name: Surface final readiness",
+		"validate-surface-final-readiness --write",
+		"validate-surface-final-readiness --report-dir reports/surface-ui-production-final",
 		"name: Upload release reports",
 		"uses: actions/upload-artifact@v4",
 	)

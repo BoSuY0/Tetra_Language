@@ -63,11 +63,22 @@ func TestReleasePackagesRunsSurfaceGateBeforePublishing(t *testing.T) {
 		"name: Surface API stability gate",
 		`report_dir="${{ steps.meta.outputs.out_dir }}/surface-api-stability-v1"`,
 		`bash scripts/release/surface/api-stability-gate.sh --report-dir "$report_dir"`,
+		"name: Surface final readiness",
+		`report_dir="${{ steps.meta.outputs.out_dir }}/surface-ui-production-final"`,
+		`product_report_dir="${{ steps.meta.outputs.out_dir }}/surface-product-v1"`,
+		`go run ./tools/cmd/validate-surface-final-readiness --write`,
+		`--report-dir "$report_dir"`,
+		`--product-report-dir "$product_report_dir"`,
+		`--current-git-head "${GITHUB_SHA}"`,
+		`go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"`,
+		`go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-hashes.json"`,
+		`go run ./tools/cmd/validate-surface-final-readiness --report-dir "$report_dir" --expected-scope surface-v1-linux-web --require-clean --require-package`,
 		`${{ steps.meta.outputs.out_dir }}/surface-product-v1/**`,
 		`${{ steps.meta.outputs.out_dir }}/surface-experimental-regression/**`,
 		`${{ steps.meta.outputs.out_dir }}/safe-view-lifetime/**`,
 		`${{ steps.meta.outputs.out_dir }}/surface-api-stability-v1/**`,
-		"Surface v1 product evidence runs the Surface product gate, experimental regression gate, safe-view lifetime gate, and API stability gate before publishing.",
+		`${{ steps.meta.outputs.out_dir }}/surface-ui-production-final/**`,
+		"Surface v1 product evidence runs the Surface product gate, experimental regression gate, safe-view lifetime gate, API stability gate, and final readiness validator before publishing.",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("release-packages workflow missing Surface gate detail %q", want)
@@ -94,6 +105,12 @@ func TestReleasePackagesRunsSurfaceGateBeforePublishing(t *testing.T) {
 	for _, forbidden := range []string{"continue-on-error", "|| true", "set +e", "GOCACHE=/tmp", "GOTMPDIR=/tmp"} {
 		if strings.Contains(section, forbidden) {
 			t.Fatalf("Surface product release package gate must not contain bypass or tmpfs cache marker %q", forbidden)
+		}
+	}
+	finalSection := releaseStepWindow(text, "name: Surface final readiness", "name: Integrated Memory/Islands/Surface release gate")
+	for _, forbidden := range []string{"continue-on-error", "|| true", "set +e", "GOCACHE=/tmp", "GOTMPDIR=/tmp"} {
+		if strings.Contains(finalSection, forbidden) {
+			t.Fatalf("Surface final readiness release package gate must not contain bypass or tmpfs cache marker %q", forbidden)
 		}
 	}
 }

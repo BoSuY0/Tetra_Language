@@ -289,6 +289,24 @@ jobs:
           go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
           git diff --exit-code -- docs/generated/manifest.json
 
+      - name: Surface final readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          export GOTELEMETRY=off
+          export GOCACHE="${PWD}/.cache/go-build-surface-final-readiness-ci"
+          export GOTMPDIR="${PWD}/.cache/go-tmp-surface-final-readiness-ci"
+          mkdir -p "$GOCACHE" "$GOTMPDIR"
+          mkdir -p reports/surface-ui-production-final
+          go run ./tools/cmd/validate-surface-final-readiness --write \
+            --report-dir reports/surface-ui-production-final \
+            --product-report-dir reports/surface-product-v1 \
+            --expected-scope surface-v1-linux-web \
+            --current-git-head "${GITHUB_SHA}"
+          go run ./tools/cmd/validate-artifact-hashes --write --root reports/surface-ui-production-final --out reports/surface-ui-production-final/artifact-hashes.json
+          go run ./tools/cmd/validate-artifact-hashes --manifest reports/surface-ui-production-final/artifact-hashes.json
+          go run ./tools/cmd/validate-surface-final-readiness --report-dir reports/surface-ui-production-final --expected-scope surface-v1-linux-web --require-clean --require-package
+
       - name: Upload release reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -302,6 +320,7 @@ jobs:
             reports/surface-experimental-regression
             reports/safe-view-lifetime
             reports/surface-api-stability-v1
+            reports/surface-ui-production-final
 
   memory-islands-surface-release-readiness-linux:
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
