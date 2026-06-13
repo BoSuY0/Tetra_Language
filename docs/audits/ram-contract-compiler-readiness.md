@@ -1,7 +1,7 @@
 # RAM Contract Compiler Readiness Audit
 
-Git head: c642a7ee5888360912745f76db1f131c18282895
-Working tree: clean detached worktree evidence for the P21 RAM Contract refresh; this is
+Git head: cafefd6865afca1de0d263b6cee71b2f8dcbc92e
+Working tree: clean detached worktree evidence for the P22 RAM Contract refresh; this is
 not a remote release-candidate checkout claim and not a historical dirty working tree cleanup claim for older RAM audits.
 Verdict: `SCOPED_READY`
 
@@ -13,12 +13,12 @@ contract. The release gate is
 `.github/workflows/ci.yml`, and package workflow wiring lives in
 `.github/workflows/release-packages.yml`.
 
-The P21 clean-worktree refresh produced current-head RAM Contract release
+The P22 clean-worktree refresh produced current-head RAM Contract release
 evidence under
-`reports/surface-full-plan/P21-clean-worktree-ram-contract-c642/`.
+`reports/surface-full-plan/P22-clean-worktree-ram-contract-cafefd6/`.
 That RAM Contract slice was directly validated for
-`c642a7ee5888360912745f76db1f131c18282895` in detached clean worktree
-`/home/tetra/.codex/worktrees/Tetra_Language/surface-full-clean-c642`, then
+`cafefd6865afca1de0d263b6cee71b2f8dcbc92e` in detached clean worktree
+`/home/tetra/.codex/worktrees/Tetra_Language/surface-full-clean-cafefd6`, then
 mirrored into this checkout's ignored `reports/` evidence directory. This audit
 does not claim remote CI or package publication proof.
 
@@ -39,23 +39,23 @@ The current-head P21 refresh reran the release smoke and validators. The default
 release report path remains `reports/ram-contract-release`; this refresh used a
 fresh scoped report directory to avoid stale artifact reuse:
 
-- `bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir reports/surface-full-plan/P21-clean-worktree-ram-contract-c642`
-- `go run -buildvcs=false ./tools/cmd/validate-ram-contract-release --report-dir reports/surface-full-plan/P21-clean-worktree-ram-contract-c642 --current-git-head c642a7ee5888360912745f76db1f131c18282895`
-- `go run -buildvcs=false ./tools/cmd/validate-artifact-hashes --manifest reports/surface-full-plan/P21-clean-worktree-ram-contract-c642/artifact-hashes.json`
+- `bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir reports/surface-full-plan/P22-clean-worktree-ram-contract-cafefd6`
+- `go run -buildvcs=false ./tools/cmd/validate-ram-contract-release --report-dir reports/surface-full-plan/P22-clean-worktree-ram-contract-cafefd6 --current-git-head cafefd6865afca1de0d263b6cee71b2f8dcbc92e`
+- `go run -buildvcs=false ./tools/cmd/validate-artifact-hashes --manifest reports/surface-full-plan/P22-clean-worktree-ram-contract-cafefd6/artifact-hashes.json`
 - `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`
 - `git diff --check`
 
 ## Artifact Evidence
 
-- `reports/surface-full-plan/P21-clean-worktree-ram-contract-c642/ram-contract-report.json`
-- `reports/surface-full-plan/P21-clean-worktree-ram-contract-c642/memory-grade-report.json`
-- `reports/surface-full-plan/P21-clean-worktree-ram-contract-c642/proof-store-summary.json`
-- `reports/surface-full-plan/P21-clean-worktree-ram-contract-c642/validation-pipeline-coverage.json`
-- `reports/surface-full-plan/P21-clean-worktree-ram-contract-c642/heap-blockers.json`
-- `reports/surface-full-plan/P21-clean-worktree-ram-contract-c642/copy-blockers.json`
-- `reports/surface-full-plan/P21-clean-worktree-ram-contract-c642/fuzz/ram-contract-fuzz-oracle.json`
-- `reports/surface-full-plan/P21-clean-worktree-ram-contract-c642/artifact-hashes.json`
-- `reports/surface-full-plan/P21-clean-worktree-ram-contract-c642/ram-contract-release-manifest.json`
+- `reports/surface-full-plan/P22-clean-worktree-ram-contract-cafefd6/ram-contract-report.json`
+- `reports/surface-full-plan/P22-clean-worktree-ram-contract-cafefd6/memory-grade-report.json`
+- `reports/surface-full-plan/P22-clean-worktree-ram-contract-cafefd6/proof-store-summary.json`
+- `reports/surface-full-plan/P22-clean-worktree-ram-contract-cafefd6/validation-pipeline-coverage.json`
+- `reports/surface-full-plan/P22-clean-worktree-ram-contract-cafefd6/heap-blockers.json`
+- `reports/surface-full-plan/P22-clean-worktree-ram-contract-cafefd6/copy-blockers.json`
+- `reports/surface-full-plan/P22-clean-worktree-ram-contract-cafefd6/fuzz/ram-contract-fuzz-oracle.json`
+- `reports/surface-full-plan/P22-clean-worktree-ram-contract-cafefd6/artifact-hashes.json`
+- `reports/surface-full-plan/P22-clean-worktree-ram-contract-cafefd6/ram-contract-release-manifest.json`
 
 ## Nonclaims
 

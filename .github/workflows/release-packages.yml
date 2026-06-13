@@ -113,6 +113,32 @@ jobs:
         run: |
           set -euo pipefail
           report_dir="${{ steps.meta.outputs.out_dir }}/surface-product-v1"
+          if ! command -v weston >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y weston
+          fi
+          export XDG_RUNTIME_DIR="${RUNNER_TEMP:-/tmp}/surface-wayland-runtime"
+          mkdir -p "$XDG_RUNTIME_DIR"
+          chmod 700 "$XDG_RUNTIME_DIR"
+          weston_log="${RUNNER_TEMP:-/tmp}/surface-weston.log"
+          weston --backend=headless-backend.so --socket=wayland-surface-release --idle-time=0 >"$weston_log" 2>&1 &
+          weston_pid=$!
+          cleanup_weston() {
+            kill "$weston_pid" >/dev/null 2>&1
+          }
+          trap cleanup_weston EXIT
+          waited=0
+          while [[ ! -S "$XDG_RUNTIME_DIR/wayland-surface-release" && "$waited" -lt 100 ]]; do
+            sleep 0.1
+            waited=$((waited + 1))
+          done
+          if [[ ! -S "$XDG_RUNTIME_DIR/wayland-surface-release" ]]; then
+            if [[ -f "$weston_log" ]]; then
+              cat "$weston_log" >&2
+            fi
+            exit 1
+          fi
+          export WAYLAND_DISPLAY=wayland-surface-release
           bash scripts/release/surface/product-gate.sh --report-dir "$report_dir"
 
       - name: Surface experimental regression gate
@@ -224,20 +250,32 @@ jobs:
           version="${{ steps.meta.outputs.version }}"
           out_dir="${{ steps.meta.outputs.out_dir }}"
           notes="$out_dir/release-notes.md"
-          cat > "$notes" <<EOF
-          Tetra Language ${version}
+          release_image="${{ steps.meta.outputs.image }}"
+          release_image_version="${{ steps.meta.outputs.image_version }}"
+          VERSION="$version" NOTES="$notes" RELEASE_IMAGE="$release_image" RELEASE_IMAGE_VERSION="$release_image_version" python - <<'PY'
+          import os
+          import textwrap
+          from pathlib import Path
+
+          version = os.environ["VERSION"]
+          repository = os.environ["GITHUB_REPOSITORY"]
+          image = os.environ["RELEASE_IMAGE"]
+          image_version = os.environ["RELEASE_IMAGE_VERSION"]
+          notes = Path(os.environ["NOTES"])
+          notes.write_text(textwrap.dedent(f"""\
+          Tetra Language {version}
 
           Install Linux x64:
 
-          \`\`\`sh
-          curl -fsSL https://github.com/${GITHUB_REPOSITORY}/releases/download/${version}/install.sh | bash
-          \`\`\`
+          ```sh
+          curl -fsSL https://github.com/{repository}/releases/download/{version}/install.sh | bash
+          ```
 
           Container:
 
-          \`\`\`sh
-          docker run --rm ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.image_version }} tetra version
-          \`\`\`
+          ```sh
+          docker run --rm {image}:{image_version} tetra version
+          ```
 
           This release publishes the current v0.4.0 local compiler/tooling profile. Linux x64 is the release binary baseline; other runtime target claims remain gated by project evidence.
           Package publishing for this workflow runs the Linux-x64 memory production release gate and uploads its `memory-production-linux-x64.json`, `targets.json`, and `artifact-hashes.json` evidence.
@@ -250,7 +288,8 @@ jobs:
           Actor runtime foundation evidence remains Linux-x64 scoped; Erlang/OTP, cluster membership, reconnect/retry production, non-Linux distributed runtime, distributed zero-copy transfer, and formal race proof are not claimed.
           Surface v1 package notes are scoped to headless, linux-x64 real-window, and wasm32-web browser-canvas evidence; macOS, Windows, wasm32-wasi, GPU rendering, platform-native widgets, DOM/React/user-JS app UI, rich text editor, and full screen-reader support are not claimed.
           No fastest-language, official benchmark, target parity, or broad zero-cost performance claim is made by these package notes.
-          EOF
+          """), encoding="utf-8")
+          PY
           if gh release view "$version" >/dev/null 2>&1; then
             existing_target="$(gh release view "$version" --json targetCommitish -q .targetCommitish)"
             if [[ "$existing_target" != "$GITHUB_SHA" ]]; then
