@@ -1,7 +1,8 @@
 # RAM Contract Compiler Readiness Audit
 
-Git head: a49094bffbfe59083b4f995845743e29adc612ca
-Working tree: dirty working tree evidence; this is not a clean release-candidate checkout claim.
+Git head: b9b98539b31825e293d134ae80b7fe53c0667afa
+Working tree: clean local evidence for the P15 RAM Contract slice; this is
+not a remote release-candidate checkout claim and not a historical dirty working tree cleanup claim for older RAM audits.
 Verdict: `SCOPED_READY`
 
 ## Scope
@@ -12,11 +13,12 @@ contract. The release gate is
 `.github/workflows/ci.yml`, and package workflow wiring lives in
 `.github/workflows/release-packages.yml`.
 
-The final RAM contract CI/test-all gate passed in
-`reports/ci-test-all-quick-p10/summary.json`. That same quick wrapper still
-exited 1 because the unrelated `formatter check examples lib runtime` step
-listed `examples/surface_block_*` and `lib/core/*`; this audit does not claim a
-clean global CI pass.
+The P15 Memory100 clean-local refresh produced current-head RAM Contract
+release evidence under
+`reports/memory-100/P15/ci-test-all-memory-100-clean-local-20260613_065519Z/memory-100-prod-stable/ram-contract/`.
+That RAM Contract slice was directly validated for
+`b9b98539b31825e293d134ae80b7fe53c0667afa`. This audit does not claim remote CI
+or package publication proof.
 
 ## Command Evidence
 
@@ -27,23 +29,23 @@ clean global CI pass.
 - `go test -buildvcs=false ./tools/scriptstest -run 'RAMContract|ReleasePackages|CIWorkflow|TestAll' -count=1`
 - `go test -buildvcs=false ./compiler ./cli/cmd/tetra -run 'RAMContract|FailIfHeap|EmitRAM|RAMContractFlags|MemoryBudget|TETRA4100' -count=1`
 - `bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir reports/ram-contract-release`
-- `go run -buildvcs=false ./tools/cmd/validate-ram-contract-release --report-dir reports/ram-contract-release --current-git-head c0258b63a636775b114d69d31cb7832fc3991b05`
-- `go run -buildvcs=false ./tools/cmd/validate-artifact-hashes --manifest reports/ram-contract-release/artifact-hashes.json`
+- `go run -buildvcs=false ./tools/cmd/validate-ram-contract-release --report-dir reports/memory-100/P15/ci-test-all-memory-100-clean-local-20260613_065519Z/memory-100-prod-stable/ram-contract --current-git-head b9b98539b31825e293d134ae80b7fe53c0667afa`
+- `go run -buildvcs=false ./tools/cmd/validate-artifact-hashes --manifest reports/memory-100/P15/ci-test-all-memory-100-clean-local-20260613_065519Z/memory-100-prod-stable/ram-contract/artifact-hashes.json`
 - `bash scripts/ci/test-all.sh --quick --keep-going --report-dir reports/ci-test-all-quick-p10`
 - `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`
 - `git diff --check`
 
 ## Artifact Evidence
 
-- `reports/ram-contract-release/ram-contract-report.json`
-- `reports/ram-contract-release/memory-grade-report.json`
-- `reports/ram-contract-release/proof-store-summary.json`
-- `reports/ram-contract-release/validation-pipeline-coverage.json`
-- `reports/ram-contract-release/heap-blockers.json`
-- `reports/ram-contract-release/copy-blockers.json`
-- `reports/ram-contract-release/fuzz/ram-contract-fuzz-oracle.json`
-- `reports/ram-contract-release/artifact-hashes.json`
-- `reports/ram-contract-release/ram-contract-release-manifest.json`
+- `reports/memory-100/P15/ci-test-all-memory-100-clean-local-20260613_065519Z/memory-100-prod-stable/ram-contract/ram-contract-report.json`
+- `reports/memory-100/P15/ci-test-all-memory-100-clean-local-20260613_065519Z/memory-100-prod-stable/ram-contract/memory-grade-report.json`
+- `reports/memory-100/P15/ci-test-all-memory-100-clean-local-20260613_065519Z/memory-100-prod-stable/ram-contract/proof-store-summary.json`
+- `reports/memory-100/P15/ci-test-all-memory-100-clean-local-20260613_065519Z/memory-100-prod-stable/ram-contract/validation-pipeline-coverage.json`
+- `reports/memory-100/P15/ci-test-all-memory-100-clean-local-20260613_065519Z/memory-100-prod-stable/ram-contract/heap-blockers.json`
+- `reports/memory-100/P15/ci-test-all-memory-100-clean-local-20260613_065519Z/memory-100-prod-stable/ram-contract/copy-blockers.json`
+- `reports/memory-100/P15/ci-test-all-memory-100-clean-local-20260613_065519Z/memory-100-prod-stable/ram-contract/fuzz/ram-contract-fuzz-oracle.json`
+- `reports/memory-100/P15/ci-test-all-memory-100-clean-local-20260613_065519Z/memory-100-prod-stable/ram-contract/artifact-hashes.json`
+- `reports/memory-100/P15/ci-test-all-memory-100-clean-local-20260613_065519Z/memory-100-prod-stable/ram-contract/ram-contract-release-manifest.json`
 
 ## Nonclaims
 
