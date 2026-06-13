@@ -15,6 +15,11 @@ on:
         required: true
         type: boolean
         default: false
+      publish_container:
+        description: "Publish the release image to GHCR; tag releases always publish"
+        required: true
+        type: boolean
+        default: false
       homebrew_tap_repository:
         description: "owner/repo for the tap; requires HOMEBREW_TAP_TOKEN"
         required: true
@@ -61,11 +66,13 @@ jobs:
           esac
           image_owner="$(printf '%s' "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
           image="ghcr.io/${image_owner}/tetra-language"
+          publish_container="${{ github.event_name != 'workflow_dispatch' || inputs.publish_container }}"
           {
             echo "version=${version}"
             echo "image_version=${version#v}"
             echo "image=${image}"
             echo "out_dir=dist/releases/${version}"
+            echo "publish_container=${publish_container}"
           } >> "$GITHUB_OUTPUT"
 
       - name: Build release archives
@@ -230,7 +237,7 @@ jobs:
           notes="$out_dir/release-notes.md"
           release_image="${{ steps.meta.outputs.image }}"
           release_image_version="${{ steps.meta.outputs.image_version }}"
-          VERSION="$version" NOTES="$notes" RELEASE_IMAGE="$release_image" RELEASE_IMAGE_VERSION="$release_image_version" python - <<'PY'
+          VERSION="$version" NOTES="$notes" RELEASE_IMAGE="$release_image" RELEASE_IMAGE_VERSION="$release_image_version" PUBLISH_CONTAINER="${{ steps.meta.outputs.publish_container }}" python - <<'PY'
           import os
           import textwrap
           from pathlib import Path
@@ -239,6 +246,17 @@ jobs:
           repository = os.environ["GITHUB_REPOSITORY"]
           image = os.environ["RELEASE_IMAGE"]
           image_version = os.environ["RELEASE_IMAGE_VERSION"]
+          publish_container = os.environ["PUBLISH_CONTAINER"] == "true"
+          if publish_container:
+              container_section = f"""\
+          Container:
+
+          ```sh
+          docker run --rm {image}:{image_version} tetra version
+          ```
+          """
+          else:
+              container_section = "Container publishing was not requested for this manual workflow run.\n"
           notes = Path(os.environ["NOTES"])
           notes.write_text(textwrap.dedent(f"""\
           Tetra Language {version}
@@ -249,12 +267,7 @@ jobs:
           curl -fsSL https://github.com/{repository}/releases/download/{version}/install.sh | bash
           ```
 
-          Container:
-
-          ```sh
-          docker run --rm {image}:{image_version} tetra version
-          ```
-
+          {container_section}
           This release publishes the current v0.4.0 local compiler/tooling profile. Linux x64 is the release binary baseline; other runtime target claims remain gated by project evidence.
           Package publishing for this workflow runs the Linux-x64 memory production release gate and uploads its `memory-production-linux-x64.json`, `targets.json`, and `artifact-hashes.json` evidence.
           RAM Contract Compiler evidence runs the strict Linux-x64 RAM contract release gate before publishing and uploads its `ram-contract-report.json`, `memory-grade-report.json`, `proof-store-summary.json`, `validation-pipeline-coverage.json`, `heap-blockers.json`, `copy-blockers.json`, and `ram-contract-fuzz-oracle.json` evidence.
@@ -284,6 +297,7 @@ jobs:
           fi
 
       - name: Build container image
+        if: steps.meta.outputs.publish_container == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -294,6 +308,7 @@ jobs:
             .
 
       - name: Publish GHCR image
+        if: steps.meta.outputs.publish_container == 'true'
         shell: bash
         run: |
           set -euo pipefail

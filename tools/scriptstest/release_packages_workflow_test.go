@@ -340,6 +340,29 @@ func TestReleasePackagesWorkflowBindsPublishedArtifactsToCurrentCommit(t *testin
 	}
 }
 
+func TestReleasePackagesWorkflowMakesManualContainerPublishOptIn(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "release-packages.yml"))
+	if err != nil {
+		t.Fatalf("read release-packages workflow: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		"publish_container:",
+		"description: \"Publish the release image to GHCR; tag releases always publish\"",
+		"default: false",
+		`publish_container="${{ github.event_name != 'workflow_dispatch' || inputs.publish_container }}"`,
+		`echo "publish_container=${publish_container}"`,
+		`PUBLISH_CONTAINER="${{ steps.meta.outputs.publish_container }}"`,
+		`publish_container = os.environ["PUBLISH_CONTAINER"] == "true"`,
+		"Container publishing was not requested for this manual workflow run.",
+		"if: steps.meta.outputs.publish_container == 'true'",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("release-packages workflow missing manual container publish guard %q", want)
+		}
+	}
+}
+
 func releaseStepWindow(workflow, start, end string) string {
 	startIdx := strings.Index(workflow, start)
 	if startIdx < 0 {
