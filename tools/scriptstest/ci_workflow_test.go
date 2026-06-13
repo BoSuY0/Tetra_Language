@@ -268,6 +268,7 @@ func TestCIWorkflowIncludesActorRuntimeFoundationGateJob(t *testing.T) {
 		"reports/actor-runtime-foundation/final/distributed-actors-linux-x64/artifact-hashes.json",
 		"reports/actor-runtime-foundation/final/parallel-production-linux-x64/parallel-production-linux-x64.json",
 		"reports/actor-runtime-foundation/final/parallel-production-linux-x64/artifact-hashes.json",
+		"reports/actor-runtime-foundation/final/parallel-production-linux-x64/parallelrt-evidence.raw.json",
 		"reports/actor-runtime-foundation/final/logs/*.log",
 	} {
 		if !strings.Contains(section, want) {
