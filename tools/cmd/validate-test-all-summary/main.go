@@ -36,12 +36,18 @@ type testAllStep struct {
 func main() {
 	var summaryPath string
 	var reportDir string
-	flag.StringVar(&summaryPath, "summary", "", "path to scripts/ci/test-all.sh summary.json")
+	var reportFormat string
+	flag.StringVar(&summaryPath, "summary", "", "path to scripts/ci/test-all.sh summary report")
 	flag.StringVar(&reportDir, "report-dir", "", "report directory containing logs")
+	flag.StringVar(&reportFormat, "format", "json", "summary report format: json")
 	flag.Parse()
 
 	if summaryPath == "" {
 		fmt.Fprintln(os.Stderr, "error: --summary is required")
+		os.Exit(2)
+	}
+	if reportFormat != "json" {
+		fmt.Fprintf(os.Stderr, "error: unsupported --format %q\n", reportFormat)
 		os.Exit(2)
 	}
 	raw, err := os.ReadFile(summaryPath)

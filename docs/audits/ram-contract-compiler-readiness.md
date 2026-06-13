@@ -1,7 +1,7 @@
 # RAM Contract Compiler Readiness Audit
 
-Git head: f51246d198b1fa8fb50125142d513c47f1be407f
-Working tree: clean worktree evidence for the DW17 latest-base RAM Contract refresh after manifest synchronization; this is
+Git head: a72369b99f2d3b2125683d227fd115cc4e70a20e
+Working tree: clean worktree evidence for the DW17 latest-base RAM Contract refresh before the summary validator format fix; this is
 not a remote release-candidate checkout claim and not a historical dirty working tree cleanup claim for older RAM audits.
 Verdict: `SCOPED_READY`
 
@@ -13,13 +13,13 @@ contract. The release gate is
 `.github/workflows/ci.yml`, and package workflow wiring lives in
 `.github/workflows/release-packages.yml`.
 
-The DW17 latest-base clean-proof refresh after manifest synchronization produced direct-parent RAM Contract release
+The DW17 latest-base clean-proof refresh before the summary validator format fix produced direct-parent RAM Contract release
 evidence under
-`reports/actor-runtime-foundation/dw17-latest-ram-contract-f51246d/`.
+`reports/actor-runtime-foundation/dw17-latest-ram-contract-a72369b/`.
 That RAM Contract slice was directly validated for
-`f51246d198b1fa8fb50125142d513c47f1be407f` in clean worktree
-`/home/tetra/.codex/worktrees/Tetra_Language/actor-runtime-dw17-clean-proof-latest`,
-then kept in that checkout's ignored `reports/` evidence directory. This audit
+`a72369b99f2d3b2125683d227fd115cc4e70a20e` in clean worktree
+`/home/tetra/.codex/worktrees/Tetra_Language/ram-contract-clean-a72369b-dw17`,
+then copied into this branch checkout's ignored `reports/` evidence directory. This audit
 does not claim remote CI or package publication proof.
 
 ## Command Evidence
@@ -39,23 +39,23 @@ The direct-parent DW17 latest-base refresh reran the release smoke and validator
 release report path remains `reports/ram-contract-release`; this refresh used a
 fresh scoped report directory to avoid stale artifact reuse:
 
-- `bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir reports/actor-runtime-foundation/dw17-latest-ram-contract-f51246d`
-- `go run -buildvcs=false ./tools/cmd/validate-ram-contract-release --report-dir reports/actor-runtime-foundation/dw17-latest-ram-contract-f51246d --current-git-head f51246d198b1fa8fb50125142d513c47f1be407f`
-- `go run -buildvcs=false ./tools/cmd/validate-artifact-hashes --manifest reports/actor-runtime-foundation/dw17-latest-ram-contract-f51246d/artifact-hashes.json`
+- `bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir reports/actor-runtime-foundation/dw17-latest-ram-contract-a72369b`
+- `go run -buildvcs=false ./tools/cmd/validate-ram-contract-release --report-dir reports/actor-runtime-foundation/dw17-latest-ram-contract-a72369b --current-git-head a72369b99f2d3b2125683d227fd115cc4e70a20e`
+- `go run -buildvcs=false ./tools/cmd/validate-artifact-hashes --manifest reports/actor-runtime-foundation/dw17-latest-ram-contract-a72369b/artifact-hashes.json`
 - `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`
 - `git diff --check`
 
 ## Artifact Evidence
 
-- `reports/actor-runtime-foundation/dw17-latest-ram-contract-f51246d/ram-contract-report.json`
-- `reports/actor-runtime-foundation/dw17-latest-ram-contract-f51246d/memory-grade-report.json`
-- `reports/actor-runtime-foundation/dw17-latest-ram-contract-f51246d/proof-store-summary.json`
-- `reports/actor-runtime-foundation/dw17-latest-ram-contract-f51246d/validation-pipeline-coverage.json`
-- `reports/actor-runtime-foundation/dw17-latest-ram-contract-f51246d/heap-blockers.json`
-- `reports/actor-runtime-foundation/dw17-latest-ram-contract-f51246d/copy-blockers.json`
-- `reports/actor-runtime-foundation/dw17-latest-ram-contract-f51246d/fuzz/ram-contract-fuzz-oracle.json`
-- `reports/actor-runtime-foundation/dw17-latest-ram-contract-f51246d/artifact-hashes.json`
-- `reports/actor-runtime-foundation/dw17-latest-ram-contract-f51246d/ram-contract-release-manifest.json`
+- `reports/actor-runtime-foundation/dw17-latest-ram-contract-a72369b/ram-contract-report.json`
+- `reports/actor-runtime-foundation/dw17-latest-ram-contract-a72369b/memory-grade-report.json`
+- `reports/actor-runtime-foundation/dw17-latest-ram-contract-a72369b/proof-store-summary.json`
+- `reports/actor-runtime-foundation/dw17-latest-ram-contract-a72369b/validation-pipeline-coverage.json`
+- `reports/actor-runtime-foundation/dw17-latest-ram-contract-a72369b/heap-blockers.json`
+- `reports/actor-runtime-foundation/dw17-latest-ram-contract-a72369b/copy-blockers.json`
+- `reports/actor-runtime-foundation/dw17-latest-ram-contract-a72369b/fuzz/ram-contract-fuzz-oracle.json`
+- `reports/actor-runtime-foundation/dw17-latest-ram-contract-a72369b/artifact-hashes.json`
+- `reports/actor-runtime-foundation/dw17-latest-ram-contract-a72369b/ram-contract-release-manifest.json`
 
 ## Nonclaims
 

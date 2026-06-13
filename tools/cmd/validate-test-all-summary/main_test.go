@@ -33,6 +33,28 @@ func TestValidateTestAllSummaryAcceptsPassingReport(t *testing.T) {
 	}
 }
 
+func TestValidateTestAllSummaryCLIAcceptsJSONFormatFlag(t *testing.T) {
+	dir := makeSummaryReport(t, `{
+  "mode": "quick",
+  "status": "pass",
+  "started_at": "2026-04-25T13:00:00Z",
+  "ended_at": "2026-04-25T13:00:01Z",
+  "step_count": 3,
+  "failed_count": 0,
+  "steps": [
+    {"name":"go test all packages","status":"pass","duration_seconds":0,"exit_code":0,"command":"go test","log":"logs/01-step.log"},
+    {"name":"json diagnostic shape","status":"pass","duration_seconds":1,"exit_code":0,"command":"check_json_diagnostic","log":"logs/02-step.log"},
+    {"name":"host smoke linux-x64","status":"pass","duration_seconds":1,"exit_code":0,"command":"check_host_smoke","log":"logs/03-step.log"}
+  ]
+}`)
+	cmd := exec.Command("go", "run", ".", "--summary", filepath.Join(dir, "summary.json"), "--report-dir", dir, "--format=json")
+	cmd.Dir = "."
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("validator should accept --format=json: %v\n%s", err, out)
+	}
+}
+
 func TestValidateTestAllSummaryAcceptsStabilizationReport(t *testing.T) {
 	dir := makeSummaryReport(t, `{
   "mode": "stabilization",
