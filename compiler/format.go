@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"tetra_language/compiler/internal/frontend"
 )
@@ -707,7 +708,7 @@ func (p *sourcePrinter) funcDeclWithName(fn *frontend.FuncDecl, name string) {
 
 func (p *sourcePrinter) funcDeclWithNameAt(fn *frontend.FuncDecl, name string, indent int) {
 	if fn.ExportName != "" {
-		p.line(indent, "@export("+strconv.Quote(fn.ExportName)+")")
+		p.line(indent, "@export("+formatStringLiteral([]byte(fn.ExportName))+")")
 	}
 	typeParams := ""
 	if len(fn.TypeParams) > 0 {
@@ -755,7 +756,7 @@ func formatFuncSigDecl(sig frontend.FuncSigDecl) string {
 }
 
 func (p *sourcePrinter) testDecl(test *frontend.TestDecl) {
-	p.line(0, "test "+strconv.Quote(test.Name)+":")
+	p.line(0, "test "+formatStringLiteral([]byte(test.Name))+":")
 	p.stmts(test.Body, 1)
 }
 
@@ -1114,6 +1115,60 @@ func (p *sourcePrinter) emitClosureValueStatement(indent int, prefix string, exp
 	return true
 }
 
+func formatStringLiteral(value []byte) string {
+	var b strings.Builder
+	b.WriteByte('"')
+	for len(value) > 0 {
+		ch := value[0]
+		switch ch {
+		case '\n':
+			b.WriteString(`\n`)
+			value = value[1:]
+			continue
+		case '\r':
+			b.WriteString(`\r`)
+			value = value[1:]
+			continue
+		case '\t':
+			b.WriteString(`\t`)
+			value = value[1:]
+			continue
+		case '\\':
+			b.WriteString(`\\`)
+			value = value[1:]
+			continue
+		case '"':
+			b.WriteString(`\"`)
+			value = value[1:]
+			continue
+		}
+		if ch >= 0x20 && ch < 0x7f {
+			b.WriteByte(ch)
+			value = value[1:]
+			continue
+		}
+		if ch >= utf8.RuneSelf {
+			r, size := utf8.DecodeRune(value)
+			if r != utf8.RuneError || size > 1 {
+				b.WriteString(string(value[:size]))
+				value = value[size:]
+				continue
+			}
+		}
+		writeHexEscape(&b, ch)
+		value = value[1:]
+	}
+	b.WriteByte('"')
+	return b.String()
+}
+
+func writeHexEscape(b *strings.Builder, ch byte) {
+	const hex = "0123456789abcdef"
+	b.WriteString(`\x`)
+	b.WriteByte(hex[ch>>4])
+	b.WriteByte(hex[ch&0x0f])
+}
+
 func singleReturnExpr(stmts []frontend.Stmt) (frontend.Expr, bool) {
 	if len(stmts) != 1 {
 		return nil, false
@@ -1200,7 +1255,7 @@ func (p *sourcePrinter) formatExprPrec(expr frontend.Expr, parent int) string {
 		}
 		return b.String()
 	case *frontend.StringLitExpr:
-		return strconv.Quote(string(e.Value))
+		return formatStringLiteral(e.Value)
 	case *frontend.IdentExpr:
 		return e.Name
 	case *frontend.UnaryExpr:
