@@ -166,7 +166,9 @@ jobs:
 
       - name: Quick stabilization wrapper
         shell: bash
-        run: bash scripts/ci/test-all.sh --quick --keep-going --report-dir reports/ci-test-all-quick
+        run: |
+          bash scripts/ci/with-headless-wayland.sh --socket wayland-test-all-quick-ci -- \
+            bash scripts/ci/test-all.sh --quick --keep-going --report-dir reports/ci-test-all-quick
 
       - name: Upload quick test report
         if: always()
@@ -224,13 +226,18 @@ jobs:
       - name: Current v0.4.0 release readiness
         shell: bash
         run: |
-          mkdir -p reports/ci-release-v0.4.0-readiness
-          ./tetra features --format=json > reports/ci-release-v0.4.0-readiness/features.json
-          ./tetra targets --format=json > reports/ci-release-v0.4.0-readiness/targets.json
+          mkdir -p reports/ci-release-v0.4.0-readiness reports/v0.4.0
+          ./tetra features --format=json > reports/v0.4.0/features.json
+          ./tetra targets --format=json > reports/v0.4.0/targets.json
+          ./tetra smoke --target linux-x64 --run=true --report reports/v0.4.0/linux-host-smoke.json
+          bash scripts/release/v0_4_0/distributed-actors-linux-x64-smoke.sh --report-dir reports/v0.4.0
+          bash scripts/release/v0_4_0/native-ui-linux-x64-smoke.sh --report-dir reports/v0.4.0
+          cp reports/v0.4.0/features.json reports/ci-release-v0.4.0-readiness/features.json
+          cp reports/v0.4.0/targets.json reports/ci-release-v0.4.0-readiness/targets.json
           go run ./tools/cmd/validate-v0-4-readiness \
             --expected-version v0.4.0 \
-            --features reports/ci-release-v0.4.0-readiness/features.json \
-            --targets reports/ci-release-v0.4.0-readiness/targets.json \
+            --features reports/v0.4.0/features.json \
+            --targets reports/v0.4.0/targets.json \
             --manifest docs/generated/manifest.json \
             --scope-decisions docs/release/v0_4_0_scope_decisions.json
           go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
@@ -241,7 +248,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: tetra-v0.4.0-${{ github.sha }}-release-readiness-linux
-          path: reports/ci-release-v0.4.0-readiness
+          path: |
+            reports/ci-release-v0.4.0-readiness
+            reports/v0.4.0
 
   surface-release-readiness-linux:
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'

@@ -106,7 +106,7 @@ func TestReleaseV10WebSmokeScript_bindHTTPServerToLoopback(t *testing.T) {
 		t.Fatalf("read web smoke script: %v", err)
 	}
 	text := string(raw)
-	want := `python3 -m http.server "$port" --bind 127.0.0.1 --directory "$tmp_dir"`
+	want := `python3 -u -m http.server "$port" --bind 127.0.0.1 --directory "$tmp_dir"`
 	if !strings.Contains(text, want) {
 		t.Fatalf("web smoke script must bind http.server to loopback, missing %q", want)
 	}

@@ -11,13 +11,13 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"tetra_language/tools/validators/platformui"
 )
 
 const webUISmokeSchema = "tetra.web-ui-smoke.v1alpha1"
-const uiBundleSchema = "tetra.ui.v1"
 const uiEventDispatchBoundaryTrace = "ui-event-dispatch:web-command-dispatch"
-const uiBundleSchemaArtifactID = "tetra.ui.v1.schema.json"
-const defaultUIBundleSchemaArtifactPath = "docs/schemas/tetra.ui.v1.schema.json"
+const defaultUIBundleSchemaArtifactPath = "docs/schemas/tetra.ui.v0.4.0.schema.json"
 const defaultMaxWebUISmokeAge = 7 * 24 * time.Hour
 
 type webUISmokeReport struct {
@@ -120,7 +120,7 @@ func main() {
 	var reportPath string
 	var uiSchemaArtifactPath string
 	flag.StringVar(&reportPath, "report", "", "path to web UI smoke JSON report")
-	flag.StringVar(&uiSchemaArtifactPath, "ui-schema-artifact", defaultUIBundleSchemaArtifactPath, "path to tetra.ui.v1 JSON Schema artifact")
+	flag.StringVar(&uiSchemaArtifactPath, "ui-schema-artifact", defaultUIBundleSchemaArtifactPath, "path to tetra.ui JSON Schema artifact")
 	flag.Parse()
 	if reportPath == "" {
 		fmt.Fprintln(os.Stderr, "error: --report is required")
@@ -182,8 +182,8 @@ func validateWebUISmokeReportAt(report webUISmokeReport, now time.Time, maxAge t
 	if report.Automation == "" {
 		return fmt.Errorf("web UI smoke missing automation")
 	}
-	if report.UISchema != "" && report.UISchema != uiBundleSchema {
-		return fmt.Errorf("web UI smoke ui_schema = %q, want %q", report.UISchema, uiBundleSchema)
+	if report.UISchema != "" && !platformui.AcceptedUISchemas[report.UISchema] {
+		return fmt.Errorf("web UI smoke ui_schema = %q, want tetra.ui.v1 or tetra.ui.v0.4.0", report.UISchema)
 	}
 	switch report.Status {
 	case "pass":
@@ -199,8 +199,8 @@ func validateWebUISmokeReportAt(report webUISmokeReport, now time.Time, maxAge t
 		if err := validateRuntimeTrace(report.RuntimeTrace); err != nil {
 			return err
 		}
-		if report.UISchema != uiBundleSchema {
-			return fmt.Errorf("web UI smoke pass ui_schema = %q, want %q", report.UISchema, uiBundleSchema)
+		if !platformui.AcceptedUISchemas[report.UISchema] {
+			return fmt.Errorf("web UI smoke pass ui_schema = %q, want tetra.ui.v1 or tetra.ui.v0.4.0", report.UISchema)
 		}
 		if report.UIBundlePath == "" || !strings.HasSuffix(report.UIBundlePath, ".ui.json") {
 			return fmt.Errorf("web UI smoke pass must include ui_bundle_path ending with .ui.json")
@@ -319,8 +319,8 @@ func validateUIBundleSchemaArtifact(path string) error {
 	if schema.JSONSchema == "" {
 		return fmt.Errorf("%s missing $schema", path)
 	}
-	if schema.ID != uiBundleSchemaArtifactID {
-		return fmt.Errorf("%s $id = %q, want %q", path, schema.ID, uiBundleSchemaArtifactID)
+	if !acceptedUIBundleSchemaArtifactID(schema.ID) {
+		return fmt.Errorf("%s $id = %q, want tetra.ui.v1.schema.json or tetra.ui.v0.4.0.schema.json", path, schema.ID)
 	}
 	if schema.Type != "object" {
 		return fmt.Errorf("%s root type = %q, want object", path, schema.Type)
@@ -362,10 +362,10 @@ func validateUIBundleArtifact(path string) (uiBundleArtifact, error) {
 	}
 	var bundle uiBundleArtifact
 	if err := decodeStrictJSON(raw, &bundle); err != nil {
-		return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui_bundle_path is not strict tetra.ui.v1 metadata: %w", err)
+		return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui_bundle_path is not strict tetra.ui metadata: %w", err)
 	}
-	if bundle.Schema != uiBundleSchema {
-		return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle schema = %q, want %q", bundle.Schema, uiBundleSchema)
+	if !platformui.AcceptedUISchemas[bundle.Schema] {
+		return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle schema = %q, want tetra.ui.v1 or tetra.ui.v0.4.0", bundle.Schema)
 	}
 	if len(bundle.Views) == 0 {
 		return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle must include at least one view")
@@ -513,6 +513,10 @@ func validateUIBundleArtifact(path string) (uiBundleArtifact, error) {
 		}
 	}
 	return bundle, nil
+}
+
+func acceptedUIBundleSchemaArtifactID(id string) bool {
+	return id == "tetra.ui.v1.schema.json" || id == "tetra.ui.v0.4.0.schema.json"
 }
 
 func validateDOMSnapshotArtifact(path string, bundle uiBundleArtifact) error {
