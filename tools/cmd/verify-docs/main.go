@@ -1058,6 +1058,7 @@ func explicitNonClaimContext(lower string) bool {
 		"not prod_ready",
 		"no prod_ready_proven",
 		"not prod_ready_proven",
+		"not_claimed",
 		"without an official",
 		"without official",
 		"forbid",
@@ -1774,6 +1775,7 @@ func defaultActorRuntimeFoundationDocPaths() []string {
 		filepath.FromSlash("docs/user/async_actors_guide.md"),
 		filepath.FromSlash("docs/design/actor_region_transfer.md"),
 		filepath.FromSlash("docs/audits/actor-runtime-production-boundary-v1.md"),
+		filepath.FromSlash("docs/audits/actor-runtime-production-foundation-final.md"),
 		filepath.FromSlash("docs/checklists/actors_linux_smoke.md"),
 		filepath.FromSlash("docs/checklists/actors_platform_smoke.md"),
 	}
@@ -1806,11 +1808,20 @@ func verifyActorRuntimeFoundationDocs(paths []string, features []featureManifest
 		"reports/actor-runtime-foundation/final/artifact-hashes.json",
 		"distributed-actors-linux-x64/distributed-actors-linux-x64.json",
 		"parallel-production-linux-x64/parallel-production-linux-x64.json",
+		"subordinate to current same-commit actor foundation gates",
 		"no full Erlang/OTP actor runtime claim",
 		"no cluster membership or reconnect/retry production claim",
 		"no non-Linux distributed actor runtime support claim",
 		"no distributed zero-copy pointer or region transfer claim",
 		"no formal race proof claim",
+		"no benchmark superiority, no C++/Rust parity, and no official benchmark claim",
+		"Distributed Runtime Target Matrix",
+		"| Target | Distributed actor runtime status | Current evidence | Promotion requirement |",
+		"`linux-x64` | current scoped",
+		"`macos-x64` | unsupported / nonclaim",
+		"`windows-x64` | unsupported / nonclaim",
+		"`wasm32-wasi` | unsupported / nonclaim",
+		"`wasm32-web` | unsupported / nonclaim",
 	} {
 		if !strings.Contains(combinedText, required) {
 			errs = append(errs, fmt.Sprintf("actor runtime foundation docs missing %q", required))
@@ -1883,6 +1894,7 @@ func forbiddenActorRuntimeFoundationClaims(text string) []string {
 		"cluster membership",
 		"reconnect/retry production",
 		"formal race proof",
+		"prod_ready_proven",
 	} {
 		searchFrom := 0
 		for {

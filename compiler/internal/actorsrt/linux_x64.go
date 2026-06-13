@@ -28,11 +28,13 @@ const (
 	schedNetFDOff        = 116 // i32
 	schedNodeIDOff       = 120 // u32
 	schedNetStatusOff    = 124 // u32
+	schedMsgFreeOff      = 128 // u64
+	schedRecvScratchOff  = 136 // message-layout scratch for typed recv slots
 	maxActors            = 128
-	schedActorGroup0Off  = 128  // u32[maxActors]
-	schedActorWakeAt0Off = 640  // u32[maxActors]
-	schedActorWait0Off   = 1152 // u32[maxActors]
-	schedSize            = 1664
+	schedActorGroup0Off  = 224  // u32[maxActors]
+	schedActorWakeAt0Off = 736  // u32[maxActors]
+	schedActorWait0Off   = 1248 // u32[maxActors]
+	schedSize            = 1760
 	actorSizeShift       = 7 // 128 bytes
 	actorSize            = 1 << actorSizeShift
 	actorRspOff          = 0   // u64

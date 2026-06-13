@@ -62,6 +62,8 @@ func ActorRuntimeProductionBoundaryAudit() (ActorRuntimeBoundaryReport, error) {
 			"full production actor runtime is not claimed",
 			"scheduler prototype evidence is not a production multi-threaded actor scheduler",
 			"distributed actor runtime support remains bounded to Linux-x64 loopback TCP smoke evidence",
+			"nonzero actor entry returns have no user-facing actor status, join, exit-code, supervision, or restart API",
+			"missing-node node_down evidence does not claim automatic retry, restart, reconnect, or supervision",
 		},
 		FullProductionClaimed: false,
 	}, nil
@@ -133,18 +135,32 @@ func currentActorRuntimeLimitsRow() ActorRuntimeBoundaryRow {
 			fmt.Sprintf("maxActorMailboxMsgs=%d", maxActorMailboxMsgs),
 			fmt.Sprintf("actor_state_slots=%d", maxActorStateSlots),
 			"single-thread cooperative scheduler documented for current actor runtime",
+			"round-robin runnable actor fairness has bounded yield-progress evidence",
+			"timed sleeping actors wake in deterministic deadline order",
 			"linux-x64 distributed runtime only; non-Linux-x64 targets keep distributed actor symbols out of the built-in runtime",
 			"non-linux actor net pump is no-op",
 			"mailbox full returns checked -2 backpressure without allocating a message",
+			"mailbox backpressure recovers after drain for local legacy, tagged, and typed sends",
+			"typed mailbox backpressure does not enqueue a partial payload",
 			"message pool exhaustion returns checked -1 without enqueueing an overflow message",
+			"drained message pool entries are reclaimed after receive and can be reused",
 			"invalid actor handle sends return checked -3 without allocating a message",
 			"done actor sends return checked -4 without allocating a message",
-			"task-group cancellation wakes timed actor receive waiters with checked error 1",
-			"message pool entries are not reclaimed during a run",
+			"nonzero actor entry return is exposed only as done-state send failure for later local sends",
+			"no actor status, actor join, or actor exit-code API is exposed for done actors",
+			"messages already queued in another actor mailbox remain receivable after the sender is done",
+			"done actors are not restarted and pending mailbox entries are not drained by a shutdown phase",
+			"blocked actors continue to depend on normal message, deadline, timer, or task-wait readiness when another actor exits",
+			"missing-node node_down remains checked distributed status evidence",
+			"no automatic retry, restart, reconnect, or supervision is claimed for local actor failure or distributed node_down status",
+			"task-group cancellation wakes recv_until and recv_msg_until waiters with checked error 1",
+			"task-group cancellation wakes actors already waiting on task_join_result_i32, task_join_until_i32, and select2_i32 with checked error 1",
+			"task_join_i32 wakes on task-group cancellation with raw zero value; checked status requires result or timed join APIs",
+			"non-timed actor receives do not expose a cancellation result in the current profile",
 			"typed actor message payloads are capped at 8 value slots",
 		},
-		Evidence: "compiler/internal/actorsrt/linux_x64.go::BuildLinuxX64; compiler/internal/actorsrt/linux_x64_emit.go::emitMailboxFullCheckForReceiverInEcx; compiler/internal/actorsrt/linux_x64_emit.go::emitCheckedMessagePoolAlloc; compiler/internal/actorsrt/linux_x64_emit.go::emitInvalidActorHandleReturn; compiler/internal/actorsrt/linux_x64_emit.go::emitActorDoneReturn; compiler/internal/actorsrt/linux_x64_emit.go::emitBlockedDeadlineWakeCheck; compiler/internal/actorsrt/linux_x64_emit.go::emitCurrentTaskGroupCanceledCheck; compiler/actors_test.go::TestActorMailboxFullReturnsCheckedBackpressure; compiler/actors_test.go::TestActorMessagePoolExhaustionReturnsCheckedFailure; compiler/actors_test.go::TestActorInvalidHandleSendReturnsCheckedFailure; compiler/actors_test.go::TestActorSendToDoneActorReturnsCheckedFailure; compiler/task_runtime_test.go::TestTaskGroupCancelWakesActorRecvUntilBeforeDeadlineBuildAndRun; compiler/internal/actorsrt/actor_state_symbols_test.go::TestActorNetPumpIsExportedButOnlyLinuxHasRuntimePump; compiler/internal/actorsrt/actor_state_symbols_test.go::TestNonLinuxRuntimesDoNotExportDistributedActorSymbols; docs/spec/actors.md::Runtime Capacity Limits; docs/spec/actors.md::Scheduling semantics",
-		Boundary: "current evidence covers fixed-capacity x64 built-in actor runtime behavior, checked per-actor mailbox backpressure, checked bounded message-pool exhaustion, checked invalid-handle and done-actor send failures, scoped timed actor receive cancellation wake, Linux-x64 distributed actor runtime symbols, and documented capacity limits; it does not provide message reclamation, production multi-threaded scheduling, non-Linux distributed runtime support, supervision/restart, a full structured-concurrency model, or a full production actor runtime claim",
+		Evidence: "compiler/internal/actorsrt/linux_x64.go::BuildLinuxX64; compiler/internal/actorsrt/linux_x64_emit.go::emitMailboxFullCheckForReceiverInEcx; compiler/internal/actorsrt/linux_x64_emit.go::emitCheckedMessagePoolAlloc; compiler/internal/actorsrt/linux_x64_emit.go::emitRecycleMessageNodeInRax; compiler/internal/actorsrt/linux_x64_emit.go::emitInvalidActorHandleReturn; compiler/internal/actorsrt/linux_x64_emit.go::emitActorDoneReturn; compiler/internal/actorsrt/linux_x64_emit.go::emitBlockedDeadlineWakeCheck; compiler/internal/actorsrt/linux_x64_emit.go::emitWaitingTaskWakeCheck; compiler/internal/actorsrt/linux_x64_emit.go::emitCurrentTaskGroupCanceledCheck; compiler/actors_test.go::TestActorMailboxFullReturnsCheckedBackpressure; compiler/actors_test.go::TestActorMailboxBackpressureRecoversAfterSelfDrainBuildAndRun; compiler/actors_test.go::TestActorTaggedMailboxBackpressureRecoversAfterSelfDrainBuildAndRun; compiler/actors_test.go::TestActorTypedMailboxBackpressureRecoversWithoutPartialPayloadBuildAndRun; compiler/actors_test.go::TestActorMessagePoolReclaimsDrainedMessagesBuildAndRun; compiler/actors_test.go::TestActorMessagePoolExhaustionReturnsCheckedFailure; compiler/actors_test.go::TestActorInvalidHandleSendReturnsCheckedFailure; compiler/actors_test.go::TestActorSendToDoneActorReturnsCheckedFailure; compiler/actors_test.go::TestActorFailureNonzeroExitBecomesDoneWithoutRestartBuildAndRun; compiler/actors_test.go::TestActorLifecycleReceivesPendingMessageFromDoneSenderBuildAndRun; compiler/actors_test.go::TestActorLifecycleDoneActorWithPendingMailboxDoesNotStallBlockedActorsBuildAndRun; compiler/actors_test.go::TestActorFairnessYieldingWorkersBothMakeBoundedProgressBuildAndRun; compiler/actors_test.go::TestActorStarvationTimedSleepersWakeInDeadlineOrderBuildAndRun; cli/internal/actornet/broker_test.go::TestBrokerMissingDestinationNodeDownDoesNotRetryOrReconnect; cli/internal/actornet/runtime_integration_test.go::TestLinuxRuntimePumpsNodeDownIntoNodeStatus; compiler/task_runtime_test.go::TestTaskGroupCancelWakesActorRecvUntilBeforeDeadlineBuildAndRun; compiler/task_runtime_test.go::TestTaskGroupCancelWakesActorRecvMsgUntilBeforeDeadlineBuildAndRun; compiler/task_runtime_test.go::TestTaskGroupCancelWhileActorWaitsOnJoinReturnsCanceledBuildAndRun; compiler/task_runtime_test.go::TestTaskGroupCancelWhileActorWaitsOnJoinI32WakesWithZeroValueBuildAndRun; compiler/task_runtime_test.go::TestTaskGroupCancelWakesJoinUntilBeforeDeadlineBuildAndRun; compiler/task_runtime_test.go::TestTaskGroupCancelWakesSelect2BeforeDeadlineBuildAndRun; compiler/internal/actorsrt/actor_state_symbols_test.go::TestActorNetPumpIsExportedButOnlyLinuxHasRuntimePump; compiler/internal/actorsrt/actor_state_symbols_test.go::TestNonLinuxRuntimesDoNotExportDistributedActorSymbols; docs/spec/actors.md::Lifecycle Matrix; docs/spec/actors.md::Runtime Capacity Limits; docs/spec/actors.md::Distributed Runtime Promotion Surface; docs/spec/actors.md::Scheduling semantics",
+		Boundary: "current evidence covers fixed-capacity x64 built-in actor runtime behavior, cooperative round-robin bounded progress for yielding runnable actors, deterministic deadline-order wake for sleeping actors, recoverable checked per-actor mailbox backpressure for local legacy/tagged/typed sends, no partial typed payload after failed backpressure, reusable drained message nodes with checked bounded message-pool exhaustion for live overload, checked invalid-handle and done-actor send failures, narrow done-state lifecycle semantics where zero and nonzero actor returns are user-visible only as done for later sends, scoped cooperative task-group cancellation wake/error behavior for timed actor receive and task join waiters, Linux-x64 distributed node_down status evidence for missing-node cases, Linux-x64 distributed actor runtime symbols, and documented capacity limits; it does not provide an unbounded mailbox, automatic retry/reconnect, actor close/shutdown API, actor status/join/exit-code API, cancellation results for non-timed actor receives, supervision/restart/linking/OTP lifecycle behavior, preemptive or production multi-threaded scheduling, non-Linux distributed runtime support, a full structured-concurrency model, or a full production actor runtime claim",
 	}
 }
 
@@ -178,11 +194,12 @@ func productionRuntimeAcceptanceRow() ActorRuntimeBoundaryRow {
 		Name:   "Production runtime acceptance",
 		Status: ActorRuntimeBoundaryAcceptanceRequired,
 		RequiredFacts: []string{
-			"production task scheduler evidence with executable fairness, wake, deadline, and stress gates",
+			"production task scheduler evidence with executable fairness, wake, deadline, actor scheduler starvation/progress bound, and stress gates",
 			"bounded mailbox backpressure with checked recoverable failure behavior",
 			"message reclamation or checked exhaustion semantics for runtime message pools",
 			"race-safety model or conservative rejection evidence across task/actor/thread boundaries",
 			"cross-target distributed runtime gates for every claimed target",
+			"blocking primitive by cancellation-source matrix covering wake and checked-error behavior",
 			"structured concurrency and cancellation semantics beyond the current cooperative task group handles",
 			"artifact-hash and validator gates that reject fake, docs-only, metadata-only, and transport-only evidence",
 		},
@@ -212,7 +229,7 @@ func validateCurrentLimitsRow(row ActorRuntimeBoundaryRow) error {
 	if row.Status != ActorRuntimeBoundaryDocumentedLimit {
 		return fmt.Errorf("actor runtime boundary audit: current limits status = %q", row.Status)
 	}
-	for _, fact := range []string{"maxActors=128", "msgPoolSize=65536", "maxActorMailboxMsgs=256", "actor_state_slots=8", "single-thread cooperative scheduler", "linux-x64 distributed runtime only", "non-linux actor net pump is no-op", "mailbox full returns checked -2", "message pool exhaustion returns checked -1", "invalid actor handle sends return checked -3", "done actor sends return checked -4", "task-group cancellation wakes timed actor receive waiters", "message pool entries are not reclaimed"} {
+	for _, fact := range []string{"maxActors=128", "msgPoolSize=65536", "maxActorMailboxMsgs=256", "actor_state_slots=8", "single-thread cooperative scheduler", "round-robin runnable actor fairness has bounded yield-progress evidence", "timed sleeping actors wake in deterministic deadline order", "linux-x64 distributed runtime only", "non-linux actor net pump is no-op", "mailbox full returns checked -2", "mailbox backpressure recovers after drain", "typed mailbox backpressure does not enqueue a partial payload", "message pool exhaustion returns checked -1", "drained message pool entries are reclaimed", "invalid actor handle sends return checked -3", "done actor sends return checked -4", "nonzero actor entry return is exposed only as done-state send failure", "no actor status, actor join, or actor exit-code API", "messages already queued in another actor mailbox remain receivable", "done actors are not restarted", "blocked actors continue to depend on normal message", "missing-node node_down remains checked distributed status evidence", "no automatic retry, restart, reconnect, or supervision", "task-group cancellation wakes recv_until", "task-group cancellation wakes actors already waiting on task_join_result_i32", "task_join_i32 wakes on task-group cancellation with raw zero value", "non-timed actor receives do not expose a cancellation result"} {
 		if !containsBoundaryText(row.RequiredFacts, fact) {
 			return fmt.Errorf("actor runtime boundary audit: current limits missing fact %q", fact)
 		}
@@ -242,7 +259,7 @@ func validateProductionAcceptanceRow(row ActorRuntimeBoundaryRow) error {
 	if row.Status != ActorRuntimeBoundaryAcceptanceRequired {
 		return fmt.Errorf("actor runtime boundary audit: production acceptance status = %q", row.Status)
 	}
-	for _, fact := range []string{"production task scheduler", "bounded mailbox backpressure", "message reclamation", "race-safety model", "cross-target distributed runtime gates", "structured concurrency"} {
+	for _, fact := range []string{"production task scheduler", "actor scheduler starvation/progress bound", "bounded mailbox backpressure", "message reclamation", "race-safety model", "cross-target distributed runtime gates", "blocking primitive by cancellation-source matrix", "structured concurrency"} {
 		if !containsBoundaryText(row.RequiredFacts, fact) {
 			return fmt.Errorf("actor runtime boundary audit: production acceptance missing fact %q", fact)
 		}

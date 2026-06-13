@@ -6,7 +6,7 @@ Islands (region memory), and the explicit safe/unsafe boundary.
 This document specifies the actor runtime and language surface included in the
 v1 profile.
 
-## Supported targets (MVP)
+## Supported Targets
 
 Actors are supported on x64 targets:
 - `linux-x64`
@@ -26,7 +26,7 @@ runtime production claim and not a non-Linux distributed actor runtime claim.
 - Keep the user-facing API safe by default.
 - Make the implementation small and auditable.
 
-## Non-goals (MVP)
+## Non-goals
 
 - Multi-threaded scheduling.
 - Broad zero-copy message passing of arbitrary region-backed data.
@@ -44,7 +44,7 @@ runtime production claim and not a non-Linux distributed actor runtime claim.
 
 ## Types
 
-- `actor` — an opaque handle identifying an actor (MVP: small integer handle).
+- `actor` — an opaque handle identifying an actor (current profile: small integer handle).
 
 ## Actor Declarations (Current Subset)
 
@@ -72,9 +72,9 @@ Current actor-state field constraints:
 - field initializers are required and must be compile-time constants;
 - each actor supports at most 8 state slots; the checker rejects actor
   declarations that exceed this budget before lowering or runtime execution;
-- pointer/resource/aggregate actor-state field types are rejected in this MVP.
+- pointer/resource/aggregate actor-state field types are rejected by the current actor-state field contract.
 
-## Core builtins (MVP)
+## Core Builtins
 
 All actor builtins are **safe** (do not require `unsafe`), but functions that
 call actor builtins or actor-using helpers must declare `uses actors`.
@@ -83,7 +83,7 @@ call actor builtins or actor-using helpers must declare `uses actors`.
 
 Spawns a new actor that executes the function named by `name`.
 
-MVP constraints:
+Current constraints:
 - `name` must be a string literal known at compile time.
 - The target function must exist and have the shape `func <name>() -> Int`.
 - The target must be synchronous, non-throwing, and must not touch mutable
@@ -94,7 +94,7 @@ MVP constraints:
 
 Appends a message `(sender=self, value=v)` to `to`’s mailbox.
 
-Returns `v` (MVP convenience).
+Returns `v` (current convenience).
 
 ### `core.recv() -> i32`
 
@@ -106,11 +106,42 @@ If the mailbox is empty, the actor **blocks** and yields to the scheduler until 
 
 Returns the sender of the most recently received message in the current actor.
 
-Valid only after a successful `core.recv()` (MVP: unspecified value otherwise).
+Valid only after a successful `core.recv()` (current profile: unspecified value otherwise).
 
 ### `core.self() -> actor`
 
 Returns the handle of the current actor.
+
+## Lifecycle Matrix
+
+The current built-in x64 actor runtime has a narrow lifecycle model:
+
+- `ready`: the actor is runnable.
+- `blocked`: the actor is waiting in `core.recv()`, `core.recv_until(...)`, or
+  `core.recv_msg_until(...)`.
+- `sleeping`: the actor is waiting for a runtime timer.
+- `waiting`: the actor is waiting on a task join.
+- `done`: the actor function returned; the runtime does not schedule that
+  actor again. Zero and nonzero actor entry returns become the same
+  user-visible `done` state.
+
+When the actor table is full, `core.spawn(...)` returns the raw invalid handle
+value `-1`; later local sends to that handle return checked failure `-3`.
+Once an actor reaches `done`, later local legacy, tagged, or typed sends to
+that actor return checked failure `-4` before allocating a message node. A
+message already queued in another actor's mailbox remains receivable after the
+sender is done, and `core.sender()` for that receive may name a done actor.
+Pending mailbox entries are not drained or delivered after the actor reaches
+`done`; this is a bounded local completion state, not mailbox-drain shutdown.
+Other blocked, sleeping, or waiting actors continue according to ordinary
+message, timer, and task-wait readiness rules when one actor exits.
+In particular, nonzero actor entry returns become the same user-visible `done`
+state as zero returns: later local sends return `-4`, and there is no separate
+actor failure channel.
+
+There is currently no shutdown API, no actor close handle, and no actor status,
+actor join, actor exit-code, supervision, or restart API. There is also no
+supervision, restart, linking, or OTP-style lifecycle guarantee.
 
 ## Scheduling semantics
 
@@ -121,24 +152,36 @@ Returns the handle of the current actor.
   - waiting in `core.task_join_i32()`, `core.task_join_result_i32()`, `core.task_join_until_i32(task, deadline)`, or `core.select2_i32(task, deadline)`,
   - sleeping in `core.sleep_ms()` or `core.sleep_until(deadline)`,
   - finished execution.
-- Scheduler policy: round-robin over runnable actors (MVP).
+- Scheduler policy: round-robin over runnable actors (current profile).
 - If no actor is ready but one or more actors have timed sleep, receive, or
   join deadlines, the runtime advances the logical clock to the nearest deadline
   and wakes due actors.
+- Current executable evidence covers bounded cooperative progress for yielding
+  runnable actors and deterministic deadline-order wake for sleeping actors.
+  This is a single-thread cooperative fairness boundary, not preemptive
+  scheduling or a production multi-threaded scheduler claim.
 - `core.send()` wakes actors blocked in `core.recv()`; sleeping actors wake only
   through their deadline or task-group cancellation.
-- Task-group cancellation wakes actors in that group when they are blocked in
-  timed receive APIs. `core.recv_until(deadline)` returns
-  `actor.recv_result_i32 { value: 0, error: 1 }`, and
+- Task-group cancellation has a scoped cooperative wake matrix:
+  `core.recv_until(deadline)` returns
+  `actor.recv_result_i32 { value: 0, error: 1 }`;
   `core.recv_msg_until(deadline)` returns
-  `actor.recv_msg_result { value: 0, tag: 0, error: 1 }`, before the original
-  receive deadline. This is a scoped timed-receive cancellation guarantee, not
-  full actor supervision or a full structured-concurrency model for every
-  blocking API.
+  `actor.recv_msg_result { value: 0, tag: 0, error: 1 }`;
+  `core.task_join_result_i32(task)`,
+  `core.task_join_until_i32(task, deadline)`, and
+  `core.select2_i32(task, deadline)` return
+  `task.result_i32 { value: 0, error: 1 }` when a task-group cancellation is
+  observed while the caller is already waiting. Raw
+  `core.task_join_i32(task)` has no error field, so its cancellation wake is
+  exposed as raw value `0`; use the result or timed join APIs when code needs a
+  checked cancellation status. Non-timed actor receives such as `core.recv()`
+  and `core.recv_msg()` do not expose a cancellation result in the current
+  profile; they remain message-oriented blocking APIs. This is not full actor
+  supervision or a full structured-concurrency model for every blocking API.
 
 ## Message Model
 
-MVP messages are `i32` values plus an implicit sender handle. Tagged messages
+Current messages are `i32` values plus an implicit sender handle. Tagged messages
 are available through `core.send_msg(to, value, tag)` and `core.recv_msg()`,
 which returns `actor.msg { value, tag }`.
 Timed receive is available through `core.recv_until(deadline)`, which returns
@@ -148,7 +191,7 @@ result shape and timeout code. Tagged timed receive is available through
 `core.recv_msg_until(deadline)`, which returns
 `actor.recv_msg_result { value, tag, error }`.
 
-Typed actor messages are supported as an enum-only MVP:
+Typed actor messages are supported as an enum-only current profile:
 
 - `core.send_typed(to, msg)` sends an enum message value to another actor and
   returns `i32`.
@@ -206,6 +249,9 @@ Typed actor messages are supported as an enum-only MVP:
   stable machine fields `case`, `code`, `severity`, `category`, `position`, and
   `expected_error`; the stable contract is the machine taxonomy and presence of
   scoped substring evidence, not frozen human diagnostic prose.
+- Actor benchmark rows in the same report remain Tier 0/Tier 1 readiness
+  evidence only. They make no benchmark superiority, no C++/Rust parity, and no official benchmark claim; higher-tier reproducibility requires a separate
+  environment and artifact gate.
 - Distributed typed actor frames still serialize fixed wire values. The P6.1
   zero-copy region-slice path is a local typed mailbox guarantee, not a
   cross-node pointer transfer guarantee.
@@ -230,23 +276,25 @@ isolation guarantees.
 - Built-in x64 done actor send behavior: once a local actor has completed and
   its runtime status is `done`, later local legacy, tagged, or typed sends to
   that actor return checked failure `-4` before allocating a message node. This
-  is a bounded shutdown diagnostic, not supervision, restart, linking, or
-  mailbox-drain lifecycle management.
+  is a bounded shutdown diagnostic, not supervision, restart, linking, OTP
+  lifecycle behavior, or mailbox-drain lifecycle management.
 - Built-in x64 per-actor mailbox depth: `maxActorMailboxMsgs = 256`. A local
   send to a full mailbox returns checked backpressure `-2` before allocating a
   message node. Receiving a message decrements the mailbox depth, so this
-  backpressure is recoverable when the receiver drains messages. This is a
-  bounded local mailbox policy, not a generic unbounded mailbox or distributed
-  delivery guarantee.
-- Built-in x64 runtime message pool: 64 KiB, bump-allocated, with no message
-  reclamation during a run. The current message node size is 88 bytes because
-  typed mailbox payload slots are stored as local 64-bit slots; this gives room
-  for pointer-like local slice fields while keeping typed payloads capped at 8
-  value slots by the checker. With the fixed 64 KiB pool, 744 single-slot
-  messages fit in the pool. When a later local send would advance the bump
-  pointer past the pool end, the built-in runtime returns checked failure
-  `-1` and does not enqueue an overflow message. Draining the mailbox does not
-  reclaim message-pool capacity in the current runtime.
+  backpressure is recoverable when the receiver drains messages. The same
+  checked `-2` contract applies to local legacy, tagged, and typed sends; a
+  failed typed send does not enqueue a partial typed payload. This is a bounded
+  local mailbox policy, not a generic unbounded mailbox, automatic retry, or
+  distributed delivery guarantee.
+- Built-in x64 runtime message pool: 64 KiB, with a bump allocator plus a
+  free list for drained message nodes. The current message node size is 88
+  bytes because typed mailbox payload slots are stored as local 64-bit slots;
+  this gives room for pointer-like local slice fields while keeping typed
+  payloads capped at 8 value slots by the checker. With the fixed 64 KiB pool,
+  744 single-slot live messages fit in the pool before reclamation. When a
+  later local send would exceed the pool while those messages remain live, the
+  built-in runtime returns checked failure `-1` and does not enqueue an
+  overflow message. Drained message nodes are reclaimed and can be reused.
 - Built-in x64 runtime actor state: 8 state slots per actor, each one `i32`
   storage cell. The checker enforces this limit for actor declarations and
   rejects programs that require more than 8 actor-state slots before lowering
@@ -272,14 +320,14 @@ The canonical modules are `__rt.actors_sysv` for `linux-x64`/`macos-x64`/
 The older `actors_poc_*` files are retained as historical PoC snapshots and
 compatibility references.
 
-Future extensions (post-MVP):
+Future extensions:
 - Copy-based passing of `[]u8` into a receiver-owned island.
 - Distributed serialization contracts for owned-region payloads.
 - Typed nonblocking/timed receive helpers if promoted by a future runtime
   profile.
 - Generic actor mailbox APIs beyond the current enum-only message calls.
-- Cancellation or structured-concurrency guarantees beyond the current
-  cooperative task group handles.
+- Cancellation or structured-concurrency guarantees beyond the scoped
+  cooperative task-group wake matrix above.
 - Non-Linux-x64 distributed actor runtime targets, multi-threaded actor
   scheduling, and production broker deployments beyond the current loopback TCP
   smoke envelope.
@@ -292,6 +340,23 @@ broker to exercise distributed node identity, remote actor handles, network
 mailbox send/receive for i32, tagged, and typed messages, missing-node
 failure/status propagation, and compatibility with existing cooperative task
 cancel/join handles.
+
+### Distributed Runtime Target Matrix
+
+| Target | Distributed actor runtime status | Current evidence | Promotion requirement |
+|---|---|---|---|
+| `linux-x64` | current scoped | executable `tetra.actors.distributed-runtime.v1` smoke plus actor foundation gate | keep same-commit distributed smoke, artifact hashes, and foundation validator green |
+| `macos-x64` | unsupported / nonclaim | no distributed actor symbols; actor net pump is no-op | add target runtime, smoke, validator, docs, and package gate before any support claim |
+| `windows-x64` | unsupported / nonclaim | no distributed actor symbols; actor net pump is no-op | add target runtime, smoke, validator, docs, and package gate before any support claim |
+| `wasm32-wasi` | unsupported / nonclaim | no distributed actor runtime gate | add target runtime, smoke, validator, docs, and package gate before any support claim |
+| `wasm32-web` | unsupported / nonclaim | no distributed actor runtime gate | add target runtime, smoke, validator, docs, and package gate before any support claim |
+
+Missing-node/node_down is status/failure evidence only. When the loopback
+broker reports a missing destination with `node_down`, the Linux-x64 runtime
+can surface that as `core.actor_node_status(...) == 1` after the network pump
+observes the frame. This does not imply automatic retry, reconnect, restart,
+supervision, or delivery retry; later delivery attempts are user-driven sends
+against the same bounded distributed status surface.
 
 Promotion evidence is executable, not report-only:
 `scripts/release/v0_4_0/distributed-actors-linux-x64-smoke.sh` builds a fresh

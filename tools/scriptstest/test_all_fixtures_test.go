@@ -64,6 +64,26 @@ if [[ "${1:-}" == "run" && "${2:-}" == "./tools/cmd/validate-test-all-summary" &
   echo "summary validator unavailable" >&2
   exit 23
 fi
+if [[ "${1:-}" == "run" && "${2:-}" == "./tools/cmd/json-to-toon" ]]; then
+  out=""
+  shift 2
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --out)
+        out="$2"
+        shift 2
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+  if [[ -n "$out" ]]; then
+    mkdir -p "$(dirname "$out")"
+    printf 'status: pass\n' >"$out"
+  fi
+  exit 0
+fi
 if [[ "${1:-}" == "run" && "${2:-}" == "./tools/cmd/gen-manifest" ]]; then
   out=""
   shift 2
@@ -293,6 +313,7 @@ if [[ "${1:-}" == "test" ]]; then
         ;;
       ./cli/internal/actornet)
         printf '%s\n' \
+          TestBrokerCloseReopenWithoutGoroutineLeak \
           TestBrokerCloseWithoutCancelStopsServeWatcher \
           TestBrokerRoutesFramesBetweenLoopbackNodesAndWritesReport \
           TestBrokerReportsNodeDownForMissingDestination

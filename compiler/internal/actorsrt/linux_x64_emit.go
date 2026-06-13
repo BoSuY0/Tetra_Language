@@ -93,8 +93,25 @@ func emitMovMem32RspDispEax(e *x64.Emitter, disp byte) {
 }
 
 func emitCheckedMessagePoolAlloc(e *x64.Emitter) int {
-	// On success, rdx is the allocated message pointer and sched.msg_bump is
-	// advanced. The returned jump targets a caller-specific stack unwind path.
+	// On success, rdx is the allocated message pointer. Reclaimed nodes are
+	// reused before advancing sched.msg_bump. The returned jump targets a
+	// caller-specific stack unwind path when no reclaimed or bump node exists.
+	e.MovRdiR15()
+	e.MovRaxFromRdiDisp(schedMsgFreeOff)
+	e.TestRaxRax()
+	bumpAt := e.JzRel32()
+
+	e.MovRdxRax()
+	e.MovRdiRdx()
+	e.MovRaxFromRdiDisp(msgNextOff)
+	e.MovRdiR15()
+	e.MovMem64RdiDispRax(schedMsgFreeOff)
+	doneAt := e.JmpRel32()
+
+	bumpTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, bumpAt, bumpTo); err != nil {
+		panic(err)
+	}
 	e.MovRdiR15()
 	e.MovRaxFromRdiDisp(schedMsgBumpOff)
 	e.MovRdxRax()
@@ -103,7 +120,40 @@ func emitCheckedMessagePoolAlloc(e *x64.Emitter) int {
 	e.CmpRaxR8()
 	overflowAt := e.JaRel32()
 	e.MovMem64RdiDispRax(schedMsgBumpOff)
+	doneTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, doneAt, doneTo); err != nil {
+		panic(err)
+	}
 	return overflowAt
+}
+
+func emitRecycleMessageNodeInRax(e *x64.Emitter) {
+	e.MovRdiR15()
+	e.MovR8FromRdiDisp(schedMsgFreeOff)
+	e.MovRdiRax()
+	e.MovMem64RdiDispR8(msgNextOff)
+	e.MovRdiR15()
+	e.MovMem64RdiDispRax(schedMsgFreeOff)
+}
+
+func emitRecycleMessageNodeFromRspDisp(e *x64.Emitter, disp int32) {
+	e.MovRaxFromRspDisp(disp)
+	emitRecycleMessageNodeInRax(e)
+}
+
+func emitCopyMessageNodeToRecvScratchFromRspDisp(e *x64.Emitter, disp int32) {
+	for off := int32(0); off < msgSize; off += 8 {
+		e.MovRaxFromRspDisp(disp)
+		e.MovRdiRax()
+		e.MovRaxFromRdiDisp(off)
+		e.MovRdiR15()
+		e.MovMem64RdiDispRax(schedRecvScratchOff + off)
+	}
+
+	e.MovRaxR15()
+	e.AddRaxImm32(schedRecvScratchOff)
+	e.MovRdiR15()
+	e.MovMem64RdiDispRax(schedPendingMsgOff)
 }
 
 func emitMessagePoolExhaustedReturn(e *x64.Emitter) {
@@ -229,6 +279,8 @@ func emitEntry(e *x64.Emitter, mainSymbol string, sysMmap uint32, mapFlags uint3
 	e.MovMem64RdiDispRax(schedMsgBumpOff)
 	e.AddRaxImm32(msgPoolSize)
 	e.MovMem64RdiDispRax(schedMsgEndOff)
+	e.XorEaxEax()
+	e.MovMem64RdiDispRax(schedMsgFreeOff)
 
 	// actor0 = sched.actorsPtr + 0
 	e.MovRdiR15()
@@ -685,6 +737,24 @@ func emitWaitingTaskWakeCheck(e *x64.Emitter) ([]int, []int, error) {
 	e.MovEaxFromRdiDisp(actorStatusOff)
 	e.CmpEaxImm32(statusDone)
 	targetDoneAt := e.JzRel32()
+	e.CmpEaxImm32(statusWaiting)
+	targetWaitingAt := e.JzRel32()
+	e.MovEaxFromRdiDisp(actorTaskGroupOff)
+	e.TestEaxEax()
+	noGroupAt := e.JzRel32()
+	e.MovEdiEax()
+	groupStatePtrFromEdi(e)
+	e.MovEaxFromRdiDisp(0)
+	e.CmpEaxImm32(taskGroupCanceled)
+	targetCanceledAt := e.JzRel32()
+
+	deadlineCheckTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, targetWaitingAt, deadlineCheckTo); err != nil {
+		return nil, nil, err
+	}
+	if err := x64.PatchRel32(e.Buf, noGroupAt, deadlineCheckTo); err != nil {
+		return nil, nil, err
+	}
 	e.MovEaxFromRspDisp(0)
 	actorWakeAtPtrFromEaxToRdi(e)
 	e.MovEcxFromRdiDisp(0)
@@ -699,6 +769,9 @@ func emitWaitingTaskWakeCheck(e *x64.Emitter) ([]int, []int, error) {
 
 	doneReadyTo := len(e.Buf)
 	if err := x64.PatchRel32(e.Buf, targetDoneAt, doneReadyTo); err != nil {
+		return nil, nil, err
+	}
+	if err := x64.PatchRel32(e.Buf, targetCanceledAt, doneReadyTo); err != nil {
 		return nil, nil, err
 	}
 	if err := x64.PatchRel32(e.Buf, deadlineDueAt, doneReadyTo); err != nil {
@@ -2233,6 +2306,15 @@ func emitTaskJoinI32(e *x64.Emitter, result bool, callPatches *[]callPatch) erro
 	e.MovEaxFromRdiDisp(actorStatusOff)
 	e.CmpEaxImm32(statusDone)
 	doneAt := e.JzRel32()
+	e.CmpEaxImm32(statusWaiting)
+	targetWaitingAt := e.JzRel32()
+	if err := emitTaskCanceledCheck(e, func() { emitTaskJoinI32CanceledReturn(e, result) }); err != nil {
+		return err
+	}
+	parkTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, targetWaitingAt, parkTo); err != nil {
+		return err
+	}
 
 	emitParkCurrentActorWaitingForTask(e)
 	at := e.CallRel32()
@@ -2283,6 +2365,15 @@ func emitTaskJoinUntilI32(e *x64.Emitter, callPatches *[]callPatch) error {
 	e.MovEaxFromRdiDisp(actorStatusOff)
 	e.CmpEaxImm32(statusDone)
 	doneAt := e.JzRel32()
+	e.CmpEaxImm32(statusWaiting)
+	targetWaitingAt := e.JzRel32()
+	if err := emitTaskCanceledCheck(e, func() { emitTaskJoinI32CanceledReturn(e, true) }); err != nil {
+		return err
+	}
+	deadlineCheckTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, targetWaitingAt, deadlineCheckTo); err != nil {
+		return err
+	}
 
 	e.MovRdiR15()
 	e.MovEaxFromRdiDisp(schedTimeMsOff)
@@ -2481,6 +2572,15 @@ func emitTaskJoinTyped(e *x64.Emitter, slots int, callPatches *[]callPatch) erro
 	e.MovEaxFromRdiDisp(actorStatusOff)
 	e.CmpEaxImm32(statusDone)
 	doneAt := e.JzRel32()
+	e.CmpEaxImm32(statusWaiting)
+	targetWaitingAt := e.JzRel32()
+	if err := emitTaskCanceledCheck(e, func() { emitTaskJoinTypedCanceledReturn(e, slots) }); err != nil {
+		return err
+	}
+	parkTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, targetWaitingAt, parkTo); err != nil {
+		return err
+	}
 
 	emitParkCurrentActorWaitingForTask(e)
 	at := e.CallRel32()
@@ -3287,6 +3387,7 @@ func emitRemoteSendCommit(e *x64.Emitter) error {
 		return err
 	}
 
+	emitRecycleMessageNodeFromRspDisp(e, 0x40)
 	e.MovRdiR15()
 	e.XorEaxEax()
 	e.MovMem64RdiDispRax(schedPendingMsgOff)
@@ -3299,6 +3400,7 @@ func emitRemoteSendCommit(e *x64.Emitter) error {
 			return err
 		}
 	}
+	emitRecycleMessageNodeFromRspDisp(e, 0x40)
 	e.MovRdiR15()
 	e.XorEaxEax()
 	e.MovMem64RdiDispRax(schedPendingMsgOff)
@@ -3310,6 +3412,7 @@ func emitRemoteSendCommit(e *x64.Emitter) error {
 
 func emitActorNetPump(e *x64.Emitter) error {
 	var retJumps []int
+	var netFailureJumps []int
 	var successJumps []int
 
 	e.PushRbp()
@@ -3445,11 +3548,8 @@ func emitActorNetPump(e *x64.Emitter) error {
 	retJumps = append(retJumps, e.JaRel32())
 	emitMovMem32RspDispEax(e, 0x48) // actor id
 
-	e.MovRdiR15()
-	e.MovRaxFromRdiDisp(schedMsgBumpOff)
-	e.MovRdxRax()
-	e.AddRaxImm32(msgSize)
-	e.MovMem64RdiDispRax(schedMsgBumpOff)
+	overflowAt := emitCheckedMessagePoolAlloc(e)
+	netFailureJumps = append(netFailureJumps, overflowAt)
 
 	e.MovRdiRdx()
 	e.XorEaxEax()
@@ -3506,6 +3606,7 @@ func emitActorNetPump(e *x64.Emitter) error {
 	if err := x64.PatchRel32(e.Buf, appendedAt, appendedTo); err != nil {
 		return err
 	}
+	emitIncrementMailboxCount(e)
 	e.MovEaxFromRdiDisp(actorStatusOff)
 	e.CmpEaxImm32(statusBlocked)
 	notBlockedAt := e.JnzRel32()
@@ -3519,6 +3620,16 @@ func emitActorNetPump(e *x64.Emitter) error {
 	e.MovMem32RdiDispEax(msgTagOff)
 	emitMovEaxRspDisp(e, 0x50)
 	e.MovMem32RdiDispEax(msgCountOff)
+	successJumps = append(successJumps, e.JmpRel32())
+
+	netFailureTo := len(e.Buf)
+	for _, at := range netFailureJumps {
+		if err := x64.PatchRel32(e.Buf, at, netFailureTo); err != nil {
+			return err
+		}
+	}
+	e.MovRdiR15()
+	e.MovMem32RdiDispImm32(schedNetStatusOff, actorWireStatusDown)
 	successJumps = append(successJumps, e.JmpRel32())
 
 	retTo := len(e.Buf)
@@ -3871,6 +3982,7 @@ func emitRecv(e *x64.Emitter, callPatches *[]callPatch) error {
 		return err
 	}
 	emitDecrementMailboxCount(e)
+	emitRecycleMessageNodeFromRspDisp(e, 16)
 
 	e.PopRax()
 	e.MovRdiRdx()
@@ -3939,6 +4051,7 @@ func emitRecvMsg(e *x64.Emitter, callPatches *[]callPatch) error {
 		return err
 	}
 	emitDecrementMailboxCount(e)
+	emitRecycleMessageNodeFromRspDisp(e, 24)
 
 	e.PopRax()
 	e.MovRdiRdx()
@@ -4143,6 +4256,7 @@ func emitRecvBegin(e *x64.Emitter, callPatches *[]callPatch) error {
 	e.PushRax()
 	e.MovEaxFromRdiDisp(msgSenderOff)
 	e.PushRax()
+	emitCopyMessageNodeToRecvScratchFromRspDisp(e, 16)
 
 	e.MovRaxFromRspDisp(16)
 	e.MovRdiRax()
@@ -4161,14 +4275,11 @@ func emitRecvBegin(e *x64.Emitter, callPatches *[]callPatch) error {
 		return err
 	}
 	emitDecrementMailboxCount(e)
+	emitRecycleMessageNodeFromRspDisp(e, 16)
 
 	e.PopRax()
 	e.MovRdiRdx()
 	e.MovMem32RdiDispEax(actorLastSenderOff)
-
-	e.MovRdiR15()
-	e.MovRaxFromRspDisp(8)
-	e.MovMem64RdiDispRax(schedPendingMsgOff)
 
 	e.PopRax()
 	e.AddRspImm32(8)

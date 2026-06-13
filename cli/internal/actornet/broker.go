@@ -190,6 +190,16 @@ func (b *Broker) handleConn(conn net.Conn) {
 			continue
 		}
 
+		if registeredNode == 0 {
+			b.rejectFrame(conn, frame.SourceNodeID, frame, actorwire.StatusDecodeError)
+			return
+		}
+		if frame.SourceNodeID != registeredNode {
+			b.rejectFrame(conn, registeredNode, frame, actorwire.StatusDecodeError)
+			b.unregisterNode(registeredNode, conn)
+			return
+		}
+
 		if err := b.routeFrame(frame); err != nil {
 			b.recordError(err)
 		}
@@ -216,6 +226,23 @@ func (b *Broker) registerNode(nodeID uint16, conn net.Conn) (*nodeConn, bool) {
 	b.report.ConnectedNodes = len(b.nodes)
 	b.mu.Unlock()
 	return node, true
+}
+
+func (b *Broker) rejectFrame(conn net.Conn, nodeID uint16, frame actorwire.Frame, status int32) {
+	b.mu.Lock()
+	b.report.DroppedFrames++
+	b.mu.Unlock()
+
+	reject := &nodeConn{nodeID: nodeID, conn: conn}
+	_ = reject.write(actorwire.Frame{
+		Type:         actorwire.FrameError,
+		SourceNodeID: nodeID,
+		DestNodeID:   nodeID,
+		SequenceID:   frame.SequenceID,
+		ActorID:      frame.ActorID,
+		Status:       status,
+	})
+	_ = conn.Close()
 }
 
 func (b *Broker) unregisterNode(nodeID uint16, conn net.Conn) {
@@ -340,7 +367,11 @@ func (node *nodeConn) write(frame actorwire.Frame) error {
 
 func readFrame(conn net.Conn) (actorwire.Frame, error) {
 	data := make([]byte, actorwire.FrameSize)
-	if _, err := io.ReadFull(conn, data); err != nil {
+	n, err := io.ReadFull(conn, data)
+	if err != nil {
+		if errors.Is(err, io.ErrUnexpectedEOF) || (errors.Is(err, io.EOF) && n > 0) {
+			return actorwire.Frame{}, fmt.Errorf("%w: got %d bytes, want %d", actorwire.ErrShortFrame, n, actorwire.FrameSize)
+		}
 		return actorwire.Frame{}, err
 	}
 	return actorwire.DecodeFrame(data)

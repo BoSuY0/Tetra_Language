@@ -3767,9 +3767,6 @@ func validateTypedActorMessageType(typeName string, types map[string]*TypeInfo, 
 		if len(info.EnumCases) > 255 {
 			return fmt.Errorf("typed actor message enum supports at most 255 cases, got %d for '%s'", len(info.EnumCases), typeName)
 		}
-		if info.SlotCount-1 > 8 {
-			return fmt.Errorf("typed actor message payload supports at most 8 value slots, got %d for '%s'", info.SlotCount-1, typeName)
-		}
 		if visiting[typeName] {
 			return nil
 		}
@@ -3781,6 +3778,9 @@ func validateTypedActorMessageType(typeName string, types map[string]*TypeInfo, 
 					return err
 				}
 			}
+		}
+		if info.SlotCount-1 > 8 {
+			return fmt.Errorf("typed actor message payload supports at most 8 value slots, got %d for '%s'", info.SlotCount-1, typeName)
 		}
 		return nil
 	case TypeStruct:

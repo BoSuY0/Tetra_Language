@@ -135,6 +135,77 @@ uses actors:
 	}
 }
 
+func TestActorBoundaryStableDiagnosticsMatrix(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			name: "dynamic spawn target",
+			src: `
+func worker() -> Int:
+    return 7
+
+func main() -> Int
+uses actors:
+    let name: str = "worker"
+    let _peer: actor = core.spawn(name)
+    return 0
+`,
+			want: "spawn expects a string literal",
+		},
+		{
+			name: "function-typed callback target crosses actor boundary",
+			src: `
+struct Handler:
+    cb: fn() -> Int
+
+var g: Int
+
+func inc() -> Int:
+    g = g + 1
+    return g
+
+func handler() -> Handler:
+    return Handler(cb: inc)
+
+func worker() -> Int:
+    let h: Handler = handler()
+    return h.cb()
+
+func main() -> Int
+uses actors:
+    let peer: actor = core.spawn("worker")
+    return core.send(peer, 1)
+`,
+			want: "spawn target 'worker' touches mutable global state and cannot cross actor boundary",
+		},
+		{
+			name: "mutable global actor target",
+			src: `
+var g: Int
+
+func worker() -> Int:
+    g = g + 1
+    return g
+
+func main() -> Int
+uses actors:
+    let peer: actor = core.spawn("worker")
+    return core.send(peer, 1)
+`,
+			want: "spawn target 'worker' touches mutable global state and cannot cross actor boundary",
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			testkit.RequireFileCheckErrorContains(t, tt.src, tt.want)
+		})
+	}
+}
+
 func TestTaskSpawnOwnershipMatrix(t *testing.T) {
 	cases := []struct {
 		name    string
