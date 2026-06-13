@@ -43,7 +43,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.20.x"
+          go-version: "1.25.x"
 
       - name: Prepare release metadata
         id: meta
@@ -113,33 +113,8 @@ jobs:
         run: |
           set -euo pipefail
           report_dir="${{ steps.meta.outputs.out_dir }}/surface-product-v1"
-          if ! command -v weston >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y weston
-          fi
-          export XDG_RUNTIME_DIR="${RUNNER_TEMP:-/tmp}/surface-wayland-runtime"
-          mkdir -p "$XDG_RUNTIME_DIR"
-          chmod 700 "$XDG_RUNTIME_DIR"
-          weston_log="${RUNNER_TEMP:-/tmp}/surface-weston.log"
-          weston --backend=headless-backend.so --socket=wayland-surface-release --idle-time=0 >"$weston_log" 2>&1 &
-          weston_pid=$!
-          cleanup_weston() {
-            kill "$weston_pid" >/dev/null 2>&1
-          }
-          trap cleanup_weston EXIT
-          waited=0
-          while [[ ! -S "$XDG_RUNTIME_DIR/wayland-surface-release" && "$waited" -lt 100 ]]; do
-            sleep 0.1
-            waited=$((waited + 1))
-          done
-          if [[ ! -S "$XDG_RUNTIME_DIR/wayland-surface-release" ]]; then
-            if [[ -f "$weston_log" ]]; then
-              cat "$weston_log" >&2
-            fi
-            exit 1
-          fi
-          export WAYLAND_DISPLAY=wayland-surface-release
-          bash scripts/release/surface/product-gate.sh --report-dir "$report_dir"
+          bash scripts/ci/with-headless-wayland.sh --socket wayland-surface-release -- \
+            bash scripts/release/surface/product-gate.sh --report-dir "$report_dir"
 
       - name: Surface experimental regression gate
         shell: bash
@@ -187,7 +162,8 @@ jobs:
         run: |
           set -euo pipefail
           report_dir="${{ steps.meta.outputs.out_dir }}/memory-islands-surface-production"
-          bash scripts/release/post_v0_4/memory-islands-surface-production-gate.sh --report-dir "$report_dir"
+          bash scripts/ci/with-headless-wayland.sh --socket wayland-memory-islands-surface-release -- \
+            bash scripts/release/post_v0_4/memory-islands-surface-production-gate.sh --report-dir "$report_dir"
 
       - name: RAM contract release gate
         shell: bash
@@ -220,7 +196,8 @@ jobs:
           export GOTMPDIR="${PWD}/.cache/go-tmp-memory-100-prod-stable-release"
           mkdir -p "$GOCACHE" "$GOTMPDIR"
           report_dir="${{ steps.meta.outputs.out_dir }}/memory-100-prod-stable"
-          bash scripts/release/post_v0_4/memory-100-prod-stable-gate.sh --report-dir "$report_dir"
+          bash scripts/ci/with-headless-wayland.sh --socket wayland-memory-100-release -- \
+            bash scripts/release/post_v0_4/memory-100-prod-stable-gate.sh --report-dir "$report_dir"
 
       - name: Upload package artifacts
         uses: actions/upload-artifact@v4
