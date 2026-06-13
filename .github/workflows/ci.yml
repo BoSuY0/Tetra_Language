@@ -48,12 +48,6 @@ jobs:
           - os: ubuntu-latest
             target: linux-x64
             canonical: true
-          - os: windows-2025
-            target: windows-x64
-            canonical: false
-          - os: macos-15-intel
-            target: macos-x64
-            canonical: false
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
