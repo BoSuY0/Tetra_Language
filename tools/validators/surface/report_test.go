@@ -4057,6 +4057,7 @@ func TestSurfaceProjectTemplateSourceAcceptsExitZeroComponentAppProcess(t *testi
 	for _, source := range []string{
 		"reports/surface-electron-react-beauty-production/P21/template-smoke/templates/command-palette/src/main.tetra",
 		"reports/surface-electron-react-beauty-production/P21/release-gate/templates/command-palette/src/main.tetra",
+		"reports/surface-product-v1-final-clean-20260613-0926/templates/command-palette/src/main.tetra",
 	} {
 		t.Run(source, func(t *testing.T) {
 			exit := 0

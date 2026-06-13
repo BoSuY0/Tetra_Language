@@ -1335,6 +1335,21 @@ func TestVerifyRAMContractCompilerDocsRejectsStaleReadinessHead(t *testing.T) {
 	}
 }
 
+func TestVerifyRAMContractCompilerDocsAcceptsDirectParentReadinessHead(t *testing.T) {
+	parent, ok := currentGitParentForDocs()
+	if !ok {
+		t.Skip("git parent unavailable")
+	}
+	paths := writeRAMContractDocsSet(t, validRAMContractDocsBody())
+	body := validRAMContractDocsBody() + "\nGit head: " + parent + "\n"
+	if err := os.WriteFile(paths.Readiness, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyRAMContractCompilerDocs(paths, []featureManifest{validVerifyDocsRAMContractFeature()}); err != nil {
+		t.Fatalf("verifyRAMContractCompilerDocs accepted direct parent evidence head: %v", err)
+	}
+}
+
 func TestVerifyRAMContractCompilerDocsAcceptsScopedEvidence(t *testing.T) {
 	paths := writeRAMContractDocsSet(t, validRAMContractDocsBody())
 	if err := verifyRAMContractCompilerDocs(paths, []featureManifest{validVerifyDocsRAMContractFeature()}); err != nil {

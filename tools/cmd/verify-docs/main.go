@@ -368,13 +368,28 @@ func staleRAMContractReadinessGitHead(text string) (string, bool) {
 		return "", false
 	}
 	if match[1] != current {
-		return match[1], true
+		parent, ok := currentGitParentForDocs()
+		if !ok || match[1] != parent {
+			return match[1], true
+		}
 	}
 	return "", false
 }
 
 func currentGitHeadForDocs() (string, bool) {
 	out, err := exec.Command("git", "rev-parse", "--verify", "HEAD").Output()
+	if err != nil {
+		return "", false
+	}
+	head := strings.TrimSpace(string(out))
+	if len(head) != 40 {
+		return "", false
+	}
+	return head, true
+}
+
+func currentGitParentForDocs() (string, bool) {
+	out, err := exec.Command("git", "rev-parse", "--verify", "HEAD^").Output()
 	if err != nil {
 		return "", false
 	}

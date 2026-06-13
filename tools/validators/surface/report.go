@@ -2834,7 +2834,9 @@ func isSurfaceProjectTemplateSource(source string) bool {
 	inSurfaceReport := strings.HasPrefix(source, "reports/surface-electron-react-beauty-production/") ||
 		strings.Contains(source, "/reports/surface-electron-react-beauty-production/") ||
 		strings.HasPrefix(source, "reports/surface-product-v1/") ||
-		strings.Contains(source, "/reports/surface-product-v1/")
+		strings.Contains(source, "/reports/surface-product-v1/") ||
+		strings.HasPrefix(source, "reports/surface-product-v1-") ||
+		strings.Contains(source, "/reports/surface-product-v1-")
 	return inSurfaceReport && strings.Contains(source, "/templates/") && strings.HasSuffix(source, "/src/main.tetra")
 }
 

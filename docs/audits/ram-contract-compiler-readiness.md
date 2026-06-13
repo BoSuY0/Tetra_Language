@@ -1,6 +1,6 @@
 # RAM Contract Compiler Readiness Audit
 
-Git head: c0258b63a636775b114d69d31cb7832fc3991b05
+Git head: a49094bffbfe59083b4f995845743e29adc612ca
 Working tree: dirty working tree evidence; this is not a clean release-candidate checkout claim.
 Verdict: `SCOPED_READY`
 
