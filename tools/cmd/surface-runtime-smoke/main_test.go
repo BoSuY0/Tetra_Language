@@ -74,6 +74,34 @@ func TestSurfaceTemplateScenarioRetargetsOnlyGeneratedSources(t *testing.T) {
 	}
 }
 
+func TestSurfaceTemplateSmokeUsesCanonicalRuntimeSources(t *testing.T) {
+	root, err := repoRootForCommands()
+	if err != nil {
+		t.Fatalf("repo root: %v", err)
+	}
+	raw, err := os.ReadFile(filepath.Join(root, "scripts", "release", "surface", "surface-template-smoke.sh"))
+	if err != nil {
+		t.Fatalf("read surface-template-smoke.sh: %v", err)
+	}
+	script := string(raw)
+	for _, want := range []string{
+		`go run ./tools/cmd/surface-runtime-smoke --mode headless-block-system --source examples/surface_block_system.tetra --report "$block_report"`,
+		`go run ./tools/cmd/surface-runtime-smoke --mode headless-morph --source examples/surface_morph_command_palette.tetra --report "$morph_report"`,
+	} {
+		if !strings.Contains(script, want) {
+			t.Fatalf("surface-template-smoke.sh missing canonical runtime source command %q", want)
+		}
+	}
+	for _, forbidden := range []string{
+		`--mode headless-block-system --source "$first_source"`,
+		`--mode headless-morph --source "$first_source"`,
+	} {
+		if strings.Contains(script, forbidden) {
+			t.Fatalf("surface-template-smoke.sh must not run template source through synthetic runtime evidence: found %q", forbidden)
+		}
+	}
+}
+
 func TestHeadlessCounterScenarioProducesValidSurfaceRuntimeEvidence(t *testing.T) {
 	scenario := runHeadlessCounterScenario()
 	report := buildReport(smokeOptions{

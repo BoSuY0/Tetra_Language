@@ -175,8 +175,8 @@ morph_report="$runtime_dir/surface-template-morph.json"
 app_model_report="$runtime_dir/surface-template-app-model.json"
 accessibility_report="$runtime_dir/surface-template-accessibility.json"
 
-go run ./tools/cmd/surface-runtime-smoke --mode headless-block-system --source "$first_source" --report "$block_report"
-go run ./tools/cmd/surface-runtime-smoke --mode headless-morph --source "$first_source" --report "$morph_report"
+go run ./tools/cmd/surface-runtime-smoke --mode headless-block-system --source examples/surface_block_system.tetra --report "$block_report"
+go run ./tools/cmd/surface-runtime-smoke --mode headless-morph --source examples/surface_morph_command_palette.tetra --report "$morph_report"
 go run ./tools/cmd/surface-runtime-smoke --mode headless-app-model --source examples/surface_app_model.tetra --report "$app_model_report"
 go run ./tools/cmd/surface-runtime-smoke --mode headless-release-accessibility --source examples/surface_release_accessibility.tetra --report "$accessibility_report"
 go run ./tools/cmd/surface-inspector \
