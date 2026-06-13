@@ -21,6 +21,7 @@ func runPlatformWindowProbe(target string) (platformWindowProbeResult, error) {
 	sourcePath := filepath.Join(tmpDir, "probe.swift")
 	binPath := filepath.Join(tmpDir, "probe")
 	source := `import AppKit
+import Darwin
 
 let app = NSApplication.shared
 app.setActivationPolicy(.regular)
@@ -62,22 +63,24 @@ window.makeKeyAndOrderFront(nil)
 input.becomeFirstResponder()
 input.stringValue = "tetra-ui"
 list.selectItem(at: 1)
-button.performClick(nil)
+let actionSent = app.sendAction(#selector(Handler.save(_:)), to: handler, from: button)
 var timerFired = false
-Timer.scheduledTimer(withTimeInterval: 0.01, repeats: false) { _ in
+let timer = Timer(timeInterval: 0.01, repeats: false) { _ in
     timerFired = true
     title.stringValue = "Saved after timer"
     window.contentView?.needsDisplay = true
 }
-let until = Date().addingTimeInterval(0.10)
-while Date() < until {
+RunLoop.current.add(timer, forMode: .default)
+let until = Date().addingTimeInterval(1.0)
+while !timerFired && Date() < until {
     if let event = app.nextEvent(matching: .any, until: Date().addingTimeInterval(0.01), inMode: .default, dequeue: true) {
         app.sendEvent(event)
     }
     RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.01))
 }
-if !handler.clicked || !timerFired || input.stringValue != "tetra-ui" || list.titleOfSelectedItem != "item-2" {
-    fatalError("AppKit UI runtime probe did not dispatch expected state changes")
+if !actionSent || !handler.clicked || !timerFired || input.stringValue != "tetra-ui" || list.titleOfSelectedItem != "item-2" {
+    fputs("AppKit UI runtime probe did not dispatch expected state changes actionSent=\(actionSent) clicked=\(handler.clicked) timerFired=\(timerFired) input=\(input.stringValue) selected=\(list.titleOfSelectedItem ?? "nil")\n", stderr)
+    exit(1)
 }
 window.close()
 print("ok")
