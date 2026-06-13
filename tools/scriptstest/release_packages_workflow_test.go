@@ -92,6 +92,48 @@ func TestReleasePackagesRunsSurfaceGateBeforePublishing(t *testing.T) {
 	}
 }
 
+func TestReleasePackagesRunsLinuxSurfaceGatesUnderXvfb(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "release-packages.yml"))
+	if err != nil {
+		t.Fatalf("read release-packages workflow: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		"name: Install Surface display dependencies",
+		"apt-get install -y xvfb",
+		`xvfb-run -a bash scripts/release/surface/release-gate.sh --report-dir "$report_dir"`,
+		`xvfb-run -a bash scripts/release/surface/gate.sh --report-dir "$report_dir"`,
+		`xvfb-run -a bash scripts/release/post_v0_4/memory-islands-surface-production-gate.sh --report-dir "$report_dir"`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("release-packages workflow missing Xvfb Surface gate detail %q", want)
+		}
+	}
+
+	installIdx := strings.Index(text, "name: Install Surface display dependencies")
+	surfaceIdx := strings.Index(text, "name: Surface release gate")
+	if installIdx < 0 || surfaceIdx < 0 || installIdx > surfaceIdx {
+		t.Fatalf("Surface display dependencies must be installed before Surface release gate")
+	}
+
+	for _, window := range []struct {
+		start string
+		end   string
+	}{
+		{"name: Surface release gate", "name: Surface experimental regression gate"},
+		{"name: Surface experimental regression gate", "name: Safe view lifetime gate"},
+		{"name: Integrated Memory/Islands/Surface release gate", "name: RAM contract release gate"},
+	} {
+		section := releaseStepWindow(text, window.start, window.end)
+		if strings.Contains(section, "continue-on-error") {
+			t.Fatalf("%s must not use continue-on-error", window.start)
+		}
+		if strings.Contains(section, "|| true") || strings.Contains(section, "set +e") {
+			t.Fatalf("%s must not hide Xvfb or Surface gate failures", window.start)
+		}
+	}
+}
+
 func TestReleasePackagesRunsIntegratedMemoryIslandsSurfaceGateBeforePublishing(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "release-packages.yml"))
 	if err != nil {

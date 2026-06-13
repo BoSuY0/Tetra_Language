@@ -388,7 +388,7 @@ func validateSurfaceReleaseManifest(path string, scope string, expectedStatus st
 		"ui.surface-toolkit-v1":       expectedStatus,
 		"ui.surface-text-input-v1":    expectedStatus,
 		"ui.surface-accessibility-v1": expectedStatus,
-		"ui.surface-morph-capsule":    expectedStatus,
+		"ui.surface-morph-capsule":    "experimental",
 		"ui.surface-macos-x64":        "unsupported",
 		"ui.surface-windows-x64":      "unsupported",
 		"ui.surface-wasm32-wasi":      "unsupported",

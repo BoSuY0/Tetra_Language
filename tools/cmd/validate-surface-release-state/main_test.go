@@ -132,7 +132,7 @@ func surfaceReleaseStateManifestJSON() string {
     {"id":"ui.surface-toolkit-v1","status":"current"},
     {"id":"ui.surface-text-input-v1","status":"current"},
     {"id":"ui.surface-accessibility-v1","status":"current"},
-    {"id":"ui.surface-morph-capsule","status":"current"},
+    {"id":"ui.surface-morph-capsule","status":"experimental"},
     {"id":"ui.surface-macos-x64","status":"unsupported"},
     {"id":"ui.surface-windows-x64","status":"unsupported"},
     {"id":"ui.surface-wasm32-wasi","status":"unsupported"}
