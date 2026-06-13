@@ -159,9 +159,9 @@ func TestSurfaceReleaseReadinessCIUploadsBlockSystemReports(t *testing.T) {
 	section := workflowJobSection(string(raw), "surface-release-readiness-linux:")
 	for _, want := range []string{
 		"surface-release-readiness-linux:",
-		"name: Surface release gate",
-		"bash scripts/release/surface/release-gate.sh --report-dir reports/surface-release-v1",
-		"reports/surface-release-v1/block-system",
+		"name: Surface product gate",
+		"bash scripts/release/surface/product-gate.sh --report-dir reports/surface-product-v1",
+		"reports/surface-product-v1/block-system",
 	} {
 		if !strings.Contains(section, want) {
 			t.Fatalf("Surface release readiness job missing Block-system CI detail %q", want)

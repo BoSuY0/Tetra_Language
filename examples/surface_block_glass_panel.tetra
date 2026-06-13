@@ -17,21 +17,10 @@ func mint() -> surface.Color:
     return surface.Color(r: 96, g: 210, b: 170, a: 255)
 
 func glass_paint() -> block.PaintSpec:
-    return block.paint_stack5(
-        block.paint_layer_fill_radius(surface.Color(r: 28, g: 36, b: 46, a: 218), 20),
-        block.paint_layer_linear_gradient(surface.Color(r: 64, g: 96, b: 126, a: 180), surface.Color(r: 24, g: 34, b: 46, a: 210), 20),
-        block.paint_layer_border(surface.Color(r: 188, g: 218, b: 244, a: 170), 1, 20),
-        block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 116), 24, 0, 10),
-        block.paint_layer_outline(sky(), 1, 22)
-    )
+    return block.paint_stack5(block.paint_layer_fill_radius(surface.Color(r: 28, g: 36, b: 46, a: 218), 20), block.paint_layer_linear_gradient(surface.Color(r: 64, g: 96, b: 126, a: 180), surface.Color(r: 24, g: 34, b: 46, a: 210), 20), block.paint_layer_border(surface.Color(r: 188, g: 218, b: 244, a: 170), 1, 20), block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 116), 24, 0, 10), block.paint_layer_outline(sky(), 1, 22))
 
 func capsule_paint(color: surface.Color) -> block.PaintSpec:
-    return block.paint_stack4(
-        block.paint_layer_fill_radius(surface.Color(r: color.r, g: color.g, b: color.b, a: 190), 999),
-        block.paint_layer_border(theme_light(), 1, 999),
-        block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 72), 12, 0, 4),
-        block.paint_layer_outline(color, 1, 999)
-    )
+    return block.paint_stack4(block.paint_layer_fill_radius(surface.Color(r: color.r, g: color.g, b: color.b, a: 190), 999), block.paint_layer_border(theme_light(), 1, 999), block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 72), 12, 0, 4), block.paint_layer_outline(color, 1, 999))
 
 func make_control(id_value: Int, parent_value: Int, x: Int, y: Int, label_len: Int, color: surface.Color, hash: Int) -> block.Block:
     let rect: surface.Rect = surface.Rect(x: x, y: y, w: 118, h: 46)
@@ -63,14 +52,12 @@ uses alloc, mem:
     let overlay_rect: surface.Rect = surface.Rect(x: 30, y: 28, w: 360, h: 224)
     let title_rect: surface.Rect = surface.Rect(x: 58, y: 54, w: 220, h: 28)
     let status_rect: surface.Rect = surface.Rect(x: 58, y: 204, w: 290, h: 20)
-
     var tree: block.BlockTree = block.tree_init(9)
     let bg_asset: block.AssetRef = block.asset_image(1, 420, 280, 9301)
     let root_props: block.BlockProps = block.props(block.layout_overlay(root_rect, 0), block.paint_stack3(block.paint_layer_fill_radius(theme_dark(), 0), block.paint_layer_linear_gradient(surface.Color(r: 18, g: 24, b: 34, a: 255), surface.Color(r: 28, g: 54, b: 68, a: 255), 0), block.paint_layer_overlay(sky(), 18, 0)), block.text_none(), block.image_asset(bg_asset, 420, 280), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_text(12), bg_asset)
     let overlay_props: block.BlockProps = block.props(block.layout_overlay(overlay_rect, 3), glass_paint(), block.text_none(), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_transition(180, 0, block.motion_ease_standard(), true, true, true, 0, 10, 100), block.accessibility_text(13), block.asset_none())
     let title_props: block.BlockProps = block.props(block.layout_fixed(title_rect), block.paint_empty(), block.text_styled(17, theme_light(), block.text_family_ui(), 19, 800, 24, block.text_align_start(), block.text_wrap_none(), block.text_overflow_ellipsis(), 255), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_text(17), block.asset_font(1, 9302))
     let status_props: block.BlockProps = block.props(block.layout_fixed(status_rect), block.paint_empty(), block.text_styled(22, theme_light(), block.text_family_ui(), 13, 500, 18, block.text_align_start(), block.text_wrap_none(), block.text_overflow_ellipsis(), 210), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_text(22), block.asset_font(2, 9303))
-
     let root: Int = block.tree_add_root(tree, block.make(block.id(1), block.id_none(), root_props), root_rect)
     let overlay: Int = block.tree_add_child(tree, block.id(1), block.make(block.id(2), block.id(1), overlay_props), overlay_rect)
     let title: Int = block.tree_add_child(tree, block.id(2), block.make(block.id(3), block.id(2), title_props), title_rect)
@@ -82,11 +69,6 @@ uses alloc, mem:
     let valid: Int = block.tree_validate(tree)
     let focus0: Int = block.id_value(block.focus_order_at(tree, 0))
     let focus_next: Int = block.id_value(block.focus_next(tree, block.id(4)))
-
-    if root == 1 && overlay == 2 && title == 3 && wifi == 4 && sync == 5 && focus == 6 && mute == 7 && status == 8 &&
-       valid == block.tree_error_ok() &&
-       focus0 == 4 && focus_next == 5 &&
-       block.paint_validate_visual_grammar(glass_paint()) == block.paint_error_ok() &&
-       scene_checksum() > 0:
+    if root == 1 && overlay == 2 && title == 3 && wifi == 4 && sync == 5 && focus == 6 && mute == 7 && status == 8 && valid == block.tree_error_ok() && focus0 == 4 && focus_next == 5 && block.paint_validate_visual_grammar(glass_paint()) == block.paint_error_ok() && scene_checksum() > 0:
         return 0
     return 1

@@ -238,6 +238,27 @@ func button_init(button: inout Button, rect: surface.Rect, action: Int) -> Int:
     button.action = action
     return action
 
+func migration_surface_v1_compatibility_layer() -> Bool:
+    return true
+
+func migration_release_widget_count() -> Int:
+    return 12
+
+func migration_block_only_core_primitive() -> Bool:
+    return true
+
+func migration_widgets_promoted_to_core() -> Bool:
+    return false
+
+func migration_panel_equivalence(panel: borrow Panel, block_width: Int) -> Bool:
+    return panel.rect.w == block_width && block_width > 0
+
+func migration_button_equivalence(button: borrow Button, block_action: Int) -> Bool:
+    return button.action == block_action && block_action > 0
+
+func migration_textbox_equivalence(box: borrow TextBox, block_width: Int) -> Bool:
+    return box.rect.w == block_width && block_width > 0 && box.text_len == 0
+
 func panel_content_rect(panel: borrow Panel) -> surface.Rect:
     return component.inset_rect(panel.rect, panel.padding)
 

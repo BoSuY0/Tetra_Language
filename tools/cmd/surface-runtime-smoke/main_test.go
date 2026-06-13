@@ -49,6 +49,31 @@ func cleanArtifactScan(filesChecked int) surface.ArtifactScanReport {
 	return surface.ArtifactScanReport{Root: "/tmp/surface-artifacts", FilesChecked: filesChecked, ForbiddenPaths: []string{}, Pass: true}
 }
 
+func TestSurfaceComponentAppExpectedExitForGeneratedTemplateSource(t *testing.T) {
+	source := "reports/surface-electron-react-beauty-production/P21/template-smoke/templates/command-palette/src/main.tetra"
+	if got := surfaceComponentAppExpectedExitForSource("headless-block-system", source); got != 0 {
+		t.Fatalf("surfaceComponentAppExpectedExitForSource(generated template) = %d, want 0", got)
+	}
+	if got := surfaceComponentAppExpectedExitForSource("headless-block-system", "examples/surface_block_system.tetra"); got != 1 {
+		t.Fatalf("surfaceComponentAppExpectedExitForSource(canonical block system) = %d, want 1", got)
+	}
+}
+
+func TestSurfaceTemplateScenarioRetargetsOnlyGeneratedSources(t *testing.T) {
+	generated := smokeOptions{Mode: "headless-block-system", SourcePath: "reports/surface-electron-react-beauty-production/P21/template-smoke/templates/command-palette/src/main.tetra"}
+	if !shouldRetargetSurfaceTemplateScenario(generated) {
+		t.Fatalf("generated template source should retarget block-system scenario")
+	}
+	canonical := smokeOptions{Mode: "headless-block-system", SourcePath: "examples/surface_block_system.tetra"}
+	if shouldRetargetSurfaceTemplateScenario(canonical) {
+		t.Fatalf("canonical block-system source must not retarget to generated template module")
+	}
+	counter := smokeOptions{Mode: "headless", SourcePath: "reports/surface-electron-react-beauty-production/P21/template-smoke/templates/command-palette/src/main.tetra"}
+	if shouldRetargetSurfaceTemplateScenario(counter) {
+		t.Fatalf("non Block/Morph mode must not retarget generated template scenario")
+	}
+}
+
 func TestHeadlessCounterScenarioProducesValidSurfaceRuntimeEvidence(t *testing.T) {
 	scenario := runHeadlessCounterScenario()
 	report := buildReport(smokeOptions{
@@ -198,13 +223,16 @@ func TestHeadlessCounterScenarioFrameChecksumComesFromRGBAFramebuffer(t *testing
 }
 
 func TestBlockPaintScenarioProducesVisualPaintEvidence(t *testing.T) {
+	if err := validateSmokeMode("headless-block-paint"); err != nil {
+		t.Fatalf("validateSmokeMode(headless-block-paint) failed: %v", err)
+	}
 	scenario := runBlockPaintScenario()
 	report := buildReport(smokeOptions{
 		Mode:       "headless-block-paint",
 		SourcePath: "examples/surface_block_paint_layers.tetra",
 	}, "linux-x64", []surface.ProcessReport{
 		{Name: "tetra build", Kind: "build", Path: "tetra build --target linux-x64 examples/surface_block_paint_layers.tetra -o /tmp/surface-artifacts/surface-block-paint", Ran: true, Pass: true, ExitCode: intPtr(0)},
-		{Name: "surface component app", Kind: "app", Path: "/tmp/surface-artifacts/surface-block-paint", Ran: true, Pass: true, ExitCode: intPtr(1), ExpectedExitCode: intPtr(1)},
+		{Name: "surface component app", Kind: "app", Path: "/tmp/surface-artifacts/surface-block-paint", Ran: true, Pass: true, ExitCode: intPtr(0), ExpectedExitCode: intPtr(0)},
 		{Name: "surface headless runtime", Kind: "runtime", Path: "tools/cmd/surface-runtime-smoke --mode headless-block-paint", Ran: true, Pass: true, ExitCode: intPtr(0)},
 	}, headlessSurfaceArtifacts("/tmp/surface-artifacts/surface-block-paint"), cleanArtifactScan(2), scenario)
 	raw, err := json.Marshal(report)
@@ -524,6 +552,16 @@ func TestMorphScenarioProducesHeadlessCapsuleEvidence(t *testing.T) {
 	}
 	if report.Morph.Schema != "tetra.surface.morph.v1" || report.Morph.QualityLevel != "deterministic-headless-morph-capsule-v1" {
 		t.Fatalf("morph = %#v, want Morph v1 deterministic headless capsule evidence", report.Morph)
+	}
+	if report.Morph.TokenGraph == nil || report.Morph.TokenGraph.SourceOfTruth != "capsule" || !report.Morph.TokenGraph.ExplicitImports || !report.Morph.TokenGraph.NoGlobalCascade {
+		t.Fatalf("morph token graph = %#v, want P07 capsule source-of-truth boundary evidence", report.Morph.TokenGraph)
+	}
+	if len(report.Morph.TokenGraph.Tokens) < 22 || len(report.Morph.TokenGraph.DensityDPI) != 3 || !report.Morph.TokenGraph.Diagnostics.CSSRuntimeRejected {
+		t.Fatalf("morph token graph = %#v, want P07 typed tokens, density mapping, and diagnostics", report.Morph.TokenGraph)
+	}
+	if len(report.Morph.Recipes) != 11 || len(report.Morph.RecipeExpansions) != 11 || len(report.Morph.RecipeApps) != 5 {
+		t.Fatalf("morph recipes=%d expansions=%d apps=%d, want P08 recipe authoring suite",
+			len(report.Morph.Recipes), len(report.Morph.RecipeExpansions), len(report.Morph.RecipeApps))
 	}
 	if report.BlockSystem == nil || report.BlockSystem.Source != source || report.BlockGraph.Source != source {
 		t.Fatalf("Block evidence sources = block_system %#v block_graph %#v, want Morph source %s", report.BlockSystem, report.BlockGraph, source)
@@ -1017,6 +1055,52 @@ func TestReleaseTextInputModesProduceProductionTextInputReports(t *testing.T) {
 	}
 }
 
+func TestHeadlessAppModelModeProducesCommandReducerEvidence(t *testing.T) {
+	const mode = "headless-app-model"
+	if err := validateSmokeMode(mode); err != nil {
+		t.Fatalf("validateSmokeMode(%s) failed: %v", mode, err)
+	}
+	opt := smokeOptions{Mode: mode, SourcePath: "examples/surface_counter.tetra"}
+	if got := defaultSurfaceSourcePath(opt); got != "examples/surface_app_model.tetra" {
+		t.Fatalf("defaultSurfaceSourcePath(%s) = %q, want examples/surface_app_model.tetra", mode, got)
+	}
+	scenario := runSurfaceScenario(mode)
+	if scenario.AppModel == nil {
+		t.Fatalf("scenario.AppModel is nil, want app-model command/reducer evidence")
+	}
+	if scenario.AppModel.Schema != "tetra.surface.app-model.v1" || scenario.AppModel.AppModelLevel != "explicit-command-reducer-v1" {
+		t.Fatalf("app_model = %#v, want app-model v1 explicit command reducer evidence", scenario.AppModel)
+	}
+	report := buildReport(opt, "linux-x64", []surface.ProcessReport{
+		{Name: "tetra build", Kind: "build", Path: "tetra build --target linux-x64 examples/surface_app_model.tetra -o /tmp/surface-artifacts/surface-app-model", Ran: true, Pass: true, ExitCode: intPtr(0)},
+		{Name: "surface component app", Kind: "app", Path: "/tmp/surface-artifacts/surface-app-model", Ran: true, Pass: true, ExitCode: intPtr(1), ExpectedExitCode: intPtr(1)},
+		{Name: "surface headless runtime", Kind: "runtime", Path: "tools/cmd/surface-runtime-smoke --mode headless-app-model", Ran: true, Pass: true, ExitCode: intPtr(0)},
+	}, headlessSurfaceArtifacts("/tmp/surface-artifacts/surface-app-model"), cleanArtifactScan(2), scenario)
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatalf("marshal app-model report: %v", err)
+	}
+	if report.Target != "headless" || report.Runtime != "surface-headless" {
+		t.Fatalf("target/runtime = %q/%q, want headless/surface-headless", report.Target, report.Runtime)
+	}
+	if err := surface.ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
+	}
+	for _, want := range []string{
+		"app model explicit event-to-command binding",
+		"app model deterministic command reducer",
+		"app model navigation stack",
+		"app model focus scope modal trap",
+		"app model async completion cancellation boundary",
+		"app model undo redo history",
+		"app model no React hooks DOM event model hidden JS state",
+	} {
+		if !caseNamesContain(report.Cases, want) {
+			t.Fatalf("cases = %#v, want %q", report.Cases, want)
+		}
+	}
+}
+
 func TestReleaseCounterSourceCanBackLinuxAndBrowserCounterReports(t *testing.T) {
 	for _, tc := range []struct {
 		mode       string
@@ -1323,6 +1407,15 @@ func TestReleaseBrowserModeProducesBrowserCanvasReleaseEvidence(t *testing.T) {
 		!report.HostEvidence.BrowserAccessibilitySnapshot ||
 		!report.HostEvidence.BrowserAccessibilityMirror {
 		t.Fatalf("host evidence = %#v, want strict browser release evidence", report.HostEvidence)
+	}
+	if report.BrowserSurface == nil ||
+		report.BrowserSurface.Schema != surface.BrowserSurfaceSchemaV1 ||
+		report.BrowserSurface.BrowserSurfaceLevel != "browser-canvas-release-v1" ||
+		!report.BrowserSurface.DOMHostCanvasOnly ||
+		!report.BrowserSurface.NegativeGuards.NoDOMAppUITree ||
+		!report.BrowserSurface.NegativeGuards.NoUserJSAppLogic ||
+		!report.BrowserSurface.NegativeGuards.NoNodeOnlyPromotion {
+		t.Fatalf("browser surface evidence = %#v, want strict browser_surface P13 evidence", report.BrowserSurface)
 	}
 	if err := surface.ValidateReport(raw); err != nil {
 		t.Fatalf("ValidateReport failed for release browser: %v\n%s", err, raw)
@@ -1739,13 +1832,19 @@ func releaseTextInputTestCases() []surface.CaseReport {
 		{Name: "no legacy UI sidecar artifacts", Kind: "positive", Ran: true, Pass: true},
 		{Name: "release text input ASCII insertion", Kind: "positive", Ran: true, Pass: true},
 		{Name: "release text input UTF-8 insertion", Kind: "positive", Ran: true, Pass: true},
+		{Name: "release text input invalid UTF-8 rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "invalid utf8 rejected"},
+		{Name: "release text input multiline storage", Kind: "positive", Ran: true, Pass: true},
 		{Name: "release text input caret home end arrows", Kind: "positive", Ran: true, Pass: true},
 		{Name: "release text input selection replacement", Kind: "positive", Ran: true, Pass: true},
+		{Name: "release text input selection clipboard transfer", Kind: "positive", Ran: true, Pass: true},
 		{Name: "release text input backspace delete", Kind: "positive", Ran: true, Pass: true},
 		{Name: "release text input clipboard owned copy transfer", Kind: "positive", Ran: true, Pass: true},
 		{Name: "release text input composition start update", Kind: "positive", Ran: true, Pass: true},
 		{Name: "release text input composition commit", Kind: "positive", Ran: true, Pass: true},
 		{Name: "release text input composition cancel", Kind: "positive", Ran: true, Pass: true},
+		{Name: "release text input shaping plan scoped", Kind: "positive", Ran: true, Pass: true},
+		{Name: "settings reference text input trace", Kind: "positive", Ran: true, Pass: true},
+		{Name: "editor reference text input trace", Kind: "positive", Ran: true, Pass: true},
 		{Name: "release text input safe view lifetime checked", Kind: "positive", Ran: true, Pass: true},
 		{Name: "reject legacy UI evidence", Kind: "negative", Ran: true, Pass: true, ExpectedError: "legacy UI evidence rejected"},
 	}

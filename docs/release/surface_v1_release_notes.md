@@ -23,13 +23,79 @@ passes. Headless Surface is a release evidence target.
   not production support and carries no production Block claim in this release.
 - Experimental `ui.surface-morph-capsule` evidence layer: `lib.core.morph`
   defines capsule tokens, materials, affordances, state lenses, motion presets,
-  and recipes that expand into Block evidence for
-  `examples/surface_morph_command_palette.tetra`. The Morph gate is
+  and recipes that expand into Block evidence for the five
+  `examples/surface_morph_*.tetra` reference apps. The Morph gate is
   deterministic headless evidence only and carries no production Morph claim.
 - Text/input baseline for UTF-8 byte storage, caret, selection,
   clipboard read/write, copy/paste, and IME/composition traces.
 - Accessibility metadata plus platform bridge evidence for supported Linux
   and web targets.
+- Scoped Linux app-shell security permission model:
+  `surface-security-permission-v1` default-deny filesystem/network policy,
+  capability-checked IPC/process boundaries, scoped clipboard policy, and
+  local hashed asset/font/image safety.
+- Scoped Linux app-shell performance budget model:
+  `surface-performance-budget-v1` local startup/frame/memory/RSS/cache/
+  framebuffer/binary-size/CPU-proxy evidence with bounded caches and mandatory
+  `peak_rss_bytes`.
+- Scoped developer fast loop: `tetra surface dev` writes
+  `tetra.surface.dev-workflow.v1` / `surface-dev-workflow-v1` evidence for
+  initial build, warm-cache rebuild, token/recipe/source changed rebuilds, and
+  positioned source diagnostics. This is fast rebuild evidence, not a hot reload
+  or React Fast Refresh claim.
+- Static Surface inspector evidence:
+  `tetra.surface.inspector.v1` / `surface-inspector-v1` reports expose Block
+  tree, Morph tokens, layout, paint, accessibility, event routes, focus, perf
+  counters, source locations, input report coverage, and hidden-state scan
+  results. Optional HTML output is a static tool report, not browser devtools,
+  React devtools, or DOM runtime UI.
+- Surface project template evidence:
+  `tetra.surface.template-smoke.v1` / `surface-template-smoke-v1` reports cover
+  `tetra new surface-app` generation for command palette, settings, dashboard,
+  editor shell, multi-window notes, and web-canvas starts, including check,
+  build, run, inspector, visual diff, and tar package evidence.
+- Surface reference app suite evidence:
+  `tetra.surface.reference-app-suite.v1` /
+  `surface-reference-app-suite-v1` reports cover command palette, settings,
+  dashboard, editor shell, file manager/list-detail, dialog/notification,
+  localized form, accessibility-heavy form, multi-window notes, and migration
+  apps. Each app checks, builds, runs, resolves Morph recipes to Block, and
+  records visual, interaction, accessibility, performance, token/theme, layout,
+  and artifact-hash evidence for headless, linux-x64 real-window, and
+  wasm32-web browser-canvas targets.
+- Surface packaging and update evidence:
+  `tetra.surface.package.v1` / `surface-package-v1` reports cover linux-x64 and
+  wasm32-web tar.gz packages for the command-palette reference app, local asset
+  hashes, package manifests, installed linux-x64 package execution, web bundle
+  HTML/wasm/compiler-owned loader output, and a hash-pinned update channel
+  manifest. Signing, notarization, automatic runtime updates, and network
+  update fetching remain nonclaims without platform/runtime evidence.
+- Surface crash recovery and error-reporting evidence:
+  `tetra.surface.crash-report.v1` / `surface-crash-report-v1` reports cover
+  bounded linux-x64 command failure, host crash diagnostic capture, redacted
+  local diagnostic artifacts, bounded trace/log collection, and scoped restart
+  evidence for the command-palette reference app. User data leaks, network
+  upload, Electron crash reporter dependency, docs-only crash claims, and
+  restart claims without before/report/after evidence remain rejected.
+- Surface internationalization and localization evidence:
+  `tetra.surface.i18n.v1` / `surface-i18n-v1` reports cover bounded string
+  tables, `uk-UA` locale selection, `en-US` fallback, missing-key diagnostics,
+  deterministic formatting hooks, localized-form reference app execution, and
+  an RTL placeholder nonclaim. Full ICU, full bidi shaping, RTL production text
+  layout, third-party intl runtime, platform locale dependency, docs-only
+  localization, and silent missing-key fallback remain rejected.
+- Surface widget migration compatibility evidence:
+  `tetra.surface.widget-migration.v1` / `surface-widget-migration-v1` reports
+  keep `lib.core.widgets` supported for Surface v1, preserve the release widget
+  set, prove Panel/Button/TextBox equivalence rows against Morph recipes that
+  resolve to Block, and reject future core widget primitive promotion, breaking
+  API changes, docs-only migration, and platform toolkit/runtime claims.
+- Claim-governance vocabulary: `PROD_STABLE_SCOPED`, `BETA_TARGET_HOST`,
+  `EXPERIMENTAL`, `UNSUPPORTED`, and `NONCLAIM`. These tiers keep current
+  Linux/web support, beta/future target paths, experimental Block/Morph
+  evidence, unsupported targets, and explicit nonclaims separate. The scoped
+  product gate is required evidence, but it is not the P29 final
+  `PROD_STABLE_SCOPED` verdict.
 - Strict release validators, release-state validation, and artifact hashes.
 
 ## Unsupported
@@ -41,6 +107,11 @@ passes. Headless Surface is a release evidence target.
 - Dynamic trait-object widgets and witness-table component dispatch.
 - Arbitrary native platform widgets.
 - DOM/React/user-JS application UI.
+- Unrestricted filesystem/network access, native permission prompts, or remote
+  network asset fetching from Surface app-shell defaults.
+- External benchmark results or unsupported Electron speed comparison claims.
+- Hot reload, Electron dev server, or React Fast Refresh claims for Surface
+  apps.
 - Full rich text editor or IDE-grade text editing.
 - Full AT-SPI or screen-reader support without separate probe artifacts.
 
@@ -60,6 +131,30 @@ Surface v1 apps still use the bounded `lib.core.widgets` subset.
 bash scripts/release/surface/release-gate.sh \
   --report-dir reports/surface-ui-production-final/surface-release-v1
 
+bash scripts/release/surface/product-gate.sh \
+  --report-dir reports/surface-product-v1
+
+bash scripts/release/surface/surface-dev-workflow-smoke.sh \
+  --report-dir reports/surface-dev-workflow/gate
+
+bash scripts/release/surface/surface-inspector-smoke.sh \
+  --report-dir reports/surface-inspector/gate
+
+bash scripts/release/surface/surface-template-smoke.sh \
+  --report-dir reports/surface-templates/gate
+
+bash scripts/release/surface/surface-reference-apps-smoke.sh \
+  --report-dir reports/surface-reference-apps/gate
+
+bash scripts/release/surface/surface-crash-report-smoke.sh \
+  --report-dir reports/surface-crash-report/gate
+
+bash scripts/release/surface/surface-i18n-smoke.sh \
+  --report-dir reports/surface-i18n/gate
+
+bash scripts/release/surface/surface-widget-migration-smoke.sh \
+  --report-dir reports/surface-widget-migration/gate
+
 bash scripts/release/surface/block-system-gate.sh \
   --report-dir reports/surface-block/p18-budget
 
@@ -73,9 +168,10 @@ bash scripts/release/safe-view-lifetime/gate.sh \
   --report-dir reports/surface-ui-production-final/safe-view-lifetime
 ```
 
-The release gate is the source of truth for the final current claim. Reports
-remain evidence, not modes; unsupported target claims remain invalid until
-target-specific evidence exists.
+The release gate is the source of truth for release evidence and current
+candidate scope. Reports remain evidence, not modes; unsupported target claims
+remain invalid until target-specific evidence exists. P29 owns the final
+same-commit verdict.
 
 The living release audit is `docs/release/surface_v1_release_audit.md`; it
 records which release checklist rows are proven now and which rows remain

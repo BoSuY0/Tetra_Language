@@ -356,6 +356,9 @@ func findRepoRoot() (string, error) {
 			if _, err := os.Stat(filepath.Join(wd, "graphify-out")); err == nil {
 				return wd, nil
 			}
+			if _, err := os.Stat(filepath.Join(wd, "go.work")); err == nil {
+				return wd, nil
+			}
 		}
 		if moduleRoot == "" {
 			if _, err := os.Stat(filepath.Join(wd, "go.mod")); err == nil {

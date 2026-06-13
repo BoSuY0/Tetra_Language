@@ -1,35 +1,52 @@
-# Tetra Actor Runtime Production Foundation Control
+# Tetra Actor Foundation RC100 Control
 
 ## Active Objective
 
-`$goal-forge $goal-loop $define-goal Реалізуй повністю весь цей план - /home/tetra/Downloads/actor-runtime-production-foundation-codex-plan.md`
+`$todium-superpower Реалізуй повністю весь цей план - /home/tetra/Downloads/2026-06-10-actor-foundation-prod-ready-scoped-rc-100-implementation-plan.md`
 
 ## Active Packet
 
-None. `ACTOR-P17` final same-commit actor production foundation gate is closed
-for local scoped evidence.
+`ACTOR-RC100-P18`: local `act` emulation of the GitHub Actions
+`actor-runtime-foundation-linux` job. `ACTOR-RC100-P17` completed with blocker
+`REMOTE_CI_BILLING_LOCKED`; candidate commit
+`3480870c7ff52d211aaa63c16238e62d6165cfbd` is pushed to
+`origin/actor-rc100-p12-expanded-clean`.
 
 ## Next Actions
 
-1. Keep final audit and tracker files aligned if new evidence is added.
-2. Do not claim release-candidate, clean-checkout proof, remote CI proof,
-   package publication, or `PROD_READY_PROVEN` unless those checks are actually
-   run and recorded.
-3. If preparing a PR/commit later, preserve unrelated dirty worktree changes and
-   rerun the final verification commands after the commit boundary is clear.
+1. Run local `act` emulation of `ci.yml` job
+   `actor-runtime-foundation-linux` on a fresh worktree for commit
+   `3480870c7ff52d211aaa63c16238e62d6165cfbd`, with artifact server output
+   captured under the P18 evidence directory.
+2. Record local report/artifact evidence and classify it as local/dry-run, not
+   remote proof.
+3. Resolve the GitHub account billing lock that prevents Actions jobs from
+   starting.
+4. Rerun `ci` workflow job `actor-runtime-foundation-linux` for commit
+   `3480870c7ff52d211aaa63c16238e62d6165cfbd`, download the
+   `tetra-actor-runtime-foundation-${SHA}-linux-x64` artifact, and validate it.
+5. Rerun the release package workflow with publish-side effects disabled where
+   supported, download the package artifact, and validate expected actor
+   runtime package paths.
+6. Rerun final acceptance before claiming
+   `ACTOR_FOUNDATION_PROD_READY_SCOPED_RC_100_PERC`.
+7. Do not claim RC100 until same-change remote CI/package proof exists.
 
 ## Stop Conditions
 
-- The same P17 gate or broad-test failure repeats twice without new evidence.
-- A required final claim would need remote CI, package publication, non-Linux
-  target-host runtime smoke, cluster deployment, distributed zero-copy, official
-  benchmark evidence, or full formal race proof that was not actually run.
-- The worktree contains unrelated dirty changes that make final status
-  ambiguous; record dirty state honestly instead of claiming release-candidate.
+- Clean checkout cannot be created without destructive cleanup or overwriting
+  user-owned changes.
+- GitHub Actions account remains locked due to a billing issue.
+- Remote CI/package artifacts are missing, fail validation, or correspond to a
+  different SHA.
+- A stronger claim would require full actor runtime production features outside
+  scoped RC100.
 
 ## Cache Discipline
 
-- Use persistent caches such as `.cache/go-build-actor-p17`,
-  `.cache/go-tmp-actor-p17`, or `${XDG_CACHE_HOME:-$HOME/.cache}/tetra-language/go-build-actor-p17`.
+- Use:
+  `GOTELEMETRY=off`
+  `GOCACHE=$(pwd)/.cache/go-build-actor-rc100`
+  `GOTMPDIR=$(pwd)/.cache/go-tmp-actor-rc100`
 - Never set `GOCACHE` to `/tmp`.
-- Clean with the concrete `GOCACHE` path after evidence runs when appropriate.
+- After evidence runs, clean with the concrete `GOCACHE` path when appropriate.

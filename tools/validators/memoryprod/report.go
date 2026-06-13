@@ -14,6 +14,7 @@ const SchemaV1 = "tetra.memory.production.v1"
 type Report struct {
 	Schema     string            `json:"schema"`
 	Status     string            `json:"status"`
+	GitHead    string            `json:"git_head,omitempty"`
 	Target     string            `json:"target"`
 	Host       string            `json:"host"`
 	Runtime    string            `json:"runtime"`

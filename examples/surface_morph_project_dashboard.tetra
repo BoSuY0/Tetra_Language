@@ -1,0 +1,47 @@
+// Project dashboard authored through Morph recipes that expand to Block.
+module examples.surface_morph_project_dashboard
+
+import lib.core.surface as surface
+import lib.core.block as block
+import lib.core.morph as morph
+
+struct MorphProjectDashboardApp:
+    expanded_recipe_count: Int
+    block_count: Int
+    a11y_projection: Bool
+
+func root_block(rect: surface.Rect) -> block.Block:
+    let paint: block.PaintSpec = block.paint_stack2(block.paint_layer_fill_radius(morph.theme_dark(), 0), block.paint_layer_overlay(morph.accent(), 36, 0))
+    let props: block.BlockProps = block.props(block.layout_overlay(rect, 0), paint, block.text_none(), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_region(17), block.asset_none())
+    return block.make(block.id(1), block.id_none(), props)
+
+func main() -> Int
+uses alloc, mem:
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 400, h: 260)
+    let panel_rect: surface.Rect = surface.Rect(x: 20, y: 20, w: 360, h: 220)
+    let label_rect: surface.Rect = surface.Rect(x: 32, y: 24, w: 120, h: 18)
+    let field_rect: surface.Rect = surface.Rect(x: 28, y: 32, w: 344, h: 42)
+    let metric_rect: surface.Rect = surface.Rect(x: 28, y: 88, w: 344, h: 44)
+    let row_rect: surface.Rect = surface.Rect(x: 28, y: 138, w: 344, h: 44)
+    let toast_rect: surface.Rect = surface.Rect(x: 28, y: 188, w: 344, h: 28)
+    let panel_recipe: morph.Recipe = morph.recipe_region_panel()
+    let metric_recipe: morph.Recipe = morph.recipe_metric_tile()
+    let row_recipe: morph.Recipe = morph.recipe_list_row()
+    let toast_recipe: morph.Recipe = morph.recipe_toast_notification()
+    var tree: block.BlockTree = block.tree_init(8)
+    let root: Int = block.tree_add_root(tree, root_block(root_rect), root_rect)
+    let panel: Int = block.tree_add_child(tree, block.id(1), morph.expand_region_panel(2, 1, panel_rect, 17), panel_rect)
+    let label: Int = block.tree_add_child(tree, block.id(2), morph.expand_label(3, 2, 4, label_rect, 6), label_rect)
+    let field: Int = block.tree_add_child(tree, block.id(2), morph.expand_field_text(4, 2, 3, field_rect, 16, 8), field_rect)
+    let metric: Int = block.tree_add_child(tree, block.id(2), morph.expand_control_action(5, 2, metric_rect, 12, 401, true), metric_rect)
+    let row: Int = block.tree_add_child(tree, block.id(2), morph.expand_control_action(6, 2, row_rect, 14, 402, false), row_rect)
+    let toast: Int = block.tree_add_child(tree, block.id(2), morph.expand_control_action(7, 2, toast_rect, 15, 403, false), toast_rect)
+    let panel_expansion: morph.RecipeExpansion = morph.recipe_expansion(panel_recipe, block.id(2))
+    let metric_expansion: morph.RecipeExpansion = morph.recipe_expansion(metric_recipe, block.id(5))
+    let row_expansion: morph.RecipeExpansion = morph.recipe_expansion(row_recipe, block.id(6))
+    let toast_expansion: morph.RecipeExpansion = morph.recipe_expansion(toast_recipe, block.id(7))
+    let app: MorphProjectDashboardApp = MorphProjectDashboardApp(expanded_recipe_count: 4, block_count: block.tree_len(tree), a11y_projection: morph.accessibility_projection_ok(3, 4, 6))
+    let valid: Int = block.tree_validate(tree)
+    if root == 1 && panel == 2 && label == 3 && field == 4 && metric == 5 && row == 6 && toast == 7 && valid == block.tree_error_ok() && app.expanded_recipe_count == 4 && app.block_count == 7 && app.a11y_projection && morph.capsule_self_check() && morph.expansion_valid(panel_expansion) && morph.expansion_valid(metric_expansion) && morph.expansion_valid(row_expansion) && morph.expansion_valid(toast_expansion):
+        return 0
+    return 1

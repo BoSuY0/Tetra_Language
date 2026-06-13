@@ -46,6 +46,9 @@ generated docs run.
 | Slice summation helpers (`sum_i32`, `weighted_sum_i32`, `sum_u8`) | `import lib.core.slices as slices` | `examples/core_slices_smoke.tetra` | `mem` |
 | ASCII length, ASCII sum, and empty checks (`ascii_len`, `ascii_sum`, `is_empty`) | `import lib.core.strings as strings` | `examples/core_strings_smoke.tetra` | none |
 | Caller-owned UTF-8 text buffer helpers | `import lib.core.text as text` | `examples/core_text_smoke.tetra` | none |
+| Bounded Surface string tables, locale fallback, formatting hooks, and RTL placeholder nonclaims | `import lib.core.i18n as i18n` | `examples/core_i18n_smoke.tetra`, `examples/surface_reference_localized_form.tetra` | none |
+| Caller-owned Surface app command/reducer helpers | `import lib.core.surface_app as appmodel` | `examples/core_surface_app_smoke.tetra`, `examples/surface_app_model.tetra` | none |
+| Scoped Linux Surface app-shell state helpers with `electron-feature-ledger-v1`, `surface-security-permission-v1`, and `surface-performance-budget-v1` release evidence | `import lib.core.surface_app_shell as shell` | `examples/core_surface_app_shell_smoke.tetra`, `examples/surface_linux_app_shell_notes.tetra` | none |
 | Generic collection views and `[]i32` scans | `import lib.core.collections as collections` | `examples/core_collections_smoke.tetra` | `mem` |
 | Tiny serialization combinators | `import lib.core.serialization as serialization` | `examples/core_serialization_smoke.tetra` | `mem` |
 | Filesystem path helpers and host-backed `exists` | `import lib.core.filesystem as filesystem` | `examples/core_filesystem_smoke.tetra` | `io` |
@@ -63,7 +66,7 @@ generated docs run.
 | Stable Surface v1 widget style and theme helpers | `import lib.core.style as style` | `examples/core_style_smoke.tetra` | none |
 | Planned Tetra Surface static component helpers | `import lib.core.component as component` | `examples/core_component_smoke.tetra` | none |
 | Experimental Surface Block System data model | `import lib.core.block as block` | `examples/core_block_smoke.tetra` | alloc, mem |
-| Experimental Surface Morph Capsule recipe layer | `import lib.core.morph as morph` | `examples/surface_morph_command_palette.tetra` | alloc, mem in consuming scenes |
+| Experimental Surface Morph Capsule recipe layer | `import lib.core.morph as morph` | `examples/core_morph_smoke.tetra`, `examples/surface_morph_command_palette.tetra`, `examples/surface_morph_project_dashboard.tetra`, `examples/surface_morph_settings.tetra`, `examples/surface_morph_editor_shell.tetra`, `examples/surface_morph_glass_panel.tetra` | none |
 | Experimental Tetra Surface accessibility metadata helpers | `import lib.core.accessibility as accessibility` | `examples/core_accessibility_smoke.tetra` | none |
 | Experimental Tetra Surface minimal widget helpers | `import lib.core.widgets as widgets` | `examples/core_widgets_smoke.tetra` | none |
 
@@ -121,14 +124,23 @@ the `_at` helpers for each request window.
 pure path-shape helpers. `lib.core.crypto` is a stable crypto interface-helper
 surface. `lib.core.networking` is a stable endpoint policy-helper surface.
 `lib.core.surface`, `lib.core.draw`, `lib.core.style`,
-`lib.core.component`, `lib.core.block`, `lib.core.morph`, and
-`lib.core.widgets` are experimental Tetra Surface modules for the pure-Tetra UI
-direction. The current evidence covers headless
-frame/event/checksum reports and Linux-x64 starter Host ABI open/present/close
-probe reports plus Linux-x64 real-window Wayland shm evidence for
-`examples/surface_window_counter.tetra`; browser runtime, full IME/String text
-editing, production widget toolkit support, and accessibility Surface support
-remain unpromoted.
+`lib.core.component`, `lib.core.block`, `lib.core.morph`, `lib.core.surface_app`,
+`lib.core.surface_app_shell`, and `lib.core.widgets` are Tetra Surface modules
+for the pure-Tetra UI direction. The current evidence covers headless
+frame/event/checksum reports, Linux-x64 starter Host ABI open/present/close
+probe reports, Linux-x64 real-window Wayland shm evidence for
+`examples/surface_window_counter.tetra`, and the scoped Linux app-shell subset
+in `examples/surface_linux_app_shell_notes.tetra`; browser runtime and the
+scoped `production-text-input-v1` baseline are release-covered separately, while
+full String-level IME editing, rich text, bidi shaping, grapheme-cluster caret
+movement, and broader all-platform Surface support remain unpromoted. The
+app-shell import does not grant ambient host permissions; release evidence
+records `surface-security-permission-v1` default-deny filesystem/network rows,
+scoped clipboard policy, capability-checked process boundaries, and local
+hashed asset/font/image safety. The same app-shell release report records
+`surface-performance-budget-v1` local startup/frame/memory/RSS/cache/
+framebuffer/binary-size/CPU-proxy evidence without promoting external benchmark
+results or unsupported Electron speed comparisons.
 `lib.core.net` is a stable linux-x64 TCP socket client/server I/O slice for
 open/bind/connect/listen/accept/read/recv/write/send/nonblocking/close, `SO_REUSEPORT`,
 `TCP_NODELAY`, plus epoll
@@ -277,7 +289,7 @@ The P19.1 benchmark gate has a checked dry-run truth-bench-harness artifact
 for `p19.1_generic_collections`: a hash-table-equivalent Tetra/C++/Rust source
 shape with matching algorithm/input metadata and Tetra proof/allocation/bounds
 and performance report paths. It is not a runtime measurement, C++/Rust parity
-claim, and makes no official benchmark result claim.
+claim, and makes no external benchmark result claim.
 
 - `collections.vec_from_slice(values)` creates a generic `Vec<T>` view over a
   caller-owned slice and records the logical length by scanning it.

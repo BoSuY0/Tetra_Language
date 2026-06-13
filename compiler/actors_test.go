@@ -593,6 +593,91 @@ uses actors, runtime:
 	}
 }
 
+func TestActorRejectedSendsDoNotConsumeMessagePool(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+enum Signal:
+    case item(Int)
+
+val MAILBOX_CAPACITY: i32 = 256
+val REMAINING_AFTER_PEER_FILL: i32 = 488
+
+func sleeper() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(100)
+    return 0
+
+func done() -> Int:
+    return 0
+
+func main() -> Int
+uses actors, runtime:
+    let me: actor = core.self()
+    let peer: actor = core.spawn("sleeper")
+    var peer_sent: Int = 0
+    while peer_sent < MAILBOX_CAPACITY:
+        let ack: Int = core.send(peer, peer_sent)
+        if ack != peer_sent:
+            return 10
+        peer_sent = peer_sent + 1
+
+    let full: Int = core.send(peer, 777)
+    if full != -2:
+        return 20
+
+    let finished: actor = core.spawn("done")
+    let _sleep_done: Int = core.sleep_ms(1)
+    let done_send: Int = core.send(finished, 1)
+    if done_send != -4:
+        return 30
+
+    var spawned: Int = 0
+    while spawned < 125:
+        let _actor: actor = core.spawn("sleeper")
+        spawned = spawned + 1
+    let failed: actor = core.spawn("sleeper")
+    let invalid: Int = core.send(failed, 1)
+    if invalid != -3:
+        return 40
+
+    var sent: Int = 0
+    var drift: Int = 0
+    while sent < REMAINING_AFTER_PEER_FILL:
+        var batch: Int = 0
+        while batch < MAILBOX_CAPACITY && sent < REMAINING_AFTER_PEER_FILL:
+            let self_ack: Int = core.send(me, sent)
+            if self_ack != sent:
+                return 50
+            sent = sent + 1
+            batch = batch + 1
+
+        var received: Int = 0
+        while received < batch:
+            let msg: actor.recv_result_i32 = core.recv_poll()
+            if msg.error != 0:
+                return 60 + msg.error
+            drift = drift + (msg.value - ((sent - batch) + received))
+            received = received + 1
+
+    let overflow: Int = core.send(me, 123)
+    if overflow != -1:
+        return 70
+    if drift != 0:
+        return 80
+    return 0
+`
+	stdout, exitCode := buildAndRunWithOptions(t, src, BuildOptions{Runtime: RuntimeBuiltin})
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, want rejected sends to leave message pool budget unchanged", exitCode)
+	}
+}
+
 func TestActorRuntimeCapacityLimitsDocumented(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "docs", "spec", "actors.md"))
 	if err != nil {

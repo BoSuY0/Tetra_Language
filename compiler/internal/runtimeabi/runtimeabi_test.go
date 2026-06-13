@@ -1,6 +1,7 @@
 package runtimeabi
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 )
@@ -182,6 +183,65 @@ func TestSignatureForSymbol(t *testing.T) {
 			}
 			if got.ParamSlots != tt.params || got.ReturnSlots != tt.rets {
 				t.Fatalf("signature = params=%d returns=%d, want params=%d returns=%d", got.ParamSlots, got.ReturnSlots, tt.params, tt.rets)
+			}
+		})
+	}
+}
+
+func TestActorRuntimeSignaturesCoverTypedMessageABI(t *testing.T) {
+	tests := []struct {
+		name   string
+		params int
+		rets   int
+	}{
+		{name: "__tetra_actor_spawn", params: 1, rets: 1},
+		{name: "__tetra_actor_send", params: 2, rets: 1},
+		{name: "__tetra_actor_send_msg", params: 3, rets: 1},
+		{name: "__tetra_actor_send_begin", params: 3, rets: 1},
+		{name: "__tetra_actor_send_slot", params: 2, rets: 1},
+		{name: "__tetra_actor_send_commit", params: 0, rets: 1},
+		{name: "__tetra_actor_recv", params: 0, rets: 1},
+		{name: "__tetra_actor_recv_msg", params: 0, rets: 2},
+		{name: "__tetra_actor_recv_poll", params: 0, rets: 2},
+		{name: "__tetra_actor_recv_until", params: 1, rets: 2},
+		{name: "__tetra_actor_recv_msg_until", params: 1, rets: 3},
+		{name: "__tetra_actor_recv_begin", params: 0, rets: 1},
+		{name: "__tetra_actor_recv_slot", params: 1, rets: 1},
+		{name: "__tetra_actor_recv_count", params: 0, rets: 1},
+		{name: "__tetra_actor_self", params: 0, rets: 1},
+		{name: "__tetra_actor_sender", params: 0, rets: 1},
+		{name: "__tetra_actor_yield_now", params: 0, rets: 1},
+		{name: "__tetra_actor_state_load", params: 1, rets: 1},
+		{name: "__tetra_actor_state_store", params: 2, rets: 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := SignatureForSymbol(tt.name)
+			if !ok {
+				t.Fatalf("missing signature")
+			}
+			if got.ParamSlots != tt.params || got.ReturnSlots != tt.rets {
+				t.Fatalf("signature = params=%d returns=%d, want params=%d returns=%d", got.ParamSlots, got.ReturnSlots, tt.params, tt.rets)
+			}
+		})
+	}
+}
+
+func TestTypedTaskJoinRuntimeSignaturesCoverSlotsTwoThroughEight(t *testing.T) {
+	for slots := 2; slots <= 8; slots++ {
+		name := fmt.Sprintf("__tetra_task_join_typed_%d", slots)
+		t.Run(name, func(t *testing.T) {
+			got, ok := SignatureForSymbol(name)
+			if !ok {
+				t.Fatalf("missing signature")
+			}
+			wantReturns := slots
+			if slots > 4 {
+				wantReturns = 1
+			}
+			if got.ParamSlots != slots || got.ReturnSlots != wantReturns {
+				t.Fatalf("signature = params=%d returns=%d, want params=%d returns=%d", got.ParamSlots, got.ReturnSlots, slots, wantReturns)
 			}
 		})
 	}

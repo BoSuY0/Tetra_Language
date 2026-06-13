@@ -567,6 +567,15 @@ check_host_leak_blockers() {
   go test ./cli/internal/actornet -run 'Broker|Leak|CloseWithoutCancel' -count=1
 }
 
+check_memory100_prod_stable_gate() {
+  local memory100_dir="$report_dir/memory-100-prod-stable"
+  mkdir -p "$repo_root/.cache/go-build-memory-100-test-all" "$repo_root/.cache/go-tmp-memory-100-test-all"
+  env GOTELEMETRY=off GOCACHE="$repo_root/.cache/go-build-memory-100-test-all" GOTMPDIR="$repo_root/.cache/go-tmp-memory-100-test-all" bash scripts/release/post_v0_4/memory-100-prod-stable-gate.sh --report-dir "$memory100_dir" || return 1
+  test -s "$memory100_dir/memory-100-prod-stable-manifest.json" || return 1
+  test -s "$memory100_dir/artifact-hashes.json" || return 1
+  go run ./tools/cmd/validate-memory-100-prod-stable --report-dir "$memory100_dir" --current-git-head "$(git rev-parse HEAD)"
+}
+
 check_performance_report() {
   local report="docs/generated/v1_0/performance-regression.json"
   if [[ ! -f "$report" ]]; then
@@ -843,6 +852,7 @@ run_step "bounds proof blocker suite" check_bounds_proof_blockers
 run_step "memory fuzz oracle artifact gate" check_memory_fuzz_oracle_gate
 run_step "RAM contract fuzz oracle artifact gate" check_ram_contract_fuzz_oracle_gate
 run_step "host leak blocker suite" check_host_leak_blockers
+run_step "Memory100 prod-stable gate" check_memory100_prod_stable_gate
 
 if [[ "$mode" == "full" || "$mode" == "stabilization" ]]; then
   run_step "repo test script" env -u TETRA_TEST_ALL_RELEASE_VERSION -u TETRA_TEST_ALL_RELEASE_ARTIFACT -u TETRA_SECURITY_REVIEW_SIGNOFF bash scripts/ci/test.sh

@@ -1,0 +1,69 @@
+{
+  "schema": "tetra.surface.block.contract.v1",
+  "status": "contract-freeze",
+  "surface_scope": "surface-block-system-linux-web",
+  "core_primitives": [
+    "Block"
+  ],
+  "forbidden_core_primitives": [
+    "Button",
+    "Card",
+    "TextField",
+    "TextBox",
+    "Sidebar",
+    "Modal"
+  ],
+  "abi": {
+    "schema": "tetra.surface.block.abi.v1",
+    "max_return_slots": 10,
+    "block_slots": [
+      "id",
+      "parent_id",
+      "props"
+    ],
+    "block_props_slots": [
+      "layout_mode",
+      "paint_layers",
+      "text_len",
+      "visual_asset",
+      "interaction_flags",
+      "state_flags",
+      "motion_ms",
+      "accessibility_role"
+    ]
+  },
+  "report_schemas": {
+    "block_graph": "tetra.surface.block-graph.v1",
+    "resolved_block": "tetra.surface.resolved-block.v1",
+    "paint_command": "tetra.surface.paint-command.v1",
+    "layout_pass": "tetra.surface.layout-pass.v1",
+    "accessibility_node": "tetra.surface.block-accessibility-node.v1"
+  },
+  "renderer_contract": {
+    "software_renderer": true,
+    "allowed_renderers": [
+      "software-rgba-headless",
+      "wayland-shm-rgba",
+      "browser-canvas-rgba"
+    ],
+    "required_report_sections": [
+      "block_graph",
+      "paint_commands",
+      "layout_passes",
+      "block_accessibility_tree"
+    ]
+  },
+  "compatibility_wrappers": [
+    "Button",
+    "Card",
+    "TextField",
+    "TextBox",
+    "Sidebar",
+    "Modal"
+  ],
+  "nonclaims": [
+    "no core Button primitive",
+    "no CSS layout parity",
+    "no GPU renderer production claim"
+  ]
+}

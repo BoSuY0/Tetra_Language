@@ -100,12 +100,15 @@ fi
 
 bash scripts/release/surface/surface-headless-block-system-smoke.sh --report-dir "$headless_report_dir"
 go run ./tools/cmd/validate-surface-block-report --report "$report_dir/headless/surface-headless-block-system.json" --same-commit "$git_head"
+go run ./tools/cmd/validate-surface-block-contract --contract docs/spec/surface_block_contract.json --report "$report_dir/headless/surface-headless-block-system.json"
 
 bash scripts/release/surface/surface-linux-x64-real-window-block-system-smoke.sh --report-dir "$linux_report_dir"
 go run ./tools/cmd/validate-surface-block-report --report "$report_dir/linux-x64-real-window/surface-block-system-linux-x64.json" --same-commit "$git_head"
+go run ./tools/cmd/validate-surface-block-contract --contract docs/spec/surface_block_contract.json --report "$report_dir/linux-x64-real-window/surface-block-system-linux-x64.json"
 
 bash scripts/release/surface/surface-wasm32-web-browser-canvas-block-system-smoke.sh --report-dir "$wasm_report_dir"
 go run ./tools/cmd/validate-surface-block-report --report "$report_dir/wasm32-web-browser-canvas/surface-block-system-wasm32-web.json" --same-commit "$git_head"
+go run ./tools/cmd/validate-surface-block-contract --contract docs/spec/surface_block_contract.json --report "$report_dir/wasm32-web-browser-canvas/surface-block-system-wasm32-web.json"
 
 required_reports=(
   "headless/surface-headless-block-system.json"

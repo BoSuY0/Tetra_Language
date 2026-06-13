@@ -1,0 +1,57 @@
+// Surface reference accessibility-heavy form app through Morph recipes over Block.
+module examples.surface_reference_accessibility_form
+
+import lib.core.surface as surface
+import lib.core.block as block
+import lib.core.morph as morph
+
+struct ReferenceAppEvidence:
+    shape_hash: Int
+    recipe_count: Int
+    block_count: Int
+    target_score: Int
+
+func reference_target_score() -> Int:
+    return 1
+
+func reference_recipe_checksum() -> Int:
+    let capsule: morph.Capsule = morph.capsule_default()
+    let first: morph.Recipe = morph.recipe_form_field()
+    let second: morph.Recipe = morph.recipe_field_text()
+    let third: morph.Recipe = morph.recipe_control_action()
+    let fourth: morph.Recipe = morph.recipe_list_row()
+    let first_expansion: morph.RecipeExpansion = morph.recipe_expansion(first, block.id(2))
+    let second_expansion: morph.RecipeExpansion = morph.recipe_expansion(second, block.id(4))
+    let third_expansion: morph.RecipeExpansion = morph.recipe_expansion(third, block.id(5))
+    let fourth_expansion: morph.RecipeExpansion = morph.recipe_expansion(fourth, block.id(6))
+    if morph.capsule_valid(capsule) && morph.recipe_expands_to_block(first) && morph.recipe_expands_to_block(second) && morph.recipe_expands_to_block(third) && morph.recipe_expands_to_block(fourth) && morph.expansion_valid(first_expansion) && morph.expansion_valid(second_expansion) && morph.expansion_valid(third_expansion) && morph.expansion_valid(fourth_expansion):
+        return capsule.token_graph_hash + first.name_hash + second.name_hash + third.name_hash + fourth.name_hash
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 420, h: 280)
+    let panel_rect: surface.Rect = surface.Rect(x: 20, y: 20, w: 380, h: 240)
+    let label_rect: surface.Rect = surface.Rect(x: 32, y: 24, w: 160, h: 18)
+    let field_rect: surface.Rect = surface.Rect(x: 32, y: 56, w: 344, h: 42)
+    let primary_rect: surface.Rect = surface.Rect(x: 32, y: 112, w: 344, h: 44)
+    let secondary_rect: surface.Rect = surface.Rect(x: 32, y: 164, w: 344, h: 44)
+    let status_rect: surface.Rect = surface.Rect(x: 32, y: 216, w: 344, h: 28)
+    let paint: block.PaintSpec = block.paint_stack2(block.paint_layer_fill_radius(morph.theme_dark(), 0), block.paint_layer_overlay(morph.accent(), 42, 0))
+    let root_props: block.BlockProps = block.props(block.layout_overlay(root_rect, 0), paint, block.text_none(), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_region(24), block.asset_none())
+    var tree: block.BlockTree = block.tree_init(8)
+    let root: Int = block.tree_add_root(tree, block.make(block.id(1), block.id_none(), root_props), root_rect)
+    let panel: Int = block.tree_add_child(tree, block.id(1), morph.expand_region_panel(2, 1, panel_rect, 24), panel_rect)
+    let label: Int = block.tree_add_child(tree, block.id(2), morph.expand_label(3, 2, 4, label_rect, 6), label_rect)
+    let field: Int = block.tree_add_child(tree, block.id(2), morph.expand_field_text(4, 2, 3, field_rect, 18, 8), field_rect)
+    let primary: Int = block.tree_add_child(tree, block.id(2), morph.expand_control_action(5, 2, primary_rect, 13, 1201, true), primary_rect)
+    let secondary: Int = block.tree_add_child(tree, block.id(2), morph.expand_control_action(6, 2, secondary_rect, 17, 1202, false), secondary_rect)
+    let status: Int = block.tree_add_child(tree, block.id(2), morph.expand_label(7, 2, 4, status_rect, 12), status_rect)
+    let hover: block.StateSelector = block.state_selector_hover()
+    let motion: block.MotionSpec = block.motion_fast()
+    let state_score: Int = block.state_resolve_int(10, 12, hover, hover) + block.motion_resolve_scale(motion, 40)
+    let evidence: ReferenceAppEvidence = ReferenceAppEvidence(shape_hash: 108, recipe_count: 4, block_count: block.tree_len(tree), target_score: reference_target_score())
+    let valid: Int = block.tree_validate(tree)
+    if root == 1 && panel == 2 && label == 3 && field == 4 && primary == 5 && secondary == 6 && status == 7 && valid == block.tree_error_ok() && evidence.shape_hash == 108 && evidence.recipe_count == 4 && evidence.block_count == 7 && evidence.target_score == 1 && reference_recipe_checksum() > 0 && state_score > 0 && morph.accessibility_projection_ok(3, 4, 6) && morph.memory_budget_ok(evidence.block_count, 3, 64 * 64 * 4):
+        return 0
+    return 1

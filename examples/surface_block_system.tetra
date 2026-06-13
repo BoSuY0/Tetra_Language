@@ -58,7 +58,6 @@ uses mem:
         action = surface.Color(r: 96, g: 174, b: 244, a: 255)
         layout_fill = surface.Color(r: 74, g: 118, b: 154, a: 255)
         scroll_fill = surface.Color(r: 96, g: 174, b: 244, a: 255)
-
     let width: Int = ctx.frame.width
     let height: Int = ctx.frame.height
     let panel_rect: surface.Rect = surface.Rect(x: 16, y: 16, w: width - 32, h: height - 32)
@@ -66,7 +65,6 @@ uses mem:
     let submit_rect: surface.Rect = surface.Rect(x: 24, y: 64, w: 120, h: 44)
     let reset_rect: surface.Rect = surface.Rect(x: 152, y: 64, w: 120, h: 44)
     let layout_rect: surface.Rect = surface.Rect(x: width - 84, y: 72, w: 72, h: 96)
-
     let _: Int = draw.clear(ctx, bg)
     let __: Int = draw.rect(ctx, panel_rect, panel)
     let ___: Int = draw.rect_outline(ctx, panel_rect, fg)
@@ -96,24 +94,20 @@ uses alloc, mem, surface:
     let submit_rect: surface.Rect = surface.Rect(x: 24, y: 64, w: 120, h: 44)
     let reset_rect: surface.Rect = surface.Rect(x: 152, y: 64, w: 120, h: 44)
     let scroll_rect: surface.Rect = surface.Rect(x: 236, y: 72, w: 72, h: 80)
-
     let label_a11y: block.AccessibilitySpec = block.accessibility_label_for(4, block.id(4))
     let submit_a11y: block.AccessibilitySpec = block.accessibility_button_labelled_by(6, block.id(3), block.action_primary())
     let reset_a11y: block.AccessibilitySpec = block.accessibility_button(5)
     let unnamed_a11y: block.AccessibilitySpec = block.accessibility_button(0)
-
     var tree: block.BlockTree = block.tree_init(8)
     let root_props: block.BlockProps = block.props(block.layout_fixed(root_rect), block.paint_empty(), block.text_none(), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_none(), block.asset_none())
     let panel_props: block.BlockProps = block.props(block.layout_fixed(panel_rect), block.paint_empty(), block.text_none(), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_none(), block.asset_none())
     let root_block: block.Block = block.make(block.id(1), block.id_none(), root_props)
     let panel_block: block.Block = block.make(block.id(2), block.id(1), panel_props)
-
     let root: Int = block.tree_add_root(tree, root_block, root_rect)
     let panel: Int = block.tree_add_child(tree, block.id(1), panel_block, panel_rect)
     let label: Int = block.tree_add_child(tree, block.id(2), make_block(3, 2, label_rect, label_a11y, false), label_rect)
     let submit: Int = block.tree_add_child(tree, block.id(2), make_block(4, 2, submit_rect, submit_a11y, true), submit_rect)
     let reset: Int = block.tree_add_child(tree, block.id(2), make_block(5, 2, reset_rect, reset_a11y, true), reset_rect)
-
     let valid: Int = block.tree_validate(tree)
     let focus0: Int = block.id_value(block.tree_focus_order_at(tree, 0))
     let focus1: Int = block.id_value(block.tree_focus_order_at(tree, 1))
@@ -126,7 +120,6 @@ uses alloc, mem, surface:
     let scroll_state: ScrollBlock = ScrollBlock(id: 7, scroll_y: 32)
     let label_state: LabelBlock = LabelBlock(id: label, text_len: label_a11y.label_len, label_for: block.id_value(label_a11y.described_by))
     let submit_state: ActionBlock = ActionBlock(id: submit, label_len: submit_a11y.label_len, labelled_by: block.id_value(submit_a11y.labelled_by), action: submit_a11y.actions)
-
     var win: surface.Surface = surface.open("Surface Block System", 320, 200)
     var before_frame: surface.Frame = surface.begin_frame(win)
     var before_ctx: draw.DrawContext = draw.DrawContext(frame: before_frame)
@@ -154,25 +147,6 @@ uses alloc, mem, surface:
     let after_draw: Int = draw_block_system_scene(browser_focused, after_ctx)
     let second_presented: Int = surface.present(after_ctx.frame)
     let closed: Int = surface.close(win)
-
-    if root == 1 && panel == 2 && label == 3 && submit == 4 && reset == 5 &&
-       valid == block.tree_error_ok() &&
-       focus0 == 4 && focus1 == 5 &&
-       a11y0 == 3 && a11y1 == 4 && a11y2 == 5 &&
-       app.focused_id == 4 && app.reading_order_checked && app.platform_claim &&
-       layout.width == 480 && layout.height == 260 && layout.scroll_y == 32 &&
-       panel_state.id == 2 && panel_state.child_count == 3 &&
-       scroll_state.id == 7 && scroll_state.scroll_y == 32 &&
-       scroll_rect.w == 72 && scroll_rect.h == 80 &&
-       label_state.id == 3 && label_state.text_len == 4 && label_state.label_for == 4 &&
-       submit_state.id == 4 && submit_state.label_len == 6 && submit_state.labelled_by == 3 && submit_state.action == block.action_primary() &&
-       block.accessibility_focusable_has_name(submit_a11y) &&
-       !block.accessibility_focusable_has_name(unnamed_a11y) &&
-       block.accessibility_relationship_matches(label_a11y, submit_a11y, block.id(3), block.id(4)) &&
-       block.accessibility_screen_reader_claim_allowed(true, true) &&
-       !block.accessibility_screen_reader_claim_allowed(false, true) &&
-       before_draw == 0 && after_draw == 0 &&
-       first_presented == 0 && second_presented == 0 && closed == 0 &&
-       host_text_len >= copied_text_len:
+    if root == 1 && panel == 2 && label == 3 && submit == 4 && reset == 5 && valid == block.tree_error_ok() && focus0 == 4 && focus1 == 5 && a11y0 == 3 && a11y1 == 4 && a11y2 == 5 && app.focused_id == 4 && app.reading_order_checked && app.platform_claim && layout.width == 480 && layout.height == 260 && layout.scroll_y == 32 && panel_state.id == 2 && panel_state.child_count == 3 && scroll_state.id == 7 && scroll_state.scroll_y == 32 && scroll_rect.w == 72 && scroll_rect.h == 80 && label_state.id == 3 && label_state.text_len == 4 && label_state.label_for == 4 && submit_state.id == 4 && submit_state.label_len == 6 && submit_state.labelled_by == 3 && submit_state.action == block.action_primary() && block.accessibility_focusable_has_name(submit_a11y) && !block.accessibility_focusable_has_name(unnamed_a11y) && block.accessibility_relationship_matches(label_a11y, submit_a11y, block.id(3), block.id(4)) && block.accessibility_screen_reader_claim_allowed(true, true) && !block.accessibility_screen_reader_claim_allowed(false, true) && before_draw == 0 && after_draw == 0 && first_presented == 0 && second_presented == 0 && closed == 0 && host_text_len >= copied_text_len:
         return 1
     return 0

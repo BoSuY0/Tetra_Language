@@ -79,6 +79,7 @@ func TestCIWorkflowHasLeastPrivilegeConcurrencyAndTimeouts(t *testing.T) {
 		"memory-islands-surface-release-readiness-linux:",
 		"actor-runtime-foundation-linux:",
 		"ram-contract-release-readiness-linux:",
+		"memory-100-prod-stable-linux:",
 		"techempower-report-schemas-linux:",
 		"lint-workflows-and-shell-linux:",
 	} {
@@ -106,8 +107,8 @@ func TestCIWorkflowIncludesSurfaceReleaseReadinessJob(t *testing.T) {
 		"bash scripts/dev/bootstrap.sh",
 		"name: Surface Morph gate",
 		"bash scripts/release/surface/morph-gate.sh --report-dir reports/surface-morph-gate",
-		"name: Surface release gate",
-		"bash scripts/release/surface/release-gate.sh --report-dir reports/surface-release-v1",
+		"name: Surface product gate",
+		"bash scripts/release/surface/product-gate.sh --report-dir reports/surface-product-v1",
 		"name: Surface experimental regression gate",
 		"bash scripts/release/surface/gate.sh --report-dir reports/surface-experimental-regression",
 		"name: Safe view lifetime gate",
@@ -128,8 +129,8 @@ func TestCIWorkflowIncludesSurfaceReleaseReadinessJob(t *testing.T) {
 		"uses: actions/upload-artifact@v4",
 		"name: tetra-surface-release-v1-${{ github.sha }}",
 		"path: |",
-		"reports/surface-release-v1",
-		"reports/surface-release-v1/morph",
+		"reports/surface-product-v1",
+		"reports/surface-product-v1/morph",
 		"reports/surface-morph-gate",
 		"reports/surface-experimental-regression",
 		"reports/safe-view-lifetime",
@@ -174,6 +175,52 @@ func TestCIWorkflowIncludesIntegratedMemoryIslandsSurfaceReadinessJob(t *testing
 	}
 	if strings.Contains(text, "continue-on-error: true") {
 		t.Fatalf("integrated Memory/Islands/Surface readiness job must not silently continue after missing production dependencies")
+	}
+}
+
+func TestCIWorkflowIncludesMemory100ProdStableGateJob(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "ci.yml"))
+	if err != nil {
+		t.Fatalf("read ci workflow: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		"memory-100-prod-stable-linux:",
+		"github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'",
+		"runs-on: ubuntu-latest",
+		"timeout-minutes: 150",
+		"actions/checkout@v4",
+		"actions/setup-go@v5",
+		"go-version: \"1.20.x\"",
+		"name: Bootstrap",
+		"bash scripts/dev/bootstrap.sh",
+		"name: Memory100 prod-stable gate",
+		"export GOTELEMETRY=off",
+		`export GOCACHE="${PWD}/.cache/go-build-memory-100-prod-stable-ci"`,
+		`export GOTMPDIR="${PWD}/.cache/go-tmp-memory-100-prod-stable-ci"`,
+		`mkdir -p "$GOCACHE" "$GOTMPDIR"`,
+		"bash scripts/release/post_v0_4/memory-100-prod-stable-gate.sh --report-dir reports/memory-100/final",
+		"name: Upload Memory100 prod-stable reports",
+		"if: always()",
+		"uses: actions/upload-artifact@v4",
+		"name: tetra-memory-100-prod-stable-${{ github.sha }}-linux-x64",
+		"path: reports/memory-100/final",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("ci workflow missing Memory100 prod-stable detail %q", want)
+		}
+	}
+	section := workflowJobSection(text, "memory-100-prod-stable-linux:")
+	assertOrderedFragments(t, section,
+		"name: Memory100 prod-stable gate",
+		"bash scripts/release/post_v0_4/memory-100-prod-stable-gate.sh --report-dir reports/memory-100/final",
+		"name: Upload Memory100 prod-stable reports",
+		"uses: actions/upload-artifact@v4",
+	)
+	for _, forbidden := range []string{"continue-on-error", "|| true", "set +e", "GOCACHE=/tmp", "GOTMPDIR=/tmp"} {
+		if strings.Contains(section, forbidden) {
+			t.Fatalf("Memory100 CI gate must not contain bypass or tmpfs cache marker %q", forbidden)
+		}
 	}
 }
 
@@ -264,17 +311,39 @@ func TestSurfaceReleaseReadinessWorkflowRunsNonOptionalSurfaceGates(t *testing.T
 	text := string(raw)
 	for _, want := range []string{
 		"surface-release-readiness-linux:",
-		"bash scripts/release/surface/release-gate.sh --report-dir reports/surface-release-v1",
+		"bash scripts/release/surface/product-gate.sh --report-dir reports/surface-product-v1",
 		"bash scripts/release/surface/gate.sh --report-dir reports/surface-experimental-regression",
 		"bash scripts/release/safe-view-lifetime/gate.sh --report-dir reports/safe-view-lifetime",
 		"bash scripts/release/surface/api-stability-gate.sh --report-dir reports/surface-api-stability-v1",
-		"reports/surface-release-v1",
+		"reports/surface-product-v1",
 		"reports/surface-experimental-regression",
 		"reports/safe-view-lifetime",
 		"reports/surface-api-stability-v1",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("ci workflow missing non-optional Surface release readiness detail %q", want)
+		}
+	}
+}
+
+func TestSurfaceProductGateWorkflowWiringHasNoBypass(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "ci.yml"))
+	if err != nil {
+		t.Fatalf("read ci workflow: %v", err)
+	}
+	text := string(raw)
+	section := workflowJobSection(text, "surface-release-readiness-linux:")
+	assertOrderedFragments(t, section,
+		"name: Surface Morph gate",
+		"name: Surface product gate",
+		"bash scripts/release/surface/product-gate.sh --report-dir reports/surface-product-v1",
+		"name: Surface experimental regression gate",
+		"name: Upload release reports",
+		"uses: actions/upload-artifact@v4",
+	)
+	for _, forbidden := range []string{"continue-on-error", "|| true", "set +e", "GOCACHE=/tmp", "GOTMPDIR=/tmp"} {
+		if strings.Contains(section, forbidden) {
+			t.Fatalf("Surface product gate CI job must not contain bypass or tmpfs cache marker %q", forbidden)
 		}
 	}
 }
@@ -391,6 +460,7 @@ func TestCIWorkflowArtifactNamesAreReleaseAware(t *testing.T) {
 		"tetra-memory-islands-surface-${{ github.sha }}",
 		"tetra-actor-runtime-foundation-${{ github.sha }}-linux-x64",
 		"tetra-ram-contract-${{ github.sha }}-linux-x64",
+		"tetra-memory-100-prod-stable-${{ github.sha }}-linux-x64",
 		"tetra-full-platform-ui-runtime-${{ github.sha }}-${{ matrix.target }}",
 		"tetra-full-platform-ui-runtime-${{ github.sha }}-gate",
 		"tetra-v0.4.0-${{ github.sha }}-coverage-linux",
@@ -414,6 +484,7 @@ func TestCIWorkflowArtifactNamesAreReleaseAware(t *testing.T) {
 			!strings.Contains(name, "memory-islands-surface") &&
 			!strings.Contains(name, "actor-runtime-foundation") &&
 			!strings.Contains(name, "ram-contract") &&
+			!strings.Contains(name, "memory-100-prod-stable") &&
 			!strings.Contains(name, "full-platform-ui-runtime") {
 			t.Fatalf("ci workflow artifact name %q missing release-aware scope", name)
 		}

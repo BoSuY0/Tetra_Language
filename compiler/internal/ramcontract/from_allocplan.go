@@ -156,6 +156,9 @@ func validationStatusFromAllocation(alloc allocplan.Allocation, placement Placem
 		return ValidationRejected
 	}
 	if strings.HasPrefix(alloc.ValidationStatus, "validated") {
+		if trustedPlacement(placement) && alloc.Escape != allocplan.EscapeNoEscape {
+			return ValidationRejected
+		}
 		if placement == PlacementHeapUnbounded || alloc.Escape == allocplan.EscapeUnknown {
 			return ValidationConservative
 		}
@@ -214,15 +217,35 @@ func blockersFromAllocation(alloc allocplan.Allocation, placement Placement) []s
 
 func proofForAllocation(function string, alloc allocplan.Allocation, row Row) ProofSummary {
 	id := "proof:ram:" + sanitizeID(row.SiteID)
-	subject := function + "/" + alloc.ValueID
-	stable := stableProofHash(id, "allocation_placement", subject, alloc.ValidationStatus, string(row.Placement))
+	kind := proofKindForRow(row)
+	subject := proofSubjectForAllocation(function, alloc, row)
+	stable := stableProofHash(id, kind, subject, alloc.ValidationStatus, string(row.Placement), string(row.EscapeStatus), row.Lifetime, row.FreePoint)
 	return ProofSummary{
 		ProofID:    id,
-		Kind:       "allocation_placement",
+		Kind:       kind,
 		Subject:    subject,
 		StableHash: stable,
 		Status:     "proven",
 	}
+}
+
+func proofKindForRow(row Row) string {
+	switch row.Placement {
+	case PlacementRegion:
+		return "region_lifetime_placement"
+	case PlacementIsland:
+		return "island_lifetime_placement"
+	default:
+		return "allocation_placement"
+	}
+}
+
+func proofSubjectForAllocation(function string, alloc allocplan.Allocation, row Row) string {
+	subject := function + "/" + alloc.ValueID
+	if row.Placement == PlacementRegion || row.Placement == PlacementIsland {
+		return subject + "@" + row.Lifetime
+	}
+	return subject
 }
 
 func stableProofHash(parts ...string) string {
@@ -261,13 +284,59 @@ func BuildPipelineCoverage(target string, gitHead string, generatedBy string, en
 		GitHead:       defaultString(gitHead, "unknown"),
 		Target:        target,
 		GeneratedBy:   defaultString(generatedBy, "tetra-compiler"),
-		Entries: []PipelineEntry{{
+		Entries:       pipelineCoverageEntries(entrypoint, artifactPath, validators),
+		NonClaims:     DefaultNonClaims(),
+	}
+}
+
+func pipelineCoverageEntries(entrypoint string, artifactPath string, validators []string) []PipelineEntry {
+	entries := make([]PipelineEntry, 0, len(requiredPipelineEntrypoints))
+	covered := map[string]bool{}
+	for _, required := range requiredPipelineEntrypoints {
+		if required == entrypoint {
+			entries = append(entries, PipelineEntry{
+				Entrypoint:   required,
+				ArtifactPath: artifactPath,
+				Status:       "validated_by_pipeline",
+				Validators:   append([]string(nil), validators...),
+			})
+			covered[required] = true
+			continue
+		}
+		entries = append(entries, PipelineEntry{
+			Entrypoint: required,
+			Status:     "formal_exemption_with_reason",
+			Exemption:  pipelineCoverageExemption(required),
+		})
+		covered[required] = true
+	}
+	if entrypoint != "" && !covered[entrypoint] {
+		entries = append(entries, PipelineEntry{
 			Entrypoint:   entrypoint,
 			ArtifactPath: artifactPath,
 			Status:       "validated_by_pipeline",
 			Validators:   append([]string(nil), validators...),
-		}},
-		NonClaims: DefaultNonClaims(),
+		})
+	}
+	return entries
+}
+
+func pipelineCoverageExemption(entrypoint string) string {
+	switch entrypoint {
+	case "buildObjectFileWithStatsOpt":
+		return "not exercised by this linux-x64 RAM release fixture; object builds must carry their own RAM coverage evidence"
+	case "buildLibraryObjectWithStatsOpt":
+		return "not exercised by this linux-x64 RAM release fixture; library builds must carry their own RAM coverage evidence"
+	case "InterfaceOnly":
+		return "interface-only mode does not produce a RAM artifact in this release fixture"
+	case "wasm32-wasi-build":
+		return "wasm32-wasi RAM coverage is target-specific and not claimed by this linux-x64 release fixture"
+	case "wasm32-web-build":
+		return "wasm32-web RAM coverage is target-specific and not claimed by this linux-x64 release fixture"
+	case "explain-report-path":
+		return "explain report path is not artifact-producing in this release fixture"
+	default:
+		return "not exercised by this RAM release fixture; covered by separate entrypoint evidence"
 	}
 }
 

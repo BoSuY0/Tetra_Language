@@ -39,8 +39,11 @@ func TestValidateSurfaceRuntimeReportAcceptsProductionTextInputSchema(t *testing
   "production_claim": true,
   "storage": "owned-utf8-byte-buffer",
   "utf8_validation": true,
+  "invalid_utf8_rejected": true,
   "caret": true,
   "selection": true,
+  "selection_clipboard_transfer": true,
+  "multiline": true,
   "backspace": true,
   "delete": true,
   "home_end": true,
@@ -52,7 +55,17 @@ func TestValidateSurfaceRuntimeReportAcceptsProductionTextInputSchema(t *testing
   "clipboard_write": true,
   "clipboard_host_abi": true,
   "clipboard_owned_copy": true,
+  "target_host_composition_trace": true,
   "composition_trace": {"start":true,"update":true,"commit":true,"cancel":true},
+  "text_shaping_plan": {"quality_level":"scoped-text-shaping-plan-v1","fallback_fonts":true,"grapheme_boundaries":"byte-offset-codepoint-v1","line_breaking":"newline-storage-plus-wrap-plan-v1","bidi":"nonclaim-full-bidi-v1","rich_text":"nonclaim-rich-text-editor-v1"},
+  "reference_traces": [
+    {"source":"examples/surface_morph_settings.tetra","trace":"settings text field trace","focus":true,"selection":true,"clipboard":true,"composition":true,"multiline":true,"pass":true},
+    {"source":"examples/surface_morph_editor_shell.tetra","trace":"editor shell text area trace","focus":true,"selection":true,"clipboard":true,"composition":true,"multiline":true,"pass":true}
+  ],
+  "unsupported_claims": ["full-rich-text-editor","full-bidi-shaping","grapheme-cluster-caret","ide-grade-editor"],
+  "rich_text_production_claim": false,
+  "bidi_production_claim": false,
+  "full_editor_production_claim": false,
   "borrowed_view_storage": false,
   "safe_view_lifetime_checked": true,
   "processes": [
@@ -77,13 +90,19 @@ func TestValidateSurfaceRuntimeReportAcceptsProductionTextInputSchema(t *testing
     {"name":"no legacy UI sidecar artifacts","kind":"positive","ran":true,"pass":true},
     {"name":"release text input ASCII insertion","kind":"positive","ran":true,"pass":true},
     {"name":"release text input UTF-8 insertion","kind":"positive","ran":true,"pass":true},
+    {"name":"release text input invalid UTF-8 rejected","kind":"negative","ran":true,"pass":true,"expected_error":"invalid utf8 rejected"},
+    {"name":"release text input multiline storage","kind":"positive","ran":true,"pass":true},
     {"name":"release text input caret home end arrows","kind":"positive","ran":true,"pass":true},
     {"name":"release text input selection replacement","kind":"positive","ran":true,"pass":true},
+    {"name":"release text input selection clipboard transfer","kind":"positive","ran":true,"pass":true},
     {"name":"release text input backspace delete","kind":"positive","ran":true,"pass":true},
     {"name":"release text input clipboard owned copy transfer","kind":"positive","ran":true,"pass":true},
     {"name":"release text input composition start update","kind":"positive","ran":true,"pass":true},
     {"name":"release text input composition commit","kind":"positive","ran":true,"pass":true},
     {"name":"release text input composition cancel","kind":"positive","ran":true,"pass":true},
+    {"name":"release text input shaping plan scoped","kind":"positive","ran":true,"pass":true},
+    {"name":"settings reference text input trace","kind":"positive","ran":true,"pass":true},
+    {"name":"editor reference text input trace","kind":"positive","ran":true,"pass":true},
     {"name":"release text input safe view lifetime checked","kind":"positive","ran":true,"pass":true},
     {"name":"reject legacy UI evidence","kind":"negative","ran":true,"pass":true,"expected_error":"legacy UI evidence rejected"}
   ]
@@ -104,6 +123,142 @@ func TestTextInputReleaseValidatorAcceptsProductionTextInputReport(t *testing.T)
 	}
 	if err := validateSurfaceRuntimeReportWithOptions(reportPath, surfaceRuntimeValidationOptions{Release: "text-input"}); err != nil {
 		t.Fatalf("validateSurfaceRuntimeReportWithOptions text-input failed: %v", err)
+	}
+}
+
+func TestAppModelReleaseValidatorAcceptsHeadlessCommandReducerReport(t *testing.T) {
+	dir := t.TempDir()
+	artifactDir := surfaceArtifactFixtureDir(t, dir)
+	artifactPath, artifactSHA, artifactSize := writeNamedSurfaceArtifactFixture(t, artifactDir, "surface-app-model", []byte("surface app-model fixture\n"), 0o755)
+	tracePath, traceSHA, traceSize := writeSurfaceTraceFixtureWithSourceAndFrames(t, artifactDir, "examples/surface_app_model.tetra", []surfaceTraceFrameFixture{
+		{Order: 1, Width: 320, Height: 200, Stride: 1280, Checksum: "1111111111111111111111111111111111111111111111111111111111111111", Presented: true},
+		{Order: 2, Width: 320, Height: 200, Stride: 1280, Checksum: "2222222222222222222222222222222222222222222222222222222222222222", Presented: true},
+	})
+	reportPath := filepath.Join(dir, "surface-headless-app-model.json")
+	raw := validAppModelReleaseRuntimeReportJSON(t, artifactPath, artifactSHA, artifactSize, tracePath, traceSHA, traceSize)
+	if err := os.WriteFile(reportPath, raw, 0o644); err != nil {
+		t.Fatalf("write report: %v", err)
+	}
+	if err := validateSurfaceRuntimeReportWithOptions(reportPath, surfaceRuntimeValidationOptions{Release: "app-model"}); err != nil {
+		t.Fatalf("validateSurfaceRuntimeReportWithOptions app-model failed: %v\n%s", err, raw)
+	}
+}
+
+func TestAppModelReleaseValidatorRejectsHiddenStateRuntimeSubstitute(t *testing.T) {
+	dir := t.TempDir()
+	artifactDir := surfaceArtifactFixtureDir(t, dir)
+	artifactPath, artifactSHA, artifactSize := writeNamedSurfaceArtifactFixture(t, artifactDir, "surface-app-model", []byte("surface app-model fixture\n"), 0o755)
+	tracePath, traceSHA, traceSize := writeSurfaceTraceFixture(t, artifactDir)
+	reportPath := filepath.Join(dir, "surface-headless-app-model-hidden-state.json")
+	var report surface.Report
+	if err := json.Unmarshal(validAppModelReleaseRuntimeReportJSON(t, artifactPath, artifactSHA, artifactSize, tracePath, traceSHA, traceSize), &report); err != nil {
+		t.Fatalf("decode app-model report: %v", err)
+	}
+	report.AppModel.HiddenAppState = true
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatalf("marshal mutated app-model report: %v", err)
+	}
+	if err := os.WriteFile(reportPath, raw, 0o644); err != nil {
+		t.Fatalf("write report: %v", err)
+	}
+	err = validateSurfaceRuntimeReportWithOptions(reportPath, surfaceRuntimeValidationOptions{Release: "app-model"})
+	if err == nil {
+		t.Fatalf("expected hidden app state app-model substitute to fail")
+	}
+	if !strings.Contains(err.Error(), "app_model") || !strings.Contains(err.Error(), "hidden app state") {
+		t.Fatalf("error = %v, want app_model hidden app state diagnostic", err)
+	}
+}
+
+func TestLinuxAppShellReleaseValidatorAcceptsTargetHostReport(t *testing.T) {
+	dir := t.TempDir()
+	artifactDir := surfaceArtifactFixtureDir(t, dir)
+	reportPath := filepath.Join(dir, "surface-linux-x64-release-app-shell.json")
+	raw := validLinuxAppShellReleaseRuntimeReportJSON(t, artifactDir, nil)
+	if err := os.WriteFile(reportPath, raw, 0o644); err != nil {
+		t.Fatalf("write report: %v", err)
+	}
+	if err := validateSurfaceRuntimeReportWithOptions(reportPath, surfaceRuntimeValidationOptions{Release: "linux-app-shell"}); err != nil {
+		t.Fatalf("validateSurfaceRuntimeReportWithOptions linux-app-shell failed: %v\n%s", err, raw)
+	}
+}
+
+func TestLinuxAppShellReleaseValidatorRejectsNativeWidgetSubstitute(t *testing.T) {
+	dir := t.TempDir()
+	artifactDir := surfaceArtifactFixtureDir(t, dir)
+	reportPath := filepath.Join(dir, "surface-linux-x64-release-app-shell-native-widget.json")
+	raw := validLinuxAppShellReleaseRuntimeReportJSON(t, artifactDir, func(report map[string]any) {
+		appShell := report["linux_app_shell"].(map[string]any)
+		appShell["negative_guards"].(map[string]any)["no_qt"] = false
+	})
+	if err := os.WriteFile(reportPath, raw, 0o644); err != nil {
+		t.Fatalf("write report: %v", err)
+	}
+	err := validateSurfaceRuntimeReportWithOptions(reportPath, surfaceRuntimeValidationOptions{Release: "linux-app-shell"})
+	if err == nil {
+		t.Fatalf("expected native widget app-shell substitute to fail")
+	}
+	if !strings.Contains(err.Error(), "GTK/Qt/native widget UI") {
+		t.Fatalf("error = %v, want native widget diagnostic", err)
+	}
+}
+
+func TestLinuxAppShellReleaseValidatorRejectsMissingP16FeatureLedger(t *testing.T) {
+	dir := t.TempDir()
+	artifactDir := surfaceArtifactFixtureDir(t, dir)
+	reportPath := filepath.Join(dir, "surface-linux-x64-release-app-shell-missing-error-report.json")
+	raw := validLinuxAppShellReleaseRuntimeReportJSON(t, artifactDir, func(report map[string]any) {
+		appShell := report["linux_app_shell"].(map[string]any)
+		appShell["shell_features"] = withoutLinuxAppShellRuntimeFeature(p16LinuxAppShellRuntimeFeaturesForTest(), "error_report")
+	})
+	if err := os.WriteFile(reportPath, raw, 0o644); err != nil {
+		t.Fatalf("write report: %v", err)
+	}
+	err := validateSurfaceRuntimeReportWithOptions(reportPath, surfaceRuntimeValidationOptions{Release: "linux-app-shell"})
+	if err == nil {
+		t.Fatalf("expected missing P16 error_report ledger row to fail")
+	}
+	if !strings.Contains(err.Error(), "error_report") {
+		t.Fatalf("error = %v, want error_report diagnostic", err)
+	}
+}
+
+func TestLinuxAppShellReleaseValidatorRejectsMissingP17SecurityPermissions(t *testing.T) {
+	dir := t.TempDir()
+	artifactDir := surfaceArtifactFixtureDir(t, dir)
+	reportPath := filepath.Join(dir, "surface-linux-x64-release-app-shell-missing-security.json")
+	raw := validLinuxAppShellReleaseRuntimeReportJSON(t, artifactDir, func(report map[string]any) {
+		delete(report, "security_permissions")
+	})
+	if err := os.WriteFile(reportPath, raw, 0o644); err != nil {
+		t.Fatalf("write report: %v", err)
+	}
+	err := validateSurfaceRuntimeReportWithOptions(reportPath, surfaceRuntimeValidationOptions{Release: "linux-app-shell"})
+	if err == nil {
+		t.Fatalf("expected missing P17 security permissions to fail")
+	}
+	if !strings.Contains(err.Error(), "security_permissions") {
+		t.Fatalf("error = %v, want security_permissions diagnostic", err)
+	}
+}
+
+func TestLinuxAppShellReleaseValidatorRejectsMissingP18PerformanceBudget(t *testing.T) {
+	dir := t.TempDir()
+	artifactDir := surfaceArtifactFixtureDir(t, dir)
+	reportPath := filepath.Join(dir, "surface-linux-x64-release-app-shell-missing-performance.json")
+	raw := validLinuxAppShellReleaseRuntimeReportJSON(t, artifactDir, func(report map[string]any) {
+		delete(report, "surface_performance_budget")
+	})
+	if err := os.WriteFile(reportPath, raw, 0o644); err != nil {
+		t.Fatalf("write report: %v", err)
+	}
+	err := validateSurfaceRuntimeReportWithOptions(reportPath, surfaceRuntimeValidationOptions{Release: "linux-app-shell"})
+	if err == nil {
+		t.Fatalf("expected missing P18 performance budget to fail")
+	}
+	if !strings.Contains(err.Error(), "surface_performance_budget") {
+		t.Fatalf("error = %v, want surface_performance_budget diagnostic", err)
 	}
 }
 
@@ -134,10 +289,25 @@ func TestValidateSurfaceRuntimeReportAcceptsReleaseSummarySchema(t *testing.T) {
   "clipboard": "clipboard-text-v1",
   "ime": "composition-baseline-v1",
   "accessibility": "platform-bridge-v1",
-  "browser_surface": "browser-canvas-release-v1",
-  "linux_surface": "linux-x64-release-window-v1",
+	  "app_model": "explicit-command-reducer-v1",
+	  "linux_app_shell": "linux-app-shell-subset-v1",
+	  "app_shell_features": "electron-feature-ledger-v1",
+	  "security_permissions": "surface-security-permission-v1",
+	  "performance_budget": "surface-performance-budget-v1",
+	  "developer_fast_loop": "surface-dev-workflow-v1",
+	  "inspector": "surface-inspector-v1",
+	  "project_templates": "surface-template-smoke-v1",
+	  "reference_apps": "surface-reference-app-suite-v1",
+	  "surface_package": "surface-package-v1",
+	  "crash_reporting": "surface-crash-report-v1",
+	  "i18n_localization": "surface-i18n-v1",
+	  "widget_migration": "surface-widget-migration-v1",
+	  "browser_surface": "browser-canvas-release-v1",
+	  "linux_surface": "linux-x64-release-window-v1",
   "block_system": "block-system",
   "block_system_gate": "tetra.surface.block-system.gate.v1",
+  "morph": "morph-capsule",
+  "morph_gate": "tetra.surface.morph.gate.v1",
   "artifact_hashes_validated": true,
   "legacy_sidecars": false,
   "dom_ui": false,
@@ -246,6 +416,34 @@ func TestCanvasFrameInputTextAccessibility(t *testing.T) {
 	}
 	if err := validateWASM32WebBrowserReleaseEnvelope(surface.SchemaV1, raw); err != nil {
 		t.Fatalf("validateWASM32WebBrowserReleaseEnvelope failed: %v", err)
+	}
+}
+
+func TestBrowserReleaseRequiresFirstClassBrowserSurfaceEvidence(t *testing.T) {
+	dir := t.TempDir()
+	reportPath := writeWASM32WebBrowserReleaseRuntimeReport(t, dir)
+	raw, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatalf("read report: %v", err)
+	}
+	var report map[string]any
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("decode report: %v", err)
+	}
+	delete(report, "browser_surface")
+	raw, err = json.Marshal(report)
+	if err != nil {
+		t.Fatalf("marshal mutated report: %v", err)
+	}
+	if err := os.WriteFile(reportPath, raw, 0o644); err != nil {
+		t.Fatalf("write mutated report: %v", err)
+	}
+	err = validateWASM32WebBrowserReleaseEnvelope(surface.SchemaV1, raw)
+	if err == nil {
+		t.Fatalf("expected browser release without first-class browser_surface evidence to fail")
+	}
+	if !strings.Contains(err.Error(), "browser_surface") {
+		t.Fatalf("error = %v, want browser_surface diagnostic", err)
 	}
 }
 
@@ -896,10 +1094,82 @@ const imports = { tetra_surface_host_v1: createSurfaceHost({ instance: null }) }
 	)
 	raw = strings.Replace(raw, `examples/surface_browser_counter.tetra`, `examples/surface_release_form.tetra`, 1)
 	raw = strings.Replace(raw, `<surface-browser-canvas-runner> wasm=`, `<surface-browser-canvas-runner> scenario=release-browser wasm=`, 1)
-	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+	var report map[string]any
+	if err := json.Unmarshal([]byte(raw), &report); err != nil {
+		t.Fatalf("decode browser release report fixture: %v", err)
+	}
+	report["browser_surface"] = browserSurfaceEvidenceMapForTest(tracePath)
+	mutatedRaw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatalf("marshal browser release report fixture: %v", err)
+	}
+	if err := os.WriteFile(reportPath, mutatedRaw, 0o644); err != nil {
 		t.Fatalf("write report: %v", err)
 	}
 	return reportPath
+}
+
+func browserSurfaceEvidenceMapForTest(tracePath string) map[string]any {
+	return map[string]any{
+		"schema":                "tetra.surface.browser-surface.v1",
+		"browser_surface_level": "browser-canvas-release-v1",
+		"release_scope":         "surface-v1-linux-web",
+		"source":                "examples/surface_release_form.tetra",
+		"host_adapter":          "compiler-owned-browser-canvas-host",
+		"production_claim":      true,
+		"experimental":          false,
+		"compiler_owned_boot":   true,
+		"dom_host_canvas_only":  true,
+		"canvas": map[string]any{
+			"opened":        true,
+			"readback":      true,
+			"width":         560,
+			"height":        420,
+			"frame_order":   5,
+			"artifact_kind": "runner-trace",
+			"pass":          true,
+		},
+		"input": map[string]any{
+			"pointer":       true,
+			"keyboard":      true,
+			"text":          true,
+			"resize":        true,
+			"host_trace":    true,
+			"native_events": []any{"pointerup", "keydown", "beforeinput", "resize"},
+			"pass":          true,
+		},
+		"clipboard": map[string]any{
+			"harness":    "deterministic-browser-clipboard-v1",
+			"read":       true,
+			"write":      true,
+			"owned_copy": true,
+			"bytes":      13,
+			"pass":       true,
+		},
+		"composition": map[string]any{"start": true, "update": true, "commit": true, "cancel": true, "pass": true},
+		"accessibility": map[string]any{
+			"snapshot":       true,
+			"mirror":         true,
+			"compiler_owned": true,
+			"bounds":         true,
+			"focus":          true,
+			"roles":          []any{"root", "textbox", "checkbox", "button", "status"},
+			"dom_visual_ui":  false,
+			"user_js":        false,
+			"pass":           true,
+		},
+		"host_traces": []any{
+			map[string]any{"name": "browser-canvas", "artifact_kind": "runner-trace", "path": tracePath, "pass": true},
+		},
+		"negative_guards": map[string]any{
+			"no_dom_app_ui_tree":     true,
+			"no_user_js_app_logic":   true,
+			"no_node_only_promotion": true,
+			"no_legacy_sidecars":     true,
+			"no_react_runtime":       true,
+			"no_platform_widgets":    true,
+		},
+	}
 }
 
 func writeBrowserReleaseTraceFixture(t *testing.T, dir string, wasmPath string) (string, string, int64) {
@@ -1038,35 +1308,60 @@ func validProductionTextInputReportJSON(t *testing.T) []byte {
 	t.Helper()
 	intRef := func(v int) *int { return &v }
 	report := surface.TextInputReport{
-		Schema:             surface.TextInputSchemaV1,
-		Target:             "headless",
-		Source:             "examples/surface_release_text_input.tetra",
-		Level:              "production-text-input-v1",
-		Experimental:       false,
-		ProductionClaim:    true,
-		Storage:            "owned-utf8-byte-buffer",
-		UTF8Validation:     true,
-		Caret:              true,
-		Selection:          true,
-		Backspace:          true,
-		Delete:             true,
-		HomeEnd:            true,
-		ArrowLeftRight:     true,
-		CompositionEvents:  true,
-		CompositionCommit:  true,
-		CompositionCancel:  true,
-		ClipboardRead:      true,
-		ClipboardWrite:     true,
-		ClipboardHostABI:   true,
-		ClipboardOwnedCopy: true,
+		Schema:                     surface.TextInputSchemaV1,
+		Target:                     "headless",
+		Source:                     "examples/surface_release_text_input.tetra",
+		Level:                      "production-text-input-v1",
+		Experimental:               false,
+		ProductionClaim:            true,
+		Storage:                    "owned-utf8-byte-buffer",
+		UTF8Validation:             true,
+		InvalidUTF8Rejected:        true,
+		Caret:                      true,
+		Selection:                  true,
+		SelectionClipboardTransfer: true,
+		Multiline:                  true,
+		Backspace:                  true,
+		Delete:                     true,
+		HomeEnd:                    true,
+		ArrowLeftRight:             true,
+		CompositionEvents:          true,
+		CompositionCommit:          true,
+		CompositionCancel:          true,
+		ClipboardRead:              true,
+		ClipboardWrite:             true,
+		ClipboardHostABI:           true,
+		ClipboardOwnedCopy:         true,
+		TargetHostCompositionTrace: true,
 		CompositionTrace: surface.CompositionTraceReport{
 			Start:  true,
 			Update: true,
 			Commit: true,
 			Cancel: true,
 		},
-		BorrowedViewStorage:     false,
-		SafeViewLifetimeChecked: true,
+		TextShapingPlan: surface.TextShapingPlanReport{
+			QualityLevel:       "scoped-text-shaping-plan-v1",
+			FallbackFonts:      true,
+			GraphemeBoundaries: "byte-offset-codepoint-v1",
+			LineBreaking:       "newline-storage-plus-wrap-plan-v1",
+			Bidi:               "nonclaim-full-bidi-v1",
+			RichText:           "nonclaim-rich-text-editor-v1",
+		},
+		ReferenceTraces: []surface.TextInputReferenceTraceReport{
+			{Source: "examples/surface_morph_settings.tetra", Trace: "settings text field trace", Focus: true, Selection: true, Clipboard: true, Composition: true, Multiline: true, Pass: true},
+			{Source: "examples/surface_morph_editor_shell.tetra", Trace: "editor shell text area trace", Focus: true, Selection: true, Clipboard: true, Composition: true, Multiline: true, Pass: true},
+		},
+		UnsupportedClaims: []string{
+			"full-rich-text-editor",
+			"full-bidi-shaping",
+			"grapheme-cluster-caret",
+			"ide-grade-editor",
+		},
+		RichTextProductionClaim:   false,
+		BidiProductionClaim:       false,
+		FullEditorProductionClaim: false,
+		BorrowedViewStorage:       false,
+		SafeViewLifetimeChecked:   true,
 		Processes: []surface.ProcessReport{
 			{Name: "tetra build", Kind: "build", Path: "tetra build --target linux-x64 examples/surface_release_text_input.tetra -o /tmp/surface-artifacts/surface-release-text-input", Ran: true, Pass: true, ExitCode: intRef(0)},
 			{Name: "surface component app", Kind: "app", Path: "/tmp/surface-artifacts/surface-release-text-input", Ran: true, Pass: true, ExitCode: intRef(1), ExpectedExitCode: intRef(1)},
@@ -1089,13 +1384,19 @@ func validProductionTextInputReportJSON(t *testing.T) []byte {
 			{Name: "no legacy UI sidecar artifacts", Kind: "positive", Ran: true, Pass: true},
 			{Name: "release text input ASCII insertion", Kind: "positive", Ran: true, Pass: true},
 			{Name: "release text input UTF-8 insertion", Kind: "positive", Ran: true, Pass: true},
+			{Name: "release text input invalid UTF-8 rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "invalid utf8 rejected"},
+			{Name: "release text input multiline storage", Kind: "positive", Ran: true, Pass: true},
 			{Name: "release text input caret home end arrows", Kind: "positive", Ran: true, Pass: true},
 			{Name: "release text input selection replacement", Kind: "positive", Ran: true, Pass: true},
+			{Name: "release text input selection clipboard transfer", Kind: "positive", Ran: true, Pass: true},
 			{Name: "release text input backspace delete", Kind: "positive", Ran: true, Pass: true},
 			{Name: "release text input clipboard owned copy transfer", Kind: "positive", Ran: true, Pass: true},
 			{Name: "release text input composition start update", Kind: "positive", Ran: true, Pass: true},
 			{Name: "release text input composition commit", Kind: "positive", Ran: true, Pass: true},
 			{Name: "release text input composition cancel", Kind: "positive", Ran: true, Pass: true},
+			{Name: "release text input shaping plan scoped", Kind: "positive", Ran: true, Pass: true},
+			{Name: "settings reference text input trace", Kind: "positive", Ran: true, Pass: true},
+			{Name: "editor reference text input trace", Kind: "positive", Ran: true, Pass: true},
 			{Name: "release text input safe view lifetime checked", Kind: "positive", Ran: true, Pass: true},
 			{Name: "reject legacy UI evidence", Kind: "negative", Ran: true, Pass: true, ExpectedError: "legacy UI evidence rejected"},
 		},
@@ -1105,6 +1406,456 @@ func validProductionTextInputReportJSON(t *testing.T) []byte {
 		t.Fatalf("marshal text input report: %v", err)
 	}
 	return raw
+}
+
+func validAppModelReleaseRuntimeReportJSON(t *testing.T, artifactPath string, artifactSHA string, artifactSize int64, tracePath string, traceSHA string, traceSize int64) []byte {
+	t.Helper()
+	intRef := func(v int) *int { return &v }
+	report := surface.Report{
+		Schema:        surface.SchemaV1,
+		Status:        "pass",
+		Target:        "headless",
+		Host:          "linux-x64",
+		Runtime:       "surface-headless",
+		SurfaceSchema: "tetra.surface.v1",
+		HostABI:       "tetra.surface.host-abi.v1",
+		HostEvidence: surface.HostEvidenceReport{
+			Level:       "deterministic-headless",
+			Backend:     "software-rgba",
+			Framebuffer: true,
+		},
+		Source: "examples/surface_app_model.tetra",
+		Processes: []surface.ProcessReport{
+			{Name: "tetra build", Kind: "build", Path: "tetra build --target linux-x64 examples/surface_app_model.tetra -o " + artifactPath, Ran: true, Pass: true, ExitCode: intRef(0)},
+			{Name: "surface component app", Kind: "app", Path: artifactPath, Ran: true, Pass: true, ExitCode: intRef(1), ExpectedExitCode: intRef(1)},
+			{Name: "surface headless runtime", Kind: "runtime", Path: "tools/cmd/surface-runtime-smoke --mode headless-app-model", Ran: true, Pass: true, ExitCode: intRef(0)},
+		},
+		Artifacts: []surface.ArtifactReport{
+			{Kind: "component-app", Path: artifactPath, SHA256: artifactSHA, Size: artifactSize},
+			{Kind: "runner-trace", Path: tracePath, SHA256: traceSHA, Size: traceSize},
+		},
+		ArtifactScan: surface.ArtifactScanReport{Root: filepath.Dir(artifactPath), FilesChecked: 2, ForbiddenPaths: []string{}, Pass: true},
+		Components: []surface.ComponentReport{
+			{ID: "AppModelApp", Type: "examples.surface_app_model.AppModelApp", Bounds: surface.RectReport{X: 0, Y: 0, W: 480, H: 320}, Abilities: []string{"measure", "layout", "draw", "event", "focus", "text", "accessibility"}, State: map[string]string{"route": "settings", "focused": "NameField", "save_count": "1", "pending_task": "0", "history_depth": "1", "redo_depth": "0", "accessibility_role": "none"}},
+			{ID: "NameField", Type: "examples.surface_app_model.NameField", Parent: "AppModelApp", Bounds: surface.RectReport{X: 32, Y: 80, W: 240, H: 44}, Abilities: []string{"measure", "layout", "draw", "event", "focus", "text", "accessibility"}, State: map[string]string{"focused": "true", "buffer": "Ada", "caret": "3", "accessibility_role": "textbox"}},
+			{ID: "SaveButton", Type: "examples.surface_app_model.SaveButton", Parent: "AppModelApp", Bounds: surface.RectReport{X: 32, Y: 144, W: 132, H: 44}, Abilities: []string{"measure", "layout", "draw", "event", "focus", "text", "accessibility"}, State: map[string]string{"focused": "false", "press_count": "1", "action": "save", "accessibility_role": "button"}},
+		},
+		Events: []surface.EventReport{
+			{Order: 1, Kind: "mouse_up", TargetComponent: "NameField", DispatchPath: []string{"AppModelApp", "NameField"}, Handled: true, Pass: true, X: 48, Y: 96, Width: 480, Height: 320, BufferSlots: []int{5, 48, 96, 1, 0, 480, 320, 0, 0}, BeforeState: map[string]string{"AppModelApp.focused": ""}, AfterState: map[string]string{"AppModelApp.focused": "NameField"}},
+			{Order: 2, Kind: "text_input", TargetComponent: "NameField", DispatchPath: []string{"AppModelApp", "NameField"}, Handled: true, Pass: true, Width: 480, Height: 320, TimestampMS: 1, TextLen: 3, TextBytesHex: "416461", BufferSlots: []int{8, 0, 0, 0, 0, 480, 320, 1, 3}, BeforeState: map[string]string{"NameField.buffer": ""}, AfterState: map[string]string{"NameField.buffer": "Ada"}},
+			{Order: 3, Kind: "key_down", TargetComponent: "SaveButton", DispatchPath: []string{"AppModelApp", "SaveButton"}, Handled: true, Pass: true, Key: 13, Width: 480, Height: 320, TimestampMS: 2, BufferSlots: []int{6, 0, 0, 0, 13, 480, 320, 2, 0}, BeforeState: map[string]string{"AppModelApp.save_count": "0"}, AfterState: map[string]string{"AppModelApp.save_count": "1"}},
+		},
+		Frames: []surface.FrameReport{
+			{Order: 1, Width: 320, Height: 200, Stride: 1280, Checksum: "1111111111111111111111111111111111111111111111111111111111111111", Presented: true},
+			{Order: 2, Width: 320, Height: 200, Stride: 1280, Checksum: "2222222222222222222222222222222222222222222222222222222222222222", Presented: true},
+		},
+		StateTransitions: []surface.StateTransitionReport{
+			{Order: 1, Component: "AppModelApp", Field: "focused", Before: "", After: "NameField", Cause: "focus"},
+			{Order: 2, Component: "NameField", Field: "buffer", Before: "", After: "Ada", Cause: "command.insert_text"},
+			{Order: 3, Component: "AppModelApp", Field: "route", Before: "home", After: "settings", Cause: "command.navigate"},
+			{Order: 4, Component: "AppModelApp", Field: "pending_task", Before: "1", After: "0", Cause: "command.async_complete"},
+			{Order: 5, Component: "AppModelApp", Field: "history_depth", Before: "0", After: "1", Cause: "command.undoable"},
+			{Order: 6, Component: "AppModelApp", Field: "save_count", Before: "0", After: "1", Cause: "command.save"},
+		},
+		AppModel: &surface.AppModelReport{
+			Schema:                "tetra.surface.app-model.v1",
+			AppModelLevel:         "explicit-command-reducer-v1",
+			ReleaseScope:          "surface-v1-linux-web",
+			Source:                "examples/surface_app_model.tetra",
+			Module:                "lib.core.surface_app",
+			UsesComponentTreeAPI:  true,
+			CallerOwnedState:      true,
+			ExplicitEventBindings: true,
+			DeterministicReducer:  true,
+			StateFields:           []string{"route", "focused", "name_buffer", "save_count", "pending_task", "history_depth", "redo_depth"},
+			CommandRegistry:       []string{"focus.name", "text.insert", "nav.push.settings", "nav.back", "async.save.start", "async.save.complete", "async.save.cancel", "history.undo", "history.redo"},
+			EventBindings: []surface.AppModelEventBindingReport{
+				{Order: 1, EventOrder: 1, EventKind: "mouse_up", Target: "NameField", DispatchPath: []string{"AppModelApp", "NameField"}, Command: "focus.name", Explicit: true},
+				{Order: 2, EventOrder: 2, EventKind: "text_input", Target: "NameField", DispatchPath: []string{"AppModelApp", "NameField"}, Command: "text.insert", Explicit: true},
+				{Order: 3, EventOrder: 3, EventKind: "key_down", Target: "SaveButton", DispatchPath: []string{"AppModelApp", "SaveButton"}, Command: "async.save.start", Explicit: true},
+			},
+			CommandDispatches: []surface.AppModelCommandDispatchReport{
+				{Order: 1, EventOrder: 1, Command: "focus.name", Kind: "focus", Target: "NameField", Handled: true, BeforeState: map[string]string{"focused": ""}, AfterState: map[string]string{"focused": "NameField"}},
+				{Order: 2, EventOrder: 2, Command: "text.insert", Kind: "edit", Target: "NameField", Handled: true, BeforeState: map[string]string{"name_buffer": ""}, AfterState: map[string]string{"name_buffer": "Ada"}, Reversible: true, HistoryIndex: 1},
+				{Order: 3, EventOrder: 3, Command: "async.save.start", Kind: "async_start", Target: "SaveButton", Handled: true, BeforeState: map[string]string{"pending_task": "0"}, AfterState: map[string]string{"pending_task": "1"}, AsyncTaskID: "save-1"},
+				{Order: 4, Command: "async.save.complete", Kind: "async_complete", Target: "AppModelApp", Handled: true, BeforeState: map[string]string{"pending_task": "1", "save_count": "0"}, AfterState: map[string]string{"pending_task": "0", "save_count": "1"}, AsyncTaskID: "save-1"},
+			},
+			NavigationTransitions: []surface.AppModelNavigationReport{
+				{Order: 1, Command: "nav.push.settings", Operation: "push", BeforeRoute: "home", AfterRoute: "settings", StackBefore: []string{"home"}, StackAfter: []string{"home", "settings"}},
+				{Order: 2, Command: "nav.back", Operation: "back", BeforeRoute: "settings", AfterRoute: "home", StackBefore: []string{"home", "settings"}, StackAfter: []string{"home"}},
+				{Order: 3, Command: "nav.back", Operation: "back", BeforeRoute: "home", AfterRoute: "home", StackBefore: []string{"home"}, StackAfter: []string{"home"}, UnderflowRejected: true},
+			},
+			FocusScopeTransitions: []surface.AppModelFocusScopeReport{
+				{Order: 1, Scope: "main", BeforeFocus: "", AfterFocus: "NameField"},
+				{Order: 2, Scope: "dialog", BeforeFocus: "DialogCancel", AfterFocus: "DialogConfirm", Wrapped: true, ModalTrap: true},
+			},
+			AsyncTasks: []surface.AppModelAsyncTaskReport{
+				{ID: "save-1", Command: "async.save.start", Operation: "start", Status: "pending", BeforeState: map[string]string{"pending_task": "0"}, AfterState: map[string]string{"pending_task": "1"}},
+				{ID: "save-1", Command: "async.save.complete", Operation: "complete", Status: "completed", BeforeState: map[string]string{"pending_task": "1"}, AfterState: map[string]string{"pending_task": "0"}, CompletionOrder: 4},
+				{ID: "save-2", Command: "async.save.cancel", Operation: "cancel", Status: "canceled", BeforeState: map[string]string{"pending_task": "1", "save_count": "1"}, AfterState: map[string]string{"pending_task": "0", "save_count": "1"}, Canceled: true},
+			},
+			UndoRedoTransitions: []surface.AppModelUndoRedoReport{
+				{Order: 1, Command: "text.insert", HistoryIndex: 1, Operation: "record", Before: "", After: "Ada", MatchedHistoryEntry: true, Applied: true},
+				{Order: 2, Command: "history.undo", HistoryIndex: 1, Operation: "undo", Before: "Ada", After: "", MatchedHistoryEntry: true, Applied: true},
+				{Order: 3, Command: "history.redo", HistoryIndex: 1, Operation: "redo", Before: "", After: "Ada", MatchedHistoryEntry: true, Applied: true},
+			},
+			NegativeGuards: surface.AppModelNegativeGuardsReport{
+				NoHiddenAppState:              true,
+				NoReactHooks:                  true,
+				NoDOMEventModel:               true,
+				NoUserJS:                      true,
+				NoPlatformWidgets:             true,
+				AsyncCancelNoMutation:         true,
+				NavigationUnderflowRejected:   true,
+				FocusScopeEscapeRejected:      true,
+				UndoRedoRequiresHistory:       true,
+				CommandWithoutBindingRejected: true,
+			},
+		},
+		Cases: []surface.CaseReport{
+			{Name: "pure Tetra component app", Kind: "positive", Ran: true, Pass: true},
+			{Name: "headless event dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "headless framebuffer checksum", Kind: "positive", Ran: true, Pass: true},
+			{Name: "headless actual runner trace", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host-provided pointer event dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host event buffer poll_event", Kind: "positive", Ran: true, Pass: true},
+			{Name: "pre/post event frame sequence", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component hierarchy dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component text input scalar dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host text payload buffer", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component focus dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component accessibility metadata", Kind: "positive", Ran: true, Pass: true},
+			{Name: "no legacy UI sidecar artifacts", Kind: "positive", Ran: true, Pass: true},
+			{Name: "state transition", Kind: "positive", Ran: true, Pass: true},
+			{Name: "app model explicit event-to-command binding", Kind: "positive", Ran: true, Pass: true},
+			{Name: "app model deterministic command reducer", Kind: "positive", Ran: true, Pass: true},
+			{Name: "app model navigation stack", Kind: "positive", Ran: true, Pass: true},
+			{Name: "app model focus scope modal trap", Kind: "positive", Ran: true, Pass: true},
+			{Name: "app model async completion cancellation boundary", Kind: "positive", Ran: true, Pass: true},
+			{Name: "app model undo redo history", Kind: "positive", Ran: true, Pass: true},
+			{Name: "app model no React hooks DOM event model hidden JS state", Kind: "positive", Ran: true, Pass: true},
+			{Name: "reject legacy UI evidence", Kind: "negative", Ran: true, Pass: true, ExpectedError: "legacy UI evidence rejected"},
+		},
+	}
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatalf("marshal app-model report: %v", err)
+	}
+	return raw
+}
+
+func validLinuxAppShellReleaseRuntimeReportJSON(t *testing.T, artifactDir string, mutate func(map[string]any)) []byte {
+	t.Helper()
+	componentPath, componentSHA, componentSize := writeNamedSurfaceArtifactFixture(t, artifactDir, "surface-linux-app-shell-notes", []byte("surface linux app-shell notes fixture\n"), 0o755)
+	hostTracePath, hostTraceSHA, hostTraceSize := writeNamedSurfaceArtifactFixture(t, artifactDir, "surface-linux-app-shell-host-trace.json", []byte(`{"schema":"tetra.surface.linux-app-shell-host-trace.v1","source":"examples/surface_linux_app_shell_notes.tetra","lifecycle":["open","close","reopen"]}`+"\n"), 0o644)
+	windowTracePath, windowTraceSHA, windowTraceSize := writeNamedSurfaceArtifactFixture(t, artifactDir, "surface-linux-app-shell-window-trace.json", []byte(`{"schema":"tetra.surface.linux-app-shell-window-trace.v1","windows":["notes-main","notes-inspector"],"dpi_scale_milli":1250}`+"\n"), 0o644)
+	accessibilityProbePath, accessibilityProbeSHA, accessibilityProbeSize := writeNamedSurfaceArtifactFixture(t, artifactDir, "surface-linux-accessibility-probe.json", []byte(`{"schema":"tetra.surface.linux-accessibility-platform-probe.v1","platform_export":true}`+"\n"), 0o644)
+
+	report := map[string]any{
+		"schema":         "tetra.surface.runtime.v1",
+		"status":         "pass",
+		"target":         "linux-x64",
+		"host":           "linux-x64",
+		"runtime":        "surface-linux-x64",
+		"surface_schema": "tetra.surface.v1",
+		"host_abi":       "tetra.surface.host-abi.v1",
+		"host_evidence": map[string]any{
+			"level":                        "linux-x64-release-window-v1",
+			"backend":                      "wayland-shm-rgba-release-v1",
+			"framebuffer":                  true,
+			"real_window":                  true,
+			"native_input":                 true,
+			"text_input":                   true,
+			"clipboard":                    true,
+			"composition":                  true,
+			"accessibility_bridge":         true,
+			"user_facing_platform_widgets": false,
+		},
+		"source": "examples/surface_linux_app_shell_notes.tetra",
+		"processes": []any{
+			map[string]any{"name": "tetra build", "kind": "build", "path": "tetra build --target linux-x64 examples/surface_linux_app_shell_notes.tetra -o " + componentPath, "ran": true, "pass": true, "exit_code": 0},
+			map[string]any{"name": "surface component app", "kind": "app", "path": componentPath, "ran": true, "pass": true, "exit_code": 1, "expected_exit_code": 1},
+			map[string]any{"name": "surface linux-x64 real-window probe", "kind": "app", "path": filepath.Join(artifactDir, "surface-linux-app-shell-window-probe"), "ran": true, "pass": true, "exit_code": 42, "expected_exit_code": 42},
+			map[string]any{"name": "surface linux app-shell host trace", "kind": "runtime", "path": hostTracePath, "ran": true, "pass": true, "exit_code": 0},
+			map[string]any{"name": "surface linux app-shell window trace", "kind": "runtime", "path": windowTracePath, "ran": true, "pass": true, "exit_code": 0},
+			map[string]any{"name": "surface linux-x64 release clipboard harness", "kind": "runtime", "path": filepath.Join(artifactDir, "surface-linux-clipboard-harness.json"), "ran": true, "pass": true, "exit_code": 0},
+			map[string]any{"name": "surface linux-x64 release composition harness", "kind": "runtime", "path": filepath.Join(artifactDir, "surface-linux-composition-harness.json"), "ran": true, "pass": true, "exit_code": 0},
+			map[string]any{"name": "surface linux accessibility platform probe", "kind": "runtime", "path": accessibilityProbePath, "ran": true, "pass": true, "exit_code": 0},
+			map[string]any{"name": "surface linux-x64 runtime", "kind": "runtime", "path": "tools/cmd/surface-runtime-smoke --mode linux-x64-release-app-shell", "ran": true, "pass": true, "exit_code": 0},
+		},
+		"artifacts": []any{
+			map[string]any{"kind": "component-app", "path": componentPath, "sha256": componentSHA, "size": componentSize},
+			map[string]any{"kind": "linux-app-shell-host-trace", "path": hostTracePath, "sha256": hostTraceSHA, "size": hostTraceSize},
+			map[string]any{"kind": "linux-app-shell-window-trace", "path": windowTracePath, "sha256": windowTraceSHA, "size": windowTraceSize},
+			map[string]any{"kind": "linux-accessibility-platform-probe", "path": accessibilityProbePath, "sha256": accessibilityProbeSHA, "size": accessibilityProbeSize},
+		},
+		"artifact_scan": map[string]any{"root": artifactDir, "files_checked": 4, "forbidden_paths": []any{}, "pass": true},
+		"components": []any{
+			map[string]any{"id": "NotesShellApp", "type": "examples.surface_linux_app_shell_notes.NotesShellApp", "bounds": map[string]any{"x": 0, "y": 0, "w": 720, "h": 540}, "abilities": []any{"measure", "layout", "draw", "event", "focus", "text", "accessibility"}, "state": map[string]any{"open_windows": "2", "focused_window": "notes-main", "accessibility_role": "application"}},
+			map[string]any{"id": "NotesMainWindow", "type": "examples.surface_linux_app_shell_notes.NotesMainWindow", "parent": "NotesShellApp", "bounds": map[string]any{"x": 0, "y": 0, "w": 560, "h": 420}, "abilities": []any{"measure", "layout", "draw", "event", "focus", "text", "accessibility"}, "state": map[string]any{"title": "Notes", "lifecycle": "reopened", "dpi_scale_milli": "1250", "cursor": "text", "accessibility_role": "document"}},
+			map[string]any{"id": "NotesInspectorWindow", "type": "examples.surface_linux_app_shell_notes.NotesInspectorWindow", "parent": "NotesShellApp", "bounds": map[string]any{"x": 24, "y": 24, "w": 320, "h": 240}, "abilities": []any{"measure", "layout", "draw", "event", "focus", "text", "accessibility"}, "state": map[string]any{"title": "Inspector", "lifecycle": "open", "dpi_scale_milli": "1000", "cursor": "pointer", "accessibility_role": "panel"}},
+		},
+		"events": []any{
+			map[string]any{"order": 1, "kind": "mouse_up", "target_component": "NotesMainWindow", "dispatch_path": []any{"NotesShellApp", "NotesMainWindow"}, "handled": true, "pass": true, "x": 40, "y": 72, "key": 0, "width": 560, "height": 420, "timestamp_ms": 0, "buffer_slots": []any{5, 40, 72, 1, 0, 560, 420, 0, 0}, "before_state": map[string]any{"NotesShellApp.focused_window": ""}, "after_state": map[string]any{"NotesShellApp.focused_window": "notes-main"}},
+			map[string]any{"order": 2, "kind": "key_down", "target_component": "NotesMainWindow", "dispatch_path": []any{"NotesShellApp", "NotesMainWindow"}, "handled": true, "pass": true, "x": 0, "y": 0, "key": 78, "width": 560, "height": 420, "timestamp_ms": 2, "buffer_slots": []any{6, 0, 0, 1, 78, 560, 420, 2, 0}, "before_state": map[string]any{"NotesMainWindow.shortcut": ""}, "after_state": map[string]any{"NotesMainWindow.shortcut": "new-note"}},
+			map[string]any{"order": 3, "kind": "text_input", "target_component": "NotesMainWindow", "dispatch_path": []any{"NotesShellApp", "NotesMainWindow"}, "handled": true, "pass": true, "x": 0, "y": 0, "key": 0, "width": 560, "height": 420, "timestamp_ms": 3, "text_len": 5, "text_bytes_hex": "4e6f746573", "buffer_slots": []any{8, 0, 0, 0, 0, 560, 420, 3, 5}, "before_state": map[string]any{"NotesMainWindow.buffer": ""}, "after_state": map[string]any{"NotesMainWindow.buffer": "Notes"}},
+			map[string]any{"order": 4, "kind": "resize", "target_component": "NotesMainWindow", "dispatch_path": []any{"NotesShellApp", "NotesMainWindow"}, "handled": true, "pass": true, "width": 720, "height": 540, "timestamp_ms": 4, "buffer_slots": []any{7, 0, 0, 0, 0, 720, 540, 4, 0}, "before_state": map[string]any{"NotesMainWindow.size": "560x420", "NotesMainWindow.dpi": "1000"}, "after_state": map[string]any{"NotesMainWindow.size": "720x540", "NotesMainWindow.dpi": "1250"}},
+			map[string]any{"order": 5, "kind": "close", "target_component": "NotesInspectorWindow", "dispatch_path": []any{"NotesShellApp", "NotesInspectorWindow"}, "handled": true, "pass": true, "width": 320, "height": 240, "timestamp_ms": 5, "buffer_slots": []any{9, 0, 0, 0, 0, 320, 240, 5, 0}, "before_state": map[string]any{"NotesInspectorWindow.open": "true"}, "after_state": map[string]any{"NotesInspectorWindow.open": "false"}},
+		},
+		"frames": []any{
+			map[string]any{"order": 1, "width": 400, "height": 240, "stride": 1600, "checksum": "1111111111111111111111111111111111111111111111111111111111111111", "presented": true},
+			map[string]any{"order": 5, "width": 560, "height": 420, "stride": 2240, "checksum": "2222222222222222222222222222222222222222222222222222222222222222", "presented": true},
+			map[string]any{"order": 6, "width": 720, "height": 540, "stride": 2880, "checksum": "3333333333333333333333333333333333333333333333333333333333333333", "presented": true},
+		},
+		"state_transitions": []any{
+			map[string]any{"order": 1, "component": "NotesShellApp", "field": "focused_window", "before": "", "after": "notes-main", "cause": "lifecycle.open"},
+			map[string]any{"order": 2, "component": "NotesInspectorWindow", "field": "open", "before": "true", "after": "false", "cause": "lifecycle.close"},
+			map[string]any{"order": 3, "component": "NotesMainWindow", "field": "size", "before": "560x420", "after": "720x540", "cause": "resize"},
+		},
+		"cases": []any{
+			map[string]any{"name": "pure Tetra component app", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "host-provided pointer event dispatch", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "host event buffer poll_event", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "pre/post event frame sequence", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "component hierarchy dispatch", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "component text input scalar dispatch", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "host text payload buffer", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "component focus dispatch", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "component accessibility metadata", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "no legacy UI sidecar artifacts", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "state transition", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "reject legacy UI evidence", "kind": "negative", "ran": true, "pass": true, "expected_error": "legacy UI evidence rejected"},
+			map[string]any{"name": "linux-x64 real-window surface", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "linux-x64 native input event pump", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "linux-x64 real-window resize event", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "linux-x64 real-window close event", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "linux release real window presented frame", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "linux release accessibility bridge probe", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "linux app-shell v1 schema", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "linux app-shell lifecycle open close reopen", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "linux app-shell multi-window notes reference", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "linux app-shell resize dpi cursor trace", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "linux app-shell clipboard ime accessibility adapters", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "linux app-shell file dialog notification blocked-pass", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "linux app-shell electron feature ledger", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "linux app-shell dialog file picker tray blocked-pass", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "linux app-shell crash error report scoped adapters", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "surface security permission model default deny filesystem network", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "surface security app-shell feature policy enforcement", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "surface security IPC process boundary schema validation", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "surface security asset font image local hash policy", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "surface security network asset fetch rejected", "kind": "negative", "ran": true, "pass": true, "expected_error": "network asset fetch rejected"},
+			map[string]any{"name": "surface security notification dialog permission nonclaims", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "surface performance budget startup first frame", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "surface performance budget frame p50 p95", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "surface performance budget memory cache framebuffer rss", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "surface performance budget binary size", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "surface performance budget cpu power proxy", "kind": "positive", "ran": true, "pass": true},
+			map[string]any{"name": "surface performance budget faster than electron nonclaim", "kind": "negative", "ran": true, "pass": true, "expected_error": "unsupported faster than electron claim rejected"},
+			map[string]any{"name": "linux app-shell rejects GTK Qt native widget UI", "kind": "negative", "ran": true, "pass": true, "expected_error": "native widget UI rejected"},
+			map[string]any{"name": "linux app-shell no Electron React DOM application scripting", "kind": "negative", "ran": true, "pass": true, "expected_error": "runtime substitute rejected"},
+		},
+		"linux_app_shell":      linuxAppShellEvidenceMap(hostTracePath, windowTracePath, accessibilityProbePath),
+		"security_permissions": linuxAppShellSecurityPermissionsMap(p16LinuxAppShellRuntimeFeaturesForTest()),
+		"surface_performance_budget": linuxAppShellPerformanceBudgetMap(
+			"linux-x64",
+			"surface-linux-x64",
+			"examples/surface_linux_app_shell_notes.tetra",
+			componentPath,
+			componentSize,
+		),
+	}
+	if mutate != nil {
+		mutate(report)
+	}
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatalf("marshal linux app-shell report: %v", err)
+	}
+	return raw
+}
+
+func linuxAppShellEvidenceMap(hostTracePath string, windowTracePath string, accessibilityProbePath string) map[string]any {
+	return map[string]any{
+		"schema":           "tetra.surface.linux-app-shell.v1",
+		"app_shell_level":  "linux-app-shell-subset-v1",
+		"release_scope":    "surface-v1-linux-web",
+		"source":           "examples/surface_linux_app_shell_notes.tetra",
+		"module":           "lib.core.surface_app_shell",
+		"host_adapter":     "wayland-shm-rgba-release-v1",
+		"production_claim": true,
+		"experimental":     false,
+		"window_lifecycle": []any{
+			map[string]any{"order": 1, "window_id": "notes-main", "operation": "open", "host_trace": true, "pass": true},
+			map[string]any{"order": 2, "window_id": "notes-inspector", "operation": "open", "host_trace": true, "pass": true},
+			map[string]any{"order": 3, "window_id": "notes-inspector", "operation": "close", "host_trace": true, "pass": true},
+			map[string]any{"order": 4, "window_id": "notes-inspector", "operation": "reopen", "host_trace": true, "pass": true},
+		},
+		"windows": []any{
+			map[string]any{"id": "notes-main", "title": "Notes", "role": "primary", "block_root": "NotesMainWindow", "real_window": true, "presented": true, "width": 720, "height": 540, "dpi_scale_milli": 1250},
+			map[string]any{"id": "notes-inspector", "title": "Inspector", "role": "secondary", "block_root": "NotesInspectorWindow", "real_window": true, "presented": true, "width": 320, "height": 240, "dpi_scale_milli": 1000},
+		},
+		"resize_dpi": []any{
+			map[string]any{"window_id": "notes-main", "operation": "resize", "before_width": 560, "before_height": 420, "after_width": 720, "after_height": 540, "dpi_scale_milli": 1250, "host_trace": true, "pass": true},
+			map[string]any{"window_id": "notes-main", "operation": "dpi_scale", "before_width": 720, "before_height": 540, "after_width": 720, "after_height": 540, "dpi_scale_milli": 1250, "host_trace": true, "pass": true},
+		},
+		"cursor_transitions": []any{
+			map[string]any{"window_id": "notes-main", "cursor": "pointer", "target": "NotesMainWindow", "host_trace": true, "pass": true},
+			map[string]any{"window_id": "notes-main", "cursor": "text", "target": "NotesMainWindow", "host_trace": true, "pass": true},
+			map[string]any{"window_id": "notes-main", "cursor": "resize", "target": "NotesMainWindow", "host_trace": true, "pass": true},
+		},
+		"clipboard":      map[string]any{"level": "clipboard-text-v1", "host_trace": true, "artifact_kind": "linux-app-shell-host-trace", "read": true, "write": true, "pass": true},
+		"ime":            map[string]any{"level": "composition-baseline-v1", "host_trace": true, "artifact_kind": "linux-app-shell-host-trace", "start": true, "update": true, "commit": true, "cancel": true, "pass": true},
+		"accessibility":  map[string]any{"level": "platform-bridge-v1", "host_trace": true, "artifact_kind": "linux-accessibility-platform-probe", "metadata_tree": true, "platform_export": true, "pass": true},
+		"shell_features": p16LinuxAppShellRuntimeFeaturesForTest(),
+		"host_traces": []any{
+			map[string]any{"name": "lifecycle", "artifact_kind": "linux-app-shell-host-trace", "path": hostTracePath, "pass": true},
+			map[string]any{"name": "windows", "artifact_kind": "linux-app-shell-window-trace", "path": windowTracePath, "pass": true},
+			map[string]any{"name": "accessibility", "artifact_kind": "linux-accessibility-platform-probe", "path": accessibilityProbePath, "pass": true},
+		},
+		"negative_guards": map[string]any{
+			"no_gtk":              true,
+			"no_qt":               true,
+			"no_native_widgets":   true,
+			"no_electron_runtime": true,
+			"no_react_runtime":    true,
+			"no_dom_ui":           true,
+			"no_user_js":          true,
+			"no_platform_widgets": true,
+		},
+	}
+}
+
+func p16LinuxAppShellRuntimeFeaturesForTest() []any {
+	return []any{
+		map[string]any{"name": "app_menu", "status": "scoped_adapter", "claimed": true, "host_trace": true, "blocked_reason": "", "no_native_widget_ui": true, "pass": true},
+		map[string]any{"name": "window_lifecycle", "status": "target_evidenced", "claimed": true, "host_trace": true, "blocked_reason": "", "no_native_widget_ui": true, "pass": true},
+		map[string]any{"name": "multi_window", "status": "target_evidenced", "claimed": true, "host_trace": true, "blocked_reason": "", "no_native_widget_ui": true, "pass": true},
+		map[string]any{"name": "clipboard", "status": "target_evidenced", "claimed": true, "host_trace": true, "blocked_reason": "", "no_native_widget_ui": true, "pass": true},
+		map[string]any{"name": "ime", "status": "target_evidenced", "claimed": true, "host_trace": true, "blocked_reason": "", "no_native_widget_ui": true, "pass": true},
+		map[string]any{"name": "accessibility_bridge", "status": "target_evidenced", "claimed": true, "host_trace": true, "blocked_reason": "", "no_native_widget_ui": true, "pass": true},
+		map[string]any{"name": "crash_recovery", "status": "scoped_adapter", "claimed": true, "host_trace": true, "blocked_reason": "", "no_native_widget_ui": true, "pass": true},
+		map[string]any{"name": "error_report", "status": "scoped_adapter", "claimed": true, "host_trace": true, "blocked_reason": "", "no_native_widget_ui": true, "pass": true},
+		map[string]any{"name": "dialog", "status": "blocked_pass", "claimed": false, "host_trace": true, "blocked_reason": "target host dialog unavailable in CI", "no_native_widget_ui": true, "pass": true},
+		map[string]any{"name": "file_dialog", "status": "blocked_pass", "claimed": false, "host_trace": true, "blocked_reason": "target host file dialog unavailable in CI", "no_native_widget_ui": true, "pass": true},
+		map[string]any{"name": "file_picker", "status": "blocked_pass", "claimed": false, "host_trace": true, "blocked_reason": "target host file picker unavailable in CI", "no_native_widget_ui": true, "pass": true},
+		map[string]any{"name": "notification", "status": "blocked_pass", "claimed": false, "host_trace": true, "blocked_reason": "target host notification unavailable in CI", "no_native_widget_ui": true, "pass": true},
+		map[string]any{"name": "tray", "status": "blocked_pass", "claimed": false, "host_trace": true, "blocked_reason": "target host tray unavailable in CI", "no_native_widget_ui": true, "pass": true},
+		map[string]any{"name": "deep_link", "status": "blocked_pass", "claimed": false, "host_trace": true, "blocked_reason": "target host deep link unavailable in CI", "no_native_widget_ui": true, "pass": true},
+	}
+}
+
+func linuxAppShellSecurityPermissionsMap(features []any) map[string]any {
+	capabilities := make([]any, 0, len(features))
+	for _, feature := range features {
+		row := feature.(map[string]any)
+		name := row["name"].(string)
+		status, allowed := securityCapabilityStatusForRuntimeTest(row["status"].(string))
+		blockedReason, _ := row["blocked_reason"].(string)
+		capabilities = append(capabilities, map[string]any{
+			"name":               name,
+			"source_feature":     name,
+			"status":             status,
+			"allowed":            allowed,
+			"capability_checked": true,
+			"host_trace":         true,
+			"policy":             "surface-app-shell-capability-policy-v1",
+			"evidence":           "linux-app-shell-host-trace",
+			"blocked_reason":     blockedReason,
+			"pass":               true,
+		})
+	}
+	return map[string]any{
+		"schema":                        "tetra.surface.security-permission.v1",
+		"model":                         "surface-security-permission-v1",
+		"release_scope":                 "surface-v1-linux-web",
+		"source":                        "examples/surface_linux_app_shell_notes.tetra",
+		"app_shell_features":            "electron-feature-ledger-v1",
+		"production_claim":              true,
+		"experimental":                  false,
+		"default_deny":                  true,
+		"shell_feature_policy_enforced": true,
+		"capabilities":                  capabilities,
+		"permissions": []any{
+			map[string]any{"name": "filesystem", "status": "denied", "allowed": false, "capability_checked": true, "blocked_reason": "ambient filesystem denied in default template", "evidence": "default-deny-policy", "pass": true},
+			map[string]any{"name": "network", "status": "denied", "allowed": false, "capability_checked": true, "blocked_reason": "ambient network denied in default template", "evidence": "default-deny-policy", "pass": true},
+			map[string]any{"name": "clipboard", "status": "allowed_with_policy", "allowed": true, "capability_checked": true, "blocked_reason": "", "evidence": "linux-app-shell-host-trace", "pass": true},
+			map[string]any{"name": "notifications", "status": "denied", "allowed": false, "capability_checked": true, "blocked_reason": "notification target evidence absent", "evidence": "blocked-pass-nonclaim", "pass": true},
+			map[string]any{"name": "dialogs", "status": "denied", "allowed": false, "capability_checked": true, "blocked_reason": "dialog target evidence absent", "evidence": "blocked-pass-nonclaim", "pass": true},
+			map[string]any{"name": "shell_open_url", "status": "denied", "allowed": false, "capability_checked": true, "blocked_reason": "shell open-url denied in default template", "evidence": "default-deny-policy", "pass": true},
+		},
+		"process_boundaries": []any{
+			map[string]any{"name": "surface_app_to_host_abi", "schema_checked": true, "capability_checked": true, "user_js": false, "node_integration": false, "electron_runtime": false, "pass": true},
+			map[string]any{"name": "linux_app_shell_host_adapter", "schema_checked": true, "capability_checked": true, "user_js": false, "node_integration": false, "electron_runtime": false, "pass": true},
+			map[string]any{"name": "browser_canvas_host", "schema_checked": true, "capability_checked": true, "user_js": false, "node_integration": false, "electron_runtime": false, "pass": true},
+		},
+		"asset_safety": []any{
+			map[string]any{"kind": "font", "local_only": true, "sha256_required": true, "size_limit_bytes": 1048576, "network_fetch_allowed": false, "parser": "bounded-font-metadata-v1", "bounds_checked": true, "pass": true},
+			map[string]any{"kind": "image", "local_only": true, "sha256_required": true, "size_limit_bytes": 2097152, "network_fetch_allowed": false, "parser": "bounded-image-header-v1", "bounds_checked": true, "pass": true},
+			map[string]any{"kind": "icon", "local_only": true, "sha256_required": true, "size_limit_bytes": 262144, "network_fetch_allowed": false, "parser": "bounded-icon-header-v1", "bounds_checked": true, "pass": true},
+		},
+		"unsupported_claims": []any{"unrestricted-filesystem", "unrestricted-network", "native-permission-prompts", "production-notifications", "production-dialogs", "remote-asset-fetch", "electron-node-integration"},
+		"negative_guards": map[string]any{
+			"no_ambient_filesystem":                          true,
+			"no_ambient_network":                             true,
+			"no_shell_feature_bypass":                        true,
+			"no_permissionless_clipboard":                    true,
+			"no_notification_dialog_without_target_evidence": true,
+			"no_network_asset_fetch":                         true,
+			"no_untrusted_font_image_decode":                 true,
+			"no_electron_node_integration":                   true,
+			"no_user_js_app_logic":                           true,
+			"no_dom_app_ui_tree":                             true,
+		},
+	}
+}
+
+func linuxAppShellPerformanceBudgetMap(target string, runtimeName string, source string, artifactPath string, artifactSize int64) map[string]any {
+	return map[string]any{
+		"schema":             "tetra.surface.performance-budget.v1",
+		"model":              "surface-performance-budget-v1",
+		"release_scope":      "surface-v1-linux-web",
+		"source":             source,
+		"target":             target,
+		"runtime":            runtimeName,
+		"production_claim":   true,
+		"experimental":       false,
+		"git_head":           "0123456789abcdef0123456789abcdef01234567",
+		"performance_claim":  "none",
+		"startup":            map[string]any{"launch_to_first_frame_ms": 18, "budget_ms": 250, "trace": "local-startup-trace-v1", "pass": true},
+		"frame":              map[string]any{"frame_count": 3, "p50_build_ms": 4, "p95_build_ms": 7, "p50_present_ms": 3, "p95_present_ms": 6, "budget_ms": 16, "idle_loop_count": 24, "work_loop_count": 6, "pass": true},
+		"scene":              map[string]any{"block_count": 3, "recipe_expansion_count": 0, "paint_command_count": 10, "layout_pass_count": 4, "text_run_count": 2},
+		"memory":             map[string]any{"glyph_cache_bytes": 4096, "asset_cache_bytes": 5376, "layout_cache_bytes": 4096, "paint_cache_bytes": 10240, "framebuffer_peak_bytes": 1555200, "framebuffer_total_bytes": 2880000, "rss_measured": false, "peak_rss_bytes": 0, "allocation_count": 42, "allocation_bytes": 2903808, "bounded_caches": true, "unbounded_cache_rejected": true, "pass": true},
+		"binary":             map[string]any{"artifact_path": artifactPath, "size_bytes": artifactSize, "budget_bytes": 16777216, "pass": true},
+		"cpu_power_proxy":    map[string]any{"idle_loop_count": 24, "work_loop_count": 6, "idle_frame_count": 2, "work_frame_count": 1, "real_power_measured": false, "pass": true},
+		"cache":              map[string]any{"glyph_cache_budget_bytes": 65536, "asset_cache_budget_bytes": 65536, "layout_cache_budget_bytes": 65536, "paint_cache_budget_bytes": 65536, "total_cache_bytes": 23808, "total_cache_budget_bytes": 262144, "eviction": "bounded-lru", "pass": true},
+		"methodology":        map[string]any{"kind": "local-deterministic-budget-v1", "electron_comparison": "none", "official_benchmark": false, "cross_machine": false, "fair_comparison_required_for_electron_claim": true},
+		"unsupported_claims": []any{"faster-than-electron", "lower-power-than-electron", "official-benchmark-result", "cross-machine-benchmark", "electron-parity-performance"},
+		"negative_guards":    map[string]any{"bounded_caches": true, "unbounded_cache_rejected": true, "stale_report_rejected": true, "no_faster_than_electron_claim": true, "no_benchmark_parity_claim": true, "peak_memory_field_required": true, "no_official_benchmark_claim": true},
+	}
+}
+
+func securityCapabilityStatusForRuntimeTest(featureStatus string) (string, bool) {
+	switch featureStatus {
+	case "target_evidenced", "scoped_adapter":
+		return "allowed_with_policy", true
+	case "blocked_pass":
+		return "blocked_nonclaim", false
+	default:
+		return "unknown", false
+	}
+}
+
+func withoutLinuxAppShellRuntimeFeature(features []any, name string) []any {
+	filtered := make([]any, 0, len(features))
+	for _, feature := range features {
+		row := feature.(map[string]any)
+		if row["name"] == name {
+			continue
+		}
+		filtered = append(filtered, feature)
+	}
+	return filtered
 }
 
 func headlessReleaseRuntimeReportJSON(artifactPath string, artifactSHA string, artifactSize int64, tracePath string, traceSHA string, traceSize int64) []byte {
@@ -1261,10 +2012,25 @@ func validSurfaceRuntimeReleaseSummaryJSON() []byte {
   "clipboard": "clipboard-text-v1",
   "ime": "composition-baseline-v1",
   "accessibility": "platform-bridge-v1",
-  "browser_surface": "browser-canvas-release-v1",
+	  "app_model": "explicit-command-reducer-v1",
+	  "linux_app_shell": "linux-app-shell-subset-v1",
+	  "app_shell_features": "electron-feature-ledger-v1",
+	  "security_permissions": "surface-security-permission-v1",
+	  "performance_budget": "surface-performance-budget-v1",
+	  "developer_fast_loop": "surface-dev-workflow-v1",
+	  "inspector": "surface-inspector-v1",
+	  "project_templates": "surface-template-smoke-v1",
+	  "reference_apps": "surface-reference-app-suite-v1",
+	  "surface_package": "surface-package-v1",
+	  "crash_reporting": "surface-crash-report-v1",
+	  "i18n_localization": "surface-i18n-v1",
+	  "widget_migration": "surface-widget-migration-v1",
+	  "browser_surface": "browser-canvas-release-v1",
   "linux_surface": "linux-x64-release-window-v1",
   "block_system": "block-system",
   "block_system_gate": "tetra.surface.block-system.gate.v1",
+  "morph": "morph-capsule",
+  "morph_gate": "tetra.surface.morph.gate.v1",
   "artifact_hashes_validated": true,
   "legacy_sidecars": false,
   "dom_ui": false,

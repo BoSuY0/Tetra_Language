@@ -91,7 +91,7 @@ go run ./tools/cmd/validate-heap-blockers --report "$report_dir/heap-blockers.js
 go run ./tools/cmd/validate-copy-blockers --report "$report_dir/copy-blockers.json"
 
 go run ./tools/cmd/ram-contract-fuzz-short --report-dir "$report_dir/fuzz" --git-head "$git_head"
-go run ./tools/cmd/validate-ram-contract-fuzz-oracle --report "$report_dir/fuzz/ram-contract-fuzz-oracle.json"
+go run ./tools/cmd/validate-ram-contract-fuzz-oracle --report "$report_dir/fuzz/ram-contract-fuzz-oracle.json" --current-git-head "$git_head"
 
 cat > "$manifest_path" <<MANIFEST
 {
@@ -111,7 +111,7 @@ cat > "$manifest_path" <<MANIFEST
     {"name": "validate-heap-blockers", "command": "go run ./tools/cmd/validate-heap-blockers --report $(json_escape "$report_dir")/heap-blockers.json"},
     {"name": "validate-copy-blockers", "command": "go run ./tools/cmd/validate-copy-blockers --report $(json_escape "$report_dir")/copy-blockers.json"},
     {"name": "ram-contract-fuzz-short", "command": "go run ./tools/cmd/ram-contract-fuzz-short --report-dir $(json_escape "$report_dir")/fuzz --git-head $git_head"},
-    {"name": "validate-ram-contract-fuzz-oracle", "command": "go run ./tools/cmd/validate-ram-contract-fuzz-oracle --report $(json_escape "$report_dir")/fuzz/ram-contract-fuzz-oracle.json"},
+    {"name": "validate-ram-contract-fuzz-oracle", "command": "go run ./tools/cmd/validate-ram-contract-fuzz-oracle --report $(json_escape "$report_dir")/fuzz/ram-contract-fuzz-oracle.json --current-git-head $git_head"},
     {"name": "artifact-hashes-write", "command": "go run ./tools/cmd/validate-artifact-hashes --write --root $(json_escape "$report_dir") --out $(json_escape "$report_dir")/artifact-hashes.json"},
     {"name": "artifact-hashes-validate", "command": "go run ./tools/cmd/validate-artifact-hashes --manifest $(json_escape "$report_dir")/artifact-hashes.json"},
     {"name": "ram-contract-release-validator", "command": "go run ./tools/cmd/validate-ram-contract-release --report-dir $(json_escape "$report_dir") --current-git-head $git_head"}

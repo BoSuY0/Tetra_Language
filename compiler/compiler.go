@@ -468,6 +468,8 @@ func planNativeModuleBuild(world *World, checked *semantics.CheckedProgram, targ
 		for name := range typeSet {
 			typeDeps = append(typeDeps, name)
 		}
+		callees = append(callees, moduleLocalFunctionSigDeps(module, sigMap)...)
+		typeDeps = append(typeDeps, moduleLocalTypeSigDeps(module, typeSigMap)...)
 		depHash, err := cache.DepSigHashFromDepsWithInterfaceHashes(callees, typeDeps, sigMap, typeSigMap, world.InterfaceHashes)
 		if err != nil {
 			return moduleBuildPlan{}, nil, err
@@ -494,12 +496,35 @@ func planNativeModuleBuild(world *World, checked *semantics.CheckedProgram, targ
 	}, stats, nil
 }
 
+func moduleLocalFunctionSigDeps(module string, sigMap map[string]semantics.FuncSig) []string {
+	names := make([]string, 0)
+	for name := range sigMap {
+		if cache.ModuleOf(name) == module {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	return names
+}
+
+func moduleLocalTypeSigDeps(module string, typeSigMap map[string]string) []string {
+	names := make([]string, 0)
+	for name := range typeSigMap {
+		if cache.ModuleOf(name) == module {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	return names
+}
+
 func compileNativeModulePlan(world *World, checked *semantics.CheckedProgram, native nativeBuildTarget, opt BuildOptions, plan moduleBuildPlan, stats *BuildStats) error {
 	if len(plan.toCompile) == 0 {
 		sortBuildStats(stats)
 		return nil
 	}
 	var allocationPlan *allocplan.Plan
+	var allocationSummaryProgram *ir.IRProgram
 	if targetSupportsStackAllocationLowering(native.triple) {
 		plirProg, err := plir.FromCheckedProgram(checked)
 		if err != nil {
@@ -509,6 +534,10 @@ func compileNativeModulePlan(world *World, checked *semantics.CheckedProgram, na
 			return err
 		}
 		allocationPlan, err = allocplan.FromPLIRWithOptions(plirProg, allocationPlanOptionsForTarget(native.triple))
+		if err != nil {
+			return err
+		}
+		allocationSummaryProgram, err = lower.LowerWithOptions(checked, lowerOptionsForTarget(native.triple))
 		if err != nil {
 			return err
 		}
@@ -563,7 +592,7 @@ func compileNativeModulePlan(world *World, checked *semantics.CheckedProgram, na
 				continue
 			}
 			if allocationPlan != nil {
-				if err := validation.ValidateAllocationLowering(allocationPlanForIRFuncs(allocationPlan, funcs), &ir.IRProgram{Funcs: funcs}); err != nil {
+				if err := validation.ValidateAllocationLoweringWithSummaryProgram(allocationPlanForIRFuncs(allocationPlan, funcs), &ir.IRProgram{Funcs: funcs}, allocationSummaryProgram); err != nil {
 					setErr(err)
 					continue
 				}

@@ -67,11 +67,22 @@ type schemaEnvelope struct {
 var requiredManifestArtifacts = []requiredIntegratedArtifact{
 	{Path: "memory/memory-production-linux-x64.json", Kind: "memory_production_report", Schema: "tetra.memory.production.v1"},
 	{Path: "memory/memory-release-manifest.json", Kind: "memory_release_manifest", Schema: "tetra.memory.release-manifest.v1"},
+	{Path: "memory/artifact-hashes.json", Kind: "memory_hash_manifest", Schema: "tetra.release-artifact-hashes.v1alpha1"},
 	{Path: "memory/island-proof-verifier.json", Kind: "island_proof_verifier_report", Schema: "tetra.island.proof.v1"},
 	{Path: "memory/island-proof-memory-report.json", Kind: "island_proof_memory_report", Schema: "tetra.memory-report.v1"},
 	{Path: "memory/memory-fuzz-tier1/island-proof-fuzz-summary.json", Kind: "island_proof_fuzz_summary", Schema: "tetra.island-proof-fuzz-summary.v1"},
+	{Path: "memory/ram-contract/ram-contract-release-manifest.json", Kind: "ram_contract_release_manifest", Schema: "tetra.ram-contract.release-manifest.v1"},
+	{Path: "memory/ram-contract/ram-contract-report.json", Kind: "ram_contract_report", Schema: "tetra.ram-contract-report.v1"},
+	{Path: "memory/ram-contract/memory-grade-report.json", Kind: "ram_memory_grade_report", Schema: "tetra.memory-grade-report.v1"},
+	{Path: "memory/ram-contract/proof-store-summary.json", Kind: "ram_proof_store_summary", Schema: "tetra.proof-store-summary.v1"},
+	{Path: "memory/ram-contract/validation-pipeline-coverage.json", Kind: "ram_validation_pipeline_coverage", Schema: "tetra.validation-pipeline-coverage.v1"},
+	{Path: "memory/ram-contract/heap-blockers.json", Kind: "ram_heap_blockers", Schema: "tetra.ram-blockers.v1"},
+	{Path: "memory/ram-contract/copy-blockers.json", Kind: "ram_copy_blockers", Schema: "tetra.ram-blockers.v1"},
+	{Path: "memory/ram-contract/fuzz/ram-contract-fuzz-oracle.json", Kind: "ram_contract_fuzz_oracle", Schema: "tetra.ram-contract-fuzz-oracle.v1"},
+	{Path: "memory/ram-contract/artifact-hashes.json", Kind: "ram_contract_hash_manifest", Schema: "tetra.release-artifact-hashes.v1alpha1"},
 	{Path: "islands-debug-smoke.json", Kind: "islands_debug_smoke_report", Schema: "tetra.release.v0_2_0.smoke-report.v1"},
 	{Path: "surface-release-v1/surface-release-summary.json", Kind: "surface_release_summary", Schema: "tetra.surface.release.v1"},
+	{Path: "surface-release-v1/artifact-hashes.json", Kind: "surface_release_hash_manifest", Schema: "tetra.release-artifact-hashes.v1alpha1"},
 	{Path: "surface-experimental-regression/artifact-hashes.json", Kind: "surface_experimental_hash_manifest", Schema: "tetra.release-artifact-hashes.v1alpha1"},
 	{Path: "safe-view-lifetime/safe-view-lifetime-summary.json", Kind: "safe_view_lifetime_summary", Schema: "tetra.safe-view-lifetime.gate.v1"},
 	{Path: "surface-api-stability-v1/surface-api-stability-summary.json", Kind: "surface_api_stability_summary", Schema: "tetra.surface.api-stability.v1"},
@@ -86,6 +97,15 @@ var requiredHashArtifacts = []string{
 	"memory/island-proof-verifier.json",
 	"memory/island-proof-memory-report.json",
 	"memory/memory-fuzz-tier1/island-proof-fuzz-summary.json",
+	"memory/ram-contract/artifact-hashes.json",
+	"memory/ram-contract/copy-blockers.json",
+	"memory/ram-contract/fuzz/ram-contract-fuzz-oracle.json",
+	"memory/ram-contract/heap-blockers.json",
+	"memory/ram-contract/memory-grade-report.json",
+	"memory/ram-contract/proof-store-summary.json",
+	"memory/ram-contract/ram-contract-release-manifest.json",
+	"memory/ram-contract/ram-contract-report.json",
+	"memory/ram-contract/validation-pipeline-coverage.json",
 	"islands-debug-smoke.json",
 	"surface-release-v1/surface-release-summary.json",
 	"surface-release-v1/artifact-hashes.json",
@@ -339,12 +359,65 @@ func validateRequiredEvidence(reportDir string, gitHead string) []string {
 	}
 
 	issues = append(issues, validateIslandsDebugSmoke(filepath.Join(reportDir, "islands-debug-smoke.json"), gitHead)...)
+	issues = append(issues, validateRAMContractEvidence(filepath.Join(reportDir, "memory", "ram-contract"), gitHead)...)
 	issues = append(issues, validateSurfaceReleaseSummary(filepath.Join(reportDir, "surface-release-v1", "surface-release-summary.json"), gitHead)...)
 	issues = append(issues, validateHashManifestEnvelope(filepath.Join(reportDir, "memory", "artifact-hashes.json"), "memory hash manifest")...)
 	issues = append(issues, validateHashManifestEnvelope(filepath.Join(reportDir, "surface-release-v1", "artifact-hashes.json"), "surface release hash manifest")...)
 	issues = append(issues, validateHashManifestEnvelope(filepath.Join(reportDir, "surface-experimental-regression", "artifact-hashes.json"), "surface experimental hash manifest")...)
 	issues = append(issues, validateSafeViewSummary(filepath.Join(reportDir, "safe-view-lifetime", "safe-view-lifetime-summary.json"))...)
 	issues = append(issues, validateSurfaceAPISummary(filepath.Join(reportDir, "surface-api-stability-v1", "surface-api-stability-summary.json"))...)
+	return issues
+}
+
+func validateRAMContractEvidence(ramDir string, gitHead string) []string {
+	type requiredRAMArtifact struct {
+		Rel    string
+		Label  string
+		Schema string
+	}
+	required := []requiredRAMArtifact{
+		{Rel: "ram-contract-release-manifest.json", Label: "RAM contract release manifest", Schema: "tetra.ram-contract.release-manifest.v1"},
+		{Rel: "ram-contract-report.json", Label: "RAM contract report", Schema: "tetra.ram-contract-report.v1"},
+		{Rel: "memory-grade-report.json", Label: "RAM memory grade report", Schema: "tetra.memory-grade-report.v1"},
+		{Rel: "proof-store-summary.json", Label: "RAM proof store summary", Schema: "tetra.proof-store-summary.v1"},
+		{Rel: "validation-pipeline-coverage.json", Label: "RAM validation pipeline coverage", Schema: "tetra.validation-pipeline-coverage.v1"},
+		{Rel: "heap-blockers.json", Label: "RAM heap blockers", Schema: "tetra.ram-blockers.v1"},
+		{Rel: "copy-blockers.json", Label: "RAM copy blockers", Schema: "tetra.ram-blockers.v1"},
+		{Rel: "fuzz/ram-contract-fuzz-oracle.json", Label: "RAM contract fuzz oracle", Schema: "tetra.ram-contract-fuzz-oracle.v1"},
+		{Rel: "artifact-hashes.json", Label: "RAM contract hash manifest", Schema: integratedHashSchema},
+	}
+	var issues []string
+	for _, req := range required {
+		path := filepath.Join(ramDir, filepath.FromSlash(req.Rel))
+		var envelope schemaEnvelope
+		if err := readJSON(path, &envelope); err != nil {
+			issues = append(issues, fmt.Sprintf("%s missing or invalid: %v", req.Label, err))
+			continue
+		}
+		if schemaOf(envelope) != req.Schema {
+			issues = append(issues, fmt.Sprintf("%s schema is %q, want %s", req.Label, schemaOf(envelope), req.Schema))
+		}
+	}
+
+	var releaseManifest struct {
+		GitHead string `json:"git_head"`
+		Status  string `json:"status"`
+	}
+	if err := readJSON(filepath.Join(ramDir, "ram-contract-release-manifest.json"), &releaseManifest); err == nil {
+		if releaseManifest.Status != "pass" {
+			issues = append(issues, fmt.Sprintf("RAM contract release manifest status is %q, want pass", releaseManifest.Status))
+		}
+		if releaseManifest.GitHead != gitHead {
+			issues = append(issues, fmt.Sprintf("RAM contract release manifest git_head %s does not match integrated git_head %s", releaseManifest.GitHead, gitHead))
+		}
+	}
+
+	var ramReport struct {
+		GitHead string `json:"git_head"`
+	}
+	if err := readJSON(filepath.Join(ramDir, "ram-contract-report.json"), &ramReport); err == nil && ramReport.GitHead != gitHead {
+		issues = append(issues, fmt.Sprintf("RAM contract report git_head %s does not match integrated git_head %s", ramReport.GitHead, gitHead))
+	}
 	return issues
 }
 

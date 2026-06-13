@@ -182,6 +182,33 @@ func TestValidateMemoryProductionReleaseManifestAcceptsFreshProvenance(t *testin
 	}
 }
 
+func TestValidateMemoryProductionReleaseManifestRejectsMissingRAMContractArtifacts(t *testing.T) {
+	reportDir, reportPath, manifestPath := writeMemoryProductionReleaseFixture(t, func(manifest *memoryReleaseTestManifest) {
+		manifest.Commands = removeMemoryReleaseTestCommand(manifest.Commands, "ram-contract-gate")
+		for _, kind := range []string{
+			"ram_contract_release_manifest",
+			"ram_contract_report",
+			"ram_memory_grade_report",
+			"ram_proof_store_summary",
+			"ram_validation_pipeline_coverage",
+			"ram_heap_blockers",
+			"ram_copy_blockers",
+			"ram_contract_fuzz_oracle",
+			"ram_contract_hash_manifest",
+		} {
+			manifest.Artifacts = removeMemoryReleaseTestArtifact(manifest.Artifacts, kind)
+		}
+	})
+	err := validateMemoryProductionReleaseManifest(reportPath, manifestPath, reportDir, "")
+	if err == nil {
+		t.Fatalf("expected missing RAM contract release evidence to fail")
+	}
+	got := err.Error()
+	if !strings.Contains(got, "ram-contract-gate") && !strings.Contains(got, "ram_contract_report") {
+		t.Fatalf("error = %v, want RAM contract release evidence rejection", err)
+	}
+}
+
 func TestValidateMemoryProductionReleaseManifestRejectsMismatchedCurrentGitHead(t *testing.T) {
 	reportDir, reportPath, manifestPath := writeMemoryProductionReleaseFixture(t, nil)
 	currentHead := "abcdefabcdefabcdefabcdefabcdefabcdefabcd"
@@ -502,6 +529,7 @@ func writeMemoryProductionReleaseFixture(t *testing.T, mutate func(*memoryReleas
 	if err := os.WriteFile(filepath.Join(fuzzDir, "island-proof-fuzz-summary.json"), []byte(validIslandProofFuzzSummary()), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	writeMemoryReleaseTestRAMBundle(t, reportDir)
 	if err := os.WriteFile(filepath.Join(reportDir, "island-proof-verifier.json"), []byte(validIslandProofVerifierReport()), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -521,6 +549,7 @@ func writeMemoryProductionReleaseFixture(t *testing.T, mutate func(*memoryReleas
 			{Name: "validate-targets", Command: "go run ./tools/cmd/validate-targets --report $targets_path"},
 			{Name: "memory-fuzz-short", Command: "go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir $memory_fuzz_dir"},
 			{Name: "validate-memory-fuzz-oracle", Command: "go run ./tools/cmd/validate-memory-fuzz-oracle --report $memory_fuzz_dir/memory-fuzz-oracle.json --artifact-dir $memory_fuzz_dir"},
+			{Name: "ram-contract-gate", Command: "bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir $report_dir/ram-contract"},
 			{Name: "island-proof-verifier", Command: "go run ./tools/cmd/validate-island-proof --proof $report_dir/island-proof-verifier.json --memory-report $report_dir/island-proof-memory-report.json --current-git-head 0123456789abcdef0123456789abcdef01234567 --require-same-commit"},
 			{Name: "artifact-hashes-write", Command: "go run ./tools/cmd/validate-artifact-hashes --write --root $report_dir --out $report_dir/artifact-hashes.json"},
 			{Name: "artifact-hashes-validate", Command: "go run ./tools/cmd/validate-artifact-hashes --manifest $report_dir/artifact-hashes.json"},
@@ -531,6 +560,15 @@ func writeMemoryProductionReleaseFixture(t *testing.T, mutate func(*memoryReleas
 			{Path: "memory-fuzz-tier1/memory-fuzz-oracle.json", Kind: "memory_fuzz_oracle_report", Schema: "tetra.memory-fuzz.oracle.v1", Target: "linux-x64", Command: "go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir $memory_fuzz_dir"},
 			{Path: "memory-fuzz-tier1/summary.json", Kind: "memory_fuzz_summary", Schema: "tetra.memory-fuzz-short.summary.v1", Target: "linux-x64", Command: "go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir $memory_fuzz_dir"},
 			{Path: "memory-fuzz-tier1/island-proof-fuzz-summary.json", Kind: "memory_fuzz_island_proof_summary", Schema: "tetra.island-proof-fuzz-summary.v1", Target: "linux-x64", Command: "go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir $memory_fuzz_dir"},
+			{Path: "ram-contract/ram-contract-release-manifest.json", Kind: "ram_contract_release_manifest", Schema: "tetra.ram-contract.release-manifest.v1", Target: "linux-x64", Command: "bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir $report_dir/ram-contract"},
+			{Path: "ram-contract/ram-contract-report.json", Kind: "ram_contract_report", Schema: "tetra.ram-contract-report.v1", Target: "linux-x64", Command: "bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir $report_dir/ram-contract"},
+			{Path: "ram-contract/memory-grade-report.json", Kind: "ram_memory_grade_report", Schema: "tetra.memory-grade-report.v1", Target: "linux-x64", Command: "bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir $report_dir/ram-contract"},
+			{Path: "ram-contract/proof-store-summary.json", Kind: "ram_proof_store_summary", Schema: "tetra.proof-store-summary.v1", Target: "linux-x64", Command: "bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir $report_dir/ram-contract"},
+			{Path: "ram-contract/validation-pipeline-coverage.json", Kind: "ram_validation_pipeline_coverage", Schema: "tetra.validation-pipeline-coverage.v1", Target: "linux-x64", Command: "bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir $report_dir/ram-contract"},
+			{Path: "ram-contract/heap-blockers.json", Kind: "ram_heap_blockers", Schema: "tetra.ram-blockers.v1", Target: "linux-x64", Command: "bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir $report_dir/ram-contract"},
+			{Path: "ram-contract/copy-blockers.json", Kind: "ram_copy_blockers", Schema: "tetra.ram-blockers.v1", Target: "linux-x64", Command: "bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir $report_dir/ram-contract"},
+			{Path: "ram-contract/fuzz/ram-contract-fuzz-oracle.json", Kind: "ram_contract_fuzz_oracle", Schema: "tetra.ram-contract-fuzz-oracle.v1", Target: "linux-x64", Command: "bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir $report_dir/ram-contract"},
+			{Path: "ram-contract/artifact-hashes.json", Kind: "ram_contract_hash_manifest", Schema: "tetra.release-artifact-hashes.v1alpha1", Target: "linux-x64", Command: "bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir $report_dir/ram-contract"},
 			{Path: "island-proof-verifier.json", Kind: "island_proof_verifier_report", Schema: "tetra.island.proof.v1", Target: "linux-x64", Command: "go run ./tools/cmd/validate-island-proof --proof $report_dir/island-proof-verifier.json --memory-report $report_dir/island-proof-memory-report.json --current-git-head 0123456789abcdef0123456789abcdef01234567 --require-same-commit"},
 			{Path: "island-proof-memory-report.json", Kind: "island_proof_memory_report", Schema: "tetra.memory-report.v1", Target: "linux-x64", Command: "go run ./tools/cmd/validate-island-proof --proof $report_dir/island-proof-verifier.json --memory-report $report_dir/island-proof-memory-report.json --current-git-head 0123456789abcdef0123456789abcdef01234567 --require-same-commit"},
 			{Path: "artifact-hashes.json", Kind: "artifact_hash_manifest", Schema: "tetra.release-artifact-hashes.v1alpha1", Target: "linux-x64", Command: "go run ./tools/cmd/validate-artifact-hashes --write --root $report_dir --out $report_dir/artifact-hashes.json"},
@@ -550,6 +588,71 @@ func writeMemoryProductionReleaseFixture(t *testing.T, mutate func(*memoryReleas
 	}
 	writeMemoryReleaseTestHashManifest(t, reportDir, memoryReleaseTestHashPaths())
 	return reportDir, reportPath, manifestPath
+}
+
+func writeMemoryReleaseTestRAMBundle(t *testing.T, reportDir string) {
+	t.Helper()
+	ramDir := filepath.Join(reportDir, "ram-contract")
+	files := map[string]string{
+		"ram-contract-release-manifest.json":                   `{"schema":"tetra.ram-contract.release-manifest.v1","status":"pass","target":"linux-x64","git_head":"0123456789abcdef0123456789abcdef01234567","hash_manifest":"artifact-hashes.json"}` + "\n",
+		"ram-contract-report.json":                             `{"schema_version":"tetra.ram-contract-report.v1","git_head":"0123456789abcdef0123456789abcdef01234567"}` + "\n",
+		"memory-grade-report.json":                             `{"schema_version":"tetra.memory-grade-report.v1","git_head":"0123456789abcdef0123456789abcdef01234567"}` + "\n",
+		"proof-store-summary.json":                             `{"schema_version":"tetra.proof-store-summary.v1","git_head":"0123456789abcdef0123456789abcdef01234567"}` + "\n",
+		"validation-pipeline-coverage.json":                    `{"schema_version":"tetra.validation-pipeline-coverage.v1","git_head":"0123456789abcdef0123456789abcdef01234567"}` + "\n",
+		"heap-blockers.json":                                   `{"schema_version":"tetra.ram-blockers.v1","kind":"heap","git_head":"0123456789abcdef0123456789abcdef01234567"}` + "\n",
+		"copy-blockers.json":                                   `{"schema_version":"tetra.ram-blockers.v1","kind":"copy","git_head":"0123456789abcdef0123456789abcdef01234567"}` + "\n",
+		filepath.Join("fuzz", "ram-contract-fuzz-oracle.json"): `{"schema_version":"tetra.ram-contract-fuzz-oracle.v1","git_head":"0123456789abcdef0123456789abcdef01234567"}` + "\n",
+	}
+	for rel, raw := range files {
+		path := filepath.Join(ramDir, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeMemoryReleaseTestNestedRAMHashManifest(t, ramDir)
+}
+
+func writeMemoryReleaseTestNestedRAMHashManifest(t *testing.T, ramDir string) {
+	t.Helper()
+	paths := []string{
+		"copy-blockers.json",
+		"fuzz/ram-contract-fuzz-oracle.json",
+		"heap-blockers.json",
+		"memory-grade-report.json",
+		"proof-store-summary.json",
+		"ram-contract-release-manifest.json",
+		"ram-contract-report.json",
+		"validation-pipeline-coverage.json",
+	}
+	sort.Strings(paths)
+	manifest := memoryReleaseTestHashManifest{
+		Schema: "tetra.release-artifact-hashes.v1alpha1",
+		Root:   ".",
+	}
+	for _, rel := range paths {
+		raw, err := os.ReadFile(filepath.Join(ramDir, filepath.FromSlash(rel)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		sum := sha256.Sum256(raw)
+		manifest.Artifacts = append(manifest.Artifacts, memoryReleaseTestHashArtifact{
+			Path:   rel,
+			SHA256: "sha256:" + hex.EncodeToString(sum[:]),
+			Size:   int64(len(raw)),
+			Schema: memoryReleaseTestJSONSchema(raw),
+		})
+	}
+	raw, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = append(raw, '\n')
+	if err := os.WriteFile(filepath.Join(ramDir, "artifact-hashes.json"), raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func removeMemoryReleaseTestCommand(commands []memoryReleaseTestCommand, name string) []memoryReleaseTestCommand {
@@ -583,6 +686,15 @@ func memoryReleaseTestHashPaths() []string {
 		"memory-fuzz-tier1/summary.json",
 		"memory-production-linux-x64.json",
 		"memory-release-manifest.json",
+		"ram-contract/artifact-hashes.json",
+		"ram-contract/copy-blockers.json",
+		"ram-contract/fuzz/ram-contract-fuzz-oracle.json",
+		"ram-contract/heap-blockers.json",
+		"ram-contract/memory-grade-report.json",
+		"ram-contract/proof-store-summary.json",
+		"ram-contract/ram-contract-release-manifest.json",
+		"ram-contract/ram-contract-report.json",
+		"ram-contract/validation-pipeline-coverage.json",
 		"targets.json",
 	}
 }

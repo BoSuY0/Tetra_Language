@@ -21,6 +21,34 @@ func checkedProgram(t *testing.T, src string) *semantics.CheckedProgram {
 	return checked
 }
 
+func TestSummaryReturnOwnershipInfersBorrowForRegionParamReturn(t *testing.T) {
+	got := summaryReturnOwnership(semantics.FuncSig{
+		ReturnType:          "[]u8",
+		ReturnRegionSummary: semantics.ReturnRegionSummary{"": 0},
+	})
+	if got != "borrow" {
+		t.Fatalf("summaryReturnOwnership = %q, want borrow", got)
+	}
+}
+
+func TestSummaryReturnOwnershipPreservesExplicitOwnership(t *testing.T) {
+	got := summaryReturnOwnership(semantics.FuncSig{
+		ReturnType:        "[]u8",
+		ReturnOwnership:   "consume",
+		ReturnRegionParam: 0,
+	})
+	if got != "consume" {
+		t.Fatalf("summaryReturnOwnership = %q, want explicit consume", got)
+	}
+}
+
+func TestSummaryReturnOwnershipDoesNotInferBorrowForOwnedSliceReturn(t *testing.T) {
+	got := summaryReturnOwnership(semantics.FuncSig{ReturnType: "[]u8"})
+	if got != "" {
+		t.Fatalf("summaryReturnOwnership = %q, want empty ownership", got)
+	}
+}
+
 func TestFromCheckedProgramRecordsSliceLoopFacts(t *testing.T) {
 	checked := checkedProgram(t, `
 func sum(xs: []i32) -> Int
@@ -397,6 +425,65 @@ func TestVerifyFunctionRejectsModuleBoundaryBorrowedReturnWithoutRegionSummary(t
 	})
 	if err == nil || !strings.Contains(err.Error(), "summary completeness") || !strings.Contains(err.Error(), "return_region_summary") {
 		t.Fatalf("VerifyFunction error = %v, want borrowed return summary completeness rejection", err)
+	}
+}
+
+func TestVerifyFunctionAllowsResourceModuleValueReturnWithoutBorrowRegionSummary(t *testing.T) {
+	err := VerifyFunction(Function{
+		Name:   "pass",
+		Module: "lib.resources",
+		Summary: &FunctionSummary{
+			Public:     true,
+			ParamNames: []string{"msg"},
+			ParamTypes: []string{"resources.MoveMsg"},
+			ReturnType: "resources.MoveMsg",
+		},
+		Values: []Value{{
+			ID:         "param:msg",
+			Kind:       ValueParam,
+			Type:       "resources.MoveMsg",
+			Source:     "resources.tetra:16:11",
+			Region:     "fn:pass",
+			Provenance: Provenance{Kind: ProvenanceParam, Root: "msg"},
+			Lifetime:   Lifetime{Birth: "entry", Death: "return", Owner: "msg"},
+			Borrow:     BorrowImm,
+			Escape:     EscapeReturn,
+		}},
+		Ops: []Operation{{ID: "return_msg", Kind: OpReturn, Source: "resources.tetra:17:5", Inputs: []string{"msg"}}},
+	})
+	if err != nil {
+		t.Fatalf("VerifyFunction rejected value return from resources module as borrowed region return: %v", err)
+	}
+}
+
+func TestVerifyFunctionAllowsOwnedIslandReturnWithResourceSummary(t *testing.T) {
+	err := VerifyFunction(Function{
+		Name:   "alias_region",
+		Module: "examples.microservices.memory_island_alias_region_service",
+		Summary: &FunctionSummary{
+			Public:     true,
+			ParamNames: []string{"region"},
+			ParamTypes: []string{"island"},
+			ReturnType: "island",
+			ReturnResourceSummary: map[string][]ResourceProvenance{
+				"": {{ParamIndex: 0}},
+			},
+		},
+		Values: []Value{{
+			ID:         "param:region",
+			Kind:       ValueParam,
+			Type:       "island",
+			Source:     "memory_island_alias_region_service.tetra:7:19",
+			Region:     "fn:alias_region",
+			Provenance: Provenance{Kind: ProvenanceParam, Root: "region"},
+			Lifetime:   Lifetime{Birth: "entry", Death: "return", Owner: "region"},
+			Borrow:     BorrowImm,
+			Escape:     EscapeReturn,
+		}},
+		Ops: []Operation{{ID: "return_region", Kind: OpReturn, Source: "memory_island_alias_region_service.tetra:8:5", Inputs: []string{"region"}}},
+	})
+	if err != nil {
+		t.Fatalf("VerifyFunction rejected owned island resource return as borrowed region return: %v", err)
 	}
 }
 

@@ -260,6 +260,35 @@ uses alloc, islands, mem:
 	t.Fatalf("main missing island make slice: %#v", fn.Instrs)
 }
 
+func TestLowerInlineExplicitIslandMakeSliceCarriesAllocationNames(t *testing.T) {
+	prog := lowerStackAllocationProgram(t, `
+struct CachePair:
+    hot: []u8
+    cold: []u8
+
+func make_pair(hot_region: island, cold_region: island) -> CachePair
+uses alloc, islands, mem:
+    return CachePair(hot: core.island_make_u8(hot_region, 2), cold: core.island_make_u8(cold_region, 2))
+
+func main() -> Int:
+    return 0
+`)
+	fn := findIRFunc(t, prog, "make_pair")
+	names := map[string]bool{}
+	for _, instr := range fn.Instrs {
+		if instr.Kind != ir.IRIslandMakeSliceU8 {
+			continue
+		}
+		if instr.Name == "" {
+			t.Fatalf("inline island make slice missing allocation name: %#v", fn.Instrs)
+		}
+		names[instr.Name] = true
+	}
+	if len(names) != 2 {
+		t.Fatalf("inline island allocation names = %#v, want two distinct names: %#v", names, fn.Instrs)
+	}
+}
+
 func TestLowerCopyIntoChecksDestinationBeforeWriting(t *testing.T) {
 	prog := lowerStackAllocationProgram(t, `
 func main() -> Int

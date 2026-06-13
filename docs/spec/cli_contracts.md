@@ -30,6 +30,7 @@ release-covered tooling around that workflow, not optional safety levels.
 | `run` | Build and execute one host-runnable input or project directory, returning the program exit code. | `--diagnostics=json` on failure. |
 | `fmt` | Format one file to stdout, rewrite with `--write`, or verify with `--check`. | `--diagnostics=json` on failure. |
 | `test` | Discover top-level `test "name":` blocks and run them on the host target; project directories use discovered source roots. | `--report=json`; `--format=json` alias for JSON reports; `--diagnostics=json` on command failure. |
+| `surface` | Run scoped Surface developer workflows such as `surface dev`, currently a fast rebuild loop rather than hot reload. | `surface dev --report <path>` emits `tetra.surface.dev-workflow.v1`; `--diagnostics=json` on failure. |
 | `doc` | Generate API docs for files/directories, or discovered `Capsule.t4` source roots when no paths are given. | Markdown output; `--diagnostics=json` on failure. |
 | `interface` | Generate a `.t4i` interface file from one source file, or verify it with `--check`. | T4 interface output; `--diagnostics=json` on failure. |
 | `smoke` | Build and optionally run the canonical smoke matrix. | `--list --format=json`; `--report <path>`. |
@@ -183,6 +184,48 @@ canonical for the contract revision being validated.
   `smoke --report <path>` and the dedicated WASI/Web smoke workflows.
 - `smoke --report <path>` emits build/run evidence; validate it with
   `tools/cmd/smoke-report-to-checklist --validate-only`.
+- `surface dev --report <path>` emits `tetra.surface.dev-workflow.v1` fast
+  rebuild evidence for Surface apps. The current evidence is scoped to
+  `linux-x64` build caching and records initial build, warm-cache rebuild, and
+  token/recipe/source changed rebuild steps plus source diagnostics. It is not
+  a hot reload or React Fast Refresh claim; full process restart remains
+  documented as fast rebuild until a real reload loop is proven.
+- `new surface-app --template <kind> <path>` creates a Surface project from the
+  current Block/Morph template set. Supported kinds are `command-palette`,
+  `settings`, `dashboard`, `editor-shell`, `multi-window-notes`, and
+  `web-canvas`. The release smoke writes
+  `tetra.surface.template-smoke.v1` evidence and validates it with
+  `tools/cmd/validate-surface-template-smoke`.
+- `scripts/release/surface/surface-reference-apps-smoke.sh --report-dir <dir>`
+  checks, builds, runs, visually validates, and writes
+  `tetra.surface.reference-app-suite.v1` evidence for the ten current
+  Block/Morph reference app shapes. Validate the report with
+  `tools/cmd/validate-surface-reference-apps --report <path>`.
+- `scripts/release/surface/surface-package-smoke.sh --report-dir <dir>` builds
+  linux-x64 and wasm32-web Surface app packages for a reference app, verifies
+  local asset hashes, unpacks and runs the linux-x64 package, records web bundle
+  HTML/wasm/compiler-owned loader output, and writes
+  `tetra.surface.package.v1` evidence. Validate the report with
+  `tools/cmd/validate-surface-package --report <path>`.
+- `scripts/release/surface/surface-crash-report-smoke.sh --report-dir <dir>`
+  builds the command-palette reference app for linux-x64, records bounded
+  command failure, host crash diagnostic capture, local trace/log collection,
+  redacted `tetra.surface.diagnostic.v1` artifacts, and scoped restart evidence
+  in `tetra.surface.crash-report.v1`. Validate the report with
+  `tools/cmd/validate-surface-crash-report --report <path>`.
+- `scripts/release/surface/surface-i18n-smoke.sh --report-dir <dir>` builds
+  the localized-form reference app for linux-x64, records bounded string
+  tables, locale selection, fallback lookup, missing-key diagnostics,
+  deterministic formatting hooks, and RTL placeholder nonclaim evidence in
+  `tetra.surface.i18n.v1`. Validate the report with
+  `tools/cmd/validate-surface-i18n --report <path>`.
+- `tools/cmd/surface-inspector --out <path>` emits
+  `tetra.surface.inspector.v1` static tool evidence for Surface apps. It
+  aggregates validated runtime reports into Block tree, Morph token, layout,
+  paint, accessibility, event route, focus, perf-counter, source-location, and
+  hidden-state scan sections. Optional HTML output is a static tool report, not
+  browser devtools, React devtools, DOM runtime UI, or target-host accessibility
+  proof by itself.
 - `eco seed export --out <path>` emits `tetra.eco.seed.v1`; validate it with
   `tools/cmd/validate-eco-seed --seed <path>`.
 - `eco needmap --lock <lock> -o <path>` emits `tetra.eco.needmap.v1`;

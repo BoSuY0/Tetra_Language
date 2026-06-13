@@ -8,7 +8,7 @@ RAM contracts are opt-in compiler reports for memory allocation and copy evidenc
 - `--fail-if-heap` fails the build when the report contains heap blockers.
 - `--fail-if-copy` fails the build when the report contains copy blockers.
 - `--fail-if-unbounded` fails the build when the report contains unbounded rows.
-- `--memory-budget <bytes>` fails the build when reported heap/copy bytes exceed the budget.
+- `--memory-budget <bytes>` fails the build when reported RAM budget bytes exceed the budget.
 - `--ram-contract <path>` supplies a RAM contract policy file for the build.
 
 Enforcement failures use `TETRA4100`.
@@ -30,6 +30,7 @@ go run ./tools/cmd/validate-proof-store-summary --report reports/ram-contract-re
 go run ./tools/cmd/validate-validation-pipeline-coverage --report reports/ram-contract-release/validation-pipeline-coverage.json
 go run ./tools/cmd/validate-heap-blockers --report reports/ram-contract-release/heap-blockers.json
 go run ./tools/cmd/validate-copy-blockers --report reports/ram-contract-release/copy-blockers.json
+go run ./tools/cmd/validate-ram-contract-fuzz-oracle --report reports/ram-contract-release/fuzz/ram-contract-fuzz-oracle.json --artifact-dir reports/ram-contract-release
 ```
 
 ## Nonclaims

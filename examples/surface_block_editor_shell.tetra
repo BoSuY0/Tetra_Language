@@ -17,13 +17,7 @@ func cyan() -> surface.Color:
     return surface.Color(r: 96, g: 190, b: 220, a: 255)
 
 func chrome_paint() -> block.PaintSpec:
-    return block.paint_stack5(
-        block.paint_layer_fill_radius(surface.Color(r: 22, g: 27, b: 34, a: 255), 10),
-        block.paint_layer_linear_gradient(surface.Color(r: 30, g: 36, b: 44, a: 255), surface.Color(r: 20, g: 24, b: 30, a: 255), 10),
-        block.paint_layer_border(surface.Color(r: 64, g: 76, b: 92, a: 255), 1, 10),
-        block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 82), 14, 0, 4),
-        block.paint_layer_outline(violet(), 1, 12)
-    )
+    return block.paint_stack5(block.paint_layer_fill_radius(surface.Color(r: 22, g: 27, b: 34, a: 255), 10), block.paint_layer_linear_gradient(surface.Color(r: 30, g: 36, b: 44, a: 255), surface.Color(r: 20, g: 24, b: 30, a: 255), 10), block.paint_layer_border(surface.Color(r: 64, g: 76, b: 92, a: 255), 1, 10), block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 82), 14, 0, 4), block.paint_layer_outline(violet(), 1, 12))
 
 func tab_paint(active: Bool) -> block.PaintSpec:
     if active:
@@ -73,13 +67,11 @@ uses alloc, mem:
     let rail_rect: surface.Rect = surface.Rect(x: 16, y: 16, w: 126, h: 268)
     let editor_rect: surface.Rect = surface.Rect(x: 154, y: 16, w: 330, h: 268)
     let code_rect: surface.Rect = surface.Rect(x: 170, y: 72, w: 298, h: 194)
-
     var tree: block.BlockTree = block.tree_init(12)
     let root_props: block.BlockProps = block.props(block.layout_row(root_rect, 12), block.paint_stack2(block.paint_layer_fill_radius(theme_dark(), 0), block.paint_layer_overlay(violet(), 24, 0)), block.text_none(), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_text(12), block.asset_none())
     let rail_props: block.BlockProps = block.props(block.layout_column(rail_rect, 8), chrome_paint(), block.text_styled(8, theme_light(), block.text_family_ui(), 14, 800, 18, block.text_align_start(), block.text_wrap_word(), block.text_overflow_ellipsis(), 255), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_fast(), block.accessibility_text(8), block.asset_none())
     let editor_props: block.BlockProps = block.props(block.layout_column(editor_rect, 10), chrome_paint(), block.text_none(), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_fast(), block.accessibility_text(12), block.asset_none())
     let code_props: block.BlockProps = block.props(block.layout_scroll(code_rect, 298, 360, 24), block.paint_stack3(block.paint_layer_fill_radius(surface.Color(r: 14, g: 18, b: 23, a: 255), 8), block.paint_layer_border(surface.Color(r: 48, g: 58, b: 72, a: 255), 1, 8), block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 64), 12, 0, 4)), block.text_none(), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_text(10), block.asset_none())
-
     let root: Int = block.tree_add_root(tree, block.make(block.id(1), block.id_none(), root_props), root_rect)
     let rail: Int = block.tree_add_child(tree, block.id(1), block.make(block.id(2), block.id(1), rail_props), rail_rect)
     let editor: Int = block.tree_add_child(tree, block.id(1), block.make(block.id(3), block.id(1), editor_props), editor_rect)
@@ -93,12 +85,6 @@ uses alloc, mem:
     let focus0: Int = block.id_value(block.focus_order_at(tree, 0))
     let focus1: Int = block.id_value(block.focus_order_at(tree, 1))
     let scroll_offset: Int = block.layout_scroll_offset_y(block.layout_scroll(code_rect, 298, 360, 24))
-
-    if root == 1 && rail == 2 && editor == 3 && tab_a == 4 && tab_b == 5 && code == 6 && line1 == 7 && line2 == 8 && line3 == 9 &&
-       valid == block.tree_error_ok() &&
-       focus0 == 4 && focus1 == 5 &&
-       scroll_offset == 24 &&
-       block.paint_validate_visual_grammar(chrome_paint()) == block.paint_error_ok() &&
-       scene_checksum() > 0:
+    if root == 1 && rail == 2 && editor == 3 && tab_a == 4 && tab_b == 5 && code == 6 && line1 == 7 && line2 == 8 && line3 == 9 && valid == block.tree_error_ok() && focus0 == 4 && focus1 == 5 && scroll_offset == 24 && block.paint_validate_visual_grammar(chrome_paint()) == block.paint_error_ok() && scene_checksum() > 0:
         return 0
     return 1

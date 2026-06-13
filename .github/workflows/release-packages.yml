@@ -108,12 +108,12 @@ jobs:
           report_dir="${{ steps.meta.outputs.out_dir }}/memory-production-linux-x64"
           bash scripts/release/post_v0_4/memory-production-linux-x64-smoke.sh --report-dir "$report_dir"
 
-      - name: Surface release gate
+      - name: Surface product gate
         shell: bash
         run: |
           set -euo pipefail
-          report_dir="${{ steps.meta.outputs.out_dir }}/surface-release-v1"
-          bash scripts/release/surface/release-gate.sh --report-dir "$report_dir"
+          report_dir="${{ steps.meta.outputs.out_dir }}/surface-product-v1"
+          bash scripts/release/surface/product-gate.sh --report-dir "$report_dir"
 
       - name: Surface experimental regression gate
         shell: bash
@@ -165,6 +165,17 @@ jobs:
           report_dir="${{ steps.meta.outputs.out_dir }}/actor-runtime-foundation-linux-x64"
           bash scripts/release/post_v0_4/actor-runtime-foundation-linux-x64-gate.sh --report-dir "$report_dir"
 
+      - name: Memory100 prod-stable gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          export GOTELEMETRY=off
+          export GOCACHE="${PWD}/.cache/go-build-memory-100-prod-stable-release"
+          export GOTMPDIR="${PWD}/.cache/go-tmp-memory-100-prod-stable-release"
+          mkdir -p "$GOCACHE" "$GOTMPDIR"
+          report_dir="${{ steps.meta.outputs.out_dir }}/memory-100-prod-stable"
+          bash scripts/release/post_v0_4/memory-100-prod-stable-gate.sh --report-dir "$report_dir"
+
       - name: Upload package artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -176,13 +187,14 @@ jobs:
             ${{ steps.meta.outputs.out_dir }}/checksums.txt
             ${{ steps.meta.outputs.out_dir }}/tetra.rb
             ${{ steps.meta.outputs.out_dir }}/memory-production-linux-x64/**
-            ${{ steps.meta.outputs.out_dir }}/surface-release-v1/**
+            ${{ steps.meta.outputs.out_dir }}/surface-product-v1/**
             ${{ steps.meta.outputs.out_dir }}/surface-experimental-regression/**
             ${{ steps.meta.outputs.out_dir }}/safe-view-lifetime/**
             ${{ steps.meta.outputs.out_dir }}/surface-api-stability-v1/**
             ${{ steps.meta.outputs.out_dir }}/memory-islands-surface-production/**
             ${{ steps.meta.outputs.out_dir }}/ram-contract-linux-x64/**
             ${{ steps.meta.outputs.out_dir }}/actor-runtime-foundation-linux-x64/**
+            ${{ steps.meta.outputs.out_dir }}/memory-100-prod-stable/**
 
       - name: Create or update GitHub Release
         shell: bash
@@ -210,9 +222,10 @@ jobs:
           Package publishing for this workflow runs the Linux-x64 memory production release gate and uploads its `memory-production-linux-x64.json`, `targets.json`, and `artifact-hashes.json` evidence.
           RAM Contract Compiler evidence runs the strict Linux-x64 RAM contract release gate before publishing and uploads its `ram-contract-report.json`, `memory-grade-report.json`, `proof-store-summary.json`, `validation-pipeline-coverage.json`, `heap-blockers.json`, `copy-blockers.json`, and `ram-contract-fuzz-oracle.json` evidence.
           Memory production evidence remains Linux-x64 scoped unless a target-specific runtime gate says otherwise.
-          Surface v1 release evidence runs the Surface release gate, experimental regression gate, safe-view lifetime gate, and API stability gate before publishing.
+          Surface v1 product evidence runs the Surface product gate, experimental regression gate, safe-view lifetime gate, and API stability gate before publishing.
           Integrated Memory/Islands/Surface evidence runs the strict integrated gate before publishing and uploads its `memory-islands-surface-production-manifest.json`, `artifact-hashes.json`, `islands-debug-smoke.json`, `island-proof-verifier.json`, and `island-proof-fuzz-summary.json` evidence.
           Actor runtime foundation evidence runs the strict Linux-x64 gate before publishing and uploads its `actor-runtime-foundation-manifest.json`, `artifact-hashes.json`, `distributed-actors-linux-x64/distributed-actors-linux-x64.json`, and `parallel-production-linux-x64/parallel-production-linux-x64.json` evidence.
+          Memory100 scoped prod-stable evidence runs the strict aggregate gate before publishing and uploads its `memory-100-prod-stable-manifest.json`, `artifact-hashes.json`, `runtime-memory/runtime-memory-contract.json`, and `proof-transition/proof-transition-report.json` evidence.
           Actor runtime foundation evidence remains Linux-x64 scoped; Erlang/OTP, cluster membership, reconnect/retry production, non-Linux distributed runtime, distributed zero-copy transfer, and formal race proof are not claimed.
           Surface v1 package notes are scoped to headless, linux-x64 real-window, and wasm32-web browser-canvas evidence; macOS, Windows, wasm32-wasi, GPU rendering, platform-native widgets, DOM/React/user-JS app UI, rich text editor, and full screen-reader support are not claimed.
           No fastest-language, official benchmark, target parity, or broad zero-cost performance claim is made by these package notes.

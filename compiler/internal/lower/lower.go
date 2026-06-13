@@ -2959,6 +2959,19 @@ func islandSliceKindByBuiltin(name string) (ir.IRInstrKind, bool) {
 	}
 }
 
+func (l *lowerer) allocationNameForBuiltinCall(name string, pos frontend.Position, storage allocplan.StorageClass) string {
+	if len(l.allocationPlan) == 0 {
+		return ""
+	}
+	source := frontend.FormatPos(pos)
+	for id, alloc := range l.allocationPlan {
+		if alloc.Builtin == name && alloc.Source == source && alloc.ActualLoweringStorage == storage {
+			return id
+		}
+	}
+	return ""
+}
+
 func (l *lowerer) lowerMatchExpr(e *frontend.MatchExpr) (int, error) {
 	info, ok := l.locals[e.ScrutineeLocal]
 	if !ok {
@@ -4506,25 +4519,25 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 			if total != 2 {
 				return 0, fmt.Errorf("%s: island_make_u8 expects 2 arguments", frontend.FormatPos(e.At))
 			}
-			l.emit(ir.IRInstr{Kind: ir.IRIslandMakeSliceU8, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRIslandMakeSliceU8, Name: l.allocationNameForBuiltinCall(e.Name, e.At, allocplan.StorageExplicitIsland), Pos: e.At})
 			return 2, nil
 		case "core.island_make_u16":
 			if total != 2 {
 				return 0, fmt.Errorf("%s: island_make_u16 expects 2 arguments", frontend.FormatPos(e.At))
 			}
-			l.emit(ir.IRInstr{Kind: ir.IRIslandMakeSliceU16, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRIslandMakeSliceU16, Name: l.allocationNameForBuiltinCall(e.Name, e.At, allocplan.StorageExplicitIsland), Pos: e.At})
 			return 2, nil
 		case "core.island_make_i32":
 			if total != 2 {
 				return 0, fmt.Errorf("%s: island_make_i32 expects 2 arguments", frontend.FormatPos(e.At))
 			}
-			l.emit(ir.IRInstr{Kind: ir.IRIslandMakeSliceI32, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRIslandMakeSliceI32, Name: l.allocationNameForBuiltinCall(e.Name, e.At, allocplan.StorageExplicitIsland), Pos: e.At})
 			return 2, nil
 		case "core.island_make_bool":
 			if total != 2 {
 				return 0, fmt.Errorf("%s: island_make_bool expects 2 arguments", frontend.FormatPos(e.At))
 			}
-			l.emit(ir.IRInstr{Kind: ir.IRIslandMakeSliceI32, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRIslandMakeSliceI32, Name: l.allocationNameForBuiltinCall(e.Name, e.At, allocplan.StorageExplicitIsland), Pos: e.At})
 			return 2, nil
 		case "core.island_reset":
 			if total != 1 {

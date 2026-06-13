@@ -629,7 +629,7 @@ func (b *builder) functionSummary() *FunctionSummary {
 		ParamTypes:            append([]string(nil), sig.ParamTypes...),
 		ParamOwnership:        append([]string(nil), sig.ParamOwnership...),
 		ReturnType:            sig.ReturnType,
-		ReturnOwnership:       sig.ReturnOwnership,
+		ReturnOwnership:       summaryReturnOwnership(sig),
 		ThrowsType:            sig.ThrowsType,
 		Effects:               append([]string(nil), sig.Effects...),
 		TouchesMutableGlobals: sig.TouchesMutableGlobals,
@@ -640,6 +640,19 @@ func (b *builder) functionSummary() *FunctionSummary {
 		ThrowResourceSummary:  cloneResourceSummary(sig.ThrowResourceSummary),
 	}
 	return summary
+}
+
+func summaryReturnOwnership(sig semantics.FuncSig) string {
+	if strings.TrimSpace(sig.ReturnOwnership) != "" {
+		return sig.ReturnOwnership
+	}
+	if !borrowedRegionSummaryType(sig.ReturnType) {
+		return ""
+	}
+	if len(sig.ReturnRegionSummary) > 0 || (sig.ReturnRegionParam >= 0 && sig.ReturnRegionParam < len(sig.ParamTypes)) {
+		return "borrow"
+	}
+	return ""
 }
 
 func cloneIntMap(in map[string]int) map[string]int {

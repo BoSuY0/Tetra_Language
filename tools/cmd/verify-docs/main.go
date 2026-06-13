@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -323,6 +324,14 @@ func verifyRAMContractCompilerDocs(paths ramContractCompilerDocPaths, features [
 		for _, claim := range forbiddenRAMContractClaims(text) {
 			errs = append(errs, fmt.Sprintf("%s: forbidden RAM contract claim %q", requirement.Path, claim))
 		}
+		for _, flag := range unsupportedRAMContractValidatorFlags(text) {
+			errs = append(errs, fmt.Sprintf("%s: unsupported RAM contract validator flag %q", requirement.Path, flag))
+		}
+		if requirement.Name == "readiness audit" {
+			if head, ok := staleRAMContractReadinessGitHead(text); ok {
+				errs = append(errs, fmt.Sprintf("%s: stale readiness git head %s", requirement.Path, head))
+			}
+		}
 	}
 	if err := verifyRAMContractManifestFeature(features); err != nil {
 		errs = append(errs, err.Error())
@@ -331,6 +340,49 @@ func verifyRAMContractCompilerDocs(paths ramContractCompilerDocPaths, features [
 		return fmt.Errorf("%s", strings.Join(errs, "; "))
 	}
 	return nil
+}
+
+func unsupportedRAMContractValidatorFlags(text string) []string {
+	var flags []string
+	for _, needle := range []string{
+		"validate-ram-contract-release --report ",
+		"validate-ram-contract-release --report=",
+	} {
+		if strings.Contains(text, needle) {
+			flags = append(flags, "validate-ram-contract-release --report")
+			break
+		}
+	}
+	return flags
+}
+
+var ramContractReadinessGitHeadPattern = regexp.MustCompile(`(?m)^Git head:\s*([0-9a-f]{40})\s*$`)
+
+func staleRAMContractReadinessGitHead(text string) (string, bool) {
+	match := ramContractReadinessGitHeadPattern.FindStringSubmatch(text)
+	if len(match) != 2 {
+		return "", false
+	}
+	current, ok := currentGitHeadForDocs()
+	if !ok {
+		return "", false
+	}
+	if match[1] != current {
+		return match[1], true
+	}
+	return "", false
+}
+
+func currentGitHeadForDocs() (string, bool) {
+	out, err := exec.Command("git", "rev-parse", "--verify", "HEAD").Output()
+	if err != nil {
+		return "", false
+	}
+	head := strings.TrimSpace(string(out))
+	if len(head) != 40 {
+		return "", false
+	}
+	return head, true
 }
 
 func verifyRAMContractManifestFeature(features []featureManifest) error {
@@ -413,6 +465,15 @@ func forbiddenRAMContractClaims(text string) []string {
 			absolute := searchFrom + index
 			clause := clauseAround(lower, absolute, len(phrase), 260)
 			sentence := sentenceAround(lower, absolute, len(phrase), 320)
+			if ramContractPhraseAllowedAsExactNonClaim(phrase, clause) {
+				searchFrom = absolute + len(phrase)
+				continue
+			}
+			if explicitRAMContractPromotionContext(clause) && !explicitNonClaimContext(clause) {
+				claims = append(claims, phrase)
+				searchFrom = absolute + len(phrase)
+				continue
+			}
 			if !explicitNonClaimContext(clause) && !explicitNonClaimContext(sentence) {
 				claims = append(claims, phrase)
 			}
@@ -421,6 +482,37 @@ func forbiddenRAMContractClaims(text string) []string {
 	}
 	sort.Strings(claims)
 	return compactStrings(claims)
+}
+
+func explicitRAMContractPromotionContext(lower string) bool {
+	normalized := strings.NewReplacer(`"`, "", "`", "", "'", "").Replace(lower)
+	for _, marker := range []string{
+		"proves",
+		"prove",
+		"guarantees",
+		"guarantee",
+		"supports",
+		"support",
+		"delivers",
+		"deliver",
+	} {
+		if strings.Contains(normalized, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func ramContractPhraseAllowedAsExactNonClaim(phrase string, contexts ...string) bool {
+	normalizedPhrase := strings.ReplaceAll(phrase, " ", "-")
+	for _, context := range contexts {
+		normalized := strings.NewReplacer(`"`, "", "`", "", "'", "").Replace(context)
+		normalized = strings.ReplaceAll(normalized, " ", "-")
+		if strings.Contains(normalized, "no-"+normalizedPhrase+"-claim") {
+			return true
+		}
+	}
+	return false
 }
 
 func verifyWASMBackendPlan(path string, plannedTargets []string) error {
@@ -750,13 +842,20 @@ func forbiddenPublicPerformanceClaims(text string) []string {
 		"official techempower",
 		"target parity",
 		"target-parity",
+		"all-target memory parity",
+		"all target memory parity",
 		"zero-cost performance",
 		"zero cost performance",
 		"memory 100%",
 		"memory 100 percent",
+		"full formal proof",
+		"formal proof of memory safety",
 		"perfect memory",
 		"leak-free",
 		"leak free",
+		"leak freedom",
+		"no leaks",
+		"no memory leaks",
 		"islandkernel complete",
 		"islandkernel is complete",
 		"island kernel complete",
@@ -1622,6 +1721,8 @@ func surfaceReleaseDocPaths() []string {
 		filepath.FromSlash("docs/release/surface_v1_release_audit.md"),
 		filepath.FromSlash("docs/user/examples_index.md"),
 		filepath.FromSlash("docs/user/surface_guide.md"),
+		filepath.FromSlash("docs/user/surface_cookbook.md"),
+		filepath.FromSlash("docs/user/surface_morph_recipe_cookbook.md"),
 	}
 }
 
@@ -2215,58 +2316,67 @@ func verifySurfaceReleaseDocs(paths []string) error {
 		if strings.Contains(text, "/tmp/") {
 			errs = append(errs, fmt.Sprintf("%s: Surface release docs must not use /tmp paths as current release evidence", path))
 		}
+		if surfaceReleaseDocRequiresP28Governance(path) {
+			errs = append(errs, verifySurfaceReleaseDocP28Governance(path, text)...)
+		}
 		for _, clause := range surfaceReleaseDocClauses(text) {
 			lower := strings.ToLower(clause)
-			if surfaceReleaseClauseSafe(lower) {
+			if surfaceReleaseClauseBoundaryOnly(lower) {
 				continue
 			}
 			if containsAnySubstring(lower, []string{"macos surface", "macos/windows surface"}) &&
-				containsAnySubstring(lower, []string{"current", "release-ready", "production-supported", "production supported"}) {
+				containsAnySubstring(lower, []string{"current", "release-ready", "production-supported", "production supported"}) &&
+				!surfaceReleaseExplicitNonClaimContext(lower) {
 				errs = append(errs, fmt.Sprintf("%s: macOS Surface fake current claim: %q", path, strings.TrimSpace(clause)))
 			}
 			if containsAnySubstring(lower, []string{"windows surface", "macos/windows surface"}) &&
-				containsAnySubstring(lower, []string{"current", "release-ready", "production-supported", "production supported"}) {
+				containsAnySubstring(lower, []string{"current", "release-ready", "production-supported", "production supported"}) &&
+				!surfaceReleaseExplicitNonClaimContext(lower) {
 				errs = append(errs, fmt.Sprintf("%s: Windows Surface fake current claim: %q", path, strings.TrimSpace(clause)))
 			}
-			if strings.Contains(lower, "wasm32-wasi") && strings.Contains(lower, "surface") && surfaceReleaseClaimPromotes(lower) {
+			if strings.Contains(lower, "wasm32-wasi") && strings.Contains(lower, "surface") && surfaceReleaseClaimPromotes(lower) && !surfaceReleaseExplicitNonClaimContext(lower) {
 				errs = append(errs, fmt.Sprintf("%s: wasm32-wasi Surface fake current claim: %q", path, strings.TrimSpace(clause)))
 			}
-			if strings.Contains(lower, "cross-platform") && surfaceReleaseClaimPromotes(lower) {
+			if strings.Contains(lower, "cross-platform") && surfaceReleaseClaimPromotes(lower) && !surfaceReleaseExplicitNonClaimContext(lower) {
 				errs = append(errs, fmt.Sprintf("%s: cross-platform Surface fake production claim: %q", path, strings.TrimSpace(clause)))
 			}
-			if strings.Contains(lower, "gpu") && surfaceReleaseClaimPromotes(lower) {
+			if strings.Contains(lower, "gpu") && surfaceReleaseClaimPromotes(lower) && !surfaceReleaseExplicitNonClaimContext(lower) {
 				errs = append(errs, fmt.Sprintf("%s: GPU Surface fake production claim: %q", path, strings.TrimSpace(clause)))
 			}
 			if containsAnySubstring(lower, []string{"platform-native widget", "native widget", "platform widget"}) &&
-				surfaceReleaseClaimPromotes(lower) {
+				surfaceReleaseClaimPromotes(lower) && !surfaceReleaseExplicitNonClaimContext(lower) {
 				errs = append(errs, fmt.Sprintf("%s: native widget Surface fake production claim: %q", path, strings.TrimSpace(clause)))
 			}
-			if strings.Contains(lower, "rich text") && surfaceReleaseClaimPromotes(lower) {
+			if strings.Contains(lower, "rich text") && surfaceReleaseClaimPromotes(lower) && !surfaceReleaseExplicitNonClaimContext(lower) {
 				errs = append(errs, fmt.Sprintf("%s: rich text Surface fake production claim: %q", path, strings.TrimSpace(clause)))
 			}
 			if containsAnySubstring(lower, []string{"screen-reader", "screen reader", "at-spi"}) &&
-				surfaceReleaseClaimPromotes(lower) {
+				surfaceReleaseClaimPromotes(lower) && !surfaceReleaseExplicitNonClaimContext(lower) {
 				errs = append(errs, fmt.Sprintf("%s: screen-reader Surface fake production claim: %q", path, strings.TrimSpace(clause)))
 			}
-			if strings.Contains(lower, "metadata-only") && strings.Contains(lower, "production accessibility") {
+			if strings.Contains(lower, "metadata-only") && strings.Contains(lower, "production accessibility") && !surfaceReleaseExplicitNonClaimContext(lower) {
 				errs = append(errs, fmt.Sprintf("%s: metadata-only accessibility fake production claim: %q", path, strings.TrimSpace(clause)))
 			}
-			if containsAnySubstring(lower, []string{"dom ui", "html ui"}) && surfaceReleaseClaimPromotes(lower) {
+			if containsAnySubstring(lower, []string{"dom ui", "html ui"}) && surfaceReleaseClaimPromotes(lower) && !surfaceReleaseExplicitNonClaimContext(lower) {
 				errs = append(errs, fmt.Sprintf("%s: DOM UI fake production claim: %q", path, strings.TrimSpace(clause)))
 			}
-			if strings.Contains(lower, "dom ui") && strings.Contains(lower, "surface model") {
+			if strings.Contains(lower, "dom ui") && strings.Contains(lower, "surface model") && !surfaceReleaseExplicitNonClaimContext(lower) {
 				errs = append(errs, fmt.Sprintf("%s: DOM UI fake Surface model claim: %q", path, strings.TrimSpace(clause)))
 			}
-			if strings.Contains(lower, "react") && surfaceReleaseClaimPromotes(lower) {
+			if strings.Contains(lower, "react") && surfaceReleaseClaimPromotes(lower) && !surfaceReleaseExplicitNonClaimContext(lower) {
 				errs = append(errs, fmt.Sprintf("%s: React Surface fake production claim: %q", path, strings.TrimSpace(clause)))
 			}
 			if containsAnySubstring(lower, []string{"core surface primitive", "surface core primitive", "core primitive"}) &&
-				containsAnySubstring(lower, []string{"button", "textfield", "text field", "card", "sidebar", "modal"}) {
+				containsAnySubstring(lower, []string{"button", "textfield", "text field", "card", "sidebar", "modal"}) &&
+				!surfaceReleaseExplicitNonClaimContext(lower) {
 				errs = append(errs, fmt.Sprintf("%s: core widget primitive fake Surface claim: %q", path, strings.TrimSpace(clause)))
 			}
 			if containsAnySubstring(lower, []string{"user js", "user javascript"}) &&
 				containsAnySubstring(lower, []string{"allowed", "may use", "can use"}) {
 				errs = append(errs, fmt.Sprintf("%s: user JS fake allowance claim: %q", path, strings.TrimSpace(clause)))
+			}
+			if strings.Contains(lower, "final current claim") {
+				errs = append(errs, fmt.Sprintf("%s: final current claim ownership must stay with P29: %q", path, strings.TrimSpace(clause)))
 			}
 		}
 	}
@@ -2279,10 +2389,64 @@ func verifySurfaceReleaseDocs(paths []string) error {
 	if !strings.Contains(combined.String(), "bash scripts/release/surface/release-gate.sh") {
 		errs = append(errs, "Surface release docs missing release-gate.sh command link")
 	}
+	if !strings.Contains(combined.String(), "bash scripts/release/surface/product-gate.sh") {
+		errs = append(errs, "Surface release docs missing product-gate.sh command link")
+	}
+	for _, tier := range []string{"PROD_STABLE_SCOPED", "BETA_TARGET_HOST", "EXPERIMENTAL", "UNSUPPORTED", "NONCLAIM"} {
+		if !strings.Contains(combined.String(), tier) {
+			errs = append(errs, fmt.Sprintf("Surface release docs missing claim tier %s", tier))
+		}
+	}
 	if len(errs) > 0 {
 		return fmt.Errorf("%s", strings.Join(errs, "; "))
 	}
 	return nil
+}
+
+func surfaceReleaseDocRequiresP28Governance(path string) bool {
+	base := filepath.ToSlash(path)
+	for _, required := range []string{
+		"docs/spec/current_supported_surface.md",
+		"docs/spec/surface_v1.md",
+		"docs/spec/surface_morph.md",
+		"docs/user/surface_guide.md",
+		"docs/user/examples_index.md",
+		"docs/user/surface_cookbook.md",
+		"docs/release/surface_v1_release_audit.md",
+		"docs/release/surface_v1_release_contract.md",
+		"docs/release/surface_v1_release_notes.md",
+	} {
+		if strings.HasSuffix(base, required) {
+			return true
+		}
+	}
+	switch strings.ToLower(filepath.Base(base)) {
+	case "current_supported_surface.md",
+		"surface_v1.md",
+		"surface_morph.md",
+		"surface_guide.md",
+		"examples_index.md",
+		"surface_cookbook.md",
+		"surface_v1_release_audit.md",
+		"surface_v1_release_contract.md",
+		"surface_v1_release_notes.md":
+		return true
+	default:
+		return false
+	}
+}
+
+func verifySurfaceReleaseDocP28Governance(path string, text string) []string {
+	var errs []string
+	for _, tier := range []string{"PROD_STABLE_SCOPED", "BETA_TARGET_HOST", "EXPERIMENTAL", "UNSUPPORTED", "NONCLAIM"} {
+		if !strings.Contains(text, tier) {
+			errs = append(errs, fmt.Sprintf("%s: Surface release doc missing claim tier %s", path, tier))
+		}
+	}
+	if !strings.Contains(text, "bash scripts/release/surface/product-gate.sh") {
+		errs = append(errs, fmt.Sprintf("%s: Surface release doc missing product-gate.sh command link", path))
+	}
+	return errs
 }
 
 func surfaceReleaseDocClauses(text string) []string {
@@ -2291,21 +2455,15 @@ func surfaceReleaseDocClauses(text string) []string {
 	})
 }
 
+func surfaceReleaseClauseBoundaryOnly(lower string) bool {
+	return surfaceReleaseClauseSafe(lower) && !surfaceReleaseClaimPromotes(lower)
+}
+
 func surfaceReleaseClauseSafe(lower string) bool {
 	return containsAnySubstring(lower, []string{
-		" not ",
-		"not ",
-		"no ",
-		"non-goal",
-		"nonclaim",
-		"non-claim",
 		"future work",
 		"remain future",
-		"not claimed",
-		"not claim",
 		"without",
-		"must not",
-		"cannot",
 		"unsupported",
 		"outside",
 		"remain outside",
@@ -2319,17 +2477,49 @@ func surfaceReleaseClauseSafe(lower string) bool {
 	})
 }
 
+func surfaceReleaseExplicitNonClaimContext(lower string) bool {
+	return containsAnySubstring(lower, []string{
+		" not ",
+		"not ",
+		"no ",
+		"non-goal",
+		"nonclaim",
+		"non-claim",
+		"not claimed",
+		"not claim",
+		"must not",
+		"cannot",
+		"forbid",
+		"forbids",
+		"rejected",
+		"reject",
+		"outside",
+		"remain outside",
+	})
+}
+
 func surfaceReleaseClaimPromotes(lower string) bool {
 	return containsAnySubstring(lower, []string{
-		"current",
 		"release-ready",
 		"release ready",
 		"production-supported",
 		"production supported",
 		"production support",
-		"production",
-		"supported",
-	})
+	}) ||
+		containsVerifyDocsClaimWord(lower, "current") ||
+		containsVerifyDocsClaimWord(lower, "production") ||
+		containsVerifyDocsClaimWord(lower, "supported")
+}
+
+func containsVerifyDocsClaimWord(lower string, word string) bool {
+	for _, field := range strings.FieldsFunc(lower, func(r rune) bool {
+		return r < 'a' || r > 'z'
+	}) {
+		if field == word {
+			return true
+		}
+	}
+	return false
 }
 
 func containsAnySubstring(text string, needles []string) bool {

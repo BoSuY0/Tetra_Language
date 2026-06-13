@@ -47,11 +47,16 @@ func TestRunMemoryFuzzShortWritesValidatedArtifacts(t *testing.T) {
 		t.Fatalf("read summary json: %v", err)
 	}
 	var summaryJSON struct {
-		SchemaVersion string `json:"schema_version"`
-		Kind          string `json:"kind"`
-		Tier          string `json:"tier"`
-		Status        string `json:"status"`
-		Commands      []struct {
+		SchemaVersion           string   `json:"schema_version"`
+		Kind                    string   `json:"kind"`
+		Tier                    string   `json:"tier"`
+		Status                  string   `json:"status"`
+		ObservedFailures        int      `json:"observed_failures"`
+		ClassifiedFailures      int      `json:"classified_failures"`
+		UnclassifiedFailures    int      `json:"unclassified_failures"`
+		ReleaseBlockingFailures int      `json:"release_blocking_failures"`
+		ReproducibilitySeeds    []string `json:"reproducibility_seeds"`
+		Commands                []struct {
 			Name    string `json:"name"`
 			Command string `json:"command"`
 			Status  string `json:"status"`
@@ -63,6 +68,12 @@ func TestRunMemoryFuzzShortWritesValidatedArtifacts(t *testing.T) {
 	}
 	if summaryJSON.SchemaVersion != "tetra.memory-fuzz-short.summary.v1" || summaryJSON.Kind != "tier1_short_ci_smoke" || summaryJSON.Tier != "tier1_short_ci_smoke" || summaryJSON.Status != "pass" {
 		t.Fatalf("summary json identity/status = %#v", summaryJSON)
+	}
+	if summaryJSON.ObservedFailures != 0 || summaryJSON.ClassifiedFailures != 0 || summaryJSON.UnclassifiedFailures != 0 || summaryJSON.ReleaseBlockingFailures != 0 {
+		t.Fatalf("summary json failure classification counts = observed %d classified %d unclassified %d release-blocking %d, want all zero", summaryJSON.ObservedFailures, summaryJSON.ClassifiedFailures, summaryJSON.UnclassifiedFailures, summaryJSON.ReleaseBlockingFailures)
+	}
+	if len(summaryJSON.ReproducibilitySeeds) != 12 || !strings.Contains(strings.Join(summaryJSON.ReproducibilitySeeds, "\n"), "memory-fuzz:v11:seed:1011") {
+		t.Fatalf("summary json reproducibility seeds = %#v, want deterministic v0-v11 seeds", summaryJSON.ReproducibilitySeeds)
 	}
 	for _, want := range []string{"oracle_report", "summary_md", "summary_json", "artifact_hashes"} {
 		if summaryJSON.Artifacts[want] == "" {

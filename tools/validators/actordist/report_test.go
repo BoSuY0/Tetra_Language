@@ -63,6 +63,20 @@ func TestValidateReportRejectsMissingSameCommitArtifactMetadata(t *testing.T) {
 	}
 }
 
+func TestValidateReportForCurrentHeadRejectsStaleGitHead(t *testing.T) {
+	raw := validDistributedActorRuntimeReport(t)
+	err := ValidateReportForCurrentHead(raw, "c0258b63a636775b114d69d31cb7832fc3991b05")
+	if err == nil {
+		t.Fatalf("expected stale git_head to fail")
+	}
+	if !strings.Contains(err.Error(), "does not match current git head") {
+		t.Fatalf("error = %v, want stale git_head rejection", err)
+	}
+	if err := ValidateReportForCurrentHead(raw, "e2c19b8ee276158f8eb2c54cf61e11bd84952893"); err != nil {
+		t.Fatalf("matching current head should pass: %v", err)
+	}
+}
+
 func TestValidateReportRejectsMissingFrameOrder(t *testing.T) {
 	var report map[string]any
 	if err := json.Unmarshal(validDistributedActorRuntimeReport(t), &report); err != nil {

@@ -51,9 +51,9 @@ func TestReleasePackagesRunsSurfaceGateBeforePublishing(t *testing.T) {
 	}
 	text := string(raw)
 	for _, want := range []string{
-		"name: Surface release gate",
-		`report_dir="${{ steps.meta.outputs.out_dir }}/surface-release-v1"`,
-		`bash scripts/release/surface/release-gate.sh --report-dir "$report_dir"`,
+		"name: Surface product gate",
+		`report_dir="${{ steps.meta.outputs.out_dir }}/surface-product-v1"`,
+		`bash scripts/release/surface/product-gate.sh --report-dir "$report_dir"`,
 		"name: Surface experimental regression gate",
 		`report_dir="${{ steps.meta.outputs.out_dir }}/surface-experimental-regression"`,
 		`bash scripts/release/surface/gate.sh --report-dir "$report_dir"`,
@@ -63,18 +63,18 @@ func TestReleasePackagesRunsSurfaceGateBeforePublishing(t *testing.T) {
 		"name: Surface API stability gate",
 		`report_dir="${{ steps.meta.outputs.out_dir }}/surface-api-stability-v1"`,
 		`bash scripts/release/surface/api-stability-gate.sh --report-dir "$report_dir"`,
-		`${{ steps.meta.outputs.out_dir }}/surface-release-v1/**`,
+		`${{ steps.meta.outputs.out_dir }}/surface-product-v1/**`,
 		`${{ steps.meta.outputs.out_dir }}/surface-experimental-regression/**`,
 		`${{ steps.meta.outputs.out_dir }}/safe-view-lifetime/**`,
 		`${{ steps.meta.outputs.out_dir }}/surface-api-stability-v1/**`,
-		"Surface v1 release evidence runs the Surface release gate, experimental regression gate, safe-view lifetime gate, and API stability gate before publishing.",
+		"Surface v1 product evidence runs the Surface product gate, experimental regression gate, safe-view lifetime gate, and API stability gate before publishing.",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("release-packages workflow missing Surface gate detail %q", want)
 		}
 	}
 
-	gateIdx := strings.Index(text, "name: Surface release gate")
+	gateIdx := strings.Index(text, "name: Surface product gate")
 	for _, publishStep := range []string{
 		"name: Upload package artifacts",
 		"name: Create or update GitHub Release",
@@ -87,7 +87,13 @@ func TestReleasePackagesRunsSurfaceGateBeforePublishing(t *testing.T) {
 			t.Fatalf("release-packages workflow missing publish step %q", publishStep)
 		}
 		if gateIdx < 0 || gateIdx > publishIdx {
-			t.Fatalf("Surface release gate must run before %q", publishStep)
+			t.Fatalf("Surface product gate must run before %q", publishStep)
+		}
+	}
+	section := releaseStepWindow(text, "name: Surface product gate", "name: Surface experimental regression gate")
+	for _, forbidden := range []string{"continue-on-error", "|| true", "set +e", "GOCACHE=/tmp", "GOTMPDIR=/tmp"} {
+		if strings.Contains(section, forbidden) {
+			t.Fatalf("Surface product release package gate must not contain bypass or tmpfs cache marker %q", forbidden)
 		}
 	}
 }
@@ -232,6 +238,69 @@ func TestReleasePackagesRunsActorRuntimeFoundationGateBeforePublishing(t *testin
 	}
 	if section := releaseStepWindow(text, "name: Actor runtime foundation release gate", "name: Upload package artifacts"); strings.Contains(section, "continue-on-error") {
 		t.Fatalf("actor runtime foundation release gate must not use continue-on-error")
+	}
+}
+
+func TestReleasePackagesRunsMemory100ProdStableGateBeforePublishing(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "release-packages.yml"))
+	if err != nil {
+		t.Fatalf("read release-packages workflow: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		"name: Memory100 prod-stable gate",
+		"export GOTELEMETRY=off",
+		`export GOCACHE="${PWD}/.cache/go-build-memory-100-prod-stable-release"`,
+		`export GOTMPDIR="${PWD}/.cache/go-tmp-memory-100-prod-stable-release"`,
+		`mkdir -p "$GOCACHE" "$GOTMPDIR"`,
+		`report_dir="${{ steps.meta.outputs.out_dir }}/memory-100-prod-stable"`,
+		`bash scripts/release/post_v0_4/memory-100-prod-stable-gate.sh --report-dir "$report_dir"`,
+		`${{ steps.meta.outputs.out_dir }}/memory-100-prod-stable/**`,
+		"Memory100 scoped prod-stable evidence runs the strict aggregate gate before publishing and uploads",
+		"`memory-100-prod-stable-manifest.json`",
+		"`artifact-hashes.json`",
+		"`runtime-memory/runtime-memory-contract.json`",
+		"`proof-transition/proof-transition-report.json`",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("release-packages workflow missing Memory100 gate detail %q", want)
+		}
+	}
+
+	memory100Idx := strings.Index(text, "name: Memory100 prod-stable gate")
+	for _, predecessor := range []string{
+		"name: Memory production release gate",
+		"name: Integrated Memory/Islands/Surface release gate",
+		"name: RAM contract release gate",
+		"name: Actor runtime foundation release gate",
+	} {
+		predecessorIdx := strings.Index(text, predecessor)
+		if predecessorIdx < 0 {
+			t.Fatalf("release-packages workflow missing predecessor gate %q", predecessor)
+		}
+		if memory100Idx < 0 || memory100Idx < predecessorIdx {
+			t.Fatalf("Memory100 prod-stable gate must run after %q", predecessor)
+		}
+	}
+	for _, publishStep := range []string{
+		"name: Upload package artifacts",
+		"name: Create or update GitHub Release",
+		"name: Build container image",
+		"name: Publish GHCR image",
+		"name: Update Homebrew tap",
+	} {
+		publishIdx := strings.Index(text, publishStep)
+		if publishIdx < 0 {
+			t.Fatalf("release-packages workflow missing publish step %q", publishStep)
+		}
+		if memory100Idx < 0 || memory100Idx > publishIdx {
+			t.Fatalf("Memory100 prod-stable gate must run before %q", publishStep)
+		}
+	}
+	for _, forbidden := range []string{"continue-on-error", "|| true", "set +e", "GOCACHE=/tmp", "GOTMPDIR=/tmp"} {
+		if section := releaseStepWindow(text, "name: Memory100 prod-stable gate", "name: Upload package artifacts"); strings.Contains(section, forbidden) {
+			t.Fatalf("Memory100 release package gate must not contain bypass or tmpfs cache marker %q", forbidden)
+		}
 	}
 }
 

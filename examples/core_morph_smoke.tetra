@@ -1,0 +1,16 @@
+// Core lib.core.morph Morph Capsule smoke.
+module examples.core_morph_smoke
+
+import lib.core.block as block
+import lib.core.morph as morph
+
+func main() -> Int:
+    let recipe: morph.Recipe = morph.recipe_control_action()
+    let form_recipe: morph.Recipe = morph.recipe_form_field()
+    let row_recipe: morph.Recipe = morph.recipe_list_row()
+    let expansion: morph.RecipeExpansion = morph.recipe_expansion(form_recipe, block.id(7))
+    let policy: morph.TokenGraphPolicy = morph.token_graph_policy_default()
+    let density: morph.DensityMapping = morph.density_mapping_default()
+    if morph.capsule_self_check() && morph.recipe_expands_to_block(recipe) && morph.recipe_expands_to_block(form_recipe) && morph.recipe_expands_to_block(row_recipe) && morph.expansion_valid(expansion) && morph.token_graph_policy_valid(policy) && morph.density_mapping_valid(density):
+        return 42
+    return 1

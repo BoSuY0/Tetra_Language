@@ -83,7 +83,17 @@ bash scripts/release/surface/surface-headless-release-smoke.sh --report-dir "$re
 bash scripts/release/surface/surface-headless-release-text-input-smoke.sh --report-dir "$report_dir"
 bash scripts/release/surface/surface-headless-release-toolkit-smoke.sh --report-dir "$report_dir"
 bash scripts/release/surface/surface-headless-release-accessibility-smoke.sh --report-dir "$report_dir"
+bash scripts/release/surface/surface-headless-app-model-smoke.sh --report-dir "$report_dir"
 bash scripts/release/surface/surface-linux-x64-release-window-smoke.sh --report-dir "$report_dir"
+bash scripts/release/surface/surface-linux-x64-release-app-shell-smoke.sh --report-dir "$report_dir"
+bash scripts/release/surface/surface-dev-workflow-smoke.sh --report-dir "$report_dir"
+bash scripts/release/surface/surface-inspector-smoke.sh --report-dir "$report_dir"
+bash scripts/release/surface/surface-template-smoke.sh --report-dir "$report_dir"
+bash scripts/release/surface/surface-reference-apps-smoke.sh --report-dir "$report_dir_arg"
+bash scripts/release/surface/surface-package-smoke.sh --report-dir "$report_dir_arg"
+bash scripts/release/surface/surface-crash-report-smoke.sh --report-dir "$report_dir_arg"
+bash scripts/release/surface/surface-i18n-smoke.sh --report-dir "$report_dir_arg"
+bash scripts/release/surface/surface-widget-migration-smoke.sh --report-dir "$report_dir_arg"
 bash scripts/release/surface/surface-linux-x64-release-text-input-smoke.sh --report-dir "$report_dir"
 bash scripts/release/surface/surface-linux-x64-release-toolkit-smoke.sh --report-dir "$report_dir"
 bash scripts/release/surface/surface-linux-x64-release-accessibility-smoke.sh --report-dir "$report_dir"
@@ -109,6 +119,96 @@ command_line="bash scripts/release/surface/release-gate.sh"
 if [[ -n "$formatted_args" ]]; then
   command_line+=" $formatted_args"
 fi
+macos_target_host_status_path="$report_dir/surface-macos-x64-target-host-status.json"
+windows_target_host_status_path="$report_dir/surface-windows-x64-target-host-status.json"
+
+cat > "$macos_target_host_status_path" <<JSON
+{
+  "schema": "tetra.surface.target-host-status.v1",
+  "target": "macos-x64",
+  "status": "unsupported",
+  "tier": "UNSUPPORTED",
+  "release_scope": "surface-v1-linux-web",
+  "source": "scripts/release/surface/release-gate.sh",
+  "host_os": $(json_string "$host_os"),
+  "host_arch": $(json_string "$host_arch"),
+  "reason": "no macOS target-host Surface v1 runner evidence exists in this release; build-only evidence is not Surface runtime evidence",
+  "production_claim": false,
+  "experimental": false,
+  "target_host_evidence": false,
+  "build_only_evidence": false,
+  "build_only_promotion": false,
+  "linux_substitute": false,
+  "ci_artifact_required": true,
+  "required_evidence": {
+    "real_window": false,
+    "native_input": false,
+    "clipboard": false,
+    "dpi_scaling": false,
+    "accessibility_snapshot": false,
+    "app_shell": false
+  },
+  "unsupported_claims": [
+    "macos-real-window-surface",
+    "macos-production-surface-nonclaim",
+    "macos-target-host-runtime",
+    "build-only-macos-surface-runtime",
+    "linux-substitute-macos-surface-runtime"
+  ],
+  "negative_guards": {
+    "no_linux_substitute": true,
+    "no_build_only_promotion": true,
+    "no_production_claim": true,
+    "no_docs_only_evidence": true,
+    "no_copied_report": true,
+    "ci_artifact_required": true
+  }
+}
+JSON
+
+cat > "$windows_target_host_status_path" <<JSON
+{
+  "schema": "tetra.surface.target-host-status.v1",
+  "target": "windows-x64",
+  "status": "unsupported",
+  "tier": "UNSUPPORTED",
+  "release_scope": "surface-v1-linux-web",
+  "source": "scripts/release/surface/release-gate.sh",
+  "host_os": $(json_string "$host_os"),
+  "host_arch": $(json_string "$host_arch"),
+  "reason": "no Windows target-host Surface v1 runner evidence exists in this release; build-only evidence is not Surface runtime evidence",
+  "production_claim": false,
+  "experimental": false,
+  "target_host_evidence": false,
+  "build_only_evidence": false,
+  "build_only_promotion": false,
+  "linux_substitute": false,
+  "ci_artifact_required": true,
+  "required_evidence": {
+    "real_window": false,
+    "native_input": false,
+    "clipboard": false,
+    "dpi_scaling": false,
+    "accessibility_snapshot": false,
+    "app_shell": false
+  },
+  "unsupported_claims": [
+    "windows-real-window-surface",
+    "windows-production-surface-nonclaim",
+    "windows-target-host-runtime",
+    "build-only-windows-surface-runtime",
+    "linux-substitute-windows-surface-runtime"
+  ],
+  "negative_guards": {
+    "no_linux_substitute": true,
+    "no_build_only_promotion": true,
+    "no_production_claim": true,
+    "no_docs_only_evidence": true,
+    "no_copied_report": true,
+    "ci_artifact_required": true
+  }
+}
+JSON
 
 cat > "$summary_path" <<JSON
 {
@@ -148,6 +248,19 @@ cat > "$summary_path" <<JSON
   "clipboard": "clipboard-text-v1",
   "ime": "composition-baseline-v1",
   "accessibility": "platform-bridge-v1",
+  "app_model": "explicit-command-reducer-v1",
+  "linux_app_shell": "linux-app-shell-subset-v1",
+  "app_shell_features": "electron-feature-ledger-v1",
+  "security_permissions": "surface-security-permission-v1",
+  "performance_budget": "surface-performance-budget-v1",
+  "developer_fast_loop": "surface-dev-workflow-v1",
+  "inspector": "surface-inspector-v1",
+  "project_templates": "surface-template-smoke-v1",
+  "reference_apps": "surface-reference-app-suite-v1",
+  "surface_package": "surface-package-v1",
+  "crash_reporting": "surface-crash-report-v1",
+  "i18n_localization": "surface-i18n-v1",
+  "widget_migration": "surface-widget-migration-v1",
   "browser_surface": "browser-canvas-release-v1",
   "linux_surface": "linux-x64-release-window-v1",
   "block_system": "block-system",
@@ -167,10 +280,22 @@ required_reports=(
   "surface-headless-release-text-input.json"
   "surface-headless-release-toolkit.json"
   "surface-headless-release-accessibility.json"
+  "surface-headless-app-model.json"
   "surface-linux-x64-release-window.json"
+  "surface-linux-x64-release-app-shell.json"
+  "surface-dev-workflow.json"
+  "surface-inspector.json"
+  "surface-template-smoke.json"
+  "surface-reference-apps.json"
+  "surface-package.json"
+  "surface-crash-report.json"
+  "surface-i18n.json"
+  "surface-widget-migration.json"
   "surface-linux-x64-release-text-input.json"
   "surface-linux-x64-release-toolkit.json"
   "surface-linux-x64-release-accessibility.json"
+  "surface-macos-x64-target-host-status.json"
+  "surface-windows-x64-target-host-status.json"
   "surface-wasm32-web-release-browser.json"
   "surface-wasm32-web-release-text-input.json"
   "surface-wasm32-web-release-toolkit.json"
@@ -196,9 +321,20 @@ for report in "${required_reports[@]}"; do
 done
 
 go run ./tools/cmd/validate-surface-runtime --report "$report_dir/surface-release-summary.json" --release surface-v1
+go run ./tools/cmd/validate-surface-security-report --report "$report_dir/surface-linux-x64-release-app-shell.json"
+go run ./tools/cmd/validate-surface-performance-budget --report "$report_dir/surface-linux-x64-release-app-shell.json"
+go run ./tools/cmd/validate-surface-dev-workflow --report "$report_dir/surface-dev-workflow.json"
+go run ./tools/cmd/validate-surface-inspector --report "$report_dir/surface-inspector.json"
+go run ./tools/cmd/validate-surface-template-smoke --report "$report_dir/surface-template-smoke.json"
+go run ./tools/cmd/validate-surface-reference-apps --report "$report_dir/surface-reference-apps.json"
+go run ./tools/cmd/validate-surface-package --report "$report_dir/surface-package.json"
+go run ./tools/cmd/validate-surface-crash-report --report "$report_dir/surface-crash-report.json"
+go run ./tools/cmd/validate-surface-i18n --report "$report_dir/surface-i18n.json"
+go run ./tools/cmd/validate-surface-widget-migration --report "$report_dir/surface-widget-migration.json"
 go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"
 go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-hashes.json"
 go run ./tools/cmd/validate-surface-release-state --report-dir "$report_dir" --expected-status current --scope surface-v1-linux-web --manifest docs/generated/manifest.json
+go run ./tools/cmd/validate-surface-claims --root "$repo_root" --report-dir "$report_dir"
 
 echo "Surface v1 release gate reports: $report_dir"
 echo "Surface v1 release gate summary: $report_dir/surface-release-summary.json"

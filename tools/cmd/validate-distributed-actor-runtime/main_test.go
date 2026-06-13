@@ -12,8 +12,11 @@ func TestValidateDistributedActorRuntimeReportAcceptsExecutableEvidence(t *testi
 	if err := os.WriteFile(reportPath, validDistributedActorRuntimeReportJSON(), 0o644); err != nil {
 		t.Fatalf("write report: %v", err)
 	}
-	if err := validateDistributedActorRuntimeReport(reportPath); err != nil {
+	if err := validateDistributedActorRuntimeReport(reportPath, ""); err != nil {
 		t.Fatalf("validateDistributedActorRuntimeReport failed: %v", err)
+	}
+	if err := validateDistributedActorRuntimeReport(reportPath, "e2c19b8ee276158f8eb2c54cf61e11bd84952893"); err != nil {
+		t.Fatalf("validateDistributedActorRuntimeReport with matching head failed: %v", err)
 	}
 }
 
@@ -23,7 +26,7 @@ func TestValidateDistributedActorRuntimeReportRejectsThinPaperEvidence(t *testin
 	if err := os.WriteFile(reportPath, raw, 0o644); err != nil {
 		t.Fatalf("write report: %v", err)
 	}
-	err := validateDistributedActorRuntimeReport(reportPath)
+	err := validateDistributedActorRuntimeReport(reportPath, "")
 	if err == nil {
 		t.Fatalf("expected thin report to fail")
 	}
@@ -31,6 +34,20 @@ func TestValidateDistributedActorRuntimeReportRejectsThinPaperEvidence(t *testin
 		if !strings.Contains(strings.ToLower(err.Error()), want) {
 			t.Fatalf("error missing %q:\n%v", want, err)
 		}
+	}
+}
+
+func TestValidateDistributedActorRuntimeReportRejectsStaleCurrentGitHead(t *testing.T) {
+	reportPath := filepath.Join(t.TempDir(), "distributed-actors.json")
+	if err := os.WriteFile(reportPath, validDistributedActorRuntimeReportJSON(), 0o644); err != nil {
+		t.Fatalf("write report: %v", err)
+	}
+	err := validateDistributedActorRuntimeReport(reportPath, "c0258b63a636775b114d69d31cb7832fc3991b05")
+	if err == nil {
+		t.Fatalf("expected stale current git head to fail")
+	}
+	if !strings.Contains(err.Error(), "does not match current git head") {
+		t.Fatalf("error = %v, want stale git_head rejection", err)
 	}
 }
 

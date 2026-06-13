@@ -13,7 +13,13 @@ import (
 const (
 	SchemaV1                      = "tetra.surface.runtime.v1"
 	ReleaseSchemaV1               = "tetra.surface.release.v1"
+	RendererFeatureSchemaV1       = "tetra.surface.renderer-feature.v1"
 	TextInputSchemaV1             = "tetra.surface.text-input.v1"
+	LinuxAppShellSchemaV1         = "tetra.surface.linux-app-shell.v1"
+	BrowserSurfaceSchemaV1        = "tetra.surface.browser-surface.v1"
+	SecurityPermissionSchemaV1    = "tetra.surface.security-permission.v1"
+	PerformanceBudgetSchemaV1     = "tetra.surface.performance-budget.v1"
+	TargetHostStatusSchemaV1      = "tetra.surface.target-host-status.v1"
 	ReleaseScopeSurfaceV1LinuxWeb = "surface-v1-linux-web"
 )
 
@@ -40,6 +46,7 @@ type Report struct {
 	PaintQualityLevel               string                          `json:"paint_quality_level,omitempty"`
 	PaintCacheBudgetBytes           int                             `json:"paint_cache_budget_bytes,omitempty"`
 	PaintUnsupportedBlur            bool                            `json:"paint_unsupported_blur,omitempty"`
+	Renderer                        *RendererReport                 `json:"renderer,omitempty"`
 	TextMeasurements                []TextMeasurementReport         `json:"text_measurements,omitempty"`
 	FontFallbacks                   []FontFallbackReport            `json:"font_fallbacks,omitempty"`
 	GlyphCaches                     []GlyphCacheReport              `json:"glyph_caches,omitempty"`
@@ -49,6 +56,7 @@ type Report struct {
 	LayoutConstraints               []BlockLayoutConstraintReport   `json:"layout_constraints,omitempty"`
 	LayoutPasses                    []BlockLayoutPassReport         `json:"layout_passes,omitempty"`
 	LayoutScrolls                   []BlockLayoutScrollReport       `json:"layout_scrolls,omitempty"`
+	LayoutDensity                   *BlockLayoutDensityReport       `json:"layout_density,omitempty"`
 	LayoutFeatures                  []string                        `json:"layout_features,omitempty"`
 	LayoutQualityLevel              string                          `json:"layout_quality_level,omitempty"`
 	LayoutUnsupportedCSSFlexbox     bool                            `json:"layout_unsupported_css_flexbox,omitempty"`
@@ -79,6 +87,11 @@ type Report struct {
 	Morph                           *MorphReport                    `json:"morph,omitempty"`
 	Toolkit                         *ToolkitReport                  `json:"toolkit,omitempty"`
 	AccessibilityTree               *AccessibilityTreeReport        `json:"accessibility_tree,omitempty"`
+	AppModel                        *AppModelReport                 `json:"app_model,omitempty"`
+	LinuxAppShell                   *LinuxAppShellReport            `json:"linux_app_shell,omitempty"`
+	SecurityPermissions             *SecurityPermissionReport       `json:"security_permissions,omitempty"`
+	SurfacePerformanceBudget        *SurfacePerformanceBudgetReport `json:"surface_performance_budget,omitempty"`
+	BrowserSurface                  *BrowserSurfaceReport           `json:"browser_surface,omitempty"`
 	Events                          []EventReport                   `json:"events"`
 	Frames                          []FrameReport                   `json:"frames"`
 	StateTransitions                []StateTransitionReport         `json:"state_transitions"`
@@ -109,6 +122,19 @@ type ReleaseSummaryReport struct {
 	Clipboard               string   `json:"clipboard"`
 	IME                     string   `json:"ime"`
 	Accessibility           string   `json:"accessibility"`
+	AppModel                string   `json:"app_model"`
+	LinuxAppShell           string   `json:"linux_app_shell"`
+	AppShellFeatures        string   `json:"app_shell_features"`
+	SecurityPermissions     string   `json:"security_permissions"`
+	PerformanceBudget       string   `json:"performance_budget"`
+	DeveloperFastLoop       string   `json:"developer_fast_loop"`
+	Inspector               string   `json:"inspector"`
+	ProjectTemplates        string   `json:"project_templates"`
+	ReferenceApps           string   `json:"reference_apps"`
+	SurfacePackage          string   `json:"surface_package"`
+	CrashReporting          string   `json:"crash_reporting"`
+	I18nLocalization        string   `json:"i18n_localization"`
+	WidgetMigration         string   `json:"widget_migration"`
 	BrowserSurface          string   `json:"browser_surface"`
 	LinuxSurface            string   `json:"linux_surface"`
 	BlockSystem             string   `json:"block_system"`
@@ -123,34 +149,44 @@ type ReleaseSummaryReport struct {
 }
 
 type TextInputReport struct {
-	Schema                  string                 `json:"schema"`
-	Target                  string                 `json:"target"`
-	Source                  string                 `json:"source"`
-	Level                   string                 `json:"level"`
-	Experimental            bool                   `json:"experimental"`
-	ProductionClaim         bool                   `json:"production_claim"`
-	Storage                 string                 `json:"storage"`
-	UTF8Validation          bool                   `json:"utf8_validation"`
-	Caret                   bool                   `json:"caret"`
-	Selection               bool                   `json:"selection"`
-	Backspace               bool                   `json:"backspace"`
-	Delete                  bool                   `json:"delete"`
-	HomeEnd                 bool                   `json:"home_end"`
-	ArrowLeftRight          bool                   `json:"arrow_left_right"`
-	CompositionEvents       bool                   `json:"composition_events"`
-	CompositionCommit       bool                   `json:"composition_commit"`
-	CompositionCancel       bool                   `json:"composition_cancel"`
-	ClipboardRead           bool                   `json:"clipboard_read"`
-	ClipboardWrite          bool                   `json:"clipboard_write"`
-	ClipboardHostABI        bool                   `json:"clipboard_host_abi"`
-	ClipboardOwnedCopy      bool                   `json:"clipboard_owned_copy"`
-	CompositionTrace        CompositionTraceReport `json:"composition_trace"`
-	BorrowedViewStorage     bool                   `json:"borrowed_view_storage"`
-	SafeViewLifetimeChecked bool                   `json:"safe_view_lifetime_checked"`
-	Processes               []ProcessReport        `json:"processes"`
-	Artifacts               []ArtifactReport       `json:"artifacts"`
-	ArtifactScan            ArtifactScanReport     `json:"artifact_scan"`
-	Cases                   []CaseReport           `json:"cases"`
+	Schema                     string                          `json:"schema"`
+	Target                     string                          `json:"target"`
+	Source                     string                          `json:"source"`
+	Level                      string                          `json:"level"`
+	Experimental               bool                            `json:"experimental"`
+	ProductionClaim            bool                            `json:"production_claim"`
+	Storage                    string                          `json:"storage"`
+	UTF8Validation             bool                            `json:"utf8_validation"`
+	InvalidUTF8Rejected        bool                            `json:"invalid_utf8_rejected"`
+	Caret                      bool                            `json:"caret"`
+	Selection                  bool                            `json:"selection"`
+	SelectionClipboardTransfer bool                            `json:"selection_clipboard_transfer"`
+	Multiline                  bool                            `json:"multiline"`
+	Backspace                  bool                            `json:"backspace"`
+	Delete                     bool                            `json:"delete"`
+	HomeEnd                    bool                            `json:"home_end"`
+	ArrowLeftRight             bool                            `json:"arrow_left_right"`
+	CompositionEvents          bool                            `json:"composition_events"`
+	CompositionCommit          bool                            `json:"composition_commit"`
+	CompositionCancel          bool                            `json:"composition_cancel"`
+	ClipboardRead              bool                            `json:"clipboard_read"`
+	ClipboardWrite             bool                            `json:"clipboard_write"`
+	ClipboardHostABI           bool                            `json:"clipboard_host_abi"`
+	ClipboardOwnedCopy         bool                            `json:"clipboard_owned_copy"`
+	TargetHostCompositionTrace bool                            `json:"target_host_composition_trace"`
+	CompositionTrace           CompositionTraceReport          `json:"composition_trace"`
+	TextShapingPlan            TextShapingPlanReport           `json:"text_shaping_plan"`
+	ReferenceTraces            []TextInputReferenceTraceReport `json:"reference_traces"`
+	UnsupportedClaims          []string                        `json:"unsupported_claims"`
+	RichTextProductionClaim    bool                            `json:"rich_text_production_claim"`
+	BidiProductionClaim        bool                            `json:"bidi_production_claim"`
+	FullEditorProductionClaim  bool                            `json:"full_editor_production_claim"`
+	BorrowedViewStorage        bool                            `json:"borrowed_view_storage"`
+	SafeViewLifetimeChecked    bool                            `json:"safe_view_lifetime_checked"`
+	Processes                  []ProcessReport                 `json:"processes"`
+	Artifacts                  []ArtifactReport                `json:"artifacts"`
+	ArtifactScan               ArtifactScanReport              `json:"artifact_scan"`
+	Cases                      []CaseReport                    `json:"cases"`
 }
 
 type CompositionTraceReport struct {
@@ -158,6 +194,26 @@ type CompositionTraceReport struct {
 	Update bool `json:"update"`
 	Commit bool `json:"commit"`
 	Cancel bool `json:"cancel"`
+}
+
+type TextShapingPlanReport struct {
+	QualityLevel       string `json:"quality_level"`
+	FallbackFonts      bool   `json:"fallback_fonts"`
+	GraphemeBoundaries string `json:"grapheme_boundaries"`
+	LineBreaking       string `json:"line_breaking"`
+	Bidi               string `json:"bidi"`
+	RichText           string `json:"rich_text"`
+}
+
+type TextInputReferenceTraceReport struct {
+	Source      string `json:"source"`
+	Trace       string `json:"trace"`
+	Focus       bool   `json:"focus"`
+	Selection   bool   `json:"selection"`
+	Clipboard   bool   `json:"clipboard"`
+	Composition bool   `json:"composition"`
+	Multiline   bool   `json:"multiline"`
+	Pass        bool   `json:"pass"`
 }
 
 type ProcessReport struct {
@@ -402,14 +458,75 @@ type PaintLayerReport struct {
 }
 
 type PaintCommandReport struct {
-	Order    int        `json:"order"`
-	Command  string     `json:"command"`
-	LayerID  string     `json:"layer_id"`
-	BlockID  int        `json:"block_id"`
-	Rect     RectReport `json:"rect"`
-	Radius   int        `json:"radius,omitempty"`
-	Quality  string     `json:"quality"`
-	Checksum string     `json:"checksum"`
+	Order     int        `json:"order"`
+	Command   string     `json:"command"`
+	LayerID   string     `json:"layer_id"`
+	BlockID   int        `json:"block_id"`
+	Rect      RectReport `json:"rect"`
+	Clip      RectReport `json:"clip,omitempty"`
+	Radius    int        `json:"radius,omitempty"`
+	Opacity   int        `json:"opacity,omitempty"`
+	Transform string     `json:"transform,omitempty"`
+	Quality   string     `json:"quality"`
+	Checksum  string     `json:"checksum"`
+}
+
+type RendererReport struct {
+	Schema                       string                          `json:"schema"`
+	Backend                      string                          `json:"backend"`
+	ColorFormat                  string                          `json:"color_format"`
+	QualityLevel                 string                          `json:"quality_level"`
+	SoftwareRenderer             bool                            `json:"software_renderer"`
+	GPUProductionClaim           bool                            `json:"gpu_production_claim"`
+	BlurProductionClaim          bool                            `json:"blur_production_claim"`
+	BackdropBlurProductionClaim  bool                            `json:"backdrop_blur_production_claim"`
+	CommandOrder                 []string                        `json:"command_order"`
+	CompositorLayers             []RendererCompositorLayerReport `json:"compositor_layers"`
+	DirtyRects                   []RendererDirtyRectReport       `json:"dirty_rects"`
+	Invalidations                []RendererInvalidationReport    `json:"invalidations"`
+	CacheStats                   RendererCacheStatsReport        `json:"cache_stats"`
+	UnsupportedEffectsRejected   []string                        `json:"unsupported_effects_rejected,omitempty"`
+	DeterministicFrameChecksums  []string                        `json:"deterministic_frame_checksums,omitempty"`
+	ReferenceFrameArtifactSHA256 string                          `json:"reference_frame_artifact_sha256,omitempty"`
+}
+
+type RendererCompositorLayerReport struct {
+	ID          string     `json:"id"`
+	Kind        string     `json:"kind"`
+	Order       int        `json:"order"`
+	BlockID     int        `json:"block_id"`
+	Rect        RectReport `json:"rect"`
+	Clip        RectReport `json:"clip,omitempty"`
+	ClipApplied bool       `json:"clip_applied,omitempty"`
+	Opacity     int        `json:"opacity"`
+	Transform   string     `json:"transform"`
+	Checksum    string     `json:"checksum"`
+}
+
+type RendererDirtyRectReport struct {
+	FrameOrder int        `json:"frame_order"`
+	Rect       RectReport `json:"rect"`
+	Reason     string     `json:"reason"`
+	Checksum   string     `json:"checksum"`
+}
+
+type RendererInvalidationReport struct {
+	Order     int        `json:"order"`
+	BlockID   int        `json:"block_id"`
+	Reason    string     `json:"reason"`
+	DirtyRect RectReport `json:"dirty_rect"`
+	Repaint   bool       `json:"repaint"`
+}
+
+type RendererCacheStatsReport struct {
+	ID          string `json:"id"`
+	Strategy    string `json:"strategy"`
+	BudgetBytes int    `json:"budget_bytes"`
+	UsedBytes   int    `json:"used_bytes"`
+	EntryCount  int    `json:"entry_count"`
+	Hits        int    `json:"hits"`
+	Misses      int    `json:"misses"`
+	Bounded     bool   `json:"bounded"`
 }
 
 type TextMeasurementReport struct {
@@ -505,6 +622,16 @@ type BlockLayoutScrollReport struct {
 	MaxOffsetY int        `json:"max_offset_y"`
 	Clipped    bool       `json:"clipped"`
 	Checksum   string     `json:"checksum"`
+}
+
+type BlockLayoutDensityReport struct {
+	TargetDPI      int      `json:"target_dpi"`
+	ScaleMilli     int      `json:"scale_milli"`
+	BaseUnitPx     int      `json:"base_unit_px"`
+	RoundingPolicy string   `json:"rounding_policy"`
+	PixelSnapping  bool     `json:"pixel_snapping"`
+	Breakpoints    []string `json:"breakpoints"`
+	Checksum       string   `json:"checksum"`
 }
 
 type BlockEventRouteReport struct {
@@ -798,6 +925,528 @@ type AccessibilityNegativeGuardsReport struct {
 	ArtifactScanChecked         bool `json:"artifact_scan_checked"`
 }
 
+type AppModelReport struct {
+	Schema                string                          `json:"schema"`
+	AppModelLevel         string                          `json:"app_model_level"`
+	ReleaseScope          string                          `json:"release_scope"`
+	Source                string                          `json:"source"`
+	Module                string                          `json:"module"`
+	UsesComponentTreeAPI  bool                            `json:"uses_component_tree_api"`
+	CallerOwnedState      bool                            `json:"caller_owned_state"`
+	ExplicitEventBindings bool                            `json:"explicit_event_bindings"`
+	DeterministicReducer  bool                            `json:"deterministic_reducer"`
+	HiddenAppState        bool                            `json:"hidden_app_state"`
+	ReactRuntime          bool                            `json:"react_runtime"`
+	ElectronRuntime       bool                            `json:"electron_runtime"`
+	DOMRuntime            bool                            `json:"dom_runtime"`
+	DOMEventModel         bool                            `json:"dom_event_model"`
+	UserJS                bool                            `json:"user_js"`
+	PlatformWidgets       bool                            `json:"platform_widgets"`
+	StateFields           []string                        `json:"state_fields"`
+	CommandRegistry       []string                        `json:"command_registry"`
+	EventBindings         []AppModelEventBindingReport    `json:"event_bindings"`
+	CommandDispatches     []AppModelCommandDispatchReport `json:"command_dispatches"`
+	NavigationTransitions []AppModelNavigationReport      `json:"navigation_transitions"`
+	FocusScopeTransitions []AppModelFocusScopeReport      `json:"focus_scope_transitions"`
+	AsyncTasks            []AppModelAsyncTaskReport       `json:"async_tasks"`
+	UndoRedoTransitions   []AppModelUndoRedoReport        `json:"undo_redo_transitions"`
+	NegativeGuards        AppModelNegativeGuardsReport    `json:"negative_guards"`
+}
+
+type AppModelEventBindingReport struct {
+	Order        int      `json:"order"`
+	EventOrder   int      `json:"event_order"`
+	EventKind    string   `json:"event_kind"`
+	Target       string   `json:"target"`
+	DispatchPath []string `json:"dispatch_path"`
+	Command      string   `json:"command"`
+	Explicit     bool     `json:"explicit"`
+}
+
+type AppModelCommandDispatchReport struct {
+	Order        int               `json:"order"`
+	EventOrder   int               `json:"event_order"`
+	Command      string            `json:"command"`
+	Kind         string            `json:"kind"`
+	Target       string            `json:"target"`
+	Handled      bool              `json:"handled"`
+	BeforeState  map[string]string `json:"before_state"`
+	AfterState   map[string]string `json:"after_state"`
+	Reversible   bool              `json:"reversible,omitempty"`
+	HistoryIndex int               `json:"history_index,omitempty"`
+	AsyncTaskID  string            `json:"async_task_id,omitempty"`
+}
+
+type AppModelNavigationReport struct {
+	Order             int      `json:"order"`
+	Command           string   `json:"command"`
+	Operation         string   `json:"operation"`
+	BeforeRoute       string   `json:"before_route"`
+	AfterRoute        string   `json:"after_route"`
+	StackBefore       []string `json:"stack_before"`
+	StackAfter        []string `json:"stack_after"`
+	UnderflowRejected bool     `json:"underflow_rejected"`
+}
+
+type AppModelFocusScopeReport struct {
+	Order       int    `json:"order"`
+	Scope       string `json:"scope"`
+	BeforeFocus string `json:"before_focus"`
+	AfterFocus  string `json:"after_focus"`
+	Wrapped     bool   `json:"wrapped"`
+	ModalTrap   bool   `json:"modal_trap"`
+	Escaped     bool   `json:"escaped"`
+}
+
+type AppModelAsyncTaskReport struct {
+	ID              string            `json:"id"`
+	Command         string            `json:"command"`
+	Operation       string            `json:"operation"`
+	Status          string            `json:"status"`
+	BeforeState     map[string]string `json:"before_state"`
+	AfterState      map[string]string `json:"after_state"`
+	CompletionOrder int               `json:"completion_order"`
+	Canceled        bool              `json:"canceled"`
+}
+
+type AppModelUndoRedoReport struct {
+	Order               int    `json:"order"`
+	Command             string `json:"command"`
+	HistoryIndex        int    `json:"history_index"`
+	Operation           string `json:"operation"`
+	Before              string `json:"before"`
+	After               string `json:"after"`
+	MatchedHistoryEntry bool   `json:"matched_history_entry"`
+	Applied             bool   `json:"applied"`
+}
+
+type AppModelNegativeGuardsReport struct {
+	NoHiddenAppState              bool `json:"no_hidden_app_state"`
+	NoReactHooks                  bool `json:"no_react_hooks"`
+	NoDOMEventModel               bool `json:"no_dom_event_model"`
+	NoUserJS                      bool `json:"no_user_js"`
+	NoPlatformWidgets             bool `json:"no_platform_widgets"`
+	AsyncCancelNoMutation         bool `json:"async_cancel_no_mutation"`
+	NavigationUnderflowRejected   bool `json:"navigation_underflow_rejected"`
+	FocusScopeEscapeRejected      bool `json:"focus_scope_escape_rejected"`
+	UndoRedoRequiresHistory       bool `json:"undo_redo_requires_history"`
+	CommandWithoutBindingRejected bool `json:"command_without_binding_rejected"`
+}
+
+type BrowserSurfaceReport struct {
+	Schema              string                            `json:"schema"`
+	BrowserSurfaceLevel string                            `json:"browser_surface_level"`
+	ReleaseScope        string                            `json:"release_scope"`
+	Source              string                            `json:"source"`
+	HostAdapter         string                            `json:"host_adapter"`
+	ProductionClaim     bool                              `json:"production_claim"`
+	Experimental        bool                              `json:"experimental"`
+	CompilerOwnedBoot   bool                              `json:"compiler_owned_boot"`
+	DOMHostCanvasOnly   bool                              `json:"dom_host_canvas_only"`
+	Canvas              BrowserSurfaceCanvasReport        `json:"canvas"`
+	Input               BrowserSurfaceInputReport         `json:"input"`
+	Clipboard           BrowserSurfaceClipboardReport     `json:"clipboard"`
+	Composition         BrowserSurfaceCompositionReport   `json:"composition"`
+	Accessibility       BrowserSurfaceAccessibilityReport `json:"accessibility"`
+	HostTraces          []BrowserSurfaceHostTraceReport   `json:"host_traces"`
+	NegativeGuards      BrowserSurfaceNegativeGuards      `json:"negative_guards"`
+}
+
+type BrowserSurfaceCanvasReport struct {
+	Opened       bool   `json:"opened"`
+	Readback     bool   `json:"readback"`
+	Width        int    `json:"width"`
+	Height       int    `json:"height"`
+	FrameOrder   int    `json:"frame_order"`
+	ArtifactKind string `json:"artifact_kind"`
+	Pass         bool   `json:"pass"`
+}
+
+type BrowserSurfaceInputReport struct {
+	Pointer      bool     `json:"pointer"`
+	Keyboard     bool     `json:"keyboard"`
+	Text         bool     `json:"text"`
+	Resize       bool     `json:"resize"`
+	HostTrace    bool     `json:"host_trace"`
+	NativeEvents []string `json:"native_events"`
+	Pass         bool     `json:"pass"`
+}
+
+type BrowserSurfaceClipboardReport struct {
+	Harness   string `json:"harness"`
+	Read      bool   `json:"read"`
+	Write     bool   `json:"write"`
+	OwnedCopy bool   `json:"owned_copy"`
+	Bytes     int    `json:"bytes"`
+	Pass      bool   `json:"pass"`
+}
+
+type BrowserSurfaceCompositionReport struct {
+	Start  bool `json:"start"`
+	Update bool `json:"update"`
+	Commit bool `json:"commit"`
+	Cancel bool `json:"cancel"`
+	Pass   bool `json:"pass"`
+}
+
+type BrowserSurfaceAccessibilityReport struct {
+	Snapshot      bool     `json:"snapshot"`
+	Mirror        bool     `json:"mirror"`
+	CompilerOwned bool     `json:"compiler_owned"`
+	Bounds        bool     `json:"bounds"`
+	Focus         bool     `json:"focus"`
+	Roles         []string `json:"roles"`
+	DOMVisualUI   bool     `json:"dom_visual_ui"`
+	UserJS        bool     `json:"user_js"`
+	Pass          bool     `json:"pass"`
+}
+
+type BrowserSurfaceHostTraceReport struct {
+	Name         string `json:"name"`
+	ArtifactKind string `json:"artifact_kind"`
+	Path         string `json:"path"`
+	Pass         bool   `json:"pass"`
+}
+
+type BrowserSurfaceNegativeGuards struct {
+	NoDOMAppUITree      bool `json:"no_dom_app_ui_tree"`
+	NoUserJSAppLogic    bool `json:"no_user_js_app_logic"`
+	NoNodeOnlyPromotion bool `json:"no_node_only_promotion"`
+	NoLegacySidecars    bool `json:"no_legacy_sidecars"`
+	NoReactRuntime      bool `json:"no_react_runtime"`
+	NoPlatformWidgets   bool `json:"no_platform_widgets"`
+}
+
+type TargetHostStatusReport struct {
+	Schema             string                           `json:"schema"`
+	Target             string                           `json:"target"`
+	Status             string                           `json:"status"`
+	Tier               string                           `json:"tier"`
+	ReleaseScope       string                           `json:"release_scope"`
+	Source             string                           `json:"source"`
+	HostOS             string                           `json:"host_os"`
+	HostArch           string                           `json:"host_arch"`
+	Reason             string                           `json:"reason"`
+	ProductionClaim    bool                             `json:"production_claim"`
+	Experimental       bool                             `json:"experimental"`
+	TargetHostEvidence bool                             `json:"target_host_evidence"`
+	BuildOnlyEvidence  bool                             `json:"build_only_evidence"`
+	BuildOnlyPromotion bool                             `json:"build_only_promotion"`
+	LinuxSubstitute    bool                             `json:"linux_substitute"`
+	CIArtifactRequired bool                             `json:"ci_artifact_required"`
+	RequiredEvidence   TargetHostRequiredEvidenceReport `json:"required_evidence"`
+	UnsupportedClaims  []string                         `json:"unsupported_claims"`
+	NegativeGuards     TargetHostNegativeGuardsReport   `json:"negative_guards"`
+}
+
+type TargetHostRequiredEvidenceReport struct {
+	RealWindow            bool `json:"real_window"`
+	NativeInput           bool `json:"native_input"`
+	Clipboard             bool `json:"clipboard"`
+	DPIScaling            bool `json:"dpi_scaling"`
+	AccessibilitySnapshot bool `json:"accessibility_snapshot"`
+	AppShell              bool `json:"app_shell"`
+}
+
+type TargetHostNegativeGuardsReport struct {
+	NoLinuxSubstitute    bool `json:"no_linux_substitute"`
+	NoBuildOnlyPromotion bool `json:"no_build_only_promotion"`
+	NoProductionClaim    bool `json:"no_production_claim"`
+	NoDocsOnlyEvidence   bool `json:"no_docs_only_evidence"`
+	NoCopiedReport       bool `json:"no_copied_report"`
+	CIArtifactRequired   bool `json:"ci_artifact_required"`
+}
+
+type LinuxAppShellReport struct {
+	Schema            string                         `json:"schema"`
+	AppShellLevel     string                         `json:"app_shell_level"`
+	ReleaseScope      string                         `json:"release_scope"`
+	Source            string                         `json:"source"`
+	Module            string                         `json:"module"`
+	HostAdapter       string                         `json:"host_adapter"`
+	ProductionClaim   bool                           `json:"production_claim"`
+	Experimental      bool                           `json:"experimental"`
+	WindowLifecycle   []LinuxAppShellLifecycleReport `json:"window_lifecycle"`
+	Windows           []LinuxAppShellWindowReport    `json:"windows"`
+	ResizeDPI         []LinuxAppShellResizeDPIReport `json:"resize_dpi"`
+	CursorTransitions []LinuxAppShellCursorReport    `json:"cursor_transitions"`
+	Clipboard         LinuxAppShellCapabilityReport  `json:"clipboard"`
+	IME               LinuxAppShellCapabilityReport  `json:"ime"`
+	Accessibility     LinuxAppShellCapabilityReport  `json:"accessibility"`
+	ShellFeatures     []LinuxAppShellFeatureReport   `json:"shell_features"`
+	HostTraces        []LinuxAppShellHostTraceReport `json:"host_traces"`
+	NegativeGuards    LinuxAppShellNegativeGuards    `json:"negative_guards"`
+}
+
+type LinuxAppShellLifecycleReport struct {
+	Order     int    `json:"order"`
+	WindowID  string `json:"window_id"`
+	Operation string `json:"operation"`
+	HostTrace bool   `json:"host_trace"`
+	Pass      bool   `json:"pass"`
+}
+
+type LinuxAppShellWindowReport struct {
+	ID            string `json:"id"`
+	Title         string `json:"title"`
+	Role          string `json:"role"`
+	BlockRoot     string `json:"block_root"`
+	RealWindow    bool   `json:"real_window"`
+	Presented     bool   `json:"presented"`
+	Width         int    `json:"width"`
+	Height        int    `json:"height"`
+	DPIScaleMilli int    `json:"dpi_scale_milli"`
+}
+
+type LinuxAppShellResizeDPIReport struct {
+	WindowID      string `json:"window_id"`
+	Operation     string `json:"operation"`
+	BeforeWidth   int    `json:"before_width"`
+	BeforeHeight  int    `json:"before_height"`
+	AfterWidth    int    `json:"after_width"`
+	AfterHeight   int    `json:"after_height"`
+	DPIScaleMilli int    `json:"dpi_scale_milli"`
+	HostTrace     bool   `json:"host_trace"`
+	Pass          bool   `json:"pass"`
+}
+
+type LinuxAppShellCursorReport struct {
+	WindowID  string `json:"window_id"`
+	Cursor    string `json:"cursor"`
+	Target    string `json:"target"`
+	HostTrace bool   `json:"host_trace"`
+	Pass      bool   `json:"pass"`
+}
+
+type LinuxAppShellCapabilityReport struct {
+	Level          string `json:"level"`
+	HostTrace      bool   `json:"host_trace"`
+	ArtifactKind   string `json:"artifact_kind"`
+	Read           bool   `json:"read,omitempty"`
+	Write          bool   `json:"write,omitempty"`
+	Start          bool   `json:"start,omitempty"`
+	Update         bool   `json:"update,omitempty"`
+	Commit         bool   `json:"commit,omitempty"`
+	Cancel         bool   `json:"cancel,omitempty"`
+	MetadataTree   bool   `json:"metadata_tree,omitempty"`
+	PlatformExport bool   `json:"platform_export,omitempty"`
+	Pass           bool   `json:"pass"`
+}
+
+type LinuxAppShellFeatureReport struct {
+	Name             string `json:"name"`
+	Status           string `json:"status"`
+	Claimed          bool   `json:"claimed"`
+	HostTrace        bool   `json:"host_trace"`
+	BlockedReason    string `json:"blocked_reason"`
+	NoNativeWidgetUI bool   `json:"no_native_widget_ui"`
+	Pass             bool   `json:"pass"`
+}
+
+type LinuxAppShellHostTraceReport struct {
+	Name         string `json:"name"`
+	ArtifactKind string `json:"artifact_kind"`
+	Path         string `json:"path"`
+	Pass         bool   `json:"pass"`
+}
+
+type LinuxAppShellNegativeGuards struct {
+	NoGTK             bool `json:"no_gtk"`
+	NoQT              bool `json:"no_qt"`
+	NoNativeWidgets   bool `json:"no_native_widgets"`
+	NoElectronRuntime bool `json:"no_electron_runtime"`
+	NoReactRuntime    bool `json:"no_react_runtime"`
+	NoDOMUI           bool `json:"no_dom_ui"`
+	NoUserJS          bool `json:"no_user_js"`
+	NoPlatformWidgets bool `json:"no_platform_widgets"`
+}
+
+type SecurityPermissionReport struct {
+	Schema                     string                            `json:"schema"`
+	Model                      string                            `json:"model"`
+	ReleaseScope               string                            `json:"release_scope"`
+	Source                     string                            `json:"source"`
+	AppShellFeatures           string                            `json:"app_shell_features"`
+	ProductionClaim            bool                              `json:"production_claim"`
+	Experimental               bool                              `json:"experimental"`
+	DefaultDeny                bool                              `json:"default_deny"`
+	ShellFeaturePolicyEnforced bool                              `json:"shell_feature_policy_enforced"`
+	Capabilities               []SurfaceSecurityCapabilityReport `json:"capabilities"`
+	Permissions                []SurfacePermissionReport         `json:"permissions"`
+	ProcessBoundaries          []SurfaceProcessBoundaryReport    `json:"process_boundaries"`
+	AssetSafety                []SurfaceAssetSafetyReport        `json:"asset_safety"`
+	UnsupportedClaims          []string                          `json:"unsupported_claims"`
+	NegativeGuards             SurfaceSecurityNegativeGuards     `json:"negative_guards"`
+}
+
+type SurfaceSecurityCapabilityReport struct {
+	Name              string `json:"name"`
+	SourceFeature     string `json:"source_feature"`
+	Status            string `json:"status"`
+	Allowed           bool   `json:"allowed"`
+	CapabilityChecked bool   `json:"capability_checked"`
+	HostTrace         bool   `json:"host_trace"`
+	Policy            string `json:"policy"`
+	Evidence          string `json:"evidence"`
+	BlockedReason     string `json:"blocked_reason"`
+	Pass              bool   `json:"pass"`
+}
+
+type SurfacePermissionReport struct {
+	Name              string `json:"name"`
+	Status            string `json:"status"`
+	Allowed           bool   `json:"allowed"`
+	CapabilityChecked bool   `json:"capability_checked"`
+	BlockedReason     string `json:"blocked_reason"`
+	Evidence          string `json:"evidence"`
+	Pass              bool   `json:"pass"`
+}
+
+type SurfaceProcessBoundaryReport struct {
+	Name              string `json:"name"`
+	SchemaChecked     bool   `json:"schema_checked"`
+	CapabilityChecked bool   `json:"capability_checked"`
+	UserJS            bool   `json:"user_js"`
+	NodeIntegration   bool   `json:"node_integration"`
+	ElectronRuntime   bool   `json:"electron_runtime"`
+	Pass              bool   `json:"pass"`
+}
+
+type SurfaceAssetSafetyReport struct {
+	Kind                string `json:"kind"`
+	LocalOnly           bool   `json:"local_only"`
+	SHA256Required      bool   `json:"sha256_required"`
+	SizeLimitBytes      int    `json:"size_limit_bytes"`
+	NetworkFetchAllowed bool   `json:"network_fetch_allowed"`
+	Parser              string `json:"parser"`
+	BoundsChecked       bool   `json:"bounds_checked"`
+	Pass                bool   `json:"pass"`
+}
+
+type SurfaceSecurityNegativeGuards struct {
+	NoAmbientFilesystem                       bool `json:"no_ambient_filesystem"`
+	NoAmbientNetwork                          bool `json:"no_ambient_network"`
+	NoShellFeatureBypass                      bool `json:"no_shell_feature_bypass"`
+	NoPermissionlessClipboard                 bool `json:"no_permissionless_clipboard"`
+	NoNotificationDialogWithoutTargetEvidence bool `json:"no_notification_dialog_without_target_evidence"`
+	NoNetworkAssetFetch                       bool `json:"no_network_asset_fetch"`
+	NoUntrustedFontImageDecode                bool `json:"no_untrusted_font_image_decode"`
+	NoElectronNodeIntegration                 bool `json:"no_electron_node_integration"`
+	NoUserJSAppLogic                          bool `json:"no_user_js_app_logic"`
+	NoDOMAppUITree                            bool `json:"no_dom_app_ui_tree"`
+}
+
+type SurfacePerformanceBudgetReport struct {
+	Schema            string                              `json:"schema"`
+	Model             string                              `json:"model"`
+	ReleaseScope      string                              `json:"release_scope"`
+	Source            string                              `json:"source"`
+	Target            string                              `json:"target"`
+	Runtime           string                              `json:"runtime"`
+	ProductionClaim   bool                                `json:"production_claim"`
+	Experimental      bool                                `json:"experimental"`
+	GitHead           string                              `json:"git_head"`
+	PerformanceClaim  string                              `json:"performance_claim"`
+	Startup           SurfaceStartupBudgetReport          `json:"startup"`
+	Frame             SurfaceFrameBudgetReport            `json:"frame"`
+	Scene             SurfaceSceneBudgetReport            `json:"scene"`
+	Memory            SurfaceMemoryBudgetReport           `json:"memory"`
+	Binary            SurfaceBinaryBudgetReport           `json:"binary"`
+	CPUPowerProxy     SurfaceCPUPowerProxyReport          `json:"cpu_power_proxy"`
+	Cache             SurfaceCacheBudgetReport            `json:"cache"`
+	Methodology       SurfacePerformanceMethodologyReport `json:"methodology"`
+	UnsupportedClaims []string                            `json:"unsupported_claims"`
+	NegativeGuards    SurfacePerformanceNegativeGuards    `json:"negative_guards"`
+}
+
+type SurfaceStartupBudgetReport struct {
+	LaunchToFirstFrameMS int    `json:"launch_to_first_frame_ms"`
+	BudgetMS             int    `json:"budget_ms"`
+	Trace                string `json:"trace"`
+	Pass                 bool   `json:"pass"`
+}
+
+type SurfaceFrameBudgetReport struct {
+	FrameCount    int  `json:"frame_count"`
+	P50BuildMS    int  `json:"p50_build_ms"`
+	P95BuildMS    int  `json:"p95_build_ms"`
+	P50PresentMS  int  `json:"p50_present_ms"`
+	P95PresentMS  int  `json:"p95_present_ms"`
+	BudgetMS      int  `json:"budget_ms"`
+	IdleLoopCount int  `json:"idle_loop_count"`
+	WorkLoopCount int  `json:"work_loop_count"`
+	Pass          bool `json:"pass"`
+}
+
+type SurfaceSceneBudgetReport struct {
+	BlockCount           int `json:"block_count"`
+	RecipeExpansionCount int `json:"recipe_expansion_count"`
+	PaintCommandCount    int `json:"paint_command_count"`
+	LayoutPassCount      int `json:"layout_pass_count"`
+	TextRunCount         int `json:"text_run_count"`
+}
+
+type SurfaceMemoryBudgetReport struct {
+	GlyphCacheBytes        int  `json:"glyph_cache_bytes"`
+	AssetCacheBytes        int  `json:"asset_cache_bytes"`
+	LayoutCacheBytes       int  `json:"layout_cache_bytes"`
+	PaintCacheBytes        int  `json:"paint_cache_bytes"`
+	FramebufferPeakBytes   int  `json:"framebuffer_peak_bytes"`
+	FramebufferTotalBytes  int  `json:"framebuffer_total_bytes"`
+	RSSMeasured            bool `json:"rss_measured"`
+	PeakRSSBytes           int  `json:"peak_rss_bytes"`
+	AllocationCount        int  `json:"allocation_count"`
+	AllocationBytes        int  `json:"allocation_bytes"`
+	BoundedCaches          bool `json:"bounded_caches"`
+	UnboundedCacheRejected bool `json:"unbounded_cache_rejected"`
+	Pass                   bool `json:"pass"`
+}
+
+type SurfaceBinaryBudgetReport struct {
+	ArtifactPath string `json:"artifact_path"`
+	SizeBytes    int    `json:"size_bytes"`
+	BudgetBytes  int    `json:"budget_bytes"`
+	Pass         bool   `json:"pass"`
+}
+
+type SurfaceCPUPowerProxyReport struct {
+	IdleLoopCount     int  `json:"idle_loop_count"`
+	WorkLoopCount     int  `json:"work_loop_count"`
+	IdleFrameCount    int  `json:"idle_frame_count"`
+	WorkFrameCount    int  `json:"work_frame_count"`
+	RealPowerMeasured bool `json:"real_power_measured"`
+	Pass              bool `json:"pass"`
+}
+
+type SurfaceCacheBudgetReport struct {
+	GlyphCacheBudgetBytes  int    `json:"glyph_cache_budget_bytes"`
+	AssetCacheBudgetBytes  int    `json:"asset_cache_budget_bytes"`
+	LayoutCacheBudgetBytes int    `json:"layout_cache_budget_bytes"`
+	PaintCacheBudgetBytes  int    `json:"paint_cache_budget_bytes"`
+	TotalCacheBytes        int    `json:"total_cache_bytes"`
+	TotalCacheBudgetBytes  int    `json:"total_cache_budget_bytes"`
+	Eviction               string `json:"eviction"`
+	Pass                   bool   `json:"pass"`
+}
+
+type SurfacePerformanceMethodologyReport struct {
+	Kind                                   string `json:"kind"`
+	ElectronComparison                     string `json:"electron_comparison"`
+	OfficialBenchmark                      bool   `json:"official_benchmark"`
+	CrossMachine                           bool   `json:"cross_machine"`
+	FairComparisonRequiredForElectronClaim bool   `json:"fair_comparison_required_for_electron_claim"`
+}
+
+type SurfacePerformanceNegativeGuards struct {
+	BoundedCaches             bool `json:"bounded_caches"`
+	UnboundedCacheRejected    bool `json:"unbounded_cache_rejected"`
+	StaleReportRejected       bool `json:"stale_report_rejected"`
+	NoFasterThanElectronClaim bool `json:"no_faster_than_electron_claim"`
+	NoBenchmarkParityClaim    bool `json:"no_benchmark_parity_claim"`
+	PeakMemoryFieldRequired   bool `json:"peak_memory_field_required"`
+	NoOfficialBenchmarkClaim  bool `json:"no_official_benchmark_claim"`
+}
+
 type BlockAccessibilityTreeReport struct {
 	Schema                  string                                 `json:"schema"`
 	AccessibilityLevel      string                                 `json:"accessibility_level"`
@@ -946,6 +1595,7 @@ type MorphReport struct {
 	MotionPresets    []MorphMotionPresetReport          `json:"motion_presets,omitempty"`
 	Recipes          []MorphRecipeReport                `json:"recipes,omitempty"`
 	RecipeExpansions []MorphRecipeExpansionReport       `json:"recipe_expansions,omitempty"`
+	RecipeApps       []MorphRecipeAppReport             `json:"recipe_apps,omitempty"`
 	Accessibility    MorphAccessibilityProjectionReport `json:"accessibility"`
 	EvidenceContract MorphEvidenceContractReport        `json:"evidence_contract"`
 	MemoryBudget     MorphMemoryBudgetReport            `json:"memory_budget"`
@@ -963,17 +1613,43 @@ type MorphCapsuleReport struct {
 }
 
 type MorphTokenGraphReport struct {
-	Schema                     string             `json:"schema"`
-	Namespace                  string             `json:"namespace"`
-	Version                    string             `json:"version"`
-	Hash                       string             `json:"hash"`
-	Categories                 []string           `json:"categories"`
-	Tokens                     []MorphTokenReport `json:"tokens"`
-	AliasCycleRejected         bool               `json:"alias_cycle_rejected"`
-	DuplicateSourceRejected    bool               `json:"duplicate_source_rejected"`
-	RawLiteralsInAppCode       bool               `json:"raw_literals_in_app_code"`
-	UnresolvedFallbackRejected bool               `json:"unresolved_fallback_rejected"`
-	FallbackToRandomDefault    bool               `json:"fallback_to_random_default"`
+	Schema                     string                           `json:"schema"`
+	Namespace                  string                           `json:"namespace"`
+	Version                    string                           `json:"version"`
+	Hash                       string                           `json:"hash"`
+	SourceOfTruth              string                           `json:"source_of_truth,omitempty"`
+	ExplicitImports            bool                             `json:"explicit_imports,omitempty"`
+	NoGlobalCascade            bool                             `json:"no_global_cascade,omitempty"`
+	FixedOverrideOrder         []string                         `json:"fixed_override_order,omitempty"`
+	Categories                 []string                         `json:"categories"`
+	Tokens                     []MorphTokenReport               `json:"tokens"`
+	DensityDPI                 []MorphDensityDPIReport          `json:"density_dpi,omitempty"`
+	Diagnostics                MorphTokenGraphDiagnosticsReport `json:"diagnostics,omitempty"`
+	AliasCycleRejected         bool                             `json:"alias_cycle_rejected"`
+	DuplicateSourceRejected    bool                             `json:"duplicate_source_rejected"`
+	RawLiteralsInAppCode       bool                             `json:"raw_literals_in_app_code"`
+	UnresolvedFallbackRejected bool                             `json:"unresolved_fallback_rejected"`
+	FallbackToRandomDefault    bool                             `json:"fallback_to_random_default"`
+}
+
+type MorphDensityDPIReport struct {
+	Target         string `json:"target"`
+	Token          string `json:"token"`
+	TargetDPI      int    `json:"target_dpi"`
+	ScaleMilli     int    `json:"scale_milli"`
+	RoundingPolicy string `json:"rounding_policy"`
+}
+
+type MorphTokenGraphDiagnosticsReport struct {
+	AliasCycleRejected           bool `json:"alias_cycle_rejected,omitempty"`
+	MissingTokenRejected         bool `json:"missing_token_rejected,omitempty"`
+	DuplicateSourceRejected      bool `json:"duplicate_source_rejected,omitempty"`
+	RawLiteralRejected           bool `json:"raw_literal_rejected,omitempty"`
+	UnresolvedFallbackRejected   bool `json:"unresolved_fallback_rejected,omitempty"`
+	CSSRuntimeRejected           bool `json:"css_runtime_rejected,omitempty"`
+	MultipleColorSourcesRejected bool `json:"multiple_color_sources_rejected,omitempty"`
+	OverrideOrderRejected        bool `json:"override_order_rejected,omitempty"`
+	DensityDPIRejected           bool `json:"density_dpi_rejected,omitempty"`
 }
 
 type MorphTokenReport struct {
@@ -1047,6 +1723,21 @@ type MorphRecipeExpansionReport struct {
 	SlotBindings []string `json:"slot_bindings"`
 	Variant      string   `json:"variant"`
 	Reported     bool     `json:"reported"`
+}
+
+type MorphRecipeAppReport struct {
+	Source                  string   `json:"source"`
+	Module                  string   `json:"module"`
+	Recipes                 []string `json:"recipes"`
+	ExpandsToBlockGraph     bool     `json:"expands_to_block_graph"`
+	BlockCount              int      `json:"block_count"`
+	AccessibilityProjection bool     `json:"accessibility_projection"`
+	HiddenAppState          bool     `json:"hidden_app_state"`
+	ReactRuntime            bool     `json:"react_runtime"`
+	ElectronRuntime         bool     `json:"electron_runtime"`
+	DOMRuntime              bool     `json:"dom_runtime"`
+	PlatformWidgets         bool     `json:"platform_widgets"`
+	OutputPrimitives        []string `json:"output_primitives"`
 }
 
 type MorphAccessibilityProjectionReport struct {
@@ -1200,7 +1891,7 @@ func ValidateReport(raw []byte) error {
 		issues = append(issues, "source is required")
 	}
 	issues = append(issues, validateProcesses(report.Source, report.Processes)...)
-	issues = append(issues, validateArtifacts(report.Target, report.Artifacts, report.Processes)...)
+	issues = append(issues, validateArtifacts(report.Target, report.Source, report.Artifacts, report.Processes)...)
 	issues = append(issues, validateArtifactScan(report.ArtifactScan, report.Artifacts)...)
 	componentIndex, componentIssues := validateComponents(report.Components)
 	issues = append(issues, componentIssues...)
@@ -1226,9 +1917,17 @@ func ValidateReport(raw []byte) error {
 	issues = append(issues, validateMorphEvidence(report)...)
 	issues = append(issues, validateProductionToolkitEvidence(report)...)
 	issues = append(issues, validateBrowserReleaseEvidence(report)...)
+	issues = append(issues, validateBrowserSurfaceEvidence(report)...)
 	issues = append(issues, validateLinuxReleaseWindowEvidence(report)...)
 	issues = append(issues, validateMinimalToolkitEvidence(report)...)
 	issues = append(issues, validateAccessibilityTreeEvidence(report)...)
+	issues = append(issues, validateAppModelEvidence(report)...)
+	issues = append(issues, validateLinuxAppShellEvidence(report)...)
+	issues = append(issues, validateSecurityPermissionEvidence(report)...)
+	issues = append(issues, validateSurfacePerformanceBudgetEvidence(report)...)
+	if report.SurfacePerformanceBudget != nil && !performanceBudgetPeakRSSFieldPresent(raw, true) {
+		issues = append(issues, "surface_performance_budget memory peak_rss_bytes field is required")
+	}
 	if len(issues) > 0 {
 		return errors.New(strings.Join(issues, "; "))
 	}
@@ -1302,6 +2001,19 @@ func ValidateReleaseSummary(raw []byte) error {
 		{field: "clipboard", got: report.Clipboard, want: "clipboard-text-v1"},
 		{field: "ime", got: report.IME, want: "composition-baseline-v1"},
 		{field: "accessibility", got: report.Accessibility, want: "platform-bridge-v1"},
+		{field: "app_model", got: report.AppModel, want: "explicit-command-reducer-v1"},
+		{field: "linux_app_shell", got: report.LinuxAppShell, want: "linux-app-shell-subset-v1"},
+		{field: "app_shell_features", got: report.AppShellFeatures, want: "electron-feature-ledger-v1"},
+		{field: "security_permissions", got: report.SecurityPermissions, want: "surface-security-permission-v1"},
+		{field: "performance_budget", got: report.PerformanceBudget, want: "surface-performance-budget-v1"},
+		{field: "developer_fast_loop", got: report.DeveloperFastLoop, want: "surface-dev-workflow-v1"},
+		{field: "inspector", got: report.Inspector, want: "surface-inspector-v1"},
+		{field: "project_templates", got: report.ProjectTemplates, want: "surface-template-smoke-v1"},
+		{field: "reference_apps", got: report.ReferenceApps, want: "surface-reference-app-suite-v1"},
+		{field: "surface_package", got: report.SurfacePackage, want: "surface-package-v1"},
+		{field: "crash_reporting", got: report.CrashReporting, want: "surface-crash-report-v1"},
+		{field: "i18n_localization", got: report.I18nLocalization, want: "surface-i18n-v1"},
+		{field: "widget_migration", got: report.WidgetMigration, want: "surface-widget-migration-v1"},
 		{field: "browser_surface", got: report.BrowserSurface, want: "browser-canvas-release-v1"},
 		{field: "linux_surface", got: report.LinuxSurface, want: "linux-x64-release-window-v1"},
 		{field: "block_system", got: report.BlockSystem, want: "block-system"},
@@ -1332,6 +2044,267 @@ func ValidateReleaseSummary(raw []byte) error {
 		return errors.New(strings.Join(issues, "; "))
 	}
 	return nil
+}
+
+func ValidateTargetHostStatus(raw []byte) error {
+	schema, err := decodeSchema(raw)
+	if err != nil {
+		return err
+	}
+	if schema != TargetHostStatusSchemaV1 {
+		return fmt.Errorf("schema is %q, want %q", schema, TargetHostStatusSchemaV1)
+	}
+
+	var report TargetHostStatusReport
+	if err := decodeStrict(raw, &report); err != nil {
+		return err
+	}
+
+	var issues []string
+	for _, check := range []struct {
+		field string
+		got   string
+		want  string
+	}{
+		{field: "schema", got: report.Schema, want: TargetHostStatusSchemaV1},
+		{field: "release_scope", got: report.ReleaseScope, want: ReleaseScopeSurfaceV1LinuxWeb},
+	} {
+		if check.got != check.want {
+			issues = append(issues, fmt.Sprintf("target_host_status %s is %q, want %q", check.field, check.got, check.want))
+		}
+	}
+	if !isTargetHostStatusTarget(report.Target) {
+		issues = append(issues, fmt.Sprintf("target_host_status target is %q, want windows-x64 or macos-x64", report.Target))
+	}
+	if strings.TrimSpace(report.Source) == "" {
+		issues = append(issues, "target_host_status source is required")
+	}
+	if strings.TrimSpace(report.HostOS) == "" {
+		issues = append(issues, "target_host_status host_os is required")
+	}
+	if strings.TrimSpace(report.HostArch) == "" {
+		issues = append(issues, "target_host_status host_arch is required")
+	}
+	if strings.TrimSpace(report.Reason) == "" {
+		issues = append(issues, "target_host_status reason is required")
+	}
+	if report.ProductionClaim {
+		issues = append(issues, "target_host_status production_claim must be false without full production target-host gate evidence")
+	}
+	if report.BuildOnlyEvidence {
+		issues = append(issues, "target_host_status build-only evidence must be false; build-only reports are not Surface runtime evidence")
+	}
+	if report.BuildOnlyPromotion {
+		issues = append(issues, "target_host_status build-only promotion must be false")
+	}
+	if report.LinuxSubstitute {
+		issues = append(issues, "target_host_status linux substitute must be false for non-Linux target-host evidence")
+	}
+	if !report.CIArtifactRequired {
+		issues = append(issues, "target_host_status ci_artifact_required must be true")
+	}
+	issues = append(issues, validateTargetHostNegativeGuards(report.NegativeGuards)...)
+
+	switch report.Status {
+	case "unsupported":
+		issues = append(issues, validateUnsupportedTargetHostStatus(report)...)
+	case "beta_target_host":
+		issues = append(issues, validateBetaTargetHostStatus(report)...)
+	default:
+		issues = append(issues, fmt.Sprintf("target_host_status status is %q, want unsupported or beta_target_host", report.Status))
+	}
+
+	if len(issues) > 0 {
+		return errors.New(strings.Join(issues, "; "))
+	}
+	return nil
+}
+
+func ValidateSecurityPermissionReport(raw []byte) error {
+	schema, err := decodeSchema(raw)
+	if err != nil {
+		return err
+	}
+	switch schema {
+	case SecurityPermissionSchemaV1:
+		var report SecurityPermissionReport
+		if err := decodeStrict(raw, &report); err != nil {
+			return err
+		}
+		issues := validateSecurityPermissionReport(report, nil, "")
+		if len(issues) > 0 {
+			return errors.New(strings.Join(issues, "; "))
+		}
+		return nil
+	case SchemaV1:
+		var report Report
+		if err := decodeStrict(raw, &report); err != nil {
+			return err
+		}
+		issues := validateSecurityPermissionEvidence(report)
+		if len(issues) > 0 {
+			return errors.New(strings.Join(issues, "; "))
+		}
+		return nil
+	default:
+		return fmt.Errorf("schema is %q, want %q or %q", schema, SecurityPermissionSchemaV1, SchemaV1)
+	}
+}
+
+func ValidatePerformanceBudgetReport(raw []byte) error {
+	schema, err := decodeSchema(raw)
+	if err != nil {
+		return err
+	}
+	switch schema {
+	case PerformanceBudgetSchemaV1:
+		var report SurfacePerformanceBudgetReport
+		if err := decodeStrict(raw, &report); err != nil {
+			return err
+		}
+		issues := validateSurfacePerformanceBudgetReport(report, nil, "")
+		if !performanceBudgetPeakRSSFieldPresent(raw, false) {
+			issues = append(issues, "surface_performance_budget memory peak_rss_bytes field is required")
+		}
+		if len(issues) > 0 {
+			return errors.New(strings.Join(issues, "; "))
+		}
+		return nil
+	case SchemaV1:
+		var report Report
+		if err := decodeStrict(raw, &report); err != nil {
+			return err
+		}
+		issues := validateSurfacePerformanceBudgetEvidence(report)
+		if report.SurfacePerformanceBudget != nil && !performanceBudgetPeakRSSFieldPresent(raw, true) {
+			issues = append(issues, "surface_performance_budget memory peak_rss_bytes field is required")
+		}
+		if len(issues) > 0 {
+			return errors.New(strings.Join(issues, "; "))
+		}
+		return nil
+	default:
+		return fmt.Errorf("schema is %q, want %q or %q", schema, PerformanceBudgetSchemaV1, SchemaV1)
+	}
+}
+
+func isTargetHostStatusTarget(target string) bool {
+	switch target {
+	case "windows-x64", "macos-x64":
+		return true
+	default:
+		return false
+	}
+}
+
+func validateUnsupportedTargetHostStatus(report TargetHostStatusReport) []string {
+	var issues []string
+	if report.Tier != "UNSUPPORTED" {
+		issues = append(issues, fmt.Sprintf("target_host_status tier is %q, want UNSUPPORTED", report.Tier))
+	}
+	if report.Experimental {
+		issues = append(issues, "target_host_status experimental must be false for unsupported nonclaim status")
+	}
+	if report.TargetHostEvidence {
+		issues = append(issues, "target_host_status target-host evidence must be false for unsupported nonclaim status")
+	}
+	if targetHostRequiredEvidenceAny(report.RequiredEvidence) {
+		issues = append(issues, "target_host_status unsupported required_evidence entries must be false until real target-host evidence exists")
+	}
+	issues = append(issues, validateUnsupportedTargetHostClaims(report.Target, report.UnsupportedClaims)...)
+	return issues
+}
+
+func validateBetaTargetHostStatus(report TargetHostStatusReport) []string {
+	var issues []string
+	if report.Tier != "BETA_TARGET_HOST" {
+		issues = append(issues, fmt.Sprintf("target_host_status tier is %q, want BETA_TARGET_HOST", report.Tier))
+	}
+	if !report.Experimental {
+		issues = append(issues, "target_host_status experimental must be true for beta target-host status")
+	}
+	if !report.TargetHostEvidence {
+		issues = append(issues, "target_host_status target-host evidence must be true for beta target-host status")
+	}
+	required := report.RequiredEvidence
+	for _, check := range []struct {
+		field string
+		ok    bool
+	}{
+		{field: "real_window", ok: required.RealWindow},
+		{field: "native_input", ok: required.NativeInput},
+		{field: "clipboard", ok: required.Clipboard},
+		{field: "dpi_scaling", ok: required.DPIScaling},
+		{field: "accessibility_snapshot", ok: required.AccessibilitySnapshot},
+	} {
+		if !check.ok {
+			issues = append(issues, fmt.Sprintf("target_host_status beta target-host evidence requires required_evidence.%s", check.field))
+		}
+	}
+	return issues
+}
+
+func validateTargetHostNegativeGuards(guards TargetHostNegativeGuardsReport) []string {
+	var issues []string
+	for _, check := range []struct {
+		field string
+		ok    bool
+	}{
+		{field: "no_linux_substitute", ok: guards.NoLinuxSubstitute},
+		{field: "no_build_only_promotion", ok: guards.NoBuildOnlyPromotion},
+		{field: "no_production_claim", ok: guards.NoProductionClaim},
+		{field: "no_docs_only_evidence", ok: guards.NoDocsOnlyEvidence},
+		{field: "no_copied_report", ok: guards.NoCopiedReport},
+		{field: "ci_artifact_required", ok: guards.CIArtifactRequired},
+	} {
+		if !check.ok {
+			issues = append(issues, fmt.Sprintf("target_host_status negative_guards.%s must be true", check.field))
+		}
+	}
+	return issues
+}
+
+func targetHostRequiredEvidenceAny(evidence TargetHostRequiredEvidenceReport) bool {
+	return evidence.RealWindow ||
+		evidence.NativeInput ||
+		evidence.Clipboard ||
+		evidence.DPIScaling ||
+		evidence.AccessibilitySnapshot ||
+		evidence.AppShell
+}
+
+func validateUnsupportedTargetHostClaims(target string, claims []string) []string {
+	var issues []string
+	required := unsupportedTargetHostClaimSet(target)
+	for _, want := range required {
+		if !stringSliceContainsFold(claims, want) {
+			issues = append(issues, fmt.Sprintf("target_host_status unsupported_claims requires %s", want))
+		}
+	}
+	return issues
+}
+
+func unsupportedTargetHostClaimSet(target string) []string {
+	switch target {
+	case "windows-x64":
+		return []string{
+			"windows-real-window-surface",
+			"windows-production-surface-nonclaim",
+			"windows-target-host-runtime",
+			"build-only-windows-surface-runtime",
+			"linux-substitute-windows-surface-runtime",
+		}
+	case "macos-x64":
+		return []string{
+			"macos-real-window-surface",
+			"macos-production-surface-nonclaim",
+			"macos-target-host-runtime",
+			"build-only-macos-surface-runtime",
+			"linux-substitute-macos-surface-runtime",
+		}
+	default:
+		return nil
+	}
 }
 
 func isGitHead(value string) bool {
@@ -1390,8 +2363,11 @@ func ValidateTextInputReport(raw []byte) error {
 		ok    bool
 	}{
 		{field: "utf8_validation", ok: report.UTF8Validation},
+		{field: "invalid_utf8_rejected", ok: report.InvalidUTF8Rejected},
 		{field: "caret", ok: report.Caret},
 		{field: "selection", ok: report.Selection},
+		{field: "selection_clipboard_transfer", ok: report.SelectionClipboardTransfer},
+		{field: "multiline", ok: report.Multiline},
 		{field: "backspace", ok: report.Backspace},
 		{field: "delete", ok: report.Delete},
 		{field: "home_end", ok: report.HomeEnd},
@@ -1403,6 +2379,7 @@ func ValidateTextInputReport(raw []byte) error {
 		{field: "clipboard_write", ok: report.ClipboardWrite},
 		{field: "clipboard_host_abi", ok: report.ClipboardHostABI},
 		{field: "clipboard_owned_copy", ok: report.ClipboardOwnedCopy},
+		{field: "target_host_composition_trace", ok: report.TargetHostCompositionTrace},
 		{field: "composition_trace.start", ok: report.CompositionTrace.Start},
 		{field: "composition_trace.update", ok: report.CompositionTrace.Update},
 		{field: "composition_trace.commit", ok: report.CompositionTrace.Commit},
@@ -1416,20 +2393,43 @@ func ValidateTextInputReport(raw []byte) error {
 	if report.BorrowedViewStorage {
 		issues = append(issues, "borrowed_view_storage must be false")
 	}
+	if report.RichTextProductionClaim {
+		issues = append(issues, "rich_text_production_claim must be false for text-input v1")
+	}
+	if report.BidiProductionClaim {
+		issues = append(issues, "bidi_production_claim must be false for text-input v1")
+	}
+	if report.FullEditorProductionClaim {
+		issues = append(issues, "full_editor_production_claim must be false for text-input v1")
+	}
+	issues = append(issues, validateTextShapingPlan(report.TextShapingPlan)...)
+	issues = append(issues, validateTextInputReferenceTraces(report.ReferenceTraces)...)
+	issues = append(issues, validateExactStringList("unsupported_claims", report.UnsupportedClaims, []string{
+		"full-rich-text-editor",
+		"full-bidi-shaping",
+		"grapheme-cluster-caret",
+		"ide-grade-editor",
+	})...)
 	issues = append(issues, validateProcesses(report.Source, report.Processes)...)
-	issues = append(issues, validateArtifacts(report.Target, report.Artifacts, report.Processes)...)
+	issues = append(issues, validateArtifacts(report.Target, report.Source, report.Artifacts, report.Processes)...)
 	issues = append(issues, validateArtifactScan(report.ArtifactScan, report.Artifacts)...)
 	issues = append(issues, validateCases(report.Cases)...)
 	for _, required := range []string{
 		"release text input ASCII insertion",
 		"release text input UTF-8 insertion",
+		"release text input invalid UTF-8 rejected",
+		"release text input multiline storage",
 		"release text input caret home end arrows",
 		"release text input selection replacement",
+		"release text input selection clipboard transfer",
 		"release text input backspace delete",
 		"release text input clipboard owned copy transfer",
 		"release text input composition start update",
 		"release text input composition commit",
 		"release text input composition cancel",
+		"release text input shaping plan scoped",
+		"settings reference text input trace",
+		"editor reference text input trace",
 		"release text input safe view lifetime checked",
 	} {
 		if !caseNameContains(report.Cases, required) {
@@ -1440,6 +2440,55 @@ func ValidateTextInputReport(raw []byte) error {
 		return errors.New(strings.Join(issues, "; "))
 	}
 	return nil
+}
+
+func validateTextShapingPlan(plan TextShapingPlanReport) []string {
+	var issues []string
+	if plan.QualityLevel != "scoped-text-shaping-plan-v1" {
+		issues = append(issues, fmt.Sprintf("text_shaping_plan.quality_level is %q, want scoped-text-shaping-plan-v1", plan.QualityLevel))
+	}
+	if !plan.FallbackFonts {
+		issues = append(issues, "text_shaping_plan.fallback_fonts must be true")
+	}
+	if plan.GraphemeBoundaries != "byte-offset-codepoint-v1" {
+		issues = append(issues, fmt.Sprintf("text_shaping_plan.grapheme_boundaries is %q, want byte-offset-codepoint-v1", plan.GraphemeBoundaries))
+	}
+	if plan.LineBreaking != "newline-storage-plus-wrap-plan-v1" {
+		issues = append(issues, fmt.Sprintf("text_shaping_plan.line_breaking is %q, want newline-storage-plus-wrap-plan-v1", plan.LineBreaking))
+	}
+	if plan.Bidi != "nonclaim-full-bidi-v1" {
+		issues = append(issues, fmt.Sprintf("text_shaping_plan.bidi is %q, want nonclaim-full-bidi-v1", plan.Bidi))
+	}
+	if plan.RichText != "nonclaim-rich-text-editor-v1" {
+		issues = append(issues, fmt.Sprintf("text_shaping_plan.rich_text is %q, want nonclaim-rich-text-editor-v1", plan.RichText))
+	}
+	return issues
+}
+
+func validateTextInputReferenceTraces(traces []TextInputReferenceTraceReport) []string {
+	required := []string{
+		"examples/surface_morph_settings.tetra",
+		"examples/surface_morph_editor_shell.tetra",
+	}
+	bySource := make(map[string]TextInputReferenceTraceReport, len(traces))
+	for _, trace := range traces {
+		bySource[normalizeEvidencePath(trace.Source)] = trace
+	}
+	var issues []string
+	for _, source := range required {
+		trace, ok := bySource[source]
+		if !ok {
+			issues = append(issues, fmt.Sprintf("reference_traces requires %s", source))
+			continue
+		}
+		if strings.TrimSpace(trace.Trace) == "" {
+			issues = append(issues, fmt.Sprintf("reference_traces %s trace is required", source))
+		}
+		if !trace.Pass || !trace.Focus || !trace.Selection || !trace.Clipboard || !trace.Composition || !trace.Multiline {
+			issues = append(issues, fmt.Sprintf("reference_traces %s must pass focus, selection, clipboard, composition, and multiline checks", source))
+		}
+	}
+	return issues
 }
 
 func validateExactStringList(field string, got []string, want []string) []string {
@@ -1636,6 +2685,7 @@ func decodeStrict(raw []byte, dst any) error {
 
 func rejectNonRuntimeEvidence(raw []byte) []string {
 	lower := strings.ToLower(string(raw))
+	lower = strings.ReplaceAll(lower, `"stale_report_rejected"`, `"freshness_report_rejected"`)
 	forbidden := []string{
 		"metadata-only",
 		"node-only",
@@ -1701,7 +2751,7 @@ func validateProcesses(source string, processes []ProcessReport) []string {
 			}
 		case "app":
 			seenApp = true
-			if isSurfaceComponentAppProcess(process) {
+			if isSurfaceComponentAppProcess(source, process) {
 				seenComponentApp = true
 			}
 		case "runtime":
@@ -1742,7 +2792,7 @@ func validateProcesses(source string, processes []ProcessReport) []string {
 		issues = append(issues, "process evidence missing executable Surface app process")
 	}
 	if !seenComponentApp {
-		issues = append(issues, "process evidence missing executable Surface component app process with expected exit code 1")
+		issues = append(issues, "process evidence missing executable Surface component app process with expected app exit")
 	}
 	if !seenRuntime {
 		issues = append(issues, "process evidence missing Surface runtime process")
@@ -1759,7 +2809,7 @@ func processReferencesSource(path string, source string) bool {
 	return strings.Contains(path, source)
 }
 
-func isSurfaceComponentAppProcess(process ProcessReport) bool {
+func isSurfaceComponentAppProcess(source string, process ProcessReport) bool {
 	name := strings.ToLower(strings.TrimSpace(process.Name))
 	if process.Kind != "app" || !strings.Contains(name, "surface") || !strings.Contains(name, "component app") {
 		return false
@@ -1770,7 +2820,27 @@ func isSurfaceComponentAppProcess(process ProcessReport) bool {
 	if *process.ExitCode == 1 && *process.ExpectedExitCode == 1 {
 		return true
 	}
+	if isSurfaceProjectTemplateSource(source) && *process.ExitCode == 0 && *process.ExpectedExitCode == 0 {
+		return true
+	}
+	if isBlockPaintValidationComponentApp(source, process) && *process.ExitCode == 0 && *process.ExpectedExitCode == 0 {
+		return true
+	}
 	return strings.Contains(name, "browser canvas") && *process.ExitCode == 0 && *process.ExpectedExitCode == 0
+}
+
+func isSurfaceProjectTemplateSource(source string) bool {
+	source = normalizeEvidencePath(source)
+	inSurfaceReport := strings.HasPrefix(source, "reports/surface-electron-react-beauty-production/") ||
+		strings.Contains(source, "/reports/surface-electron-react-beauty-production/") ||
+		strings.HasPrefix(source, "reports/surface-product-v1/") ||
+		strings.Contains(source, "/reports/surface-product-v1/")
+	return inSurfaceReport && strings.Contains(source, "/templates/") && strings.HasSuffix(source, "/src/main.tetra")
+}
+
+func isBlockPaintValidationComponentApp(source string, process ProcessReport) bool {
+	return normalizeEvidencePath(source) == "examples/surface_block_paint_layers.tetra" &&
+		strings.Contains(normalizeEvidencePath(process.Path), "surface-block-paint")
 }
 
 func normalizeEvidencePath(path string) string {
@@ -1781,7 +2851,7 @@ func normalizeEvidencePath(path string) string {
 	return path
 }
 
-func validateArtifacts(target string, artifacts []ArtifactReport, processes []ProcessReport) []string {
+func validateArtifacts(target string, source string, artifacts []ArtifactReport, processes []ProcessReport) []string {
 	var issues []string
 	if len(artifacts) == 0 {
 		issues = append(issues, "artifact evidence is required")
@@ -1809,7 +2879,7 @@ func validateArtifacts(target string, artifacts []ArtifactReport, processes []Pr
 		if artifact.Size <= 0 {
 			issues = append(issues, fmt.Sprintf("artifact %s size must be positive", artifact.Path))
 		}
-		if kind == "component-app" && artifactReferencedByComponentAppProcess(path, processes) {
+		if kind == "component-app" && artifactReferencedByComponentAppProcess(source, path, processes) {
 			seenComponentAppArtifact = true
 		}
 		if kind == "compiler-owned-loader" && strings.HasSuffix(strings.ToLower(path), ".mjs") {
@@ -1909,9 +2979,9 @@ func evidencePathUnderRoot(path string, root string) bool {
 	return path == root || strings.HasPrefix(path, root+"/")
 }
 
-func artifactReferencedByComponentAppProcess(artifactPath string, processes []ProcessReport) bool {
+func artifactReferencedByComponentAppProcess(source string, artifactPath string, processes []ProcessReport) bool {
 	for _, process := range processes {
-		if !isSurfaceComponentAppProcess(process) {
+		if !isSurfaceComponentAppProcess(source, process) {
 			continue
 		}
 		if strings.Contains(normalizeEvidencePath(process.Path), artifactPath) {
@@ -2000,7 +3070,11 @@ func validateTargetRuntimeEvidence(report Report) []string {
 			if !caseNameContains(report.Cases, "linux-x64 real-window close event") {
 				issues = append(issues, "linux-x64 real-window target requires close event evidence")
 			}
-			if isLinuxReleaseWindowReport(report) {
+			if isLinuxAppShellReport(report) {
+				if !hasFrameOrderDimensions(report.Frames, 6, 720, 540, 2880) {
+					issues = append(issues, "linux-x64 app-shell target requires order-6 720x540 presented app-shell frame evidence")
+				}
+			} else if isLinuxReleaseWindowReport(report) {
 				if !hasFrameOrderDimensions(report.Frames, 5, 560, 420, 2240) {
 					issues = append(issues, "linux-x64 release-window target requires order-5 560x420 presented window frame evidence")
 				}
@@ -3233,6 +4307,133 @@ func validateBrowserReleaseEvidence(report Report) []string {
 	return issues
 }
 
+func validateBrowserSurfaceEvidence(report Report) []string {
+	if !isBrowserReleaseReport(report) {
+		return nil
+	}
+	browser := report.BrowserSurface
+	if browser == nil {
+		return []string{"browser_surface evidence is required for wasm32-web browser-canvas release reports"}
+	}
+	var issues []string
+	for _, check := range []struct {
+		field string
+		got   string
+		want  string
+	}{
+		{field: "schema", got: browser.Schema, want: BrowserSurfaceSchemaV1},
+		{field: "browser_surface_level", got: browser.BrowserSurfaceLevel, want: "browser-canvas-release-v1"},
+		{field: "release_scope", got: browser.ReleaseScope, want: ReleaseScopeSurfaceV1LinuxWeb},
+		{field: "host_adapter", got: browser.HostAdapter, want: "compiler-owned-browser-canvas-host"},
+	} {
+		if check.got != check.want {
+			issues = append(issues, fmt.Sprintf("browser_surface %s is %q, want %q", check.field, check.got, check.want))
+		}
+	}
+	if !isSurfaceReleaseFormSource(browser.Source) {
+		issues = append(issues, fmt.Sprintf("browser_surface source path must match examples/surface_release_form.tetra, got %q", browser.Source))
+	}
+	if !browser.ProductionClaim {
+		issues = append(issues, "browser_surface production_claim must be true")
+	}
+	if browser.Experimental {
+		issues = append(issues, "browser_surface experimental must be false")
+	}
+	if !browser.CompilerOwnedBoot {
+		issues = append(issues, "browser_surface compiler_owned_boot must be true")
+	}
+	if !browser.DOMHostCanvasOnly {
+		issues = append(issues, "browser_surface dom_host_canvas_only must be true")
+	}
+	if !browser.Canvas.Opened || !browser.Canvas.Readback || !browser.Canvas.Pass {
+		issues = append(issues, "browser_surface canvas requires opened, readback, and pass evidence")
+	}
+	if browser.Canvas.Width != 560 || browser.Canvas.Height != 420 || browser.Canvas.FrameOrder != 5 {
+		issues = append(issues, fmt.Sprintf("browser_surface canvas frame is order-%d %dx%d, want order-5 560x420", browser.Canvas.FrameOrder, browser.Canvas.Width, browser.Canvas.Height))
+	}
+	if browser.Canvas.ArtifactKind != "runner-trace" {
+		issues = append(issues, fmt.Sprintf("browser_surface canvas artifact_kind is %q, want runner-trace", browser.Canvas.ArtifactKind))
+	}
+	if !browser.Input.Pointer || !browser.Input.Keyboard || !browser.Input.Text || !browser.Input.Resize || !browser.Input.HostTrace || !browser.Input.Pass {
+		issues = append(issues, "browser_surface input requires pointer, keyboard, text, resize, host_trace, and pass evidence")
+	}
+	issues = append(issues, validateBrowserSurfaceNativeEvents(browser.Input.NativeEvents)...)
+	if browser.Clipboard.Harness != "deterministic-browser-clipboard-v1" {
+		issues = append(issues, fmt.Sprintf("browser_surface clipboard.harness is %q, want deterministic-browser-clipboard-v1", browser.Clipboard.Harness))
+	}
+	if !browser.Clipboard.Read || !browser.Clipboard.Write || !browser.Clipboard.OwnedCopy || !browser.Clipboard.Pass || browser.Clipboard.Bytes <= 0 {
+		issues = append(issues, "browser_surface clipboard requires read, write, owned_copy, positive bytes, and pass evidence")
+	}
+	if !browser.Composition.Start || !browser.Composition.Update || !browser.Composition.Commit || !browser.Composition.Cancel || !browser.Composition.Pass {
+		issues = append(issues, "browser_surface composition requires start, update, commit, cancel, and pass evidence")
+	}
+	if !browser.Accessibility.Snapshot || !browser.Accessibility.Mirror || !browser.Accessibility.CompilerOwned || !browser.Accessibility.Bounds || !browser.Accessibility.Focus || !browser.Accessibility.Pass {
+		issues = append(issues, "browser_surface accessibility requires snapshot, mirror, compiler_owned, bounds, focus, and pass evidence")
+	}
+	issues = append(issues, validateBrowserSurfaceRoles(browser.Accessibility.Roles)...)
+	if browser.Accessibility.DOMVisualUI {
+		issues = append(issues, "browser_surface accessibility.dom_visual_ui must be false")
+	}
+	if browser.Accessibility.UserJS {
+		issues = append(issues, "browser_surface accessibility.user_js must be false")
+	}
+	if !browserSurfaceHostTraceContains(browser.HostTraces, "runner-trace") {
+		issues = append(issues, "browser_surface host_traces requires passing runner-trace evidence")
+	}
+	if !artifactKindContains(report.Artifacts, "runner-trace") {
+		issues = append(issues, "browser_surface requires runner-trace artifact evidence")
+	}
+	guards := browser.NegativeGuards
+	for _, check := range []struct {
+		field string
+		ok    bool
+	}{
+		{field: "no_dom_app_ui_tree", ok: guards.NoDOMAppUITree},
+		{field: "no_user_js_app_logic", ok: guards.NoUserJSAppLogic},
+		{field: "no_node_only_promotion", ok: guards.NoNodeOnlyPromotion},
+		{field: "no_legacy_sidecars", ok: guards.NoLegacySidecars},
+		{field: "no_react_runtime", ok: guards.NoReactRuntime},
+		{field: "no_platform_widgets", ok: guards.NoPlatformWidgets},
+	} {
+		if !check.ok {
+			issues = append(issues, fmt.Sprintf("browser_surface negative_guards.%s must be true", check.field))
+		}
+	}
+	return issues
+}
+
+func validateBrowserSurfaceNativeEvents(events []string) []string {
+	var issues []string
+	for _, required := range []string{"pointerup", "keydown", "beforeinput", "resize"} {
+		if !stringSliceContainsFold(events, required) {
+			issues = append(issues, fmt.Sprintf("browser_surface input.native_events requires %s", required))
+		}
+	}
+	return issues
+}
+
+func validateBrowserSurfaceRoles(roles []string) []string {
+	var issues []string
+	for _, required := range []string{"root", "textbox", "checkbox", "button", "status"} {
+		if !stringSliceContainsFold(roles, required) {
+			issues = append(issues, fmt.Sprintf("browser_surface accessibility.roles requires %s", required))
+		}
+	}
+	return issues
+}
+
+func browserSurfaceHostTraceContains(traces []BrowserSurfaceHostTraceReport, artifactKind string) bool {
+	for _, trace := range traces {
+		if strings.TrimSpace(trace.Path) == "" || !trace.Pass {
+			continue
+		}
+		if strings.TrimSpace(trace.ArtifactKind) == artifactKind {
+			return true
+		}
+	}
+	return false
+}
+
 func validateLinuxReleaseWindowEvidence(report Report) []string {
 	if !isLinuxReleaseWindowReport(report) {
 		return nil
@@ -3622,6 +4823,1376 @@ func validateAccessibilityTreeEvidence(report Report) []string {
 		}
 	}
 	return issues
+}
+
+func validateAppModelEvidence(report Report) []string {
+	if !isAppModelReport(report) {
+		return nil
+	}
+	var issues []string
+	if !isSurfaceAppModelSource(report.Source) {
+		issues = append(issues, fmt.Sprintf("app_model source path must match examples/surface_app_model.tetra, got %q", report.Source))
+	}
+	if report.AppModel == nil {
+		return append(issues, "app_model evidence is required for examples/surface_app_model.tetra")
+	}
+	app := report.AppModel
+	if app.Schema != "tetra.surface.app-model.v1" {
+		issues = append(issues, fmt.Sprintf("app_model schema is %q, want tetra.surface.app-model.v1", app.Schema))
+	}
+	if app.AppModelLevel != "explicit-command-reducer-v1" {
+		issues = append(issues, fmt.Sprintf("app_model app_model_level is %q, want explicit-command-reducer-v1", app.AppModelLevel))
+	}
+	if app.ReleaseScope != "surface-v1-linux-web" {
+		issues = append(issues, fmt.Sprintf("app_model release_scope is %q, want surface-v1-linux-web", app.ReleaseScope))
+	}
+	if normalizeEvidencePath(app.Source) != normalizeEvidencePath(report.Source) {
+		issues = append(issues, fmt.Sprintf("app_model source %q must match report source %q", app.Source, report.Source))
+	}
+	if app.Module != "lib.core.surface_app" {
+		issues = append(issues, fmt.Sprintf("app_model module is %q, want lib.core.surface_app", app.Module))
+	}
+	if !app.UsesComponentTreeAPI || !app.CallerOwnedState || !app.ExplicitEventBindings || !app.DeterministicReducer {
+		issues = append(issues, "app_model requires component-tree API use, caller-owned state, explicit event bindings, and deterministic reducer evidence")
+	}
+	if app.HiddenAppState || app.ReactRuntime || app.ElectronRuntime || app.DOMRuntime || app.DOMEventModel || app.UserJS || app.PlatformWidgets {
+		issues = append(issues, "app_model must not claim hidden app state, React/Electron/DOM runtime, DOM event model, user JS, or platform widgets")
+	}
+	for _, field := range []string{"route", "focused", "name_buffer", "save_count", "pending_task", "history_depth", "redo_depth"} {
+		if !contains(app.StateFields, field) {
+			issues = append(issues, fmt.Sprintf("app_model state_fields missing %s", field))
+		}
+	}
+	for _, command := range []string{"focus.name", "text.insert", "nav.push.settings", "nav.back", "async.save.start", "async.save.complete", "async.save.cancel", "history.undo", "history.redo"} {
+		if !contains(app.CommandRegistry, command) {
+			issues = append(issues, fmt.Sprintf("app_model command_registry missing %s", command))
+		}
+	}
+
+	commandSet := map[string]bool{}
+	for _, command := range app.CommandRegistry {
+		commandSet[command] = true
+	}
+	eventByOrder := map[int]EventReport{}
+	for _, event := range report.Events {
+		eventByOrder[event.Order] = event
+	}
+	bindingByEventCommand := map[string]bool{}
+	issues = append(issues, validateAppModelEventBindings(app.EventBindings, eventByOrder, commandSet, bindingByEventCommand)...)
+	issues = append(issues, validateAppModelCommandDispatches(app.CommandDispatches, report.Components, commandSet, bindingByEventCommand)...)
+	issues = append(issues, validateAppModelNavigation(app.NavigationTransitions, commandSet)...)
+	issues = append(issues, validateAppModelFocusScopes(app.FocusScopeTransitions)...)
+	issues = append(issues, validateAppModelAsyncTasks(app.AsyncTasks, commandSet)...)
+	issues = append(issues, validateAppModelUndoRedo(app.UndoRedoTransitions, commandSet)...)
+	issues = append(issues, validateAppModelNegativeGuards(app.NegativeGuards)...)
+	for _, required := range []string{
+		"app model explicit event-to-command binding",
+		"app model deterministic command reducer",
+		"app model navigation stack",
+		"app model focus scope modal trap",
+		"app model async completion cancellation boundary",
+		"app model undo redo history",
+		"app model no React hooks DOM event model hidden JS state",
+	} {
+		if !caseNameContains(report.Cases, required) {
+			issues = append(issues, fmt.Sprintf("app_model report requires %s evidence", required))
+		}
+	}
+	return issues
+}
+
+func validateLinuxAppShellEvidence(report Report) []string {
+	if !isLinuxAppShellReport(report) {
+		return nil
+	}
+	var issues []string
+	if report.Target != "linux-x64" {
+		issues = append(issues, fmt.Sprintf("linux app-shell target is %q, want linux-x64", report.Target))
+	}
+	if !isSurfaceLinuxAppShellNotesSource(report.Source) {
+		issues = append(issues, fmt.Sprintf("linux app-shell source path must match examples/surface_linux_app_shell_notes.tetra, got %q", report.Source))
+	}
+	if report.HostEvidence.Level != "linux-x64-release-window-v1" {
+		issues = append(issues, fmt.Sprintf("linux app-shell host_evidence.level is %q, want linux-x64-release-window-v1", report.HostEvidence.Level))
+	}
+	if report.HostEvidence.Backend != "wayland-shm-rgba-release-v1" {
+		issues = append(issues, fmt.Sprintf("linux app-shell host_evidence.backend is %q, want wayland-shm-rgba-release-v1", report.HostEvidence.Backend))
+	}
+	for _, check := range []struct {
+		name string
+		ok   bool
+	}{
+		{name: "framebuffer", ok: report.HostEvidence.Framebuffer},
+		{name: "real_window", ok: report.HostEvidence.RealWindow},
+		{name: "native_input", ok: report.HostEvidence.NativeInput},
+		{name: "text_input", ok: report.HostEvidence.TextInput},
+		{name: "clipboard", ok: report.HostEvidence.Clipboard},
+		{name: "composition", ok: report.HostEvidence.Composition},
+		{name: "accessibility_bridge", ok: report.HostEvidence.AccessibilityBridge},
+	} {
+		if !check.ok {
+			issues = append(issues, fmt.Sprintf("linux app-shell host_evidence.%s must be true", check.name))
+		}
+	}
+	if report.HostEvidence.UserFacingPlatformWidgets {
+		issues = append(issues, "linux app-shell must not expose GTK/Qt/native widget UI or user-facing platform widgets")
+	}
+	if !hasFrameOrderDimensions(report.Frames, 6, 720, 540, 2880) {
+		issues = append(issues, "linux app-shell requires order-6 720x540 presented resize/DPI frame evidence")
+	}
+	for _, kind := range []string{"mouse_up", "key_down", "text_input", "resize", "close"} {
+		if !eventKindContains(report.Events, kind) {
+			issues = append(issues, fmt.Sprintf("linux app-shell requires %s event evidence", kind))
+		}
+	}
+	for _, process := range []string{
+		"surface linux app-shell host trace",
+		"surface linux app-shell window trace",
+		"surface linux-x64 release clipboard harness",
+		"surface linux-x64 release composition harness",
+		"surface linux accessibility platform probe",
+	} {
+		if !hasRuntimeProcessName(report.Processes, process) {
+			issues = append(issues, fmt.Sprintf("linux app-shell requires %s process evidence", process))
+		}
+	}
+	for _, kind := range []string{"linux-app-shell-host-trace", "linux-app-shell-window-trace", "linux-accessibility-platform-probe"} {
+		if !artifactKindContains(report.Artifacts, kind) {
+			issues = append(issues, fmt.Sprintf("linux app-shell requires %s artifact", kind))
+		}
+	}
+	for _, required := range []string{
+		"linux app-shell v1 schema",
+		"linux app-shell lifecycle open close reopen",
+		"linux app-shell multi-window notes reference",
+		"linux app-shell resize dpi cursor trace",
+		"linux app-shell clipboard ime accessibility adapters",
+		"linux app-shell file dialog notification blocked-pass",
+		"linux app-shell electron feature ledger",
+		"linux app-shell dialog file picker tray blocked-pass",
+		"linux app-shell crash error report scoped adapters",
+		"linux app-shell rejects GTK Qt native widget UI",
+		"linux app-shell no Electron React DOM application scripting",
+	} {
+		if !caseNameContains(report.Cases, required) {
+			issues = append(issues, fmt.Sprintf("linux app-shell report requires %s evidence", required))
+		}
+	}
+	if report.LinuxAppShell == nil {
+		return append(issues, "linux_app_shell evidence is required for examples/surface_linux_app_shell_notes.tetra")
+	}
+	app := report.LinuxAppShell
+	for _, check := range []struct {
+		field string
+		got   string
+		want  string
+	}{
+		{field: "schema", got: app.Schema, want: LinuxAppShellSchemaV1},
+		{field: "app_shell_level", got: app.AppShellLevel, want: "linux-app-shell-subset-v1"},
+		{field: "release_scope", got: app.ReleaseScope, want: ReleaseScopeSurfaceV1LinuxWeb},
+		{field: "module", got: app.Module, want: "lib.core.surface_app_shell"},
+		{field: "host_adapter", got: app.HostAdapter, want: "wayland-shm-rgba-release-v1"},
+	} {
+		if check.got != check.want {
+			issues = append(issues, fmt.Sprintf("linux_app_shell %s is %q, want %q", check.field, check.got, check.want))
+		}
+	}
+	if normalizeEvidencePath(app.Source) != normalizeEvidencePath(report.Source) {
+		issues = append(issues, fmt.Sprintf("linux_app_shell source %q must match report source %q", app.Source, report.Source))
+	}
+	if !app.ProductionClaim {
+		issues = append(issues, "linux_app_shell production_claim must be true")
+	}
+	if app.Experimental {
+		issues = append(issues, "linux_app_shell experimental must be false")
+	}
+	issues = append(issues, validateLinuxAppShellLifecycle(app.WindowLifecycle)...)
+	issues = append(issues, validateLinuxAppShellWindows(app.Windows)...)
+	issues = append(issues, validateLinuxAppShellResizeDPI(app.ResizeDPI)...)
+	issues = append(issues, validateLinuxAppShellCursors(app.CursorTransitions)...)
+	issues = append(issues, validateLinuxAppShellCapability("clipboard", app.Clipboard, "clipboard-text-v1", "linux-app-shell-host-trace", []string{"read", "write"})...)
+	issues = append(issues, validateLinuxAppShellCapability("ime", app.IME, "composition-baseline-v1", "linux-app-shell-host-trace", []string{"start", "update", "commit", "cancel"})...)
+	issues = append(issues, validateLinuxAppShellCapability("accessibility", app.Accessibility, "platform-bridge-v1", "linux-accessibility-platform-probe", []string{"metadata_tree", "platform_export"})...)
+	issues = append(issues, validateLinuxAppShellFeatures(app.ShellFeatures)...)
+	issues = append(issues, validateLinuxAppShellHostTraces(app.HostTraces)...)
+	issues = append(issues, validateLinuxAppShellNegativeGuards(app.NegativeGuards)...)
+	return issues
+}
+
+func validateLinuxAppShellLifecycle(rows []LinuxAppShellLifecycleReport) []string {
+	var issues []string
+	if len(rows) < 3 {
+		issues = append(issues, "linux_app_shell window_lifecycle requires open, close, and reopen evidence")
+	}
+	seen := map[string]bool{}
+	for _, row := range rows {
+		if strings.TrimSpace(row.WindowID) == "" {
+			issues = append(issues, "linux_app_shell window_lifecycle window_id is required")
+		}
+		if !row.HostTrace || !row.Pass {
+			issues = append(issues, fmt.Sprintf("linux_app_shell lifecycle %s must have host_trace=true and pass=true", row.Operation))
+		}
+		seen[row.Operation] = true
+	}
+	for _, op := range []string{"open", "close", "reopen"} {
+		if !seen[op] {
+			issues = append(issues, fmt.Sprintf("linux_app_shell window_lifecycle missing %s", op))
+		}
+	}
+	return issues
+}
+
+func validateLinuxAppShellWindows(rows []LinuxAppShellWindowReport) []string {
+	var issues []string
+	if len(rows) < 2 {
+		issues = append(issues, "linux_app_shell windows requires at least two real windows for multi-window notes")
+	}
+	seen := map[string]bool{}
+	for _, row := range rows {
+		if strings.TrimSpace(row.ID) == "" || strings.TrimSpace(row.BlockRoot) == "" {
+			issues = append(issues, "linux_app_shell windows require id and block_root")
+		}
+		if !row.RealWindow || !row.Presented {
+			issues = append(issues, fmt.Sprintf("linux_app_shell window %s must be real_window=true and presented=true", row.ID))
+		}
+		if row.Width <= 0 || row.Height <= 0 || row.DPIScaleMilli <= 0 {
+			issues = append(issues, fmt.Sprintf("linux_app_shell window %s requires positive size and dpi_scale_milli", row.ID))
+		}
+		seen[row.ID] = true
+	}
+	for _, id := range []string{"notes-main", "notes-inspector"} {
+		if !seen[id] {
+			issues = append(issues, fmt.Sprintf("linux_app_shell windows missing %s multi-window notes evidence", id))
+		}
+	}
+	return issues
+}
+
+func validateLinuxAppShellResizeDPI(rows []LinuxAppShellResizeDPIReport) []string {
+	var issues []string
+	seen := map[string]bool{}
+	for _, row := range rows {
+		if !row.HostTrace || !row.Pass {
+			issues = append(issues, fmt.Sprintf("linux_app_shell resize_dpi %s must have host_trace=true and pass=true", row.Operation))
+		}
+		if row.BeforeWidth <= 0 || row.BeforeHeight <= 0 || row.AfterWidth <= 0 || row.AfterHeight <= 0 || row.DPIScaleMilli <= 0 {
+			issues = append(issues, fmt.Sprintf("linux_app_shell resize_dpi %s requires positive dimensions and dpi_scale_milli", row.Operation))
+		}
+		seen[row.Operation] = true
+	}
+	for _, op := range []string{"resize", "dpi_scale"} {
+		if !seen[op] {
+			issues = append(issues, fmt.Sprintf("linux_app_shell resize_dpi missing %s", op))
+		}
+	}
+	return issues
+}
+
+func validateLinuxAppShellCursors(rows []LinuxAppShellCursorReport) []string {
+	var issues []string
+	seen := map[string]bool{}
+	for _, row := range rows {
+		if !row.HostTrace || !row.Pass {
+			issues = append(issues, fmt.Sprintf("linux_app_shell cursor %s must have host_trace=true and pass=true", row.Cursor))
+		}
+		if strings.TrimSpace(row.Target) == "" {
+			issues = append(issues, fmt.Sprintf("linux_app_shell cursor %s target is required", row.Cursor))
+		}
+		seen[row.Cursor] = true
+	}
+	for _, cursor := range []string{"pointer", "text", "resize"} {
+		if !seen[cursor] {
+			issues = append(issues, fmt.Sprintf("linux_app_shell cursor_transitions missing %s", cursor))
+		}
+	}
+	return issues
+}
+
+func validateLinuxAppShellCapability(name string, cap LinuxAppShellCapabilityReport, wantLevel string, wantArtifactKind string, required []string) []string {
+	var issues []string
+	if cap.Level != wantLevel {
+		issues = append(issues, fmt.Sprintf("linux_app_shell %s level is %q, want %q", name, cap.Level, wantLevel))
+	}
+	if !cap.HostTrace || !cap.Pass {
+		issues = append(issues, fmt.Sprintf("linux_app_shell %s requires host_trace=true and pass=true", name))
+	}
+	if cap.ArtifactKind != wantArtifactKind {
+		issues = append(issues, fmt.Sprintf("linux_app_shell %s artifact_kind is %q, want %q", name, cap.ArtifactKind, wantArtifactKind))
+	}
+	checks := map[string]bool{
+		"read":            cap.Read,
+		"write":           cap.Write,
+		"start":           cap.Start,
+		"update":          cap.Update,
+		"commit":          cap.Commit,
+		"cancel":          cap.Cancel,
+		"metadata_tree":   cap.MetadataTree,
+		"platform_export": cap.PlatformExport,
+	}
+	for _, field := range required {
+		if !checks[field] {
+			issues = append(issues, fmt.Sprintf("linux_app_shell %s requires %s=true", name, field))
+		}
+	}
+	return issues
+}
+
+func validateLinuxAppShellFeatures(rows []LinuxAppShellFeatureReport) []string {
+	var issues []string
+	features := map[string]LinuxAppShellFeatureReport{}
+	for _, row := range rows {
+		if strings.TrimSpace(row.Name) == "" {
+			issues = append(issues, "linux_app_shell shell_feature name is required")
+			continue
+		}
+		features[row.Name] = row
+		if !row.Pass || !row.HostTrace || !row.NoNativeWidgetUI {
+			issues = append(issues, fmt.Sprintf("linux_app_shell shell_feature %s requires host_trace=true, no_native_widget_ui=true, and pass=true", row.Name))
+		}
+		if !linuxAppShellKnownFeature(row.Name) {
+			issues = append(issues, fmt.Sprintf("linux_app_shell shell_feature %s is not part of the supported P16 feature ledger", row.Name))
+		}
+	}
+	for _, name := range []string{"window_lifecycle", "multi_window", "clipboard", "ime", "accessibility_bridge"} {
+		feature, ok := features[name]
+		if !ok {
+			issues = append(issues, fmt.Sprintf("linux_app_shell shell_features missing %s", name))
+			continue
+		}
+		if feature.Status != "target_evidenced" || !feature.Claimed || strings.TrimSpace(feature.BlockedReason) != "" {
+			issues = append(issues, fmt.Sprintf("linux_app_shell %s must be target_evidenced, claimed=true, and carry no blocked_reason", name))
+		}
+	}
+	for _, name := range []string{"app_menu", "crash_recovery", "error_report"} {
+		feature, ok := features[name]
+		if !ok {
+			issues = append(issues, fmt.Sprintf("linux_app_shell shell_features missing %s", name))
+			continue
+		}
+		if feature.Status != "scoped_adapter" || !feature.Claimed || strings.TrimSpace(feature.BlockedReason) != "" {
+			issues = append(issues, fmt.Sprintf("linux_app_shell %s must be a claimed scoped_adapter with target evidence, not GTK/Qt/native widget UI", name))
+		}
+	}
+	for _, name := range []string{"dialog", "file_dialog", "file_picker", "notification", "tray", "deep_link"} {
+		feature, ok := features[name]
+		if !ok {
+			issues = append(issues, fmt.Sprintf("linux_app_shell shell_features missing %s", name))
+			continue
+		}
+		if feature.Status != "blocked_pass" || feature.Claimed || strings.TrimSpace(feature.BlockedReason) == "" {
+			issues = append(issues, fmt.Sprintf("linux_app_shell %s requires blocked_pass nonclaim until target evidence exists", name))
+		}
+	}
+	return issues
+}
+
+func linuxAppShellKnownFeature(name string) bool {
+	switch name {
+	case "app_menu",
+		"window_lifecycle",
+		"multi_window",
+		"clipboard",
+		"ime",
+		"accessibility_bridge",
+		"crash_recovery",
+		"error_report",
+		"dialog",
+		"file_dialog",
+		"file_picker",
+		"notification",
+		"tray",
+		"deep_link":
+		return true
+	default:
+		return false
+	}
+}
+
+func validateLinuxAppShellHostTraces(rows []LinuxAppShellHostTraceReport) []string {
+	var issues []string
+	seen := map[string]bool{}
+	for _, row := range rows {
+		if !row.Pass || strings.TrimSpace(row.Path) == "" {
+			issues = append(issues, fmt.Sprintf("linux_app_shell host_trace %s requires path and pass=true", row.Name))
+		}
+		seen[row.ArtifactKind] = true
+	}
+	for _, kind := range []string{"linux-app-shell-host-trace", "linux-app-shell-window-trace", "linux-accessibility-platform-probe"} {
+		if !seen[kind] {
+			issues = append(issues, fmt.Sprintf("linux_app_shell host_traces missing %s", kind))
+		}
+	}
+	return issues
+}
+
+func validateLinuxAppShellNegativeGuards(guards LinuxAppShellNegativeGuards) []string {
+	if guards.NoGTK &&
+		guards.NoQT &&
+		guards.NoNativeWidgets &&
+		guards.NoElectronRuntime &&
+		guards.NoReactRuntime &&
+		guards.NoDOMUI &&
+		guards.NoUserJS &&
+		guards.NoPlatformWidgets {
+		return nil
+	}
+	return []string{"linux_app_shell negative_guards must reject GTK/Qt/native widget UI, Electron/React runtimes, DOM UI, user JS, and platform widgets"}
+}
+
+func validateSecurityPermissionEvidence(report Report) []string {
+	if report.SecurityPermissions == nil {
+		if isLinuxAppShellReport(report) {
+			return []string{"security_permissions evidence is required for linux app-shell reports"}
+		}
+		return nil
+	}
+	var features []LinuxAppShellFeatureReport
+	if report.LinuxAppShell != nil {
+		features = report.LinuxAppShell.ShellFeatures
+	}
+	return validateSecurityPermissionReport(*report.SecurityPermissions, features, report.Source)
+}
+
+func validateSecurityPermissionReport(report SecurityPermissionReport, features []LinuxAppShellFeatureReport, source string) []string {
+	var issues []string
+	for _, check := range []struct {
+		field string
+		got   string
+		want  string
+	}{
+		{field: "schema", got: report.Schema, want: SecurityPermissionSchemaV1},
+		{field: "model", got: report.Model, want: "surface-security-permission-v1"},
+		{field: "release_scope", got: report.ReleaseScope, want: ReleaseScopeSurfaceV1LinuxWeb},
+		{field: "app_shell_features", got: report.AppShellFeatures, want: "electron-feature-ledger-v1"},
+	} {
+		if check.got != check.want {
+			issues = append(issues, fmt.Sprintf("security_permissions %s is %q, want %q", check.field, check.got, check.want))
+		}
+	}
+	if strings.TrimSpace(source) != "" && normalizeEvidencePath(report.Source) != normalizeEvidencePath(source) {
+		issues = append(issues, fmt.Sprintf("security_permissions source %q must match report source %q", report.Source, source))
+	}
+	if strings.TrimSpace(report.Source) == "" {
+		issues = append(issues, "security_permissions source is required")
+	}
+	if !report.ProductionClaim {
+		issues = append(issues, "security_permissions production_claim must be true")
+	}
+	if report.Experimental {
+		issues = append(issues, "security_permissions experimental must be false")
+	}
+	if !report.DefaultDeny {
+		issues = append(issues, "security_permissions default_deny must be true")
+	}
+	if !report.ShellFeaturePolicyEnforced {
+		issues = append(issues, "security_permissions shell_feature_policy_enforced must be true")
+	}
+	issues = append(issues, validateSecurityCapabilityRows(report.Capabilities, features)...)
+	issues = append(issues, validateSecurityPermissionRows(report.Permissions)...)
+	issues = append(issues, validateSurfaceSecurityProcessBoundaries(report.ProcessBoundaries)...)
+	issues = append(issues, validateSurfaceSecurityAssetSafety(report.AssetSafety)...)
+	issues = append(issues, validateSurfaceSecurityUnsupportedClaims(report.UnsupportedClaims)...)
+	issues = append(issues, validateSurfaceSecurityNegativeGuards(report.NegativeGuards)...)
+	return issues
+}
+
+func validateSurfacePerformanceBudgetEvidence(report Report) []string {
+	if report.SurfacePerformanceBudget == nil {
+		if isLinuxAppShellReport(report) {
+			return []string{"surface_performance_budget evidence is required for linux app-shell reports"}
+		}
+		return nil
+	}
+	return validateSurfacePerformanceBudgetReport(*report.SurfacePerformanceBudget, &report, report.Source)
+}
+
+func validateSurfacePerformanceBudgetReport(budget SurfacePerformanceBudgetReport, runtime *Report, source string) []string {
+	var issues []string
+	for _, check := range []struct {
+		field string
+		got   string
+		want  string
+	}{
+		{field: "schema", got: budget.Schema, want: PerformanceBudgetSchemaV1},
+		{field: "model", got: budget.Model, want: "surface-performance-budget-v1"},
+		{field: "release_scope", got: budget.ReleaseScope, want: ReleaseScopeSurfaceV1LinuxWeb},
+	} {
+		if check.got != check.want {
+			issues = append(issues, fmt.Sprintf("surface_performance_budget %s is %q, want %q", check.field, check.got, check.want))
+		}
+	}
+	if strings.TrimSpace(source) != "" && normalizeEvidencePath(budget.Source) != normalizeEvidencePath(source) {
+		issues = append(issues, fmt.Sprintf("surface_performance_budget source %q must match report source %q", budget.Source, source))
+	}
+	if strings.TrimSpace(budget.Source) == "" {
+		issues = append(issues, "surface_performance_budget source is required")
+	}
+	if !isSupportedRuntimeTarget(budget.Target) {
+		issues = append(issues, fmt.Sprintf("surface_performance_budget target is %q, want headless, linux-x64, or wasm32-web", budget.Target))
+	}
+	if !isSupportedRuntimeName(budget.Runtime) {
+		issues = append(issues, fmt.Sprintf("surface_performance_budget runtime is %q, want surface-headless, surface-linux-x64, or surface-wasm32-web", budget.Runtime))
+	}
+	if runtime != nil {
+		if budget.Target != runtime.Target {
+			issues = append(issues, fmt.Sprintf("surface_performance_budget target %q must match report target %q", budget.Target, runtime.Target))
+		}
+		if budget.Runtime != runtime.Runtime {
+			issues = append(issues, fmt.Sprintf("surface_performance_budget runtime %q must match report runtime %q", budget.Runtime, runtime.Runtime))
+		}
+	}
+	if !budget.ProductionClaim {
+		issues = append(issues, "surface_performance_budget production_claim must be true")
+	}
+	if budget.Experimental {
+		issues = append(issues, "surface_performance_budget experimental must be false")
+	}
+	if !isGitHead(budget.GitHead) {
+		issues = append(issues, "surface_performance_budget git_head must be a 40-character hex commit")
+	}
+	if strings.TrimSpace(budget.PerformanceClaim) != "none" {
+		issues = append(issues, fmt.Sprintf("surface_performance_budget performance_claim is %q, want none", budget.PerformanceClaim))
+	}
+	issues = append(issues, forbiddenBlockPerformanceClaimIssues("surface_performance_budget performance_claim", budget.PerformanceClaim)...)
+	issues = append(issues, forbiddenBlockPerformanceClaimIssues("surface_performance_budget methodology", budget.Methodology.ElectronComparison)...)
+	issues = append(issues, validateSurfaceStartupBudget(budget.Startup)...)
+	issues = append(issues, validateSurfaceFrameBudget(budget.Frame)...)
+	issues = append(issues, validateSurfaceSceneBudget(budget.Scene, runtime)...)
+	issues = append(issues, validateSurfaceMemoryBudget(budget.Memory, runtime)...)
+	issues = append(issues, validateSurfaceBinaryBudget(budget.Binary)...)
+	issues = append(issues, validateSurfaceCPUPowerProxy(budget.CPUPowerProxy)...)
+	issues = append(issues, validateSurfaceCacheBudget(budget.Cache, budget.Memory)...)
+	issues = append(issues, validateSurfacePerformanceMethodology(budget.Methodology)...)
+	issues = append(issues, validateSurfacePerformanceUnsupportedClaims(budget.UnsupportedClaims)...)
+	issues = append(issues, validateSurfacePerformanceNegativeGuards(budget.NegativeGuards)...)
+	return issues
+}
+
+func validateSurfaceStartupBudget(startup SurfaceStartupBudgetReport) []string {
+	var issues []string
+	if startup.LaunchToFirstFrameMS <= 0 {
+		issues = append(issues, "surface_performance_budget startup launch_to_first_frame_ms must be positive")
+	}
+	if startup.BudgetMS <= 0 {
+		issues = append(issues, "surface_performance_budget startup budget_ms must be positive")
+	}
+	if startup.BudgetMS > 0 && startup.LaunchToFirstFrameMS > startup.BudgetMS {
+		issues = append(issues, fmt.Sprintf("surface_performance_budget startup launch_to_first_frame_ms %d exceeds budget_ms %d", startup.LaunchToFirstFrameMS, startup.BudgetMS))
+	}
+	if strings.TrimSpace(startup.Trace) == "" {
+		issues = append(issues, "surface_performance_budget startup trace is required")
+	}
+	if !startup.Pass {
+		issues = append(issues, "surface_performance_budget startup pass must be true")
+	}
+	return issues
+}
+
+func validateSurfaceFrameBudget(frame SurfaceFrameBudgetReport) []string {
+	var issues []string
+	if frame.FrameCount <= 0 {
+		issues = append(issues, "surface_performance_budget frame frame_count must be positive")
+	}
+	for _, check := range []struct {
+		field string
+		value int
+	}{
+		{field: "p50_build_ms", value: frame.P50BuildMS},
+		{field: "p95_build_ms", value: frame.P95BuildMS},
+		{field: "p50_present_ms", value: frame.P50PresentMS},
+		{field: "p95_present_ms", value: frame.P95PresentMS},
+		{field: "budget_ms", value: frame.BudgetMS},
+	} {
+		if check.value <= 0 {
+			issues = append(issues, fmt.Sprintf("surface_performance_budget frame %s must be positive", check.field))
+		}
+	}
+	if frame.P95BuildMS < frame.P50BuildMS {
+		issues = append(issues, "surface_performance_budget frame p95_build_ms must be >= p50_build_ms")
+	}
+	if frame.P95PresentMS < frame.P50PresentMS {
+		issues = append(issues, "surface_performance_budget frame p95_present_ms must be >= p50_present_ms")
+	}
+	if frame.BudgetMS > 0 && (frame.P95BuildMS > frame.BudgetMS || frame.P95PresentMS > frame.BudgetMS) {
+		issues = append(issues, "surface_performance_budget frame p95 build/present must fit within budget_ms")
+	}
+	if frame.IdleLoopCount < 0 || frame.WorkLoopCount < 0 {
+		issues = append(issues, "surface_performance_budget frame idle/work loop counts must be non-negative")
+	}
+	if !frame.Pass {
+		issues = append(issues, "surface_performance_budget frame pass must be true")
+	}
+	return issues
+}
+
+func validateSurfaceSceneBudget(scene SurfaceSceneBudgetReport, runtime *Report) []string {
+	var issues []string
+	if scene.BlockCount <= 0 {
+		issues = append(issues, "surface_performance_budget scene block_count must be positive")
+	}
+	for _, check := range []struct {
+		field string
+		value int
+	}{
+		{field: "recipe_expansion_count", value: scene.RecipeExpansionCount},
+		{field: "paint_command_count", value: scene.PaintCommandCount},
+		{field: "layout_pass_count", value: scene.LayoutPassCount},
+		{field: "text_run_count", value: scene.TextRunCount},
+	} {
+		if check.value < 0 {
+			issues = append(issues, fmt.Sprintf("surface_performance_budget scene %s must be non-negative", check.field))
+		}
+	}
+	if runtime != nil && len(runtime.Components) > 0 && scene.BlockCount < len(runtime.Components) {
+		issues = append(issues, fmt.Sprintf("surface_performance_budget scene block_count = %d, want at least component count %d", scene.BlockCount, len(runtime.Components)))
+	}
+	return issues
+}
+
+func validateSurfaceMemoryBudget(memory SurfaceMemoryBudgetReport, runtime *Report) []string {
+	var issues []string
+	for _, check := range []struct {
+		field string
+		value int
+	}{
+		{field: "glyph_cache_bytes", value: memory.GlyphCacheBytes},
+		{field: "asset_cache_bytes", value: memory.AssetCacheBytes},
+		{field: "layout_cache_bytes", value: memory.LayoutCacheBytes},
+		{field: "paint_cache_bytes", value: memory.PaintCacheBytes},
+		{field: "allocation_count", value: memory.AllocationCount},
+		{field: "allocation_bytes", value: memory.AllocationBytes},
+	} {
+		if check.value < 0 {
+			issues = append(issues, fmt.Sprintf("surface_performance_budget memory %s must be non-negative", check.field))
+		}
+	}
+	if memory.FramebufferPeakBytes <= 0 {
+		issues = append(issues, "surface_performance_budget memory framebuffer_peak_bytes must be positive")
+	}
+	if memory.FramebufferTotalBytes < memory.FramebufferPeakBytes {
+		issues = append(issues, "surface_performance_budget memory framebuffer_total_bytes must be >= framebuffer_peak_bytes")
+	}
+	if runtime != nil && len(runtime.Frames) > 0 {
+		peak, total := blockFramebufferByteTotals(runtime.Frames)
+		if memory.FramebufferPeakBytes < peak {
+			issues = append(issues, fmt.Sprintf("surface_performance_budget memory framebuffer_peak_bytes = %d, want at least runtime peak %d", memory.FramebufferPeakBytes, peak))
+		}
+		if memory.FramebufferTotalBytes < total {
+			issues = append(issues, fmt.Sprintf("surface_performance_budget memory framebuffer_total_bytes = %d, want at least runtime total %d", memory.FramebufferTotalBytes, total))
+		}
+	}
+	if memory.RSSMeasured {
+		if memory.PeakRSSBytes <= 0 {
+			issues = append(issues, "surface_performance_budget memory peak_rss_bytes must be positive when rss_measured=true")
+		}
+	} else if memory.PeakRSSBytes != 0 {
+		issues = append(issues, "surface_performance_budget memory peak_rss_bytes must be 0 when rss_measured=false")
+	}
+	if memory.AllocationCount <= 0 {
+		issues = append(issues, "surface_performance_budget memory allocation_count must be positive")
+	}
+	cacheBytes := memory.GlyphCacheBytes + memory.AssetCacheBytes + memory.LayoutCacheBytes + memory.PaintCacheBytes
+	if memory.AllocationBytes < memory.FramebufferPeakBytes+cacheBytes {
+		issues = append(issues, fmt.Sprintf("surface_performance_budget memory allocation_bytes = %d, want at least framebuffer peak plus caches %d", memory.AllocationBytes, memory.FramebufferPeakBytes+cacheBytes))
+	}
+	if !memory.BoundedCaches {
+		issues = append(issues, "surface_performance_budget memory bounded_caches must be true")
+	}
+	if !memory.UnboundedCacheRejected {
+		issues = append(issues, "surface_performance_budget memory unbounded_cache_rejected must be true")
+	}
+	if !memory.Pass {
+		issues = append(issues, "surface_performance_budget memory pass must be true")
+	}
+	return issues
+}
+
+func validateSurfaceBinaryBudget(binary SurfaceBinaryBudgetReport) []string {
+	var issues []string
+	if strings.TrimSpace(binary.ArtifactPath) == "" {
+		issues = append(issues, "surface_performance_budget binary artifact_path is required")
+	}
+	if binary.SizeBytes <= 0 {
+		issues = append(issues, "surface_performance_budget binary size_bytes must be positive")
+	}
+	if binary.BudgetBytes <= 0 {
+		issues = append(issues, "surface_performance_budget binary budget_bytes must be positive")
+	}
+	if binary.BudgetBytes > 0 && binary.SizeBytes > binary.BudgetBytes {
+		issues = append(issues, fmt.Sprintf("surface_performance_budget binary size_bytes %d exceeds budget_bytes %d", binary.SizeBytes, binary.BudgetBytes))
+	}
+	if !binary.Pass {
+		issues = append(issues, "surface_performance_budget binary pass must be true")
+	}
+	return issues
+}
+
+func validateSurfaceCPUPowerProxy(proxy SurfaceCPUPowerProxyReport) []string {
+	var issues []string
+	for _, check := range []struct {
+		field string
+		value int
+	}{
+		{field: "idle_loop_count", value: proxy.IdleLoopCount},
+		{field: "work_loop_count", value: proxy.WorkLoopCount},
+		{field: "idle_frame_count", value: proxy.IdleFrameCount},
+		{field: "work_frame_count", value: proxy.WorkFrameCount},
+	} {
+		if check.value < 0 {
+			issues = append(issues, fmt.Sprintf("surface_performance_budget cpu_power_proxy %s must be non-negative", check.field))
+		}
+	}
+	if proxy.RealPowerMeasured {
+		issues = append(issues, "surface_performance_budget cpu_power_proxy real_power_measured must be false unless a real power harness is attached")
+	}
+	if !proxy.Pass {
+		issues = append(issues, "surface_performance_budget cpu_power_proxy pass must be true")
+	}
+	return issues
+}
+
+func validateSurfaceCacheBudget(cache SurfaceCacheBudgetReport, memory SurfaceMemoryBudgetReport) []string {
+	var issues []string
+	for _, check := range []struct {
+		field string
+		value int
+	}{
+		{field: "glyph_cache_budget_bytes", value: cache.GlyphCacheBudgetBytes},
+		{field: "asset_cache_budget_bytes", value: cache.AssetCacheBudgetBytes},
+		{field: "layout_cache_budget_bytes", value: cache.LayoutCacheBudgetBytes},
+		{field: "paint_cache_budget_bytes", value: cache.PaintCacheBudgetBytes},
+		{field: "total_cache_budget_bytes", value: cache.TotalCacheBudgetBytes},
+	} {
+		if check.value <= 0 {
+			issues = append(issues, fmt.Sprintf("surface_performance_budget cache %s must be positive", check.field))
+		}
+	}
+	expectedTotal := memory.GlyphCacheBytes + memory.AssetCacheBytes + memory.LayoutCacheBytes + memory.PaintCacheBytes
+	if cache.TotalCacheBytes != expectedTotal {
+		issues = append(issues, fmt.Sprintf("surface_performance_budget cache total_cache_bytes = %d, want memory cache total %d", cache.TotalCacheBytes, expectedTotal))
+	}
+	if cache.TotalCacheBudgetBytes > 0 && cache.TotalCacheBytes > cache.TotalCacheBudgetBytes {
+		issues = append(issues, "surface_performance_budget cache total_cache_bytes must fit within total_cache_budget_bytes")
+	}
+	if strings.TrimSpace(cache.Eviction) == "" {
+		issues = append(issues, "surface_performance_budget cache eviction policy is required")
+	}
+	if !cache.Pass {
+		issues = append(issues, "surface_performance_budget cache pass must be true")
+	}
+	return issues
+}
+
+func validateSurfacePerformanceMethodology(methodology SurfacePerformanceMethodologyReport) []string {
+	var issues []string
+	if methodology.Kind != "local-deterministic-budget-v1" {
+		issues = append(issues, fmt.Sprintf("surface_performance_budget methodology kind is %q, want local-deterministic-budget-v1", methodology.Kind))
+	}
+	if strings.TrimSpace(methodology.ElectronComparison) != "none" {
+		issues = append(issues, fmt.Sprintf("surface_performance_budget methodology electron_comparison is %q, want none", methodology.ElectronComparison))
+	}
+	if methodology.OfficialBenchmark {
+		issues = append(issues, "surface_performance_budget methodology official_benchmark must be false")
+	}
+	if methodology.CrossMachine {
+		issues = append(issues, "surface_performance_budget methodology cross_machine must be false")
+	}
+	if !methodology.FairComparisonRequiredForElectronClaim {
+		issues = append(issues, "surface_performance_budget methodology requires fair_comparison_required_for_electron_claim=true")
+	}
+	return issues
+}
+
+func validateSurfacePerformanceUnsupportedClaims(claims []string) []string {
+	var issues []string
+	for _, claim := range claims {
+		issues = append(issues, forbiddenBlockPerformanceClaimIssues("surface_performance_budget unsupported_claims", claim)...)
+	}
+	for _, required := range []string{
+		"faster-than-electron",
+		"lower-power-than-electron",
+		"official-benchmark-result",
+		"cross-machine-benchmark",
+		"electron-parity-performance",
+	} {
+		if !containsExactText(claims, required) {
+			issues = append(issues, fmt.Sprintf("surface_performance_budget unsupported_claims missing %q", required))
+		}
+	}
+	return issues
+}
+
+func validateSurfacePerformanceNegativeGuards(guards SurfacePerformanceNegativeGuards) []string {
+	if guards.BoundedCaches &&
+		guards.UnboundedCacheRejected &&
+		guards.StaleReportRejected &&
+		guards.NoFasterThanElectronClaim &&
+		guards.NoBenchmarkParityClaim &&
+		guards.PeakMemoryFieldRequired &&
+		guards.NoOfficialBenchmarkClaim {
+		return nil
+	}
+	return []string{"surface_performance_budget negative_guards must require bounded caches, stale report rejection, peak memory field, and no unsupported Electron benchmark claims"}
+}
+
+func containsExactText(values []string, want string) bool {
+	want = strings.ToLower(strings.TrimSpace(want))
+	for _, value := range values {
+		if strings.ToLower(strings.TrimSpace(value)) == want {
+			return true
+		}
+	}
+	return false
+}
+
+func isSupportedRuntimeTarget(target string) bool {
+	switch target {
+	case "headless", "linux-x64", "wasm32-web":
+		return true
+	default:
+		return false
+	}
+}
+
+func isSupportedRuntimeName(runtime string) bool {
+	switch runtime {
+	case "surface-headless", "surface-linux-x64", "surface-wasm32-web":
+		return true
+	default:
+		return false
+	}
+}
+
+func performanceBudgetPeakRSSFieldPresent(raw []byte, embedded bool) bool {
+	var root map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &root); err != nil {
+		return false
+	}
+	var budgetRaw json.RawMessage
+	if embedded {
+		var ok bool
+		budgetRaw, ok = root["surface_performance_budget"]
+		if !ok {
+			return false
+		}
+	} else {
+		budgetRaw = raw
+	}
+	var budget map[string]json.RawMessage
+	if err := json.Unmarshal(budgetRaw, &budget); err != nil {
+		return false
+	}
+	var memory map[string]json.RawMessage
+	if err := json.Unmarshal(budget["memory"], &memory); err != nil {
+		return false
+	}
+	_, ok := memory["peak_rss_bytes"]
+	return ok
+}
+
+func validateSecurityCapabilityRows(rows []SurfaceSecurityCapabilityReport, features []LinuxAppShellFeatureReport) []string {
+	var issues []string
+	if len(rows) == 0 {
+		return []string{"security_permissions capabilities evidence is required"}
+	}
+	capabilities := map[string]SurfaceSecurityCapabilityReport{}
+	for _, row := range rows {
+		name := strings.TrimSpace(row.Name)
+		if name == "" {
+			issues = append(issues, "security_permissions capability name is required")
+			continue
+		}
+		capabilities[name] = row
+		if !linuxAppShellKnownFeature(name) {
+			issues = append(issues, fmt.Sprintf("security_permissions capability %s is not a known app-shell feature", name))
+		}
+		if row.SourceFeature != name {
+			issues = append(issues, fmt.Sprintf("security_permissions capability %s source_feature is %q, want %q", name, row.SourceFeature, name))
+		}
+		if !row.CapabilityChecked || !row.HostTrace || !row.Pass {
+			issues = append(issues, fmt.Sprintf("security_permissions capability %s requires capability_checked=true, host_trace=true, and pass=true", name))
+		}
+		if strings.TrimSpace(row.Policy) == "" || strings.TrimSpace(row.Evidence) == "" {
+			issues = append(issues, fmt.Sprintf("security_permissions capability %s requires policy and evidence", name))
+		}
+	}
+	for _, feature := range features {
+		name := strings.TrimSpace(feature.Name)
+		if name == "" {
+			continue
+		}
+		capability, ok := capabilities[name]
+		if !ok {
+			issues = append(issues, fmt.Sprintf("security_permissions capabilities missing %s", name))
+			continue
+		}
+		issues = append(issues, validateSecurityCapabilityAgainstFeature(capability, feature)...)
+	}
+	return issues
+}
+
+func validateSecurityCapabilityAgainstFeature(capability SurfaceSecurityCapabilityReport, feature LinuxAppShellFeatureReport) []string {
+	name := feature.Name
+	switch feature.Status {
+	case "target_evidenced", "scoped_adapter":
+		var issues []string
+		if capability.Status != "allowed_with_policy" || !capability.Allowed {
+			issues = append(issues, fmt.Sprintf("security_permissions capability %s must be allowed_with_policy for claimed app-shell feature", name))
+		}
+		if !capability.CapabilityChecked || !capability.HostTrace || !capability.Pass {
+			issues = append(issues, fmt.Sprintf("security_permissions capability %s requires checked target-host evidence", name))
+		}
+		if strings.TrimSpace(capability.BlockedReason) != "" {
+			issues = append(issues, fmt.Sprintf("security_permissions capability %s must not carry blocked_reason when allowed", name))
+		}
+		return issues
+	case "blocked_pass":
+		if capability.Status != "blocked_nonclaim" || capability.Allowed || strings.TrimSpace(capability.BlockedReason) == "" {
+			return []string{fmt.Sprintf("security_permissions capability %s must remain blocked_nonclaim and cannot bypass the P16 blocked feature ledger", name)}
+		}
+		return nil
+	default:
+		return []string{fmt.Sprintf("security_permissions capability %s references unsupported feature status %q", name, feature.Status)}
+	}
+}
+
+func validateSecurityPermissionRows(rows []SurfacePermissionReport) []string {
+	var issues []string
+	if len(rows) == 0 {
+		return []string{"security_permissions permissions evidence is required"}
+	}
+	permissions := map[string]SurfacePermissionReport{}
+	for _, row := range rows {
+		name := strings.TrimSpace(row.Name)
+		if name == "" {
+			issues = append(issues, "security_permissions permission name is required")
+			continue
+		}
+		permissions[name] = row
+		if !row.CapabilityChecked || !row.Pass {
+			issues = append(issues, fmt.Sprintf("security_permissions permission %s requires capability_checked=true and pass=true", name))
+		}
+		if strings.TrimSpace(row.Evidence) == "" {
+			issues = append(issues, fmt.Sprintf("security_permissions permission %s evidence is required", name))
+		}
+	}
+	for _, name := range []string{"filesystem", "network"} {
+		row, ok := permissions[name]
+		if !ok {
+			issues = append(issues, fmt.Sprintf("security_permissions permissions missing %s", name))
+			continue
+		}
+		if row.Status != "denied" || row.Allowed || strings.TrimSpace(row.BlockedReason) == "" {
+			issues = append(issues, fmt.Sprintf("security_permissions permission %s must be denied by default with blocked_reason", name))
+		}
+	}
+	if row, ok := permissions["clipboard"]; !ok {
+		issues = append(issues, "security_permissions permissions missing clipboard")
+	} else if row.Status != "allowed_with_policy" || !row.Allowed || !row.CapabilityChecked || strings.TrimSpace(row.Evidence) == "" {
+		issues = append(issues, "security_permissions permission clipboard must be allowed_with_policy with host evidence")
+	}
+	for _, name := range []string{"notifications", "dialogs", "shell_open_url"} {
+		row, ok := permissions[name]
+		if !ok {
+			issues = append(issues, fmt.Sprintf("security_permissions permissions missing %s", name))
+			continue
+		}
+		if row.Status != "denied" || row.Allowed || strings.TrimSpace(row.BlockedReason) == "" {
+			issues = append(issues, fmt.Sprintf("security_permissions permission %s must be denied until target evidence exists", name))
+		}
+	}
+	return issues
+}
+
+func validateSurfaceSecurityProcessBoundaries(rows []SurfaceProcessBoundaryReport) []string {
+	var issues []string
+	boundaries := map[string]SurfaceProcessBoundaryReport{}
+	for _, row := range rows {
+		name := strings.TrimSpace(row.Name)
+		if name == "" {
+			issues = append(issues, "security_permissions process_boundary name is required")
+			continue
+		}
+		boundaries[name] = row
+		if !row.SchemaChecked || !row.CapabilityChecked || !row.Pass {
+			issues = append(issues, fmt.Sprintf("security_permissions process_boundary %s requires schema_checked, capability_checked, and pass", name))
+		}
+		if row.UserJS || row.NodeIntegration || row.ElectronRuntime {
+			issues = append(issues, fmt.Sprintf("security_permissions process_boundary %s must reject user JS app logic, Node integration, and Electron runtime", name))
+		}
+	}
+	for _, name := range []string{"surface_app_to_host_abi", "linux_app_shell_host_adapter", "browser_canvas_host"} {
+		if _, ok := boundaries[name]; !ok {
+			issues = append(issues, fmt.Sprintf("security_permissions process_boundaries missing %s", name))
+		}
+	}
+	return issues
+}
+
+func validateSurfaceSecurityAssetSafety(rows []SurfaceAssetSafetyReport) []string {
+	var issues []string
+	assets := map[string]SurfaceAssetSafetyReport{}
+	for _, row := range rows {
+		kind := strings.TrimSpace(row.Kind)
+		if kind == "" {
+			issues = append(issues, "security_permissions asset_safety kind is required")
+			continue
+		}
+		assets[kind] = row
+		if !validBlockAssetKind(kind) {
+			issues = append(issues, fmt.Sprintf("security_permissions asset_safety kind %s is unsupported", kind))
+		}
+		if !row.LocalOnly || !row.SHA256Required || row.SizeLimitBytes <= 0 || row.NetworkFetchAllowed || strings.TrimSpace(row.Parser) == "" || !row.BoundsChecked || !row.Pass {
+			issues = append(issues, fmt.Sprintf("security_permissions asset_safety %s requires local_only, sha256, positive size limit, no network fetch, parser, bounds check, and pass", kind))
+		}
+	}
+	for _, kind := range []string{"font", "image", "icon"} {
+		if _, ok := assets[kind]; !ok {
+			issues = append(issues, fmt.Sprintf("security_permissions asset_safety missing %s", kind))
+		}
+	}
+	return issues
+}
+
+func validateSurfaceSecurityUnsupportedClaims(claims []string) []string {
+	var issues []string
+	for _, claim := range []string{
+		"unrestricted-filesystem",
+		"unrestricted-network",
+		"native-permission-prompts",
+		"production-notifications",
+		"production-dialogs",
+		"remote-asset-fetch",
+		"electron-node-integration",
+	} {
+		if !stringSliceContainsFold(claims, claim) {
+			issues = append(issues, fmt.Sprintf("security_permissions unsupported_claims requires %s", claim))
+		}
+	}
+	return issues
+}
+
+func validateSurfaceSecurityNegativeGuards(guards SurfaceSecurityNegativeGuards) []string {
+	var issues []string
+	for _, check := range []struct {
+		field string
+		ok    bool
+	}{
+		{field: "no_ambient_filesystem", ok: guards.NoAmbientFilesystem},
+		{field: "no_ambient_network", ok: guards.NoAmbientNetwork},
+		{field: "no_shell_feature_bypass", ok: guards.NoShellFeatureBypass},
+		{field: "no_permissionless_clipboard", ok: guards.NoPermissionlessClipboard},
+		{field: "no_notification_dialog_without_target_evidence", ok: guards.NoNotificationDialogWithoutTargetEvidence},
+		{field: "no_network_asset_fetch", ok: guards.NoNetworkAssetFetch},
+		{field: "no_untrusted_font_image_decode", ok: guards.NoUntrustedFontImageDecode},
+		{field: "no_electron_node_integration", ok: guards.NoElectronNodeIntegration},
+		{field: "no_user_js_app_logic", ok: guards.NoUserJSAppLogic},
+		{field: "no_dom_app_ui_tree", ok: guards.NoDOMAppUITree},
+	} {
+		if !check.ok {
+			issues = append(issues, fmt.Sprintf("security_permissions negative_guards.%s must be true", check.field))
+		}
+	}
+	return issues
+}
+
+func validateAppModelEventBindings(bindings []AppModelEventBindingReport, eventByOrder map[int]EventReport, commandSet map[string]bool, bindingByEventCommand map[string]bool) []string {
+	var issues []string
+	if len(bindings) == 0 {
+		return []string{"app_model event_bindings are required"}
+	}
+	lastOrder := 0
+	for _, binding := range bindings {
+		if binding.Order <= lastOrder {
+			issues = append(issues, fmt.Sprintf("app_model event binding order %d is not strictly greater than previous order %d", binding.Order, lastOrder))
+		}
+		lastOrder = binding.Order
+		if binding.EventOrder <= 0 {
+			issues = append(issues, fmt.Sprintf("app_model event binding %d event_order must be positive", binding.Order))
+		}
+		event, ok := eventByOrder[binding.EventOrder]
+		if !ok {
+			issues = append(issues, fmt.Sprintf("app_model event binding %d references missing event order %d", binding.Order, binding.EventOrder))
+		} else {
+			if event.Kind != binding.EventKind || event.TargetComponent != binding.Target {
+				issues = append(issues, fmt.Sprintf("app_model event binding %d = %s/%s, want event %d %s/%s", binding.Order, binding.EventKind, binding.Target, event.Order, event.Kind, event.TargetComponent))
+			}
+			if !stringSlicesEqual(binding.DispatchPath, event.DispatchPath) {
+				issues = append(issues, fmt.Sprintf("app_model event binding %d dispatch_path = %v, want event path %v", binding.Order, binding.DispatchPath, event.DispatchPath))
+			}
+		}
+		if !binding.Explicit {
+			issues = append(issues, fmt.Sprintf("app_model event binding %d must be explicit", binding.Order))
+		}
+		if strings.TrimSpace(binding.Command) == "" || !commandSet[binding.Command] {
+			issues = append(issues, fmt.Sprintf("app_model event binding %d references unregistered command %q", binding.Order, binding.Command))
+		}
+		bindingByEventCommand[appModelEventCommandKey(binding.EventOrder, binding.Command)] = true
+	}
+	return issues
+}
+
+func validateAppModelCommandDispatches(dispatches []AppModelCommandDispatchReport, components []ComponentReport, commandSet map[string]bool, bindingByEventCommand map[string]bool) []string {
+	var issues []string
+	if len(dispatches) == 0 {
+		return []string{"app_model command_dispatches are required"}
+	}
+	componentSet := map[string]bool{}
+	for _, component := range components {
+		componentSet[component.ID] = true
+	}
+	lastOrder := 0
+	seenKinds := map[string]bool{}
+	for _, dispatch := range dispatches {
+		if dispatch.Order <= lastOrder {
+			issues = append(issues, fmt.Sprintf("app_model command dispatch order %d is not strictly greater than previous order %d", dispatch.Order, lastOrder))
+		}
+		lastOrder = dispatch.Order
+		if strings.TrimSpace(dispatch.Command) == "" || !commandSet[dispatch.Command] {
+			issues = append(issues, fmt.Sprintf("app_model command dispatch %d references unregistered command %q", dispatch.Order, dispatch.Command))
+		}
+		if strings.TrimSpace(dispatch.Kind) == "" {
+			issues = append(issues, fmt.Sprintf("app_model command dispatch %d kind is required", dispatch.Order))
+		}
+		seenKinds[dispatch.Kind] = true
+		if strings.TrimSpace(dispatch.Target) == "" || !componentSet[dispatch.Target] {
+			issues = append(issues, fmt.Sprintf("app_model command dispatch %d target %q is not in component evidence", dispatch.Order, dispatch.Target))
+		}
+		if !dispatch.Handled {
+			issues = append(issues, fmt.Sprintf("app_model command dispatch %d must be handled", dispatch.Order))
+		}
+		if len(dispatch.BeforeState) == 0 || len(dispatch.AfterState) == 0 {
+			issues = append(issues, fmt.Sprintf("app_model command dispatch %d requires before_state and after_state", dispatch.Order))
+		}
+		if dispatch.EventOrder > 0 && !bindingByEventCommand[appModelEventCommandKey(dispatch.EventOrder, dispatch.Command)] {
+			issues = append(issues, fmt.Sprintf("app_model command dispatch %d has no explicit event binding for event %d command %s", dispatch.Order, dispatch.EventOrder, dispatch.Command))
+		}
+		if dispatch.Kind == "edit" && (!dispatch.Reversible || dispatch.HistoryIndex <= 0) {
+			issues = append(issues, fmt.Sprintf("app_model edit command dispatch %d requires reversible history evidence", dispatch.Order))
+		}
+		if strings.HasPrefix(dispatch.Kind, "async_") && strings.TrimSpace(dispatch.AsyncTaskID) == "" {
+			issues = append(issues, fmt.Sprintf("app_model async command dispatch %d requires async_task_id", dispatch.Order))
+		}
+	}
+	for _, requiredKind := range []string{"focus", "edit", "async_start", "async_complete"} {
+		if !seenKinds[requiredKind] {
+			issues = append(issues, fmt.Sprintf("app_model command dispatches missing %s kind", requiredKind))
+		}
+	}
+	return issues
+}
+
+func validateAppModelNavigation(transitions []AppModelNavigationReport, commandSet map[string]bool) []string {
+	var issues []string
+	if len(transitions) == 0 {
+		return []string{"app_model navigation_transitions are required"}
+	}
+	lastOrder := 0
+	seenPush := false
+	seenBack := false
+	seenUnderflow := false
+	for _, transition := range transitions {
+		if transition.Order <= lastOrder {
+			issues = append(issues, fmt.Sprintf("app_model navigation order %d is not strictly greater than previous order %d", transition.Order, lastOrder))
+		}
+		lastOrder = transition.Order
+		if !commandSet[transition.Command] {
+			issues = append(issues, fmt.Sprintf("app_model navigation %d references unregistered command %q", transition.Order, transition.Command))
+		}
+		switch transition.Operation {
+		case "push", "replace", "back":
+		default:
+			issues = append(issues, fmt.Sprintf("app_model navigation %d operation is %q, want push, replace, or back", transition.Order, transition.Operation))
+		}
+		if transition.Operation == "push" {
+			seenPush = true
+		}
+		if transition.Operation == "back" {
+			seenBack = true
+		}
+		if len(transition.StackBefore) == 0 || len(transition.StackAfter) == 0 {
+			issues = append(issues, fmt.Sprintf("app_model navigation %d requires stack_before and stack_after", transition.Order))
+		}
+		if strings.TrimSpace(transition.BeforeRoute) == "" || strings.TrimSpace(transition.AfterRoute) == "" {
+			issues = append(issues, fmt.Sprintf("app_model navigation %d requires before_route and after_route", transition.Order))
+		}
+		if transition.UnderflowRejected {
+			seenUnderflow = true
+			if transition.BeforeRoute != transition.AfterRoute || !stringSlicesEqual(transition.StackBefore, transition.StackAfter) {
+				issues = append(issues, fmt.Sprintf("app_model navigation %d underflow rejection must preserve route and stack", transition.Order))
+			}
+		}
+	}
+	if !seenPush || !seenBack || !seenUnderflow {
+		issues = append(issues, "app_model navigation requires push, back, and underflow rejection evidence")
+	}
+	return issues
+}
+
+func validateAppModelFocusScopes(transitions []AppModelFocusScopeReport) []string {
+	var issues []string
+	if len(transitions) == 0 {
+		return []string{"app_model focus_scope_transitions are required"}
+	}
+	lastOrder := 0
+	seenModalTrap := false
+	for _, transition := range transitions {
+		if transition.Order <= lastOrder {
+			issues = append(issues, fmt.Sprintf("app_model focus scope order %d is not strictly greater than previous order %d", transition.Order, lastOrder))
+		}
+		lastOrder = transition.Order
+		if strings.TrimSpace(transition.Scope) == "" || strings.TrimSpace(transition.AfterFocus) == "" {
+			issues = append(issues, fmt.Sprintf("app_model focus scope %d requires scope and after_focus", transition.Order))
+		}
+		if transition.Escaped {
+			issues = append(issues, fmt.Sprintf("app_model focus scope %d escaped active scope", transition.Order))
+		}
+		if transition.ModalTrap && transition.Wrapped && !transition.Escaped {
+			seenModalTrap = true
+		}
+	}
+	if !seenModalTrap {
+		issues = append(issues, "app_model focus scopes require modal trap wrap evidence")
+	}
+	return issues
+}
+
+func validateAppModelAsyncTasks(tasks []AppModelAsyncTaskReport, commandSet map[string]bool) []string {
+	var issues []string
+	if len(tasks) == 0 {
+		return []string{"app_model async_tasks are required"}
+	}
+	started := map[string]bool{}
+	completed := map[string]bool{}
+	seenCancel := false
+	for _, task := range tasks {
+		if strings.TrimSpace(task.ID) == "" {
+			issues = append(issues, "app_model async task id is required")
+		}
+		if !commandSet[task.Command] {
+			issues = append(issues, fmt.Sprintf("app_model async task %s references unregistered command %q", task.ID, task.Command))
+		}
+		if len(task.BeforeState) == 0 || len(task.AfterState) == 0 {
+			issues = append(issues, fmt.Sprintf("app_model async task %s requires before_state and after_state", task.ID))
+		}
+		switch task.Operation {
+		case "start":
+			started[task.ID] = true
+			if task.Status != "pending" || task.Canceled {
+				issues = append(issues, fmt.Sprintf("app_model async task %s start must be pending and not canceled", task.ID))
+			}
+		case "complete":
+			completed[task.ID] = true
+			if task.Status != "completed" || task.Canceled || task.CompletionOrder <= 0 {
+				issues = append(issues, fmt.Sprintf("app_model async task %s completion requires completed status and completion_order", task.ID))
+			}
+		case "cancel":
+			seenCancel = true
+			if task.Status != "canceled" || !task.Canceled {
+				issues = append(issues, fmt.Sprintf("app_model async task %s cancel must be canceled", task.ID))
+			}
+			if appModelCanceledTaskMutatesBusinessState(task.BeforeState, task.AfterState) {
+				issues = append(issues, fmt.Sprintf("app_model async task %s canceled command must not mutate app state beyond pending_task", task.ID))
+			}
+		default:
+			issues = append(issues, fmt.Sprintf("app_model async task %s operation is %q, want start, complete, or cancel", task.ID, task.Operation))
+		}
+	}
+	for id := range completed {
+		if !started[id] {
+			issues = append(issues, fmt.Sprintf("app_model async task %s completed without matching start", id))
+		}
+	}
+	if !seenCancel {
+		issues = append(issues, "app_model async tasks require cancel evidence")
+	}
+	return issues
+}
+
+func validateAppModelUndoRedo(transitions []AppModelUndoRedoReport, commandSet map[string]bool) []string {
+	var issues []string
+	if len(transitions) == 0 {
+		return []string{"app_model undo_redo_transitions are required"}
+	}
+	lastOrder := 0
+	seen := map[string]bool{}
+	for _, transition := range transitions {
+		if transition.Order <= lastOrder {
+			issues = append(issues, fmt.Sprintf("app_model undo/redo order %d is not strictly greater than previous order %d", transition.Order, lastOrder))
+		}
+		lastOrder = transition.Order
+		if !commandSet[transition.Command] {
+			issues = append(issues, fmt.Sprintf("app_model undo/redo %d references unregistered command %q", transition.Order, transition.Command))
+		}
+		switch transition.Operation {
+		case "record", "undo", "redo":
+			seen[transition.Operation] = true
+		default:
+			issues = append(issues, fmt.Sprintf("app_model undo/redo %d operation is %q, want record, undo, or redo", transition.Order, transition.Operation))
+		}
+		if transition.HistoryIndex <= 0 || !transition.MatchedHistoryEntry || !transition.Applied {
+			issues = append(issues, fmt.Sprintf("app_model undo/redo %d requires matched applied history entry", transition.Order))
+		}
+		if transition.Before == transition.After {
+			issues = append(issues, fmt.Sprintf("app_model undo/redo %d must change value", transition.Order))
+		}
+	}
+	for _, required := range []string{"record", "undo", "redo"} {
+		if !seen[required] {
+			issues = append(issues, fmt.Sprintf("app_model undo_redo_transitions missing %s operation", required))
+		}
+	}
+	return issues
+}
+
+func validateAppModelNegativeGuards(guards AppModelNegativeGuardsReport) []string {
+	missing := []string{}
+	checks := []struct {
+		name string
+		ok   bool
+	}{
+		{"no_hidden_app_state", guards.NoHiddenAppState},
+		{"no_react_hooks", guards.NoReactHooks},
+		{"no_dom_event_model", guards.NoDOMEventModel},
+		{"no_user_js", guards.NoUserJS},
+		{"no_platform_widgets", guards.NoPlatformWidgets},
+		{"async_cancel_no_mutation", guards.AsyncCancelNoMutation},
+		{"navigation_underflow_rejected", guards.NavigationUnderflowRejected},
+		{"focus_scope_escape_rejected", guards.FocusScopeEscapeRejected},
+		{"undo_redo_requires_history", guards.UndoRedoRequiresHistory},
+		{"command_without_binding_rejected", guards.CommandWithoutBindingRejected},
+	}
+	for _, check := range checks {
+		if !check.ok {
+			missing = append(missing, check.name)
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	return []string{fmt.Sprintf("app_model negative_guards missing %s", strings.Join(missing, ", "))}
+}
+
+func appModelEventCommandKey(eventOrder int, command string) string {
+	return fmt.Sprintf("%d:%s", eventOrder, command)
+}
+
+func appModelCanceledTaskMutatesBusinessState(before map[string]string, after map[string]string) bool {
+	for key, beforeValue := range before {
+		afterValue, ok := after[key]
+		if !ok || beforeValue == afterValue {
+			continue
+		}
+		if key != "pending_task" {
+			return true
+		}
+	}
+	for key := range after {
+		if _, ok := before[key]; !ok && key != "pending_task" {
+			return true
+		}
+	}
+	return false
 }
 
 func validateReleaseAccessibilityBridgeEvidence(report Report, tree *AccessibilityTreeReport) []string {
@@ -4854,8 +7425,8 @@ func validateMorphEvidence(report Report) []string {
 	if strings.TrimSpace(morph.Source) == "" {
 		issues = append(issues, "morph source is required")
 	}
-	if normalizeEvidencePath(morph.Source) != "examples/surface_morph_command_palette.tetra" {
-		issues = append(issues, fmt.Sprintf("morph source is %q, want examples/surface_morph_command_palette.tetra", morph.Source))
+	if !isSurfaceMorphReportSource(morph.Source) {
+		issues = append(issues, fmt.Sprintf("morph source is %q, want examples/surface_morph_command_palette.tetra or generated Surface project template source", morph.Source))
 	}
 	if morph.Module != "lib.core.morph" {
 		issues = append(issues, fmt.Sprintf("morph module is %q, want lib.core.morph", morph.Module))
@@ -4892,6 +7463,7 @@ func validateMorphEvidence(report Report) []string {
 	issues = append(issues, validateMorphMotionPresets(morph.MotionPresets, report)...)
 	issues = append(issues, validateMorphRecipes(morph.Recipes)...)
 	issues = append(issues, validateMorphRecipeExpansions(morph.RecipeExpansions, report)...)
+	issues = append(issues, validateMorphRecipeApps(morph.RecipeApps, morph.Recipes, morph.RecipeExpansions)...)
 	issues = append(issues, validateMorphAccessibilityProjection(morph.Accessibility, report)...)
 	issues = append(issues, validateMorphEvidenceContract(morph.EvidenceContract, morph, report)...)
 	issues = append(issues, validateMorphMemoryBudget(morph.MemoryBudget, report)...)
@@ -4919,6 +7491,11 @@ func validateMorphEvidence(report Report) []string {
 		issues = append(issues, "morph evidence requires asset hash/cache evidence")
 	}
 	return issues
+}
+
+func isSurfaceMorphReportSource(source string) bool {
+	source = normalizeEvidencePath(source)
+	return source == "examples/surface_morph_command_palette.tetra" || isSurfaceProjectTemplateSource(source)
 }
 
 func validateMorphCapsule(capsule MorphCapsuleReport) []string {
@@ -5186,6 +7763,32 @@ func validateMorphMotionPresets(presets []MorphMotionPresetReport, report Report
 	return issues
 }
 
+func requiredMorphRecipeNames() []string {
+	return []string{
+		"control.action@1",
+		"field.text@1",
+		"command.item@1",
+		"region.panel@1",
+		"form.field@1",
+		"nav.item@1",
+		"metric.tile@1",
+		"dialog.panel@1",
+		"toast.notification@1",
+		"tab.item@1",
+		"list.row@1",
+	}
+}
+
+func requiredMorphRecipeAppSources() []string {
+	return []string{
+		"examples/surface_morph_command_palette.tetra",
+		"examples/surface_morph_project_dashboard.tetra",
+		"examples/surface_morph_settings.tetra",
+		"examples/surface_morph_editor_shell.tetra",
+		"examples/surface_morph_glass_panel.tetra",
+	}
+}
+
 func validateMorphRecipes(recipes []MorphRecipeReport) []string {
 	var issues []string
 	if len(recipes) == 0 {
@@ -5229,7 +7832,7 @@ func validateMorphRecipes(recipes []MorphRecipeReport) []string {
 			issues = append(issues, fmt.Sprintf("morph recipe %q core primitive promotion rejected", name))
 		}
 	}
-	for _, required := range []string{"control.action@1", "field.text@1", "command.item@1", "region.panel@1"} {
+	for _, required := range requiredMorphRecipeNames() {
 		if !seen[required] {
 			issues = append(issues, fmt.Sprintf("morph recipes require %s", required))
 		}
@@ -5271,9 +7874,84 @@ func validateMorphRecipeExpansions(expansions []MorphRecipeExpansionReport, repo
 			issues = append(issues, fmt.Sprintf("morph recipe_expansions %q must be reported", expansion.Recipe))
 		}
 	}
-	for _, required := range []string{"control.action@1", "field.text@1", "command.item@1", "region.panel@1"} {
+	for _, required := range requiredMorphRecipeNames() {
 		if !seenRecipe[required] {
 			issues = append(issues, fmt.Sprintf("morph recipe_expansions require %s", required))
+		}
+	}
+	return issues
+}
+
+func validateMorphRecipeApps(apps []MorphRecipeAppReport, recipes []MorphRecipeReport, expansions []MorphRecipeExpansionReport) []string {
+	if len(apps) == 0 {
+		return []string{"morph recipe_apps are required"}
+	}
+	var issues []string
+	knownRecipes := map[string]bool{}
+	for _, recipe := range recipes {
+		knownRecipes[recipe.Name] = true
+	}
+	expandedRecipes := map[string]bool{}
+	for _, expansion := range expansions {
+		expandedRecipes[expansion.Recipe] = true
+	}
+	seenSources := map[string]bool{}
+	for _, app := range apps {
+		source := normalizeEvidencePath(app.Source)
+		seenSources[source] = true
+		if !strings.HasPrefix(source, "examples/surface_morph_") || !strings.HasSuffix(source, ".tetra") {
+			issues = append(issues, fmt.Sprintf("morph recipe_apps source %q must be a Surface Morph example", app.Source))
+		}
+		if strings.TrimSpace(app.Module) == "" {
+			issues = append(issues, fmt.Sprintf("morph recipe_apps %q module is required", app.Source))
+		}
+		if len(app.Recipes) == 0 {
+			issues = append(issues, fmt.Sprintf("morph recipe_apps %q recipes are required", app.Source))
+		}
+		for _, recipe := range app.Recipes {
+			if !knownRecipes[recipe] {
+				issues = append(issues, fmt.Sprintf("morph recipe_apps %q references undeclared recipe %s", app.Source, recipe))
+			}
+			if !expandedRecipes[recipe] {
+				issues = append(issues, fmt.Sprintf("morph recipe_apps %q references recipe %s without expansion report", app.Source, recipe))
+			}
+		}
+		if !app.ExpandsToBlockGraph {
+			issues = append(issues, fmt.Sprintf("morph recipe_apps %q must expand to Block graph", app.Source))
+		}
+		if app.BlockCount <= 0 {
+			issues = append(issues, fmt.Sprintf("morph recipe_apps %q block_count must be positive", app.Source))
+		}
+		if !app.AccessibilityProjection {
+			issues = append(issues, fmt.Sprintf("morph recipe_apps %q requires accessibility projection", app.Source))
+		}
+		if app.HiddenAppState {
+			issues = append(issues, fmt.Sprintf("morph recipe_apps %q must not allocate hidden app state", app.Source))
+		}
+		if app.ReactRuntime {
+			issues = append(issues, fmt.Sprintf("morph recipe_apps %q must not use React runtime", app.Source))
+		}
+		if app.ElectronRuntime {
+			issues = append(issues, fmt.Sprintf("morph recipe_apps %q must not use Electron runtime", app.Source))
+		}
+		if app.DOMRuntime {
+			issues = append(issues, fmt.Sprintf("morph recipe_apps %q must not use DOM runtime", app.Source))
+		}
+		if app.PlatformWidgets {
+			issues = append(issues, fmt.Sprintf("morph recipe_apps %q must not use platform widgets", app.Source))
+		}
+		if !contains(app.OutputPrimitives, "Block") {
+			issues = append(issues, fmt.Sprintf("morph recipe_apps %q output_primitives require Block", app.Source))
+		}
+		for _, primitive := range app.OutputPrimitives {
+			if primitive != "Block" {
+				issues = append(issues, fmt.Sprintf("morph recipe_apps %q fake output primitive %s rejected", app.Source, primitive))
+			}
+		}
+	}
+	for _, required := range requiredMorphRecipeAppSources() {
+		if !seenSources[required] {
+			issues = append(issues, fmt.Sprintf("morph recipe_apps require %s", required))
 		}
 	}
 	return issues
@@ -5875,6 +8553,8 @@ func validateBlockPaintEvidence(report Report) []string {
 	}
 
 	var issues []string
+	expectedCommands := expectedRendererPaintCommandOrder()
+
 	if report.PaintQualityLevel != "deterministic-software-paint-v1" {
 		issues = append(issues, fmt.Sprintf("paint_quality_level is %q, want deterministic-software-paint-v1", report.PaintQualityLevel))
 	}
@@ -5893,8 +8573,9 @@ func validateBlockPaintEvidence(report Report) []string {
 	if len(report.VisualFeatures) == 0 {
 		issues = append(issues, "visual_features evidence is required")
 	}
+	issues = append(issues, validateRendererEvidence(report.Renderer, expectedCommands)...)
 
-	for _, feature := range []string{"fill", "gradient", "border", "radius", "shadow", "outline"} {
+	for _, feature := range []string{"fill", "gradient", "image_fill", "border", "radius", "radius_clip", "shadow", "overlay", "outline", "text", "icon"} {
 		if !visualFeatureContains(report.VisualFeatures, feature) {
 			issues = append(issues, fmt.Sprintf("visual_features require %s", feature))
 		}
@@ -5920,11 +8601,17 @@ func validateBlockPaintEvidence(report Report) []string {
 		if layer.Radius > 0 {
 			hasLayerRadius = true
 		}
+		if kind == "radius_clip" && layer.Radius <= 0 {
+			issues = append(issues, fmt.Sprintf("paint_layers %q radius must be positive for radius_clip", layer.ID))
+		}
 		if (kind == "border" || kind == "outline") && layer.Width <= 0 {
 			issues = append(issues, fmt.Sprintf("paint_layers %q width must be positive for %s", layer.ID, kind))
 		}
 		if kind == "shadow" && layer.Blur <= 0 {
 			issues = append(issues, fmt.Sprintf("paint_layers %q blur must be positive for shadow approximation", layer.ID))
+		}
+		if kind == "overlay" && (layer.Opacity <= 0 || layer.Opacity > 255) {
+			issues = append(issues, fmt.Sprintf("paint_layers %q opacity must be 1..255 for overlay", layer.ID))
 		}
 		if kind == "blur" || kind == "backdrop_blur" {
 			issues = append(issues, "paint_layers unsupported blur/backdrop_blur layer is not allowed")
@@ -5933,7 +8620,7 @@ func validateBlockPaintEvidence(report Report) []string {
 			layerByKind[kind] = layer
 		}
 	}
-	for _, kind := range []string{"fill", "gradient", "border", "shadow", "outline"} {
+	for _, kind := range expectedCommands {
 		if _, ok := layerByKind[kind]; !ok {
 			issues = append(issues, fmt.Sprintf("paint_layers require %s layer", kind))
 		}
@@ -5942,9 +8629,11 @@ func validateBlockPaintEvidence(report Report) []string {
 		issues = append(issues, "paint_layers require radius evidence")
 	}
 
-	expectedCommands := []string{"fill", "gradient", "border", "shadow", "outline"}
 	seenCommands := map[string]bool{}
 	lastOrder := 0
+	if len(report.PaintCommands) > 0 && len(report.PaintCommands) != len(expectedCommands) {
+		issues = append(issues, fmt.Sprintf("paint_commands count = %d, want %d deterministic renderer commands", len(report.PaintCommands), len(expectedCommands)))
+	}
 	for i, command := range report.PaintCommands {
 		name := normalizePaintToken(command.Command)
 		if command.Order <= lastOrder {
@@ -5971,7 +8660,10 @@ func validateBlockPaintEvidence(report Report) []string {
 		if !validChecksumLike(command.Checksum) {
 			issues = append(issues, fmt.Sprintf("paint_commands[%d] checksum must be sha256 evidence", i))
 		}
-		if name == "fill" || name == "gradient" || name == "border" || name == "outline" {
+		if command.Opacity < 0 || command.Opacity > 255 {
+			issues = append(issues, fmt.Sprintf("paint_commands[%d] opacity must be 0..255 when present", i))
+		}
+		if name == "fill" || name == "gradient" || name == "image_fill" || name == "border" || name == "radius_clip" || name == "overlay" || name == "outline" {
 			if command.Radius <= 0 {
 				issues = append(issues, fmt.Sprintf("paint_commands[%d] %s radius must be positive", i, name))
 			}
@@ -5988,10 +8680,15 @@ func validateBlockPaintEvidence(report Report) []string {
 		issues = append(issues, "paint frame checksum evidence must show visual change")
 	}
 	for _, required := range []string{
-		"block paint fill border radius shadow outline",
+		"block paint fill gradient image fill border radius clip shadow overlay outline text icon",
 		"block paint deterministic command order",
 		"block paint frame checksum changed",
 		"block paint unsupported blur rejected",
+		"block renderer software rgba contract",
+		"block compositor dirty rect invalidation cache",
+		"block renderer opacity transform clipped child",
+		"block renderer gpu production claim rejected",
+		"block renderer unsupported backdrop blur rejected",
 	} {
 		if !caseNameContains(report.Cases, required) {
 			issues = append(issues, fmt.Sprintf("paint report requires %s evidence", required))
@@ -6006,7 +8703,246 @@ func hasBlockPaintEvidence(report Report) bool {
 		len(report.VisualFeatures) > 0 ||
 		strings.TrimSpace(report.PaintQualityLevel) != "" ||
 		report.PaintCacheBudgetBytes != 0 ||
-		report.PaintUnsupportedBlur
+		report.PaintUnsupportedBlur ||
+		report.Renderer != nil
+}
+
+func expectedRendererPaintCommandOrder() []string {
+	return []string{"fill", "gradient", "image_fill", "border", "radius_clip", "shadow", "overlay", "outline", "text", "icon"}
+}
+
+func validateRendererEvidence(renderer *RendererReport, expectedCommands []string) []string {
+	if renderer == nil {
+		return []string{"renderer evidence is required for block paint production baseline"}
+	}
+	var issues []string
+	if renderer.Schema != RendererFeatureSchemaV1 {
+		issues = append(issues, fmt.Sprintf("renderer schema is %q, want %s", renderer.Schema, RendererFeatureSchemaV1))
+	}
+	if normalizePaintToken(renderer.Backend) != "software_rgba" {
+		issues = append(issues, fmt.Sprintf("renderer backend is %q, want software-rgba", renderer.Backend))
+	}
+	if strings.ToLower(strings.TrimSpace(renderer.ColorFormat)) != "rgba8" {
+		issues = append(issues, fmt.Sprintf("renderer color_format is %q, want rgba8", renderer.ColorFormat))
+	}
+	if renderer.QualityLevel != "deterministic-software-renderer-v1" {
+		issues = append(issues, fmt.Sprintf("renderer quality_level is %q, want deterministic-software-renderer-v1", renderer.QualityLevel))
+	}
+	if !renderer.SoftwareRenderer {
+		issues = append(issues, "renderer software_renderer must be true for the P05 software RGBA baseline")
+	}
+	if renderer.GPUProductionClaim {
+		issues = append(issues, "renderer gpu production claim must be false without target-host GPU report")
+	}
+	if renderer.BlurProductionClaim {
+		issues = append(issues, "renderer blur production claim must be false without supported backend evidence")
+	}
+	if renderer.BackdropBlurProductionClaim {
+		issues = append(issues, "renderer backdrop blur production claim must be false without supported backend evidence")
+	}
+	if len(renderer.CommandOrder) != len(expectedCommands) {
+		issues = append(issues, fmt.Sprintf("renderer command_order count = %d, want %d", len(renderer.CommandOrder), len(expectedCommands)))
+	}
+	for i, expected := range expectedCommands {
+		if i >= len(renderer.CommandOrder) {
+			issues = append(issues, fmt.Sprintf("renderer command_order missing %s", expected))
+			continue
+		}
+		if normalizePaintToken(renderer.CommandOrder[i]) != expected {
+			issues = append(issues, fmt.Sprintf("renderer command_order[%d] is %q, want %s", i, renderer.CommandOrder[i], expected))
+		}
+	}
+	issues = append(issues, validateRendererCompositorLayers(renderer.CompositorLayers)...)
+	issues = append(issues, validateRendererDirtyRects(renderer.DirtyRects)...)
+	issues = append(issues, validateRendererInvalidations(renderer.Invalidations)...)
+	issues = append(issues, validateRendererCacheStats(renderer.CacheStats)...)
+	for _, effect := range []string{"gpu-production", "blur", "backdrop-blur"} {
+		if !containsNormalizedPaint(renderer.UnsupportedEffectsRejected, effect) {
+			issues = append(issues, fmt.Sprintf("renderer unsupported_effects_rejected requires %s", effect))
+		}
+	}
+	if len(renderer.DeterministicFrameChecksums) < 2 {
+		issues = append(issues, "renderer deterministic_frame_checksums require before and after checksums")
+	} else {
+		first := strings.TrimSpace(renderer.DeterministicFrameChecksums[0])
+		second := strings.TrimSpace(renderer.DeterministicFrameChecksums[1])
+		if !validChecksumLike(first) || !validChecksumLike(second) || first == second {
+			issues = append(issues, "renderer deterministic_frame_checksums must be distinct sha256 evidence")
+		}
+	}
+	if !validChecksumLike(renderer.ReferenceFrameArtifactSHA256) {
+		issues = append(issues, "renderer reference_frame_artifact_sha256 must be sha256 evidence")
+	}
+	return issues
+}
+
+func validateRendererCompositorLayers(layers []RendererCompositorLayerReport) []string {
+	if len(layers) == 0 {
+		return []string{"renderer compositor_layers evidence is required"}
+	}
+	var issues []string
+	ids := map[string]bool{}
+	kinds := map[string]bool{}
+	lastOrder := 0
+	hasOpacityEvidence := false
+	hasTransformEvidence := false
+	hasClipEvidence := false
+	for i, layer := range layers {
+		id := strings.TrimSpace(layer.ID)
+		kind := normalizePaintToken(layer.Kind)
+		if id == "" {
+			issues = append(issues, fmt.Sprintf("renderer compositor_layers[%d] id is required", i))
+		} else if ids[id] {
+			issues = append(issues, fmt.Sprintf("renderer compositor_layers duplicate id %q", id))
+		}
+		ids[id] = true
+		if kind == "" {
+			issues = append(issues, fmt.Sprintf("renderer compositor_layers[%d] kind is required", i))
+		}
+		kinds[kind] = true
+		if layer.Order <= lastOrder {
+			issues = append(issues, fmt.Sprintf("renderer compositor_layers order %d is not strictly greater than previous order %d", layer.Order, lastOrder))
+		}
+		lastOrder = layer.Order
+		if layer.BlockID <= 0 {
+			issues = append(issues, fmt.Sprintf("renderer compositor_layers[%d] block_id must be positive", i))
+		}
+		if !validPositiveRect(layer.Rect) {
+			issues = append(issues, fmt.Sprintf("renderer compositor_layers[%d] rect dimensions must be positive", i))
+		}
+		if layer.Opacity <= 0 || layer.Opacity > 255 {
+			issues = append(issues, fmt.Sprintf("renderer compositor_layers[%d] opacity must be 1..255", i))
+		}
+		if layer.Opacity > 0 && layer.Opacity < 255 {
+			hasOpacityEvidence = true
+		}
+		transform := strings.TrimSpace(strings.ToLower(layer.Transform))
+		if transform == "" {
+			issues = append(issues, fmt.Sprintf("renderer compositor_layers[%d] transform is required", i))
+		}
+		if transform != "" && transform != "identity" && transform != "translate(0,0)" {
+			hasTransformEvidence = true
+		}
+		if layer.ClipApplied {
+			if !validPositiveRect(layer.Clip) {
+				issues = append(issues, fmt.Sprintf("renderer compositor_layers[%d] clip dimensions must be positive when clip_applied", i))
+			} else {
+				hasClipEvidence = true
+			}
+		}
+		if !validChecksumLike(layer.Checksum) {
+			issues = append(issues, fmt.Sprintf("renderer compositor_layers[%d] checksum must be sha256 evidence", i))
+		}
+	}
+	for _, kind := range []string{"root", "content", "overlay", "text", "icon"} {
+		if !kinds[kind] {
+			issues = append(issues, fmt.Sprintf("renderer compositor_layers require %s layer", kind))
+		}
+	}
+	if !hasOpacityEvidence {
+		issues = append(issues, "renderer compositor_layers require opacity evidence below 255")
+	}
+	if !hasTransformEvidence {
+		issues = append(issues, "renderer compositor_layers require transform evidence")
+	}
+	if !hasClipEvidence {
+		issues = append(issues, "renderer compositor_layers require clipped child evidence")
+	}
+	return issues
+}
+
+func validateRendererDirtyRects(rects []RendererDirtyRectReport) []string {
+	if len(rects) == 0 {
+		return []string{"renderer dirty_rects evidence is required"}
+	}
+	var issues []string
+	lastFrame := 0
+	for i, rect := range rects {
+		if rect.FrameOrder <= 0 {
+			issues = append(issues, fmt.Sprintf("renderer dirty_rects[%d] frame_order must be positive", i))
+		}
+		if rect.FrameOrder < lastFrame {
+			issues = append(issues, fmt.Sprintf("renderer dirty_rects[%d] frame_order must not go backwards", i))
+		}
+		lastFrame = rect.FrameOrder
+		if !validPositiveRect(rect.Rect) {
+			issues = append(issues, fmt.Sprintf("renderer dirty_rects[%d] rect dimensions must be positive", i))
+		}
+		if strings.TrimSpace(rect.Reason) == "" {
+			issues = append(issues, fmt.Sprintf("renderer dirty_rects[%d] reason is required", i))
+		}
+		if !validChecksumLike(rect.Checksum) {
+			issues = append(issues, fmt.Sprintf("renderer dirty_rects[%d] checksum must be sha256 evidence", i))
+		}
+	}
+	return issues
+}
+
+func validateRendererInvalidations(invalidations []RendererInvalidationReport) []string {
+	if len(invalidations) == 0 {
+		return []string{"renderer invalidations evidence is required"}
+	}
+	var issues []string
+	lastOrder := 0
+	for i, invalidation := range invalidations {
+		if invalidation.Order <= lastOrder {
+			issues = append(issues, fmt.Sprintf("renderer invalidations order %d is not strictly greater than previous order %d", invalidation.Order, lastOrder))
+		}
+		lastOrder = invalidation.Order
+		if invalidation.BlockID <= 0 {
+			issues = append(issues, fmt.Sprintf("renderer invalidations[%d] block_id must be positive", i))
+		}
+		if strings.TrimSpace(invalidation.Reason) == "" {
+			issues = append(issues, fmt.Sprintf("renderer invalidations[%d] reason is required", i))
+		}
+		if !validPositiveRect(invalidation.DirtyRect) {
+			issues = append(issues, fmt.Sprintf("renderer invalidations[%d] dirty_rect dimensions must be positive", i))
+		}
+		if !invalidation.Repaint {
+			issues = append(issues, fmt.Sprintf("renderer invalidations[%d] repaint must be true", i))
+		}
+	}
+	return issues
+}
+
+func validateRendererCacheStats(cache RendererCacheStatsReport) []string {
+	var issues []string
+	if strings.TrimSpace(cache.ID) == "" {
+		issues = append(issues, "renderer cache id is required")
+	}
+	if strings.TrimSpace(cache.Strategy) == "" {
+		issues = append(issues, "renderer cache strategy is required")
+	}
+	if !cache.Bounded {
+		issues = append(issues, "renderer cache must be bounded")
+	}
+	if cache.BudgetBytes <= 0 || cache.BudgetBytes > 1024*1024 {
+		issues = append(issues, fmt.Sprintf("renderer cache budget_bytes = %d, want 1..1048576", cache.BudgetBytes))
+	}
+	if cache.UsedBytes < 0 || (cache.BudgetBytes > 0 && cache.UsedBytes > cache.BudgetBytes) {
+		issues = append(issues, fmt.Sprintf("renderer cache used_bytes = %d exceeds budget %d", cache.UsedBytes, cache.BudgetBytes))
+	}
+	if cache.EntryCount <= 0 {
+		issues = append(issues, "renderer cache entry_count must be positive")
+	}
+	if cache.Hits+cache.Misses <= 0 {
+		issues = append(issues, "renderer cache requires hit/miss evidence")
+	}
+	return issues
+}
+
+func validPositiveRect(rect RectReport) bool {
+	return rect.W > 0 && rect.H > 0
+}
+
+func containsNormalizedPaint(values []string, want string) bool {
+	want = normalizePaintToken(want)
+	for _, value := range values {
+		if normalizePaintToken(value) == want {
+			return true
+		}
+	}
+	return false
 }
 
 func validateBlockTextEvidence(report Report) []string {
@@ -6227,8 +9163,13 @@ func validateBlockLayoutEvidence(report Report) []string {
 	if len(report.LayoutScrolls) == 0 {
 		issues = append(issues, "layout_scrolls evidence is required")
 	}
+	if report.LayoutDensity == nil {
+		issues = append(issues, "layout_density evidence is required")
+	} else {
+		issues = append(issues, validateBlockLayoutDensityEvidence(*report.LayoutDensity)...)
+	}
 
-	for _, feature := range []string{"stack", "row", "column", "absolute", "overlay", "grid", "dock", "scroll", "fit", "fill", "fixed", "min", "max", "spacing", "alignment", "z-order", "clipping", "resize"} {
+	for _, feature := range []string{"stack", "row", "column", "absolute", "overlay", "grid", "dock", "scroll", "fit", "fill", "fixed", "min", "max", "aspect", "spacing", "alignment", "z-order", "clipping", "resize", "density", "stable-rounding"} {
 		if !layoutFeatureContains(report.LayoutFeatures, feature) {
 			issues = append(issues, fmt.Sprintf("layout_features require %s", feature))
 		}
@@ -6241,6 +9182,7 @@ func validateBlockLayoutEvidence(report Report) []string {
 	hasAlignment := false
 	hasClip := false
 	hasZ := false
+	hasAspect := false
 	constraintIDs := map[string]bool{}
 	for _, constraint := range report.LayoutConstraints {
 		id := strings.TrimSpace(constraint.ID)
@@ -6305,6 +9247,9 @@ func validateBlockLayoutEvidence(report Report) []string {
 		if constraint.Clip || normalizeLayoutToken(constraint.Overflow) == "clip" || normalizeLayoutToken(constraint.Overflow) == "scroll" {
 			hasClip = true
 		}
+		if strings.Contains(normalizeLayoutToken(id), "aspect") {
+			hasAspect = true
+		}
 	}
 	for _, policy := range []string{"fixed", "fit", "fill"} {
 		if !hasPolicy[policy] {
@@ -6358,6 +9303,9 @@ func validateBlockLayoutEvidence(report Report) []string {
 		if pass.Resize && (pass.Input.W != pass.Resolved.W || pass.Input.H != pass.Resolved.H) {
 			hasResize = true
 		}
+		if strings.Contains(normalizeLayoutToken(pass.Pass), "aspect") {
+			hasAspect = true
+		}
 	}
 	for _, mode := range []string{"stack", "row", "column", "absolute", "overlay", "grid", "dock", "scroll"} {
 		if !passModes[mode] {
@@ -6366,6 +9314,9 @@ func validateBlockLayoutEvidence(report Report) []string {
 	}
 	if !hasResize {
 		issues = append(issues, "layout_passes require resize evidence with changed bounds")
+	}
+	if !hasAspect {
+		issues = append(issues, "layout report requires aspect sizing evidence")
 	}
 
 	hasScroll := false
@@ -6411,6 +9362,7 @@ func validateBlockLayoutEvidence(report Report) []string {
 		"block layout grid dock overlay scroll",
 		"block layout clipping z-order",
 		"block layout resize constraints",
+		"block layout aspect density stable rounding",
 		"block layout no css flexbox parity",
 	} {
 		if !caseNameContains(report.Cases, required) {
@@ -6420,10 +9372,39 @@ func validateBlockLayoutEvidence(report Report) []string {
 	return issues
 }
 
+func validateBlockLayoutDensityEvidence(density BlockLayoutDensityReport) []string {
+	var issues []string
+	if density.TargetDPI < 96 {
+		issues = append(issues, fmt.Sprintf("layout_density target_dpi is %d, want >= 96", density.TargetDPI))
+	}
+	if density.ScaleMilli < 1000 || density.ScaleMilli > 4000 {
+		issues = append(issues, fmt.Sprintf("layout_density scale_milli is %d, want 1000..4000", density.ScaleMilli))
+	}
+	if density.BaseUnitPx <= 0 {
+		issues = append(issues, "layout_density base_unit_px must be positive")
+	}
+	if normalizeLayoutToken(density.RoundingPolicy) != "integer_half_up_v1" {
+		issues = append(issues, fmt.Sprintf("layout_density rounding_policy is %q, want integer-half-up-v1", density.RoundingPolicy))
+	}
+	if !density.PixelSnapping {
+		issues = append(issues, "layout_density pixel_snapping must be true")
+	}
+	for _, breakpoint := range []string{"small", "medium", "large"} {
+		if !layoutFeatureContains(density.Breakpoints, breakpoint) {
+			issues = append(issues, fmt.Sprintf("layout_density breakpoints require %s", breakpoint))
+		}
+	}
+	if !validChecksumLike(density.Checksum) {
+		issues = append(issues, "layout_density checksum must be sha256 evidence")
+	}
+	return issues
+}
+
 func hasBlockLayoutEvidence(report Report) bool {
 	return len(report.LayoutConstraints) > 0 ||
 		len(report.LayoutPasses) > 0 ||
 		len(report.LayoutScrolls) > 0 ||
+		report.LayoutDensity != nil ||
 		len(report.LayoutFeatures) > 0 ||
 		strings.TrimSpace(report.LayoutQualityLevel) != "" ||
 		report.LayoutUnsupportedCSSFlexbox
@@ -7411,10 +10392,23 @@ func isBrowserReleaseReport(report Report) bool {
 }
 
 func isLinuxReleaseWindowReport(report Report) bool {
+	if isLinuxAppShellReport(report) {
+		return false
+	}
 	if report.HostEvidence.Level == "linux-x64-release-window-v1" {
 		return true
 	}
 	return caseNameContains(report.Cases, "linux release window v1 schema")
+}
+
+func isLinuxAppShellReport(report Report) bool {
+	if isSurfaceLinuxAppShellNotesSource(report.Source) {
+		return true
+	}
+	if report.LinuxAppShell != nil {
+		return true
+	}
+	return caseNameContains(report.Cases, "linux app-shell")
 }
 
 func isAccessibilityMetadataReport(report Report) bool {
@@ -7428,6 +10422,16 @@ func isAccessibilityMetadataReport(report Report) bool {
 		return true
 	}
 	return caseNameContains(report.Cases, "accessibility metadata tree") || caseNameContains(report.Cases, "accessibility platform bridge")
+}
+
+func isAppModelReport(report Report) bool {
+	if isSurfaceAppModelSource(report.Source) {
+		return true
+	}
+	if report.AppModel != nil {
+		return true
+	}
+	return caseNameContains(report.Cases, "app model")
 }
 
 func isSurfaceToolkitFormSource(source string) bool {
@@ -7450,11 +10454,20 @@ func isSurfaceReleaseAccessibilitySource(source string) bool {
 	return strings.HasSuffix(normalizeEvidencePath(source), "examples/surface_release_accessibility.tetra")
 }
 
+func isSurfaceAppModelSource(source string) bool {
+	return strings.HasSuffix(normalizeEvidencePath(source), "examples/surface_app_model.tetra")
+}
+
+func isSurfaceLinuxAppShellNotesSource(source string) bool {
+	return strings.HasSuffix(normalizeEvidencePath(source), "examples/surface_linux_app_shell_notes.tetra")
+}
+
 func isSurfaceBlockAccessibilitySource(source string) bool {
 	source = normalizeEvidencePath(source)
 	return strings.HasSuffix(source, "examples/surface_block_accessibility.tetra") ||
 		strings.HasSuffix(source, "examples/surface_block_system.tetra") ||
-		strings.HasSuffix(source, "examples/surface_morph_command_palette.tetra")
+		strings.HasSuffix(source, "examples/surface_morph_command_palette.tetra") ||
+		isSurfaceProjectTemplateSource(source)
 }
 
 func isPlatformBridgeAccessibilityReport(report Report) bool {
@@ -7901,6 +10914,16 @@ func artifactKindContains(artifacts []ArtifactReport, marker string) bool {
 	marker = strings.ToLower(strings.TrimSpace(marker))
 	for _, artifact := range artifacts {
 		if strings.Contains(strings.ToLower(strings.TrimSpace(artifact.Kind)), marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func stringSliceContainsFold(values []string, want string) bool {
+	want = strings.ToLower(strings.TrimSpace(want))
+	for _, value := range values {
+		if strings.ToLower(strings.TrimSpace(value)) == want {
 			return true
 		}
 	}

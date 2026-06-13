@@ -568,6 +568,9 @@ func validateFeatures(features []featureManifest) error {
 		if claims := forbiddenPersistentObjectMemoryClaims(feature.Scope + " " + feature.Stability); len(claims) > 0 {
 			return fmt.Errorf("feature %s forbidden persistent/object memory claim %q", feature.ID, strings.Join(claims, ", "))
 		}
+		if claims := forbiddenMemory100ManifestClaims(feature.Scope + " " + feature.Stability); len(claims) > 0 {
+			return fmt.Errorf("feature %s forbidden Memory100 claim %q", feature.ID, strings.Join(claims, ", "))
+		}
 		for _, doc := range feature.Docs {
 			docPath := filepath.ToSlash(doc)
 			if doc == "" || filepath.IsAbs(doc) || strings.Contains(docPath, "..") {
@@ -794,14 +797,14 @@ func validateSurfaceFeatureRows(features map[string]featureManifest) error {
 		"ui.surface-block-system":     {"Block-first Surface architecture", "core Surface primitive", "recipes/compatibility", "tetra.surface.block-system.gate.v1", "block_system.memory_budget", "reports/surface-block/p18-budget", "same-commit target evidence", "not current", "not production support", "no production Block claim"},
 		"ui.surface-morph-capsule":    {"Morph Capsule", "lib.core.morph", "expands into Block", "tetra.surface.morph.gate.v1", "deterministic headless", "not Surface v1 production support", "does not add core widget primitives"},
 		"ui.surface-headless":         {"release evidence target", "not as an end-user platform claim"},
-		"ui.surface-linux-x64":        {"linux-x64-release-window-v1", "no GTK, Qt, platform widget, metadata sidecar playback, macOS, or Windows production claim"},
-		"ui.surface-web-wasm":         {"wasm32-web-browser-canvas-release-v1", "DOM UI", "Node-only evidence"},
+		"ui.surface-linux-x64":        {"linux-x64-release-window-v1", "linux-app-shell-subset-v1", "electron-feature-ledger-v1", "tray/notification/file-picker/dialog support", "broad Electron shell parity"},
+		"ui.surface-web-wasm":         {"wasm32-web-browser-canvas-release-v1", "DOM host canvas only", "DOM-authored app UI trees", "Node-only promotion"},
 		"ui.surface-component-model":  {"component-tree-api release subset", "dynamic trait-object", "witness-table"},
 		"ui.surface-toolkit-v1":       {"production-widgets-v1", "no magical widgets, platform widgets, DOM UI, user JS"},
 		"ui.surface-text-input-v1":    {"production-text-input-v1", "rich text"},
 		"ui.surface-accessibility-v1": {"platform-bridge-v1", "screen-reader claims"},
-		"ui.surface-macos-x64":        {"unsupported for Surface v1", "no production target evidence"},
-		"ui.surface-windows-x64":      {"unsupported for Surface v1", "no production target evidence"},
+		"ui.surface-macos-x64":        {"unsupported for Surface v1", "no production target evidence", "tetra.surface.target-host-status.v1", "UNSUPPORTED", "build-only"},
+		"ui.surface-windows-x64":      {"unsupported for Surface v1", "no production target evidence", "tetra.surface.target-host-status.v1", "UNSUPPORTED", "build-only"},
 		"ui.surface-wasm32-wasi":      {"unsupported for Surface v1", "no production target evidence"},
 	}
 	for id, wantStatus := range requiredStatus {
@@ -879,6 +882,44 @@ func forbiddenPersistentObjectMemoryClaims(text string) []string {
 	return compactStrings(claims)
 }
 
+func forbiddenMemory100ManifestClaims(text string) []string {
+	lower := strings.ToLower(text)
+	var claims []string
+	for _, phrase := range []string{
+		"memory 100%",
+		"memory 100 percent",
+		"memory is 100% ready",
+		"memory 100% ready",
+		"full formal proof",
+		"formal proof of memory safety",
+		"all-target memory parity",
+		"all target memory parity",
+		"all targets memory-stable",
+		"all targets memory stable",
+		"no leaks",
+		"no memory leaks",
+		"leak-free",
+		"leak free",
+		"leak freedom",
+	} {
+		searchFrom := 0
+		for {
+			index := strings.Index(lower[searchFrom:], phrase)
+			if index < 0 {
+				break
+			}
+			absolute := searchFrom + index
+			clause := claimClauseAround(lower, absolute, len(phrase), 260)
+			if !explicitMemory100NonClaimContext(clause) {
+				claims = append(claims, phrase)
+			}
+			searchFrom = absolute + len(phrase)
+		}
+	}
+	sort.Strings(claims)
+	return compactStrings(claims)
+}
+
 func persistentObjectMemoryClaimContext(phrase string, clause string) bool {
 	switch phrase {
 	case "object memory", "persistent memory", "persistent/object memory", "object/persistent memory":
@@ -900,6 +941,35 @@ func persistentObjectMemoryClaimContext(phrase string, clause string) bool {
 	default:
 		return true
 	}
+}
+
+func explicitMemory100NonClaimContext(lower string) bool {
+	if explicitNonClaimContext(lower) {
+		return true
+	}
+	normalized := strings.NewReplacer(`"`, "", "`", "", "'", "").Replace(lower)
+	for _, marker := range []string{
+		"rejects",
+		"rejected",
+		"rejection",
+		"fake",
+		"not a public",
+		"not a full",
+		"not full",
+		"no memory 100",
+		"no full",
+		"no all-target",
+		"no all target",
+		"no target parity",
+		"no leak-free",
+		"no leak free",
+		"or full formal proof",
+	} {
+		if strings.Contains(lower, marker) || strings.Contains(normalized, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func explicitNonClaimContext(lower string) bool {

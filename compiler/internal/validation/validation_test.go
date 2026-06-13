@@ -791,6 +791,37 @@ func TestValidateAllocationLoweringAcceptsExplicitIslandHandleReturnedFromCall(t
 	}
 }
 
+func TestValidateAllocationLoweringAcceptsExplicitIslandHandleReturnedFromSummaryProgram(t *testing.T) {
+	plan := explicitIslandValidationPlan("main")
+	prog := &ir.IRProgram{Funcs: []ir.IRFunc{{
+		Name:       "main",
+		LocalSlots: 2,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 1},
+			{Kind: ir.IRIslandNew},
+			{Kind: ir.IRCall, Name: "lib.regions.pass_region", ArgSlots: 1, RetSlots: 1},
+			{Kind: ir.IRConstI32, Imm: 4},
+			{Kind: ir.IRIslandMakeSliceI32, Name: "xs"},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRReturn},
+		},
+	}}}
+	summaryProg := &ir.IRProgram{Funcs: []ir.IRFunc{{
+		Name:        "lib.regions.pass_region",
+		ParamSlots:  1,
+		LocalSlots:  1,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRReturn},
+		},
+	}}}
+	if err := ValidateAllocationLoweringWithSummaryProgram(plan, prog, summaryProg); err != nil {
+		t.Fatalf("ValidateAllocationLoweringWithSummaryProgram: %v", err)
+	}
+}
+
 func TestValidateAllocationLoweringAcceptsExplicitIslandSliceMovedByCall(t *testing.T) {
 	plan := explicitIslandValidationPlan("main")
 	prog := &ir.IRProgram{Funcs: []ir.IRFunc{{

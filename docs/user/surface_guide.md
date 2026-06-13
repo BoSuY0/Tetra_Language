@@ -9,6 +9,33 @@ Tetra Surface is the future UI model for new Tetra applications. It is not a
 wrapper over React, the HTML DOM, Qt, GTK, WinUI, Cocoa, or generated metadata
 sidecars. A Surface app is written as Tetra structs and methods that measure,
 lay out, draw, and handle events.
+On `wasm32-web`, the browser DOM document and canvas are compiler-owned host
+plumbing; app authors do not provide a DOM-authored UI tree or user JavaScript
+application logic.
+
+## Claim Tiers For Surface Authors
+
+Surface docs use five claim tiers so examples and release notes do not outrun
+evidence:
+
+| Tier | Author-facing meaning |
+| --- | --- |
+| `PROD_STABLE_SCOPED` | guarded vocabulary for the named Linux/web release scope only after the product gate and final audit; it is not a broad Electron, React, CSS, DOM, Windows, macOS, GPU, rich-text, bidi, or screen-reader claim |
+| `BETA_TARGET_HOST` | target-host path with evidence but not current production support |
+| `EXPERIMENTAL` | Block/Morph/visual/recipe evidence that is useful for design direction but must not be described as production support |
+| `UNSUPPORTED` | feature or target with no current release support |
+| `NONCLAIM` | explicit wording for adjacent capabilities that are deliberately not claimed |
+
+The docs governance checks are `validate-manifest`, `verify-docs`, and
+`validate-surface-claims`. The scoped product gate is:
+
+```sh
+bash scripts/release/surface/product-gate.sh \
+  --report-dir reports/surface-product-v1
+```
+
+That gate is product evidence, not a final all-platform or API-compatibility
+claim.
 
 ## Block-First Direction
 
@@ -88,10 +115,16 @@ scoped design tokens, materials, affordances, state lenses, motion presets, and
 recipes in `lib.core.morph`, then expands those recipes into `Block` values.
 It does not add new core widget primitives or a separate runtime.
 
-The current Morph example is
-`examples/surface_morph_command_palette.tetra`. It builds the same kind of
-command-palette scene as the Block example, but routes panel, field, label, and
-action rows through Morph recipes before they become a `BlockTree`.
+The current Morph examples are:
+
+- `examples/surface_morph_command_palette.tetra`
+- `examples/surface_morph_project_dashboard.tetra`
+- `examples/surface_morph_settings.tetra`
+- `examples/surface_morph_editor_shell.tetra`
+- `examples/surface_morph_glass_panel.tetra`
+
+They build command palette, dashboard, settings, editor shell, and glass-panel
+scenes through Morph recipes before the recipes become `Block` graph evidence.
 
 Run the Morph evidence gate with:
 
@@ -130,12 +163,15 @@ in the current starter slice. The app owns the component tree, hit testing,
 state updates, drawing rules, and layout. The current component-model evidence
 covers text input dispatch through `event_text_input`, `text_len`, and host
 bytes copied into a caller-owned `[]u8`. The Linux-x64 event queue is
-deterministic for smoke evidence: pointer, key, resize, text, then close. Full
-IME, clipboard, rich text, and String-level text editing remain future work,
-but `examples/surface_textbox_app.tetra` now proves the first pure-Tetra
-TextBox layer: click focus, Tab focus changes, focused keyboard routing,
-byte-buffer insertion, caret movement, backspace/delete, resize focus
-preservation, and visible framebuffer updates.
+deterministic for smoke evidence: pointer, key, resize, text, then close.
+`examples/surface_textbox_app.tetra` proves the first pure-Tetra TextBox layer:
+click focus, Tab focus changes, focused keyboard routing, byte-buffer
+insertion, caret movement, backspace/delete, resize focus preservation, and
+visible framebuffer updates. `examples/surface_release_text_input.tetra` is the
+separate `production-text-input-v1` baseline for invalid UTF-8 rejection,
+multiline byte storage, selection copy/paste, host clipboard read/write, and
+IME/composition lifecycle traces. Full String-level IME editing, rich text,
+bidi shaping, and grapheme-cluster caret movement remain nonclaims.
 `examples/surface_tree_app.tetra` layers the next experimental milestone on
 top: a Tetra-owned `ComponentTree`/`TreeNode` model built through
 `lib.core.component` helpers, with stable IDs, helper-owned parent/child links,
@@ -170,7 +206,169 @@ accessibility support are claimed.
 Linux-x64 real-window and wasm32-web browser-canvas are the current release
 targets for Surface v1. macOS, Windows, and wasm32-wasi UI production claims
 require real target-host evidence. Build-only or docs-only evidence does not
-promote Surface support.
+promote Surface support. macOS and Windows stay `UNSUPPORTED` through
+`tetra.surface.target-host-status.v1` until real target-host runners produce
+the required window/input/clipboard/DPI/accessibility evidence.
+
+## Developer Fast Loop
+
+Use `tetra surface dev` for the current Surface developer loop. It runs a
+scoped fast rebuild workflow and can write a
+`tetra.surface.dev-workflow.v1` report:
+
+```text
+tetra surface dev \
+  --source path/to/project-or-entry \
+  --target linux-x64 \
+  --out-dir reports/surface-dev-workflow/dev-artifacts \
+  --report reports/surface-dev-workflow/surface-dev-workflow.json \
+  --change-file token:path/to/design/tokens.tetra \
+  --change-file recipe:path/to/design/recipes.tetra \
+  --change-file source:path/to/app/main.tetra
+```
+
+The report records the initial build, warm-cache rebuild, token/recipe/source
+changed rebuilds, source diagnostics, and artifact hashes. It is intentionally
+described as fast rebuild evidence: it is not hot reload, not an Electron dev
+server, and not React Fast Refresh.
+
+## Surface Inspector
+
+Use `tools/cmd/surface-inspector` to turn validated Surface runtime reports into
+a static `tetra.surface.inspector.v1` report:
+
+```text
+go run ./tools/cmd/surface-inspector \
+  --runtime-report block:path/to/surface-headless-block-system.json \
+  --runtime-report morph:path/to/surface-headless-morph.json \
+  --runtime-report app-model:path/to/surface-headless-app-model.json \
+  --runtime-report accessibility:path/to/surface-headless-release-accessibility.json \
+  --out reports/surface-inspector/surface-inspector.json \
+  --html reports/surface-inspector/surface-inspector.html
+```
+
+The report exposes Block tree, resolved Morph tokens, layout, paint,
+accessibility, event route, focus, and perf-counter state, plus source
+locations, input report coverage, hidden-state scan results, and optional static
+HTML. The HTML is a tool report only. It is not browser devtools, React
+devtools, DOM runtime UI, hidden app state, hot reload, or a replacement for
+target-host accessibility evidence.
+
+## Project Templates
+
+Use `tetra new surface-app` to start a Block/Morph Surface app:
+
+```text
+tetra new surface-app --template command-palette my-palette
+tetra new surface-app --template settings my-settings
+tetra new surface-app --template dashboard my-dashboard
+tetra new surface-app --template editor-shell my-editor
+tetra new surface-app --template multi-window-notes my-notes
+tetra new surface-app --template web-canvas my-web-canvas
+```
+
+Generated projects include `Capsule.t4`, `src/main.tetra`,
+`surface-template.json`, design token/recipe marker files, and a README. They
+target linux-x64 plus wasm32-web, use Block/Morph recipe expansion, and avoid
+core widget primitives in template source. Validate the full onboarding path
+with:
+
+```text
+bash scripts/release/surface/surface-template-smoke.sh \
+  --report-dir reports/surface-templates/gate
+```
+
+The smoke writes `tetra.surface.template-smoke.v1` /
+`surface-template-smoke-v1` evidence for generation, check, build, run,
+inspector, visual diff, and package artifacts.
+
+## Reference App Suite
+
+Use the reference app suite to check real product shapes rather than isolated
+rectangles or one-off screenshots:
+
+```text
+bash scripts/release/surface/surface-reference-apps-smoke.sh \
+  --report-dir reports/surface-reference-apps/gate
+```
+
+The suite covers command palette, settings, dashboard, editor shell, file
+manager/list-detail, dialog/notification, localized form, accessibility-heavy
+form, multi-window notes, and migration examples. It writes
+`tetra.surface.reference-app-suite.v1` / `surface-reference-app-suite-v1`
+evidence plus a `tetra.surface.visual-regression.v1` report for headless,
+linux-x64 real-window, and wasm32-web browser-canvas targets. Each app uses
+stable Morph recipes that resolve to Block and records visual, interaction,
+accessibility, performance, token/theme, layout, and artifact-hash evidence.
+The migration app is the only reference app allowed to import
+`lib.core.widgets`; that import is compatibility evidence, not a new core
+primitive.
+
+## Packaging And Updates
+
+Use the package smoke to build installable Surface app artifacts for the current
+Linux/web scope:
+
+```text
+bash scripts/release/surface/surface-package-smoke.sh \
+  --report-dir reports/surface-packages/gate
+```
+
+The smoke writes `tetra.surface.package.v1` / `surface-package-v1` evidence for
+the command-palette reference app. It creates a linux-x64 tar.gz package, a
+wasm32-web tar.gz bundle with HTML, wasm, and the compiler-owned loader, local
+asset manifests with sha256 hashes, an installed linux-x64 package run, and a
+hash-pinned update channel manifest. The report keeps signing, notarization,
+automatic runtime updates, network update fetching, Electron runtime, React
+runtime, CSS cascade runtime, DOM-authored app UI trees, remote asset fetching,
+and user JavaScript app logic as nonclaims unless later platform/runtime
+evidence promotes them.
+
+Use the crash report smoke to prove bounded diagnostic behavior:
+
+```text
+bash scripts/release/surface/surface-crash-report-smoke.sh \
+  --report-dir reports/surface-crash-report/gate
+```
+
+The smoke writes `tetra.surface.crash-report.v1` /
+`surface-crash-report-v1` evidence for the command-palette reference app. It
+records linux-x64 `command_failure`, `host_crash`, and `restart_recovery`
+scenarios, local redacted `tetra.surface.diagnostic.v1` artifacts, bounded
+trace/log collection, a non-user-data diagnostics policy, and scoped
+before/report/after restart proof. It does not claim universal crash recovery
+and rejects diagnostics that leak user data, upload over the network, depend on
+Electron crash reporting, or claim restart without evidence.
+
+Use the i18n smoke to prove bounded localization behavior:
+
+```text
+bash scripts/release/surface/surface-i18n-smoke.sh \
+  --report-dir reports/surface-i18n/gate
+```
+
+The smoke writes `tetra.surface.i18n.v1` / `surface-i18n-v1` evidence for the
+localized-form reference app. It records bounded string tables, `uk-UA` locale
+selection, `en-US` fallback, missing-key diagnostics, deterministic formatting
+hooks, localized form execution, and an RTL placeholder nonclaim. It does not
+claim full ICU, full bidi shaping, RTL production text layout, third-party intl
+runtime, platform locale dependency, or silent missing-key fallback.
+
+Use the widget migration smoke to prove that existing Surface v1 widget-helper
+apps remain compatible while new architecture moves through Morph recipes to
+Block:
+
+```text
+bash scripts/release/surface/surface-widget-migration-smoke.sh \
+  --report-dir reports/surface-widget-migration/gate
+```
+
+The smoke writes `tetra.surface.widget-migration.v1` /
+`surface-widget-migration-v1` evidence for the migration reference app. It keeps
+`lib.core.widgets` supported as a compatibility layer, preserves the release
+widget set, proves Panel/Button/TextBox equivalence rows against Morph recipes
+that resolve to Block, and rejects future core widget primitive promotion,
+breaking API changes, docs-only migration, and platform toolkit/runtime claims.
 
 ## Troubleshooting Release Evidence
 
@@ -194,18 +392,38 @@ promote Surface support.
 
 Release-supported apps use ordinary Tetra structs plus `lib.core.component`,
 `lib.core.widgets`, `lib.core.text`, `lib.core.accessibility`, and
-`lib.core.style`. The app owns layout, hit testing, focus, state, text
-buffers, clipboard/IME state, and accessibility metadata. The host boundary
-only opens a surface, copies events/text into caller-owned buffers, reports
-time, handles clipboard/composition bridge calls, mirrors accessibility for
-supported targets, and presents RGBA frames.
+`lib.core.style`. The scoped Linux app-shell subset also uses
+`lib.core.surface_app_shell` for explicit window/shell state helpers. The app
+owns layout, hit testing, focus, state, text buffers, clipboard/IME state,
+accessibility metadata, and app-shell lifecycle state. The host boundary only
+opens a surface, copies events/text into caller-owned buffers, reports time,
+handles clipboard/composition bridge calls, mirrors accessibility for supported
+targets, records scoped app-shell traces, checks app-shell capabilities through
+`surface-security-permission-v1`, records local `surface-performance-budget-v1`
+startup/frame/memory/RSS/cache/framebuffer/binary-size/CPU-proxy evidence,
+records `surface-dev-workflow-v1` fast rebuild evidence through
+`tetra surface dev`, records `surface-inspector-v1` static inspector evidence
+for Block/Morph/layout/paint/accessibility/event/focus/perf state, records
+`surface-reference-app-suite-v1` evidence for ten Block/Morph product shapes
+across headless, linux-x64 real-window, and wasm32-web browser-canvas targets,
+records `surface-package-v1` package/install/web-bundle/update-channel
+evidence, records `surface-crash-report-v1` local diagnostic/restart evidence,
+records `surface-i18n-v1` bounded localization evidence, and presents RGBA
+frames. Ambient filesystem and network access are
+denied by default in the release app-shell template; clipboard is allowed only
+through the scoped host policy, while notifications, dialogs, shell open-url,
+remote asset fetching, signing, notarization, automatic runtime updates,
+network update fetching, and unsupported Electron speed comparisons remain
+nonclaims until target evidence exists.
 
 Use `examples/surface_release_counter.tetra`,
 `examples/surface_release_form.tetra`,
 `examples/surface_release_text_input.tetra`, and
 `examples/surface_release_accessibility.tetra` as the release-supported
-examples. Older `surface_toolkit_*` and `surface_accessibility_settings`
-examples remain experimental regression evidence.
+examples. Use `examples/surface_linux_app_shell_notes.tetra` only for the
+scoped Linux app-shell subset. Older `surface_toolkit_*` and
+`surface_accessibility_settings` examples remain experimental regression
+evidence.
 
 The current headless evidence entrypoint is:
 
@@ -300,6 +518,33 @@ presents a 400x240 RGBA frame, records
 docs-only, metadata-only, legacy `.ui.*`, DOM/web-only, fake, or stale evidence
 for that promotion level.
 
+The Linux-x64 app-shell subset entrypoint is:
+
+```text
+bash scripts/release/surface/surface-linux-x64-release-app-shell-smoke.sh
+```
+
+That gate builds `examples/surface_linux_app_shell_notes.tetra`, opens the
+target Linux Surface path, writes `surface-linux-x64-release-app-shell.json`,
+and validates `tetra.surface.linux-app-shell.v1` evidence. The accepted subset
+is lifecycle open/close/reopen, two presented notes windows, resize/DPI/cursor
+traces, clipboard read/write, IME composition start/update/commit/cancel,
+accessibility platform bridge evidence, a scoped app-menu adapter, and
+`electron-feature-ledger-v1` rows for scoped crash/error reporting plus
+blocked-pass nonclaims for dialog, file dialog, file picker, notification,
+tray, and deep link. The same report carries
+`surface-security-permission-v1` permission evidence: default-deny filesystem
+and network policy, capability-checked IPC/process boundaries, scoped clipboard
+policy, denied notification/dialog/shell-open-url rows, and local hashed
+font/image/icon asset safety. It also carries `surface-performance-budget-v1`
+budget evidence for startup-to-first-frame, p50/p95 frame build/present, scene
+counts, memory/RSS/cache/framebuffer, binary size, CPU/power proxy, bounded
+caches, and mandatory `peak_rss_bytes`. It rejects GTK/Qt/native widget UI,
+Electron/React runtimes, DOM UI, user JavaScript app logic, platform widgets,
+unrestricted filesystem/network access, remote asset fetches, unsupported
+Electron speed comparisons, headless-only evidence, build-only evidence,
+docs-only evidence, and artifact claims without matching local hashes.
+
 Surface runtime gates reject reports that mention legacy `.ui.html`,
 `.ui.web.mjs`, `.ui.json`, `tetra.ui.v1`, DOM UI, HTML UI, user JavaScript, or
 user JS evidence instead of pure-Tetra Surface runtime evidence.
@@ -387,8 +632,8 @@ the focused root-to-leaf tree path; the reset button clears the TextBox through
 a routed tree event; resize relayout widens the TextBox from 288 to 368 pixels
 and preserves the focused node. This remains experimental semi-dynamic
 child-list evidence with a hardened helper API, not a production widget
-toolkit, final trait-object child list, IME, clipboard, rich text, or platform
-accessibility tree.
+toolkit, final trait-object child list, the stricter `production-text-input-v1`
+gate, rich text, bidi shaping, or platform accessibility tree.
 
 The minimal toolkit evidence entrypoints are:
 
@@ -579,8 +824,8 @@ let path_len: Int = component.tree_build_dispatch_path(tree, target, path_slots)
 The current helper API is an experimental foundation for a future toolkit. It
 now has a minimal experimental reusable `lib.core.widgets` layer, but it still
 does not provide production `Button` or `TextBox` widgets, trait-object child
-lists, witness-table dispatch, IME, clipboard, rich text, or platform
-accessibility integration.
+lists, witness-table dispatch, the stricter `production-text-input-v1` gate,
+rich text, bidi shaping, or platform accessibility integration.
 
 The static component fixture is
 `examples/surface_component_counter.tetra`. It composes `CounterApp` and
@@ -600,8 +845,9 @@ does not hit the target component bounds.
 pure Tetra: the host copies deterministic text payload bytes into the
 component-owned `[]u8` buffer, and the user-defined `TextBox` accepts those
 bytes through its `text_input` method before drawing a Surface frame. This is
-byte-buffer text input evidence, not full IME composition or String-level text
-editing.
+byte-buffer text input evidence; the stricter release text-input example covers
+the scoped clipboard/composition baseline, while full String-level IME editing,
+rich text, bidi shaping, and grapheme-cluster caret movement remain nonclaims.
 `examples/surface_textbox_app.tetra` is the editable milestone fixture: a Tetra
 `FocusManager` routes click/Tab focus between `TextBox` and `SubmitButton`,
 keyboard input goes only to the focused component, text bytes insert into
@@ -615,8 +861,8 @@ TextBox text insertion, keyboard-routed Submit/Reset Button actions, and resize
 relayout. Source tests reject app-side writes to structural tree fields, and
 API reports prove `manual_bookkeeping:false`. This is experimental
 component-tree helper evidence, not a full dynamic trait-object list, full
-IME/text editing, clipboard/rich text, platform accessibility integration, or
-production browser evidence. Linux-x64 real-window counter evidence is
+String/IME editor, rich text, bidi shaping, platform accessibility integration,
+or production browser evidence. Linux-x64 real-window counter evidence is
 covered separately by `examples/surface_window_counter.tetra`; wasm32-web
 browser canvas/input counter evidence is covered separately by
 `examples/surface_browser_counter.tetra`.

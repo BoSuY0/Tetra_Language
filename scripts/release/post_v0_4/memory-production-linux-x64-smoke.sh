@@ -93,15 +93,15 @@ ram_contract_dir="$report_dir/ram-contract"
 island_proof_path="$report_dir/island-proof-verifier.json"
 island_proof_memory_report_path="$report_dir/island-proof-memory-report.json"
 memory_release_manifest_path="$report_dir/memory-release-manifest.json"
+git_head="$(git rev-parse --verify HEAD)"
 
-go run ./tools/cmd/memory-production-smoke --report "$report_path"
+go run ./tools/cmd/memory-production-smoke --report "$report_path" --git-head "$git_head"
 go run ./tools/cmd/validate-memory-production --report "$report_path"
 go run ./cli/cmd/tetra targets --format=json > "$targets_path"
 go run ./tools/cmd/validate-targets --report "$targets_path"
-go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir "$memory_fuzz_dir"
-go run ./tools/cmd/validate-memory-fuzz-oracle --report "$memory_fuzz_dir/memory-fuzz-oracle.json" --artifact-dir "$memory_fuzz_dir"
+go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir "$memory_fuzz_dir" --git-head "$git_head"
+go run ./tools/cmd/validate-memory-fuzz-oracle --report "$memory_fuzz_dir/memory-fuzz-oracle.json" --artifact-dir "$memory_fuzz_dir" --current-git-head "$git_head"
 bash "$script_dir/ram-contract-linux-x64-smoke.sh" --report-dir "$ram_contract_dir"
-git_head="$(git rev-parse --verify HEAD)"
 generated_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 cat > "$island_proof_memory_report_path" <<ISLAND_MEMORY_REPORT
 {
@@ -174,22 +174,23 @@ cat > "$memory_release_manifest_path" <<MANIFEST
   "report_dir": ".",
   "hash_manifest": "artifact-hashes.json",
   "commands": [
-    {"name": "memory-production-smoke", "command": "go run ./tools/cmd/memory-production-smoke --report $(json_escape "$report_path")"},
+    {"name": "memory-production-smoke", "command": "go run ./tools/cmd/memory-production-smoke --report $(json_escape "$report_path") --git-head $git_head"},
     {"name": "target-report", "command": "go run ./cli/cmd/tetra targets --format=json > $(json_escape "$targets_path")"},
     {"name": "validate-targets", "command": "go run ./tools/cmd/validate-targets --report $(json_escape "$targets_path")"},
-    {"name": "memory-fuzz-short", "command": "go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir $(json_escape "$memory_fuzz_dir")"},
-    {"name": "validate-memory-fuzz-oracle", "command": "go run ./tools/cmd/validate-memory-fuzz-oracle --report $(json_escape "$memory_fuzz_dir")/memory-fuzz-oracle.json --artifact-dir $(json_escape "$memory_fuzz_dir")"},
+    {"name": "memory-fuzz-short", "command": "go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir $(json_escape "$memory_fuzz_dir") --git-head $git_head"},
+    {"name": "validate-memory-fuzz-oracle", "command": "go run ./tools/cmd/validate-memory-fuzz-oracle --report $(json_escape "$memory_fuzz_dir")/memory-fuzz-oracle.json --artifact-dir $(json_escape "$memory_fuzz_dir") --current-git-head $git_head"},
     {"name": "ram-contract-gate", "command": "bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir $(json_escape "$ram_contract_dir")"},
     {"name": "island-proof-verifier", "command": "go run ./tools/cmd/validate-island-proof --proof $(json_escape "$island_proof_path") --memory-report $(json_escape "$island_proof_memory_report_path") --current-git-head $git_head --require-same-commit"},
     {"name": "artifact-hashes-write", "command": "go run ./tools/cmd/validate-artifact-hashes --write --root $(json_escape "$report_dir") --out $(json_escape "$report_dir")/artifact-hashes.json"},
     {"name": "artifact-hashes-validate", "command": "go run ./tools/cmd/validate-artifact-hashes --manifest $(json_escape "$report_dir")/artifact-hashes.json"}
   ],
   "artifacts": [
-    {"path": "memory-production-linux-x64.json", "kind": "memory_production_report", "schema": "tetra.memory.production.v1", "target": "linux-x64", "command": "go run ./tools/cmd/memory-production-smoke --report $(json_escape "$report_path")"},
+    {"path": "memory-production-linux-x64.json", "kind": "memory_production_report", "schema": "tetra.memory.production.v1", "target": "linux-x64", "command": "go run ./tools/cmd/memory-production-smoke --report $(json_escape "$report_path") --git-head $git_head"},
     {"path": "targets.json", "kind": "target_report", "target": "linux-x64", "command": "go run ./cli/cmd/tetra targets --format=json > $(json_escape "$targets_path")"},
-    {"path": "memory-fuzz-tier1/memory-fuzz-oracle.json", "kind": "memory_fuzz_oracle_report", "schema": "tetra.memory-fuzz.oracle.v1", "target": "linux-x64", "command": "go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir $(json_escape "$memory_fuzz_dir")"},
-    {"path": "memory-fuzz-tier1/summary.json", "kind": "memory_fuzz_summary", "schema": "tetra.memory-fuzz-short.summary.v1", "target": "linux-x64", "command": "go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir $(json_escape "$memory_fuzz_dir")"},
-    {"path": "memory-fuzz-tier1/island-proof-fuzz-summary.json", "kind": "memory_fuzz_island_proof_summary", "schema": "tetra.island-proof-fuzz-summary.v1", "target": "linux-x64", "command": "go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir $(json_escape "$memory_fuzz_dir")"},
+    {"path": "memory-fuzz-tier1/memory-fuzz-oracle.json", "kind": "memory_fuzz_oracle_report", "schema": "tetra.memory-fuzz.oracle.v1", "target": "linux-x64", "command": "go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir $(json_escape "$memory_fuzz_dir") --git-head $git_head"},
+    {"path": "memory-fuzz-tier1/summary.json", "kind": "memory_fuzz_summary", "schema": "tetra.memory-fuzz-short.summary.v1", "target": "linux-x64", "command": "go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir $(json_escape "$memory_fuzz_dir") --git-head $git_head"},
+    {"path": "memory-fuzz-tier1/island-proof-fuzz-summary.json", "kind": "memory_fuzz_island_proof_summary", "schema": "tetra.island-proof-fuzz-summary.v1", "target": "linux-x64", "command": "go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir $(json_escape "$memory_fuzz_dir") --git-head $git_head"},
+    {"path": "ram-contract/ram-contract-release-manifest.json", "kind": "ram_contract_release_manifest", "schema": "tetra.ram-contract.release-manifest.v1", "target": "linux-x64", "command": "bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir $(json_escape "$ram_contract_dir")"},
     {"path": "ram-contract/ram-contract-report.json", "kind": "ram_contract_report", "schema": "tetra.ram-contract-report.v1", "target": "linux-x64", "command": "bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir $(json_escape "$ram_contract_dir")"},
     {"path": "ram-contract/memory-grade-report.json", "kind": "ram_memory_grade_report", "schema": "tetra.memory-grade-report.v1", "target": "linux-x64", "command": "bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir $(json_escape "$ram_contract_dir")"},
     {"path": "ram-contract/proof-store-summary.json", "kind": "ram_proof_store_summary", "schema": "tetra.proof-store-summary.v1", "target": "linux-x64", "command": "bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir $(json_escape "$ram_contract_dir")"},
@@ -197,6 +198,7 @@ cat > "$memory_release_manifest_path" <<MANIFEST
     {"path": "ram-contract/heap-blockers.json", "kind": "ram_heap_blockers", "schema": "tetra.ram-blockers.v1", "target": "linux-x64", "command": "bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir $(json_escape "$ram_contract_dir")"},
     {"path": "ram-contract/copy-blockers.json", "kind": "ram_copy_blockers", "schema": "tetra.ram-blockers.v1", "target": "linux-x64", "command": "bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir $(json_escape "$ram_contract_dir")"},
     {"path": "ram-contract/fuzz/ram-contract-fuzz-oracle.json", "kind": "ram_contract_fuzz_oracle", "schema": "tetra.ram-contract-fuzz-oracle.v1", "target": "linux-x64", "command": "bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir $(json_escape "$ram_contract_dir")"},
+    {"path": "ram-contract/artifact-hashes.json", "kind": "ram_contract_hash_manifest", "schema": "tetra.release-artifact-hashes.v1alpha1", "target": "linux-x64", "command": "bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir $(json_escape "$ram_contract_dir")"},
     {"path": "island-proof-verifier.json", "kind": "island_proof_verifier_report", "schema": "tetra.island.proof.v1", "target": "linux-x64", "command": "go run ./tools/cmd/validate-island-proof --proof $(json_escape "$island_proof_path") --memory-report $(json_escape "$island_proof_memory_report_path") --current-git-head $git_head --require-same-commit"},
     {"path": "island-proof-memory-report.json", "kind": "island_proof_memory_report", "schema": "tetra.memory-report.v1", "target": "linux-x64", "command": "go run ./tools/cmd/validate-island-proof --proof $(json_escape "$island_proof_path") --memory-report $(json_escape "$island_proof_memory_report_path") --current-git-head $git_head --require-same-commit"},
     {"path": "artifact-hashes.json", "kind": "artifact_hash_manifest", "schema": "tetra.release-artifact-hashes.v1alpha1", "target": "linux-x64", "command": "go run ./tools/cmd/validate-artifact-hashes --write --root $(json_escape "$report_dir") --out $(json_escape "$report_dir")/artifact-hashes.json"}

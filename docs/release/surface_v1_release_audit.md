@@ -45,15 +45,33 @@ or DOM/React/user-JS application UI.
   `reports/surface-ui-production-final/surface-release-v1/surface-release-summary.json`.
 - Final artifact hash manifest target path:
   `reports/surface-ui-production-final/surface-release-v1/artifact-hashes.json`.
+- Developer fast loop evidence:
+  `surface-dev-workflow-v1` reports from `tetra surface dev`, with fast rebuild
+  token/recipe/source changed rebuilds and no hot reload claim.
+- Surface inspector evidence:
+  `surface-inspector-v1` reports from `tools/cmd/surface-inspector`, with Block
+  tree, Morph tokens, layout, paint, accessibility, event route, focus,
+  perf-counter, source-location, hidden-state scan, JSON, and static HTML tool
+  report evidence.
+- P28 docs-governance evidence:
+  `PROD_STABLE_SCOPED`, `BETA_TARGET_HOST`, `EXPERIMENTAL`, `UNSUPPORTED`, and
+  `NONCLAIM` tier vocabulary stays present across the Surface release docs,
+  generated manifest references, user guide, examples index, and cookbook docs.
+- Product evidence gate:
+  `bash scripts/release/surface/product-gate.sh --report-dir reports/surface-product-v1`
+  runs the release gate, artifact hash validation, claim scanner, manifest
+  validator, and docs verifier. It is not the final `PROD_STABLE_SCOPED`
+  verdict; P29 owns the final same-commit product readiness audit.
 
 ## Checklist
 
 | Item | Status | Evidence |
 | --- | --- | --- |
 | release contract created | done | `docs/release/surface_v1_release_contract.md` |
-| feature registry updated | done | `compiler/features.go`; manifest lists 8 Surface current IDs and 3 unsupported target IDs |
+| feature registry updated | done | `compiler/features.go`; manifest lists current Surface IDs including `ui.surface-inspector-v1` and unsupported target IDs |
 | docs updated | done | `docs/spec/surface_v1.md`, `docs/spec/current_supported_surface.md`, `docs/user/surface_guide.md`, `docs/user/examples_index.md`, `docs/release/surface_v1_release_notes.md` |
 | manifest updated | done | `docs/generated/manifest.json`; `validate-manifest` passed |
+| P28 claim-tier governance documented | done | `PROD_STABLE_SCOPED`, `BETA_TARGET_HOST`, `EXPERIMENTAL`, `UNSUPPORTED`, and `NONCLAIM` vocabulary plus product-gate/docs/claim scanner commands |
 | experimental Block-system gate evidence recorded | done | `reports/surface-block/p18-budget/surface-block-system-gate-summary.json`; `block_system.memory_budget`; no production Block claim |
 | experimental Morph Capsule gate evidence recorded | done | `reports/surface-morph/gate/surface-morph-gate-summary.json`; `tetra.surface.morph.v1`; no production Morph claim |
 | API docs generated | done | `scripts/release/surface/api-stability-gate.sh --report-dir reports/surface-ui-production-p10/surface-api-stability-v1` generated and validated `artifacts/tetra-docs.md` with 7 stable Surface modules |
@@ -62,6 +80,8 @@ or DOM/React/user-JS application UI.
 | clipboard gate passed | done | Surface v1 release gate summary reports `clipboard-text-v1` |
 | IME/composition gate passed | done | Surface v1 release gate summary reports `composition-baseline-v1` |
 | toolkit gate passed | done | Surface v1 release gate generated toolkit reports for headless, linux-x64, and wasm32-web |
+| developer fast loop gate passed | done | Surface v1 release gate generated `surface-dev-workflow.json` with `surface-dev-workflow-v1` fast rebuild evidence |
+| Surface inspector gate passed | done | Surface v1 release gate generated `surface-inspector.json` with `surface-inspector-v1` static tool evidence |
 | Linux accessibility bridge gate passed | done | `reports/surface-ui-production-p08/linux-accessibility/surface-linux-x64-release-accessibility.json` |
 | browser accessibility snapshot gate passed | done | `reports/surface-ui-production-p08/wasm-accessibility/surface-wasm32-web-release-accessibility.json` |
 | release gate passed | done | `reports/surface-block/final/surface-release-v1/surface-release-summary.json` |

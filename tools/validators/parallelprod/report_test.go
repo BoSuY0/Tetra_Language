@@ -128,6 +128,41 @@ func TestValidateReportRejectsMissingActorBenchmarkPrepRows(t *testing.T) {
 	}
 }
 
+func TestValidateReportRejectsSchedulerPrototypeProductionPromotion(t *testing.T) {
+	var report map[string]any
+	if err := json.Unmarshal([]byte(validParallelProductionReport()), &report); err != nil {
+		t.Fatal(err)
+	}
+	benchmarks := report["benchmarks"].([]any)
+	benchmarks = append(benchmarks, map[string]any{
+		"name":                 "per-core scheduler prototype benchmark",
+		"kind":                 "scheduler",
+		"metric":               "scheduler_fairness",
+		"unit":                 "local_model",
+		"baseline_value":       float64(1),
+		"measured_value":       float64(1),
+		"improvement_ratio":    float64(0),
+		"evidence":             "per-core scheduler prototype row from compiler/internal/parallelrt",
+		"claim_tier":           "tier1_local_benchmark_evidence",
+		"claim":                "Per-core scheduler prototype benchmark proves production runtime scheduler readiness.",
+		"raw_output_artifacts": []any{"reports/actor-final-production/parallel-production-linux-x64/parallelrt-evidence.raw.json"},
+		"ran":                  true,
+		"pass":                 true,
+	})
+	report["benchmarks"] = benchmarks
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = ValidateReport(raw)
+	if err == nil {
+		t.Fatalf("expected scheduler prototype production promotion to fail")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "scheduler prototype") {
+		t.Fatalf("error = %v, want scheduler prototype rejection", err)
+	}
+}
+
 func TestValidateReportRejectsMissingSafeUnsafeForbiddenBoundaryCoverageCase(t *testing.T) {
 	raw := strings.Replace(validParallelProductionReport(), `    {"name":"safe unsafe forbidden boundary coverage","kind":"positive","ran":true,"pass":true},
 `, "", 1)

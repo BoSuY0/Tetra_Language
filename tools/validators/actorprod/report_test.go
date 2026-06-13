@@ -107,6 +107,80 @@ func TestValidateReportDirCrossChecksSubreportsAndArtifactHashes(t *testing.T) {
 	}
 }
 
+func TestValidateReportDirRejectsMissingSubreportsAndHashManifests(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		remove    string
+		wantError string
+	}{
+		{
+			name:      "missing parallel subreport",
+			remove:    "parallel-production-linux-x64/parallel-production-linux-x64.json",
+			wantError: "parallel-production-linux-x64.json",
+		},
+		{
+			name:      "missing distributed subreport",
+			remove:    "distributed-actors-linux-x64/distributed-actors-linux-x64.json",
+			wantError: "distributed-actors-linux-x64.json",
+		},
+		{
+			name:      "missing foundation hash manifest",
+			remove:    "artifact-hashes.json",
+			wantError: "artifact-hashes.json",
+		},
+		{
+			name:      "missing parallel hash manifest",
+			remove:    "parallel-production-linux-x64/artifact-hashes.json",
+			wantError: "parallel-production-linux-x64/artifact-hashes.json",
+		},
+		{
+			name:      "missing distributed hash manifest",
+			remove:    "distributed-actors-linux-x64/artifact-hashes.json",
+			wantError: "distributed-actors-linux-x64/artifact-hashes.json",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeActorFoundationFixtureDir(t, dir)
+			if err := os.Remove(filepath.Join(dir, filepath.FromSlash(tc.remove))); err != nil {
+				t.Fatalf("remove fixture artifact: %v", err)
+			}
+			err := ValidateReportDir(dir, Options{CurrentGitHead: testGitHead})
+			if err == nil {
+				t.Fatalf("expected missing %s to fail", tc.remove)
+			}
+			if !strings.Contains(filepath.ToSlash(err.Error()), tc.wantError) {
+				t.Fatalf("error = %v, want %s", err, tc.wantError)
+			}
+		})
+	}
+}
+
+func TestValidateReportDirRejectsDistributedSubreportStaleGitHead(t *testing.T) {
+	dir := t.TempDir()
+	writeActorFoundationFixtureDir(t, dir)
+	stale := strings.Replace(validDistributedActorSubreport, testGitHead, strings.Repeat("a", 40), 1)
+	writeFile(t, filepath.Join(dir, "distributed-actors-linux-x64", "distributed-actors-linux-x64.json"), stale)
+	writeArtifactHashManifest(t, filepath.Join(dir, "distributed-actors-linux-x64"), []testArtifact{
+		{Path: "distributed-actors-linux-x64.json", Schema: "tetra.actors.distributed-runtime.v1"},
+	})
+	writeArtifactHashManifest(t, dir, []testArtifact{
+		{Path: "actor-runtime-foundation-manifest.json", Schema: SchemaV1},
+		{Path: "distributed-actors-linux-x64/artifact-hashes.json", Schema: ArtifactHashSchema},
+		{Path: "distributed-actors-linux-x64/distributed-actors-linux-x64.json", Schema: "tetra.actors.distributed-runtime.v1"},
+		{Path: "logs/focused-actor-tests.log"},
+		{Path: "parallel-production-linux-x64/artifact-hashes.json", Schema: ArtifactHashSchema},
+		{Path: "parallel-production-linux-x64/parallel-production-linux-x64.json", Schema: "tetra.parallel.production.v1"},
+	})
+	err := ValidateReportDir(dir, Options{CurrentGitHead: testGitHead})
+	if err == nil {
+		t.Fatalf("expected stale distributed subreport git_head to fail")
+	}
+	if !strings.Contains(err.Error(), "distributed actor git_head") {
+		t.Fatalf("error = %v, want distributed actor git_head mismatch", err)
+	}
+}
+
 func validActorFoundationReport(t *testing.T) []byte {
 	t.Helper()
 	return validActorFoundationReportFrom(t, func(*Report) {})

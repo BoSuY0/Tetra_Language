@@ -1,0 +1,47 @@
+// Glass panel scene authored through Morph recipes that expand to Block.
+module examples.surface_morph_glass_panel
+
+import lib.core.surface as surface
+import lib.core.block as block
+import lib.core.morph as morph
+
+struct MorphGlassPanelApp:
+    expanded_recipe_count: Int
+    block_count: Int
+    a11y_projection: Bool
+
+func root_block(rect: surface.Rect) -> block.Block:
+    let paint: block.PaintSpec = block.paint_stack2(block.paint_layer_fill_radius(morph.theme_dark(), 0), block.paint_layer_overlay(morph.accent(), 42, 0))
+    let props: block.BlockProps = block.props(block.layout_overlay(rect, 0), paint, block.text_none(), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_dialog(15), block.asset_none())
+    return block.make(block.id(1), block.id_none(), props)
+
+func main() -> Int
+uses alloc, mem:
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 400, h: 260)
+    let panel_rect: surface.Rect = surface.Rect(x: 20, y: 20, w: 360, h: 220)
+    let label_rect: surface.Rect = surface.Rect(x: 32, y: 24, w: 120, h: 18)
+    let field_rect: surface.Rect = surface.Rect(x: 28, y: 32, w: 344, h: 42)
+    let dialog_rect: surface.Rect = surface.Rect(x: 28, y: 88, w: 344, h: 44)
+    let toast_rect: surface.Rect = surface.Rect(x: 28, y: 138, w: 344, h: 44)
+    let action_rect: surface.Rect = surface.Rect(x: 28, y: 188, w: 344, h: 28)
+    let dialog_recipe: morph.Recipe = morph.recipe_dialog_panel()
+    let toast_recipe: morph.Recipe = morph.recipe_toast_notification()
+    let action_recipe: morph.Recipe = morph.recipe_control_action()
+    let panel_recipe: morph.Recipe = morph.recipe_region_panel()
+    var tree: block.BlockTree = block.tree_init(8)
+    let root: Int = block.tree_add_root(tree, root_block(root_rect), root_rect)
+    let panel: Int = block.tree_add_child(tree, block.id(1), morph.expand_region_panel(2, 1, panel_rect, 15), panel_rect)
+    let label: Int = block.tree_add_child(tree, block.id(2), morph.expand_label(3, 2, 4, label_rect, 6), label_rect)
+    let field: Int = block.tree_add_child(tree, block.id(2), morph.expand_field_text(4, 2, 3, field_rect, 18, 8), field_rect)
+    let dialog: Int = block.tree_add_child(tree, block.id(2), morph.expand_control_action(5, 2, dialog_rect, 13, 701, true), dialog_rect)
+    let toast: Int = block.tree_add_child(tree, block.id(2), morph.expand_control_action(6, 2, toast_rect, 15, 702, false), toast_rect)
+    let action: Int = block.tree_add_child(tree, block.id(2), morph.expand_control_action(7, 2, action_rect, 12, 703, false), action_rect)
+    let dialog_expansion: morph.RecipeExpansion = morph.recipe_expansion(dialog_recipe, block.id(5))
+    let toast_expansion: morph.RecipeExpansion = morph.recipe_expansion(toast_recipe, block.id(6))
+    let action_expansion: morph.RecipeExpansion = morph.recipe_expansion(action_recipe, block.id(7))
+    let panel_expansion: morph.RecipeExpansion = morph.recipe_expansion(panel_recipe, block.id(2))
+    let app: MorphGlassPanelApp = MorphGlassPanelApp(expanded_recipe_count: 4, block_count: block.tree_len(tree), a11y_projection: morph.accessibility_projection_ok(3, 4, 6))
+    let valid: Int = block.tree_validate(tree)
+    if root == 1 && panel == 2 && label == 3 && field == 4 && dialog == 5 && toast == 6 && action == 7 && valid == block.tree_error_ok() && app.expanded_recipe_count == 4 && app.block_count == 7 && app.a11y_projection && morph.capsule_self_check() && morph.expansion_valid(dialog_expansion) && morph.expansion_valid(toast_expansion) && morph.expansion_valid(action_expansion) && morph.expansion_valid(panel_expansion):
+        return 0
+    return 1

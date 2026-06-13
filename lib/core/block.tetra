@@ -391,6 +391,15 @@ func layout_dock_bottom() -> Int:
 func layout_dock_fill() -> Int:
     return 5
 
+func layout_density_dpi_default() -> Int:
+    return 96
+
+func layout_density_scale_default() -> Int:
+    return 1000
+
+func layout_density_scale_retina() -> Int:
+    return 2000
+
 func layout_error_ok() -> Int:
     return 0
 
@@ -406,6 +415,17 @@ func layout_clamp_small(value: Int, min_value: Int, max_value: Int) -> Int:
     if value > max_value:
         return max_value
     return value
+
+func layout_stable_round_div(value: Int, divisor: Int) -> Int:
+    if divisor <= 0:
+        return 0
+    if value <= 0:
+        return 0
+    return (value + divisor / 2) / divisor
+
+func layout_scale_px(value: Int, scale_milli: Int) -> Int:
+    let safe_scale: Int = layout_clamp_small(scale_milli, 250, 4000)
+    return layout_stable_round_div(value * safe_scale, 1000)
 
 func layout_pack_flags(padding: Int, gap: Int, align: Int, justify: Int, overflow: Int, z_index: Int, width_policy: Int, height_policy: Int) -> Int:
     let safe_padding: Int = layout_clamp_small(padding, 0, 99)
@@ -512,6 +532,20 @@ func layout_resize(spec: LayoutSpec, width: Int, height: Int) -> LayoutSpec:
     next.h = height
     return next
 
+func layout_resize_density(spec: LayoutSpec, width: Int, height: Int, scale_milli: Int) -> LayoutSpec:
+    return layout_resize(spec, layout_scale_px(width, scale_milli), layout_scale_px(height, scale_milli))
+
+func layout_aspect_fit(rect: surface.Rect, aspect_w: Int, aspect_h: Int) -> LayoutSpec:
+    let safe_aspect_w: Int = layout_clamp_small(aspect_w, 1, 1000)
+    let safe_aspect_h: Int = layout_clamp_small(aspect_h, 1, 1000)
+    var out_w: Int = rect.w
+    var out_h: Int = layout_stable_round_div(rect.w * safe_aspect_h, safe_aspect_w)
+    if out_h > rect.h:
+        out_h = rect.h
+        out_w = layout_stable_round_div(rect.h * safe_aspect_w, safe_aspect_h)
+    let out_rect: surface.Rect = surface.Rect(x: rect.x, y: rect.y, w: out_w, h: out_h)
+    return layout_constrained(layout_mode_fixed(), out_rect, layout_size_fixed(), layout_size_fixed(), out_w, out_h, out_w, out_h, 0, 0, layout_align_start(), layout_justify_start(), layout_overflow_clip(), 0)
+
 func layout_clamp_dimension(value: Int, min_value: Int, max_value: Int) -> Int:
     var out: Int = value
     if min_value > 0 && out < min_value:
@@ -582,10 +616,9 @@ func layout_resolve_child(parent: LayoutSpec, child: LayoutSpec, index: Int, chi
     var height: Int = layout_effective_height(child, measured, available_h)
     var x: Int = parent.x + parent_padding + child.x
     var y: Int = parent.y + parent_padding + child.y
-
     if parent.mode == layout_mode_row():
         if layout_width_policy(child) == layout_size_fill():
-            width = available_w / safe_count
+            width = layout_stable_round_div(available_w, safe_count)
         x = parent.x + parent_padding + index * (width + parent_gap)
         y = parent.y + parent_padding
         if layout_align_value(parent) == layout_align_center():
@@ -613,8 +646,8 @@ func layout_resolve_child(parent: LayoutSpec, child: LayoutSpec, index: Int, chi
         let gap: Int = layout_gap(child)
         let col: Int = index % columns
         let row: Int = index / columns
-        width = (child.w - gap * (columns - 1)) / columns
-        height = (child.h - gap * (rows - 1)) / rows
+        width = layout_stable_round_div(child.w - gap * (columns - 1), columns)
+        height = layout_stable_round_div(child.h - gap * (rows - 1), rows)
         x = child.x + col * (width + gap)
         y = child.y + row * (height + gap)
     if child.mode == layout_mode_dock():
@@ -1203,10 +1236,7 @@ func event_route_rejected_not_editable() -> Int:
     return 5
 
 func event_kind_is_pointer(kind: Int) -> Bool:
-    return kind == event_kind_pointer_enter() || kind == event_kind_pointer_leave() ||
-           kind == event_kind_pointer_move() || kind == event_kind_pointer_down() ||
-           kind == event_kind_pointer_up() || kind == event_kind_click() ||
-           kind == event_kind_double_click()
+    return kind == event_kind_pointer_enter() || kind == event_kind_pointer_leave() || kind == event_kind_pointer_move() || kind == event_kind_pointer_down() || kind == event_kind_pointer_up() || kind == event_kind_click() || kind == event_kind_double_click()
 
 func event_dispatch_status(input: InputSpec, kind: Int, focused: Bool) -> Int:
     if input.disabled:
@@ -1449,10 +1479,10 @@ func motion_progress(motion: MotionSpec, elapsed_ms: Int) -> Int:
     let local_ms: Int = elapsed_ms - motion.delay_ms
     if local_ms >= motion.duration_ms:
         return 1000
-    return (local_ms * 1000) / motion.duration_ms
+    return local_ms * 1000 / motion.duration_ms
 
 func motion_lerp_int(start: Int, finish: Int, progress: Int) -> Int:
-    return start + ((finish - start) * progress) / 1000
+    return start + (finish - start) * progress / 1000
 
 func motion_resolve_int(start: Int, finish: Int, motion: MotionSpec, elapsed_ms: Int) -> Int:
     return motion_lerp_int(start, finish, motion_progress(motion, elapsed_ms))
@@ -1502,6 +1532,21 @@ func accessibility_role_text() -> Int:
 func accessibility_role_textbox() -> Int:
     return 3
 
+func accessibility_role_checkbox() -> Int:
+    return 4
+
+func accessibility_role_navigation() -> Int:
+    return 5
+
+func accessibility_role_region() -> Int:
+    return 6
+
+func accessibility_role_dialog() -> Int:
+    return 7
+
+func accessibility_role_status() -> Int:
+    return 8
+
 func accessibility_none() -> AccessibilitySpec:
     return AccessibilitySpec(role: accessibility_role_none(), label_len: 0, labelled_by: id_none(), described_by: id_none(), focus_order: -1, reading_order: -1, actions: 0, hidden: false)
 
@@ -1520,8 +1565,23 @@ func accessibility_button_labelled_by(label_len: Int, label_id: BlockID, action:
 func accessibility_textbox_labelled_by(label_len: Int, label_id: BlockID) -> AccessibilitySpec:
     return AccessibilitySpec(role: accessibility_role_textbox(), label_len: label_len, labelled_by: label_id, described_by: id_none(), focus_order: 0, reading_order: 0, actions: action_primary(), hidden: false)
 
+func accessibility_checkbox(label_len: Int) -> AccessibilitySpec:
+    return AccessibilitySpec(role: accessibility_role_checkbox(), label_len: label_len, labelled_by: id_none(), described_by: id_none(), focus_order: 0, reading_order: 0, actions: action_primary(), hidden: false)
+
+func accessibility_navigation(label_len: Int) -> AccessibilitySpec:
+    return AccessibilitySpec(role: accessibility_role_navigation(), label_len: label_len, labelled_by: id_none(), described_by: id_none(), focus_order: -1, reading_order: 0, actions: 0, hidden: false)
+
+func accessibility_region(label_len: Int) -> AccessibilitySpec:
+    return AccessibilitySpec(role: accessibility_role_region(), label_len: label_len, labelled_by: id_none(), described_by: id_none(), focus_order: -1, reading_order: 0, actions: 0, hidden: false)
+
+func accessibility_dialog(label_len: Int) -> AccessibilitySpec:
+    return AccessibilitySpec(role: accessibility_role_dialog(), label_len: label_len, labelled_by: id_none(), described_by: id_none(), focus_order: 0, reading_order: 0, actions: action_primary(), hidden: false)
+
+func accessibility_status(label_len: Int) -> AccessibilitySpec:
+    return AccessibilitySpec(role: accessibility_role_status(), label_len: label_len, labelled_by: id_none(), described_by: id_none(), focus_order: -1, reading_order: 0, actions: 0, hidden: false)
+
 func accessibility_focusable_has_name(spec: AccessibilitySpec) -> Bool:
-    let focusable: Bool = spec.focus_order >= 0 || spec.actions > 0 || spec.role == accessibility_role_button() || spec.role == accessibility_role_textbox()
+    let focusable: Bool = spec.focus_order >= 0 || spec.actions > 0 || spec.role == accessibility_role_button() || spec.role == accessibility_role_textbox() || spec.role == accessibility_role_checkbox() || spec.role == accessibility_role_dialog()
     if !focusable:
         return true
     return spec.label_len > 0 || id_value(spec.labelled_by) != id_value(id_none())

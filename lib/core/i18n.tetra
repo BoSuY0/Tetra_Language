@@ -1,0 +1,149 @@
+// Surface v1 bounded internationalization helpers.
+// Effects: none
+// ```tetra doctest
+// func i18n_doctest() -> Int:
+//     let primary: lib.core.i18n.StringTable = lib.core.i18n.table_uk_ua()
+//     let fallback: lib.core.i18n.StringTable = lib.core.i18n.table_en_us()
+//     let result: lib.core.i18n.StringLookupResult = lib.core.i18n.lookup_with_fallback(primary, fallback, lib.core.i18n.key_form_secondary())
+//     if result.ok && result.fallback_used && lib.core.i18n.rtl_placeholder_nonclaim():
+//         return 1
+//     return 0
+// ```
+module lib.core.i18n
+
+import lib.core.strings as strings
+
+struct Locale:
+    tag_hash: Int
+    language_hash: Int
+    direction: Int
+    supported: Bool
+
+struct StringTable:
+    locale_tag_hash: Int
+    fallback_tag_hash: Int
+    entry_count: Int
+    checksum: Int
+    primary: Bool
+
+struct StringLookupResult:
+    ok: Bool
+    missing_key: Bool
+    fallback_used: Bool
+    locale_tag_hash: Int
+    value_hash: Int
+    diagnostic: Int
+
+struct FormatHook:
+    kind_hash: Int
+    locale_tag_hash: Int
+    input_hash: Int
+    output_hash: Int
+    deterministic: Bool
+    icu_claim: Bool
+
+struct TextDirection:
+    direction: Int
+    rtl_placeholder: Bool
+    full_bidi_supported: Bool
+    full_bidi_claim: Bool
+    shaping_proof: Bool
+
+func direction_ltr() -> Int:
+    return 1
+
+func direction_rtl() -> Int:
+    return 2
+
+func diagnostic_none() -> Int:
+    return 0
+
+func diagnostic_missing_key() -> Int:
+    return 2001
+
+func diagnostic_unsupported_locale() -> Int:
+    return 2002
+
+func hash_text(value: String) -> Int:
+    return strings.ascii_sum(value) * 31 + strings.ascii_len(value)
+
+func locale_en_us_hash() -> Int:
+    return hash_text("en-US")
+
+func locale_uk_ua_hash() -> Int:
+    return hash_text("uk-UA")
+
+func locale_en_us() -> Locale:
+    return Locale(tag_hash: locale_en_us_hash(), language_hash: hash_text("en"), direction: direction_ltr(), supported: true)
+
+func locale_uk_ua() -> Locale:
+    return Locale(tag_hash: locale_uk_ua_hash(), language_hash: hash_text("uk"), direction: direction_ltr(), supported: true)
+
+func locale_ar_placeholder() -> Locale:
+    return Locale(tag_hash: hash_text("ar"), language_hash: hash_text("ar"), direction: direction_rtl(), supported: false)
+
+func table_en_us() -> StringTable:
+    return StringTable(locale_tag_hash: locale_en_us_hash(), fallback_tag_hash: locale_en_us_hash(), entry_count: 5, checksum: 1005, primary: true)
+
+func table_uk_ua() -> StringTable:
+    return StringTable(locale_tag_hash: locale_uk_ua_hash(), fallback_tag_hash: locale_en_us_hash(), entry_count: 4, checksum: 904, primary: false)
+
+func key_form_title() -> Int:
+    return hash_text("form.title")
+
+func key_form_name() -> Int:
+    return hash_text("form.name")
+
+func key_form_primary() -> Int:
+    return hash_text("form.primary")
+
+func key_form_secondary() -> Int:
+    return hash_text("form.secondary")
+
+func key_form_status() -> Int:
+    return hash_text("form.status")
+
+func key_form_unknown() -> Int:
+    return hash_text("form.unknown")
+
+func locale_supported(locale: Locale) -> Bool:
+    return locale.supported && (locale.tag_hash == locale_en_us_hash() || locale.tag_hash == locale_uk_ua_hash())
+
+func table_has_key(table: StringTable, key_hash: Int) -> Bool:
+    if table.locale_tag_hash == locale_en_us_hash():
+        return key_hash == key_form_title() || key_hash == key_form_name() || key_hash == key_form_primary() || key_hash == key_form_secondary() || key_hash == key_form_status()
+    if table.locale_tag_hash == locale_uk_ua_hash():
+        return key_hash == key_form_title() || key_hash == key_form_name() || key_hash == key_form_primary() || key_hash == key_form_status()
+    return false
+
+func localized_value_hash(table: StringTable, key_hash: Int) -> Int:
+    return table.locale_tag_hash + key_hash + table.checksum
+
+func lookup(table: StringTable, key_hash: Int) -> StringLookupResult:
+    if table_has_key(table, key_hash):
+        return StringLookupResult(ok: true, missing_key: false, fallback_used: false, locale_tag_hash: table.locale_tag_hash, value_hash: localized_value_hash(table, key_hash), diagnostic: diagnostic_none())
+    return StringLookupResult(ok: false, missing_key: true, fallback_used: false, locale_tag_hash: table.locale_tag_hash, value_hash: 0, diagnostic: diagnostic_missing_key())
+
+func lookup_with_fallback(table: StringTable, fallback: StringTable, key_hash: Int) -> StringLookupResult:
+    let primary: StringLookupResult = lookup(table, key_hash)
+    if primary.ok:
+        return primary
+    let fallback_result: StringLookupResult = lookup(fallback, key_hash)
+    if fallback_result.ok:
+        return StringLookupResult(ok: true, missing_key: false, fallback_used: true, locale_tag_hash: fallback.locale_tag_hash, value_hash: fallback_result.value_hash, diagnostic: diagnostic_none())
+    return StringLookupResult(ok: false, missing_key: true, fallback_used: true, locale_tag_hash: fallback.locale_tag_hash, value_hash: 0, diagnostic: diagnostic_missing_key())
+
+func date_format_hook(locale: Locale, value_hash: Int) -> FormatHook:
+    return FormatHook(kind_hash: hash_text("date"), locale_tag_hash: locale.tag_hash, input_hash: value_hash, output_hash: value_hash, deterministic: true, icu_claim: false)
+
+func number_format_hook(locale: Locale, value_hash: Int) -> FormatHook:
+    return FormatHook(kind_hash: hash_text("number"), locale_tag_hash: locale.tag_hash, input_hash: value_hash, output_hash: value_hash, deterministic: true, icu_claim: false)
+
+func direction_for(locale: Locale) -> TextDirection:
+    if locale.direction == direction_rtl():
+        return TextDirection(direction: direction_rtl(), rtl_placeholder: true, full_bidi_supported: false, full_bidi_claim: false, shaping_proof: false)
+    return TextDirection(direction: direction_ltr(), rtl_placeholder: false, full_bidi_supported: false, full_bidi_claim: false, shaping_proof: false)
+
+func rtl_placeholder_nonclaim() -> Bool:
+    let direction: TextDirection = direction_for(locale_ar_placeholder())
+    return direction.rtl_placeholder && !direction.full_bidi_supported && !direction.full_bidi_claim && !direction.shaping_proof

@@ -24,26 +24,22 @@ uses alloc, mem:
     let label_rect: surface.Rect = surface.Rect(x: 24, y: 24, w: 200, h: 24)
     let submit_rect: surface.Rect = surface.Rect(x: 24, y: 64, w: 120, h: 44)
     let reset_rect: surface.Rect = surface.Rect(x: 152, y: 64, w: 120, h: 44)
-
     var tree: block.BlockTree = block.tree_init(8)
     let root: Int = block.tree_add_root(tree, make_block(1, block.id_value(block.id_none()), root_rect, false, 0), root_rect)
     let panel: Int = block.tree_add_child(tree, block.id(1), make_block(2, 1, panel_rect, false, 0), panel_rect)
     let label: Int = block.tree_add_child(tree, block.id(2), make_block(3, 2, label_rect, false, 4), label_rect)
     let submit: Int = block.tree_add_child(tree, block.id(2), make_block(4, 2, submit_rect, true, 6), submit_rect)
     let reset: Int = block.tree_add_child(tree, block.id(2), make_block(5, 2, reset_rect, true, 5), reset_rect)
-
     let duplicate: Int = block.tree_add_child(tree, block.id(2), make_block(4, 2, submit_rect, true, 6), submit_rect)
     let duplicate_error: Int = block.tree_last_error(tree)
     let missing: Int = block.tree_add_child(tree, block.id(99), make_block(6, 99, submit_rect, true, 6), submit_rect)
     let missing_error: Int = block.tree_last_error(tree)
     let cycle_error: Int = block.tree_validate_link(tree, block.id(5), block.id(2))
     let valid: Int = block.tree_validate(tree)
-
     var hit_path: []i32 = core.make_i32(8)
     let hit_len: Int = block.tree_hit_test_path(tree, 180, 80, hit_path)
     var dispatch_path: []i32 = core.make_i32(8)
     let dispatch_len: Int = block.tree_build_dispatch_path(tree, block.id(4), dispatch_path)
-
     let child0: Int = block.id_value(block.tree_child_at(tree, block.id(2), 0))
     let child1: Int = block.id_value(block.tree_child_at(tree, block.id(2), 1))
     let child2: Int = block.id_value(block.tree_child_at(tree, block.id(2), 2))
@@ -52,15 +48,6 @@ uses alloc, mem:
     let a11y0: Int = block.id_value(block.tree_accessibility_order_at(tree, 0))
     let a11y1: Int = block.id_value(block.tree_accessibility_order_at(tree, 1))
     let a11y2: Int = block.id_value(block.tree_accessibility_order_at(tree, 2))
-
-    if root == 1 && panel == 2 && label == 3 && submit == 4 && reset == 5 &&
-       duplicate == block.tree_error_duplicate() && duplicate_error == block.tree_error_duplicate() &&
-       missing == block.tree_error_missing_parent() && missing_error == block.tree_error_missing_parent() &&
-       cycle_error == block.tree_error_cycle() && valid == block.tree_error_ok() &&
-       child0 == 3 && child1 == 4 && child2 == 5 &&
-       focus0 == 4 && focus1 == 5 &&
-       a11y0 == 3 && a11y1 == 4 && a11y2 == 5 &&
-       hit_len == 3 && hit_path[0] == 1 && hit_path[1] == 2 && hit_path[2] == 5 &&
-       dispatch_len == 3 && dispatch_path[0] == 1 && dispatch_path[1] == 2 && dispatch_path[2] == 4:
+    if root == 1 && panel == 2 && label == 3 && submit == 4 && reset == 5 && duplicate == block.tree_error_duplicate() && duplicate_error == block.tree_error_duplicate() && missing == block.tree_error_missing_parent() && missing_error == block.tree_error_missing_parent() && cycle_error == block.tree_error_cycle() && valid == block.tree_error_ok() && child0 == 3 && child1 == 4 && child2 == 5 && focus0 == 4 && focus1 == 5 && a11y0 == 3 && a11y1 == 4 && a11y2 == 5 && hit_len == 3 && hit_path[0] == 1 && hit_path[1] == 2 && hit_path[2] == 5 && dispatch_len == 3 && dispatch_path[0] == 1 && dispatch_path[1] == 2 && dispatch_path[2] == 4:
         return 0
     return 1

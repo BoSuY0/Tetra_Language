@@ -39,6 +39,23 @@ func TestValidateIntegratedReportDirRejectsMissingSafeViewLifetime(t *testing.T)
 	}
 }
 
+func TestValidateIntegratedReportDirRejectsMissingRAMContractArtifacts(t *testing.T) {
+	reportDir := writeIntegratedFixture(t)
+	if err := os.RemoveAll(filepath.Join(reportDir, "memory", "ram-contract")); err != nil {
+		t.Fatalf("remove RAM contract bundle: %v", err)
+	}
+	writeIntegratedHashManifest(t, reportDir, nil)
+
+	err := validateIntegratedReportDir(reportDir, integratedTestHead)
+	if err == nil {
+		t.Fatalf("expected missing RAM contract evidence to fail")
+	}
+	got := err.Error()
+	if !strings.Contains(got, "ram_contract_report") && !strings.Contains(got, "memory/ram-contract") {
+		t.Fatalf("error = %v, want RAM contract evidence rejection", err)
+	}
+}
+
 func TestValidateIntegratedReportDirRejectsMismatchedGitHead(t *testing.T) {
 	reportDir := writeIntegratedFixture(t)
 	writeJSONFile(t, filepath.Join(reportDir, "surface-release-v1", "surface-release-summary.json"), map[string]any{
@@ -124,6 +141,7 @@ func writeIntegratedFixture(t *testing.T) string {
 		"rejected":       11,
 		"accepted":       0,
 	})
+	writeIntegratedRAMBundle(t, filepath.Join(reportDir, "memory", "ram-contract"))
 	writeJSONFile(t, filepath.Join(reportDir, "memory", "artifact-hashes.json"), map[string]any{
 		"schema":    "tetra.release-artifact-hashes.v1alpha1",
 		"root":      ".",
@@ -200,11 +218,22 @@ func writeIntegratedFixture(t *testing.T) string {
 		"artifacts": []any{
 			map[string]any{"path": "memory/memory-production-linux-x64.json", "kind": "memory_production_report", "schema": "tetra.memory.production.v1"},
 			map[string]any{"path": "memory/memory-release-manifest.json", "kind": "memory_release_manifest", "schema": "tetra.memory.release-manifest.v1"},
+			map[string]any{"path": "memory/artifact-hashes.json", "kind": "memory_hash_manifest", "schema": "tetra.release-artifact-hashes.v1alpha1"},
 			map[string]any{"path": "memory/island-proof-verifier.json", "kind": "island_proof_verifier_report", "schema": "tetra.island.proof.v1"},
 			map[string]any{"path": "memory/island-proof-memory-report.json", "kind": "island_proof_memory_report", "schema": "tetra.memory-report.v1"},
 			map[string]any{"path": "memory/memory-fuzz-tier1/island-proof-fuzz-summary.json", "kind": "island_proof_fuzz_summary", "schema": "tetra.island-proof-fuzz-summary.v1"},
+			map[string]any{"path": "memory/ram-contract/ram-contract-release-manifest.json", "kind": "ram_contract_release_manifest", "schema": "tetra.ram-contract.release-manifest.v1"},
+			map[string]any{"path": "memory/ram-contract/ram-contract-report.json", "kind": "ram_contract_report", "schema": "tetra.ram-contract-report.v1"},
+			map[string]any{"path": "memory/ram-contract/memory-grade-report.json", "kind": "ram_memory_grade_report", "schema": "tetra.memory-grade-report.v1"},
+			map[string]any{"path": "memory/ram-contract/proof-store-summary.json", "kind": "ram_proof_store_summary", "schema": "tetra.proof-store-summary.v1"},
+			map[string]any{"path": "memory/ram-contract/validation-pipeline-coverage.json", "kind": "ram_validation_pipeline_coverage", "schema": "tetra.validation-pipeline-coverage.v1"},
+			map[string]any{"path": "memory/ram-contract/heap-blockers.json", "kind": "ram_heap_blockers", "schema": "tetra.ram-blockers.v1"},
+			map[string]any{"path": "memory/ram-contract/copy-blockers.json", "kind": "ram_copy_blockers", "schema": "tetra.ram-blockers.v1"},
+			map[string]any{"path": "memory/ram-contract/fuzz/ram-contract-fuzz-oracle.json", "kind": "ram_contract_fuzz_oracle", "schema": "tetra.ram-contract-fuzz-oracle.v1"},
+			map[string]any{"path": "memory/ram-contract/artifact-hashes.json", "kind": "ram_contract_hash_manifest", "schema": "tetra.release-artifact-hashes.v1alpha1"},
 			map[string]any{"path": "islands-debug-smoke.json", "kind": "islands_debug_smoke_report", "schema": "tetra.release.v0_2_0.smoke-report.v1"},
 			map[string]any{"path": "surface-release-v1/surface-release-summary.json", "kind": "surface_release_summary", "schema": "tetra.surface.release.v1"},
+			map[string]any{"path": "surface-release-v1/artifact-hashes.json", "kind": "surface_release_hash_manifest", "schema": "tetra.release-artifact-hashes.v1alpha1"},
 			map[string]any{"path": "surface-experimental-regression/artifact-hashes.json", "kind": "surface_experimental_hash_manifest", "schema": "tetra.release-artifact-hashes.v1alpha1"},
 			map[string]any{"path": "safe-view-lifetime/safe-view-lifetime-summary.json", "kind": "safe_view_lifetime_summary", "schema": "tetra.safe-view-lifetime.gate.v1"},
 			map[string]any{"path": "surface-api-stability-v1/surface-api-stability-summary.json", "kind": "surface_api_stability_summary", "schema": "tetra.surface.api-stability.v1"},
@@ -213,6 +242,53 @@ func writeIntegratedFixture(t *testing.T) string {
 	})
 
 	return reportDir
+}
+
+func writeIntegratedRAMBundle(t *testing.T, ramDir string) {
+	t.Helper()
+	files := map[string]any{
+		"ram-contract-release-manifest.json": map[string]any{
+			"schema":        "tetra.ram-contract.release-manifest.v1",
+			"status":        "pass",
+			"target":        "linux-x64",
+			"git_head":      integratedTestHead,
+			"hash_manifest": "artifact-hashes.json",
+		},
+		"ram-contract-report.json": map[string]any{
+			"schema_version": "tetra.ram-contract-report.v1",
+			"git_head":       integratedTestHead,
+		},
+		"memory-grade-report.json": map[string]any{
+			"schema_version": "tetra.memory-grade-report.v1",
+			"git_head":       integratedTestHead,
+		},
+		"proof-store-summary.json": map[string]any{
+			"schema_version": "tetra.proof-store-summary.v1",
+			"git_head":       integratedTestHead,
+		},
+		"validation-pipeline-coverage.json": map[string]any{
+			"schema_version": "tetra.validation-pipeline-coverage.v1",
+			"git_head":       integratedTestHead,
+		},
+		"heap-blockers.json": map[string]any{
+			"schema_version": "tetra.ram-blockers.v1",
+			"kind":           "heap",
+			"git_head":       integratedTestHead,
+		},
+		"copy-blockers.json": map[string]any{
+			"schema_version": "tetra.ram-blockers.v1",
+			"kind":           "copy",
+			"git_head":       integratedTestHead,
+		},
+		filepath.Join("fuzz", "ram-contract-fuzz-oracle.json"): map[string]any{
+			"schema_version": "tetra.ram-contract-fuzz-oracle.v1",
+			"git_head":       integratedTestHead,
+		},
+	}
+	for rel, value := range files {
+		writeJSONFile(t, filepath.Join(ramDir, filepath.FromSlash(rel)), value)
+	}
+	writeIntegratedHashManifest(t, ramDir, nil)
 }
 
 func writeJSONFile(t *testing.T, path string, value any) {

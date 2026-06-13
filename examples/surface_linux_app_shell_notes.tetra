@@ -1,0 +1,52 @@
+// Multi-window notes reference for the scoped Linux app-shell subset.
+module examples.surface_linux_app_shell_notes
+
+import lib.core.surface_app_shell as shell
+
+struct NotesShellApp:
+    main_window: shell.ShellWindow
+    inspector_window: shell.ShellWindow
+    lifecycle_score: Int
+
+struct NotesMainWindow:
+    window: shell.ShellWindow
+    text_len: Int
+    shortcut_count: Int
+
+struct NotesInspectorWindow:
+    window: shell.ShellWindow
+    visible_count: Int
+
+func main() -> Int:
+    var main_win: shell.ShellWindow = shell.window(1, 5, 560, 420, 1000)
+    var inspector_win: shell.ShellWindow = shell.window(2, 9, 320, 240, 1000)
+    let open_main: Int = shell.open_window(main_win)
+    let open_inspector: Int = shell.open_window(inspector_win)
+    let close_inspector: Int = shell.close_window(inspector_win)
+    let reopen_inspector: Int = shell.reopen_window(inspector_win)
+    let resize_main: Int = shell.resize_window(main_win, 720, 540)
+    let dpi_main: Int = shell.set_dpi_scale(main_win, 1250)
+    let pointer_cursor: Int = shell.set_cursor(inspector_win, shell.cursor_pointer())
+    let text_cursor: Int = shell.set_cursor(main_win, shell.cursor_text())
+    let resize_cursor: Int = shell.set_cursor(main_win, shell.cursor_resize())
+    let app_menu: shell.ShellFeature = shell.scoped_adapter_feature(shell.feature_app_menu())
+    let lifecycle_feature: shell.ShellFeature = shell.target_evidenced_feature(shell.feature_window_lifecycle())
+    let multi_window_feature: shell.ShellFeature = shell.target_evidenced_feature(shell.feature_multi_window())
+    let clipboard_feature: shell.ShellFeature = shell.target_evidenced_feature(shell.feature_clipboard())
+    let ime_feature: shell.ShellFeature = shell.target_evidenced_feature(shell.feature_ime())
+    let accessibility_feature: shell.ShellFeature = shell.target_evidenced_feature(shell.feature_accessibility_bridge())
+    let crash_recovery: shell.ShellFeature = shell.scoped_adapter_feature(shell.feature_crash_recovery())
+    let error_report: shell.ShellFeature = shell.scoped_adapter_feature(shell.feature_error_report())
+    let dialog: shell.ShellFeature = shell.blocked_pass_feature(shell.feature_dialog())
+    let file_dialog: shell.ShellFeature = shell.blocked_pass_feature(shell.feature_file_dialog())
+    let file_picker: shell.ShellFeature = shell.blocked_pass_feature(shell.feature_file_picker())
+    let notification: shell.ShellFeature = shell.blocked_pass_feature(shell.feature_notification())
+    let tray: shell.ShellFeature = shell.blocked_pass_feature(shell.feature_tray())
+    let deep_link: shell.ShellFeature = shell.blocked_pass_feature(shell.feature_deep_link())
+    let feature_ok: Bool = shell.feature_is_honest(app_menu) && shell.feature_is_honest(lifecycle_feature) && shell.feature_is_honest(multi_window_feature) && shell.feature_is_honest(clipboard_feature) && shell.feature_is_honest(ime_feature) && shell.feature_is_honest(accessibility_feature) && shell.feature_is_honest(crash_recovery) && shell.feature_is_honest(error_report) && shell.feature_is_honest(dialog) && shell.feature_is_honest(file_dialog) && shell.feature_is_honest(file_picker) && shell.feature_is_honest(notification) && shell.feature_is_honest(tray) && shell.feature_is_honest(deep_link)
+    let app: NotesShellApp = NotesShellApp(main_window: main_win, inspector_window: inspector_win, lifecycle_score: open_main + open_inspector + close_inspector + reopen_inspector)
+    let main_view: NotesMainWindow = NotesMainWindow(window: main_win, text_len: 5, shortcut_count: 1)
+    let inspector_view: NotesInspectorWindow = NotesInspectorWindow(window: inspector_win, visible_count: 1)
+    if app.lifecycle_score == 4 && resize_main == 1 && dpi_main == 1 && pointer_cursor == 1 && text_cursor == 1 && resize_cursor == 1 && shell.multi_window_ready(app.main_window, app.inspector_window) && main_view.text_len == 5 && main_view.shortcut_count == 1 && inspector_view.visible_count == 1 && feature_ok:
+        return 1
+    return 0

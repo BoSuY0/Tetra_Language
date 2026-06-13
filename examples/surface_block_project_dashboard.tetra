@@ -17,21 +17,10 @@ func amber() -> surface.Color:
     return surface.Color(r: 244, g: 205, b: 92, a: 255)
 
 func panel_paint() -> block.PaintSpec:
-    return block.paint_stack4(
-        block.paint_layer_fill_radius(surface.Color(r: 28, g: 34, b: 42, a: 255), 14),
-        block.paint_layer_border(surface.Color(r: 72, g: 86, b: 102, a: 255), 1, 14),
-        block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 88), 16, 0, 6),
-        block.paint_layer_outline(surface.Color(r: 96, g: 174, b: 244, a: 255), 1, 16)
-    )
+    return block.paint_stack4(block.paint_layer_fill_radius(surface.Color(r: 28, g: 34, b: 42, a: 255), 14), block.paint_layer_border(surface.Color(r: 72, g: 86, b: 102, a: 255), 1, 14), block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 88), 16, 0, 6), block.paint_layer_outline(surface.Color(r: 96, g: 174, b: 244, a: 255), 1, 16))
 
 func metric_paint(accent_color: surface.Color) -> block.PaintSpec:
-    return block.paint_stack5(
-        block.paint_layer_fill_radius(surface.Color(r: 32, g: 40, b: 48, a: 255), 12),
-        block.paint_layer_linear_gradient(surface.Color(r: 36, g: 46, b: 56, a: 255), surface.Color(r: 28, g: 34, b: 42, a: 255), 12),
-        block.paint_layer_border(surface.Color(r: 76, g: 92, b: 108, a: 255), 1, 12),
-        block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 64), 10, 0, 4),
-        block.paint_layer_outline(accent_color, 1, 14)
-    )
+    return block.paint_stack5(block.paint_layer_fill_radius(surface.Color(r: 32, g: 40, b: 48, a: 255), 12), block.paint_layer_linear_gradient(surface.Color(r: 36, g: 46, b: 56, a: 255), surface.Color(r: 28, g: 34, b: 42, a: 255), 12), block.paint_layer_border(surface.Color(r: 76, g: 92, b: 108, a: 255), 1, 12), block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 64), 10, 0, 4), block.paint_layer_outline(accent_color, 1, 14))
 
 func make_metric(id_value: Int, parent_value: Int, x: Int, y: Int, w: Int, h: Int, label_len: Int, accent_color: surface.Color, hash: Int) -> block.Block:
     let rect: surface.Rect = surface.Rect(x: x, y: y, w: w, h: h)
@@ -65,7 +54,6 @@ uses alloc, mem:
     let content_rect: surface.Rect = surface.Rect(x: 156, y: 16, w: 348, h: 268)
     let header_rect: surface.Rect = surface.Rect(x: 176, y: 34, w: 220, h: 30)
     let action_rect: surface.Rect = surface.Rect(x: 388, y: 34, w: 82, h: 30)
-
     var tree: block.BlockTree = block.tree_init(9)
     let root_props: block.BlockProps = block.props(block.layout_dock(root_rect, block.layout_dock_fill(), 0), block.paint_stack2(block.paint_layer_fill_radius(theme_dark(), 0), block.paint_layer_overlay(surface.Color(r: 96, g: 180, b: 132, a: 28), 28, 0)), block.text_none(), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_text(17), block.asset_none())
     let sidebar_props: block.BlockProps = block.props(block.layout_column(sidebar_rect, 10), panel_paint(), block.text_styled(11, theme_light(), block.text_family_ui(), 14, 700, 18, block.text_align_start(), block.text_wrap_word(), block.text_overflow_ellipsis(), 255), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_fast(), block.accessibility_text(11), block.asset_font(1, 4101))
@@ -73,7 +61,6 @@ uses alloc, mem:
     let header_props: block.BlockProps = block.props(block.layout_row(header_rect, 8), block.paint_empty(), block.text_styled(18, theme_light(), block.text_family_ui(), 20, 800, 24, block.text_align_start(), block.text_wrap_none(), block.text_overflow_ellipsis(), 255), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_text(18), block.asset_none())
     let action_icon: block.AssetRef = block.asset_icon(8, 16, 16, 502)
     let action_props: block.BlockProps = block.props(block.layout_row(action_rect, 6), block.paint_stack3(block.paint_layer_fill_radius(surface.Color(r: 64, g: 112, b: 148, a: 255), 9), block.paint_layer_border(surface.Color(r: 134, g: 196, b: 255, a: 255), 1, 9), block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 72), 8, 0, 3)), block.text_styled(6, theme_light(), block.text_family_ui(), 13, 700, 18, block.text_align_center(), block.text_wrap_none(), block.text_overflow_ellipsis(), 255), block.image_asset(action_icon, 16, 16), block.input_clickable(), block.event_click(block.action_secondary()), block.state_interactive(), block.motion_transition(100, 0, block.motion_ease_standard(), true, true, true, 0, 0, 98), block.accessibility_button(6), action_icon)
-
     let root: Int = block.tree_add_root(tree, block.make(block.id(1), block.id_none(), root_props), root_rect)
     let sidebar: Int = block.tree_add_child(tree, block.id(1), block.make(block.id(2), block.id(1), sidebar_props), sidebar_rect)
     let content: Int = block.tree_add_child(tree, block.id(1), block.make(block.id(3), block.id(1), content_props), content_rect)
@@ -86,11 +73,6 @@ uses alloc, mem:
     let focus0: Int = block.id_value(block.focus_order_at(tree, 0))
     let focus3: Int = block.id_value(block.focus_order_at(tree, 3))
     let next_focus: Int = block.id_value(block.focus_next(tree, block.id(5)))
-
-    if root == 1 && sidebar == 2 && content == 3 && header == 4 && builds == 5 && latency == 6 && activity == 7 && action == 8 &&
-       valid == block.tree_error_ok() &&
-       focus0 == 5 && focus3 == 8 && next_focus == 6 &&
-       block.paint_validate_visual_grammar(metric_paint(green())) == block.paint_error_ok() &&
-       scene_checksum() > 0:
+    if root == 1 && sidebar == 2 && content == 3 && header == 4 && builds == 5 && latency == 6 && activity == 7 && action == 8 && valid == block.tree_error_ok() && focus0 == 5 && focus3 == 8 && next_focus == 6 && block.paint_validate_visual_grammar(metric_paint(green())) == block.paint_error_ok() && scene_checksum() > 0:
         return 0
     return 1

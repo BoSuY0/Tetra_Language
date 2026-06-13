@@ -99,6 +99,7 @@ func discoverCLIProject(startDir string) (*cliProjectContext, error) {
 		dependencyRoots = nil
 	}
 	dependencyRoots = append(dependencyRoots, artifactRoots...)
+	dependencyRoots = appendProjectStdlibDependencyRoot(root, dependencyRoots)
 	manifests := append([]capsuleManifest{manifest}, dependencyManifests...)
 	return &cliProjectContext{
 		Found:           true,
@@ -111,6 +112,22 @@ func discoverCLIProject(startDir string) (*cliProjectContext, error) {
 		SourceRoots:     sourceRoots,
 		DependencyRoots: dependencyRoots,
 	}, nil
+}
+
+func appendProjectStdlibDependencyRoot(projectRoot string, roots []compiler.ModuleRoot) []compiler.ModuleRoot {
+	repoRoot, err := findRepoRoot()
+	if err != nil {
+		return roots
+	}
+	repoRoot = filepath.Clean(repoRoot)
+	projectRoot = filepath.Clean(projectRoot)
+	if repoRoot == "" || repoRoot == projectRoot {
+		return roots
+	}
+	if !fileExists(filepath.Join(repoRoot, "lib", "core")) {
+		return roots
+	}
+	return append(roots, compiler.ModuleRoot{Root: repoRoot})
 }
 
 func findProjectCapsule(startDir string) (string, string, bool, error) {

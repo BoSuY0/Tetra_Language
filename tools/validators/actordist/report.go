@@ -114,6 +114,24 @@ func ValidateReport(raw []byte) error {
 	return nil
 }
 
+func ValidateReportForCurrentHead(raw []byte, currentGitHead string) error {
+	if err := ValidateReport(raw); err != nil {
+		return err
+	}
+	currentGitHead = strings.ToLower(strings.TrimSpace(currentGitHead))
+	if !isHexGitHead(currentGitHead) {
+		return fmt.Errorf("current git head is %q, want 40 hex characters", currentGitHead)
+	}
+	var report Report
+	if err := decodeStrict(raw, &report); err != nil {
+		return err
+	}
+	if report.GitHead != currentGitHead {
+		return fmt.Errorf("git_head %q does not match current git head %q", report.GitHead, currentGitHead)
+	}
+	return nil
+}
+
 func validateBroker(b BrokerReport) []string {
 	var issues []string
 	if b.Runtime != "actornet" {

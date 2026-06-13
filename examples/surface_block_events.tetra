@@ -38,7 +38,6 @@ uses alloc, mem:
     let input_rect: surface.Rect = surface.Rect(x: 24, y: 64, w: 120, h: 44)
     let disabled_rect: surface.Rect = surface.Rect(x: 152, y: 64, w: 120, h: 44)
     let action_rect: surface.Rect = surface.Rect(x: 24, y: 120, w: 120, h: 44)
-
     var tree: block.BlockTree = block.tree_init(8)
     let root_id: Int = block.tree_add_root(tree, make_block(1, block.id_value(block.id_none()), root_rect, block.input_none(), block.event_none(), 0), root_rect)
     let panel_id: Int = block.tree_add_child(tree, block.id(1), make_block(2, 1, panel_rect, block.input_none(), block.event_none(), 0), panel_rect)
@@ -46,7 +45,6 @@ uses alloc, mem:
     let input_id: Int = block.tree_add_child(tree, block.id(2), make_block(4, 2, input_rect, block.input_text(), block.event_text(block.action_primary()), 4), input_rect)
     let disabled_id: Int = block.tree_add_child(tree, block.id(2), make_block(5, 2, disabled_rect, block.input_disabled(block.input_clickable()), block.event_click(block.action_primary()), 8), disabled_rect)
     let action_id: Int = block.tree_add_child(tree, block.id(2), make_block(6, 2, action_rect, block.input_clickable(), block.event_click(block.action_secondary()), 6), action_rect)
-
     var hit_path: []i32 = core.make_i32(8)
     let hit_len: Int = block.event_hit_test_path(tree, 40, 80, hit_path)
     var disabled_path: []i32 = core.make_i32(8)
@@ -59,28 +57,12 @@ uses alloc, mem:
     let unfocused_text: Int = block.event_dispatch_status(block.input_text(), block.event_kind_text(), false)
     let focused_text: Int = block.event_dispatch_status(block.input_text(), block.event_kind_text(), true)
     let policy: Int = block.event_policy_capture_bubble_direct()
-    let kinds_ok: Bool = block.event_kind_pointer_enter() > 0 && block.event_kind_pointer_leave() > 0 &&
-                         block.event_kind_pointer_move() > 0 && block.event_kind_pointer_down() > 0 &&
-                         block.event_kind_pointer_up() > 0 && block.event_kind_double_click() > 0 &&
-                         block.event_kind_key() > 0 && block.event_kind_text() > 0 &&
-                         block.event_kind_focus() > 0 && block.event_kind_blur() > 0 &&
-                         block.event_kind_scroll() > 0 && block.event_kind_resize() > 0 &&
-                         block.event_kind_close() > 0 && block.event_kind_frame() > 0
-
+    let kinds_ok: Bool = block.event_kind_pointer_enter() > 0 && block.event_kind_pointer_leave() > 0 && block.event_kind_pointer_move() > 0 && block.event_kind_pointer_down() > 0 && block.event_kind_pointer_up() > 0 && block.event_kind_double_click() > 0 && block.event_kind_key() > 0 && block.event_kind_text() > 0 && block.event_kind_focus() > 0 && block.event_kind_blur() > 0 && block.event_kind_scroll() > 0 && block.event_kind_resize() > 0 && block.event_kind_close() > 0 && block.event_kind_frame() > 0
     let app: BlockEventApp = BlockEventApp(focused_id: wrap_focus, quality: policy)
     let panel: PanelBlock = PanelBlock(id: panel_id, rect: panel_rect)
     let input: InputBlock = InputBlock(id: input_id, rect: input_rect, editable: true)
     let disabled: DisabledBlock = DisabledBlock(id: disabled_id, rect: disabled_rect, disabled: true)
     let action: ActionBlock = ActionBlock(id: action_id, rect: action_rect)
-
-    if root_id == 1 && panel.id == 2 && label_id == 3 && input.id == 4 && disabled.id == 5 && action.id == 6 &&
-       hit_len == 3 && hit_path[0] == 1 && hit_path[1] == 2 && hit_path[2] == 4 &&
-       disabled_hit_len == 3 && disabled_path[0] == 1 && disabled_path[1] == 2 && disabled_path[2] == 5 &&
-       dispatch_len == 3 && dispatch_path[0] == 1 && dispatch_path[1] == 2 && dispatch_path[2] == 4 &&
-       next_focus == 6 && app.focused_id == 4 &&
-       disabled_status == block.event_route_rejected_disabled() &&
-       unfocused_text == block.event_route_rejected_unfocused() &&
-       focused_text == block.event_route_delivered() &&
-       input.editable && disabled.disabled && action.rect.h == 44 && kinds_ok:
+    if root_id == 1 && panel.id == 2 && label_id == 3 && input.id == 4 && disabled.id == 5 && action.id == 6 && hit_len == 3 && hit_path[0] == 1 && hit_path[1] == 2 && hit_path[2] == 4 && disabled_hit_len == 3 && disabled_path[0] == 1 && disabled_path[1] == 2 && disabled_path[2] == 5 && dispatch_len == 3 && dispatch_path[0] == 1 && dispatch_path[1] == 2 && dispatch_path[2] == 4 && next_focus == 6 && app.focused_id == 4 && disabled_status == block.event_route_rejected_disabled() && unfocused_text == block.event_route_rejected_unfocused() && focused_text == block.event_route_delivered() && input.editable && disabled.disabled && action.rect.h == 44 && kinds_ok:
         return 1
     return 0

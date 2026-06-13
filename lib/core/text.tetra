@@ -76,7 +76,7 @@ func editable_set_focus(editable: inout EditableText, focused: Bool) -> Int:
 func editable_validate(editable: borrow EditableText) -> Int:
     if editable.len < 0 || editable.len > editable.capacity:
         return error_invalid_range()
-    if !validate_utf8(editable.bytes.window(0, editable.len).borrow()):
+    if !validate_utf8(__method.borrow(editable.bytes.window(0, editable.len))):
         return error_invalid_utf8()
     return error_none()
 
@@ -159,6 +159,17 @@ func clear_selection() -> TextSelection:
 
 func composition_clear() -> TextComposition:
     return TextComposition(active: false, start: 0, len: 0, preview_len: 0)
+
+func composition_start(cursor: TextCursor) -> TextComposition:
+    return TextComposition(active: true, start: cursor.byte_index, len: 0, preview_len: 0)
+
+func composition_update(composition: inout TextComposition, preview_len: Int) -> TextComposition:
+    composition.active = true
+    if preview_len < 0:
+        composition.preview_len = 0
+    else:
+        composition.preview_len = preview_len
+    return composition
 
 func select_range(buf: TextBuffer, start: Int, end: Int) -> TextSelection:
     var anchor: Int = clamp_index(buf, start)
@@ -275,6 +286,23 @@ func delete_range(buf: inout TextBuffer, cursor: inout TextCursor, start: Int, e
     cursor.byte_index = start
     return make_result(true, 0, cursor.byte_index, removed > 0, error_none())
 
+func copy_range(buf: TextBuffer, start: Int, end: Int, out: inout []u8) -> TextEditResult:
+    if !valid_range(buf, start, end):
+        return TextEditResult(ok: false, error: error_invalid_range())
+    let count: Int = end - start
+    if count > out.len:
+        return TextEditResult(ok: false, error: error_capacity())
+    var i: Int = 0
+    while i < count:
+        out[i] = buf.bytes[start + i]
+        i = i + 1
+    return TextEditResult(ok: true, error: error_none())
+
+func copy_selection(buf: TextBuffer, selection: TextSelection, out: inout []u8) -> TextEditResult:
+    if !selection.active:
+        return TextEditResult(ok: true, error: error_none())
+    return copy_range(buf, selection_start(selection), selection_end(selection), out)
+
 func replace_selection(buf: inout TextBuffer, cursor: inout TextCursor, selection: inout TextSelection, bytes: borrow []u8) -> TextEditResult:
     if !selection.active:
         return insert_bytes(buf, cursor, bytes)
@@ -285,6 +313,19 @@ func replace_selection(buf: inout TextBuffer, cursor: inout TextCursor, selectio
         return deleted
     selection = clear_selection()
     return insert_bytes(buf, cursor, bytes)
+
+func paste_bytes(buf: inout TextBuffer, cursor: inout TextCursor, selection: inout TextSelection, bytes: borrow []u8) -> TextEditResult:
+    return replace_selection(buf, cursor, selection, bytes)
+
+func composition_commit(composition: inout TextComposition) -> TextEditResult:
+    if !composition.active:
+        return TextEditResult(ok: false, error: error_invalid_range())
+    composition = composition_clear()
+    return TextEditResult(ok: true, error: error_none())
+
+func composition_cancel(composition: inout TextComposition) -> TextEditResult:
+    composition = composition_clear()
+    return TextEditResult(ok: true, error: error_none())
 
 func backspace(buf: inout TextBuffer, cursor: inout TextCursor, selection: inout TextSelection) -> TextEditResult:
     if selection.active:
@@ -311,3 +352,29 @@ func delete(buf: inout TextBuffer, cursor: inout TextCursor, selection: inout Te
         return make_result(true, 0, cursor.byte_index, false, error_none())
     let next_end: Int = next_codepoint_start(buf, idx)
     return delete_range(buf, cursor, idx, next_end)
+
+func line_count(buf: TextBuffer) -> Int:
+    if buf.len <= 0:
+        return 1
+    var count: Int = 1
+    var i: Int = 0
+    while i < buf.len:
+        if buf.bytes[i] == 10:
+            count = count + 1
+        i = i + 1
+    return count
+
+func text_shaping_plan_v1() -> Int:
+    return 1
+
+func multiline_storage_supported() -> Bool:
+    return true
+
+func full_rich_text_supported() -> Bool:
+    return false
+
+func full_bidi_supported() -> Bool:
+    return false
+
+func grapheme_cluster_caret_supported() -> Bool:
+    return false

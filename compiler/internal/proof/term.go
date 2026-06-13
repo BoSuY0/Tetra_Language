@@ -152,29 +152,41 @@ func (s Store) ValidateReferences(refs []Reference) error {
 
 func StableHash(term Term) string {
 	canonical := struct {
-		ID             string   `json:"id"`
-		Kind           Kind     `json:"kind"`
-		Subject        Subject  `json:"subject"`
-		Assumptions    []string `json:"assumptions,omitempty"`
-		DerivationRule string   `json:"derivation_rule"`
-		SourceSpan     string   `json:"source_span,omitempty"`
-		ASTID          string   `json:"ast_id,omitempty"`
-		PLIROpID       string   `json:"plir_op_id,omitempty"`
-		IROpID         string   `json:"ir_op_id,omitempty"`
-		ProducerPass   string   `json:"producer_pass"`
-		Status         Status   `json:"status"`
+		ID                 string   `json:"id"`
+		Kind               Kind     `json:"kind"`
+		Subject            Subject  `json:"subject"`
+		Assumptions        []string `json:"assumptions,omitempty"`
+		DerivationRule     string   `json:"derivation_rule"`
+		SourceSpan         string   `json:"source_span,omitempty"`
+		ASTID              string   `json:"ast_id,omitempty"`
+		PLIROpID           string   `json:"plir_op_id,omitempty"`
+		IROpID             string   `json:"ir_op_id,omitempty"`
+		DominanceScope     string   `json:"dominance_scope,omitempty"`
+		LifetimeScope      string   `json:"lifetime_scope,omitempty"`
+		MutationEpoch      string   `json:"mutation_epoch,omitempty"`
+		AliasEpoch         string   `json:"alias_epoch,omitempty"`
+		InvalidationPolicy string   `json:"invalidation_policy,omitempty"`
+		ProducerPass       string   `json:"producer_pass"`
+		ConsumerPasses     []string `json:"consumer_passes,omitempty"`
+		Status             Status   `json:"status"`
 	}{
-		ID:             term.ID,
-		Kind:           term.Kind,
-		Subject:        term.Subject,
-		Assumptions:    sortedCopy(term.Assumptions),
-		DerivationRule: term.DerivationRule,
-		SourceSpan:     term.SourceSpan,
-		ASTID:          term.ASTID,
-		PLIROpID:       term.PLIROpID,
-		IROpID:         term.IROpID,
-		ProducerPass:   term.ProducerPass,
-		Status:         term.Status,
+		ID:                 term.ID,
+		Kind:               term.Kind,
+		Subject:            term.Subject,
+		Assumptions:        sortedCopy(term.Assumptions),
+		DerivationRule:     term.DerivationRule,
+		SourceSpan:         term.SourceSpan,
+		ASTID:              term.ASTID,
+		PLIROpID:           term.PLIROpID,
+		IROpID:             term.IROpID,
+		DominanceScope:     term.DominanceScope,
+		LifetimeScope:      term.LifetimeScope,
+		MutationEpoch:      term.MutationEpoch,
+		AliasEpoch:         term.AliasEpoch,
+		InvalidationPolicy: term.InvalidationPolicy,
+		ProducerPass:       term.ProducerPass,
+		ConsumerPasses:     sortedCopy(term.ConsumerPasses),
+		Status:             term.Status,
 	}
 	raw, _ := json.Marshal(canonical)
 	sum := sha256.Sum256(raw)

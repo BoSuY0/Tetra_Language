@@ -21,6 +21,9 @@ func testAllFakeRepo(t *testing.T, failFmt bool) string {
 	if err := os.MkdirAll(filepath.Join(root, "scripts", "release", "v1_0"), 0o755); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.MkdirAll(filepath.Join(root, "scripts", "release", "post_v0_4"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := copyFile(filepath.Join(repoRoot(t), "scripts", "ci", "test-all.sh"), filepath.Join(root, "scripts", "ci", "test-all.sh"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -37,6 +40,9 @@ func testAllFakeRepo(t *testing.T, failFmt bool) string {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(root, "scripts", "release", "v1_0", "api-diff.sh"), []byte("#!/usr/bin/env bash\nset -euo pipefail\nreport_dir=\"\"\nwhile [[ $# -gt 0 ]]; do case \"$1\" in --report-dir) report_dir=\"$2\"; shift 2 ;; *) shift ;; esac; done\nmkdir -p \"$report_dir\"\nprintf '{\"review\":{\"status\":\"clean\"},\"diff\":{\"added\":[],\"removed\":[],\"changed\":[]}}\\n' >\"$report_dir/api-diff.json\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "scripts", "release", "post_v0_4", "memory-100-prod-stable-gate.sh"), []byte("#!/usr/bin/env bash\nset -euo pipefail\nreport_dir=\"\"\nwhile [[ $# -gt 0 ]]; do case \"$1\" in --report-dir) report_dir=\"$2\"; shift 2 ;; *) shift ;; esac; done\nmkdir -p -- \"$report_dir\"\nprintf '{\"schema\":\"tetra.memory-100.prod-stable.v1\",\"status\":\"pass\"}\\n' >\"$report_dir/memory-100-prod-stable-manifest.json\"\nprintf '{\"schema\":\"tetra.artifact-hashes.v1\",\"artifacts\":[]}\\n' >\"$report_dir/artifact-hashes.json\"\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.MkdirAll(filepath.Join(root, "docs", "generated"), 0o755); err != nil {
@@ -298,6 +304,20 @@ fi
 exit 0
 `
 	if err := os.WriteFile(filepath.Join(binDir, "go"), []byte(goScript), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	gitScript := `#!/usr/bin/env bash
+set -euo pipefail
+if [[ "${1:-}" == "rev-parse" && "${2:-}" == "HEAD" ]]; then
+  echo "e2c19b8ee276158f8eb2c54cf61e11bd84952893"
+  exit 0
+fi
+if [[ "${1:-}" == "diff" && "${2:-}" == "--check" ]]; then
+  exit 0
+fi
+exit 0
+`
+	if err := os.WriteFile(filepath.Join(binDir, "git"), []byte(gitScript), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	tetra := `#!/usr/bin/env bash

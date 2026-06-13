@@ -12,7 +12,7 @@ import (
 
 func runNew(args []string, stdout io.Writer, stderr io.Writer) int {
 	if isHelpArgs(args) {
-		fmt.Fprintln(stdout, "usage: tetra new app [--lock] <NameOrPath>")
+		fmt.Fprintln(stdout, "usage: tetra new {app|surface-app} [options] <NameOrPath>")
 		return 0
 	}
 	if len(args) == 0 {
@@ -22,6 +22,8 @@ func runNew(args []string, stdout io.Writer, stderr io.Writer) int {
 	switch args[0] {
 	case "app":
 		return runNewAppArgs(args[1:], stdout, stderr)
+	case "surface-app":
+		return runNewSurfaceAppArgs(args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "unknown new template %q\n", args[0])
 		return 2

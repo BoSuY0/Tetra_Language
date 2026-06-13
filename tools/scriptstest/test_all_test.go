@@ -336,6 +336,31 @@ func TestTestAllRunsHostLeakBlockerSuite(t *testing.T) {
 	}
 }
 
+func TestTestAllRunsMemory100ProdStableGate(t *testing.T) {
+	raw, err := readTestAllScript(t)
+	if err != nil {
+		t.Fatalf("read test-all script: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		`run_step "Memory100 prod-stable gate" check_memory100_prod_stable_gate`,
+		`local memory100_dir="$report_dir/memory-100-prod-stable"`,
+		`env GOTELEMETRY=off GOCACHE="$repo_root/.cache/go-build-memory-100-test-all" GOTMPDIR="$repo_root/.cache/go-tmp-memory-100-test-all" bash scripts/release/post_v0_4/memory-100-prod-stable-gate.sh --report-dir "$memory100_dir"`,
+		`test -s "$memory100_dir/memory-100-prod-stable-manifest.json"`,
+		`test -s "$memory100_dir/artifact-hashes.json"`,
+		`go run ./tools/cmd/validate-memory-100-prod-stable --report-dir "$memory100_dir" --current-git-head "$(git rev-parse HEAD)"`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("scripts/ci/test-all.sh missing Memory100 prod-stable gate requirement %q", want)
+		}
+	}
+	for _, forbidden := range []string{"GOCACHE=/tmp", "GOTMPDIR=/tmp"} {
+		if strings.Contains(text, forbidden) {
+			t.Fatalf("scripts/ci/test-all.sh must not use tmpfs Go cache marker %q", forbidden)
+		}
+	}
+}
+
 func TestTestAllQuickReportsHostLeakBlockerSuite(t *testing.T) {
 	root := testAllFakeRepo(t, false)
 	reportDir := filepath.Join(root, "report")

@@ -61,6 +61,44 @@ func TestSelfhostActorRuntimeSourcesMatchCanonicalRT(t *testing.T) {
 	}
 }
 
+func TestActorRuntimePOCSourcesRemainHistoricalReferences(t *testing.T) {
+	root := repoRootFromActorsRTTest(t)
+	historical := []string{
+		filepath.Join("__rt", "actors_poc_sysv.tetra"),
+		filepath.Join("__rt", "actors_poc_win64.tetra"),
+		filepath.Join("compiler", "selfhostrt", "actors_poc_sysv.tetra"),
+		filepath.Join("compiler", "selfhostrt", "actors_poc_win64.tetra"),
+	}
+	for _, rel := range historical {
+		t.Run(rel, func(t *testing.T) {
+			raw, err := os.ReadFile(filepath.Join(root, rel))
+			if err != nil {
+				t.Fatalf("read historical PoC runtime source: %v", err)
+			}
+			if !bytes.Contains(raw, []byte("actors_poc")) {
+				t.Fatalf("%s does not look like a historical actors_poc module", rel)
+			}
+		})
+	}
+
+	productionSelectionFiles := []string{
+		filepath.Join("compiler", "selfhostrt_embed.go"),
+		filepath.Join("compiler", "selfhostrt_build.go"),
+		filepath.Join("compiler", "internal", "actorsrt", "production_boundary.go"),
+	}
+	for _, rel := range productionSelectionFiles {
+		t.Run(rel, func(t *testing.T) {
+			raw, err := os.ReadFile(filepath.Join(root, rel))
+			if err != nil {
+				t.Fatalf("read production runtime selection file: %v", err)
+			}
+			if bytes.Contains(raw, []byte("actors_poc")) {
+				t.Fatalf("%s promotes historical actors_poc runtime into production selection", rel)
+			}
+		})
+	}
+}
+
 func repoRootFromActorsRTTest(t *testing.T) string {
 	t.Helper()
 	_, file, _, ok := runtime.Caller(0)

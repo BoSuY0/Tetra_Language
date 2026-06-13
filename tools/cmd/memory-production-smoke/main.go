@@ -20,6 +20,7 @@ import (
 type smokeOptions struct {
 	ReportPath string
 	TetraPath  string
+	GitHead    string
 	KeepWork   bool
 }
 
@@ -43,6 +44,7 @@ func main() {
 	var opt smokeOptions
 	flag.StringVar(&opt.ReportPath, "report", "", "path to write tetra.memory.production.v1 report")
 	flag.StringVar(&opt.TetraPath, "tetra", "", "tetra CLI path; defaults to a fresh temp build from ./cli/cmd/tetra")
+	flag.StringVar(&opt.GitHead, "git-head", "", "optional git HEAD provenance to include in the report")
 	flag.BoolVar(&opt.KeepWork, "keep-work", false, "keep temporary build directory")
 	flag.Parse()
 	if opt.ReportPath == "" {
@@ -1135,6 +1137,7 @@ func smallHeapBenchmarkSource(allocationCount, bytesPerAllocation int) string {
 
 func (r *smokeRunner) writeReport() error {
 	report := buildReport("tools/cmd/memory-production-smoke", r.processes, r.benchmarks, r.cases)
+	report.GitHead = strings.TrimSpace(r.opt.GitHead)
 	raw, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
 		return err

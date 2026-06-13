@@ -1,5 +1,14 @@
 // Experimental Surface Morph Capsule layer.
 // Morph recipes project into lib.core.block Blocks; they do not add runtime primitives.
+// Effects: none
+// ```tetra doctest
+// func morph_doctest() -> Int:
+//     let capsule: lib.core.morph.Capsule = lib.core.morph.capsule_default()
+//     let recipe: lib.core.morph.Recipe = lib.core.morph.recipe_control_action()
+//     if lib.core.morph.capsule_valid(capsule) && lib.core.morph.recipe_expands_to_block(recipe):
+//         return lib.core.morph.schema_v1()
+//     return 0
+// ```
 module lib.core.morph
 
 import lib.core.surface as surface
@@ -21,6 +30,22 @@ struct TokenRef:
     category: Int
     index: Int
     hash: Int
+
+struct TokenGraphPolicy:
+    source_hash: Int
+    namespace_hash: Int
+    override_order_hash: Int
+    single_source: Bool
+    explicit_imports: Bool
+    no_global_cascade: Bool
+    diagnostic_flags: Int
+
+struct DensityMapping:
+    target_hash: Int
+    token_hash: Int
+    target_dpi: Int
+    scale_milli: Int
+    rounding_policy_hash: Int
 
 struct Material:
     fill_hash: Int
@@ -114,6 +139,27 @@ func token_asset() -> Int:
 func token_density() -> Int:
     return 11
 
+func token_source_capsule_hash() -> Int:
+    return 1201
+
+func token_namespace_app_hash() -> Int:
+    return 1202
+
+func token_override_order_hash() -> Int:
+    return 1203
+
+func token_rounding_integer_half_up_hash() -> Int:
+    return 1204
+
+func token_density_1x_hash() -> Int:
+    return 1205
+
+func token_target_headless_hash() -> Int:
+    return 1206
+
+func token_graph_diagnostic_flags() -> Int:
+    return 511
+
 func recipe_control_action_hash() -> Int:
     return 1101
 
@@ -126,34 +172,53 @@ func recipe_command_item_hash() -> Int:
 func recipe_region_panel_hash() -> Int:
     return 1104
 
+func recipe_form_field_hash() -> Int:
+    return 1105
+
+func recipe_nav_item_hash() -> Int:
+    return 1106
+
+func recipe_metric_tile_hash() -> Int:
+    return 1107
+
+func recipe_dialog_panel_hash() -> Int:
+    return 1108
+
+func recipe_toast_notification_hash() -> Int:
+    return 1109
+
+func recipe_tab_item_hash() -> Int:
+    return 1110
+
+func recipe_list_row_hash() -> Int:
+    return 1111
+
 func token_ref(category: Int, index: Int, hash: Int) -> TokenRef:
     return TokenRef(category: category, index: index, hash: hash)
 
 func token_category_supported(category: Int) -> Bool:
-    return category == token_color() || category == token_space() ||
-           category == token_radius() || category == token_border() ||
-           category == token_elevation() || category == token_opacity() ||
-           category == token_typography() || category == token_motion() ||
-           category == token_z() || category == token_asset() ||
-           category == token_density()
+    return category == token_color() || category == token_space() || category == token_radius() || category == token_border() || category == token_elevation() || category == token_opacity() || category == token_typography() || category == token_motion() || category == token_z() || category == token_asset() || category == token_density()
 
 func token_valid(token: TokenRef) -> Bool:
     return token_category_supported(token.category) && token.index >= 0 && token.hash > 0
 
+func token_graph_policy_default() -> TokenGraphPolicy:
+    return TokenGraphPolicy(source_hash: token_source_capsule_hash(), namespace_hash: token_namespace_app_hash(), override_order_hash: token_override_order_hash(), single_source: true, explicit_imports: true, no_global_cascade: true, diagnostic_flags: token_graph_diagnostic_flags())
+
+func token_graph_policy_valid(policy: TokenGraphPolicy) -> Bool:
+    return policy.source_hash == token_source_capsule_hash() && policy.namespace_hash == token_namespace_app_hash() && policy.override_order_hash == token_override_order_hash() && policy.single_source && policy.explicit_imports && policy.no_global_cascade && policy.diagnostic_flags == token_graph_diagnostic_flags()
+
+func density_mapping_default() -> DensityMapping:
+    return DensityMapping(target_hash: token_target_headless_hash(), token_hash: token_density_1x_hash(), target_dpi: 96, scale_milli: 1000, rounding_policy_hash: token_rounding_integer_half_up_hash())
+
+func density_mapping_valid(mapping: DensityMapping) -> Bool:
+    return mapping.target_hash > 0 && mapping.token_hash == token_density_1x_hash() && mapping.target_dpi >= 96 && mapping.scale_milli >= 1000 && mapping.scale_milli <= 4000 && mapping.rounding_policy_hash == token_rounding_integer_half_up_hash()
+
 func capsule_default() -> Capsule:
-    return Capsule(schema: schema_v1(), version: 1, token_graph_hash: 760031, recipe_count: 4, explicit_imports: true, isolated_scope: true, no_global_cascade: true, alias_cycle_rejected: true, duplicate_recipe_rejected: true, output_kind: output_block())
+    return Capsule(schema: schema_v1(), version: 1, token_graph_hash: 760031, recipe_count: 11, explicit_imports: true, isolated_scope: true, no_global_cascade: true, alias_cycle_rejected: true, duplicate_recipe_rejected: true, output_kind: output_block())
 
 func capsule_valid(capsule: Capsule) -> Bool:
-    return capsule.schema == schema_v1() &&
-           capsule.version == 1 &&
-           capsule.token_graph_hash > 0 &&
-           capsule.recipe_count == 4 &&
-           capsule.explicit_imports &&
-           capsule.isolated_scope &&
-           capsule.no_global_cascade &&
-           capsule.alias_cycle_rejected &&
-           capsule.duplicate_recipe_rejected &&
-           capsule.output_kind == output_block()
+    return capsule.schema == schema_v1() && capsule.version == 1 && capsule.token_graph_hash > 0 && capsule.recipe_count == 11 && capsule.explicit_imports && capsule.isolated_scope && capsule.no_global_cascade && capsule.alias_cycle_rejected && capsule.duplicate_recipe_rejected && capsule.output_kind == output_block()
 
 func material_panel() -> Material:
     return Material(fill_hash: 2011, border_hash: 2012, radius_hash: 2013, shadow_hash: 2014, overlay_hash: 2015, layer_count: 5, unsupported_blur: false, unsupported_blur_rejected: true)
@@ -165,14 +230,7 @@ func material_field() -> Material:
     return Material(fill_hash: 2031, border_hash: 2032, radius_hash: 2033, shadow_hash: 2034, overlay_hash: 2035, layer_count: 3, unsupported_blur: false, unsupported_blur_rejected: true)
 
 func material_valid(material: Material) -> Bool:
-    return material.fill_hash > 0 &&
-           material.border_hash > 0 &&
-           material.radius_hash > 0 &&
-           material.shadow_hash > 0 &&
-           material.overlay_hash > 0 &&
-           material.layer_count > 0 &&
-           !material.unsupported_blur &&
-           material.unsupported_blur_rejected
+    return material.fill_hash > 0 && material.border_hash > 0 && material.radius_hash > 0 && material.shadow_hash > 0 && material.overlay_hash > 0 && material.layer_count > 0 && !material.unsupported_blur && material.unsupported_blur_rejected
 
 func affordance_action() -> Affordance:
     return Affordance(role: block.accessibility_role_button(), focusable: true, accepts_action: true, accepts_text: false, projects_accessibility: true)
@@ -181,13 +239,22 @@ func affordance_text_field() -> Affordance:
     return Affordance(role: block.accessibility_role_textbox(), focusable: true, accepts_action: false, accepts_text: true, projects_accessibility: true)
 
 func affordance_region() -> Affordance:
-    return Affordance(role: block.accessibility_role_text(), focusable: false, accepts_action: false, accepts_text: false, projects_accessibility: true)
+    return Affordance(role: block.accessibility_role_region(), focusable: false, accepts_action: false, accepts_text: false, projects_accessibility: true)
+
+func affordance_toggle() -> Affordance:
+    return Affordance(role: block.accessibility_role_checkbox(), focusable: true, accepts_action: true, accepts_text: false, projects_accessibility: true)
+
+func affordance_navigation() -> Affordance:
+    return Affordance(role: block.accessibility_role_navigation(), focusable: false, accepts_action: false, accepts_text: false, projects_accessibility: true)
+
+func affordance_overlay() -> Affordance:
+    return Affordance(role: block.accessibility_role_dialog(), focusable: true, accepts_action: true, accepts_text: false, projects_accessibility: true)
+
+func affordance_status() -> Affordance:
+    return Affordance(role: block.accessibility_role_status(), focusable: false, accepts_action: false, accepts_text: false, projects_accessibility: true)
 
 func affordance_valid(affordance: Affordance) -> Bool:
-    return affordance.projects_accessibility &&
-           (affordance.role == block.accessibility_role_button() ||
-            affordance.role == block.accessibility_role_textbox() ||
-            affordance.role == block.accessibility_role_text())
+    return affordance.projects_accessibility && (affordance.role == block.accessibility_role_button() || affordance.role == block.accessibility_role_textbox() || affordance.role == block.accessibility_role_text() || affordance.role == block.accessibility_role_checkbox() || affordance.role == block.accessibility_role_navigation() || affordance.role == block.accessibility_role_region() || affordance.role == block.accessibility_role_dialog() || affordance.role == block.accessibility_role_status())
 
 func state_lens_base() -> StateLens:
     return StateLens(selector_flags: 0, variant: 0, deterministic: true)
@@ -219,15 +286,29 @@ func recipe_command_item() -> Recipe:
 func recipe_region_panel() -> Recipe:
     return Recipe(name_hash: recipe_region_panel_hash(), output_kind: output_block(), slot_count: 8, input_count: 4, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
 
+func recipe_form_field() -> Recipe:
+    return Recipe(name_hash: recipe_form_field_hash(), output_kind: output_block(), slot_count: 8, input_count: 5, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
+
+func recipe_nav_item() -> Recipe:
+    return Recipe(name_hash: recipe_nav_item_hash(), output_kind: output_block(), slot_count: 8, input_count: 5, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
+
+func recipe_metric_tile() -> Recipe:
+    return Recipe(name_hash: recipe_metric_tile_hash(), output_kind: output_block(), slot_count: 8, input_count: 5, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
+
+func recipe_dialog_panel() -> Recipe:
+    return Recipe(name_hash: recipe_dialog_panel_hash(), output_kind: output_block(), slot_count: 8, input_count: 5, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
+
+func recipe_toast_notification() -> Recipe:
+    return Recipe(name_hash: recipe_toast_notification_hash(), output_kind: output_block(), slot_count: 8, input_count: 5, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
+
+func recipe_tab_item() -> Recipe:
+    return Recipe(name_hash: recipe_tab_item_hash(), output_kind: output_block(), slot_count: 8, input_count: 4, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
+
+func recipe_list_row() -> Recipe:
+    return Recipe(name_hash: recipe_list_row_hash(), output_kind: output_block(), slot_count: 8, input_count: 5, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
+
 func recipe_safe(recipe: Recipe) -> Bool:
-    return recipe.name_hash > 0 &&
-           recipe.output_kind == output_block() &&
-           recipe.slot_count <= 8 &&
-           recipe.input_count > 0 &&
-           !recipe.hidden_app_state &&
-           !recipe.platform_widgets &&
-           !recipe.core_primitive_promotion &&
-           recipe.deterministic
+    return recipe.name_hash > 0 && recipe.output_kind == output_block() && recipe.slot_count <= 8 && recipe.input_count > 0 && !recipe.hidden_app_state && !recipe.platform_widgets && !recipe.core_primitive_promotion && recipe.deterministic
 
 func recipe_expansion(recipe: Recipe, block_id: block.BlockID) -> RecipeExpansion:
     return RecipeExpansion(recipe_hash: recipe.name_hash, block_id: block_id, output_kind: recipe.output_kind, slot_count: recipe.slot_count, reported: true, deterministic: recipe.deterministic, used_block_graph: true)
@@ -236,13 +317,7 @@ func recipe_expands_to_block(recipe: Recipe) -> Bool:
     return recipe_safe(recipe) && recipe.output_kind == output_block()
 
 func expansion_valid(expansion: RecipeExpansion) -> Bool:
-    return expansion.recipe_hash > 0 &&
-           block.id_value(expansion.block_id) > 0 &&
-           expansion.output_kind == output_block() &&
-           expansion.slot_count <= 8 &&
-           expansion.reported &&
-           expansion.deterministic &&
-           expansion.used_block_graph
+    return expansion.recipe_hash > 0 && block.id_value(expansion.block_id) > 0 && expansion.output_kind == output_block() && expansion.slot_count <= 8 && expansion.reported && expansion.deterministic && expansion.used_block_graph
 
 func accent() -> surface.Color:
     return surface.Color(r: 96, g: 174, b: 244, a: 255)
@@ -257,34 +332,15 @@ func muted() -> surface.Color:
     return surface.Color(r: 126, g: 144, b: 163, a: 255)
 
 func panel_paint() -> block.PaintSpec:
-    return block.paint_stack5(
-        block.paint_layer_fill_radius(surface.Color(r: 24, g: 31, b: 38, a: 255), 18),
-        block.paint_layer_linear_gradient(surface.Color(r: 28, g: 38, b: 48, a: 255), surface.Color(r: 38, g: 54, b: 66, a: 255), 18),
-        block.paint_layer_border(surface.Color(r: 82, g: 104, b: 124, a: 255), 1, 18),
-        block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 128), 24, 0, 10),
-        block.paint_layer_outline(accent(), 1, 20)
-    )
+    return block.paint_stack5(block.paint_layer_fill_radius(surface.Color(r: 24, g: 31, b: 38, a: 255), 18), block.paint_layer_linear_gradient(surface.Color(r: 28, g: 38, b: 48, a: 255), surface.Color(r: 38, g: 54, b: 66, a: 255), 18), block.paint_layer_border(surface.Color(r: 82, g: 104, b: 124, a: 255), 1, 18), block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 128), 24, 0, 10), block.paint_layer_outline(accent(), 1, 20))
 
 func control_paint(selected: Bool) -> block.PaintSpec:
     if selected:
-        return block.paint_stack4(
-            block.paint_layer_fill_radius(surface.Color(r: 44, g: 70, b: 92, a: 255), 12),
-            block.paint_layer_linear_gradient(surface.Color(r: 52, g: 92, b: 126, a: 255), surface.Color(r: 44, g: 72, b: 96, a: 255), 12),
-            block.paint_layer_border(accent(), 1, 12),
-            block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 72), 10, 0, 3)
-        )
-    return block.paint_stack3(
-        block.paint_layer_fill_radius(surface.Color(r: 30, g: 38, b: 46, a: 255), 12),
-        block.paint_layer_border(surface.Color(r: 50, g: 62, b: 74, a: 255), 1, 12),
-        block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 48), 8, 0, 2)
-    )
+        return block.paint_stack4(block.paint_layer_fill_radius(surface.Color(r: 44, g: 70, b: 92, a: 255), 12), block.paint_layer_linear_gradient(surface.Color(r: 52, g: 92, b: 126, a: 255), surface.Color(r: 44, g: 72, b: 96, a: 255), 12), block.paint_layer_border(accent(), 1, 12), block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 72), 10, 0, 3))
+    return block.paint_stack3(block.paint_layer_fill_radius(surface.Color(r: 30, g: 38, b: 46, a: 255), 12), block.paint_layer_border(surface.Color(r: 50, g: 62, b: 74, a: 255), 1, 12), block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 48), 8, 0, 2))
 
 func field_paint() -> block.PaintSpec:
-    return block.paint_stack3(
-        block.paint_layer_fill_radius(surface.Color(r: 12, g: 16, b: 20, a: 255), 12),
-        block.paint_layer_border(surface.Color(r: 76, g: 92, b: 108, a: 255), 1, 12),
-        block.paint_layer_outline(accent(), 1, 14)
-    )
+    return block.paint_stack3(block.paint_layer_fill_radius(surface.Color(r: 12, g: 16, b: 20, a: 255), 12), block.paint_layer_border(surface.Color(r: 76, g: 92, b: 108, a: 255), 1, 12), block.paint_layer_outline(accent(), 1, 14))
 
 func expand_region_panel(id_value: Int, parent_value: Int, rect: surface.Rect, label_len: Int) -> block.Block:
     let props: block.BlockProps = block.props(block.layout_column(rect, 10), panel_paint(), block.text_none(), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_transition(180, 0, block.motion_ease_standard(), true, true, true, 0, 8, 100), block.accessibility_text(label_len), block.asset_none())
@@ -318,26 +374,11 @@ func accessibility_projection_ok(label_id_value: Int, field_id_value: Int, label
     let field_id: block.BlockID = block.id(field_id_value)
     let label: block.AccessibilitySpec = block.accessibility_label_for(label_len, field_id)
     let field: block.AccessibilitySpec = block.accessibility_textbox_labelled_by(label_len, label_id)
-    return block.accessibility_focusable_has_name(field) &&
-           block.accessibility_relationship_matches(label, field, label_id, field_id)
+    return block.accessibility_focusable_has_name(field) && block.accessibility_relationship_matches(label, field, label_id, field_id)
 
 func memory_budget_ok(block_count: Int, asset_count: Int, framebuffer_bytes: Int) -> Bool:
     return block_count <= 64 && asset_count <= block.asset_cache_entry_limit() && framebuffer_bytes <= block.asset_cache_budget_bytes()
 
 func capsule_self_check() -> Bool:
     let capsule: Capsule = capsule_default()
-    return capsule_valid(capsule) &&
-           material_valid(material_panel()) &&
-           material_valid(material_control()) &&
-           material_valid(material_field()) &&
-           affordance_valid(affordance_action()) &&
-           affordance_valid(affordance_text_field()) &&
-           affordance_valid(affordance_region()) &&
-           state_lens_valid(state_lens_base()) &&
-           state_lens_valid(state_lens_focus()) &&
-           motion_preset_valid(motion_preset_fast()) &&
-           motion_preset_valid(motion_preset_panel()) &&
-           recipe_safe(recipe_control_action()) &&
-           recipe_safe(recipe_field_text()) &&
-           recipe_safe(recipe_command_item()) &&
-           recipe_safe(recipe_region_panel())
+    return capsule_valid(capsule) && material_valid(material_panel()) && material_valid(material_control()) && material_valid(material_field()) && affordance_valid(affordance_action()) && affordance_valid(affordance_text_field()) && affordance_valid(affordance_toggle()) && affordance_valid(affordance_navigation()) && affordance_valid(affordance_region()) && affordance_valid(affordance_overlay()) && affordance_valid(affordance_status()) && state_lens_valid(state_lens_base()) && state_lens_valid(state_lens_focus()) && motion_preset_valid(motion_preset_fast()) && motion_preset_valid(motion_preset_panel()) && recipe_safe(recipe_control_action()) && recipe_safe(recipe_field_text()) && recipe_safe(recipe_command_item()) && recipe_safe(recipe_region_panel()) && recipe_safe(recipe_form_field()) && recipe_safe(recipe_nav_item()) && recipe_safe(recipe_metric_tile()) && recipe_safe(recipe_dialog_panel()) && recipe_safe(recipe_toast_notification()) && recipe_safe(recipe_tab_item()) && recipe_safe(recipe_list_row())

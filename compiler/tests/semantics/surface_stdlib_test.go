@@ -21,6 +21,31 @@ func surfaceBlockBeautyExamplePaths() []string {
 	}
 }
 
+func surfaceMorphRecipeExamplePaths() []string {
+	return []string{
+		"examples/surface_morph_command_palette.tetra",
+		"examples/surface_morph_project_dashboard.tetra",
+		"examples/surface_morph_settings.tetra",
+		"examples/surface_morph_editor_shell.tetra",
+		"examples/surface_morph_glass_panel.tetra",
+	}
+}
+
+func surfaceReferenceExamplePaths() []string {
+	return []string{
+		"examples/surface_reference_command_palette.tetra",
+		"examples/surface_reference_settings.tetra",
+		"examples/surface_reference_dashboard.tetra",
+		"examples/surface_reference_editor_shell.tetra",
+		"examples/surface_reference_file_manager.tetra",
+		"examples/surface_reference_dialog_notification.tetra",
+		"examples/surface_reference_localized_form.tetra",
+		"examples/surface_reference_accessibility_form.tetra",
+		"examples/surface_reference_multi_window_notes.tetra",
+		"examples/surface_reference_migration.tetra",
+	}
+}
+
 func TestSurfaceCounterExampleLoadsCoreSurfaceAndDrawModules(t *testing.T) {
 	entry := testkit.RepoPath(t, "examples", "surface_counter.tetra")
 	world, err := compiler.LoadWorld(entry)
@@ -123,6 +148,63 @@ uses alloc, mem:
 	}
 	if _, err := compiler.CheckWorld(world); err != nil {
 		t.Fatalf("CheckWorld(lib.core.text consumer): %v", err)
+	}
+}
+
+func TestSurfaceTextModuleDefinesP09EditingIMEClipboardAPI(t *testing.T) {
+	tmp := t.TempDir()
+	testkit.WriteFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.core.text as text
+
+func main() -> Int
+uses alloc, mem:
+    var storage: []u8 = core.make_u8(48)
+    var buf: text.TextBuffer = text.buffer_init(storage)
+    var cursor: text.TextCursor = text.caret_start(buf)
+    var selection: text.TextSelection = text.clear_selection()
+    var ascii: []u8 = core.make_u8(5)
+    ascii[0] = 72
+    ascii[1] = 105
+    ascii[2] = 10
+    ascii[3] = 79
+    ascii[4] = 75
+    var invalid: []u8 = core.make_u8(1)
+    invalid[0] = 255
+    var out: []u8 = core.make_u8(4)
+    var paste: []u8 = core.make_u8(2)
+    paste[0] = 89
+    paste[1] = 111
+    let inserted: text.TextEditResult = text.insert_bytes(buf, cursor, ascii)
+    selection = text.select_range(buf, 0, 2)
+    let copied: text.TextEditResult = text.copy_selection(buf, selection, out)
+    let pasted: text.TextEditResult = text.paste_bytes(buf, cursor, selection, paste)
+    var composition: text.TextComposition = text.composition_start(cursor)
+    let preview: text.TextComposition = text.composition_update(composition, 2)
+    let committed_text: text.TextEditResult = text.insert_bytes(buf, cursor, paste)
+    let committed: text.TextEditResult = text.composition_commit(composition)
+    var cancel_me: text.TextComposition = text.composition_start(cursor)
+    let cancelled: text.TextEditResult = text.composition_cancel(cancel_me)
+    let invalid_insert: text.TextEditResult = text.insert_bytes(buf, cursor, invalid)
+    let lines: Int = text.line_count(buf)
+
+    if inserted.ok && copied.ok && pasted.ok && committed_text.ok && committed.ok && cancelled.ok && !invalid_insert.ok && invalid_insert.error == text.error_invalid_utf8() && lines >= 2 && out[0] == 72 && out[1] == 105 && preview.active && !composition.active && !cancel_me.active && text.text_shaping_plan_v1() == 1 && text.multiline_storage_supported() && !text.full_rich_text_supported() && !text.full_bidi_supported() && !text.grapheme_cluster_caret_supported():
+        return 0
+    return 1
+`,
+	})
+
+	entry := filepath.Join(tmp, "app", "main.t4")
+	world, err := compiler.LoadWorldOpt(entry, compiler.WorldOptions{
+		DependencyRoots: []compiler.ModuleRoot{{
+			Root: testkit.RepoRoot(t),
+		}},
+	})
+	if err != nil {
+		t.Fatalf("LoadWorldOpt: %v", err)
+	}
+	if _, err := compiler.CheckWorld(world); err != nil {
+		t.Fatalf("CheckWorld(lib.core.text P09 consumer): %v", err)
 	}
 }
 
@@ -252,6 +334,134 @@ func main() -> Int:
 	}
 	if _, err := compiler.CheckWorld(world); err != nil {
 		t.Fatalf("CheckWorld(lib.core.block consumer): %v", err)
+	}
+}
+
+func TestSurfaceMorphModuleDefinesP08RecipeAuthoringAPI(t *testing.T) {
+	tmp := t.TempDir()
+	testkit.WriteFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.core.block as block
+import lib.core.morph as morph
+
+func main() -> Int:
+    let capsule: morph.Capsule = morph.capsule_default()
+    let toggle: morph.Affordance = morph.affordance_toggle()
+    let navigation: morph.Affordance = morph.affordance_navigation()
+    let overlay: morph.Affordance = morph.affordance_overlay()
+    let status: morph.Affordance = morph.affordance_status()
+    let form_field: morph.Recipe = morph.recipe_form_field()
+    let nav_item: morph.Recipe = morph.recipe_nav_item()
+    let metric_tile: morph.Recipe = morph.recipe_metric_tile()
+    let dialog_panel: morph.Recipe = morph.recipe_dialog_panel()
+    let toast: morph.Recipe = morph.recipe_toast_notification()
+    let tab: morph.Recipe = morph.recipe_tab_item()
+    let row: morph.Recipe = morph.recipe_list_row()
+    let expansion: morph.RecipeExpansion = morph.recipe_expansion(form_field, block.id(8))
+
+    if morph.capsule_valid(capsule) && morph.affordance_valid(toggle) && morph.affordance_valid(navigation) && morph.affordance_valid(overlay) && morph.affordance_valid(status) && morph.recipe_expands_to_block(form_field) && morph.recipe_expands_to_block(nav_item) && morph.recipe_expands_to_block(metric_tile) && morph.recipe_expands_to_block(dialog_panel) && morph.recipe_expands_to_block(toast) && morph.recipe_expands_to_block(tab) && morph.recipe_expands_to_block(row) && morph.expansion_valid(expansion):
+        return 0
+    return 1
+`,
+	})
+
+	entry := filepath.Join(tmp, "app", "main.t4")
+	world, err := compiler.LoadWorldOpt(entry, compiler.WorldOptions{
+		DependencyRoots: []compiler.ModuleRoot{{
+			Root: testkit.RepoRoot(t),
+		}},
+	})
+	if err != nil {
+		t.Fatalf("LoadWorldOpt: %v", err)
+	}
+	if _, err := compiler.CheckWorld(world); err != nil {
+		t.Fatalf("CheckWorld(lib.core.morph P08 consumer): %v", err)
+	}
+}
+
+func TestSurfaceMorphRecipeReferenceAppsLoadRecipeAuthoring(t *testing.T) {
+	for _, rel := range surfaceMorphRecipeExamplePaths() {
+		t.Run(rel, func(t *testing.T) {
+			entry := testkit.RepoPath(t, filepath.FromSlash(rel))
+			raw, err := os.ReadFile(entry)
+			if err != nil {
+				t.Fatalf("read %s: %v", rel, err)
+			}
+			text := string(raw)
+			for _, want := range []string{"import lib.core.morph as morph", "morph.recipe_", "morph.recipe_expansion", "block.tree_add_"} {
+				if !strings.Contains(text, want) {
+					t.Fatalf("%s missing recipe authoring marker %q", rel, want)
+				}
+			}
+			world, err := compiler.LoadWorld(entry)
+			if err != nil {
+				t.Fatalf("LoadWorld(%s): %v", rel, err)
+			}
+			for _, module := range []string{"lib.core.surface", "lib.core.block", "lib.core.morph"} {
+				if _, ok := world.ByModule[module]; !ok {
+					t.Fatalf("%s did not load module %s; modules=%v", rel, module, world.ByModule)
+				}
+			}
+			if _, err := compiler.CheckWorld(world); err != nil {
+				t.Fatalf("CheckWorld(%s): %v", rel, err)
+			}
+		})
+	}
+}
+
+func TestSurfaceReferenceAppsCompileAndRun(t *testing.T) {
+	for _, rel := range surfaceReferenceExamplePaths() {
+		t.Run(rel, func(t *testing.T) {
+			entry := testkit.RepoPath(t, filepath.FromSlash(rel))
+			raw, err := os.ReadFile(entry)
+			if err != nil {
+				t.Fatalf("read %s: %v", rel, err)
+			}
+			text := string(raw)
+			for _, want := range []string{
+				"import lib.core.surface as surface",
+				"import lib.core.block as block",
+				"import lib.core.morph as morph",
+				"morph.recipe_",
+				"morph.recipe_expansion",
+				"block.tree_add_",
+				"morph.accessibility_projection_ok",
+				"morph.memory_budget_ok",
+			} {
+				if !strings.Contains(text, want) {
+					t.Fatalf("%s missing reference app marker %q", rel, want)
+				}
+			}
+			if rel != "examples/surface_reference_migration.tetra" && strings.Contains(text, "lib.core.widgets") {
+				t.Fatalf("%s imports lib.core.widgets outside migration compatibility example", rel)
+			}
+			world, err := compiler.LoadWorld(entry)
+			if err != nil {
+				t.Fatalf("LoadWorld(%s): %v", rel, err)
+			}
+			for _, module := range []string{"lib.core.surface", "lib.core.block", "lib.core.morph"} {
+				if _, ok := world.ByModule[module]; !ok {
+					t.Fatalf("%s did not load module %s; modules=%v", rel, module, world.ByModule)
+				}
+			}
+			if rel == "examples/surface_reference_migration.tetra" {
+				if _, ok := world.ByModule["lib.core.widgets"]; !ok {
+					t.Fatalf("%s did not load migration compatibility module lib.core.widgets; modules=%v", rel, world.ByModule)
+				}
+			}
+			if _, err := compiler.CheckWorld(world); err != nil {
+				t.Fatalf("CheckWorld(%s): %v", rel, err)
+			}
+			out := filepath.Join(t.TempDir(), strings.TrimSuffix(filepath.Base(rel), ".tetra"))
+			if _, err := compiler.BuildFileWithStatsOpt(entry, out, "linux-x64", compiler.BuildOptions{Jobs: 1}); err != nil {
+				t.Fatalf("BuildFileWithStatsOpt(%s): %v", rel, err)
+			}
+			cmd := exec.Command(out)
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				t.Fatalf("%s exited with %v\n%s", rel, err, output)
+			}
+		})
 	}
 }
 
@@ -491,6 +701,41 @@ func main() -> Int:
 	}
 	if _, err := compiler.CheckWorld(world); err != nil {
 		t.Fatalf("CheckWorld(lib.core.block layout consumer): %v", err)
+	}
+}
+
+func TestSurfaceBlockLayoutSpecDefinesDensityAndStableRoundingAPI(t *testing.T) {
+	tmp := t.TempDir()
+	testkit.WriteFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.core.surface as surface
+import lib.core.block as block
+
+func main() -> Int:
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 320, h: 200)
+    let root: block.LayoutSpec = block.layout_column(root_rect, 8)
+    let scaled: Int = block.layout_scale_px(3, 1500)
+    let rounded: Int = block.layout_stable_round_div(5, 2)
+    let resized: block.LayoutSpec = block.layout_resize_density(root, 321, 201, 1500)
+    let aspect: block.LayoutSpec = block.layout_aspect_fit(root_rect, 16, 9)
+
+    if block.layout_density_dpi_default() == 96 && block.layout_density_scale_default() == 1000 && scaled == 5 && rounded == 3 && resized.w == 482 && resized.h == 302 && aspect.w == 320 && aspect.h == 180:
+        return 0
+    return 1
+`,
+	})
+
+	entry := filepath.Join(tmp, "app", "main.t4")
+	world, err := compiler.LoadWorldOpt(entry, compiler.WorldOptions{
+		DependencyRoots: []compiler.ModuleRoot{{
+			Root: testkit.RepoRoot(t),
+		}},
+	})
+	if err != nil {
+		t.Fatalf("LoadWorldOpt: %v", err)
+	}
+	if _, err := compiler.CheckWorld(world); err != nil {
+		t.Fatalf("CheckWorld(lib.core.block density layout consumer): %v", err)
 	}
 }
 

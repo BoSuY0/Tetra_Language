@@ -8,6 +8,6 @@ func main() -> Int:
     var panel: widgets.Panel = widgets.Panel(rect: rect, padding: 8)
     let width: Int = widgets.panel_init(panel, rect, 8)
     let content: surface.Rect = widgets.panel_content_rect(panel)
-    if width == 120 && content.x == 8 && content.y == 8 && content.w == 104 && content.h == 48:
+    if width == 120 && content.x == 8 && content.y == 8 && content.w == 104 && content.h == 48 && widgets.migration_surface_v1_compatibility_layer() && widgets.migration_release_widget_count() == 12 && widgets.migration_block_only_core_primitive() && !widgets.migration_widgets_promoted_to_core():
         return 42
     return 0

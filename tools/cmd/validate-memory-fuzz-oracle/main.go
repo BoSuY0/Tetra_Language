@@ -17,14 +17,19 @@ import (
 )
 
 type memoryFuzzShortArtifactSummary struct {
-	SchemaVersion string                           `json:"schema_version"`
-	Kind          string                           `json:"kind"`
-	Tier          string                           `json:"tier"`
-	Status        string                           `json:"status"`
-	Artifacts     map[string]string                `json:"artifacts"`
-	Commands      []memoryFuzzShortArtifactCommand `json:"commands"`
-	Policies      []string                         `json:"policies,omitempty"`
-	NonClaims     []string                         `json:"non_claims,omitempty"`
+	SchemaVersion           string                           `json:"schema_version"`
+	Kind                    string                           `json:"kind"`
+	Tier                    string                           `json:"tier"`
+	Status                  string                           `json:"status"`
+	ObservedFailures        *int                             `json:"observed_failures"`
+	ClassifiedFailures      *int                             `json:"classified_failures"`
+	UnclassifiedFailures    *int                             `json:"unclassified_failures"`
+	ReleaseBlockingFailures *int                             `json:"release_blocking_failures"`
+	ReproducibilitySeeds    []string                         `json:"reproducibility_seeds"`
+	Artifacts               map[string]string                `json:"artifacts"`
+	Commands                []memoryFuzzShortArtifactCommand `json:"commands"`
+	Policies                []string                         `json:"policies,omitempty"`
+	NonClaims               []string                         `json:"non_claims,omitempty"`
 }
 
 type memoryFuzzShortArtifactCommand struct {
@@ -63,23 +68,38 @@ type islandProofFuzzArtifactSummary struct {
 	NonClaims []string `json:"non_claims,omitempty"`
 }
 
+type memoryFuzzOracleValidationOptions struct {
+	ReportPath     string
+	ArtifactDir    string
+	CurrentGitHead string
+}
+
 func main() {
-	var reportPath string
-	var artifactDir string
-	flag.StringVar(&reportPath, "report", "", "path to tetra.memory-fuzz.oracle.v1 report")
-	flag.StringVar(&artifactDir, "artifact-dir", "", "optional Tier 1 artifact directory to validate alongside the oracle report")
+	var opt memoryFuzzOracleValidationOptions
+	flag.StringVar(&opt.ReportPath, "report", "", "path to tetra.memory-fuzz.oracle.v1 report")
+	flag.StringVar(&opt.ArtifactDir, "artifact-dir", "", "optional Tier 1 artifact directory to validate alongside the oracle report")
+	flag.StringVar(&opt.CurrentGitHead, "current-git-head", "", "optional current git HEAD to require in the oracle report")
 	flag.Parse()
-	if reportPath == "" {
+	if opt.ReportPath == "" {
 		fmt.Fprintln(os.Stderr, "error: --report is required")
 		os.Exit(2)
 	}
-	if err := validateMemoryFuzzOracleReportFile(reportPath, artifactDir); err != nil {
+	if err := validateMemoryFuzzOracleReportFileWithOptions(opt); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
 func validateMemoryFuzzOracleReportFile(path string, artifactDirs ...string) error {
+	opt := memoryFuzzOracleValidationOptions{ReportPath: path}
+	if len(artifactDirs) > 0 {
+		opt.ArtifactDir = artifactDirs[0]
+	}
+	return validateMemoryFuzzOracleReportFileWithOptions(opt)
+}
+
+func validateMemoryFuzzOracleReportFileWithOptions(opt memoryFuzzOracleValidationOptions) error {
+	path := opt.ReportPath
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -91,10 +111,22 @@ func validateMemoryFuzzOracleReportFile(path string, artifactDirs ...string) err
 	if err := compiler.ValidateMemoryFuzzOracleReport(report); err != nil {
 		return err
 	}
-	if len(artifactDirs) == 0 || strings.TrimSpace(artifactDirs[0]) == "" {
+	currentGitHead := strings.TrimSpace(opt.CurrentGitHead)
+	if currentGitHead != "" {
+		if !isMemoryFuzzGitHead(currentGitHead) {
+			return fmt.Errorf("current git_head must be a 40-character lowercase hex commit")
+		}
+		if !isMemoryFuzzGitHead(report.GitHead) {
+			return fmt.Errorf("memory fuzz oracle report git_head must be a 40-character lowercase hex commit when same-commit validation is required")
+		}
+		if report.GitHead != currentGitHead {
+			return fmt.Errorf("memory fuzz oracle report git_head %s does not match current git head %s", report.GitHead, currentGitHead)
+		}
+	}
+	if strings.TrimSpace(opt.ArtifactDir) == "" {
 		return nil
 	}
-	return validateMemoryFuzzOracleArtifactDir(path, artifactDirs[0])
+	return validateMemoryFuzzOracleArtifactDir(path, opt.ArtifactDir)
 }
 
 func validateMemoryFuzzOracleArtifactDir(reportPath string, artifactDir string) error {
@@ -117,6 +149,11 @@ func validateMemoryFuzzOracleArtifactDir(reportPath string, artifactDir string) 
 	}
 	for _, rel := range []string{"memory-fuzz-oracle.json", "summary.md", "summary.json", "island-proof-fuzz-summary.json", "artifact-hashes.json"} {
 		if err := requireMemoryFuzzArtifactFile(artifactDir, rel); err != nil {
+			return err
+		}
+	}
+	for _, rel := range []string{"reproducers/compiler-crash", "reproducers/miscompile", "reducers/miscompile"} {
+		if err := requireMemoryFuzzArtifactDir(artifactDir, rel); err != nil {
 			return err
 		}
 	}
@@ -143,6 +180,12 @@ func validateMemoryFuzzOracleArtifactDir(reportPath string, artifactDir string) 
 	}
 	if summary.Kind != "tier1_short_ci_smoke" || summary.Tier != string(compiler.MemoryFuzzTier1ShortCI) || summary.Status != "pass" {
 		return fmt.Errorf("summary.json identity/status must record passing Tier 1 short CI smoke, got kind=%q tier=%q status=%q", summary.Kind, summary.Tier, summary.Status)
+	}
+	if err := validateMemoryFuzzFailureClassificationCounts(summary); err != nil {
+		return fmt.Errorf("summary.json %w", err)
+	}
+	if err := validateMemoryFuzzReproducibilitySeeds(summary.ReproducibilitySeeds); err != nil {
+		return fmt.Errorf("summary.json %w", err)
 	}
 	for key, want := range map[string]string{
 		"artifact_hashes":           "artifact-hashes.json",
@@ -186,6 +229,74 @@ func validateMemoryFuzzOracleArtifactDir(reportPath string, artifactDir string) 
 	}
 	if err := validateMemoryFuzzArtifactHashes(filepath.Join(artifactDir, "artifact-hashes.json")); err != nil {
 		return err
+	}
+	return nil
+}
+
+func validateMemoryFuzzReproducibilitySeeds(seeds []string) error {
+	if len(seeds) == 0 {
+		return fmt.Errorf("reproducibility_seeds are required")
+	}
+	if len(seeds) < 12 {
+		return fmt.Errorf("reproducibility_seeds has %d entries, want at least 12 for v0-v11", len(seeds))
+	}
+	seen := map[string]bool{}
+	for _, seed := range seeds {
+		text := strings.TrimSpace(seed)
+		if text == "" {
+			return fmt.Errorf("reproducibility_seeds contains empty seed")
+		}
+		lower := strings.ToLower(text)
+		for _, forbidden := range []string{"todo", "placeholder", "fake", "mock"} {
+			if strings.Contains(lower, forbidden) {
+				return fmt.Errorf("reproducibility_seeds contains forbidden marker %q", forbidden)
+			}
+		}
+		if seen[text] {
+			return fmt.Errorf("reproducibility_seeds duplicate seed %q", text)
+		}
+		seen[text] = true
+	}
+	joined := "\n" + strings.Join(seeds, "\n") + "\n"
+	for i := 0; i < 12; i++ {
+		if !strings.Contains(joined, fmt.Sprintf(":v%d:", i)) {
+			return fmt.Errorf("reproducibility_seeds missing v%d seed", i)
+		}
+	}
+	return nil
+}
+
+func validateMemoryFuzzFailureClassificationCounts(summary memoryFuzzShortArtifactSummary) error {
+	counts := []struct {
+		name  string
+		value *int
+	}{
+		{name: "observed_failures", value: summary.ObservedFailures},
+		{name: "classified_failures", value: summary.ClassifiedFailures},
+		{name: "unclassified_failures", value: summary.UnclassifiedFailures},
+		{name: "release_blocking_failures", value: summary.ReleaseBlockingFailures},
+	}
+	values := map[string]int{}
+	for _, count := range counts {
+		if count.value == nil {
+			return fmt.Errorf("%s is required", count.name)
+		}
+		if *count.value < 0 {
+			return fmt.Errorf("%s = %d, want non-negative", count.name, *count.value)
+		}
+		values[count.name] = *count.value
+	}
+	if values["classified_failures"]+values["unclassified_failures"] != values["observed_failures"] {
+		return fmt.Errorf("classified_failures + unclassified_failures must equal observed_failures")
+	}
+	if values["release_blocking_failures"] > values["observed_failures"] {
+		return fmt.Errorf("release_blocking_failures = %d exceeds observed_failures = %d", values["release_blocking_failures"], values["observed_failures"])
+	}
+	if values["unclassified_failures"] != 0 {
+		return fmt.Errorf("unclassified_failures = %d, want 0", values["unclassified_failures"])
+	}
+	if summary.Status == "pass" && (values["observed_failures"] != 0 || values["classified_failures"] != 0 || values["release_blocking_failures"] != 0) {
+		return fmt.Errorf("passing Tier 1 summary must record zero observed/classified/release_blocking failures, got observed=%d classified=%d release_blocking=%d", values["observed_failures"], values["classified_failures"], values["release_blocking_failures"])
 	}
 	return nil
 }
@@ -355,6 +466,28 @@ func requireMemoryFuzzArtifactFile(dir string, rel string) error {
 	return nil
 }
 
+func requireMemoryFuzzArtifactDir(dir string, rel string) error {
+	if err := requireMemoryFuzzRelativeArtifactPath(rel); err != nil {
+		return err
+	}
+	rel = filepath.ToSlash(filepath.Clean(filepath.FromSlash(rel)))
+	path := filepath.Join(dir, filepath.FromSlash(rel))
+	info, err := os.Lstat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("missing required memory fuzz artifact dir %s", rel)
+		}
+		return err
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("required memory fuzz artifact dir %s must not be a symlink", rel)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("required memory fuzz artifact dir %s is not a directory", rel)
+	}
+	return nil
+}
+
 func requireMemoryFuzzRelativeArtifactPath(rel string) error {
 	if strings.TrimSpace(rel) == "" {
 		return fmt.Errorf("path is required")
@@ -460,6 +593,18 @@ func detectMemoryFuzzJSONSchema(raw []byte) string {
 		return envelope.Schema
 	}
 	return envelope.SchemaVersion
+}
+
+func isMemoryFuzzGitHead(value string) bool {
+	if len(value) != 40 {
+		return false
+	}
+	for _, r := range value {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
+			return false
+		}
+	}
+	return true
 }
 
 func rejectMemoryFuzzSymlinkPath(path string, label string) error {

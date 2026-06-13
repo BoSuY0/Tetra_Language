@@ -35,7 +35,7 @@ func TestReleasePostV04RAMContractSmokeScriptRunsStrictValidators(t *testing.T) 
 		`go run ./tools/cmd/validate-heap-blockers --report "$report_dir/heap-blockers.json"`,
 		`go run ./tools/cmd/validate-copy-blockers --report "$report_dir/copy-blockers.json"`,
 		`go run ./tools/cmd/ram-contract-fuzz-short --report-dir "$report_dir/fuzz" --git-head "$git_head"`,
-		`go run ./tools/cmd/validate-ram-contract-fuzz-oracle --report "$report_dir/fuzz/ram-contract-fuzz-oracle.json"`,
+		`go run ./tools/cmd/validate-ram-contract-fuzz-oracle --report "$report_dir/fuzz/ram-contract-fuzz-oracle.json" --current-git-head "$git_head"`,
 		`go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"`,
 		`go run ./tools/cmd/validate-ram-contract-release --report-dir "$report_dir" --current-git-head "$git_head"`,
 		`tetra.ram-contract.release-manifest.v1`,

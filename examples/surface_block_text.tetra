@@ -56,7 +56,6 @@ uses alloc, mem:
     let root: block.Block = block.make(block.id(1), block.id_none(), root_props)
     let title: block.Block = block.make(block.id(text_block.id), block.id(1), text_props)
     let input: block.Block = block.make(block.id(input_block.id), block.id(1), input_props)
-
     var pixels: []u8 = core.make_u8(root_rect.w * root_rect.h * 4)
     let surface_ref: surface.Surface = surface.Surface(handle: 0, width: root_rect.w, height: root_rect.h)
     var frame: surface.Frame = surface.Frame(surface: surface_ref, width: root_rect.w, height: root_rect.h, stride: root_rect.w * 4, pixels: pixels)
@@ -66,17 +65,6 @@ uses alloc, mem:
     let render_ok: Int = draw.text_glyph_run(ctx, text_rect, title_spec.text_len, block.text_char_width(title_spec), block.text_effective_line_height(title_spec), fg)
     let input_render_ok: Int = draw.text_glyph_run(ctx, surface.Rect(x: input_rect.x + 10, y: input_rect.y + 8, w: 100, h: 18), input_spec.text_len, block.text_char_width(input_spec), block.text_effective_line_height(input_spec), fg)
     let caret_ok: Int = draw.text_caret(ctx, input_rect.x + 10 + text.editable_caret(input_block.state) * 6, input_rect.y + 6, 22, accent)
-
-    if block.id_value(root.id) == 1 && block.id_value(title.parent_id) == 1 &&
-       block.id_value(input.parent_id) == 1 && title.props.text_len == 28 &&
-       input.props.text_len == text.editable_len(input_block.state) &&
-       measured.w == text_rect.w && measured.h >= 20 && line_count >= 2 &&
-       ellipsis_len > 0 && ellipsis_len < title_spec.text_len &&
-       fallback_len >= 2 && cache_status == block.text_cache_error_ok() &&
-       edit.ok && text.editable_validate(input_block.state) == text.error_none() &&
-       block.text_is_editable(input_block.spec) && focus_status == 1 &&
-       clear_ok == 0 && panel_ok == 0 && render_ok == draw.text_command_render() &&
-       input_render_ok == draw.text_command_render() && caret_ok == draw.text_command_caret() &&
-       app.focused_id == 3:
+    if block.id_value(root.id) == 1 && block.id_value(title.parent_id) == 1 && block.id_value(input.parent_id) == 1 && title.props.text_len == 28 && input.props.text_len == text.editable_len(input_block.state) && measured.w == text_rect.w && measured.h >= 20 && line_count >= 2 && ellipsis_len > 0 && ellipsis_len < title_spec.text_len && fallback_len >= 2 && cache_status == block.text_cache_error_ok() && edit.ok && text.editable_validate(input_block.state) == text.error_none() && block.text_is_editable(input_block.spec) && focus_status == 1 && clear_ok == 0 && panel_ok == 0 && render_ok == draw.text_command_render() && input_render_ok == draw.text_command_render() && caret_ok == draw.text_command_caret() && app.focused_id == 3:
         return 0
     return 1

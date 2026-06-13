@@ -258,9 +258,9 @@ jobs:
         shell: bash
         run: bash scripts/release/surface/morph-gate.sh --report-dir reports/surface-morph-gate
 
-      - name: Surface release gate
+      - name: Surface product gate
         shell: bash
-        run: bash scripts/release/surface/release-gate.sh --report-dir reports/surface-release-v1
+        run: bash scripts/release/surface/product-gate.sh --report-dir reports/surface-product-v1
 
       - name: Surface experimental regression gate
         shell: bash
@@ -295,9 +295,9 @@ jobs:
         with:
           name: tetra-surface-release-v1-${{ github.sha }}
           path: |
-            reports/surface-release-v1
-            reports/surface-release-v1/block-system
-            reports/surface-release-v1/morph
+            reports/surface-product-v1
+            reports/surface-product-v1/block-system
+            reports/surface-product-v1/morph
             reports/surface-morph-gate
             reports/surface-experimental-regression
             reports/safe-view-lifetime
@@ -399,6 +399,38 @@ jobs:
         with:
           name: tetra-ram-contract-${{ github.sha }}-linux-x64
           path: reports/ram-contract-release
+
+  memory-100-prod-stable-linux:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.20.x"
+
+      - name: Bootstrap
+        shell: bash
+        run: bash scripts/dev/bootstrap.sh
+
+      - name: Memory100 prod-stable gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          export GOTELEMETRY=off
+          export GOCACHE="${PWD}/.cache/go-build-memory-100-prod-stable-ci"
+          export GOTMPDIR="${PWD}/.cache/go-tmp-memory-100-prod-stable-ci"
+          mkdir -p "$GOCACHE" "$GOTMPDIR"
+          bash scripts/release/post_v0_4/memory-100-prod-stable-gate.sh --report-dir reports/memory-100/final
+
+      - name: Upload Memory100 prod-stable reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tetra-memory-100-prod-stable-${{ github.sha }}-linux-x64
+          path: reports/memory-100/final
 
   techempower-report-schemas-linux:
     if: github.event_name != 'schedule'

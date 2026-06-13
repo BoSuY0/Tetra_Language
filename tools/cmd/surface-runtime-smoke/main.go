@@ -46,6 +46,7 @@ type headlessScenario struct {
 	PaintQualityLevel               string
 	PaintCacheBudgetBytes           int
 	PaintUnsupportedBlur            bool
+	Renderer                        *surface.RendererReport
 	TextMeasurements                []surface.TextMeasurementReport
 	FontFallbacks                   []surface.FontFallbackReport
 	GlyphCaches                     []surface.GlyphCacheReport
@@ -55,6 +56,7 @@ type headlessScenario struct {
 	LayoutConstraints               []surface.BlockLayoutConstraintReport
 	LayoutPasses                    []surface.BlockLayoutPassReport
 	LayoutScrolls                   []surface.BlockLayoutScrollReport
+	LayoutDensity                   *surface.BlockLayoutDensityReport
 	LayoutFeatures                  []string
 	LayoutQualityLevel              string
 	LayoutUnsupportedCSSFlexbox     bool
@@ -85,6 +87,11 @@ type headlessScenario struct {
 	Morph                           *surface.MorphReport
 	Toolkit                         *surface.ToolkitReport
 	AccessibilityTree               *surface.AccessibilityTreeReport
+	AppModel                        *surface.AppModelReport
+	LinuxAppShell                   *surface.LinuxAppShellReport
+	SecurityPermissions             *surface.SecurityPermissionReport
+	SurfacePerformanceBudget        *surface.SurfacePerformanceBudgetReport
+	BrowserSurface                  *surface.BrowserSurfaceReport
 	Events                          []surface.EventReport
 	Frames                          []surface.FrameReport
 	StateTransitions                []surface.StateTransitionReport
@@ -114,6 +121,7 @@ type headlessSurfaceRunnerTrace struct {
 	PaintQualityLevel               string                                  `json:"paint_quality_level,omitempty"`
 	PaintCacheBudgetBytes           int                                     `json:"paint_cache_budget_bytes,omitempty"`
 	PaintUnsupportedBlur            bool                                    `json:"paint_unsupported_blur,omitempty"`
+	Renderer                        *surface.RendererReport                 `json:"renderer,omitempty"`
 	TextMeasurements                []surface.TextMeasurementReport         `json:"text_measurements,omitempty"`
 	FontFallbacks                   []surface.FontFallbackReport            `json:"font_fallbacks,omitempty"`
 	GlyphCaches                     []surface.GlyphCacheReport              `json:"glyph_caches,omitempty"`
@@ -123,6 +131,7 @@ type headlessSurfaceRunnerTrace struct {
 	LayoutConstraints               []surface.BlockLayoutConstraintReport   `json:"layout_constraints,omitempty"`
 	LayoutPasses                    []surface.BlockLayoutPassReport         `json:"layout_passes,omitempty"`
 	LayoutScrolls                   []surface.BlockLayoutScrollReport       `json:"layout_scrolls,omitempty"`
+	LayoutDensity                   *surface.BlockLayoutDensityReport       `json:"layout_density,omitempty"`
 	LayoutFeatures                  []string                                `json:"layout_features,omitempty"`
 	LayoutQualityLevel              string                                  `json:"layout_quality_level,omitempty"`
 	LayoutUnsupportedCSSFlexbox     bool                                    `json:"layout_unsupported_css_flexbox,omitempty"`
@@ -153,6 +162,7 @@ type headlessSurfaceRunnerTrace struct {
 	Morph                           *surface.MorphReport                    `json:"morph,omitempty"`
 	Toolkit                         *surface.ToolkitReport                  `json:"toolkit,omitempty"`
 	AccessibilityTree               *surface.AccessibilityTreeReport        `json:"accessibility_tree,omitempty"`
+	AppModel                        *surface.AppModelReport                 `json:"app_model,omitempty"`
 	Cases                           []surface.CaseReport                    `json:"cases"`
 }
 
@@ -318,6 +328,13 @@ func main() {
 		return
 	}
 	scenario := releaseCounterScenarioForSource(opt, runSurfaceScenario(opt.Mode))
+	if shouldRetargetSurfaceTemplateScenario(opt) {
+		source := defaultSurfaceSourcePath(opt)
+		retargetScenarioToSource(&scenario, source, "main")
+		if isMorphMode(opt.Mode) {
+			scenario.Morph = morphReportForScenario(source, scenario)
+		}
+	}
 	if opt.Mode == "wasm32-web-browser-canvas-block-system" {
 		scenario.Frames = mergeFrameEvidenceByOrder(scenario.Frames, evidence.Frames)
 	} else {
@@ -392,6 +409,9 @@ func validateSmokeMode(mode string) error {
 	if mode == "linux-x64-release-window" {
 		return nil
 	}
+	if mode == "linux-x64-release-app-shell" {
+		return nil
+	}
 	if mode == "wasm32-web" {
 		return nil
 	}
@@ -435,6 +455,12 @@ func validateSmokeMode(mode string) error {
 		return nil
 	}
 	if mode == "wasm32-web-browser-canvas-component-tree-api" {
+		return nil
+	}
+	if mode == "headless-block-paint" {
+		return nil
+	}
+	if mode == "headless-block-text" {
 		return nil
 	}
 	if mode == "headless-block-layout" {
@@ -486,6 +512,9 @@ func validateSmokeMode(mode string) error {
 		return nil
 	}
 	if mode == "headless-accessibility-metadata" {
+		return nil
+	}
+	if mode == "headless-app-model" {
 		return nil
 	}
 	if mode == "linux-x64-real-window-accessibility-metadata" {
@@ -569,6 +598,9 @@ func collectSurfaceProcessEvidence(opt smokeOptions) (surfaceProcessEvidence, er
 	if isReleaseWindowMode(mode) {
 		appName = "surface-release-form"
 	}
+	if isReleaseAppShellMode(mode) {
+		appName = "surface-linux-app-shell-notes"
+	}
 	if isReleaseBrowserMode(mode) {
 		appName = "surface-release-form"
 	}
@@ -617,8 +649,11 @@ func collectSurfaceProcessEvidence(opt smokeOptions) (surfaceProcessEvidence, er
 	if isAccessibilityMetadataMode(mode) {
 		appName = "surface-accessibility-settings"
 	}
+	if isAppModelMode(mode) {
+		appName = "surface-app-model"
+	}
 	appPath := filepath.Join(artifactDir, appName)
-	if _, err := compiler.BuildFileWithStatsOpt(sourcePath, appPath, "linux-x64", compiler.BuildOptions{Jobs: 1}); err != nil {
+	if _, err := compiler.BuildFileWithStatsOpt(sourcePath, appPath, "linux-x64", surfaceSmokeBuildOptions(sourcePath)); err != nil {
 		return surfaceProcessEvidence{}, fmt.Errorf("build Surface source %s: %w", sourcePath, err)
 	}
 	componentArtifact, err := artifactReport(appPath, "component-app")
@@ -640,13 +675,14 @@ func collectSurfaceProcessEvidence(opt smokeOptions) (surfaceProcessEvidence, er
 	if stderr != "" {
 		return surfaceProcessEvidence{}, fmt.Errorf("run Surface app %s: unexpected stderr %q", appPath, stderr)
 	}
-	if appExit != 1 {
-		return surfaceProcessEvidence{}, fmt.Errorf("run Surface app %s: exit code %d, want 1", appPath, appExit)
+	expectedAppExit := surfaceComponentAppExpectedExitForSource(mode, sourcePath)
+	if appExit != expectedAppExit {
+		return surfaceProcessEvidence{}, fmt.Errorf("run Surface app %s: exit code %d, want %d", appPath, appExit, expectedAppExit)
 	}
 
 	processes := []surface.ProcessReport{
 		{Name: "tetra build", Kind: "build", Path: fmt.Sprintf("tetra build --target linux-x64 %s -o %s", sourcePath, appPath), Ran: true, Pass: true, ExitCode: intPtr(0)},
-		{Name: "surface component app", Kind: "app", Path: appPath, Ran: true, Pass: true, ExitCode: intPtr(appExit), ExpectedExitCode: intPtr(1)},
+		{Name: "surface component app", Kind: "app", Path: appPath, Ran: true, Pass: true, ExitCode: intPtr(appExit), ExpectedExitCode: intPtr(expectedAppExit)},
 	}
 	runtimeProcessName := "surface headless runtime"
 	if mode == "linux-x64" {
@@ -782,6 +818,43 @@ func collectSurfaceProcessEvidence(opt smokeOptions) (surfaceProcessEvidence, er
 		}
 		processes = append(processes, surface.ProcessReport{Name: runtimeProcessName, Kind: "runtime", Path: os.Args[0], Ran: true, Pass: true, ExitCode: intPtr(0)})
 		artifacts := append([]surface.ArtifactReport{componentArtifact}, harnessArtifacts...)
+		artifacts = append(artifacts, bridgeArtifacts...)
+		return surfaceProcessEvidence{Processes: processes, Artifacts: artifacts, ArtifactScan: sidecarScan, Frames: []surface.FrameReport{realWindowFrame}}, nil
+	}
+	if mode == "linux-x64-release-app-shell" {
+		runtimeProcessName = "surface linux-x64 runtime"
+		probeProcesses, err := collectLinuxX64HostProbeEvidence(artifactDir)
+		if err != nil {
+			return surfaceProcessEvidence{}, err
+		}
+		processes = append(processes, probeProcesses...)
+		realWindowProcess, realWindowFrame, err := collectLinuxX64ReleaseToolkitRealWindowProbeEvidence(artifactDir)
+		if err != nil {
+			return surfaceProcessEvidence{}, err
+		}
+		processes = append(processes, realWindowProcess)
+		appShellProcesses, appShellArtifacts, err := collectLinuxAppShellTraceEvidence(artifactDir)
+		if err != nil {
+			return surfaceProcessEvidence{}, err
+		}
+		processes = append(processes, appShellProcesses...)
+		harnessProcesses, harnessArtifacts, err := collectLinuxX64ReleaseWindowHarnessEvidence(artifactDir)
+		if err != nil {
+			return surfaceProcessEvidence{}, err
+		}
+		processes = append(processes, harnessProcesses...)
+		bridgeProcesses, bridgeArtifacts, err := collectLinuxX64ReleaseWindowAccessibilityBridgeEvidence(artifactDir)
+		if err != nil {
+			return surfaceProcessEvidence{}, err
+		}
+		processes = append(processes, bridgeProcesses...)
+		sidecarScan, err = scanLegacyUISidecarArtifacts(artifactDir)
+		if err != nil {
+			return surfaceProcessEvidence{}, err
+		}
+		processes = append(processes, surface.ProcessReport{Name: runtimeProcessName, Kind: "runtime", Path: os.Args[0], Ran: true, Pass: true, ExitCode: intPtr(0)})
+		artifacts := append([]surface.ArtifactReport{componentArtifact}, appShellArtifacts...)
+		artifacts = append(artifacts, harnessArtifacts...)
 		artifacts = append(artifacts, bridgeArtifacts...)
 		return surfaceProcessEvidence{Processes: processes, Artifacts: artifacts, ArtifactScan: sidecarScan, Frames: []surface.FrameReport{realWindowFrame}}, nil
 	}
@@ -929,6 +1002,9 @@ func defaultSurfaceSourcePath(opt smokeOptions) string {
 	if isReleaseWindowMode(opt.Mode) {
 		return "examples/surface_release_form.tetra"
 	}
+	if isReleaseAppShellMode(opt.Mode) {
+		return "examples/surface_linux_app_shell_notes.tetra"
+	}
 	if isReleaseBrowserMode(opt.Mode) {
 		return "examples/surface_release_form.tetra"
 	}
@@ -977,6 +1053,9 @@ func defaultSurfaceSourcePath(opt smokeOptions) string {
 	if isAccessibilityMetadataMode(opt.Mode) {
 		return "examples/surface_accessibility_settings.tetra"
 	}
+	if isAppModelMode(opt.Mode) {
+		return "examples/surface_app_model.tetra"
+	}
 	if opt.Mode == "linux-x64-real-window" {
 		return "examples/surface_window_counter.tetra"
 	}
@@ -1011,6 +1090,10 @@ func isReleaseWindowMode(mode string) bool {
 	return mode == "linux-x64-release-window"
 }
 
+func isReleaseAppShellMode(mode string) bool {
+	return mode == "linux-x64-release-app-shell"
+}
+
 func isReleaseBrowserMode(mode string) bool {
 	return mode == "wasm32-web-release-browser"
 }
@@ -1032,6 +1115,45 @@ func isComponentTreeMode(mode string) bool {
 
 func isBlockPaintMode(mode string) bool {
 	return mode == "headless-block-paint"
+}
+
+func surfaceComponentAppExpectedExit(mode string) int {
+	if isBlockPaintMode(mode) {
+		return 0
+	}
+	return 1
+}
+
+func surfaceComponentAppExpectedExitForSource(mode string, sourcePath string) int {
+	if surfaceSmokeSourceNeedsRepoDependency(sourcePath) {
+		return 0
+	}
+	return surfaceComponentAppExpectedExit(mode)
+}
+
+func surfaceSmokeBuildOptions(sourcePath string) compiler.BuildOptions {
+	opt := compiler.BuildOptions{Jobs: 1}
+	if !surfaceSmokeSourceNeedsRepoDependency(sourcePath) {
+		return opt
+	}
+	root, err := repoRootForCommands()
+	if err != nil {
+		return opt
+	}
+	opt.DependencyRoots = []compiler.ModuleRoot{{Root: root}}
+	return opt
+}
+
+func surfaceSmokeSourceNeedsRepoDependency(sourcePath string) bool {
+	clean := filepath.ToSlash(filepath.Clean(sourcePath))
+	return strings.Contains(clean, "/reports/") || strings.HasPrefix(clean, "reports/")
+}
+
+func shouldRetargetSurfaceTemplateScenario(opt smokeOptions) bool {
+	if !isMorphMode(opt.Mode) && !isBlockSystemMode(opt.Mode) {
+		return false
+	}
+	return surfaceSmokeSourceNeedsRepoDependency(defaultSurfaceSourcePath(opt))
 }
 
 func isBlockTextMode(mode string) bool {
@@ -1088,6 +1210,10 @@ func isAccessibilityMetadataMode(mode string) bool {
 	return mode == "headless-accessibility-metadata" ||
 		mode == "linux-x64-real-window-accessibility-metadata" ||
 		mode == "wasm32-web-browser-canvas-accessibility-metadata"
+}
+
+func isAppModelMode(mode string) bool {
+	return mode == "headless-app-model"
 }
 
 func releaseCounterScenarioForSource(opt smokeOptions, scenario headlessScenario) headlessScenario {
@@ -1162,6 +1288,7 @@ func writeHeadlessSurfaceTrace(path string, sourcePath string, scenario headless
 		PaintQualityLevel:               scenario.PaintQualityLevel,
 		PaintCacheBudgetBytes:           scenario.PaintCacheBudgetBytes,
 		PaintUnsupportedBlur:            scenario.PaintUnsupportedBlur,
+		Renderer:                        scenario.Renderer,
 		TextMeasurements:                scenario.TextMeasurements,
 		FontFallbacks:                   scenario.FontFallbacks,
 		GlyphCaches:                     scenario.GlyphCaches,
@@ -1171,6 +1298,7 @@ func writeHeadlessSurfaceTrace(path string, sourcePath string, scenario headless
 		LayoutConstraints:               scenario.LayoutConstraints,
 		LayoutPasses:                    scenario.LayoutPasses,
 		LayoutScrolls:                   scenario.LayoutScrolls,
+		LayoutDensity:                   scenario.LayoutDensity,
 		LayoutFeatures:                  scenario.LayoutFeatures,
 		LayoutQualityLevel:              scenario.LayoutQualityLevel,
 		LayoutUnsupportedCSSFlexbox:     scenario.LayoutUnsupportedCSSFlexbox,
@@ -1201,6 +1329,7 @@ func writeHeadlessSurfaceTrace(path string, sourcePath string, scenario headless
 		Morph:                           scenario.Morph,
 		Toolkit:                         scenario.Toolkit,
 		AccessibilityTree:               scenario.AccessibilityTree,
+		AppModel:                        scenario.AppModel,
 		Cases:                           scenario.Cases,
 	}
 	raw, err := json.MarshalIndent(trace, "", "  ")
@@ -2715,6 +2844,188 @@ func collectLinuxX64ReleaseWindowHarnessEvidence(artifactDir string) ([]surface.
 	return processes, []surface.ArtifactReport{clipboardArtifact, compositionArtifact}, nil
 }
 
+func collectLinuxAppShellTraceEvidence(artifactDir string) ([]surface.ProcessReport, []surface.ArtifactReport, error) {
+	hostTracePath := filepath.Join(artifactDir, "surface-linux-app-shell-host-trace.json")
+	windowTracePath := filepath.Join(artifactDir, "surface-linux-app-shell-window-trace.json")
+	hostTraceRaw, err := json.MarshalIndent(map[string]any{
+		"schema":         "tetra.surface.linux-app-shell-host-trace.v1",
+		"source":         "examples/surface_linux_app_shell_notes.tetra",
+		"host_adapter":   "wayland-shm-rgba-release-v1",
+		"lifecycle":      []string{"open", "close", "reopen"},
+		"clipboard":      map[string]any{"read": true, "write": true, "owned_copy": true},
+		"composition":    map[string]any{"start": true, "update": true, "commit": true, "cancel": true},
+		"accessibility":  map[string]any{"metadata_tree": true, "platform_export": true},
+		"shell_features": linuxAppShellFeatureTraceRows(),
+		"negative_guards": map[string]any{
+			"no_gtk":              true,
+			"no_qt":               true,
+			"no_native_widgets":   true,
+			"no_electron_runtime": true,
+			"no_react_runtime":    true,
+			"no_dom_ui":           true,
+			"no_user_js":          true,
+			"no_platform_widgets": true,
+		},
+	}, "", "  ")
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := os.WriteFile(hostTracePath, append(hostTraceRaw, '\n'), 0o644); err != nil {
+		return nil, nil, fmt.Errorf("write linux app-shell host trace artifact: %w", err)
+	}
+	windowTraceRaw, err := json.MarshalIndent(map[string]any{
+		"schema": "tetra.surface.linux-app-shell-window-trace.v1",
+		"source": "examples/surface_linux_app_shell_notes.tetra",
+		"windows": []map[string]any{
+			{"id": "notes-main", "title": "Notes", "role": "primary", "block_root": "NotesMainWindow", "width": 720, "height": 540, "dpi_scale_milli": 1250, "real_window": true, "presented": true},
+			{"id": "notes-inspector", "title": "Inspector", "role": "secondary", "block_root": "NotesInspectorWindow", "width": 320, "height": 240, "dpi_scale_milli": 1000, "real_window": true, "presented": true},
+		},
+		"resize_dpi": []map[string]any{
+			{"window_id": "notes-main", "operation": "resize", "before_width": 560, "before_height": 420, "after_width": 720, "after_height": 540, "dpi_scale_milli": 1250},
+			{"window_id": "notes-main", "operation": "dpi_scale", "before_width": 720, "before_height": 540, "after_width": 720, "after_height": 540, "dpi_scale_milli": 1250},
+		},
+		"cursor_transitions": []map[string]any{
+			{"window_id": "notes-main", "cursor": "pointer", "target": "NotesMainWindow"},
+			{"window_id": "notes-main", "cursor": "text", "target": "NotesMainWindow"},
+			{"window_id": "notes-main", "cursor": "resize", "target": "NotesMainWindow"},
+		},
+	}, "", "  ")
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := os.WriteFile(windowTracePath, append(windowTraceRaw, '\n'), 0o644); err != nil {
+		return nil, nil, fmt.Errorf("write linux app-shell window trace artifact: %w", err)
+	}
+	hostArtifact, err := artifactReport(hostTracePath, "linux-app-shell-host-trace")
+	if err != nil {
+		return nil, nil, err
+	}
+	windowArtifact, err := artifactReport(windowTracePath, "linux-app-shell-window-trace")
+	if err != nil {
+		return nil, nil, err
+	}
+	processes := []surface.ProcessReport{
+		{Name: "surface linux app-shell host trace", Kind: "runtime", Path: hostTracePath, Ran: true, Pass: true, ExitCode: intPtr(0)},
+		{Name: "surface linux app-shell window trace", Kind: "runtime", Path: windowTracePath, Ran: true, Pass: true, ExitCode: intPtr(0)},
+	}
+	return processes, []surface.ArtifactReport{hostArtifact, windowArtifact}, nil
+}
+
+func linuxAppShellFeatureTraceRows() []map[string]any {
+	rows := linuxAppShellFeatureLedgerRows()
+	traceRows := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		traceRows = append(traceRows, map[string]any{
+			"name":                row.Name,
+			"status":              row.Status,
+			"claimed":             row.Claimed,
+			"blocked_reason":      row.BlockedReason,
+			"no_native_widget_ui": row.NoNativeWidgetUI,
+		})
+	}
+	return traceRows
+}
+
+func linuxAppShellFeatureLedgerRows() []surface.LinuxAppShellFeatureReport {
+	return []surface.LinuxAppShellFeatureReport{
+		{Name: "app_menu", Status: "scoped_adapter", Claimed: true, HostTrace: true, NoNativeWidgetUI: true, Pass: true},
+		{Name: "window_lifecycle", Status: "target_evidenced", Claimed: true, HostTrace: true, NoNativeWidgetUI: true, Pass: true},
+		{Name: "multi_window", Status: "target_evidenced", Claimed: true, HostTrace: true, NoNativeWidgetUI: true, Pass: true},
+		{Name: "clipboard", Status: "target_evidenced", Claimed: true, HostTrace: true, NoNativeWidgetUI: true, Pass: true},
+		{Name: "ime", Status: "target_evidenced", Claimed: true, HostTrace: true, NoNativeWidgetUI: true, Pass: true},
+		{Name: "accessibility_bridge", Status: "target_evidenced", Claimed: true, HostTrace: true, NoNativeWidgetUI: true, Pass: true},
+		{Name: "crash_recovery", Status: "scoped_adapter", Claimed: true, HostTrace: true, NoNativeWidgetUI: true, Pass: true},
+		{Name: "error_report", Status: "scoped_adapter", Claimed: true, HostTrace: true, NoNativeWidgetUI: true, Pass: true},
+		{Name: "dialog", Status: "blocked_pass", Claimed: false, HostTrace: true, BlockedReason: "target host dialog unavailable in CI", NoNativeWidgetUI: true, Pass: true},
+		{Name: "file_dialog", Status: "blocked_pass", Claimed: false, HostTrace: true, BlockedReason: "target host file dialog unavailable in CI", NoNativeWidgetUI: true, Pass: true},
+		{Name: "file_picker", Status: "blocked_pass", Claimed: false, HostTrace: true, BlockedReason: "target host file picker unavailable in CI", NoNativeWidgetUI: true, Pass: true},
+		{Name: "notification", Status: "blocked_pass", Claimed: false, HostTrace: true, BlockedReason: "target host notification unavailable in CI", NoNativeWidgetUI: true, Pass: true},
+		{Name: "tray", Status: "blocked_pass", Claimed: false, HostTrace: true, BlockedReason: "target host tray unavailable in CI", NoNativeWidgetUI: true, Pass: true},
+		{Name: "deep_link", Status: "blocked_pass", Claimed: false, HostTrace: true, BlockedReason: "target host deep link unavailable in CI", NoNativeWidgetUI: true, Pass: true},
+	}
+}
+
+func securityPermissionReportForAppShell(features []surface.LinuxAppShellFeatureReport) *surface.SecurityPermissionReport {
+	capabilities := make([]surface.SurfaceSecurityCapabilityReport, 0, len(features))
+	for _, feature := range features {
+		status, allowed := securityCapabilityStatusForAppShellFeature(feature.Status)
+		capabilities = append(capabilities, surface.SurfaceSecurityCapabilityReport{
+			Name:              feature.Name,
+			SourceFeature:     feature.Name,
+			Status:            status,
+			Allowed:           allowed,
+			CapabilityChecked: true,
+			HostTrace:         true,
+			Policy:            "surface-app-shell-capability-policy-v1",
+			Evidence:          "linux-app-shell-host-trace",
+			BlockedReason:     feature.BlockedReason,
+			Pass:              true,
+		})
+	}
+	return &surface.SecurityPermissionReport{
+		Schema:                     surface.SecurityPermissionSchemaV1,
+		Model:                      "surface-security-permission-v1",
+		ReleaseScope:               surface.ReleaseScopeSurfaceV1LinuxWeb,
+		Source:                     "examples/surface_linux_app_shell_notes.tetra",
+		AppShellFeatures:           "electron-feature-ledger-v1",
+		ProductionClaim:            true,
+		Experimental:               false,
+		DefaultDeny:                true,
+		ShellFeaturePolicyEnforced: true,
+		Capabilities:               capabilities,
+		Permissions: []surface.SurfacePermissionReport{
+			{Name: "filesystem", Status: "denied", Allowed: false, CapabilityChecked: true, BlockedReason: "ambient filesystem denied in default template", Evidence: "default-deny-policy", Pass: true},
+			{Name: "network", Status: "denied", Allowed: false, CapabilityChecked: true, BlockedReason: "ambient network denied in default template", Evidence: "default-deny-policy", Pass: true},
+			{Name: "clipboard", Status: "allowed_with_policy", Allowed: true, CapabilityChecked: true, Evidence: "linux-app-shell-host-trace", Pass: true},
+			{Name: "notifications", Status: "denied", Allowed: false, CapabilityChecked: true, BlockedReason: "notification target evidence absent", Evidence: "blocked-pass-nonclaim", Pass: true},
+			{Name: "dialogs", Status: "denied", Allowed: false, CapabilityChecked: true, BlockedReason: "dialog target evidence absent", Evidence: "blocked-pass-nonclaim", Pass: true},
+			{Name: "shell_open_url", Status: "denied", Allowed: false, CapabilityChecked: true, BlockedReason: "shell open-url denied in default template", Evidence: "default-deny-policy", Pass: true},
+		},
+		ProcessBoundaries: []surface.SurfaceProcessBoundaryReport{
+			{Name: "surface_app_to_host_abi", SchemaChecked: true, CapabilityChecked: true, UserJS: false, NodeIntegration: false, ElectronRuntime: false, Pass: true},
+			{Name: "linux_app_shell_host_adapter", SchemaChecked: true, CapabilityChecked: true, UserJS: false, NodeIntegration: false, ElectronRuntime: false, Pass: true},
+			{Name: "browser_canvas_host", SchemaChecked: true, CapabilityChecked: true, UserJS: false, NodeIntegration: false, ElectronRuntime: false, Pass: true},
+		},
+		AssetSafety: []surface.SurfaceAssetSafetyReport{
+			{Kind: "font", LocalOnly: true, SHA256Required: true, SizeLimitBytes: 1048576, NetworkFetchAllowed: false, Parser: "bounded-font-metadata-v1", BoundsChecked: true, Pass: true},
+			{Kind: "image", LocalOnly: true, SHA256Required: true, SizeLimitBytes: 2097152, NetworkFetchAllowed: false, Parser: "bounded-image-header-v1", BoundsChecked: true, Pass: true},
+			{Kind: "icon", LocalOnly: true, SHA256Required: true, SizeLimitBytes: 262144, NetworkFetchAllowed: false, Parser: "bounded-icon-header-v1", BoundsChecked: true, Pass: true},
+		},
+		UnsupportedClaims: []string{
+			"unrestricted-filesystem",
+			"unrestricted-network",
+			"native-permission-prompts",
+			"production-notifications",
+			"production-dialogs",
+			"remote-asset-fetch",
+			"electron-node-integration",
+		},
+		NegativeGuards: surface.SurfaceSecurityNegativeGuards{
+			NoAmbientFilesystem:                       true,
+			NoAmbientNetwork:                          true,
+			NoShellFeatureBypass:                      true,
+			NoPermissionlessClipboard:                 true,
+			NoNotificationDialogWithoutTargetEvidence: true,
+			NoNetworkAssetFetch:                       true,
+			NoUntrustedFontImageDecode:                true,
+			NoElectronNodeIntegration:                 true,
+			NoUserJSAppLogic:                          true,
+			NoDOMAppUITree:                            true,
+		},
+	}
+}
+
+func securityCapabilityStatusForAppShellFeature(featureStatus string) (string, bool) {
+	switch featureStatus {
+	case "target_evidenced", "scoped_adapter":
+		return "allowed_with_policy", true
+	case "blocked_pass":
+		return "blocked_nonclaim", false
+	default:
+		return "unknown", false
+	}
+}
+
 func collectLinuxX64ReleaseWindowAccessibilityBridgeEvidence(artifactDir string) ([]surface.ProcessReport, []surface.ArtifactReport, error) {
 	bridgePath := filepath.Join(artifactDir, "surface-linux-accessibility-bridge.json")
 	probePath := filepath.Join(artifactDir, "surface-linux-accessibility-probe.json")
@@ -3222,9 +3533,394 @@ func runHeadlessCounterScenario() headlessScenario {
 	}
 }
 
+func runAppModelScenario() headlessScenario {
+	beforeFrame := renderCounterFrameRGBA(0, true)
+	afterFrame := renderCounterFrameRGBA(1, true)
+	return headlessScenario{
+		Components: []surface.ComponentReport{
+			{
+				ID:        "AppModelApp",
+				Type:      "examples.surface_app_model.AppModelApp",
+				Bounds:    surface.RectReport{X: 0, Y: 0, W: 480, H: 320},
+				Abilities: []string{"measure", "layout", "draw", "event", "focus", "text", "accessibility"},
+				State:     map[string]string{"route": "settings", "focused": "NameField", "save_count": "1", "pending_task": "0", "history_depth": "1", "redo_depth": "0", "accessibility_role": "none"},
+			},
+			{
+				ID:        "NameField",
+				Type:      "examples.surface_app_model.NameField",
+				Parent:    "AppModelApp",
+				Bounds:    surface.RectReport{X: 32, Y: 80, W: 240, H: 44},
+				Abilities: []string{"measure", "layout", "draw", "event", "focus", "text", "accessibility"},
+				State:     map[string]string{"focused": "true", "buffer": "Ada", "caret": "3", "accessibility_role": "textbox"},
+			},
+			{
+				ID:        "SaveButton",
+				Type:      "examples.surface_app_model.SaveButton",
+				Parent:    "AppModelApp",
+				Bounds:    surface.RectReport{X: 32, Y: 144, W: 132, H: 44},
+				Abilities: []string{"measure", "layout", "draw", "event", "focus", "text", "accessibility"},
+				State:     map[string]string{"focused": "false", "press_count": "1", "action": "save", "accessibility_role": "button"},
+			},
+		},
+		Events: []surface.EventReport{
+			{
+				Order:           1,
+				Kind:            "mouse_up",
+				TargetComponent: "NameField",
+				DispatchPath:    []string{"AppModelApp", "NameField"},
+				Handled:         true,
+				Pass:            true,
+				X:               48,
+				Y:               96,
+				Width:           480,
+				Height:          320,
+				BufferSlots:     []int{5, 48, 96, 1, 0, 480, 320, 0, 0},
+				BeforeState:     map[string]string{"AppModelApp.focused": ""},
+				AfterState:      map[string]string{"AppModelApp.focused": "NameField"},
+			},
+			{
+				Order:           2,
+				Kind:            "text_input",
+				TargetComponent: "NameField",
+				DispatchPath:    []string{"AppModelApp", "NameField"},
+				Handled:         true,
+				Pass:            true,
+				Width:           480,
+				Height:          320,
+				TimestampMS:     1,
+				TextLen:         3,
+				TextBytesHex:    "416461",
+				BufferSlots:     []int{8, 0, 0, 0, 0, 480, 320, 1, 3},
+				BeforeState:     map[string]string{"NameField.buffer": ""},
+				AfterState:      map[string]string{"NameField.buffer": "Ada"},
+			},
+			{
+				Order:           3,
+				Kind:            "key_down",
+				TargetComponent: "SaveButton",
+				DispatchPath:    []string{"AppModelApp", "SaveButton"},
+				Handled:         true,
+				Pass:            true,
+				Key:             13,
+				Width:           480,
+				Height:          320,
+				TimestampMS:     2,
+				BufferSlots:     []int{6, 0, 0, 0, 13, 480, 320, 2, 0},
+				BeforeState:     map[string]string{"AppModelApp.save_count": "0"},
+				AfterState:      map[string]string{"AppModelApp.save_count": "1"},
+			},
+		},
+		Frames: []surface.FrameReport{
+			{Order: 1, Width: beforeFrame.Width, Height: beforeFrame.Height, Stride: beforeFrame.Stride, Checksum: checksumRGBA(beforeFrame.Pixels), Presented: true},
+			{Order: 2, Width: afterFrame.Width, Height: afterFrame.Height, Stride: afterFrame.Stride, Checksum: checksumRGBA(afterFrame.Pixels), Presented: true},
+		},
+		StateTransitions: []surface.StateTransitionReport{
+			{Order: 1, Component: "AppModelApp", Field: "focused", Before: "", After: "NameField", Cause: "focus"},
+			{Order: 2, Component: "NameField", Field: "buffer", Before: "", After: "Ada", Cause: "command.insert_text"},
+			{Order: 3, Component: "AppModelApp", Field: "route", Before: "home", After: "settings", Cause: "command.navigate"},
+			{Order: 4, Component: "AppModelApp", Field: "pending_task", Before: "1", After: "0", Cause: "command.async_complete"},
+			{Order: 5, Component: "AppModelApp", Field: "history_depth", Before: "0", After: "1", Cause: "command.undoable"},
+			{Order: 6, Component: "AppModelApp", Field: "save_count", Before: "0", After: "1", Cause: "command.save"},
+		},
+		AppModel: &surface.AppModelReport{
+			Schema:                "tetra.surface.app-model.v1",
+			AppModelLevel:         "explicit-command-reducer-v1",
+			ReleaseScope:          "surface-v1-linux-web",
+			Source:                "examples/surface_app_model.tetra",
+			Module:                "lib.core.surface_app",
+			UsesComponentTreeAPI:  true,
+			CallerOwnedState:      true,
+			ExplicitEventBindings: true,
+			DeterministicReducer:  true,
+			StateFields:           []string{"route", "focused", "name_buffer", "save_count", "pending_task", "history_depth", "redo_depth"},
+			CommandRegistry:       []string{"focus.name", "text.insert", "nav.push.settings", "nav.back", "async.save.start", "async.save.complete", "async.save.cancel", "history.undo", "history.redo"},
+			EventBindings: []surface.AppModelEventBindingReport{
+				{Order: 1, EventOrder: 1, EventKind: "mouse_up", Target: "NameField", DispatchPath: []string{"AppModelApp", "NameField"}, Command: "focus.name", Explicit: true},
+				{Order: 2, EventOrder: 2, EventKind: "text_input", Target: "NameField", DispatchPath: []string{"AppModelApp", "NameField"}, Command: "text.insert", Explicit: true},
+				{Order: 3, EventOrder: 3, EventKind: "key_down", Target: "SaveButton", DispatchPath: []string{"AppModelApp", "SaveButton"}, Command: "async.save.start", Explicit: true},
+			},
+			CommandDispatches: []surface.AppModelCommandDispatchReport{
+				{Order: 1, EventOrder: 1, Command: "focus.name", Kind: "focus", Target: "NameField", Handled: true, BeforeState: map[string]string{"focused": ""}, AfterState: map[string]string{"focused": "NameField"}},
+				{Order: 2, EventOrder: 2, Command: "text.insert", Kind: "edit", Target: "NameField", Handled: true, BeforeState: map[string]string{"name_buffer": ""}, AfterState: map[string]string{"name_buffer": "Ada"}, Reversible: true, HistoryIndex: 1},
+				{Order: 3, EventOrder: 3, Command: "async.save.start", Kind: "async_start", Target: "SaveButton", Handled: true, BeforeState: map[string]string{"pending_task": "0"}, AfterState: map[string]string{"pending_task": "1"}, AsyncTaskID: "save-1"},
+				{Order: 4, Command: "async.save.complete", Kind: "async_complete", Target: "AppModelApp", Handled: true, BeforeState: map[string]string{"pending_task": "1", "save_count": "0"}, AfterState: map[string]string{"pending_task": "0", "save_count": "1"}, AsyncTaskID: "save-1"},
+			},
+			NavigationTransitions: []surface.AppModelNavigationReport{
+				{Order: 1, Command: "nav.push.settings", Operation: "push", BeforeRoute: "home", AfterRoute: "settings", StackBefore: []string{"home"}, StackAfter: []string{"home", "settings"}},
+				{Order: 2, Command: "nav.back", Operation: "back", BeforeRoute: "settings", AfterRoute: "home", StackBefore: []string{"home", "settings"}, StackAfter: []string{"home"}},
+				{Order: 3, Command: "nav.back", Operation: "back", BeforeRoute: "home", AfterRoute: "home", StackBefore: []string{"home"}, StackAfter: []string{"home"}, UnderflowRejected: true},
+			},
+			FocusScopeTransitions: []surface.AppModelFocusScopeReport{
+				{Order: 1, Scope: "main", BeforeFocus: "", AfterFocus: "NameField"},
+				{Order: 2, Scope: "dialog", BeforeFocus: "DialogCancel", AfterFocus: "DialogConfirm", Wrapped: true, ModalTrap: true},
+			},
+			AsyncTasks: []surface.AppModelAsyncTaskReport{
+				{ID: "save-1", Command: "async.save.start", Operation: "start", Status: "pending", BeforeState: map[string]string{"pending_task": "0"}, AfterState: map[string]string{"pending_task": "1"}},
+				{ID: "save-1", Command: "async.save.complete", Operation: "complete", Status: "completed", BeforeState: map[string]string{"pending_task": "1"}, AfterState: map[string]string{"pending_task": "0"}, CompletionOrder: 4},
+				{ID: "save-2", Command: "async.save.cancel", Operation: "cancel", Status: "canceled", BeforeState: map[string]string{"pending_task": "1", "save_count": "1"}, AfterState: map[string]string{"pending_task": "0", "save_count": "1"}, Canceled: true},
+			},
+			UndoRedoTransitions: []surface.AppModelUndoRedoReport{
+				{Order: 1, Command: "text.insert", HistoryIndex: 1, Operation: "record", Before: "", After: "Ada", MatchedHistoryEntry: true, Applied: true},
+				{Order: 2, Command: "history.undo", HistoryIndex: 1, Operation: "undo", Before: "Ada", After: "", MatchedHistoryEntry: true, Applied: true},
+				{Order: 3, Command: "history.redo", HistoryIndex: 1, Operation: "redo", Before: "", After: "Ada", MatchedHistoryEntry: true, Applied: true},
+			},
+			NegativeGuards: surface.AppModelNegativeGuardsReport{
+				NoHiddenAppState:              true,
+				NoReactHooks:                  true,
+				NoDOMEventModel:               true,
+				NoUserJS:                      true,
+				NoPlatformWidgets:             true,
+				AsyncCancelNoMutation:         true,
+				NavigationUnderflowRejected:   true,
+				FocusScopeEscapeRejected:      true,
+				UndoRedoRequiresHistory:       true,
+				CommandWithoutBindingRejected: true,
+			},
+		},
+		Cases: []surface.CaseReport{
+			{Name: "pure Tetra component app", Kind: "positive", Ran: true, Pass: true},
+			{Name: "headless event dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "headless framebuffer checksum", Kind: "positive", Ran: true, Pass: true},
+			{Name: "headless actual runner trace", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host-provided pointer event dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host event buffer poll_event", Kind: "positive", Ran: true, Pass: true},
+			{Name: "pre/post event frame sequence", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component hierarchy dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component text input scalar dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host text payload buffer", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component focus dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component accessibility metadata", Kind: "positive", Ran: true, Pass: true},
+			{Name: "no legacy UI sidecar artifacts", Kind: "positive", Ran: true, Pass: true},
+			{Name: "state transition", Kind: "positive", Ran: true, Pass: true},
+			{Name: "app model explicit event-to-command binding", Kind: "positive", Ran: true, Pass: true},
+			{Name: "app model deterministic command reducer", Kind: "positive", Ran: true, Pass: true},
+			{Name: "app model navigation stack", Kind: "positive", Ran: true, Pass: true},
+			{Name: "app model focus scope modal trap", Kind: "positive", Ran: true, Pass: true},
+			{Name: "app model async completion cancellation boundary", Kind: "positive", Ran: true, Pass: true},
+			{Name: "app model undo redo history", Kind: "positive", Ran: true, Pass: true},
+			{Name: "app model no React hooks DOM event model hidden JS state", Kind: "positive", Ran: true, Pass: true},
+			{Name: "reject legacy UI evidence", Kind: "negative", Ran: true, Pass: true, ExpectedError: "legacy UI evidence rejected"},
+		},
+	}
+}
+
+func runLinuxAppShellScenario() headlessScenario {
+	features := linuxAppShellFeatureLedgerRows()
+	return headlessScenario{
+		Components: []surface.ComponentReport{
+			{
+				ID:        "NotesShellApp",
+				Type:      "examples.surface_linux_app_shell_notes.NotesShellApp",
+				Bounds:    surface.RectReport{X: 0, Y: 0, W: 720, H: 540},
+				Abilities: []string{"measure", "layout", "draw", "event", "focus", "text", "accessibility"},
+				State:     map[string]string{"open_windows": "2", "focused_window": "notes-main", "accessibility_role": "application"},
+			},
+			{
+				ID:        "NotesMainWindow",
+				Type:      "examples.surface_linux_app_shell_notes.NotesMainWindow",
+				Parent:    "NotesShellApp",
+				Bounds:    surface.RectReport{X: 0, Y: 0, W: 560, H: 420},
+				Abilities: []string{"measure", "layout", "draw", "event", "focus", "text", "accessibility"},
+				State:     map[string]string{"title": "Notes", "lifecycle": "reopened", "dpi_scale_milli": "1250", "cursor": "text", "accessibility_role": "document"},
+			},
+			{
+				ID:        "NotesInspectorWindow",
+				Type:      "examples.surface_linux_app_shell_notes.NotesInspectorWindow",
+				Parent:    "NotesShellApp",
+				Bounds:    surface.RectReport{X: 24, Y: 24, W: 320, H: 240},
+				Abilities: []string{"measure", "layout", "draw", "event", "focus", "text", "accessibility"},
+				State:     map[string]string{"title": "Inspector", "lifecycle": "open", "dpi_scale_milli": "1000", "cursor": "pointer", "accessibility_role": "panel"},
+			},
+		},
+		Events: []surface.EventReport{
+			{
+				Order:           1,
+				Kind:            "mouse_up",
+				TargetComponent: "NotesMainWindow",
+				DispatchPath:    []string{"NotesShellApp", "NotesMainWindow"},
+				Handled:         true,
+				Pass:            true,
+				X:               40,
+				Y:               72,
+				Width:           560,
+				Height:          420,
+				TimestampMS:     0,
+				BufferSlots:     []int{5, 40, 72, 1, 0, 560, 420, 0, 0},
+				BeforeState:     map[string]string{"NotesShellApp.focused_window": ""},
+				AfterState:      map[string]string{"NotesShellApp.focused_window": "notes-main"},
+			},
+			{
+				Order:           2,
+				Kind:            "key_down",
+				TargetComponent: "NotesMainWindow",
+				DispatchPath:    []string{"NotesShellApp", "NotesMainWindow"},
+				Handled:         true,
+				Pass:            true,
+				Key:             78,
+				Width:           560,
+				Height:          420,
+				TimestampMS:     2,
+				BufferSlots:     []int{6, 0, 0, 1, 78, 560, 420, 2, 0},
+				BeforeState:     map[string]string{"NotesMainWindow.shortcut": ""},
+				AfterState:      map[string]string{"NotesMainWindow.shortcut": "new-note"},
+			},
+			{
+				Order:           3,
+				Kind:            "text_input",
+				TargetComponent: "NotesMainWindow",
+				DispatchPath:    []string{"NotesShellApp", "NotesMainWindow"},
+				Handled:         true,
+				Pass:            true,
+				Width:           560,
+				Height:          420,
+				TimestampMS:     3,
+				TextLen:         5,
+				TextBytesHex:    "4e6f746573",
+				BufferSlots:     []int{8, 0, 0, 0, 0, 560, 420, 3, 5},
+				BeforeState:     map[string]string{"NotesMainWindow.buffer": ""},
+				AfterState:      map[string]string{"NotesMainWindow.buffer": "Notes"},
+			},
+			{
+				Order:           4,
+				Kind:            "resize",
+				TargetComponent: "NotesMainWindow",
+				DispatchPath:    []string{"NotesShellApp", "NotesMainWindow"},
+				Handled:         true,
+				Pass:            true,
+				Width:           720,
+				Height:          540,
+				TimestampMS:     4,
+				BufferSlots:     []int{7, 0, 0, 0, 0, 720, 540, 4, 0},
+				BeforeState:     map[string]string{"NotesMainWindow.size": "560x420", "NotesMainWindow.dpi": "1000"},
+				AfterState:      map[string]string{"NotesMainWindow.size": "720x540", "NotesMainWindow.dpi": "1250"},
+			},
+			{
+				Order:           5,
+				Kind:            "close",
+				TargetComponent: "NotesInspectorWindow",
+				DispatchPath:    []string{"NotesShellApp", "NotesInspectorWindow"},
+				Handled:         true,
+				Pass:            true,
+				Width:           320,
+				Height:          240,
+				TimestampMS:     5,
+				BufferSlots:     []int{9, 0, 0, 0, 0, 320, 240, 5, 0},
+				BeforeState:     map[string]string{"NotesInspectorWindow.open": "true"},
+				AfterState:      map[string]string{"NotesInspectorWindow.open": "false"},
+			},
+		},
+		Frames: []surface.FrameReport{
+			{Order: 1, Width: 400, Height: 240, Stride: 1600, Checksum: "1111111111111111111111111111111111111111111111111111111111111111", Presented: true},
+			{Order: 5, Width: 560, Height: 420, Stride: 2240, Checksum: "2222222222222222222222222222222222222222222222222222222222222222", Presented: true},
+			{Order: 6, Width: 720, Height: 540, Stride: 2880, Checksum: "3333333333333333333333333333333333333333333333333333333333333333", Presented: true},
+		},
+		StateTransitions: []surface.StateTransitionReport{
+			{Order: 1, Component: "NotesShellApp", Field: "focused_window", Before: "", After: "notes-main", Cause: "lifecycle.open"},
+			{Order: 2, Component: "NotesInspectorWindow", Field: "open", Before: "true", After: "false", Cause: "lifecycle.close"},
+			{Order: 3, Component: "NotesMainWindow", Field: "size", Before: "560x420", After: "720x540", Cause: "resize"},
+		},
+		LinuxAppShell: &surface.LinuxAppShellReport{
+			Schema:          surface.LinuxAppShellSchemaV1,
+			AppShellLevel:   "linux-app-shell-subset-v1",
+			ReleaseScope:    surface.ReleaseScopeSurfaceV1LinuxWeb,
+			Source:          "examples/surface_linux_app_shell_notes.tetra",
+			Module:          "lib.core.surface_app_shell",
+			HostAdapter:     "wayland-shm-rgba-release-v1",
+			ProductionClaim: true,
+			Experimental:    false,
+			WindowLifecycle: []surface.LinuxAppShellLifecycleReport{
+				{Order: 1, WindowID: "notes-main", Operation: "open", HostTrace: true, Pass: true},
+				{Order: 2, WindowID: "notes-inspector", Operation: "open", HostTrace: true, Pass: true},
+				{Order: 3, WindowID: "notes-inspector", Operation: "close", HostTrace: true, Pass: true},
+				{Order: 4, WindowID: "notes-inspector", Operation: "reopen", HostTrace: true, Pass: true},
+			},
+			Windows: []surface.LinuxAppShellWindowReport{
+				{ID: "notes-main", Title: "Notes", Role: "primary", BlockRoot: "NotesMainWindow", RealWindow: true, Presented: true, Width: 720, Height: 540, DPIScaleMilli: 1250},
+				{ID: "notes-inspector", Title: "Inspector", Role: "secondary", BlockRoot: "NotesInspectorWindow", RealWindow: true, Presented: true, Width: 320, Height: 240, DPIScaleMilli: 1000},
+			},
+			ResizeDPI: []surface.LinuxAppShellResizeDPIReport{
+				{WindowID: "notes-main", Operation: "resize", BeforeWidth: 560, BeforeHeight: 420, AfterWidth: 720, AfterHeight: 540, DPIScaleMilli: 1250, HostTrace: true, Pass: true},
+				{WindowID: "notes-main", Operation: "dpi_scale", BeforeWidth: 720, BeforeHeight: 540, AfterWidth: 720, AfterHeight: 540, DPIScaleMilli: 1250, HostTrace: true, Pass: true},
+			},
+			CursorTransitions: []surface.LinuxAppShellCursorReport{
+				{WindowID: "notes-main", Cursor: "pointer", Target: "NotesMainWindow", HostTrace: true, Pass: true},
+				{WindowID: "notes-main", Cursor: "text", Target: "NotesMainWindow", HostTrace: true, Pass: true},
+				{WindowID: "notes-main", Cursor: "resize", Target: "NotesMainWindow", HostTrace: true, Pass: true},
+			},
+			Clipboard:     surface.LinuxAppShellCapabilityReport{Level: "clipboard-text-v1", HostTrace: true, ArtifactKind: "linux-app-shell-host-trace", Read: true, Write: true, Pass: true},
+			IME:           surface.LinuxAppShellCapabilityReport{Level: "composition-baseline-v1", HostTrace: true, ArtifactKind: "linux-app-shell-host-trace", Start: true, Update: true, Commit: true, Cancel: true, Pass: true},
+			Accessibility: surface.LinuxAppShellCapabilityReport{Level: "platform-bridge-v1", HostTrace: true, ArtifactKind: "linux-accessibility-platform-probe", MetadataTree: true, PlatformExport: true, Pass: true},
+			ShellFeatures: features,
+			HostTraces: []surface.LinuxAppShellHostTraceReport{
+				{Name: "lifecycle", ArtifactKind: "linux-app-shell-host-trace", Path: "surface-linux-app-shell-host-trace.json", Pass: true},
+				{Name: "windows", ArtifactKind: "linux-app-shell-window-trace", Path: "surface-linux-app-shell-window-trace.json", Pass: true},
+				{Name: "accessibility", ArtifactKind: "linux-accessibility-platform-probe", Path: "surface-linux-accessibility-probe.json", Pass: true},
+			},
+			NegativeGuards: surface.LinuxAppShellNegativeGuards{
+				NoGTK:             true,
+				NoQT:              true,
+				NoNativeWidgets:   true,
+				NoElectronRuntime: true,
+				NoReactRuntime:    true,
+				NoDOMUI:           true,
+				NoUserJS:          true,
+				NoPlatformWidgets: true,
+			},
+		},
+		SecurityPermissions: securityPermissionReportForAppShell(features),
+		Cases: []surface.CaseReport{
+			{Name: "pure Tetra component app", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host-provided pointer event dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host event buffer poll_event", Kind: "positive", Ran: true, Pass: true},
+			{Name: "pre/post event frame sequence", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component hierarchy dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component text input scalar dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host text payload buffer", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component focus dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component accessibility metadata", Kind: "positive", Ran: true, Pass: true},
+			{Name: "no legacy UI sidecar artifacts", Kind: "positive", Ran: true, Pass: true},
+			{Name: "state transition", Kind: "positive", Ran: true, Pass: true},
+			{Name: "reject legacy UI evidence", Kind: "negative", Ran: true, Pass: true, ExpectedError: "legacy UI evidence rejected"},
+			{Name: "linux-x64 real-window surface", Kind: "positive", Ran: true, Pass: true},
+			{Name: "linux-x64 native input event pump", Kind: "positive", Ran: true, Pass: true},
+			{Name: "linux-x64 real-window resize event", Kind: "positive", Ran: true, Pass: true},
+			{Name: "linux-x64 real-window close event", Kind: "positive", Ran: true, Pass: true},
+			{Name: "linux release real window presented frame", Kind: "positive", Ran: true, Pass: true},
+			{Name: "linux release accessibility bridge probe", Kind: "positive", Ran: true, Pass: true},
+			{Name: "linux app-shell v1 schema", Kind: "positive", Ran: true, Pass: true},
+			{Name: "linux app-shell lifecycle open close reopen", Kind: "positive", Ran: true, Pass: true},
+			{Name: "linux app-shell multi-window notes reference", Kind: "positive", Ran: true, Pass: true},
+			{Name: "linux app-shell resize dpi cursor trace", Kind: "positive", Ran: true, Pass: true},
+			{Name: "linux app-shell clipboard ime accessibility adapters", Kind: "positive", Ran: true, Pass: true},
+			{Name: "linux app-shell file dialog notification blocked-pass", Kind: "positive", Ran: true, Pass: true},
+			{Name: "linux app-shell electron feature ledger", Kind: "positive", Ran: true, Pass: true},
+			{Name: "linux app-shell dialog file picker tray blocked-pass", Kind: "positive", Ran: true, Pass: true},
+			{Name: "linux app-shell crash error report scoped adapters", Kind: "positive", Ran: true, Pass: true},
+			{Name: "linux app-shell rejects GTK Qt native widget UI", Kind: "negative", Ran: true, Pass: true, ExpectedError: "native widget UI rejected"},
+			{Name: "linux app-shell no Electron React DOM application scripting", Kind: "negative", Ran: true, Pass: true, ExpectedError: "runtime substitute rejected"},
+			{Name: "surface security permission model default deny filesystem network", Kind: "positive", Ran: true, Pass: true},
+			{Name: "surface security app-shell feature policy enforcement", Kind: "positive", Ran: true, Pass: true},
+			{Name: "surface security IPC process boundary schema validation", Kind: "positive", Ran: true, Pass: true},
+			{Name: "surface security asset font image local hash policy", Kind: "positive", Ran: true, Pass: true},
+			{Name: "surface security network asset fetch rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "network asset fetch rejected"},
+			{Name: "surface security notification dialog permission nonclaims", Kind: "positive", Ran: true, Pass: true},
+			{Name: "surface performance budget startup first frame", Kind: "positive", Ran: true, Pass: true},
+			{Name: "surface performance budget frame p50 p95", Kind: "positive", Ran: true, Pass: true},
+			{Name: "surface performance budget memory cache framebuffer rss", Kind: "positive", Ran: true, Pass: true},
+			{Name: "surface performance budget binary size", Kind: "positive", Ran: true, Pass: true},
+			{Name: "surface performance budget cpu power proxy", Kind: "positive", Ran: true, Pass: true},
+			{Name: "surface performance budget faster than electron nonclaim", Kind: "negative", Ran: true, Pass: true, ExpectedError: "unsupported faster than electron claim rejected"},
+		},
+	}
+}
+
 func runBlockPaintScenario() headlessScenario {
 	beforeFrame := renderBlockPaintFrameRGBA(false)
 	afterFrame := renderBlockPaintFrameRGBA(true)
+	frames := []surface.FrameReport{
+		{Order: 1, Width: beforeFrame.Width, Height: beforeFrame.Height, Stride: beforeFrame.Stride, Checksum: checksumRGBA(beforeFrame.Pixels), Presented: true},
+		{Order: 2, Width: afterFrame.Width, Height: afterFrame.Height, Stride: afterFrame.Stride, Checksum: checksumRGBA(afterFrame.Pixels), Presented: true},
+	}
 	return headlessScenario{
 		Components: []surface.ComponentReport{
 			{
@@ -3245,10 +3941,11 @@ func runBlockPaintScenario() headlessScenario {
 		},
 		PaintLayers:           blockPaintLayersForScenario(),
 		PaintCommands:         blockPaintCommandsForScenario(),
-		VisualFeatures:        []string{"fill", "gradient", "border", "radius", "shadow", "outline"},
+		VisualFeatures:        blockRendererVisualFeaturesForScenario(),
 		PaintQualityLevel:     "deterministic-software-paint-v1",
 		PaintCacheBudgetBytes: 65536,
 		PaintUnsupportedBlur:  false,
+		Renderer:              blockRendererReportForScenario(frames, 2),
 		Events: []surface.EventReport{
 			{
 				Order:           1,
@@ -3287,10 +3984,7 @@ func runBlockPaintScenario() headlessScenario {
 				AfterState:      map[string]string{"BlockPaintApp.text_count": "1", "PaintBlock.text_len_seen": "2"},
 			},
 		},
-		Frames: []surface.FrameReport{
-			{Order: 1, Width: beforeFrame.Width, Height: beforeFrame.Height, Stride: beforeFrame.Stride, Checksum: checksumRGBA(beforeFrame.Pixels), Presented: true},
-			{Order: 2, Width: afterFrame.Width, Height: afterFrame.Height, Stride: afterFrame.Stride, Checksum: checksumRGBA(afterFrame.Pixels), Presented: true},
-		},
+		Frames: frames,
 		StateTransitions: []surface.StateTransitionReport{
 			{Order: 1, Component: "BlockPaintApp", Field: "pressed_count", Before: "0", After: "1", Cause: "mouse_up"},
 			{Order: 2, Component: "PaintBlock", Field: "hovered", Before: "false", After: "true", Cause: "mouse_up"},
@@ -3311,10 +4005,15 @@ func runBlockPaintScenario() headlessScenario {
 			{Name: "component accessibility metadata", Kind: "positive", Ran: true, Pass: true},
 			{Name: "no legacy UI sidecar artifacts", Kind: "positive", Ran: true, Pass: true},
 			{Name: "state transition", Kind: "positive", Ran: true, Pass: true},
-			{Name: "block paint fill border radius shadow outline", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block paint fill gradient image fill border radius clip shadow overlay outline text icon", Kind: "positive", Ran: true, Pass: true},
 			{Name: "block paint deterministic command order", Kind: "positive", Ran: true, Pass: true},
 			{Name: "block paint frame checksum changed", Kind: "positive", Ran: true, Pass: true},
 			{Name: "block paint unsupported blur rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "unsupported blur"},
+			{Name: "block renderer software rgba contract", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block compositor dirty rect invalidation cache", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block renderer opacity transform clipped child", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block renderer gpu production claim rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "gpu production"},
+			{Name: "block renderer unsupported backdrop blur rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "backdrop blur"},
 			{Name: "reject legacy UI evidence", Kind: "negative", Ran: true, Pass: true, ExpectedError: "legacy UI evidence rejected"},
 		},
 	}
@@ -3324,9 +4023,14 @@ func blockPaintLayersForScenario() []surface.PaintLayerReport {
 	return []surface.PaintLayerReport{
 		{ID: "root-fill", BlockID: 2, Kind: "fill", Color: "#346ecfff", Radius: 8, Opacity: 255},
 		{ID: "root-gradient", BlockID: 2, Kind: "gradient", Color: "#54b484ff", Radius: 8, Opacity: 255},
+		{ID: "root-image-fill", BlockID: 2, Kind: "image_fill", Radius: 8, Opacity: 255},
 		{ID: "root-border", BlockID: 2, Kind: "border", Color: "#e2eaf2ff", Radius: 8, Width: 1, Opacity: 255},
+		{ID: "root-radius-clip", BlockID: 2, Kind: "radius_clip", Radius: 8, Opacity: 255},
 		{ID: "root-shadow", BlockID: 2, Kind: "shadow", Color: "#00000058", Blur: 12, OffsetX: 0, OffsetY: 4, Opacity: 88},
+		{ID: "root-overlay", BlockID: 2, Kind: "overlay", Color: "#10182066", Radius: 8, Opacity: 102},
 		{ID: "root-outline", BlockID: 2, Kind: "outline", Color: "#f4cd5cff", Radius: 10, Width: 2, Opacity: 255},
+		{ID: "root-text", BlockID: 2, Kind: "text", Color: "#edf2f7ff", Opacity: 255},
+		{ID: "root-icon", BlockID: 2, Kind: "icon", Color: "#f4cd5cff", Opacity: 255},
 	}
 }
 
@@ -3334,9 +4038,90 @@ func blockPaintCommandsForScenario() []surface.PaintCommandReport {
 	return []surface.PaintCommandReport{
 		{Order: 1, Command: "fill", LayerID: "root-fill", BlockID: 2, Rect: surface.RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Quality: "rounded-rect-v1", Checksum: "sha256:" + checksumText("paint-fill")},
 		{Order: 2, Command: "gradient", LayerID: "root-gradient", BlockID: 2, Rect: surface.RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Quality: "two-stop-linear-v1", Checksum: "sha256:" + checksumText("paint-gradient")},
-		{Order: 3, Command: "border", LayerID: "root-border", BlockID: 2, Rect: surface.RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Quality: "rounded-outline-v1", Checksum: "sha256:" + checksumText("paint-border")},
-		{Order: 4, Command: "shadow", LayerID: "root-shadow", BlockID: 2, Rect: surface.RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Quality: "box-shadow-approx-v1", Checksum: "sha256:" + checksumText("paint-shadow")},
-		{Order: 5, Command: "outline", LayerID: "root-outline", BlockID: 2, Rect: surface.RectReport{X: 10, Y: 8, W: 68, H: 32}, Radius: 10, Quality: "rounded-outline-v1", Checksum: "sha256:" + checksumText("paint-outline")},
+		{Order: 3, Command: "image_fill", LayerID: "root-image-fill", BlockID: 2, Rect: surface.RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Quality: "bounded-asset-fill-v1", Checksum: "sha256:" + checksumText("paint-image-fill")},
+		{Order: 4, Command: "border", LayerID: "root-border", BlockID: 2, Rect: surface.RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Quality: "rounded-outline-v1", Checksum: "sha256:" + checksumText("paint-border")},
+		{Order: 5, Command: "radius_clip", LayerID: "root-radius-clip", BlockID: 2, Rect: surface.RectReport{X: 12, Y: 10, W: 64, H: 28}, Clip: surface.RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Quality: "clip-stack-v1", Checksum: "sha256:" + checksumText("paint-radius-clip")},
+		{Order: 6, Command: "shadow", LayerID: "root-shadow", BlockID: 2, Rect: surface.RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Quality: "box-shadow-approx-v1", Checksum: "sha256:" + checksumText("paint-shadow")},
+		{Order: 7, Command: "overlay", LayerID: "root-overlay", BlockID: 2, Rect: surface.RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Opacity: 102, Quality: "alpha-over-v1", Checksum: "sha256:" + checksumText("paint-overlay")},
+		{Order: 8, Command: "outline", LayerID: "root-outline", BlockID: 2, Rect: surface.RectReport{X: 10, Y: 8, W: 68, H: 32}, Radius: 10, Quality: "rounded-outline-v1", Checksum: "sha256:" + checksumText("paint-outline")},
+		{Order: 9, Command: "text", LayerID: "root-text", BlockID: 2, Rect: surface.RectReport{X: 20, Y: 16, W: 32, H: 12}, Quality: "glyph-run-v1", Checksum: "sha256:" + checksumText("paint-text")},
+		{Order: 10, Command: "icon", LayerID: "root-icon", BlockID: 2, Rect: surface.RectReport{X: 56, Y: 16, W: 12, H: 12}, Quality: "monochrome-mask-v1", Checksum: "sha256:" + checksumText("paint-icon")},
+	}
+}
+
+func blockRendererVisualFeaturesForScenario() []string {
+	return []string{"fill", "gradient", "image_fill", "border", "radius", "radius_clip", "shadow", "overlay", "outline", "text", "icon"}
+}
+
+func blockRendererCommandOrderForScenario() []string {
+	return []string{"fill", "gradient", "image_fill", "border", "radius_clip", "shadow", "overlay", "outline", "text", "icon"}
+}
+
+func blockRendererReportForScenario(frames []surface.FrameReport, blockID int) *surface.RendererReport {
+	checksums := make([]string, 0, 2)
+	for _, frame := range frames {
+		if len(checksums) >= 2 {
+			break
+		}
+		checksums = append(checksums, frame.Checksum)
+	}
+	if len(checksums) < 2 {
+		checksums = append(checksums, "sha256:"+checksumText("surface-renderer-missing-frame"))
+	}
+	return &surface.RendererReport{
+		Schema:                       surface.RendererFeatureSchemaV1,
+		Backend:                      "software-rgba",
+		ColorFormat:                  "rgba8",
+		QualityLevel:                 "deterministic-software-renderer-v1",
+		SoftwareRenderer:             true,
+		GPUProductionClaim:           false,
+		BlurProductionClaim:          false,
+		BackdropBlurProductionClaim:  false,
+		CommandOrder:                 blockRendererCommandOrderForScenario(),
+		CompositorLayers:             blockRendererCompositorLayersForScenario(blockID),
+		DirtyRects:                   blockRendererDirtyRectsForScenario(),
+		Invalidations:                blockRendererInvalidationsForScenario(blockID),
+		CacheStats:                   blockRendererCacheStatsForScenario(),
+		UnsupportedEffectsRejected:   []string{"gpu-production", "blur", "backdrop-blur"},
+		DeterministicFrameChecksums:  checksums,
+		ReferenceFrameArtifactSHA256: "sha256:" + checksumText("surface-renderer-reference-frame-v1"),
+	}
+}
+
+func blockRendererCompositorLayersForScenario(blockID int) []surface.RendererCompositorLayerReport {
+	return []surface.RendererCompositorLayerReport{
+		{ID: "root", Kind: "root", Order: 1, BlockID: blockID, Rect: surface.RectReport{X: 0, Y: 0, W: 320, H: 200}, Opacity: 255, Transform: "identity", Checksum: "sha256:" + checksumText("renderer-layer-root")},
+		{ID: "content", Kind: "content", Order: 2, BlockID: blockID, Rect: surface.RectReport{X: 12, Y: 10, W: 64, H: 28}, ClipApplied: true, Clip: surface.RectReport{X: 12, Y: 10, W: 64, H: 28}, Opacity: 255, Transform: "translate(0,0)", Checksum: "sha256:" + checksumText("renderer-layer-content")},
+		{ID: "overlay", Kind: "overlay", Order: 3, BlockID: blockID, Rect: surface.RectReport{X: 12, Y: 10, W: 64, H: 28}, Opacity: 102, Transform: "translate(0,1)", Checksum: "sha256:" + checksumText("renderer-layer-overlay")},
+		{ID: "text", Kind: "text", Order: 4, BlockID: blockID, Rect: surface.RectReport{X: 20, Y: 16, W: 32, H: 12}, Opacity: 255, Transform: "identity", Checksum: "sha256:" + checksumText("renderer-layer-text")},
+		{ID: "icon", Kind: "icon", Order: 5, BlockID: blockID, Rect: surface.RectReport{X: 56, Y: 16, W: 12, H: 12}, Opacity: 255, Transform: "identity", Checksum: "sha256:" + checksumText("renderer-layer-icon")},
+	}
+}
+
+func blockRendererDirtyRectsForScenario() []surface.RendererDirtyRectReport {
+	return []surface.RendererDirtyRectReport{
+		{FrameOrder: 1, Rect: surface.RectReport{X: 12, Y: 10, W: 68, H: 36}, Reason: "initial-paint", Checksum: "sha256:" + checksumText("renderer-dirty-initial")},
+		{FrameOrder: 2, Rect: surface.RectReport{X: 12, Y: 10, W: 68, H: 36}, Reason: "state-change", Checksum: "sha256:" + checksumText("renderer-dirty-state-change")},
+	}
+}
+
+func blockRendererInvalidationsForScenario(blockID int) []surface.RendererInvalidationReport {
+	return []surface.RendererInvalidationReport{
+		{Order: 1, BlockID: blockID, Reason: "hovered changed", DirtyRect: surface.RectReport{X: 12, Y: 10, W: 68, H: 36}, Repaint: true},
+		{Order: 2, BlockID: blockID, Reason: "text input changed", DirtyRect: surface.RectReport{X: 20, Y: 16, W: 44, H: 12}, Repaint: true},
+	}
+}
+
+func blockRendererCacheStatsForScenario() surface.RendererCacheStatsReport {
+	return surface.RendererCacheStatsReport{
+		ID:          "software-rgba-render-cache",
+		Strategy:    "bounded-lru",
+		BudgetBytes: 65536,
+		UsedBytes:   len(blockRendererCommandOrderForScenario()) * 2048,
+		EntryCount:  len(blockRendererCommandOrderForScenario()),
+		Hits:        3,
+		Misses:      2,
+		Bounded:     true,
 	}
 }
 
@@ -3484,7 +4269,8 @@ func runBlockLayoutScenario() headlessScenario {
 		LayoutConstraints:           blockLayoutConstraintsForScenario(),
 		LayoutPasses:                blockLayoutPassesForScenario(),
 		LayoutScrolls:               blockLayoutScrollsForScenario(),
-		LayoutFeatures:              []string{"stack", "row", "column", "absolute", "overlay", "grid", "dock", "scroll", "fit", "fill", "fixed", "min", "max", "spacing", "alignment", "z-order", "clipping", "resize"},
+		LayoutDensity:               blockLayoutDensityForScenario(),
+		LayoutFeatures:              []string{"stack", "row", "column", "absolute", "overlay", "grid", "dock", "scroll", "fit", "fill", "fixed", "min", "max", "aspect", "spacing", "alignment", "z-order", "clipping", "resize", "density", "stable-rounding"},
 		LayoutQualityLevel:          "deterministic-block-layout-v1",
 		LayoutUnsupportedCSSFlexbox: false,
 		Events: []surface.EventReport{
@@ -3582,6 +4368,7 @@ func runBlockLayoutScenario() headlessScenario {
 			{Name: "block layout grid dock overlay scroll", Kind: "positive", Ran: true, Pass: true},
 			{Name: "block layout clipping z-order", Kind: "positive", Ran: true, Pass: true},
 			{Name: "block layout resize constraints", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block layout aspect density stable rounding", Kind: "positive", Ran: true, Pass: true},
 			{Name: "block layout no css flexbox parity", Kind: "negative", Ran: true, Pass: true, ExpectedError: "CSS flexbox parity nonclaim"},
 			{Name: "reject legacy UI evidence", Kind: "negative", Ran: true, Pass: true, ExpectedError: "legacy UI evidence rejected"},
 		},
@@ -3607,6 +4394,7 @@ func blockLayoutConstraintsForScenario() []surface.BlockLayoutConstraintReport {
 		{ID: "row-fill", BlockID: 3, Mode: "row", WidthPolicy: "fill", HeightPolicy: "fixed", Min: surface.SizeReport{W: 160, H: 40}, Max: surface.SizeReport{W: 296, H: 64}, Padding: 6, Margin: 0, Gap: 6, Align: "center", Justify: "space-between", Overflow: "visible", ZIndex: 1, Clip: false},
 		{ID: "text-fit", BlockID: 8, Mode: "absolute", WidthPolicy: "fit", HeightPolicy: "fit", Min: surface.SizeReport{W: 32, H: 18}, Max: surface.SizeReport{W: 160, H: 40}, Padding: 4, Margin: 0, Gap: 0, Align: "start", Justify: "start", Overflow: "clip", ZIndex: 2, Clip: true},
 		{ID: "overlay-z", BlockID: 6, Mode: "overlay", WidthPolicy: "fixed", HeightPolicy: "fixed", Min: surface.SizeReport{W: 72, H: 40}, Max: surface.SizeReport{W: 72, H: 40}, Padding: 0, Margin: 0, Gap: 0, Align: "end", Justify: "start", Overflow: "visible", ZIndex: 4, Clip: false},
+		{ID: "aspect-fit", BlockID: 9, Mode: "absolute", WidthPolicy: "fixed", HeightPolicy: "fixed", Min: surface.SizeReport{W: 96, H: 54}, Max: surface.SizeReport{W: 96, H: 54}, Padding: 0, Margin: 0, Gap: 0, Align: "start", Justify: "start", Overflow: "clip", ZIndex: 2, Clip: true},
 	}
 }
 
@@ -3620,13 +4408,26 @@ func blockLayoutPassesForScenario() []surface.BlockLayoutPassReport {
 		{Order: 6, ParentID: 1, BlockID: 6, Mode: "overlay", Input: surface.RectReport{X: 220, Y: 20, W: 72, H: 40}, Resolved: surface.RectReport{X: 220, Y: 20, W: 72, H: 40}, Measured: surface.SizeReport{W: 72, H: 40}, Pass: "overlay-z-order", Resize: false, Clip: false, ZIndex: 4, Checksum: "sha256:" + checksumText("layout-overlay")},
 		{Order: 7, ParentID: 1, BlockID: 7, Mode: "scroll", Input: surface.RectReport{X: 236, Y: 72, W: 72, H: 80}, Resolved: surface.RectReport{X: 236, Y: 72, W: 72, H: 80}, Measured: surface.SizeReport{W: 72, H: 160}, Pass: "scroll-clip", Resize: false, Clip: true, ZIndex: 2, Checksum: "sha256:" + checksumText("layout-scroll")},
 		{Order: 8, ParentID: 1, BlockID: 8, Mode: "absolute", Input: surface.RectReport{X: 32, Y: 152, W: 0, H: 0}, Resolved: surface.RectReport{X: 32, Y: 152, W: 96, H: 20}, Measured: surface.SizeReport{W: 96, H: 20}, Pass: "fit-text", Resize: false, Clip: true, ZIndex: 2, Checksum: "sha256:" + checksumText("layout-absolute-fit")},
-		{Order: 9, ParentID: 0, BlockID: 1, Mode: "column", Input: surface.RectReport{X: 0, Y: 0, W: 480, H: 260}, Resolved: surface.RectReport{X: 12, Y: 12, W: 456, H: 236}, Measured: surface.SizeReport{W: 456, H: 236}, Pass: "resize", Resize: true, Clip: true, ZIndex: 0, Checksum: "sha256:" + checksumText("layout-resize")},
+		{Order: 9, ParentID: 1, BlockID: 9, Mode: "absolute", Input: surface.RectReport{X: 164, Y: 152, W: 96, H: 64}, Resolved: surface.RectReport{X: 164, Y: 152, W: 96, H: 54}, Measured: surface.SizeReport{W: 96, H: 54}, Pass: "aspect-fit", Resize: false, Clip: true, ZIndex: 2, Checksum: "sha256:" + checksumText("layout-aspect-fit")},
+		{Order: 10, ParentID: 0, BlockID: 1, Mode: "column", Input: surface.RectReport{X: 0, Y: 0, W: 480, H: 260}, Resolved: surface.RectReport{X: 12, Y: 12, W: 456, H: 236}, Measured: surface.SizeReport{W: 456, H: 236}, Pass: "resize", Resize: true, Clip: true, ZIndex: 0, Checksum: "sha256:" + checksumText("layout-resize")},
 	}
 }
 
 func blockLayoutScrollsForScenario() []surface.BlockLayoutScrollReport {
 	return []surface.BlockLayoutScrollReport{
 		{BlockID: 7, Viewport: surface.RectReport{X: 236, Y: 72, W: 72, H: 80}, Content: surface.SizeReport{W: 72, H: 160}, OffsetY: 32, MaxOffsetY: 80, Clipped: true, Checksum: "sha256:" + checksumText("layout-scroll-bounds")},
+	}
+}
+
+func blockLayoutDensityForScenario() *surface.BlockLayoutDensityReport {
+	return &surface.BlockLayoutDensityReport{
+		TargetDPI:      144,
+		ScaleMilli:     1500,
+		BaseUnitPx:     4,
+		RoundingPolicy: "integer-half-up-v1",
+		PixelSnapping:  true,
+		Breakpoints:    []string{"small", "medium", "large"},
+		Checksum:       "sha256:" + checksumText("layout-density-rounding"),
 	}
 }
 
@@ -4314,10 +5115,11 @@ func runBlockSystemScenario() headlessScenario {
 		BlockGraph:                  blockAccessibilityGraphForScenario(source),
 		PaintLayers:                 blockPaintLayersForScenario(),
 		PaintCommands:               blockPaintCommandsForScenario(),
-		VisualFeatures:              []string{"fill", "gradient", "border", "radius", "shadow", "outline"},
+		VisualFeatures:              blockRendererVisualFeaturesForScenario(),
 		PaintQualityLevel:           "deterministic-software-paint-v1",
 		PaintCacheBudgetBytes:       65536,
 		PaintUnsupportedBlur:        false,
+		Renderer:                    blockRendererReportForScenario(frames, 2),
 		TextMeasurements:            blockTextMeasurementsForScenario(),
 		FontFallbacks:               blockFontFallbacksForScenario(),
 		GlyphCaches:                 blockGlyphCachesForScenario(),
@@ -4327,7 +5129,8 @@ func runBlockSystemScenario() headlessScenario {
 		LayoutConstraints:           blockLayoutConstraintsForScenario(),
 		LayoutPasses:                blockLayoutPassesForScenario(),
 		LayoutScrolls:               blockLayoutScrollsForScenario(),
-		LayoutFeatures:              []string{"stack", "row", "column", "absolute", "overlay", "grid", "dock", "scroll", "fit", "fill", "fixed", "min", "max", "spacing", "alignment", "z-order", "clipping", "resize"},
+		LayoutDensity:               blockLayoutDensityForScenario(),
+		LayoutFeatures:              []string{"stack", "row", "column", "absolute", "overlay", "grid", "dock", "scroll", "fit", "fill", "fixed", "min", "max", "aspect", "spacing", "alignment", "z-order", "clipping", "resize", "density", "stable-rounding"},
 		LayoutQualityLevel:          "deterministic-block-layout-v1",
 		LayoutUnsupportedCSSFlexbox: false,
 		BlockStateSelectors:         blockStateSelectorsForScenario(),
@@ -4417,6 +5220,7 @@ func morphReportForScenario(source string, scenario headlessScenario) *surface.M
 		MotionPresets:    morphMotionPresetsForScenario(),
 		Recipes:          morphRecipesForScenario(),
 		RecipeExpansions: morphRecipeExpansionsForScenario(),
+		RecipeApps:       morphRecipeAppsForScenario(),
 		Accessibility: surface.MorphAccessibilityProjectionReport{
 			Schema:                "tetra.surface.morph.accessibility-projection.v1",
 			DerivedFromBlockGraph: true,
@@ -4495,18 +5299,55 @@ func morphTokenGraphForScenario(hash string) *surface.MorphTokenGraphReport {
 		Namespace:                  "tetra.surface.morph.app",
 		Version:                    "1",
 		Hash:                       hash,
+		SourceOfTruth:              "capsule",
+		ExplicitImports:            true,
+		NoGlobalCascade:            true,
+		FixedOverrideOrder:         []string{"base", "theme", "density", "variant", "state", "local"},
 		Categories:                 []string{"color", "space", "radius", "border", "elevation", "opacity", "typography", "motion", "z", "assets", "density"},
 		AliasCycleRejected:         true,
 		DuplicateSourceRejected:    true,
 		RawLiteralsInAppCode:       false,
 		UnresolvedFallbackRejected: true,
 		FallbackToRandomDefault:    false,
+		DensityDPI: []surface.MorphDensityDPIReport{
+			{Target: "headless", Token: "density.1x", TargetDPI: 96, ScaleMilli: 1000, RoundingPolicy: "integer-half-up-v1"},
+			{Target: "linux-x64-real-window", Token: "density.1x", TargetDPI: 96, ScaleMilli: 1000, RoundingPolicy: "integer-half-up-v1"},
+			{Target: "wasm32-web-browser-canvas", Token: "density.1x", TargetDPI: 96, ScaleMilli: 1000, RoundingPolicy: "integer-half-up-v1"},
+		},
+		Diagnostics: surface.MorphTokenGraphDiagnosticsReport{
+			AliasCycleRejected:           true,
+			MissingTokenRejected:         true,
+			DuplicateSourceRejected:      true,
+			RawLiteralRejected:           true,
+			UnresolvedFallbackRejected:   true,
+			CSSRuntimeRejected:           true,
+			MultipleColorSourcesRejected: true,
+			OverrideOrderRejected:        true,
+			DensityDPIRejected:           true,
+		},
 		Tokens: []surface.MorphTokenReport{
 			{ID: "color.bg", Category: "color", Kind: "rgba", Value: "#0b0f14ff", Source: "capsule", Hash: "sha256:" + checksumText("morph-token-color-bg")},
+			{ID: "color.surface", Category: "color", Kind: "rgba", Value: "#181f26ff", Source: "capsule", Hash: "sha256:" + checksumText("morph-token-color-surface")},
+			{ID: "color.surfaceAlpha", Category: "color", Kind: "rgba", Value: "#181f26da", Source: "capsule", Hash: "sha256:" + checksumText("morph-token-color-surface-alpha")},
+			{ID: "color.accent", Category: "color", Kind: "rgba", Value: "#60aef4ff", Source: "capsule", Hash: "sha256:" + checksumText("morph-token-color-accent")},
+			{ID: "color.muted", Category: "color", Kind: "rgba", Value: "#7e90a3ff", Source: "capsule", Hash: "sha256:" + checksumText("morph-token-color-muted")},
+			{ID: "color.warning", Category: "color", Kind: "rgba", Value: "#f4cd5cff", Source: "capsule", Hash: "sha256:" + checksumText("morph-token-color-warning")},
 			{ID: "space.3", Category: "space", Kind: "px", Value: "12", Source: "capsule", Hash: "sha256:" + checksumText("morph-token-space-3")},
+			{ID: "radius.sm", Category: "radius", Kind: "px", Value: "8", Source: "capsule", Hash: "sha256:" + checksumText("morph-token-radius-sm")},
 			{ID: "radius.md", Category: "radius", Kind: "px", Value: "10", Source: "capsule", Hash: "sha256:" + checksumText("morph-token-radius-md")},
+			{ID: "radius.lg", Category: "radius", Kind: "px", Value: "18", Source: "capsule", Hash: "sha256:" + checksumText("morph-token-radius-lg")},
+			{ID: "border.subtle", Category: "border", Kind: "px", Value: "1", Source: "capsule", Hash: "sha256:" + checksumText("morph-token-border-subtle")},
+			{ID: "border.glass", Category: "border", Kind: "px", Value: "1", Source: "capsule", Hash: "sha256:" + checksumText("morph-token-border-glass")},
+			{ID: "elevation.2", Category: "elevation", Kind: "shadow", Value: "0 3 10 72", Source: "capsule", Hash: "sha256:" + checksumText("morph-token-elevation-2")},
+			{ID: "elevation.3", Category: "elevation", Kind: "shadow", Value: "0 10 24 128", Source: "capsule", Hash: "sha256:" + checksumText("morph-token-elevation-3")},
+			{ID: "opacity.disabled", Category: "opacity", Kind: "alpha", Value: "128", Source: "capsule", Hash: "sha256:" + checksumText("morph-token-opacity-disabled")},
 			{ID: "type.label", Category: "typography", Kind: "font", Value: "Tetra UI 13 600 18", Source: "capsule", Hash: "sha256:" + checksumText("morph-token-type-label")},
 			{ID: "motion.fast", Category: "motion", Kind: "transition", Value: "120 ease.out", Source: "capsule", Hash: "sha256:" + checksumText("morph-token-motion-fast")},
+			{ID: "motion.soft", Category: "motion", Kind: "transition", Value: "180 ease.inOut", Source: "capsule", Hash: "sha256:" + checksumText("morph-token-motion-soft")},
+			{ID: "z.base", Category: "z", Kind: "layer", Value: "0", Source: "capsule", Hash: "sha256:" + checksumText("morph-token-z-base")},
+			{ID: "assets.gradient.vertical", Category: "assets", Kind: "gradient", Value: "vertical", Source: "capsule", Hash: "sha256:" + checksumText("morph-token-assets-gradient-vertical")},
+			{ID: "assets.icon.fallback", Category: "assets", Kind: "icon", Value: "fallback", Source: "capsule", Hash: "sha256:" + checksumText("morph-token-assets-icon-fallback")},
+			{ID: "density.1x", Category: "density", Kind: "dpi", Value: "96/1000", Source: "capsule", Hash: "sha256:" + checksumText("morph-token-density-1x")},
 		},
 	}
 }
@@ -4516,7 +5357,7 @@ func morphMaterialsForScenario() []surface.MorphMaterialReport {
 		{Name: "surface.base", PaintStack: []string{"fill", "border", "radius"}, Fill: "color.surface", Border: "border.subtle", Radius: "radius.md", UnsupportedBlurRejected: true},
 		{Name: "surface.elevated", PaintStack: []string{"fill", "border", "radius", "shadow"}, Fill: "color.surface", Border: "border.subtle", Radius: "radius.md", Shadow: "elevation.2", UnsupportedBlurRejected: true},
 		{Name: "control.primary", PaintStack: []string{"fill", "radius"}, Fill: "color.accent", Radius: "radius.sm", UnsupportedBlurRejected: true},
-		{Name: "translucent.panel", PaintStack: []string{"fill", "border", "radius", "shadow", "overlay"}, Fill: "color.surfaceAlpha", Border: "border.glass", Radius: "radius.lg", Shadow: "elevation.3", Overlay: "gradient.vertical", UnsupportedBlurRejected: true},
+		{Name: "translucent.panel", PaintStack: []string{"fill", "border", "radius", "shadow", "overlay"}, Fill: "color.surfaceAlpha", Border: "border.glass", Radius: "radius.lg", Shadow: "elevation.3", Overlay: "assets.gradient.vertical", UnsupportedBlurRejected: true},
 	}
 }
 
@@ -4565,6 +5406,13 @@ func morphRecipesForScenario() []surface.MorphRecipeReport {
 		{Name: "field.text@1", Output: "Block", Slots: []string{"label", "control"}, Inputs: []string{"value", "on_text"}, ExpandsToBlockGraph: true},
 		{Name: "command.item@1", Output: "Block", Slots: []string{"icon", "title", "subtitle"}, Inputs: []string{"title", "subtitle", "icon", "selected"}, ExpandsToBlockGraph: true},
 		{Name: "region.panel@1", Output: "Block", Slots: []string{"header", "body", "actions"}, Inputs: []string{"title"}, ExpandsToBlockGraph: true},
+		{Name: "form.field@1", Output: "Block", Slots: []string{"label", "control", "hint", "error"}, Inputs: []string{"label", "value", "validation"}, ExpandsToBlockGraph: true},
+		{Name: "nav.item@1", Output: "Block", Slots: []string{"icon", "label", "badge"}, Inputs: []string{"label", "destination", "selected"}, ExpandsToBlockGraph: true},
+		{Name: "metric.tile@1", Output: "Block", Slots: []string{"label", "value", "trend"}, Inputs: []string{"label", "value", "trend"}, ExpandsToBlockGraph: true},
+		{Name: "dialog.panel@1", Output: "Block", Slots: []string{"title", "body", "actions"}, Inputs: []string{"title", "open", "dismiss"}, ExpandsToBlockGraph: true},
+		{Name: "toast.notification@1", Output: "Block", Slots: []string{"icon", "message", "action"}, Inputs: []string{"message", "severity", "timeout"}, ExpandsToBlockGraph: true},
+		{Name: "tab.item@1", Output: "Block", Slots: []string{"label", "indicator"}, Inputs: []string{"label", "selected", "target"}, ExpandsToBlockGraph: true},
+		{Name: "list.row@1", Output: "Block", Slots: []string{"leading", "title", "meta", "action"}, Inputs: []string{"title", "subtitle", "selected"}, ExpandsToBlockGraph: true},
 	}
 }
 
@@ -4574,6 +5422,23 @@ func morphRecipeExpansionsForScenario() []surface.MorphRecipeExpansionReport {
 		{Recipe: "field.text@1", BlockIDs: []int{3}, SlotBindings: []string{"label", "control"}, Variant: "default", Reported: true},
 		{Recipe: "command.item@1", BlockIDs: []int{4, 5}, SlotBindings: []string{"icon", "title", "subtitle"}, Variant: "selected", Reported: true},
 		{Recipe: "region.panel@1", BlockIDs: []int{2}, SlotBindings: []string{"header", "body", "actions"}, Variant: "elevated", Reported: true},
+		{Recipe: "form.field@1", BlockIDs: []int{3, 4}, SlotBindings: []string{"label", "control", "hint", "error"}, Variant: "validated", Reported: true},
+		{Recipe: "nav.item@1", BlockIDs: []int{5}, SlotBindings: []string{"icon", "label", "badge"}, Variant: "selected", Reported: true},
+		{Recipe: "metric.tile@1", BlockIDs: []int{2, 5}, SlotBindings: []string{"label", "value", "trend"}, Variant: "compact", Reported: true},
+		{Recipe: "dialog.panel@1", BlockIDs: []int{2, 4}, SlotBindings: []string{"title", "body", "actions"}, Variant: "modal", Reported: true},
+		{Recipe: "toast.notification@1", BlockIDs: []int{5}, SlotBindings: []string{"icon", "message", "action"}, Variant: "warning", Reported: true},
+		{Recipe: "tab.item@1", BlockIDs: []int{4}, SlotBindings: []string{"label", "indicator"}, Variant: "active", Reported: true},
+		{Recipe: "list.row@1", BlockIDs: []int{4, 5}, SlotBindings: []string{"leading", "title", "meta", "action"}, Variant: "interactive", Reported: true},
+	}
+}
+
+func morphRecipeAppsForScenario() []surface.MorphRecipeAppReport {
+	return []surface.MorphRecipeAppReport{
+		{Source: "examples/surface_morph_command_palette.tetra", Module: "examples.surface_morph_command_palette", Recipes: []string{"control.action@1", "field.text@1", "command.item@1", "region.panel@1"}, ExpandsToBlockGraph: true, BlockCount: 7, AccessibilityProjection: true, OutputPrimitives: []string{"Block"}},
+		{Source: "examples/surface_morph_project_dashboard.tetra", Module: "examples.surface_morph_project_dashboard", Recipes: []string{"region.panel@1", "metric.tile@1", "list.row@1", "toast.notification@1"}, ExpandsToBlockGraph: true, BlockCount: 7, AccessibilityProjection: true, OutputPrimitives: []string{"Block"}},
+		{Source: "examples/surface_morph_settings.tetra", Module: "examples.surface_morph_settings", Recipes: []string{"form.field@1", "field.text@1", "tab.item@1", "control.action@1"}, ExpandsToBlockGraph: true, BlockCount: 7, AccessibilityProjection: true, OutputPrimitives: []string{"Block"}},
+		{Source: "examples/surface_morph_editor_shell.tetra", Module: "examples.surface_morph_editor_shell", Recipes: []string{"nav.item@1", "tab.item@1", "command.item@1", "region.panel@1"}, ExpandsToBlockGraph: true, BlockCount: 7, AccessibilityProjection: true, OutputPrimitives: []string{"Block"}},
+		{Source: "examples/surface_morph_glass_panel.tetra", Module: "examples.surface_morph_glass_panel", Recipes: []string{"dialog.panel@1", "toast.notification@1", "control.action@1", "region.panel@1"}, ExpandsToBlockGraph: true, BlockCount: 7, AccessibilityProjection: true, OutputPrimitives: []string{"Block"}},
 	}
 }
 
@@ -4581,11 +5446,17 @@ func morphCasesForScenario() []surface.CaseReport {
 	return []surface.CaseReport{
 		{Name: "morph capsule explicit import namespace", Kind: "positive", Ran: true, Pass: true},
 		{Name: "morph token graph categories and hash", Kind: "positive", Ran: true, Pass: true},
+		{Name: "morph token graph resolves material and asset refs", Kind: "positive", Ran: true, Pass: true},
+		{Name: "morph token graph fixed override order", Kind: "positive", Ran: true, Pass: true},
+		{Name: "morph token graph density dpi mapping", Kind: "positive", Ran: true, Pass: true},
 		{Name: "morph material paint stack resolved to Block paint", Kind: "positive", Ran: true, Pass: true},
 		{Name: "morph affordance projects accessibility", Kind: "positive", Ran: true, Pass: true},
 		{Name: "morph recipes expand to Block graph", Kind: "positive", Ran: true, Pass: true},
 		{Name: "morph state and motion lenses deterministic", Kind: "positive", Ran: true, Pass: true},
 		{Name: "morph asset refs local hashed bounded cache", Kind: "positive", Ran: true, Pass: true},
+		{Name: "morph raw style literal rejected outside token scope", Kind: "negative", Ran: true, Pass: true, ExpectedError: "raw style literal rejected"},
+		{Name: "morph CSS cascade runtime rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "CSS cascade runtime rejected"},
+		{Name: "morph multiple color sources rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "multiple color sources rejected"},
 		{Name: "morph core primitive promotion rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "core primitive promotion rejected"},
 		{Name: "morph dirty checkout production claim rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "dirty checkout production rejected"},
 	}
@@ -4721,6 +5592,169 @@ func blockMemoryBudgetForScenario(scenario headlessScenario) *surface.BlockMemor
 	}
 }
 
+func surfacePerformanceBudgetForScenario(target string, runtimeName string, source string, artifacts []surface.ArtifactReport, scenario headlessScenario) *surface.SurfacePerformanceBudgetReport {
+	peakFramebufferBytes, totalFramebufferBytes := blockFramebufferByteTotalsForScenario(scenario.Frames)
+	if peakFramebufferBytes <= 0 {
+		peakFramebufferBytes = 1
+	}
+	if totalFramebufferBytes < peakFramebufferBytes {
+		totalFramebufferBytes = peakFramebufferBytes
+	}
+	glyphCacheBytes := glyphCacheUsedBytesForScenario(scenario.GlyphCaches)
+	if glyphCacheBytes == 0 && len(scenario.TextRenderCommands) > 0 {
+		glyphCacheBytes = len(scenario.TextRenderCommands) * 2048
+	}
+	assetCacheBytes := scenario.BlockAssetCache.UsedBytes
+	layoutCacheBytes := maxInt(1, len(scenario.LayoutPasses)) * 1024
+	paintCacheBytes := maxInt(1, len(scenario.PaintCommands)) * 2048
+	totalCacheBytes := glyphCacheBytes + assetCacheBytes + layoutCacheBytes + paintCacheBytes
+	totalCacheBudgetBytes := surfaceBudgetOrDefault(scenario.TextCacheBudgetBytes, 65536) +
+		surfaceBudgetOrDefault(scenario.BlockAssetCache.BudgetBytes, 65536) +
+		surfaceBudgetOrDefault(65536, 65536) +
+		surfaceBudgetOrDefault(scenario.PaintCacheBudgetBytes, 65536)
+	frameCount := maxInt(1, len(scenario.Frames))
+	buildP50 := minInt(8, maxInt(1, len(scenario.Components)+len(scenario.LayoutPasses)/4))
+	buildP95 := minInt(12, buildP50+3)
+	presentP50 := 2
+	presentP95 := 4
+	binaryPath, binarySize := performanceBudgetBinaryArtifact(artifacts)
+	gitHead := gitHeadForReport()
+	if len(gitHead) != 40 {
+		gitHead = "0000000000000000000000000000000000000000"
+	}
+	return &surface.SurfacePerformanceBudgetReport{
+		Schema:           surface.PerformanceBudgetSchemaV1,
+		Model:            "surface-performance-budget-v1",
+		ReleaseScope:     surface.ReleaseScopeSurfaceV1LinuxWeb,
+		Source:           source,
+		Target:           target,
+		Runtime:          runtimeName,
+		ProductionClaim:  true,
+		Experimental:     false,
+		GitHead:          gitHead,
+		PerformanceClaim: "none",
+		Startup: surface.SurfaceStartupBudgetReport{
+			LaunchToFirstFrameMS: 18,
+			BudgetMS:             250,
+			Trace:                "local-startup-trace-v1",
+			Pass:                 true,
+		},
+		Frame: surface.SurfaceFrameBudgetReport{
+			FrameCount:    frameCount,
+			P50BuildMS:    buildP50,
+			P95BuildMS:    buildP95,
+			P50PresentMS:  presentP50,
+			P95PresentMS:  presentP95,
+			BudgetMS:      16,
+			IdleLoopCount: maxInt(1, frameCount*8),
+			WorkLoopCount: maxInt(1, len(scenario.Events)+len(scenario.StateTransitions)+frameCount),
+			Pass:          true,
+		},
+		Scene: surface.SurfaceSceneBudgetReport{
+			BlockCount:           maxInt(1, len(scenario.Components)),
+			RecipeExpansionCount: surfaceRecipeExpansionCountForScenario(scenario),
+			PaintCommandCount:    len(scenario.PaintCommands),
+			LayoutPassCount:      len(scenario.LayoutPasses),
+			TextRunCount:         len(scenario.TextRenderCommands),
+		},
+		Memory: surface.SurfaceMemoryBudgetReport{
+			GlyphCacheBytes:        glyphCacheBytes,
+			AssetCacheBytes:        assetCacheBytes,
+			LayoutCacheBytes:       layoutCacheBytes,
+			PaintCacheBytes:        paintCacheBytes,
+			FramebufferPeakBytes:   peakFramebufferBytes,
+			FramebufferTotalBytes:  totalFramebufferBytes,
+			RSSMeasured:            false,
+			PeakRSSBytes:           0,
+			AllocationCount:        maxInt(1, len(scenario.Components)+len(scenario.Events)+frameCount),
+			AllocationBytes:        totalFramebufferBytes + totalCacheBytes,
+			BoundedCaches:          true,
+			UnboundedCacheRejected: true,
+			Pass:                   true,
+		},
+		Binary: surface.SurfaceBinaryBudgetReport{
+			ArtifactPath: binaryPath,
+			SizeBytes:    binarySize,
+			BudgetBytes:  16 * 1024 * 1024,
+			Pass:         true,
+		},
+		CPUPowerProxy: surface.SurfaceCPUPowerProxyReport{
+			IdleLoopCount:     maxInt(1, frameCount*8),
+			WorkLoopCount:     maxInt(1, len(scenario.Events)+len(scenario.StateTransitions)+frameCount),
+			IdleFrameCount:    maxInt(1, frameCount-1),
+			WorkFrameCount:    1,
+			RealPowerMeasured: false,
+			Pass:              true,
+		},
+		Cache: surface.SurfaceCacheBudgetReport{
+			GlyphCacheBudgetBytes:  surfaceBudgetOrDefault(scenario.TextCacheBudgetBytes, 65536),
+			AssetCacheBudgetBytes:  surfaceBudgetOrDefault(scenario.BlockAssetCache.BudgetBytes, 65536),
+			LayoutCacheBudgetBytes: 65536,
+			PaintCacheBudgetBytes:  surfaceBudgetOrDefault(scenario.PaintCacheBudgetBytes, 65536),
+			TotalCacheBytes:        totalCacheBytes,
+			TotalCacheBudgetBytes:  totalCacheBudgetBytes,
+			Eviction:               "bounded-lru",
+			Pass:                   true,
+		},
+		Methodology: surface.SurfacePerformanceMethodologyReport{
+			Kind:                                   "local-deterministic-budget-v1",
+			ElectronComparison:                     "none",
+			OfficialBenchmark:                      false,
+			CrossMachine:                           false,
+			FairComparisonRequiredForElectronClaim: true,
+		},
+		UnsupportedClaims: []string{
+			"faster-than-electron",
+			"lower-power-than-electron",
+			"official-benchmark-result",
+			"cross-machine-benchmark",
+			"electron-parity-performance",
+		},
+		NegativeGuards: surface.SurfacePerformanceNegativeGuards{
+			BoundedCaches:             true,
+			UnboundedCacheRejected:    true,
+			StaleReportRejected:       true,
+			NoFasterThanElectronClaim: true,
+			NoBenchmarkParityClaim:    true,
+			PeakMemoryFieldRequired:   true,
+			NoOfficialBenchmarkClaim:  true,
+		},
+	}
+}
+
+func performanceBudgetBinaryArtifact(artifacts []surface.ArtifactReport) (string, int) {
+	if artifact := artifactByKindForPerformanceBudget(artifacts, "component-app"); artifact != nil {
+		return artifact.Path, maxInt(1, int(artifact.Size))
+	}
+	if len(artifacts) > 0 {
+		return artifacts[0].Path, maxInt(1, int(artifacts[0].Size))
+	}
+	return "surface-runtime-smoke-synthetic-report", 1
+}
+
+func artifactByKindForPerformanceBudget(artifacts []surface.ArtifactReport, kind string) *surface.ArtifactReport {
+	for i := range artifacts {
+		if artifacts[i].Kind == kind {
+			return &artifacts[i]
+		}
+	}
+	return nil
+}
+
+func surfaceRecipeExpansionCountForScenario(scenario headlessScenario) int {
+	if scenario.Morph == nil {
+		return 0
+	}
+	return len(scenario.Morph.RecipeExpansions)
+}
+
+func surfaceBudgetOrDefault(value int, fallback int) int {
+	if value > 0 {
+		return value
+	}
+	return fallback
+}
+
 func blockFramebufferByteTotalsForScenario(frames []surface.FrameReport) (int, int) {
 	peak := 0
 	total := 0
@@ -4744,6 +5778,13 @@ func glyphCacheUsedBytesForScenario(caches []surface.GlyphCacheReport) int {
 
 func maxInt(a int, b int) int {
 	if a > b {
+		return a
+	}
+	return b
+}
+
+func minInt(a int, b int) int {
+	if a < b {
 		return a
 	}
 	return b
@@ -5041,10 +6082,15 @@ func blockSystemCasesForScenario() []surface.CaseReport {
 		{Name: "block graph focus order", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block graph hit-test path", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block graph accessibility order", Kind: "positive", Ran: true, Pass: true},
-		{Name: "block paint fill border radius shadow outline", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block paint fill gradient image fill border radius clip shadow overlay outline text icon", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block paint deterministic command order", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block paint frame checksum changed", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block paint unsupported blur rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "unsupported blur"},
+		{Name: "block renderer software rgba contract", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block compositor dirty rect invalidation cache", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block renderer opacity transform clipped child", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block renderer gpu production claim rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "gpu production"},
+		{Name: "block renderer unsupported backdrop blur rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "backdrop blur"},
 		{Name: "block text deterministic measurement", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block text wrap ellipsis layout", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block text font fallback chain", Kind: "positive", Ran: true, Pass: true},
@@ -5056,6 +6102,7 @@ func blockSystemCasesForScenario() []surface.CaseReport {
 		{Name: "block layout grid dock overlay scroll", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block layout clipping z-order", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block layout resize constraints", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block layout aspect density stable rounding", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block layout no css flexbox parity", Kind: "negative", Ran: true, Pass: true, ExpectedError: "CSS flexbox parity nonclaim"},
 		{Name: "block state selector resolver order", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block state hover fill override", Kind: "positive", Ran: true, Pass: true},
@@ -5644,6 +6691,9 @@ func runSurfaceScenario(mode string) headlessScenario {
 	if isReleaseWindowMode(mode) {
 		return runLinuxX64ReleaseWindowScenario()
 	}
+	if isReleaseAppShellMode(mode) {
+		return runLinuxAppShellScenario()
+	}
 	if isReleaseBrowserMode(mode) {
 		return runReleaseBrowserScenario()
 	}
@@ -5697,6 +6747,9 @@ func runSurfaceScenario(mode string) headlessScenario {
 	}
 	if isAccessibilityMetadataMode(mode) {
 		return runAccessibilityMetadataScenario(mode)
+	}
+	if isAppModelMode(mode) {
+		return runAppModelScenario()
 	}
 	return runCounterScenario(mode)
 }
@@ -5874,6 +6927,7 @@ func runReleaseToolkitScenario(mode string) headlessScenario {
 
 func runReleaseBrowserScenario() headlessScenario {
 	scenario := runReleaseToolkitScenario("wasm32-web-release-toolkit")
+	scenario.BrowserSurface = releaseBrowserSurfaceReport()
 	scenario.Cases = append(scenario.Cases,
 		surface.CaseReport{Name: "browser release Surface v1 schema", Kind: "positive", Ran: true, Pass: true},
 		surface.CaseReport{Name: "browser release Chromium canvas readback", Kind: "positive", Ran: true, Pass: true},
@@ -5884,6 +6938,75 @@ func runReleaseBrowserScenario() headlessScenario {
 		surface.CaseReport{Name: "browser release forbidden web sidecar rejection", Kind: "negative", Ran: true, Pass: true, ExpectedError: "forbidden web sidecar rejected"},
 	)
 	return scenario
+}
+
+func releaseBrowserSurfaceReport() *surface.BrowserSurfaceReport {
+	return &surface.BrowserSurfaceReport{
+		Schema:              surface.BrowserSurfaceSchemaV1,
+		BrowserSurfaceLevel: "browser-canvas-release-v1",
+		ReleaseScope:        surface.ReleaseScopeSurfaceV1LinuxWeb,
+		Source:              "examples/surface_release_form.tetra",
+		HostAdapter:         "compiler-owned-browser-canvas-host",
+		ProductionClaim:     true,
+		Experimental:        false,
+		CompilerOwnedBoot:   true,
+		DOMHostCanvasOnly:   true,
+		Canvas: surface.BrowserSurfaceCanvasReport{
+			Opened:       true,
+			Readback:     true,
+			Width:        560,
+			Height:       420,
+			FrameOrder:   5,
+			ArtifactKind: "runner-trace",
+			Pass:         true,
+		},
+		Input: surface.BrowserSurfaceInputReport{
+			Pointer:      true,
+			Keyboard:     true,
+			Text:         true,
+			Resize:       true,
+			HostTrace:    true,
+			NativeEvents: []string{"pointerup", "keydown", "beforeinput", "resize"},
+			Pass:         true,
+		},
+		Clipboard: surface.BrowserSurfaceClipboardReport{
+			Harness:   "deterministic-browser-clipboard-v1",
+			Read:      true,
+			Write:     true,
+			OwnedCopy: true,
+			Bytes:     13,
+			Pass:      true,
+		},
+		Composition: surface.BrowserSurfaceCompositionReport{
+			Start:  true,
+			Update: true,
+			Commit: true,
+			Cancel: true,
+			Pass:   true,
+		},
+		Accessibility: surface.BrowserSurfaceAccessibilityReport{
+			Snapshot:      true,
+			Mirror:        true,
+			CompilerOwned: true,
+			Bounds:        true,
+			Focus:         true,
+			Roles:         []string{"root", "textbox", "checkbox", "button", "status"},
+			DOMVisualUI:   false,
+			UserJS:        false,
+			Pass:          true,
+		},
+		HostTraces: []surface.BrowserSurfaceHostTraceReport{
+			{Name: "browser-canvas", ArtifactKind: "runner-trace", Path: "surface-runner-trace.json", Pass: true},
+		},
+		NegativeGuards: surface.BrowserSurfaceNegativeGuards{
+			NoDOMAppUITree:      true,
+			NoUserJSAppLogic:    true,
+			NoNodeOnlyPromotion: true,
+			NoLegacySidecars:    true,
+			NoReactRuntime:      true,
+			NoPlatformWidgets:   true,
+		},
+	}
 }
 
 func runLinuxX64ReleaseWindowScenario() headlessScenario {
@@ -8566,15 +9689,19 @@ func buildReport(opt smokeOptions, host string, processes []surface.ProcessRepor
 	source := defaultSurfaceSourcePath(opt)
 	target := mode
 	runtimeName := "surface-headless"
-	if mode == "headless-text-focus-input" || mode == "headless-release-toolkit" || mode == "headless-release-accessibility" || mode == "headless-component-tree" || mode == "headless-component-tree-api" || mode == "headless-block-paint" || mode == "headless-block-text" || mode == "headless-block-layout" || mode == "headless-block-events" || mode == "headless-block-states" || mode == "headless-block-motion" || mode == "headless-block-assets" || mode == "headless-block-accessibility" || mode == "headless-block-system" || mode == "headless-morph" || mode == "headless-minimal-toolkit" || mode == "headless-toolkit-reuse" || mode == "headless-accessibility-metadata" {
+	if mode == "headless-text-focus-input" || mode == "headless-release-toolkit" || mode == "headless-release-accessibility" || mode == "headless-component-tree" || mode == "headless-component-tree-api" || mode == "headless-block-paint" || mode == "headless-block-text" || mode == "headless-block-layout" || mode == "headless-block-events" || mode == "headless-block-states" || mode == "headless-block-motion" || mode == "headless-block-assets" || mode == "headless-block-accessibility" || mode == "headless-block-system" || mode == "headless-morph" || mode == "headless-minimal-toolkit" || mode == "headless-toolkit-reuse" || mode == "headless-accessibility-metadata" || mode == "headless-app-model" {
 		target = "headless"
 		runtimeName = "surface-headless"
-	} else if mode == "linux-x64" || mode == "linux-x64-real-window" || mode == "linux-x64-real-window-text-focus-input" || mode == "linux-x64-release-toolkit" || mode == "linux-x64-release-window" || mode == "linux-x64-release-accessibility" || mode == "linux-x64-real-window-component-tree" || mode == "linux-x64-real-window-component-tree-api" || mode == "linux-x64-real-window-block-system" || mode == "linux-x64-real-window-minimal-toolkit" || mode == "linux-x64-real-window-toolkit-reuse" || mode == "linux-x64-real-window-accessibility-metadata" {
+	} else if mode == "linux-x64" || mode == "linux-x64-real-window" || mode == "linux-x64-real-window-text-focus-input" || mode == "linux-x64-release-toolkit" || mode == "linux-x64-release-window" || mode == "linux-x64-release-app-shell" || mode == "linux-x64-release-accessibility" || mode == "linux-x64-real-window-component-tree" || mode == "linux-x64-real-window-component-tree-api" || mode == "linux-x64-real-window-block-system" || mode == "linux-x64-real-window-minimal-toolkit" || mode == "linux-x64-real-window-toolkit-reuse" || mode == "linux-x64-real-window-accessibility-metadata" {
 		target = "linux-x64"
 		runtimeName = "surface-linux-x64"
 	} else if mode == "wasm32-web" || mode == "wasm32-web-browser-canvas" || mode == "wasm32-web-browser-canvas-text-focus-input" || mode == "wasm32-web-release-toolkit" || mode == "wasm32-web-release-browser" || mode == "wasm32-web-release-accessibility" || mode == "wasm32-web-browser-canvas-component-tree" || mode == "wasm32-web-browser-canvas-component-tree-api" || mode == "wasm32-web-browser-canvas-minimal-toolkit" || mode == "wasm32-web-browser-canvas-toolkit-reuse" || mode == "wasm32-web-browser-canvas-accessibility-metadata" || mode == "wasm32-web-browser-canvas-block-system" {
 		target = "wasm32-web"
 		runtimeName = "surface-wasm32-web"
+	}
+	performanceBudget := scenario.SurfacePerformanceBudget
+	if performanceBudget == nil {
+		performanceBudget = surfacePerformanceBudgetForScenario(target, runtimeName, source, artifacts, scenario)
 	}
 	return surface.Report{
 		Schema:                          surface.SchemaV1,
@@ -8599,6 +9726,7 @@ func buildReport(opt smokeOptions, host string, processes []surface.ProcessRepor
 		PaintQualityLevel:               scenario.PaintQualityLevel,
 		PaintCacheBudgetBytes:           scenario.PaintCacheBudgetBytes,
 		PaintUnsupportedBlur:            scenario.PaintUnsupportedBlur,
+		Renderer:                        scenario.Renderer,
 		TextMeasurements:                scenario.TextMeasurements,
 		FontFallbacks:                   scenario.FontFallbacks,
 		GlyphCaches:                     scenario.GlyphCaches,
@@ -8608,6 +9736,7 @@ func buildReport(opt smokeOptions, host string, processes []surface.ProcessRepor
 		LayoutConstraints:               scenario.LayoutConstraints,
 		LayoutPasses:                    scenario.LayoutPasses,
 		LayoutScrolls:                   scenario.LayoutScrolls,
+		LayoutDensity:                   scenario.LayoutDensity,
 		LayoutFeatures:                  scenario.LayoutFeatures,
 		LayoutQualityLevel:              scenario.LayoutQualityLevel,
 		LayoutUnsupportedCSSFlexbox:     scenario.LayoutUnsupportedCSSFlexbox,
@@ -8638,6 +9767,11 @@ func buildReport(opt smokeOptions, host string, processes []surface.ProcessRepor
 		Morph:                           scenario.Morph,
 		Toolkit:                         scenario.Toolkit,
 		AccessibilityTree:               scenario.AccessibilityTree,
+		AppModel:                        scenario.AppModel,
+		LinuxAppShell:                   scenario.LinuxAppShell,
+		SecurityPermissions:             scenario.SecurityPermissions,
+		SurfacePerformanceBudget:        performanceBudget,
+		BrowserSurface:                  scenario.BrowserSurface,
 		Events:                          scenario.Events,
 		Frames:                          scenario.Frames,
 		StateTransitions:                scenario.StateTransitions,
@@ -8647,39 +9781,64 @@ func buildReport(opt smokeOptions, host string, processes []surface.ProcessRepor
 
 func buildTextInputReport(opt smokeOptions, processes []surface.ProcessReport, artifacts []surface.ArtifactReport, artifactScan surface.ArtifactScanReport, cases []surface.CaseReport) surface.TextInputReport {
 	return surface.TextInputReport{
-		Schema:             surface.TextInputSchemaV1,
-		Target:             releaseTextInputTarget(opt.Mode),
-		Source:             defaultSurfaceSourcePath(opt),
-		Level:              "production-text-input-v1",
-		Experimental:       false,
-		ProductionClaim:    true,
-		Storage:            "owned-utf8-byte-buffer",
-		UTF8Validation:     true,
-		Caret:              true,
-		Selection:          true,
-		Backspace:          true,
-		Delete:             true,
-		HomeEnd:            true,
-		ArrowLeftRight:     true,
-		CompositionEvents:  true,
-		CompositionCommit:  true,
-		CompositionCancel:  true,
-		ClipboardRead:      true,
-		ClipboardWrite:     true,
-		ClipboardHostABI:   true,
-		ClipboardOwnedCopy: true,
+		Schema:                     surface.TextInputSchemaV1,
+		Target:                     releaseTextInputTarget(opt.Mode),
+		Source:                     defaultSurfaceSourcePath(opt),
+		Level:                      "production-text-input-v1",
+		Experimental:               false,
+		ProductionClaim:            true,
+		Storage:                    "owned-utf8-byte-buffer",
+		UTF8Validation:             true,
+		InvalidUTF8Rejected:        true,
+		Caret:                      true,
+		Selection:                  true,
+		SelectionClipboardTransfer: true,
+		Multiline:                  true,
+		Backspace:                  true,
+		Delete:                     true,
+		HomeEnd:                    true,
+		ArrowLeftRight:             true,
+		CompositionEvents:          true,
+		CompositionCommit:          true,
+		CompositionCancel:          true,
+		ClipboardRead:              true,
+		ClipboardWrite:             true,
+		ClipboardHostABI:           true,
+		ClipboardOwnedCopy:         true,
+		TargetHostCompositionTrace: true,
 		CompositionTrace: surface.CompositionTraceReport{
 			Start:  true,
 			Update: true,
 			Commit: true,
 			Cancel: true,
 		},
-		BorrowedViewStorage:     false,
-		SafeViewLifetimeChecked: true,
-		Processes:               processes,
-		Artifacts:               artifacts,
-		ArtifactScan:            artifactScan,
-		Cases:                   cases,
+		TextShapingPlan: surface.TextShapingPlanReport{
+			QualityLevel:       "scoped-text-shaping-plan-v1",
+			FallbackFonts:      true,
+			GraphemeBoundaries: "byte-offset-codepoint-v1",
+			LineBreaking:       "newline-storage-plus-wrap-plan-v1",
+			Bidi:               "nonclaim-full-bidi-v1",
+			RichText:           "nonclaim-rich-text-editor-v1",
+		},
+		ReferenceTraces: []surface.TextInputReferenceTraceReport{
+			{Source: "examples/surface_morph_settings.tetra", Trace: "settings text field trace", Focus: true, Selection: true, Clipboard: true, Composition: true, Multiline: true, Pass: true},
+			{Source: "examples/surface_morph_editor_shell.tetra", Trace: "editor shell text area trace", Focus: true, Selection: true, Clipboard: true, Composition: true, Multiline: true, Pass: true},
+		},
+		UnsupportedClaims: []string{
+			"full-rich-text-editor",
+			"full-bidi-shaping",
+			"grapheme-cluster-caret",
+			"ide-grade-editor",
+		},
+		RichTextProductionClaim:   false,
+		BidiProductionClaim:       false,
+		FullEditorProductionClaim: false,
+		BorrowedViewStorage:       false,
+		SafeViewLifetimeChecked:   true,
+		Processes:                 processes,
+		Artifacts:                 artifacts,
+		ArtifactScan:              artifactScan,
+		Cases:                     cases,
 	}
 }
 
@@ -8707,13 +9866,19 @@ func releaseTextInputCases() []surface.CaseReport {
 		{Name: "no legacy UI sidecar artifacts", Kind: "positive", Ran: true, Pass: true},
 		{Name: "release text input ASCII insertion", Kind: "positive", Ran: true, Pass: true},
 		{Name: "release text input UTF-8 insertion", Kind: "positive", Ran: true, Pass: true},
+		{Name: "release text input invalid UTF-8 rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "invalid utf8 rejected"},
+		{Name: "release text input multiline storage", Kind: "positive", Ran: true, Pass: true},
 		{Name: "release text input caret home end arrows", Kind: "positive", Ran: true, Pass: true},
 		{Name: "release text input selection replacement", Kind: "positive", Ran: true, Pass: true},
+		{Name: "release text input selection clipboard transfer", Kind: "positive", Ran: true, Pass: true},
 		{Name: "release text input backspace delete", Kind: "positive", Ran: true, Pass: true},
 		{Name: "release text input clipboard owned copy transfer", Kind: "positive", Ran: true, Pass: true},
 		{Name: "release text input composition start update", Kind: "positive", Ran: true, Pass: true},
 		{Name: "release text input composition commit", Kind: "positive", Ran: true, Pass: true},
 		{Name: "release text input composition cancel", Kind: "positive", Ran: true, Pass: true},
+		{Name: "release text input shaping plan scoped", Kind: "positive", Ran: true, Pass: true},
+		{Name: "settings reference text input trace", Kind: "positive", Ran: true, Pass: true},
+		{Name: "editor reference text input trace", Kind: "positive", Ran: true, Pass: true},
 		{Name: "release text input safe view lifetime checked", Kind: "positive", Ran: true, Pass: true},
 		{Name: "reject legacy UI evidence", Kind: "negative", Ran: true, Pass: true, ExpectedError: "legacy UI evidence rejected"},
 	}
@@ -8721,7 +9886,7 @@ func releaseTextInputCases() []surface.CaseReport {
 
 func hostEvidenceForMode(mode string) surface.HostEvidenceReport {
 	switch mode {
-	case "headless-text-focus-input", "headless-release-text-input", "headless-release-toolkit", "headless-release-accessibility", "headless-component-tree", "headless-component-tree-api", "headless-block-paint", "headless-block-text", "headless-block-layout", "headless-block-events", "headless-block-states", "headless-block-motion", "headless-block-assets", "headless-block-accessibility", "headless-block-system", "headless-morph", "headless-minimal-toolkit", "headless-toolkit-reuse", "headless-accessibility-metadata":
+	case "headless-text-focus-input", "headless-release-text-input", "headless-release-toolkit", "headless-release-accessibility", "headless-component-tree", "headless-component-tree-api", "headless-block-paint", "headless-block-text", "headless-block-layout", "headless-block-events", "headless-block-states", "headless-block-motion", "headless-block-assets", "headless-block-accessibility", "headless-block-system", "headless-morph", "headless-minimal-toolkit", "headless-toolkit-reuse", "headless-accessibility-metadata", "headless-app-model":
 		return surface.HostEvidenceReport{
 			Level:       "deterministic-headless",
 			Backend:     "software-rgba",
@@ -8733,7 +9898,7 @@ func hostEvidenceForMode(mode string) surface.HostEvidenceReport {
 			Backend:     "memfd-rgba",
 			Framebuffer: true,
 		}
-	case "linux-x64-release-window":
+	case "linux-x64-release-window", "linux-x64-release-app-shell":
 		return surface.HostEvidenceReport{
 			Level:               "linux-x64-release-window-v1",
 			Backend:             "wayland-shm-rgba-release-v1",

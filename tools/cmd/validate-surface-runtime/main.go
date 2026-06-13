@@ -48,7 +48,9 @@ func validateSurfaceRuntimeReportWithOptions(path string, opt surfaceRuntimeVali
 		release != "headless" &&
 		release != "linux-x64-real-window" &&
 		release != "wasm32-web-browser" &&
-		release != "text-input" {
+		release != "text-input" &&
+		release != "app-model" &&
+		release != "linux-app-shell" {
 		return fmt.Errorf("unsupported release %q", release)
 	}
 	schema, err := surfaceReportSchema(raw)
@@ -83,6 +85,12 @@ func validateSurfaceRuntimeReportWithOptions(path string, opt surfaceRuntimeVali
 	}
 	if release == "text-input" {
 		return validateTextInputReleaseEnvelope(schema, raw)
+	}
+	if release == "app-model" {
+		return validateAppModelReleaseEnvelope(schema, raw)
+	}
+	if release == "linux-app-shell" {
+		return validateLinuxAppShellReleaseEnvelope(schema, raw)
 	}
 	return nil
 }
@@ -274,6 +282,35 @@ func validateWASM32WebBrowserReleaseEnvelope(schema string, raw []byte) error {
 		!runtimeReportHasProcessNameAndPathMarkers(report.Processes, "app", "surface wasm32-web browser canvas component app", "chrome") {
 		issues = append(issues, "release wasm32-web-browser requires Chromium-compatible browser app process evidence")
 	}
+	browser := report.BrowserSurface
+	if browser == nil {
+		issues = append(issues, "release wasm32-web-browser requires browser_surface evidence")
+	} else {
+		for _, check := range []struct {
+			field string
+			got   string
+			want  string
+		}{
+			{field: "schema", got: browser.Schema, want: surface.BrowserSurfaceSchemaV1},
+			{field: "browser_surface_level", got: browser.BrowserSurfaceLevel, want: "browser-canvas-release-v1"},
+			{field: "release_scope", got: browser.ReleaseScope, want: surface.ReleaseScopeSurfaceV1LinuxWeb},
+			{field: "host_adapter", got: browser.HostAdapter, want: "compiler-owned-browser-canvas-host"},
+		} {
+			if check.got != check.want {
+				issues = append(issues, fmt.Sprintf("release wasm32-web-browser browser_surface.%s is %q, want %q", check.field, check.got, check.want))
+			}
+		}
+		if !isSurfaceReleaseFormSource(browser.Source) {
+			issues = append(issues, fmt.Sprintf("release wasm32-web-browser browser_surface.source is %q, want examples/surface_release_form.tetra", browser.Source))
+		}
+		if !browser.ProductionClaim || browser.Experimental || !browser.CompilerOwnedBoot || !browser.DOMHostCanvasOnly {
+			issues = append(issues, "release wasm32-web-browser browser_surface requires production_claim=true, experimental=false, compiler_owned_boot=true, and dom_host_canvas_only=true")
+		}
+		guards := browser.NegativeGuards
+		if !guards.NoDOMAppUITree || !guards.NoUserJSAppLogic || !guards.NoNodeOnlyPromotion || !guards.NoLegacySidecars || !guards.NoReactRuntime || !guards.NoPlatformWidgets {
+			issues = append(issues, "release wasm32-web-browser browser_surface negative guards must reject DOM-authored app UI trees, user JavaScript app logic, Node-only promotion, legacy sidecars, React runtime, and platform widgets")
+		}
+	}
 	if len(issues) > 0 {
 		return errors.New(strings.Join(issues, "; "))
 	}
@@ -297,6 +334,221 @@ func validateTextInputReleaseEnvelope(schema string, raw []byte) error {
 	}
 	if report.Experimental || !report.ProductionClaim {
 		issues = append(issues, "release text-input requires experimental=false and production_claim=true")
+	}
+	if len(issues) > 0 {
+		return errors.New(strings.Join(issues, "; "))
+	}
+	return nil
+}
+
+func validateAppModelReleaseEnvelope(schema string, raw []byte) error {
+	if schema != surface.SchemaV1 {
+		return fmt.Errorf("release app-model schema is %q, want %q", schema, surface.SchemaV1)
+	}
+	var report surface.Report
+	if err := json.Unmarshal(raw, &report); err != nil {
+		return err
+	}
+	var issues []string
+	if report.Target != "headless" {
+		issues = append(issues, fmt.Sprintf("release app-model target is %q, want headless", report.Target))
+	}
+	if report.Runtime != "surface-headless" {
+		issues = append(issues, fmt.Sprintf("release app-model runtime is %q, want surface-headless", report.Runtime))
+	}
+	if !isSurfaceAppModelSource(report.Source) {
+		issues = append(issues, fmt.Sprintf("release app-model source is %q, want examples/surface_app_model.tetra", report.Source))
+	}
+	if report.HostEvidence.Level != "deterministic-headless" {
+		issues = append(issues, fmt.Sprintf("release app-model host_evidence.level is %q, want deterministic-headless", report.HostEvidence.Level))
+	}
+	if report.HostEvidence.Backend != "software-rgba" {
+		issues = append(issues, fmt.Sprintf("release app-model host_evidence.backend is %q, want software-rgba", report.HostEvidence.Backend))
+	}
+	if !report.HostEvidence.Framebuffer {
+		issues = append(issues, "release app-model host_evidence.framebuffer must be true")
+	}
+	if report.HostEvidence.RealWindow || report.HostEvidence.NativeInput || report.HostEvidence.UserFacingPlatformWidgets {
+		issues = append(issues, "release app-model must not claim real window, native input, or platform widgets")
+	}
+	if !runtimeReportHasProcessNameAndPathMarkers(report.Processes, "build", "tetra build", "surface_app_model.tetra") {
+		issues = append(issues, "release app-model requires tetra build process evidence for examples/surface_app_model.tetra")
+	}
+	if !runtimeReportHasProcessNameAndPathMarkers(report.Processes, "runtime", "surface headless runtime") {
+		issues = append(issues, "release app-model requires surface headless runtime process evidence")
+	}
+	app := report.AppModel
+	if app == nil {
+		issues = append(issues, "release app-model requires tetra.surface.app-model.v1 evidence")
+	} else {
+		for _, check := range []struct {
+			field string
+			got   string
+			want  string
+		}{
+			{field: "schema", got: app.Schema, want: "tetra.surface.app-model.v1"},
+			{field: "app_model_level", got: app.AppModelLevel, want: "explicit-command-reducer-v1"},
+			{field: "release_scope", got: app.ReleaseScope, want: surface.ReleaseScopeSurfaceV1LinuxWeb},
+			{field: "module", got: app.Module, want: "lib.core.surface_app"},
+		} {
+			if check.got != check.want {
+				issues = append(issues, fmt.Sprintf("release app-model %s is %q, want %q", check.field, check.got, check.want))
+			}
+		}
+		if normalizeEvidencePath(app.Source) != "examples/surface_app_model.tetra" {
+			issues = append(issues, fmt.Sprintf("release app-model app_model.source is %q, want examples/surface_app_model.tetra", app.Source))
+		}
+		if !app.UsesComponentTreeAPI || !app.CallerOwnedState || !app.ExplicitEventBindings || !app.DeterministicReducer {
+			issues = append(issues, "release app-model requires component-tree API use, caller-owned state, explicit event bindings, and deterministic reducer evidence")
+		}
+		if app.HiddenAppState || app.ReactRuntime || app.ElectronRuntime || app.DOMRuntime || app.DOMEventModel || app.UserJS || app.PlatformWidgets {
+			issues = append(issues, "release app-model must not claim hidden app state, React/Electron/DOM runtime, DOM event model, user JS, or platform widgets")
+		}
+	}
+	for _, required := range []string{
+		"app model explicit event-to-command binding",
+		"app model deterministic command reducer",
+		"app model navigation stack",
+		"app model focus scope modal trap",
+		"app model async completion cancellation boundary",
+		"app model undo redo history",
+		"app model no React hooks DOM event model hidden JS state",
+	} {
+		if !reportHasCase(report, required) {
+			issues = append(issues, fmt.Sprintf("release app-model requires %s evidence", required))
+		}
+	}
+	if len(issues) > 0 {
+		return errors.New(strings.Join(issues, "; "))
+	}
+	return nil
+}
+
+func validateLinuxAppShellReleaseEnvelope(schema string, raw []byte) error {
+	if schema != surface.SchemaV1 {
+		return fmt.Errorf("release linux-app-shell schema is %q, want %q", schema, surface.SchemaV1)
+	}
+	var report surface.Report
+	if err := json.Unmarshal(raw, &report); err != nil {
+		return err
+	}
+	var issues []string
+	if report.Target != "linux-x64" {
+		issues = append(issues, fmt.Sprintf("release linux-app-shell target is %q, want linux-x64", report.Target))
+	}
+	if report.Runtime != "surface-linux-x64" {
+		issues = append(issues, fmt.Sprintf("release linux-app-shell runtime is %q, want surface-linux-x64", report.Runtime))
+	}
+	if !isSurfaceLinuxAppShellNotesSource(report.Source) {
+		issues = append(issues, fmt.Sprintf("release linux-app-shell source is %q, want examples/surface_linux_app_shell_notes.tetra", report.Source))
+	}
+	if report.HostEvidence.Level != "linux-x64-release-window-v1" {
+		issues = append(issues, fmt.Sprintf("release linux-app-shell host_evidence.level is %q, want linux-x64-release-window-v1", report.HostEvidence.Level))
+	}
+	if report.HostEvidence.Backend != "wayland-shm-rgba-release-v1" {
+		issues = append(issues, fmt.Sprintf("release linux-app-shell host_evidence.backend is %q, want wayland-shm-rgba-release-v1", report.HostEvidence.Backend))
+	}
+	for _, check := range []struct {
+		name string
+		ok   bool
+	}{
+		{name: "framebuffer", ok: report.HostEvidence.Framebuffer},
+		{name: "real_window", ok: report.HostEvidence.RealWindow},
+		{name: "native_input", ok: report.HostEvidence.NativeInput},
+		{name: "text_input", ok: report.HostEvidence.TextInput},
+		{name: "clipboard", ok: report.HostEvidence.Clipboard},
+		{name: "composition", ok: report.HostEvidence.Composition},
+		{name: "accessibility_bridge", ok: report.HostEvidence.AccessibilityBridge},
+	} {
+		if !check.ok {
+			issues = append(issues, fmt.Sprintf("release linux-app-shell host_evidence.%s must be true", check.name))
+		}
+	}
+	if report.HostEvidence.UserFacingPlatformWidgets {
+		issues = append(issues, "release linux-app-shell must not claim GTK/Qt/native widget UI")
+	}
+	if !runtimeReportHasProcessNameAndPathMarkers(report.Processes, "build", "tetra build", "surface_linux_app_shell_notes.tetra") {
+		issues = append(issues, "release linux-app-shell requires tetra build process evidence for examples/surface_linux_app_shell_notes.tetra")
+	}
+	for _, process := range []string{
+		"surface linux app-shell host trace",
+		"surface linux app-shell window trace",
+		"surface linux-x64 runtime",
+	} {
+		if !runtimeReportHasProcessNameAndPathMarkers(report.Processes, "runtime", process) {
+			issues = append(issues, fmt.Sprintf("release linux-app-shell requires %s process evidence", process))
+		}
+	}
+	for _, kind := range []string{"linux-app-shell-host-trace", "linux-app-shell-window-trace", "linux-accessibility-platform-probe"} {
+		if !runtimeReportHasArtifactKind(report.Artifacts, kind) {
+			issues = append(issues, fmt.Sprintf("release linux-app-shell requires %s artifact", kind))
+		}
+	}
+	app := report.LinuxAppShell
+	if app == nil {
+		issues = append(issues, "release linux-app-shell requires tetra.surface.linux-app-shell.v1 evidence")
+	} else {
+		for _, check := range []struct {
+			field string
+			got   string
+			want  string
+		}{
+			{field: "schema", got: app.Schema, want: surface.LinuxAppShellSchemaV1},
+			{field: "app_shell_level", got: app.AppShellLevel, want: "linux-app-shell-subset-v1"},
+			{field: "release_scope", got: app.ReleaseScope, want: surface.ReleaseScopeSurfaceV1LinuxWeb},
+			{field: "module", got: app.Module, want: "lib.core.surface_app_shell"},
+			{field: "host_adapter", got: app.HostAdapter, want: "wayland-shm-rgba-release-v1"},
+		} {
+			if check.got != check.want {
+				issues = append(issues, fmt.Sprintf("release linux-app-shell %s is %q, want %q", check.field, check.got, check.want))
+			}
+		}
+		if normalizeEvidencePath(app.Source) != "examples/surface_linux_app_shell_notes.tetra" {
+			issues = append(issues, fmt.Sprintf("release linux-app-shell linux_app_shell.source is %q, want examples/surface_linux_app_shell_notes.tetra", app.Source))
+		}
+		if !app.ProductionClaim || app.Experimental {
+			issues = append(issues, "release linux-app-shell requires production_claim=true and experimental=false")
+		}
+		if !app.NegativeGuards.NoGTK || !app.NegativeGuards.NoQT || !app.NegativeGuards.NoNativeWidgets || !app.NegativeGuards.NoElectronRuntime || !app.NegativeGuards.NoReactRuntime || !app.NegativeGuards.NoDOMUI || !app.NegativeGuards.NoUserJS || !app.NegativeGuards.NoPlatformWidgets {
+			issues = append(issues, "release linux-app-shell must reject GTK/Qt/native widget UI, Electron/React runtime, DOM UI, user JS, and platform widgets")
+		}
+	}
+	if report.SecurityPermissions == nil {
+		issues = append(issues, "release linux-app-shell requires security_permissions evidence")
+	} else if err := surface.ValidateSecurityPermissionReport(raw); err != nil {
+		issues = append(issues, fmt.Sprintf("release linux-app-shell security_permissions invalid: %v", err))
+	}
+	if report.SurfacePerformanceBudget == nil {
+		issues = append(issues, "release linux-app-shell requires surface_performance_budget evidence")
+	} else if err := surface.ValidatePerformanceBudgetReport(raw); err != nil {
+		issues = append(issues, fmt.Sprintf("release linux-app-shell surface_performance_budget invalid: %v", err))
+	}
+	for _, required := range []string{
+		"linux app-shell lifecycle open close reopen",
+		"linux app-shell multi-window notes reference",
+		"linux app-shell resize dpi cursor trace",
+		"linux app-shell clipboard ime accessibility adapters",
+		"linux app-shell file dialog notification blocked-pass",
+		"linux app-shell electron feature ledger",
+		"linux app-shell dialog file picker tray blocked-pass",
+		"linux app-shell crash error report scoped adapters",
+		"linux app-shell rejects GTK Qt native widget UI",
+		"surface security permission model default deny filesystem network",
+		"surface security app-shell feature policy enforcement",
+		"surface security IPC process boundary schema validation",
+		"surface security asset font image local hash policy",
+		"surface security network asset fetch rejected",
+		"surface security notification dialog permission nonclaims",
+		"surface performance budget startup first frame",
+		"surface performance budget frame p50 p95",
+		"surface performance budget memory cache framebuffer rss",
+		"surface performance budget binary size",
+		"surface performance budget cpu power proxy",
+		"surface performance budget faster than electron nonclaim",
+	} {
+		if !reportHasCase(report, required) {
+			issues = append(issues, fmt.Sprintf("release linux-app-shell requires %s evidence", required))
+		}
 	}
 	if len(issues) > 0 {
 		return errors.New(strings.Join(issues, "; "))
@@ -590,6 +842,14 @@ func isSurfaceReleaseFormSource(source string) bool {
 
 func isSurfaceReleaseAccessibilitySource(source string) bool {
 	return normalizeEvidencePath(source) == "examples/surface_release_accessibility.tetra"
+}
+
+func isSurfaceAppModelSource(source string) bool {
+	return normalizeEvidencePath(source) == "examples/surface_app_model.tetra"
+}
+
+func isSurfaceLinuxAppShellNotesSource(source string) bool {
+	return normalizeEvidencePath(source) == "examples/surface_linux_app_shell_notes.tetra"
 }
 
 func isSurfaceV1FinalLinuxWindowReport(report surface.Report) bool {

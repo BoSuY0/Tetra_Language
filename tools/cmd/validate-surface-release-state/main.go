@@ -38,11 +38,15 @@ type surfaceReleaseHashArtifact struct {
 }
 
 type surfaceReleaseRuntimeEnvelope struct {
-	Schema       string                     `json:"schema"`
-	Status       string                     `json:"status"`
-	Target       string                     `json:"target"`
-	Source       string                     `json:"source"`
-	HostEvidence surface.HostEvidenceReport `json:"host_evidence"`
+	Schema                   string                                  `json:"schema"`
+	Status                   string                                  `json:"status"`
+	Target                   string                                  `json:"target"`
+	Source                   string                                  `json:"source"`
+	HostEvidence             surface.HostEvidenceReport              `json:"host_evidence"`
+	LinuxAppShell            *surface.LinuxAppShellReport            `json:"linux_app_shell,omitempty"`
+	SecurityPermissions      *surface.SecurityPermissionReport       `json:"security_permissions,omitempty"`
+	SurfacePerformanceBudget *surface.SurfacePerformanceBudgetReport `json:"surface_performance_budget,omitempty"`
+	BrowserSurface           *surface.BrowserSurfaceReport           `json:"browser_surface,omitempty"`
 }
 
 type surfaceMorphGateSummary struct {
@@ -103,6 +107,17 @@ func validateSurfaceReleaseState(opt surfaceReleaseStateOptions) error {
 	issues = append(issues, validateReleaseTextInputFile(filepath.Join(reportDir, "surface-headless-release-text-input.json"))...)
 	issues = append(issues, validateReleaseRuntimeEnvelopeFile(filepath.Join(reportDir, "surface-wasm32-web-release-browser.json"), "wasm32-web")...)
 	issues = append(issues, validateReleaseRuntimeEnvelopeFile(filepath.Join(reportDir, "surface-linux-x64-release-window.json"), "linux-x64")...)
+	issues = append(issues, validateReleaseLinuxAppShellEnvelopeFile(filepath.Join(reportDir, "surface-linux-x64-release-app-shell.json"))...)
+	issues = append(issues, validateReleaseDevWorkflowFile(filepath.Join(reportDir, "surface-dev-workflow.json"))...)
+	issues = append(issues, validateReleaseInspectorFile(filepath.Join(reportDir, "surface-inspector.json"))...)
+	issues = append(issues, validateReleaseTemplateSmokeFile(filepath.Join(reportDir, "surface-template-smoke.json"))...)
+	issues = append(issues, validateReleaseReferenceAppsFile(filepath.Join(reportDir, "surface-reference-apps.json"))...)
+	issues = append(issues, validateReleaseSurfacePackageFile(filepath.Join(reportDir, "surface-package.json"))...)
+	issues = append(issues, validateReleaseCrashReportFile(filepath.Join(reportDir, "surface-crash-report.json"))...)
+	issues = append(issues, validateReleaseI18nFile(filepath.Join(reportDir, "surface-i18n.json"))...)
+	issues = append(issues, validateReleaseWidgetMigrationFile(filepath.Join(reportDir, "surface-widget-migration.json"))...)
+	issues = append(issues, validateReleaseTargetHostStatusFile(filepath.Join(reportDir, "surface-macos-x64-target-host-status.json"), "macos-x64", "unsupported")...)
+	issues = append(issues, validateReleaseTargetHostStatusFile(filepath.Join(reportDir, "surface-windows-x64-target-host-status.json"), "windows-x64", "unsupported")...)
 	issues = append(issues, validateReleaseMorphGateFile(filepath.Join(reportDir, "morph", "surface-morph-gate-summary.json"))...)
 	issues = append(issues, validateReleaseMorphReportFile(filepath.Join(reportDir, "morph", "headless", "surface-headless-morph.json"))...)
 	issues = append(issues, validateSurfaceArtifactHashes(filepath.Join(reportDir, "artifact-hashes.json"))...)
@@ -237,6 +252,61 @@ func validateReleaseTextInputFile(path string) []string {
 	return nil
 }
 
+func validateReleaseReferenceAppsFile(path string) []string {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return []string{fmt.Sprintf("%s read failed: %v", filepath.Base(path), err)}
+	}
+	if err := surface.ValidateReferenceAppsReport(raw); err != nil {
+		return []string{fmt.Sprintf("%s invalid: %v", filepath.Base(path), err)}
+	}
+	return nil
+}
+
+func validateReleaseSurfacePackageFile(path string) []string {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return []string{fmt.Sprintf("%s read failed: %v", filepath.Base(path), err)}
+	}
+	if err := surface.ValidatePackageReport(raw); err != nil {
+		return []string{fmt.Sprintf("%s invalid: %v", filepath.Base(path), err)}
+	}
+	return nil
+}
+
+func validateReleaseCrashReportFile(path string) []string {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return []string{fmt.Sprintf("%s read failed: %v", filepath.Base(path), err)}
+	}
+	if err := surface.ValidateCrashReport(raw); err != nil {
+		return []string{fmt.Sprintf("%s invalid: %v", filepath.Base(path), err)}
+	}
+	return nil
+}
+
+func validateReleaseI18nFile(path string) []string {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return []string{fmt.Sprintf("%s read failed: %v", filepath.Base(path), err)}
+	}
+	if err := surface.ValidateI18nReport(raw); err != nil {
+		return []string{fmt.Sprintf("%s invalid: %v", filepath.Base(path), err)}
+	}
+	return nil
+}
+
+func validateReleaseWidgetMigrationFile(path string) []string {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return []string{fmt.Sprintf("%s read failed: %v", filepath.Base(path), err)}
+	}
+	if err := surface.ValidateWidgetMigrationReport(raw); err != nil {
+		return []string{fmt.Sprintf("%s invalid: %v", filepath.Base(path), err)}
+	}
+	return nil
+}
+
 func validateReleaseRuntimeEnvelopeFile(path string, target string) []string {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -307,6 +377,177 @@ func validateReleaseRuntimeEnvelopeFile(path string, target string) []string {
 				issues = append(issues, fmt.Sprintf("%s host_evidence.%s must be true", filepath.Base(path), check.name))
 			}
 		}
+		if report.BrowserSurface == nil {
+			issues = append(issues, fmt.Sprintf("%s requires browser_surface evidence", filepath.Base(path)))
+			break
+		}
+		if report.BrowserSurface.Schema != surface.BrowserSurfaceSchemaV1 {
+			issues = append(issues, fmt.Sprintf("%s browser_surface schema is %q, want %q", filepath.Base(path), report.BrowserSurface.Schema, surface.BrowserSurfaceSchemaV1))
+		}
+		if report.BrowserSurface.BrowserSurfaceLevel != "browser-canvas-release-v1" {
+			issues = append(issues, fmt.Sprintf("%s browser_surface browser_surface_level is %q, want browser-canvas-release-v1", filepath.Base(path), report.BrowserSurface.BrowserSurfaceLevel))
+		}
+		if !report.BrowserSurface.DOMHostCanvasOnly {
+			issues = append(issues, fmt.Sprintf("%s browser_surface dom_host_canvas_only must be true", filepath.Base(path)))
+		}
+		guards := report.BrowserSurface.NegativeGuards
+		if !guards.NoDOMAppUITree || !guards.NoUserJSAppLogic || !guards.NoNodeOnlyPromotion {
+			issues = append(issues, fmt.Sprintf("%s browser_surface must reject DOM-authored app UI tree, user JavaScript app logic, and Node-only promotion", filepath.Base(path)))
+		}
+	}
+	return issues
+}
+
+func validateReleaseLinuxAppShellEnvelopeFile(path string) []string {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return []string{fmt.Sprintf("%s read failed: %v", filepath.Base(path), err)}
+	}
+	var report surfaceReleaseRuntimeEnvelope
+	if err := json.Unmarshal(raw, &report); err != nil {
+		return []string{fmt.Sprintf("%s decode failed: %v", filepath.Base(path), err)}
+	}
+	var issues []string
+	if report.Schema != surface.SchemaV1 {
+		issues = append(issues, fmt.Sprintf("%s schema is %q, want %q", filepath.Base(path), report.Schema, surface.SchemaV1))
+	}
+	if report.Status != "pass" {
+		issues = append(issues, fmt.Sprintf("%s status is %q, want pass", filepath.Base(path), report.Status))
+	}
+	if report.Target != "linux-x64" {
+		issues = append(issues, fmt.Sprintf("%s target is %q, want linux-x64", filepath.Base(path), report.Target))
+	}
+	if report.Source != "examples/surface_linux_app_shell_notes.tetra" {
+		issues = append(issues, fmt.Sprintf("%s source is %q, want examples/surface_linux_app_shell_notes.tetra", filepath.Base(path), report.Source))
+	}
+	if report.HostEvidence.Level != "linux-x64-release-window-v1" {
+		issues = append(issues, fmt.Sprintf("%s host_evidence.level is %q, want linux-x64-release-window-v1", filepath.Base(path), report.HostEvidence.Level))
+	}
+	if report.HostEvidence.Backend != "wayland-shm-rgba-release-v1" {
+		issues = append(issues, fmt.Sprintf("%s host_evidence.backend is %q, want wayland-shm-rgba-release-v1", filepath.Base(path), report.HostEvidence.Backend))
+	}
+	if report.HostEvidence.UserFacingPlatformWidgets {
+		issues = append(issues, fmt.Sprintf("%s must not claim GTK/Qt/native widget UI", filepath.Base(path)))
+	}
+	if report.LinuxAppShell == nil {
+		return append(issues, fmt.Sprintf("%s requires linux_app_shell evidence", filepath.Base(path)))
+	}
+	if report.LinuxAppShell.Schema != surface.LinuxAppShellSchemaV1 {
+		issues = append(issues, fmt.Sprintf("%s linux_app_shell schema is %q, want %q", filepath.Base(path), report.LinuxAppShell.Schema, surface.LinuxAppShellSchemaV1))
+	}
+	if report.LinuxAppShell.AppShellLevel != "linux-app-shell-subset-v1" {
+		issues = append(issues, fmt.Sprintf("%s linux_app_shell app_shell_level is %q, want linux-app-shell-subset-v1", filepath.Base(path), report.LinuxAppShell.AppShellLevel))
+	}
+	if report.LinuxAppShell.NegativeGuards.NoGTK == false || report.LinuxAppShell.NegativeGuards.NoQT == false || report.LinuxAppShell.NegativeGuards.NoNativeWidgets == false {
+		issues = append(issues, fmt.Sprintf("%s linux_app_shell must reject GTK/Qt/native widget UI", filepath.Base(path)))
+	}
+	issues = append(issues, validateReleaseLinuxAppShellFeatureLedger(filepath.Base(path), report.LinuxAppShell.ShellFeatures)...)
+	if report.SecurityPermissions == nil {
+		issues = append(issues, fmt.Sprintf("%s requires security_permissions evidence", filepath.Base(path)))
+	} else if err := surface.ValidateSecurityPermissionReport(raw); err != nil {
+		issues = append(issues, fmt.Sprintf("%s security_permissions invalid: %v", filepath.Base(path), err))
+	}
+	if report.SurfacePerformanceBudget == nil {
+		issues = append(issues, fmt.Sprintf("%s requires surface_performance_budget evidence", filepath.Base(path)))
+	} else if err := surface.ValidatePerformanceBudgetReport(raw); err != nil {
+		issues = append(issues, fmt.Sprintf("%s surface_performance_budget invalid: %v", filepath.Base(path), err))
+	}
+	return issues
+}
+
+func validateReleaseDevWorkflowFile(path string) []string {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return []string{fmt.Sprintf("%s read failed: %v", filepath.Base(path), err)}
+	}
+	if err := surface.ValidateDevWorkflowReport(raw); err != nil {
+		return []string{fmt.Sprintf("%s invalid: %v", filepath.Base(path), err)}
+	}
+	return nil
+}
+
+func validateReleaseInspectorFile(path string) []string {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return []string{fmt.Sprintf("%s read failed: %v", filepath.Base(path), err)}
+	}
+	if err := surface.ValidateInspectorReport(raw); err != nil {
+		return []string{fmt.Sprintf("%s invalid: %v", filepath.Base(path), err)}
+	}
+	return nil
+}
+
+func validateReleaseTemplateSmokeFile(path string) []string {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return []string{fmt.Sprintf("%s read failed: %v", filepath.Base(path), err)}
+	}
+	if err := surface.ValidateTemplateSmokeReport(raw); err != nil {
+		return []string{fmt.Sprintf("%s invalid: %v", filepath.Base(path), err)}
+	}
+	return nil
+}
+
+func validateReleaseLinuxAppShellFeatureLedger(base string, rows []surface.LinuxAppShellFeatureReport) []string {
+	features := map[string]surface.LinuxAppShellFeatureReport{}
+	for _, row := range rows {
+		features[row.Name] = row
+	}
+	var issues []string
+	for _, name := range []string{"window_lifecycle", "multi_window", "clipboard", "ime", "accessibility_bridge"} {
+		feature, ok := features[name]
+		if !ok {
+			issues = append(issues, fmt.Sprintf("%s linux_app_shell shell_features missing %s", base, name))
+			continue
+		}
+		if feature.Status != "target_evidenced" || !feature.Claimed {
+			issues = append(issues, fmt.Sprintf("%s linux_app_shell %s must be target_evidenced and claimed", base, name))
+		}
+	}
+	for _, name := range []string{"app_menu", "crash_recovery", "error_report"} {
+		feature, ok := features[name]
+		if !ok {
+			issues = append(issues, fmt.Sprintf("%s linux_app_shell shell_features missing %s", base, name))
+			continue
+		}
+		if feature.Status != "scoped_adapter" || !feature.Claimed {
+			issues = append(issues, fmt.Sprintf("%s linux_app_shell %s must be scoped_adapter and claimed", base, name))
+		}
+	}
+	for _, name := range []string{"dialog", "file_dialog", "file_picker", "notification", "tray", "deep_link"} {
+		feature, ok := features[name]
+		if !ok {
+			issues = append(issues, fmt.Sprintf("%s linux_app_shell shell_features missing %s", base, name))
+			continue
+		}
+		if feature.Status != "blocked_pass" || feature.Claimed || strings.TrimSpace(feature.BlockedReason) == "" {
+			issues = append(issues, fmt.Sprintf("%s linux_app_shell %s must be blocked_pass nonclaim", base, name))
+		}
+	}
+	return issues
+}
+
+func validateReleaseTargetHostStatusFile(path string, target string, status string) []string {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return []string{fmt.Sprintf("%s read failed: %v", filepath.Base(path), err)}
+	}
+	if err := surface.ValidateTargetHostStatus(raw); err != nil {
+		return []string{fmt.Sprintf("%s invalid: %v", filepath.Base(path), err)}
+	}
+	var report surface.TargetHostStatusReport
+	if err := json.Unmarshal(raw, &report); err != nil {
+		return []string{fmt.Sprintf("%s decode failed: %v", filepath.Base(path), err)}
+	}
+	var issues []string
+	if report.Target != target {
+		issues = append(issues, fmt.Sprintf("%s target is %q, want %q", filepath.Base(path), report.Target, target))
+	}
+	if report.Status != status {
+		issues = append(issues, fmt.Sprintf("%s status is %q, want %q", filepath.Base(path), report.Status, status))
+	}
+	if status == "unsupported" && report.Tier != "UNSUPPORTED" {
+		issues = append(issues, fmt.Sprintf("%s tier is %q, want UNSUPPORTED", filepath.Base(path), report.Tier))
 	}
 	return issues
 }
@@ -380,18 +621,25 @@ func validateSurfaceReleaseManifest(path string, scope string, expectedStatus st
 		return issues
 	}
 	requiredSurfaceFeatures := map[string]string{
-		"ui.surface-core":             expectedStatus,
-		"ui.surface-headless":         expectedStatus,
-		"ui.surface-linux-x64":        expectedStatus,
-		"ui.surface-web-wasm":         expectedStatus,
-		"ui.surface-component-model":  expectedStatus,
-		"ui.surface-toolkit-v1":       expectedStatus,
-		"ui.surface-text-input-v1":    expectedStatus,
-		"ui.surface-accessibility-v1": expectedStatus,
-		"ui.surface-morph-capsule":    expectedStatus,
-		"ui.surface-macos-x64":        "unsupported",
-		"ui.surface-windows-x64":      "unsupported",
-		"ui.surface-wasm32-wasi":      "unsupported",
+		"ui.surface-core":                   expectedStatus,
+		"ui.surface-headless":               expectedStatus,
+		"ui.surface-linux-x64":              expectedStatus,
+		"ui.surface-web-wasm":               expectedStatus,
+		"ui.surface-component-model":        expectedStatus,
+		"ui.surface-toolkit-v1":             expectedStatus,
+		"ui.surface-text-input-v1":          expectedStatus,
+		"ui.surface-accessibility-v1":       expectedStatus,
+		"ui.surface-inspector-v1":           expectedStatus,
+		"ui.surface-project-templates-v1":   expectedStatus,
+		"ui.surface-reference-app-suite-v1": expectedStatus,
+		"ui.surface-packaging-v1":           expectedStatus,
+		"ui.surface-crash-reporting-v1":     expectedStatus,
+		"ui.surface-i18n-v1":                expectedStatus,
+		"ui.surface-widget-migration-v1":    expectedStatus,
+		"ui.surface-morph-capsule":          "experimental",
+		"ui.surface-macos-x64":              "unsupported",
+		"ui.surface-windows-x64":            "unsupported",
+		"ui.surface-wasm32-wasi":            "unsupported",
 	}
 	seen := map[string]string{}
 	for _, feature := range manifest.Features {

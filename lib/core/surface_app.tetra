@@ -1,0 +1,200 @@
+// Explicit command/reducer app-model helpers for Surface examples.
+// Effects: none
+// ```tetra doctest
+// func surface_app_doctest() -> Int:
+//     var state: lib.core.surface_app.AppState = lib.core.surface_app.init_state()
+//     let _: Int = lib.core.surface_app.apply_focus_name(state)
+//     if state.focused == lib.core.surface_app.focus_name():
+//         return lib.core.surface_app.command_registry_count()
+//     return 0
+// ```
+module lib.core.surface_app
+
+struct AppState:
+    route: Int
+    focused: Int
+    name_len: Int
+    save_count: Int
+    pending_task: Int
+    history_depth: Int
+    redo_depth: Int
+
+struct EventBinding:
+    event_kind: Int
+    target: Int
+    command: Int
+    explicit: Bool
+
+struct NavigationTransition:
+    operation: Int
+    before_route: Int
+    after_route: Int
+    underflow_rejected: Bool
+
+struct FocusScope:
+    focused: Int
+    first: Int
+    last: Int
+    modal_trap: Bool
+    escaped: Bool
+
+struct AsyncTask:
+    id: Int
+    pending: Bool
+    canceled: Bool
+    completed: Bool
+    mutated_business_state: Bool
+
+struct HistoryState:
+    depth: Int
+    redo_depth: Int
+    matched_entry: Bool
+    applied: Bool
+
+func route_home() -> Int:
+    return 1
+
+func route_settings() -> Int:
+    return 2
+
+func focus_none() -> Int:
+    return 0
+
+func focus_name() -> Int:
+    return 1
+
+func focus_save() -> Int:
+    return 2
+
+func event_mouse_up() -> Int:
+    return 5
+
+func event_text_input() -> Int:
+    return 8
+
+func event_key_down() -> Int:
+    return 6
+
+func target_name() -> Int:
+    return 1
+
+func target_save() -> Int:
+    return 2
+
+func cmd_focus_name() -> Int:
+    return 101
+
+func cmd_text_insert() -> Int:
+    return 102
+
+func cmd_nav_push_settings() -> Int:
+    return 201
+
+func cmd_nav_back() -> Int:
+    return 202
+
+func cmd_async_save_start() -> Int:
+    return 301
+
+func cmd_async_save_complete() -> Int:
+    return 302
+
+func cmd_async_save_cancel() -> Int:
+    return 303
+
+func cmd_history_undo() -> Int:
+    return 401
+
+func cmd_history_redo() -> Int:
+    return 402
+
+func command_registry_count() -> Int:
+    return 9
+
+func init_state() -> AppState:
+    return AppState(route: route_home(), focused: focus_none(), name_len: 0, save_count: 0, pending_task: 0, history_depth: 0, redo_depth: 0)
+
+func bind_event(event_kind: Int, target: Int, command: Int) -> EventBinding:
+    return EventBinding(event_kind: event_kind, target: target, command: command, explicit: true)
+
+func binding_valid(binding: EventBinding, event_kind: Int, target: Int, command: Int) -> Bool:
+    return binding.explicit && binding.event_kind == event_kind && binding.target == target && binding.command == command
+
+func apply_focus_name(state: inout AppState) -> Int:
+    state.focused = focus_name()
+    return 1
+
+func apply_text_insert(state: inout AppState, text_len: Int) -> Int:
+    state.name_len = text_len
+    state.history_depth = state.history_depth + 1
+    state.redo_depth = 0
+    return 1
+
+func apply_nav_push_settings(state: inout AppState) -> Int:
+    state.route = route_settings()
+    return 1
+
+func apply_nav_back(state: inout AppState) -> Bool:
+    if state.route == route_home():
+        return true
+    state.route = route_home()
+    return false
+
+func apply_async_save_start(state: inout AppState, task_id: Int) -> Int:
+    state.pending_task = task_id
+    return task_id
+
+func apply_async_save_complete(state: inout AppState, task_id: Int) -> Bool:
+    if state.pending_task == task_id:
+        state.pending_task = 0
+        state.save_count = state.save_count + 1
+        return true
+    return false
+
+func apply_async_save_cancel(state: inout AppState, task_id: Int) -> Bool:
+    if state.pending_task == task_id:
+        state.pending_task = 0
+        return true
+    return false
+
+func focus_scope_main() -> FocusScope:
+    return FocusScope(focused: focus_none(), first: focus_name(), last: focus_save(), modal_trap: false, escaped: false)
+
+func focus_scope_dialog() -> FocusScope:
+    return FocusScope(focused: focus_name(), first: focus_name(), last: focus_save(), modal_trap: true, escaped: false)
+
+func focus_scope_next(scope: inout FocusScope) -> Int:
+    if scope.focused < scope.first:
+        scope.focused = scope.first
+        return scope.focused
+    if scope.focused >= scope.last:
+        scope.focused = scope.first
+        return scope.focused
+    scope.focused = scope.focused + 1
+    return scope.focused
+
+func focus_scope_reject_escape(scope: inout FocusScope) -> Bool:
+    if scope.modal_trap:
+        scope.escaped = false
+        return true
+    scope.escaped = true
+    return false
+
+func apply_history_undo(state: inout AppState) -> Bool:
+    if state.history_depth <= 0:
+        return false
+    state.history_depth = state.history_depth - 1
+    state.redo_depth = state.redo_depth + 1
+    state.name_len = 0
+    return true
+
+func apply_history_redo(state: inout AppState) -> Bool:
+    if state.redo_depth <= 0:
+        return false
+    state.redo_depth = state.redo_depth - 1
+    state.history_depth = state.history_depth + 1
+    state.name_len = 3
+    return true
+
+func command_without_binding_rejected(binding: EventBinding, command: Int) -> Bool:
+    return binding.command != command

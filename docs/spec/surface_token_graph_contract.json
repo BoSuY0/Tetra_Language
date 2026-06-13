@@ -1,0 +1,139 @@
+{
+  "schema": "tetra.surface.token-graph.contract.v1",
+  "status": "current",
+  "surface_scope": "surface-token-graph-linux-web",
+  "source_of_truth": {
+    "module": "lib.core.morph",
+    "namespace": "tetra.surface.morph.app",
+    "source": "capsule",
+    "single_token_graph": true,
+    "explicit_imports": true,
+    "no_global_cascade": true,
+    "multiple_color_sources": false
+  },
+  "required_categories": [
+    "color",
+    "space",
+    "radius",
+    "border",
+    "elevation",
+    "opacity",
+    "typography",
+    "motion",
+    "z",
+    "assets",
+    "density"
+  ],
+  "required_tokens": [
+    "color.bg",
+    "color.surface",
+    "color.surfaceAlpha",
+    "color.accent",
+    "color.muted",
+    "color.warning",
+    "space.3",
+    "radius.sm",
+    "radius.md",
+    "radius.lg",
+    "border.subtle",
+    "border.glass",
+    "elevation.2",
+    "elevation.3",
+    "opacity.disabled",
+    "type.label",
+    "motion.fast",
+    "motion.soft",
+    "z.base",
+    "assets.gradient.vertical",
+    "assets.icon.fallback",
+    "density.1x"
+  ],
+  "reference_sources": [
+    "examples/surface_morph_command_palette.tetra",
+    "examples/surface_morph_project_dashboard.tetra",
+    "examples/surface_morph_settings.tetra",
+    "examples/surface_morph_editor_shell.tetra",
+    "examples/surface_morph_glass_panel.tetra"
+  ],
+  "allowed_raw_literal_scopes": [
+    {
+      "path": "lib/core/morph.tetra",
+      "reason": "canonical token graph source"
+    },
+    {
+      "path": "lib/core/style.tetra",
+      "reason": "legacy Surface v1 style compatibility"
+    },
+    {
+      "path": "examples/surface_block_*.tetra",
+      "reason": "experimental raw Block fixture until recipe migration"
+    }
+  ],
+  "forbidden_runtime_models": [
+    "CSS cascade runtime",
+    "DOM style runtime",
+    "React runtime",
+    "Electron runtime",
+    "platform-native widgets"
+  ],
+  "override_order": [
+    "base",
+    "theme",
+    "density",
+    "variant",
+    "state",
+    "local"
+  ],
+  "density_dpi": [
+    {
+      "target": "headless",
+      "token": "density.1x",
+      "target_dpi": 96,
+      "scale_milli": 1000,
+      "rounding_policy": "integer-half-up-v1"
+    },
+    {
+      "target": "linux-x64-real-window",
+      "token": "density.1x",
+      "target_dpi": 96,
+      "scale_milli": 1000,
+      "rounding_policy": "integer-half-up-v1"
+    },
+    {
+      "target": "wasm32-web-browser-canvas",
+      "token": "density.1x",
+      "target_dpi": 96,
+      "scale_milli": 1000,
+      "rounding_policy": "integer-half-up-v1"
+    }
+  ],
+  "diagnostics_required": [
+    "alias_cycle",
+    "missing_token",
+    "duplicate_source",
+    "raw_literal",
+    "unresolved_fallback",
+    "css_runtime",
+    "multiple_color_sources",
+    "override_order",
+    "density_dpi"
+  ],
+  "negative_guards": {
+    "alias_cycle_rejected": true,
+    "missing_token_rejected": true,
+    "duplicate_source_rejected": true,
+    "raw_literal_rejected": true,
+    "unresolved_fallback_rejected": true,
+    "css_runtime_rejected": true,
+    "multiple_color_sources_rejected": true,
+    "override_order_rejected": true,
+    "density_dpi_rejected": true
+  },
+  "nonclaims": [
+    "no CSS cascade runtime",
+    "no React runtime",
+    "no Electron runtime",
+    "no DOM style runtime",
+    "no platform-native widgets"
+  ]
+}

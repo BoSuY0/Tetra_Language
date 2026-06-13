@@ -76,6 +76,112 @@ func TestValidateSurfaceProductionToolkitReport(t *testing.T) {
 	}
 }
 
+func TestValidateSurfaceAppModelReport(t *testing.T) {
+	raw := validHeadlessAppModelSurfaceReportJSON(t, nil)
+	if err := ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
+	}
+}
+
+func TestValidateSurfaceAppModelRejectsIncompleteEvidence(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(map[string]any)
+		want   string
+	}{
+		{
+			name: "hidden app state",
+			mutate: func(report map[string]any) {
+				report["app_model"].(map[string]any)["hidden_app_state"] = true
+			},
+			want: "hidden app state",
+		},
+		{
+			name: "React runtime",
+			mutate: func(report map[string]any) {
+				report["app_model"].(map[string]any)["react_runtime"] = true
+			},
+			want: "React",
+		},
+		{
+			name: "DOM event model",
+			mutate: func(report map[string]any) {
+				report["app_model"].(map[string]any)["dom_event_model"] = true
+			},
+			want: "DOM event model",
+		},
+		{
+			name: "command without binding",
+			mutate: func(report map[string]any) {
+				app := report["app_model"].(map[string]any)
+				bindings := app["event_bindings"].([]any)
+				app["event_bindings"] = bindings[:len(bindings)-1]
+			},
+			want: "no explicit event binding",
+		},
+		{
+			name: "async complete without start",
+			mutate: func(report map[string]any) {
+				app := report["app_model"].(map[string]any)
+				tasks := app["async_tasks"].([]any)
+				app["async_tasks"] = tasks[1:]
+			},
+			want: "completed without matching start",
+		},
+		{
+			name: "async cancel mutates state",
+			mutate: func(report map[string]any) {
+				app := report["app_model"].(map[string]any)
+				tasks := app["async_tasks"].([]any)
+				cancel := tasks[2].(map[string]any)
+				cancel["after_state"] = map[string]any{"pending_task": "0", "save_count": "2"}
+			},
+			want: "canceled command must not mutate app state",
+		},
+		{
+			name: "navigation underflow drift",
+			mutate: func(report map[string]any) {
+				app := report["app_model"].(map[string]any)
+				nav := app["navigation_transitions"].([]any)
+				underflow := nav[2].(map[string]any)
+				underflow["after_route"] = "settings"
+			},
+			want: "underflow rejection must preserve route and stack",
+		},
+		{
+			name: "focus scope escape",
+			mutate: func(report map[string]any) {
+				app := report["app_model"].(map[string]any)
+				focus := app["focus_scope_transitions"].([]any)
+				modal := focus[1].(map[string]any)
+				modal["escaped"] = true
+			},
+			want: "escaped active scope",
+		},
+		{
+			name: "undo redo without history",
+			mutate: func(report map[string]any) {
+				app := report["app_model"].(map[string]any)
+				history := app["undo_redo_transitions"].([]any)
+				undo := history[1].(map[string]any)
+				undo["matched_history_entry"] = false
+			},
+			want: "matched applied history entry",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := validHeadlessAppModelSurfaceReportJSON(t, tc.mutate)
+			err := ValidateReport(raw)
+			if err == nil {
+				t.Fatalf("expected app_model %s evidence to fail", tc.name)
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want %q diagnostic", err, tc.want)
+			}
+		})
+	}
+}
+
 func TestValidateSurfaceProductionToolkitRejectsMissingReleaseWidget(t *testing.T) {
 	raw := validHeadlessProductionToolkitSurfaceReportJSON(t, func(report map[string]any) {
 		toolkit := report["toolkit"].(map[string]any)
@@ -132,6 +238,162 @@ func TestValidateSurfaceReleaseSummaryAcceptsBlockSystemAndMorphGateMetadata(t *
 	raw := validSurfaceReleaseSummaryJSON()
 	if err := ValidateReleaseSummary(raw); err != nil {
 		t.Fatalf("ValidateReleaseSummary failed with Block-system/Morph gate metadata: %v\n%s", err, raw)
+	}
+}
+
+func TestValidateSurfaceReleaseSummaryRequiresProjectTemplates(t *testing.T) {
+	withTemplates := string(validSurfaceReleaseSummaryJSON())
+	if err := ValidateReleaseSummary([]byte(withTemplates)); err != nil {
+		t.Fatalf("ValidateReleaseSummary rejected project template evidence: %v\n%s", err, withTemplates)
+	}
+
+	missing := strings.Replace(withTemplates, `  "project_templates": "surface-template-smoke-v1",
+`, "", 1)
+	err := ValidateReleaseSummary([]byte(missing))
+	if err == nil {
+		t.Fatalf("expected missing project_templates to fail")
+	}
+	if !strings.Contains(err.Error(), "project_templates") {
+		t.Fatalf("error = %v, want project_templates diagnostic", err)
+	}
+
+	wrong := strings.Replace(withTemplates, `"project_templates": "surface-template-smoke-v1"`, `"project_templates": "docs-only-template-claim"`, 1)
+	err = ValidateReleaseSummary([]byte(wrong))
+	if err == nil {
+		t.Fatalf("expected wrong project_templates to fail")
+	}
+	if !strings.Contains(err.Error(), "project_templates") {
+		t.Fatalf("error = %v, want project_templates diagnostic", err)
+	}
+}
+
+func TestValidateSurfaceReleaseSummaryRequiresReferenceApps(t *testing.T) {
+	withReferenceApps := string(validSurfaceReleaseSummaryJSON())
+	if err := ValidateReleaseSummary([]byte(withReferenceApps)); err != nil {
+		t.Fatalf("ValidateReleaseSummary rejected reference app evidence: %v\n%s", err, withReferenceApps)
+	}
+
+	missing := strings.Replace(withReferenceApps, `  "reference_apps": "surface-reference-app-suite-v1",
+`, "", 1)
+	err := ValidateReleaseSummary([]byte(missing))
+	if err == nil {
+		t.Fatalf("expected missing reference_apps to fail")
+	}
+	if !strings.Contains(err.Error(), "reference_apps") {
+		t.Fatalf("error = %v, want reference_apps diagnostic", err)
+	}
+
+	wrong := strings.Replace(withReferenceApps, `"reference_apps": "surface-reference-app-suite-v1"`, `"reference_apps": "docs-only-reference-app-claim"`, 1)
+	err = ValidateReleaseSummary([]byte(wrong))
+	if err == nil {
+		t.Fatalf("expected wrong reference_apps to fail")
+	}
+	if !strings.Contains(err.Error(), "reference_apps") {
+		t.Fatalf("error = %v, want reference_apps diagnostic", err)
+	}
+}
+
+func TestValidateSurfaceReleaseSummaryRequiresSurfacePackage(t *testing.T) {
+	withPackage := string(validSurfaceReleaseSummaryJSON())
+	if err := ValidateReleaseSummary([]byte(withPackage)); err != nil {
+		t.Fatalf("ValidateReleaseSummary rejected Surface package evidence: %v\n%s", err, withPackage)
+	}
+
+	missing := strings.Replace(withPackage, `  "surface_package": "surface-package-v1",
+`, "", 1)
+	err := ValidateReleaseSummary([]byte(missing))
+	if err == nil {
+		t.Fatalf("expected missing surface_package to fail")
+	}
+	if !strings.Contains(err.Error(), "surface_package") {
+		t.Fatalf("error = %v, want surface_package diagnostic", err)
+	}
+
+	wrong := strings.Replace(withPackage, `"surface_package": "surface-package-v1"`, `"surface_package": "docs-only-package-claim"`, 1)
+	err = ValidateReleaseSummary([]byte(wrong))
+	if err == nil {
+		t.Fatalf("expected wrong surface_package to fail")
+	}
+	if !strings.Contains(err.Error(), "surface_package") {
+		t.Fatalf("error = %v, want surface_package diagnostic", err)
+	}
+}
+
+func TestValidateSurfaceReleaseSummaryRequiresCrashReporting(t *testing.T) {
+	withCrashReporting := string(validSurfaceReleaseSummaryJSON())
+	if err := ValidateReleaseSummary([]byte(withCrashReporting)); err != nil {
+		t.Fatalf("ValidateReleaseSummary rejected crash reporting evidence: %v\n%s", err, withCrashReporting)
+	}
+
+	missing := strings.Replace(withCrashReporting, `  "crash_reporting": "surface-crash-report-v1",
+`, "", 1)
+	err := ValidateReleaseSummary([]byte(missing))
+	if err == nil {
+		t.Fatalf("expected missing crash_reporting to fail")
+	}
+	if !strings.Contains(err.Error(), "crash_reporting") {
+		t.Fatalf("error = %v, want crash_reporting diagnostic", err)
+	}
+
+	wrong := strings.Replace(withCrashReporting, `"crash_reporting": "surface-crash-report-v1"`, `"crash_reporting": "docs-only-crash-claim"`, 1)
+	err = ValidateReleaseSummary([]byte(wrong))
+	if err == nil {
+		t.Fatalf("expected wrong crash_reporting to fail")
+	}
+	if !strings.Contains(err.Error(), "crash_reporting") {
+		t.Fatalf("error = %v, want crash_reporting diagnostic", err)
+	}
+}
+
+func TestValidateSurfaceReleaseSummaryRequiresI18nLocalization(t *testing.T) {
+	withI18n := string(validSurfaceReleaseSummaryJSON())
+	if err := ValidateReleaseSummary([]byte(withI18n)); err != nil {
+		t.Fatalf("ValidateReleaseSummary rejected i18n localization evidence: %v\n%s", err, withI18n)
+	}
+
+	missing := strings.Replace(withI18n, `  "i18n_localization": "surface-i18n-v1",
+`, "", 1)
+	err := ValidateReleaseSummary([]byte(missing))
+	if err == nil {
+		t.Fatalf("expected missing i18n_localization to fail")
+	}
+	if !strings.Contains(err.Error(), "i18n_localization") {
+		t.Fatalf("error = %v, want i18n_localization diagnostic", err)
+	}
+
+	wrong := strings.Replace(withI18n, `"i18n_localization": "surface-i18n-v1"`, `"i18n_localization": "full-icu-bidi-claim"`, 1)
+	err = ValidateReleaseSummary([]byte(wrong))
+	if err == nil {
+		t.Fatalf("expected wrong i18n_localization to fail")
+	}
+	if !strings.Contains(err.Error(), "i18n_localization") {
+		t.Fatalf("error = %v, want i18n_localization diagnostic", err)
+	}
+}
+
+func TestValidateSurfaceReleaseSummaryRequiresWidgetMigration(t *testing.T) {
+	withMigration := string(validSurfaceReleaseSummaryJSON())
+	if err := ValidateReleaseSummary([]byte(withMigration)); err != nil {
+		t.Fatalf("ValidateReleaseSummary rejected widget migration evidence: %v\n%s", err, withMigration)
+	}
+
+	missing := strings.Replace(withMigration, `  "widget_migration": "surface-widget-migration-v1",
+`, "", 1)
+	err := ValidateReleaseSummary([]byte(missing))
+	if err == nil {
+		t.Fatalf("expected missing widget_migration to fail")
+	}
+	if !strings.Contains(err.Error(), "widget_migration") {
+		t.Fatalf("error = %v, want widget_migration diagnostic", err)
+	}
+
+	wrong := strings.Replace(withMigration, `"widget_migration": "surface-widget-migration-v1"`, `"widget_migration": "future-widget-core-claim"`, 1)
+	err = ValidateReleaseSummary([]byte(wrong))
+	if err == nil {
+		t.Fatalf("expected wrong widget_migration to fail")
+	}
+	if !strings.Contains(err.Error(), "widget_migration") {
+		t.Fatalf("error = %v, want widget_migration diagnostic", err)
 	}
 }
 
@@ -213,6 +475,97 @@ func TestValidateSurfaceReleaseSummaryRejectsFakePromotionClaims(t *testing.T) {
 				return strings.Replace(raw, `"morph_gate": "tetra.surface.morph.gate.v1"`, `"morph_gate": "tetra.surface.morph.invalid"`, 1)
 			},
 			want: "morph_gate",
+		},
+		{
+			name: "missing app model",
+			mutate: func(raw string) string {
+				return strings.Replace(raw, `  "app_model": "explicit-command-reducer-v1",
+`, ``, 1)
+			},
+			want: "app_model",
+		},
+		{
+			name: "wrong app model",
+			mutate: func(raw string) string {
+				return strings.Replace(raw, `"app_model": "explicit-command-reducer-v1"`, `"app_model": "hidden-state-runtime"`, 1)
+			},
+			want: "app_model",
+		},
+		{
+			name: "missing linux app shell",
+			mutate: func(raw string) string {
+				return strings.Replace(raw, `  "linux_app_shell": "linux-app-shell-subset-v1",
+  "app_shell_features": "electron-feature-ledger-v1",
+`, ``, 1)
+			},
+			want: "linux_app_shell",
+		},
+		{
+			name: "wrong linux app shell",
+			mutate: func(raw string) string {
+				return strings.Replace(raw, `"linux_app_shell": "linux-app-shell-subset-v1"`, `"linux_app_shell": "native-widget-shell"`, 1)
+			},
+			want: "linux_app_shell",
+		},
+		{
+			name: "missing security permissions",
+			mutate: func(raw string) string {
+				return strings.Replace(raw, `  "security_permissions": "surface-security-permission-v1",
+`, ``, 1)
+			},
+			want: "security_permissions",
+		},
+		{
+			name: "wrong security permissions",
+			mutate: func(raw string) string {
+				return strings.Replace(raw, `"security_permissions": "surface-security-permission-v1"`, `"security_permissions": "ambient-network-filesystem"`, 1)
+			},
+			want: "security_permissions",
+		},
+		{
+			name: "missing performance budget",
+			mutate: func(raw string) string {
+				return strings.Replace(raw, `  "performance_budget": "surface-performance-budget-v1",
+`, ``, 1)
+			},
+			want: "performance_budget",
+		},
+		{
+			name: "wrong performance budget",
+			mutate: func(raw string) string {
+				return strings.Replace(raw, `"performance_budget": "surface-performance-budget-v1"`, `"performance_budget": "faster-than-electron"`, 1)
+			},
+			want: "performance_budget",
+		},
+		{
+			name: "missing developer fast loop",
+			mutate: func(raw string) string {
+				return strings.Replace(raw, `  "developer_fast_loop": "surface-dev-workflow-v1",
+`, ``, 1)
+			},
+			want: "developer_fast_loop",
+		},
+		{
+			name: "wrong developer fast loop",
+			mutate: func(raw string) string {
+				return strings.Replace(raw, `"developer_fast_loop": "surface-dev-workflow-v1"`, `"developer_fast_loop": "hot-reload-claim"`, 1)
+			},
+			want: "developer_fast_loop",
+		},
+		{
+			name: "missing inspector",
+			mutate: func(raw string) string {
+				return strings.Replace(raw, `  "inspector": "surface-inspector-v1",
+`, ``, 1)
+			},
+			want: "inspector",
+		},
+		{
+			name: "wrong inspector",
+			mutate: func(raw string) string {
+				return strings.Replace(raw, `"inspector": "surface-inspector-v1"`, `"inspector": "browser-devtools-proxy"`, 1)
+			},
+			want: "inspector",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -385,6 +738,20 @@ func TestValidateSurfaceTextInputReportRejectsFakeProductionClaims(t *testing.T)
 			want: "utf8_validation",
 		},
 		{
+			name: "missing invalid utf8 rejection",
+			mutate: func(raw string) string {
+				return strings.Replace(raw, `"invalid_utf8_rejected": true`, `"invalid_utf8_rejected": false`, 1)
+			},
+			want: "invalid_utf8_rejected",
+		},
+		{
+			name: "missing multiline storage",
+			mutate: func(raw string) string {
+				return strings.Replace(raw, `"multiline": true`, `"multiline": false`, 1)
+			},
+			want: "multiline",
+		},
+		{
 			name: "missing composition commit",
 			mutate: func(raw string) string {
 				return strings.Replace(raw, `"composition_commit": true`, `"composition_commit": false`, 1)
@@ -432,6 +799,42 @@ func TestValidateSurfaceTextInputReportRejectsFakeProductionClaims(t *testing.T)
 				return strings.Replace(raw, `"safe_view_lifetime_checked": true`, `"safe_view_lifetime_checked": false`, 1)
 			},
 			want: "safe_view_lifetime_checked",
+		},
+		{
+			name: "missing target host composition trace",
+			mutate: func(raw string) string {
+				return strings.Replace(raw, `"target_host_composition_trace": true`, `"target_host_composition_trace": false`, 1)
+			},
+			want: "target_host_composition_trace",
+		},
+		{
+			name: "rich text production claim",
+			mutate: func(raw string) string {
+				return strings.Replace(raw, `"rich_text_production_claim": false`, `"rich_text_production_claim": true`, 1)
+			},
+			want: "rich_text_production_claim",
+		},
+		{
+			name: "bidi production claim",
+			mutate: func(raw string) string {
+				return strings.Replace(raw, `"bidi_production_claim": false`, `"bidi_production_claim": true`, 1)
+			},
+			want: "bidi_production_claim",
+		},
+		{
+			name: "missing settings reference trace",
+			mutate: func(raw string) string {
+				return strings.Replace(raw, `    {"source":"examples/surface_morph_settings.tetra","trace":"settings text field trace","focus":true,"selection":true,"clipboard":true,"composition":true,"multiline":true,"pass":true},
+`, "", 1)
+			},
+			want: "examples/surface_morph_settings.tetra",
+		},
+		{
+			name: "shaping plan claims bidi",
+			mutate: func(raw string) string {
+				return strings.Replace(raw, `"bidi":"nonclaim-full-bidi-v1"`, `"bidi":"full-bidi-production-v1"`, 1)
+			},
+			want: "text_shaping_plan.bidi",
 		},
 		{
 			name: "missing target evidence",
@@ -524,6 +927,19 @@ func TestValidateSurfaceBrowserReleaseReport(t *testing.T) {
 	raw := validWASM32WebReleaseBrowserSurfaceReportJSON(t, nil)
 	if err := ValidateReport(raw); err != nil {
 		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
+	}
+}
+
+func TestValidateSurfaceBrowserReleaseRequiresFirstClassBrowserSurfaceEvidence(t *testing.T) {
+	raw := validWASM32WebReleaseBrowserSurfaceReportJSON(t, func(report map[string]any) {
+		delete(report, "browser_surface")
+	})
+	err := ValidateReport(raw)
+	if err == nil {
+		t.Fatalf("expected browser release without first-class browser_surface evidence to fail")
+	}
+	if !strings.Contains(err.Error(), "browser_surface") {
+		t.Fatalf("error = %v, want browser_surface diagnostic", err)
 	}
 }
 
@@ -638,6 +1054,202 @@ func TestValidateSurfaceLinuxReleaseWindowRejectsFakeProductionClaims(t *testing
 			err := ValidateReport(raw)
 			if err == nil {
 				t.Fatalf("expected linux release fake claim to fail")
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want %q diagnostic", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestValidateSurfaceLinuxAppShellReport(t *testing.T) {
+	raw := validLinuxAppShellSurfaceReportJSON(t, nil)
+	if err := ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
+	}
+}
+
+func TestValidateSurfaceLinuxAppShellRejectsMissingP17SecurityPermissions(t *testing.T) {
+	raw := validLinuxAppShellSurfaceReportJSON(t, func(report map[string]any) {
+		delete(report, "security_permissions")
+	})
+	err := ValidateReport(raw)
+	if err == nil {
+		t.Fatalf("expected missing P17 security permissions to fail")
+	}
+	if !strings.Contains(err.Error(), "security_permissions") {
+		t.Fatalf("error = %v, want security_permissions diagnostic", err)
+	}
+}
+
+func TestValidateSurfaceLinuxAppShellRejectsPermissionBypassForBlockedFeatures(t *testing.T) {
+	raw := validLinuxAppShellSurfaceReportJSON(t, func(report map[string]any) {
+		security := report["security_permissions"].(map[string]any)
+		capabilities := security["capabilities"].([]any)
+		for _, capability := range capabilities {
+			row := capability.(map[string]any)
+			if row["name"] == "notification" {
+				row["status"] = "allowed_with_policy"
+				row["allowed"] = true
+				row["blocked_reason"] = ""
+			}
+		}
+	})
+	err := ValidateReport(raw)
+	if err == nil {
+		t.Fatalf("expected permission bypass for blocked notification feature to fail")
+	}
+	if !strings.Contains(err.Error(), "notification") || !strings.Contains(err.Error(), "security_permissions") {
+		t.Fatalf("error = %v, want security_permissions notification diagnostic", err)
+	}
+}
+
+func TestValidateSurfaceLinuxAppShellRejectsMissingP18PerformanceBudget(t *testing.T) {
+	raw := validLinuxAppShellSurfaceReportJSON(t, func(report map[string]any) {
+		delete(report, "surface_performance_budget")
+	})
+	err := ValidateReport(raw)
+	if err == nil {
+		t.Fatalf("expected missing P18 performance budget to fail")
+	}
+	if !strings.Contains(err.Error(), "surface_performance_budget") {
+		t.Fatalf("error = %v, want surface_performance_budget diagnostic", err)
+	}
+}
+
+func TestValidateSurfacePerformanceBudgetRejectsFasterThanElectronClaim(t *testing.T) {
+	raw := validLinuxAppShellSurfaceReportJSON(t, func(report map[string]any) {
+		budget := report["surface_performance_budget"].(map[string]any)
+		budget["performance_claim"] = "faster than Electron"
+		budget["methodology"].(map[string]any)["electron_comparison"] = "faster than Electron"
+	})
+	err := ValidateReport(raw)
+	if err == nil {
+		t.Fatalf("expected fake faster-than-Electron claim to fail")
+	}
+	lower := strings.ToLower(err.Error())
+	if !strings.Contains(lower, "faster than electron") && !strings.Contains(err.Error(), "surface_performance_budget") {
+		t.Fatalf("error = %v, want faster than Electron performance diagnostic", err)
+	}
+}
+
+func TestValidateSurfacePerformanceBudgetRejectsMissingPeakMemoryField(t *testing.T) {
+	raw := validLinuxAppShellSurfaceReportJSON(t, func(report map[string]any) {
+		budget := report["surface_performance_budget"].(map[string]any)
+		memory := budget["memory"].(map[string]any)
+		delete(memory, "peak_rss_bytes")
+	})
+	err := ValidateReport(raw)
+	if err == nil {
+		t.Fatalf("expected missing peak memory field to fail")
+	}
+	if !strings.Contains(err.Error(), "peak_rss_bytes") {
+		t.Fatalf("error = %v, want peak_rss_bytes diagnostic", err)
+	}
+}
+
+func TestValidateSurfaceLinuxAppShellRejectsMissingP16FeatureLedgerRows(t *testing.T) {
+	raw := validLinuxAppShellSurfaceReportJSON(t, func(report map[string]any) {
+		appShell := report["linux_app_shell"].(map[string]any)
+		appShell["shell_features"] = withoutLinuxAppShellFeature(p16LinuxAppShellFeaturesForTest(), "tray")
+	})
+	err := ValidateReport(raw)
+	if err == nil {
+		t.Fatalf("expected missing P16 tray ledger row to fail")
+	}
+	if !strings.Contains(err.Error(), "tray") {
+		t.Fatalf("error = %v, want tray diagnostic", err)
+	}
+}
+
+func TestValidateSurfaceLinuxAppShellRejectsTrayClaimWithoutTargetEvidence(t *testing.T) {
+	raw := validLinuxAppShellSurfaceReportJSON(t, func(report map[string]any) {
+		appShell := report["linux_app_shell"].(map[string]any)
+		features := p16LinuxAppShellFeaturesForTest()
+		for _, feature := range features {
+			row := feature.(map[string]any)
+			if row["name"] == "tray" {
+				row["status"] = "scoped_adapter"
+				row["claimed"] = true
+				row["blocked_reason"] = ""
+			}
+		}
+		appShell["shell_features"] = features
+	})
+	err := ValidateReport(raw)
+	if err == nil {
+		t.Fatalf("expected tray claim without target evidence to fail")
+	}
+	if !strings.Contains(err.Error(), "tray") || !strings.Contains(err.Error(), "target evidence") {
+		t.Fatalf("error = %v, want tray target evidence diagnostic", err)
+	}
+}
+
+func TestValidateSurfaceLinuxAppShellRejectsFakeProductionClaims(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(map[string]any)
+		want   string
+	}{
+		{
+			name: "memfd starter host level",
+			mutate: func(report map[string]any) {
+				host := report["host_evidence"].(map[string]any)
+				host["level"] = "linux-x64-memfd-starter"
+				host["backend"] = "memfd-rgba"
+				host["real_window"] = false
+				host["native_input"] = false
+			},
+			want: "linux app-shell host_evidence.level",
+		},
+		{
+			name: "missing reopen lifecycle",
+			mutate: func(report map[string]any) {
+				appShell := report["linux_app_shell"].(map[string]any)
+				appShell["window_lifecycle"] = []any{
+					map[string]any{"order": 1, "window_id": "notes-main", "operation": "open", "host_trace": true, "pass": true},
+					map[string]any{"order": 2, "window_id": "notes-main", "operation": "close", "host_trace": true, "pass": true},
+				}
+			},
+			want: "reopen",
+		},
+		{
+			name: "native widget UI substitute",
+			mutate: func(report map[string]any) {
+				appShell := report["linux_app_shell"].(map[string]any)
+				appShell["negative_guards"].(map[string]any)["no_gtk"] = false
+			},
+			want: "GTK/Qt/native widget UI",
+		},
+		{
+			name: "file dialog claimed without blocked pass",
+			mutate: func(report map[string]any) {
+				appShell := report["linux_app_shell"].(map[string]any)
+				features := appShell["shell_features"].([]any)
+				for _, feature := range features {
+					row := feature.(map[string]any)
+					if row["name"] == "file_dialog" {
+						row["status"] = "claimed-native-dialog"
+						row["claimed"] = true
+					}
+				}
+			},
+			want: "file_dialog",
+		},
+		{
+			name: "missing host trace artifact",
+			mutate: func(report map[string]any) {
+				artifacts := report["artifacts"].([]any)
+				report["artifacts"] = artifacts[:1]
+			},
+			want: "linux-app-shell-host-trace",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := validLinuxAppShellSurfaceReportJSON(t, tc.mutate)
+			err := ValidateReport(raw)
+			if err == nil {
+				t.Fatalf("expected linux app-shell fake claim to fail")
 			}
 			if !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("error = %v, want %q diagnostic", err, tc.want)
@@ -1437,6 +2049,13 @@ func TestValidateReportRejectsIncompleteBlockPaintEvidence(t *testing.T) {
 			want: "fill",
 		},
 		{
+			name: "missing renderer report",
+			mutate: func(report *Report) {
+				report.Renderer = nil
+			},
+			want: "renderer",
+		},
+		{
 			name: "missing border",
 			mutate: func(report *Report) {
 				report.PaintLayers = removePaintLayerKind(report.PaintLayers, "border")
@@ -1444,12 +2063,21 @@ func TestValidateReportRejectsIncompleteBlockPaintEvidence(t *testing.T) {
 			want: "border",
 		},
 		{
+			name: "missing image fill command",
+			mutate: func(report *Report) {
+				report.PaintCommands = removePaintCommand(report.PaintCommands, "image_fill")
+			},
+			want: "image_fill",
+		},
+		{
 			name: "missing radius",
 			mutate: func(report *Report) {
-				report.PaintLayers[0].Radius = 0
-				report.PaintLayers[1].Radius = 0
-				report.PaintLayers[2].Radius = 0
-				report.PaintLayers[4].Radius = 0
+				for i := range report.PaintLayers {
+					report.PaintLayers[i].Radius = 0
+				}
+				for i := range report.PaintCommands {
+					report.PaintCommands[i].Radius = 0
+				}
 			},
 			want: "radius",
 		},
@@ -1474,6 +2102,41 @@ func TestValidateReportRejectsIncompleteBlockPaintEvidence(t *testing.T) {
 				report.VisualFeatures = append(report.VisualFeatures, "blur")
 			},
 			want: "unsupported blur",
+		},
+		{
+			name: "gpu production claim",
+			mutate: func(report *Report) {
+				report.Renderer.GPUProductionClaim = true
+			},
+			want: "gpu production",
+		},
+		{
+			name: "backdrop blur production claim",
+			mutate: func(report *Report) {
+				report.Renderer.BackdropBlurProductionClaim = true
+			},
+			want: "backdrop blur",
+		},
+		{
+			name: "missing dirty rects",
+			mutate: func(report *Report) {
+				report.Renderer.DirtyRects = nil
+			},
+			want: "dirty_rects",
+		},
+		{
+			name: "missing invalidations",
+			mutate: func(report *Report) {
+				report.Renderer.Invalidations = nil
+			},
+			want: "invalidations",
+		},
+		{
+			name: "unbounded renderer cache",
+			mutate: func(report *Report) {
+				report.Renderer.CacheStats.Bounded = false
+			},
+			want: "renderer cache",
 		},
 		{
 			name: "command order",
@@ -1618,6 +2281,20 @@ func TestValidateReportRejectsIncompleteBlockLayoutEvidence(t *testing.T) {
 				report.LayoutFeatures = removeString(report.LayoutFeatures, "resize")
 			},
 			want: "resize",
+		},
+		{
+			name: "missing density stable rounding",
+			mutate: func(report *Report) {
+				report.LayoutFeatures = removeString(removeString(report.LayoutFeatures, "density"), "stable-rounding")
+			},
+			want: "density",
+		},
+		{
+			name: "missing aspect",
+			mutate: func(report *Report) {
+				report.LayoutFeatures = removeString(report.LayoutFeatures, "aspect")
+			},
+			want: "aspect",
 		},
 		{
 			name: "unsupported css flexbox",
@@ -1891,6 +2568,78 @@ func TestValidateReportAcceptsMorphCapsuleEvidence(t *testing.T) {
 	raw := validHeadlessMorphSurfaceReportJSON(t, nil)
 	if err := ValidateReport(raw); err != nil {
 		t.Fatalf("ValidateReport failed with Morph evidence: %v\n%s", err, raw)
+	}
+}
+
+func TestValidateReportRequiresP08RecipeAuthoringSuite(t *testing.T) {
+	raw := validHeadlessMorphSurfaceReportJSON(t, func(morph map[string]any) {
+		morph["recipes"] = []any{
+			map[string]any{"name": "control.action@1", "output": "Block", "slots": []any{"label", "icon"}, "inputs": []any{"text", "action", "variant"}, "expands_to_block_graph": true, "hidden_app_state": false, "platform_widgets": false, "core_primitive_promotion": false},
+			map[string]any{"name": "field.text@1", "output": "Block", "slots": []any{"label", "control"}, "inputs": []any{"value", "on_text"}, "expands_to_block_graph": true, "hidden_app_state": false, "platform_widgets": false, "core_primitive_promotion": false},
+			map[string]any{"name": "command.item@1", "output": "Block", "slots": []any{"icon", "title", "subtitle"}, "inputs": []any{"title", "subtitle", "icon", "selected"}, "expands_to_block_graph": true, "hidden_app_state": false, "platform_widgets": false, "core_primitive_promotion": false},
+			map[string]any{"name": "region.panel@1", "output": "Block", "slots": []any{"header", "body", "actions"}, "inputs": []any{"title"}, "expands_to_block_graph": true, "hidden_app_state": false, "platform_widgets": false, "core_primitive_promotion": false},
+		}
+	})
+	err := ValidateReport(raw)
+	if err == nil {
+		t.Fatalf("expected P08 Morph recipe suite to reject the legacy four-recipe set")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "form.field@1") {
+		t.Fatalf("error = %v, want missing form.field@1 diagnostic", err)
+	}
+}
+
+func TestValidateReportRejectsIncompleteMorphRecipeApps(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(map[string]any)
+		want   string
+	}{
+		{
+			name: "missing recipe apps",
+			mutate: func(morph map[string]any) {
+				delete(morph, "recipe_apps")
+			},
+			want: "recipe_apps",
+		},
+		{
+			name: "hidden app state",
+			mutate: func(morph map[string]any) {
+				apps := morph["recipe_apps"].([]any)
+				app := apps[0].(map[string]any)
+				app["hidden_app_state"] = true
+			},
+			want: "hidden app state",
+		},
+		{
+			name: "React runtime",
+			mutate: func(morph map[string]any) {
+				apps := morph["recipe_apps"].([]any)
+				app := apps[0].(map[string]any)
+				app["react_runtime"] = true
+			},
+			want: "React runtime",
+		},
+		{
+			name: "Button primitive",
+			mutate: func(morph map[string]any) {
+				apps := morph["recipe_apps"].([]any)
+				app := apps[0].(map[string]any)
+				app["output_primitives"] = []any{"Block", "Button"}
+			},
+			want: "Button",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := validHeadlessMorphSurfaceReportJSON(t, tc.mutate)
+			err := ValidateReport(raw)
+			if err == nil {
+				t.Fatalf("expected incomplete Morph recipe app evidence to fail")
+			}
+			if !strings.Contains(strings.ToLower(err.Error()), strings.ToLower(tc.want)) {
+				t.Fatalf("error = %v, want %q diagnostic", err, tc.want)
+			}
+		})
 	}
 }
 
@@ -3230,6 +3979,16 @@ func TestValidateReportRejectsMissingComponentAppArtifactEvidence(t *testing.T) 
 	}
 }
 
+func TestSurfaceProjectTemplateSourceAcceptsFinalProductReportPath(t *testing.T) {
+	source := "reports/surface-product-v1/templates/command-palette/src/main.tetra"
+	if !isSurfaceProjectTemplateSource(source) {
+		t.Fatalf("final product report template source was rejected: %s", source)
+	}
+	if !isSurfaceBlockAccessibilitySource(source) {
+		t.Fatalf("final product report template source was rejected for Block accessibility evidence: %s", source)
+	}
+}
+
 func TestValidateReportRejectsWASM32WebMissingCompilerOwnedLoaderArtifact(t *testing.T) {
 	raw := strings.Replace(string(validWASM32WebSurfaceReportJSON()), `,
     {"kind":"compiler-owned-loader","path":"/tmp/surface-artifacts/surface-counter.mjs","sha256":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","size":4931}`, ``, 1)
@@ -3291,6 +4050,36 @@ func TestValidateReportRejectsSourceComponentModuleMismatch(t *testing.T) {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("error = %v, want %q diagnostic", err, want)
 		}
+	}
+}
+
+func TestSurfaceProjectTemplateSourceAcceptsExitZeroComponentAppProcess(t *testing.T) {
+	for _, source := range []string{
+		"reports/surface-electron-react-beauty-production/P21/template-smoke/templates/command-palette/src/main.tetra",
+		"reports/surface-electron-react-beauty-production/P21/release-gate/templates/command-palette/src/main.tetra",
+	} {
+		t.Run(source, func(t *testing.T) {
+			exit := 0
+			expected := 0
+			process := ProcessReport{
+				Name:             "surface component app",
+				Kind:             "app",
+				Path:             "reports/surface-electron-react-beauty-production/P21/template-smoke/template-runtime/command-palette-linux-x64",
+				Ran:              true,
+				Pass:             true,
+				ExitCode:         &exit,
+				ExpectedExitCode: &expected,
+			}
+			if !isSurfaceComponentAppProcess(source, process) {
+				t.Fatalf("generated Surface template source should accept exit-zero component app process")
+			}
+			if !isSurfaceBlockAccessibilitySource(source) {
+				t.Fatalf("generated Surface template source should accept Block accessibility evidence")
+			}
+			if !isSurfaceMorphReportSource(source) {
+				t.Fatalf("generated Surface template source should accept Morph evidence")
+			}
+		})
 	}
 }
 
@@ -3405,7 +4194,209 @@ func validHeadlessSurfaceReportJSON() []byte {
     {"name":"state transition","kind":"positive","ran":true,"pass":true},
     {"name":"reject legacy UI evidence","kind":"negative","ran":true,"pass":true,"expected_error":"legacy UI evidence rejected"}
   ]
-}`)
+	}`)
+}
+
+func validHeadlessAppModelSurfaceReportJSON(t *testing.T, mutate func(map[string]any)) []byte {
+	t.Helper()
+	var report map[string]any
+	if err := json.Unmarshal(validHeadlessSurfaceReportJSON(), &report); err != nil {
+		t.Fatalf("decode base headless report: %v", err)
+	}
+	report["source"] = "examples/surface_app_model.tetra"
+	report["processes"] = []any{
+		map[string]any{"name": "tetra build", "kind": "build", "path": "tetra build --target linux-x64 examples/surface_app_model.tetra -o /tmp/surface-artifacts/surface-app-model", "ran": true, "pass": true, "exit_code": 0},
+		map[string]any{"name": "surface component app", "kind": "app", "path": "/tmp/surface-artifacts/surface-app-model", "ran": true, "pass": true, "exit_code": 1, "expected_exit_code": 1},
+		map[string]any{"name": "surface headless runtime", "kind": "runtime", "path": "tools/cmd/surface-runtime-smoke", "ran": true, "pass": true, "exit_code": 0},
+	}
+	report["artifacts"] = []any{
+		map[string]any{"kind": "component-app", "path": "/tmp/surface-artifacts/surface-app-model", "sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "size": 98234},
+		map[string]any{"kind": "runner-trace", "path": "/tmp/surface-artifacts/surface-runner-trace.json", "sha256": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "size": 26000},
+	}
+	report["components"] = []any{
+		componentMap("AppModelApp", "examples.surface_app_model.AppModelApp", "", RectReport{X: 0, Y: 0, W: 480, H: 320}, map[string]string{"route": "settings", "focused": "NameField", "save_count": "1", "pending_task": "0", "history_depth": "1", "redo_depth": "0", "accessibility_role": "none"}),
+		componentMap("NameField", "examples.surface_app_model.NameField", "AppModelApp", RectReport{X: 32, Y: 80, W: 240, H: 44}, map[string]string{"focused": "true", "buffer": "Ada", "caret": "3", "accessibility_role": "textbox"}),
+		componentMap("SaveButton", "examples.surface_app_model.SaveButton", "AppModelApp", RectReport{X: 32, Y: 144, W: 132, H: 44}, map[string]string{"focused": "false", "press_count": "1", "action": "save", "accessibility_role": "button"}),
+	}
+	report["events"] = []any{
+		eventMap(1, "mouse_up", "NameField", []any{"AppModelApp", "NameField"}, 48, 96, 0, 480, 320, map[string]string{"AppModelApp.focused": ""}, map[string]string{"AppModelApp.focused": "NameField"}),
+		textEventMap(2, "NameField", []any{"AppModelApp", "NameField"}, 3, "416461", 480, 320, map[string]string{"NameField.buffer": ""}, map[string]string{"NameField.buffer": "Ada"}),
+		keyEventMap(3, "SaveButton", []any{"AppModelApp", "SaveButton"}, 13, 480, 320, map[string]string{"AppModelApp.save_count": "0"}, map[string]string{"AppModelApp.save_count": "1"}),
+	}
+	report["state_transitions"] = []any{
+		map[string]any{"order": 1, "component": "AppModelApp", "field": "focused", "before": "", "after": "NameField", "cause": "focus"},
+		map[string]any{"order": 2, "component": "NameField", "field": "buffer", "before": "", "after": "Ada", "cause": "command.insert_text"},
+		map[string]any{"order": 3, "component": "AppModelApp", "field": "route", "before": "home", "after": "settings", "cause": "command.navigate"},
+		map[string]any{"order": 4, "component": "AppModelApp", "field": "pending_task", "before": "1", "after": "0", "cause": "command.async_complete"},
+		map[string]any{"order": 5, "component": "AppModelApp", "field": "history_depth", "before": "0", "after": "1", "cause": "command.undoable"},
+		map[string]any{"order": 6, "component": "AppModelApp", "field": "save_count", "before": "0", "after": "1", "cause": "command.save"},
+	}
+	report["app_model"] = map[string]any{
+		"schema":                  "tetra.surface.app-model.v1",
+		"app_model_level":         "explicit-command-reducer-v1",
+		"release_scope":           "surface-v1-linux-web",
+		"source":                  "examples/surface_app_model.tetra",
+		"module":                  "lib.core.surface_app",
+		"uses_component_tree_api": true,
+		"caller_owned_state":      true,
+		"explicit_event_bindings": true,
+		"deterministic_reducer":   true,
+		"hidden_app_state":        false,
+		"react_runtime":           false,
+		"electron_runtime":        false,
+		"dom_runtime":             false,
+		"dom_event_model":         false,
+		"user_js":                 false,
+		"platform_widgets":        false,
+		"state_fields":            []any{"route", "focused", "name_buffer", "save_count", "pending_task", "history_depth", "redo_depth"},
+		"command_registry":        []any{"focus.name", "text.insert", "nav.push.settings", "nav.back", "async.save.start", "async.save.complete", "async.save.cancel", "history.undo", "history.redo"},
+		"event_bindings":          validAppModelEventBindings(),
+		"command_dispatches":      validAppModelCommandDispatches(),
+		"navigation_transitions":  validAppModelNavigationTransitions(),
+		"focus_scope_transitions": validAppModelFocusScopeTransitions(),
+		"async_tasks":             validAppModelAsyncTasks(),
+		"undo_redo_transitions":   validAppModelUndoRedoTransitions(),
+		"negative_guards":         validAppModelNegativeGuards(),
+	}
+	report["cases"] = append(report["cases"].([]any),
+		map[string]any{"name": "app model explicit event-to-command binding", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "app model deterministic command reducer", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "app model navigation stack", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "app model focus scope modal trap", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "app model async completion cancellation boundary", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "app model undo redo history", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "app model no React hooks DOM event model hidden JS state", "kind": "positive", "ran": true, "pass": true},
+	)
+	if mutate != nil {
+		mutate(report)
+	}
+	raw, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal app model report: %v", err)
+	}
+	return raw
+}
+
+func validAppModelEventBindings() []any {
+	return []any{
+		map[string]any{"order": 1, "event_order": 1, "event_kind": "mouse_up", "target": "NameField", "dispatch_path": []any{"AppModelApp", "NameField"}, "command": "focus.name", "explicit": true},
+		map[string]any{"order": 2, "event_order": 2, "event_kind": "text_input", "target": "NameField", "dispatch_path": []any{"AppModelApp", "NameField"}, "command": "text.insert", "explicit": true},
+		map[string]any{"order": 3, "event_order": 3, "event_kind": "key_down", "target": "SaveButton", "dispatch_path": []any{"AppModelApp", "SaveButton"}, "command": "async.save.start", "explicit": true},
+	}
+}
+
+func validAppModelCommandDispatches() []any {
+	return []any{
+		map[string]any{"order": 1, "event_order": 1, "command": "focus.name", "kind": "focus", "target": "NameField", "handled": true, "before_state": map[string]any{"focused": ""}, "after_state": map[string]any{"focused": "NameField"}},
+		map[string]any{"order": 2, "event_order": 2, "command": "text.insert", "kind": "edit", "target": "NameField", "handled": true, "reversible": true, "history_index": 1, "before_state": map[string]any{"name_buffer": ""}, "after_state": map[string]any{"name_buffer": "Ada"}},
+		map[string]any{"order": 3, "event_order": 3, "command": "async.save.start", "kind": "async_start", "target": "SaveButton", "handled": true, "async_task_id": "save-1", "before_state": map[string]any{"pending_task": "0"}, "after_state": map[string]any{"pending_task": "1"}},
+		map[string]any{"order": 4, "event_order": 0, "command": "async.save.complete", "kind": "async_complete", "target": "AppModelApp", "handled": true, "async_task_id": "save-1", "before_state": map[string]any{"pending_task": "1", "save_count": "0"}, "after_state": map[string]any{"pending_task": "0", "save_count": "1"}},
+	}
+}
+
+func validAppModelNavigationTransitions() []any {
+	return []any{
+		map[string]any{"order": 1, "command": "nav.push.settings", "operation": "push", "before_route": "home", "after_route": "settings", "stack_before": []any{"home"}, "stack_after": []any{"home", "settings"}, "underflow_rejected": false},
+		map[string]any{"order": 2, "command": "nav.back", "operation": "back", "before_route": "settings", "after_route": "home", "stack_before": []any{"home", "settings"}, "stack_after": []any{"home"}, "underflow_rejected": false},
+		map[string]any{"order": 3, "command": "nav.back", "operation": "back", "before_route": "home", "after_route": "home", "stack_before": []any{"home"}, "stack_after": []any{"home"}, "underflow_rejected": true},
+	}
+}
+
+func validAppModelFocusScopeTransitions() []any {
+	return []any{
+		map[string]any{"order": 1, "scope": "main", "before_focus": "", "after_focus": "NameField", "wrapped": false, "modal_trap": false, "escaped": false},
+		map[string]any{"order": 2, "scope": "dialog", "before_focus": "DialogCancel", "after_focus": "DialogConfirm", "wrapped": true, "modal_trap": true, "escaped": false},
+	}
+}
+
+func validAppModelAsyncTasks() []any {
+	return []any{
+		map[string]any{"id": "save-1", "command": "async.save.start", "operation": "start", "status": "pending", "before_state": map[string]any{"pending_task": "0"}, "after_state": map[string]any{"pending_task": "1"}, "completion_order": 0, "canceled": false},
+		map[string]any{"id": "save-1", "command": "async.save.complete", "operation": "complete", "status": "completed", "before_state": map[string]any{"pending_task": "1"}, "after_state": map[string]any{"pending_task": "0"}, "completion_order": 4, "canceled": false},
+		map[string]any{"id": "save-2", "command": "async.save.cancel", "operation": "cancel", "status": "canceled", "before_state": map[string]any{"pending_task": "1", "save_count": "1"}, "after_state": map[string]any{"pending_task": "0", "save_count": "1"}, "completion_order": 0, "canceled": true},
+	}
+}
+
+func validAppModelUndoRedoTransitions() []any {
+	return []any{
+		map[string]any{"order": 1, "command": "text.insert", "history_index": 1, "operation": "record", "before": "", "after": "Ada", "matched_history_entry": true, "applied": true},
+		map[string]any{"order": 2, "command": "history.undo", "history_index": 1, "operation": "undo", "before": "Ada", "after": "", "matched_history_entry": true, "applied": true},
+		map[string]any{"order": 3, "command": "history.redo", "history_index": 1, "operation": "redo", "before": "", "after": "Ada", "matched_history_entry": true, "applied": true},
+	}
+}
+
+func TestValidateSurfaceTargetHostStatusAcceptsWindowsUnsupportedNonclaim(t *testing.T) {
+	raw := validSurfaceWindowsTargetHostStatusJSON()
+	if err := ValidateTargetHostStatus(raw); err != nil {
+		t.Fatalf("ValidateTargetHostStatus failed: %v\n%s", err, raw)
+	}
+}
+
+func TestValidateSurfaceTargetHostStatusAcceptsMacOSUnsupportedNonclaim(t *testing.T) {
+	raw := validSurfaceMacOSTargetHostStatusJSON()
+	if err := ValidateTargetHostStatus(raw); err != nil {
+		t.Fatalf("ValidateTargetHostStatus failed: %v\n%s", err, raw)
+	}
+}
+
+func TestValidateSurfaceTargetHostStatusRejectsFakeBuildOnlyPromotion(t *testing.T) {
+	raw := strings.Replace(string(validSurfaceWindowsTargetHostStatusJSON()), `"build_only_promotion": false`, `"build_only_promotion": true`, 1)
+	err := ValidateTargetHostStatus([]byte(raw))
+	if err == nil {
+		t.Fatalf("expected build-only promotion to fail")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "build-only") {
+		t.Fatalf("error = %v, want build-only diagnostic", err)
+	}
+}
+
+func TestValidateSurfaceTargetHostStatusRejectsLinuxSubstitute(t *testing.T) {
+	raw := strings.Replace(string(validSurfaceWindowsTargetHostStatusJSON()), `"linux_substitute": false`, `"linux_substitute": true`, 1)
+	err := ValidateTargetHostStatus([]byte(raw))
+	if err == nil {
+		t.Fatalf("expected Linux substitute to fail")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "linux substitute") {
+		t.Fatalf("error = %v, want Linux substitute diagnostic", err)
+	}
+}
+
+func TestValidateSurfaceTargetHostStatusRejectsProductionClaim(t *testing.T) {
+	raw := strings.Replace(string(validSurfaceWindowsTargetHostStatusJSON()), `"production_claim": false`, `"production_claim": true`, 1)
+	err := ValidateTargetHostStatus([]byte(raw))
+	if err == nil {
+		t.Fatalf("expected Windows production claim to fail without target-host evidence")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "production_claim") {
+		t.Fatalf("error = %v, want production_claim diagnostic", err)
+	}
+}
+
+func TestValidateSurfaceTargetHostStatusRejectsBetaWithoutTargetHostEvidence(t *testing.T) {
+	raw := strings.Replace(string(validSurfaceWindowsTargetHostStatusJSON()), `"status": "unsupported"`, `"status": "beta_target_host"`, 1)
+	raw = strings.Replace(raw, `"tier": "UNSUPPORTED"`, `"tier": "BETA_TARGET_HOST"`, 1)
+	err := ValidateTargetHostStatus([]byte(raw))
+	if err == nil {
+		t.Fatalf("expected beta target-host status without target-host evidence to fail")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "target-host") {
+		t.Fatalf("error = %v, want target-host diagnostic", err)
+	}
+}
+
+func validAppModelNegativeGuards() map[string]any {
+	return map[string]any{
+		"no_hidden_app_state":              true,
+		"no_react_hooks":                   true,
+		"no_dom_event_model":               true,
+		"no_user_js":                       true,
+		"no_platform_widgets":              true,
+		"async_cancel_no_mutation":         true,
+		"navigation_underflow_rejected":    true,
+		"focus_scope_escape_rejected":      true,
+		"undo_redo_requires_history":       true,
+		"command_without_binding_rejected": true,
+	}
 }
 
 func validSurfaceReleaseSummaryJSON() []byte {
@@ -3433,6 +4424,19 @@ func validSurfaceReleaseSummaryJSON() []byte {
   "clipboard": "clipboard-text-v1",
   "ime": "composition-baseline-v1",
   "accessibility": "platform-bridge-v1",
+  "app_model": "explicit-command-reducer-v1",
+  "linux_app_shell": "linux-app-shell-subset-v1",
+  "app_shell_features": "electron-feature-ledger-v1",
+  "security_permissions": "surface-security-permission-v1",
+  "performance_budget": "surface-performance-budget-v1",
+  "developer_fast_loop": "surface-dev-workflow-v1",
+  "inspector": "surface-inspector-v1",
+  "project_templates": "surface-template-smoke-v1",
+  "reference_apps": "surface-reference-app-suite-v1",
+  "surface_package": "surface-package-v1",
+  "crash_reporting": "surface-crash-report-v1",
+  "i18n_localization": "surface-i18n-v1",
+  "widget_migration": "surface-widget-migration-v1",
   "browser_surface": "browser-canvas-release-v1",
   "linux_surface": "linux-x64-release-window-v1",
   "block_system": "block-system",
@@ -3447,6 +4451,94 @@ func validSurfaceReleaseSummaryJSON() []byte {
 }`)
 }
 
+func validSurfaceWindowsTargetHostStatusJSON() []byte {
+	return []byte(`{
+  "schema": "tetra.surface.target-host-status.v1",
+  "target": "windows-x64",
+  "status": "unsupported",
+  "tier": "UNSUPPORTED",
+  "release_scope": "surface-v1-linux-web",
+  "source": "scripts/release/surface/release-gate.sh",
+  "host_os": "linux",
+  "host_arch": "amd64",
+  "reason": "no Windows target-host Surface v1 runner evidence exists in this release",
+  "production_claim": false,
+  "experimental": false,
+  "target_host_evidence": false,
+  "build_only_evidence": false,
+  "build_only_promotion": false,
+  "linux_substitute": false,
+  "ci_artifact_required": true,
+  "required_evidence": {
+    "real_window": false,
+    "native_input": false,
+    "clipboard": false,
+    "dpi_scaling": false,
+    "accessibility_snapshot": false,
+    "app_shell": false
+  },
+  "unsupported_claims": [
+    "windows-real-window-surface",
+    "windows-production-surface-nonclaim",
+    "windows-target-host-runtime",
+    "build-only-windows-surface-runtime",
+    "linux-substitute-windows-surface-runtime"
+  ],
+  "negative_guards": {
+    "no_linux_substitute": true,
+    "no_build_only_promotion": true,
+    "no_production_claim": true,
+    "no_docs_only_evidence": true,
+    "no_copied_report": true,
+    "ci_artifact_required": true
+  }
+}`)
+}
+
+func validSurfaceMacOSTargetHostStatusJSON() []byte {
+	return []byte(`{
+  "schema": "tetra.surface.target-host-status.v1",
+  "target": "macos-x64",
+  "status": "unsupported",
+  "tier": "UNSUPPORTED",
+  "release_scope": "surface-v1-linux-web",
+  "source": "scripts/release/surface/release-gate.sh",
+  "host_os": "linux",
+  "host_arch": "amd64",
+  "reason": "no macOS target-host Surface v1 runner evidence exists in this release",
+  "production_claim": false,
+  "experimental": false,
+  "target_host_evidence": false,
+  "build_only_evidence": false,
+  "build_only_promotion": false,
+  "linux_substitute": false,
+  "ci_artifact_required": true,
+  "required_evidence": {
+    "real_window": false,
+    "native_input": false,
+    "clipboard": false,
+    "dpi_scaling": false,
+    "accessibility_snapshot": false,
+    "app_shell": false
+  },
+  "unsupported_claims": [
+    "macos-real-window-surface",
+    "macos-production-surface-nonclaim",
+    "macos-target-host-runtime",
+    "build-only-macos-surface-runtime",
+    "linux-substitute-macos-surface-runtime"
+  ],
+  "negative_guards": {
+    "no_linux_substitute": true,
+    "no_build_only_promotion": true,
+    "no_production_claim": true,
+    "no_docs_only_evidence": true,
+    "no_copied_report": true,
+    "ci_artifact_required": true
+  }
+}`)
+}
+
 func validSurfaceTextInputReportJSON() []byte {
 	return []byte(`{
   "schema": "tetra.surface.text-input.v1",
@@ -3457,8 +4549,11 @@ func validSurfaceTextInputReportJSON() []byte {
   "production_claim": true,
   "storage": "owned-utf8-byte-buffer",
   "utf8_validation": true,
+  "invalid_utf8_rejected": true,
   "caret": true,
   "selection": true,
+  "selection_clipboard_transfer": true,
+  "multiline": true,
   "backspace": true,
   "delete": true,
   "home_end": true,
@@ -3470,7 +4565,17 @@ func validSurfaceTextInputReportJSON() []byte {
   "clipboard_write": true,
   "clipboard_host_abi": true,
   "clipboard_owned_copy": true,
+  "target_host_composition_trace": true,
   "composition_trace": {"start":true,"update":true,"commit":true,"cancel":true},
+  "text_shaping_plan": {"quality_level":"scoped-text-shaping-plan-v1","fallback_fonts":true,"grapheme_boundaries":"byte-offset-codepoint-v1","line_breaking":"newline-storage-plus-wrap-plan-v1","bidi":"nonclaim-full-bidi-v1","rich_text":"nonclaim-rich-text-editor-v1"},
+  "reference_traces": [
+    {"source":"examples/surface_morph_settings.tetra","trace":"settings text field trace","focus":true,"selection":true,"clipboard":true,"composition":true,"multiline":true,"pass":true},
+    {"source":"examples/surface_morph_editor_shell.tetra","trace":"editor shell text area trace","focus":true,"selection":true,"clipboard":true,"composition":true,"multiline":true,"pass":true}
+  ],
+  "unsupported_claims": ["full-rich-text-editor","full-bidi-shaping","grapheme-cluster-caret","ide-grade-editor"],
+  "rich_text_production_claim": false,
+  "bidi_production_claim": false,
+  "full_editor_production_claim": false,
   "borrowed_view_storage": false,
   "safe_view_lifetime_checked": true,
   "processes": [
@@ -3495,13 +4600,19 @@ func validSurfaceTextInputReportJSON() []byte {
     {"name":"no legacy UI sidecar artifacts","kind":"positive","ran":true,"pass":true},
     {"name":"release text input ASCII insertion","kind":"positive","ran":true,"pass":true},
     {"name":"release text input UTF-8 insertion","kind":"positive","ran":true,"pass":true},
+    {"name":"release text input invalid UTF-8 rejected","kind":"negative","ran":true,"pass":true,"expected_error":"invalid utf8 rejected"},
+    {"name":"release text input multiline storage","kind":"positive","ran":true,"pass":true},
     {"name":"release text input caret home end arrows","kind":"positive","ran":true,"pass":true},
     {"name":"release text input selection replacement","kind":"positive","ran":true,"pass":true},
+    {"name":"release text input selection clipboard transfer","kind":"positive","ran":true,"pass":true},
     {"name":"release text input backspace delete","kind":"positive","ran":true,"pass":true},
     {"name":"release text input clipboard owned copy transfer","kind":"positive","ran":true,"pass":true},
     {"name":"release text input composition start update","kind":"positive","ran":true,"pass":true},
     {"name":"release text input composition commit","kind":"positive","ran":true,"pass":true},
     {"name":"release text input composition cancel","kind":"positive","ran":true,"pass":true},
+    {"name":"release text input shaping plan scoped","kind":"positive","ran":true,"pass":true},
+    {"name":"settings reference text input trace","kind":"positive","ran":true,"pass":true},
+    {"name":"editor reference text input trace","kind":"positive","ran":true,"pass":true},
     {"name":"release text input safe view lifetime checked","kind":"positive","ran":true,"pass":true},
     {"name":"reject legacy UI evidence","kind":"negative","ran":true,"pass":true,"expected_error":"legacy UI evidence rejected"}
   ]
@@ -3806,12 +4917,18 @@ func validHeadlessBlockPaintSurfaceReportJSON(t *testing.T, mutate func(*Report)
 	report.PaintUnsupportedBlur = false
 	report.PaintLayers = blockPaintLayersForTest()
 	report.PaintCommands = blockPaintCommandsForTest()
-	report.VisualFeatures = []string{"fill", "gradient", "border", "radius", "shadow", "outline"}
+	report.VisualFeatures = []string{"fill", "gradient", "image_fill", "border", "radius", "radius_clip", "shadow", "overlay", "outline", "text", "icon"}
+	report.Renderer = rendererReportForTest()
 	report.Cases = append(report.Cases,
-		CaseReport{Name: "block paint fill border radius shadow outline", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block paint fill gradient image fill border radius clip shadow overlay outline text icon", Kind: "positive", Ran: true, Pass: true},
 		CaseReport{Name: "block paint deterministic command order", Kind: "positive", Ran: true, Pass: true},
 		CaseReport{Name: "block paint frame checksum changed", Kind: "positive", Ran: true, Pass: true},
 		CaseReport{Name: "block paint unsupported blur rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "unsupported blur"},
+		CaseReport{Name: "block renderer software rgba contract", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block compositor dirty rect invalidation cache", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block renderer opacity transform clipped child", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block renderer gpu production claim rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "gpu production"},
+		CaseReport{Name: "block renderer unsupported backdrop blur rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "backdrop blur"},
 	)
 	if mutate != nil {
 		mutate(&report)
@@ -3895,10 +5012,11 @@ func validHeadlessBlockLayoutSurfaceReportJSON(t *testing.T, mutate func(*Report
 	report.Components = blockLayoutComponentsForTest()
 	report.LayoutQualityLevel = "deterministic-block-layout-v1"
 	report.LayoutUnsupportedCSSFlexbox = false
-	report.LayoutFeatures = []string{"stack", "row", "column", "absolute", "overlay", "grid", "dock", "scroll", "fit", "fill", "fixed", "min", "max", "spacing", "alignment", "z-order", "clipping", "resize"}
+	report.LayoutFeatures = []string{"stack", "row", "column", "absolute", "overlay", "grid", "dock", "scroll", "fit", "fill", "fixed", "min", "max", "aspect", "spacing", "alignment", "z-order", "clipping", "resize", "density", "stable-rounding"}
 	report.LayoutConstraints = blockLayoutConstraintsForTest()
 	report.LayoutPasses = blockLayoutPassesForTest()
 	report.LayoutScrolls = blockLayoutScrollsForTest()
+	report.LayoutDensity = blockLayoutDensityForTest()
 	report.Frames = []FrameReport{
 		{Order: 1, Width: 320, Height: 200, Stride: 1280, Checksum: "1111111111111111111111111111111111111111111111111111111111111111", Presented: true},
 		{Order: 2, Width: 320, Height: 200, Stride: 1280, Checksum: "2222222222222222222222222222222222222222222222222222222222222222", Presented: true},
@@ -3922,6 +5040,7 @@ func validHeadlessBlockLayoutSurfaceReportJSON(t *testing.T, mutate func(*Report
 		CaseReport{Name: "block layout grid dock overlay scroll", Kind: "positive", Ran: true, Pass: true},
 		CaseReport{Name: "block layout clipping z-order", Kind: "positive", Ran: true, Pass: true},
 		CaseReport{Name: "block layout resize constraints", Kind: "positive", Ran: true, Pass: true},
+		CaseReport{Name: "block layout aspect density stable rounding", Kind: "positive", Ran: true, Pass: true},
 		CaseReport{Name: "block layout no css flexbox parity", Kind: "negative", Ran: true, Pass: true, ExpectedError: "CSS flexbox parity nonclaim"},
 	)
 	if mutate != nil {
@@ -4241,7 +5360,8 @@ func validHeadlessBlockSystemSurfaceReportJSON(t *testing.T, mutate func(*Report
 	report.PaintUnsupportedBlur = false
 	report.PaintLayers = blockPaintLayersForTest()
 	report.PaintCommands = blockPaintCommandsForTest()
-	report.VisualFeatures = []string{"fill", "gradient", "border", "radius", "shadow", "outline"}
+	report.VisualFeatures = []string{"fill", "gradient", "image_fill", "border", "radius", "radius_clip", "shadow", "overlay", "outline", "text", "icon"}
+	report.Renderer = rendererReportForTest()
 	report.TextQualityLevel = "deterministic-fallback-text-v1"
 	report.TextCacheBudgetBytes = 65536
 	report.TextMeasurements = blockTextMeasurementsForTest()
@@ -4250,10 +5370,11 @@ func validHeadlessBlockSystemSurfaceReportJSON(t *testing.T, mutate func(*Report
 	report.TextRenderCommands = blockTextRenderCommandsForTest()
 	report.LayoutQualityLevel = "deterministic-block-layout-v1"
 	report.LayoutUnsupportedCSSFlexbox = false
-	report.LayoutFeatures = []string{"stack", "row", "column", "absolute", "overlay", "grid", "dock", "scroll", "fit", "fill", "fixed", "min", "max", "spacing", "alignment", "z-order", "clipping", "resize"}
+	report.LayoutFeatures = []string{"stack", "row", "column", "absolute", "overlay", "grid", "dock", "scroll", "fit", "fill", "fixed", "min", "max", "aspect", "spacing", "alignment", "z-order", "clipping", "resize", "density", "stable-rounding"}
 	report.LayoutConstraints = blockLayoutConstraintsForTest()
 	report.LayoutPasses = blockLayoutPassesForTest()
 	report.LayoutScrolls = blockLayoutScrollsForTest()
+	report.LayoutDensity = blockLayoutDensityForTest()
 	report.BlockStateQualityLevel = "deterministic-block-state-resolver-v1"
 	report.BlockStateUnsupportedCSSPseudos = false
 	report.BlockStateResolverOrder = []string{"base", "variant", "hover", "pressed", "focused", "selected", "disabled", "error", "loading", "motion"}
@@ -4366,6 +5487,7 @@ func validMorphEvidenceMap() map[string]any {
 		"motion_presets":    validMorphMotionPresets(),
 		"recipes":           validMorphRecipes(),
 		"recipe_expansions": validMorphRecipeExpansions(),
+		"recipe_apps":       validMorphRecipeApps(),
 		"accessibility":     validMorphAccessibilityProjectionMap(),
 		"evidence_contract": validMorphEvidenceContractMap(),
 		"memory_budget":     validMorphMemoryBudgetMap(),
@@ -4465,6 +5587,13 @@ func validMorphRecipes() []any {
 		map[string]any{"name": "field.text@1", "output": "Block", "slots": []any{"label", "control"}, "inputs": []any{"value", "on_text"}, "expands_to_block_graph": true, "hidden_app_state": false, "platform_widgets": false, "core_primitive_promotion": false},
 		map[string]any{"name": "command.item@1", "output": "Block", "slots": []any{"icon", "title", "subtitle"}, "inputs": []any{"title", "subtitle", "icon", "selected"}, "expands_to_block_graph": true, "hidden_app_state": false, "platform_widgets": false, "core_primitive_promotion": false},
 		map[string]any{"name": "region.panel@1", "output": "Block", "slots": []any{"header", "body", "actions"}, "inputs": []any{"title"}, "expands_to_block_graph": true, "hidden_app_state": false, "platform_widgets": false, "core_primitive_promotion": false},
+		map[string]any{"name": "form.field@1", "output": "Block", "slots": []any{"label", "control", "hint", "error"}, "inputs": []any{"label", "value", "validation"}, "expands_to_block_graph": true, "hidden_app_state": false, "platform_widgets": false, "core_primitive_promotion": false},
+		map[string]any{"name": "nav.item@1", "output": "Block", "slots": []any{"icon", "label", "badge"}, "inputs": []any{"label", "destination", "selected"}, "expands_to_block_graph": true, "hidden_app_state": false, "platform_widgets": false, "core_primitive_promotion": false},
+		map[string]any{"name": "metric.tile@1", "output": "Block", "slots": []any{"label", "value", "trend"}, "inputs": []any{"label", "value", "trend"}, "expands_to_block_graph": true, "hidden_app_state": false, "platform_widgets": false, "core_primitive_promotion": false},
+		map[string]any{"name": "dialog.panel@1", "output": "Block", "slots": []any{"title", "body", "actions"}, "inputs": []any{"title", "open", "dismiss"}, "expands_to_block_graph": true, "hidden_app_state": false, "platform_widgets": false, "core_primitive_promotion": false},
+		map[string]any{"name": "toast.notification@1", "output": "Block", "slots": []any{"icon", "message", "action"}, "inputs": []any{"message", "severity", "timeout"}, "expands_to_block_graph": true, "hidden_app_state": false, "platform_widgets": false, "core_primitive_promotion": false},
+		map[string]any{"name": "tab.item@1", "output": "Block", "slots": []any{"label", "indicator"}, "inputs": []any{"label", "selected", "target"}, "expands_to_block_graph": true, "hidden_app_state": false, "platform_widgets": false, "core_primitive_promotion": false},
+		map[string]any{"name": "list.row@1", "output": "Block", "slots": []any{"leading", "title", "meta", "action"}, "inputs": []any{"title", "subtitle", "selected"}, "expands_to_block_graph": true, "hidden_app_state": false, "platform_widgets": false, "core_primitive_promotion": false},
 	}
 }
 
@@ -4474,6 +5603,23 @@ func validMorphRecipeExpansions() []any {
 		map[string]any{"recipe": "field.text@1", "block_ids": []any{3}, "slot_bindings": []any{"label", "control"}, "variant": "default", "reported": true},
 		map[string]any{"recipe": "command.item@1", "block_ids": []any{4, 5}, "slot_bindings": []any{"icon", "title", "subtitle"}, "variant": "selected", "reported": true},
 		map[string]any{"recipe": "region.panel@1", "block_ids": []any{2}, "slot_bindings": []any{"header", "body", "actions"}, "variant": "elevated", "reported": true},
+		map[string]any{"recipe": "form.field@1", "block_ids": []any{3, 4}, "slot_bindings": []any{"label", "control", "hint", "error"}, "variant": "validated", "reported": true},
+		map[string]any{"recipe": "nav.item@1", "block_ids": []any{5}, "slot_bindings": []any{"icon", "label", "badge"}, "variant": "selected", "reported": true},
+		map[string]any{"recipe": "metric.tile@1", "block_ids": []any{2, 5}, "slot_bindings": []any{"label", "value", "trend"}, "variant": "compact", "reported": true},
+		map[string]any{"recipe": "dialog.panel@1", "block_ids": []any{2, 4}, "slot_bindings": []any{"title", "body", "actions"}, "variant": "modal", "reported": true},
+		map[string]any{"recipe": "toast.notification@1", "block_ids": []any{5}, "slot_bindings": []any{"icon", "message", "action"}, "variant": "warning", "reported": true},
+		map[string]any{"recipe": "tab.item@1", "block_ids": []any{4}, "slot_bindings": []any{"label", "indicator"}, "variant": "active", "reported": true},
+		map[string]any{"recipe": "list.row@1", "block_ids": []any{4, 5}, "slot_bindings": []any{"leading", "title", "meta", "action"}, "variant": "interactive", "reported": true},
+	}
+}
+
+func validMorphRecipeApps() []any {
+	return []any{
+		map[string]any{"source": "examples/surface_morph_command_palette.tetra", "module": "examples.surface_morph_command_palette", "recipes": []any{"control.action@1", "field.text@1", "command.item@1", "region.panel@1"}, "expands_to_block_graph": true, "block_count": 7, "accessibility_projection": true, "hidden_app_state": false, "react_runtime": false, "electron_runtime": false, "dom_runtime": false, "platform_widgets": false, "output_primitives": []any{"Block"}},
+		map[string]any{"source": "examples/surface_morph_project_dashboard.tetra", "module": "examples.surface_morph_project_dashboard", "recipes": []any{"region.panel@1", "metric.tile@1", "list.row@1", "toast.notification@1"}, "expands_to_block_graph": true, "block_count": 7, "accessibility_projection": true, "hidden_app_state": false, "react_runtime": false, "electron_runtime": false, "dom_runtime": false, "platform_widgets": false, "output_primitives": []any{"Block"}},
+		map[string]any{"source": "examples/surface_morph_settings.tetra", "module": "examples.surface_morph_settings", "recipes": []any{"form.field@1", "field.text@1", "tab.item@1", "control.action@1"}, "expands_to_block_graph": true, "block_count": 7, "accessibility_projection": true, "hidden_app_state": false, "react_runtime": false, "electron_runtime": false, "dom_runtime": false, "platform_widgets": false, "output_primitives": []any{"Block"}},
+		map[string]any{"source": "examples/surface_morph_editor_shell.tetra", "module": "examples.surface_morph_editor_shell", "recipes": []any{"nav.item@1", "tab.item@1", "command.item@1", "region.panel@1"}, "expands_to_block_graph": true, "block_count": 7, "accessibility_projection": true, "hidden_app_state": false, "react_runtime": false, "electron_runtime": false, "dom_runtime": false, "platform_widgets": false, "output_primitives": []any{"Block"}},
+		map[string]any{"source": "examples/surface_morph_glass_panel.tetra", "module": "examples.surface_morph_glass_panel", "recipes": []any{"dialog.panel@1", "toast.notification@1", "control.action@1", "region.panel@1"}, "expands_to_block_graph": true, "block_count": 7, "accessibility_projection": true, "hidden_app_state": false, "react_runtime": false, "electron_runtime": false, "dom_runtime": false, "platform_widgets": false, "output_primitives": []any{"Block"}},
 	}
 }
 
@@ -4509,7 +5655,7 @@ func validMorphEvidenceContractMap() map[string]any {
 func validMorphMemoryBudgetMap() map[string]any {
 	return map[string]any{
 		"schema":                   "tetra.surface.morph-memory-budget.v1",
-		"expanded_recipe_count":    4,
+		"expanded_recipe_count":    11,
 		"block_count":              24,
 		"paint_command_count":      6,
 		"layout_pass_count":        8,
@@ -4776,10 +5922,15 @@ func blockSystemCasesForTest() []CaseReport {
 		{Name: "block graph focus order", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block graph hit-test path", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block graph accessibility order", Kind: "positive", Ran: true, Pass: true},
-		{Name: "block paint fill border radius shadow outline", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block paint fill gradient image fill border radius clip shadow overlay outline text icon", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block paint deterministic command order", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block paint frame checksum changed", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block paint unsupported blur rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "unsupported blur"},
+		{Name: "block renderer software rgba contract", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block compositor dirty rect invalidation cache", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block renderer opacity transform clipped child", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block renderer gpu production claim rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "gpu production"},
+		{Name: "block renderer unsupported backdrop blur rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "backdrop blur"},
 		{Name: "block text deterministic measurement", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block text wrap ellipsis layout", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block text font fallback chain", Kind: "positive", Ran: true, Pass: true},
@@ -4791,6 +5942,7 @@ func blockSystemCasesForTest() []CaseReport {
 		{Name: "block layout grid dock overlay scroll", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block layout clipping z-order", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block layout resize constraints", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block layout aspect density stable rounding", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block layout no css flexbox parity", Kind: "negative", Ran: true, Pass: true, ExpectedError: "CSS flexbox parity nonclaim"},
 		{Name: "block state selector resolver order", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block state hover fill override", Kind: "positive", Ran: true, Pass: true},
@@ -5240,6 +6392,7 @@ func blockLayoutConstraintsForTest() []BlockLayoutConstraintReport {
 		{ID: "row-fill", BlockID: 3, Mode: "row", WidthPolicy: "fill", HeightPolicy: "fixed", Min: SizeReport{W: 160, H: 40}, Max: SizeReport{W: 296, H: 64}, Padding: 6, Margin: 0, Gap: 6, Align: "center", Justify: "space-between", Overflow: "visible", ZIndex: 1, Clip: false},
 		{ID: "text-fit", BlockID: 8, Mode: "absolute", WidthPolicy: "fit", HeightPolicy: "fit", Min: SizeReport{W: 32, H: 18}, Max: SizeReport{W: 160, H: 40}, Padding: 4, Margin: 0, Gap: 0, Align: "start", Justify: "start", Overflow: "clip", ZIndex: 2, Clip: true},
 		{ID: "overlay-z", BlockID: 6, Mode: "overlay", WidthPolicy: "fixed", HeightPolicy: "fixed", Min: SizeReport{W: 72, H: 40}, Max: SizeReport{W: 72, H: 40}, Padding: 0, Margin: 0, Gap: 0, Align: "end", Justify: "start", Overflow: "visible", ZIndex: 4, Clip: false},
+		{ID: "aspect-fit", BlockID: 9, Mode: "absolute", WidthPolicy: "fixed", HeightPolicy: "fixed", Min: SizeReport{W: 96, H: 54}, Max: SizeReport{W: 96, H: 54}, Padding: 0, Margin: 0, Gap: 0, Align: "start", Justify: "start", Overflow: "clip", ZIndex: 2, Clip: true},
 	}
 }
 
@@ -5253,13 +6406,26 @@ func blockLayoutPassesForTest() []BlockLayoutPassReport {
 		{Order: 6, ParentID: 1, BlockID: 6, Mode: "overlay", Input: RectReport{X: 220, Y: 20, W: 72, H: 40}, Resolved: RectReport{X: 220, Y: 20, W: 72, H: 40}, Measured: SizeReport{W: 72, H: 40}, Pass: "overlay-z-order", Resize: false, Clip: false, ZIndex: 4, Checksum: "sha256:6666666666666666666666666666666666666666666666666666666666666666"},
 		{Order: 7, ParentID: 1, BlockID: 7, Mode: "scroll", Input: RectReport{X: 236, Y: 72, W: 72, H: 80}, Resolved: RectReport{X: 236, Y: 72, W: 72, H: 80}, Measured: SizeReport{W: 72, H: 160}, Pass: "scroll-clip", Resize: false, Clip: true, ZIndex: 2, Checksum: "sha256:7777777777777777777777777777777777777777777777777777777777777777"},
 		{Order: 8, ParentID: 1, BlockID: 8, Mode: "absolute", Input: RectReport{X: 32, Y: 152, W: 0, H: 0}, Resolved: RectReport{X: 32, Y: 152, W: 96, H: 20}, Measured: SizeReport{W: 96, H: 20}, Pass: "fit-text", Resize: false, Clip: true, ZIndex: 2, Checksum: "sha256:8888888888888888888888888888888888888888888888888888888888888888"},
-		{Order: 9, ParentID: 0, BlockID: 1, Mode: "column", Input: RectReport{X: 0, Y: 0, W: 480, H: 260}, Resolved: RectReport{X: 12, Y: 12, W: 456, H: 236}, Measured: SizeReport{W: 456, H: 236}, Pass: "resize", Resize: true, Clip: true, ZIndex: 0, Checksum: "sha256:9999999999999999999999999999999999999999999999999999999999999999"},
+		{Order: 9, ParentID: 1, BlockID: 9, Mode: "absolute", Input: RectReport{X: 164, Y: 152, W: 96, H: 64}, Resolved: RectReport{X: 164, Y: 152, W: 96, H: 54}, Measured: SizeReport{W: 96, H: 54}, Pass: "aspect-fit", Resize: false, Clip: true, ZIndex: 2, Checksum: "sha256:9999999999999999999999999999999999999999999999999999999999999999"},
+		{Order: 10, ParentID: 0, BlockID: 1, Mode: "column", Input: RectReport{X: 0, Y: 0, W: 480, H: 260}, Resolved: RectReport{X: 12, Y: 12, W: 456, H: 236}, Measured: SizeReport{W: 456, H: 236}, Pass: "resize", Resize: true, Clip: true, ZIndex: 0, Checksum: "sha256:1010101010101010101010101010101010101010101010101010101010101010"},
 	}
 }
 
 func blockLayoutScrollsForTest() []BlockLayoutScrollReport {
 	return []BlockLayoutScrollReport{
 		{BlockID: 7, Viewport: RectReport{X: 236, Y: 72, W: 72, H: 80}, Content: SizeReport{W: 72, H: 160}, OffsetY: 32, MaxOffsetY: 80, Clipped: true, Checksum: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+	}
+}
+
+func blockLayoutDensityForTest() *BlockLayoutDensityReport {
+	return &BlockLayoutDensityReport{
+		TargetDPI:      144,
+		ScaleMilli:     1500,
+		BaseUnitPx:     4,
+		RoundingPolicy: "integer-half-up-v1",
+		PixelSnapping:  true,
+		Breakpoints:    []string{"small", "medium", "large"},
+		Checksum:       "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 	}
 }
 
@@ -5300,9 +6466,14 @@ func blockPaintLayersForTest() []PaintLayerReport {
 	return []PaintLayerReport{
 		{ID: "root-fill", BlockID: 1, Kind: "fill", Color: "#346ecfff", Radius: 8, Opacity: 255},
 		{ID: "root-gradient", BlockID: 1, Kind: "gradient", Color: "#54b484ff", Radius: 8, Opacity: 255},
+		{ID: "root-image-fill", BlockID: 1, Kind: "image_fill", Radius: 8, Opacity: 255},
 		{ID: "root-border", BlockID: 1, Kind: "border", Color: "#e2eaf2ff", Radius: 8, Width: 1, Opacity: 255},
+		{ID: "root-radius-clip", BlockID: 1, Kind: "radius_clip", Radius: 8, Opacity: 255},
 		{ID: "root-shadow", BlockID: 1, Kind: "shadow", Color: "#00000058", Blur: 12, OffsetX: 0, OffsetY: 4, Opacity: 88},
+		{ID: "root-overlay", BlockID: 1, Kind: "overlay", Color: "#10182066", Radius: 8, Opacity: 102},
 		{ID: "root-outline", BlockID: 1, Kind: "outline", Color: "#f4cd5cff", Radius: 10, Width: 2, Opacity: 255},
+		{ID: "root-text", BlockID: 1, Kind: "text", Color: "#edf2f7ff", Opacity: 255},
+		{ID: "root-icon", BlockID: 1, Kind: "icon", Color: "#f4cd5cff", Opacity: 255},
 	}
 }
 
@@ -5310,9 +6481,72 @@ func blockPaintCommandsForTest() []PaintCommandReport {
 	return []PaintCommandReport{
 		{Order: 1, Command: "fill", LayerID: "root-fill", BlockID: 1, Rect: RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Quality: "rounded-rect-v1", Checksum: "sha256:1111111111111111111111111111111111111111111111111111111111111111"},
 		{Order: 2, Command: "gradient", LayerID: "root-gradient", BlockID: 1, Rect: RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Quality: "two-stop-linear-v1", Checksum: "sha256:2222222222222222222222222222222222222222222222222222222222222222"},
-		{Order: 3, Command: "border", LayerID: "root-border", BlockID: 1, Rect: RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Quality: "rounded-outline-v1", Checksum: "sha256:3333333333333333333333333333333333333333333333333333333333333333"},
-		{Order: 4, Command: "shadow", LayerID: "root-shadow", BlockID: 1, Rect: RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Quality: "box-shadow-approx-v1", Checksum: "sha256:4444444444444444444444444444444444444444444444444444444444444444"},
-		{Order: 5, Command: "outline", LayerID: "root-outline", BlockID: 1, Rect: RectReport{X: 10, Y: 8, W: 68, H: 32}, Radius: 10, Quality: "rounded-outline-v1", Checksum: "sha256:5555555555555555555555555555555555555555555555555555555555555555"},
+		{Order: 3, Command: "image_fill", LayerID: "root-image-fill", BlockID: 1, Rect: RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Quality: "bounded-asset-fill-v1", Checksum: "sha256:3333333333333333333333333333333333333333333333333333333333333333"},
+		{Order: 4, Command: "border", LayerID: "root-border", BlockID: 1, Rect: RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Quality: "rounded-outline-v1", Checksum: "sha256:4444444444444444444444444444444444444444444444444444444444444444"},
+		{Order: 5, Command: "radius_clip", LayerID: "root-radius-clip", BlockID: 1, Rect: RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Quality: "clip-stack-v1", Checksum: "sha256:5555555555555555555555555555555555555555555555555555555555555555"},
+		{Order: 6, Command: "shadow", LayerID: "root-shadow", BlockID: 1, Rect: RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Quality: "box-shadow-approx-v1", Checksum: "sha256:6666666666666666666666666666666666666666666666666666666666666666"},
+		{Order: 7, Command: "overlay", LayerID: "root-overlay", BlockID: 1, Rect: RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Quality: "alpha-over-v1", Checksum: "sha256:7777777777777777777777777777777777777777777777777777777777777777"},
+		{Order: 8, Command: "outline", LayerID: "root-outline", BlockID: 1, Rect: RectReport{X: 10, Y: 8, W: 68, H: 32}, Radius: 10, Quality: "rounded-outline-v1", Checksum: "sha256:8888888888888888888888888888888888888888888888888888888888888888"},
+		{Order: 9, Command: "text", LayerID: "root-text", BlockID: 1, Rect: RectReport{X: 20, Y: 16, W: 32, H: 12}, Quality: "glyph-run-v1", Checksum: "sha256:9999999999999999999999999999999999999999999999999999999999999999"},
+		{Order: 10, Command: "icon", LayerID: "root-icon", BlockID: 1, Rect: RectReport{X: 56, Y: 16, W: 12, H: 12}, Quality: "monochrome-mask-v1", Checksum: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+	}
+}
+
+func rendererReportForTest() *RendererReport {
+	return &RendererReport{
+		Schema:                       "tetra.surface.renderer-feature.v1",
+		Backend:                      "software-rgba",
+		ColorFormat:                  "rgba8",
+		QualityLevel:                 "deterministic-software-renderer-v1",
+		SoftwareRenderer:             true,
+		GPUProductionClaim:           false,
+		BlurProductionClaim:          false,
+		BackdropBlurProductionClaim:  false,
+		CommandOrder:                 []string{"fill", "gradient", "image_fill", "border", "radius_clip", "shadow", "overlay", "outline", "text", "icon"},
+		CompositorLayers:             rendererCompositorLayersForTest(),
+		DirtyRects:                   rendererDirtyRectsForTest(),
+		Invalidations:                rendererInvalidationsForTest(),
+		CacheStats:                   rendererCacheStatsForTest(),
+		UnsupportedEffectsRejected:   []string{"gpu-production", "blur", "backdrop-blur"},
+		DeterministicFrameChecksums:  []string{"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},
+		ReferenceFrameArtifactSHA256: "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+	}
+}
+
+func rendererCompositorLayersForTest() []RendererCompositorLayerReport {
+	return []RendererCompositorLayerReport{
+		{ID: "root", Kind: "root", Order: 1, BlockID: 1, Rect: RectReport{X: 0, Y: 0, W: 320, H: 200}, Opacity: 255, Transform: "identity", Checksum: "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"},
+		{ID: "content", Kind: "content", Order: 2, BlockID: 1, Rect: RectReport{X: 12, Y: 10, W: 64, H: 28}, Opacity: 255, Transform: "translate(0,0)", ClipApplied: true, Clip: RectReport{X: 12, Y: 10, W: 64, H: 28}, Checksum: "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"},
+		{ID: "overlay", Kind: "overlay", Order: 3, BlockID: 1, Rect: RectReport{X: 12, Y: 10, W: 64, H: 28}, Opacity: 102, Transform: "translate(0,1)", Checksum: "sha256:1212121212121212121212121212121212121212121212121212121212121212"},
+		{ID: "text", Kind: "text", Order: 4, BlockID: 1, Rect: RectReport{X: 20, Y: 16, W: 32, H: 12}, Opacity: 255, Transform: "identity", Checksum: "sha256:1313131313131313131313131313131313131313131313131313131313131313"},
+		{ID: "icon", Kind: "icon", Order: 5, BlockID: 1, Rect: RectReport{X: 56, Y: 16, W: 12, H: 12}, Opacity: 255, Transform: "identity", Checksum: "sha256:1414141414141414141414141414141414141414141414141414141414141414"},
+	}
+}
+
+func rendererDirtyRectsForTest() []RendererDirtyRectReport {
+	return []RendererDirtyRectReport{
+		{FrameOrder: 1, Rect: RectReport{X: 12, Y: 10, W: 68, H: 36}, Reason: "initial-paint", Checksum: "sha256:1515151515151515151515151515151515151515151515151515151515151515"},
+		{FrameOrder: 2, Rect: RectReport{X: 12, Y: 10, W: 68, H: 36}, Reason: "state-change", Checksum: "sha256:1616161616161616161616161616161616161616161616161616161616161616"},
+	}
+}
+
+func rendererInvalidationsForTest() []RendererInvalidationReport {
+	return []RendererInvalidationReport{
+		{Order: 1, BlockID: 1, Reason: "hovered changed", DirtyRect: RectReport{X: 12, Y: 10, W: 68, H: 36}, Repaint: true},
+		{Order: 2, BlockID: 1, Reason: "text input changed", DirtyRect: RectReport{X: 20, Y: 16, W: 44, H: 12}, Repaint: true},
+	}
+}
+
+func rendererCacheStatsForTest() RendererCacheStatsReport {
+	return RendererCacheStatsReport{
+		ID:          "software-rgba-render-cache",
+		Strategy:    "bounded-lru",
+		BudgetBytes: 65536,
+		UsedBytes:   20480,
+		EntryCount:  10,
+		Hits:        3,
+		Misses:      2,
+		Bounded:     true,
 	}
 }
 
@@ -6320,6 +7554,7 @@ func validWASM32WebReleaseBrowserSurfaceReportJSON(t *testing.T, mutate func(map
 		map[string]any{"kind": "compiler-owned-loader", "path": "/tmp/surface-artifacts/surface-release-form.mjs", "sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "size": 4939},
 		map[string]any{"kind": "runner-trace", "path": "/tmp/surface-artifacts/surface-runner-trace.json", "sha256": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "size": 4096},
 	}
+	report["browser_surface"] = validBrowserSurfaceEvidenceMap()
 	report["artifact_scan"].(map[string]any)["files_checked"] = float64(3)
 	cases := make([]any, 0, len(report["cases"].([]any)))
 	for _, item := range report["cases"].([]any) {
@@ -6360,6 +7595,75 @@ func validWASM32WebReleaseBrowserSurfaceReportJSON(t *testing.T, mutate func(map
 		t.Fatalf("marshal browser release report: %v", err)
 	}
 	return raw
+}
+
+func validBrowserSurfaceEvidenceMap() map[string]any {
+	return map[string]any{
+		"schema":                "tetra.surface.browser-surface.v1",
+		"browser_surface_level": "browser-canvas-release-v1",
+		"release_scope":         "surface-v1-linux-web",
+		"source":                "examples/surface_release_form.tetra",
+		"host_adapter":          "compiler-owned-browser-canvas-host",
+		"production_claim":      true,
+		"experimental":          false,
+		"compiler_owned_boot":   true,
+		"dom_host_canvas_only":  true,
+		"canvas": map[string]any{
+			"opened":        true,
+			"readback":      true,
+			"width":         560,
+			"height":        420,
+			"frame_order":   5,
+			"artifact_kind": "runner-trace",
+			"pass":          true,
+		},
+		"input": map[string]any{
+			"pointer":       true,
+			"keyboard":      true,
+			"text":          true,
+			"resize":        true,
+			"host_trace":    true,
+			"native_events": []any{"pointerup", "keydown", "beforeinput", "resize"},
+			"pass":          true,
+		},
+		"clipboard": map[string]any{
+			"harness":    "deterministic-browser-clipboard-v1",
+			"read":       true,
+			"write":      true,
+			"owned_copy": true,
+			"bytes":      13,
+			"pass":       true,
+		},
+		"composition": map[string]any{
+			"start":  true,
+			"update": true,
+			"commit": true,
+			"cancel": true,
+			"pass":   true,
+		},
+		"accessibility": map[string]any{
+			"snapshot":       true,
+			"mirror":         true,
+			"compiler_owned": true,
+			"bounds":         true,
+			"focus":          true,
+			"roles":          []any{"root", "textbox", "checkbox", "button", "status"},
+			"dom_visual_ui":  false,
+			"user_js":        false,
+			"pass":           true,
+		},
+		"host_traces": []any{
+			map[string]any{"name": "browser-canvas", "artifact_kind": "runner-trace", "path": "/tmp/surface-artifacts/surface-runner-trace.json", "pass": true},
+		},
+		"negative_guards": map[string]any{
+			"no_dom_app_ui_tree":     true,
+			"no_user_js_app_logic":   true,
+			"no_node_only_promotion": true,
+			"no_legacy_sidecars":     true,
+			"no_react_runtime":       true,
+			"no_platform_widgets":    true,
+		},
+	}
 }
 
 func validLinuxReleaseWindowSurfaceReportJSON(t *testing.T, mutate func(map[string]any)) []byte {
@@ -6446,6 +7750,305 @@ func validLinuxReleaseWindowSurfaceReportJSON(t *testing.T, mutate func(map[stri
 		t.Fatalf("marshal linux release window report: %v", err)
 	}
 	return raw
+}
+
+func validLinuxAppShellSurfaceReportJSON(t *testing.T, mutate func(map[string]any)) []byte {
+	t.Helper()
+	var report map[string]any
+	if err := json.Unmarshal(validHeadlessSurfaceReportJSON(), &report); err != nil {
+		t.Fatalf("decode base headless report: %v", err)
+	}
+	report["target"] = "linux-x64"
+	report["runtime"] = "surface-linux-x64"
+	report["source"] = "examples/surface_linux_app_shell_notes.tetra"
+	report["host_evidence"] = map[string]any{
+		"level":                        "linux-x64-release-window-v1",
+		"backend":                      "wayland-shm-rgba-release-v1",
+		"framebuffer":                  true,
+		"real_window":                  true,
+		"native_input":                 true,
+		"text_input":                   true,
+		"clipboard":                    true,
+		"composition":                  true,
+		"accessibility_bridge":         true,
+		"user_facing_platform_widgets": false,
+	}
+	report["processes"] = []any{
+		map[string]any{"name": "tetra build", "kind": "build", "path": "tetra build --target linux-x64 examples/surface_linux_app_shell_notes.tetra -o /tmp/surface-artifacts/surface-linux-app-shell-notes", "ran": true, "pass": true, "exit_code": 0},
+		map[string]any{"name": "surface component app", "kind": "app", "path": "/tmp/surface-artifacts/surface-linux-app-shell-notes", "ran": true, "pass": true, "exit_code": 1, "expected_exit_code": 1},
+		map[string]any{"name": "surface linux-x64 real-window probe", "kind": "app", "path": "/tmp/surface-artifacts/surface-linux-app-shell-window-probe", "ran": true, "pass": true, "exit_code": 42, "expected_exit_code": 42},
+		map[string]any{"name": "surface linux app-shell host trace", "kind": "runtime", "path": "/tmp/surface-artifacts/surface-linux-app-shell-host-trace.json", "ran": true, "pass": true, "exit_code": 0},
+		map[string]any{"name": "surface linux app-shell window trace", "kind": "runtime", "path": "/tmp/surface-artifacts/surface-linux-app-shell-window-trace.json", "ran": true, "pass": true, "exit_code": 0},
+		map[string]any{"name": "surface linux-x64 release clipboard harness", "kind": "runtime", "path": "/tmp/surface-artifacts/surface-linux-clipboard-harness.json", "ran": true, "pass": true, "exit_code": 0},
+		map[string]any{"name": "surface linux-x64 release composition harness", "kind": "runtime", "path": "/tmp/surface-artifacts/surface-linux-composition-harness.json", "ran": true, "pass": true, "exit_code": 0},
+		map[string]any{"name": "surface linux accessibility platform probe", "kind": "runtime", "path": "/tmp/surface-artifacts/surface-linux-accessibility-probe.json", "ran": true, "pass": true, "exit_code": 0},
+		map[string]any{"name": "surface linux-x64 runtime", "kind": "runtime", "path": "tools/cmd/surface-runtime-smoke --mode linux-x64-release-app-shell", "ran": true, "pass": true, "exit_code": 0},
+	}
+	report["artifacts"] = []any{
+		map[string]any{"kind": "component-app", "path": "/tmp/surface-artifacts/surface-linux-app-shell-notes", "sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "size": 90001},
+		map[string]any{"kind": "linux-app-shell-host-trace", "path": "/tmp/surface-artifacts/surface-linux-app-shell-host-trace.json", "sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "size": 4096},
+		map[string]any{"kind": "linux-app-shell-window-trace", "path": "/tmp/surface-artifacts/surface-linux-app-shell-window-trace.json", "sha256": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "size": 4096},
+		map[string]any{"kind": "linux-accessibility-platform-probe", "path": "/tmp/surface-artifacts/surface-linux-accessibility-probe.json", "sha256": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "size": 4096},
+	}
+	report["artifact_scan"] = map[string]any{"root": "/tmp/surface-artifacts", "files_checked": 4, "forbidden_paths": []any{}, "pass": true}
+	report["components"] = []any{
+		componentMap("NotesShellApp", "examples.surface_linux_app_shell_notes.NotesShellApp", "", RectReport{X: 0, Y: 0, W: 720, H: 540}, map[string]string{"open_windows": "2", "focused_window": "notes-main", "accessibility_role": "application"}),
+		componentMap("NotesMainWindow", "examples.surface_linux_app_shell_notes.NotesMainWindow", "NotesShellApp", RectReport{X: 0, Y: 0, W: 560, H: 420}, map[string]string{"title": "Notes", "lifecycle": "reopened", "dpi_scale_milli": "1250", "cursor": "text", "accessibility_role": "document"}),
+		componentMap("NotesInspectorWindow", "examples.surface_linux_app_shell_notes.NotesInspectorWindow", "NotesShellApp", RectReport{X: 24, Y: 24, W: 320, H: 240}, map[string]string{"title": "Inspector", "lifecycle": "open", "dpi_scale_milli": "1000", "cursor": "pointer", "accessibility_role": "panel"}),
+	}
+	report["events"] = []any{
+		map[string]any{"order": 1, "kind": "mouse_up", "target_component": "NotesMainWindow", "dispatch_path": []any{"NotesShellApp", "NotesMainWindow"}, "handled": true, "pass": true, "x": 40, "y": 72, "key": 0, "width": 560, "height": 420, "timestamp_ms": 0, "buffer_slots": []any{5, 40, 72, 1, 0, 560, 420, 0, 0}, "before_state": map[string]any{"NotesShellApp.focused_window": ""}, "after_state": map[string]any{"NotesShellApp.focused_window": "notes-main"}},
+		map[string]any{"order": 2, "kind": "key_down", "target_component": "NotesMainWindow", "dispatch_path": []any{"NotesShellApp", "NotesMainWindow"}, "handled": true, "pass": true, "x": 0, "y": 0, "key": 78, "width": 560, "height": 420, "timestamp_ms": 2, "buffer_slots": []any{6, 0, 0, 1, 78, 560, 420, 2, 0}, "before_state": map[string]any{"NotesMainWindow.shortcut": ""}, "after_state": map[string]any{"NotesMainWindow.shortcut": "new-note"}},
+		map[string]any{"order": 3, "kind": "text_input", "target_component": "NotesMainWindow", "dispatch_path": []any{"NotesShellApp", "NotesMainWindow"}, "handled": true, "pass": true, "x": 0, "y": 0, "key": 0, "width": 560, "height": 420, "timestamp_ms": 3, "text_len": 5, "text_bytes_hex": "4e6f746573", "buffer_slots": []any{8, 0, 0, 0, 0, 560, 420, 3, 5}, "before_state": map[string]any{"NotesMainWindow.buffer": ""}, "after_state": map[string]any{"NotesMainWindow.buffer": "Notes"}},
+		map[string]any{"order": 4, "kind": "resize", "target_component": "NotesMainWindow", "dispatch_path": []any{"NotesShellApp", "NotesMainWindow"}, "handled": true, "pass": true, "width": 720, "height": 540, "timestamp_ms": 4, "buffer_slots": []any{7, 0, 0, 0, 0, 720, 540, 4, 0}, "before_state": map[string]any{"NotesMainWindow.size": "560x420", "NotesMainWindow.dpi": "1000"}, "after_state": map[string]any{"NotesMainWindow.size": "720x540", "NotesMainWindow.dpi": "1250"}},
+		map[string]any{"order": 5, "kind": "close", "target_component": "NotesInspectorWindow", "dispatch_path": []any{"NotesShellApp", "NotesInspectorWindow"}, "handled": true, "pass": true, "width": 320, "height": 240, "timestamp_ms": 5, "buffer_slots": []any{9, 0, 0, 0, 0, 320, 240, 5, 0}, "before_state": map[string]any{"NotesInspectorWindow.open": "true"}, "after_state": map[string]any{"NotesInspectorWindow.open": "false"}},
+	}
+	report["frames"] = []any{
+		map[string]any{"order": 1, "width": 400, "height": 240, "stride": 1600, "checksum": "1111111111111111111111111111111111111111111111111111111111111111", "presented": true},
+		map[string]any{"order": 5, "width": 560, "height": 420, "stride": 2240, "checksum": "2222222222222222222222222222222222222222222222222222222222222222", "presented": true},
+		map[string]any{"order": 6, "width": 720, "height": 540, "stride": 2880, "checksum": "3333333333333333333333333333333333333333333333333333333333333333", "presented": true},
+	}
+	report["state_transitions"] = []any{
+		map[string]any{"order": 1, "component": "NotesShellApp", "field": "focused_window", "before": "", "after": "notes-main", "cause": "lifecycle.open"},
+		map[string]any{"order": 2, "component": "NotesInspectorWindow", "field": "open", "before": "true", "after": "false", "cause": "lifecycle.close"},
+		map[string]any{"order": 3, "component": "NotesMainWindow", "field": "size", "before": "560x420", "after": "720x540", "cause": "resize"},
+	}
+	report["cases"] = []any{
+		map[string]any{"name": "pure Tetra component app", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "host-provided pointer event dispatch", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "host event buffer poll_event", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "pre/post event frame sequence", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "component hierarchy dispatch", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "component text input scalar dispatch", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "host text payload buffer", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "component focus dispatch", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "component accessibility metadata", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "no legacy UI sidecar artifacts", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "state transition", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "reject legacy UI evidence", "kind": "negative", "ran": true, "pass": true, "expected_error": "legacy UI evidence rejected"},
+		map[string]any{"name": "linux-x64 real-window surface", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "linux-x64 native input event pump", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "linux-x64 real-window resize event", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "linux-x64 real-window close event", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "linux release real window presented frame", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "linux release accessibility bridge probe", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "linux app-shell v1 schema", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "linux app-shell lifecycle open close reopen", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "linux app-shell multi-window notes reference", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "linux app-shell resize dpi cursor trace", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "linux app-shell clipboard ime accessibility adapters", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "linux app-shell file dialog notification blocked-pass", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "linux app-shell electron feature ledger", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "linux app-shell dialog file picker tray blocked-pass", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "linux app-shell crash error report scoped adapters", "kind": "positive", "ran": true, "pass": true},
+		map[string]any{"name": "linux app-shell rejects GTK Qt native widget UI", "kind": "negative", "ran": true, "pass": true, "expected_error": "native widget UI rejected"},
+		map[string]any{"name": "linux app-shell no Electron React DOM application scripting", "kind": "negative", "ran": true, "pass": true, "expected_error": "runtime substitute rejected"},
+	}
+	report["linux_app_shell"] = validLinuxAppShellEvidenceMap()
+	report["security_permissions"] = validSurfaceSecurityPermissionsMap(p16LinuxAppShellFeaturesForTest())
+	report["surface_performance_budget"] = validSurfacePerformanceBudgetMap("linux-x64", "surface-linux-x64", "examples/surface_linux_app_shell_notes.tetra")
+	if mutate != nil {
+		mutate(report)
+	}
+	raw, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal linux app-shell report: %v", err)
+	}
+	return raw
+}
+
+func validSurfacePerformanceBudgetMap(target string, runtimeName string, source string) map[string]any {
+	return map[string]any{
+		"schema":             "tetra.surface.performance-budget.v1",
+		"model":              "surface-performance-budget-v1",
+		"release_scope":      "surface-v1-linux-web",
+		"source":             source,
+		"target":             target,
+		"runtime":            runtimeName,
+		"production_claim":   true,
+		"experimental":       false,
+		"git_head":           "0123456789abcdef0123456789abcdef01234567",
+		"performance_claim":  "none",
+		"startup":            map[string]any{"launch_to_first_frame_ms": 18, "budget_ms": 250, "trace": "local-startup-trace-v1", "pass": true},
+		"frame":              map[string]any{"frame_count": 3, "p50_build_ms": 4, "p95_build_ms": 7, "p50_present_ms": 3, "p95_present_ms": 6, "budget_ms": 16, "idle_loop_count": 24, "work_loop_count": 6, "pass": true},
+		"scene":              map[string]any{"block_count": 3, "recipe_expansion_count": 0, "paint_command_count": 10, "layout_pass_count": 4, "text_run_count": 2},
+		"memory":             map[string]any{"glyph_cache_bytes": 4096, "asset_cache_bytes": 5376, "layout_cache_bytes": 4096, "paint_cache_bytes": 10240, "framebuffer_peak_bytes": 1555200, "framebuffer_total_bytes": 2880000, "rss_measured": false, "peak_rss_bytes": 0, "allocation_count": 42, "allocation_bytes": 2903808, "bounded_caches": true, "unbounded_cache_rejected": true, "pass": true},
+		"binary":             map[string]any{"artifact_path": "/tmp/surface-artifacts/surface-linux-app-shell-notes", "size_bytes": 90001, "budget_bytes": 16777216, "pass": true},
+		"cpu_power_proxy":    map[string]any{"idle_loop_count": 24, "work_loop_count": 6, "idle_frame_count": 2, "work_frame_count": 1, "real_power_measured": false, "pass": true},
+		"cache":              map[string]any{"glyph_cache_budget_bytes": 65536, "asset_cache_budget_bytes": 65536, "layout_cache_budget_bytes": 65536, "paint_cache_budget_bytes": 65536, "total_cache_bytes": 23808, "total_cache_budget_bytes": 262144, "eviction": "bounded-lru", "pass": true},
+		"methodology":        map[string]any{"kind": "local-deterministic-budget-v1", "electron_comparison": "none", "official_benchmark": false, "cross_machine": false, "fair_comparison_required_for_electron_claim": true},
+		"unsupported_claims": []any{"faster-than-electron", "lower-power-than-electron", "official-benchmark-result", "cross-machine-benchmark", "electron-parity-performance"},
+		"negative_guards":    map[string]any{"bounded_caches": true, "unbounded_cache_rejected": true, "stale_report_rejected": true, "no_faster_than_electron_claim": true, "no_benchmark_parity_claim": true, "peak_memory_field_required": true, "no_official_benchmark_claim": true},
+	}
+}
+
+func validLinuxAppShellEvidenceMap() map[string]any {
+	return map[string]any{
+		"schema":           "tetra.surface.linux-app-shell.v1",
+		"app_shell_level":  "linux-app-shell-subset-v1",
+		"release_scope":    "surface-v1-linux-web",
+		"source":           "examples/surface_linux_app_shell_notes.tetra",
+		"module":           "lib.core.surface_app_shell",
+		"host_adapter":     "wayland-shm-rgba-release-v1",
+		"production_claim": true,
+		"experimental":     false,
+		"window_lifecycle": []any{
+			map[string]any{"order": 1, "window_id": "notes-main", "operation": "open", "host_trace": true, "pass": true},
+			map[string]any{"order": 2, "window_id": "notes-inspector", "operation": "open", "host_trace": true, "pass": true},
+			map[string]any{"order": 3, "window_id": "notes-inspector", "operation": "close", "host_trace": true, "pass": true},
+			map[string]any{"order": 4, "window_id": "notes-inspector", "operation": "reopen", "host_trace": true, "pass": true},
+		},
+		"windows": []any{
+			map[string]any{"id": "notes-main", "title": "Notes", "role": "primary", "block_root": "NotesMainWindow", "real_window": true, "presented": true, "width": 720, "height": 540, "dpi_scale_milli": 1250},
+			map[string]any{"id": "notes-inspector", "title": "Inspector", "role": "secondary", "block_root": "NotesInspectorWindow", "real_window": true, "presented": true, "width": 320, "height": 240, "dpi_scale_milli": 1000},
+		},
+		"resize_dpi": []any{
+			map[string]any{"window_id": "notes-main", "operation": "resize", "before_width": 560, "before_height": 420, "after_width": 720, "after_height": 540, "dpi_scale_milli": 1250, "host_trace": true, "pass": true},
+			map[string]any{"window_id": "notes-main", "operation": "dpi_scale", "before_width": 720, "before_height": 540, "after_width": 720, "after_height": 540, "dpi_scale_milli": 1250, "host_trace": true, "pass": true},
+		},
+		"cursor_transitions": []any{
+			map[string]any{"window_id": "notes-main", "cursor": "pointer", "target": "NotesMainWindow", "host_trace": true, "pass": true},
+			map[string]any{"window_id": "notes-main", "cursor": "text", "target": "NotesMainWindow", "host_trace": true, "pass": true},
+			map[string]any{"window_id": "notes-main", "cursor": "resize", "target": "NotesMainWindow", "host_trace": true, "pass": true},
+		},
+		"clipboard":      map[string]any{"level": "clipboard-text-v1", "host_trace": true, "artifact_kind": "linux-app-shell-host-trace", "read": true, "write": true, "pass": true},
+		"ime":            map[string]any{"level": "composition-baseline-v1", "host_trace": true, "artifact_kind": "linux-app-shell-host-trace", "start": true, "update": true, "commit": true, "cancel": true, "pass": true},
+		"accessibility":  map[string]any{"level": "platform-bridge-v1", "host_trace": true, "artifact_kind": "linux-accessibility-platform-probe", "metadata_tree": true, "platform_export": true, "pass": true},
+		"shell_features": p16LinuxAppShellFeaturesForTest(),
+		"host_traces": []any{
+			map[string]any{"name": "lifecycle", "artifact_kind": "linux-app-shell-host-trace", "path": "/tmp/surface-artifacts/surface-linux-app-shell-host-trace.json", "pass": true},
+			map[string]any{"name": "windows", "artifact_kind": "linux-app-shell-window-trace", "path": "/tmp/surface-artifacts/surface-linux-app-shell-window-trace.json", "pass": true},
+			map[string]any{"name": "accessibility", "artifact_kind": "linux-accessibility-platform-probe", "path": "/tmp/surface-artifacts/surface-linux-accessibility-probe.json", "pass": true},
+		},
+		"negative_guards": map[string]any{
+			"no_gtk":              true,
+			"no_qt":               true,
+			"no_native_widgets":   true,
+			"no_electron_runtime": true,
+			"no_react_runtime":    true,
+			"no_dom_ui":           true,
+			"no_user_js":          true,
+			"no_platform_widgets": true,
+		},
+	}
+}
+
+func p16LinuxAppShellFeaturesForTest() []any {
+	return []any{
+		map[string]any{"name": "app_menu", "status": "scoped_adapter", "claimed": true, "host_trace": true, "blocked_reason": "", "no_native_widget_ui": true, "pass": true},
+		map[string]any{"name": "window_lifecycle", "status": "target_evidenced", "claimed": true, "host_trace": true, "blocked_reason": "", "no_native_widget_ui": true, "pass": true},
+		map[string]any{"name": "multi_window", "status": "target_evidenced", "claimed": true, "host_trace": true, "blocked_reason": "", "no_native_widget_ui": true, "pass": true},
+		map[string]any{"name": "clipboard", "status": "target_evidenced", "claimed": true, "host_trace": true, "blocked_reason": "", "no_native_widget_ui": true, "pass": true},
+		map[string]any{"name": "ime", "status": "target_evidenced", "claimed": true, "host_trace": true, "blocked_reason": "", "no_native_widget_ui": true, "pass": true},
+		map[string]any{"name": "accessibility_bridge", "status": "target_evidenced", "claimed": true, "host_trace": true, "blocked_reason": "", "no_native_widget_ui": true, "pass": true},
+		map[string]any{"name": "crash_recovery", "status": "scoped_adapter", "claimed": true, "host_trace": true, "blocked_reason": "", "no_native_widget_ui": true, "pass": true},
+		map[string]any{"name": "error_report", "status": "scoped_adapter", "claimed": true, "host_trace": true, "blocked_reason": "", "no_native_widget_ui": true, "pass": true},
+		map[string]any{"name": "dialog", "status": "blocked_pass", "claimed": false, "host_trace": true, "blocked_reason": "target host dialog unavailable in CI", "no_native_widget_ui": true, "pass": true},
+		map[string]any{"name": "file_dialog", "status": "blocked_pass", "claimed": false, "host_trace": true, "blocked_reason": "target host file dialog unavailable in CI", "no_native_widget_ui": true, "pass": true},
+		map[string]any{"name": "file_picker", "status": "blocked_pass", "claimed": false, "host_trace": true, "blocked_reason": "target host file picker unavailable in CI", "no_native_widget_ui": true, "pass": true},
+		map[string]any{"name": "notification", "status": "blocked_pass", "claimed": false, "host_trace": true, "blocked_reason": "target host notification unavailable in CI", "no_native_widget_ui": true, "pass": true},
+		map[string]any{"name": "tray", "status": "blocked_pass", "claimed": false, "host_trace": true, "blocked_reason": "target host tray unavailable in CI", "no_native_widget_ui": true, "pass": true},
+		map[string]any{"name": "deep_link", "status": "blocked_pass", "claimed": false, "host_trace": true, "blocked_reason": "target host deep link unavailable in CI", "no_native_widget_ui": true, "pass": true},
+	}
+}
+
+func validSurfaceSecurityPermissionsMap(features []any) map[string]any {
+	capabilities := make([]any, 0, len(features))
+	for _, feature := range features {
+		row := feature.(map[string]any)
+		name := row["name"].(string)
+		status, allowed := mapSecurityCapabilityStatus(row["status"].(string))
+		blockedReason := ""
+		if value, ok := row["blocked_reason"].(string); ok {
+			blockedReason = value
+		}
+		capabilities = append(capabilities, map[string]any{
+			"name":               name,
+			"source_feature":     name,
+			"status":             status,
+			"allowed":            allowed,
+			"capability_checked": true,
+			"host_trace":         true,
+			"policy":             "surface-app-shell-capability-policy-v1",
+			"evidence":           "linux-app-shell-host-trace",
+			"blocked_reason":     blockedReason,
+			"pass":               true,
+		})
+	}
+	return map[string]any{
+		"schema":                        "tetra.surface.security-permission.v1",
+		"model":                         "surface-security-permission-v1",
+		"release_scope":                 "surface-v1-linux-web",
+		"source":                        "examples/surface_linux_app_shell_notes.tetra",
+		"app_shell_features":            "electron-feature-ledger-v1",
+		"production_claim":              true,
+		"experimental":                  false,
+		"default_deny":                  true,
+		"shell_feature_policy_enforced": true,
+		"capabilities":                  capabilities,
+		"permissions": []any{
+			map[string]any{"name": "filesystem", "status": "denied", "allowed": false, "capability_checked": true, "blocked_reason": "ambient filesystem denied in default template", "evidence": "default-deny-policy", "pass": true},
+			map[string]any{"name": "network", "status": "denied", "allowed": false, "capability_checked": true, "blocked_reason": "ambient network denied in default template", "evidence": "default-deny-policy", "pass": true},
+			map[string]any{"name": "clipboard", "status": "allowed_with_policy", "allowed": true, "capability_checked": true, "blocked_reason": "", "evidence": "linux-app-shell-host-trace", "pass": true},
+			map[string]any{"name": "notifications", "status": "denied", "allowed": false, "capability_checked": true, "blocked_reason": "notification target evidence absent", "evidence": "blocked-pass-nonclaim", "pass": true},
+			map[string]any{"name": "dialogs", "status": "denied", "allowed": false, "capability_checked": true, "blocked_reason": "dialog target evidence absent", "evidence": "blocked-pass-nonclaim", "pass": true},
+			map[string]any{"name": "shell_open_url", "status": "denied", "allowed": false, "capability_checked": true, "blocked_reason": "shell open-url denied in default template", "evidence": "default-deny-policy", "pass": true},
+		},
+		"process_boundaries": []any{
+			map[string]any{"name": "surface_app_to_host_abi", "schema_checked": true, "capability_checked": true, "user_js": false, "node_integration": false, "electron_runtime": false, "pass": true},
+			map[string]any{"name": "linux_app_shell_host_adapter", "schema_checked": true, "capability_checked": true, "user_js": false, "node_integration": false, "electron_runtime": false, "pass": true},
+			map[string]any{"name": "browser_canvas_host", "schema_checked": true, "capability_checked": true, "user_js": false, "node_integration": false, "electron_runtime": false, "pass": true},
+		},
+		"asset_safety": []any{
+			map[string]any{"kind": "font", "local_only": true, "sha256_required": true, "size_limit_bytes": 1048576, "network_fetch_allowed": false, "parser": "bounded-font-metadata-v1", "bounds_checked": true, "pass": true},
+			map[string]any{"kind": "image", "local_only": true, "sha256_required": true, "size_limit_bytes": 2097152, "network_fetch_allowed": false, "parser": "bounded-image-header-v1", "bounds_checked": true, "pass": true},
+			map[string]any{"kind": "icon", "local_only": true, "sha256_required": true, "size_limit_bytes": 262144, "network_fetch_allowed": false, "parser": "bounded-icon-header-v1", "bounds_checked": true, "pass": true},
+		},
+		"unsupported_claims": []any{
+			"unrestricted-filesystem",
+			"unrestricted-network",
+			"native-permission-prompts",
+			"production-notifications",
+			"production-dialogs",
+			"remote-asset-fetch",
+			"electron-node-integration",
+		},
+		"negative_guards": map[string]any{
+			"no_ambient_filesystem":                          true,
+			"no_ambient_network":                             true,
+			"no_shell_feature_bypass":                        true,
+			"no_permissionless_clipboard":                    true,
+			"no_notification_dialog_without_target_evidence": true,
+			"no_network_asset_fetch":                         true,
+			"no_untrusted_font_image_decode":                 true,
+			"no_electron_node_integration":                   true,
+			"no_user_js_app_logic":                           true,
+			"no_dom_app_ui_tree":                             true,
+		},
+	}
+}
+
+func mapSecurityCapabilityStatus(featureStatus string) (string, bool) {
+	switch featureStatus {
+	case "target_evidenced", "scoped_adapter":
+		return "allowed_with_policy", true
+	case "blocked_pass":
+		return "blocked_nonclaim", false
+	default:
+		return "unknown", false
+	}
+}
+
+func withoutLinuxAppShellFeature(features []any, name string) []any {
+	filtered := make([]any, 0, len(features))
+	for _, feature := range features {
+		row := feature.(map[string]any)
+		if row["name"] == name {
+			continue
+		}
+		filtered = append(filtered, feature)
+	}
+	return filtered
 }
 
 func releaseWindowAccessibilityTreeMap() map[string]any {

@@ -95,6 +95,7 @@ type MemoryFuzzObservation struct {
 
 type MemoryFuzzOracleReport struct {
 	SchemaVersion                        string                          `json:"schema_version"`
+	GitHead                              string                          `json:"git_head,omitempty"`
 	Scope                                string                          `json:"scope"`
 	Tier1ShortCISmokeCases               int                             `json:"tier1_short_ci_smoke_cases"`
 	Tier2NightlyBoundaryRecorded         bool                            `json:"tier2_nightly_boundary_recorded"`

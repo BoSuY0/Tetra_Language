@@ -327,6 +327,19 @@ func validateBenchmarkClaim(name string, claim string, evidence string) error {
 			}
 		}
 	}
+	schedulerPrototypeContext := strings.Contains(lower, "scheduler") && strings.Contains(lower, "prototype")
+	if schedulerPrototypeContext {
+		for _, phrase := range []string{
+			"production runtime",
+			"production scheduler",
+			"production actor runtime",
+			"full production",
+		} {
+			if containsUnsafeBenchmarkPhrase(lower, phrase) {
+				return fmt.Errorf("benchmark %s scheduler prototype claim uses forbidden wording %q", name, phrase)
+			}
+		}
+	}
 	return nil
 }
 

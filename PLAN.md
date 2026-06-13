@@ -1,60 +1,73 @@
-# Tetra Actor Runtime Production Foundation Plan Tracker
+# Actor Foundation RC100 Plan Tracker
 
 External plan:
-`/home/tetra/Downloads/actor-runtime-production-foundation-codex-plan.md`
+`/home/tetra/Downloads/2026-06-10-actor-foundation-prod-ready-scoped-rc-100-implementation-plan.md`
 
 Evidence root:
-`reports/actor-runtime-foundation/`
+`reports/actor-foundation-prod-ready-scoped-rc-100/`
 
 ## Current Strategy
 
 1. Treat the external Markdown file as the execution contract.
-2. Keep every claim scoped to Linux-x64 actor/task runtime foundation evidence.
-3. Preserve prototype/runtime boundaries: scheduler model and benchmark prep
-   rows are not production multi-threaded actor scheduler claims.
-4. Use same-commit code/test/script/validator evidence before docs claims.
-5. Preserve unrelated dirty worktree changes.
-6. Complete P17 only after a requirement-by-requirement final audit.
+2. Execute scoped packets `ACTOR-RC100-P00` through `ACTOR-RC100-P08` in order,
+   unless a packet is proven already green on current HEAD and current state.
+3. Preserve the current dirty source worktree; use an isolated clean worktree
+   for release-candidate proof instead of destructive cleanup.
+4. Do not claim `ACTOR_FOUNDATION_PROD_READY_SCOPED_RC_100_PERC` unless clean
+   local proof, remote CI proof, and package workflow proof or approved dry-run
+   proof all exist.
+5. Keep full actor runtime production blockers separate under the optional
+   `ACTOR-RC100-FULL-*` track.
 
 ## Packet Matrix
 
 | Packet | Status | Acceptance Evidence |
 | --- | --- | --- |
-| `ACTOR-P00` baseline discovery and truth map | completed | `reports/actor-runtime-foundation/P00/truth-summary.md`, `truth-summary.json`, `command-status.tsv` |
-| `ACTOR-P01` scheduler foundation boundary | completed | `reports/actor-runtime-foundation/P01/summary.md`, `summary.json`, `command-status.tsv`; disposition `PROTOTYPE_ONLY_NON_GOAL` |
-| `ACTOR-P02` message pool exhaustion/reclamation | completed | `reports/actor-runtime-foundation/P02/summary.md`, `summary.json`, `command-status.tsv` |
-| `ACTOR-P03` bounded mailbox backpressure | completed | `reports/actor-runtime-foundation/P03/summary.md`, `summary.json`, `command-status.tsv` |
-| `ACTOR-P04` typed mailbox ownership and island proof | completed | `reports/actor-runtime-foundation/P04/summary.md`, `summary.json`, `command-status.tsv` |
-| `ACTOR-P05` actor failure/shutdown/invalid handles | completed | `reports/actor-runtime-foundation/P05/summary.md`, `summary.json`, `command-status.tsv` |
-| `ACTOR-P06` actor/task cancellation and structured concurrency | completed | `reports/actor-runtime-foundation/P06/summary.md`, `summary.json`, `command-status.tsv` |
-| `ACTOR-P07` race-safety conservative rejection matrix | completed | `reports/actor-runtime-foundation/P07/summary.md`, `summary.json`, `command-status.tsv` |
-| `ACTOR-P08` actor/island boundary integration | completed | `reports/actor-runtime-foundation/P08/summary.md`, `summary.json`, `command-status.tsv` |
-| `ACTOR-P09` distributed loopback hardening | completed | `reports/actor-runtime-foundation/P09/summary.md`, `summary.json`, `command-status.tsv` |
-| `ACTOR-P10` leak/race/soak evidence | completed | `reports/actor-runtime-foundation/P10/summary.md`, `summary.json`, `command-status.tsv` |
-| `ACTOR-P11` stable diagnostics and JSON evidence | completed | `reports/actor-runtime-foundation/P11/summary.md`, `summary.json`, `command-status.tsv` |
-| `ACTOR-P12` actor foundation validator and release gate | completed | `reports/actor-runtime-foundation/P12/summary.md`, `summary.json`, `command-status.tsv` |
-| `ACTOR-P13` CI and package release hardening | completed | `reports/actor-runtime-foundation/P13/summary.md`, `summary.json`, `command-status.tsv` |
-| `ACTOR-P14` docs/spec/user guide correction | completed | `reports/actor-runtime-foundation/P14/summary.md`, `summary.json`, `command-status.tsv` |
-| `ACTOR-P15` benchmark Tier 0/Tier 1 prep only | completed | `reports/actor-runtime-foundation/P15/summary.md`, `summary.json`, `command-status.tsv`, `parallelrt-evidence.raw.json` |
-| `ACTOR-P16` ABI/selfhostrt parity and unsupported targets | completed | `reports/actor-runtime-foundation/P16/summary.md`, `summary.json`, `command-status.tsv`, `actor-runtime-source-sha256.txt` |
-| `ACTOR-P17` final same-commit evidence and audit | completed | `docs/audits/actor-runtime-production-foundation-final.md`, `reports/actor-runtime-foundation/P17/summary.md`, `summary.json`, `command-status.tsv` |
+| `ACTOR-RC100-P00` preflight and target freeze | completed | `reports/actor-foundation-prod-ready-scoped-rc-100/P00/summary.md`, `summary.json`, `command-status.tsv` |
+| `ACTOR-RC100-P01` clean checkout / isolated worktree RC proof setup | completed | `reports/actor-foundation-prod-ready-scoped-rc-100/P01/summary.md`, `summary.json`, `command-status.tsv` |
+| `ACTOR-RC100-P02` clean local actor foundation gate rerun | completed | `reports/actor-foundation-prod-ready-scoped-rc-100/P02/summary.md`, `summary.json`, `command-status.tsv` |
+| `ACTOR-RC100-P03` final artifact hash and stale-evidence bundle | completed | `reports/actor-foundation-prod-ready-scoped-rc-100/P03/summary.md`, `summary.json`, `command-status.tsv`, root `artifact-hashes.json` |
+| `ACTOR-RC100-P04` remote CI actor foundation proof | completed / blocked | `reports/actor-foundation-prod-ready-scoped-rc-100/P04/summary.md`, `summary.json`, `command-status.tsv`, `remote-ci/actor-runtime-foundation-run.json` |
+| `ACTOR-RC100-P05` release package workflow proof or approved dry-run | completed / blocked | `reports/actor-foundation-prod-ready-scoped-rc-100/P05/summary.md`, `summary.json`, `command-status.tsv`, `package-workflow/release-packages-run.json` |
+| `ACTOR-RC100-P06` CI/workflow hardening against bypass and stale uploads | completed | `reports/actor-foundation-prod-ready-scoped-rc-100/P06/summary.md`, `summary.json`, `command-status.tsv`, `workflow-hardening.log` |
+| `ACTOR-RC100-P07` final audit, docs, manifest, and handoff update | completed | `reports/actor-foundation-prod-ready-scoped-rc-100/P07/summary.md`, `summary.json`, `post-commit-command-status.tsv`, `final-handoff.md`, `final-artifact-sha256.txt` |
+| `ACTOR-RC100-P08` final acceptance gate and verdict lock | completed / blocked | `reports/actor-foundation-prod-ready-scoped-rc-100/P08/summary.md`, `summary.json`, root `final-verdict.json`, `final-handoff.md`, `final-artifact-hashes.json`, `final-artifact-sha256.txt` |
+| `ACTOR-RC100-P09` broad validation unblock and remote CI bundle | completed / remote blocked | `reports/actor-foundation-prod-ready-scoped-rc-100/P09-broad-fix/broad-rerun2-status.tsv`, `remote-ci-instruction-bundle.md`, `remote-ci-blocker.json`, `remote-ci-preflight-status.tsv` |
+| `ACTOR-RC100-P10` remote blocker recheck | completed / remote blocked | `reports/actor-foundation-prod-ready-scoped-rc-100/P10-remote-blocker-recheck/summary.md`, `summary.json`, `remote-blocker-recheck-status.tsv` |
+| `ACTOR-RC100-P11` third remote blocker recheck | completed / blocked threshold reached | `reports/actor-foundation-prod-ready-scoped-rc-100/P11-remote-blocked-final/summary.md`, `summary.json`, `remote-blocked-final-status.tsv` |
+| `ACTOR-RC100-P12` auth-restored candidate integration | completed | `reports/actor-foundation-prod-ready-scoped-rc-100/P12-auth-restored/auth-restored-status.tsv`, candidate patch artifacts |
+| `ACTOR-RC100-P13` broad green candidate and remote CI bundle | completed / remote execution pending approval | `reports/actor-foundation-prod-ready-scoped-rc-100/P13-broad-green/broad-status.tsv`, `broad-compiler-cli-tools.log`, `candidate-selected-tracked.patch`, `candidate-newfiles.patch`, `remote-ci-instruction-bundle.md` |
+| `ACTOR-RC100-P16` approval blocked final | completed / blocked threshold reached | `reports/actor-foundation-prod-ready-scoped-rc-100/P16-approval-blocked-final/status.tsv`, `summary.md` |
+| `ACTOR-RC100-P17` approved commit, push, remote CI, and package proof | completed / blocked | `reports/actor-foundation-prod-ready-scoped-rc-100/P17-remote-execution-billing-blocked/summary.md`, `status.tsv`, `ci-run.json`, `ci-jobs.json`, `ci-check-annotations.jsonl`, `ci-artifacts.json` |
+| `ACTOR-RC100-P18` local `act` emulation of actor runtime foundation job | in progress | User installed `act`; running local emulation on fresh worktree for commit `3480870c7ff52d211aaa63c16238e62d6165cfbd` |
+| `ACTOR-RC100-FULL-*` optional full actor runtime production track | not started / follow-on | Not required for scoped RC100 target |
 
 ## Current Iteration
 
-1. Active packet: none; completion audit is current.
-2. P01 and P04 were explicitly dispositioned on 2026-06-10 with current
-   targeted evidence so the packet sequence is complete before final audit.
-3. P17 final gate, broad tests, race slice, docs/manifest checks, hash
-   validators, `git diff --check`, `git status --short`, and Graphify update
-   were refreshed on 2026-06-10.
-4. Completion verdict: `PROD_STABLE_SCOPED`; release-candidate and
-   `PROD_READY_PROVEN` are not claimed because dirty worktree and no remote
-   CI/package publication evidence were recorded.
+1. Active packet: P18 local `act` emulation is in progress.
+2. Local broad validation is green in the clean candidate worktree:
+   `go test -buildvcs=false ./compiler/... ./cli/... ./tools/... -count=1`
+   passed; see `P13-broad-green/broad-status.tsv` and
+   `P13-broad-green/broad-compiler-cli-tools.log`.
+3. User approval on 2026-06-10 cleared the P16 approval blocker for
+   commit/push/remote evidence.
+4. `gh repo view` confirms access to `BoSuY0/Tetra_Language` as `ADMIN`, and
+   both `ci.yml` and `release-packages.yml` are active.
+5. Target `ACTOR_FOUNDATION_PROD_READY_SCOPED_RC_100_PERC` remains unclaimed
+   because GitHub Actions did not start jobs and produced no remote CI/package
+   artifacts. A local `act` pass can strengthen local/dry-run evidence only.
+6. Remote CI instruction bundle is prepared at
+   `P13-broad-green/remote-ci-instruction-bundle.md`.
 
 ## Open Decisions
 
-- Release-candidate is not claimed unless clean checkout plus remote CI/release
-  evidence actually exists.
-- Full production actor runtime remains not claimed; this goal is
-  `PROD_STABLE_SCOPED` only if final evidence proves the bounded Linux-x64
-  actor/task foundation.
+- GitHub account billing lock must be resolved before same-change remote CI or
+  package workflow proof can be produced.
+- The current dirty main worktree cannot itself prove clean RC status.
+- P08 broad compiler/CLI/tools validation is fixed in P13 clean candidate
+  evidence, but the broad-green state is not yet a pushed same-change commit.
+  `gh auth status` is valid; see
+  `reports/actor-foundation-prod-ready-scoped-rc-100/P13-broad-green/remote-ci-instruction-bundle.md`.
+- The root `final-verdict.json` remains the historical P08 verdict artifact and
+  still records the old broad failure; current broad-green remote-blocked state
+  is recorded by P09 through P11 evidence.

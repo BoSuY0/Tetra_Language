@@ -17,27 +17,12 @@ func rose() -> surface.Color:
     return surface.Color(r: 244, g: 118, b: 142, a: 255)
 
 func shell_paint() -> block.PaintSpec:
-    return block.paint_stack5(
-        block.paint_layer_fill_radius(surface.Color(r: 27, g: 32, b: 39, a: 255), 16),
-        block.paint_layer_linear_gradient(surface.Color(r: 32, g: 40, b: 50, a: 255), surface.Color(r: 24, g: 29, b: 36, a: 255), 16),
-        block.paint_layer_border(surface.Color(r: 74, g: 88, b: 104, a: 255), 1, 16),
-        block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 96), 18, 0, 8),
-        block.paint_layer_outline(blue(), 1, 18)
-    )
+    return block.paint_stack5(block.paint_layer_fill_radius(surface.Color(r: 27, g: 32, b: 39, a: 255), 16), block.paint_layer_linear_gradient(surface.Color(r: 32, g: 40, b: 50, a: 255), surface.Color(r: 24, g: 29, b: 36, a: 255), 16), block.paint_layer_border(surface.Color(r: 74, g: 88, b: 104, a: 255), 1, 16), block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 96), 18, 0, 8), block.paint_layer_outline(blue(), 1, 18))
 
 func field_paint(focused: Bool) -> block.PaintSpec:
     if focused:
-        return block.paint_stack4(
-            block.paint_layer_fill_radius(surface.Color(r: 14, g: 18, b: 22, a: 255), 10),
-            block.paint_layer_border(blue(), 2, 10),
-            block.paint_layer_shadow(surface.Color(r: 96, g: 174, b: 244, a: 42), 12, 0, 0),
-            block.paint_layer_outline(blue(), 1, 12)
-        )
-    return block.paint_stack3(
-        block.paint_layer_fill_radius(surface.Color(r: 16, g: 20, b: 26, a: 255), 10),
-        block.paint_layer_border(surface.Color(r: 68, g: 80, b: 94, a: 255), 1, 10),
-        block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 56), 8, 0, 2)
-    )
+        return block.paint_stack4(block.paint_layer_fill_radius(surface.Color(r: 14, g: 18, b: 22, a: 255), 10), block.paint_layer_border(blue(), 2, 10), block.paint_layer_shadow(surface.Color(r: 96, g: 174, b: 244, a: 42), 12, 0, 0), block.paint_layer_outline(blue(), 1, 12))
+    return block.paint_stack3(block.paint_layer_fill_radius(surface.Color(r: 16, g: 20, b: 26, a: 255), 10), block.paint_layer_border(surface.Color(r: 68, g: 80, b: 94, a: 255), 1, 10), block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 56), 8, 0, 2))
 
 func make_field(id_value: Int, parent_value: Int, label_id: block.BlockID, y: Int, label_len: Int, focused: Bool) -> block.Block:
     let rect: surface.Rect = surface.Rect(x: 182, y: y, w: 254, h: 42)
@@ -85,14 +70,12 @@ uses alloc, mem:
     let email_label_rect: surface.Rect = surface.Rect(x: 182, y: 142, w: 120, h: 18)
     let name_id: block.BlockID = block.id(5)
     let email_id: block.BlockID = block.id(7)
-
     var tree: block.BlockTree = block.tree_init(10)
     let root_props: block.BlockProps = block.props(block.layout_row(root_rect, 12), block.paint_stack2(block.paint_layer_fill_radius(theme_dark(), 0), block.paint_layer_overlay(blue(), 22, 0)), block.text_none(), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_text(14), block.asset_none())
     let nav_props: block.BlockProps = block.props(block.layout_column(nav_rect, 8), shell_paint(), block.text_styled(8, theme_light(), block.text_family_ui(), 15, 700, 20, block.text_align_start(), block.text_wrap_word(), block.text_overflow_ellipsis(), 255), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_fast(), block.accessibility_text(8), block.asset_none())
     let form_props: block.BlockProps = block.props(block.layout_column(form_rect, 12), shell_paint(), block.text_styled(15, theme_light(), block.text_family_ui(), 18, 800, 24, block.text_align_start(), block.text_wrap_none(), block.text_overflow_ellipsis(), 255), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_fast(), block.accessibility_text(15), block.asset_none())
     let name_label_props: block.BlockProps = block.props(block.layout_fixed(name_label_rect), block.paint_empty(), block.text_styled(4, theme_light(), block.text_family_ui(), 12, 600, 16, block.text_align_start(), block.text_wrap_none(), block.text_overflow_ellipsis(), 220), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_label_for(4, name_id), block.asset_none())
     let email_label_props: block.BlockProps = block.props(block.layout_fixed(email_label_rect), block.paint_empty(), block.text_styled(5, theme_light(), block.text_family_ui(), 12, 600, 16, block.text_align_start(), block.text_wrap_none(), block.text_overflow_ellipsis(), 220), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_label_for(5, email_id), block.asset_none())
-
     let root: Int = block.tree_add_root(tree, block.make(block.id(1), block.id_none(), root_props), root_rect)
     let nav: Int = block.tree_add_child(tree, block.id(1), block.make(block.id(2), block.id(1), nav_props), nav_rect)
     let form: Int = block.tree_add_child(tree, block.id(1), block.make(block.id(3), block.id(1), form_props), form_rect)
@@ -105,12 +88,6 @@ uses alloc, mem:
     let valid: Int = block.tree_validate(tree)
     let focus0: Int = block.id_value(block.focus_order_at(tree, 0))
     let focus3: Int = block.id_value(block.focus_order_at(tree, 3))
-
-    if root == 1 && nav == 2 && form == 3 && name_label == 4 && name_field == 5 && email_label == 6 && email_field == 7 && save == 8 && reset == 9 &&
-       valid == block.tree_error_ok() &&
-       focus0 == 5 && focus3 == 9 &&
-       block.accessibility_relationship_matches(block.accessibility_label_for(4, name_id), block.accessibility_textbox_labelled_by(14, block.id(4)), block.id(4), name_id) &&
-       block.paint_validate_visual_grammar(shell_paint()) == block.paint_error_ok() &&
-       scene_checksum() > 0:
+    if root == 1 && nav == 2 && form == 3 && name_label == 4 && name_field == 5 && email_label == 6 && email_field == 7 && save == 8 && reset == 9 && valid == block.tree_error_ok() && focus0 == 5 && focus3 == 9 && block.accessibility_relationship_matches(block.accessibility_label_for(4, name_id), block.accessibility_textbox_labelled_by(14, block.id(4)), block.id(4), name_id) && block.paint_validate_visual_grammar(shell_paint()) == block.paint_error_ok() && scene_checksum() > 0:
         return 0
     return 1

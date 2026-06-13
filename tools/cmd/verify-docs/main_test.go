@@ -809,6 +809,32 @@ func TestVerifyReleaseTruthDocsRejectsPerformanceAndTargetParityClaims(t *testin
 	}
 }
 
+func TestVerifyReleaseTruthDocsRejectsMemory100FormalProofAndLeakClaims(t *testing.T) {
+	dir := t.TempDir()
+	doc := filepath.Join(dir, "release_notes.md")
+	body := strings.Join([]string{
+		"# Release Notes",
+		"",
+		"The release proves full formal proof of memory safety.",
+		"Memory production now has all-target memory parity.",
+		"The memory model has no leaks.",
+		"Memory 100% is guaranteed for users.",
+	}, "\n")
+	if err := os.WriteFile(doc, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err := verifyReleaseTruthDocs([]string{doc})
+	if err == nil {
+		t.Fatalf("expected Memory100/formal/leak claim failure")
+	}
+	for _, want := range []string{"full formal proof", "all-target memory parity", "no leaks", "memory 100%"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("expected %q in error, got %v", want, err)
+		}
+	}
+}
+
 func TestVerifyReleaseTruthDocsRejectsProductionPersistentObjectMemoryClaim(t *testing.T) {
 	dir := t.TempDir()
 	doc := filepath.Join(dir, "release_notes.md")
@@ -947,6 +973,16 @@ func TestVerifySurfaceReleaseDocsRequireUnsupportedTargetsAndReleaseGate(t *test
 			body: "Surface v1 scope is linux-x64 real-window and wasm32-web browser-canvas. Unsupported targets: macOS, Windows, wasm32-wasi.\n",
 			want: "release-gate.sh",
 		},
+		{
+			name: "missing-claim-tier-vocabulary",
+			body: "Surface v1 scope is linux-x64 real-window and wasm32-web browser-canvas. macOS Surface, Windows Surface, and wasm32-wasi Surface UI are unsupported targets.\n\nbash scripts/release/surface/release-gate.sh\nbash scripts/release/surface/product-gate.sh\n",
+			want: "PROD_STABLE_SCOPED",
+		},
+		{
+			name: "missing-product-gate-command",
+			body: "Surface v1 scope is linux-x64 real-window and wasm32-web browser-canvas. macOS Surface, Windows Surface, and wasm32-wasi Surface UI are unsupported targets. Claim tiers: PROD_STABLE_SCOPED, BETA_TARGET_HOST, EXPERIMENTAL, UNSUPPORTED, NONCLAIM.\n\nbash scripts/release/surface/release-gate.sh\n",
+			want: "product-gate.sh",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			doc := writeSurfaceReleaseDoc(t, tc.body)
@@ -960,9 +996,43 @@ func TestVerifySurfaceReleaseDocsRequireUnsupportedTargetsAndReleaseGate(t *test
 		})
 	}
 
-	okDoc := writeSurfaceReleaseDoc(t, "Surface v1 scope is linux-x64 real-window and wasm32-web browser-canvas. macOS Surface, Windows Surface, and wasm32-wasi Surface UI are unsupported targets. Metadata-only accessibility is not production accessibility. DOM UI and user JavaScript app logic are outside the Surface model.\n\nbash scripts/release/surface/release-gate.sh\n")
+	okDoc := writeSurfaceReleaseDoc(t, "Surface v1 scope is linux-x64 real-window and wasm32-web browser-canvas. macOS Surface, Windows Surface, and wasm32-wasi Surface UI are unsupported targets. Metadata-only accessibility is not production accessibility. DOM UI and user JavaScript app logic are outside the Surface model. Claim tiers: PROD_STABLE_SCOPED, BETA_TARGET_HOST, EXPERIMENTAL, UNSUPPORTED, NONCLAIM.\n\nbash scripts/release/surface/release-gate.sh\nbash scripts/release/surface/product-gate.sh\n")
 	if err := verifySurfaceReleaseDocs([]string{okDoc}); err != nil {
 		t.Fatalf("verifySurfaceReleaseDocs accepted doc: %v", err)
+	}
+}
+
+func TestVerifySurfaceReleaseDocsRequireP28GovernancePerDocument(t *testing.T) {
+	fullDoc := writeSurfaceReleaseDoc(t, "Surface v1 scope is linux-x64 real-window and wasm32-web browser-canvas. macOS Surface, Windows Surface, and wasm32-wasi Surface UI are unsupported targets. Claim tiers: PROD_STABLE_SCOPED, BETA_TARGET_HOST, EXPERIMENTAL, UNSUPPORTED, NONCLAIM.\n\nbash scripts/release/surface/release-gate.sh\nbash scripts/release/surface/product-gate.sh\n")
+	missingTierDoc := writeSurfaceReleaseDoc(t, "Surface v1 scope is linux-x64 real-window and wasm32-web browser-canvas. macOS Surface, Windows Surface, and wasm32-wasi Surface UI are unsupported targets.\n\nbash scripts/release/surface/release-gate.sh\nbash scripts/release/surface/product-gate.sh\n")
+	err := verifySurfaceReleaseDocs([]string{fullDoc, missingTierDoc})
+	if err == nil {
+		t.Fatalf("expected per-document claim-tier requirement failure")
+	}
+	if !strings.Contains(err.Error(), "PROD_STABLE_SCOPED") {
+		t.Fatalf("error = %v, want PROD_STABLE_SCOPED diagnostic", err)
+	}
+}
+
+func TestVerifySurfaceReleaseDocsRejectsMixedGPUProductionWithoutEvidenceClause(t *testing.T) {
+	doc := writeSurfaceReleaseDoc(t, "Surface v1 scope is linux-x64 real-window and wasm32-web browser-canvas. macOS Surface, Windows Surface, and wasm32-wasi Surface UI are unsupported targets. Claim tiers: PROD_STABLE_SCOPED, BETA_TARGET_HOST, EXPERIMENTAL, UNSUPPORTED, NONCLAIM.\n\nSurface GPU rendering is production supported without additional evidence.\n\nbash scripts/release/surface/release-gate.sh\nbash scripts/release/surface/product-gate.sh\n")
+	err := verifySurfaceReleaseDocs([]string{doc})
+	if err == nil {
+		t.Fatalf("expected mixed GPU production claim failure")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "gpu") {
+		t.Fatalf("error = %v, want GPU diagnostic", err)
+	}
+}
+
+func TestVerifySurfaceReleaseDocsRejectsFinalCurrentClaimOwnership(t *testing.T) {
+	doc := writeSurfaceReleaseDoc(t, "Surface v1 scope is linux-x64 real-window and wasm32-web browser-canvas. macOS Surface, Windows Surface, and wasm32-wasi Surface UI are unsupported targets. Claim tiers: PROD_STABLE_SCOPED, BETA_TARGET_HOST, EXPERIMENTAL, UNSUPPORTED, NONCLAIM.\n\nThe release gate is the source of truth for the final current claim.\n\nbash scripts/release/surface/release-gate.sh\nbash scripts/release/surface/product-gate.sh\n")
+	err := verifySurfaceReleaseDocs([]string{doc})
+	if err == nil {
+		t.Fatalf("expected final current claim ownership failure")
+	}
+	if !strings.Contains(err.Error(), "final current claim") {
+		t.Fatalf("error = %v, want final current claim diagnostic", err)
 	}
 }
 
@@ -1232,6 +1302,36 @@ func TestVerifyRAMContractCompilerDocsRejectsForbiddenClaim(t *testing.T) {
 	}
 	if !strings.Contains(strings.ToLower(err.Error()), "zero heap for all programs") {
 		t.Fatalf("expected zero heap claim in error, got %v", err)
+	}
+}
+
+func TestVerifyRAMContractCompilerDocsRejectsUnsupportedValidatorFlag(t *testing.T) {
+	paths := writeRAMContractDocsSet(t, validRAMContractDocsBody()+"\ngo run ./tools/cmd/validate-ram-contract-release --report reports/ram-contract-release\n")
+	err := verifyRAMContractCompilerDocs(paths, []featureManifest{validVerifyDocsRAMContractFeature()})
+	if err == nil {
+		t.Fatalf("expected unsupported RAM contract validator flag failure")
+	}
+	if !strings.Contains(err.Error(), "validate-ram-contract-release --report") {
+		t.Fatalf("expected unsupported flag in error, got %v", err)
+	}
+}
+
+func TestVerifyRAMContractCompilerDocsRejectsStaleReadinessHead(t *testing.T) {
+	if _, ok := currentGitHeadForDocs(); !ok {
+		t.Skip("git head unavailable")
+	}
+	paths := writeRAMContractDocsSet(t, validRAMContractDocsBody())
+	stale := "0000000000000000000000000000000000000000"
+	body := validRAMContractDocsBody() + "\nGit head: " + stale + "\n"
+	if err := os.WriteFile(paths.Readiness, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err := verifyRAMContractCompilerDocs(paths, []featureManifest{validVerifyDocsRAMContractFeature()})
+	if err == nil {
+		t.Fatalf("expected stale readiness git head failure")
+	}
+	if !strings.Contains(err.Error(), "stale readiness git head "+stale) {
+		t.Fatalf("expected stale head in error, got %v", err)
 	}
 }
 

@@ -1,0 +1,136 @@
+// Scoped Surface app-shell state helpers for Linux target-host evidence.
+// Effects: none
+// ```tetra doctest
+// func surface_app_shell_doctest() -> Int:
+//     var win: lib.core.surface_app_shell.ShellWindow = lib.core.surface_app_shell.window(1, 5, 560, 420, 1000)
+//     let _: Int = lib.core.surface_app_shell.open_window(win)
+//     if win.open && win.cursor == lib.core.surface_app_shell.cursor_pointer():
+//         return 1
+//     return 0
+// ```
+module lib.core.surface_app_shell
+
+struct ShellWindow:
+    id: Int
+    open: Bool
+    width: Int
+    height: Int
+    dpi_scale_milli: Int
+    cursor: Int
+    title_len: Int
+
+struct ShellFeature:
+    name: Int
+    status: Int
+    claimed: Bool
+    blocked_pass: Bool
+    no_native_widget_ui: Bool
+
+func cursor_pointer() -> Int:
+    return 1
+
+func cursor_text() -> Int:
+    return 2
+
+func cursor_resize() -> Int:
+    return 3
+
+func feature_file_dialog() -> Int:
+    return 10
+
+func feature_notification() -> Int:
+    return 11
+
+func feature_app_menu() -> Int:
+    return 12
+
+func feature_dialog() -> Int:
+    return 13
+
+func feature_file_picker() -> Int:
+    return 14
+
+func feature_tray() -> Int:
+    return 15
+
+func feature_deep_link() -> Int:
+    return 16
+
+func feature_crash_recovery() -> Int:
+    return 17
+
+func feature_error_report() -> Int:
+    return 18
+
+func feature_window_lifecycle() -> Int:
+    return 19
+
+func feature_multi_window() -> Int:
+    return 20
+
+func feature_clipboard() -> Int:
+    return 21
+
+func feature_ime() -> Int:
+    return 22
+
+func feature_accessibility_bridge() -> Int:
+    return 23
+
+func status_blocked_pass() -> Int:
+    return 30
+
+func status_scoped_adapter() -> Int:
+    return 31
+
+func status_target_evidenced() -> Int:
+    return 32
+
+func window(id: Int, title_len: Int, width: Int, height: Int, dpi_scale_milli: Int) -> ShellWindow:
+    return ShellWindow(id: id, open: false, width: width, height: height, dpi_scale_milli: dpi_scale_milli, cursor: cursor_pointer(), title_len: title_len)
+
+func open_window(win: inout ShellWindow) -> Int:
+    win.open = true
+    return 1
+
+func close_window(win: inout ShellWindow) -> Int:
+    win.open = false
+    return 1
+
+func reopen_window(win: inout ShellWindow) -> Int:
+    win.open = true
+    return 1
+
+func resize_window(win: inout ShellWindow, width: Int, height: Int) -> Int:
+    win.width = width
+    win.height = height
+    return 1
+
+func set_dpi_scale(win: inout ShellWindow, dpi_scale_milli: Int) -> Int:
+    win.dpi_scale_milli = dpi_scale_milli
+    return 1
+
+func set_cursor(win: inout ShellWindow, cursor: Int) -> Int:
+    win.cursor = cursor
+    return 1
+
+func blocked_pass_feature(name: Int) -> ShellFeature:
+    return ShellFeature(name: name, status: status_blocked_pass(), claimed: false, blocked_pass: true, no_native_widget_ui: true)
+
+func scoped_adapter_feature(name: Int) -> ShellFeature:
+    return ShellFeature(name: name, status: status_scoped_adapter(), claimed: true, blocked_pass: false, no_native_widget_ui: true)
+
+func target_evidenced_feature(name: Int) -> ShellFeature:
+    return ShellFeature(name: name, status: status_target_evidenced(), claimed: true, blocked_pass: false, no_native_widget_ui: true)
+
+func feature_is_honest(feature: ShellFeature) -> Bool:
+    if feature.status == status_blocked_pass():
+        return feature.blocked_pass && !feature.claimed && feature.no_native_widget_ui
+    if feature.status == status_scoped_adapter():
+        return feature.claimed && feature.no_native_widget_ui
+    if feature.status == status_target_evidenced():
+        return feature.claimed && feature.no_native_widget_ui
+    return false
+
+func multi_window_ready(main: ShellWindow, inspector: ShellWindow) -> Bool:
+    return main.open && inspector.open && main.width >= 560 && main.height >= 420 && inspector.width >= 320 && inspector.height >= 240
