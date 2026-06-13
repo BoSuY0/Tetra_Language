@@ -45,14 +45,25 @@ if [[ $# -lt 1 ]]; then
   exit 2
 fi
 
+missing_packages=()
 if ! command -v weston >/dev/null 2>&1; then
+  missing_packages+=("weston")
+fi
+if ! command -v rg >/dev/null 2>&1; then
+  missing_packages+=("ripgrep")
+fi
+if [[ "${#missing_packages[@]}" -gt 0 ]]; then
   if command -v sudo >/dev/null 2>&1 && command -v apt-get >/dev/null 2>&1; then
     sudo apt-get update
-    sudo apt-get install -y weston
+    sudo apt-get install -y "${missing_packages[@]}"
   else
-    echo "with-headless-wayland: weston is required" >&2
+    echo "with-headless-wayland: missing required tools: ${missing_packages[*]}" >&2
     exit 127
   fi
+fi
+if ! command -v weston >/dev/null 2>&1 || ! command -v rg >/dev/null 2>&1; then
+  echo "with-headless-wayland: weston and rg are required" >&2
+  exit 127
 fi
 
 runtime_parent="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"

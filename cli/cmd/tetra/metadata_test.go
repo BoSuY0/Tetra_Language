@@ -179,7 +179,7 @@ func TestTargetsCommandJSON(t *testing.T) {
 			if got.RunUnsupportedReason != "" {
 				t.Fatalf("linux-x32 supported host-probed metadata = %#v", got)
 			}
-		} else if !strings.Contains(got.RunUnsupportedReason, "host does not support Linux x32 ABI execution") || !strings.Contains(got.RunUnsupportedReason, "no host fallback") {
+		} else if !strings.Contains(got.RunUnsupportedReason, "does not support Linux x32 ABI execution") || !strings.Contains(got.RunUnsupportedReason, "no host fallback") {
 			t.Fatalf("linux-x32 unsupported host-probed metadata = %#v", got)
 		}
 	}

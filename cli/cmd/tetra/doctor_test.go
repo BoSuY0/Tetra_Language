@@ -99,7 +99,7 @@ func TestTargetMetadataCheck(t *testing.T) {
 			if x32.RunUnsupportedReason != "" {
 				t.Fatalf("linux-x32 supported host-probed metadata = %#v", x32)
 			}
-		} else if !strings.Contains(x32.RunUnsupportedReason, "host does not support Linux x32 ABI execution") || !strings.Contains(x32.RunUnsupportedReason, "no host fallback") {
+		} else if !strings.Contains(x32.RunUnsupportedReason, "does not support Linux x32 ABI execution") || !strings.Contains(x32.RunUnsupportedReason, "no host fallback") {
 			t.Fatalf("linux-x32 unsupported host-probed metadata = %#v", x32)
 		}
 	})
