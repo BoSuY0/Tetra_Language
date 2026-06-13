@@ -19,9 +19,147 @@ func FormatSource(src []byte, filename string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := validateFormatterBlocks(file, filename); err != nil {
+		return nil, err
+	}
 	var p sourcePrinter
 	p.file(file)
 	return applyLineComments([]byte(p.b.String()), comments), nil
+}
+
+func validateFormatterBlocks(file *frontend.FileAST, filename string) error {
+	if file == nil {
+		return nil
+	}
+	for _, actor := range file.Actors {
+		if actor == nil {
+			continue
+		}
+		for _, fn := range actor.Methods {
+			if err := validateFormatterFunc(fn, filename); err != nil {
+				return err
+			}
+		}
+	}
+	for _, ext := range file.Extensions {
+		if ext == nil {
+			continue
+		}
+		for _, fn := range ext.Methods {
+			if err := validateFormatterFunc(fn, filename); err != nil {
+				return err
+			}
+		}
+	}
+	for _, fn := range file.Funcs {
+		if err := validateFormatterFunc(fn, filename); err != nil {
+			return err
+		}
+	}
+	for _, test := range file.Tests {
+		if test == nil {
+			continue
+		}
+		if err := validateFormatterStmtBlock(test.Body, test.At, filename); err != nil {
+			return err
+		}
+	}
+	for _, view := range file.Views {
+		if view == nil {
+			continue
+		}
+		for _, cmd := range view.Commands {
+			if err := validateFormatterStmtBlock(cmd.Body, cmd.At, filename); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func validateFormatterFunc(fn *frontend.FuncDecl, filename string) error {
+	if fn == nil {
+		return nil
+	}
+	return validateFormatterStmtBlock(fn.Body, fn.Pos, filename)
+}
+
+func validateFormatterStmtBlock(stmts []frontend.Stmt, pos frontend.Position, filename string) error {
+	if len(stmts) == 0 {
+		return formatterEmptyBlockError(pos, filename)
+	}
+	return validateFormatterStmts(stmts, filename)
+}
+
+func validateFormatterStmts(stmts []frontend.Stmt, filename string) error {
+	for _, stmt := range stmts {
+		switch s := stmt.(type) {
+		case *frontend.DeferStmt:
+			if err := validateFormatterStmtBlock(s.Body, s.At, filename); err != nil {
+				return err
+			}
+		case *frontend.IfStmt:
+			if err := validateFormatterStmtBlock(s.Then, s.At, filename); err != nil {
+				return err
+			}
+			if len(s.Else) > 0 {
+				if err := validateFormatterStmts(s.Else, filename); err != nil {
+					return err
+				}
+			}
+		case *frontend.IfLetStmt:
+			if err := validateFormatterStmtBlock(s.Then, s.At, filename); err != nil {
+				return err
+			}
+			if len(s.Else) > 0 {
+				if err := validateFormatterStmts(s.Else, filename); err != nil {
+					return err
+				}
+			}
+		case *frontend.WhileStmt:
+			if err := validateFormatterStmtBlock(s.Body, s.At, filename); err != nil {
+				return err
+			}
+		case *frontend.ForRangeStmt:
+			if err := validateFormatterStmtBlock(s.Body, s.At, filename); err != nil {
+				return err
+			}
+		case *frontend.MatchStmt:
+			for _, c := range s.Cases {
+				if err := validateFormatterStmtBlock(c.Body, c.At, filename); err != nil {
+					return err
+				}
+			}
+		case *frontend.UnsafeStmt:
+			if err := validateFormatterStmtBlock(s.Body, s.At, filename); err != nil {
+				return err
+			}
+		case *frontend.IslandStmt:
+			if err := validateFormatterStmtBlock(s.Body, s.At, filename); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func formatterEmptyBlockError(pos frontend.Position, filename string) error {
+	if filename == "" {
+		filename = pos.File
+	}
+	line := pos.Line + 1
+	if line < 1 {
+		line = 1
+	}
+	return &frontend.DiagnosticError{Info: frontend.Diagnostic{
+		Code:     frontend.DiagnosticCodeParse,
+		Message:  "expected indented block after ':'",
+		File:     filename,
+		Line:     line,
+		Column:   1,
+		Severity: "error",
+		Hint:     "Indent the block under the preceding ':' with spaces.",
+	}}
 }
 
 func stripStandaloneBlockComments(src []byte) []byte {

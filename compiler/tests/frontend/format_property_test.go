@@ -70,6 +70,14 @@ func TestFormatSourcePropertySuiteCoversCommentRejectionAndMalformedInput(t *tes
 			wantLine:    2,
 			wantColumn:  1,
 		},
+		{
+			name:        "incomplete_function_body",
+			src:         "func A()->A:\n ;",
+			wantCode:    "TETRA0001",
+			wantMessage: "expected indented block after ':'",
+			wantLine:    2,
+			wantColumn:  1,
+		},
 	}
 
 	for _, tt := range tests {
