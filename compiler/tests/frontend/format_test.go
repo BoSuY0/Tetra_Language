@@ -59,6 +59,25 @@ uses io, mem:
 	}
 }
 
+func TestFormatSourceEscapesUnsupportedControlBytesAsHex(t *testing.T) {
+	src := []byte("func main() -> String:\n    return \"\x0b\"\n")
+	got, err := compiler.FormatSource(src, "control_string.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource: %v", err)
+	}
+	want := "func main() -> String:\n    return \"\\x0b\"\n"
+	if string(got) != want {
+		t.Fatalf("formatted source:\n%s\nwant:\n%s", string(got), want)
+	}
+	again, err := compiler.FormatSource(got, "control_string.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource again: %v", err)
+	}
+	if string(again) != want {
+		t.Fatalf("second formatted source:\n%s\nwant:\n%s", string(again), want)
+	}
+}
+
 func TestFormatSourceDeferBlock(t *testing.T) {
 	src := []byte(`func main() -> Int
 uses io:

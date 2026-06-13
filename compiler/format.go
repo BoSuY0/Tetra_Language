@@ -1200,7 +1200,7 @@ func (p *sourcePrinter) formatExprPrec(expr frontend.Expr, parent int) string {
 		}
 		return b.String()
 	case *frontend.StringLitExpr:
-		return strconv.Quote(string(e.Value))
+		return formatStringLiteral(e.Value)
 	case *frontend.IdentExpr:
 		return e.Name
 	case *frontend.UnaryExpr:
@@ -1267,6 +1267,37 @@ func (p *sourcePrinter) formatExprPrec(expr frontend.Expr, parent int) string {
 	default:
 		return "<expr>"
 	}
+}
+
+func formatStringLiteral(value []byte) string {
+	var b strings.Builder
+	b.Grow(len(value) + 2)
+	b.WriteByte('"')
+	for _, ch := range value {
+		switch ch {
+		case '\n':
+			b.WriteString(`\n`)
+		case '\r':
+			b.WriteString(`\r`)
+		case '\t':
+			b.WriteString(`\t`)
+		case '\\':
+			b.WriteString(`\\`)
+		case '"':
+			b.WriteString(`\"`)
+		default:
+			if ch >= 0x20 && ch <= 0x7e {
+				b.WriteByte(ch)
+				continue
+			}
+			const hex = "0123456789abcdef"
+			b.WriteString(`\x`)
+			b.WriteByte(hex[ch>>4])
+			b.WriteByte(hex[ch&0x0f])
+		}
+	}
+	b.WriteByte('"')
+	return b.String()
 }
 
 func exprPrecedence(op frontend.TokenType) int {
