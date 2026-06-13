@@ -246,6 +246,20 @@ func TestTargetsCommandJSONMarksWASIRunUnsupportedWhenRunnerMissing(t *testing.T
 	}
 }
 
+func TestTargetsCommandTOON(t *testing.T) {
+	var report targetsJSONReportForTest
+	raw := runCLITOONStdout(t, []string{"targets", "--format=toon"}, 0, &report)
+	if !strings.Contains(raw, "targets[") || !strings.Contains(raw, "supported[") {
+		t.Fatalf("targets TOON output missing structured fields:\n%s", raw)
+	}
+	if len(report.Targets) != 7 {
+		t.Fatalf("targets metadata count = %d, want 7", len(report.Targets))
+	}
+	if targetMetaForTest(t, report, "linux-x64").RunMode == "" {
+		t.Fatalf("linux-x64 TOON target metadata incomplete: %#v", report)
+	}
+}
+
 type targetMetaJSONForTest struct {
 	Triple               string `json:"triple"`
 	BuildOnly            bool   `json:"build_only"`
@@ -590,6 +604,21 @@ func TestFeaturesCommandJSON(t *testing.T) {
 	}
 }
 
+func TestFeaturesCommandTOON(t *testing.T) {
+	var report struct {
+		Schema   string `json:"schema"`
+		Version  string `json:"version"`
+		Features []struct {
+			ID     string `json:"id"`
+			Status string `json:"status"`
+		} `json:"features"`
+	}
+	raw := runCLITOONStdout(t, []string{"features", "--format=toon"}, 0, &report)
+	if !strings.Contains(raw, "features[") || report.Schema != "tetra.features.v1" || report.Version != compiler.Version() || len(report.Features) == 0 {
+		t.Fatalf("features TOON report incomplete: raw=%s report=%#v", raw, report)
+	}
+}
+
 func TestFeaturesCommandRejectsUnsupportedFormat(t *testing.T) {
 	var stderr bytes.Buffer
 	code := runCLI([]string{"features", "--format=yaml"}, &bytes.Buffer{}, &stderr)
@@ -648,5 +677,20 @@ func TestFormatsCommandListsOfficialT4Family(t *testing.T) {
 	}
 	if got := byExtension[".tetra"]; got.Role != "source" || got.Primary || !got.Legacy {
 		t.Fatalf(".tetra format metadata = %#v", got)
+	}
+}
+
+func TestFormatsCommandTOON(t *testing.T) {
+	var report struct {
+		Formats []struct {
+			Name      string `json:"name"`
+			Role      string `json:"role"`
+			Extension string `json:"extension"`
+			FileName  string `json:"file_name"`
+		} `json:"formats"`
+	}
+	raw := runCLITOONStdout(t, []string{"formats", "--format=toon"}, 0, &report)
+	if !strings.Contains(raw, "formats[") || len(report.Formats) == 0 {
+		t.Fatalf("formats TOON report incomplete: raw=%s report=%#v", raw, report)
 	}
 }

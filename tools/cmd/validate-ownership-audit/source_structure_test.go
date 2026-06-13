@@ -8,7 +8,14 @@ import (
 )
 
 func TestOwnershipAuditFixtureSourceAvoidsGiantRows(t *testing.T) {
-	for _, path := range []string{"fixture_test.go", "evidence_requirements_test.go"} {
+	paths := []string{"fixture_test.go"}
+	evidencePaths, err := filepath.Glob("evidence_requirements*_test.go")
+	if err != nil {
+		t.Fatalf("glob evidence requirement tests: %v", err)
+	}
+	paths = append(paths, evidencePaths...)
+
+	for _, path := range paths {
 		raw, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatalf("read %s: %v", path, err)
@@ -72,7 +79,19 @@ func TestOwnershipAuditTestsAreSplitByResponsibility(t *testing.T) {
 		"evidence_requirements_test.go": {
 			"TestValidateOwnershipAuditRejectsMissingOwnershipSmokeExampleEvidence",
 			"TestValidateOwnershipAuditRejectsMissingFeatureRegistryCommandEvidence",
+			"TestValidateOwnershipAuditRejectsMissingSliceOptionalPayloadInoutGlobalEvidence",
+		},
+		"evidence_requirements_escape_test.go": {
+			"TestValidateOwnershipAuditRejectsMissingNestedSliceEnumPayloadEscapeEvidence",
+			"TestValidateOwnershipAuditRejectsMissingStableOptionalPayloadWholeValueEvidence",
+		},
+		"evidence_requirements_stable_runtime_test.go": {
+			"TestValidateOwnershipAuditRejectsMissingStableActorTaskUseAfterTransferEvidence",
+			"TestValidateOwnershipAuditRejectsMissingStableCallableEscapeDiagnosticsEvidence",
+		},
+		"evidence_requirements_stable_cli_test.go": {
 			"TestValidateOwnershipAuditRejectsMissingStableCLIJSONOwnershipLifetimeSafetyCodesEvidence",
+			"TestValidateOwnershipAuditRejectsMissingPartialStructEnumConsumeWholeValueEvidence",
 		},
 	}
 
@@ -105,7 +124,14 @@ func TestOwnershipAuditFixtureHelpersLiveInFocusedFile(t *testing.T) {
 		}
 	}
 
-	for _, path := range []string{"source_structure_test.go", "validate_test.go", "evidence_requirements_test.go"} {
+	paths := []string{"source_structure_test.go", "validate_test.go"}
+	evidencePaths, err := filepath.Glob("evidence_requirements*_test.go")
+	if err != nil {
+		t.Fatalf("glob evidence requirement tests: %v", err)
+	}
+	paths = append(paths, evidencePaths...)
+
+	for _, path := range paths {
 		raw, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatalf("read %s: %v", path, err)

@@ -38,7 +38,7 @@ func TestP24RuntimeHardeningV1CoversMasterPlanTargets(t *testing.T) {
 	p24AssertRuntimeHardeningRow(t, rows[RuntimeHardeningIntegerOverflowSemantics], []string{"checkedNegI32", "foldConstBinaryI32", "byte-size overflow"})
 	p24AssertRuntimeHardeningRow(t, rows[RuntimeHardeningAllocatorCorruptionInstrumentation], []string{"bounds_header", "stale or double free", "PerCoreSmallHeapAllocator"})
 	p24AssertRuntimeHardeningRow(t, rows[RuntimeHardeningRegionUseAfterFreeInstrumentation], []string{"AllocationDebugDoubleFree", "AllocationDebugUseAfterFree", "region.temp"})
-	p24AssertRuntimeHardeningRow(t, rows[RuntimeHardeningActorMailboxOverflowPolicy], []string{"ErrMailboxFull", "blocking_recv_yield", "message pool exhaustion returns checked -1", "message pool entries are not reclaimed"})
+	p24AssertRuntimeHardeningRow(t, rows[RuntimeHardeningActorMailboxOverflowPolicy], []string{"ErrMailboxFull", "blocking_recv_yield", "message pool exhaustion returns checked -1", "drained message pool entries are reclaimed"})
 	p24AssertRuntimeHardeningRow(t, rows[RuntimeHardeningNetworkParserLimits], []string{"ErrHeaderTooLarge", "ErrBodyTooLarge", "ErrFrameTooLarge", "ErrMalformedFrame"})
 
 	if !report.DeterministicTrapsReviewed || !report.OOMPolicyReviewed || !report.StackOverflowGuardReviewed || !report.IntegerOverflowSemanticsAudited || !report.AllocatorCorruptionInstrumentationReviewed || !report.RegionDoubleFreeUseAfterFreeReviewed || !report.ActorMailboxOverflowPolicyReviewed || !report.NetworkParserLimitsReviewed {

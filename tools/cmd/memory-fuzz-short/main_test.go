@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -148,5 +150,71 @@ func TestRunMemoryFuzzShortRejectsStaleReportDir(t *testing.T) {
 	err := runMemoryFuzzShort(memoryFuzzShortOptions{Tier: "1", ReportDir: dir})
 	if err == nil || !strings.Contains(err.Error(), "fresh --report-dir") {
 		t.Fatalf("runMemoryFuzzShort stale report dir error = %v, want fresh-dir rejection", err)
+	}
+}
+
+func TestWriteMemoryFuzzJSONFileKeepsIndentedJSONFormat(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "artifact.json")
+	value := struct {
+		Schema string   `json:"schema"`
+		Rows   []string `json:"rows"`
+	}{
+		Schema: "tetra.test.schema.v1",
+		Rows:   []string{"one", "two"},
+	}
+	if err := writeMemoryFuzzJSONFile(path, value); err != nil {
+		t.Fatalf("writeMemoryFuzzJSONFile: %v", err)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read written json: %v", err)
+	}
+	want := "{\n  \"schema\": \"tetra.test.schema.v1\",\n  \"rows\": [\n    \"one\",\n    \"two\"\n  ]\n}\n"
+	if string(raw) != want {
+		t.Fatalf("written JSON = %q, want %q", raw, want)
+	}
+}
+
+func TestMemoryFuzzShortArtifactHashingSchemaSniffIsBounded(t *testing.T) {
+	root := t.TempDir()
+	largePrefix := strings.Repeat("x", 64*1024+1024)
+	raw := []byte(`{"padding":"` + largePrefix + `","schema":"too-late"}`)
+	if err := os.WriteFile(filepath.Join(root, "large-report.json"), raw, 0o644); err != nil {
+		t.Fatalf("write large report: %v", err)
+	}
+
+	artifact, err := hashMemoryFuzzArtifact(root, "large-report.json")
+	if err != nil {
+		t.Fatalf("hashMemoryFuzzArtifact: %v", err)
+	}
+	if artifact.Schema != "" {
+		t.Fatalf("artifact schema = %q, want empty schema when schema appears beyond bounded sniff window", artifact.Schema)
+	}
+	if artifact.Size != int64(len(raw)) {
+		t.Fatalf("artifact size = %d, want %d", artifact.Size, len(raw))
+	}
+}
+
+func TestMemoryFuzzShortArtifactHashingKeepsEarlySchemaForLargeJSON(t *testing.T) {
+	root := t.TempDir()
+	raw := []byte(`{"schema":"schema-first","payload":"` + strings.Repeat("x", 64*1024+1024) + `"}`)
+	if err := os.WriteFile(filepath.Join(root, "schema-first-large.json"), raw, 0o644); err != nil {
+		t.Fatalf("write large report: %v", err)
+	}
+
+	artifact, err := hashMemoryFuzzArtifact(root, "schema-first-large.json")
+	if err != nil {
+		t.Fatalf("hashMemoryFuzzArtifact: %v", err)
+	}
+	if artifact.Schema != "schema-first" {
+		t.Fatalf("artifact schema = %q, want schema-first", artifact.Schema)
+	}
+	sum := sha256.Sum256(raw)
+	wantSHA := "sha256:" + hex.EncodeToString(sum[:])
+	if artifact.SHA256 != wantSHA {
+		t.Fatalf("artifact sha256 = %q, want streaming hash of whole artifact %q", artifact.SHA256, wantSHA)
+	}
+	if artifact.Size != int64(len(raw)) {
+		t.Fatalf("artifact size = %d, want %d", artifact.Size, len(raw))
 	}
 }

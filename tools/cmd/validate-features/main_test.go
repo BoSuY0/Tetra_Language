@@ -3,6 +3,8 @@ package main
 import (
 	"strings"
 	"testing"
+
+	"tetra_language/internal/toon"
 )
 
 func validFeaturesReportJSON() []byte {
@@ -51,6 +53,16 @@ func validFeaturesReportJSON() []byte {
 func TestValidateFeaturesReportAcceptsExpectedShape(t *testing.T) {
 	if err := validateFeaturesReport(validFeaturesReportJSON()); err != nil {
 		t.Fatalf("validate features: %v", err)
+	}
+}
+
+func TestValidateFeaturesReportAcceptsTOON(t *testing.T) {
+	raw, err := toon.ConvertJSONToTOON(validFeaturesReportJSON(), toon.Options{Deterministic: true, Strict: true})
+	if err != nil {
+		t.Fatalf("json->toon: %v", err)
+	}
+	if err := validateFeaturesReport(raw); err != nil {
+		t.Fatalf("validate features TOON: %v\n%s", err, raw)
 	}
 }
 

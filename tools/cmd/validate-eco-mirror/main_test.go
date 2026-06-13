@@ -6,12 +6,24 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"tetra_language/internal/toon"
 )
 
 func TestValidateEcoMirrorAcceptsValidReport(t *testing.T) {
 	out, err := runEcoMirrorValidator(t, validMirrorReport())
 	if err != nil {
 		t.Fatalf("validator failed: %v\n%s", err, out)
+	}
+}
+
+func TestValidateEcoMirrorAcceptsTOON(t *testing.T) {
+	toonRaw, err := toon.ConvertJSONToTOON([]byte(validMirrorReport()), toon.Options{Strict: true, Deterministic: true})
+	if err != nil {
+		t.Fatalf("json->toon: %v", err)
+	}
+	if err := validateEcoMirrorFormat(toonRaw, "toon"); err != nil {
+		t.Fatalf("validateEcoMirrorFormat TOON: %v\n%s", err, toonRaw)
 	}
 }
 

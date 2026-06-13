@@ -8,6 +8,8 @@ import (
 	"os"
 	"sort"
 	"strings"
+
+	"tetra_language/tools/internal/reportdecode"
 )
 
 type testResult struct {
@@ -45,7 +47,7 @@ const testReportArtifact = "tetra.release.v0_2_0.test-report.v1"
 
 func main() {
 	var reportPath string
-	flag.StringVar(&reportPath, "report", "", "path to tetra test JSON report")
+	flag.StringVar(&reportPath, "report", "", "path to tetra test JSON or TOON report")
 	flag.Parse()
 
 	if reportPath == "" {
@@ -65,7 +67,7 @@ func main() {
 
 func validateTestReport(raw []byte) error {
 	var report testReportEnvelope
-	if err := decodeStrictJSON(raw, &report); err != nil {
+	if err := reportdecode.DecodeStrict(raw, &report); err != nil {
 		return err
 	}
 	if err := unmarshalArray(report.FilesRaw, "files", &report.Files); err != nil {
@@ -85,16 +87,10 @@ func unmarshalArray[T any](raw json.RawMessage, field string, out *[]T) error {
 	if bytes.Equal(trimmed, []byte("null")) || trimmed[0] != '[' {
 		return fmt.Errorf("%s must be an array, not null", field)
 	}
-	if err := decodeStrictJSON(trimmed, out); err != nil {
+	if err := reportdecode.DecodeStrict(trimmed, out); err != nil {
 		return fmt.Errorf("%s: %w", field, err)
 	}
 	return nil
-}
-
-func decodeStrictJSON(raw []byte, out any) error {
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.DisallowUnknownFields()
-	return dec.Decode(out)
 }
 
 func validateTestReportCounts(report testReportEnvelope) error {

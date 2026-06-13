@@ -9,6 +9,7 @@ type TypedActorOwnershipTransferID string
 
 const (
 	TypedActorOwnershipBorrowedViewCopyBoundary     TypedActorOwnershipTransferID = "borrowed_view_copy_boundary"
+	TypedActorOwnershipWrapperPayloadRejection      TypedActorOwnershipTransferID = "wrapper_payload_rejection_matrix"
 	TypedActorOwnershipOwnedRegionMove              TypedActorOwnershipTransferID = "owned_region_move"
 	TypedActorOwnershipSenderUseAfterMove           TypedActorOwnershipTransferID = "sender_use_after_move"
 	TypedActorOwnershipReceiverOwnsMovedRegion      TypedActorOwnershipTransferID = "receiver_owns_moved_region"
@@ -52,6 +53,7 @@ func TypedActorOwnershipTransferCoverage() TypedActorOwnershipTransferReport {
 		SchemaVersion: "tetra.actors.ownership_transfer.v1",
 		Rows: []TypedActorOwnershipTransferRow{
 			borrowedViewCopyBoundaryRow(),
+			wrapperPayloadRejectionRow(),
 			ownedRegionMoveRow(),
 			senderUseAfterMoveRow(),
 			receiverOwnsMovedRegionRow(),
@@ -94,6 +96,7 @@ func ValidateTypedActorOwnershipTransferCoverage(report TypedActorOwnershipTrans
 
 	expected := map[TypedActorOwnershipTransferID]bool{
 		TypedActorOwnershipBorrowedViewCopyBoundary:     false,
+		TypedActorOwnershipWrapperPayloadRejection:      false,
 		TypedActorOwnershipOwnedRegionMove:              false,
 		TypedActorOwnershipSenderUseAfterMove:           false,
 		TypedActorOwnershipReceiverOwnsMovedRegion:      false,
@@ -146,6 +149,9 @@ func ValidateTypedActorOwnershipTransferCoverage(report TypedActorOwnershipTrans
 	if err := requireOwnershipTransferFacts(rows[TypedActorOwnershipBorrowedViewCopyBoundary], "borrowed view rejected", "explicit copy accepted", ".copy()"); err != nil {
 		return err
 	}
+	if err := requireOwnershipTransferFacts(rows[TypedActorOwnershipWrapperPayloadRejection], "optional wrapper borrowed payload rejected", "generic wrapper borrowed payload rejected", "function-typed wrapper payload rejected"); err != nil {
+		return fmt.Errorf("typed actor ownership transfer: wrapper payload rejection row invalid: %w", err)
+	}
 	if err := requireOwnershipTransferFacts(rows[TypedActorOwnershipOwnedRegionMove], "owned region can move", "bytes_copied=0", "zero_copy_move"); err != nil {
 		return err
 	}
@@ -194,6 +200,21 @@ func borrowedViewCopyBoundaryRow() TypedActorOwnershipTransferRow {
 		},
 		Evidence: "compiler/internal/actorsafety/sendability_test.go::TestBorrowedSliceAcrossActorBoundaryRejectsUnlessCopied; compiler/tests/semantics/borrow_copy_test.go::TestBorrowedActorSendRejectedUnlessCopied; compiler/internal/semantics/exprs.go::validateActorBoundaryPayloadExpr",
 		Boundary: "covers checked typed actor message expressions; borrowed views do not get a zero-copy actor path unless the expression is explicitly copied or an owned-region slice moves with its owner",
+	}
+}
+
+func wrapperPayloadRejectionRow() TypedActorOwnershipTransferRow {
+	return TypedActorOwnershipTransferRow{
+		ID:     TypedActorOwnershipWrapperPayloadRejection,
+		Name:   "Wrapper payload rejection matrix",
+		Status: TypedActorOwnershipImplementedNarrow,
+		RequiredFacts: []string{
+			"optional wrapper borrowed payload rejected at actor boundary",
+			"generic wrapper borrowed payload rejected at actor boundary",
+			"function-typed wrapper payload rejected as non-value typed actor payload",
+		},
+		Evidence: "compiler/tests/semantics/memory_ideal_v4_boundary_test.go::TestMemoryIdealV4ActorBoundaryCopyAndBorrowDiagnostics; compiler/internal/semantics/exprs.go::validateTypedActorMessageType; compiler/internal/semantics/exprs.go::validateActorBoundaryPayloadExpr",
+		Boundary: "wrapper rejection evidence is source-checker evidence for current typed actor message payloads; it does not add distributed zero-copy transfer or hidden runtime behavior",
 	}
 }
 

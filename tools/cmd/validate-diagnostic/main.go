@@ -1,12 +1,12 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"strings"
+
+	"tetra_language/tools/internal/reportdecode"
 )
 
 type diagnostic struct {
@@ -56,10 +56,8 @@ func main() {
 
 func parseDiagnostic(raw []byte) (diagnostic, error) {
 	var diag diagnostic
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&diag); err != nil {
-		return diagnostic{}, fmt.Errorf("invalid diagnostic JSON: %w", err)
+	if err := reportdecode.DecodeStrict(raw, &diag); err != nil {
+		return diagnostic{}, fmt.Errorf("invalid diagnostic report: %w", err)
 	}
 	return diag, nil
 }

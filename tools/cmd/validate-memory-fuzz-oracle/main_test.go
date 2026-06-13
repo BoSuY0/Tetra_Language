@@ -168,6 +168,45 @@ func TestValidateMemoryFuzzOracleReportFileRejectsMissingArtifactHashes(t *testi
 	}
 }
 
+func TestValidateMemoryFuzzOracleReportFileRejectsArtifactHashMismatch(t *testing.T) {
+	dir := t.TempDir()
+	writeTier1ArtifactBundle(t, dir)
+	markerPath := filepath.Join(dir, "reproducers", "compiler-crash", "README.md")
+	raw, err := os.ReadFile(markerPath)
+	if err != nil {
+		t.Fatalf("read marker: %v", err)
+	}
+	raw = []byte(strings.Replace(string(raw), "slot", "sl0t", 1))
+	if err := os.WriteFile(markerPath, raw, 0o644); err != nil {
+		t.Fatalf("mutate marker: %v", err)
+	}
+
+	path := filepath.Join(dir, "memory-fuzz-oracle.json")
+	err = validateMemoryFuzzOracleReportFile(path, dir)
+	if err == nil || !strings.Contains(err.Error(), "sha256 mismatch") {
+		t.Fatalf("validateMemoryFuzzOracleReportFile error = %v, want artifact hash mismatch rejection", err)
+	}
+}
+
+func TestValidateMemoryFuzzOracleReportFileRejectsSymlinkArtifactPath(t *testing.T) {
+	dir := t.TempDir()
+	writeTier1ArtifactBundle(t, dir)
+	summaryPath := filepath.Join(dir, "summary.md")
+	targetPath := filepath.Join(dir, "summary-real.md")
+	if err := os.Rename(summaryPath, targetPath); err != nil {
+		t.Fatalf("rename summary: %v", err)
+	}
+	if err := os.Symlink("summary-real.md", summaryPath); err != nil {
+		t.Fatalf("symlink summary: %v", err)
+	}
+
+	path := filepath.Join(dir, "memory-fuzz-oracle.json")
+	err := validateMemoryFuzzOracleReportFile(path, dir)
+	if err == nil || !strings.Contains(err.Error(), "must not be a symlink") {
+		t.Fatalf("validateMemoryFuzzOracleReportFile error = %v, want symlink artifact rejection", err)
+	}
+}
+
 func TestValidateMemoryFuzzOracleReportFileRejectsMissingValidatorProvenance(t *testing.T) {
 	dir := t.TempDir()
 	writeTier1ArtifactBundle(t, dir)
@@ -302,6 +341,128 @@ func TestValidateMemoryFuzzOracleReportFileRejectsUnknownSummaryField(t *testing
 	err = validateMemoryFuzzOracleReportFile(path, dir)
 	if err == nil || !strings.Contains(err.Error(), "unknown field") {
 		t.Fatalf("validateMemoryFuzzOracleReportFile error = %v, want strict summary json rejection", err)
+	}
+}
+
+func TestMemoryFuzzArtifactHashingSchemaSniffIsBounded(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "large-report.json")
+	largePrefix := strings.Repeat("x", maxMemoryFuzzJSONSchemaSniffBytes+1024)
+	raw := `{"padding":"` + largePrefix + `","schema":"too-late"}`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := hashMemoryFuzzArtifact(root, "large-report.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if artifact.Schema != "" {
+		t.Fatalf("artifact schema = %q, want empty schema when field is beyond bounded sniff window", artifact.Schema)
+	}
+}
+
+func TestMemoryFuzzArtifactHashingKeepsEarlySchemaForLargeJSON(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "schema-first-large.json")
+	largePayload := strings.Repeat("x", maxMemoryFuzzJSONSchemaSniffBytes+1024)
+	raw := `{"schema":"schema-first","payload":"` + largePayload + `"}`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := hashMemoryFuzzArtifact(root, "schema-first-large.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if artifact.Schema != "schema-first" {
+		t.Fatalf("artifact schema = %q, want early schema from bounded prefix", artifact.Schema)
+	}
+	if artifact.Size != int64(len(raw)) {
+		t.Fatalf("artifact size = %d, want %d", artifact.Size, len(raw))
+	}
+	sum := sha256.Sum256([]byte(raw))
+	if artifact.SHA256 != "sha256:"+hex.EncodeToString(sum[:]) {
+		t.Fatalf("artifact sha256 = %q, want streaming hash of whole artifact", artifact.SHA256)
+	}
+}
+
+func TestMemoryFuzzArtifactHashingDoesNotFallbackWhenSchemaMayBeLater(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "schema-version-first-large.json")
+	largePayload := strings.Repeat("x", maxMemoryFuzzJSONSchemaSniffBytes+1024)
+	raw := `{"schema_version":"version-first","payload":"` + largePayload + `","schema":"schema-too-late"}`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := hashMemoryFuzzArtifact(root, "schema-version-first-large.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if artifact.Schema != "" {
+		t.Fatalf("artifact schema = %q, want empty schema_version fallback when schema may be beyond bounded sniff window", artifact.Schema)
+	}
+}
+
+func TestMemoryFuzzArtifactHashingRejectsNonStringSchemaFallback(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "object-schema.json")
+	raw := `{"schema_version":"version-fallback","schema":{"bad":true}}`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := hashMemoryFuzzArtifact(root, "object-schema.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if artifact.Schema != "" {
+		t.Fatalf("artifact schema = %q, want empty schema for non-string schema field", artifact.Schema)
+	}
+}
+
+func TestMemoryFuzzArtifactHashingRejectsNonStringSchemaVersion(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "object-schema-version.json")
+	raw := `{"schema":"schema-first","schema_version":{"bad":true}}`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := hashMemoryFuzzArtifact(root, "object-schema-version.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if artifact.Schema != "" {
+		t.Fatalf("artifact schema = %q, want empty schema when schema_version has non-string type", artifact.Schema)
+	}
+}
+
+func TestMemoryFuzzArtifactHashingRejectsMalformedJSONTail(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "malformed-tail.json")
+	raw := `{"schema":"looks-valid","broken":`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := hashMemoryFuzzArtifact(root, "malformed-tail.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if artifact.Schema != "" {
+		t.Fatalf("artifact schema = %q, want empty schema for malformed JSON tail", artifact.Schema)
+	}
+}
+
+func TestMemoryFuzzArtifactHashingRejectsTrailingJunkAfterJSON(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "trailing-junk.json")
+	raw := `{"schema":"looks-valid"}junk`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := hashMemoryFuzzArtifact(root, "trailing-junk.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if artifact.Schema != "" {
+		t.Fatalf("artifact schema = %q, want empty schema for trailing junk after JSON object", artifact.Schema)
 	}
 }
 

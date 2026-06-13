@@ -1,14 +1,13 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"tetra_language/tools/internal/reportdecode"
 )
 
 type featuresReport struct {
@@ -61,19 +60,7 @@ func validateFeaturesReport(raw []byte) error {
 }
 
 func decodeStrictJSON(raw []byte, out any) error {
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(out); err != nil {
-		return err
-	}
-	var extra any
-	if err := dec.Decode(&extra); err != io.EOF {
-		if err == nil {
-			return fmt.Errorf("unexpected trailing JSON value")
-		}
-		return err
-	}
-	return nil
+	return reportdecode.DecodeStrict(raw, out)
 }
 
 func validateFeatures(features []featureEntry) error {

@@ -5600,8 +5600,6 @@
         "docs/audits/per-core-scheduler-v1.md",
         "docs/audits/async-io-reactor-v1.md",
         "docs/audits/region-aware-stdlib-v1.md",
-        "docs/audits/typed-actor-ownership-transfer-v1.md",
-        "docs/audits/per-core-scheduler-v1.md",
         "docs/audits/stable-generic-collections-v1.md",
         "docs/audits/production-http-json-stack-v1.md",
         "docs/audits/production-postgres-driver-pool-v1.md",

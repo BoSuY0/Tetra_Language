@@ -57,6 +57,14 @@ release bundle, heap rows and copy rows are indexed by `site_id` in both
 directions against `ram-contract-report.json`; extra blocker rows and missing
 blocker rows are invalid.
 
+Blocker rows are implementation inputs, not just summaries. Non-empty blocker
+rows record `file`, `line`, `symbol`, `source_location_status`, `severity`,
+`reason`, `suggested_fix`, `evidence_id` or `proof_id`, and
+`safe_to_optimize`. Copy blocker rows also record `copy_kind`, `source_value`,
+`destination_value`, `bytes_estimate`, and `safety_reason`. If a real source
+span is not available, producers must set `source_location_status` to
+`unavailable`, `generated`, or `internal` rather than inventing a file or line.
+
 ## Nonclaims
 
 The schema records report evidence. It makes no zero heap for all programs

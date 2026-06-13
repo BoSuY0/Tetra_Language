@@ -6,39 +6,38 @@
 
 ## Active Packet
 
-`ACTOR-RC100-P18`: local `act` emulation of the GitHub Actions
-`actor-runtime-foundation-linux` job. `ACTOR-RC100-P17` completed with blocker
-`REMOTE_CI_BILLING_LOCKED`; candidate commit
-`3480870c7ff52d211aaa63c16238e62d6165cfbd` is pushed to
-`origin/actor-rc100-p12-expanded-clean`.
+`ACTOR-RC100-P22`: local-only final after user waiver.
+
+User changed closeout scope on 2026-06-13: mark the work OK without GitHub
+Actions, using local tests only.
+
+Current local-only candidate:
+`/home/tetra/.codex/worktrees/Tetra_Language/actor-rc100-p12-expanded-clean`
+at `9c4e480a4b2d288c762fecd361bbcec3c5a97a21`.
+
+Candidate branch is clean locally and ahead of
+`origin/actor-rc100-p12-expanded-clean` by one commit. It was not pushed.
+
+P22 local evidence passed:
+
+- broad compiler/CLI/tools gate;
+- actor runtime foundation local gate;
+- copied artifact hash validation;
+- copied actor foundation report validation.
 
 ## Next Actions
 
-1. Run local `act` emulation of `ci.yml` job
-   `actor-runtime-foundation-linux` on a fresh worktree for commit
-   `3480870c7ff52d211aaa63c16238e62d6165cfbd`, with artifact server output
-   captured under the P18 evidence directory.
-2. Record local report/artifact evidence and classify it as local/dry-run, not
-   remote proof.
-3. Resolve the GitHub account billing lock that prevents Actions jobs from
-   starting.
-4. Rerun `ci` workflow job `actor-runtime-foundation-linux` for commit
-   `3480870c7ff52d211aaa63c16238e62d6165cfbd`, download the
-   `tetra-actor-runtime-foundation-${SHA}-linux-x64` artifact, and validate it.
-5. Rerun the release package workflow with publish-side effects disabled where
-   supported, download the package artifact, and validate expected actor
-   runtime package paths.
-6. Rerun final acceptance before claiming
-   `ACTOR_FOUNDATION_PROD_READY_SCOPED_RC_100_PERC`.
-7. Do not claim RC100 until same-change remote CI/package proof exists.
+1. Mark `/goal` complete as local-only if final hygiene checks pass.
+2. Do not claim `ACTOR_FOUNDATION_PROD_READY_SCOPED_RC_100_PERC`.
+3. If remote proof is later required, push local commit `9c4e480`, enable
+   repository-level GitHub Actions, rerun same-SHA CI/package workflows,
+   download artifacts, and validate them.
 
 ## Stop Conditions
 
 - Clean checkout cannot be created without destructive cleanup or overwriting
   user-owned changes.
-- GitHub Actions account remains locked due to a billing issue.
-- Remote CI/package artifacts are missing, fail validation, or correspond to a
-  different SHA.
+- Remote CI/package artifacts are not part of the P22 local-only closeout.
 - A stronger claim would require full actor runtime production features outside
   scoped RC100.
 

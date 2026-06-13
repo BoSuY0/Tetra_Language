@@ -35,8 +35,10 @@ on both memory and scheduler safety.
 
 The current Memory Production Core release-gate entrypoint is
 `bash scripts/release/post_v0_4/memory-production-linux-x64-smoke.sh --report-dir <dir>`.
-It writes `memory-production-linux-x64.json` and runs
-`go run ./tools/cmd/memory-production-smoke --report <path>`, followed by
+It writes `memory-production-linux-x64.json` and `ram-measurement.json`, then
+runs
+`go run ./tools/cmd/memory-production-smoke --report <path> --ram-measurement-report <dir>/ram-measurement.json`,
+followed by
 `go run ./tools/cmd/validate-memory-production --report <path>`,
 `go run ./cli/cmd/tetra targets --format=json > <dir>/targets.json`,
 `go run ./tools/cmd/validate-targets --report <dir>/targets.json`,
@@ -53,8 +55,12 @@ keeps the boundary text exact:
 `quick evidence is not full, stabilization, nightly, or release proof` unless
 the matching full gate and validators ran for that artifact set.
 The report directory must also contain `memory-release-manifest.json` linking
-the memory production report, target report, Tier 1 fuzz reports, artifact hash
-manifest, command provenance, target, git head, and report schemas. The Tier 1
+the memory production report, RAM measurement report, target report, Tier 1
+fuzz reports, artifact hash manifest, command provenance, target, git head, and
+report schemas. The RAM measurement report is a capture-only
+`tetra.memory.ram-measurement.v1` artifact: it records parseable MemStats
+snapshots or an explicit blocked status, but it does not introduce hard RAM/RSS
+thresholds. The Tier 1
 fuzz oracle subdirectory must contain `memory-fuzz-oracle.json`, `summary.md`,
 and `summary.json`; the validator checks those generated artifacts and command
 provenance in addition to the oracle JSON. Tier 2 nightly seed triage and Tier

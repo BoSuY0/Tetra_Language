@@ -1095,7 +1095,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				return nil, err
 			}
 			if !isSupportedActorStateScalarType(resolved) {
-				return nil, fmt.Errorf("%s: actor state field '%s' type '%s' is not supported in this MVP (supported: Int/Bool/UInt8/UInt16/task.error)", frontend.FormatPos(field.At), field.Name, resolved)
+				return nil, fmt.Errorf("%s: actor state field '%s' type '%s' is not supported; supported actor state field types are Int, Bool, UInt8, UInt16, and task.error", frontend.FormatPos(field.At), field.Name, resolved)
 			}
 			fieldSlots := fieldType.SlotCount
 			if fieldSlots <= 0 {
@@ -1109,7 +1109,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			}
 			initType, initValue, ok := evaluateActorStateInitializer(field.Init)
 			if !ok {
-				return nil, fmt.Errorf("%s: actor state field '%s' initializer must be a compile-time constant i32/bool", frontend.FormatPos(field.At), field.Name)
+				return nil, fmt.Errorf("%s: actor state field '%s' initializer must be a compile-time constant Int/Bool expression", frontend.FormatPos(field.At), field.Name)
 			}
 			if !typesCompatible(resolved, initType) {
 				return nil, fmt.Errorf("%s: actor state field '%s' type mismatch: expected '%s', got '%s'", frontend.FormatPos(field.At), field.Name, resolved, initType)

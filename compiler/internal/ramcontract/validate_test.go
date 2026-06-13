@@ -159,6 +159,7 @@ func TestRAMContractFromAllocPlanTracksRowsAndBlockers(t *testing.T) {
 			Allocations: []allocplan.Allocation{{
 				SiteID:                "site:main:heap",
 				ValueID:               "heap",
+				Source:                "fixtures/main.tetra:7:13",
 				Escape:                allocplan.EscapeUnknown,
 				Storage:               allocplan.StorageStack,
 				PlannedStorage:        allocplan.StorageStack,
@@ -181,6 +182,82 @@ func TestRAMContractFromAllocPlanTracksRowsAndBlockers(t *testing.T) {
 	}
 	if report.Summary.HeapRows != 1 || report.Summary.UnboundedRows != 1 || report.Summary.ArtifactGrade != GradeM5 {
 		t.Fatalf("summary = %#v, want heap/unbounded M5 summary", report.Summary)
+	}
+}
+
+func TestRAMContractHeapBlockerReportCarriesActionableSourceMetadata(t *testing.T) {
+	plan := &allocplan.Plan{
+		Functions: []allocplan.FunctionPlan{{
+			Name: "main",
+			Allocations: []allocplan.Allocation{{
+				SiteID:                "site:main:heap",
+				ValueID:               "heap",
+				Source:                "fixtures/main.tetra:7:13",
+				Escape:                allocplan.EscapeUnknown,
+				Storage:               allocplan.StorageStack,
+				PlannedStorage:        allocplan.StorageStack,
+				ActualLoweringStorage: allocplan.StorageHeap,
+				Reason:                "backend conservative heap fallback",
+				ValidationStatus:      "validated_conservative",
+			}},
+		}},
+	}
+	report := BuildReportFromAllocPlan(plan, "linux-x64", "e2c19b8ee276158f8eb2c54cf61e11bd84952893", "test")
+	blockers := BuildHeapBlockerReport(report)
+	if err := ValidateBlockerReport(blockers, "heap"); err != nil {
+		t.Fatalf("ValidateBlockerReport: %v", err)
+	}
+	if len(blockers.Rows) != 1 {
+		t.Fatalf("heap blocker rows = %d, want 1", len(blockers.Rows))
+	}
+	row := blockers.Rows[0]
+	if row.File != "fixtures/main.tetra" || row.Line != 7 || row.SourceLocationStatus != "available" {
+		t.Fatalf("source metadata = file %q line %d status %q, want fixtures/main.tetra:7 available", row.File, row.Line, row.SourceLocationStatus)
+	}
+	if row.Symbol != "main" || row.Severity == "" || row.Reason == "" || row.SuggestedFix == "" || row.EvidenceID == "" {
+		t.Fatalf("row missing actionable metadata: %#v", row)
+	}
+	if row.SafeToOptimize {
+		t.Fatalf("heap blocker safe_to_optimize = true, want conservative false")
+	}
+}
+
+func TestRAMContractCopyBlockerReportClassifiesCopySafety(t *testing.T) {
+	report := validReportForTest()
+	report.Rows = []Row{{
+		SiteID:           "site:main:copy",
+		ValueID:          "copy",
+		Function:         "main",
+		SourceSpan:       "fixtures/copy.tetra:9:17",
+		Intent:           IntentCopyHeapBounded,
+		RequestedBytes:   64,
+		Bounded:          true,
+		Owner:            "function:main",
+		Lifetime:         "function:main",
+		EscapeStatus:     EscapeNoEscape,
+		Placement:        PlacementHeapBounded,
+		ProofIDs:         nil,
+		Blockers:         []string{"backend_conservative_heap_fallback"},
+		CopyReason:       "copy_requires_bounded_heap_fallback",
+		ContractGrade:    GradeM4,
+		ValidationStatus: ValidationConservative,
+		SourceFactID:     "fact:ram:site:main:copy",
+	}}
+	report.Summary = SummarizeRows(report.Rows)
+	report.Functions = SummarizeFunctions(report.Rows)
+	blockers := BuildCopyBlockerReport(report)
+	if err := ValidateBlockerReport(blockers, "copy"); err != nil {
+		t.Fatalf("ValidateBlockerReport: %v", err)
+	}
+	if len(blockers.Rows) != 1 {
+		t.Fatalf("copy blocker rows = %d, want 1", len(blockers.Rows))
+	}
+	row := blockers.Rows[0]
+	if row.CopyKind != "HOT_PATH_COPY" || row.SourceValue != "copy" || row.DestinationValue != "heap_bounded" || row.BytesEstimate != 64 {
+		t.Fatalf("copy classification = %#v, want HOT_PATH_COPY copy -> heap_bounded bytes 64", row)
+	}
+	if row.SafetyReason == "" || row.SuggestedFix == "" || row.SafeToOptimize {
+		t.Fatalf("copy safety metadata = safety_reason %q suggested_fix %q safe %v, want conservative action guidance", row.SafetyReason, row.SuggestedFix, row.SafeToOptimize)
 	}
 }
 

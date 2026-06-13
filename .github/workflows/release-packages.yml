@@ -10,6 +10,11 @@ on:
         description: "Release version, e.g. v0.4.0"
         required: true
         default: "v0.4.0"
+      dry_run:
+        description: "Build packages and release evidence without creating a GitHub Release, pushing GHCR, or updating Homebrew"
+        required: true
+        type: boolean
+        default: true
       update_homebrew_tap:
         description: "Commit Formula/tetra.rb to the Homebrew tap repository"
         required: true
@@ -41,6 +46,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       HOMEBREW_TAP_REPOSITORY: ${{ inputs.homebrew_tap_repository || 'BoSuY0/homebrew-tetra' }}
       UPDATE_HOMEBREW_TAP: ${{ inputs.update_homebrew_tap && 'true' || 'false' }}
+      RELEASE_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -108,10 +114,21 @@ jobs:
           tar -xzf "$archive" -C "${{ steps.meta.outputs.out_dir }}/smoke"
           "${{ steps.meta.outputs.out_dir }}/smoke/tetra-${version}-linux-x64/bin/tetra" version
 
+      - name: Dry-run package proof
+        if: env.RELEASE_DRY_RUN == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "release-packages dry run: package build, smoke, release gates, and artifact upload will run; external publishing steps are skipped"
+
       - name: Memory production release gate
         shell: bash
         run: |
           set -euo pipefail
+          export GOTELEMETRY=off
+          export GOCACHE="${PWD}/.cache/go-build-memory-production-release"
+          export GOTMPDIR="${PWD}/.cache/go-tmp-memory-production-release"
+          mkdir -p "$GOCACHE" "$GOTMPDIR"
           report_dir="${{ steps.meta.outputs.out_dir }}/memory-production-linux-x64"
           bash scripts/release/post_v0_4/memory-production-linux-x64-smoke.sh --report-dir "$report_dir"
 
@@ -229,6 +246,7 @@ jobs:
             ${{ steps.meta.outputs.out_dir }}/memory-100-prod-stable/**
 
       - name: Create or update GitHub Release
+        if: env.RELEASE_DRY_RUN != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -269,8 +287,8 @@ jobs:
 
           {container_section}
           This release publishes the current v0.4.0 local compiler/tooling profile. Linux x64 is the release binary baseline; other runtime target claims remain gated by project evidence.
-          Package publishing for this workflow runs the Linux-x64 memory production release gate and uploads its `memory-production-linux-x64.json`, `targets.json`, and `artifact-hashes.json` evidence.
-          RAM Contract Compiler evidence runs the strict Linux-x64 RAM contract release gate before publishing and uploads its `ram-contract-report.json`, `memory-grade-report.json`, `proof-store-summary.json`, `validation-pipeline-coverage.json`, `heap-blockers.json`, `copy-blockers.json`, and `ram-contract-fuzz-oracle.json` evidence.
+          Package publishing for this workflow runs the Linux-x64 memory production release gate and uploads its `memory-production-linux-x64.json`, `memory-release-manifest.json`, `ram-measurement.json`, `targets.json`, and `artifact-hashes.json` evidence.
+          RAM Contract Compiler evidence runs the strict Linux-x64 RAM contract release gate before publishing and uploads its `ram-contract-release-manifest.json`, `ram-contract-report.json`, `memory-grade-report.json`, `proof-store-summary.json`, `validation-pipeline-coverage.json`, `heap-blockers.json`, `copy-blockers.json`, `fuzz/ram-contract-fuzz-oracle.json`, and `artifact-hashes.json` evidence.
           Memory production evidence remains Linux-x64 scoped unless a target-specific runtime gate says otherwise.
           Surface v1 product evidence runs the Surface product gate, experimental regression gate, safe-view lifetime gate, API stability gate, and final readiness validator before publishing.
           Integrated Memory/Islands/Surface evidence runs the strict integrated gate before publishing and uploads its `memory-islands-surface-production-manifest.json`, `artifact-hashes.json`, `islands-debug-smoke.json`, `island-proof-verifier.json`, and `island-proof-fuzz-summary.json` evidence.
@@ -308,7 +326,7 @@ jobs:
             .
 
       - name: Publish GHCR image
-        if: steps.meta.outputs.publish_container == 'true'
+        if: env.RELEASE_DRY_RUN != 'true' && steps.meta.outputs.publish_container == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -319,7 +337,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
 
       - name: Update Homebrew tap
-        if: env.UPDATE_HOMEBREW_TAP == 'true'
+        if: env.UPDATE_HOMEBREW_TAP == 'true' && env.RELEASE_DRY_RUN != 'true'
         shell: bash
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}

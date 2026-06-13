@@ -1,12 +1,12 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"strings"
+
+	"tetra_language/tools/internal/reportdecode"
 )
 
 type formatsReport struct {
@@ -51,9 +51,7 @@ func validateFormatsReport(raw []byte) error {
 }
 
 func decodeStrictJSON(raw []byte, out any) error {
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.DisallowUnknownFields()
-	return dec.Decode(out)
+	return reportdecode.DecodeStrict(raw, out)
 }
 
 func validateFormats(formats []formatEntry) error {

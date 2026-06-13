@@ -1,14 +1,14 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"os/exec"
 	"runtime"
 	"strings"
+
+	"tetra_language/tools/internal/reportdecode"
 )
 
 type targetsReport struct {
@@ -135,9 +135,7 @@ func validateTargetsReport(raw []byte) error {
 }
 
 func decodeStrictJSON(raw []byte, out any) error {
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.DisallowUnknownFields()
-	return dec.Decode(out)
+	return reportdecode.DecodeStrict(raw, out)
 }
 
 func validateTargetList(name string, got []string, want []string) error {

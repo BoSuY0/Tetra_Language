@@ -4,6 +4,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"tetra_language/internal/toon"
 )
 
 func TestReadTargetsReportDefaultsToTargetsCommand(t *testing.T) {
@@ -13,6 +15,20 @@ func TestReadTargetsReportDefaultsToTargetsCommand(t *testing.T) {
 	}
 	if err := validateTargetsReport(raw); err != nil {
 		t.Fatalf("validate default targets report: %v", err)
+	}
+}
+
+func TestValidateTargetsReportAcceptsTOON(t *testing.T) {
+	rawJSON, err := readTargetsReport("")
+	if err != nil {
+		t.Fatalf("read default targets report: %v", err)
+	}
+	rawTOON, err := toon.ConvertJSONToTOON(rawJSON, toon.Options{Deterministic: true, Strict: true})
+	if err != nil {
+		t.Fatalf("json->toon: %v", err)
+	}
+	if err := validateTargetsReport(rawTOON); err != nil {
+		t.Fatalf("validate targets TOON: %v\n%s", err, rawTOON)
 	}
 }
 

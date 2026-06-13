@@ -251,7 +251,7 @@ func PrototypeBenchmarks() ([]PrototypeBenchmark, error) {
 			Unit:               "prep_only",
 			Evidence:           "compiler/internal/parallelrt ErrMailboxFull and blocking_recv_yield metadata define the local backpressure latency diagnostic candidate",
 			ClaimTier:          "tier0_local_smoke_only",
-			Claim:              "Actor backpressure latency benchmark prep row exists as Tier 0 local smoke only; no real-world SLA or latency advantage is claimed.",
+			Claim:              "Actor backpressure latency benchmark prep row exists as Tier 0 local smoke only; no real-world SLA is claimed.",
 			RawOutputArtifacts: []string{rawArtifact},
 			Ran:                false,
 			Pass:               true,

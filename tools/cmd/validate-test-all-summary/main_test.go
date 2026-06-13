@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"tetra_language/internal/toon"
 )
 
 func TestValidateTestAllSummaryAcceptsPassingReport(t *testing.T) {
@@ -30,6 +32,35 @@ func TestValidateTestAllSummaryAcceptsPassingReport(t *testing.T) {
 	out, err := runSummaryValidator(t, dir)
 	if err != nil {
 		t.Fatalf("validator failed: %v\n%s", err, out)
+	}
+}
+
+func TestValidateTestAllSummaryAcceptsTOONReport(t *testing.T) {
+	dir := makeSummaryReport(t, `{
+  "mode": "quick",
+  "status": "pass",
+  "started_at": "2026-04-25T13:00:00Z",
+  "ended_at": "2026-04-25T13:00:01Z",
+  "step_count": 3,
+  "failed_count": 0,
+  "release_version": "v0.2.0",
+  "release_artifact": "tetra.release.v0_2_0.test-all-summary.v1",
+  "steps": [
+    {"name":"go test all packages","status":"pass","duration_seconds":0,"exit_code":0,"command":"go test","log":"logs/01-step.log"},
+    {"name":"json diagnostic shape","status":"pass","duration_seconds":1,"exit_code":0,"command":"check_json_diagnostic","log":"logs/02-step.log"},
+    {"name":"host smoke linux-x64","status":"pass","duration_seconds":1,"exit_code":0,"command":"check_host_smoke","log":"logs/03-step.log"}
+  ]
+}`)
+	raw, err := os.ReadFile(filepath.Join(dir, "summary.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	toonRaw, err := toon.ConvertJSONToTOON(raw, toon.Options{Deterministic: true, Strict: true})
+	if err != nil {
+		t.Fatalf("convert summary to TOON: %v", err)
+	}
+	if err := validateTestAllSummaryFormat(toonRaw, dir, "toon"); err != nil {
+		t.Fatalf("validate TOON summary: %v\n%s", err, toonRaw)
 	}
 }
 

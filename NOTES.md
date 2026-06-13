@@ -172,10 +172,64 @@
   `ci-artifacts.json` has `total_count=0`, and downloading
   `tetra-actor-runtime-foundation-3480870c7ff52d211aaa63c16238e62d6165cfbd-linux-x64`
   failed with `no valid artifacts found to download`.
+- P18 local `act` evidence is green for
+  `2482fc72805730b665f18c1be398aad7fcdb839b`, and real remote CI actor
+  foundation evidence is green for
+  `8b94c80917d5aa97178eef63f8727029924d9ff3`. Both are useful evidence but
+  cannot be combined into the final scoped RC100 claim because the plan requires
+  one clean release-candidate checkout at one exact commit.
+- Current pushed candidate branch is
+  `origin/actor-rc100-p12-expanded-clean` at
+  `e80d68f011b9c145e536bb704dedd16a9bc71e33`; the candidate worktree is clean.
+- P19 enabled `ci.yml` and `release-packages.yml`, dispatched CI run
+  `27459960470` and release package dry-run run `27459960966` on the same
+  `e80d68f0` branch head. Both runs remain queued with `jobs=[]` because
+  repository Actions permissions report
+  `{"enabled":false,"sha_pinning_required":false}`. Evidence:
+  `reports/actor-foundation-prod-ready-scoped-rc-100/P19-same-sha-remote-package-proof/summary.md`.
+- P20 rechecked the same P19 runs and blocker: repository Actions permissions
+  still report `{"enabled":false,"sha_pinning_required":false}`; CI run
+  `27459960470` and release package dry-run run `27459960966` both remain
+  queued at `e80d68f011b9c145e536bb704dedd16a9bc71e33`, with no jobs and no
+  artifacts. Evidence:
+  `reports/actor-foundation-prod-ready-scoped-rc-100/P20-actions-disabled-recheck/summary.md`.
+- Blocked audit count after P20: same repository-level Actions disabled
+  blocker has repeated for the second consecutive continuation after P19. If
+  the next resumed goal turn rechecks and sees the same condition, the strict
+  blocked threshold is satisfied.
+- P20 package proof contract from read-only audit: after Actions execution is
+  enabled, the same-SHA release package dry-run artifact should be
+  `tetra-v0.4.0-e80d68f011b9c145e536bb704dedd16a9bc71e33-release-packages`
+  and include `actor-runtime-foundation-linux-x64/**`; dry-run proof must not
+  be described as publication success.
+- P21 rechecked the same P19/P20 blocker: repository Actions permissions still
+  report `{"enabled":false,"sha_pinning_required":false}`; CI run
+  `27459960470` and release package dry-run run `27459960966` remain queued at
+  `e80d68f011b9c145e536bb704dedd16a9bc71e33`, with no jobs and no artifacts.
+  Evidence:
+  `reports/actor-foundation-prod-ready-scoped-rc-100/P21-actions-disabled-blocked-final/summary.md`.
+- Blocked audit count after P21: same repository-level Actions disabled
+  blocker has repeated for the third consecutive continuation after P19/P20.
+  Strict blocked threshold is satisfied; goal status should be `blocked`.
+- User changed closeout scope on 2026-06-13: mark the work OK without GitHub
+  Actions, using local tests only. P22 local-only verdict is
+  `LOCAL_ONLY_OK_GITHUB_ACTIONS_WAIVED`; it does not claim remote
+  `ACTOR_FOUNDATION_PROD_READY_SCOPED_RC_100_PERC`.
+- P22 made one local candidate commit:
+  `9c4e480a4b2d288c762fecd361bbcec3c5a97a21`
+  (`Tighten headless Wayland temp cleanup`) in
+  `/home/tetra/.codex/worktrees/Tetra_Language/actor-rc100-p12-expanded-clean`.
+  The branch is clean locally and ahead of origin by one commit; it was not
+  pushed.
+- P22 local evidence passed: `broad-final-clean-head-status.tsv`,
+  `actor-foundation-gate-rerun-status.tsv`,
+  `validate-artifact-hashes-status.tsv`, and
+  `validate-actor-runtime-foundation-status.tsv` under
+  `reports/actor-foundation-prod-ready-scoped-rc-100/P22-local-only-final/`.
 
 ## Active Bridge
 
-- Scoped RC packets plus P13 clean broad-green candidate are complete. P17
-  proved same-change commit/push, but same-change remote CI/package proof is
-  blocked by GitHub account billing lock. The target remains unclaimed until
-  billing is resolved and the workflows produce downloadable artifacts.
+- Scoped RC packets plus P22 local-only closeout are complete under the user's
+  revised local-tests-only acceptance. The target remote RC100 verdict remains
+  unclaimed because GitHub Actions jobs/artifacts and release-package dry-run
+  artifacts are not verified.

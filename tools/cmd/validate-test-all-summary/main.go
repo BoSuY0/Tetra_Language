@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -10,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"tetra_language/tools/internal/reportdecode"
 )
 
 type testAllSummary struct {
@@ -36,8 +36,10 @@ type testAllStep struct {
 func main() {
 	var summaryPath string
 	var reportDir string
-	flag.StringVar(&summaryPath, "summary", "", "path to scripts/ci/test-all.sh summary.json")
+	var format string
+	flag.StringVar(&summaryPath, "summary", "", "path to scripts/ci/test-all.sh summary report")
 	flag.StringVar(&reportDir, "report-dir", "", "report directory containing logs")
+	flag.StringVar(&format, "format", "auto", "summary format: auto, json, or toon")
 	flag.Parse()
 
 	if summaryPath == "" {
@@ -52,15 +54,19 @@ func main() {
 	if reportDir == "" {
 		reportDir = filepath.Dir(summaryPath)
 	}
-	if err := validateTestAllSummary(raw, reportDir); err != nil {
+	if err := validateTestAllSummaryFormat(raw, reportDir, format); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
 func validateTestAllSummary(raw []byte, reportDir string) error {
+	return validateTestAllSummaryFormat(raw, reportDir, "auto")
+}
+
+func validateTestAllSummaryFormat(raw []byte, reportDir string, format string) error {
 	var summary testAllSummary
-	if err := decodeStrictJSON(raw, &summary); err != nil {
+	if err := reportdecode.DecodeStrictFormat(raw, format, &summary); err != nil {
 		return err
 	}
 	switch summary.Mode {
@@ -179,12 +185,6 @@ func expectedTestAllSummaryArtifact(version string) string {
 	slug := strings.TrimPrefix(version, "v")
 	slug = strings.ReplaceAll(slug, ".", "_")
 	return "tetra.release.v" + slug + ".test-all-summary.v1"
-}
-
-func decodeStrictJSON(raw []byte, out any) error {
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.DisallowUnknownFields()
-	return dec.Decode(out)
 }
 
 func validateStep(step testAllStep, reportDir string, expectedIndex int) error {

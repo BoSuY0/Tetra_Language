@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"tetra_language/compiler"
+	"tetra_language/internal/toon"
 )
 
 func stubLookPath(fn func(string) (string, error)) func() {
@@ -67,6 +68,27 @@ func runCLIJSONDiagnostic(t *testing.T, args []string, wantExit int) cliJSONDiag
 	return diag
 }
 
+func runCLITOONDiagnostic(t *testing.T, args []string, wantExit int) cliJSONDiagnostic {
+	t.Helper()
+	var stdout, stderr bytes.Buffer
+	code := runCLI(args, &stdout, &stderr)
+	if code != wantExit {
+		t.Fatalf("exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if strings.TrimSpace(stdout.String()) != "" {
+		t.Fatalf("expected empty stdout for TOON diagnostic, stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+	jsonData, err := toon.ConvertTOONToJSON(stderr.Bytes(), toon.Options{Strict: true})
+	if err != nil {
+		t.Fatalf("toon diagnostic: %v\n%s", err, stderr.String())
+	}
+	var diag cliJSONDiagnostic
+	if err := json.Unmarshal(jsonData, &diag); err != nil {
+		t.Fatalf("toon->json diagnostic: %v\nTOON:\n%s\nJSON:\n%s", err, stderr.String(), jsonData)
+	}
+	return diag
+}
+
 func runCLIJSONStdout(t *testing.T, args []string, wantExit int, out any) string {
 	t.Helper()
 	var stdout, stderr bytes.Buffer
@@ -76,6 +98,23 @@ func runCLIJSONStdout(t *testing.T, args []string, wantExit int, out any) string
 	}
 	if err := json.Unmarshal(stdout.Bytes(), out); err != nil {
 		t.Fatalf("json stdout: %v\n%s", err, stdout.String())
+	}
+	return stdout.String()
+}
+
+func runCLITOONStdout(t *testing.T, args []string, wantExit int, out any) string {
+	t.Helper()
+	var stdout, stderr bytes.Buffer
+	code := runCLI(args, &stdout, &stderr)
+	if code != wantExit {
+		t.Fatalf("exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	jsonData, err := toon.ConvertTOONToJSON(stdout.Bytes(), toon.Options{Strict: true})
+	if err != nil {
+		t.Fatalf("toon stdout: %v\n%s", err, stdout.String())
+	}
+	if err := json.Unmarshal(jsonData, out); err != nil {
+		t.Fatalf("toon->json stdout: %v\nTOON:\n%s\nJSON:\n%s", err, stdout.String(), jsonData)
 	}
 	return stdout.String()
 }

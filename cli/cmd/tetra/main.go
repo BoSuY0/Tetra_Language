@@ -19,6 +19,7 @@ import (
 
 	"tetra_language/compiler"
 	ctarget "tetra_language/compiler/target"
+	"tetra_language/internal/outputformat"
 )
 
 var commandLookPath = exec.LookPath
@@ -146,7 +147,7 @@ func runBuild(args []string, stdout io.Writer, stderr io.Writer) int {
 	runtimeObject := fs.String("runtime-object", "", "actors runtime object override")
 	jobs := fs.Int("jobs", 1, "parallel module build jobs")
 	artifactsMode := fs.String("artifacts", "strict", "artifact handling: strict or auto")
-	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text or json")
+	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text, json, or toon")
 	var linkObjects multiFlag
 	fs.Var(&linkObjects, "link-object", "extra TOBJ object to link")
 	if err := fs.Parse(args); err != nil {
@@ -364,7 +365,7 @@ func runRun(args []string, stdout io.Writer, stderr io.Writer) int {
 	runtimeMode := fs.String("runtime", "auto", "actors runtime: auto, selfhost, or builtin")
 	runtimeObject := fs.String("runtime-object", "", "actors runtime object override")
 	jobs := fs.Int("jobs", 1, "parallel module build jobs")
-	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text or json")
+	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text, json, or toon")
 	var linkObjects multiFlag
 	fs.Var(&linkObjects, "link-object", "extra TOBJ object to link")
 	if err := fs.Parse(args); err != nil {
@@ -979,16 +980,16 @@ func writeJSON(path string, value any) error {
 }
 
 func writeDiagnostic(w io.Writer, mode string, err error) {
-	if mode == "json" {
-		writeDiagnosticObject(w, compiler.DiagnosticFromError(err))
+	if outputformat.Structured(mode) {
+		writeDiagnosticObject(w, mode, compiler.DiagnosticFromError(err))
 		return
 	}
 	fmt.Fprintln(w, err)
 }
 
 func writeDiagnosticWithHint(w io.Writer, mode string, message string, hint string) {
-	if mode == "json" {
-		writeDiagnosticObject(w, compiler.Diagnostic{
+	if outputformat.Structured(mode) {
+		writeDiagnosticObject(w, mode, compiler.Diagnostic{
 			Code:     compiler.DiagnosticCodeParse,
 			Message:  message,
 			Severity: "error",
@@ -1000,8 +1001,8 @@ func writeDiagnosticWithHint(w io.Writer, mode string, message string, hint stri
 }
 
 func writeTargetRuntimeDiagnostic(w io.Writer, mode string, message string) {
-	if mode == "json" {
-		writeDiagnosticObject(w, compiler.Diagnostic{
+	if outputformat.Structured(mode) {
+		writeDiagnosticObject(w, mode, compiler.Diagnostic{
 			Code:     compiler.DiagnosticCodeTargetRuntime,
 			Message:  message,
 			Severity: "error",
@@ -1035,17 +1036,16 @@ func writeValidationDiagnostic(w io.Writer, mode string, message string) {
 }
 
 func validateDiagnosticsMode(w io.Writer, mode string) bool {
-	if mode == "text" || mode == "json" {
+	if mode == "text" || outputformat.Structured(mode) {
 		return true
 	}
 	fmt.Fprintln(w, "unsupported --diagnostics format")
 	return false
 }
 
-func writeDiagnosticObject(w io.Writer, diag compiler.Diagnostic) {
-	raw, err := json.Marshal(diag)
-	if err == nil {
-		fmt.Fprintln(w, string(raw))
+func writeDiagnosticObject(w io.Writer, mode string, diag compiler.Diagnostic) {
+	if err := outputformat.WriteStructured(w, mode, diag); err != nil {
+		fmt.Fprintln(w, err)
 	}
 }
 

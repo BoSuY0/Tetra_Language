@@ -14,7 +14,7 @@ func runDoc(args []string, stdout io.Writer, stderr io.Writer) int {
 	fs := flag.NewFlagSet("doc", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	outPath := fs.String("o", "", "output markdown path; stdout when empty")
-	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text or json")
+	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text, json, or toon")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			return 0
@@ -60,7 +60,7 @@ func runCheck(args []string, stdout io.Writer, stderr io.Writer) int {
 	fs := flag.NewFlagSet("check", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	interfaceOnly := fs.Bool("interface-only", false, "check interface/API surface without requiring executable output")
-	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text or json")
+	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text, json, or toon")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			return 0
@@ -109,7 +109,7 @@ func runFmt(args []string, stdout io.Writer, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	check := fs.Bool("check", false, "check whether files are formatted")
 	write := fs.Bool("write", false, "rewrite files in place")
-	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text or json")
+	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text, json, or toon")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			return 0
@@ -152,9 +152,9 @@ func runFmt(args []string, stdout io.Writer, stderr io.Writer) int {
 		if *check {
 			if string(raw) != string(formatted) {
 				dirty = true
-				if *diagnostics == "json" {
+				if *diagnostics == "json" || *diagnostics == "toon" {
 					line, column := firstFormatterDiffPosition(raw, formatted)
-					writeDiagnosticObject(stderr, compiler.Diagnostic{
+					writeDiagnosticObject(stderr, *diagnostics, compiler.Diagnostic{
 						Code:     compiler.DiagnosticCodeFormatterCheck,
 						Message:  "not formatted",
 						File:     path,

@@ -191,13 +191,28 @@ type BlockerReport struct {
 }
 
 type BlockerRow struct {
-	SiteID        string      `json:"site_id"`
-	Function      string      `json:"function"`
-	Intent        Intent      `json:"intent"`
-	Placement     Placement   `json:"placement"`
-	Blockers      []string    `json:"blockers,omitempty"`
-	CopyReason    string      `json:"copy_reason,omitempty"`
-	ContractGrade MemoryGrade `json:"contract_grade"`
+	SiteID               string      `json:"site_id"`
+	Function             string      `json:"function"`
+	Intent               Intent      `json:"intent"`
+	Placement            Placement   `json:"placement"`
+	Blockers             []string    `json:"blockers,omitempty"`
+	CopyReason           string      `json:"copy_reason,omitempty"`
+	ContractGrade        MemoryGrade `json:"contract_grade"`
+	File                 string      `json:"file,omitempty"`
+	Line                 int         `json:"line,omitempty"`
+	Symbol               string      `json:"symbol,omitempty"`
+	SourceLocationStatus string      `json:"source_location_status"`
+	Severity             string      `json:"severity"`
+	Reason               string      `json:"reason"`
+	SuggestedFix         string      `json:"suggested_fix"`
+	ProofID              string      `json:"proof_id,omitempty"`
+	EvidenceID           string      `json:"evidence_id"`
+	SafeToOptimize       bool        `json:"safe_to_optimize"`
+	CopyKind             string      `json:"copy_kind,omitempty"`
+	SourceValue          string      `json:"source_value,omitempty"`
+	DestinationValue     string      `json:"destination_value,omitempty"`
+	BytesEstimate        int64       `json:"bytes_estimate,omitempty"`
+	SafetyReason         string      `json:"safety_reason,omitempty"`
 }
 
 func nowRFC3339() string {

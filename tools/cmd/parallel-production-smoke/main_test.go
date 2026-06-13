@@ -148,6 +148,38 @@ func TestRequiredPassingCasesIncludeParallelEdgeCases(t *testing.T) {
 	}
 }
 
+func TestRequiredPassingCasesRecordBoundedStressMetadata(t *testing.T) {
+	cases := requiredPassingCases()
+	want := map[string]struct {
+		iterations int
+		seed       string
+	}{
+		"actor fanout mailbox drain soak": {iterations: 512, seed: "actor-fanout-mailbox-drain-v1"},
+		"many tasks stress":               {iterations: 64, seed: "task-bounded-stress-seed-17"},
+		"many actor messages stress":      {iterations: 256, seed: "actors-tagged-stress-v1"},
+		"cancellation storm":              {iterations: 16, seed: "parallel-cancellation-storm-v1"},
+		"timeouts stress":                 {iterations: 1, seed: "deadline-aware-waits-v1"},
+	}
+	for name, expected := range want {
+		c, ok := caseByName(cases, name)
+		if !ok {
+			t.Fatalf("requiredPassingCases missing stress case %q", name)
+		}
+		if c.Kind != "stress" {
+			t.Fatalf("%s kind = %q, want stress", name, c.Kind)
+		}
+		if c.Iterations != expected.iterations {
+			t.Fatalf("%s iterations = %d, want %d", name, c.Iterations, expected.iterations)
+		}
+		if c.DeterministicSeed != expected.seed {
+			t.Fatalf("%s deterministic_seed = %q, want %q", name, c.DeterministicSeed, expected.seed)
+		}
+		if c.MaxDurationMS <= 0 {
+			t.Fatalf("%s max_duration_ms = %d, want positive bound", name, c.MaxDurationMS)
+		}
+	}
+}
+
 func hasCase(cases []parallelprod.CaseReport, name string) bool {
 	for _, c := range cases {
 		if c.Name == name {
@@ -155,6 +187,15 @@ func hasCase(cases []parallelprod.CaseReport, name string) bool {
 		}
 	}
 	return false
+}
+
+func caseByName(cases []parallelprod.CaseReport, name string) (parallelprod.CaseReport, bool) {
+	for _, c := range cases {
+		if c.Name == name {
+			return c, true
+		}
+	}
+	return parallelprod.CaseReport{}, false
 }
 
 type benchmarkPrepRow struct {

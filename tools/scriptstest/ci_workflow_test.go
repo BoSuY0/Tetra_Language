@@ -241,12 +241,17 @@ func TestCIWorkflowIncludesActorRuntimeFoundationGateJob(t *testing.T) {
 		t.Fatalf("read ci workflow: %v", err)
 	}
 	text := string(raw)
+	section := workflowJobSection(text, "actor-runtime-foundation-linux:")
+	if section == "" {
+		t.Fatalf("ci workflow missing actor-runtime-foundation-linux job")
+	}
 	for _, want := range []string{
 		"actor-runtime-foundation-linux:",
 		"github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'",
 		"runs-on: ubuntu-latest",
 		"timeout-minutes: 120",
 		"actions/checkout@v4",
+		"fetch-depth: 2",
 		"actions/setup-go@v5",
 		"go-version: \"1.25.x\"",
 		"name: Bootstrap",
@@ -265,11 +270,10 @@ func TestCIWorkflowIncludesActorRuntimeFoundationGateJob(t *testing.T) {
 		"reports/actor-runtime-foundation/final/parallel-production-linux-x64/artifact-hashes.json",
 		"reports/actor-runtime-foundation/final/logs/*.log",
 	} {
-		if !strings.Contains(text, want) {
+		if !strings.Contains(section, want) {
 			t.Fatalf("ci workflow missing actor runtime foundation detail %q", want)
 		}
 	}
-	section := workflowJobSection(text, "actor-runtime-foundation-linux:")
 	assertOrderedFragments(t, section,
 		"name: Actor runtime foundation gate",
 		"bash scripts/release/post_v0_4/actor-runtime-foundation-linux-x64-gate.sh --report-dir reports/actor-runtime-foundation/final",

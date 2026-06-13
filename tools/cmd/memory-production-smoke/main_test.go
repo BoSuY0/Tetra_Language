@@ -1,10 +1,14 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"tetra_language/tools/validators/memoryprod"
 )
@@ -24,6 +28,96 @@ func TestBuildReportProducesValidMemoryProductionEvidence(t *testing.T) {
 	}
 	if err := memoryprod.ValidateReport(raw); err != nil {
 		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
+	}
+}
+
+func TestSmokeRunnerWriteReportStreamsValidatedReport(t *testing.T) {
+	exit0 := 0
+	reportPath := filepath.Join(t.TempDir(), "memory-production-linux-x64.json")
+	r := &smokeRunner{
+		opt: smokeOptions{ReportPath: reportPath, GitHead: "0123456789abcdef0123456789abcdef01234567"},
+		processes: []memoryprod.ProcessReport{
+			{Name: "tetra build", Kind: "build", Path: "go build ./cli/cmd/tetra", Ran: true, Pass: true, ExitCode: &exit0},
+			{Name: "memory smoke app", Kind: "app", Path: "examples/core_memory_smoke", Ran: true, Pass: true, ExitCode: &exit0},
+			{Name: "memory stress", Kind: "stress", Path: "tools/cmd/memory-production-smoke", Ran: true, Pass: true, ExitCode: &exit0},
+			{Name: "actornet close-without-cancel leak coverage", Kind: "stress", Path: "go test -buildvcs=false ./cli/internal/actornet -run TestBrokerCloseWithoutCancelStopsServeWatcher -count=1", Ran: true, Pass: true, ExitCode: &exit0},
+			{Name: "compiler resource finalization diagnostics", Kind: "stress", Path: "go test -buildvcs=false ./compiler/tests/runtime -run ^(TestTaskHandleFinalization|TestTaskGroupFinalization|TestIslandFinalization) -count=1", Ran: true, Pass: true, ExitCode: &exit0},
+		},
+		benchmarks: requiredPassingBenchmarks(),
+		cases:      requiredPassingCases(),
+	}
+	if err := r.writeReport(); err != nil {
+		t.Fatalf("writeReport: %v", err)
+	}
+	raw, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatalf("read report: %v", err)
+	}
+	if !strings.HasSuffix(string(raw), "\n") {
+		t.Fatalf("written report should end with newline")
+	}
+	if err := memoryprod.ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed for streamed report: %v\n%s", err, raw)
+	}
+}
+
+func TestWriteMemoryProductionJSONFileKeepsIndentedJSONFormat(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "report.json")
+	value := struct {
+		Schema string   `json:"schema"`
+		Rows   []string `json:"rows"`
+	}{
+		Schema: "tetra.test.schema.v1",
+		Rows:   []string{"one", "two"},
+	}
+	if err := writeMemoryProductionJSONFile(path, value); err != nil {
+		t.Fatalf("writeMemoryProductionJSONFile: %v", err)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read written json: %v", err)
+	}
+	want := "{\n  \"schema\": \"tetra.test.schema.v1\",\n  \"rows\": [\n    \"one\",\n    \"two\"\n  ]\n}\n"
+	if string(raw) != want {
+		t.Fatalf("written JSON = %q, want %q", raw, want)
+	}
+}
+
+func TestWriteRAMMeasurementReportCapturesMemStatsSnapshots(t *testing.T) {
+	reportPath := filepath.Join(t.TempDir(), "ram-measurement.json")
+	r := &smokeRunner{
+		opt: smokeOptions{
+			RAMMeasurementPath: reportPath,
+			GitHead:            "0123456789abcdef0123456789abcdef01234567",
+		},
+	}
+	r.recordRAMSnapshot("start")
+	r.recordRAMSnapshot("end")
+	if err := r.writeRAMMeasurementReport(); err != nil {
+		t.Fatalf("writeRAMMeasurementReport: %v", err)
+	}
+	raw, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatalf("read RAM measurement report: %v", err)
+	}
+	var report ramMeasurementReport
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("decode RAM measurement report: %v\n%s", err, raw)
+	}
+	if report.Schema != ramMeasurementSchema {
+		t.Fatalf("schema = %q, want %q", report.Schema, ramMeasurementSchema)
+	}
+	if report.Status != "pass" || report.EvidenceClass != "runtime_measured" || report.Method != "MemStats" {
+		t.Fatalf("classification = status %q evidence_class %q method %q", report.Status, report.EvidenceClass, report.Method)
+	}
+	if len(report.Snapshots) != 2 {
+		t.Fatalf("snapshots = %d, want 2", len(report.Snapshots))
+	}
+	if report.Snapshots[0].Name != "start" || report.Snapshots[1].Name != "end" {
+		t.Fatalf("snapshot names = %#v", report.Snapshots)
+	}
+	if report.Snapshots[0].SysBytes == 0 || report.Snapshots[1].HeapSysBytes == 0 {
+		t.Fatalf("snapshots missing MemStats byte values: %#v", report.Snapshots)
 	}
 }
 
@@ -344,19 +438,83 @@ func TestValidateRawSliceGatewayCorrelationAcceptsRuntimeAndReportEvidence(t *te
 	}
 }
 
+func TestRunCommandKeepsBoundedOutputTailForSpam(t *testing.T) {
+	res := runCommand(context.Background(), 5*time.Second, os.Args[0], "-test.run=TestMemoryProductionSmokeHelperProcess", "--", "spam-output")
+	if res.err != nil || res.exitCode != 0 {
+		t.Fatalf("runCommand helper failed: exit=%d err=%v output=%q", res.exitCode, res.err, res.output)
+	}
+	if len(res.output) > 96*1024 {
+		t.Fatalf("runCommand output length = %d, want bounded tail <= 96KiB", len(res.output))
+	}
+	if !strings.Contains(res.output, "output truncated") {
+		t.Fatalf("runCommand output missing truncation marker; len=%d", len(res.output))
+	}
+	if strings.Contains(res.output, "spam-prefix") {
+		t.Fatalf("runCommand kept the beginning of spam output instead of tail")
+	}
+	if !strings.Contains(res.output, "spam-tail") {
+		t.Fatalf("runCommand output missing tail marker")
+	}
+}
+
+func TestMemoryProductionSmokeHelperProcess(t *testing.T) {
+	helperArg := ""
+	for i, arg := range os.Args {
+		if arg == "--" && i+1 < len(os.Args) {
+			helperArg = os.Args[i+1]
+			break
+		}
+	}
+	if helperArg != "spam-output" {
+		return
+	}
+	fmt.Fprintln(os.Stdout, "spam-prefix")
+	chunk := strings.Repeat("x", 1024)
+	for i := 0; i < 2048; i++ {
+		fmt.Fprint(os.Stdout, chunk)
+	}
+	fmt.Fprintln(os.Stdout, "spam-tail")
+	os.Exit(0)
+}
+
 func requiredPassingBenchmarks() []memoryprod.BenchmarkReport {
 	return []memoryprod.BenchmarkReport{{
 		Name:             "small heap allocation syscall reduction",
 		Kind:             "allocator",
 		Metric:           "estimated_os_syscalls",
 		Unit:             "syscalls",
+		EvidenceClass:    "allocation_report_estimate",
+		Method:           "allocation_report_summary",
 		BaselineValue:    64,
 		MeasuredValue:    1,
 		ImprovementRatio: 64,
-		Evidence:         "allocation report schema v2 shows 64 per_core_small_heap rows with same_core_same_size_class_free_list reuse policy inside one 64KiB chunk refill",
+		Evidence:         "allocation report schema v2 estimates 64 per_core_small_heap allocation intents inside one 64KiB chunk refill; allocation_report_estimate only, not a runtime measurement",
 		Ran:              true,
 		Pass:             true,
 	}}
+}
+
+func TestRequiredPassingBenchmarksClassifySmallHeapEvidence(t *testing.T) {
+	benchmarks := requiredPassingBenchmarks()
+	if len(benchmarks) != 1 {
+		t.Fatalf("requiredPassingBenchmarks returned %d rows, want 1", len(benchmarks))
+	}
+	row := benchmarks[0]
+	if row.EvidenceClass != "allocation_report_estimate" {
+		t.Fatalf("EvidenceClass = %q, want allocation_report_estimate", row.EvidenceClass)
+	}
+	if row.Method != "allocation_report_summary" {
+		t.Fatalf("Method = %q, want allocation_report_summary", row.Method)
+	}
+	if row.MeasurementArtifact != "" {
+		t.Fatalf("MeasurementArtifact = %q, want empty for allocation report estimate", row.MeasurementArtifact)
+	}
+	lower := strings.ToLower(row.Evidence)
+	for _, forbidden := range []string{"same_core_same_size_class_free_list", "free-list", "reuse policy"} {
+		if strings.Contains(lower, forbidden) {
+			t.Fatalf("Evidence = %q, contains runtime free-list wording %q", row.Evidence, forbidden)
+		}
+	}
 }
 
 func hasCase(cases []memoryprod.CaseReport, name string) bool {

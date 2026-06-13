@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"tetra_language/compiler"
+	"tetra_language/internal/outputformat"
 )
 
 func runLSP(args []string, stdout io.Writer, stderr io.Writer) int {
@@ -17,6 +18,7 @@ func runLSP(args []string, stdout io.Writer, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	smokePath := fs.String("stdio-smoke", "", "analyze one .t4/.tetra file and print LSP-basic JSON")
 	stdio := fs.Bool("stdio", false, "run LSP-basic JSON-RPC over stdio")
+	format := fs.String("format", outputformat.JSON, "stdio-smoke report format: json or toon")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			return 0
@@ -28,16 +30,31 @@ func runLSP(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 2
 	}
 	if *stdio {
+		if outputformat.Normalize(*format) != outputformat.JSON {
+			fmt.Fprintln(stderr, "lsp --stdio only supports --format=json because stdio uses framed JSON-RPC")
+			return 2
+		}
 		return runLSPStdio(os.Stdin, stdout, stderr)
 	}
 	if *smokePath == "" {
 		fmt.Fprintln(stderr, "lsp requires --stdio or --stdio-smoke <file>")
 		return 2
 	}
+	if !outputformat.Structured(*format) {
+		fmt.Fprintf(stderr, "unsupported lsp smoke report format %q\n", *format)
+		return 2
+	}
 	analysis, err := compiler.AnalyzeLSPFile(*smokePath)
 	if err != nil {
 		writeDiagnostic(stderr, "json", err)
 		return 1
+	}
+	if outputformat.Normalize(*format) == outputformat.TOON {
+		if err := outputformat.WriteStructured(stdout, outputformat.TOON, analysis); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		return 0
 	}
 	enc := json.NewEncoder(stdout)
 	enc.SetEscapeHTML(false)

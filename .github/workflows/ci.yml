@@ -68,6 +68,11 @@ jobs:
         shell: bash
         run: bash scripts/ci/test.sh
 
+      - name: TOON format focused gate
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash scripts/ci/toon-format-check.sh
+
       - name: Verify docs manifest
         if: matrix.canonical
         shell: bash

@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"tetra_language/tools/internal/reportdecode"
 )
 
 type lspSmokeEnvelope struct {
@@ -44,7 +46,9 @@ type lspHover struct {
 
 func main() {
 	var reportPath string
+	var reportFormat string
 	flag.StringVar(&reportPath, "report", "", "path to tetra lsp --stdio-smoke JSON report")
+	flag.StringVar(&reportFormat, "format", "auto", "report format: auto, json, or toon")
 	flag.Parse()
 
 	if reportPath == "" {
@@ -56,15 +60,19 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err := validateLSPSmoke(raw); err != nil {
+	if err := validateLSPSmokeFormat(raw, reportFormat); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
 func validateLSPSmoke(raw []byte) error {
+	return validateLSPSmokeFormat(raw, "auto")
+}
+
+func validateLSPSmokeFormat(raw []byte, format string) error {
 	var report lspSmokeEnvelope
-	if err := strictDecodeJSON(raw, &report); err != nil {
+	if err := reportdecode.DecodeStrictFormat(raw, format, &report); err != nil {
 		return err
 	}
 	if report.URI == "" {

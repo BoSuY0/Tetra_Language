@@ -456,7 +456,7 @@ func runWorkspaceBuild(args []string, stdout io.Writer, stderr io.Writer) int {
 	runtimeObject := fs.String("runtime-object", "", "actors runtime object override")
 	jobs := fs.Int("jobs", 1, "parallel module build jobs")
 	artifactsMode := fs.String("artifacts", "strict", "artifact handling: strict or auto")
-	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text or json")
+	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text, json, or toon")
 	format := fs.String("format", "text", "workspace report format: text or json")
 	outDir := ""
 	fs.StringVar(&outDir, "o", "", "workspace output directory")
@@ -647,7 +647,7 @@ func runWorkspaceTest(args []string, stdout io.Writer, stderr io.Writer) int {
 	target := fs.String("target", defaultTarget(), "target triple ("+supportedTargetsHelp+")")
 	failFast := fs.Bool("fail-fast", false, "stop after the first failed member")
 	format := fs.String("format", "text", "workspace report format: text or json")
-	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text or json")
+	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text, json, or toon")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			return 0

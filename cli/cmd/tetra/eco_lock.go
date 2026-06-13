@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -12,6 +11,7 @@ import (
 	"strings"
 
 	"tetra_language/compiler"
+	"tetra_language/internal/outputformat"
 )
 
 type ecoLock struct {
@@ -46,19 +46,16 @@ type ecoLockArtifact struct {
 }
 
 func writeEcoLock(path string, manifests []capsuleManifest) error {
+	_, err := writeEcoLockFormatted(path, outputformat.JSON, manifests)
+	return err
+}
+
+func writeEcoLockFormatted(path string, format string, manifests []capsuleManifest) ([]string, error) {
 	lock, err := buildEcoLockWithArtifactHashes(manifests)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	raw, err := json.MarshalIndent(lock, "", "  ")
-	if err != nil {
-		return err
-	}
-	raw = append(raw, '\n')
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(path, raw, 0o644)
+	return writeEcoStructuredFile(path, format, lock)
 }
 
 func buildEcoLockWithArtifactHashes(manifests []capsuleManifest) (ecoLock, error) {
@@ -178,9 +175,7 @@ func setEcoLockGraphHash(lock *ecoLock) {
 
 func decodeEcoLock(raw []byte) (ecoLock, error) {
 	var lock ecoLock
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&lock); err != nil {
+	if err := decodeEcoStructuredStrict(raw, outputformat.Auto, &lock); err != nil {
 		return ecoLock{}, err
 	}
 	normalizeLock(&lock)

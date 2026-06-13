@@ -166,10 +166,17 @@ match the exact plan rows. P15.2 heap safe-slice rows use
 `allocator_scope: core:0` for the single-threaded report model, and
 `allocator_reuse_policy: same_core_same_size_class_free_list`.
 
-P5 completion evidence for measured memory improvement is owned by
+P5 allocator benchmark evidence classification is owned by
 `tools/cmd/memory-production-smoke` and `tools/validators/memoryprod`. The
 smoke tool builds a generated Linux-x64 small-allocation benchmark with
-`--emit-alloc-report`, reads the schema-v2 allocation summary, requires 64
-`per_core_small_heap` allocation rows with
-`same_core_same_size_class_free_list`, and records the estimated syscall
-reduction from 64 mmap-per-allocation calls to one 64 KiB chunk refill.
+`--emit-alloc-report`, reads the schema-v2 allocation summary, and records the
+small heap benchmark as `evidence_class: allocation_report_estimate` with
+`method: allocation_report_summary`. The benchmark records the estimated
+syscall reduction from 64 mmap-per-allocation calls to one 64 KiB chunk refill;
+it does not claim runtime RSS, pprof, MemStats, `/usr/bin/time -v`, or `strace`
+measurement unless a separate `runtime_measured` artifact is present.
+Memory production release bundles now include `ram-measurement.json` as that
+separate capture artifact, using schema `tetra.memory.ram-measurement.v1` and
+MemStats snapshots when available. The validator parses and classifies the
+artifact, or accepts an explicit `blocked` artifact for unavailable tools, but
+does not enforce RAM/RSS thresholds before historical evidence exists.

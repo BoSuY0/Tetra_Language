@@ -63,6 +63,7 @@ func RequiredChecklist() []RequiredItem {
 		{Layer: "memory", Requirement: "raw pointer bounds metadata"},
 		{Layer: "memory", Requirement: "stress/fuzz evidence"},
 		{Layer: "memory", Requirement: "measured memory benchmark improvement"},
+		{Layer: "memory", Requirement: "allocator benchmark evidence classification"},
 		{Layer: "memory", Requirement: "use-after-free, double-free, borrow escape, and aliasing safety"},
 		{Layer: "memory", Requirement: "actor/task transfer safety"},
 		{Layer: "memory", Requirement: "leak/resource finalization evidence"},

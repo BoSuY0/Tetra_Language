@@ -103,7 +103,7 @@ func runSurfaceDev(args []string, stdout io.Writer, stderr io.Writer) int {
 	targetFlag := fs.String("target", "", "target triple; current fast rebuild evidence is linux-x64")
 	outDirFlag := fs.String("out-dir", "", "directory for dev-loop build artifacts")
 	reportPath := fs.String("report", "", "write tetra.surface.dev-workflow.v1 JSON report")
-	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text or json")
+	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text, json, or toon")
 	jobs := fs.Int("jobs", 1, "parallel module build jobs")
 	watch := fs.Bool("watch", false, "reserve watch-mode metadata; current command records one fast rebuild loop")
 	var changeFlags multiFlag

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"tetra_language/internal/toon"
 )
 
 func TestValidateTestReportAcceptsValidReport(t *testing.T) {
@@ -23,6 +25,29 @@ func TestValidateTestReportAcceptsValidReport(t *testing.T) {
   ]
 }`
 	out, err := runValidator(t, report)
+	if err != nil {
+		t.Fatalf("validator failed: %v\n%s", err, out)
+	}
+}
+
+func TestValidateTestReportAcceptsTOONReport(t *testing.T) {
+	raw, err := toon.ConvertJSONToTOON([]byte(`{
+  "total": 1,
+  "passed": 1,
+  "failed": 0,
+  "target": "linux-x64",
+  "duration_ms": 1,
+  "files": [
+    {"filename": "a.tetra", "total": 1, "passed": 1, "failed": 0, "duration_ms": 1}
+  ],
+  "results": [
+    {"name": "ok", "filename": "a.tetra", "index": 0, "function_name": "__tetra_test_0_ok", "exit_code": 0, "passed": true, "duration_ms": 1}
+  ]
+}`), toon.Options{Deterministic: true, Strict: true})
+	if err != nil {
+		t.Fatalf("json->toon: %v", err)
+	}
+	out, err := runValidator(t, string(raw))
 	if err != nil {
 		t.Fatalf("validator failed: %v\n%s", err, out)
 	}

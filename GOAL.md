@@ -60,6 +60,7 @@ Target claim:
 
 Allowed lower verdicts:
 
+- `ACTOR_FOUNDATION_RC_LOCAL_ONLY_OK`
 - `ACTOR_FOUNDATION_RC_LOCAL_CLEAN`
 - `ACTOR_FOUNDATION_RC_LOCAL_CLEAN_REMOTE_BLOCKED`
 - `ACTOR_FOUNDATION_RC_BLOCKED_CLEAN_CHECKOUT`
@@ -347,3 +348,64 @@ Maintain:
   `reports/actor-foundation-prod-ready-scoped-rc-100/P16-approval-blocked-final/summary.md`.
   Strict blocked-audit threshold is reached. Goal status should be `blocked`;
   RC100 remains `NOT_CLAIMED`.
+- 2026-06-13: P18/P19 resumed from current evidence, not memory. P18 local
+  `act` actor foundation proof passed for
+  `2482fc72805730b665f18c1be398aad7fcdb839b`, and remote CI actor foundation
+  proof validated for
+  `8b94c80917d5aa97178eef63f8727029924d9ff3`, but those SHAs cannot be merged
+  into the final scoped RC100 claim. P19 selected the current clean pushed
+  candidate `origin/actor-rc100-p12-expanded-clean` at
+  `e80d68f011b9c145e536bb704dedd16a9bc71e33`, enabled `ci.yml` and
+  `release-packages.yml`, and dispatched same-SHA CI run `27459960470` plus
+  release package dry-run run `27459960966`. Both runs remain queued with
+  `jobs=[]` because repository Actions permissions report
+  `{"enabled":false,"sha_pinning_required":false}`. Evidence:
+  `reports/actor-foundation-prod-ready-scoped-rc-100/P19-same-sha-remote-package-proof/summary.md`,
+  `summary.json`, `actions-permissions.json`, `ci-run-live.json`,
+  `release-packages-run-live.json`, `ci-jobs-live.json`, and
+  `release-packages-jobs-live.json`. Bridge: enable repository-level GitHub
+  Actions, then let or rerun same-SHA workflows, download/validate artifacts,
+  and rerun final acceptance. RC100 remains `NOT_CLAIMED`.
+- 2026-06-13: P20 rechecked the same P19 blocker. Repository Actions
+  permissions still report
+  `{"enabled":false,"sha_pinning_required":false}`; CI run `27459960470` and
+  release package dry-run run `27459960966` are still queued at
+  `e80d68f011b9c145e536bb704dedd16a9bc71e33`, with `jobs.total_count=0` and
+  `artifacts.total_count=0`. Evidence:
+  `reports/actor-foundation-prod-ready-scoped-rc-100/P20-actions-disabled-recheck/summary.md`
+  and `summary.json`. This is the second consecutive continuation observing
+  the same repository-level Actions disabled blocker after P19; do not call
+  `update_goal blocked` unless it repeats for the strict third consecutive
+  blocker turn. Bridge: enable repository-level GitHub Actions, then inspect or
+  rerun same-SHA workflows, download/validate artifacts, and rerun final
+  acceptance. RC100 remains `NOT_CLAIMED`.
+- 2026-06-13: P21 rechecked the same P19/P20 blocker. Repository Actions
+  permissions still report
+  `{"enabled":false,"sha_pinning_required":false}`; CI run `27459960470` and
+  release package dry-run run `27459960966` are still queued at
+  `e80d68f011b9c145e536bb704dedd16a9bc71e33`, with `jobs.total_count=0` and
+  `artifacts.total_count=0`. Evidence:
+  `reports/actor-foundation-prod-ready-scoped-rc-100/P21-actions-disabled-blocked-final/summary.md`
+  and `summary.json`. This is the third consecutive continuation observing the
+  same repository-level Actions disabled blocker after P19/P20; strict blocked
+  threshold is satisfied. Goal status should be `blocked`. RC100 remains
+  `NOT_CLAIMED` until repository-level GitHub Actions is enabled, same-SHA
+  workflows produce downloadable artifacts, and final acceptance passes.
+- 2026-06-13: User changed completion scope: mark the work as OK using local
+  tests only, without GitHub Actions. P22 recorded this as
+  `LOCAL_ONLY_OK_GITHUB_ACTIONS_WAIVED`, not as the remote
+  `ACTOR_FOUNDATION_PROD_READY_SCOPED_RC_100_PERC` target. Candidate worktree
+  `/home/tetra/.codex/worktrees/Tetra_Language/actor-rc100-p12-expanded-clean`
+  now has clean local-only SHA
+  `9c4e480a4b2d288c762fecd361bbcec3c5a97a21` after local commit
+  `9c4e480 Tighten headless Wayland temp cleanup`; it is ahead of
+  `origin/actor-rc100-p12-expanded-clean` by one commit and was not pushed.
+  Evidence:
+  `reports/actor-foundation-prod-ready-scoped-rc-100/P22-local-only-final/summary.md`,
+  `summary.json`, `broad-final-clean-head-status.tsv`,
+  `actor-foundation-gate-rerun-status.tsv`,
+  `validate-artifact-hashes-status.tsv`, and
+  `validate-actor-runtime-foundation-status.tsv`. Goal completion is now
+  local-only: GitHub Actions remote CI, release-package dry-run artifacts, and
+  downloaded same-SHA remote artifacts remain not verified and are explicitly
+  waived by user instruction.

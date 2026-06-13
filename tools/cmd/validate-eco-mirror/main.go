@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	ctarget "tetra_language/compiler/target"
+	"tetra_language/tools/internal/reportdecode"
 )
 
 const (
@@ -41,7 +42,9 @@ type mirrorReport struct {
 
 func main() {
 	var mirrorPath string
+	var reportFormat string
 	flag.StringVar(&mirrorPath, "mirror", "", "path to tetra.eco.mirror.v1 JSON report")
+	flag.StringVar(&reportFormat, "format", "auto", "report format: auto, json, or toon")
 	flag.Parse()
 
 	if mirrorPath == "" {
@@ -53,15 +56,19 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err := validateEcoMirror(raw); err != nil {
+	if err := validateEcoMirrorFormat(raw, reportFormat); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
 func validateEcoMirror(raw []byte) error {
+	return validateEcoMirrorFormat(raw, "auto")
+}
+
+func validateEcoMirrorFormat(raw []byte, format string) error {
 	var report mirrorReport
-	if err := decodeStrictJSON(raw, &report); err != nil {
+	if err := reportdecode.DecodeStrictFormat(raw, format, &report); err != nil {
 		return err
 	}
 	if report.Schema == "" {

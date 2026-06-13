@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"tetra_language/internal/toon"
 )
 
 func TestValidateLSPSmokeAcceptsValidAnalysis(t *testing.T) {
@@ -22,6 +24,27 @@ func TestValidateLSPSmokeAcceptsValidAnalysis(t *testing.T) {
 	out, err := runLSPValidator(t, report)
 	if err != nil {
 		t.Fatalf("validator failed: %v\n%s", err, out)
+	}
+}
+
+func TestValidateLSPSmokeAcceptsTOONAnalysis(t *testing.T) {
+	report := `{
+  "uri": "examples/flow_hello.tetra",
+  "diagnostics": [],
+  "symbols": [
+    {"name": "main", "kind": "function", "line": 1, "column": 5, "detail": "func main() -> Int uses io"}
+  ],
+  "hovers": [
+    {"name": "main", "line": 1, "column": 5, "contents": "func main() -> Int uses io"}
+  ]
+}`
+	toonReport, err := toon.ConvertJSONToTOON([]byte(report), toon.Options{Strict: true, Deterministic: true})
+	if err != nil {
+		t.Fatalf("json->toon: %v", err)
+	}
+	out, err := runLSPValidator(t, string(toonReport), "--format=toon")
+	if err != nil {
+		t.Fatalf("validator failed for TOON: %v\n%s\nTOON:\n%s", err, out, toonReport)
 	}
 }
 
@@ -218,14 +241,15 @@ func TestValidateLSPSmokeRejectsHoverWithoutContents(t *testing.T) {
 	}
 }
 
-func runLSPValidator(t *testing.T, report string) ([]byte, error) {
+func runLSPValidator(t *testing.T, report string, args ...string) ([]byte, error) {
 	t.Helper()
 	dir := t.TempDir()
-	path := filepath.Join(dir, "lsp.json")
+	path := filepath.Join(dir, "lsp-report")
 	if err := os.WriteFile(path, []byte(report), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command("go", "run", ".", "--report", path)
+	cmdArgs := append([]string{"run", ".", "--report", path}, args...)
+	cmd := exec.Command("go", cmdArgs...)
 	cmd.Dir = "."
 	return cmd.CombinedOutput()
 }

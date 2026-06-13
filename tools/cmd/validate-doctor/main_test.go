@@ -3,10 +3,12 @@ package main
 import (
 	"strings"
 	"testing"
+
+	"tetra_language/internal/toon"
 )
 
-func TestValidateDoctorReportAcceptsExpectedShape(t *testing.T) {
-	raw := []byte(`{
+func validDoctorReportJSON() []byte {
+	return []byte(`{
   "status": "pass",
   "checks": [
     {"name":"version","status":"pass","detail":"v0.6.0"},
@@ -28,8 +30,22 @@ func TestValidateDoctorReportAcceptsExpectedShape(t *testing.T) {
     {"name":"tooling commands","status":"pass","detail":"fmt, test, doc, smoke, lsp, eco"}
   ]
 }`)
+}
+
+func TestValidateDoctorReportAcceptsExpectedShape(t *testing.T) {
+	raw := validDoctorReportJSON()
 	if err := validateDoctorReport(raw); err != nil {
 		t.Fatalf("validate doctor: %v", err)
+	}
+}
+
+func TestValidateDoctorReportAcceptsTOON(t *testing.T) {
+	raw, err := toon.ConvertJSONToTOON(validDoctorReportJSON(), toon.Options{Deterministic: true, Strict: true})
+	if err != nil {
+		t.Fatalf("json->toon: %v", err)
+	}
+	if err := validateDoctorReport(raw); err != nil {
+		t.Fatalf("validate doctor TOON: %v\n%s", err, raw)
 	}
 }
 

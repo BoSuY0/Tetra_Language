@@ -11,6 +11,7 @@ import (
 
 	"tetra_language/compiler"
 	ctarget "tetra_language/compiler/target"
+	"tetra_language/internal/outputformat"
 )
 
 const (
@@ -74,6 +75,7 @@ func runEcoVerify(args []string, stdout io.Writer, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	target := fs.String("target", "", "validate capsule target compatibility")
 	lockPath := fs.String("lock", "", "write dependency lock/provenance JSON")
+	lockFormat := fs.String("lock-format", outputformat.JSON, "lock output format: json, toon, or both")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			return 0
@@ -90,7 +92,7 @@ func runEcoVerify(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 	if *lockPath != "" {
-		if err := writeEcoLock(*lockPath, manifests); err != nil {
+		if _, err := writeEcoLockFormatted(*lockPath, *lockFormat, manifests); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}
@@ -114,6 +116,18 @@ func writeJSONFile(path string, v interface{}) error {
 		return err
 	}
 	return os.WriteFile(path, raw, 0o644)
+}
+
+func writeEcoStructuredFile(path string, format string, v interface{}) ([]string, error) {
+	return outputformat.WriteStructuredFiles(path, format, v)
+}
+
+func decodeEcoStructured(raw []byte, format string, out interface{}) error {
+	return outputformat.DecodeStructured(raw, format, out)
+}
+
+func decodeEcoStructuredStrict(raw []byte, format string, out interface{}) error {
+	return outputformat.DecodeStructuredStrict(raw, format, out)
 }
 
 func defaultCapsulePath() string {

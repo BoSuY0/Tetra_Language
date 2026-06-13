@@ -17,26 +17,26 @@ release-covered tooling around that workflow, not optional safety levels.
 | Command | Primary behavior | Structured output |
 | --- | --- | --- |
 | `version` | Print the compiler version. | Text only. |
-| `targets` | Print supported, build-only, and planned targets. | `--format=json`. |
-| `features` | Print the machine-readable current, experimental, planned, and post-v1 feature registry. | `--format=json`. |
-| `formats` | Print the official T4 source, package, lock, and artifact format family. | `--format=json`. |
-| `doctor` | Check local release-critical metadata and source files, or project structure when given a project path. | `--format=json`. |
+| `targets` | Print supported, build-only, and planned targets. | `--format=json`; `--format=toon`. |
+| `features` | Print the machine-readable current, experimental, planned, and post-v1 feature registry. | `--format=json`; `--format=toon`. |
+| `formats` | Print the official T4 source, package, lock, and artifact format family. | `--format=json`; `--format=toon`. |
+| `doctor` | Check local release-critical metadata and source files, or project structure when given a project path. | `--format=json`; `--format=toon`. |
 | `actor-net` | Run the loopback TCP broker used by Linux-x64 distributed actor runtime smokes. | Optional `--report <path>` JSON runtime report. |
 | `project` | Inspect, sync, or edit local dependencies for a discovered `Capsule.t4` project. | `project info --format=json`; `project deps list/check --format=json`; sync/deps text output. |
 | `workspace` | Manage a local `Tetra.workspace` member list and run multi-capsule check/sync/build/test/run workflows. | `workspace list/check/graph/build/test --format=json`; sync/run text output. |
 | `new` | Scaffold a local T4 app project, optionally with `--lock`. | Text only. |
-| `check` | Load and type-check one input, defaulting to `Capsule.t4` `entry` or `main.t4`/`main.tetra`; a project directory argument uses the capsule entry; `--interface-only` checks an API graph without requiring `main`. | `--diagnostics=json` on failure. |
-| `build` | Build one input, defaulting to `Capsule.t4` `entry` or `main.t4`/`main.tetra`; a project directory argument uses the capsule entry; `--interface-only` validates the graph without emitting an artifact; `--artifacts=auto` repairs project artifacts before compiling. | `--diagnostics=json` on failure. |
-| `run` | Build and execute one host-runnable input or project directory, returning the program exit code. | `--diagnostics=json` on failure. |
-| `fmt` | Format one file to stdout, rewrite with `--write`, or verify with `--check`. | `--diagnostics=json` on failure. |
-| `test` | Discover top-level `test "name":` blocks and run them on the host target; project directories use discovered source roots. | `--report=json`; `--format=json` alias for JSON reports; `--diagnostics=json` on command failure. |
-| `surface` | Run scoped Surface developer workflows such as `surface dev`, currently a fast rebuild loop rather than hot reload. | `surface dev --report <path>` emits `tetra.surface.dev-workflow.v1`; `--diagnostics=json` on failure. |
-| `doc` | Generate API docs for files/directories, or discovered `Capsule.t4` source roots when no paths are given. | Markdown output; `--diagnostics=json` on failure. |
-| `interface` | Generate a `.t4i` interface file from one source file, or verify it with `--check`. | T4 interface output; `--diagnostics=json` on failure. |
-| `smoke` | Build and optionally run the canonical smoke matrix. | `--list --format=json`; `--report <path>`. |
+| `check` | Load and type-check one input, defaulting to `Capsule.t4` `entry` or `main.t4`/`main.tetra`; a project directory argument uses the capsule entry; `--interface-only` checks an API graph without requiring `main`. | `--diagnostics=json`; `--diagnostics=toon` on failure. |
+| `build` | Build one input, defaulting to `Capsule.t4` `entry` or `main.t4`/`main.tetra`; a project directory argument uses the capsule entry; `--interface-only` validates the graph without emitting an artifact; `--artifacts=auto` repairs project artifacts before compiling. | `--diagnostics=json`; `--diagnostics=toon` on failure. |
+| `run` | Build and execute one host-runnable input or project directory, returning the program exit code. | `--diagnostics=json`; `--diagnostics=toon` on failure. |
+| `fmt` | Format one file to stdout, rewrite with `--write`, or verify with `--check`. | `--diagnostics=json`; `--diagnostics=toon` on failure. |
+| `test` | Discover top-level `test "name":` blocks and run them on the host target; project directories use discovered source roots. | `--report=json`; `--report=toon`; `--format=json|toon` alias for reports; `--diagnostics=json|toon` on command failure. |
+| `surface` | Run scoped Surface developer workflows such as `surface dev`, currently a fast rebuild loop rather than hot reload. | `surface dev --report <path>` emits `tetra.surface.dev-workflow.v1`; `--diagnostics=json`; `--diagnostics=toon` on failure. |
+| `doc` | Generate API docs for files/directories, or discovered `Capsule.t4` source roots when no paths are given. | Markdown output; `--diagnostics=json`; `--diagnostics=toon` on failure. |
+| `interface` | Generate a `.t4i` interface file from one source file, or verify it with `--check`. | T4 interface output; `--diagnostics=json`; `--diagnostics=toon` on failure. |
+| `smoke` | Build and optionally run the canonical smoke matrix. | `--list --format=json|toon`; `--report <path> --report-format=json|toon|both`. |
 | `clean` | Remove local Tetra cache directories. | Text only. |
-| `eco` | Run local capsule/package workflows. | Command-specific text/JSON files. |
-| `lsp` | Run stdio LSP or one-shot stdio smoke analysis. | JSON-RPC or smoke JSON. |
+| `eco` | Run local capsule/package workflows. | Command-specific text/JSON/TOON report files. |
+| `lsp` | Run stdio LSP or one-shot stdio smoke analysis. | JSON-RPC frames for stdio; `--stdio-smoke --format=json|toon`. |
 
 The `lsp --stdio` contract is intentionally an editor-tooling baseline, not a
 complete language server. Release transcripts must cover initialize,
@@ -61,6 +61,9 @@ document contains a same-named local binding or parameter that would make the
 edit ambiguous, rename returns `null` instead of producing a workspace edit.
 This contract intentionally does not claim project-wide or cross-module rename;
 public API renames should still be reviewed through the resulting diff.
+`lsp --stdio-smoke <path> --format=json|toon` is a separate one-shot smoke
+report and is not a JSON-RPC transport. Validate it with
+`tools/cmd/validate-lsp-smoke --format=auto|json|toon`.
 
 Exit codes:
 
@@ -71,18 +74,20 @@ Exit codes:
 | `2` | Command-line usage, unsupported target, unsupported format, or invalid option. |
 | program code | `tetra run` returns the built program exit code after a successful build. |
 
-JSON diagnostics use `code`, `message`, `severity`, and optional `file`, `line`,
-`column`, and `hint`. Supported diagnostic modes are exactly `text` and `json`.
+JSON and TOON diagnostics use `code`, `message`, `severity`, and optional
+`file`, `line`, `column`, and `hint`. Supported diagnostic modes are exactly
+`text`, `json`, and `toon`; `text` remains the default.
 The stable code families are `TETRA0001` for parser/frontend diagnostics,
 `TETRA2001` for positioned semantic/compiler diagnostics, `TETRA3001` for
 target-neutral IR verifier failures, `TETRA3002` for unsupported lowering
 paths, and `TETRA_FMT*` for formatter diagnostics.
 
-Diagnostic JSON shape is validated by
-`go test ./tools/cmd/validate-diagnostic/... -count=1`. The validator rejects
-unknown JSON fields, missing `code`/`message`/`severity`, leading or trailing
-whitespace in stable string fields, invalid severity values, and partial source
-positions.
+Diagnostic shape is validated by
+`go test ./tools/cmd/validate-diagnostic/... -count=1` and by
+`tools/cmd/validate-diagnostic`, which accepts JSON or TOON. The validator
+rejects unknown fields, missing `code`/`message`/`severity`, leading or
+trailing whitespace in stable string fields, invalid severity values, and
+partial source positions.
 
 JSON reports:
 
@@ -98,7 +103,18 @@ Conformance validators are stricter than forward-compatible consumers: the
 documented validator tools reject unknown JSON fields so release evidence stays
 canonical for the contract revision being validated.
 
-- `targets --format=json` emits target metadata including `triple`, `os`,
+TOON is available only as an opt-in second structured format for
+`targets`, `features`, `formats`, `doctor`, structured diagnostics,
+`tetra test` reports, LSP smoke reports, selected Eco metadata reports,
+release manifest mirrors, and selected path-based release reports in this
+revision. The TOON contract is defined in
+`docs/spec/toon_support.md`: JSON remains default and canonical, and validators
+decode TOON into the same typed report models before running existing
+validation. LSP JSON-RPC frames, canonical Eco store/package metadata, and
+canonical release manifests remain JSON unless a command explicitly documents a
+TOON mirror or input.
+
+- `targets --format=json` and `targets --format=toon` emit target metadata including `triple`, `os`,
   `arch`, `abi`, `data_model`, `format`, `exe_ext`, `build_only`,
   `run_mode`, `run_runner`, `run_supported`, pointer/register/native-int
   widths, endian, stack alignment, atomic widths, and any
@@ -152,38 +168,46 @@ canonical for the contract revision being validated.
   valid only when `run_supported` is true for that target, while a no-host
   diagnostic is valid only when the same `targets.json` records
   `run_supported: false`.
-- `features --format=json` emits `schema`, `version`, and `features` entries
+- `features --format=json` and `features --format=toon` emit `schema`, `version`, and `features` entries
   with `id`, `name`, `status`, `scope`, `stability`, and `docs`. Status is one
   of `current`, `experimental`, `planned`, or `post-v1`.
-- `formats --format=json` emits a top-level `formats` array. Each entry has
+- `formats --format=json` and `formats --format=toon` emit a top-level `formats` array. Each entry has
   `name`, `role`, `description`, either `extension` or `file_name`, and optional
   `primary`/`legacy` booleans. The entries match the manifest `formats` schema
   validated by `tools/cmd/validate-manifest`.
   The primary Todex package/fragment extension is `.tdx`; `.todex` is accepted
   only as a compatibility alias by Eco package commands and is not a separate
   manifest format entry.
-- `doctor --format=json` emits top-level `status` plus named checks.
+- `doctor --format=json` and `doctor --format=toon` emit top-level `status`
+  plus named checks.
 - `actor-net --report <path>` emits an `actornet` loopback broker report with
   runtime identity, transport, listen address, connection counts, routed frame
   counts, dropped frame counts, decode-error counts, and optional last error.
   It is broker evidence only; production distributed actor promotion still
   requires the executable `tetra.actors.distributed-runtime.v1` report accepted
   by `tools/cmd/validate-distributed-actor-runtime`.
-- `test --report=json` emits `total`, `passed`, `failed`, `duration_ms`,
+- `test --report=json` and `test --report=toon` emit `total`, `passed`, `failed`, `duration_ms`,
   `files`, and `results`; single-target reports also include canonical
   `target` identity such as `linux-x64`, `linux-x86`, or `linux-x32`.
-  Validate it with `tools/cmd/validate-test-report`. `test --format=json` is an
-  alias for the same report output, including target-suite commands such as
+  Validate JSON or TOON with `tools/cmd/validate-test-report`.
+  `test --format=json` and `test --format=toon` are aliases for the same report
+  output, including target-suite commands such as
   `test --all-targets --brutal --format=json`; multi-target reports omit a
   single `target` value.
   If both `--report` and `--format` are provided, they must match.
-- `smoke --list --format=json` emits the smoke matrix; validate it with
-  `tools/cmd/validate-smoke-list`.
+- `smoke --list --format=json` and `smoke --list --format=toon` emit the smoke
+  matrix; validate them with `tools/cmd/validate-smoke-list --format=json|toon`.
   Its top-level `run_supported` is smoke-list metadata and is not a substitute
   for `targets --format=json`: WASI/Web runtime evidence is recorded by
   `smoke --report <path>` and the dedicated WASI/Web smoke workflows.
 - `smoke --report <path>` emits build/run evidence; validate it with
-  `tools/cmd/smoke-report-to-checklist --validate-only`.
+  `tools/cmd/smoke-report-to-checklist --validate-only --format=json`.
+  `--report-format=both` writes the canonical JSON report plus a `.toon` mirror;
+  validate the mirror with
+  `tools/cmd/smoke-report-to-checklist --validate-only --format=toon`.
+- `scripts/ci/test-all.sh --report-dir <dir>` writes canonical `summary.json`.
+  `--report-format=toon|both` also writes `summary.toon` and TOON mirrors for
+  selected path reports while `--json-only` stdout remains JSON.
 - `surface dev --report <path>` emits `tetra.surface.dev-workflow.v1` fast
   rebuild evidence for Surface apps. The current evidence is scoped to
   `linux-x64` build caching and records initial build, warm-cache rebuild, and
@@ -226,30 +250,36 @@ canonical for the contract revision being validated.
   hidden-state scan sections. Optional HTML output is a static tool report, not
   browser devtools, React devtools, DOM runtime UI, or target-host accessibility
   proof by itself.
-- `eco seed export --out <path>` emits `tetra.eco.seed.v1`; validate it with
-  `tools/cmd/validate-eco-seed --seed <path>`.
-- `eco needmap --lock <lock> -o <path>` emits `tetra.eco.needmap.v1`;
-  validate it with `tools/cmd/validate-eco-needmap --needmap <path>`.
-- `eco trust snapshot --lock <lock> --store <vault> -o <path>` emits
+- `eco seed export --out <path> [--format=json|toon|both]` emits
+  `tetra.eco.seed.v1`; validate it with
+  `tools/cmd/validate-eco-seed --seed <path> --format=auto|json|toon`.
+- `eco needmap --lock <lock> -o <path> [--format=json|toon|both]` emits
+  `tetra.eco.needmap.v1`; validate it with
+  `tools/cmd/validate-eco-needmap --needmap <path> --format=auto|json|toon`.
+- `eco trust snapshot --lock <lock> --store <vault> -o <path>
+  [--format=json|toon|both]` emits
   `tetra.eco.trust-snapshot.v1`; validate it with
-  `tools/cmd/validate-eco-trust --trust <path>`.
-- `eco materialize <package.tdx> -C <out>` emits
-  `<out>/tetra.materialization.json` using `tetra.eco.materialization.v1`;
+  `tools/cmd/validate-eco-trust --trust <path> --format=auto|json|toon`.
+- `eco materialize <package.tdx> -C <out> [--metadata-format json|toon|both]`
+  emits `<out>/tetra.materialization.json` and optionally
+  `<out>/tetra.materialization.toon` using `tetra.eco.materialization.v1`;
   validate it with
-  `tools/cmd/validate-eco-materialization --materialization <path>`.
+  `tools/cmd/validate-eco-materialization --materialization <path>
+  --format=auto|json|toon`.
 - `eco publish --channel stable` emits `tetra.eco.publish.v1`; validate it
   with `tools/cmd/validate-eco-publish --channel stable`.
 - `eco tetrahub publish --channel stable` emits the same metadata schema under
   the configured TetraHub store path.
 - `eco tetrahub mirror --from <store> --to <store> --id <id> --version <x.y.z>
-  --target <triple> -o <report>` copies a validated local TetraHub package
-  entry and emits `tetra.eco.mirror.v1`; validate it with
-  `tools/cmd/validate-eco-mirror --mirror <report>`.
+  --target <triple> -o <report> [--format=json|toon|both]` copies a validated
+  local TetraHub package entry and emits `tetra.eco.mirror.v1`; validate it with
+  `tools/cmd/validate-eco-mirror --mirror <report> --format=auto|json|toon`.
 - `eco tetrahub fetch --url <http-url> --to <store> --id <id>
-  --version <x.y.z> --target <triple> -o <report>` downloads a single
+  --version <x.y.z> --target <triple> -o <report> [--format=json|toon|both]`
+  downloads a single
   TetraHub package entry over HTTP(S), verifies metadata/package/trust hashes,
   writes a local store entry, and emits `tetra.eco.mirror.v1`; validate it with
-  `tools/cmd/validate-eco-mirror --mirror <report>`.
+  `tools/cmd/validate-eco-mirror --mirror <report> --format=auto|json|toon`.
 - `project info --format=json` emits `found`, `root`, `capsule_path`,
   `lock_path`, `entry_path`, `source_roots`, `targets`, dependency roots, and
   artifact counts.

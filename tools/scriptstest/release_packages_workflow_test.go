@@ -15,11 +15,17 @@ func TestReleasePackagesWorkflowRunsMemoryProductionGateBeforePublishing(t *test
 	text := string(raw)
 	for _, want := range []string{
 		"name: Memory production release gate",
+		"export GOTELEMETRY=off",
+		`export GOCACHE="${PWD}/.cache/go-build-memory-production-release"`,
+		`export GOTMPDIR="${PWD}/.cache/go-tmp-memory-production-release"`,
+		`mkdir -p "$GOCACHE" "$GOTMPDIR"`,
 		`report_dir="${{ steps.meta.outputs.out_dir }}/memory-production-linux-x64"`,
 		`bash scripts/release/post_v0_4/memory-production-linux-x64-smoke.sh --report-dir "$report_dir"`,
 		`${{ steps.meta.outputs.out_dir }}/memory-production-linux-x64/**`,
 		"Package publishing for this workflow runs the Linux-x64 memory production release gate",
 		"`targets.json`",
+		"`memory-release-manifest.json`",
+		"`ram-measurement.json`",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("release-packages workflow missing %q", want)
@@ -42,6 +48,12 @@ func TestReleasePackagesWorkflowRunsMemoryProductionGateBeforePublishing(t *test
 			t.Fatalf("memory production gate must run before %q", publishStep)
 		}
 	}
+	section := releaseStepWindow(text, "name: Memory production release gate", "name: Surface product gate")
+	for _, forbidden := range []string{"continue-on-error", "|| true", "set +e", "GOCACHE=/tmp", "GOTMPDIR=/tmp"} {
+		if strings.Contains(section, forbidden) {
+			t.Fatalf("memory production release package gate must not contain bypass or tmpfs cache marker %q", forbidden)
+		}
+	}
 }
 
 func TestReleasePackagesRunsSurfaceGateBeforePublishing(t *testing.T) {
@@ -53,6 +65,7 @@ func TestReleasePackagesRunsSurfaceGateBeforePublishing(t *testing.T) {
 	for _, want := range []string{
 		"name: Surface product gate",
 		`report_dir="${{ steps.meta.outputs.out_dir }}/surface-product-v1"`,
+		"bash scripts/ci/with-headless-wayland.sh --socket wayland-surface-release --",
 		`bash scripts/release/surface/product-gate.sh --report-dir "$report_dir"`,
 		"name: Surface experimental regression gate",
 		`report_dir="${{ steps.meta.outputs.out_dir }}/surface-experimental-regression"`,
@@ -186,7 +199,7 @@ func TestReleasePackagesRunsRAMContractGateBeforePublishing(t *testing.T) {
 		"`validation-pipeline-coverage.json`",
 		"`heap-blockers.json`",
 		"`copy-blockers.json`",
-		"`ram-contract-fuzz-oracle.json`",
+		"`fuzz/ram-contract-fuzz-oracle.json`",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("release-packages workflow missing RAM contract gate detail %q", want)
@@ -255,6 +268,56 @@ func TestReleasePackagesRunsActorRuntimeFoundationGateBeforePublishing(t *testin
 	}
 	if section := releaseStepWindow(text, "name: Actor runtime foundation release gate", "name: Upload package artifacts"); strings.Contains(section, "continue-on-error") {
 		t.Fatalf("actor runtime foundation release gate must not use continue-on-error")
+	}
+}
+
+func TestReleasePackagesWorkflowSupportsNonPublishingDryRun(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "release-packages.yml"))
+	if err != nil {
+		t.Fatalf("read release-packages workflow: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		"dry_run:",
+		"Build packages and release evidence without creating a GitHub Release, pushing GHCR, or updating Homebrew",
+		"RELEASE_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}",
+		"name: Dry-run package proof",
+		"if: env.RELEASE_DRY_RUN == 'true'",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("release-packages workflow missing dry-run detail %q", want)
+		}
+	}
+
+	actorGate := releaseStepWindow(text, "name: Actor runtime foundation release gate", "name: Memory100 prod-stable gate")
+	if strings.Contains(actorGate, "RELEASE_DRY_RUN") {
+		t.Fatalf("actor runtime foundation gate must still run during release package dry-run")
+	}
+	for _, externalStep := range []struct {
+		name string
+		next string
+		want string
+	}{
+		{
+			name: "name: Create or update GitHub Release",
+			next: "name: Build container image",
+			want: "if: env.RELEASE_DRY_RUN != 'true'",
+		},
+		{
+			name: "name: Publish GHCR image",
+			next: "name: Update Homebrew tap",
+			want: "if: env.RELEASE_DRY_RUN != 'true'",
+		},
+		{
+			name: "name: Update Homebrew tap",
+			next: "name: release-packages-dry-run-end",
+			want: "if: env.UPDATE_HOMEBREW_TAP == 'true' && env.RELEASE_DRY_RUN != 'true'",
+		},
+	} {
+		section := releaseStepWindow(text, externalStep.name, externalStep.next)
+		if !strings.Contains(section, externalStep.want) {
+			t.Fatalf("release-packages workflow external step %q missing dry-run guard %q", externalStep.name, externalStep.want)
+		}
 	}
 }
 
@@ -355,7 +418,7 @@ func TestReleasePackagesWorkflowMakesManualContainerPublishOptIn(t *testing.T) {
 		`PUBLISH_CONTAINER="${{ steps.meta.outputs.publish_container }}"`,
 		`publish_container = os.environ["PUBLISH_CONTAINER"] == "true"`,
 		"Container publishing was not requested for this manual workflow run.",
-		"if: steps.meta.outputs.publish_container == 'true'",
+		"steps.meta.outputs.publish_container == 'true'",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("release-packages workflow missing manual container publish guard %q", want)

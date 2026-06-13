@@ -37,6 +37,13 @@ while [[ $# -gt 0 ]]; do
 done
 
 cd "$repo_root"
+if [[ -z "${GOCACHE:-}" ]]; then
+  export GOCACHE="$repo_root/.cache/go-build-memory-production-release"
+fi
+if [[ -z "${GOTMPDIR:-}" ]]; then
+  export GOTMPDIR="$repo_root/.cache/go-tmp-memory-production-release"
+fi
+mkdir -p "$GOCACHE" "$GOTMPDIR"
 
 check_report_dir_fresh() {
   local find_report_dir="$report_dir"
@@ -87,6 +94,7 @@ json_escape() {
 check_report_dir_fresh
 mkdir -p -- "$report_dir"
 report_path="$report_dir/memory-production-linux-x64.json"
+ram_measurement_path="$report_dir/ram-measurement.json"
 targets_path="$report_dir/targets.json"
 memory_fuzz_dir="$report_dir/memory-fuzz-tier1"
 ram_contract_dir="$report_dir/ram-contract"
@@ -95,7 +103,7 @@ island_proof_memory_report_path="$report_dir/island-proof-memory-report.json"
 memory_release_manifest_path="$report_dir/memory-release-manifest.json"
 git_head="$(git rev-parse --verify HEAD)"
 
-go run ./tools/cmd/memory-production-smoke --report "$report_path" --git-head "$git_head"
+go run ./tools/cmd/memory-production-smoke --report "$report_path" --ram-measurement-report "$ram_measurement_path" --git-head "$git_head"
 go run ./tools/cmd/validate-memory-production --report "$report_path"
 go run ./cli/cmd/tetra targets --format=json > "$targets_path"
 go run ./tools/cmd/validate-targets --report "$targets_path"
@@ -174,7 +182,7 @@ cat > "$memory_release_manifest_path" <<MANIFEST
   "report_dir": ".",
   "hash_manifest": "artifact-hashes.json",
   "commands": [
-    {"name": "memory-production-smoke", "command": "go run ./tools/cmd/memory-production-smoke --report $(json_escape "$report_path") --git-head $git_head"},
+    {"name": "memory-production-smoke", "command": "go run ./tools/cmd/memory-production-smoke --report $(json_escape "$report_path") --ram-measurement-report $(json_escape "$ram_measurement_path") --git-head $git_head"},
     {"name": "target-report", "command": "go run ./cli/cmd/tetra targets --format=json > $(json_escape "$targets_path")"},
     {"name": "validate-targets", "command": "go run ./tools/cmd/validate-targets --report $(json_escape "$targets_path")"},
     {"name": "memory-fuzz-short", "command": "go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir $(json_escape "$memory_fuzz_dir") --git-head $git_head"},
@@ -185,7 +193,8 @@ cat > "$memory_release_manifest_path" <<MANIFEST
     {"name": "artifact-hashes-validate", "command": "go run ./tools/cmd/validate-artifact-hashes --manifest $(json_escape "$report_dir")/artifact-hashes.json"}
   ],
   "artifacts": [
-    {"path": "memory-production-linux-x64.json", "kind": "memory_production_report", "schema": "tetra.memory.production.v1", "target": "linux-x64", "command": "go run ./tools/cmd/memory-production-smoke --report $(json_escape "$report_path") --git-head $git_head"},
+    {"path": "memory-production-linux-x64.json", "kind": "memory_production_report", "schema": "tetra.memory.production.v1", "target": "linux-x64", "command": "go run ./tools/cmd/memory-production-smoke --report $(json_escape "$report_path") --ram-measurement-report $(json_escape "$ram_measurement_path") --git-head $git_head"},
+    {"path": "ram-measurement.json", "kind": "ram_measurement_report", "schema": "tetra.memory.ram-measurement.v1", "target": "linux-x64", "command": "go run ./tools/cmd/memory-production-smoke --report $(json_escape "$report_path") --ram-measurement-report $(json_escape "$ram_measurement_path") --git-head $git_head"},
     {"path": "targets.json", "kind": "target_report", "target": "linux-x64", "command": "go run ./cli/cmd/tetra targets --format=json > $(json_escape "$targets_path")"},
     {"path": "memory-fuzz-tier1/memory-fuzz-oracle.json", "kind": "memory_fuzz_oracle_report", "schema": "tetra.memory-fuzz.oracle.v1", "target": "linux-x64", "command": "go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir $(json_escape "$memory_fuzz_dir") --git-head $git_head"},
     {"path": "memory-fuzz-tier1/summary.json", "kind": "memory_fuzz_summary", "schema": "tetra.memory-fuzz-short.summary.v1", "target": "linux-x64", "command": "go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir $(json_escape "$memory_fuzz_dir") --git-head $git_head"},
@@ -210,6 +219,7 @@ go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-has
 go run ./tools/cmd/validate-memory-production --report "$report_path" --manifest "$memory_release_manifest_path" --report-dir "$report_dir" --current-git-head "$git_head"
 
 echo "memory production linux-x64 smoke report: $report_path"
+echo "memory production RAM measurement report: $ram_measurement_path"
 echo "memory production target capability report: $targets_path"
 echo "memory production Tier 1 fuzz oracle report: $memory_fuzz_dir/memory-fuzz-oracle.json"
 echo "memory production Tier 1 fuzz oracle summary: $memory_fuzz_dir/summary.json"

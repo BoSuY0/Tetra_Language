@@ -1071,6 +1071,130 @@ uses runtime:
 	}
 }
 
+func TestTaskGroupCancelWhileActorWaitsOnJoinReturnsCanceledBuildAndRun(t *testing.T) {
+	src := `
+func slow() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(100)
+    return 99
+
+func canceller() -> Int
+uses runtime:
+    let _delay: Int = core.sleep_ms(2)
+    let group: task.group = core.task_group_current()
+    let _canceled: task.group = core.task_group_cancel(group)
+    return core.time_now_ms()
+
+func main() -> Int
+uses runtime:
+    var group: task.group = core.task_group_open()
+    let slow_task: task.i32 = core.task_spawn_group_i32(group, "slow")
+    let _cancel_task: task.i32 = core.task_spawn_group_i32(group, "canceller")
+    let result: task.result_i32 = core.task_join_result_i32(slow_task)
+    let _closed: Int = core.task_group_close(group)
+    if result.value != 0:
+        return result.value
+    if result.error != 1:
+        return 30 + result.error
+    let now: Int = core.time_now_ms()
+    if now != 2:
+        return 50 + now
+    return result.error
+`
+	stdout, exitCode, timedOut := buildAndRunWithOptionsTimeout(t, src, BuildOptions{}, 250*time.Millisecond)
+	if timedOut {
+		t.Fatalf("program timed out; task group cancel should wake actor waiting on task_join_result_i32")
+	}
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 1 {
+		t.Fatalf("exit code = %d, want join_result_i32 canceled error 1 while caller was already waiting", exitCode)
+	}
+}
+
+func TestTaskGroupCancelWhileActorWaitsOnJoinI32WakesWithZeroValueBuildAndRun(t *testing.T) {
+	src := `
+func slow() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(100)
+    return 99
+
+func canceller() -> Int
+uses runtime:
+    let _delay: Int = core.sleep_ms(2)
+    let group: task.group = core.task_group_current()
+    let _canceled: task.group = core.task_group_cancel(group)
+    return core.time_now_ms()
+
+func main() -> Int
+uses runtime:
+    var group: task.group = core.task_group_open()
+    let slow_task: task.i32 = core.task_spawn_group_i32(group, "slow")
+    let _cancel_task: task.i32 = core.task_spawn_group_i32(group, "canceller")
+    let joined: Int = core.task_join_i32(slow_task)
+    let _closed: Int = core.task_group_close(group)
+    if joined != 0:
+        return joined
+    let now: Int = core.time_now_ms()
+    if now != 2:
+        return 50 + now
+    return 1
+`
+	stdout, exitCode, timedOut := buildAndRunWithOptionsTimeout(t, src, BuildOptions{}, 250*time.Millisecond)
+	if timedOut {
+		t.Fatalf("program timed out; task group cancel should wake actor waiting on task_join_i32")
+	}
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 1 {
+		t.Fatalf("exit code = %d, want task_join_i32 to wake at cancellation time with raw zero value", exitCode)
+	}
+}
+
+func TestTaskGroupCancelWakesSelect2BeforeDeadlineBuildAndRun(t *testing.T) {
+	src := `
+func slow() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(100)
+    return 99
+
+func canceller() -> Int
+uses runtime:
+    let _delay: Int = core.sleep_ms(2)
+    let group: task.group = core.task_group_current()
+    let _canceled: task.group = core.task_group_cancel(group)
+    return core.time_now_ms()
+
+func main() -> Int
+uses runtime:
+    var group: task.group = core.task_group_open()
+    let slow_task: task.i32 = core.task_spawn_group_i32(group, "slow")
+    let _cancel_task: task.i32 = core.task_spawn_group_i32(group, "canceller")
+    let selected: task.result_i32 = core.select2_i32(slow_task, core.deadline_ms(100))
+    let _closed: Int = core.task_group_close(group)
+    if selected.value != 0:
+        return selected.value
+    if selected.error != 1:
+        return 30 + selected.error
+    let now: Int = core.time_now_ms()
+    if now != 2:
+        return 50 + now
+    return selected.error
+`
+	stdout, exitCode, timedOut := buildAndRunWithOptionsTimeout(t, src, BuildOptions{}, 250*time.Millisecond)
+	if timedOut {
+		t.Fatalf("program timed out; task group cancel should wake select2_i32 before deadline")
+	}
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 1 {
+		t.Fatalf("exit code = %d, want select2_i32 canceled error 1 before deadline", exitCode)
+	}
+}
+
 func TestTaskGroupJoinUntilTimeoutThenCancelFinalJoinBuildAndRun(t *testing.T) {
 	src := `
 func worker() -> Int
@@ -3174,6 +3298,55 @@ uses actors, runtime:
 	}
 	if exitCode != 0 {
 		t.Fatalf("exit code = %d, want actor recv_until canceled wake at logical time 2", exitCode)
+	}
+}
+
+func TestTaskGroupCancelWakesActorRecvMsgUntilBeforeDeadlineBuildAndRun(t *testing.T) {
+	src := `
+func actor_waiter() -> Int
+uses actors, runtime:
+    let result: actor.recv_msg_result = core.recv_msg_until(core.deadline_ms(100))
+    let _sent: Int = core.send_msg(core.sender(), result.error, result.tag)
+    return result.error
+
+func worker() -> Int
+uses actors:
+    let _actor: actor = core.spawn("actor_waiter")
+    return 1
+
+func main() -> Int
+uses actors, runtime:
+    var group: task.group = core.task_group_open()
+    let task: task.i32 = core.task_spawn_group_i32(group, "worker")
+    let launched: task.result_i32 = core.task_join_result_i32(task)
+    if launched.error != 0:
+        return 20 + launched.error
+    if launched.value != 1:
+        return 30 + launched.value
+    let _delay: Int = core.sleep_ms(2)
+    group = core.task_group_cancel(group)
+    let reply: actor.recv_msg_result = core.recv_msg_until(core.deadline_ms(5))
+    let _closed: Int = core.task_group_close(group)
+    if reply.error != 0:
+        return 40 + reply.error
+    if reply.value != 1:
+        return 60 + reply.value
+    if reply.tag != 0:
+        return 70 + reply.tag
+    let now: Int = core.time_now_ms()
+    if now != 2:
+        return 80 + now
+    return 0
+`
+	stdout, exitCode, timedOut := buildAndRunWithOptionsTimeout(t, src, BuildOptions{}, 250*time.Millisecond)
+	if timedOut {
+		t.Fatalf("program timed out; task group cancel should wake actor recv_msg_until before the original deadline")
+	}
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, want actor recv_msg_until canceled wake at logical time 2", exitCode)
 	}
 }
 

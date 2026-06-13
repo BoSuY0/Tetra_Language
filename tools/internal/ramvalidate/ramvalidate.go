@@ -132,13 +132,28 @@ type BlockerReport struct {
 }
 
 type BlockerRow struct {
-	SiteID        string   `json:"site_id"`
-	Function      string   `json:"function"`
-	Intent        string   `json:"intent"`
-	Placement     string   `json:"placement"`
-	Blockers      []string `json:"blockers,omitempty"`
-	CopyReason    string   `json:"copy_reason,omitempty"`
-	ContractGrade string   `json:"contract_grade"`
+	SiteID               string   `json:"site_id"`
+	Function             string   `json:"function"`
+	Intent               string   `json:"intent"`
+	Placement            string   `json:"placement"`
+	Blockers             []string `json:"blockers,omitempty"`
+	CopyReason           string   `json:"copy_reason,omitempty"`
+	ContractGrade        string   `json:"contract_grade"`
+	File                 string   `json:"file,omitempty"`
+	Line                 int      `json:"line,omitempty"`
+	Symbol               string   `json:"symbol,omitempty"`
+	SourceLocationStatus string   `json:"source_location_status"`
+	Severity             string   `json:"severity"`
+	Reason               string   `json:"reason"`
+	SuggestedFix         string   `json:"suggested_fix"`
+	ProofID              string   `json:"proof_id,omitempty"`
+	EvidenceID           string   `json:"evidence_id"`
+	SafeToOptimize       *bool    `json:"safe_to_optimize"`
+	CopyKind             string   `json:"copy_kind,omitempty"`
+	SourceValue          string   `json:"source_value,omitempty"`
+	DestinationValue     string   `json:"destination_value,omitempty"`
+	BytesEstimate        int64    `json:"bytes_estimate,omitempty"`
+	SafetyReason         string   `json:"safety_reason,omitempty"`
 }
 
 var fullGitHeadRE = regexp.MustCompile(`^[0-9a-f]{40}$`)
@@ -363,6 +378,10 @@ func ValidateBlockerReportFile(path string, kind string) error {
 	if err := ReadStrictJSONFile(path, &report); err != nil {
 		return err
 	}
+	return ValidateBlockerReport(report, kind)
+}
+
+func ValidateBlockerReport(report BlockerReport, kind string) error {
 	var issues []string
 	if report.SchemaVersion != BlockerReportSchemaV1 {
 		issues = append(issues, fmt.Sprintf("schema_version is %q, want %q", report.SchemaVersion, BlockerReportSchemaV1))
@@ -374,18 +393,90 @@ func ValidateBlockerReportFile(path string, kind string) error {
 		if strings.TrimSpace(row.SiteID) == "" || strings.TrimSpace(row.Function) == "" {
 			issues = append(issues, fmt.Sprintf("row %d missing site_id/function", i))
 		}
+		if !knownIntent(row.Intent) {
+			issues = append(issues, fmt.Sprintf("row %d unknown intent %q", i, row.Intent))
+		}
+		if !knownPlacement(row.Placement) {
+			issues = append(issues, fmt.Sprintf("row %d unknown placement %q", i, row.Placement))
+		}
+		if !knownGrade(row.ContractGrade) {
+			issues = append(issues, fmt.Sprintf("row %d unknown contract_grade %q", i, row.ContractGrade))
+		}
 		if kind == "heap" && len(row.Blockers) == 0 {
 			issues = append(issues, fmt.Sprintf("row %d heap blocker row requires blockers", i))
 		}
 		if kind == "copy" && strings.TrimSpace(row.CopyReason) == "" {
 			issues = append(issues, fmt.Sprintf("row %d copy row requires copy_reason", i))
 		}
+		issues = append(issues, validateActionableBlockerRow(i, row, kind)...)
 	}
 	issues = append(issues, validateNonClaims(report.NonClaims)...)
 	if len(issues) > 0 {
 		return errors.New(strings.Join(issues, "; "))
 	}
 	return nil
+}
+
+func validateActionableBlockerRow(index int, row BlockerRow, kind string) []string {
+	var issues []string
+	prefix := fmt.Sprintf("row %d", index)
+	switch row.SourceLocationStatus {
+	case "available":
+		if strings.TrimSpace(row.File) == "" || row.Line <= 0 {
+			issues = append(issues, prefix+" source_location_status available requires file and positive line")
+		}
+	case "unavailable", "generated", "internal":
+	default:
+		issues = append(issues, fmt.Sprintf("%s source_location_status %q is required and must be available, unavailable, generated, or internal", prefix, row.SourceLocationStatus))
+	}
+	if strings.TrimSpace(row.Symbol) == "" {
+		issues = append(issues, prefix+" symbol is required")
+	}
+	switch row.Severity {
+	case "P1", "P2", "P3":
+	default:
+		issues = append(issues, fmt.Sprintf("%s severity %q must be P1, P2, or P3", prefix, row.Severity))
+	}
+	if strings.TrimSpace(row.Reason) == "" {
+		issues = append(issues, prefix+" reason is required")
+	}
+	if strings.TrimSpace(row.SuggestedFix) == "" {
+		issues = append(issues, prefix+" suggested_fix is required")
+	}
+	if strings.TrimSpace(row.ProofID) == "" && strings.TrimSpace(row.EvidenceID) == "" {
+		issues = append(issues, prefix+" proof_id or evidence_id is required")
+	}
+	if row.SafeToOptimize == nil {
+		issues = append(issues, prefix+" safe_to_optimize is required")
+	}
+	if kind == "copy" {
+		if !knownCopyKind(row.CopyKind) {
+			issues = append(issues, fmt.Sprintf("%s copy_kind %q is not recognized", prefix, row.CopyKind))
+		}
+		if strings.TrimSpace(row.SourceValue) == "" {
+			issues = append(issues, prefix+" source_value is required")
+		}
+		if strings.TrimSpace(row.DestinationValue) == "" {
+			issues = append(issues, prefix+" destination_value is required")
+		}
+		if row.BytesEstimate < 0 {
+			issues = append(issues, prefix+" bytes_estimate must not be negative")
+		}
+		if strings.TrimSpace(row.SafetyReason) == "" {
+			issues = append(issues, prefix+" safety_reason is required")
+		}
+	}
+	return issues
+}
+
+func knownCopyKind(value string) bool {
+	switch value {
+	case "HOT_PATH_COPY", "RELEASE_TOOL_COPY", "TEST_ONLY_COPY", "ACCEPTABLE_SMALL_COPY",
+		"NEEDS_STREAMING", "NEEDS_CAPACITY_HINT", "NEEDS_ZERO_COPY_OR_BORROWED_VIEW":
+		return true
+	default:
+		return false
+	}
 }
 
 func validateRow(i int, row Row, proofs map[string]ProofSummary) []string {

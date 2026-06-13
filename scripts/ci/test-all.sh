@@ -9,10 +9,11 @@ mode="full"
 report_dir=""
 keep_going=false
 json_only=false
+report_format="json"
 
 usage() {
   cat <<'USAGE'
-Usage: bash scripts/ci/test-all.sh [--quick|--full|--stabilization] [--keep-going] [--json-only] [--report-dir DIR]
+Usage: bash scripts/ci/test-all.sh [--quick|--full|--stabilization] [--keep-going] [--json-only] [--report-dir DIR] [--report-format json|toon|both]
 
 Modes:
   --quick          Run the fast stabilization gate for local iteration.
@@ -22,9 +23,13 @@ Modes:
 Output:
   --keep-going  Run remaining steps after a failure and exit 1 at the end.
   --json-only   Suppress progress logs and print summary JSON to stdout.
+  --report-format FORMAT
+                Write structured summary artifacts as json, toon, or both.
+                summary.json remains the canonical machine report.
 
 Artifacts:
   The script writes per-step logs plus summary.md and summary.json to DIR.
+  With --report-format toon|both it also writes summary.toon to DIR.
   summary.json records each step name, status, duration_seconds, exit_code, and log.
   It also includes top-level step_count and failed_count fields.
   release_artifact defaults to tetra.release.<version-slug>.test-all-summary.v1.
@@ -67,6 +72,18 @@ while [[ $# -gt 0 ]]; do
       json_only=true
       shift
       ;;
+    --report-format)
+      if [[ $# -lt 2 ]]; then
+        echo "--report-format requires json, toon, or both" >&2
+        exit 2
+      fi
+      report_format="$2"
+      shift 2
+      ;;
+    --report-format=*)
+      report_format="${1#--report-format=}"
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -78,6 +95,15 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+case "$report_format" in
+  json|toon|both)
+    ;;
+  *)
+    echo "--report-format must be json, toon, or both" >&2
+    exit 2
+    ;;
+esac
 
 release_version="${TETRA_TEST_ALL_RELEASE_VERSION:-}"
 if [[ -z "$release_version" ]]; then
@@ -135,6 +161,7 @@ check_report_dir_fresh
 logs_dir="$report_dir/logs"
 summary_md="$report_dir/summary.md"
 summary_json="$report_dir/summary.json"
+summary_toon="$report_dir/summary.toon"
 tmp_dir="$(mktemp -d)"
 started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 step_count=0
@@ -155,6 +182,10 @@ json_escape() {
   s="${s//\"/\\\"}"
   s="${s//$'\n'/\\n}"
   printf '%s' "$s"
+}
+
+wants_toon_summary() {
+  [[ "$report_format" == "toon" || "$report_format" == "both" ]]
 }
 
 write_summary() {
@@ -194,10 +225,19 @@ write_summary() {
     echo '  ]'
     echo "}"
   } >"$summary_json"
+
+  if wants_toon_summary; then
+    go run ./tools/cmd/json-to-toon --in "$summary_json" --out "$summary_toon"
+  fi
 }
 
 validate_summary() {
-  go run ./tools/cmd/validate-test-all-summary --summary "$summary_json" --report-dir "$report_dir"
+  local failures=0
+  go run ./tools/cmd/validate-test-all-summary --summary "$summary_json" --report-dir "$report_dir" --format=json || failures=1
+  if wants_toon_summary; then
+    go run ./tools/cmd/validate-test-all-summary --summary "$summary_toon" --report-dir "$report_dir" --format=toon || failures=1
+  fi
+  return "$failures"
 }
 
 validate_summary_best_effort() {
@@ -561,6 +601,7 @@ check_ram_contract_fuzz_oracle_gate() {
 
 check_host_leak_blockers() {
   require_host_leak_go_test_names ./cli/internal/actornet 'Broker|Leak|CloseWithoutCancel' \
+    TestBrokerCloseReopenWithoutGoroutineLeak \
     TestBrokerCloseWithoutCancelStopsServeWatcher \
     TestBrokerRoutesFramesBetweenLoopbackNodesAndWritesReport \
     TestBrokerReportsNodeDownForMissingDestination || return 1
@@ -658,8 +699,16 @@ run_tetra_smoke_target() {
   local target="$1"
   local run_binaries="$2"
   local report_path="$3"
-  ./tetra smoke --target "$target" --run="$run_binaries" --report "$report_path"
-  go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$report_path"
+  local smoke_report_format="json"
+  if wants_toon_summary; then
+    smoke_report_format="both"
+  fi
+  ./tetra smoke --target "$target" --run="$run_binaries" --report "$report_path" --report-format "$smoke_report_format"
+  go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$report_path" --format=json
+  if wants_toon_summary; then
+    local toon_report_path="${report_path%.*}.toon"
+    go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$toon_report_path" --format=toon
+  fi
 }
 
 check_host_smoke() {
@@ -668,7 +717,11 @@ check_host_smoke() {
 
 check_smoke_list() {
   ./tetra smoke --list --target linux-x64 --format=json >"$report_dir/smoke-list.json"
-  go run ./tools/cmd/validate-smoke-list --report "$report_dir/smoke-list.json" --examples-root examples
+  go run ./tools/cmd/validate-smoke-list --report "$report_dir/smoke-list.json" --examples-root examples --format=json
+  if wants_toon_summary; then
+    ./tetra smoke --list --target linux-x64 --format=toon >"$report_dir/smoke-list.toon"
+    go run ./tools/cmd/validate-smoke-list --report "$report_dir/smoke-list.toon" --examples-root examples --format=toon
+  fi
 }
 
 check_generated_api_docs() {
