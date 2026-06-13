@@ -113,7 +113,7 @@ func TestValidateReportRejectsMissingActorBenchmarkPrepRows(t *testing.T) {
     {"name":"actor ping-pong benchmark prep","kind":"actor_benchmark_prep","metric":"messages_round_trip","unit":"prep_only","baseline_value":0,"measured_value":0,"improvement_ratio":0.0,"evidence":"compiler/actors_test.go::TestActorsPingPongBuildAndRun and examples/actors_pingpong.tetra define the local Linux-x64 actor ping-pong workload candidate","claim_tier":"tier0_local_smoke_only","claim":"Actor ping-pong benchmark prep row exists as Tier 0 local smoke only; no measured result is published and cross-runtime comparison is out of scope.","raw_output_artifacts":["reports/actor-runtime-foundation/P15/parallelrt-evidence.raw.json"],"ran":false,"pass":true},
     {"name":"actor fanout/fanin benchmark prep","kind":"actor_benchmark_prep","metric":"fanout_fanin_messages","unit":"prep_only","baseline_value":0,"measured_value":0,"improvement_ratio":0.0,"evidence":"compiler/internal/parallelrt two-core work stealing model checks actor fanout/fanin scheduling shape without publishing throughput","claim_tier":"tier0_local_smoke_only","claim":"Actor fanout/fanin benchmark prep row exists as Tier 0 local smoke only; it records local workload shape and leaves public benchmark publication out of scope.","raw_output_artifacts":["reports/actor-runtime-foundation/P15/parallelrt-evidence.raw.json"],"ran":false,"pass":true},
     {"name":"actor mailbox throughput benchmark prep","kind":"actor_benchmark_prep","metric":"mailbox_messages","unit":"prep_only","baseline_value":0,"measured_value":0,"improvement_ratio":0.0,"evidence":"compiler/internal/parallelrt TypedMailbox and parallel production actor mailbox cases define the local mailbox throughput workload candidate","claim_tier":"tier0_local_smoke_only","claim":"Actor mailbox throughput benchmark prep row exists as Tier 0 local smoke only; it publishes no measured result and no throughput guarantee.","raw_output_artifacts":["reports/actor-runtime-foundation/P15/parallelrt-evidence.raw.json"],"ran":false,"pass":true},
-    {"name":"actor backpressure latency benchmark prep","kind":"actor_benchmark_prep","metric":"backpressure_wait","unit":"prep_only","baseline_value":0,"measured_value":0,"improvement_ratio":0.0,"evidence":"compiler/internal/parallelrt ErrMailboxFull and blocking_recv_yield metadata define the local backpressure latency diagnostic candidate","claim_tier":"tier0_local_smoke_only","claim":"Actor backpressure latency benchmark prep row exists as Tier 0 local smoke only; no real-world SLA or latency advantage is claimed.","raw_output_artifacts":["reports/actor-runtime-foundation/P15/parallelrt-evidence.raw.json"],"ran":false,"pass":true},
+    {"name":"actor backpressure latency benchmark prep","kind":"actor_benchmark_prep","metric":"backpressure_wait","unit":"prep_only","baseline_value":0,"measured_value":0,"improvement_ratio":0.0,"evidence":"compiler/internal/parallelrt ErrMailboxFull and blocking_recv_yield metadata define the local backpressure latency diagnostic candidate","claim_tier":"tier0_local_smoke_only","claim":"Actor backpressure latency benchmark prep row exists as Tier 0 local smoke only; no real-world SLA is claimed.","raw_output_artifacts":["reports/actor-runtime-foundation/P15/parallelrt-evidence.raw.json"],"ran":false,"pass":true},
     {"name":"zero_copy_move local typed mailbox benchmark prep","kind":"actor_transfer_prep","metric":"owned_region_transfer","unit":"prep_only","baseline_value":0,"measured_value":0,"improvement_ratio":0.0,"evidence":"compiler/internal/parallelrt owned-region transfer report emits zero_copy_move for local typed mailbox metadata only","claim_tier":"tier0_local_smoke_only","claim":"zero_copy_move local typed mailbox benchmark prep row exists as Tier 0 local smoke only; it records local owned-region metadata and leaves distributed or network transfer behavior out of scope.","raw_output_artifacts":["reports/actor-runtime-foundation/P15/parallelrt-evidence.raw.json"],"ran":false,"pass":true}
   ],
 `, "", 1)
@@ -163,10 +163,146 @@ func TestValidateReportRejectsSchedulerPrototypeProductionPromotion(t *testing.T
 	}
 }
 
+func TestValidateReportRejectsZeroCopyMoveDistributedSpellingVariants(t *testing.T) {
+	for _, claim := range []string{
+		"zero_copy_move local typed mailbox benchmark prep proves distributed zero copy actor transfer.",
+		"zero_copy_move local typed mailbox benchmark prep proves cross-node zero-copy actor transfer.",
+		"zero_copy_move local typed mailbox benchmark prep proves actor transfer across nodes.",
+	} {
+		t.Run(claim, func(t *testing.T) {
+			var report Report
+			if err := json.Unmarshal([]byte(validParallelProductionReport()), &report); err != nil {
+				t.Fatalf("fixture unmarshal failed: %v", err)
+			}
+			found := false
+			for i := range report.Benchmarks {
+				if report.Benchmarks[i].Name == "zero_copy_move local typed mailbox benchmark prep" {
+					report.Benchmarks[i].Claim = claim
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Fatalf("fixture missing zero_copy_move benchmark prep row")
+			}
+			raw, err := json.Marshal(report)
+			if err != nil {
+				t.Fatalf("fixture marshal failed: %v", err)
+			}
+			err = ValidateReport(raw)
+			if err == nil {
+				t.Fatalf("expected zero_copy_move distributed spelling variant to fail")
+			}
+			if !strings.Contains(strings.ToLower(err.Error()), "zero") {
+				t.Fatalf("error = %v, want zero-copy rejection", err)
+			}
+		})
+	}
+}
+
+func TestValidateReportRejectsActorBenchmarkSuperiorityClaimWithoutReproducibleArtifacts(t *testing.T) {
+	var report Report
+	if err := json.Unmarshal([]byte(validParallelProductionReport()), &report); err != nil {
+		t.Fatalf("fixture unmarshal failed: %v", err)
+	}
+	report.Benchmarks[0].ClaimTier = "tier2_reproducible_cross_machine"
+	report.Benchmarks[0].Ran = true
+	report.Benchmarks[0].BaselineValue = 100
+	report.Benchmarks[0].MeasuredValue = 90
+	report.Benchmarks[0].Claim = "Actor benchmark proves Tetra actors are faster than Rust/C++ actor runtimes."
+	report.Benchmarks[0].Evidence = "Tier 2 cross-machine actor throughput result without reproduction artifacts"
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatalf("fixture marshal failed: %v", err)
+	}
+	err = ValidateReport(raw)
+	if err == nil {
+		t.Fatalf("expected actor benchmark superiority claim without reproducible artifacts to fail")
+	}
+	for _, want := range []string{"faster than rust/c++", "tier 2", "reproduction_artifacts"} {
+		if !strings.Contains(strings.ToLower(err.Error()), want) {
+			t.Fatalf("error missing %q:\n%v", want, err)
+		}
+	}
+}
+
+func TestValidateReportRejectsBenchmarkPromotionBeyondTierOneWithoutEnvironmentMetadata(t *testing.T) {
+	var report Report
+	if err := json.Unmarshal([]byte(validParallelProductionReport()), &report); err != nil {
+		t.Fatalf("fixture unmarshal failed: %v", err)
+	}
+	report.Benchmarks[1].ClaimTier = "tier3_independent_reproduction"
+	report.Benchmarks[1].Ran = true
+	report.Benchmarks[1].BaselineValue = 100
+	report.Benchmarks[1].MeasuredValue = 100
+	report.Benchmarks[1].Claim = "Actor fanout benchmark prep is an independently reproduced actor benchmark result."
+	report.Benchmarks[1].Evidence = "Tier 3 independent actor benchmark result with no environment metadata"
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatalf("fixture marshal failed: %v", err)
+	}
+	err = ValidateReport(raw)
+	if err == nil {
+		t.Fatalf("expected Tier 3 benchmark promotion without environment metadata to fail")
+	}
+	for _, want := range []string{"tier 3", "environment metadata", "reproduction_artifacts"} {
+		if !strings.Contains(strings.ToLower(err.Error()), want) {
+			t.Fatalf("error missing %q:\n%v", want, err)
+		}
+	}
+}
+
+func TestValidateReportRejectsMissingActorBenchmarkNonClaimAudit(t *testing.T) {
+	var report Report
+	if err := json.Unmarshal([]byte(validParallelProductionReport()), &report); err != nil {
+		t.Fatalf("fixture unmarshal failed: %v", err)
+	}
+	found := false
+	for i := range report.Audit {
+		if report.Audit[i].Requirement == "actor benchmark Tier 0/Tier 1 preparation" {
+			report.Audit[i].Evidence = "parallelrt evidence emits Tier 0 actor benchmark prep rows with raw artifact references"
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("fixture missing actor benchmark audit row")
+	}
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatalf("fixture marshal failed: %v", err)
+	}
+	err = ValidateReport(raw)
+	if err == nil {
+		t.Fatalf("expected missing actor benchmark nonclaim audit to fail")
+	}
+	for _, want := range []string{"benchmark superiority", "parity", "official benchmark"} {
+		if !strings.Contains(strings.ToLower(err.Error()), want) {
+			t.Fatalf("error missing %q:\n%v", want, err)
+		}
+	}
+}
+
 func TestValidateReportRejectsMissingSafeUnsafeForbiddenBoundaryCoverageCase(t *testing.T) {
-	raw := strings.Replace(validParallelProductionReport(), `    {"name":"safe unsafe forbidden boundary coverage","kind":"positive","ran":true,"pass":true},
-`, "", 1)
-	err := ValidateReport([]byte(raw))
+	var report Report
+	if err := json.Unmarshal([]byte(validParallelProductionReport()), &report); err != nil {
+		t.Fatalf("fixture unmarshal failed: %v", err)
+	}
+	var kept []CaseReport
+	for _, c := range report.Cases {
+		if c.Name != "safe unsafe forbidden boundary coverage" {
+			kept = append(kept, c)
+		}
+	}
+	if len(kept) == len(report.Cases) {
+		t.Fatalf("fixture missing safe unsafe forbidden boundary coverage case")
+	}
+	report.Cases = kept
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatalf("fixture marshal failed: %v", err)
+	}
+	err = ValidateReport(raw)
 	if err == nil {
 		t.Fatalf("expected missing safe unsafe forbidden boundary coverage case to fail")
 	}
@@ -200,6 +336,8 @@ func TestValidateReportRejectsMissingParallelEdgeCases(t *testing.T) {
 `},
 		{name: "actor broker leak cleanup", row: `    {"name":"actor broker leak cleanup","kind":"positive","ran":true,"pass":true},
 `},
+		{name: "actor fanout mailbox drain soak", row: `    {"name":"actor fanout mailbox drain soak","kind":"stress","ran":true,"pass":true,"iterations":512,"deterministic_seed":"actor-fanout-mailbox-drain-v1","max_duration_ms":90000},
+`},
 		{name: "resource double join diagnostic", row: `    {"name":"resource double join diagnostic","kind":"negative","ran":true,"pass":true,"expected_error":"joined"},
 `},
 		{name: "task group use-after-close diagnostic", row: `    {"name":"task group use-after-close diagnostic","kind":"negative","ran":true,"pass":true,"expected_error":"closed"},
@@ -218,6 +356,47 @@ func TestValidateReportRejectsMissingParallelEdgeCases(t *testing.T) {
 	}
 }
 
+func TestValidateReportRejectsStressCasesMissingBoundedMetadata(t *testing.T) {
+	var report map[string]any
+	if err := json.Unmarshal([]byte(validParallelProductionReport()), &report); err != nil {
+		t.Fatalf("fixture unmarshal failed: %v", err)
+	}
+	cases, ok := report["cases"].([]any)
+	if !ok {
+		t.Fatalf("fixture cases have type %T, want []any", report["cases"])
+	}
+	found := false
+	for _, rawCase := range cases {
+		c, ok := rawCase.(map[string]any)
+		if !ok {
+			t.Fatalf("fixture case has type %T, want map[string]any", rawCase)
+		}
+		if c["name"] == "many tasks stress" {
+			delete(c, "iterations")
+			delete(c, "deterministic_seed")
+			delete(c, "max_duration_ms")
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("fixture missing many tasks stress case")
+	}
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatalf("fixture marshal failed: %v", err)
+	}
+	err = ValidateReport(raw)
+	if err == nil {
+		t.Fatalf("expected stress case without bounded metadata to fail")
+	}
+	for _, want := range []string{"many tasks stress", "iterations", "deterministic_seed", "max_duration_ms"} {
+		if !strings.Contains(strings.ToLower(err.Error()), want) {
+			t.Fatalf("error missing %q:\n%v", want, err)
+		}
+	}
+}
+
 func TestValidateReportRejectsMissingCompletionAudit(t *testing.T) {
 	raw := strings.Replace(validParallelProductionReport(), `,
   "audit": [
@@ -226,10 +405,10 @@ func TestValidateReportRejectsMissingCompletionAudit(t *testing.T) {
     {"requirement":"actor mailbox backpressure and failure handling","artifact":"compiler/actors_test.go; compiler/distributed_actor_runtime_test.go","evidence":"actor mailbox backpressure, checked message pool exhaustion, invalid actor handle send, done actor send, task actor mailbox handoff, and actor failure handling cases are required","result":"pass"},
     {"requirement":"task/actor/thread-boundary transfer rules","artifact":"compiler/tests/ownership; cli/cmd/tetra/check_diagnostics_resource_actor_test.go","evidence":"task and actor ownership transfer, actor/island boundary proof, resource double join, and task group use-after-close diagnostics are required cases","result":"pass"},
     {"requirement":"race-safety model or conservative rejections","artifact":"compiler/tests/ownership; docs/spec/actors.md","evidence":"shared mutable race-safety rejection and race-safety rejection matrix evidence are required until a broader race-safe model is implemented","result":"pass"},
-    {"requirement":"stress evidence for tasks, actor messages, cancellation storms, and timeouts","artifact":"tools/cmd/parallel-production-smoke","evidence":"many tasks stress, many actor messages stress, cancellation storm, timeouts stress, and actor broker leak cleanup cases are required","result":"pass"},
+    {"requirement":"stress evidence for tasks, actor messages, cancellation storms, and timeouts","artifact":"tools/cmd/parallel-production-smoke","evidence":"many tasks stress, many actor messages stress, actor fanout mailbox drain soak, cancellation storm, timeouts stress, and actor broker leak cleanup cases are required with bounded metadata","result":"pass"},
     {"requirement":"safe/unsafe/forbidden parallelism documentation","artifact":"docs/spec/actors.md; docs/user/async_actors_guide.md; docs/spec/runtime_abi.md; compiler/tests/semantics/async_test.go; compiler/tests/safety/effects_test.go","evidence":"documentation defines supported actor/task runtime, transfer boundaries, and unsupported guarantees; safe unsafe forbidden boundary coverage runs compiler tests for allowed immutable task targets, missing runtime/actors effects, unsafe-only operations, and forbidden mutable actor/task targets","result":"pass"},
     {"requirement":"stable parallel diagnostics","artifact":"compiler/task_runtime_test.go; compiler/actors_test.go; compiler/tests/ownership/actor_task_ownership_test.go; cli/cmd/tetra/check_diagnostics_resource_actor_test.go","evidence":"negative parallel cases require stable expected_error evidence for cancellation, deadline, backpressure, invalid handle, double join, use-after-close, transfer, and shared mutable rejection diagnostics","result":"pass"},
-    {"requirement":"actor benchmark Tier 0/Tier 1 preparation","artifact":"compiler/internal/parallelrt; tools/cmd/parallel-production-smoke","evidence":"parallelrt evidence emits Tier 0 actor ping-pong, fanout/fanin, mailbox throughput, backpressure latency, and zero_copy_move local typed mailbox prep rows with raw artifact references and no performance claim","result":"pass"},
+    {"requirement":"actor benchmark Tier 0/Tier 1 preparation","artifact":"compiler/internal/parallelrt; tools/cmd/parallel-production-smoke","evidence":"parallelrt evidence emits Tier 0 actor ping-pong, fanout/fanin, mailbox throughput, backpressure latency, and zero_copy_move local typed mailbox prep rows with raw artifact references; Tier 1 remains preparation-only here, with no benchmark superiority, no C++/Rust parity, and no official benchmark claim","result":"pass"},
     {"requirement":"release-gate entrypoint","artifact":"scripts/release/post_v0_4/parallel-production-linux-x64-smoke.sh","evidence":"parallel production gate must run producer, validator, and artifact hash validation","result":"pass"}
   ]`, "", 1)
 	err := ValidateReport([]byte(raw))
@@ -259,7 +438,7 @@ func validParallelProductionReport() string {
     {"name":"actor ping-pong benchmark prep","kind":"actor_benchmark_prep","metric":"messages_round_trip","unit":"prep_only","baseline_value":0,"measured_value":0,"improvement_ratio":0.0,"evidence":"compiler/actors_test.go::TestActorsPingPongBuildAndRun and examples/actors_pingpong.tetra define the local Linux-x64 actor ping-pong workload candidate","claim_tier":"tier0_local_smoke_only","claim":"Actor ping-pong benchmark prep row exists as Tier 0 local smoke only; no measured result is published and cross-runtime comparison is out of scope.","raw_output_artifacts":["reports/actor-runtime-foundation/P15/parallelrt-evidence.raw.json"],"ran":false,"pass":true},
     {"name":"actor fanout/fanin benchmark prep","kind":"actor_benchmark_prep","metric":"fanout_fanin_messages","unit":"prep_only","baseline_value":0,"measured_value":0,"improvement_ratio":0.0,"evidence":"compiler/internal/parallelrt two-core work stealing model checks actor fanout/fanin scheduling shape without publishing throughput","claim_tier":"tier0_local_smoke_only","claim":"Actor fanout/fanin benchmark prep row exists as Tier 0 local smoke only; it records local workload shape and leaves public benchmark publication out of scope.","raw_output_artifacts":["reports/actor-runtime-foundation/P15/parallelrt-evidence.raw.json"],"ran":false,"pass":true},
     {"name":"actor mailbox throughput benchmark prep","kind":"actor_benchmark_prep","metric":"mailbox_messages","unit":"prep_only","baseline_value":0,"measured_value":0,"improvement_ratio":0.0,"evidence":"compiler/internal/parallelrt TypedMailbox and parallel production actor mailbox cases define the local mailbox throughput workload candidate","claim_tier":"tier0_local_smoke_only","claim":"Actor mailbox throughput benchmark prep row exists as Tier 0 local smoke only; it publishes no measured result and no throughput guarantee.","raw_output_artifacts":["reports/actor-runtime-foundation/P15/parallelrt-evidence.raw.json"],"ran":false,"pass":true},
-    {"name":"actor backpressure latency benchmark prep","kind":"actor_benchmark_prep","metric":"backpressure_wait","unit":"prep_only","baseline_value":0,"measured_value":0,"improvement_ratio":0.0,"evidence":"compiler/internal/parallelrt ErrMailboxFull and blocking_recv_yield metadata define the local backpressure latency diagnostic candidate","claim_tier":"tier0_local_smoke_only","claim":"Actor backpressure latency benchmark prep row exists as Tier 0 local smoke only; no real-world SLA or latency advantage is claimed.","raw_output_artifacts":["reports/actor-runtime-foundation/P15/parallelrt-evidence.raw.json"],"ran":false,"pass":true},
+    {"name":"actor backpressure latency benchmark prep","kind":"actor_benchmark_prep","metric":"backpressure_wait","unit":"prep_only","baseline_value":0,"measured_value":0,"improvement_ratio":0.0,"evidence":"compiler/internal/parallelrt ErrMailboxFull and blocking_recv_yield metadata define the local backpressure latency diagnostic candidate","claim_tier":"tier0_local_smoke_only","claim":"Actor backpressure latency benchmark prep row exists as Tier 0 local smoke only; no real-world SLA is claimed.","raw_output_artifacts":["reports/actor-runtime-foundation/P15/parallelrt-evidence.raw.json"],"ran":false,"pass":true},
     {"name":"zero_copy_move local typed mailbox benchmark prep","kind":"actor_transfer_prep","metric":"owned_region_transfer","unit":"prep_only","baseline_value":0,"measured_value":0,"improvement_ratio":0.0,"evidence":"compiler/internal/parallelrt owned-region transfer report emits zero_copy_move for local typed mailbox metadata only","claim_tier":"tier0_local_smoke_only","claim":"zero_copy_move local typed mailbox benchmark prep row exists as Tier 0 local smoke only; it records local owned-region metadata and leaves distributed or network transfer behavior out of scope.","raw_output_artifacts":["reports/actor-runtime-foundation/P15/parallelrt-evidence.raw.json"],"ran":false,"pass":true}
   ],
   "contracts": [
@@ -296,10 +475,11 @@ func validParallelProductionReport() string {
     {"name":"actor island boundary proof","kind":"positive","ran":true,"pass":true},
     {"name":"actor broker leak cleanup","kind":"positive","ran":true,"pass":true},
     {"name":"safe unsafe forbidden boundary coverage","kind":"positive","ran":true,"pass":true},
-    {"name":"many tasks stress","kind":"stress","ran":true,"pass":true},
-    {"name":"many actor messages stress","kind":"stress","ran":true,"pass":true},
-    {"name":"cancellation storm","kind":"stress","ran":true,"pass":true},
-    {"name":"timeouts stress","kind":"stress","ran":true,"pass":true}
+    {"name":"actor fanout mailbox drain soak","kind":"stress","ran":true,"pass":true,"iterations":512,"deterministic_seed":"actor-fanout-mailbox-drain-v1","max_duration_ms":90000},
+    {"name":"many tasks stress","kind":"stress","ran":true,"pass":true,"iterations":64,"deterministic_seed":"task-bounded-stress-seed-17","max_duration_ms":10000},
+    {"name":"many actor messages stress","kind":"stress","ran":true,"pass":true,"iterations":256,"deterministic_seed":"actors-tagged-stress-v1","max_duration_ms":10000},
+    {"name":"cancellation storm","kind":"stress","ran":true,"pass":true,"iterations":16,"deterministic_seed":"parallel-cancellation-storm-v1","max_duration_ms":10000},
+    {"name":"timeouts stress","kind":"stress","ran":true,"pass":true,"iterations":1,"deterministic_seed":"deadline-aware-waits-v1","max_duration_ms":10000}
   ],
   "diagnostics": [
     {"case":"task cancellation","code":"TASK_CANCELLED","severity":"error","category":"task","position":"runtime","expected_error":"cancelled"},
@@ -324,10 +504,10 @@ func validParallelProductionReport() string {
     {"requirement":"actor mailbox backpressure and failure handling","artifact":"compiler/actors_test.go; compiler/distributed_actor_runtime_test.go","evidence":"actor mailbox backpressure, checked message pool exhaustion, invalid actor handle send, done actor send, task actor mailbox handoff, and actor failure handling cases are required","result":"pass"},
     {"requirement":"task/actor/thread-boundary transfer rules","artifact":"compiler/tests/ownership; cli/cmd/tetra/check_diagnostics_resource_actor_test.go","evidence":"task and actor ownership transfer, actor/island boundary proof, resource double join, and task group use-after-close diagnostics are required cases","result":"pass"},
     {"requirement":"race-safety model or conservative rejections","artifact":"compiler/tests/ownership; docs/spec/actors.md","evidence":"shared mutable race-safety rejection and race-safety rejection matrix evidence are required until a broader race-safe model is implemented","result":"pass"},
-    {"requirement":"stress evidence for tasks, actor messages, cancellation storms, and timeouts","artifact":"tools/cmd/parallel-production-smoke","evidence":"many tasks stress, many actor messages stress, cancellation storm, timeouts stress, and actor broker leak cleanup cases are required","result":"pass"},
+    {"requirement":"stress evidence for tasks, actor messages, cancellation storms, and timeouts","artifact":"tools/cmd/parallel-production-smoke","evidence":"many tasks stress, many actor messages stress, actor fanout mailbox drain soak, cancellation storm, timeouts stress, and actor broker leak cleanup cases are required with bounded metadata","result":"pass"},
     {"requirement":"safe/unsafe/forbidden parallelism documentation","artifact":"docs/spec/actors.md; docs/user/async_actors_guide.md; docs/spec/runtime_abi.md; compiler/tests/semantics/async_test.go; compiler/tests/safety/effects_test.go","evidence":"documentation defines supported actor/task runtime, transfer boundaries, and unsupported guarantees; safe unsafe forbidden boundary coverage runs compiler tests for allowed immutable task targets, missing runtime/actors effects, unsafe-only operations, and forbidden mutable actor/task targets","result":"pass"},
     {"requirement":"stable parallel diagnostics","artifact":"compiler/task_runtime_test.go; compiler/actors_test.go; compiler/tests/ownership/actor_task_ownership_test.go; cli/cmd/tetra/check_diagnostics_resource_actor_test.go","evidence":"negative parallel cases require stable expected_error evidence for cancellation, deadline, backpressure, invalid handle, double join, use-after-close, transfer, and shared mutable rejection diagnostics","result":"pass"},
-    {"requirement":"actor benchmark Tier 0/Tier 1 preparation","artifact":"compiler/internal/parallelrt; tools/cmd/parallel-production-smoke","evidence":"parallelrt evidence emits Tier 0 actor ping-pong, fanout/fanin, mailbox throughput, backpressure latency, and zero_copy_move local typed mailbox prep rows with raw artifact references and no performance claim","result":"pass"},
+    {"requirement":"actor benchmark Tier 0/Tier 1 preparation","artifact":"compiler/internal/parallelrt; tools/cmd/parallel-production-smoke","evidence":"parallelrt evidence emits Tier 0 actor ping-pong, fanout/fanin, mailbox throughput, backpressure latency, and zero_copy_move local typed mailbox prep rows with raw artifact references; Tier 1 remains preparation-only here, with no benchmark superiority, no C++/Rust parity, and no official benchmark claim","result":"pass"},
     {"requirement":"release-gate entrypoint","artifact":"scripts/release/post_v0_4/parallel-production-linux-x64-smoke.sh","evidence":"parallel production gate must run producer, validator, and artifact hash validation","result":"pass"}
   ]
 }`

@@ -2,6 +2,12 @@
 
 Date: 2026-06-10
 
+Historical audit note: this document is historical supporting evidence,
+subordinate to current same-commit actor foundation gates. Do not use it as
+current release proof unless its recorded git head and artifacts are revalidated
+by the current actor foundation gate, artifact hash validator, and foundation
+validator.
+
 ## Verdict
 
 Actor Runtime Production Foundation v1:
@@ -43,7 +49,7 @@ Historical baseline note: prior actor foundation evidence for
 `reports/actor-runtime-foundation/` is historical supporting evidence only. It
 is not current same-commit final-production proof for this audit.
 
-## Current Final-Production Artifacts
+## Historical Final-Production Artifacts
 
 - `reports/actor-final-production/foundation-gate/actor-runtime-foundation-manifest.json`
   sha256: `5cb72b8c9fedb15ff1a39c14a75f7c0585cfed919807ddb9bed354d59e8db977`

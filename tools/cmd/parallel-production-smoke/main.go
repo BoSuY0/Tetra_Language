@@ -118,7 +118,7 @@ func (r *smokeRunner) runExecutableEvidence(ctx context.Context) error {
 		recordProcess: false,
 		cases: []parallelprod.CaseReport{
 			{Name: "deadline timeout", Kind: "negative", Ran: true, Pass: true, ExpectedError: "deadline"},
-			{Name: "timeouts stress", Kind: "stress", Ran: true, Pass: true},
+			stressCase("timeouts stress", 1, "deadline-aware-waits-v1", 10000),
 		},
 	}); err != nil {
 		return err
@@ -132,7 +132,7 @@ func (r *smokeRunner) runExecutableEvidence(ctx context.Context) error {
 		processKind:   "stress",
 		recordProcess: true,
 		cases: []parallelprod.CaseReport{
-			{Name: "many actor messages stress", Kind: "stress", Ran: true, Pass: true},
+			stressCase("many actor messages stress", 256, "actors-tagged-stress-v1", 10000),
 		},
 	}); err != nil {
 		return err
@@ -144,7 +144,7 @@ func (r *smokeRunner) runExecutableEvidence(ctx context.Context) error {
 		recordProcess: false,
 		cases: []parallelprod.CaseReport{
 			{Name: "scheduler fairness", Kind: "positive", Ran: true, Pass: true},
-			{Name: "many tasks stress", Kind: "stress", Ran: true, Pass: true},
+			stressCase("many tasks stress", 64, "task-bounded-stress-seed-17", 10000),
 		},
 	}); err != nil {
 		return err
@@ -182,7 +182,7 @@ func (r *smokeRunner) runExecutableEvidence(ctx context.Context) error {
 		expectedExit:  0,
 		recordProcess: false,
 		cases: []parallelprod.CaseReport{
-			{Name: "cancellation storm", Kind: "stress", Ran: true, Pass: true},
+			stressCase("cancellation storm", 16, "parallel-cancellation-storm-v1", 10000),
 		},
 	})
 }
@@ -229,6 +229,9 @@ func (r *smokeRunner) runCompilerEvidence(ctx context.Context) error {
 		pkg           string
 		pattern       string
 		expectedError string
+		iterations    int
+		seed          string
+		maxDurationMS int
 	}{
 		{name: "actor mailbox backpressure", kind: "negative", pkg: "./compiler", pattern: "TestActorMailboxFullReturnsCheckedBackpressure", expectedError: "mailbox full/backpressure"},
 		{name: "message pool exhaustion", kind: "negative", pkg: "./compiler", pattern: "TestActorMessagePoolExhaustionReturnsCheckedFailure", expectedError: "message pool exhausted"},
@@ -248,12 +251,17 @@ func (r *smokeRunner) runCompilerEvidence(ctx context.Context) error {
 		{name: "actor recv cancel wake", kind: "negative", pkg: "./compiler", pattern: "TestTaskGroupCancelWakesActorRecvUntilBeforeDeadlineBuildAndRun", expectedError: "actor recv cancel wake"},
 		{name: "nested cancellation propagation", kind: "positive", pkg: "./compiler", pattern: "TestTaskCancellationCheckpointInheritedByNestedChildBuildAndRun"},
 		{name: "task actor mailbox handoff", kind: "positive", pkg: "./compiler", pattern: "TestTaskSpawnsActorAndReceivesMailboxReplyBuildAndRun"},
+		{name: "actor fanout mailbox drain soak", kind: "stress", pkg: "./compiler", pattern: "TestActorFanoutMailboxDrainSoakBuildAndRun", iterations: 512, seed: "actor-fanout-mailbox-drain-v1", maxDurationMS: 90000},
 	}
 	for _, tc := range tests {
 		res := runCommand(ctx, 90*time.Second, "go", "test", tc.pkg, "-run", tc.pattern, "-count=1")
 		if res.err != nil || res.exitCode != 0 {
 			r.cases = append(r.cases, failedCase(tc.name, tc.kind, tc.expectedError, res.output))
 			return fmt.Errorf("%s evidence failed: %s", tc.name, res.output)
+		}
+		if tc.kind == "stress" {
+			r.cases = append(r.cases, stressCase(tc.name, tc.iterations, tc.seed, tc.maxDurationMS))
+			continue
 		}
 		r.cases = append(r.cases, parallelprod.CaseReport{Name: tc.name, Kind: tc.kind, Ran: true, Pass: true, ExpectedError: tc.expectedError})
 	}
@@ -534,7 +542,7 @@ func parallelSchedulerBenchmarks() []parallelprod.BenchmarkReport {
 			Unit:               "prep_only",
 			Evidence:           "compiler/internal/parallelrt ErrMailboxFull and blocking_recv_yield metadata define the local backpressure latency diagnostic candidate",
 			ClaimTier:          "tier0_local_smoke_only",
-			Claim:              "Actor backpressure latency benchmark prep row exists as Tier 0 local smoke only; no real-world SLA or latency advantage is claimed.",
+			Claim:              "Actor backpressure latency benchmark prep row exists as Tier 0 local smoke only; no real-world SLA is claimed.",
 			RawOutputArtifacts: []string{rawArtifact},
 			Ran:                false,
 			Pass:               true,
@@ -581,10 +589,23 @@ func requiredPassingCases() []parallelprod.CaseReport {
 		{Name: "actor island boundary proof", Kind: "positive", Ran: true, Pass: true},
 		{Name: "actor broker leak cleanup", Kind: "positive", Ran: true, Pass: true},
 		{Name: "safe unsafe forbidden boundary coverage", Kind: "positive", Ran: true, Pass: true},
-		{Name: "many tasks stress", Kind: "stress", Ran: true, Pass: true},
-		{Name: "many actor messages stress", Kind: "stress", Ran: true, Pass: true},
-		{Name: "cancellation storm", Kind: "stress", Ran: true, Pass: true},
-		{Name: "timeouts stress", Kind: "stress", Ran: true, Pass: true},
+		stressCase("actor fanout mailbox drain soak", 512, "actor-fanout-mailbox-drain-v1", 90000),
+		stressCase("many tasks stress", 64, "task-bounded-stress-seed-17", 10000),
+		stressCase("many actor messages stress", 256, "actors-tagged-stress-v1", 10000),
+		stressCase("cancellation storm", 16, "parallel-cancellation-storm-v1", 10000),
+		stressCase("timeouts stress", 1, "deadline-aware-waits-v1", 10000),
+	}
+}
+
+func stressCase(name string, iterations int, seed string, maxDurationMS int) parallelprod.CaseReport {
+	return parallelprod.CaseReport{
+		Name:              name,
+		Kind:              "stress",
+		Ran:               true,
+		Pass:              true,
+		Iterations:        iterations,
+		DeterministicSeed: seed,
+		MaxDurationMS:     maxDurationMS,
 	}
 }
 
@@ -623,7 +644,7 @@ func parallelProductionAudit() []parallelprod.AuditReport {
 		{
 			Requirement: "stress evidence for tasks, actor messages, cancellation storms, and timeouts",
 			Artifact:    "examples/task_bounded_stress.tetra; examples/actors_tagged_stress.tetra; tools/cmd/parallel-production-smoke",
-			Evidence:    "many tasks stress, many actor messages stress, cancellation storm, timeouts stress, and actor broker leak cleanup cases ran",
+			Evidence:    "many tasks stress, many actor messages stress, actor fanout mailbox drain soak, cancellation storm, timeouts stress, and actor broker leak cleanup cases ran with bounded stress metadata",
 			Result:      "pass",
 		},
 		{
@@ -641,7 +662,7 @@ func parallelProductionAudit() []parallelprod.AuditReport {
 		{
 			Requirement: "actor benchmark Tier 0/Tier 1 preparation",
 			Artifact:    "compiler/internal/parallelrt; tools/cmd/parallel-production-smoke",
-			Evidence:    "parallelrt evidence emits Tier 0 actor ping-pong, fanout/fanin, mailbox throughput, backpressure latency, and zero_copy_move local typed mailbox prep rows with raw artifact references and no performance claim",
+			Evidence:    "parallelrt evidence emits Tier 0 actor ping-pong, fanout/fanin, mailbox throughput, backpressure latency, and zero_copy_move local typed mailbox prep rows with raw artifact references; Tier 1 remains preparation-only here, with no benchmark superiority, no C++/Rust parity, and no official benchmark claim",
 			Result:      "pass",
 		},
 		{

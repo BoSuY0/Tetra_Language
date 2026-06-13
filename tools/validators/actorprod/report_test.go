@@ -72,6 +72,26 @@ func TestValidateReportRejectsCrossTargetDistributedActorClaimWithoutSmoke(t *te
 	}
 }
 
+func TestValidateReportRejectsDistributedZeroCopySpellingVariants(t *testing.T) {
+	for _, claim := range []string{
+		"linux-x64 actor foundation proves distributed zero copy actor transfer",
+		"linux-x64 actor foundation proves cross-node zero-copy actor transfer",
+	} {
+		t.Run(claim, func(t *testing.T) {
+			raw := validActorFoundationReportFrom(t, func(report *Report) {
+				report.Claims = []string{claim}
+			})
+			err := ValidateReport(raw)
+			if err == nil {
+				t.Fatalf("expected distributed zero-copy spelling variant to fail")
+			}
+			if !strings.Contains(strings.ToLower(err.Error()), "zero") {
+				t.Fatalf("error = %v, want zero-copy rejection", err)
+			}
+		})
+	}
+}
+
 func TestValidateReportRejectsMissingArtifactHashes(t *testing.T) {
 	raw := validActorFoundationReportFrom(t, func(report *Report) {
 		report.ArtifactHashes = ""
@@ -326,7 +346,7 @@ const validParallelProductionSubreport = `{
     {"name":"actor ping-pong benchmark prep","kind":"actor_benchmark_prep","metric":"messages_round_trip","unit":"prep_only","baseline_value":0,"measured_value":0,"improvement_ratio":0.0,"evidence":"compiler/actors_test.go::TestActorsPingPongBuildAndRun and examples/actors_pingpong.tetra define the local Linux-x64 actor ping-pong workload candidate","claim_tier":"tier0_local_smoke_only","claim":"Actor ping-pong benchmark prep row exists as Tier 0 local smoke only; no measured result is published and cross-runtime comparison is out of scope.","raw_output_artifacts":["reports/actor-runtime-foundation/P15/parallelrt-evidence.raw.json"],"ran":false,"pass":true},
     {"name":"actor fanout/fanin benchmark prep","kind":"actor_benchmark_prep","metric":"fanout_fanin_messages","unit":"prep_only","baseline_value":0,"measured_value":0,"improvement_ratio":0.0,"evidence":"compiler/internal/parallelrt two-core work stealing model checks actor fanout/fanin scheduling shape without publishing throughput","claim_tier":"tier0_local_smoke_only","claim":"Actor fanout/fanin benchmark prep row exists as Tier 0 local smoke only; it records local workload shape and leaves public benchmark publication out of scope.","raw_output_artifacts":["reports/actor-runtime-foundation/P15/parallelrt-evidence.raw.json"],"ran":false,"pass":true},
     {"name":"actor mailbox throughput benchmark prep","kind":"actor_benchmark_prep","metric":"mailbox_messages","unit":"prep_only","baseline_value":0,"measured_value":0,"improvement_ratio":0.0,"evidence":"compiler/internal/parallelrt TypedMailbox and parallel production actor mailbox cases define the local mailbox throughput workload candidate","claim_tier":"tier0_local_smoke_only","claim":"Actor mailbox throughput benchmark prep row exists as Tier 0 local smoke only; it publishes no measured result and no throughput guarantee.","raw_output_artifacts":["reports/actor-runtime-foundation/P15/parallelrt-evidence.raw.json"],"ran":false,"pass":true},
-    {"name":"actor backpressure latency benchmark prep","kind":"actor_benchmark_prep","metric":"backpressure_wait","unit":"prep_only","baseline_value":0,"measured_value":0,"improvement_ratio":0.0,"evidence":"compiler/internal/parallelrt ErrMailboxFull and blocking_recv_yield metadata define the local backpressure latency diagnostic candidate","claim_tier":"tier0_local_smoke_only","claim":"Actor backpressure latency benchmark prep row exists as Tier 0 local smoke only; no real-world SLA or latency advantage is claimed.","raw_output_artifacts":["reports/actor-runtime-foundation/P15/parallelrt-evidence.raw.json"],"ran":false,"pass":true},
+    {"name":"actor backpressure latency benchmark prep","kind":"actor_benchmark_prep","metric":"backpressure_wait","unit":"prep_only","baseline_value":0,"measured_value":0,"improvement_ratio":0.0,"evidence":"compiler/internal/parallelrt ErrMailboxFull and blocking_recv_yield metadata define the local backpressure latency diagnostic candidate","claim_tier":"tier0_local_smoke_only","claim":"Actor backpressure latency benchmark prep row exists as Tier 0 local smoke only; no real-world SLA is claimed.","raw_output_artifacts":["reports/actor-runtime-foundation/P15/parallelrt-evidence.raw.json"],"ran":false,"pass":true},
     {"name":"zero_copy_move local typed mailbox benchmark prep","kind":"actor_transfer_prep","metric":"owned_region_transfer","unit":"prep_only","baseline_value":0,"measured_value":0,"improvement_ratio":0.0,"evidence":"compiler/internal/parallelrt owned-region transfer report emits zero_copy_move for local typed mailbox metadata only","claim_tier":"tier0_local_smoke_only","claim":"zero_copy_move local typed mailbox benchmark prep row exists as Tier 0 local smoke only; it records local owned-region metadata and leaves distributed or network transfer behavior out of scope.","raw_output_artifacts":["reports/actor-runtime-foundation/P15/parallelrt-evidence.raw.json"],"ran":false,"pass":true}
   ],
   "contracts": [
@@ -359,14 +379,15 @@ const validParallelProductionSubreport = `{
     {"name":"ownership transfer across task boundary","kind":"negative","ran":true,"pass":true,"expected_error":"transfer"},
     {"name":"ownership transfer across actor boundary","kind":"negative","ran":true,"pass":true,"expected_error":"transfer"},
     {"name":"race-safety shared mutable rejection","kind":"negative","ran":true,"pass":true,"expected_error":"shared mutable"},
-    {"name":"race-safety rejection matrix","kind":"positive","ran":true,"pass":true},
-    {"name":"actor island boundary proof","kind":"positive","ran":true,"pass":true},
-    {"name":"actor broker leak cleanup","kind":"positive","ran":true,"pass":true},
-    {"name":"safe unsafe forbidden boundary coverage","kind":"positive","ran":true,"pass":true},
-    {"name":"many tasks stress","kind":"stress","ran":true,"pass":true},
-    {"name":"many actor messages stress","kind":"stress","ran":true,"pass":true},
-    {"name":"cancellation storm","kind":"stress","ran":true,"pass":true},
-    {"name":"timeouts stress","kind":"stress","ran":true,"pass":true}
+	    {"name":"race-safety rejection matrix","kind":"positive","ran":true,"pass":true},
+	    {"name":"actor island boundary proof","kind":"positive","ran":true,"pass":true},
+	    {"name":"actor broker leak cleanup","kind":"positive","ran":true,"pass":true},
+	    {"name":"safe unsafe forbidden boundary coverage","kind":"positive","ran":true,"pass":true},
+	    {"name":"actor fanout mailbox drain soak","kind":"stress","ran":true,"pass":true,"iterations":512,"deterministic_seed":"actor-fanout-mailbox-drain-v1","max_duration_ms":90000},
+	    {"name":"many tasks stress","kind":"stress","ran":true,"pass":true,"iterations":64,"deterministic_seed":"task-bounded-stress-seed-17","max_duration_ms":10000},
+	    {"name":"many actor messages stress","kind":"stress","ran":true,"pass":true,"iterations":256,"deterministic_seed":"actors-tagged-stress-v1","max_duration_ms":10000},
+	    {"name":"cancellation storm","kind":"stress","ran":true,"pass":true,"iterations":16,"deterministic_seed":"parallel-cancellation-storm-v1","max_duration_ms":10000},
+	    {"name":"timeouts stress","kind":"stress","ran":true,"pass":true,"iterations":1,"deterministic_seed":"deadline-aware-waits-v1","max_duration_ms":10000}
   ],
   "diagnostics": [
     {"case":"task cancellation","code":"TASK_CANCELLED","severity":"error","category":"task","position":"runtime","expected_error":"cancelled"},
@@ -391,10 +412,10 @@ const validParallelProductionSubreport = `{
     {"requirement":"actor mailbox backpressure and failure handling","artifact":"compiler/actors_test.go; compiler/distributed_actor_runtime_test.go","evidence":"actor mailbox backpressure, checked message pool exhaustion, invalid actor handle send, done actor send, task actor mailbox handoff, and actor failure handling cases are required","result":"pass"},
     {"requirement":"task/actor/thread-boundary transfer rules","artifact":"compiler/tests/ownership; cli/cmd/tetra/check_diagnostics_resource_actor_test.go","evidence":"task and actor ownership transfer, actor/island boundary proof, resource double join, and task group use-after-close diagnostics are required cases","result":"pass"},
     {"requirement":"race-safety model or conservative rejections","artifact":"compiler/tests/ownership; docs/spec/actors.md","evidence":"shared mutable race-safety rejection and race-safety rejection matrix evidence are required until a broader race-safe model is implemented","result":"pass"},
-    {"requirement":"stress evidence for tasks, actor messages, cancellation storms, and timeouts","artifact":"tools/cmd/parallel-production-smoke","evidence":"many tasks stress, many actor messages stress, cancellation storm, timeouts stress, and actor broker leak cleanup cases are required","result":"pass"},
+	    {"requirement":"stress evidence for tasks, actor messages, cancellation storms, and timeouts","artifact":"tools/cmd/parallel-production-smoke","evidence":"many tasks stress, many actor messages stress, actor fanout mailbox drain soak, cancellation storm, timeouts stress, and actor broker leak cleanup cases are required with bounded metadata","result":"pass"},
     {"requirement":"safe/unsafe/forbidden parallelism documentation","artifact":"docs/spec/actors.md; docs/user/async_actors_guide.md; docs/spec/runtime_abi.md; compiler/tests/semantics/async_test.go; compiler/tests/safety/effects_test.go","evidence":"documentation defines supported actor/task runtime, transfer boundaries, and unsupported guarantees; safe unsafe forbidden boundary coverage runs compiler tests for allowed immutable task targets, missing runtime/actors effects, unsafe-only operations, and forbidden mutable actor/task targets","result":"pass"},
     {"requirement":"stable parallel diagnostics","artifact":"compiler/task_runtime_test.go; compiler/actors_test.go; compiler/tests/ownership/actor_task_ownership_test.go; cli/cmd/tetra/check_diagnostics_resource_actor_test.go","evidence":"negative parallel cases require stable expected_error evidence for cancellation, deadline, backpressure, invalid handle, double join, use-after-close, transfer, and shared mutable rejection diagnostics","result":"pass"},
-    {"requirement":"actor benchmark Tier 0/Tier 1 preparation","artifact":"compiler/internal/parallelrt; tools/cmd/parallel-production-smoke","evidence":"parallelrt evidence emits Tier 0 actor ping-pong, fanout/fanin, mailbox throughput, backpressure latency, and zero_copy_move local typed mailbox prep rows with raw artifact references and no performance claim","result":"pass"},
+    {"requirement":"actor benchmark Tier 0/Tier 1 preparation","artifact":"compiler/internal/parallelrt; tools/cmd/parallel-production-smoke","evidence":"parallelrt evidence emits Tier 0 actor ping-pong, fanout/fanin, mailbox throughput, backpressure latency, and zero_copy_move local typed mailbox prep rows with raw artifact references; Tier 1 remains preparation-only here, with no benchmark superiority, no C++/Rust parity, and no official benchmark claim","result":"pass"},
     {"requirement":"release-gate entrypoint","artifact":"scripts/release/post_v0_4/parallel-production-linux-x64-smoke.sh","evidence":"parallel production gate must run producer, validator, and artifact hash validation","result":"pass"}
   ]
 }`
@@ -410,19 +431,25 @@ const validDistributedActorSubreport = `{
   "artifact_hashes": "artifact-hashes.json",
   "claims": ["linux-x64 loopback tcp distributed actor runtime evidence"],
   "nonclaims": ["no cluster membership", "no reconnect/retry production", "no non-linux distributed actor runtime support"],
-  "broker": {"runtime":"actornet","transport":"loopback-tcp","listen_addr":"127.0.0.1:47777","accepted_connections":3,"routed_frames":5,"dropped_frames":1},
+  "broker": {"runtime":"actornet","transport":"loopback-tcp","listen_addr":"127.0.0.1:47777","accepted_connections":8,"routed_frames":5,"dropped_frames":3,"decode_errors":3,"expected_decode_errors":3,"last_error":"actor wire: invalid slot count: 9"},
   "processes": [
     {"name":"broker","kind":"broker","path":"./tetra actor-net","ran":true,"pass":true,"exit_code":0},
     {"name":"node-a","kind":"node","path":"node-a","ran":true,"pass":true,"exit_code":0},
     {"name":"node-b","kind":"node","path":"node-b","ran":true,"pass":true,"exit_code":0}
   ],
-  "frame_counts": {"hello":2,"hello_ack":2,"spawn_req":1,"spawn_ack":1,"send_i32":1,"send_msg":1,"send_typed":1,"node_down":1},
-  "frame_order": ["hello","hello_ack","spawn_req","spawn_ack","send_i32","send_msg","send_typed","node_down"],
+  "frame_counts": {"hello":2,"hello_ack":2,"spawn_req":1,"spawn_ack":1,"send_i32":1,"send_msg":1,"send_typed":1,"node_down":1,"error":2},
+  "frame_order": ["hello","hello_ack","spawn_req","spawn_ack","send_i32","send_msg","send_typed","node_down","error","error"],
   "cases": [
     {"name":"cross-node i32 send/receive","ran":true,"pass":true,"expected_exit":0,"actual_exit":0,"node_processes":2},
     {"name":"cross-node tagged send/receive","ran":true,"pass":true,"expected_exit":0,"actual_exit":0,"node_processes":2},
     {"name":"cross-node typed send/receive","ran":true,"pass":true,"expected_exit":0,"actual_exit":0,"node_processes":2},
     {"name":"missing-node failure/status","ran":true,"pass":true,"expected_exit":0,"actual_exit":0,"node_processes":1},
-    {"name":"task cancel/join compatibility","ran":true,"pass":true,"expected_exit":0,"actual_exit":0,"node_processes":1}
+    {"name":"task cancel/join compatibility","ran":true,"pass":true,"expected_exit":0,"actual_exit":0,"node_processes":1},
+    {"name":"malformed frame length rejected","kind":"network_negative","ran":true,"pass":true,"expected_exit":0,"actual_exit":0,"node_processes":0},
+    {"name":"duplicate node rejected","kind":"network_negative","ran":true,"pass":true,"expected_exit":0,"actual_exit":0,"node_processes":0},
+    {"name":"unknown frame type rejected","kind":"network_negative","ran":true,"pass":true,"expected_exit":0,"actual_exit":0,"node_processes":0},
+    {"name":"bad typed slot count rejected","kind":"network_negative","ran":true,"pass":true,"expected_exit":0,"actual_exit":0,"node_processes":0},
+    {"name":"missing-node send after broker close","kind":"network_negative","ran":true,"pass":true,"expected_exit":0,"actual_exit":0,"node_processes":0},
+    {"name":"forged source node rejected","kind":"network_negative","ran":true,"pass":true,"expected_exit":0,"actual_exit":0,"node_processes":0}
   ]
 }`

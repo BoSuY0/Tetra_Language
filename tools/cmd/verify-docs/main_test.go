@@ -1239,6 +1239,24 @@ func TestVerifyActorRuntimeFoundationDocsRejectsBroadActorProductionClaim(t *tes
 	}
 }
 
+func TestVerifyActorRuntimeFoundationDocsRejectsProdReadyProvenClaim(t *testing.T) {
+	doc := writeActorRuntimeFoundationDoc(t, validActorRuntimeFoundationDocBody()+".\nActor foundation verdict: PROD_READY_PROVEN.\n")
+	err := verifyActorRuntimeFoundationDocs([]string{doc}, validActorRuntimeFoundationFeatures())
+	if err == nil {
+		t.Fatalf("expected actor foundation docs to reject PROD_READY_PROVEN claim")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "prod_ready_proven") {
+		t.Fatalf("expected PROD_READY_PROVEN in error, got %v", err)
+	}
+}
+
+func TestVerifyActorRuntimeFoundationDocsAllowsProdReadyProvenNonClaim(t *testing.T) {
+	doc := writeActorRuntimeFoundationDoc(t, validActorRuntimeFoundationDocBody()+"\n`PROD_READY_PROVEN`: `NOT_CLAIMED`.\n")
+	if err := verifyActorRuntimeFoundationDocs([]string{doc}, validActorRuntimeFoundationFeatures()); err != nil {
+		t.Fatalf("verifyActorRuntimeFoundationDocs: %v", err)
+	}
+}
+
 func TestVerifyActorRuntimeFoundationDocsRejectsNonLinuxDistributedClaim(t *testing.T) {
 	doc := writeActorRuntimeFoundationDoc(t, validActorRuntimeFoundationDocBody()+".\nWindows distributed actor runtime support is production-ready.\n")
 	err := verifyActorRuntimeFoundationDocs([]string{doc}, validActorRuntimeFoundationFeatures())
@@ -1261,6 +1279,28 @@ func TestVerifyActorRuntimeFoundationDocsRejectsDistributedZeroCopyClaim(t *test
 	}
 }
 
+func TestVerifyActorRuntimeFoundationDocsRejectsMissingDistributedTargetMatrix(t *testing.T) {
+	doc := writeActorRuntimeFoundationDoc(t, strings.Replace(validActorRuntimeFoundationDocBody(), distributedRuntimeTargetMatrixDocBody(), "", 1))
+	err := verifyActorRuntimeFoundationDocs([]string{doc}, validActorRuntimeFoundationFeatures())
+	if err == nil {
+		t.Fatalf("expected actor foundation docs to require distributed target matrix")
+	}
+	if !strings.Contains(err.Error(), "Distributed Runtime Target Matrix") {
+		t.Fatalf("expected Distributed Runtime Target Matrix in error, got %v", err)
+	}
+}
+
+func TestVerifyActorRuntimeFoundationDocsRejectsMissingBenchmarkNonClaim(t *testing.T) {
+	doc := writeActorRuntimeFoundationDoc(t, strings.Replace(validActorRuntimeFoundationDocBody(), "no benchmark superiority, no C++/Rust parity, and no official benchmark claim", "", 1))
+	err := verifyActorRuntimeFoundationDocs([]string{doc}, validActorRuntimeFoundationFeatures())
+	if err == nil {
+		t.Fatalf("expected actor foundation docs to require actor benchmark nonclaim")
+	}
+	if !strings.Contains(err.Error(), "no benchmark superiority") {
+		t.Fatalf("expected actor benchmark nonclaim in error, got %v", err)
+	}
+}
+
 func TestVerifyActorRuntimeFoundationDocsRejectsStaleManifestFeature(t *testing.T) {
 	doc := writeActorRuntimeFoundationDoc(t, validActorRuntimeFoundationDocBody())
 	features := validActorRuntimeFoundationFeatures()
@@ -1279,6 +1319,17 @@ func TestVerifyActorRuntimeFoundationDocsAcceptsScopedGateEvidence(t *testing.T)
 	if err := verifyActorRuntimeFoundationDocs([]string{doc}, validActorRuntimeFoundationFeatures()); err != nil {
 		t.Fatalf("verifyActorRuntimeFoundationDocs: %v", err)
 	}
+}
+
+func TestDefaultActorRuntimeFoundationDocPathsIncludeHistoricalFinalAudit(t *testing.T) {
+	paths := defaultActorRuntimeFoundationDocPaths()
+	want := filepath.FromSlash("docs/audits/actor-runtime-production-foundation-final.md")
+	for _, path := range paths {
+		if path == want {
+			return
+		}
+	}
+	t.Fatalf("defaultActorRuntimeFoundationDocPaths() missing %q: %#v", want, paths)
 }
 
 func TestVerifyRAMContractCompilerDocsRejectsIncompleteDocs(t *testing.T) {
@@ -1518,11 +1569,27 @@ func validActorRuntimeFoundationDocBody() string {
 		"reports/actor-runtime-foundation/final/artifact-hashes.json",
 		"distributed-actors-linux-x64/distributed-actors-linux-x64.json",
 		"parallel-production-linux-x64/parallel-production-linux-x64.json",
+		"subordinate to current same-commit actor foundation gates",
 		"no full Erlang/OTP actor runtime claim",
 		"no cluster membership or reconnect/retry production claim",
 		"no non-Linux distributed actor runtime support claim",
 		"no distributed zero-copy pointer or region transfer claim",
 		"no formal race proof claim",
+		"no benchmark superiority, no C++/Rust parity, and no official benchmark claim",
+		distributedRuntimeTargetMatrixDocBody(),
+	}, "\n")
+}
+
+func distributedRuntimeTargetMatrixDocBody() string {
+	return strings.Join([]string{
+		"Distributed Runtime Target Matrix",
+		"| Target | Distributed actor runtime status | Current evidence | Promotion requirement |",
+		"|---|---|---|---|",
+		"`linux-x64` | current scoped | executable `tetra.actors.distributed-runtime.v1` smoke plus actor foundation gate | keep same-commit distributed smoke, artifact hashes, and foundation validator green |",
+		"`macos-x64` | unsupported / nonclaim | no distributed actor symbols; actor net pump is no-op | add target runtime, smoke, validator, docs, and package gate before any support claim |",
+		"`windows-x64` | unsupported / nonclaim | no distributed actor symbols; actor net pump is no-op | add target runtime, smoke, validator, docs, and package gate before any support claim |",
+		"`wasm32-wasi` | unsupported / nonclaim | no distributed actor runtime gate | add target runtime, smoke, validator, docs, and package gate before any support claim |",
+		"`wasm32-web` | unsupported / nonclaim | no distributed actor runtime gate | add target runtime, smoke, validator, docs, and package gate before any support claim |",
 	}, "\n")
 }
 

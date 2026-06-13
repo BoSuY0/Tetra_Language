@@ -53,9 +53,11 @@ func TestReleasePackagesRunsSurfaceGateBeforePublishing(t *testing.T) {
 	for _, want := range []string{
 		"name: Surface product gate",
 		`report_dir="${{ steps.meta.outputs.out_dir }}/surface-product-v1"`,
+		`bash scripts/ci/with-headless-wayland.sh --socket wayland-surface-release --`,
 		`bash scripts/release/surface/product-gate.sh --report-dir "$report_dir"`,
 		"name: Surface experimental regression gate",
 		`report_dir="${{ steps.meta.outputs.out_dir }}/surface-experimental-regression"`,
+		`bash scripts/ci/with-headless-wayland.sh --socket wayland-surface-experimental-release --`,
 		`bash scripts/release/surface/gate.sh --report-dir "$report_dir"`,
 		"name: Safe view lifetime gate",
 		`report_dir="${{ steps.meta.outputs.out_dir }}/safe-view-lifetime"`,
@@ -111,6 +113,25 @@ func TestReleasePackagesRunsSurfaceGateBeforePublishing(t *testing.T) {
 	for _, forbidden := range []string{"continue-on-error", "|| true", "set +e", "GOCACHE=/tmp", "GOTMPDIR=/tmp"} {
 		if strings.Contains(finalSection, forbidden) {
 			t.Fatalf("Surface final readiness release package gate must not contain bypass or tmpfs cache marker %q", forbidden)
+		}
+	}
+}
+
+func TestHeadlessWaylandHelperInstallsRipgrepForSurfaceGates(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "ci", "with-headless-wayland.sh"))
+	if err != nil {
+		t.Fatalf("read headless Wayland helper: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		`if ! command -v rg >/dev/null 2>&1; then`,
+		`missing_packages+=("ripgrep")`,
+		`sudo apt-get install -y "${missing_packages[@]}"`,
+		`if ! command -v weston >/dev/null 2>&1 || ! command -v rg >/dev/null 2>&1; then`,
+		`with-headless-wayland: weston and rg are required`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("headless Wayland helper missing ripgrep guard %q", want)
 		}
 	}
 }
@@ -255,6 +276,61 @@ func TestReleasePackagesRunsActorRuntimeFoundationGateBeforePublishing(t *testin
 	}
 	if section := releaseStepWindow(text, "name: Actor runtime foundation release gate", "name: Upload package artifacts"); strings.Contains(section, "continue-on-error") {
 		t.Fatalf("actor runtime foundation release gate must not use continue-on-error")
+	}
+}
+
+func TestReleasePackagesWorkflowSupportsNonPublishingDryRun(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "release-packages.yml"))
+	if err != nil {
+		t.Fatalf("read release-packages workflow: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		"dry_run:",
+		"Build packages and release evidence without creating a GitHub Release, pushing GHCR, or updating Homebrew",
+		"RELEASE_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}",
+		"name: Dry-run package proof",
+		"if: env.RELEASE_DRY_RUN == 'true'",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("release-packages workflow missing dry-run detail %q", want)
+		}
+	}
+
+	actorGate := releaseStepWindow(text, "name: Actor runtime foundation release gate", "name: Memory100 prod-stable gate")
+	if strings.Contains(actorGate, "RELEASE_DRY_RUN") {
+		t.Fatalf("actor runtime foundation gate must still run during release package dry-run")
+	}
+	for _, externalStep := range []struct {
+		name string
+		next string
+		want string
+	}{
+		{
+			name: "name: Create or update GitHub Release",
+			next: "name: Build container image",
+			want: "if: env.RELEASE_DRY_RUN != 'true'",
+		},
+		{
+			name: "name: Build container image",
+			next: "name: Publish GHCR image",
+			want: "if: steps.meta.outputs.publish_container == 'true' && env.RELEASE_DRY_RUN != 'true'",
+		},
+		{
+			name: "name: Publish GHCR image",
+			next: "name: Update Homebrew tap",
+			want: "if: steps.meta.outputs.publish_container == 'true' && env.RELEASE_DRY_RUN != 'true'",
+		},
+		{
+			name: "name: Update Homebrew tap",
+			next: "name: release-packages-dry-run-end",
+			want: "if: env.UPDATE_HOMEBREW_TAP == 'true' && env.RELEASE_DRY_RUN != 'true'",
+		},
+	} {
+		section := releaseStepWindow(text, externalStep.name, externalStep.next)
+		if !strings.Contains(section, externalStep.want) {
+			t.Fatalf("release-packages workflow external step %q missing dry-run guard %q", externalStep.name, externalStep.want)
+		}
 	}
 }
 

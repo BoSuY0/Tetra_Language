@@ -10,6 +10,11 @@ on:
         description: "Release version, e.g. v0.4.0"
         required: true
         default: "v0.4.0"
+      dry_run:
+        description: "Build packages and release evidence without creating a GitHub Release, pushing GHCR, or updating Homebrew"
+        required: true
+        type: boolean
+        default: true
       update_homebrew_tap:
         description: "Commit Formula/tetra.rb to the Homebrew tap repository"
         required: true
@@ -41,6 +46,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       HOMEBREW_TAP_REPOSITORY: ${{ inputs.homebrew_tap_repository || 'BoSuY0/homebrew-tetra' }}
       UPDATE_HOMEBREW_TAP: ${{ inputs.update_homebrew_tap && 'true' || 'false' }}
+      RELEASE_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -107,6 +113,13 @@ jobs:
           mkdir -p "${{ steps.meta.outputs.out_dir }}/smoke"
           tar -xzf "$archive" -C "${{ steps.meta.outputs.out_dir }}/smoke"
           "${{ steps.meta.outputs.out_dir }}/smoke/tetra-${version}-linux-x64/bin/tetra" version
+
+      - name: Dry-run package proof
+        if: env.RELEASE_DRY_RUN == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "release-packages dry run: package build, smoke, release gates, and artifact upload will run; external publishing steps are skipped"
 
       - name: Memory production release gate
         shell: bash
@@ -229,6 +242,7 @@ jobs:
             ${{ steps.meta.outputs.out_dir }}/memory-100-prod-stable/**
 
       - name: Create or update GitHub Release
+        if: env.RELEASE_DRY_RUN != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -297,7 +311,7 @@ jobs:
           fi
 
       - name: Build container image
-        if: steps.meta.outputs.publish_container == 'true'
+        if: steps.meta.outputs.publish_container == 'true' && env.RELEASE_DRY_RUN != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -308,7 +322,7 @@ jobs:
             .
 
       - name: Publish GHCR image
-        if: steps.meta.outputs.publish_container == 'true'
+        if: steps.meta.outputs.publish_container == 'true' && env.RELEASE_DRY_RUN != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -319,7 +333,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
 
       - name: Update Homebrew tap
-        if: env.UPDATE_HOMEBREW_TAP == 'true'
+        if: env.UPDATE_HOMEBREW_TAP == 'true' && env.RELEASE_DRY_RUN != 'true'
         shell: bash
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}

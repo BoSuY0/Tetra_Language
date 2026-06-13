@@ -816,6 +816,24 @@ func readinessDistributedActorRuntimeJSON() []byte {
 			"node_processes": nodeProcesses,
 		})
 	}
+	for _, name := range []string{
+		"malformed frame length rejected",
+		"duplicate node rejected",
+		"unknown frame type rejected",
+		"bad typed slot count rejected",
+		"missing-node send after broker close",
+		"forged source node rejected",
+	} {
+		cases = append(cases, map[string]any{
+			"name":           name,
+			"kind":           "network_negative",
+			"ran":            true,
+			"pass":           true,
+			"expected_exit":  0,
+			"actual_exit":    0,
+			"node_processes": 0,
+		})
+	}
 	raw, err := json.Marshal(map[string]any{
 		"schema":          "tetra.actors.distributed-runtime.v1",
 		"status":          "pass",
@@ -832,12 +850,15 @@ func readinessDistributedActorRuntimeJSON() []byte {
 			"no non-linux distributed actor runtime support",
 		},
 		"broker": map[string]any{
-			"runtime":              "actornet",
-			"transport":            "loopback-tcp",
-			"listen_addr":          "127.0.0.1:47777",
-			"accepted_connections": 3,
-			"routed_frames":        5,
-			"dropped_frames":       1,
+			"runtime":                "actornet",
+			"transport":              "loopback-tcp",
+			"listen_addr":            "127.0.0.1:47777",
+			"accepted_connections":   8,
+			"routed_frames":          5,
+			"dropped_frames":         3,
+			"decode_errors":          3,
+			"expected_decode_errors": 3,
+			"last_error":             "actor wire: invalid slot count: 9",
 		},
 		"processes": []map[string]any{
 			{"name": "broker", "kind": "broker", "path": "./tetra actor-net", "ran": true, "pass": true, "exit_code": zero},
@@ -853,8 +874,9 @@ func readinessDistributedActorRuntimeJSON() []byte {
 			"send_msg":   1,
 			"send_typed": 1,
 			"node_down":  1,
+			"error":      2,
 		},
-		"frame_order": []string{"hello", "hello_ack", "spawn_req", "spawn_ack", "send_i32", "send_msg", "send_typed", "node_down"},
+		"frame_order": []string{"hello", "hello_ack", "spawn_req", "spawn_ack", "send_i32", "send_msg", "send_typed", "node_down", "error", "error"},
 		"cases":       cases,
 	})
 	if err != nil {

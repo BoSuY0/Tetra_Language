@@ -42,28 +42,44 @@ type ContractReport struct {
 }
 
 type BenchmarkReport struct {
-	Name               string   `json:"name"`
-	Kind               string   `json:"kind"`
-	Metric             string   `json:"metric"`
-	Unit               string   `json:"unit"`
-	BaselineValue      int      `json:"baseline_value"`
-	MeasuredValue      int      `json:"measured_value"`
-	ImprovementRatio   float64  `json:"improvement_ratio"`
-	Evidence           string   `json:"evidence"`
-	ClaimTier          string   `json:"claim_tier"`
-	Claim              string   `json:"claim"`
-	RawOutputArtifacts []string `json:"raw_output_artifacts"`
-	Ran                bool     `json:"ran"`
-	Pass               bool     `json:"pass"`
+	Name                  string                `json:"name"`
+	Kind                  string                `json:"kind"`
+	Metric                string                `json:"metric"`
+	Unit                  string                `json:"unit"`
+	BaselineValue         int                   `json:"baseline_value"`
+	MeasuredValue         int                   `json:"measured_value"`
+	ImprovementRatio      float64               `json:"improvement_ratio"`
+	Evidence              string                `json:"evidence"`
+	ClaimTier             string                `json:"claim_tier"`
+	Claim                 string                `json:"claim"`
+	RawOutputArtifacts    []string              `json:"raw_output_artifacts"`
+	Environment           *BenchmarkEnvironment `json:"environment,omitempty"`
+	ReproductionArtifacts []string              `json:"reproduction_artifacts,omitempty"`
+	Ran                   bool                  `json:"ran"`
+	Pass                  bool                  `json:"pass"`
+}
+
+type BenchmarkEnvironment struct {
+	Host       string `json:"host,omitempty"`
+	OS         string `json:"os,omitempty"`
+	Arch       string `json:"arch,omitempty"`
+	CPU        string `json:"cpu,omitempty"`
+	Kernel     string `json:"kernel,omitempty"`
+	Command    string `json:"command,omitempty"`
+	Repeats    int    `json:"repeats,omitempty"`
+	DurationMS int    `json:"duration_ms,omitempty"`
 }
 
 type CaseReport struct {
-	Name          string `json:"name"`
-	Kind          string `json:"kind"`
-	Ran           bool   `json:"ran"`
-	Pass          bool   `json:"pass"`
-	ExpectedError string `json:"expected_error,omitempty"`
-	Error         string `json:"error,omitempty"`
+	Name              string `json:"name"`
+	Kind              string `json:"kind"`
+	Ran               bool   `json:"ran"`
+	Pass              bool   `json:"pass"`
+	ExpectedError     string `json:"expected_error,omitempty"`
+	Iterations        int    `json:"iterations,omitempty"`
+	DeterministicSeed string `json:"deterministic_seed,omitempty"`
+	MaxDurationMS     int    `json:"max_duration_ms,omitempty"`
+	Error             string `json:"error,omitempty"`
 }
 
 type DiagnosticReport struct {
@@ -256,6 +272,8 @@ func validateBenchmarks(benchmarks []BenchmarkReport) []string {
 			if b.MeasuredValue < 0 {
 				issues = append(issues, fmt.Sprintf("benchmark %s measured_value = %d, want non-negative", name, b.MeasuredValue))
 			}
+		case "tier2_reproducible_cross_machine", "tier3_independent_reproduction", "tier4_official_upstream_submission":
+			issues = append(issues, validateUnsupportedBenchmarkPromotion(name, b)...)
 		default:
 			issues = append(issues, fmt.Sprintf("benchmark %s claim_tier is %q, want tier0_local_smoke_only or tier1_local_benchmark_evidence", name, b.ClaimTier))
 		}
@@ -289,6 +307,53 @@ func validateBenchmarks(benchmarks []BenchmarkReport) []string {
 	return issues
 }
 
+func validateUnsupportedBenchmarkPromotion(name string, b BenchmarkReport) []string {
+	tier := benchmarkTierLabel(b.ClaimTier)
+	issues := []string{
+		fmt.Sprintf("benchmark %s claim_tier %q is beyond actor benchmark readiness scope; %s requires a separate reproducible benchmark gate", name, b.ClaimTier, tier),
+	}
+	if benchmarkEnvironmentMissing(b.Environment) {
+		issues = append(issues, fmt.Sprintf("benchmark %s %s promotion missing environment metadata", name, tier))
+	}
+	if len(b.ReproductionArtifacts) == 0 {
+		issues = append(issues, fmt.Sprintf("benchmark %s %s promotion missing reproduction_artifacts", name, tier))
+	} else {
+		for _, artifact := range b.ReproductionArtifacts {
+			if strings.TrimSpace(artifact) == "" {
+				issues = append(issues, fmt.Sprintf("benchmark %s %s promotion has empty reproduction_artifacts entry", name, tier))
+			}
+		}
+	}
+	return issues
+}
+
+func benchmarkTierLabel(claimTier string) string {
+	switch claimTier {
+	case "tier2_reproducible_cross_machine":
+		return "Tier 2"
+	case "tier3_independent_reproduction":
+		return "Tier 3"
+	case "tier4_official_upstream_submission":
+		return "Tier 4"
+	default:
+		return claimTier
+	}
+}
+
+func benchmarkEnvironmentMissing(env *BenchmarkEnvironment) bool {
+	if env == nil {
+		return true
+	}
+	return strings.TrimSpace(env.Host) == "" &&
+		strings.TrimSpace(env.OS) == "" &&
+		strings.TrimSpace(env.Arch) == "" &&
+		strings.TrimSpace(env.CPU) == "" &&
+		strings.TrimSpace(env.Kernel) == "" &&
+		strings.TrimSpace(env.Command) == "" &&
+		env.Repeats == 0 &&
+		env.DurationMS == 0
+}
+
 func validateBenchmarkClaim(name string, claim string, evidence string) error {
 	claim = strings.TrimSpace(claim)
 	if claim == "" {
@@ -298,15 +363,31 @@ func validateBenchmarkClaim(name string, claim string, evidence string) error {
 	actorBenchmarkContext := strings.Contains(lower, "actor") || strings.Contains(lower, "mailbox") || strings.Contains(lower, "zero_copy_move")
 	if actorBenchmarkContext {
 		for _, phrase := range []string{
+			"faster than rust/c++",
+			"faster than c++/rust",
+			"faster than rust",
+			"faster than c++",
 			"fastest",
 			"faster than",
+			"benchmark superiority",
 			"superiority",
 			"outperforms",
 			"beats rust",
+			"beats c++",
 			"beats go",
 			"beats erlang",
+			"official benchmark result",
 			"official benchmark",
+			"official upstream benchmark",
 			"c++/rust parity",
+			"rust/c++ parity",
+			"rust parity",
+			"c++ parity",
+			"parity with rust",
+			"parity with c++",
+			"measured speed comparison",
+			"throughput advantage",
+			"latency advantage",
 			"production throughput guarantee",
 			"real-world sla",
 		} {
@@ -316,15 +397,8 @@ func validateBenchmarkClaim(name string, claim string, evidence string) error {
 		}
 	}
 	if strings.Contains(lower, "zero_copy_move") {
-		for _, phrase := range []string{
-			"production runtime",
-			"distributed zero-copy",
-			"network zero-copy",
-			"cross-machine zero-copy",
-		} {
-			if containsUnsafeBenchmarkPhrase(lower, phrase) {
-				return fmt.Errorf("benchmark %s zero_copy_move claim uses forbidden wording %q", name, phrase)
-			}
+		if err := validateZeroCopyPromotionText(fmt.Sprintf("benchmark %s zero_copy_move claim", name), lower); err != nil {
+			return err
 		}
 	}
 	schedulerPrototypeContext := strings.Contains(lower, "scheduler") && strings.Contains(lower, "prototype")
@@ -341,6 +415,41 @@ func validateBenchmarkClaim(name string, claim string, evidence string) error {
 		}
 	}
 	return nil
+}
+
+func validateZeroCopyPromotionText(context string, text string) error {
+	rawLower := strings.ToLower(text)
+	normalized := normalizeClaimText(rawLower)
+	zeroCopyContext := strings.Contains(rawLower, "zero_copy_move") || strings.Contains(normalized, "zero copy") || strings.Contains(normalized, "copy free")
+	if !zeroCopyContext {
+		return nil
+	}
+	for _, phrase := range []string{
+		"production runtime",
+		"distributed zero copy",
+		"network zero copy",
+		"cross machine zero copy",
+		"cross node zero copy",
+		"inter node zero copy",
+		"remote node zero copy",
+		"remote nodes zero copy",
+		"distributed copy free",
+		"cross node copy free",
+		"across nodes",
+		"across node",
+		"remote nodes",
+		"remote node",
+	} {
+		if containsUnsafeBenchmarkPhrase(normalized, phrase) {
+			return fmt.Errorf("%s uses forbidden wording %q", context, phrase)
+		}
+	}
+	return nil
+}
+
+func normalizeClaimText(text string) string {
+	replacer := strings.NewReplacer("-", " ", "_", " ", "/", " ")
+	return strings.Join(strings.Fields(replacer.Replace(strings.ToLower(text))), " ")
 }
 
 func containsUnsafeBenchmarkPhrase(lower string, phrase string) bool {
@@ -411,6 +520,8 @@ func validateContracts(contracts []ContractReport) []string {
 		}
 		if strings.TrimSpace(c.Evidence) == "" {
 			issues = append(issues, fmt.Sprintf("contract %s evidence is required", name))
+		} else if err := validateZeroCopyPromotionText(fmt.Sprintf("contract %s", name), c.Evidence); err != nil {
+			issues = append(issues, err.Error())
 		}
 	}
 	for name, seen := range required {
@@ -448,6 +559,7 @@ func validateCases(cases []CaseReport) []string {
 		"actor island boundary proof":              false,
 		"actor broker leak cleanup":                false,
 		"safe unsafe forbidden boundary coverage":  false,
+		"actor fanout mailbox drain soak":          false,
 		"many tasks stress":                        false,
 		"many actor messages stress":               false,
 		"cancellation storm":                       false,
@@ -476,6 +588,7 @@ func validateCases(cases []CaseReport) []string {
 			}
 		case "stress":
 			seenStress = true
+			issues = append(issues, validateStressCaseMetadata(c)...)
 		default:
 			issues = append(issues, fmt.Sprintf("case %s kind is %q, want positive, negative, or stress", name, c.Kind))
 		}
@@ -502,6 +615,23 @@ func validateCases(cases []CaseReport) []string {
 		if !seen {
 			issues = append(issues, fmt.Sprintf("missing required parallel case %q", name))
 		}
+	}
+	return issues
+}
+
+func validateStressCaseMetadata(c CaseReport) []string {
+	name := strings.TrimSpace(c.Name)
+	var issues []string
+	if c.Iterations <= 0 {
+		issues = append(issues, fmt.Sprintf("stress case %s iterations = %d, want positive bounded iteration count", name, c.Iterations))
+	}
+	if strings.TrimSpace(c.DeterministicSeed) == "" {
+		issues = append(issues, fmt.Sprintf("stress case %s deterministic_seed is required", name))
+	}
+	if c.MaxDurationMS <= 0 {
+		issues = append(issues, fmt.Sprintf("stress case %s max_duration_ms = %d, want positive bounded duration cap", name, c.MaxDurationMS))
+	} else if c.MaxDurationMS > 600000 {
+		issues = append(issues, fmt.Sprintf("stress case %s max_duration_ms = %d, want <= 600000", name, c.MaxDurationMS))
 	}
 	return issues
 }
@@ -604,14 +734,36 @@ func validateAudit(audit []AuditReport) []string {
 		}
 		if strings.TrimSpace(row.Evidence) == "" {
 			issues = append(issues, fmt.Sprintf("completion audit requirement %q evidence is required", requirement))
+		} else if err := validateZeroCopyPromotionText(fmt.Sprintf("completion audit requirement %s", requirement), row.Evidence+"\n"+row.Result); err != nil {
+			issues = append(issues, err.Error())
 		}
 		if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(row.Result)), "pass") {
 			issues = append(issues, fmt.Sprintf("completion audit requirement %q result is %q, want pass", requirement, row.Result))
+		}
+		if requirement == "actor benchmark Tier 0/Tier 1 preparation" {
+			issues = append(issues, validateActorBenchmarkAuditNonClaims(row)...)
 		}
 	}
 	for requirement, ok := range required {
 		if !ok {
 			issues = append(issues, fmt.Sprintf("completion audit missing required requirement %q", requirement))
+		}
+	}
+	return issues
+}
+
+func validateActorBenchmarkAuditNonClaims(row AuditReport) []string {
+	text := strings.ToLower(row.Evidence + "\n" + row.Result)
+	var issues []string
+	for _, phrase := range []string{
+		"tier 0",
+		"tier 1",
+		"no benchmark superiority",
+		"no c++/rust parity",
+		"no official benchmark",
+	} {
+		if !strings.Contains(text, phrase) {
+			issues = append(issues, fmt.Sprintf("actor benchmark audit missing %q", phrase))
 		}
 	}
 	return issues

@@ -38,6 +38,25 @@ func TestTestAllQuickJSONIncludesStepExitCodes(t *testing.T) {
 	}
 }
 
+func TestTestAllQuickWritesTOONSummaryMirror(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	reportDir := filepath.Join(root, "report")
+	out, err := runTestAll(t, root, nil, "--quick", "--json-only", "--report-dir", reportDir, "--report-format", "both")
+	if err != nil {
+		t.Fatalf("test_all quick failed: %v\n%s", err, out)
+	}
+	summary := decodeTestAllSummary(t, out)
+	if summary.Status != "pass" || summary.StepCount == 0 {
+		t.Fatalf("summary = %#v", summary)
+	}
+	if _, err := os.Stat(filepath.Join(reportDir, "summary.json")); err != nil {
+		t.Fatalf("expected summary.json: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(reportDir, "summary.toon")); err != nil {
+		t.Fatalf("expected summary.toon mirror: %v", err)
+	}
+}
+
 func TestTestAllRunsUnsafePromotionBlockerSuite(t *testing.T) {
 	raw, err := readTestAllScript(t)
 	if err != nil {
@@ -327,6 +346,7 @@ func TestTestAllRunsHostLeakBlockerSuite(t *testing.T) {
 	for _, want := range []string{
 		`run_step "host leak blocker suite" check_host_leak_blockers`,
 		`require_host_leak_go_test_names ./cli/internal/actornet 'Broker|Leak|CloseWithoutCancel'`,
+		`TestBrokerCloseReopenWithoutGoroutineLeak`,
 		`TestBrokerCloseWithoutCancelStopsServeWatcher`,
 		`go test ./cli/internal/actornet -run 'Broker|Leak|CloseWithoutCancel' -count=1`,
 	} {
@@ -434,6 +454,7 @@ func TestTestAllWorkflowLivesInCIEntryPoint(t *testing.T) {
 		"--quick",
 		"--full",
 		"--stabilization",
+		"--report-format",
 		"release_artifact defaults",
 	} {
 		if !strings.Contains(helpText, want) {
@@ -1133,7 +1154,7 @@ func TestTestAllValidatesSummaryArtifacts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read test_all: %v", err)
 	}
-	want := `go run ./tools/cmd/validate-test-all-summary --summary "$summary_json" --report-dir "$report_dir"`
+	want := `go run ./tools/cmd/validate-test-all-summary --summary "$summary_json" --report-dir "$report_dir" --format=json`
 	if !strings.Contains(string(raw), want) {
 		t.Fatalf("test_all missing summary validation %q", want)
 	}
@@ -1180,9 +1201,13 @@ func TestTestAllValidatesHostSmokeReport(t *testing.T) {
 	if !strings.Contains(text, run) {
 		t.Fatalf("test_all missing host smoke report command %q", run)
 	}
-	validate := `go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$report_path"`
+	validate := `go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$report_path" --format=json`
 	if !strings.Contains(text, validate) {
 		t.Fatalf("test_all missing host smoke report validation %q", validate)
+	}
+	toonValidate := `go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$toon_report_path" --format=toon`
+	if !strings.Contains(text, toonValidate) {
+		t.Fatalf("test_all missing host smoke TOON validation %q", toonValidate)
 	}
 	if strings.Contains(text, `release_smoke_cases=`) {
 		t.Fatalf("test_all should not keep a local release smoke case array")
@@ -1361,7 +1386,9 @@ func TestTestAllValidatesSmokeListJSONReport(t *testing.T) {
 	for _, want := range []string{
 		`run_step "smoke list json report" check_smoke_list`,
 		`./tetra smoke --list --target linux-x64 --format=json >"$report_dir/smoke-list.json"`,
-		`go run ./tools/cmd/validate-smoke-list --report "$report_dir/smoke-list.json" --examples-root examples`,
+		`go run ./tools/cmd/validate-smoke-list --report "$report_dir/smoke-list.json" --examples-root examples --format=json`,
+		`./tetra smoke --list --target linux-x64 --format=toon >"$report_dir/smoke-list.toon"`,
+		`go run ./tools/cmd/validate-smoke-list --report "$report_dir/smoke-list.toon" --examples-root examples --format=toon`,
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("test_all missing smoke list validation %q", want)
