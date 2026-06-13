@@ -38,8 +38,8 @@ fi
 
 runtime_base="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
 mkdir -p "$runtime_base"
-runtime_dir="$(mktemp -d "${runtime_base%/}/tetra-wayland.XXXXXX")"
-chmod 700 "$runtime_dir"
+tmp_dir="$(mktemp -d "${runtime_base%/}/tetra-wayland.XXXXXX")"
+chmod 700 "$tmp_dir"
 weston_pid=""
 
 cleanup_headless_wayland() {
@@ -48,14 +48,14 @@ cleanup_headless_wayland() {
     kill "$weston_pid" 2>/dev/null || :
     wait "$weston_pid" 2>/dev/null || :
   fi
-  rm -rf "$runtime_dir"
+  rm -rf "$tmp_dir"
   exit "$code"
 }
 trap cleanup_headless_wayland EXIT INT TERM
 
-export XDG_RUNTIME_DIR="$runtime_dir"
+export XDG_RUNTIME_DIR="$tmp_dir"
 export WAYLAND_DISPLAY="tetra-wayland"
-weston_log="$runtime_dir/weston.log"
+weston_log="$tmp_dir/weston.log"
 
 weston --backend=headless-backend.so --socket="$WAYLAND_DISPLAY" --idle-time=0 --log="$weston_log" &
 weston_pid=$!
