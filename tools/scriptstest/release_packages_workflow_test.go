@@ -92,7 +92,7 @@ func TestReleasePackagesRunsSurfaceGateBeforePublishing(t *testing.T) {
 	}
 }
 
-func TestReleasePackagesRunsLinuxSurfaceGatesUnderXvfb(t *testing.T) {
+func TestReleasePackagesRunsLinuxSurfaceGatesUnderHeadlessWayland(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "release-packages.yml"))
 	if err != nil {
 		t.Fatalf("read release-packages workflow: %v", err)
@@ -100,13 +100,13 @@ func TestReleasePackagesRunsLinuxSurfaceGatesUnderXvfb(t *testing.T) {
 	text := string(raw)
 	for _, want := range []string{
 		"name: Install Surface display dependencies",
-		"apt-get install -y xvfb",
-		`xvfb-run -a bash scripts/release/surface/release-gate.sh --report-dir "$report_dir"`,
-		`xvfb-run -a bash scripts/release/surface/gate.sh --report-dir "$report_dir"`,
-		`xvfb-run -a bash scripts/release/post_v0_4/memory-islands-surface-production-gate.sh --report-dir "$report_dir"`,
+		"apt-get install -y weston",
+		`scripts/release/surface/with-headless-wayland.sh bash scripts/release/surface/release-gate.sh --report-dir "$report_dir"`,
+		`scripts/release/surface/with-headless-wayland.sh bash scripts/release/surface/gate.sh --report-dir "$report_dir"`,
+		`scripts/release/surface/with-headless-wayland.sh bash scripts/release/post_v0_4/memory-islands-surface-production-gate.sh --report-dir "$report_dir"`,
 	} {
 		if !strings.Contains(text, want) {
-			t.Fatalf("release-packages workflow missing Xvfb Surface gate detail %q", want)
+			t.Fatalf("release-packages workflow missing headless Wayland Surface gate detail %q", want)
 		}
 	}
 
@@ -129,7 +129,7 @@ func TestReleasePackagesRunsLinuxSurfaceGatesUnderXvfb(t *testing.T) {
 			t.Fatalf("%s must not use continue-on-error", window.start)
 		}
 		if strings.Contains(section, "|| true") || strings.Contains(section, "set +e") {
-			t.Fatalf("%s must not hide Xvfb or Surface gate failures", window.start)
+			t.Fatalf("%s must not hide headless Wayland or Surface gate failures", window.start)
 		}
 	}
 }

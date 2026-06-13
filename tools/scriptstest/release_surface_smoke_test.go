@@ -1078,6 +1078,26 @@ func TestReleaseSurfaceFinalReleaseGateRunsCurrentSurfaceV1Evidence(t *testing.T
 	}
 }
 
+func TestSurfaceHeadlessWaylandHelperStartsWeston(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release", "surface", "with-headless-wayland.sh"))
+	if err != nil {
+		t.Fatalf("read Surface headless Wayland helper: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		"Usage: scripts/release/surface/with-headless-wayland.sh COMMAND [ARG...]",
+		"weston --backend=headless-backend.so",
+		"XDG_RUNTIME_DIR",
+		"WAYLAND_DISPLAY",
+		"test -S",
+		"weston.log",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("headless Wayland helper missing %q", want)
+		}
+	}
+}
+
 func TestSurfaceTreeAppUsesHardenedComponentTreeAPI(t *testing.T) {
 	root := repoRoot(t)
 	componentRaw, err := os.ReadFile(filepath.Join(root, "lib", "core", "component.tetra"))

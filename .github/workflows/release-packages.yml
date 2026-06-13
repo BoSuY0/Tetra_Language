@@ -118,19 +118,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if command -v xvfb-run >/dev/null 2>&1; then
+          if command -v weston >/dev/null 2>&1; then
             exit 0
           fi
           if ! command -v apt-get >/dev/null 2>&1; then
-            echo "apt-get is required to install xvfb-run for Surface release gates" >&2
+            echo "apt-get is required to install weston for Surface release gates" >&2
             exit 1
           fi
           if command -v sudo >/dev/null 2>&1; then
             sudo apt-get update
-            sudo apt-get install -y xvfb
+            sudo apt-get install -y weston
           else
             apt-get update
-            apt-get install -y xvfb
+            apt-get install -y weston
           fi
 
       - name: Surface release gate
@@ -138,14 +138,14 @@ jobs:
         run: |
           set -euo pipefail
           report_dir="${{ steps.meta.outputs.out_dir }}/surface-release-v1"
-          xvfb-run -a bash scripts/release/surface/release-gate.sh --report-dir "$report_dir"
+          scripts/release/surface/with-headless-wayland.sh bash scripts/release/surface/release-gate.sh --report-dir "$report_dir"
 
       - name: Surface experimental regression gate
         shell: bash
         run: |
           set -euo pipefail
           report_dir="${{ steps.meta.outputs.out_dir }}/surface-experimental-regression"
-          xvfb-run -a bash scripts/release/surface/gate.sh --report-dir "$report_dir"
+          scripts/release/surface/with-headless-wayland.sh bash scripts/release/surface/gate.sh --report-dir "$report_dir"
 
       - name: Safe view lifetime gate
         shell: bash
@@ -166,7 +166,7 @@ jobs:
         run: |
           set -euo pipefail
           report_dir="${{ steps.meta.outputs.out_dir }}/memory-islands-surface-production"
-          xvfb-run -a bash scripts/release/post_v0_4/memory-islands-surface-production-gate.sh --report-dir "$report_dir"
+          scripts/release/surface/with-headless-wayland.sh bash scripts/release/post_v0_4/memory-islands-surface-production-gate.sh --report-dir "$report_dir"
 
       - name: RAM contract release gate
         shell: bash
