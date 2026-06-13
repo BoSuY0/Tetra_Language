@@ -196,7 +196,9 @@ jobs:
 
       - name: v0.4 stabilization wrapper
         shell: bash
-        run: bash scripts/ci/test-all.sh --stabilization --keep-going --report-dir reports/ci-test-all-stabilization
+        run: |
+          bash scripts/ci/with-headless-wayland.sh --socket wayland-test-all-stabilization-ci -- \
+            bash scripts/ci/test-all.sh --stabilization --keep-going --report-dir reports/ci-test-all-stabilization
 
       - name: Upload stabilization test report
         if: always()

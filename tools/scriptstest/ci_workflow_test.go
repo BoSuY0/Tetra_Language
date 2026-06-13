@@ -20,6 +20,7 @@ func TestCIWorkflowIncludesStabilizationAndRobustnessJobs(t *testing.T) {
 		"bash scripts/ci/test-all.sh --quick --keep-going --report-dir reports/ci-test-all-quick",
 		"stabilization-linux:",
 		"github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'",
+		"bash scripts/ci/with-headless-wayland.sh --socket wayland-test-all-stabilization-ci --",
 		"bash scripts/ci/test-all.sh --stabilization --keep-going --report-dir reports/ci-test-all-stabilization",
 		"test-all-stabilization-linux",
 		"coverage-linux:",
