@@ -65,15 +65,15 @@ func TestFullPlatformUIRuntimeWorkflowRunsOnBranchPush(t *testing.T) {
 	}
 }
 
-func TestFullPlatformUIRuntimeWorkflowFetchesParentCommitForDocVerification(t *testing.T) {
+func TestFullPlatformUIRuntimeWorkflowFetchesBranchParentAncestryForDocVerification(t *testing.T) {
 	path := filepath.Join(repoRoot(t), ".github", "workflows", "full-platform-ui-runtime.yml")
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read full-platform UI runtime workflow: %v", err)
 	}
 	text := string(raw)
-	if got := strings.Count(text, "fetch-depth: 2"); got < 2 {
-		t.Fatalf("full-platform UI runtime workflow must fetch HEAD^ for docs verification; got %d fetch-depth markers", got)
+	if got := strings.Count(text, "fetch-depth: 3"); got < 2 {
+		t.Fatalf("full-platform UI runtime workflow must fetch PR branch-parent ancestry for HEAD^2^ docs verification; got %d fetch-depth: 3 markers", got)
 	}
 }
 
