@@ -1,0 +1,475 @@
+{
+  "schema": "tetra.gate-contract.v1",
+  "id": "ram-contract-linux-x64-v1",
+  "title": "RAM Contract Linux-x64 release gate",
+  "scope": "ram-contract-linux-x64",
+  "producer": "scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh",
+  "entrypoint": "scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh",
+  "fresh_report_dir_policy": "require-empty-or-new",
+  "host_preconditions": [
+    "linux",
+    "go",
+    "fresh-report-dir"
+  ],
+  "steps": [
+    {
+      "id": "ram-contract-build",
+      "kind": "go-run",
+      "command": "go run ./cli/cmd/tetra build --target linux-x64 --emit-ram-contract-report --emit-memory-report --emit-alloc-report -o \"$REPORT_DIR/ram-contract-fixture\" \"$REPORT_DIR/ram_contract_fixture.tetra\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "ram-contract-report.json",
+        "memory-grade-report.json",
+        "proof-store-summary.json",
+        "validation-pipeline-coverage.json",
+        "heap-blockers.json",
+        "copy-blockers.json"
+      ],
+      "validator_refs": [
+        "validate-ram-contract-report",
+        "validate-memory-grade-report",
+        "validate-proof-store-summary",
+        "validate-validation-pipeline-coverage",
+        "validate-heap-blockers",
+        "validate-copy-blockers"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "validate-ram-contract-report",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-ram-contract-report --report \"$REPORT_DIR/ram-contract-report.json\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-ram-contract-report"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "validate-memory-grade-report",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-memory-grade-report --report \"$REPORT_DIR/memory-grade-report.json\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-memory-grade-report"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "validate-proof-store-summary",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-proof-store-summary --report \"$REPORT_DIR/proof-store-summary.json\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-proof-store-summary"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "validate-validation-pipeline-coverage",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-validation-pipeline-coverage --report \"$REPORT_DIR/validation-pipeline-coverage.json\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-validation-pipeline-coverage"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "validate-heap-blockers",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-heap-blockers --report \"$REPORT_DIR/heap-blockers.json\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-heap-blockers"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "validate-copy-blockers",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-copy-blockers --report \"$REPORT_DIR/copy-blockers.json\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-copy-blockers"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "ram-contract-fuzz-short",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/ram-contract-fuzz-short --report-dir \"$REPORT_DIR/fuzz\" --git-head \"$GIT_HEAD\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "fuzz/ram-contract-fuzz-oracle.json"
+      ],
+      "validator_refs": [
+        "validate-ram-contract-fuzz-oracle"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "validate-ram-contract-fuzz-oracle",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-ram-contract-fuzz-oracle --report \"$REPORT_DIR/fuzz/ram-contract-fuzz-oracle.json\" --current-git-head \"$GIT_HEAD\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-ram-contract-fuzz-oracle"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "write-ram-contract-release-manifest",
+      "kind": "internal-write",
+      "command": "scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh writes \"$REPORT_DIR/ram-contract-release-manifest.json\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "ram-contract-release-manifest.json"
+      ],
+      "validator_refs": [
+        "validate-ram-contract-release"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "artifact-hashes-write",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-artifact-hashes --write --root \"$REPORT_DIR\" --out \"$REPORT_DIR/artifact-hashes.json\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "artifact-hashes.json"
+      ],
+      "validator_refs": [
+        "validate-artifact-hashes"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "artifact-hashes-validate",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-artifact-hashes --manifest \"$REPORT_DIR/artifact-hashes.json\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-artifact-hashes"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "validate-ram-contract-release",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-ram-contract-release --report-dir \"$REPORT_DIR\" --current-git-head \"$GIT_HEAD\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-ram-contract-release"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    }
+  ],
+  "required_reports": [
+    {
+      "path": "ram-contract-release-manifest.json",
+      "schema": "tetra.ram-contract.release-manifest.v1",
+      "validator": "validate-ram-contract-release",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "release_manifest"
+      ]
+    },
+    {
+      "path": "ram-contract-report.json",
+      "schema": "tetra.ram-contract-report.v1",
+      "validator": "validate-ram-contract-report",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "ram_contract_report_evidence"
+      ]
+    },
+    {
+      "path": "memory-grade-report.json",
+      "schema": "tetra.memory-grade-report.v1",
+      "validator": "validate-memory-grade-report",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "memory_grade_report"
+      ]
+    },
+    {
+      "path": "proof-store-summary.json",
+      "schema": "tetra.proof-store-summary.v1",
+      "validator": "validate-proof-store-summary",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "proof_store_summary"
+      ]
+    },
+    {
+      "path": "validation-pipeline-coverage.json",
+      "schema": "tetra.validation-pipeline-coverage.v1",
+      "validator": "validate-validation-pipeline-coverage",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "validation_pipeline_coverage"
+      ]
+    },
+    {
+      "path": "heap-blockers.json",
+      "schema": "tetra.ram-blockers.v1",
+      "validator": "validate-heap-blockers",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "heap_blocker_evidence"
+      ]
+    },
+    {
+      "path": "copy-blockers.json",
+      "schema": "tetra.ram-blockers.v1",
+      "validator": "validate-copy-blockers",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "copy_blocker_evidence"
+      ]
+    },
+    {
+      "path": "fuzz/ram-contract-fuzz-oracle.json",
+      "schema": "tetra.ram-contract-fuzz-oracle.v1",
+      "validator": "validate-ram-contract-fuzz-oracle",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "fuzz_oracle_rejection_evidence"
+      ]
+    },
+    {
+      "path": "artifact-hashes.json",
+      "schema": "tetra.release-artifact-hashes.v1alpha1",
+      "validator": "validate-artifact-hashes",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "artifact_hash_integrity"
+      ]
+    }
+  ],
+  "validators": [
+    {
+      "id": "validate-ram-contract-report",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-ram-contract-report --report \"$REPORT_DIR/ram-contract-report.json\""
+    },
+    {
+      "id": "validate-memory-grade-report",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-memory-grade-report --report \"$REPORT_DIR/memory-grade-report.json\""
+    },
+    {
+      "id": "validate-proof-store-summary",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-proof-store-summary --report \"$REPORT_DIR/proof-store-summary.json\""
+    },
+    {
+      "id": "validate-validation-pipeline-coverage",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-validation-pipeline-coverage --report \"$REPORT_DIR/validation-pipeline-coverage.json\""
+    },
+    {
+      "id": "validate-heap-blockers",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-heap-blockers --report \"$REPORT_DIR/heap-blockers.json\""
+    },
+    {
+      "id": "validate-copy-blockers",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-copy-blockers --report \"$REPORT_DIR/copy-blockers.json\""
+    },
+    {
+      "id": "validate-ram-contract-fuzz-oracle",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-ram-contract-fuzz-oracle --report \"$REPORT_DIR/fuzz/ram-contract-fuzz-oracle.json\" --current-git-head \"$GIT_HEAD\""
+    },
+    {
+      "id": "validate-artifact-hashes",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-artifact-hashes --manifest \"$REPORT_DIR/artifact-hashes.json\""
+    },
+    {
+      "id": "validate-ram-contract-release",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-ram-contract-release --report-dir \"$REPORT_DIR\" --current-git-head \"$GIT_HEAD\""
+    }
+  ],
+  "artifact_hashes": {
+    "enabled": true,
+    "required": true,
+    "algorithm": "sha256"
+  },
+  "claims": [
+    {
+      "id": "ram_contract_report_evidence",
+      "statement": "The RAM contract report is produced by the Linux-x64 smoke build and checked by validate-ram-contract-report."
+    },
+    {
+      "id": "memory_grade_report",
+      "statement": "The memory grade report is produced by the Linux-x64 smoke build and checked by validate-memory-grade-report."
+    },
+    {
+      "id": "proof_store_summary",
+      "statement": "The proof-store summary is produced by the Linux-x64 smoke build and checked by validate-proof-store-summary."
+    },
+    {
+      "id": "validation_pipeline_coverage",
+      "statement": "Validation pipeline coverage evidence is produced by the Linux-x64 smoke build and checked by validate-validation-pipeline-coverage."
+    },
+    {
+      "id": "heap_blocker_evidence",
+      "statement": "Explicit heap blocker evidence is produced by the Linux-x64 smoke build and checked by validate-heap-blockers."
+    },
+    {
+      "id": "copy_blocker_evidence",
+      "statement": "Explicit copy blocker evidence is produced by the Linux-x64 smoke build and checked by validate-copy-blockers."
+    },
+    {
+      "id": "fuzz_oracle_rejection_evidence",
+      "statement": "The RAM contract fuzz oracle records deterministic fake-evidence rejection evidence checked by validate-ram-contract-fuzz-oracle."
+    },
+    {
+      "id": "artifact_hash_integrity",
+      "statement": "The RAM contract release bundle is covered by a required sha256 artifact hash manifest."
+    },
+    {
+      "id": "release_manifest",
+      "statement": "The RAM contract release manifest records the local Linux-x64 gate commands and artifact index checked by validate-ram-contract-release."
+    }
+  ],
+  "nonclaims": [
+    {
+      "id": "no_memory100_claim",
+      "statement": "This RAM contract gate does not claim Memory100 status."
+    },
+    {
+      "id": "no_full_formal_proof_claim",
+      "statement": "This RAM contract gate does not claim a full formal proof of all memory behavior."
+    },
+    {
+      "id": "no_official_benchmark_or_fastest_language_claim",
+      "statement": "This RAM contract gate does not claim official benchmark results or fastest-language status."
+    },
+    {
+      "id": "local_linux_x64_scope_only",
+      "statement": "This contract is scoped to local Linux-x64 RAM contract release evidence only."
+    },
+    {
+      "id": "no_zero_heap_for_all_programs",
+      "statement": "This RAM contract gate does not claim zero heap allocation for all programs."
+    },
+    {
+      "id": "no_zero_copy_for_all_programs",
+      "statement": "This RAM contract gate does not claim zero-copy behavior for all programs."
+    }
+  ],
+  "ci_artifacts": [
+    {
+      "path": "ram-contract-release-manifest.json",
+      "required": true
+    },
+    {
+      "path": "ram-contract-report.json",
+      "required": true
+    },
+    {
+      "path": "memory-grade-report.json",
+      "required": true
+    },
+    {
+      "path": "proof-store-summary.json",
+      "required": true
+    },
+    {
+      "path": "validation-pipeline-coverage.json",
+      "required": true
+    },
+    {
+      "path": "heap-blockers.json",
+      "required": true
+    },
+    {
+      "path": "copy-blockers.json",
+      "required": true
+    },
+    {
+      "path": "fuzz/ram-contract-fuzz-oracle.json",
+      "required": true
+    },
+    {
+      "path": "artifact-hashes.json",
+      "required": true
+    }
+  ]
+}

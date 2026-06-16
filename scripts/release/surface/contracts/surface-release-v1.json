@@ -1,0 +1,1276 @@
+{
+  "schema": "tetra.gate-contract.v1",
+  "id": "surface-release-v1",
+  "title": "Surface v1 Linux/Web release gate",
+  "scope": "surface-v1-linux-web",
+  "producer": "scripts/release/surface/release-gate.sh",
+  "entrypoint": "scripts/release/surface/release-gate.sh",
+  "fresh_report_dir_policy": "require-empty-or-new",
+  "host_preconditions": [
+    "linux",
+    "go",
+    "fresh-report-dir"
+  ],
+  "steps": [
+    {
+      "id": "surface-headless-release-smoke",
+      "kind": "shell",
+      "command": "bash scripts/release/surface/surface-headless-release-smoke.sh --report-dir \"$REPORT_DIR\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "surface-headless-release.json"
+      ],
+      "validator_refs": [
+        "validate-surface-release-state"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "surface-headless-release-text-input-smoke",
+      "kind": "shell",
+      "command": "bash scripts/release/surface/surface-headless-release-text-input-smoke.sh --report-dir \"$REPORT_DIR\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "surface-headless-release-text-input.json"
+      ],
+      "validator_refs": [
+        "validate-surface-release-state"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "surface-headless-release-toolkit-smoke",
+      "kind": "shell",
+      "command": "bash scripts/release/surface/surface-headless-release-toolkit-smoke.sh --report-dir \"$REPORT_DIR\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "surface-headless-release-toolkit.json"
+      ],
+      "validator_refs": [
+        "validate-surface-release-state"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "surface-headless-release-accessibility-smoke",
+      "kind": "shell",
+      "command": "bash scripts/release/surface/surface-headless-release-accessibility-smoke.sh --report-dir \"$REPORT_DIR\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "surface-headless-release-accessibility.json"
+      ],
+      "validator_refs": [
+        "validate-surface-release-state"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "surface-headless-app-model-smoke",
+      "kind": "shell",
+      "command": "bash scripts/release/surface/surface-headless-app-model-smoke.sh --report-dir \"$REPORT_DIR\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "surface-headless-app-model.json"
+      ],
+      "validator_refs": [
+        "validate-surface-release-state"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "surface-linux-x64-release-window-smoke",
+      "kind": "shell",
+      "command": "bash scripts/release/surface/surface-linux-x64-release-window-smoke.sh --report-dir \"$REPORT_DIR\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "surface-linux-x64-release-window.json"
+      ],
+      "validator_refs": [
+        "validate-surface-release-state"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "surface-linux-x64-release-app-shell-smoke",
+      "kind": "shell",
+      "command": "bash scripts/release/surface/surface-linux-x64-release-app-shell-smoke.sh --report-dir \"$REPORT_DIR\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "surface-linux-x64-release-app-shell.json"
+      ],
+      "validator_refs": [
+        "validate-surface-security-report",
+        "validate-surface-performance-budget",
+        "validate-surface-release-state"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "surface-dev-workflow-smoke",
+      "kind": "shell",
+      "command": "bash scripts/release/surface/surface-dev-workflow-smoke.sh --report-dir \"$REPORT_DIR\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "surface-dev-workflow.json"
+      ],
+      "validator_refs": [
+        "validate-surface-dev-workflow"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "surface-inspector-smoke",
+      "kind": "shell",
+      "command": "bash scripts/release/surface/surface-inspector-smoke.sh --report-dir \"$REPORT_DIR\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "surface-inspector.json"
+      ],
+      "validator_refs": [
+        "validate-surface-inspector"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "surface-template-smoke",
+      "kind": "shell",
+      "command": "bash scripts/release/surface/surface-template-smoke.sh --report-dir \"$REPORT_DIR\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "surface-template-smoke.json"
+      ],
+      "validator_refs": [
+        "validate-surface-template-smoke"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "surface-reference-apps-smoke",
+      "kind": "shell",
+      "command": "bash scripts/release/surface/surface-reference-apps-smoke.sh --report-dir \"$REPORT_DIR\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "surface-reference-apps.json"
+      ],
+      "validator_refs": [
+        "validate-surface-reference-apps"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "surface-package-smoke",
+      "kind": "shell",
+      "command": "bash scripts/release/surface/surface-package-smoke.sh --report-dir \"$REPORT_DIR\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "surface-package.json"
+      ],
+      "validator_refs": [
+        "validate-surface-package"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "surface-crash-report-smoke",
+      "kind": "shell",
+      "command": "bash scripts/release/surface/surface-crash-report-smoke.sh --report-dir \"$REPORT_DIR\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "surface-crash-report.json"
+      ],
+      "validator_refs": [
+        "validate-surface-crash-report"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "surface-i18n-smoke",
+      "kind": "shell",
+      "command": "bash scripts/release/surface/surface-i18n-smoke.sh --report-dir \"$REPORT_DIR\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "surface-i18n.json"
+      ],
+      "validator_refs": [
+        "validate-surface-i18n"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "surface-widget-migration-smoke",
+      "kind": "shell",
+      "command": "bash scripts/release/surface/surface-widget-migration-smoke.sh --report-dir \"$REPORT_DIR\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "surface-widget-migration.json"
+      ],
+      "validator_refs": [
+        "validate-surface-widget-migration"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "surface-linux-x64-release-text-input-smoke",
+      "kind": "shell",
+      "command": "bash scripts/release/surface/surface-linux-x64-release-text-input-smoke.sh --report-dir \"$REPORT_DIR\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "surface-linux-x64-release-text-input.json"
+      ],
+      "validator_refs": [
+        "validate-surface-release-state"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "surface-linux-x64-release-toolkit-smoke",
+      "kind": "shell",
+      "command": "bash scripts/release/surface/surface-linux-x64-release-toolkit-smoke.sh --report-dir \"$REPORT_DIR\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "surface-linux-x64-release-toolkit.json"
+      ],
+      "validator_refs": [
+        "validate-surface-release-state"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "surface-linux-x64-release-accessibility-smoke",
+      "kind": "shell",
+      "command": "bash scripts/release/surface/surface-linux-x64-release-accessibility-smoke.sh --report-dir \"$REPORT_DIR\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "surface-linux-x64-release-accessibility.json"
+      ],
+      "validator_refs": [
+        "validate-surface-release-state"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "surface-wasm32-web-release-browser-smoke",
+      "kind": "shell",
+      "command": "bash scripts/release/surface/surface-wasm32-web-release-browser-smoke.sh --report-dir \"$REPORT_DIR\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "surface-wasm32-web-release-browser.json"
+      ],
+      "validator_refs": [
+        "validate-surface-release-state"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "surface-wasm32-web-release-text-input-smoke",
+      "kind": "shell",
+      "command": "bash scripts/release/surface/surface-wasm32-web-release-text-input-smoke.sh --report-dir \"$REPORT_DIR\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "surface-wasm32-web-release-text-input.json"
+      ],
+      "validator_refs": [
+        "validate-surface-release-state"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "surface-wasm32-web-release-toolkit-smoke",
+      "kind": "shell",
+      "command": "bash scripts/release/surface/surface-wasm32-web-release-toolkit-smoke.sh --report-dir \"$REPORT_DIR\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "surface-wasm32-web-release-toolkit.json"
+      ],
+      "validator_refs": [
+        "validate-surface-release-state"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "surface-wasm32-web-release-accessibility-smoke",
+      "kind": "shell",
+      "command": "bash scripts/release/surface/surface-wasm32-web-release-accessibility-smoke.sh --report-dir \"$REPORT_DIR\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "surface-wasm32-web-release-accessibility.json"
+      ],
+      "validator_refs": [
+        "validate-surface-release-state"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "block-system-gate",
+      "kind": "shell",
+      "command": "bash scripts/release/surface/block-system-gate.sh --report-dir \"$REPORT_DIR/block-system\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "block-system/surface-block-system-gate-summary.json",
+        "block-system/headless/surface-headless-block-system.json",
+        "block-system/headless/surface-block-examples.json",
+        "block-system/linux-x64-real-window/surface-block-system-linux-x64.json",
+        "block-system/wasm32-web-browser-canvas/surface-block-system-wasm32-web.json"
+      ],
+      "validator_refs": [
+        "validate-artifact-hashes"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "morph-gate",
+      "kind": "shell",
+      "command": "bash scripts/release/surface/morph-gate.sh --report-dir \"$REPORT_DIR/morph\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "morph/surface-morph-gate-summary.json",
+        "morph/headless/surface-headless-morph.json"
+      ],
+      "validator_refs": [
+        "validate-surface-release-state"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "write-target-host-status-reports",
+      "kind": "internal-write",
+      "command": "scripts/release/surface/release-gate.sh writes \"$REPORT_DIR/surface-macos-x64-target-host-status.json\" \"$REPORT_DIR/surface-windows-x64-target-host-status.json\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "surface-macos-x64-target-host-status.json",
+        "surface-windows-x64-target-host-status.json"
+      ],
+      "validator_refs": [
+        "validate-surface-release-state"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "write-surface-release-summary",
+      "kind": "internal-write",
+      "command": "scripts/release/surface/release-gate.sh writes \"$REPORT_DIR/surface-release-summary.json\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "surface-release-summary.json"
+      ],
+      "validator_refs": [
+        "validate-surface-runtime-release-summary"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "validate-surface-runtime-release-summary",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-surface-runtime --report \"$REPORT_DIR/surface-release-summary.json\" --release surface-v1",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-surface-runtime-release-summary"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "validate-surface-security-report",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-surface-security-report --report \"$REPORT_DIR/surface-linux-x64-release-app-shell.json\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-surface-security-report"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "validate-surface-performance-budget",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-surface-performance-budget --report \"$REPORT_DIR/surface-linux-x64-release-app-shell.json\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-surface-performance-budget"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "validate-surface-dev-workflow",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-surface-dev-workflow --report \"$REPORT_DIR/surface-dev-workflow.json\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-surface-dev-workflow"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "validate-surface-inspector",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-surface-inspector --report \"$REPORT_DIR/surface-inspector.json\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-surface-inspector"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "validate-surface-template-smoke",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-surface-template-smoke --report \"$REPORT_DIR/surface-template-smoke.json\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-surface-template-smoke"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "validate-surface-reference-apps",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-surface-reference-apps --report \"$REPORT_DIR/surface-reference-apps.json\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-surface-reference-apps"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "validate-surface-package",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-surface-package --report \"$REPORT_DIR/surface-package.json\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-surface-package"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "validate-surface-crash-report",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-surface-crash-report --report \"$REPORT_DIR/surface-crash-report.json\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-surface-crash-report"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "validate-surface-i18n",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-surface-i18n --report \"$REPORT_DIR/surface-i18n.json\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-surface-i18n"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "validate-surface-widget-migration",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-surface-widget-migration --report \"$REPORT_DIR/surface-widget-migration.json\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-surface-widget-migration"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "artifact-hashes-write",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-artifact-hashes --write --root \"$REPORT_DIR\" --out \"$REPORT_DIR/artifact-hashes.json\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "artifact-hashes.json"
+      ],
+      "validator_refs": [
+        "validate-artifact-hashes"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "artifact-hashes-validate",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-artifact-hashes --manifest \"$REPORT_DIR/artifact-hashes.json\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-artifact-hashes"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "validate-surface-release-state",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-surface-release-state --report-dir \"$REPORT_DIR\" --expected-status current --scope surface-v1-linux-web --manifest docs/generated/manifest.json",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-surface-release-state"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "validate-surface-claims",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-surface-claims --root \"$REPO_ROOT\" --report-dir \"$REPORT_DIR\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-surface-claims"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    }
+  ],
+  "required_reports": [
+    {
+      "path": "surface-headless-release.json",
+      "schema": "tetra.surface.runtime.v1",
+      "validator": "validate-surface-release-state",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "surface_release_required_reports"
+      ]
+    },
+    {
+      "path": "surface-headless-release-text-input.json",
+      "schema": "tetra.surface.text-input.v1",
+      "validator": "validate-surface-release-state",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "surface_release_required_reports"
+      ]
+    },
+    {
+      "path": "surface-headless-release-toolkit.json",
+      "schema": "tetra.surface.runtime.v1",
+      "validator": "validate-surface-release-state",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "surface_release_required_reports"
+      ]
+    },
+    {
+      "path": "surface-headless-release-accessibility.json",
+      "schema": "tetra.surface.runtime.v1",
+      "validator": "validate-surface-release-state",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "surface_release_required_reports"
+      ]
+    },
+    {
+      "path": "surface-headless-app-model.json",
+      "schema": "tetra.surface.runtime.v1",
+      "validator": "validate-surface-release-state",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "surface_release_required_reports"
+      ]
+    },
+    {
+      "path": "surface-linux-x64-release-window.json",
+      "schema": "tetra.surface.runtime.v1",
+      "validator": "validate-surface-release-state",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "surface_release_required_reports"
+      ]
+    },
+    {
+      "path": "surface-linux-x64-release-app-shell.json",
+      "schema": "tetra.surface.runtime.v1",
+      "validator": "validate-surface-security-report",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "surface_release_required_reports"
+      ]
+    },
+    {
+      "path": "surface-dev-workflow.json",
+      "schema": "tetra.surface.dev-workflow.v1",
+      "validator": "validate-surface-dev-workflow",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "surface_release_required_reports"
+      ]
+    },
+    {
+      "path": "surface-inspector.json",
+      "schema": "tetra.surface.inspector.v1",
+      "validator": "validate-surface-inspector",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "surface_release_required_reports"
+      ]
+    },
+    {
+      "path": "surface-template-smoke.json",
+      "schema": "tetra.surface.template-smoke.v1",
+      "validator": "validate-surface-template-smoke",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "surface_release_required_reports"
+      ]
+    },
+    {
+      "path": "surface-reference-apps.json",
+      "schema": "tetra.surface.reference-app-suite.v1",
+      "validator": "validate-surface-reference-apps",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "surface_release_required_reports"
+      ]
+    },
+    {
+      "path": "surface-package.json",
+      "schema": "tetra.surface.package.v1",
+      "validator": "validate-surface-package",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "surface_release_required_reports"
+      ]
+    },
+    {
+      "path": "surface-crash-report.json",
+      "schema": "tetra.surface.crash-report.v1",
+      "validator": "validate-surface-crash-report",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "crash_reporting",
+        "surface_release_required_reports"
+      ]
+    },
+    {
+      "path": "surface-i18n.json",
+      "schema": "tetra.surface.i18n.v1",
+      "validator": "validate-surface-i18n",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "surface_release_required_reports"
+      ]
+    },
+    {
+      "path": "surface-widget-migration.json",
+      "schema": "tetra.surface.widget-migration.v1",
+      "validator": "validate-surface-widget-migration",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "surface_release_required_reports"
+      ]
+    },
+    {
+      "path": "surface-linux-x64-release-text-input.json",
+      "schema": "tetra.surface.text-input.v1",
+      "validator": "validate-surface-release-state",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "surface_release_required_reports"
+      ]
+    },
+    {
+      "path": "surface-linux-x64-release-toolkit.json",
+      "schema": "tetra.surface.runtime.v1",
+      "validator": "validate-surface-release-state",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "surface_release_required_reports"
+      ]
+    },
+    {
+      "path": "surface-linux-x64-release-accessibility.json",
+      "schema": "tetra.surface.runtime.v1",
+      "validator": "validate-surface-release-state",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "surface_release_required_reports"
+      ]
+    },
+    {
+      "path": "surface-macos-x64-target-host-status.json",
+      "schema": "tetra.surface.target-host-status.v1",
+      "validator": "validate-surface-release-state",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "unsupported_target_nonclaim_evidence",
+        "surface_release_required_reports"
+      ]
+    },
+    {
+      "path": "surface-windows-x64-target-host-status.json",
+      "schema": "tetra.surface.target-host-status.v1",
+      "validator": "validate-surface-release-state",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "unsupported_target_nonclaim_evidence",
+        "surface_release_required_reports"
+      ]
+    },
+    {
+      "path": "surface-wasm32-web-release-browser.json",
+      "schema": "tetra.surface.runtime.v1",
+      "validator": "validate-surface-release-state",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "surface_release_required_reports"
+      ]
+    },
+    {
+      "path": "surface-wasm32-web-release-text-input.json",
+      "schema": "tetra.surface.text-input.v1",
+      "validator": "validate-surface-release-state",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "surface_release_required_reports"
+      ]
+    },
+    {
+      "path": "surface-wasm32-web-release-toolkit.json",
+      "schema": "tetra.surface.runtime.v1",
+      "validator": "validate-surface-release-state",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "surface_release_required_reports"
+      ]
+    },
+    {
+      "path": "surface-wasm32-web-release-accessibility.json",
+      "schema": "tetra.surface.runtime.v1",
+      "validator": "validate-surface-release-state",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "surface_release_required_reports"
+      ]
+    },
+    {
+      "path": "block-system/surface-block-system-gate-summary.json",
+      "schema": "tetra.surface.block-system.gate.v1",
+      "validator": "validate-artifact-hashes",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "surface_release_required_reports"
+      ]
+    },
+    {
+      "path": "block-system/headless/surface-headless-block-system.json",
+      "schema": "tetra.surface.runtime.v1",
+      "validator": "validate-artifact-hashes",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "surface_release_required_reports"
+      ]
+    },
+    {
+      "path": "block-system/headless/surface-block-examples.json",
+      "schema": "tetra.surface.block-examples.v1",
+      "validator": "validate-artifact-hashes",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "surface_release_required_reports"
+      ]
+    },
+    {
+      "path": "block-system/linux-x64-real-window/surface-block-system-linux-x64.json",
+      "schema": "tetra.surface.runtime.v1",
+      "validator": "validate-artifact-hashes",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "surface_release_required_reports"
+      ]
+    },
+    {
+      "path": "block-system/wasm32-web-browser-canvas/surface-block-system-wasm32-web.json",
+      "schema": "tetra.surface.runtime.v1",
+      "validator": "validate-artifact-hashes",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "surface_release_required_reports"
+      ]
+    },
+    {
+      "path": "morph/surface-morph-gate-summary.json",
+      "schema": "tetra.surface.morph.gate.v1",
+      "validator": "validate-surface-release-state",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "surface_release_required_reports"
+      ]
+    },
+    {
+      "path": "morph/headless/surface-headless-morph.json",
+      "schema": "tetra.surface.runtime.v1",
+      "validator": "validate-surface-release-state",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "surface_release_required_reports"
+      ]
+    },
+    {
+      "path": "surface-release-summary.json",
+      "schema": "tetra.surface.release.v1",
+      "validator": "validate-surface-runtime-release-summary",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "surface_release_summary",
+        "release_state_current"
+      ]
+    },
+    {
+      "path": "artifact-hashes.json",
+      "schema": "tetra.release-artifact-hashes.v1alpha1",
+      "validator": "validate-artifact-hashes",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "artifact_hash_integrity"
+      ]
+    }
+  ],
+  "validators": [
+    {
+      "id": "validate-surface-runtime-release-summary",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-surface-runtime --report \"$REPORT_DIR/surface-release-summary.json\" --release surface-v1"
+    },
+    {
+      "id": "validate-surface-security-report",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-surface-security-report --report \"$REPORT_DIR/surface-linux-x64-release-app-shell.json\""
+    },
+    {
+      "id": "validate-surface-performance-budget",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-surface-performance-budget --report \"$REPORT_DIR/surface-linux-x64-release-app-shell.json\""
+    },
+    {
+      "id": "validate-surface-dev-workflow",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-surface-dev-workflow --report \"$REPORT_DIR/surface-dev-workflow.json\""
+    },
+    {
+      "id": "validate-surface-inspector",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-surface-inspector --report \"$REPORT_DIR/surface-inspector.json\""
+    },
+    {
+      "id": "validate-surface-template-smoke",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-surface-template-smoke --report \"$REPORT_DIR/surface-template-smoke.json\""
+    },
+    {
+      "id": "validate-surface-reference-apps",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-surface-reference-apps --report \"$REPORT_DIR/surface-reference-apps.json\""
+    },
+    {
+      "id": "validate-surface-package",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-surface-package --report \"$REPORT_DIR/surface-package.json\""
+    },
+    {
+      "id": "validate-surface-crash-report",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-surface-crash-report --report \"$REPORT_DIR/surface-crash-report.json\""
+    },
+    {
+      "id": "validate-surface-i18n",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-surface-i18n --report \"$REPORT_DIR/surface-i18n.json\""
+    },
+    {
+      "id": "validate-surface-widget-migration",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-surface-widget-migration --report \"$REPORT_DIR/surface-widget-migration.json\""
+    },
+    {
+      "id": "validate-artifact-hashes",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-artifact-hashes --manifest \"$REPORT_DIR/artifact-hashes.json\""
+    },
+    {
+      "id": "validate-surface-release-state",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-surface-release-state --report-dir \"$REPORT_DIR\" --expected-status current --scope surface-v1-linux-web --manifest docs/generated/manifest.json"
+    },
+    {
+      "id": "validate-surface-claims",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-surface-claims --root \"$REPO_ROOT\" --report-dir \"$REPORT_DIR\""
+    }
+  ],
+  "artifact_hashes": {
+    "enabled": true,
+    "required": true,
+    "algorithm": "sha256"
+  },
+  "claims": [
+    {
+      "id": "surface_release_required_reports",
+      "statement": "The Surface release gate contract enumerates the report artifacts required by scripts/release/surface/release-gate.sh for surface-v1-linux-web."
+    },
+    {
+      "id": "crash_reporting",
+      "statement": "Surface crash reporting evidence is produced by surface-crash-report-smoke and checked by validate-surface-crash-report."
+    },
+    {
+      "id": "surface_release_summary",
+      "statement": "Surface release summary evidence is present and checked in Surface v1 release mode."
+    },
+    {
+      "id": "artifact_hash_integrity",
+      "statement": "Release report artifacts are covered by a required sha256 artifact hash manifest."
+    },
+    {
+      "id": "release_state_current",
+      "statement": "Surface release-state validation is part of this contract's release gate plan."
+    },
+    {
+      "id": "unsupported_target_nonclaim_evidence",
+      "statement": "macOS and Windows target-host status reports are unsupported-target nonclaim evidence written by release-gate.sh, not runtime support claims."
+    }
+  ],
+  "nonclaims": [
+    {
+      "id": "not_remote_ci_execution",
+      "statement": "This contract represents the local release-gate plan and required report surface; it does not prove remote CI execution."
+    },
+    {
+      "id": "not_unsupported_target_runtime_support",
+      "statement": "macOS and Windows target-host status reports are nonclaim evidence and do not prove unsupported target runtime support."
+    }
+  ],
+  "ci_artifacts": [
+    {
+      "path": "surface-headless-release.json",
+      "required": true
+    },
+    {
+      "path": "surface-headless-release-text-input.json",
+      "required": true
+    },
+    {
+      "path": "surface-headless-release-toolkit.json",
+      "required": true
+    },
+    {
+      "path": "surface-headless-release-accessibility.json",
+      "required": true
+    },
+    {
+      "path": "surface-headless-app-model.json",
+      "required": true
+    },
+    {
+      "path": "surface-linux-x64-release-window.json",
+      "required": true
+    },
+    {
+      "path": "surface-linux-x64-release-app-shell.json",
+      "required": true
+    },
+    {
+      "path": "surface-dev-workflow.json",
+      "required": true
+    },
+    {
+      "path": "surface-inspector.json",
+      "required": true
+    },
+    {
+      "path": "surface-template-smoke.json",
+      "required": true
+    },
+    {
+      "path": "surface-reference-apps.json",
+      "required": true
+    },
+    {
+      "path": "surface-package.json",
+      "required": true
+    },
+    {
+      "path": "surface-crash-report.json",
+      "required": true
+    },
+    {
+      "path": "surface-i18n.json",
+      "required": true
+    },
+    {
+      "path": "surface-widget-migration.json",
+      "required": true
+    },
+    {
+      "path": "surface-linux-x64-release-text-input.json",
+      "required": true
+    },
+    {
+      "path": "surface-linux-x64-release-toolkit.json",
+      "required": true
+    },
+    {
+      "path": "surface-linux-x64-release-accessibility.json",
+      "required": true
+    },
+    {
+      "path": "surface-macos-x64-target-host-status.json",
+      "required": true
+    },
+    {
+      "path": "surface-windows-x64-target-host-status.json",
+      "required": true
+    },
+    {
+      "path": "surface-wasm32-web-release-browser.json",
+      "required": true
+    },
+    {
+      "path": "surface-wasm32-web-release-text-input.json",
+      "required": true
+    },
+    {
+      "path": "surface-wasm32-web-release-toolkit.json",
+      "required": true
+    },
+    {
+      "path": "surface-wasm32-web-release-accessibility.json",
+      "required": true
+    },
+    {
+      "path": "block-system/surface-block-system-gate-summary.json",
+      "required": true
+    },
+    {
+      "path": "block-system/headless/surface-headless-block-system.json",
+      "required": true
+    },
+    {
+      "path": "block-system/headless/surface-block-examples.json",
+      "required": true
+    },
+    {
+      "path": "block-system/linux-x64-real-window/surface-block-system-linux-x64.json",
+      "required": true
+    },
+    {
+      "path": "block-system/wasm32-web-browser-canvas/surface-block-system-wasm32-web.json",
+      "required": true
+    },
+    {
+      "path": "morph/surface-morph-gate-summary.json",
+      "required": true
+    },
+    {
+      "path": "morph/headless/surface-headless-morph.json",
+      "required": true
+    },
+    {
+      "path": "surface-release-summary.json",
+      "required": true
+    },
+    {
+      "path": "artifact-hashes.json",
+      "required": true
+    }
+  ]
+}

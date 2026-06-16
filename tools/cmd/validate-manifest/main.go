@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	ctarget "tetra_language/compiler/target"
+	"tetra_language/tools/internal/reportdecode"
 )
 
 type manifestEnvelope struct {
@@ -119,7 +120,9 @@ const manifestArtifact = "tetra.release.v0_4_0.manifest-json.v1"
 
 func main() {
 	var manifestPath string
+	var reportFormat string
 	flag.StringVar(&manifestPath, "manifest", "", "path to generated manifest JSON")
+	flag.StringVar(&reportFormat, "format", "auto", "manifest format: auto, json, or toon")
 	flag.Parse()
 
 	if manifestPath == "" {
@@ -131,15 +134,19 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err := validateManifest(raw); err != nil {
+	if err := validateManifestFormat(raw, reportFormat); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
 func validateManifest(raw []byte) error {
+	return validateManifestFormat(raw, "auto")
+}
+
+func validateManifestFormat(raw []byte, format string) error {
 	var manifest manifestEnvelope
-	if err := decodeStrictJSON(raw, &manifest); err != nil {
+	if err := reportdecode.DecodeStrictFormat(raw, format, &manifest); err != nil {
 		return err
 	}
 	if manifest.CompilerVersion == "" {
