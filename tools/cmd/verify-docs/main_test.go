@@ -1350,11 +1350,59 @@ func TestVerifyRAMContractCompilerDocsAcceptsDirectParentReadinessHead(t *testin
 	}
 }
 
+func TestVerifyRAMContractCompilerDocsAcceptsPullRequestMergeBranchParentReadinessHead(t *testing.T) {
+	head := "1111111111111111111111111111111111111111"
+	base := "2222222222222222222222222222222222222222"
+	branch := "3333333333333333333333333333333333333333"
+	branchParent := "4444444444444444444444444444444444444444"
+	writeFakeGitForRAMReadiness(t, head, base, branch, branchParent)
+
+	paths := writeRAMContractDocsSet(t, validRAMContractDocsBody())
+	body := validRAMContractDocsBody() + "\nGit head: " + branchParent + "\n"
+	if err := os.WriteFile(paths.Readiness, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyRAMContractCompilerDocs(paths, []featureManifest{validVerifyDocsRAMContractFeature()}); err != nil {
+		t.Fatalf("verifyRAMContractCompilerDocs accepted PR merge branch-parent evidence head: %v", err)
+	}
+}
+
 func TestVerifyRAMContractCompilerDocsAcceptsScopedEvidence(t *testing.T) {
 	paths := writeRAMContractDocsSet(t, validRAMContractDocsBody())
 	if err := verifyRAMContractCompilerDocs(paths, []featureManifest{validVerifyDocsRAMContractFeature()}); err != nil {
 		t.Fatalf("verifyRAMContractCompilerDocs: %v", err)
 	}
+}
+
+func writeFakeGitForRAMReadiness(t *testing.T, head, base, branch, branchParent string) {
+	t.Helper()
+	dir := t.TempDir()
+	script := strings.Join([]string{
+		"#!/bin/sh",
+		"case \"$*\" in",
+		"\"rev-parse --verify HEAD\")",
+		"  printf '%s\\n' '" + head + "'",
+		"  ;;",
+		"\"rev-parse --verify HEAD^\")",
+		"  printf '%s\\n' '" + base + "'",
+		"  ;;",
+		"\"rev-list --parents -n 1 HEAD\")",
+		"  printf '%s\\n' '" + head + " " + base + " " + branch + "'",
+		"  ;;",
+		"\"rev-parse --verify " + branch + "^\")",
+		"  printf '%s\\n' '" + branchParent + "'",
+		"  ;;",
+		"*)",
+		"  printf 'unexpected git args: %s\\n' \"$*\" >&2",
+		"  exit 1",
+		"  ;;",
+		"esac",
+	}, "\n")
+	path := filepath.Join(dir, "git")
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 }
 
 func writeMemoryIslandsSurfaceReleaseDoc(t *testing.T, body string) string {

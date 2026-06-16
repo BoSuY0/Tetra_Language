@@ -367,29 +367,61 @@ func staleRAMContractReadinessGitHead(text string) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	if match[1] != current {
-		parent, ok := currentGitParentForDocs()
-		if !ok || match[1] != parent {
-			return match[1], true
+	for _, fresh := range append([]string{current}, currentGitReadinessParentHeadsForDocs()...) {
+		if match[1] == fresh {
+			return "", false
 		}
 	}
-	return "", false
+	return match[1], true
 }
 
 func currentGitHeadForDocs() (string, bool) {
-	out, err := exec.Command("git", "rev-parse", "--verify", "HEAD").Output()
-	if err != nil {
-		return "", false
-	}
-	head := strings.TrimSpace(string(out))
-	if len(head) != 40 {
-		return "", false
-	}
-	return head, true
+	return gitRevParseForDocs("HEAD")
 }
 
 func currentGitParentForDocs() (string, bool) {
-	out, err := exec.Command("git", "rev-parse", "--verify", "HEAD^").Output()
+	return gitRevParseForDocs("HEAD^")
+}
+
+func currentGitReadinessParentHeadsForDocs() []string {
+	var heads []string
+	if parent, ok := currentGitParentForDocs(); ok {
+		heads = append(heads, parent)
+	}
+	parents, ok := currentGitParentsForDocs("HEAD")
+	if !ok || len(parents) < 2 {
+		return heads
+	}
+	// GitHub pull_request checkouts use a synthetic merge; non-base parents are PR heads.
+	for _, parent := range parents[1:] {
+		if branchParent, ok := gitRevParseForDocs(parent + "^"); ok {
+			heads = append(heads, branchParent)
+		}
+	}
+	return heads
+}
+
+func currentGitParentsForDocs(rev string) ([]string, bool) {
+	out, err := exec.Command("git", "rev-list", "--parents", "-n", "1", rev).Output()
+	if err != nil {
+		return nil, false
+	}
+	fields := strings.Fields(string(out))
+	if len(fields) == 0 || len(fields[0]) != 40 {
+		return nil, false
+	}
+	var parents []string
+	for _, parent := range fields[1:] {
+		if len(parent) != 40 {
+			return nil, false
+		}
+		parents = append(parents, parent)
+	}
+	return parents, true
+}
+
+func gitRevParseForDocs(rev string) (string, bool) {
+	out, err := exec.Command("git", "rev-parse", "--verify", rev).Output()
 	if err != nil {
 		return "", false
 	}
