@@ -21,6 +21,8 @@ func FromStackIRFunction(fn ir.IRFunc) (Function, bool, error) {
 		return scalarAffineLoopSSA(fn), true, nil
 	case isScalarCountdownLoop(fn):
 		return scalarCountdownLoopSSA(fn), true, nil
+	case isScalarConstBoundTwoArgSuccessCallLoop(fn):
+		return scalarConstBoundTwoArgSuccessCallLoopSSA(fn), true, nil
 	case isScalarCallLoop(fn):
 		return scalarLoopSSA(fn, true), true, nil
 	case isScalarLoop(fn):
@@ -299,6 +301,75 @@ func scalarLoopSSA(fn ir.IRFunc, withCall bool) Function {
 				ID:     "exit",
 				Params: []ValueID{"exit.total"},
 				Term:   Terminator{Kind: TermReturn, Value: "exit.total"},
+			},
+		},
+	}
+}
+
+func scalarConstBoundTwoArgSuccessCallLoopSSA(fn ir.IRFunc) Function {
+	callName := fn.Instrs[12].Name
+	return Function{
+		Name:       fn.Name,
+		ReturnType: TypeI32,
+		Values: []Value{
+			{ID: "zero", Type: TypeI32, Origin: "const"},
+			{ID: "one", Type: TypeI32, Origin: "const"},
+			{ID: "bound", Type: TypeI32, Origin: "const"},
+			{ID: "loop.index", Type: TypeI32, Origin: "block_param"},
+			{ID: "loop.total", Type: TypeI32, Origin: "block_param"},
+			{ID: "loop.effect", Type: TypeEffect, Origin: "block_param"},
+			{ID: "body.index", Type: TypeI32, Origin: "block_param"},
+			{ID: "body.total", Type: TypeI32, Origin: "block_param"},
+			{ID: "body.effect", Type: TypeEffect, Origin: "block_param"},
+			{ID: "exit.total", Type: TypeI32, Origin: "block_param"},
+			{ID: "cmp.loop", Type: TypeBool, Origin: "instr"},
+			{ID: "cmp.success", Type: TypeBool, Origin: "instr"},
+			{ID: "call.ret", Type: TypeI32, Origin: "call_result"},
+			{ID: "call.effect", Type: TypeEffect, Origin: "call_effect"},
+			{ID: "next.index", Type: TypeI32, Origin: "instr"},
+			{ID: "next.total", Type: TypeI32, Origin: "instr"},
+			{ID: "effect0", Type: TypeEffect, Origin: "entry_effect"},
+		},
+		Blocks: []Block{
+			{
+				ID:    "entry",
+				Entry: true,
+				Instrs: []Instr{
+					{ID: "const_zero", Kind: OpConstI32, Result: "zero", Type: TypeI32},
+					{ID: "const_one", Kind: OpConstI32, Result: "one", Type: TypeI32, Imm: 1},
+					{ID: "const_bound", Kind: OpConstI32, Result: "bound", Type: TypeI32, Imm: fn.Instrs[6].Imm},
+				},
+				Term: Terminator{Kind: TermBranch, Target: "loop", Args: []ValueID{"zero", "zero", "effect0"}},
+			},
+			{
+				ID:     "loop",
+				Params: []ValueID{"loop.index", "loop.total", "loop.effect"},
+				Instrs: []Instr{{ID: "cmp_loop", Kind: OpCmpLtI32, Result: "cmp.loop", Type: TypeBool, Args: []ValueID{"loop.index", "bound"}}},
+				Term:   Terminator{Kind: TermCondBr, Cond: "cmp.loop", IfTrue: "body", IfTrueArgs: []ValueID{"loop.index", "loop.total", "loop.effect"}, IfFalse: "exit", IfFalseArgs: []ValueID{"loop.total"}},
+			},
+			{
+				ID:     "body",
+				Params: []ValueID{"body.index", "body.total", "body.effect"},
+				Instrs: []Instr{
+					{ID: "call", Kind: OpCall, Result: "call.ret", Type: TypeI32, Args: []ValueID{"body.index", "body.total"}, Call: callName, EffectIn: "body.effect", EffectOut: "call.effect"},
+					{ID: "add_total", Kind: OpAddI32, Result: "next.total", Type: TypeI32, Args: []ValueID{"body.total", "call.ret"}},
+					{ID: "inc_index", Kind: OpAddI32, Result: "next.index", Type: TypeI32, Args: []ValueID{"body.index", "one"}},
+				},
+				Term: Terminator{Kind: TermBranch, Target: "loop", Args: []ValueID{"next.index", "next.total", "call.effect"}},
+			},
+			{
+				ID:     "exit",
+				Params: []ValueID{"exit.total"},
+				Instrs: []Instr{{ID: "cmp_success", Kind: OpCmpGeI32, Result: "cmp.success", Type: TypeBool, Args: []ValueID{"exit.total", "zero"}}},
+				Term:   Terminator{Kind: TermCondBr, Cond: "cmp.success", IfTrue: "success", IfFalse: "failure"},
+			},
+			{
+				ID:   "success",
+				Term: Terminator{Kind: TermReturn, Value: "zero"},
+			},
+			{
+				ID:   "failure",
+				Term: Terminator{Kind: TermReturn, Value: "one"},
 			},
 		},
 	}
@@ -761,6 +832,29 @@ func isScalarCallLoop(fn ir.IRFunc) bool {
 		in[16].Kind == ir.IRAddI32 && isStore(in[17], in[1].Local) &&
 		in[18].Kind == ir.IRJmp && in[18].Label == in[4].Label && in[19].Kind == ir.IRLabel &&
 		in[19].Label == in[8].Label && isLoad(in[20], in[3].Local) && in[21].Kind == ir.IRReturn
+}
+
+func isScalarConstBoundTwoArgSuccessCallLoop(fn ir.IRFunc) bool {
+	in := fn.Instrs
+	return fn.ReturnSlots == 1 && fn.ParamSlots == 0 && fn.LocalSlots >= 2 && len(in) == 30 &&
+		isConstStore(in[0], in[1], 0) && isConstStore(in[2], in[3], 0) &&
+		in[1].Local != in[3].Local &&
+		in[4].Kind == ir.IRLabel && isLoad(in[5], in[1].Local) &&
+		in[6].Kind == ir.IRConstI32 && in[6].Imm > 0 &&
+		in[7].Kind == ir.IRCmpLtI32 && in[8].Kind == ir.IRJmpIfZero &&
+		isLoad(in[9], in[3].Local) && isLoad(in[10], in[1].Local) &&
+		isLoad(in[11], in[3].Local) &&
+		in[12].Kind == ir.IRCall && in[12].Name != "" && in[12].ArgSlots == 2 && in[12].RetSlots == 1 &&
+		in[13].Kind == ir.IRAddI32 && isStore(in[14], in[3].Local) &&
+		isLoad(in[15], in[1].Local) && in[16].Kind == ir.IRConstI32 && in[16].Imm == 1 &&
+		in[17].Kind == ir.IRAddI32 && isStore(in[18], in[1].Local) &&
+		in[19].Kind == ir.IRJmp && in[19].Label == in[4].Label &&
+		in[20].Kind == ir.IRLabel && in[20].Label == in[8].Label &&
+		isLoad(in[21], in[3].Local) && in[22].Kind == ir.IRConstI32 && in[22].Imm == 0 &&
+		in[23].Kind == ir.IRCmpGeI32 && in[24].Kind == ir.IRJmpIfZero &&
+		in[25].Kind == ir.IRConstI32 && in[25].Imm == 0 && in[26].Kind == ir.IRReturn &&
+		in[27].Kind == ir.IRLabel && in[27].Label == in[24].Label &&
+		in[28].Kind == ir.IRConstI32 && in[28].Imm == 1 && in[29].Kind == ir.IRReturn
 }
 
 func isSliceSumLoop(fn ir.IRFunc) bool {

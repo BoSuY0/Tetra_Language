@@ -27,6 +27,7 @@ type SurfaceReferenceAppReport struct {
 	Module                string                            `json:"module"`
 	Imports               []string                          `json:"imports"`
 	Recipes               []string                          `json:"recipes"`
+	BeautyCoverage        []string                          `json:"beauty_coverage"`
 	StableMorphRecipes    bool                              `json:"stable_morph_recipes"`
 	ResolvesToBlock       bool                              `json:"resolves_to_block"`
 	Compiles              bool                              `json:"compiles"`
@@ -39,6 +40,9 @@ type SurfaceReferenceAppReport struct {
 	PerformanceBudget     bool                              `json:"performance_budget"`
 	ArtifactHashes        bool                              `json:"artifact_hashes"`
 	CompatibilityWidgets  bool                              `json:"compatibility_widgets"`
+	InfrastructureOnly    bool                              `json:"infrastructure_only"`
+	NonProductReason      string                            `json:"non_product_reason,omitempty"`
+	MorphToPixels         *MorphToPixelsChainReport         `json:"morph_to_pixels,omitempty"`
 	Targets               []SurfaceReferenceAppTargetReport `json:"targets"`
 }
 
@@ -157,6 +161,7 @@ func validateSurfaceReferenceApps(apps []SurfaceReferenceAppReport, requiredTarg
 			issues = append(issues, fmt.Sprintf("reference suite missing %s", shape))
 		}
 	}
+	issues = append(issues, validateSurfaceReferenceBeautyCoverage(apps)...)
 	if len(apps) != len(required) {
 		issues = append(issues, fmt.Sprintf("apps length = %d, want %d", len(apps), len(required)))
 	}
@@ -198,6 +203,9 @@ func validateSurfaceReferenceApp(app SurfaceReferenceAppReport, requiredTargets 
 	if len(app.Recipes) < 4 || !app.StableMorphRecipes || !app.ResolvesToBlock {
 		issues = append(issues, prefix+" requires at least four stable Morph recipes that resolve to Block")
 	}
+	if !app.InfrastructureOnly && len(app.BeautyCoverage) == 0 {
+		issues = append(issues, prefix+" beauty_coverage is required for product reference apps")
+	}
 	if !app.Compiles || !app.Runs || app.ExitCode != 0 {
 		issues = append(issues, fmt.Sprintf("%s compile/run evidence must pass with exit 0", prefix))
 	}
@@ -216,7 +224,63 @@ func validateSurfaceReferenceApp(app SurfaceReferenceAppReport, requiredTargets 
 			issues = append(issues, fmt.Sprintf("%s %s must be true", prefix, check.name))
 		}
 	}
+	issues = append(issues, validateSurfaceReferenceMorphToPixels(prefix, app)...)
 	issues = append(issues, validateSurfaceReferenceAppTargets(prefix, app.Targets, requiredTargets)...)
+	return issues
+}
+
+func validateSurfaceReferenceBeautyCoverage(apps []SurfaceReferenceAppReport) []string {
+	covered := map[string]bool{}
+	for _, app := range apps {
+		if app.InfrastructureOnly {
+			continue
+		}
+		for _, item := range app.BeautyCoverage {
+			covered[strings.ToLower(strings.TrimSpace(item))] = true
+		}
+	}
+	var missing []string
+	for _, required := range []string{"command-palette", "dashboard", "settings", "editor-shell", "elevated-panel", "focus-state", "disabled-state"} {
+		if !covered[required] {
+			missing = append(missing, required)
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	return []string{fmt.Sprintf("reference beauty coverage missing %s", strings.Join(missing, ", "))}
+}
+
+func validateSurfaceReferenceMorphToPixels(prefix string, app SurfaceReferenceAppReport) []string {
+	if app.InfrastructureOnly {
+		if strings.TrimSpace(app.NonProductReason) == "" {
+			return []string{prefix + " infrastructure_only requires non_product_reason"}
+		}
+		if app.MorphToPixels != nil {
+			return []string{prefix + " infrastructure_only must not provide product morph_to_pixels evidence"}
+		}
+		return nil
+	}
+	if strings.TrimSpace(app.NonProductReason) != "" {
+		return []string{prefix + " non_product_reason is allowed only for infrastructure_only apps"}
+	}
+	if app.MorphToPixels == nil {
+		return []string{prefix + " morph_to_pixels is required or the app must be marked infrastructure_only"}
+	}
+	var issues []string
+	issues = append(issues, validateMorphToPixelsChain(prefix+" morph_to_pixels", *app.MorphToPixels, app.Source)...)
+	if !safeRelativeReportPath(app.MorphToPixels.ReportPath) {
+		issues = append(issues, prefix+" morph_to_pixels.report_path is unsafe or empty")
+	}
+	if !safeRelativeReportPath(app.MorphToPixels.FrameArtifact) {
+		issues = append(issues, prefix+" morph_to_pixels.frame_artifact is unsafe or empty")
+	}
+	if !safeRelativeReportPath(app.MorphToPixels.GoldenArtifact) {
+		issues = append(issues, prefix+" morph_to_pixels.golden_artifact is unsafe or empty")
+	}
+	if app.MorphToPixels.ProductClaim || app.MorphToPixels.FinalSignoff {
+		issues = append(issues, prefix+" morph_to_pixels reference evidence must not assert product_claim or final_signoff")
+	}
 	return issues
 }
 

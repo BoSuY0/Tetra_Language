@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	ctarget "tetra_language/compiler/target"
+	"tetra_language/tools/internal/reportdecode"
 )
 
 const (
@@ -71,7 +72,9 @@ var knownCapsulePermissions = map[string]string{
 
 func main() {
 	var needMapPath string
+	var reportFormat string
 	flag.StringVar(&needMapPath, "needmap", "", "path to tetra.eco.needmap.v1 JSON report")
+	flag.StringVar(&reportFormat, "format", "auto", "report format: auto, json, or toon")
 	flag.Parse()
 
 	if needMapPath == "" {
@@ -83,15 +86,19 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err := validateEcoNeedMap(raw); err != nil {
+	if err := validateEcoNeedMapFormat(raw, reportFormat); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
 func validateEcoNeedMap(raw []byte) error {
+	return validateEcoNeedMapFormat(raw, "auto")
+}
+
+func validateEcoNeedMapFormat(raw []byte, format string) error {
 	var report needMapReport
-	if err := decodeStrictJSON(raw, &report); err != nil {
+	if err := reportdecode.DecodeStrictFormat(raw, format, &report); err != nil {
 		return err
 	}
 	if report.Schema == "" {

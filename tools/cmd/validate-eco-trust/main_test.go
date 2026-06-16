@@ -6,12 +6,24 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"tetra_language/internal/toon"
 )
 
 func TestValidateEcoTrustAcceptsValidSnapshot(t *testing.T) {
 	out, err := runEcoTrustValidator(t, validTrustSnapshot())
 	if err != nil {
 		t.Fatalf("validator failed: %v\n%s", err, out)
+	}
+}
+
+func TestValidateEcoTrustAcceptsTOON(t *testing.T) {
+	toonRaw, err := toon.ConvertJSONToTOON([]byte(validTrustSnapshot()), toon.Options{Strict: true, Deterministic: true})
+	if err != nil {
+		t.Fatalf("json->toon: %v", err)
+	}
+	if err := validateEcoTrustSnapshotFormat(toonRaw, "toon"); err != nil {
+		t.Fatalf("validateEcoTrustSnapshotFormat TOON: %v\n%s", err, toonRaw)
 	}
 }
 

@@ -15,11 +15,17 @@ func TestReleasePackagesWorkflowRunsMemoryProductionGateBeforePublishing(t *test
 	text := string(raw)
 	for _, want := range []string{
 		"name: Memory production release gate",
+		"export GOTELEMETRY=off",
+		`export GOCACHE="${PWD}/.cache/go-build-memory-production-release"`,
+		`export GOTMPDIR="${PWD}/.cache/go-tmp-memory-production-release"`,
+		`mkdir -p "$GOCACHE" "$GOTMPDIR"`,
 		`report_dir="${{ steps.meta.outputs.out_dir }}/memory-production-linux-x64"`,
 		`bash scripts/release/post_v0_4/memory-production-linux-x64-smoke.sh --report-dir "$report_dir"`,
 		`${{ steps.meta.outputs.out_dir }}/memory-production-linux-x64/**`,
 		"Package publishing for this workflow runs the Linux-x64 memory production release gate",
 		"`targets.json`",
+		"`memory-release-manifest.json`",
+		"`ram-measurement.json`",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("release-packages workflow missing %q", want)
@@ -42,17 +48,28 @@ func TestReleasePackagesWorkflowRunsMemoryProductionGateBeforePublishing(t *test
 			t.Fatalf("memory production gate must run before %q", publishStep)
 		}
 	}
+	section := releaseStepWindow(text, "name: Memory production release gate", "name: Surface product gate")
+	for _, forbidden := range []string{"continue-on-error", "|| true", "set +e", "GOCACHE=/tmp", "GOTMPDIR=/tmp"} {
+		if strings.Contains(section, forbidden) {
+			t.Fatalf("memory production release package gate must not contain bypass or tmpfs cache marker %q", forbidden)
+		}
+	}
 }
 
 func TestReleasePackagesRunsSurfaceGateBeforePublishing(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "release-packages.yml"))
+	root := repoRoot(t)
+	contract := loadSurfaceReleaseContract(t, root)
+	reportRoot := `${{ steps.meta.outputs.out_dir }}/surface-product-v1`
+	raw, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "release-packages.yml"))
 	if err != nil {
 		t.Fatalf("read release-packages workflow: %v", err)
 	}
 	text := string(raw)
 	for _, want := range []string{
 		"name: Surface product gate",
-		`report_dir="${{ steps.meta.outputs.out_dir }}/surface-product-v1"`,
+		`report_dir="` + reportRoot + `"`,
+		"command -v rg",
+		"sudo apt-get install -y weston ripgrep",
 		`bash scripts/release/surface/product-gate.sh --report-dir "$report_dir"`,
 		"name: Surface experimental regression gate",
 		`report_dir="${{ steps.meta.outputs.out_dir }}/surface-experimental-regression"`,
@@ -73,7 +90,6 @@ func TestReleasePackagesRunsSurfaceGateBeforePublishing(t *testing.T) {
 		`go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"`,
 		`go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-hashes.json"`,
 		`go run ./tools/cmd/validate-surface-final-readiness --report-dir "$report_dir" --expected-scope surface-v1-linux-web --require-clean --require-package`,
-		`${{ steps.meta.outputs.out_dir }}/surface-product-v1/**`,
 		`${{ steps.meta.outputs.out_dir }}/surface-experimental-regression/**`,
 		`${{ steps.meta.outputs.out_dir }}/safe-view-lifetime/**`,
 		`${{ steps.meta.outputs.out_dir }}/surface-api-stability-v1/**`,
@@ -101,6 +117,11 @@ func TestReleasePackagesRunsSurfaceGateBeforePublishing(t *testing.T) {
 			t.Fatalf("Surface product gate must run before %q", publishStep)
 		}
 	}
+	uploadSection := releaseStepWindow(text, "name: Upload package artifacts", "name: Create or update GitHub Release")
+	if uploadSection == "" {
+		t.Fatalf("release-packages workflow missing Upload package artifacts section")
+	}
+	assertWorkflowUploadsContractArtifacts(t, uploadSection, reportRoot, contract)
 	section := releaseStepWindow(text, "name: Surface product gate", "name: Surface experimental regression gate")
 	for _, forbidden := range []string{"continue-on-error", "|| true", "set +e", "GOCACHE=/tmp", "GOTMPDIR=/tmp"} {
 		if strings.Contains(section, forbidden) {
@@ -169,16 +190,19 @@ func TestReleasePackagesRunsIntegratedMemoryIslandsSurfaceGateBeforePublishing(t
 }
 
 func TestReleasePackagesRunsRAMContractGateBeforePublishing(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "release-packages.yml"))
+	root := repoRoot(t)
+	contract := loadRAMContract(t, root)
+	reportRoot := `${{ steps.meta.outputs.out_dir }}/ram-contract-linux-x64`
+	raw, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "release-packages.yml"))
 	if err != nil {
 		t.Fatalf("read release-packages workflow: %v", err)
 	}
 	text := string(raw)
 	for _, want := range []string{
 		"name: RAM contract release gate",
-		`report_dir="${{ steps.meta.outputs.out_dir }}/ram-contract-linux-x64"`,
+		`report_dir="` + reportRoot + `"`,
 		`bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir "$report_dir"`,
-		`${{ steps.meta.outputs.out_dir }}/ram-contract-linux-x64/**`,
+		reportRoot + `/**`,
 		"RAM Contract Compiler evidence runs the strict Linux-x64 RAM contract release gate before publishing and uploads",
 		"`ram-contract-report.json`",
 		"`memory-grade-report.json`",
@@ -186,7 +210,7 @@ func TestReleasePackagesRunsRAMContractGateBeforePublishing(t *testing.T) {
 		"`validation-pipeline-coverage.json`",
 		"`heap-blockers.json`",
 		"`copy-blockers.json`",
-		"`ram-contract-fuzz-oracle.json`",
+		"`fuzz/ram-contract-fuzz-oracle.json`",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("release-packages workflow missing RAM contract gate detail %q", want)
@@ -212,19 +236,27 @@ func TestReleasePackagesRunsRAMContractGateBeforePublishing(t *testing.T) {
 	if section := releaseStepWindow(text, "name: RAM contract release gate", "name: Actor runtime foundation release gate"); strings.Contains(section, "continue-on-error") {
 		t.Fatalf("RAM contract release gate must not use continue-on-error")
 	}
+	uploadSection := releaseStepWindow(text, "name: Upload package artifacts", "name: Create or update GitHub Release")
+	if uploadSection == "" {
+		t.Fatalf("release-packages workflow missing Upload package artifacts section")
+	}
+	assertWorkflowUploadsContractArtifacts(t, uploadSection, reportRoot, contract)
 }
 
 func TestReleasePackagesRunsActorRuntimeFoundationGateBeforePublishing(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "release-packages.yml"))
+	root := repoRoot(t)
+	contract := loadActorRuntimeFoundationContract(t, root)
+	reportRoot := `${{ steps.meta.outputs.out_dir }}/actor-runtime-foundation-linux-x64`
+	raw, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "release-packages.yml"))
 	if err != nil {
 		t.Fatalf("read release-packages workflow: %v", err)
 	}
 	text := string(raw)
 	for _, want := range []string{
 		"name: Actor runtime foundation release gate",
-		`report_dir="${{ steps.meta.outputs.out_dir }}/actor-runtime-foundation-linux-x64"`,
+		`report_dir="` + reportRoot + `"`,
 		`bash scripts/release/post_v0_4/actor-runtime-foundation-linux-x64-gate.sh --report-dir "$report_dir"`,
-		`${{ steps.meta.outputs.out_dir }}/actor-runtime-foundation-linux-x64/**`,
+		reportRoot + `/**`,
 		"Actor runtime foundation evidence runs the strict Linux-x64 gate before publishing and uploads",
 		"`actor-runtime-foundation-manifest.json`",
 		"`artifact-hashes.json`",
@@ -256,10 +288,68 @@ func TestReleasePackagesRunsActorRuntimeFoundationGateBeforePublishing(t *testin
 	if section := releaseStepWindow(text, "name: Actor runtime foundation release gate", "name: Upload package artifacts"); strings.Contains(section, "continue-on-error") {
 		t.Fatalf("actor runtime foundation release gate must not use continue-on-error")
 	}
+	uploadSection := releaseStepWindow(text, "name: Upload package artifacts", "name: Create or update GitHub Release")
+	if uploadSection == "" {
+		t.Fatalf("release-packages workflow missing Upload package artifacts section")
+	}
+	assertWorkflowUploadsContractArtifacts(t, uploadSection, reportRoot, contract)
+}
+
+func TestReleasePackagesWorkflowSupportsNonPublishingDryRun(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "release-packages.yml"))
+	if err != nil {
+		t.Fatalf("read release-packages workflow: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		"dry_run:",
+		"Build packages and release evidence without creating a GitHub Release, pushing GHCR, or updating Homebrew",
+		"RELEASE_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}",
+		"name: Dry-run package proof",
+		"if: env.RELEASE_DRY_RUN == 'true'",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("release-packages workflow missing dry-run detail %q", want)
+		}
+	}
+
+	actorGate := releaseStepWindow(text, "name: Actor runtime foundation release gate", "name: Memory100 prod-stable gate")
+	if strings.Contains(actorGate, "RELEASE_DRY_RUN") {
+		t.Fatalf("actor runtime foundation gate must still run during release package dry-run")
+	}
+	for _, externalStep := range []struct {
+		name string
+		next string
+		want string
+	}{
+		{
+			name: "name: Create or update GitHub Release",
+			next: "name: Build container image",
+			want: "if: env.RELEASE_DRY_RUN != 'true'",
+		},
+		{
+			name: "name: Publish GHCR image",
+			next: "name: Update Homebrew tap",
+			want: "if: env.RELEASE_DRY_RUN != 'true'",
+		},
+		{
+			name: "name: Update Homebrew tap",
+			next: "name: release-packages-dry-run-end",
+			want: "if: env.UPDATE_HOMEBREW_TAP == 'true' && env.RELEASE_DRY_RUN != 'true'",
+		},
+	} {
+		section := releaseStepWindow(text, externalStep.name, externalStep.next)
+		if !strings.Contains(section, externalStep.want) {
+			t.Fatalf("release-packages workflow external step %q missing dry-run guard %q", externalStep.name, externalStep.want)
+		}
+	}
 }
 
 func TestReleasePackagesRunsMemory100ProdStableGateBeforePublishing(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "release-packages.yml"))
+	root := repoRoot(t)
+	contract := loadMemory100Contract(t, root)
+	reportRoot := `${{ steps.meta.outputs.out_dir }}/memory-100-prod-stable`
+	raw, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "release-packages.yml"))
 	if err != nil {
 		t.Fatalf("read release-packages workflow: %v", err)
 	}
@@ -270,9 +360,9 @@ func TestReleasePackagesRunsMemory100ProdStableGateBeforePublishing(t *testing.T
 		`export GOCACHE="${PWD}/.cache/go-build-memory-100-prod-stable-release"`,
 		`export GOTMPDIR="${PWD}/.cache/go-tmp-memory-100-prod-stable-release"`,
 		`mkdir -p "$GOCACHE" "$GOTMPDIR"`,
-		`report_dir="${{ steps.meta.outputs.out_dir }}/memory-100-prod-stable"`,
+		`report_dir="` + reportRoot + `"`,
 		`bash scripts/release/post_v0_4/memory-100-prod-stable-gate.sh --report-dir "$report_dir"`,
-		`${{ steps.meta.outputs.out_dir }}/memory-100-prod-stable/**`,
+		reportRoot + `/**`,
 		"Memory100 scoped prod-stable evidence runs the strict aggregate gate before publishing and uploads",
 		"`memory-100-prod-stable-manifest.json`",
 		"`artifact-hashes.json`",
@@ -319,6 +409,11 @@ func TestReleasePackagesRunsMemory100ProdStableGateBeforePublishing(t *testing.T
 			t.Fatalf("Memory100 release package gate must not contain bypass or tmpfs cache marker %q", forbidden)
 		}
 	}
+	uploadSection := releaseStepWindow(text, "name: Upload package artifacts", "name: Create or update GitHub Release")
+	if uploadSection == "" {
+		t.Fatalf("release-packages workflow missing Upload package artifacts section")
+	}
+	assertWorkflowUploadsContractArtifacts(t, uploadSection, reportRoot, contract)
 }
 
 func TestReleasePackagesWorkflowBindsPublishedArtifactsToCurrentCommit(t *testing.T) {

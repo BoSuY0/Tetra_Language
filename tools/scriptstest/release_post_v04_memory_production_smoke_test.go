@@ -21,6 +21,8 @@ func TestReleasePostV04MemoryProductionSmokeScriptRunsExecutableValidator(t *tes
 		"Usage: bash scripts/release/post_v0_4/memory-production-linux-x64-smoke.sh [--report-dir DIR]",
 		`memory-production-linux-x64.json`,
 		`go run ./tools/cmd/memory-production-smoke`,
+		`ram_measurement_path="$report_dir/ram-measurement.json"`,
+		`--ram-measurement-report "$ram_measurement_path"`,
 		`go run ./tools/cmd/validate-memory-production`,
 		`targets_path="$report_dir/targets.json"`,
 		`go run ./cli/cmd/tetra targets --format=json > "$targets_path"`,
@@ -37,6 +39,7 @@ func TestReleasePostV04MemoryProductionSmokeScriptRunsExecutableValidator(t *tes
 		`git_head="$(git rev-parse --verify HEAD)"`,
 		`generated_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"`,
 		`memory-release-manifest.json`,
+		`ram-measurement.json`,
 		`go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"`,
 		`go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-hashes.json"`,
 		`go run ./tools/cmd/validate-memory-production --report "$report_path" --manifest "$memory_release_manifest_path" --report-dir "$report_dir" --current-git-head "$git_head"`,
@@ -45,7 +48,9 @@ func TestReleasePostV04MemoryProductionSmokeScriptRunsExecutableValidator(t *tes
 		`$memory_fuzz_dir/summary.json`,
 		`artifact-hashes.json`,
 		`memory production release manifest: $memory_release_manifest_path`,
+		`memory production RAM measurement report: $ram_measurement_path`,
 		`tetra.memory.production.v1`,
+		`tetra.memory.ram-measurement.v1`,
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("memory production smoke script missing %q", want)
@@ -72,6 +77,94 @@ func TestReleasePostV04MemoryProductionSmokeScriptRunsExecutableValidator(t *tes
 	manifestValidateIdx := strings.Index(text, `go run ./tools/cmd/validate-memory-production --report "$report_path" --manifest "$memory_release_manifest_path" --report-dir "$report_dir" --current-git-head "$git_head"`)
 	if hashValidateIdx < 0 || manifestValidateIdx < 0 || hashValidateIdx > manifestValidateIdx {
 		t.Fatalf("memory production smoke script must validate artifact hashes before validating release manifest provenance")
+	}
+}
+
+func TestReleasePostV04MemoryProductionSmokeSetsRepoLocalGoCacheDefaults(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("bash release script test")
+	}
+
+	for _, tc := range []struct {
+		name string
+		env  []string
+	}{
+		{
+			name: "unset",
+			env:  envWithoutKeys(os.Environ(), "GOCACHE", "GOTMPDIR"),
+		},
+		{
+			name: "empty",
+			env:  append(envWithoutKeys(os.Environ(), "GOCACHE", "GOTMPDIR"), "GOCACHE=", "GOTMPDIR="),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := memoryProductionSmokeFakeRoot(t)
+			reportDir := staleMemoryProductionReportDir(t, root)
+
+			out, err := runMemoryProductionSmokeScriptInRoot(t, root, tc.env, "--report-dir", reportDir)
+			if err == nil {
+				t.Fatalf("expected stale report-dir rejection\n%s", out)
+			}
+			if !strings.Contains(string(out), "refusing to reuse non-empty report directory: "+reportDir) {
+				t.Fatalf("stale report-dir output missing guard:\n%s", out)
+			}
+			for _, dir := range []string{
+				filepath.Join(root, ".cache", "go-build-memory-production-release"),
+				filepath.Join(root, ".cache", "go-tmp-memory-production-release"),
+			} {
+				info, err := os.Stat(dir)
+				if err != nil {
+					t.Fatalf("expected repo-local Go cache dir %s: %v\n%s", dir, err, out)
+				}
+				if !info.IsDir() {
+					t.Fatalf("expected repo-local Go cache path %s to be a directory", dir)
+				}
+			}
+		})
+	}
+}
+
+func TestReleasePostV04MemoryProductionSmokePreservesCallerGoCacheOverrides(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("bash release script test")
+	}
+
+	root := memoryProductionSmokeFakeRoot(t)
+	reportDir := staleMemoryProductionReportDir(t, root)
+	overrideGoCache := filepath.Join(root, "caller-cache", "go-build")
+	overrideGoTmpDir := filepath.Join(root, "caller-cache", "go-tmp")
+	env := append(
+		envWithoutKeys(os.Environ(), "GOCACHE", "GOTMPDIR"),
+		"GOCACHE="+overrideGoCache,
+		"GOTMPDIR="+overrideGoTmpDir,
+	)
+
+	out, err := runMemoryProductionSmokeScriptInRoot(t, root, env, "--report-dir", reportDir)
+	if err == nil {
+		t.Fatalf("expected stale report-dir rejection\n%s", out)
+	}
+	if !strings.Contains(string(out), "refusing to reuse non-empty report directory: "+reportDir) {
+		t.Fatalf("stale report-dir output missing guard:\n%s", out)
+	}
+	for _, dir := range []string{overrideGoCache, overrideGoTmpDir} {
+		info, err := os.Stat(dir)
+		if err != nil {
+			t.Fatalf("expected caller Go cache override dir %s: %v\n%s", dir, err, out)
+		}
+		if !info.IsDir() {
+			t.Fatalf("expected caller Go cache override path %s to be a directory", dir)
+		}
+	}
+	for _, dir := range []string{
+		filepath.Join(root, ".cache", "go-build-memory-production-release"),
+		filepath.Join(root, ".cache", "go-tmp-memory-production-release"),
+	} {
+		if _, err := os.Stat(dir); err == nil {
+			t.Fatalf("caller Go cache override should preserve %s and not create default %s", overrideGoCache, dir)
+		} else if !os.IsNotExist(err) {
+			t.Fatalf("stat default Go cache dir %s: %v", dir, err)
+		}
 	}
 }
 
@@ -145,6 +238,61 @@ func runMemoryProductionSmokeScript(t *testing.T, root string, args ...string) (
 	return cmd.CombinedOutput()
 }
 
+func memoryProductionSmokeFakeRoot(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	repo := repoRoot(t)
+	scriptDir := filepath.Join(root, "scripts", "release", "post_v0_4")
+	if err := os.MkdirAll(scriptDir, 0o755); err != nil {
+		t.Fatalf("mkdir fake script dir: %v", err)
+	}
+	if err := copyFile(
+		filepath.Join(repo, "scripts", "release", "post_v0_4", "memory-production-linux-x64-smoke.sh"),
+		filepath.Join(scriptDir, "memory-production-linux-x64-smoke.sh"),
+		0o755,
+	); err != nil {
+		t.Fatalf("copy memory production smoke script: %v", err)
+	}
+	return root
+}
+
+func staleMemoryProductionReportDir(t *testing.T, root string) string {
+	t.Helper()
+	reportDir := filepath.Join(root, "reports", "memory-production")
+	if err := os.MkdirAll(reportDir, 0o755); err != nil {
+		t.Fatalf("mkdir stale report dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(reportDir, "stale.json"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatalf("write stale artifact: %v", err)
+	}
+	return reportDir
+}
+
+func runMemoryProductionSmokeScriptInRoot(t *testing.T, root string, env []string, args ...string) ([]byte, error) {
+	t.Helper()
+	cmdArgs := append([]string{"scripts/release/post_v0_4/memory-production-linux-x64-smoke.sh"}, args...)
+	cmd := exec.Command("bash", cmdArgs...)
+	cmd.Dir = root
+	cmd.Env = env
+	return cmd.CombinedOutput()
+}
+
+func envWithoutKeys(env []string, keys ...string) []string {
+	blocked := map[string]bool{}
+	for _, key := range keys {
+		blocked[key] = true
+	}
+	filtered := env[:0:0]
+	for _, entry := range env {
+		name, _, ok := strings.Cut(entry, "=")
+		if ok && blocked[name] {
+			continue
+		}
+		filtered = append(filtered, entry)
+	}
+	return filtered
+}
+
 func TestReleasePostV04ScopeDocsAdvertiseMemoryProductionSmokeScript(t *testing.T) {
 	root := repoRoot(t)
 	path := filepath.Join(root, "docs", "release", "post_v0_4_linux_x64_memory_parallel_ui_scope.md")
@@ -156,6 +304,7 @@ func TestReleasePostV04ScopeDocsAdvertiseMemoryProductionSmokeScript(t *testing.
 	for _, want := range []string{
 		`bash scripts/release/post_v0_4/memory-production-linux-x64-smoke.sh --report-dir <dir>`,
 		`go run ./tools/cmd/memory-production-smoke --report <path>`,
+		`go run ./tools/cmd/memory-production-smoke --report <path> --ram-measurement-report <dir>/ram-measurement.json`,
 		`go run ./tools/cmd/validate-memory-production --report <path>`,
 		`go run ./cli/cmd/tetra targets --format=json > <dir>/targets.json`,
 		`go run ./tools/cmd/validate-targets --report <dir>/targets.json`,
@@ -164,6 +313,7 @@ func TestReleasePostV04ScopeDocsAdvertiseMemoryProductionSmokeScript(t *testing.
 		`go run ./tools/cmd/validate-artifact-hashes --manifest <dir>/artifact-hashes.json`,
 		`go run ./tools/cmd/validate-memory-production --report <dir>/memory-production-linux-x64.json --manifest <dir>/memory-release-manifest.json --report-dir <dir> --current-git-head <head>`,
 		`memory-release-manifest.json`,
+		`ram-measurement.json`,
 		`fresh --report-dir`,
 		`memory-fuzz-oracle.json`,
 		`summary.json`,

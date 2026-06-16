@@ -27,7 +27,7 @@ func TestTestAllScriptInterface(t *testing.T) {
 	if err != nil {
 		t.Fatalf("--help failed: %v\n%s", err, string(helpOut))
 	}
-	for _, want := range []string{"--keep-going", "--json-only", "Exit codes", "--report-dir"} {
+	for _, want := range []string{"--keep-going", "--json-only", "--report-format", "Exit codes", "--report-dir"} {
 		if !strings.Contains(string(helpOut), want) {
 			t.Fatalf("help missing %q:\n%s", want, string(helpOut))
 		}
@@ -188,7 +188,7 @@ if [[ "${1:-}" == "test" ]]; then
         printf '%s\n' TestRAMContractFromAllocPlanTracksRowsAndBlockers TestRAMContractRejectsMissingBlockerExplanation TestRAMContractEnforcementFailsForHeap
         ;;
       ./cli/internal/actornet)
-        printf '%s\n' TestBrokerCloseWithoutCancelStopsServeWatcher TestBrokerRoutesFramesBetweenLoopbackNodesAndWritesReport TestBrokerReportsNodeDownForMissingDestination
+        printf '%s\n' TestBrokerCloseReopenWithoutGoroutineLeak TestBrokerCloseWithoutCancelStopsServeWatcher TestBrokerRoutesFramesBetweenLoopbackNodesAndWritesReport TestBrokerReportsNodeDownForMissingDestination
         ;;
     esac
     exit 0

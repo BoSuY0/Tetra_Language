@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"tetra_language/internal/toon"
 )
 
 func nativeSmokeListForTest(omit string) []byte {
@@ -81,6 +83,17 @@ func TestValidateSmokeListAcceptsExpectedShape(t *testing.T) {
 	raw := nativeSmokeListForTest("")
 	if err := validateSmokeList(raw); err != nil {
 		t.Fatalf("validate smoke list: %v", err)
+	}
+}
+
+func TestValidateSmokeListAcceptsTOONFormat(t *testing.T) {
+	raw := nativeSmokeListForTest("")
+	toonRaw, err := toon.ConvertJSONToTOON(raw, toon.Options{Deterministic: true, Strict: true})
+	if err != nil {
+		t.Fatalf("convert smoke list to TOON: %v", err)
+	}
+	if err := validateSmokeListWithExamplesRootFormat(toonRaw, "", "toon"); err != nil {
+		t.Fatalf("validate TOON smoke list: %v\n%s", err, toonRaw)
 	}
 }
 

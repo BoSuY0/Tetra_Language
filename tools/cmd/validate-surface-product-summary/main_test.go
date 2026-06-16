@@ -23,8 +23,8 @@ func TestValidateSurfaceProductSummaryRejectsMissingP29Nonclaim(t *testing.T) {
 	writeSurfaceProductSummaryFixture(t, dir, func(summary map[string]any) {
 		summary["nonclaims"] = []any{
 			"all-platform-surface-parity",
-			"macos-surface-production",
-			"windows-surface-production",
+			"nonclaim-macos-surface-production-support",
+			"nonclaim-windows-surface-production-support",
 			"wasm32-wasi-surface-ui-runtime",
 			"gpu-renderer",
 			"full-rich-text-editor",
@@ -321,8 +321,8 @@ func uniqueStringValues(values map[string]string) []string {
 func surfaceProductSummaryNonclaimsFixture() []any {
 	return []any{
 		"all-platform-surface-parity",
-		"macos-surface-production",
-		"windows-surface-production",
+		"nonclaim-macos-surface-production-support",
+		"nonclaim-windows-surface-production-support",
 		"wasm32-wasi-surface-ui-runtime",
 		"gpu-renderer",
 		"full-rich-text-editor",

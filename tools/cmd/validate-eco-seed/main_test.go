@@ -7,12 +7,24 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"tetra_language/internal/toon"
 )
 
 func TestValidateEcoSeedAcceptsValidReport(t *testing.T) {
 	out, err := runEcoSeedValidator(t, validSeedReport())
 	if err != nil {
 		t.Fatalf("validator failed: %v\n%s", err, out)
+	}
+}
+
+func TestValidateEcoSeedAcceptsTOON(t *testing.T) {
+	toonRaw, err := toon.ConvertJSONToTOON([]byte(validSeedReport()), toon.Options{Strict: true, Deterministic: true})
+	if err != nil {
+		t.Fatalf("json->toon: %v", err)
+	}
+	if err := validateEcoSeedFormat(toonRaw, "toon"); err != nil {
+		t.Fatalf("validateEcoSeedFormat TOON: %v\n%s", err, toonRaw)
 	}
 }
 

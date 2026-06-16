@@ -92,6 +92,38 @@ exit 0
 	}
 }
 
+func TestTOONFormatCheckCoversExpandedStructuredSurfaces(t *testing.T) {
+	root := repoRoot(t)
+	script := filepath.Join(root, "scripts", "ci", "toon-format-check.sh")
+	if out, err := exec.Command("bash", "-n", script).CombinedOutput(); err != nil {
+		t.Fatalf("bash -n failed: %v\n%s", err, out)
+	}
+	raw, err := os.ReadFile(script)
+	if err != nil {
+		t.Fatalf("read toon format check: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		"GOTMPDIR",
+		"lsp --stdio-smoke",
+		"lsp --stdio --format=toon",
+		"smoke --list --target linux-x64 --format=toon",
+		"smoke --target linux-x64 --run=false",
+		"--report-format=both",
+		"gen-manifest",
+		"validate-test-all-summary",
+		"eco verify",
+		"eco seed export",
+		"eco needmap",
+		"compiler/internal/webrt",
+		"OK toon-format-check",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("toon format check missing %q", want)
+		}
+	}
+}
+
 func TestCanonicalTestScriptArtifactFollowsTetraVersion(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "scripts"), 0o755); err != nil {

@@ -53,6 +53,11 @@ type VisualRegressionFrameReport struct {
 	Stride                int    `json:"stride"`
 	Checksum              string `json:"checksum"`
 	GoldenChecksum        string `json:"golden_checksum"`
+	ArtifactPath          string `json:"artifact_path"`
+	ArtifactSHA256        string `json:"artifact_sha256"`
+	ArtifactFormat        string `json:"artifact_format"`
+	GoldenArtifactPath    string `json:"golden_artifact_path"`
+	GoldenArtifactSHA256  string `json:"golden_artifact_sha256"`
 	DiffPixels            int    `json:"diff_pixels"`
 	DiffRatioMilli        int    `json:"diff_ratio_milli"`
 	MaxChannelDelta       int    `json:"max_channel_delta"`
@@ -63,13 +68,17 @@ type VisualRegressionFrameReport struct {
 }
 
 type VisualRegressionNegativeGuardsReport struct {
-	ScreenshotOnlyRejected       bool `json:"screenshot_only_rejected"`
-	StaleGoldenRejected          bool `json:"stale_golden_rejected"`
-	MajorDriftRejected           bool `json:"major_drift_rejected"`
-	MissingBlockGraphRejected    bool `json:"missing_block_graph_rejected"`
-	MissingLayoutRejected        bool `json:"missing_layout_rejected"`
-	MissingAccessibilityRejected bool `json:"missing_accessibility_rejected"`
-	MissingPerformanceRejected   bool `json:"missing_performance_rejected"`
+	ScreenshotOnlyRejected           bool `json:"screenshot_only_rejected"`
+	StaleGoldenRejected              bool `json:"stale_golden_rejected"`
+	MajorDriftRejected               bool `json:"major_drift_rejected"`
+	MissingBlockGraphRejected        bool `json:"missing_block_graph_rejected"`
+	MissingLayoutRejected            bool `json:"missing_layout_rejected"`
+	MissingAccessibilityRejected     bool `json:"missing_accessibility_rejected"`
+	MissingPerformanceRejected       bool `json:"missing_performance_rejected"`
+	SelfGoldenRejected               bool `json:"self_golden_rejected"`
+	MetadataChecksumRejected         bool `json:"metadata_checksum_rejected"`
+	FixtureFrameOnlyRejected         bool `json:"fixture_frame_only_rejected"`
+	MissingPNGOrRGBAArtifactRejected bool `json:"missing_png_or_rgba_artifact_rejected"`
 }
 
 func ValidateVisualReport(raw []byte) error {
@@ -146,6 +155,18 @@ func validateVisualNegativeGuards(guards VisualRegressionNegativeGuardsReport) [
 	}
 	if !guards.MissingPerformanceRejected {
 		missing = append(missing, "missing_performance_rejected")
+	}
+	if !guards.SelfGoldenRejected {
+		missing = append(missing, "self_golden_rejected")
+	}
+	if !guards.MetadataChecksumRejected {
+		missing = append(missing, "metadata_checksum_rejected")
+	}
+	if !guards.FixtureFrameOnlyRejected {
+		missing = append(missing, "fixture_frame_only_rejected")
+	}
+	if !guards.MissingPNGOrRGBAArtifactRejected {
+		missing = append(missing, "missing_png_or_rgba_artifact_rejected")
 	}
 	if len(missing) == 0 {
 		return nil
@@ -255,6 +276,42 @@ func validateVisualFrame(prefix string, frame VisualRegressionFrameReport) []str
 	if !validChecksumLike(frame.GoldenChecksum) {
 		issues = append(issues, prefix+" golden_checksum must be sha256 evidence")
 	}
+	artifactPath := normalizeEvidencePath(frame.ArtifactPath)
+	goldenArtifactPath := normalizeEvidencePath(frame.GoldenArtifactPath)
+	if artifactPath == "" {
+		issues = append(issues, prefix+" artifact_path is required")
+	}
+	if goldenArtifactPath == "" {
+		issues = append(issues, prefix+" golden_artifact_path is required")
+	}
+	if artifactPath != "" && goldenArtifactPath != "" && artifactPath == goldenArtifactPath {
+		issues = append(issues, prefix+" self-golden artifact rejected")
+	}
+	if visualArtifactLooksLikeFixture(artifactPath) || visualArtifactLooksLikeFixture(goldenArtifactPath) {
+		issues = append(issues, prefix+" fixture frame artifact is not product visual evidence")
+	}
+	format := strings.ToLower(strings.TrimSpace(frame.ArtifactFormat))
+	if format != "rgba" && format != "png" {
+		issues = append(issues, prefix+" artifact_format must be png or rgba")
+	}
+	if artifactPath != "" && !visualArtifactPathHasSupportedFormat(artifactPath) {
+		issues = append(issues, prefix+" artifact_path must point to a png or rgba artifact")
+	}
+	if goldenArtifactPath != "" && !visualArtifactPathHasSupportedFormat(goldenArtifactPath) {
+		issues = append(issues, prefix+" golden_artifact_path must point to a png or rgba artifact")
+	}
+	if !validChecksumLike(frame.ArtifactSHA256) {
+		issues = append(issues, prefix+" artifact_sha256 must be sha256 evidence")
+	}
+	if !validChecksumLike(frame.GoldenArtifactSHA256) {
+		issues = append(issues, prefix+" golden_artifact_sha256 must be sha256 evidence")
+	}
+	if validChecksumLike(frame.Checksum) && validChecksumLike(frame.ArtifactSHA256) && frame.Checksum != frame.ArtifactSHA256 {
+		issues = append(issues, prefix+" artifact_sha256 must match checksum")
+	}
+	if validChecksumLike(frame.GoldenChecksum) && validChecksumLike(frame.GoldenArtifactSHA256) && frame.GoldenChecksum != frame.GoldenArtifactSHA256 {
+		issues = append(issues, prefix+" golden_artifact_sha256 must match golden_checksum")
+	}
 	if frame.DiffPixels < 0 || frame.DiffRatioMilli < 0 || frame.MaxChannelDelta < 0 {
 		issues = append(issues, prefix+" visual diff metrics must be non-negative")
 	}
@@ -272,4 +329,16 @@ func validateVisualFrame(prefix string, frame VisualRegressionFrameReport) []str
 
 func normalizeVisualTarget(value string) string {
 	return strings.TrimSpace(strings.ToLower(strings.ReplaceAll(value, "_", "-")))
+}
+
+func visualArtifactPathHasSupportedFormat(path string) bool {
+	lower := strings.ToLower(strings.TrimSpace(path))
+	return strings.HasSuffix(lower, ".rgba") || strings.HasSuffix(lower, ".png")
+}
+
+func visualArtifactLooksLikeFixture(path string) bool {
+	lower := normalizeEvidencePath(strings.ToLower(path))
+	return strings.Contains(lower, "/testdata/") ||
+		strings.Contains(lower, "/fixtures/") ||
+		strings.Contains(lower, "fixture-frame")
 }

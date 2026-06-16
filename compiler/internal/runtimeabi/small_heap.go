@@ -64,6 +64,7 @@ func AlignSmallHeapBytes(bytes int64) (int64, bool) {
 type PerCoreSmallHeapABI struct {
 	RuntimePath          AllocationRuntimePath `json:"runtime_path"`
 	CoreCount            int                   `json:"core_count"`
+	DefaultDomain        MemoryDomain          `json:"default_domain"`
 	ChunkBytes           int                   `json:"chunk_bytes"`
 	MaxSmallBytes        int                   `json:"max_small_bytes"`
 	Alignment            int                   `json:"alignment"`
@@ -75,15 +76,16 @@ type PerCoreSmallHeapABI struct {
 }
 
 type PerCoreSmallHeapHandle struct {
-	BlockID        int64  `json:"block_id"`
-	Generation     int64  `json:"generation"`
-	CoreID         int    `json:"core_id"`
-	ChunkID        int    `json:"chunk_id"`
-	Offset         int    `json:"offset"`
-	RequestedBytes int    `json:"requested_bytes"`
-	ReservedBytes  int    `json:"reserved_bytes"`
-	ClassName      string `json:"class_name"`
-	Reused         bool   `json:"reused"`
+	BlockID        int64        `json:"block_id"`
+	Generation     int64        `json:"generation"`
+	CoreID         int          `json:"core_id"`
+	ChunkID        int          `json:"chunk_id"`
+	Offset         int          `json:"offset"`
+	RequestedBytes int          `json:"requested_bytes"`
+	ReservedBytes  int          `json:"reserved_bytes"`
+	ClassName      string       `json:"class_name"`
+	Reused         bool         `json:"reused"`
+	Domain         MemoryDomain `json:"domain"`
 }
 
 type PerCoreSmallHeapReport struct {
@@ -97,6 +99,7 @@ type PerCoreSmallHeapReport struct {
 	BytesRequested             int                          `json:"bytes_requested"`
 	BytesReserved              int                          `json:"bytes_reserved"`
 	FragmentationBytes         int                          `json:"fragmentation_bytes"`
+	Domain                     MemoryDomain                 `json:"domain"`
 	EstimatedMmapPerAllocation bool                         `json:"estimated_mmap_per_allocation"`
 	Cores                      []PerCoreSmallHeapCoreReport `json:"cores"`
 }
@@ -111,6 +114,7 @@ type PerCoreSmallHeapCoreReport struct {
 	BytesRequested     int            `json:"bytes_requested"`
 	BytesReserved      int            `json:"bytes_reserved"`
 	FragmentationBytes int            `json:"fragmentation_bytes"`
+	Domain             MemoryDomain   `json:"domain"`
 	FreeListBlocks     map[string]int `json:"free_list_blocks"`
 }
 
@@ -143,6 +147,7 @@ func RuntimePerCoreSmallHeapABI(coreCount int) PerCoreSmallHeapABI {
 	return PerCoreSmallHeapABI{
 		RuntimePath:          AllocationPathPerCoreSmallHeap,
 		CoreCount:            coreCount,
+		DefaultDomain:        DefaultProcessMemoryDomain(0, 0),
 		ChunkBytes:           cfg.ChunkBytes,
 		MaxSmallBytes:        cfg.MaxSmallBytes,
 		Alignment:            cfg.Alignment,
@@ -200,6 +205,7 @@ func (allocator *PerCoreSmallHeapAllocator) Alloc(coreID int, bytes int64) (PerC
 		handle.Generation++
 		handle.RequestedBytes = int(bytes)
 		handle.ReservedBytes = cls.MaxBytes
+		handle.Domain = DefaultProcessMemoryDomain(int64(handle.RequestedBytes), int64(handle.ReservedBytes))
 		handle.Reused = true
 		allocator.live[handle.BlockID] = handle.Generation
 		core.recordAllocation(handle)
@@ -221,6 +227,7 @@ func (allocator *PerCoreSmallHeapAllocator) Alloc(coreID int, bytes int64) (PerC
 		RequestedBytes: int(bytes),
 		ReservedBytes:  cls.MaxBytes,
 		ClassName:      cls.Name,
+		Domain:         DefaultProcessMemoryDomain(bytes, int64(cls.MaxBytes)),
 	}
 	core.bumpOffset += cls.MaxBytes
 	allocator.live[handle.BlockID] = handle.Generation
@@ -264,6 +271,7 @@ func (allocator *PerCoreSmallHeapAllocator) Report() PerCoreSmallHeapReport {
 		report.Cores = append(report.Cores, coreReport)
 	}
 	report.TotalMmapCalls = report.TotalChunkRefills
+	report.Domain = DefaultProcessMemoryDomain(int64(report.BytesRequested), int64(report.BytesReserved))
 	report.EstimatedMmapPerAllocation = report.TotalAllocations > 0 && report.TotalMmapCalls >= report.TotalAllocations
 	return report
 }
@@ -290,6 +298,7 @@ func (core perCoreSmallHeapCore) report() PerCoreSmallHeapCoreReport {
 		BytesRequested:     core.bytesRequested,
 		BytesReserved:      core.bytesReserved,
 		FragmentationBytes: core.fragmentationBytes,
+		Domain:             DefaultProcessMemoryDomain(int64(core.bytesRequested), int64(core.bytesReserved)),
 		FreeListBlocks:     freeListBlocks,
 	}
 }

@@ -25,6 +25,13 @@ no cluster membership or reconnect/retry production claim, no non-Linux
 distributed actor runtime support claim, no distributed zero-copy pointer or
 region transfer claim, and no formal race proof claim.
 
+Actor failure/status boundary: actor entry functions that return zero or
+nonzero both become the same user-visible `done` state; later local sends
+return checked failure `-4`. There is no actor status, actor join,
+actor exit-code, supervision, or restart API. Distributed
+missing-node/node_down smoke evidence is checked status evidence only, with no
+automatic retry, reconnect, restart, or supervision claim.
+
 ## Prereqs
 
 - Go 1.20+

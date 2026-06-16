@@ -1,17 +1,17 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"tetra_language/compiler"
+	"tetra_language/internal/outputformat"
 )
 
 func main() {
 	outPath := flag.String("o", "docs/generated/manifest.json", "output path")
+	format := flag.String("format", outputformat.JSON, "manifest output format: json, toon, or both")
 	flag.Parse()
 
 	manifest, err := compiler.GetManifest()
@@ -20,18 +20,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	data, err := json.MarshalIndent(manifest, "", "  ")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
-	}
-	data = append(data, '\n')
-
-	if err := os.MkdirAll(filepath.Dir(*outPath), 0o755); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
-	}
-	if err := os.WriteFile(*outPath, data, 0o644); err != nil {
+	if _, err := outputformat.WriteStructuredFiles(*outPath, *format, manifest); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}

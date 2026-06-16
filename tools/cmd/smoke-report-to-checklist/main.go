@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -11,6 +9,7 @@ import (
 	"time"
 
 	ctarget "tetra_language/compiler/target"
+	"tetra_language/tools/internal/reportdecode"
 )
 
 type smokeCaseReport struct {
@@ -207,10 +206,12 @@ func validateSmokeReportCounts(report *smokeReport) error {
 }
 
 func parseSmokeReport(raw []byte) (*smokeReport, error) {
+	return parseSmokeReportFormat(raw, "auto")
+}
+
+func parseSmokeReportFormat(raw []byte, format string) (*smokeReport, error) {
 	var report smokeReport
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&report); err != nil {
+	if err := reportdecode.DecodeStrictFormat(raw, format, &report); err != nil {
 		return nil, err
 	}
 	return &report, nil
@@ -483,11 +484,13 @@ func main() {
 	var islandsChecklist string
 	var actorsChecklist string
 	var validateOnly bool
+	var format string
 
-	flag.StringVar(&reportPath, "report", "", "path to tetra smoke JSON report")
+	flag.StringVar(&reportPath, "report", "", "path to tetra smoke structured report")
 	flag.StringVar(&islandsChecklist, "islands-checklist", filepath.FromSlash("docs/checklists/islands_platform_smoke.md"), "path to islands platform checklist")
 	flag.StringVar(&actorsChecklist, "actors-checklist", filepath.FromSlash("docs/checklists/actors_platform_smoke.md"), "path to actors platform checklist")
-	flag.BoolVar(&validateOnly, "validate-only", false, "validate smoke report JSON without updating checklists")
+	flag.BoolVar(&validateOnly, "validate-only", false, "validate smoke report without updating checklists")
+	flag.StringVar(&format, "format", "auto", "report format: auto, json, or toon")
 	flag.Parse()
 
 	if reportPath == "" {
@@ -499,7 +502,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	report, err := parseSmokeReport(raw)
+	report, err := parseSmokeReportFormat(raw, format)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

@@ -1,0 +1,9 @@
+duration_ms: 1
+failed: 0
+files[1]{duration_ms,failed,filename,passed,total}:
+  1,0,examples/toon/toon_report.tetra,1,1
+passed: 1
+results[1]{duration_ms,exit_code,filename,function_name,index,name,passed}:
+  1,0,examples/toon/toon_report.tetra,__tetra_test_0_toon_report,0,toon report,true
+target: linux-x64
+total: 1

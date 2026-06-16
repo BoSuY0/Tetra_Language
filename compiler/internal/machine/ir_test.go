@@ -348,6 +348,77 @@ func TestScalarIntLoopFunctionFromStackIRRejectsInvalidConstantStrideLoop(t *tes
 	}
 }
 
+func TestScalarIntConstModuloLoopFunctionFromStackIRLowersIntegerLoopsBenchmark(t *testing.T) {
+	mfn, ok, err := ScalarIntConstModuloLoopFunctionFromStackIR(integerLoopsBenchmarkStackIRFunc())
+	if err != nil {
+		t.Fatalf("ScalarIntConstModuloLoopFunctionFromStackIR: %v", err)
+	}
+	if !ok {
+		t.Fatalf("ScalarIntConstModuloLoopFunctionFromStackIR did not accept integer_loops benchmark")
+	}
+	text := FormatFunction(mfn)
+	for _, want := range []string{
+		"func p25.integer_loops.main target:scalar-int-const-modulo-loop",
+		"mov defs:t1 ; literal loop bound",
+		"mov defs:t2 ; literal modulo divisor",
+		"mod defs:t3 uses:local0,t2",
+		"add defs:local1 uses:local1,t3",
+		"cmp defs:t5 uses:local1,t4 ; total >= 0",
+		"branch_if uses:t5 -> label2",
+		"return uses:t6",
+		"return uses:t7",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("machine const-modulo loop dump missing %q:\n%s", want, text)
+		}
+	}
+	intervals, err := BuildIntervals(mfn)
+	if err != nil {
+		t.Fatalf("BuildIntervals: %v", err)
+	}
+	alloc, err := LinearScan(intervals, LinuxX64CallerSaved())
+	if err != nil {
+		t.Fatalf("LinearScan: %v", err)
+	}
+	if len(alloc.Spills) != 0 {
+		t.Fatalf("integer_loops benchmark loop should fit in linux-x64 caller-saved registers, spills=%v", alloc.Spills)
+	}
+}
+
+func TestScalarIntConstModuloLoopFunctionFromStackIRRejectsNonBenchmarkShape(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(*ir.IRFunc)
+	}{
+		{
+			name: "different_bound",
+			mutate: func(fn *ir.IRFunc) {
+				fn.Instrs[6].Imm = 1000
+			},
+		},
+		{
+			name: "different_modulus",
+			mutate: func(fn *ir.IRFunc) {
+				fn.Instrs[11].Imm = 5
+			},
+		},
+		{
+			name: "different_final_guard",
+			mutate: func(fn *ir.IRFunc) {
+				fn.Instrs[23].Kind = ir.IRCmpGtI32
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fn := integerLoopsBenchmarkStackIRFunc()
+			tc.mutate(&fn)
+			if _, ok, err := ScalarIntConstModuloLoopFunctionFromStackIR(fn); err != nil || ok {
+				t.Fatalf("ScalarIntConstModuloLoopFunctionFromStackIR ok=%v err=%v, want strict fallback without error", ok, err)
+			}
+		})
+	}
+}
+
 func TestScalarIntSumSquaresLoopFunctionFromStackIRLowersMulLoop(t *testing.T) {
 	mfn, ok, err := ScalarIntSumSquaresLoopFunctionFromStackIR(sumSquaresStackIRFunc())
 	if err != nil {
@@ -901,6 +972,182 @@ func TestScalarIntCallLoopFunctionFromStackIRLowersCallWithABIClobbers(t *testin
 	}
 }
 
+func TestScalarIntCallLoopFunctionFromStackIRLowersCompileTimeEqualityTail(t *testing.T) {
+	mfn, ok, err := ScalarIntCallLoopFunctionFromStackIR(compileTimeBenchmarkMainStackIRFunc())
+	if err != nil {
+		t.Fatalf("ScalarIntCallLoopFunctionFromStackIR: %v", err)
+	}
+	if !ok {
+		t.Fatalf("ScalarIntCallLoopFunctionFromStackIR did not accept compile_time equality-tail call loop")
+	}
+	text := FormatFunction(mfn)
+	for _, want := range []string{
+		"func p25.compile_time.main target:scalar-int-call-loop",
+		"call p25.compile_time.f2",
+		"abi:sysv",
+		"clobbers:rax,rcx,rdx,rsi,rdi,r8,r9,r10,r11",
+		"loop bound constant",
+		"total == 0",
+		"return 1",
+		"return 0",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("machine compile_time call-loop dump missing %q:\n%s", want, text)
+		}
+	}
+	if err := VerifyFunction(mfn); err != nil {
+		t.Fatalf("VerifyFunction: %v", err)
+	}
+	intervals, err := BuildIntervals(mfn)
+	if err != nil {
+		t.Fatalf("BuildIntervals: %v", err)
+	}
+	alloc, err := LinearScan(intervals, LinuxX64CallerSaved())
+	if err != nil {
+		t.Fatalf("LinearScan: %v", err)
+	}
+	if err := VerifyAllocation(mfn, alloc, LinuxX64CallerSaved(), len(alloc.Spills)); err != nil {
+		t.Fatalf("VerifyAllocation: %v", err)
+	}
+}
+
+func TestScalarIntCallLoopFunctionFromStackIRRejectsAlteredCompileTimeEqualityTail(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(*ir.IRFunc)
+	}{
+		{
+			name: "altered_loop_bound",
+			mutate: func(fn *ir.IRFunc) {
+				fn.Instrs[6].Imm = 199999
+			},
+		},
+		{
+			name: "altered_final_compare",
+			mutate: func(fn *ir.IRFunc) {
+				fn.Instrs[22].Kind = ir.IRCmpGeI32
+			},
+		},
+		{
+			name: "altered_equal_return",
+			mutate: func(fn *ir.IRFunc) {
+				fn.Instrs[24].Imm = 0
+			},
+		},
+		{
+			name: "altered_fallthrough_return",
+			mutate: func(fn *ir.IRFunc) {
+				fn.Instrs[27].Imm = 1
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fn := compileTimeBenchmarkMainStackIRFunc()
+			tc.mutate(&fn)
+			if _, ok, err := ScalarIntCallLoopFunctionFromStackIR(fn); err != nil || ok {
+				t.Fatalf("ScalarIntCallLoopFunctionFromStackIR ok=%v err=%v, want strict fallback without error", ok, err)
+			}
+		})
+	}
+}
+
+func TestRecursionBenchmarkFunctionFromStackIRLowersFibAndMain(t *testing.T) {
+	fib, ok, err := RecursionFibFunctionFromStackIRWithCallABI(recursionFibStackIRFunc(), SysVCallABIInfo())
+	if err != nil {
+		t.Fatalf("RecursionFibFunctionFromStackIRWithCallABI: %v", err)
+	}
+	if !ok {
+		t.Fatalf("RecursionFibFunctionFromStackIRWithCallABI did not accept exact fib")
+	}
+	fibText := FormatFunction(fib)
+	for _, want := range []string{
+		"func p25.recursion.fib target:recursion-fib",
+		"cmp defs:",
+		"call p25.recursion.fib",
+		"abi:sysv",
+		"clobbers:rax,rcx,rdx,rsi,rdi,r8,r9,r10,r11",
+		"add defs:",
+		"return uses:",
+	} {
+		if !strings.Contains(fibText, want) {
+			t.Fatalf("machine recursion fib dump missing %q:\n%s", want, fibText)
+		}
+	}
+	if err := VerifyFunction(fib); err != nil {
+		t.Fatalf("VerifyFunction fib: %v", err)
+	}
+	fibIntervals, err := BuildIntervals(fib)
+	if err != nil {
+		t.Fatalf("BuildIntervals fib: %v", err)
+	}
+	fibAlloc, err := LinearScan(fibIntervals, LinuxX64CallerSaved())
+	if err != nil {
+		t.Fatalf("LinearScan fib: %v", err)
+	}
+	if err := VerifyAllocation(fib, fibAlloc, LinuxX64CallerSaved(), len(fibAlloc.Spills)); err != nil {
+		t.Fatalf("VerifyAllocation fib: %v", err)
+	}
+
+	mainFn, ok, err := RecursionMainFunctionFromStackIRWithCallABI(recursionMainStackIRFunc(), SysVCallABIInfo())
+	if err != nil {
+		t.Fatalf("RecursionMainFunctionFromStackIRWithCallABI: %v", err)
+	}
+	if !ok {
+		t.Fatalf("RecursionMainFunctionFromStackIRWithCallABI did not accept exact recursion main")
+	}
+	mainText := FormatFunction(mainFn)
+	for _, want := range []string{
+		"func p25.recursion.main target:recursion-main-loop",
+		"mov defs:call_arg ; fib(10)",
+		"call p25.recursion.fib",
+		"cmp defs:",
+		"return uses:ret0",
+		"return uses:ret1",
+	} {
+		if !strings.Contains(mainText, want) {
+			t.Fatalf("machine recursion main dump missing %q:\n%s", want, mainText)
+		}
+	}
+	if err := VerifyFunction(mainFn); err != nil {
+		t.Fatalf("VerifyFunction main: %v", err)
+	}
+	mainIntervals, err := BuildIntervals(mainFn)
+	if err != nil {
+		t.Fatalf("BuildIntervals main: %v", err)
+	}
+	mainAlloc, err := LinearScan(mainIntervals, LinuxX64CallerSaved())
+	if err != nil {
+		t.Fatalf("LinearScan main: %v", err)
+	}
+	if err := VerifyAllocation(mainFn, mainAlloc, LinuxX64CallerSaved(), len(mainAlloc.Spills)); err != nil {
+		t.Fatalf("VerifyAllocation main: %v", err)
+	}
+}
+
+func TestRecursionBenchmarkFunctionFromStackIRRejectsAlteredShapes(t *testing.T) {
+	t.Run("altered_fib_base_case", func(t *testing.T) {
+		fn := recursionFibStackIRFunc()
+		fn.Instrs[1].Imm = 3
+		if _, ok, err := RecursionFibFunctionFromStackIRWithCallABI(fn, SysVCallABIInfo()); err != nil || ok {
+			t.Fatalf("RecursionFibFunctionFromStackIRWithCallABI ok=%v err=%v, want strict fallback without error", ok, err)
+		}
+	})
+	t.Run("altered_main_loop_bound", func(t *testing.T) {
+		fn := recursionMainStackIRFunc()
+		fn.Instrs[6].Imm = 41
+		if _, ok, err := RecursionMainFunctionFromStackIRWithCallABI(fn, SysVCallABIInfo()); err != nil || ok {
+			t.Fatalf("RecursionMainFunctionFromStackIRWithCallABI ok=%v err=%v, want strict fallback without error", ok, err)
+		}
+	})
+	t.Run("altered_main_success_value", func(t *testing.T) {
+		fn := recursionMainStackIRFunc()
+		fn.Instrs[21].Imm = 2199
+		if _, ok, err := RecursionMainFunctionFromStackIRWithCallABI(fn, SysVCallABIInfo()); err != nil || ok {
+			t.Fatalf("RecursionMainFunctionFromStackIRWithCallABI ok=%v err=%v, want strict fallback without error", ok, err)
+		}
+	})
+}
+
 func hasMachineImmDef(fn Function, def VReg, imm int64) bool {
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
@@ -976,6 +1223,46 @@ func sumStrideStackIRFunc(step int32) ir.IRFunc {
 			{Kind: ir.IRJmp, Label: 1},
 			{Kind: ir.IRLabel, Label: 2},
 			{Kind: ir.IRLoadLocal, Local: 2},
+			{Kind: ir.IRReturn},
+		},
+	}
+}
+
+func integerLoopsBenchmarkStackIRFunc() ir.IRFunc {
+	return ir.IRFunc{
+		Name:        "p25.integer_loops.main",
+		LocalSlots:  2,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRLabel, Label: 0},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 200000},
+			{Kind: ir.IRCmpLtI32},
+			{Kind: ir.IRJmpIfZero, Label: 1},
+			{Kind: ir.IRLoadLocal, Local: 1},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 7},
+			{Kind: ir.IRModI32},
+			{Kind: ir.IRAddI32},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 1},
+			{Kind: ir.IRAddI32},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRJmp, Label: 0},
+			{Kind: ir.IRLabel, Label: 1},
+			{Kind: ir.IRLoadLocal, Local: 1},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRCmpGeI32},
+			{Kind: ir.IRJmpIfZero, Label: 2},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRReturn},
+			{Kind: ir.IRLabel, Label: 2},
+			{Kind: ir.IRConstI32, Imm: 1},
 			{Kind: ir.IRReturn},
 		},
 	}
@@ -1191,6 +1478,114 @@ func sumCallLoopStackIRFunc() ir.IRFunc {
 			{Kind: ir.IRJmp, Label: 1},
 			{Kind: ir.IRLabel, Label: 2},
 			{Kind: ir.IRLoadLocal, Local: 2},
+			{Kind: ir.IRReturn},
+		},
+	}
+}
+
+func compileTimeBenchmarkMainStackIRFunc() ir.IRFunc {
+	return ir.IRFunc{
+		Name:        "p25.compile_time.main",
+		ExportName:  "main",
+		LocalSlots:  2,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRLabel, Label: 0},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 200000},
+			{Kind: ir.IRCmpLtI32},
+			{Kind: ir.IRJmpIfZero, Label: 1},
+			{Kind: ir.IRLoadLocal, Local: 1},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRCall, Name: "p25.compile_time.f2", ArgSlots: 1, RetSlots: 1},
+			{Kind: ir.IRAddI32},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 1},
+			{Kind: ir.IRAddI32},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRJmp, Label: 0},
+			{Kind: ir.IRLabel, Label: 1},
+			{Kind: ir.IRLoadLocal, Local: 1},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRCmpEqI32},
+			{Kind: ir.IRJmpIfZero, Label: 2},
+			{Kind: ir.IRConstI32, Imm: 1},
+			{Kind: ir.IRReturn},
+			{Kind: ir.IRLabel, Label: 2},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRReturn},
+		},
+	}
+}
+
+func recursionFibStackIRFunc() ir.IRFunc {
+	return ir.IRFunc{
+		Name:        "p25.recursion.fib",
+		ParamSlots:  1,
+		LocalSlots:  1,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 2},
+			{Kind: ir.IRCmpLtI32},
+			{Kind: ir.IRJmpIfZero, Label: 0},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRReturn},
+			{Kind: ir.IRLabel, Label: 0},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 1},
+			{Kind: ir.IRSubI32},
+			{Kind: ir.IRCall, Name: "p25.recursion.fib", ArgSlots: 1, RetSlots: 1},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 2},
+			{Kind: ir.IRSubI32},
+			{Kind: ir.IRCall, Name: "p25.recursion.fib", ArgSlots: 1, RetSlots: 1},
+			{Kind: ir.IRAddI32},
+			{Kind: ir.IRReturn},
+		},
+	}
+}
+
+func recursionMainStackIRFunc() ir.IRFunc {
+	return ir.IRFunc{
+		Name:        "p25.recursion.main",
+		ExportName:  "main",
+		LocalSlots:  2,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRLabel, Label: 0},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 40},
+			{Kind: ir.IRCmpLtI32},
+			{Kind: ir.IRJmpIfZero, Label: 1},
+			{Kind: ir.IRLoadLocal, Local: 1},
+			{Kind: ir.IRConstI32, Imm: 10},
+			{Kind: ir.IRCall, Name: "p25.recursion.fib", ArgSlots: 1, RetSlots: 1},
+			{Kind: ir.IRAddI32},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 1},
+			{Kind: ir.IRAddI32},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRJmp, Label: 0},
+			{Kind: ir.IRLabel, Label: 1},
+			{Kind: ir.IRLoadLocal, Local: 1},
+			{Kind: ir.IRConstI32, Imm: 2200},
+			{Kind: ir.IRCmpEqI32},
+			{Kind: ir.IRJmpIfZero, Label: 2},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRReturn},
+			{Kind: ir.IRLabel, Label: 2},
+			{Kind: ir.IRConstI32, Imm: 1},
 			{Kind: ir.IRReturn},
 		},
 	}

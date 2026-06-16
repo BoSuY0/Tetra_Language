@@ -186,12 +186,30 @@ uses alloc, mem:
 	if small.BytesRequested != 17 || small.BytesReserved != 32 {
 		t.Fatalf("small allocation bytes = requested %d reserved %d, want 17/32", small.BytesRequested, small.BytesReserved)
 	}
+	if small.BytesCommitted != 32 || small.BytesReleased != 32 {
+		t.Fatalf("small allocation backend bytes = committed %d released %d, want 32/32", small.BytesCommitted, small.BytesReleased)
+	}
+	if small.MemoryBackend == nil ||
+		small.MemoryBackend.BackendClass != runtimeabi.MemoryBackendClassSmallHeap ||
+		small.MemoryBackend.Adapter != "runtime.small_heap.per_core_v1" ||
+		small.MemoryBackend.EvidenceClass != runtimeabi.MemoryFootprintEstimated {
+		t.Fatalf("small allocation memory backend evidence = %+v, want small heap allocation estimate", small.MemoryBackend)
+	}
+	if small.Domain == nil || small.Domain.DomainID != "domain:process" || small.Domain.Kind != runtimeabi.DomainProcess {
+		t.Fatalf("small allocation domain = %+v, want process domain", small.Domain)
+	}
 	large := findAllocation(t, plan, "ret_large", "xs")
 	if large.RuntimePath != runtimeabi.AllocationPathLargeMmap || large.AllocatorClass != "large_mmap" {
 		t.Fatalf("large allocation runtime evidence = %+v, want large_mmap", large)
 	}
 	if large.BytesRequested != 5000 || large.BytesReserved != 5000 {
 		t.Fatalf("large allocation bytes = requested %d reserved %d, want 5000/5000", large.BytesRequested, large.BytesReserved)
+	}
+	if large.MemoryBackend == nil ||
+		large.MemoryBackend.BackendClass != runtimeabi.MemoryBackendClassLargeBackend ||
+		large.MemoryBackend.Adapter != "target.large_mmap_v1" ||
+		large.MemoryBackend.EvidenceClass != runtimeabi.MemoryFootprintEstimated {
+		t.Fatalf("large allocation memory backend evidence = %+v, want large backend allocation estimate", large.MemoryBackend)
 	}
 	if !strings.Contains(FormatText(plan), "allocator_class: small_32") {
 		t.Fatalf("FormatText missing small heap allocator class:\n%s", FormatText(plan))
@@ -240,6 +258,20 @@ uses alloc, mem:
 	if summary.AllocatorReusePolicies["same_core_same_size_class_free_list"] != 1 {
 		t.Fatalf("allocator reuse summary = %+v, want same-core reuse policy count", summary.AllocatorReusePolicies)
 	}
+	if summary.BytesCommitted != 32 || summary.BytesReleased != 32 {
+		t.Fatalf("backend byte summary = committed %d released %d, want 32/32", summary.BytesCommitted, summary.BytesReleased)
+	}
+	if summary.MemoryBackendClasses[string(runtimeabi.MemoryBackendClassSmallHeap)] != 1 {
+		t.Fatalf("memory backend class summary = %+v, want small_heap count", summary.MemoryBackendClasses)
+	}
+	if summary.MemoryBackendOperations[string(runtimeabi.MemoryBackendCommit)] != 1 ||
+		summary.MemoryBackendOperations[string(runtimeabi.MemoryBackendRelease)] != 1 ||
+		summary.MemoryBackendOperations[string(runtimeabi.MemoryBackendFootprint)] != 1 {
+		t.Fatalf("memory backend operation summary = %+v, want commit/release/footprint counts", summary.MemoryBackendOperations)
+	}
+	if len(summary.Domains) != 1 || summary.Domains[0].DomainID != "domain:process" || summary.Domains[0].RequestedBytes != 17 {
+		t.Fatalf("domain summary = %+v, want process domain accounting", summary.Domains)
+	}
 	text := FormatText(plan)
 	for _, want := range []string{
 		"runtime_path: per_core_small_heap",
@@ -247,7 +279,15 @@ uses alloc, mem:
 		"allocator_scope: core:0",
 		"allocator_reuse_policy: same_core_same_size_class_free_list",
 		"allocator_chunk_bytes: 65536",
+		"memory_backend: small_heap",
+		"memory_backend_ops: commit,footprint,release,reserve",
+		"bytes_committed: 32",
+		"bytes_released: 32",
+		"domain_id: domain:process",
+		"memory_backend_classes:small_heap=1",
+		"memory_backend_operations:commit=1,footprint=1,release=1,reserve=1",
 		"allocator_reuse_policies:same_core_same_size_class_free_list=1",
+		"domains:domain:process=17/32",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("FormatText missing %q:\n%s", want, text)
@@ -327,11 +367,23 @@ uses alloc, islands, mem:
 	if island.BytesRequested != 17 || island.BytesReserved != 32 {
 		t.Fatalf("island bytes = requested %d reserved %d, want 17/32", island.BytesRequested, island.BytesReserved)
 	}
+	if island.BytesCommitted != 32 || island.BytesReleased != 32 {
+		t.Fatalf("island backend bytes = committed %d released %d, want 32/32", island.BytesCommitted, island.BytesReleased)
+	}
+	if island.MemoryBackend == nil ||
+		island.MemoryBackend.BackendClass != runtimeabi.MemoryBackendClassRegion ||
+		island.MemoryBackend.Adapter != "runtime.region_bump_v1" ||
+		island.MemoryBackend.EvidenceClass != runtimeabi.MemoryFootprintEstimated {
+		t.Fatalf("island memory backend evidence = %+v, want region allocation estimate", island.MemoryBackend)
+	}
 	if island.RegionID != "island:isl" || island.Lifetime == "" || island.DebugMode == "" {
 		t.Fatalf("island report hooks missing region/lifetime/debug evidence: %+v", island)
 	}
+	if island.Domain == nil || island.Domain.DomainID != "domain:island:isl" || island.Domain.Kind != runtimeabi.DomainIsland {
+		t.Fatalf("island domain = %+v, want explicit island domain", island.Domain)
+	}
 	text := FormatText(plan)
-	for _, want := range []string{"runtime_path: explicit_island", "allocator_class: region_bump_16", "region_id: island:isl", "bytes_reserved: 32"} {
+	for _, want := range []string{"runtime_path: explicit_island", "allocator_class: region_bump_16", "memory_backend: region", "region_id: island:isl", "bytes_reserved: 32", "bytes_committed: 32", "bytes_released: 32", "domain_id: domain:island:isl"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("FormatText missing %q:\n%s", want, text)
 		}
@@ -434,6 +486,12 @@ uses alloc, mem:
 	if copied.AllocatorClass != "" {
 		t.Fatalf("temporary copy fallback allocator class = %q, want no region allocator claim: %+v", copied.AllocatorClass, copied)
 	}
+	if copied.MemoryBackend == nil ||
+		copied.MemoryBackend.BackendClass != runtimeabi.MemoryBackendClassConservativeHeap ||
+		copied.MemoryBackend.EvidenceClass != runtimeabi.MemoryFootprintBlocked ||
+		copied.MemoryBackend.BlockedReason == "" {
+		t.Fatalf("temporary copy fallback memory backend evidence = %+v, want blocked conservative heap", copied.MemoryBackend)
+	}
 	if copied.Lifetime != "function:local_copy" || copied.DebugMode == "" {
 		t.Fatalf("temporary copy lifetime/debug evidence = %+v", copied)
 	}
@@ -470,8 +528,14 @@ uses alloc, mem:
 	if copied.RuntimePath != runtimeabi.AllocationPathRegion || copied.AllocatorClass != "function_temp_region" || copied.RegionID != "region:local_copy:temp" {
 		t.Fatalf("temporary copy region report evidence = %+v, want function temp region", copied)
 	}
+	if copied.MemoryBackend == nil ||
+		copied.MemoryBackend.BackendClass != runtimeabi.MemoryBackendClassRegion ||
+		copied.MemoryBackend.Adapter != "runtime.region_bump_v1" ||
+		copied.MemoryBackend.EvidenceClass != runtimeabi.MemoryFootprintEstimated {
+		t.Fatalf("temporary copy region memory backend evidence = %+v, want region estimate", copied.MemoryBackend)
+	}
 	text := FormatText(plan)
-	for _, want := range []string{"planned_storage: FunctionTempRegion", "actual_lowering_storage: FunctionTempRegion", "runtime_path: region", "allocator_class: function_temp_region", "function_temp_region:1"} {
+	for _, want := range []string{"planned_storage: FunctionTempRegion", "actual_lowering_storage: FunctionTempRegion", "runtime_path: region", "allocator_class: function_temp_region", "memory_backend: region", "function_temp_region:1"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("FormatText missing %q:\n%s", want, text)
 		}
@@ -807,13 +871,46 @@ uses alloc, mem:
 	}
 }
 
-func TestPlannerClassifiesUnknownCallUnsafeAndIslandAllocations(t *testing.T) {
+func TestPlannerDoesNotTreatReadOnlyLookupCallAsEscapesCallUnknown(t *testing.T) {
+	plan := allocationPlan(t, `
+func lookup(keys: []i32, values: []i32, n: Int, key: Int) -> Int
+uses mem:
+    var i: Int = 0
+    while i < n:
+        if keys[i] == key:
+            return values[i]
+        i = i + 1
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    let n: Int = 4
+    var keys: []i32 = make_i32(n)
+    var values: []i32 = make_i32(n)
+    return lookup(keys, values, n, 2)
+`)
+
+	for _, id := range []string{"keys", "values"} {
+		alloc := findAllocation(t, plan, "main", id)
+		if alloc.Escape != EscapeNoEscape {
+			t.Fatalf("%s allocation = %+v, want NoEscape from read-only local lookup summary", id, alloc)
+		}
+		if strings.Contains(alloc.Reason, "unknown call escape") || strings.Contains(alloc.Reason, "without interprocedural escape facts") {
+			t.Fatalf("%s allocation reason still reports unknown call escape: %q", id, alloc.Reason)
+		}
+		if !strings.Contains(alloc.Reason, "read-only local call summary") {
+			t.Fatalf("%s allocation reason = %q, want read-only local call summary evidence", id, alloc.Reason)
+		}
+	}
+}
+
+func TestPlannerClassifiesReadOnlyCallUnsafeAndIslandAllocations(t *testing.T) {
 	plan := allocationPlan(t, `
 func consume(xs: []u8) -> Int
 uses mem:
     return xs.len
 
-func call_unknown() -> Int
+func read_only_call() -> Int
 uses alloc, mem:
     var xs: []u8 = make_u8(4)
     return consume(xs)
@@ -834,12 +931,36 @@ uses alloc, islands, mem:
 
 func main() -> Int
 uses alloc, islands, mem:
-    return call_unknown() + unsafe_boundary() + islanded()
+    return read_only_call() + unsafe_boundary() + islanded()
 `)
 
-	call := findAllocation(t, plan, "call_unknown", "xs")
-	if call.Escape != EscapeCallUnknown || call.Storage != StorageHeap {
-		t.Fatalf("unknown-call allocation = %+v, want EscapesCallUnknown/Heap", call)
+	call := findAllocation(t, plan, "read_only_call", "xs")
+	if call.Escape != EscapeNoEscape || call.Storage != StorageStack || call.ActualLoweringStorage != StorageHeap {
+		t.Fatalf("read-only-call allocation = %+v, want NoEscape planned Stack with conservative actual Heap when stack lowering is disabled", call)
+	}
+	if !strings.Contains(call.Reason, "read-only local call summary") {
+		t.Fatalf("read-only-call reason = %q, want summary evidence", call.Reason)
+	}
+	stackPlan := allocationPlanWithOptions(t, `
+func consume(xs: []u8) -> Int
+uses mem:
+    return xs.len
+
+func read_only_call() -> Int
+uses alloc, mem:
+    var xs: []u8 = make_u8(4)
+    return consume(xs)
+
+func main() -> Int
+uses alloc, mem:
+    return read_only_call()
+`, Options{EnableStackLowering: true})
+	stacked := findAllocation(t, stackPlan, "read_only_call", "xs")
+	if stacked.Escape != EscapeNoEscape || stacked.Storage != StorageStack || stacked.ActualLoweringStorage != StorageStack {
+		t.Fatalf("read-only-call stack lowering = %+v, want NoEscape Stack/Stack when stack lowering is enabled", stacked)
+	}
+	if stacked.LoweringStatus != "stack_lowering" {
+		t.Fatalf("read-only-call lowering status = %q, want stack_lowering: %+v", stacked.LoweringStatus, stacked)
 	}
 	unsafeAlloc := findAllocation(t, plan, "unsafe_boundary", "xs")
 	if unsafeAlloc.Escape != EscapeUnsafe || unsafeAlloc.Storage != StorageHeap {
@@ -850,10 +971,146 @@ uses alloc, islands, mem:
 		t.Fatalf("island allocation = %+v, want NoEscape/ExplicitIsland", island)
 	}
 	dump := FormatText(plan)
-	for _, want := range []string{"escape: EscapesCallUnknown", "planned_storage: ExplicitIsland", "actual_lowering_storage: ExplicitIsland"} {
+	for _, want := range []string{"planned_storage: Stack", "read-only local call summary", "planned_storage: ExplicitIsland", "actual_lowering_storage: ExplicitIsland"} {
 		if !strings.Contains(dump, want) {
 			t.Fatalf("FormatText missing %q:\n%s", want, dump)
 		}
+	}
+}
+
+func TestPlannerKeepsEscapingLocalCallSummariesConservative(t *testing.T) {
+	plan := allocationPlanFile(t, `
+var stored: []u8
+
+func returns_slice(xs: []u8) -> []u8
+uses mem:
+    return xs
+
+func stores_global(xs: []u8) -> Int
+uses mem:
+    stored = xs
+    return 0
+
+func touches_unsafe(xs: []u8) -> Int
+uses mem:
+    unsafe:
+        var y = 1
+    return xs.len
+
+func call_return() -> Int
+uses alloc, mem:
+    var xs: []u8 = make_u8(4)
+    let ys: []u8 = returns_slice(xs)
+    return ys.len
+
+func call_global() -> Int
+uses alloc, mem:
+    var xs: []u8 = make_u8(4)
+    return stores_global(xs)
+
+func call_unsafe() -> Int
+uses alloc, mem:
+    var xs: []u8 = make_u8(4)
+    return touches_unsafe(xs)
+
+func main() -> Int
+uses alloc, mem:
+    return call_return() + call_global() + call_unsafe()
+`)
+
+	for _, tc := range []struct {
+		fn string
+		id string
+	}{
+		{fn: "call_return", id: "xs"},
+		{fn: "call_global", id: "xs"},
+		{fn: "call_unsafe", id: "xs"},
+	} {
+		alloc := findAllocation(t, plan, tc.fn, tc.id)
+		if alloc.Escape == EscapeNoEscape || alloc.Storage != StorageHeap {
+			t.Fatalf("%s allocation = %+v, want conservative heap fallback", tc.fn, alloc)
+		}
+		if !strings.Contains(alloc.Reason, "without interprocedural escape facts") {
+			t.Fatalf("%s reason = %q, want conservative interprocedural fallback evidence", tc.fn, alloc.Reason)
+		}
+	}
+}
+
+func TestPlannerKeepsLocalActorTaskCallSummariesConservative(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		callee string
+		op     plir.Operation
+	}{
+		{
+			name:   "actor",
+			callee: "callee_a",
+			op:     plir.Operation{Kind: plir.OpActorSend, Inputs: []string{"mailbox", "xs"}, Note: "actor send payload"},
+		},
+		{
+			name:   "task",
+			callee: "callee_b",
+			op:     plir.Operation{Kind: plir.OpCall, Inputs: []string{"xs"}, Note: "core.task_spawn_i32_typed captures payload"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calleeName := tc.callee
+			op := tc.op
+			op.ID = "op1"
+			prog := &plir.Program{Funcs: []plir.Function{
+				{
+					Name: calleeName,
+					Summary: &plir.FunctionSummary{
+						ParamNames: []string{"xs"},
+						ParamTypes: []string{"[]u8"},
+						ReturnType: "i32",
+						Effects:    []string{"mem"},
+					},
+					Values: []plir.Value{{
+						ID:         "param:xs",
+						Kind:       plir.ValueParam,
+						Type:       "[]u8",
+						Provenance: plir.Provenance{Kind: plir.ProvenanceParam, Root: "param:xs"},
+						Borrow:     plir.BorrowImm,
+					}},
+					Ops: []plir.Operation{op},
+				},
+				{
+					Name: "caller_" + tc.name,
+					Values: []plir.Value{{
+						ID:   "alloc_intent:xs",
+						Kind: plir.ValueAllocIntent,
+						Type: "[]u8",
+						Alloc: &plir.AllocIntent{
+							ElementType:         "u8",
+							ElementSize:         1,
+							LengthExpr:          "4",
+							LengthConstKnown:    true,
+							LengthConst:         4,
+							ZeroGuardStatus:     "valid_empty_no_allocator",
+							NegativeGuardStatus: "reject_before_allocation",
+							OverflowGuardStatus: "reject_before_allocation",
+							Builtin:             "core.make_u8",
+						},
+						Provenance: plir.Provenance{Kind: plir.ProvenanceAllocation, Root: "xs"},
+					}},
+					Ops: []plir.Operation{{
+						ID:     "op_call",
+						Kind:   plir.OpCall,
+						Inputs: []string{"xs"},
+						Note:   calleeName,
+					}},
+				},
+			}}
+			plan, err := FromPLIR(prog)
+			if err != nil {
+				t.Fatalf("FromPLIR: %v", err)
+			}
+			alloc := findAllocation(t, plan, "caller_"+tc.name, "xs")
+			if alloc.Escape != EscapeCallUnknown || alloc.Storage != StorageHeap {
+				t.Fatalf("%s local boundary allocation = %+v, want EscapesCallUnknown/Heap", tc.name, alloc)
+			}
+		})
 	}
 }
 
@@ -941,139 +1198,6 @@ func syntheticEscapeFunction(name string, op plir.Operation) plir.Function {
 			op,
 		},
 		Blocks: []plir.BasicBlock{{ID: "entry", Kind: "entry", Entry: true, Ops: []string{"op0", "op1"}, Exit: true}},
-	}
-}
-
-func TestVerifyPlanRejectsMissingSiteID(t *testing.T) {
-	err := VerifyPlan(&Plan{Functions: []FunctionPlan{{
-		Name: "bad",
-		Allocations: []Allocation{{
-			ID:                    "xs",
-			ValueID:               "alloc_intent:xs",
-			Builtin:               "core.make_u8",
-			ElementType:           "u8",
-			ElementSize:           1,
-			LengthExpr:            "4",
-			LengthStatus:          LengthStatusNormal,
-			ZeroGuardStatus:       "valid_empty_no_allocator",
-			NegativeGuardStatus:   "reject_before_allocation",
-			OverflowGuardStatus:   "reject_before_allocation",
-			Escape:                EscapeNoEscape,
-			Storage:               StorageStack,
-			PlannedStorage:        StorageStack,
-			ActualLoweringStorage: StorageHeap,
-			ValidationStatus:      "validated_no_escape",
-			LoweringStatus:        "conservative_heap_fallback",
-			Reason:                "test",
-		}},
-	}}})
-	if err == nil || !strings.Contains(err.Error(), "missing stable site id") {
-		t.Fatalf("VerifyPlan error = %v, want missing stable site id", err)
-	}
-}
-
-func TestVerifyPlanRejectsEscapedActualTrustedLowering(t *testing.T) {
-	tests := []struct {
-		name   string
-		escape EscapeClass
-		actual StorageClass
-	}{
-		{name: "returned_stack", escape: EscapeReturn, actual: StorageStack},
-		{name: "global_region", escape: EscapeGlobal, actual: StorageRegion},
-		{name: "task_region", escape: EscapeTask, actual: StorageTaskRegion},
-		{name: "actor_move_region", escape: EscapeActor, actual: StorageActorMoveRegion},
-		{name: "unknown_call_stack", escape: EscapeCallUnknown, actual: StorageStack},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			alloc := validVerifierAllocation()
-			alloc.Escape = test.escape
-			alloc.Storage = StorageHeap
-			alloc.PlannedStorage = StorageHeap
-			alloc.ActualLoweringStorage = test.actual
-			alloc.ValidationStatus = "validated_heap_fallback"
-			alloc.LoweringStatus = "storage_lowering"
-			alloc.Reason = "escaped allocation should stay on heap"
-
-			err := verifySingleAllocation(alloc)
-			if err == nil || !strings.Contains(err.Error(), "actual lowering storage") {
-				t.Fatalf("VerifyPlan error = %v, want actual lowering storage escape rejection", err)
-			}
-		})
-	}
-}
-
-func TestVerifyPlanRejectsTrustedStorageWithoutNoEscapeProof(t *testing.T) {
-	tests := []struct {
-		name    string
-		storage StorageClass
-		status  string
-	}{
-		{name: "stack", storage: StorageStack, status: "validated_heap_fallback"},
-		{name: "region", storage: StorageRegion, status: "validated_conservative"},
-		{name: "function_temp_region", storage: StorageFunctionTempRegion, status: "validated_heap_fallback"},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			alloc := validVerifierAllocation()
-			alloc.Storage = test.storage
-			alloc.PlannedStorage = test.storage
-			alloc.ActualLoweringStorage = test.storage
-			alloc.ValidationStatus = test.status
-			alloc.LoweringStatus = "trusted_storage_lowering"
-			alloc.Reason = "trusted storage fixture without a matching no-escape proof"
-
-			err := verifySingleAllocation(alloc)
-			if err == nil || !strings.Contains(err.Error(), "no-escape proof") {
-				t.Fatalf("VerifyPlan error = %v, want no-escape proof rejection", err)
-			}
-		})
-	}
-}
-
-func TestVerifyPlanRejectsHeapFallbackWithoutReason(t *testing.T) {
-	alloc := validVerifierAllocation()
-	alloc.Escape = EscapeReturn
-	alloc.Storage = StorageHeap
-	alloc.PlannedStorage = StorageHeap
-	alloc.ActualLoweringStorage = StorageHeap
-	alloc.ValidationStatus = "validated_heap_fallback"
-	alloc.LoweringStatus = "heap_runtime"
-	alloc.Reason = ""
-
-	err := verifySingleAllocation(alloc)
-	if err == nil || !strings.Contains(err.Error(), "reason") {
-		t.Fatalf("VerifyPlan error = %v, want missing reason rejection", err)
-	}
-}
-
-func verifySingleAllocation(alloc Allocation) error {
-	return VerifyPlan(&Plan{Functions: []FunctionPlan{{
-		Name:        "main",
-		Allocations: []Allocation{alloc},
-	}}})
-}
-
-func validVerifierAllocation() Allocation {
-	return Allocation{
-		ID:                    "xs",
-		SiteID:                "alloc:main:xs",
-		ValueID:               "alloc_intent:xs",
-		Builtin:               "core.make_u8",
-		ElementType:           "u8",
-		ElementSize:           1,
-		LengthExpr:            "4",
-		LengthStatus:          LengthStatusNormal,
-		ZeroGuardStatus:       "valid_empty_no_allocator",
-		NegativeGuardStatus:   "reject_before_allocation",
-		OverflowGuardStatus:   "reject_before_allocation",
-		Escape:                EscapeNoEscape,
-		Storage:               StorageStack,
-		PlannedStorage:        StorageStack,
-		ActualLoweringStorage: StorageStack,
-		ValidationStatus:      "validated_no_escape",
-		LoweringStatus:        "stack_lowering",
-		Reason:                "fixed small no-escape allocation",
 	}
 }
 

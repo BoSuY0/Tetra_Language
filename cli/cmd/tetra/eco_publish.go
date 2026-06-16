@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"tetra_language/compiler"
+	"tetra_language/internal/outputformat"
 )
 
 type ecoPublishMetadata struct {
@@ -228,6 +229,7 @@ func runEcoTetraHubMirror(args []string, stdout io.Writer, stderr io.Writer) int
 	version := fs.String("version", "", "capsule version")
 	target := fs.String("target", "", "target triple")
 	outPath := fs.String("o", "tetra.eco.mirror.json", "output mirror report path")
+	format := fs.String("format", outputformat.JSON, "mirror report format: json, toon, or both")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			return 0
@@ -247,7 +249,7 @@ func runEcoTetraHubMirror(args []string, stdout io.Writer, stderr io.Writer) int
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
-	if err := writeJSONFile(*outPath, report); err != nil {
+	if _, err := writeEcoStructuredFile(*outPath, *format, report); err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
@@ -264,6 +266,7 @@ func runEcoTetraHubFetch(args []string, stdout io.Writer, stderr io.Writer) int 
 	version := fs.String("version", "", "capsule version")
 	target := fs.String("target", "", "target triple")
 	outPath := fs.String("o", "tetra.eco.mirror.json", "output mirror report path")
+	format := fs.String("format", outputformat.JSON, "mirror report format: json, toon, or both")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			return 0
@@ -283,7 +286,7 @@ func runEcoTetraHubFetch(args []string, stdout io.Writer, stderr io.Writer) int 
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
-	if err := writeJSONFile(*outPath, report); err != nil {
+	if _, err := writeEcoStructuredFile(*outPath, *format, report); err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
 	}

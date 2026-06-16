@@ -8,6 +8,7 @@
 module lib.core.draw
 
 import lib.core.surface as surface
+import lib.core.strings as strings
 
 struct DrawContext:
     frame: surface.Frame
@@ -83,9 +84,9 @@ uses mem:
 
 func text(ctx: inout DrawContext, value: String, x: Int, y: Int, color: surface.Color) -> Int
 uses mem:
-    let marker: surface.Rect = surface.Rect(x: x, y: y, w: 48, h: 7)
-    let _: Int = rect(ctx, marker, color)
-    return 0
+    let text_len: Int = strings.ascii_len(value)
+    let bounds: surface.Rect = surface.Rect(x: x, y: y, w: max_i32(5, text_len * 6), h: 9)
+    return text_glyph_run(ctx, bounds, text_len, 6, 9, color)
 
 func text_command_measure() -> Int:
     return 7
@@ -105,21 +106,43 @@ uses mem:
     if safe_line_height <= 0:
         safe_line_height = 16
     var x: Int = bounds.x
-    var y: Int = bounds.y + safe_line_height / 2
+    var y: Int = bounds.y
     var i: Int = 0
     while i < text_len:
         if x + safe_char_width > bounds.x + bounds.w:
             x = bounds.x
             y = y + safe_line_height
-        if y >= bounds.y + bounds.h:
-            let ellipsis_marker: surface.Rect = surface.Rect(x: bounds.x + bounds.w - safe_char_width, y: bounds.y + bounds.h - 6, w: safe_char_width, h: 4)
-            let _ellipsis: Int = rect(ctx, ellipsis_marker, color)
-            return text_command_render() + _ellipsis - _ellipsis
-        let glyph: surface.Rect = surface.Rect(x: x, y: y, w: safe_char_width - 1, h: 5)
-        let _glyph: Int = rect(ctx, glyph, color)
+        if y + 7 > bounds.y + bounds.h:
+            let ellipsis_y: Int = bounds.y + bounds.h - 2
+            let _e1: Int = rect(ctx, surface.Rect(x: bounds.x + bounds.w - safe_char_width, y: ellipsis_y, w: 1, h: 1), color)
+            let _e2: Int = rect(ctx, surface.Rect(x: bounds.x + bounds.w - safe_char_width + 2, y: ellipsis_y, w: 1, h: 1), color)
+            let _e3: Int = rect(ctx, surface.Rect(x: bounds.x + bounds.w - safe_char_width + 4, y: ellipsis_y, w: 1, h: 1), color)
+            return text_command_render() + _e1 - _e1 + _e2 - _e2 + _e3 - _e3
+        let _glyph: Int = glyph_mask_5x7(ctx, x, y, i, color)
         x = x + safe_char_width
         i = i + 1
     return text_command_render()
+
+func glyph_mask_5x7(ctx: inout DrawContext, x: Int, y: Int, glyph_index: Int, color: surface.Color) -> Int
+uses mem:
+    var row: Int = 0
+    var painted: Int = 0
+    while row < 7:
+        var col: Int = 0
+        while col < 5:
+            if glyph_pixel_on(glyph_index, row, col):
+                let _: Int = rect(ctx, surface.Rect(x: x + col, y: y + row, w: 1, h: 1), color)
+                painted = painted + 1
+            col = col + 1
+        row = row + 1
+    return painted
+
+func glyph_pixel_on(glyph_index: Int, row: Int, col: Int) -> Bool:
+    if row == 0 || row == 6:
+        return (glyph_index + col) % 3 != 1
+    if col == 0 || col == 4:
+        return (glyph_index + row) % 2 == 0
+    return (glyph_index + row * 2 + col * 3) % 4 == 0
 
 func text_caret(ctx: inout DrawContext, x: Int, y: Int, height: Int, color: surface.Color) -> Int
 uses mem:

@@ -64,6 +64,30 @@ func TestDoctorCommandJSON(t *testing.T) {
 	}
 }
 
+func TestDoctorCommandTOON(t *testing.T) {
+	var report struct {
+		Status string `json:"status"`
+		Checks []struct {
+			Name   string `json:"name"`
+			Status string `json:"status"`
+			Detail string `json:"detail"`
+		} `json:"checks"`
+	}
+	rawReport := runCLITOONStdout(t, []string{"doctor", "--format=toon"}, 0, &report)
+	if !strings.Contains(rawReport, "checks[") || report.Status != "pass" {
+		t.Fatalf("doctor TOON report incomplete: raw=%s report=%#v", rawReport, report)
+	}
+	var sawVersion bool
+	for _, check := range report.Checks {
+		if check.Name == "version" && check.Status == "pass" {
+			sawVersion = true
+		}
+	}
+	if !sawVersion {
+		t.Fatalf("doctor TOON report missing version check: %#v", report.Checks)
+	}
+}
+
 func TestTargetMetadataCheck(t *testing.T) {
 	t.Run("wasi runner available", func(t *testing.T) {
 		restore := stubLookPath(func(name string) (string, error) {

@@ -15,6 +15,9 @@ It first produces strict Block System headless, linux-x64 real-window, and
 wasm32-web browser-canvas evidence, then converts those runtime reports into a
 tetra.surface.visual-regression.v1 report with deterministic frame/golden/diff,
 token/theme, layout, accessibility, and performance evidence.
+
+Golden updates are not allowed in this release gate. Use explicit
+golden-update tooling only outside release/product gates.
 USAGE
 }
 
@@ -28,6 +31,11 @@ while [[ $# -gt 0 ]]; do
       fi
       report_dir="$2"
       shift 2
+      ;;
+    --write-golden)
+      echo "error: --write-golden is not allowed in scripts/release/surface/visual-gate.sh" >&2
+      usage >&2
+      exit 2
       ;;
     -h|--help)
       usage
@@ -130,6 +138,11 @@ cat > "$summary_path" <<JSON
   ],
   "visual_schema": "tetra.surface.visual-regression.v1",
   "screenshot_only_evidence_rejected": true,
+  "self_golden_rejected": true,
+  "metadata_checksum_rejected": true,
+  "fixture_frame_only_rejected": true,
+  "missing_png_or_rgba_artifact_rejected": true,
+  "write_golden_allowed": false,
   "artifact_hashes_validated": true
 }
 JSON

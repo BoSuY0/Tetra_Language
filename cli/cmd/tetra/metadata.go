@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -10,6 +9,7 @@ import (
 
 	"tetra_language/compiler"
 	ctarget "tetra_language/compiler/target"
+	"tetra_language/internal/outputformat"
 )
 
 type targetsReport struct {
@@ -79,7 +79,7 @@ type featuresReport struct {
 func runTargets(args []string, stdout io.Writer, stderr io.Writer) int {
 	fs := flag.NewFlagSet("targets", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	format := fs.String("format", "text", "output format: text or json")
+	format := fs.String("format", "text", "output format: text, json, or toon")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			return 0
@@ -111,10 +111,8 @@ func runTargets(args []string, stdout io.Writer, stderr io.Writer) int {
 			fmt.Fprintf(stdout, "  %s\n", triple)
 		}
 		return 0
-	case "json":
-		enc := json.NewEncoder(stdout)
-		enc.SetIndent("", "  ")
-		if err := enc.Encode(report); err != nil {
+	case "json", "toon":
+		if err := outputformat.WriteStructured(stdout, *format, report); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}
@@ -128,7 +126,7 @@ func runTargets(args []string, stdout io.Writer, stderr io.Writer) int {
 func runFeatures(args []string, stdout io.Writer, stderr io.Writer) int {
 	fs := flag.NewFlagSet("features", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	format := fs.String("format", "text", "output format: text or json")
+	format := fs.String("format", "text", "output format: text, json, or toon")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			return 0
@@ -151,10 +149,8 @@ func runFeatures(args []string, stdout io.Writer, stderr io.Writer) int {
 			fmt.Fprintf(stdout, "  %s [%s] - %s\n", feature.ID, feature.Status, feature.Name)
 		}
 		return 0
-	case "json":
-		enc := json.NewEncoder(stdout)
-		enc.SetIndent("", "  ")
-		if err := enc.Encode(report); err != nil {
+	case "json", "toon":
+		if err := outputformat.WriteStructured(stdout, *format, report); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}
@@ -168,7 +164,7 @@ func runFeatures(args []string, stdout io.Writer, stderr io.Writer) int {
 func runFormats(args []string, stdout io.Writer, stderr io.Writer) int {
 	fs := flag.NewFlagSet("formats", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	format := fs.String("format", "text", "output format: text or json")
+	format := fs.String("format", "text", "output format: text, json, or toon")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			return 0
@@ -198,10 +194,8 @@ func runFormats(args []string, stdout io.Writer, stderr io.Writer) int {
 			fmt.Fprintf(stdout, "  %s - %s (%s)\n", suffix, item.Name, strings.Join(markers, ", "))
 		}
 		return 0
-	case "json":
-		enc := json.NewEncoder(stdout)
-		enc.SetIndent("", "  ")
-		if err := enc.Encode(report); err != nil {
+	case "json", "toon":
+		if err := outputformat.WriteStructured(stdout, *format, report); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}

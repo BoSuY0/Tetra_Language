@@ -43,6 +43,30 @@ func TestBuildCommandJSONDiagnosticsForOptionValidation(t *testing.T) {
 	}
 }
 
+func TestApplyRuntimeHeapTelemetryOptionsRequiresExplicitFlagAndLinuxX64(t *testing.T) {
+	var opt compiler.BuildOptions
+	if applyRuntimeHeapTelemetryOptions(&opt, "linux-x64", false, "reports/heap", "text", ioDiscard{}) {
+		t.Fatalf("telemetry dir without telemetry flag should be rejected")
+	}
+
+	opt = compiler.BuildOptions{}
+	if applyRuntimeHeapTelemetryOptions(&opt, "wasm32-wasi", true, "reports/heap", "text", ioDiscard{}) {
+		t.Fatalf("runtime heap telemetry should reject unsupported targets")
+	}
+
+	opt = compiler.BuildOptions{}
+	if !applyRuntimeHeapTelemetryOptions(&opt, "linux-x64", true, "reports/heap", "text", ioDiscard{}) {
+		t.Fatalf("runtime heap telemetry linux-x64 option should be accepted")
+	}
+	if !opt.EmitRuntimeHeapTelemetry || opt.RuntimeHeapTelemetryDir != "reports/heap" {
+		t.Fatalf("BuildOptions telemetry = enabled:%v dir:%q", opt.EmitRuntimeHeapTelemetry, opt.RuntimeHeapTelemetryDir)
+	}
+}
+
+type ioDiscard struct{}
+
+func (ioDiscard) Write(p []byte) (int, error) { return len(p), nil }
+
 func TestBuildCommandExplainFlagsWriteReports(t *testing.T) {
 	dir := t.TempDir()
 	srcPath := filepath.Join(dir, "main.tetra")

@@ -13,6 +13,7 @@ import (
 
 	"tetra_language/compiler"
 	ctarget "tetra_language/compiler/target"
+	"tetra_language/internal/outputformat"
 )
 
 type doctorReport struct {
@@ -29,7 +30,7 @@ type doctorCheck struct {
 func runDoctor(args []string, stdout io.Writer, stderr io.Writer) int {
 	fs := flag.NewFlagSet("doctor", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	format := fs.String("format", "text", "output format: text or json")
+	format := fs.String("format", "text", "output format: text, json, or toon")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			return 0
@@ -58,10 +59,8 @@ func runDoctor(args []string, stdout io.Writer, stderr io.Writer) int {
 				fmt.Fprintf(stdout, "  %s: %s (%s)\n", check.Name, check.Status, check.Detail)
 			}
 		}
-	case "json":
-		enc := json.NewEncoder(stdout)
-		enc.SetIndent("", "  ")
-		if err := enc.Encode(report); err != nil {
+	case "json", "toon":
+		if err := outputformat.WriteStructured(stdout, *format, report); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}

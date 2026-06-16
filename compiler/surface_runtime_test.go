@@ -387,9 +387,9 @@ func TestSurfaceMigrationExamplesBuildAndRunLinuxX64(t *testing.T) {
 		src          string
 		expectedExit int
 	}{
-		{name: "ui_web_smoke", src: filepath.Join("..", "examples", "surface_migration_ui_web_smoke.tetra"), expectedExit: 2},
-		{name: "ui_native_shell_smoke", src: filepath.Join("..", "examples", "surface_migration_ui_native_shell_smoke.tetra"), expectedExit: 11},
-		{name: "dogfood_web_ui", src: filepath.Join("..", "examples", "surface_migration_dogfood_web_ui.tetra"), expectedExit: 3},
+		{name: "ui_web_smoke", src: filepath.Join("..", "examples", "surface_migration_ui_web_smoke.tetra"), expectedExit: 26},
+		{name: "ui_native_shell_smoke", src: filepath.Join("..", "examples", "surface_migration_ui_native_shell_smoke.tetra"), expectedExit: 27},
+		{name: "dogfood_web_ui", src: filepath.Join("..", "examples", "surface_migration_dogfood_web_ui.tetra"), expectedExit: 43},
 		{name: "tetra_control_center", src: filepath.Join("..", "examples", "surface_migration_tetra_control_center.tetra"), expectedExit: 5},
 	}
 

@@ -280,6 +280,9 @@ func validateClaims(claims []string) []string {
 				issues = append(issues, fmt.Sprintf("forbidden actor foundation claim %q mentions %q", claim, forbidden))
 			}
 		}
+		if forbidden, ok := forbiddenZeroCopyFoundationClaim(lower); ok {
+			issues = append(issues, fmt.Sprintf("forbidden actor foundation claim %q mentions %q", claim, forbidden))
+		}
 		if strings.Contains(lower, "distributed actor") {
 			for _, unsupportedTarget := range []string{"windows", "win64", "macos", "darwin", "all-target", "all target", "cross-target", "cross target", "cross-platform", "cross platform"} {
 				if strings.Contains(lower, unsupportedTarget) {
@@ -289,6 +292,35 @@ func validateClaims(claims []string) []string {
 		}
 	}
 	return issues
+}
+
+func forbiddenZeroCopyFoundationClaim(lower string) (string, bool) {
+	normalized := normalizeClaimText(lower)
+	zeroCopyContext := strings.Contains(normalized, "zero copy") || strings.Contains(normalized, "copy free")
+	if !zeroCopyContext {
+		return "", false
+	}
+	for _, phrase := range []string{
+		"distributed",
+		"network",
+		"cross machine",
+		"cross node",
+		"inter node",
+		"across node",
+		"across nodes",
+		"remote node",
+		"remote nodes",
+	} {
+		if strings.Contains(normalized, phrase) {
+			return phrase + " zero-copy", true
+		}
+	}
+	return "", false
+}
+
+func normalizeClaimText(text string) string {
+	replacer := strings.NewReplacer("-", " ", "_", " ", "/", " ")
+	return strings.Join(strings.Fields(replacer.Replace(strings.ToLower(text))), " ")
 }
 
 func validateNonClaims(nonclaims []string) []string {

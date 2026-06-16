@@ -189,7 +189,7 @@ func validateMorphStableRecipeContract(contract morphStableRecipeContract) []str
 
 func validateMorphStablePromotionGates(gates []string) []string {
 	var issues []string
-	for _, gate := range []string{"validate-surface-morph-report", "validate-surface-claims", "visual regression gate", "target-host evidence"} {
+	for _, gate := range []string{"validate-surface-morph-report", "validate-surface-claims", "visual regression gate", "target-host evidence", "renderer-owned stable proof"} {
 		if !containsTextFold(gates, gate) {
 			issues = append(issues, fmt.Sprintf("promotion_gates missing %q", gate))
 		}

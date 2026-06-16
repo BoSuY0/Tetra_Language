@@ -23,6 +23,7 @@ type SurfaceDevWorkflowReport struct {
 	SupportedTargets       []string                         `json:"supported_targets"`
 	Steps                  []SurfaceDevWorkflowStepReport   `json:"steps"`
 	SourceDiagnostics      []SurfaceDevWorkflowDiagnostic   `json:"source_diagnostics"`
+	MorphToPixels          *MorphToPixelsChainReport        `json:"morph_to_pixels,omitempty"`
 	NegativeGuards         SurfaceDevWorkflowNegativeGuards `json:"negative_guards"`
 	Pass                   bool                             `json:"pass"`
 }
@@ -104,6 +105,9 @@ func ValidateDevWorkflowReport(raw []byte) error {
 	issues = append(issues, validateExactStringList("supported_targets", report.SupportedTargets, []string{"headless", "linux-x64", "wasm32-web"})...)
 	issues = append(issues, validateSurfaceDevWorkflowSteps(report.Steps)...)
 	issues = append(issues, validateSurfaceDevWorkflowDiagnostics(report.SourceDiagnostics)...)
+	if report.MorphToPixels != nil {
+		issues = append(issues, validateMorphToPixelsChain("morph_to_pixels", *report.MorphToPixels, report.Source)...)
+	}
 	issues = append(issues, validateSurfaceDevWorkflowNegativeGuards(report.NegativeGuards)...)
 	if !report.Pass {
 		issues = append(issues, "pass must be true")

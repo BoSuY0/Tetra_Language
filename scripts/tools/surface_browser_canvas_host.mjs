@@ -664,9 +664,35 @@ export async function runSurfaceBrowserCanvas({ wasmURL, canvas, scenario = 'cou
     window.dispatchEvent(new Event('resize'));
   }
 
+  function dispatchStudioShellBrowserInput(surface) {
+    canvas.focus();
+    canvas.dispatchEvent(new PointerEvent('pointerup', {
+      bubbles: true,
+      clientX: 720,
+      clientY: 336,
+      button: 0,
+      pointerType: 'mouse',
+    }));
+    canvas.dispatchEvent(new InputEvent('beforeinput', {
+      bubbles: true,
+      inputType: 'insertText',
+      data: 'OK',
+    }));
+    canvas.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true,
+      key: 'Enter',
+      code: 'Enter',
+      keyCode: 13,
+    }));
+  }
+
   function dispatchDeterministicBrowserInput(surface) {
     if (scenario === 'text-focus-input' || scenario === 'release-text-input') {
       dispatchTextFocusInputBrowserInput(surface);
+      return;
+    }
+    if (scenario === 'studio-shell') {
+      dispatchStudioShellBrowserInput(surface);
       return;
     }
     if (scenario === 'component-tree') {

@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"tetra_language/tools/internal/gatecontract"
 )
 
 func TestCIWorkflowIncludesStabilizationAndRobustnessJobs(t *testing.T) {
@@ -75,6 +77,7 @@ func TestCIWorkflowHasLeastPrivilegeConcurrencyAndTimeouts(t *testing.T) {
 		"fuzz-short-linux:",
 		"fuzz-nightly-linux:",
 		"release-v0-4-0-readiness-linux:",
+		"surface-product-slice-linux:",
 		"surface-release-readiness-linux:",
 		"memory-islands-surface-release-readiness-linux:",
 		"actor-runtime-foundation-linux:",
@@ -90,7 +93,10 @@ func TestCIWorkflowHasLeastPrivilegeConcurrencyAndTimeouts(t *testing.T) {
 }
 
 func TestCIWorkflowIncludesSurfaceReleaseReadinessJob(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "ci.yml"))
+	root := repoRoot(t)
+	contract := loadSurfaceReleaseContract(t, root)
+	reportRoot := "reports/surface-product-v1"
+	raw, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "ci.yml"))
 	if err != nil {
 		t.Fatalf("read ci workflow: %v", err)
 	}
@@ -108,7 +114,7 @@ func TestCIWorkflowIncludesSurfaceReleaseReadinessJob(t *testing.T) {
 		"name: Surface Morph gate",
 		"bash scripts/release/surface/morph-gate.sh --report-dir reports/surface-morph-gate",
 		"name: Surface product gate",
-		"bash scripts/release/surface/product-gate.sh --report-dir reports/surface-product-v1",
+		"bash scripts/release/surface/product-gate.sh --report-dir " + reportRoot,
 		"name: Surface experimental regression gate",
 		"bash scripts/release/surface/gate.sh --report-dir reports/surface-experimental-regression",
 		"name: Safe view lifetime gate",
@@ -138,8 +144,6 @@ func TestCIWorkflowIncludesSurfaceReleaseReadinessJob(t *testing.T) {
 		"uses: actions/upload-artifact@v4",
 		"name: tetra-surface-release-v1-${{ github.sha }}",
 		"path: |",
-		"reports/surface-product-v1",
-		"reports/surface-product-v1/morph",
 		"reports/surface-morph-gate",
 		"reports/surface-experimental-regression",
 		"reports/safe-view-lifetime",
@@ -150,8 +154,49 @@ func TestCIWorkflowIncludesSurfaceReleaseReadinessJob(t *testing.T) {
 			t.Fatalf("ci workflow missing Surface release readiness detail %q", want)
 		}
 	}
+	jobSection := workflowJobSection(text, "surface-release-readiness-linux:")
+	if jobSection == "" {
+		t.Fatalf("ci workflow missing surface-release-readiness-linux job section")
+	}
+	assertWorkflowUploadsContractArtifacts(t, jobSection, reportRoot, contract)
 	if strings.Contains(text, "continue-on-error: true") {
 		t.Fatalf("Surface release readiness job must not silently continue after missing production dependencies")
+	}
+}
+
+func TestCIWorkflowIncludesSurfaceProductSliceJob(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "ci.yml"))
+	if err != nil {
+		t.Fatalf("read ci workflow: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		"surface-product-slice-linux:",
+		"github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'",
+		"runs-on: ubuntu-latest",
+		"timeout-minutes: 90",
+		"actions/checkout@v4",
+		"actions/setup-go@v5",
+		"go-version: \"1.20.x\"",
+		"name: Bootstrap",
+		"bash scripts/dev/bootstrap.sh",
+		"name: Surface product-slice gate",
+		"export GOTELEMETRY=off",
+		`export GOCACHE="${PWD}/.cache/go-build-surface-product-slice-ci"`,
+		`export GOTMPDIR="${PWD}/.cache/go-tmp-surface-product-slice-ci"`,
+		"command -v weston",
+		"sudo apt-get install -y weston",
+		"wayland-surface-product-slice-ci",
+		"bash scripts/release/surface/surface-product-slice-gate.sh --report-dir reports/surface-product-slice-ci",
+		"name: Upload Surface product-slice reports",
+		"if: always()",
+		"uses: actions/upload-artifact@v4",
+		"name: tetra-surface-product-slice-${{ github.sha }}-linux-x64",
+		"path: reports/surface-product-slice-ci",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("ci workflow missing Surface product-slice detail %q", want)
+		}
 	}
 }
 
@@ -189,7 +234,10 @@ func TestCIWorkflowIncludesIntegratedMemoryIslandsSurfaceReadinessJob(t *testing
 }
 
 func TestCIWorkflowIncludesMemory100ProdStableGateJob(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "ci.yml"))
+	root := repoRoot(t)
+	contract := loadMemory100Contract(t, root)
+	reportRoot := "reports/memory-100/final"
+	raw, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "ci.yml"))
 	if err != nil {
 		t.Fatalf("read ci workflow: %v", err)
 	}
@@ -214,7 +262,7 @@ func TestCIWorkflowIncludesMemory100ProdStableGateJob(t *testing.T) {
 		"if: always()",
 		"uses: actions/upload-artifact@v4",
 		"name: tetra-memory-100-prod-stable-${{ github.sha }}-linux-x64",
-		"path: reports/memory-100/final",
+		"path: " + reportRoot,
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("ci workflow missing Memory100 prod-stable detail %q", want)
@@ -232,26 +280,35 @@ func TestCIWorkflowIncludesMemory100ProdStableGateJob(t *testing.T) {
 			t.Fatalf("Memory100 CI gate must not contain bypass or tmpfs cache marker %q", forbidden)
 		}
 	}
+	assertWorkflowUploadsContractArtifacts(t, section, reportRoot, contract)
 }
 
 func TestCIWorkflowIncludesActorRuntimeFoundationGateJob(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "ci.yml"))
+	root := repoRoot(t)
+	contract := loadActorRuntimeFoundationContract(t, root)
+	reportRoot := "reports/actor-runtime-foundation/final"
+	raw, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "ci.yml"))
 	if err != nil {
 		t.Fatalf("read ci workflow: %v", err)
 	}
 	text := string(raw)
+	section := workflowJobSection(text, "actor-runtime-foundation-linux:")
+	if section == "" {
+		t.Fatalf("ci workflow missing actor-runtime-foundation-linux job")
+	}
 	for _, want := range []string{
 		"actor-runtime-foundation-linux:",
 		"github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'",
 		"runs-on: ubuntu-latest",
 		"timeout-minutes: 120",
 		"actions/checkout@v4",
+		"fetch-depth: 2",
 		"actions/setup-go@v5",
 		"go-version: \"1.20.x\"",
 		"name: Bootstrap",
 		"bash scripts/dev/bootstrap.sh",
 		"name: Actor runtime foundation gate",
-		"bash scripts/release/post_v0_4/actor-runtime-foundation-linux-x64-gate.sh --report-dir reports/actor-runtime-foundation/final",
+		"bash scripts/release/post_v0_4/actor-runtime-foundation-linux-x64-gate.sh --report-dir " + reportRoot,
 		"name: Upload actor runtime foundation reports",
 		"if: always()",
 		"uses: actions/upload-artifact@v4",
@@ -264,11 +321,10 @@ func TestCIWorkflowIncludesActorRuntimeFoundationGateJob(t *testing.T) {
 		"reports/actor-runtime-foundation/final/parallel-production-linux-x64/artifact-hashes.json",
 		"reports/actor-runtime-foundation/final/logs/*.log",
 	} {
-		if !strings.Contains(text, want) {
+		if !strings.Contains(section, want) {
 			t.Fatalf("ci workflow missing actor runtime foundation detail %q", want)
 		}
 	}
-	section := workflowJobSection(text, "actor-runtime-foundation-linux:")
 	assertOrderedFragments(t, section,
 		"name: Actor runtime foundation gate",
 		"bash scripts/release/post_v0_4/actor-runtime-foundation-linux-x64-gate.sh --report-dir reports/actor-runtime-foundation/final",
@@ -278,10 +334,14 @@ func TestCIWorkflowIncludesActorRuntimeFoundationGateJob(t *testing.T) {
 	if strings.Contains(section, "continue-on-error") {
 		t.Fatalf("actor runtime foundation CI gate must not use continue-on-error")
 	}
+	assertWorkflowUploadsContractArtifacts(t, section, reportRoot, contract)
 }
 
 func TestCIWorkflowIncludesRAMContractReleaseReadinessJob(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "ci.yml"))
+	root := repoRoot(t)
+	contract := loadRAMContract(t, root)
+	reportRoot := "reports/ram-contract-release"
+	raw, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "ci.yml"))
 	if err != nil {
 		t.Fatalf("read ci workflow: %v", err)
 	}
@@ -297,17 +357,18 @@ func TestCIWorkflowIncludesRAMContractReleaseReadinessJob(t *testing.T) {
 		"name: Bootstrap",
 		"bash scripts/dev/bootstrap.sh",
 		"name: RAM contract release gate",
-		"bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir reports/ram-contract-release",
+		"bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir " + reportRoot,
 		"name: Upload RAM contract release reports",
 		"uses: actions/upload-artifact@v4",
 		"name: tetra-ram-contract-${{ github.sha }}-linux-x64",
-		"path: reports/ram-contract-release",
+		"path: " + reportRoot,
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("ci workflow missing RAM contract release readiness detail %q", want)
 		}
 	}
 	section := workflowJobSection(text, "ram-contract-release-readiness-linux:")
+	assertWorkflowUploadsContractArtifacts(t, section, reportRoot, contract)
 	if strings.Contains(section, "continue-on-error") {
 		t.Fatalf("RAM contract CI gate must not use continue-on-error")
 	}
@@ -360,6 +421,28 @@ func TestSurfaceProductGateWorkflowWiringHasNoBypass(t *testing.T) {
 	for _, forbidden := range []string{"continue-on-error", "|| true", "set +e", "GOCACHE=/tmp", "GOTMPDIR=/tmp"} {
 		if strings.Contains(section, forbidden) {
 			t.Fatalf("Surface product gate CI job must not contain bypass or tmpfs cache marker %q", forbidden)
+		}
+	}
+}
+
+func TestSurfaceProductSliceGateWorkflowWiringHasNoBypass(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "ci.yml"))
+	if err != nil {
+		t.Fatalf("read ci workflow: %v", err)
+	}
+	text := string(raw)
+	section := workflowJobSection(text, "surface-product-slice-linux:")
+	assertOrderedFragments(t, section,
+		"name: Surface product-slice gate",
+		`export GOCACHE="${PWD}/.cache/go-build-surface-product-slice-ci"`,
+		`export GOTMPDIR="${PWD}/.cache/go-tmp-surface-product-slice-ci"`,
+		"bash scripts/release/surface/surface-product-slice-gate.sh --report-dir reports/surface-product-slice-ci",
+		"name: Upload Surface product-slice reports",
+		"uses: actions/upload-artifact@v4",
+	)
+	for _, forbidden := range []string{"continue-on-error", "|| true", "set +e", "GOCACHE=/tmp", "GOTMPDIR=/tmp"} {
+		if strings.Contains(section, forbidden) {
+			t.Fatalf("Surface product-slice CI job must not contain bypass or tmpfs cache marker %q", forbidden)
 		}
 	}
 }
@@ -472,6 +555,7 @@ func TestCIWorkflowArtifactNamesAreReleaseAware(t *testing.T) {
 		"tetra-v0.4.0-${{ github.sha }}-test-all-quick-linux",
 		"tetra-v0.4.0-${{ github.sha }}-test-all-stabilization-linux",
 		"tetra-v0.4.0-${{ github.sha }}-release-readiness-linux",
+		"tetra-surface-product-slice-${{ github.sha }}-linux-x64",
 		"tetra-surface-release-v1-${{ github.sha }}",
 		"tetra-memory-islands-surface-${{ github.sha }}",
 		"tetra-actor-runtime-foundation-${{ github.sha }}-linux-x64",
@@ -496,6 +580,7 @@ func TestCIWorkflowArtifactNamesAreReleaseAware(t *testing.T) {
 			t.Fatalf("ci workflow artifact name %q missing git SHA metadata", name)
 		}
 		if !strings.Contains(name, "v0.4.0") &&
+			!strings.Contains(name, "surface-product-slice") &&
 			!strings.Contains(name, "surface-release-v1") &&
 			!strings.Contains(name, "memory-islands-surface") &&
 			!strings.Contains(name, "actor-runtime-foundation") &&
@@ -609,6 +694,78 @@ func workflowJobSection(workflow, job string) string {
 		}
 	}
 	return strings.Join(section, "\n")
+}
+
+func assertWorkflowUploadsContractArtifacts(t *testing.T, workflowSection, reportRoot string, contract gatecontract.Contract) {
+	t.Helper()
+	uploadPaths := workflowUploadPaths(workflowSection)
+	if len(uploadPaths) == 0 {
+		t.Fatalf("workflow section has no upload-artifact paths for %s", reportRoot)
+	}
+	var missing []string
+	for _, artifactPath := range ciArtifactPaths(t, contract) {
+		expectedPath := reportRoot + "/" + artifactPath
+		if !workflowUploadPathsCover(uploadPaths, expectedPath) {
+			missing = append(missing, expectedPath)
+		}
+	}
+	if len(missing) > 0 {
+		t.Fatalf("workflow upload paths do not cover Surface release contract ci_artifacts under %s\nmissing: %q\nupload paths: %q", reportRoot, missing, uploadPaths)
+	}
+}
+
+func workflowUploadPaths(workflowSection string) []string {
+	lines := strings.Split(workflowSection, "\n")
+	var paths []string
+	for i := 0; i < len(lines); i++ {
+		line := lines[i]
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "path:") {
+			continue
+		}
+		value := strings.TrimSpace(strings.TrimPrefix(trimmed, "path:"))
+		if value != "" && value != "|" && value != ">" {
+			paths = append(paths, normalizeWorkflowUploadPath(value))
+			continue
+		}
+		baseIndent := len(line) - len(strings.TrimLeft(line, " "))
+		for j := i + 1; j < len(lines); j++ {
+			candidate := lines[j]
+			candidateTrimmed := strings.TrimSpace(candidate)
+			if candidateTrimmed == "" || strings.HasPrefix(candidateTrimmed, "#") {
+				continue
+			}
+			indent := len(candidate) - len(strings.TrimLeft(candidate, " "))
+			if indent <= baseIndent {
+				break
+			}
+			paths = append(paths, normalizeWorkflowUploadPath(candidateTrimmed))
+		}
+	}
+	return paths
+}
+
+func workflowUploadPathsCover(uploadPaths []string, artifactPath string) bool {
+	for _, uploadPath := range uploadPaths {
+		if uploadPath == "" {
+			continue
+		}
+		if strings.HasSuffix(uploadPath, "/**/*") {
+			uploadPath = strings.TrimSuffix(uploadPath, "/**/*")
+		} else if strings.HasSuffix(uploadPath, "/**") {
+			uploadPath = strings.TrimSuffix(uploadPath, "/**")
+		}
+		if artifactPath == uploadPath || strings.HasPrefix(artifactPath, uploadPath+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeWorkflowUploadPath(path string) string {
+	path = strings.TrimSpace(path)
+	path = strings.Trim(path, "\"'")
+	return strings.TrimSuffix(path, "/")
 }
 
 func stringSliceContains(values []string, want string) bool {

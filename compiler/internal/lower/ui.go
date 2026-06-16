@@ -5,76 +5,22 @@ import (
 	"strings"
 
 	"tetra_language/compiler/internal/frontend"
+	lowermodel "tetra_language/compiler/internal/lower/model"
 	"tetra_language/compiler/internal/semantics"
 )
 
-type UILoweredBundle struct {
-	Schema string           `json:"schema"`
-	States []UILoweredState `json:"states"`
-	Views  []UILoweredView  `json:"views"`
-}
+const UIBundleSchema = lowermodel.UIBundleSchema
 
-const UIBundleSchema = "tetra.ui.v0.4.0"
-
-type UILoweredState struct {
-	Name   string                `json:"name"`
-	Module string                `json:"module"`
-	Fields []UILoweredStateField `json:"fields"`
-}
-
-type UILoweredStateField struct {
-	Name    string `json:"name"`
-	Type    string `json:"type"`
-	Mutable bool   `json:"mutable"`
-	Const   bool   `json:"const"`
-	Init    string `json:"init"`
-}
-
-type UILoweredView struct {
-	Name          string                   `json:"name"`
-	Module        string                   `json:"module"`
-	StateType     string                   `json:"state_type"`
-	Bindings      []UILoweredBinding       `json:"bindings"`
-	Events        []UILoweredEvent         `json:"events"`
-	Commands      []UILoweredCommand       `json:"commands"`
-	Styles        []UILoweredStyle         `json:"styles"`
-	Accessibility []UILoweredAccessibility `json:"accessibility"`
-}
-
-type UILoweredBinding struct {
-	Name   string `json:"name"`
-	Type   string `json:"type"`
-	Source string `json:"source"`
-}
-
-type UILoweredEvent struct {
-	Name    string `json:"name"`
-	Command string `json:"command"`
-}
-
-type UILoweredCommand struct {
-	Name           string                      `json:"name"`
-	StatementCount int                         `json:"statement_count"`
-	Operations     []UILoweredCommandOperation `json:"operations,omitempty"`
-}
-
-type UILoweredCommandOperation struct {
-	Kind   string `json:"kind"`
-	Target string `json:"target"`
-	Value  string `json:"value,omitempty"`
-}
-
-type UILoweredStyle struct {
-	Name  string `json:"name"`
-	Type  string `json:"type"`
-	Value string `json:"value"`
-}
-
-type UILoweredAccessibility struct {
-	Name  string `json:"name"`
-	Type  string `json:"type"`
-	Value string `json:"value"`
-}
+type UILoweredBundle = lowermodel.UILoweredBundle
+type UILoweredState = lowermodel.UILoweredState
+type UILoweredStateField = lowermodel.UILoweredStateField
+type UILoweredView = lowermodel.UILoweredView
+type UILoweredBinding = lowermodel.UILoweredBinding
+type UILoweredEvent = lowermodel.UILoweredEvent
+type UILoweredCommand = lowermodel.UILoweredCommand
+type UILoweredCommandOperation = lowermodel.UILoweredCommandOperation
+type UILoweredStyle = lowermodel.UILoweredStyle
+type UILoweredAccessibility = lowermodel.UILoweredAccessibility
 
 func LowerUI(checked *semantics.CheckedProgram) (*UILoweredBundle, error) {
 	if checked == nil {

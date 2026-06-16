@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"tetra_language/compiler"
+	"tetra_language/internal/outputformat"
 )
 
 type ecoNeedMap struct {
@@ -58,6 +59,7 @@ func runEcoNeedMap(args []string, stdout io.Writer, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	lockPath := fs.String("lock", "", "path to lock JSON input")
 	outPath := fs.String("o", compiler.DefaultNeedMapName, "path to NeedMap output")
+	format := fs.String("format", outputformat.JSON, "NeedMap output format: json, toon, or both")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			return 0
@@ -70,7 +72,7 @@ func runEcoNeedMap(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 	needMap := buildNeedMap(lock, rawLock)
-	if err := writeJSONFile(*outPath, needMap); err != nil {
+	if _, err := writeEcoStructuredFile(*outPath, *format, needMap); err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
@@ -98,6 +100,7 @@ func runEcoTrustSnapshot(args []string, stdout io.Writer, stderr io.Writer) int 
 	lockPath := fs.String("lock", "", "path to lock JSON input")
 	store := fs.String("store", ".tetra/todex-vault", "path to local Todex vault store")
 	outPath := fs.String("o", "tetra.trust-snapshot.json", "path to trust snapshot output")
+	format := fs.String("format", outputformat.JSON, "trust snapshot output format: json, toon, or both")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			return 0
@@ -150,7 +153,7 @@ func runEcoTrustSnapshot(args []string, stdout io.Writer, stderr io.Writer) int 
 		})
 	}
 	sort.Slice(snapshot.Capsules, func(i, j int) bool { return snapshot.Capsules[i].ID < snapshot.Capsules[j].ID })
-	if err := writeJSONFile(*outPath, snapshot); err != nil {
+	if _, err := writeEcoStructuredFile(*outPath, *format, snapshot); err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
 	}

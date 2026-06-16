@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"tetra_language/internal/toon"
 )
 
 func nativeSmokeReportForTest(omit string) *smokeReport {
@@ -176,6 +178,24 @@ func TestValidateSmokeReportShapeRejectsMissingCaseSource(t *testing.T) {
 func TestValidateSmokeReportShapeAcceptsNativeRequiredProfile(t *testing.T) {
 	if err := validateSmokeReport(nativeSmokeReportForTest("")); err != nil {
 		t.Fatalf("validate native smoke report: %v", err)
+	}
+}
+
+func TestParseSmokeReportAcceptsTOONFormat(t *testing.T) {
+	raw, err := json.Marshal(nativeSmokeReportForTest(""))
+	if err != nil {
+		t.Fatalf("marshal smoke report: %v", err)
+	}
+	toonRaw, err := toon.ConvertJSONToTOON(raw, toon.Options{Deterministic: true, Strict: true})
+	if err != nil {
+		t.Fatalf("convert smoke report to TOON: %v", err)
+	}
+	report, err := parseSmokeReportFormat(toonRaw, "toon")
+	if err != nil {
+		t.Fatalf("parse TOON smoke report: %v\n%s", err, toonRaw)
+	}
+	if err := validateSmokeReport(report); err != nil {
+		t.Fatalf("validate TOON smoke report: %v", err)
 	}
 }
 

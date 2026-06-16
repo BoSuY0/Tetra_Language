@@ -16,6 +16,7 @@ import (
 
 const hashManifestSchema = "tetra.release-artifact-hashes.v1alpha1"
 const hashManifestArtifact = "tetra.release.v0_2_0.artifact-hashes.v1"
+const maxJSONSchemaSniffBytes = 64 * 1024
 
 type hashManifest struct {
 	Schema    string           `json:"schema"`
@@ -55,13 +56,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		raw, err := json.MarshalIndent(manifest, "", "  ")
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-		raw = append(raw, '\n')
-		if err := os.WriteFile(out, raw, 0o644); err != nil {
+		if err := writeHashManifestFile(out, manifest); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
@@ -129,6 +124,20 @@ func buildHashManifest(root string, manifestName string) (hashManifest, error) {
 		Root:      ".",
 		Artifacts: artifacts,
 	}, nil
+}
+
+func writeHashManifestFile(path string, manifest hashManifest) error {
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	enc := json.NewEncoder(file)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(manifest); err != nil {
+		_ = file.Close()
+		return err
+	}
+	return file.Close()
 }
 
 func validateHashManifest(manifestPath string) error {
@@ -261,7 +270,8 @@ func hashFile(root string, rel string) (hashedArtifact, error) {
 	}
 	defer file.Close()
 	h := sha256.New()
-	size, err := io.Copy(h, file)
+	prefix := newSchemaSniffPrefix(maxJSONSchemaSniffBytes)
+	size, err := io.Copy(io.MultiWriter(h, prefix), file)
 	if err != nil {
 		return hashedArtifact{}, err
 	}
@@ -269,7 +279,7 @@ func hashFile(root string, rel string) (hashedArtifact, error) {
 		Path:   filepath.ToSlash(rel),
 		SHA256: "sha256:" + hex.EncodeToString(h.Sum(nil)),
 		Size:   size,
-		Schema: detectJSONSchema(path),
+		Schema: detectJSONSchemaFromPrefix(path, prefix.Bytes(), size > int64(prefix.Len())),
 	}, nil
 }
 
@@ -333,19 +343,168 @@ func detectJSONSchema(path string) string {
 	if filepath.Ext(path) != ".json" {
 		return ""
 	}
-	raw, err := os.ReadFile(path)
+	file, err := os.Open(path)
 	if err != nil {
 		return ""
 	}
-	var envelope struct {
-		Schema        string `json:"schema"`
-		SchemaVersion string `json:"schema_version"`
-	}
-	if err := json.Unmarshal(raw, &envelope); err != nil {
+	defer file.Close()
+	prefix, truncated, err := readSchemaSniffPrefix(file, maxJSONSchemaSniffBytes)
+	if err != nil {
 		return ""
 	}
-	if envelope.Schema != "" {
-		return envelope.Schema
+	return detectJSONSchemaFromPrefix(path, prefix, truncated)
+}
+
+func detectJSONSchemaBounded(r io.Reader, maxBytes int64) string {
+	if maxBytes <= 0 {
+		return ""
 	}
-	return envelope.SchemaVersion
+	prefix, truncated, err := readSchemaSniffPrefix(r, maxBytes)
+	if err != nil {
+		return ""
+	}
+	return detectJSONSchemaPrefix(prefix, truncated)
+}
+
+func readSchemaSniffPrefix(r io.Reader, maxBytes int64) ([]byte, bool, error) {
+	if maxBytes <= 0 {
+		return nil, false, nil
+	}
+	raw, err := io.ReadAll(io.LimitReader(r, maxBytes+1))
+	if err != nil {
+		return nil, false, err
+	}
+	if int64(len(raw)) > maxBytes {
+		return raw[:maxBytes], true, nil
+	}
+	return raw, false, nil
+}
+
+func detectJSONSchemaFromPrefix(path string, prefix []byte, truncated bool) string {
+	if filepath.Ext(path) != ".json" {
+		return ""
+	}
+	return detectJSONSchemaPrefix(prefix, truncated)
+}
+
+func detectJSONSchemaPrefix(prefix []byte, truncated bool) string {
+	dec := json.NewDecoder(bytes.NewReader(prefix))
+	token, err := dec.Token()
+	if err != nil {
+		return schemaSniffAfterError("", truncated)
+	}
+	delim, ok := token.(json.Delim)
+	if !ok || delim != '{' {
+		return ""
+	}
+	var schema string
+	var schemaVersion string
+	for dec.More() {
+		token, err := dec.Token()
+		if err != nil {
+			return schemaSniffAfterError(schema, truncated)
+		}
+		key, ok := token.(string)
+		if !ok {
+			return ""
+		}
+		if key == "schema" || key == "schema_version" {
+			var raw json.RawMessage
+			if err := dec.Decode(&raw); err != nil {
+				return schemaSniffAfterError(schema, truncated)
+			}
+			value, ok, invalid := schemaSniffStringValue(raw)
+			if invalid {
+				return ""
+			}
+			if key == "schema" {
+				if ok {
+					schema = value
+				}
+			} else {
+				if ok {
+					schemaVersion = value
+				}
+			}
+			continue
+		}
+		var discard json.RawMessage
+		if err := dec.Decode(&discard); err != nil {
+			return schemaSniffAfterError(schema, truncated)
+		}
+	}
+	if _, err := dec.Token(); err != nil {
+		return schemaSniffAfterError(schema, truncated)
+	}
+	if truncated {
+		return ""
+	}
+	if err := schemaSniffRequireEOF(dec); err != nil {
+		return ""
+	}
+	return schemaSniffClosed(schema, schemaVersion)
+}
+
+type schemaSniffPrefix struct {
+	buf       bytes.Buffer
+	remaining int64
+}
+
+func newSchemaSniffPrefix(maxBytes int64) *schemaSniffPrefix {
+	return &schemaSniffPrefix{remaining: maxBytes}
+}
+
+func (w *schemaSniffPrefix) Write(p []byte) (int, error) {
+	if w.remaining > 0 {
+		n := len(p)
+		if int64(n) > w.remaining {
+			n = int(w.remaining)
+		}
+		_, _ = w.buf.Write(p[:n])
+		w.remaining -= int64(n)
+	}
+	return len(p), nil
+}
+
+func (w *schemaSniffPrefix) Bytes() []byte {
+	return w.buf.Bytes()
+}
+
+func (w *schemaSniffPrefix) Len() int {
+	return w.buf.Len()
+}
+
+func schemaSniffClosed(schema string, schemaVersion string) string {
+	if schema != "" {
+		return schema
+	}
+	return schemaVersion
+}
+
+func schemaSniffStringValue(raw json.RawMessage) (string, bool, bool) {
+	if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return "", false, false
+	}
+	var value string
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return "", false, true
+	}
+	return value, true, false
+}
+
+func schemaSniffRequireEOF(dec *json.Decoder) error {
+	if err := dec.Decode(&struct{}{}); err != io.EOF {
+		return fmt.Errorf("json schema sniff must contain a single JSON document")
+	}
+	return nil
+}
+
+func schemaSniffAfterError(schema string, truncated bool) string {
+	if !truncated {
+		return ""
+	}
+	if schema != "" {
+		return schema
+	}
+	return ""
 }

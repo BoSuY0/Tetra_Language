@@ -20,14 +20,25 @@ func TestWorkspaceModules(t *testing.T) {
 		t.Run(module, func(t *testing.T) {
 			cacheDir := filepath.Join(root, ".cache", "go-build-workspace-modules-"+module)
 			tmpDir := filepath.Join(root, ".cache", "go-tmp-workspace-modules-"+module)
+			stableTmpRoot, err := os.UserCacheDir()
+			if err != nil || stableTmpRoot == "" {
+				stableTmpRoot = filepath.Join(root, ".cache")
+			}
+			stableTmpDir := filepath.Join(stableTmpRoot, "tetra-language", "tmp-workspace-modules-"+module)
 			if err := os.RemoveAll(cacheDir); err != nil {
 				t.Fatalf("clean module cache %s: %v", cacheDir, err)
 			}
 			if err := os.RemoveAll(tmpDir); err != nil {
 				t.Fatalf("clean module tmp %s: %v", tmpDir, err)
 			}
+			if err := os.RemoveAll(stableTmpDir); err != nil {
+				t.Fatalf("clean stable module tmp %s: %v", stableTmpDir, err)
+			}
 			if err := os.MkdirAll(tmpDir, 0o755); err != nil {
 				t.Fatalf("create module tmp %s: %v", tmpDir, err)
+			}
+			if err := os.MkdirAll(stableTmpDir, 0o755); err != nil {
+				t.Fatalf("create stable module tmp %s: %v", stableTmpDir, err)
 			}
 			t.Cleanup(func() {
 				if err := os.RemoveAll(cacheDir); err != nil {
@@ -36,6 +47,9 @@ func TestWorkspaceModules(t *testing.T) {
 				if err := os.RemoveAll(tmpDir); err != nil {
 					t.Logf("clean module tmp %s: %v", tmpDir, err)
 				}
+				if err := os.RemoveAll(stableTmpDir); err != nil {
+					t.Logf("clean stable module tmp %s: %v", stableTmpDir, err)
+				}
 			})
 			cmd := exec.Command("go", "test", "./...", "-count=1")
 			cmd.Dir = filepath.Join(root, module)
@@ -43,6 +57,7 @@ func TestWorkspaceModules(t *testing.T) {
 				"TETRA_WORKSPACE_MODULES_SUBPROCESS=1",
 				"GOCACHE="+cacheDir,
 				"GOTMPDIR="+tmpDir,
+				"TMPDIR="+stableTmpDir,
 			)
 			out, err := cmd.CombinedOutput()
 			if err != nil {

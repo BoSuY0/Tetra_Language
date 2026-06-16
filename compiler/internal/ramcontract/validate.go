@@ -9,6 +9,8 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+
+	"tetra_language/compiler/internal/allocplan"
 )
 
 var fullGitHeadRE = regexp.MustCompile(`^[0-9a-f]{40}$`)
@@ -125,6 +127,7 @@ func validateRow(index int, row Row, proofs map[string]ProofSummary) []string {
 	if strings.TrimSpace(row.Lifetime) == "" {
 		issues = append(issues, prefix+": lifetime is required")
 	}
+	issues = append(issues, validateMemoryDomain(prefix, row.Domain)...)
 	if trustedPlacement(row.Placement) {
 		if row.EscapeStatus != EscapeNoEscape {
 			issues = append(issues, fmt.Sprintf("%s: trusted placement %q requires no_escape escape_status, got %q", prefix, row.Placement, row.EscapeStatus))
@@ -139,6 +142,14 @@ func validateRow(index int, row Row, proofs map[string]ProofSummary) []string {
 	if isHeapPlacement(row.Placement) && len(row.Blockers) == 0 {
 		issues = append(issues, prefix+": heap placement requires at least one blocker")
 	}
+	if isHeapPlacement(row.Placement) {
+		if len(row.HeapReasonCodes) == 0 {
+			issues = append(issues, prefix+": heap placement requires at least one heap_reason_code")
+		}
+	} else if len(row.HeapReasonCodes) > 0 {
+		issues = append(issues, prefix+": heap_reason_codes require heap placement")
+	}
+	issues = append(issues, validateRAMReasonCodes(prefix, row.ReasonCodes, row.HeapReasonCodes)...)
 	if row.Placement == PlacementHeapUnbounded && row.Bounded {
 		issues = append(issues, prefix+": heap_unbounded row cannot be bounded")
 	}
@@ -158,6 +169,52 @@ func validateRow(index int, row Row, proofs map[string]ProofSummary) []string {
 			issues = append(issues, fmt.Sprintf("%s: trusted placement proof_id %q must be proven, got %s", prefix, proofID, proof.Status))
 		}
 		issues = append(issues, validateScopedPlacementProof(prefix, row, proofID, proof)...)
+	}
+	return issues
+}
+
+func validateMemoryDomain(prefix string, domain *MemoryDomain) []string {
+	if domain == nil {
+		return nil
+	}
+	var issues []string
+	if strings.TrimSpace(domain.DomainID) == "" {
+		issues = append(issues, prefix+": domain_id is required")
+	}
+	if !knownDomainKind(domain.Kind) {
+		issues = append(issues, fmt.Sprintf("%s: unknown domain kind %q", prefix, domain.Kind))
+	}
+	if strings.TrimSpace(domain.OwnerKind) == "" {
+		issues = append(issues, prefix+": domain owner_kind is required")
+	}
+	if strings.TrimSpace(domain.OwnerID) == "" {
+		issues = append(issues, prefix+": domain owner_id is required")
+	}
+	if strings.TrimSpace(domain.Lifetime) == "" {
+		issues = append(issues, prefix+": domain lifetime is required")
+	}
+	for name, value := range map[string]int64{
+		"budget_bytes":    domain.BudgetBytes,
+		"requested_bytes": domain.RequestedBytes,
+		"reserved_bytes":  domain.ReservedBytes,
+		"committed_bytes": domain.CommittedBytes,
+		"released_bytes":  domain.ReleasedBytes,
+		"current_bytes":   domain.CurrentBytes,
+		"peak_bytes":      domain.PeakBytes,
+		"bytes_copied":    domain.BytesCopied,
+	} {
+		if value < 0 {
+			issues = append(issues, fmt.Sprintf("%s: domain %s must not be negative", prefix, name))
+		}
+	}
+	if domain.CopyCount < 0 {
+		issues = append(issues, prefix+": domain copy_count must not be negative")
+	}
+	if domain.PeakBytes < domain.CurrentBytes {
+		issues = append(issues, prefix+": domain peak_bytes must be >= current_bytes")
+	}
+	if domain.BytesCopied > 0 && domain.CopyCount == 0 {
+		issues = append(issues, prefix+": domain bytes_copied requires copy_count")
 	}
 	return issues
 }
@@ -294,18 +351,147 @@ func ValidateBlockerReport(report BlockerReport, kind string) error {
 		if strings.TrimSpace(row.SiteID) == "" || strings.TrimSpace(row.Function) == "" {
 			issues = append(issues, fmt.Sprintf("row %d: site_id and function are required", i))
 		}
+		if !knownIntent(row.Intent) {
+			issues = append(issues, fmt.Sprintf("row %d: unknown intent %q", i, row.Intent))
+		}
+		if !knownPlacement(row.Placement) {
+			issues = append(issues, fmt.Sprintf("row %d: unknown placement %q", i, row.Placement))
+		}
+		if !knownGrade(row.ContractGrade) {
+			issues = append(issues, fmt.Sprintf("row %d: unknown contract_grade %q", i, row.ContractGrade))
+		}
 		if kind == "heap" && len(row.Blockers) == 0 {
 			issues = append(issues, fmt.Sprintf("row %d: heap blocker row requires blockers", i))
+		}
+		if kind == "heap" && len(row.HeapReasonCodes) == 0 {
+			issues = append(issues, fmt.Sprintf("row %d: heap blocker row requires heap_reason_codes", i))
 		}
 		if kind == "copy" && strings.TrimSpace(row.CopyReason) == "" {
 			issues = append(issues, fmt.Sprintf("row %d: copy blocker row requires copy_reason", i))
 		}
+		issues = append(issues, validateRAMReasonCodes(fmt.Sprintf("row %d", i), row.ReasonCodes, row.HeapReasonCodes)...)
+		issues = append(issues, validateActionableBlockerRow(i, row, kind)...)
 	}
 	issues = append(issues, validateNonClaims(report.NonClaims)...)
 	if len(issues) > 0 {
 		return errors.New(strings.Join(issues, "; "))
 	}
 	return nil
+}
+
+func validateRAMReasonCodes(prefix string, reasonCodes []string, heapReasonCodes []string) []string {
+	var issues []string
+	seen := map[string]bool{}
+	for _, code := range reasonCodes {
+		if strings.TrimSpace(code) == "" {
+			issues = append(issues, prefix+": reason_codes contains an empty entry")
+			continue
+		}
+		if strings.TrimSpace(code) != code {
+			issues = append(issues, fmt.Sprintf("%s: reason_codes contains untrimmed entry %q", prefix, code))
+		}
+		if seen[code] {
+			issues = append(issues, fmt.Sprintf("%s: reason_codes contains duplicate entry %q", prefix, code))
+		}
+		seen[code] = true
+	}
+	heapSeen := map[string]bool{}
+	for _, code := range heapReasonCodes {
+		if strings.TrimSpace(code) == "" {
+			issues = append(issues, prefix+": heap_reason_codes contains an empty entry")
+			continue
+		}
+		if strings.TrimSpace(code) != code {
+			issues = append(issues, fmt.Sprintf("%s: heap_reason_codes contains untrimmed entry %q", prefix, code))
+		}
+		if heapSeen[code] {
+			issues = append(issues, fmt.Sprintf("%s: heap_reason_codes contains duplicate entry %q", prefix, code))
+		}
+		heapSeen[code] = true
+		if !knownHeapReasonCode(code) {
+			issues = append(issues, fmt.Sprintf("%s: unknown heap_reason_code %q", prefix, code))
+		}
+		if !seen[code] {
+			issues = append(issues, fmt.Sprintf("%s: heap_reason_code %q missing from reason_codes", prefix, code))
+		}
+	}
+	return issues
+}
+
+func knownHeapReasonCode(code string) bool {
+	switch code {
+	case allocplan.HeapReasonEscapeReturn,
+		allocplan.HeapReasonUnknownCall,
+		allocplan.HeapReasonActorBoundary,
+		allocplan.HeapReasonTaskBoundary,
+		allocplan.HeapReasonDynamicLifetime,
+		allocplan.HeapReasonLargeObject,
+		allocplan.HeapReasonFFIExternal,
+		allocplan.HeapReasonBackendLoweringUnavailable,
+		allocplan.HeapReasonRegionLoweringUnavailable:
+		return true
+	default:
+		return false
+	}
+}
+
+func validateActionableBlockerRow(index int, row BlockerRow, kind string) []string {
+	var issues []string
+	prefix := fmt.Sprintf("row %d", index)
+	switch row.SourceLocationStatus {
+	case "available":
+		if strings.TrimSpace(row.File) == "" || row.Line <= 0 {
+			issues = append(issues, prefix+": source_location_status available requires file and positive line")
+		}
+	case "unavailable", "generated", "internal":
+	default:
+		issues = append(issues, fmt.Sprintf("%s: source_location_status %q is required and must be available, unavailable, generated, or internal", prefix, row.SourceLocationStatus))
+	}
+	if strings.TrimSpace(row.Symbol) == "" {
+		issues = append(issues, prefix+": symbol is required")
+	}
+	switch row.Severity {
+	case "P1", "P2", "P3":
+	default:
+		issues = append(issues, fmt.Sprintf("%s: severity %q must be P1, P2, or P3", prefix, row.Severity))
+	}
+	if strings.TrimSpace(row.Reason) == "" {
+		issues = append(issues, prefix+": reason is required")
+	}
+	if strings.TrimSpace(row.SuggestedFix) == "" {
+		issues = append(issues, prefix+": suggested_fix is required")
+	}
+	if strings.TrimSpace(row.ProofID) == "" && strings.TrimSpace(row.EvidenceID) == "" {
+		issues = append(issues, prefix+": proof_id or evidence_id is required")
+	}
+	if kind == "copy" {
+		if !knownCopyKind(row.CopyKind) {
+			issues = append(issues, fmt.Sprintf("%s: copy_kind %q is not recognized", prefix, row.CopyKind))
+		}
+		if strings.TrimSpace(row.SourceValue) == "" {
+			issues = append(issues, prefix+": source_value is required")
+		}
+		if strings.TrimSpace(row.DestinationValue) == "" {
+			issues = append(issues, prefix+": destination_value is required")
+		}
+		if row.BytesEstimate < 0 {
+			issues = append(issues, prefix+": bytes_estimate must not be negative")
+		}
+		if strings.TrimSpace(row.SafetyReason) == "" {
+			issues = append(issues, prefix+": safety_reason is required")
+		}
+	}
+	return issues
+}
+
+func knownCopyKind(value string) bool {
+	switch value {
+	case "HOT_PATH_COPY", "RELEASE_TOOL_COPY", "TEST_ONLY_COPY", "ACCEPTABLE_SMALL_COPY",
+		"NEEDS_STREAMING", "NEEDS_CAPACITY_HINT", "NEEDS_ZERO_COPY_OR_BORROWED_VIEW":
+		return true
+	default:
+		return false
+	}
 }
 
 func readStrictJSONFile(path string, out any) error {
@@ -380,6 +566,15 @@ func knownEscapeStatus(status EscapeStatus) bool {
 func knownValidationStatus(status ValidationStatus) bool {
 	switch status {
 	case ValidationValidated, ValidationConservative, ValidationRejected, ValidationUnknown:
+		return true
+	default:
+		return false
+	}
+}
+
+func knownDomainKind(kind MemoryDomainKind) bool {
+	switch kind {
+	case DomainProcess, DomainTask, DomainActor, DomainIsland, DomainRequest, DomainExternal:
 		return true
 	default:
 		return false

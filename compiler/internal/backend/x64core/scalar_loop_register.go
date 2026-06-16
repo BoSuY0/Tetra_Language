@@ -7,7 +7,7 @@ import (
 	"tetra_language/compiler/internal/machine"
 )
 
-func emitScalarLoopRegisterFunction(e *x64.Emitter, fn ir.IRFunc, abi x64abi.ABI, opt x64.CodegenOptions) (bool, error) {
+func emitScalarLoopRegisterFunction(e *x64.Emitter, fn ir.IRFunc, abi x64abi.ABI, opt x64.CodegenOptions, flush runtimeHeapTelemetryFlushFunc) (bool, error) {
 	if opt.DisableMachinePaths {
 		return false, nil
 	}
@@ -48,6 +48,9 @@ func emitScalarLoopRegisterFunction(e *x64.Emitter, fn ir.IRFunc, abi x64abi.ABI
 	}
 	exitTo := len(e.Buf)
 	if err := x64.PatchRel32(e.Buf, exitAt, exitTo); err != nil {
+		return true, err
+	}
+	if err := flush.emit(); err != nil {
 		return true, err
 	}
 	e.Leave()

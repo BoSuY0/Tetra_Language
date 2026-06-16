@@ -39,6 +39,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 cd "$repo_root"
+gate_contract="scripts/release/post_v0_4/contracts/ram-contract-linux-x64.json"
 source "$repo_root/scripts/release/surface/report-dir-guard.sh"
 if [[ -z "${GOCACHE:-}" ]]; then
   export GOCACHE="$repo_root/.cache/go-build-ram-contract-release"
@@ -48,6 +49,7 @@ if [[ -z "${GOTMPDIR:-}" ]]; then
 fi
 mkdir -p "$GOCACHE" "$GOTMPDIR"
 
+go run ./tools/cmd/run-gate --contract "$gate_contract" --report-dir "$report_dir_arg" --dry-run >/dev/null
 report_dir="$(surface_release_require_fresh_report_dir "$report_dir_arg" "$repo_root" "ram_contract_gate:")"
 git_head="$(git rev-parse --verify HEAD)"
 generated_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"

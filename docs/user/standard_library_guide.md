@@ -66,7 +66,7 @@ generated docs run.
 | Stable Surface v1 widget style and theme helpers | `import lib.core.style as style` | `examples/core_style_smoke.tetra` | none |
 | Planned Tetra Surface static component helpers | `import lib.core.component as component` | `examples/core_component_smoke.tetra` | none |
 | Experimental Surface Block System data model | `import lib.core.block as block` | `examples/core_block_smoke.tetra` | alloc, mem |
-| Experimental Surface Morph Capsule recipe layer | `import lib.core.morph as morph` | `examples/core_morph_smoke.tetra`, `examples/surface_morph_command_palette.tetra`, `examples/surface_morph_project_dashboard.tetra`, `examples/surface_morph_settings.tetra`, `examples/surface_morph_editor_shell.tetra`, `examples/surface_morph_glass_panel.tetra` | none |
+| Experimental Surface Morph Capsule recipe layer | `import lib.core.morph as morph` | `examples/core_morph_smoke.tetra`, `examples/surface_morph_command_palette.tetra`, `examples/surface_morph_project_dashboard.tetra`, `examples/surface_morph_settings.tetra`, `examples/surface_morph_editor_shell.tetra`, `examples/surface_morph_glass_panel.tetra` | mem |
 | Experimental Tetra Surface accessibility metadata helpers | `import lib.core.accessibility as accessibility` | `examples/core_accessibility_smoke.tetra` | none |
 | Experimental Tetra Surface minimal widget helpers | `import lib.core.widgets as widgets` | `examples/core_widgets_smoke.tetra` | none |
 

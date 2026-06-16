@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"tetra_language/compiler/internal/abisuite"
 	"tetra_language/compiler/internal/frontend"
 	"tetra_language/compiler/internal/semantics"
 )
@@ -120,38 +121,19 @@ func validateTargetExportedFFIABI(checked *semantics.CheckedProgram, target stri
 }
 
 func targetRequiresExplicitAggregateExportGate(target string) bool {
-	switch target {
-	case "linux-x86", "linux-x64", "linux-x32", "macos-x64", "windows-x64":
-		return true
-	default:
-		return false
-	}
+	return abisuite.TargetRequiresExplicitAggregateExportGate(target)
 }
 
 func targetRequiresExplicitPointerExportGate(target string) bool {
-	switch target {
-	case "linux-x86", "linux-x32":
-		return true
-	default:
-		return false
-	}
+	return abisuite.TargetRequiresExplicitPointerExportGate(target)
 }
 
 func targetExportedFFIRequiresX32PointerBoundaryGate(target, typeName string) bool {
-	return target == "linux-x32" && targetExportedFFIRequiresPointerBoundaryGate(target, typeName)
+	return abisuite.TargetExportedFFIRequiresX32PointerBoundaryGate(target, typeName)
 }
 
 func targetExportedFFIRequiresPointerBoundaryGate(target, typeName string) bool {
-	if !targetRequiresExplicitPointerExportGate(target) {
-		return false
-	}
-	normalized := strings.TrimSpace(typeName)
-	switch normalized {
-	case "fnptr":
-		return true
-	default:
-		return strings.HasPrefix(normalized, "fn(")
-	}
+	return abisuite.TargetExportedFFIRequiresPointerBoundaryGate(target, typeName)
 }
 
 func translateTargetExportedFFISemanticError(err error, target string) error {
@@ -194,20 +176,7 @@ func quotedAfter(s, prefix string) string {
 }
 
 func targetExportedFFIRequiresAggregateABI(typeName string, types map[string]*semantics.TypeInfo) bool {
-	typeName = strings.TrimSpace(typeName)
-	if typeName == "" || typeName == "none" {
-		return false
-	}
-	info, ok := types[typeName]
-	if !ok {
-		return false
-	}
-	switch info.Kind {
-	case semantics.TypeStruct, semantics.TypeArray, semantics.TypeSlice, semantics.TypeStr, semantics.TypeEnum, semantics.TypeOptional:
-		return true
-	default:
-		return false
-	}
+	return abisuite.TargetExportedFFIRequiresAggregateABI(typeName, types)
 }
 
 func isInternalRuntimeExportedSymbol(module, exportName string) bool {

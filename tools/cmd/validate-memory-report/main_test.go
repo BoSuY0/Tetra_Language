@@ -78,6 +78,59 @@ func TestValidateMemoryReportWithAllocReportAcceptsMatchingLoweredArtifactID(t *
 	}
 }
 
+func TestValidateMemoryReportWithAllocReportAcceptsDomainMetadata(t *testing.T) {
+	dir := t.TempDir()
+	reportPath := filepath.Join(dir, "memory-report.json")
+	raw := strings.Replace(validSchemaV1MemoryReport(), `"lowered_artifact_id": "ir:main:alloc_bytes:0"`, `"lowered_artifact_id": "ir:main:alloc_bytes:0:Heap"`, 1)
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	allocReport := strings.Replace(validSchemaV2AllocationReport(), `"reason": "fixture allocation report row"`, `"reason": "fixture allocation report row",
+          "domain": {
+            "domain_id": "domain:process",
+            "kind": "process",
+            "owner_kind": "process",
+            "owner_id": "current",
+            "lifetime": "process",
+            "requested_bytes": 17,
+            "reserved_bytes": 32
+          }`, 1)
+	allocPath := filepath.Join(dir, "alloc-report.json")
+	if err := os.WriteFile(allocPath, []byte(allocReport), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := validateMemoryReportWithAllocReport(reportPath, allocPath); err != nil {
+		t.Fatalf("validateMemoryReportWithAllocReport rejected allocation domain metadata: %v", err)
+	}
+}
+
+func TestValidateMemoryReportWithAllocReportRejectsInvalidDomainMetadata(t *testing.T) {
+	dir := t.TempDir()
+	reportPath := filepath.Join(dir, "memory-report.json")
+	raw := strings.Replace(validSchemaV1MemoryReport(), `"lowered_artifact_id": "ir:main:alloc_bytes:0"`, `"lowered_artifact_id": "ir:main:alloc_bytes:0:Heap"`, 1)
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	allocReport := strings.Replace(validSchemaV2AllocationReport(), `"reason": "fixture allocation report row"`, `"reason": "fixture allocation report row",
+          "domain": {
+            "domain_id": "domain:process",
+            "kind": "mystery",
+            "owner_kind": "process",
+            "owner_id": "current",
+            "lifetime": "process"
+          }`, 1)
+	allocPath := filepath.Join(dir, "alloc-report.json")
+	if err := os.WriteFile(allocPath, []byte(allocReport), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err := validateMemoryReportWithAllocReport(reportPath, allocPath)
+	if err == nil || !strings.Contains(err.Error(), "unknown domain kind") {
+		t.Fatalf("validateMemoryReportWithAllocReport error = %v, want domain kind rejection", err)
+	}
+}
+
 func TestValidateMemoryReportWithAllocReportRejectsMissingAllocationLengthContract(t *testing.T) {
 	dir := t.TempDir()
 	reportPath := filepath.Join(dir, "memory-report.json")
@@ -103,6 +156,26 @@ func TestValidateMemoryReportWithAllocReportRejectsMissingAllocationLengthContra
 	err := validateMemoryReportWithAllocReport(reportPath, allocPath)
 	if err == nil || !strings.Contains(err.Error(), "length_status") || !strings.Contains(err.Error(), "zero_guard_status") {
 		t.Fatalf("validateMemoryReportWithAllocReport error = %v, want allocation length contract rejection", err)
+	}
+}
+
+func TestValidateMemoryReportWithAllocReportRejectsHeapAllocationWithoutReasonCodes(t *testing.T) {
+	dir := t.TempDir()
+	reportPath := filepath.Join(dir, "memory-report.json")
+	raw := strings.Replace(validSchemaV1MemoryReport(), `"lowered_artifact_id": "ir:main:alloc_bytes:0"`, `"lowered_artifact_id": "ir:main:alloc_bytes:0:Heap"`, 1)
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	allocReport := removeJSONLineContaining(validSchemaV2AllocationReport(), `"reason_codes":`)
+	allocReport = removeJSONLineContaining(allocReport, `"heap_reason_codes":`)
+	allocPath := filepath.Join(dir, "alloc-report.json")
+	if err := os.WriteFile(allocPath, []byte(allocReport), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err := validateMemoryReportWithAllocReport(reportPath, allocPath)
+	if err == nil || !strings.Contains(err.Error(), "heap_reason_codes") {
+		t.Fatalf("validateMemoryReportWithAllocReport error = %v, want heap_reason_codes rejection", err)
 	}
 }
 
@@ -908,6 +981,8 @@ func validSchemaV2AllocationReport() string {
           "actual_lowering_storage": "Heap",
           "validation_status": "validated_heap_runtime",
           "lowering_status": "heap_runtime",
+          "reason_codes": ["heap.required_dynamic_lifetime"],
+          "heap_reason_codes": ["heap.required_dynamic_lifetime"],
           "reason": "fixture allocation report row"
         }
       ]

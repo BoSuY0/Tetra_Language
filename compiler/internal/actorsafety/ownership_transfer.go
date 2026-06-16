@@ -9,6 +9,7 @@ type TypedActorOwnershipTransferID string
 
 const (
 	TypedActorOwnershipBorrowedViewCopyBoundary     TypedActorOwnershipTransferID = "borrowed_view_copy_boundary"
+	TypedActorOwnershipWrapperPayloadRejection      TypedActorOwnershipTransferID = "wrapper_payload_rejection_matrix"
 	TypedActorOwnershipOwnedRegionMove              TypedActorOwnershipTransferID = "owned_region_move"
 	TypedActorOwnershipSenderUseAfterMove           TypedActorOwnershipTransferID = "sender_use_after_move"
 	TypedActorOwnershipReceiverOwnsMovedRegion      TypedActorOwnershipTransferID = "receiver_owns_moved_region"
@@ -52,6 +53,7 @@ func TypedActorOwnershipTransferCoverage() TypedActorOwnershipTransferReport {
 		SchemaVersion: "tetra.actors.ownership_transfer.v1",
 		Rows: []TypedActorOwnershipTransferRow{
 			borrowedViewCopyBoundaryRow(),
+			wrapperPayloadRejectionRow(),
 			ownedRegionMoveRow(),
 			senderUseAfterMoveRow(),
 			receiverOwnsMovedRegionRow(),
@@ -94,6 +96,7 @@ func ValidateTypedActorOwnershipTransferCoverage(report TypedActorOwnershipTrans
 
 	expected := map[TypedActorOwnershipTransferID]bool{
 		TypedActorOwnershipBorrowedViewCopyBoundary:     false,
+		TypedActorOwnershipWrapperPayloadRejection:      false,
 		TypedActorOwnershipOwnedRegionMove:              false,
 		TypedActorOwnershipSenderUseAfterMove:           false,
 		TypedActorOwnershipReceiverOwnsMovedRegion:      false,
@@ -146,6 +149,9 @@ func ValidateTypedActorOwnershipTransferCoverage(report TypedActorOwnershipTrans
 	if err := requireOwnershipTransferFacts(rows[TypedActorOwnershipBorrowedViewCopyBoundary], "borrowed view rejected", "explicit copy accepted", ".copy()"); err != nil {
 		return err
 	}
+	if err := requireOwnershipTransferFacts(rows[TypedActorOwnershipWrapperPayloadRejection], "optional wrapper borrowed payload rejected", "generic wrapper borrowed payload rejected", "function-typed wrapper payload rejected"); err != nil {
+		return fmt.Errorf("typed actor ownership transfer: wrapper payload rejection row invalid: %w", err)
+	}
 	if err := requireOwnershipTransferFacts(rows[TypedActorOwnershipOwnedRegionMove], "owned region can move", "bytes_copied=0", "zero_copy_move"); err != nil {
 		return err
 	}
@@ -167,7 +173,7 @@ func ValidateTypedActorOwnershipTransferCoverage(report TypedActorOwnershipTrans
 	if err := requireOwnershipTransferFacts(rows[TypedActorOwnershipPLIRMovedFacts], "PLIR moved facts", "FactMoved", "OpActorSend", "core.send_typed"); err != nil {
 		return fmt.Errorf("typed actor ownership transfer: PLIR moved facts row invalid: %w", err)
 	}
-	if err := requireOwnershipTransferFacts(rows[TypedActorOwnershipRuntimeMailboxRepresentation], "TypedMailbox", "OwnershipMetadata", "zero_copy_move", "blocking_recv_yield"); err != nil {
+	if err := requireOwnershipTransferFacts(rows[TypedActorOwnershipRuntimeMailboxRepresentation], "TypedMailbox", "OwnershipMetadata", "zero_copy_move", "blocking_recv_yield", "ActorMemoryDomain", "byte_limit_reached", "DomainMoves"); err != nil {
 		return err
 	}
 	if err := requireOwnershipTransferFacts(rows[TypedActorOwnershipActorTransferReport], "actor-transfer.json", "ownership", "transfer_mode", "bytes_copied"); err != nil {
@@ -194,6 +200,21 @@ func borrowedViewCopyBoundaryRow() TypedActorOwnershipTransferRow {
 		},
 		Evidence: "compiler/internal/actorsafety/sendability_test.go::TestBorrowedSliceAcrossActorBoundaryRejectsUnlessCopied; compiler/tests/semantics/borrow_copy_test.go::TestBorrowedActorSendRejectedUnlessCopied; compiler/internal/semantics/exprs.go::validateActorBoundaryPayloadExpr",
 		Boundary: "covers checked typed actor message expressions; borrowed views do not get a zero-copy actor path unless the expression is explicitly copied or an owned-region slice moves with its owner",
+	}
+}
+
+func wrapperPayloadRejectionRow() TypedActorOwnershipTransferRow {
+	return TypedActorOwnershipTransferRow{
+		ID:     TypedActorOwnershipWrapperPayloadRejection,
+		Name:   "Wrapper payload rejection matrix",
+		Status: TypedActorOwnershipImplementedNarrow,
+		RequiredFacts: []string{
+			"optional wrapper borrowed payload rejected at actor boundary",
+			"generic wrapper borrowed payload rejected at actor boundary",
+			"function-typed wrapper payload rejected as non-value typed actor payload",
+		},
+		Evidence: "compiler/tests/semantics/memory_ideal_v4_boundary_test.go::TestMemoryIdealV4ActorBoundaryCopyAndBorrowDiagnostics; compiler/internal/semantics/exprs.go::validateTypedActorMessageType; compiler/internal/semantics/exprs.go::validateActorBoundaryPayloadExpr",
+		Boundary: "wrapper rejection evidence is source-checker evidence for current typed actor message payloads; it does not add distributed zero-copy transfer or hidden runtime behavior",
 	}
 }
 
@@ -252,7 +273,7 @@ func explicitCopyFallbackRow() TypedActorOwnershipTransferRow {
 			"borrowed copied payloads report TransferCopy",
 			"actor transfer report keeps explicit view copy rows",
 		},
-		Evidence: "compiler/tests/semantics/borrow_copy_test.go::TestBorrowedActorSendRejectedUnlessCopied; compiler/internal/parallelrt/scheduler_model_test.go::TestOwnedRegionMessageMovesZeroCopyAndBorrowedPayloadRequiresCopy; compiler/reports.go::actorTransferRowForPayload",
+		Evidence: "compiler/tests/semantics/borrow_copy_test.go::TestBorrowedActorSendRejectedUnlessCopied; compiler/internal/parallelrt/scheduler_model_test.go::TestOwnedRegionMessageMovesZeroCopyAndBorrowedPayloadRequiresCopy; compiler/internal/buildreports/actor_transfer.go::actorTransferRowForPayload",
 		Boundary: "copy fallback is opt-in at the expression/report level; no implicit copy-elision or hidden zero-copy promotion is claimed",
 	}
 }
@@ -311,9 +332,12 @@ func runtimeMailboxRepresentationRow() TypedActorOwnershipTransferRow {
 			"TypedMailbox preserves OwnershipMetadata",
 			"bounded typed mailbox uses blocking_recv_yield backpressure",
 			"zero_copy_move reports bytes_copied=0 for owned-region model transfer",
+			"ActorMemoryDomain report records mailbox bytes and reclaimed bytes",
+			"byte-aware backpressure reports byte_limit_reached",
+			"DomainMoves records sender actor domain to receiver actor domain",
 		},
-		Evidence: "compiler/internal/parallelrt/scheduler_model.go::TypedMailbox; compiler/internal/parallelrt/scheduler_model_test.go::TestTypedMailboxPreservesCapacityBackpressureAndOwnershipMetadata; compiler/internal/parallelrt/scheduler_model_test.go::TestOwnedRegionMessageMovesZeroCopyAndBorrowedPayloadRequiresCopy",
-		Boundary: "runtime mailbox evidence is local bounded model/report evidence and does not promote P18.0 actor runtime production blockers",
+		Evidence: "compiler/internal/parallelrt/scheduler_model.go::TypedMailbox; compiler/internal/parallelrt/scheduler_model.go::ActorMemoryDomainReport; compiler/internal/parallelrt/scheduler_model_test.go::TestTypedMailboxPreservesCapacityBackpressureAndOwnershipMetadata; compiler/internal/parallelrt/scheduler_model_test.go::TestTypedMailboxMemoryDomainTracksBytesBackpressureAndReclaim; compiler/internal/parallelrt/scheduler_model_test.go::TestOwnedRegionMessageMovesZeroCopyAndBorrowedPayloadRequiresCopy",
+		Boundary: "runtime mailbox evidence is local bounded model/report evidence with byte accounting; it does not promote P18.0 actor runtime production blockers, distributed zero-copy, or runtime-measured RSS claims",
 	}
 }
 
@@ -327,7 +351,7 @@ func actorTransferReportRow() TypedActorOwnershipTransferRow {
 			"actor-transfer.json records transfer_mode",
 			"actor-transfer.json records bytes_copied",
 		},
-		Evidence: "compiler/reports.go::buildActorTransferReport; compiler/reports.go::actorTransferRowForPayload; compiler/actors_test.go::TestActorsTypedMessagesOwnedRegionSliceMoveExplainReport; compiler/actors_test.go::TestActorsTypedMailboxExplainReportIncludesMetadataAndCopyMove",
+		Evidence: "compiler/internal/buildreports/actor_transfer.go::BuildActorTransferReport; compiler/internal/buildreports/actor_transfer.go::actorTransferRowForPayload; compiler/actors_test.go::TestActorsTypedMessagesOwnedRegionSliceMoveExplainReport; compiler/actors_test.go::TestActorsTypedMailboxExplainReportIncludesMetadataAndCopyMove",
 		Boundary: "report rows are evidence only; reports do not toggle safe semantics or runtime behavior",
 	}
 }

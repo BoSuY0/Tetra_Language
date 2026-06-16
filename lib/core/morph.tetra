@@ -1,6 +1,6 @@
 // Experimental Surface Morph Capsule layer.
 // Morph recipes project into lib.core.block Blocks; they do not add runtime primitives.
-// Effects: none
+// Effects: mem
 // ```tetra doctest
 // func morph_doctest() -> Int:
 //     let capsule: lib.core.morph.Capsule = lib.core.morph.capsule_default()
@@ -193,6 +193,30 @@ func recipe_tab_item_hash() -> Int:
 func recipe_list_row_hash() -> Int:
     return 1111
 
+func recipe_app_shell_hash() -> Int:
+    return 1112
+
+func recipe_toolbar_hash() -> Int:
+    return 1113
+
+func recipe_split_pane_hash() -> Int:
+    return 1114
+
+func recipe_status_bar_hash() -> Int:
+    return 1115
+
+func recipe_settings_form_hash() -> Int:
+    return 1116
+
+func recipe_log_row_hash() -> Int:
+    return 1117
+
+func recipe_empty_state_hash() -> Int:
+    return 1118
+
+func recipe_error_panel_hash() -> Int:
+    return 1119
+
 func token_ref(category: Int, index: Int, hash: Int) -> TokenRef:
     return TokenRef(category: category, index: index, hash: hash)
 
@@ -215,10 +239,10 @@ func density_mapping_valid(mapping: DensityMapping) -> Bool:
     return mapping.target_hash > 0 && mapping.token_hash == token_density_1x_hash() && mapping.target_dpi >= 96 && mapping.scale_milli >= 1000 && mapping.scale_milli <= 4000 && mapping.rounding_policy_hash == token_rounding_integer_half_up_hash()
 
 func capsule_default() -> Capsule:
-    return Capsule(schema: schema_v1(), version: 1, token_graph_hash: 760031, recipe_count: 11, explicit_imports: true, isolated_scope: true, no_global_cascade: true, alias_cycle_rejected: true, duplicate_recipe_rejected: true, output_kind: output_block())
+    return Capsule(schema: schema_v1(), version: 1, token_graph_hash: 760031, recipe_count: 19, explicit_imports: true, isolated_scope: true, no_global_cascade: true, alias_cycle_rejected: true, duplicate_recipe_rejected: true, output_kind: output_block())
 
 func capsule_valid(capsule: Capsule) -> Bool:
-    return capsule.schema == schema_v1() && capsule.version == 1 && capsule.token_graph_hash > 0 && capsule.recipe_count == 11 && capsule.explicit_imports && capsule.isolated_scope && capsule.no_global_cascade && capsule.alias_cycle_rejected && capsule.duplicate_recipe_rejected && capsule.output_kind == output_block()
+    return capsule.schema == schema_v1() && capsule.version == 1 && capsule.token_graph_hash > 0 && capsule.recipe_count == 19 && capsule.explicit_imports && capsule.isolated_scope && capsule.no_global_cascade && capsule.alias_cycle_rejected && capsule.duplicate_recipe_rejected && capsule.output_kind == output_block()
 
 func material_panel() -> Material:
     return Material(fill_hash: 2011, border_hash: 2012, radius_hash: 2013, shadow_hash: 2014, overlay_hash: 2015, layer_count: 5, unsupported_blur: false, unsupported_blur_rejected: true)
@@ -307,6 +331,30 @@ func recipe_tab_item() -> Recipe:
 func recipe_list_row() -> Recipe:
     return Recipe(name_hash: recipe_list_row_hash(), output_kind: output_block(), slot_count: 8, input_count: 5, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
 
+func recipe_app_shell() -> Recipe:
+    return Recipe(name_hash: recipe_app_shell_hash(), output_kind: output_block(), slot_count: 8, input_count: 5, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
+
+func recipe_toolbar() -> Recipe:
+    return Recipe(name_hash: recipe_toolbar_hash(), output_kind: output_block(), slot_count: 8, input_count: 5, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
+
+func recipe_split_pane() -> Recipe:
+    return Recipe(name_hash: recipe_split_pane_hash(), output_kind: output_block(), slot_count: 8, input_count: 5, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
+
+func recipe_status_bar() -> Recipe:
+    return Recipe(name_hash: recipe_status_bar_hash(), output_kind: output_block(), slot_count: 8, input_count: 4, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
+
+func recipe_settings_form() -> Recipe:
+    return Recipe(name_hash: recipe_settings_form_hash(), output_kind: output_block(), slot_count: 8, input_count: 6, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
+
+func recipe_log_row() -> Recipe:
+    return Recipe(name_hash: recipe_log_row_hash(), output_kind: output_block(), slot_count: 8, input_count: 5, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
+
+func recipe_empty_state() -> Recipe:
+    return Recipe(name_hash: recipe_empty_state_hash(), output_kind: output_block(), slot_count: 8, input_count: 4, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
+
+func recipe_error_panel() -> Recipe:
+    return Recipe(name_hash: recipe_error_panel_hash(), output_kind: output_block(), slot_count: 8, input_count: 5, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
+
 func recipe_safe(recipe: Recipe) -> Bool:
     return recipe.name_hash > 0 && recipe.output_kind == output_block() && recipe.slot_count <= 8 && recipe.input_count > 0 && !recipe.hidden_app_state && !recipe.platform_widgets && !recipe.core_primitive_promotion && recipe.deterministic
 
@@ -330,6 +378,96 @@ func theme_light() -> surface.Color:
 
 func muted() -> surface.Color:
     return surface.Color(r: 126, g: 144, b: 163, a: 255)
+
+// MRB-12 evidence bridge only: Morph-authored flagship pixels for smoke gates.
+// Stable promotion must keep recipes Block-first and use renderer-owned proof.
+func render_frame_clear(frame: inout surface.Frame, color: surface.Color) -> Int
+uses mem:
+    var y: Int = 0
+    while y < frame.height:
+        var x: Int = 0
+        while x < frame.width:
+            let i: Int = y * frame.stride + x * 4
+            frame.pixels[i] = color.r
+            frame.pixels[i + 1] = color.g
+            frame.pixels[i + 2] = color.b
+            frame.pixels[i + 3] = color.a
+            x = x + 1
+        y = y + 1
+    return 0
+
+func render_frame_rect(frame: inout surface.Frame, rect: surface.Rect, color: surface.Color) -> Int
+uses mem:
+    var y: Int = rect.y
+    let max_y: Int = rect.y + rect.h
+    let max_x: Int = rect.x + rect.w
+    while y < max_y:
+        var x: Int = rect.x
+        while x < max_x:
+            if x >= 0 && y >= 0 && x < frame.width && y < frame.height:
+                let i: Int = y * frame.stride + x * 4
+                frame.pixels[i] = color.r
+                frame.pixels[i + 1] = color.g
+                frame.pixels[i + 2] = color.b
+                frame.pixels[i + 3] = color.a
+            x = x + 1
+        y = y + 1
+    return 0
+
+func render_frame_outline(frame: inout surface.Frame, r: surface.Rect, color: surface.Color) -> Int
+uses mem:
+    let top: surface.Rect = surface.Rect(x: r.x, y: r.y, w: r.w, h: 1)
+    let bottom: surface.Rect = surface.Rect(x: r.x, y: r.y + r.h - 1, w: r.w, h: 1)
+    let left: surface.Rect = surface.Rect(x: r.x, y: r.y, w: 1, h: r.h)
+    let right: surface.Rect = surface.Rect(x: r.x + r.w - 1, y: r.y, w: 1, h: r.h)
+    let _: Int = render_frame_rect(frame, top, color)
+    let __: Int = render_frame_rect(frame, bottom, color)
+    let ___: Int = render_frame_rect(frame, left, color)
+    return render_frame_rect(frame, right, color)
+
+func render_studio_shell_frame(active: Bool, frame: inout surface.Frame) -> Int
+uses mem:
+    let bg: surface.Color = theme_dark()
+    let panel: surface.Color = surface.Color(r: 32, g: 42, b: 50, a: 255)
+    let panel_soft: surface.Color = surface.Color(r: 45, g: 58, b: 70, a: 255)
+    let fg: surface.Color = surface.Color(r: 232, g: 238, b: 244, a: 255)
+    let soft_text: surface.Color = surface.Color(r: 150, g: 166, b: 184, a: 255)
+    let action: surface.Color = surface.Color(r: 64, g: 112, b: 148, a: 255)
+    let success: surface.Color = surface.Color(r: 84, g: 180, b: 132, a: 255)
+    var focus: surface.Color = surface.Color(r: 244, g: 205, b: 92, a: 255)
+    if active:
+        focus = accent()
+    let width: Int = frame.width
+    let height: Int = frame.height
+    let shell_rect: surface.Rect = surface.Rect(x: 8, y: 8, w: width - 16, h: height - 16)
+    let nav_rect: surface.Rect = surface.Rect(x: 18, y: 28, w: 72, h: height - 56)
+    let toolbar_rect: surface.Rect = surface.Rect(x: 102, y: 28, w: width - 122, h: 32)
+    let content_rect: surface.Rect = surface.Rect(x: 102, y: 72, w: width - 122, h: height - 114)
+    let command_rect: surface.Rect = surface.Rect(x: 118, y: 86, w: width - 154, h: 30)
+    let metric_rect: surface.Rect = surface.Rect(x: 118, y: 130, w: 86, h: 40)
+    let log_rect: surface.Rect = surface.Rect(x: 216, y: 130, w: width - 252, h: 40)
+    let status_rect: surface.Rect = surface.Rect(x: 102, y: height - 34, w: width - 122, h: 18)
+    let _: Int = render_frame_clear(frame, bg)
+    let __: Int = render_frame_rect(frame, shell_rect, panel)
+    let ___: Int = render_frame_outline(frame, shell_rect, fg)
+    let ____: Int = render_frame_rect(frame, nav_rect, panel_soft)
+    let _____: Int = render_frame_rect(frame, toolbar_rect, panel_soft)
+    let ______: Int = render_frame_rect(frame, content_rect, surface.Color(r: 24, g: 31, b: 38, a: 255))
+    let _______: Int = render_frame_rect(frame, command_rect, action)
+    let ________: Int = render_frame_rect(frame, metric_rect, accent())
+    let _________: Int = render_frame_rect(frame, log_rect, soft_text)
+    let __________: Int = render_frame_rect(frame, status_rect, success)
+    let ___________: Int = render_frame_outline(frame, command_rect, fg)
+    let ____________: Int = render_frame_rect(frame, surface.Rect(x: nav_rect.x + 12, y: nav_rect.y + 14, w: nav_rect.w - 24, h: 8), accent())
+    let _____________: Int = render_frame_rect(frame, surface.Rect(x: nav_rect.x + 12, y: nav_rect.y + 34, w: nav_rect.w - 24, h: 8), soft_text)
+    let ______________: Int = render_frame_rect(frame, surface.Rect(x: nav_rect.x + 12, y: nav_rect.y + 54, w: nav_rect.w - 24, h: 8), soft_text)
+    if active:
+        let focus_command: surface.Rect = surface.Rect(x: command_rect.x - 3, y: command_rect.y - 3, w: command_rect.w + 6, h: command_rect.h + 6)
+        let focus_metric: surface.Rect = surface.Rect(x: metric_rect.x - 3, y: metric_rect.y - 3, w: metric_rect.w + 6, h: metric_rect.h + 6)
+        let _______________: Int = render_frame_outline(frame, focus_command, focus)
+        let ________________: Int = render_frame_outline(frame, focus_metric, focus)
+        let _________________: Int = render_frame_rect(frame, surface.Rect(x: command_rect.x + 14, y: command_rect.y + 12, w: 72, h: 6), bg)
+    return 0
 
 func panel_paint() -> block.PaintSpec:
     return block.paint_stack5(block.paint_layer_fill_radius(surface.Color(r: 24, g: 31, b: 38, a: 255), 18), block.paint_layer_linear_gradient(surface.Color(r: 28, g: 38, b: 48, a: 255), surface.Color(r: 38, g: 54, b: 66, a: 255), 18), block.paint_layer_border(surface.Color(r: 82, g: 104, b: 124, a: 255), 1, 18), block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 128), 24, 0, 10), block.paint_layer_outline(accent(), 1, 20))
@@ -381,4 +519,4 @@ func memory_budget_ok(block_count: Int, asset_count: Int, framebuffer_bytes: Int
 
 func capsule_self_check() -> Bool:
     let capsule: Capsule = capsule_default()
-    return capsule_valid(capsule) && material_valid(material_panel()) && material_valid(material_control()) && material_valid(material_field()) && affordance_valid(affordance_action()) && affordance_valid(affordance_text_field()) && affordance_valid(affordance_toggle()) && affordance_valid(affordance_navigation()) && affordance_valid(affordance_region()) && affordance_valid(affordance_overlay()) && affordance_valid(affordance_status()) && state_lens_valid(state_lens_base()) && state_lens_valid(state_lens_focus()) && motion_preset_valid(motion_preset_fast()) && motion_preset_valid(motion_preset_panel()) && recipe_safe(recipe_control_action()) && recipe_safe(recipe_field_text()) && recipe_safe(recipe_command_item()) && recipe_safe(recipe_region_panel()) && recipe_safe(recipe_form_field()) && recipe_safe(recipe_nav_item()) && recipe_safe(recipe_metric_tile()) && recipe_safe(recipe_dialog_panel()) && recipe_safe(recipe_toast_notification()) && recipe_safe(recipe_tab_item()) && recipe_safe(recipe_list_row())
+    return capsule_valid(capsule) && material_valid(material_panel()) && material_valid(material_control()) && material_valid(material_field()) && affordance_valid(affordance_action()) && affordance_valid(affordance_text_field()) && affordance_valid(affordance_toggle()) && affordance_valid(affordance_navigation()) && affordance_valid(affordance_region()) && affordance_valid(affordance_overlay()) && affordance_valid(affordance_status()) && state_lens_valid(state_lens_base()) && state_lens_valid(state_lens_focus()) && motion_preset_valid(motion_preset_fast()) && motion_preset_valid(motion_preset_panel()) && recipe_safe(recipe_control_action()) && recipe_safe(recipe_field_text()) && recipe_safe(recipe_command_item()) && recipe_safe(recipe_region_panel()) && recipe_safe(recipe_form_field()) && recipe_safe(recipe_nav_item()) && recipe_safe(recipe_metric_tile()) && recipe_safe(recipe_dialog_panel()) && recipe_safe(recipe_toast_notification()) && recipe_safe(recipe_tab_item()) && recipe_safe(recipe_list_row()) && recipe_safe(recipe_app_shell()) && recipe_safe(recipe_toolbar()) && recipe_safe(recipe_split_pane()) && recipe_safe(recipe_status_bar()) && recipe_safe(recipe_settings_form()) && recipe_safe(recipe_log_row()) && recipe_safe(recipe_empty_state()) && recipe_safe(recipe_error_panel())

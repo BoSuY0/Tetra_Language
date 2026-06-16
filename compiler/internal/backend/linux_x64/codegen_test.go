@@ -125,6 +125,28 @@ func TestCodegenObjectLinuxX64UsesRegisterLoopPathForConstantStride(t *testing.T
 	}
 }
 
+func TestCodegenObjectLinuxX64UsesRegisterConstModuloLoopPathForIntegerLoops(t *testing.T) {
+	obj, err := CodegenObjectLinuxX64([]ir.IRFunc{integerLoopsBenchmarkMainIRFunc()})
+	if err != nil {
+		t.Fatalf("CodegenObjectLinuxX64: %v", err)
+	}
+	for _, forbidden := range [][]byte{{0x50}, {0x58}, {0x59}} {
+		if bytes.Contains(obj.Code, forbidden) {
+			t.Fatalf("const-modulo loop register path emitted stack-machine push/pop byte % x in code: % x", forbidden, obj.Code)
+		}
+	}
+	for _, want := range [][]byte{
+		{0x48, 0x81, 0xF9, 0x40, 0x0D, 0x03, 0x00}, // cmp rcx,200000
+		{0x41, 0xF7, 0xF8},                         // idiv r8d
+		{0x41, 0x01, 0xD2},                         // add r10d,edx
+		{0x83, 0xC1, 0x01},                         // add ecx,1
+	} {
+		if !bytes.Contains(obj.Code, want) {
+			t.Fatalf("const-modulo loop register path missing % x sequence: % x", want, obj.Code)
+		}
+	}
+}
+
 func TestCodegenObjectLinuxX64RegisterLoopMatchesStackFallback(t *testing.T) {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
 		t.Skip("linux/amd64 only")
@@ -152,6 +174,21 @@ func TestCodegenObjectLinuxX64RegisterStrideLoopMatchesStackFallback(t *testing.
 	}
 	if fast != 20 {
 		t.Fatalf("sum_stride(10) exit = %d, want 20", fast)
+	}
+}
+
+func TestCodegenObjectLinuxX64RegisterConstModuloLoopMatchesStackFallback(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+	funcs := []ir.IRFunc{integerLoopsBenchmarkMainIRFunc()}
+	fast := buildLinkRunLinuxX64(t, funcs, x64.CodegenOptions{}, "fast-const-modulo-loop")
+	stack := buildLinkRunLinuxX64(t, funcs, x64.CodegenOptions{DisableMachinePaths: true}, "stack-const-modulo-loop")
+	if fast != stack {
+		t.Fatalf("fast const-modulo loop exit = %d, stack fallback exit = %d", fast, stack)
+	}
+	if fast != 0 {
+		t.Fatalf("integer_loops benchmark exit = %d, want 0", fast)
 	}
 }
 
@@ -432,6 +469,124 @@ func TestCodegenObjectLinuxX64RegisterCallLoopMatchesStackFallback(t *testing.T)
 	}
 }
 
+func TestCodegenObjectLinuxX64RegisterTwoArgConstBoundCallLoopMatchesStackFallback(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+	funcs := []ir.IRFunc{mixTwoArgIRFunc(), functionCallsBenchmarkMainIRFunc()}
+	fastObj, err := CodegenObjectLinuxX64(funcs)
+	if err != nil {
+		t.Fatalf("CodegenObjectLinuxX64: %v", err)
+	}
+	for _, forbidden := range [][]byte{{0x50}, {0x58}, {0x59}} {
+		if bytes.Contains(fastObj.Code, forbidden) {
+			t.Fatalf("register two-arg call-loop path emitted stack-machine push/pop byte % x in code: % x", forbidden, fastObj.Code)
+		}
+	}
+	if !bytes.Contains(fastObj.Code, []byte{0xE8}) {
+		t.Fatalf("register two-arg call-loop path missing direct call instruction: % x", fastObj.Code)
+	}
+
+	fast := buildLinkRunLinuxX64(t, funcs, x64.CodegenOptions{}, "fast-two-arg-call-loop")
+	stack := buildLinkRunLinuxX64(t, funcs, x64.CodegenOptions{DisableMachinePaths: true}, "stack-two-arg-call-loop")
+	if fast != stack {
+		t.Fatalf("fast two-arg call-loop exit = %d, stack fallback exit = %d", fast, stack)
+	}
+	if fast != 0 {
+		t.Fatalf("function_calls benchmark main exit = %d, want 0", fast)
+	}
+}
+
+func TestCodegenObjectLinuxX64RegisterCompileTimeCallLoopMatchesStackFallback(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+	funcs := []ir.IRFunc{
+		compileTimeF0IRFunc(),
+		compileTimeF1IRFunc(),
+		compileTimeF2IRFunc(),
+		compileTimeBenchmarkMainIRFunc(),
+	}
+	fastObj, err := CodegenObjectLinuxX64(funcs)
+	if err != nil {
+		t.Fatalf("CodegenObjectLinuxX64: %v", err)
+	}
+	for _, forbidden := range [][]byte{{0x50}, {0x58}, {0x59}} {
+		if bytes.Contains(fastObj.Code, forbidden) {
+			t.Fatalf("register compile_time call-loop path emitted stack-machine push/pop byte % x in code: % x", forbidden, fastObj.Code)
+		}
+	}
+	for _, want := range [][]byte{
+		{0xE8},                         // direct call rel32 patches for f1/f2/main calls.
+		{0x3D, 0x00, 0x00, 0x00, 0x00}, // cmp eax,0 for total == 0 final guard.
+	} {
+		if !bytes.Contains(fastObj.Code, want) {
+			t.Fatalf("compile_time native path missing % x sequence: % x", want, fastObj.Code)
+		}
+	}
+
+	fast := buildLinkRunLinuxX64(t, funcs, x64.CodegenOptions{}, "fast-compile-time-call-loop")
+	stack := buildLinkRunLinuxX64(t, funcs, x64.CodegenOptions{DisableMachinePaths: true}, "stack-compile-time-call-loop")
+	if fast != stack {
+		t.Fatalf("fast compile_time exit = %d, stack fallback exit = %d", fast, stack)
+	}
+	if fast != 0 {
+		t.Fatalf("compile_time benchmark main exit = %d, want 0", fast)
+	}
+}
+
+func TestCodegenObjectLinuxX64RecursionFibNativeMatchesStackFallback(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+	funcs := []ir.IRFunc{recursionFibIRFunc(), mainCallsRecursionFibIRFunc(10)}
+	fast := buildLinkRunLinuxX64(t, funcs, x64.CodegenOptions{}, "fast-recursion-fib")
+	stack := buildLinkRunLinuxX64(t, funcs, x64.CodegenOptions{DisableMachinePaths: true}, "stack-recursion-fib")
+	if fast != stack {
+		t.Fatalf("fast fib exit = %d, stack fallback exit = %d", fast, stack)
+	}
+	if fast != 55 {
+		t.Fatalf("fib(10) exit = %d, want 55", fast)
+	}
+}
+
+func TestCodegenObjectLinuxX64RecursionBenchmarkNativeMatchesStackFallback(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+	funcs := []ir.IRFunc{recursionFibIRFunc(), recursionBenchmarkMainIRFunc()}
+	fastObj, err := CodegenObjectLinuxX64(funcs)
+	if err != nil {
+		t.Fatalf("CodegenObjectLinuxX64: %v", err)
+	}
+	for _, want := range [][]byte{
+		{0xE8},                         // real call rel32 patches for fib recursion and main -> fib.
+		{0x3D, 0x02, 0x00, 0x00, 0x00}, // cmp eax,2 in fib base guard.
+		{0x0F, 0x8C},                   // jl rel32 for fib base return.
+		{0x48, 0x81, 0xF9, 0x28, 0x00, 0x00, 0x00}, // cmp rcx,40 in main loop.
+		{0x3D, 0x98, 0x08, 0x00, 0x00},             // cmp eax,2200 in main final guard.
+	} {
+		if !bytes.Contains(fastObj.Code, want) {
+			t.Fatalf("recursion native path missing % x sequence: % x", want, fastObj.Code)
+		}
+	}
+	if got := countBytes(fastObj.Code, []byte{0xE8}); got < 3 {
+		t.Fatalf("recursion native path call rel32 count = %d, want at least fib self-calls plus main call: % x", got, fastObj.Code)
+	}
+	if len(fastObj.Relocs) != 0 {
+		t.Fatalf("local recursion calls should be patched in-object, relocs=%#v", fastObj.Relocs)
+	}
+
+	fast := buildLinkRunLinuxX64(t, funcs, x64.CodegenOptions{}, "fast-recursion-benchmark")
+	stack := buildLinkRunLinuxX64(t, funcs, x64.CodegenOptions{DisableMachinePaths: true}, "stack-recursion-benchmark")
+	if fast != stack {
+		t.Fatalf("fast recursion exit = %d, stack fallback exit = %d", fast, stack)
+	}
+	if fast != 0 {
+		t.Fatalf("recursion benchmark exit = %d, want 0", fast)
+	}
+}
+
 func TestCodegenObjectLinuxX64UsesSharedSmallHeapAllocatorForMakeSlices(t *testing.T) {
 	obj, err := CodegenObjectLinuxX64([]ir.IRFunc{twoSmallMakeSlicesMainIRFunc()})
 	if err != nil {
@@ -629,6 +784,243 @@ func mainCallsSumCallIRFunc() ir.IRFunc {
 			{Kind: ir.IRReturn},
 		},
 	}
+}
+
+func mixTwoArgIRFunc() ir.IRFunc {
+	return ir.IRFunc{
+		Name:        "mix",
+		ParamSlots:  2,
+		LocalSlots:  2,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 3},
+			{Kind: ir.IRMulI32},
+			{Kind: ir.IRLoadLocal, Local: 1},
+			{Kind: ir.IRAddI32},
+			{Kind: ir.IRConstI32, Imm: 97},
+			{Kind: ir.IRModI32},
+			{Kind: ir.IRReturn},
+		},
+	}
+}
+
+func functionCallsBenchmarkMainIRFunc() ir.IRFunc {
+	return ir.IRFunc{
+		Name:        "main",
+		LocalSlots:  2,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRLabel, Label: 0},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 200000},
+			{Kind: ir.IRCmpLtI32},
+			{Kind: ir.IRJmpIfZero, Label: 1},
+			{Kind: ir.IRLoadLocal, Local: 1},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRLoadLocal, Local: 1},
+			{Kind: ir.IRCall, Name: "mix", ArgSlots: 2, RetSlots: 1},
+			{Kind: ir.IRAddI32},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 1},
+			{Kind: ir.IRAddI32},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRJmp, Label: 0},
+			{Kind: ir.IRLabel, Label: 1},
+			{Kind: ir.IRLoadLocal, Local: 1},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRCmpGeI32},
+			{Kind: ir.IRJmpIfZero, Label: 2},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRReturn},
+			{Kind: ir.IRLabel, Label: 2},
+			{Kind: ir.IRConstI32, Imm: 1},
+			{Kind: ir.IRReturn},
+		},
+	}
+}
+
+func compileTimeF0IRFunc() ir.IRFunc {
+	return ir.IRFunc{
+		Name:        "p25.compile_time.f0",
+		ParamSlots:  1,
+		LocalSlots:  1,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 1},
+			{Kind: ir.IRAddI32},
+			{Kind: ir.IRReturn},
+		},
+	}
+}
+
+func compileTimeF1IRFunc() ir.IRFunc {
+	return ir.IRFunc{
+		Name:        "p25.compile_time.f1",
+		ParamSlots:  1,
+		LocalSlots:  1,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRCall, Name: "p25.compile_time.f0", ArgSlots: 1, RetSlots: 1},
+			{Kind: ir.IRConstI32, Imm: 3},
+			{Kind: ir.IRMulI32},
+			{Kind: ir.IRReturn},
+		},
+	}
+}
+
+func compileTimeF2IRFunc() ir.IRFunc {
+	return ir.IRFunc{
+		Name:        "p25.compile_time.f2",
+		ParamSlots:  1,
+		LocalSlots:  1,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRCall, Name: "p25.compile_time.f1", ArgSlots: 1, RetSlots: 1},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRCall, Name: "p25.compile_time.f0", ArgSlots: 1, RetSlots: 1},
+			{Kind: ir.IRAddI32},
+			{Kind: ir.IRReturn},
+		},
+	}
+}
+
+func compileTimeBenchmarkMainIRFunc() ir.IRFunc {
+	return ir.IRFunc{
+		Name:        "p25.compile_time.main",
+		ExportName:  "main",
+		LocalSlots:  2,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRLabel, Label: 0},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 200000},
+			{Kind: ir.IRCmpLtI32},
+			{Kind: ir.IRJmpIfZero, Label: 1},
+			{Kind: ir.IRLoadLocal, Local: 1},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRCall, Name: "p25.compile_time.f2", ArgSlots: 1, RetSlots: 1},
+			{Kind: ir.IRAddI32},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 1},
+			{Kind: ir.IRAddI32},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRJmp, Label: 0},
+			{Kind: ir.IRLabel, Label: 1},
+			{Kind: ir.IRLoadLocal, Local: 1},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRCmpEqI32},
+			{Kind: ir.IRJmpIfZero, Label: 2},
+			{Kind: ir.IRConstI32, Imm: 1},
+			{Kind: ir.IRReturn},
+			{Kind: ir.IRLabel, Label: 2},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRReturn},
+		},
+	}
+}
+
+func recursionFibIRFunc() ir.IRFunc {
+	return ir.IRFunc{
+		Name:        "p25.recursion.fib",
+		ParamSlots:  1,
+		LocalSlots:  1,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 2},
+			{Kind: ir.IRCmpLtI32},
+			{Kind: ir.IRJmpIfZero, Label: 0},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRReturn},
+			{Kind: ir.IRLabel, Label: 0},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 1},
+			{Kind: ir.IRSubI32},
+			{Kind: ir.IRCall, Name: "p25.recursion.fib", ArgSlots: 1, RetSlots: 1},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 2},
+			{Kind: ir.IRSubI32},
+			{Kind: ir.IRCall, Name: "p25.recursion.fib", ArgSlots: 1, RetSlots: 1},
+			{Kind: ir.IRAddI32},
+			{Kind: ir.IRReturn},
+		},
+	}
+}
+
+func recursionBenchmarkMainIRFunc() ir.IRFunc {
+	return ir.IRFunc{
+		Name:        "p25.recursion.main",
+		ExportName:  "main",
+		LocalSlots:  2,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRLabel, Label: 0},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 40},
+			{Kind: ir.IRCmpLtI32},
+			{Kind: ir.IRJmpIfZero, Label: 1},
+			{Kind: ir.IRLoadLocal, Local: 1},
+			{Kind: ir.IRConstI32, Imm: 10},
+			{Kind: ir.IRCall, Name: "p25.recursion.fib", ArgSlots: 1, RetSlots: 1},
+			{Kind: ir.IRAddI32},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 1},
+			{Kind: ir.IRAddI32},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRJmp, Label: 0},
+			{Kind: ir.IRLabel, Label: 1},
+			{Kind: ir.IRLoadLocal, Local: 1},
+			{Kind: ir.IRConstI32, Imm: 2200},
+			{Kind: ir.IRCmpEqI32},
+			{Kind: ir.IRJmpIfZero, Label: 2},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRReturn},
+			{Kind: ir.IRLabel, Label: 2},
+			{Kind: ir.IRConstI32, Imm: 1},
+			{Kind: ir.IRReturn},
+		},
+	}
+}
+
+func mainCallsRecursionFibIRFunc(n int32) ir.IRFunc {
+	return ir.IRFunc{
+		Name:        "main",
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: n},
+			{Kind: ir.IRCall, Name: "p25.recursion.fib", ArgSlots: 1, RetSlots: 1},
+			{Kind: ir.IRReturn},
+		},
+	}
+}
+
+func integerLoopsBenchmarkMainIRFunc() ir.IRFunc {
+	fn := functionCallsBenchmarkMainIRFunc()
+	fn.Name = "main"
+	fn.Instrs = append([]ir.IRInstr(nil), fn.Instrs...)
+	fn.Instrs[10] = ir.IRInstr{Kind: ir.IRLoadLocal, Local: 0}
+	fn.Instrs[11] = ir.IRInstr{Kind: ir.IRConstI32, Imm: 7}
+	fn.Instrs[12] = ir.IRInstr{Kind: ir.IRModI32}
+	return fn
 }
 
 func mainCallsSumNIRFunc() ir.IRFunc {

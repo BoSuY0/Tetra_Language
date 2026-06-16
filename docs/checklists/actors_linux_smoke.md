@@ -13,6 +13,13 @@ reconnect/retry production claim, no non-Linux distributed actor runtime support
 claim, no distributed zero-copy pointer or region transfer claim, and no formal
 race proof claim.
 
+Actor failure/status boundary: zero and nonzero actor entry returns are
+user-visible only as `done`; later local sends return the checked done-actor
+failure `-4`. There is no actor status, actor join, actor exit-code,
+supervision, or restart API. Distributed missing-node/node_down evidence is a
+checked status signal only, with no automatic retry, reconnect, restart, or
+supervision claim.
+
 Date:
 Target version:
 Git HEAD:

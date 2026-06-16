@@ -8,6 +8,7 @@ import (
 
 	"tetra_language/compiler/internal/httprt"
 	"tetra_language/compiler/internal/pgrt"
+	"tetra_language/internal/toon"
 )
 
 func TestRegisterTechEmpowerRoutesMountsAllEndpoints(t *testing.T) {
@@ -49,6 +50,27 @@ func TestRegisterTechEmpowerRoutesMountsAllEndpoints(t *testing.T) {
 		t.Fatalf("/json message = %q", decoded.Message)
 	}
 
+	toonResp, ok := router.Route(httprt.Request{
+		Method: "GET",
+		Path:   "/json",
+		Headers: []httprt.Header{
+			{Name: "Accept", Value: "text/toon"},
+		},
+	})
+	if !ok {
+		t.Fatalf("/json route not mounted for TOON")
+	}
+	if toonResp.StatusCode != 200 || toonResp.ContentType != "text/toon; charset=utf-8" {
+		t.Fatalf("/json TOON response metadata = %#v", toonResp)
+	}
+	decoded = struct {
+		Message string `json:"message"`
+	}{}
+	decodeTOONPayload(t, toonResp.Body, &decoded)
+	if decoded.Message != "Hello, World!" {
+		t.Fatalf("/json TOON message = %q", decoded.Message)
+	}
+
 	for _, path := range []string{"/db", "/queries", "/updates", "/fortunes"} {
 		resp, ok := router.Route(httprt.Request{Method: "GET", Path: path})
 		if !ok {
@@ -65,6 +87,26 @@ func TestRegisterTechEmpowerRoutesRequiresPool(t *testing.T) {
 	err := RegisterTechEmpowerRoutes(&router, TechEmpowerRoutes{})
 	if !errors.Is(err, ErrMissingPostgresPool) {
 		t.Fatalf("RegisterTechEmpowerRoutes without pool = %v, want ErrMissingPostgresPool", err)
+	}
+}
+
+func TestAcceptExplicitTOON(t *testing.T) {
+	cases := []struct {
+		header string
+		want   bool
+	}{
+		{header: "", want: false},
+		{header: "*/*", want: false},
+		{header: "application/json", want: false},
+		{header: "text/toon", want: true},
+		{header: "application/json, text/toon; charset=utf-8", want: true},
+		{header: "text/toon;q=0", want: false},
+		{header: "Text/Toon; Q=0.5", want: true},
+	}
+	for _, tc := range cases {
+		if got := acceptExplicitTOON(tc.header); got != tc.want {
+			t.Fatalf("acceptExplicitTOON(%q) = %v, want %v", tc.header, got, tc.want)
+		}
 	}
 }
 
@@ -94,5 +136,16 @@ func TestNewTechEmpowerServerAppliesConfigAndRoutes(t *testing.T) {
 	}
 	if _, ok := srv.Router.Route(httprt.Request{Method: "GET", Path: "/plaintext"}); !ok {
 		t.Fatalf("NewTechEmpowerServer did not mount /plaintext")
+	}
+}
+
+func decodeTOONPayload(t *testing.T, raw []byte, out any) {
+	t.Helper()
+	jsonRaw, err := toon.ConvertTOONToJSON(raw, toon.Options{Strict: true})
+	if err != nil {
+		t.Fatalf("TOON payload did not decode: %v\n%s", err, raw)
+	}
+	if err := json.Unmarshal(jsonRaw, out); err != nil {
+		t.Fatalf("json.Unmarshal converted TOON: %v\nTOON:\n%s\nJSON:\n%s", err, raw, jsonRaw)
 	}
 }

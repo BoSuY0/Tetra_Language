@@ -71,7 +71,7 @@ func TestNewSurfaceAppGeneratesAllP21TemplateKinds(t *testing.T) {
 	if _, ok := hostTarget(); !ok {
 		t.Skip("host target unsupported")
 	}
-	for _, kind := range []string{"command-palette", "settings", "dashboard", "editor-shell", "multi-window-notes", "web-canvas"} {
+	for _, kind := range []string{"command-palette", "settings", "dashboard", "editor-shell", "studio-shell", "multi-window-notes", "web-canvas"} {
 		t.Run(kind, func(t *testing.T) {
 			dir := t.TempDir()
 			appDir := filepath.Join(dir, "Surface"+strings.ReplaceAll(kind, "-", ""))
@@ -97,8 +97,15 @@ func TestNewSurfaceAppGeneratesAllP21TemplateKinds(t *testing.T) {
 					t.Fatalf("%s source missing %q:\n%s", kind, want, sourceText)
 				}
 			}
-			if kind == "multi-window-notes" && !strings.Contains(sourceText, "import lib.core.surface_app_shell as shell") {
-				t.Fatalf("multi-window-notes source missing app shell import:\n%s", sourceText)
+			if (kind == "multi-window-notes" || kind == "studio-shell") && !strings.Contains(sourceText, "import lib.core.surface_app_shell as shell") {
+				t.Fatalf("%s source missing app shell import:\n%s", kind, sourceText)
+			}
+			if kind == "studio-shell" {
+				for _, want := range []string{"morph.recipe_app_shell()", "morph.recipe_toolbar()", "morph.recipe_split_pane()", "morph.recipe_status_bar()"} {
+					if !strings.Contains(sourceText, want) {
+						t.Fatalf("studio-shell source missing %q:\n%s", want, sourceText)
+					}
+				}
 			}
 			if kind == "web-canvas" {
 				capsuleRaw, err := os.ReadFile(filepath.Join(appDir, "Capsule.t4"))

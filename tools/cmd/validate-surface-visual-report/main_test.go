@@ -77,6 +77,11 @@ func validVisualReportJSONForCLI() []byte {
         "stride": 1280,
         "checksum": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
         "golden_checksum": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "artifact_path": "reports/surface-visual/headless/frames/initial.rgba",
+        "artifact_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "artifact_format": "rgba",
+        "golden_artifact_path": "reports/surface/goldens/headless/initial.rgba",
+        "golden_artifact_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
         "tolerance_pixels": 4,
         "tolerance_ratio_milli": 1,
         "tolerance_channel_delta": 1,
@@ -91,7 +96,11 @@ func validVisualReportJSONForCLI() []byte {
     "missing_block_graph_rejected": true,
     "missing_layout_rejected": true,
     "missing_accessibility_rejected": true,
-    "missing_performance_rejected": true
+    "missing_performance_rejected": true,
+    "self_golden_rejected": true,
+    "metadata_checksum_rejected": true,
+    "fixture_frame_only_rejected": true,
+    "missing_png_or_rgba_artifact_rejected": true
   }
 }`)
 }

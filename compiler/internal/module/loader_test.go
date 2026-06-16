@@ -64,6 +64,33 @@ func TestModuleLoadWorldPrefersT4OverLegacyTetraImport(t *testing.T) {
 	}
 }
 
+func TestModuleLoadWorldMergesSameModuleFragments(t *testing.T) {
+	tmp := t.TempDir()
+	writeModuleFiles(t, tmp, map[string]string{
+		"engine/math.t4":             "module engine.math\nfunc base() -> Int:\n    return 40\n",
+		"engine/math.parts/extra.t4": "module engine.math\nfunc add_two(x: Int) -> Int:\n    return x + 2\n",
+		"app/main.t4":                "module app.main\nimport engine.math as math\nfunc main() -> Int:\n    return math.add_two(math.base())\n",
+	})
+
+	world, err := LoadWorld(filepath.Join(tmp, filepath.FromSlash("app/main.t4")))
+	if err != nil {
+		t.Fatalf("LoadWorld: %v", err)
+	}
+	file := world.ByModule["engine.math"]
+	if file == nil {
+		t.Fatalf("engine.math module missing")
+	}
+	if got := len(file.Funcs); got != 2 {
+		t.Fatalf("engine.math funcs = %d, want 2", got)
+	}
+	if got := filepath.Base(file.Path); got != "math.t4" {
+		t.Fatalf("engine.math primary path = %q, want math.t4", got)
+	}
+	if src := string(file.Src); !strings.Contains(src, "func base") || !strings.Contains(src, "func add_two") {
+		t.Fatalf("merged source missing primary or fragment function:\n%s", src)
+	}
+}
+
 func TestModuleLoadWorldWithSourceRootsResolvesImportsAcrossProjectRoots(t *testing.T) {
 	tmp := t.TempDir()
 	writeModuleFiles(t, tmp, map[string]string{

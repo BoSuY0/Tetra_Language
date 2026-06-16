@@ -23,6 +23,14 @@ Required recipes:
 - `toast.notification@1`
 - `tab.item@1`
 - `list.row@1`
+- `app.shell@1`
+- `toolbar@1`
+- `split.pane@1`
+- `status.bar@1`
+- `settings.form@1`
+- `log.row@1`
+- `empty.state@1`
+- `error.panel@1`
 
 Required affordances:
 
@@ -47,6 +55,7 @@ The P08 reference set is:
 - `examples/surface_morph_settings.tetra`
 - `examples/surface_morph_editor_shell.tetra`
 - `examples/surface_morph_glass_panel.tetra`
+- `examples/surface_morph_studio_shell.tetra`
 
 Each app imports `lib.core.morph`, constructs recipes, records
 `RecipeExpansion` values, builds a `BlockTree`, and validates the resulting
@@ -57,5 +66,5 @@ bash scripts/release/surface/morph-gate.sh \
   --report-dir reports/surface-morph/gate
 ```
 
-The gate summary records `recipe_count: 11`, the recipe expansion report path,
-and the five reference app sources.
+The gate summary records `recipe_count: 19`, the recipe expansion report path,
+and the six reference app sources.

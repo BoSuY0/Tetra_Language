@@ -175,6 +175,17 @@ func TestPerCoreSmallHeapAllocatorStressDoesNotBehaveLikeMmapPerAllocation(t *te
 	if report.FragmentationBytes <= 0 {
 		t.Fatalf("stress report = %+v, want fragmentation accounting from size-class rounding", report)
 	}
+	if report.Domain.DomainID != "domain:process" || report.Domain.Kind != DomainProcess {
+		t.Fatalf("stress report domain = %+v, want process domain", report.Domain)
+	}
+	if report.Domain.RequestedBytes != int64(report.BytesRequested) || report.Domain.ReservedBytes != int64(report.BytesReserved) {
+		t.Fatalf("stress report domain bytes = %+v, want requested/reserved from report %+v", report.Domain, report)
+	}
+	for _, core := range report.Cores {
+		if core.Domain.DomainID != "domain:process" {
+			t.Fatalf("core report domain = %+v, want process domain", core.Domain)
+		}
+	}
 }
 
 func containsString(values []string, want string) bool {

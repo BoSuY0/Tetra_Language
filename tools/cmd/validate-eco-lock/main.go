@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	ctarget "tetra_language/compiler/target"
+	"tetra_language/tools/internal/reportdecode"
 )
 
 type ecoLockEnvelope struct {
@@ -100,7 +101,9 @@ const (
 
 func main() {
 	var lockPath string
+	var reportFormat string
 	flag.StringVar(&lockPath, "lock", "", "path to tetra eco lock JSON")
+	flag.StringVar(&reportFormat, "format", "auto", "report format: auto, json, or toon")
 	flag.Parse()
 
 	if lockPath == "" {
@@ -112,17 +115,19 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err := validateEcoLock(raw); err != nil {
+	if err := validateEcoLockFormat(raw, reportFormat); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
 func validateEcoLock(raw []byte) error {
+	return validateEcoLockFormat(raw, "auto")
+}
+
+func validateEcoLockFormat(raw []byte, format string) error {
 	var lock ecoLockEnvelope
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&lock); err != nil {
+	if err := reportdecode.DecodeStrictFormat(raw, format, &lock); err != nil {
 		return err
 	}
 	if lock.Schema != "" && lock.Schema != lockSchemaV1 {

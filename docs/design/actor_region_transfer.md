@@ -11,6 +11,8 @@ published through `.github/workflows/ci.yml` and
 `reports/actor-runtime-foundation/final/artifact-hashes.json`,
 `distributed-actors-linux-x64/distributed-actors-linux-x64.json`, and
 `parallel-production-linux-x64/parallel-production-linux-x64.json`.
+The machine-readable gate contract is
+`scripts/release/post_v0_4/contracts/actor-runtime-foundation-linux-x64.json`.
 
 This design keeps the transfer claim local: no full Erlang/OTP actor runtime
 claim, no cluster membership or reconnect/retry production claim, no non-Linux
@@ -124,6 +126,11 @@ scheduling. The model covers:
 - two-core work stealing from another core's queue tail;
 - bounded typed mailboxes with explicit `blocking_recv_yield` backpressure
   metadata;
+- `ActorMemoryDomainReport` rows with mailbox byte capacity, queued bytes,
+  reclaimed bytes, message-pool/slab bytes, and `byte_limit_reached`
+  backpressure status;
+- local owned-region `DomainMoves` from sender actor domain to receiver actor
+  domain with `bytes_copied: 0`;
 - actor ping-pong/fanout comparison rows in the
   `tetra.parallel.production.v1` smoke report;
 - owned-region message transfer rows that report `zero_copy_move` with

@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -15,15 +14,16 @@ import (
 
 	"tetra_language/compiler"
 	ctarget "tetra_language/compiler/target"
+	"tetra_language/internal/outputformat"
 )
 
 func runTest(args []string, stdout io.Writer, stderr io.Writer) int {
 	fs := flag.NewFlagSet("test", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	target := fs.String("target", defaultTarget(), "target triple ("+supportedTargetsHelp+")")
-	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text or json")
-	reportFormat := fs.String("report", "text", "report format: text or json")
-	format := fs.String("format", "", "output format alias for --report: text or json")
+	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text, json, or toon")
+	reportFormat := fs.String("report", "text", "report format: text, json, or toon")
+	format := fs.String("format", "", "output format alias for --report: text, json, or toon")
 	allTargets := fs.Bool("all-targets", false, "run the required x86/x64/x32 target matrix")
 	brutal := fs.Bool("brutal", false, "run the full brutal target matrix")
 	abiSuite := fs.Bool("abi", false, "run ABI torture tests for the target")
@@ -42,7 +42,7 @@ func runTest(args []string, stdout io.Writer, stderr io.Writer) int {
 	if !ok {
 		return 2
 	}
-	if reportFormatValue != "text" && reportFormatValue != "json" {
+	if reportFormatValue != outputformat.Text && !outputformat.Structured(reportFormatValue) {
 		writeValidationDiagnostic(stderr, *diagnostics, "unsupported --report format")
 		return 2
 	}
@@ -272,10 +272,8 @@ func runTest(args []string, stdout io.Writer, stderr io.Writer) int {
 			}
 		}
 	}
-	if reportFormatValue == "json" {
-		enc := json.NewEncoder(stdout)
-		enc.SetIndent("", "  ")
-		if err := enc.Encode(compiler.NewTestRunnerReportForTarget(results, tgt.Triple)); err != nil {
+	if outputformat.Structured(reportFormatValue) {
+		if err := outputformat.WriteStructured(stdout, reportFormatValue, compiler.NewTestRunnerReportForTarget(results, tgt.Triple)); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}
@@ -302,7 +300,7 @@ func resolveTestReportFormat(fs *flag.FlagSet, reportValue string, formatValue s
 	if !formatProvided {
 		return reportValue, true
 	}
-	if formatValue != "text" && formatValue != "json" {
+	if formatValue != outputformat.Text && !outputformat.Structured(formatValue) {
 		writeValidationDiagnostic(stderr, diagnostics, "unsupported --format")
 		return "", false
 	}
@@ -573,10 +571,8 @@ func writeTargetSuiteReport(results []compiler.TestRunnerResult, target string, 
 			}
 		}
 	}
-	if reportFormat == "json" {
-		enc := json.NewEncoder(stdout)
-		enc.SetIndent("", "  ")
-		if err := enc.Encode(compiler.NewTestRunnerReportForTarget(results, target)); err != nil {
+	if outputformat.Structured(reportFormat) {
+		if err := outputformat.WriteStructured(stdout, reportFormat, compiler.NewTestRunnerReportForTarget(results, target)); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}

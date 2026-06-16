@@ -21,6 +21,9 @@ Use the release validator when checking a complete bundle:
 go run ./tools/cmd/validate-ram-contract-release --report-dir reports/ram-contract-release
 ```
 
+The Linux-x64 release gate's machine-readable contract lives at
+`scripts/release/post_v0_4/contracts/ram-contract-linux-x64.json`.
+
 Use the individual validators for focused iteration:
 
 ```sh

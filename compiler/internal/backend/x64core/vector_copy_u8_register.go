@@ -9,7 +9,7 @@ import (
 	"tetra_language/compiler/internal/machine"
 )
 
-func emitVectorCopyU8RegisterFunction(e *x64.Emitter, fn ir.IRFunc, abi x64abi.ABI, opt x64.CodegenOptions) (bool, error) {
+func emitVectorCopyU8RegisterFunction(e *x64.Emitter, fn ir.IRFunc, abi x64abi.ABI, opt x64.CodegenOptions, flush runtimeHeapTelemetryFlushFunc) (bool, error) {
 	if opt.DisableMachinePaths {
 		return false, nil
 	}
@@ -84,6 +84,9 @@ func emitVectorCopyU8RegisterFunction(e *x64.Emitter, fn ir.IRFunc, abi x64abi.A
 		return true, err
 	}
 	e.MovEaxImm32(0)
+	if err := flush.emit(); err != nil {
+		return true, err
+	}
 	e.Leave()
 	e.Ret()
 	return true, nil

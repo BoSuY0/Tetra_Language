@@ -18,6 +18,7 @@ type SurfaceTemplateSmokeReport struct {
 	Templates         []SurfaceTemplateSmokeTemplate     `json:"templates"`
 	InspectorEvidence SurfaceTemplateSmokeInspector      `json:"inspector_evidence"`
 	VisualEvidence    SurfaceTemplateSmokeVisual         `json:"visual_evidence"`
+	MorphToPixels     *MorphToPixelsChainReport          `json:"morph_to_pixels,omitempty"`
 	PackageEvidence   []SurfaceTemplateSmokePackage      `json:"package_evidence"`
 	NegativeGuards    SurfaceTemplateSmokeNegativeGuards `json:"negative_guards"`
 	Pass              bool                               `json:"pass"`
@@ -120,6 +121,7 @@ func ValidateTemplateSmokeReport(raw []byte) error {
 	issues = append(issues, validateSurfaceTemplateSmokeTemplates(report.TemplateCount, report.Templates)...)
 	issues = append(issues, validateSurfaceTemplateSmokeInspector(report.InspectorEvidence)...)
 	issues = append(issues, validateSurfaceTemplateSmokeVisual(report.VisualEvidence)...)
+	issues = append(issues, validateSurfaceTemplateSmokeMorphToPixels(report.MorphToPixels, report.Templates)...)
 	issues = append(issues, validateSurfaceTemplateSmokePackages(report.PackageEvidence)...)
 	issues = append(issues, validateSurfaceTemplateSmokeNegativeGuards(report.NegativeGuards)...)
 	if !report.Pass {
@@ -132,7 +134,7 @@ func ValidateTemplateSmokeReport(raw []byte) error {
 }
 
 func validateSurfaceTemplateSmokeTemplates(templateCount int, templates []SurfaceTemplateSmokeTemplate) []string {
-	required := []string{"command-palette", "settings", "dashboard", "editor-shell", "multi-window-notes", "web-canvas"}
+	required := []string{"command-palette", "settings", "dashboard", "editor-shell", "studio-shell", "multi-window-notes", "web-canvas"}
 	if templateCount != len(templates) {
 		return []string{fmt.Sprintf("template_count = %d, want len(templates) %d", templateCount, len(templates))}
 	}
@@ -171,8 +173,8 @@ func validateSurfaceTemplateSmokeTemplates(templateCount int, templates []Surfac
 		if !tmpl.BlockMorphOnly {
 			issues = append(issues, fmt.Sprintf("%s block_morph_only must be true", kind))
 		}
-		if kind == "multi-window-notes" && !tmpl.UsesAppShell {
-			issues = append(issues, "multi-window-notes uses_app_shell must be true")
+		if (kind == "multi-window-notes" || kind == "studio-shell") && !tmpl.UsesAppShell {
+			issues = append(issues, fmt.Sprintf("%s uses_app_shell must be true", kind))
 		}
 		if kind == "web-canvas" && !tmpl.WebCanvas {
 			issues = append(issues, "web-canvas web_canvas must be true")
@@ -206,8 +208,8 @@ func validateSurfaceTemplateImports(kind string, imports []string) []string {
 			issues = append(issues, fmt.Sprintf("%s imports missing %s", kind, required))
 		}
 	}
-	if kind == "multi-window-notes" && !templateSmokeContainsString(imports, "lib.core.surface_app_shell") {
-		issues = append(issues, "multi-window-notes imports missing lib.core.surface_app_shell")
+	if (kind == "multi-window-notes" || kind == "studio-shell") && !templateSmokeContainsString(imports, "lib.core.surface_app_shell") {
+		issues = append(issues, fmt.Sprintf("%s imports missing lib.core.surface_app_shell", kind))
 	}
 	for _, imported := range imports {
 		lower := strings.ToLower(imported)
@@ -332,6 +334,30 @@ func validateSurfaceTemplateSmokeVisual(evidence SurfaceTemplateSmokeVisual) []s
 	return issues
 }
 
+func validateSurfaceTemplateSmokeMorphToPixels(chain *MorphToPixelsChainReport, templates []SurfaceTemplateSmokeTemplate) []string {
+	if chain == nil {
+		return []string{"morph_to_pixels is required for generated Surface template rendered beauty evidence"}
+	}
+	var issues []string
+	issues = append(issues, validateMorphToPixelsChain("morph_to_pixels", *chain, "")...)
+	if !safeRelativeReportPath(chain.ReportPath) {
+		issues = append(issues, "morph_to_pixels.report_path is unsafe or empty")
+	}
+	if !safeRelativeReportPath(chain.FrameArtifact) {
+		issues = append(issues, "morph_to_pixels.frame_artifact is unsafe or empty")
+	}
+	if !safeRelativeReportPath(chain.GoldenArtifact) {
+		issues = append(issues, "morph_to_pixels.golden_artifact is unsafe or empty")
+	}
+	if chain.ProductClaim || chain.FinalSignoff {
+		issues = append(issues, "morph_to_pixels template smoke evidence must not assert product_claim or final_signoff")
+	}
+	if !templateSmokeContainsSource(templates, chain.Source) {
+		issues = append(issues, fmt.Sprintf("morph_to_pixels source %q must match one generated template source", chain.Source))
+	}
+	return issues
+}
+
 func validateSurfaceTemplateSmokePackages(packages []SurfaceTemplateSmokePackage) []string {
 	if len(packages) == 0 {
 		return []string{"package_evidence is required"}
@@ -371,6 +397,16 @@ func validateSurfaceTemplateSmokeNegativeGuards(guards SurfaceTemplateSmokeNegat
 func templateSmokeContainsString(values []string, want string) bool {
 	for _, value := range values {
 		if value == want {
+			return true
+		}
+	}
+	return false
+}
+
+func templateSmokeContainsSource(templates []SurfaceTemplateSmokeTemplate, want string) bool {
+	want = normalizeEvidencePath(want)
+	for _, tmpl := range templates {
+		if normalizeEvidencePath(tmpl.Source) == want {
 			return true
 		}
 	}

@@ -1,0 +1,412 @@
+module lib.core.block
+
+func tree_none() -> Int:
+    return -1
+
+func tree_error_ok() -> Int:
+    return 0
+
+func tree_error_capacity() -> Int:
+    return 1
+
+func tree_error_invalid() -> Int:
+    return 2
+
+func tree_error_bounds() -> Int:
+    return 3
+
+func tree_error_duplicate() -> Int:
+    return 4
+
+func tree_error_missing_parent() -> Int:
+    return 5
+
+func tree_error_cycle() -> Int:
+    return 6
+
+func tree_flag_focusable() -> Int:
+    return 1
+
+func tree_node_stride() -> Int:
+    return 12
+
+func tree_field_id() -> Int:
+    return 0
+
+func tree_field_parent() -> Int:
+    return 1
+
+func tree_field_first_child() -> Int:
+    return 2
+
+func tree_field_last_child() -> Int:
+    return 3
+
+func tree_field_next_sibling() -> Int:
+    return 4
+
+func tree_field_child_count() -> Int:
+    return 5
+
+func tree_field_flags() -> Int:
+    return 6
+
+func tree_field_x() -> Int:
+    return 7
+
+func tree_field_y() -> Int:
+    return 8
+
+func tree_field_w() -> Int:
+    return 9
+
+func tree_field_h() -> Int:
+    return 10
+
+func tree_field_accessibility_role() -> Int:
+    return 11
+
+func tree_slot(index: Int, field: Int) -> Int:
+    return index * tree_node_stride() + field
+
+func tree_set_error(tree: inout BlockTree, code: Int) -> Int:
+    tree.last_error = code
+    return code
+
+func tree_init(capacity: Int) -> BlockTree
+uses alloc, mem:
+    var safe_capacity: Int = capacity
+    if safe_capacity < 0:
+        safe_capacity = 0
+    let storage: []i32 = core.make_i32(safe_capacity * tree_node_stride())
+    return BlockTree(storage: storage, len: 0, capacity: safe_capacity, root_id: tree_none(), last_error: tree_error_ok())
+
+func graph_init(capacity: Int) -> BlockGraph
+uses alloc, mem:
+    return BlockGraph(tree: tree_init(capacity), schema_version: 1)
+
+func tree_len(tree: borrow BlockTree) -> Int:
+    return tree.len
+
+func tree_capacity(tree: borrow BlockTree) -> Int:
+    return tree.capacity
+
+func tree_root_id(tree: borrow BlockTree) -> BlockID:
+    return id(tree.root_id)
+
+func tree_last_error(tree: borrow BlockTree) -> Int:
+    return tree.last_error
+
+func graph_tree_len(graph: borrow BlockGraph) -> Int:
+    return tree_len(graph.tree)
+
+func tree_get(tree: borrow BlockTree, index: Int, field: Int) -> Int:
+    if index < 0 || index >= tree.len:
+        return tree_none()
+    return tree.storage[tree_slot(index, field)]
+
+func tree_put(tree: inout BlockTree, index: Int, field: Int, value: Int) -> Int:
+    if index < 0 || index >= tree.capacity:
+        return tree_error_bounds()
+    tree.storage[tree_slot(index, field)] = value
+    return value
+
+func tree_find_index(tree: borrow BlockTree, block_id: BlockID) -> Int:
+    let wanted: Int = id_value(block_id)
+    var i: Int = 0
+    while i < tree.len:
+        if tree_get(tree, i, tree_field_id()) == wanted:
+            return i
+        i = i + 1
+    return tree_none()
+
+func tree_id_at_index(tree: borrow BlockTree, index: Int) -> BlockID:
+    return id(tree_get(tree, index, tree_field_id()))
+
+func tree_contains_rect(rect: surface.Rect, x: Int, y: Int) -> Bool:
+    return x >= rect.x && y >= rect.y && x < rect.x + rect.w && y < rect.y + rect.h
+
+func tree_node_contains(tree: borrow BlockTree, index: Int, x: Int, y: Int) -> Bool:
+    let rect: surface.Rect = surface.Rect(x: tree_get(tree, index, tree_field_x()), y: tree_get(tree, index, tree_field_y()), w: tree_get(tree, index, tree_field_w()), h: tree_get(tree, index, tree_field_h()))
+    return tree_contains_rect(rect, x, y)
+
+func tree_flags_for_block(block: Block) -> Int:
+    var flags: Int = 0
+    if block.props.interaction_flags > 0 && block.props.interaction_flags < 160:
+        flags = flags + tree_flag_focusable()
+    return flags
+
+func tree_write_node(tree: inout BlockTree, index: Int, block: Block, parent_id: BlockID, bounds: surface.Rect) -> Int:
+    let block_value: Int = id_value(block.id)
+    let parent_value: Int = id_value(parent_id)
+    let flags: Int = tree_flags_for_block(block)
+    let role: Int = block.props.accessibility_role
+    let _id: Int = tree_put(tree, index, tree_field_id(), block_value)
+    let _parent: Int = tree_put(tree, index, tree_field_parent(), parent_value)
+    let _first: Int = tree_put(tree, index, tree_field_first_child(), tree_none())
+    let _last: Int = tree_put(tree, index, tree_field_last_child(), tree_none())
+    let _next: Int = tree_put(tree, index, tree_field_next_sibling(), tree_none())
+    let _count: Int = tree_put(tree, index, tree_field_child_count(), 0)
+    let _flags: Int = tree_put(tree, index, tree_field_flags(), flags)
+    let _x: Int = tree_put(tree, index, tree_field_x(), bounds.x)
+    let _y: Int = tree_put(tree, index, tree_field_y(), bounds.y)
+    let _w: Int = tree_put(tree, index, tree_field_w(), bounds.w)
+    let _h: Int = tree_put(tree, index, tree_field_h(), bounds.h)
+    let _role: Int = tree_put(tree, index, tree_field_accessibility_role(), role)
+    return _id + _parent - _parent + _first - _first + _last - _last + _next - _next + _count - _count + _flags - _flags + _x - _x + _y - _y + _w - _w + _h - _h + _role - _role
+
+func tree_add_root(tree: inout BlockTree, block: Block, bounds: surface.Rect) -> Int:
+    if tree.len != 0:
+        return tree_set_error(tree, tree_error_invalid())
+    if tree.capacity <= 0 || tree.storage.len < tree_node_stride():
+        return tree_set_error(tree, tree_error_capacity())
+    if id_value(block.id) == tree_none() || id_value(block.parent_id) != tree_none():
+        return tree_set_error(tree, tree_error_invalid())
+    if bounds.w < 0 || bounds.h < 0:
+        return tree_set_error(tree, tree_error_bounds())
+    let written: Int = tree_write_node(tree, 0, block, id_none(), bounds)
+    tree.len = 1
+    tree.root_id = id_value(block.id)
+    tree.last_error = tree_error_ok() + written - written
+    return tree.root_id
+
+func tree_add_child(tree: inout BlockTree, parent_id: BlockID, block: Block, bounds: surface.Rect) -> Int:
+    let parent_value: Int = id_value(parent_id)
+    let child_value: Int = id_value(block.id)
+    if tree.root_id == tree_none() || parent_value == tree_none() || child_value == tree_none():
+        return tree_set_error(tree, tree_error_invalid())
+    if id_value(block.parent_id) != parent_value:
+        return tree_set_error(tree, tree_error_invalid())
+    if tree.len >= tree.capacity || tree.storage.len < (tree.len + 1) * tree_node_stride():
+        return tree_set_error(tree, tree_error_capacity())
+    if bounds.w < 0 || bounds.h < 0:
+        return tree_set_error(tree, tree_error_bounds())
+    let parent_index: Int = tree_find_index(tree, parent_id)
+    if parent_index == tree_none():
+        return tree_set_error(tree, tree_error_missing_parent())
+    if tree_find_index(tree, block.id) != tree_none():
+        return tree_set_error(tree, tree_error_duplicate())
+    if parent_value == child_value:
+        return tree_set_error(tree, tree_error_cycle())
+    let child_index: Int = tree.len
+    let written: Int = tree_write_node(tree, child_index, block, parent_id, bounds)
+    let previous_last: Int = tree_get(tree, parent_index, tree_field_last_child())
+    if tree_get(tree, parent_index, tree_field_child_count()) == 0:
+        let _first: Int = tree_put(tree, parent_index, tree_field_first_child(), child_value)
+    else:
+        let previous_index: Int = tree_find_index(tree, id(previous_last))
+        if previous_index == tree_none():
+            return tree_set_error(tree, tree_error_invalid())
+        let _next: Int = tree_put(tree, previous_index, tree_field_next_sibling(), child_value)
+    let _last: Int = tree_put(tree, parent_index, tree_field_last_child(), child_value)
+    let next_count: Int = tree_get(tree, parent_index, tree_field_child_count()) + 1
+    let _count: Int = tree_put(tree, parent_index, tree_field_child_count(), next_count)
+    tree.len = tree.len + 1
+    tree.last_error = tree_error_ok() + written - written + _last - _last + _count - _count
+    return child_value
+
+func tree_validate_link(tree: borrow BlockTree, parent_id: BlockID, child_id: BlockID) -> Int:
+    let parent_value: Int = id_value(parent_id)
+    let child_value: Int = id_value(child_id)
+    if parent_value == tree_none() || child_value == tree_none():
+        return tree_error_invalid()
+    let parent_index: Int = tree_find_index(tree, parent_id)
+    let child_index: Int = tree_find_index(tree, child_id)
+    if parent_index == tree_none():
+        return tree_error_missing_parent()
+    if child_index == tree_none():
+        return tree_error_invalid()
+    if parent_value == child_value:
+        return tree_error_cycle()
+    var cursor: Int = parent_index
+    while cursor != tree_none():
+        if tree_get(tree, cursor, tree_field_id()) == child_value:
+            return tree_error_cycle()
+        let next_parent: Int = tree_get(tree, cursor, tree_field_parent())
+        if next_parent == tree_none():
+            return tree_error_ok()
+        cursor = tree_find_index(tree, id(next_parent))
+        if cursor == tree_none():
+            return tree_error_missing_parent()
+    return tree_error_ok()
+
+func tree_validate(tree: borrow BlockTree) -> Int:
+    if tree.len <= 0 || tree.root_id == tree_none():
+        return tree_error_invalid()
+    var i: Int = 0
+    while i < tree.len:
+        let node_id: Int = tree_get(tree, i, tree_field_id())
+        if node_id == tree_none():
+            return tree_error_invalid()
+        if tree_get(tree, i, tree_field_w()) < 0 || tree_get(tree, i, tree_field_h()) < 0:
+            return tree_error_bounds()
+        var j: Int = i + 1
+        while j < tree.len:
+            if tree_get(tree, j, tree_field_id()) == node_id:
+                return tree_error_duplicate()
+            j = j + 1
+        let parent_value: Int = tree_get(tree, i, tree_field_parent())
+        if node_id == tree.root_id:
+            if parent_value != tree_none():
+                return tree_error_invalid()
+        else:
+            let parent_index: Int = tree_find_index(tree, id(parent_value))
+            if parent_index == tree_none():
+                return tree_error_missing_parent()
+            let link_status: Int = tree_validate_link(tree, id(parent_value), id(node_id))
+            if link_status != tree_error_ok():
+                return link_status
+        i = i + 1
+    return tree_error_ok()
+
+func tree_child_at(tree: borrow BlockTree, parent_id: BlockID, index: Int) -> BlockID:
+    if index < 0:
+        return id_none()
+    let parent_index: Int = tree_find_index(tree, parent_id)
+    if parent_index == tree_none():
+        return id_none()
+    var cursor: Int = tree_get(tree, parent_index, tree_field_first_child())
+    var i: Int = 0
+    while cursor != tree_none() && i < index:
+        let cursor_index: Int = tree_find_index(tree, id(cursor))
+        if cursor_index == tree_none():
+            return id_none()
+        cursor = tree_get(tree, cursor_index, tree_field_next_sibling())
+        i = i + 1
+    return id(cursor)
+
+func tree_layout_order_at(tree: borrow BlockTree, index: Int) -> BlockID:
+    if index < 0 || index >= tree.len:
+        return id_none()
+    return tree_id_at_index(tree, index)
+
+func tree_draw_order_at(tree: borrow BlockTree, index: Int) -> BlockID:
+    return tree_layout_order_at(tree, index)
+
+func tree_focus_order_at(tree: borrow BlockTree, index: Int) -> BlockID:
+    if index < 0:
+        return id_none()
+    var seen: Int = 0
+    var i: Int = 0
+    while i < tree.len:
+        let flags: Int = tree_get(tree, i, tree_field_flags())
+        if flags / tree_flag_focusable() % 2 == 1:
+            if seen == index:
+                return tree_id_at_index(tree, i)
+            seen = seen + 1
+        i = i + 1
+    return id_none()
+
+func focus_order_at(tree: borrow BlockTree, index: Int) -> BlockID:
+    return tree_focus_order_at(tree, index)
+
+func focus_next(tree: borrow BlockTree, current_id: BlockID) -> BlockID:
+    let first: BlockID = tree_focus_order_at(tree, 0)
+    if id_value(first) == tree_none():
+        return id_none()
+    let current_value: Int = id_value(current_id)
+    if current_value == tree_none():
+        return first
+    var i: Int = 0
+    while i < tree.len:
+        let item: BlockID = tree_focus_order_at(tree, i)
+        let item_value: Int = id_value(item)
+        if item_value == tree_none():
+            return first
+        if item_value == current_value:
+            let next: BlockID = tree_focus_order_at(tree, i + 1)
+            if id_value(next) == tree_none():
+                return first
+            return next
+        i = i + 1
+    return first
+
+func focus_prev(tree: borrow BlockTree, current_id: BlockID) -> BlockID:
+    let first: BlockID = tree_focus_order_at(tree, 0)
+    if id_value(first) == tree_none():
+        return id_none()
+    let current_value: Int = id_value(current_id)
+    var previous: BlockID = id_none()
+    var last: BlockID = first
+    var i: Int = 0
+    while i < tree.len:
+        let item: BlockID = tree_focus_order_at(tree, i)
+        let item_value: Int = id_value(item)
+        if item_value == tree_none():
+            if current_value == id_value(first):
+                return last
+            return previous
+        if item_value == current_value:
+            if id_value(previous) == tree_none():
+                return last
+            return previous
+        previous = item
+        last = item
+        i = i + 1
+    return previous
+
+func tree_accessibility_order_at(tree: borrow BlockTree, index: Int) -> BlockID:
+    if index < 0:
+        return id_none()
+    var seen: Int = 0
+    var i: Int = 0
+    while i < tree.len:
+        if tree_get(tree, i, tree_field_accessibility_role()) != accessibility_role_none():
+            if seen == index:
+                return tree_id_at_index(tree, i)
+            seen = seen + 1
+        i = i + 1
+    return id_none()
+
+func tree_build_dispatch_path(tree: borrow BlockTree, target_id: BlockID, out: inout []i32) -> Int:
+    let target_index: Int = tree_find_index(tree, target_id)
+    if target_index == tree_none():
+        return 0
+    var cursor: Int = target_index
+    var count: Int = 0
+    while cursor != tree_none() && count < out.len:
+        out[count] = tree_get(tree, cursor, tree_field_id())
+        let parent_value: Int = tree_get(tree, cursor, tree_field_parent())
+        if parent_value == tree_none():
+            cursor = tree_none()
+        else:
+            cursor = tree_find_index(tree, id(parent_value))
+        count = count + 1
+    var left: Int = 0
+    var right: Int = count - 1
+    while left < right:
+        let tmp: Int = out[left]
+        out[left] = out[right]
+        out[right] = tmp
+        left = left + 1
+        right = right - 1
+    return count
+
+func event_build_dispatch_path(tree: borrow BlockTree, target_id: BlockID, out: inout []i32) -> Int:
+    return tree_build_dispatch_path(tree, target_id, out)
+
+func tree_hit_test_path(tree: borrow BlockTree, x: Int, y: Int, out: inout []i32) -> Int:
+    let root_index: Int = tree_find_index(tree, id(tree.root_id))
+    if root_index == tree_none() || !tree_node_contains(tree, root_index, x, y):
+        return 0
+    var current_index: Int = root_index
+    var count: Int = 0
+    var searching: Bool = true
+    while searching && current_index != tree_none() && count < out.len:
+        out[count] = tree_get(tree, current_index, tree_field_id())
+        count = count + 1
+        searching = false
+        var child_id: Int = tree_get(tree, current_index, tree_field_first_child())
+        while child_id != tree_none() && !searching:
+            let child_index: Int = tree_find_index(tree, id(child_id))
+            if child_index == tree_none():
+                child_id = tree_none()
+            else if tree_node_contains(tree, child_index, x, y):
+                current_index = child_index
+                searching = true
+            else:
+                child_id = tree_get(tree, child_index, tree_field_next_sibling())
+    return count
+
+func event_hit_test_path(tree: borrow BlockTree, x: Int, y: Int, out: inout []i32) -> Int:
+    return tree_hit_test_path(tree, x, y, out)

@@ -34,6 +34,22 @@ func TestRunRejectsSurfaceReferenceAppsScreenshotOnlyEvidence(t *testing.T) {
 	}
 }
 
+func TestRunRejectsSurfaceReferenceAppsMissingMorphToPixels(t *testing.T) {
+	dir := t.TempDir()
+	reportPath := filepath.Join(dir, "surface-reference-apps.json")
+	raw := strings.Replace(validSurfaceReferenceAppsReportJSON(), `,"morph_to_pixels":`+morphToPixelsChainJSON("examples/surface_reference_command_palette.tetra"), "", 1)
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatalf("write report: %v", err)
+	}
+	err := run([]string{"--report", reportPath})
+	if err == nil {
+		t.Fatalf("expected missing Morph-to-pixels evidence to fail")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "morph_to_pixels") {
+		t.Fatalf("error = %v, want morph_to_pixels diagnostic", err)
+	}
+}
+
 func validSurfaceReferenceAppsReportJSON() string {
 	apps := []string{
 		referenceAppJSON("command-palette", "examples/surface_reference_command_palette.tetra", false),
@@ -56,7 +72,34 @@ func referenceAppJSON(shape string, source string, compatibility bool) string {
 		referenceTargetJSON("linux-x64-real-window"),
 		referenceTargetJSON("wasm32-web-browser-canvas"),
 	}
-	return `{"shape":"` + shape + `","source":"` + source + `","module":"examples.` + strings.TrimSuffix(strings.TrimPrefix(strings.ReplaceAll(source, "/", "."), "examples."), ".tetra") + `","imports":["lib.core.surface","lib.core.block","lib.core.morph"],"recipes":["region.panel","field.text","control.action","command.item"],"stable_morph_recipes":true,"resolves_to_block":true,"compiles":true,"runs":true,"exit_code":0,"token_theme_conformance":true,"layout_report":true,"interaction_trace":true,"accessibility_snapshot":true,"performance_budget":true,"artifact_hashes":true,"compatibility_widgets":` + boolJSON(compatibility) + `,"targets":[` + strings.Join(targets, ",") + `]}`
+	base := `{"shape":"` + shape + `","source":"` + source + `","module":"examples.` + strings.TrimSuffix(strings.TrimPrefix(strings.ReplaceAll(source, "/", "."), "examples."), ".tetra") + `","imports":["lib.core.surface","lib.core.block","lib.core.morph"],"recipes":["region.panel","field.text","control.action","command.item"],"beauty_coverage":` + referenceBeautyCoverageJSON(shape) + `,"stable_morph_recipes":true,"resolves_to_block":true,"compiles":true,"runs":true,"exit_code":0,"token_theme_conformance":true,"layout_report":true,"interaction_trace":true,"accessibility_snapshot":true,"performance_budget":true,"artifact_hashes":true,"compatibility_widgets":` + boolJSON(compatibility)
+	if compatibility {
+		return base + `,"infrastructure_only":true,"non_product_reason":"legacy widget migration compatibility evidence only","targets":[` + strings.Join(targets, ",") + `]}`
+	}
+	return base + `,"infrastructure_only":false,"morph_to_pixels":` + morphToPixelsChainJSON(source) + `,"targets":[` + strings.Join(targets, ",") + `]}`
+}
+
+func referenceBeautyCoverageJSON(shape string) string {
+	switch shape {
+	case "command-palette":
+		return `["command-palette","focus-state"]`
+	case "settings":
+		return `["settings","disabled-state"]`
+	case "dashboard":
+		return `["dashboard"]`
+	case "editor-shell":
+		return `["editor-shell"]`
+	case "dialog-notification":
+		return `["elevated-panel"]`
+	case "migration":
+		return `[]`
+	default:
+		return `["focus-state"]`
+	}
+}
+
+func morphToPixelsChainJSON(source string) string {
+	return `{"chain_id":"sha256:0000000000000000000000000000000000000000000000000000000000000900","report_path":"reports/surface/morph-rendered-beauty.json","schema":"tetra.surface.morph-rendered-beauty.v1","status":"pass","surface_scope":"surface-morph-rendered-beauty-linux-web","source":"` + source + `","source_sha256":"sha256:0000000000000000000000000000000000000000000000000000000000000001","target":"headless","scenario_name":"headless-morph:` + source + `","token_graph_hash":"sha256:0000000000000000000000000000000000000000000000000000000000000003","token_count":6,"token_categories":["color","space","radius","typography","motion","assets"],"recipe_count":3,"recipe_expansion_count":4,"recipe_names":["studio_shell","hero_panel","toolbar"],"block_scene_hash":"sha256:0000000000000000000000000000000000000000000000000000000000000005","block_scene_node_count":12,"render_command_stream_hash":"sha256:0000000000000000000000000000000000000000000000000000000000000007","render_command_count":10,"renderer":"software-rgba-headless","frame_artifact":"reports/surface/frame.rgba","frame_artifact_sha256":"sha256:000000000000000000000000000000000000000000000000000000000000003c","frame_checksum":"sha256:000000000000000000000000000000000000000000000000000000000000003c","golden_artifact":"reports/surface/golden.rgba","golden_artifact_sha256":"sha256:000000000000000000000000000000000000000000000000000000000000003d","golden_checksum":"sha256:000000000000000000000000000000000000000000000000000000000000003d","diff_pixels":1,"diff_ratio_milli":0,"max_channel_delta":1,"product_claim":false,"final_signoff":false,"pass":true}`
 }
 
 func referenceTargetJSON(target string) string {

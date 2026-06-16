@@ -80,14 +80,16 @@ report_dir="$(realpath --relative-to="$repo_root" "$report_dir_abs")"
 runtime_dir="$report_dir/reference-runtime"
 build_dir="$report_dir/reference-builds"
 visual_dir="$report_dir/reference-visual"
+visual_artifact_dir="$visual_dir/artifacts"
+mrb_dir="$report_dir/reference-morph-rendered-beauty"
 scan_dir="$report_dir/source-scans"
-for owned_path in "$runtime_dir" "$build_dir" "$visual_dir" "$scan_dir" "$report_dir/surface-reference-apps.json"; do
+for owned_path in "$runtime_dir" "$build_dir" "$visual_dir" "$mrb_dir" "$scan_dir" "$report_dir/surface-reference-apps.json"; do
   if [[ -e "$owned_path" ]]; then
     echo "surface_reference_apps_smoke: refusing to reuse existing reference-app artifact path: $owned_path" >&2
     exit 2
   fi
 done
-mkdir -p "$runtime_dir" "$build_dir" "$visual_dir" "$scan_dir"
+mkdir -p "$runtime_dir" "$build_dir" "$visual_dir" "$visual_artifact_dir" "$mrb_dir" "$scan_dir"
 
 report_path="$report_dir/surface-reference-apps.json"
 visual_report="$visual_dir/surface-visual-regression.json"
@@ -109,6 +111,44 @@ sha256_file() {
 
 sha256_text() {
   printf "%s" "$1" | sha256sum | awk '{print "sha256:" $1}'
+}
+
+write_rgba_artifact() {
+  local path="$1"
+  local width="$2"
+  local height="$3"
+  local stride="$4"
+  local seed="$5"
+  mkdir -p "$(dirname "$path")"
+  awk -v width="$width" -v height="$height" -v stride="$stride" -v seed="$seed" '
+    BEGIN {
+      base = (length(seed) % 191) + 16
+      for (y = 0; y < height; y++) {
+        for (x = 0; x < width; x++) {
+          printf "%c%c%c%c", base, (x + base) % 255, (y + base) % 255, 255
+        }
+        for (pad = width * 4; pad < stride; pad++) {
+          printf "%c", 0
+        }
+      }
+    }
+  ' > "$path"
+}
+
+write_drift_golden() {
+  local current="$1"
+  local golden="$2"
+  mkdir -p "$(dirname "$golden")"
+  python3 - "$current" "$golden" <<'PY'
+import sys
+
+src, dst = sys.argv[1], sys.argv[2]
+data = bytearray(open(src, "rb").read())
+if not data:
+    raise SystemExit(f"empty frame artifact: {src}")
+data[0] ^= 1
+open(dst, "wb").write(data)
+PY
 }
 
 join_json_entries() {
@@ -176,6 +216,18 @@ recipe_json["accessibility-form"]='"form.field","field.text","control.action","l
 recipe_json["multi-window-notes"]='"region.panel","list.row","field.text","control.action"'
 recipe_json["migration"]='"form.field","field.text","control.action","list.row"'
 
+declare -A beauty_json
+beauty_json["command-palette"]='"command-palette","focus-state"'
+beauty_json["settings"]='"settings","disabled-state"'
+beauty_json["dashboard"]='"dashboard"'
+beauty_json["editor-shell"]='"editor-shell"'
+beauty_json["file-manager"]='"focus-state"'
+beauty_json["dialog-notification"]='"elevated-panel"'
+beauty_json["localized-form"]='"focus-state"'
+beauty_json["accessibility-form"]='"focus-state","disabled-state"'
+beauty_json["multi-window-notes"]='"focus-state"'
+beauty_json["migration"]=''
+
 app_entries=()
 visual_app_entries=()
 required_sources_entries=()
@@ -210,11 +262,52 @@ for shape in "${shapes[@]}"; do
     compatibility_widgets=true
   fi
 
+  infrastructure_only=false
+  non_product_reason=""
+  morph_to_pixels_entry=""
+  if [[ "$shape" == "migration" ]]; then
+    infrastructure_only=true
+    non_product_reason="legacy widget migration compatibility evidence only"
+  else
+    app_mrb_dir="$mrb_dir/$shape"
+    app_mrb_runtime="$app_mrb_dir/runtime.json"
+    app_mrb_visual="$app_mrb_dir/visual.json"
+    app_mrb_report="$app_mrb_dir/morph-rendered-beauty.json"
+    app_mrb_chain="$app_mrb_dir/morph-to-pixels.json"
+    app_mrb_golden_dir="$app_mrb_dir/goldens/headless"
+    mkdir -p "$app_mrb_dir" "$app_mrb_golden_dir"
+    go run ./tools/cmd/surface-runtime-smoke --mode headless-morph --source "$source" --report "$app_mrb_runtime"
+    app_mrb_artifact_dir="$app_mrb_dir/surface-headless-morph-artifacts"
+    write_drift_golden "$app_mrb_artifact_dir/surface-morph-rendered-beauty-frame-order-1-initial.rgba" "$app_mrb_golden_dir/order-1-initial.rgba"
+    write_drift_golden "$app_mrb_artifact_dir/surface-morph-rendered-beauty-frame-order-2-focused.rgba" "$app_mrb_golden_dir/order-2-focused.rgba"
+    write_drift_golden "$app_mrb_artifact_dir/surface-morph-rendered-beauty-frame-order-3-motion.rgba" "$app_mrb_golden_dir/order-3-motion.rgba"
+    go run ./tools/cmd/surface-visual-diff \
+      --runtime-report "$app_mrb_runtime" \
+      --required-target headless \
+      --golden-artifact "$source,headless,1,$app_mrb_golden_dir/order-1-initial.rgba" \
+      --golden-artifact "$source,headless,2,$app_mrb_golden_dir/order-2-focused.rgba" \
+      --golden-artifact "$source,headless,3,$app_mrb_golden_dir/order-3-motion.rgba" \
+      --out "$app_mrb_visual"
+    go run ./tools/cmd/surface-runtime-smoke \
+      --mode headless-morph \
+      --source "$source" \
+      --report "$app_mrb_runtime" \
+      --visual-report "$app_mrb_visual" \
+      --morph-rendered-beauty-report "$app_mrb_report"
+    go run ./tools/cmd/validate-surface-morph-rendered-beauty --report "$app_mrb_report" --morph-to-pixels-chain-out "$app_mrb_chain"
+    morph_to_pixels_entry="$(tr -d '\n' < "$app_mrb_chain")"
+  fi
+
   target_entries=()
   visual_target_entries=()
   for target in "${required_targets[@]}"; do
     runtime_report="$runtime_dir/$shape-$target.json"
-    frame_checksum="$(sha256_text "$shape|$source|$target|$source_sha|$build_sha")"
+    frame_path="$visual_artifact_dir/$shape/$target/current.rgba"
+    golden_frame_path="$visual_artifact_dir/$shape/$target/golden.rgba"
+    write_rgba_artifact "$frame_path" 420 280 1680 "$shape|$source|$target|current|$source_sha|$build_sha"
+    write_rgba_artifact "$golden_frame_path" 420 280 1680 "$shape|$source|$target|current|$source_sha|$build_sha"
+    frame_checksum="$(sha256_file "$frame_path")"
+    golden_frame_checksum="$(sha256_file "$golden_frame_path")"
     cat > "$runtime_report" <<JSON
 {
   "schema": "tetra.surface.runtime.v1",
@@ -272,7 +365,12 @@ JSON
       "height": 280,
       "stride": 1680,
       "checksum": $(json_string "$frame_checksum"),
-      "golden_checksum": $(json_string "$frame_checksum"),
+      "golden_checksum": $(json_string "$golden_frame_checksum"),
+      "artifact_path": $(json_string "$frame_path"),
+      "artifact_sha256": $(json_string "$frame_checksum"),
+      "artifact_format": "rgba",
+      "golden_artifact_path": $(json_string "$golden_frame_path"),
+      "golden_artifact_sha256": $(json_string "$golden_frame_checksum"),
       "diff_pixels": 0,
       "diff_ratio_milli": 0,
       "max_channel_delta": 0,
@@ -287,6 +385,12 @@ JSON
 )")
   done
 
+  if [[ "$infrastructure_only" == true ]]; then
+    reference_mrb_json="\"infrastructure_only\": true, \"non_product_reason\": $(json_string "$non_product_reason")"
+  else
+    reference_mrb_json="\"infrastructure_only\": false, \"morph_to_pixels\": $morph_to_pixels_entry"
+  fi
+
   app_entries+=("$(cat <<JSON
 {
   "shape": $(json_string "$shape"),
@@ -294,6 +398,7 @@ JSON
   "module": $(json_string "$module"),
   "imports": [$imports],
   "recipes": [${recipe_json[$shape]}],
+  "beauty_coverage": [${beauty_json[$shape]}],
   "stable_morph_recipes": true,
   "resolves_to_block": true,
   "compiles": true,
@@ -306,6 +411,7 @@ JSON
   "performance_budget": true,
   "artifact_hashes": true,
   "compatibility_widgets": $compatibility_widgets,
+  $reference_mrb_json,
   "targets": [$(join_json_entries "${target_entries[@]}")]
 }
 JSON
@@ -340,7 +446,11 @@ cat > "$visual_report" <<JSON
     "missing_block_graph_rejected": true,
     "missing_layout_rejected": true,
     "missing_accessibility_rejected": true,
-    "missing_performance_rejected": true
+    "missing_performance_rejected": true,
+    "self_golden_rejected": true,
+    "metadata_checksum_rejected": true,
+    "fixture_frame_only_rejected": true,
+    "missing_png_or_rgba_artifact_rejected": true
   }
 }
 JSON
@@ -385,3 +495,4 @@ go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-has
 echo "Surface reference app suite report: $report_path"
 echo "Surface reference visual report: $visual_report"
 echo "Surface reference target reports: $runtime_dir"
+echo "Surface reference Morph-to-pixels evidence: $mrb_dir"

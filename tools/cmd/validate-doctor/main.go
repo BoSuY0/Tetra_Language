@@ -1,11 +1,11 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
+
+	"tetra_language/tools/internal/reportdecode"
 )
 
 type doctorReport struct {
@@ -93,7 +93,5 @@ func validateDoctorReport(raw []byte) error {
 }
 
 func decodeStrictJSON(raw []byte, out any) error {
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.DisallowUnknownFields()
-	return dec.Decode(out)
+	return reportdecode.DecodeStrict(raw, out)
 }

@@ -60,6 +60,11 @@ jobs:
         shell: bash
         run: bash scripts/ci/test.sh
 
+      - name: TOON format focused gate
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash scripts/ci/toon-format-check.sh
+
       - name: Verify docs manifest
         shell: bash
         run: |
@@ -233,6 +238,64 @@ jobs:
           name: tetra-v0.4.0-${{ github.sha }}-release-readiness-linux
           path: reports/ci-release-v0.4.0-readiness
 
+  surface-product-slice-linux:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.20.x"
+
+      - name: Bootstrap
+        shell: bash
+        run: bash scripts/dev/bootstrap.sh
+
+      - name: Surface product-slice gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          export GOTELEMETRY=off
+          export GOCACHE="${PWD}/.cache/go-build-surface-product-slice-ci"
+          export GOTMPDIR="${PWD}/.cache/go-tmp-surface-product-slice-ci"
+          mkdir -p "$GOCACHE" "$GOTMPDIR"
+          if ! command -v weston >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y weston
+          fi
+          export XDG_RUNTIME_DIR="${RUNNER_TEMP:-/tmp}/surface-wayland-runtime"
+          mkdir -p "$XDG_RUNTIME_DIR"
+          chmod 700 "$XDG_RUNTIME_DIR"
+          weston_log="${RUNNER_TEMP:-/tmp}/surface-product-slice-weston.log"
+          weston --backend=headless-backend.so --socket=wayland-surface-product-slice-ci --idle-time=0 >"$weston_log" 2>&1 &
+          weston_pid=$!
+          cleanup_weston() {
+            kill "$weston_pid" >/dev/null 2>&1
+          }
+          trap cleanup_weston EXIT
+          waited=0
+          while [[ ! -S "$XDG_RUNTIME_DIR/wayland-surface-product-slice-ci" && "$waited" -lt 100 ]]; do
+            sleep 0.1
+            waited=$((waited + 1))
+          done
+          if [[ ! -S "$XDG_RUNTIME_DIR/wayland-surface-product-slice-ci" ]]; then
+            if [[ -f "$weston_log" ]]; then
+              cat "$weston_log" >&2
+            fi
+            exit 1
+          fi
+          export WAYLAND_DISPLAY=wayland-surface-product-slice-ci
+          bash scripts/release/surface/surface-product-slice-gate.sh --report-dir reports/surface-product-slice-ci
+
+      - name: Upload Surface product-slice reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tetra-surface-product-slice-${{ github.sha }}-linux-x64
+          path: reports/surface-product-slice-ci
+
   surface-release-readiness-linux:
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
@@ -350,6 +413,8 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - uses: actions/setup-go@v5
         with:
@@ -376,6 +441,8 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - uses: actions/setup-go@v5
         with:

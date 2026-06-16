@@ -477,7 +477,7 @@ func validHeapBlockers(gitHead string) string {
   "git_head":%q,
   "target":"linux-x64",
   "generated_by":"ram-contract-fuzz-short",
-  "rows":[{"site_id":"site:main:heap","function":"main","intent":"heap_fallback","placement":"heap_unbounded","blockers":["unknown_size"],"contract_grade":"M5"}],
+  "rows":[{"site_id":"site:main:heap","function":"main","intent":"heap_fallback","placement":"heap_unbounded","blockers":["unknown_size"],"contract_grade":"M5","file":"fixtures/main.tetra","line":3,"symbol":"main","source_location_status":"available","severity":"P1","reason":"unknown_size","suggested_fix":"add no-escape, lifetime, or bounded allocation proof before changing this heap fallback","evidence_id":"fact:ram:site:main:heap","safe_to_optimize":false}],
   "non_claims":["no Memory 100%% claim"]
 }
 `, gitHead)

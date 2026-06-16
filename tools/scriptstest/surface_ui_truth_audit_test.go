@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -72,7 +73,7 @@ func TestSurfaceUITruthAuditRejectsUnsafeReportDirs(t *testing.T) {
 func TestSurfaceUITruthAuditWritesRequiredArtifacts(t *testing.T) {
 	root := repoRoot(t)
 	script := filepath.Join(root, "scripts", "analysis", "surface-ui-truth-audit.sh")
-	reportRel := filepath.ToSlash(filepath.Join("reports", "surface-ui-production-audit", "scriptstest-p00"))
+	reportRel := filepath.ToSlash(filepath.Join("reports", "surface-ui-production-audit", "scriptstest-p00-"+strconv.Itoa(os.Getpid())))
 	reportDir := filepath.Join(root, filepath.FromSlash(reportRel))
 	if err := os.RemoveAll(reportDir); err != nil {
 		t.Fatalf("clean report dir: %v", err)

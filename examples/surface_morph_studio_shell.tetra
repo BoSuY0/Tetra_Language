@@ -1,0 +1,66 @@
+// Tetra Studio Shell product slice authored through Morph recipes over Block.
+module examples.surface_morph_studio_shell
+
+import lib.core.surface as surface
+import lib.core.block as block
+import lib.core.morph as morph
+
+struct MorphStudioShellApp:
+    expanded_recipe_count: Int
+    block_count: Int
+    product_surface_count: Int
+    a11y_projection: Bool
+
+func root_block(rect: surface.Rect) -> block.Block:
+    let paint: block.PaintSpec = block.paint_stack2(block.paint_layer_fill_radius(morph.theme_dark(), 0), block.paint_layer_overlay(morph.accent(), 42, 0))
+    let props: block.BlockProps = block.props(block.layout_overlay(rect, 0), paint, block.text_none(), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_region(18), block.asset_none())
+    return block.make(block.id(1), block.id_none(), props)
+
+func main() -> Int
+uses alloc, mem:
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 640, h: 360)
+    let shell_rect: surface.Rect = surface.Rect(x: 16, y: 16, w: 608, h: 328)
+    let toolbar_rect: surface.Rect = surface.Rect(x: 32, y: 32, w: 576, h: 44)
+    let nav_rect: surface.Rect = surface.Rect(x: 32, y: 88, w: 132, h: 200)
+    let content_rect: surface.Rect = surface.Rect(x: 180, y: 88, w: 288, h: 200)
+    let inspector_rect: surface.Rect = surface.Rect(x: 484, y: 88, w: 124, h: 200)
+    let command_label_rect: surface.Rect = surface.Rect(x: 196, y: 100, w: 140, h: 18)
+    let command_rect: surface.Rect = surface.Rect(x: 196, y: 126, w: 256, h: 40)
+    let log_rect: surface.Rect = surface.Rect(x: 196, y: 178, w: 256, h: 38)
+    let error_rect: surface.Rect = surface.Rect(x: 196, y: 226, w: 256, h: 38)
+    let empty_rect: surface.Rect = surface.Rect(x: 496, y: 104, w: 96, h: 62)
+    let status_rect: surface.Rect = surface.Rect(x: 32, y: 300, w: 576, h: 28)
+    let app_shell_recipe: morph.Recipe = morph.recipe_app_shell()
+    let toolbar_recipe: morph.Recipe = morph.recipe_toolbar()
+    let split_recipe: morph.Recipe = morph.recipe_split_pane()
+    let status_recipe: morph.Recipe = morph.recipe_status_bar()
+    let settings_recipe: morph.Recipe = morph.recipe_settings_form()
+    let log_recipe: morph.Recipe = morph.recipe_log_row()
+    let empty_recipe: morph.Recipe = morph.recipe_empty_state()
+    let error_recipe: morph.Recipe = morph.recipe_error_panel()
+    var tree: block.BlockTree = block.tree_init(14)
+    let root: Int = block.tree_add_root(tree, root_block(root_rect), root_rect)
+    let shell: Int = block.tree_add_child(tree, block.id(1), morph.expand_region_panel(2, 1, shell_rect, 18), shell_rect)
+    let toolbar: Int = block.tree_add_child(tree, block.id(2), morph.expand_control_action(3, 2, toolbar_rect, 12, 1301, true), toolbar_rect)
+    let nav: Int = block.tree_add_child(tree, block.id(2), morph.expand_control_action(4, 2, nav_rect, 10, 1302, false), nav_rect)
+    let content: Int = block.tree_add_child(tree, block.id(2), morph.expand_region_panel(5, 2, content_rect, 16), content_rect)
+    let inspector: Int = block.tree_add_child(tree, block.id(2), morph.expand_region_panel(6, 2, inspector_rect, 11), inspector_rect)
+    let command_label: Int = block.tree_add_child(tree, block.id(5), morph.expand_label(7, 5, 8, command_label_rect, 7), command_label_rect)
+    let command: Int = block.tree_add_child(tree, block.id(5), morph.expand_field_text(8, 5, 7, command_rect, 20, 8), command_rect)
+    let log: Int = block.tree_add_child(tree, block.id(5), morph.expand_control_action(9, 5, log_rect, 14, 1303, false), log_rect)
+    let error: Int = block.tree_add_child(tree, block.id(5), morph.expand_control_action(10, 5, error_rect, 13, 1304, false), error_rect)
+    let empty: Int = block.tree_add_child(tree, block.id(6), morph.expand_control_action(11, 6, empty_rect, 11, 1305, false), empty_rect)
+    let status: Int = block.tree_add_child(tree, block.id(2), morph.expand_label(12, 2, 8, status_rect, 18), status_rect)
+    let app_shell_expansion: morph.RecipeExpansion = morph.recipe_expansion(app_shell_recipe, block.id(2))
+    let toolbar_expansion: morph.RecipeExpansion = morph.recipe_expansion(toolbar_recipe, block.id(3))
+    let split_expansion: morph.RecipeExpansion = morph.recipe_expansion(split_recipe, block.id(5))
+    let status_expansion: morph.RecipeExpansion = morph.recipe_expansion(status_recipe, block.id(12))
+    let settings_expansion: morph.RecipeExpansion = morph.recipe_expansion(settings_recipe, block.id(8))
+    let log_expansion: morph.RecipeExpansion = morph.recipe_expansion(log_recipe, block.id(9))
+    let empty_expansion: morph.RecipeExpansion = morph.recipe_expansion(empty_recipe, block.id(11))
+    let error_expansion: morph.RecipeExpansion = morph.recipe_expansion(error_recipe, block.id(10))
+    let app: MorphStudioShellApp = MorphStudioShellApp(expanded_recipe_count: 8, block_count: block.tree_len(tree), product_surface_count: 7, a11y_projection: morph.accessibility_projection_ok(7, 8, 7))
+    let valid: Int = block.tree_validate(tree)
+    if root == 1 && shell == 2 && toolbar == 3 && nav == 4 && content == 5 && inspector == 6 && command_label == 7 && command == 8 && log == 9 && error == 10 && empty == 11 && status == 12 && valid == block.tree_error_ok() && app.expanded_recipe_count == 8 && app.block_count == 12 && app.product_surface_count == 7 && app.a11y_projection && morph.capsule_self_check() && morph.expansion_valid(app_shell_expansion) && morph.expansion_valid(toolbar_expansion) && morph.expansion_valid(split_expansion) && morph.expansion_valid(status_expansion) && morph.expansion_valid(settings_expansion) && morph.expansion_valid(log_expansion) && morph.expansion_valid(empty_expansion) && morph.expansion_valid(error_expansion):
+        return 0
+    return 1

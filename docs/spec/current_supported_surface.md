@@ -1232,9 +1232,9 @@ audit proves that separate checkout state.
   | Linux app-shell subset | current | `linux-app-shell-subset-v1` lifecycle, multi-window notes, resize/DPI/cursor, clipboard, IME, accessibility bridge, scoped app-menu, and blocked-pass dialog/notification evidence |
   | Surface developer fast loop | current | `tetra surface dev` emits `tetra.surface.dev-workflow.v1` / `surface-dev-workflow-v1` fast rebuild evidence for initial, warm-cache, token-change, recipe-change, and source-change steps with source diagnostics |
   | Surface inspector | current | `tools/cmd/surface-inspector` emits `tetra.surface.inspector.v1` / `surface-inspector-v1` static JSON plus optional HTML tool reports for Block tree, Morph tokens, layout, paint, accessibility, event routes, focus, perf counters, source locations, and hidden-state scan evidence |
-  | Surface project templates | current | `tetra new surface-app --template <kind>` generates command palette, settings, dashboard, editor shell, multi-window notes, and web-canvas Block/Morph projects; `surface-template-smoke-v1` checks generation, build/run, inspection, visual diff, and tar package artifacts |
+  | Surface project templates | current | `tetra new surface-app --template <kind>` generates command palette, settings, dashboard, editor shell, studio shell, multi-window notes, and web-canvas Block/Morph projects; `surface-template-smoke-v1` checks generation, build/run, inspection, visual diff, and tar package artifacts |
   | Surface reference app suite | current | `surface-reference-app-suite-v1` validates ten Block/Morph product shapes: command palette, settings, dashboard, editor shell, file manager/list-detail, dialog/notification, localized form, accessibility-heavy form, multi-window notes, and migration; every app checks, builds, runs, resolves Morph recipes to Block, and records visual/interaction/accessibility/performance evidence for headless, linux-x64 real-window, and wasm32-web browser-canvas targets |
-  | Surface packaging and update story | current | `surface-package-v1` packages the command-palette reference app as linux-x64 and wasm32-web tar.gz artifacts, verifies package manifests, local asset hashes, installed linux-x64 binary execution, web bundle HTML/wasm/compiler-owned loader output, and a hash-pinned update channel manifest; signing, notarization, automatic runtime update, and network update fetching are nonclaims without platform/runtime evidence |
+  | Surface packaging and update story | current | `surface-package-v1` packages the command-palette reference app and the product-slice `studio-shell` flagship source as linux-x64 and wasm32-web tar.gz artifacts, verifies package manifests, local asset hashes, installed linux-x64 binary execution, web bundle HTML/wasm/compiler-owned loader output, and a hash-pinned update channel manifest; signing, notarization, automatic runtime update, and network update fetching are nonclaims without platform/runtime evidence |
   | Surface crash recovery and error reporting | current | `surface-crash-report-v1` records bounded linux-x64 command failure, host crash diagnostic capture, local ring-buffer trace/log collection, redacted `tetra.surface.diagnostic.v1` artifacts, and scoped restart evidence; validators reject user data leaks, network upload, Electron crash reporter dependency, docs-only crash claims, and restart claims without before/report/after proof |
   | Surface internationalization and localization | current | `surface-i18n-v1` records bounded string tables, `uk-UA` locale selection, `en-US` fallback, missing-key diagnostics, deterministic formatting hooks, localized-form reference app execution, and RTL placeholder nonclaim evidence; validators reject full ICU, full bidi shaping, RTL production text layout, third-party intl runtime, platform locale dependency, docs-only localization, and silent missing-key fallback |
   | Surface widget migration compatibility | current | `surface-widget-migration-v1` keeps `lib.core.widgets` supported as a Surface v1 compatibility layer, preserves the release widget set, proves Panel/Button/TextBox equivalence rows against Morph recipes that resolve to Block, runs the migration reference app, and rejects future core widget primitive promotion, primary future-widget-core claims, breaking API changes, docs-only migration, and platform toolkit/runtime claims |
@@ -1266,6 +1266,13 @@ audit proves that separate checkout state.
   `bash scripts/release/surface/product-gate.sh --report-dir reports/surface-product-v1`.
   That product gate is mandatory product evidence, but it is not the final
   `PROD_STABLE_SCOPED` verdict; P29 owns the final same-commit audit.
+  The same claim-tier boundary is mirrored by
+  `scripts/release/surface/contracts/surface-release-v1.json`; its
+  `go run ./tools/cmd/run-gate --contract scripts/release/surface/contracts/surface-release-v1.json --report-dir reports/surface-product-v1 --dry-run --json`
+  dry-run checks the machine-readable validation/report/upload plan when the
+  report directory is empty. The shell gate remains the evidence producer,
+  preserving `NONCLAIM` boundaries for remote CI execution and unsupported
+  macOS/Windows runtime support.
 
   Historical feature IDs `ui.surface-minimal-toolkit`,
   `ui.surface-toolkit-reuse-v1`, and
@@ -1287,19 +1294,24 @@ audit proves that separate checkout state.
   The current developer loop is `tetra surface dev`. It writes
   `surface-dev-workflow-v1` evidence for a scoped fast rebuild flow over
   token, recipe, and source changes, with warm-cache cache-hit proof and
-  positioned diagnostics tied to the changed Surface paths. This is not hot
-  reload, not an Electron dev server, and not React Fast Refresh; a full process
-  restart remains documented as fast rebuild until a real reload loop has
-  evidence.
+  positioned diagnostics tied to the changed Surface paths. When a validated
+  Morph rendered beauty report is attached, the dev report also exposes the
+  Morph-to-pixels chain from token graph and recipe expansion through Block
+  scene, render command stream, frame artifact, golden artifact, and diff
+  metrics. This is not hot reload, not an Electron dev server, and not React
+  Fast Refresh; a full process restart remains documented as fast rebuild until
+  a real reload loop has evidence.
   The current inspector is `tools/cmd/surface-inspector`. It aggregates
   validated runtime reports into `surface-inspector-v1` evidence for Block,
-  Morph, layout, paint, accessibility, event routes, focus, and perf counters,
-  with source locations and hidden-state scan results. The optional HTML output
-  is a static tool report. It is not browser devtools, React devtools, DOM
-  runtime UI, hidden app state, or target-host accessibility proof by itself.
+  Morph, layout, paint, accessibility, event routes, focus, and perf counters.
+  With a Morph rendered beauty input it also reports recipe expansions, Block
+  scene nodes, render commands, frame artifacts, golden diff result, and the
+  source-linked Morph-to-pixels hash chain. The optional HTML output is a static
+  tool report. It is not browser devtools, React devtools, DOM runtime UI,
+  hidden app state, or target-host accessibility proof by itself.
   The current project template path is `tetra new surface-app --template`.
   It writes Block/Morph project sources for command palette, settings,
-  dashboard, editor shell, multi-window notes, and web-canvas starts. The
+  dashboard, editor shell, studio shell, multi-window notes, and web-canvas starts. The
   `surface-template-smoke-v1` gate checks generated app paths end to end:
   generate, check, build, run, inspect, visual diff, and tar package evidence.
   Template source does not import `lib.core.widgets`, platform widgets, React,

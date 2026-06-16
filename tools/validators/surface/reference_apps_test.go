@@ -34,6 +34,17 @@ func TestValidateReferenceAppsReportRejectsScreenshotOnlyEvidence(t *testing.T) 
 	}
 }
 
+func TestValidateReferenceAppsReportRejectsProductAppWithoutMorphToPixels(t *testing.T) {
+	raw := strings.Replace(validReferenceAppsSuiteReportJSON(), `,"morph_to_pixels":`+validMorphToPixelsChainJSON("examples/surface_reference_command_palette.tetra"), "", 1)
+	err := ValidateReferenceAppsReport([]byte(raw))
+	if err == nil {
+		t.Fatalf("expected product reference app without Morph-to-pixels evidence to fail")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "morph_to_pixels") {
+		t.Fatalf("error = %v, want morph_to_pixels diagnostic", err)
+	}
+}
+
 func validReferenceAppsSuiteReportJSON() string {
 	apps := []string{
 		referenceAppJSON("command-palette", "examples/surface_reference_command_palette.tetra", false),
@@ -56,7 +67,30 @@ func referenceAppJSON(shape string, source string, compatibility bool) string {
 		referenceTargetJSON("linux-x64-real-window"),
 		referenceTargetJSON("wasm32-web-browser-canvas"),
 	}
-	return `{"shape":"` + shape + `","source":"` + source + `","module":"examples.` + strings.TrimSuffix(strings.TrimPrefix(strings.ReplaceAll(source, "/", "."), "examples."), ".tetra") + `","imports":["lib.core.surface","lib.core.block","lib.core.morph"],"recipes":["region.panel","field.text","control.action","command.item"],"stable_morph_recipes":true,"resolves_to_block":true,"compiles":true,"runs":true,"exit_code":0,"token_theme_conformance":true,"layout_report":true,"interaction_trace":true,"accessibility_snapshot":true,"performance_budget":true,"artifact_hashes":true,"compatibility_widgets":` + boolJSON(compatibility) + `,"targets":[` + strings.Join(targets, ",") + `]}`
+	base := `{"shape":"` + shape + `","source":"` + source + `","module":"examples.` + strings.TrimSuffix(strings.TrimPrefix(strings.ReplaceAll(source, "/", "."), "examples."), ".tetra") + `","imports":["lib.core.surface","lib.core.block","lib.core.morph"],"recipes":["region.panel","field.text","control.action","command.item"],"beauty_coverage":` + referenceBeautyCoverageJSON(shape) + `,"stable_morph_recipes":true,"resolves_to_block":true,"compiles":true,"runs":true,"exit_code":0,"token_theme_conformance":true,"layout_report":true,"interaction_trace":true,"accessibility_snapshot":true,"performance_budget":true,"artifact_hashes":true,"compatibility_widgets":` + boolJSON(compatibility)
+	if compatibility {
+		return base + `,"infrastructure_only":true,"non_product_reason":"legacy widget migration compatibility evidence only","targets":[` + strings.Join(targets, ",") + `]}`
+	}
+	return base + `,"infrastructure_only":false,"morph_to_pixels":` + validMorphToPixelsChainJSON(source) + `,"targets":[` + strings.Join(targets, ",") + `]}`
+}
+
+func referenceBeautyCoverageJSON(shape string) string {
+	switch shape {
+	case "command-palette":
+		return `["command-palette","focus-state"]`
+	case "settings":
+		return `["settings","disabled-state"]`
+	case "dashboard":
+		return `["dashboard"]`
+	case "editor-shell":
+		return `["editor-shell"]`
+	case "dialog-notification":
+		return `["elevated-panel"]`
+	case "migration":
+		return `[]`
+	default:
+		return `["focus-state"]`
+	}
 }
 
 func referenceTargetJSON(target string) string {

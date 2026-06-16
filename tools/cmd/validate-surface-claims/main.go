@@ -1,20 +1,26 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
 	"unicode/utf8"
+
+	"tetra_language/tools/validators/surface"
 )
 
 type surfaceClaimOptions struct {
 	Root       string
 	ReportDirs []string
+	GitHead    string
 }
 
 type stringListFlag []string
@@ -47,6 +53,8 @@ type surfaceClaimClause struct {
 type surfaceClaimEvidence struct {
 	WindowsProductionTargetHost bool
 	MacOSProductionTargetHost   bool
+	MorphRenderedBeautySameHead bool
+	MorphRenderedBeautyProduct  bool
 }
 
 var defaultSurfaceClaimScanPaths = []string{
@@ -70,6 +78,7 @@ var defaultSurfaceClaimScanPaths = []string{
 	"tools/cmd/validate-surface-block-report",
 	"tools/cmd/validate-surface-block-examples",
 	"tools/cmd/validate-surface-morph-report",
+	"tools/cmd/validate-surface-morph-rendered-beauty",
 }
 
 func main() {
@@ -98,7 +107,11 @@ func validateSurfaceClaims(opt surfaceClaimOptions) error {
 	if err != nil {
 		return err
 	}
-	evidence := collectSurfaceClaimEvidence(files)
+	gitHead := strings.TrimSpace(opt.GitHead)
+	if gitHead == "" {
+		gitHead = currentSurfaceClaimGitHead(absRoot)
+	}
+	evidence := collectSurfaceClaimEvidence(files, gitHead)
 	var issues []surfaceClaimIssue
 	for _, path := range files {
 		raw, err := os.ReadFile(path)
@@ -200,7 +213,7 @@ func shouldScanSurfaceClaimFile(path string) bool {
 	}
 }
 
-func collectSurfaceClaimEvidence(files []string) surfaceClaimEvidence {
+func collectSurfaceClaimEvidence(files []string, gitHead string) surfaceClaimEvidence {
 	var evidence surfaceClaimEvidence
 	for _, path := range files {
 		if !strings.Contains(filepath.ToSlash(path), "/reports/") {
@@ -217,8 +230,46 @@ func collectSurfaceClaimEvidence(files []string) surfaceClaimEvidence {
 		if hasTargetHostProductionEvidence(lower, "macos") {
 			evidence.MacOSProductionTargetHost = true
 		}
+		if report, ok := morphRenderedBeautyClaimReport(raw); ok && report.GitHead == gitHead && report.GitCommit == gitHead {
+			evidence.MorphRenderedBeautySameHead = true
+			if report.ProductClaim && report.FinalSignoff {
+				evidence.MorphRenderedBeautyProduct = true
+			}
+		}
 	}
 	return evidence
+}
+
+func currentSurfaceClaimGitHead(root string) string {
+	cmd := exec.Command("git", "rev-parse", "HEAD")
+	cmd.Dir = root
+	raw, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(raw))
+}
+
+func morphRenderedBeautyClaimReport(raw []byte) (surface.MorphRenderedBeautyReport, bool) {
+	var meta struct {
+		Schema string `json:"schema"`
+	}
+	if err := json.Unmarshal(raw, &meta); err != nil {
+		return surface.MorphRenderedBeautyReport{}, false
+	}
+	if meta.Schema != surface.MorphRenderedBeautyReportSchemaV1 {
+		return surface.MorphRenderedBeautyReport{}, false
+	}
+	var report surface.MorphRenderedBeautyReport
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&report); err != nil {
+		return surface.MorphRenderedBeautyReport{}, false
+	}
+	if err := surface.ValidateMorphRenderedBeautyReportValue(report); err != nil {
+		return surface.MorphRenderedBeautyReport{}, false
+	}
+	return report, true
 }
 
 func hasTargetHostProductionEvidence(lower string, target string) bool {
@@ -255,11 +306,19 @@ func inspectSurfaceClaimText(root string, path string, text string, evidence sur
 				})
 			}
 		}
-		if containsProductionMorphClaim(lower) && !surfaceClaimExplicitNonClaimContext(lower) {
+		if containsSurfaceQualityClaim(lower) && !evidence.MorphRenderedBeautySameHead && !surfaceClaimExplicitNonClaimContext(lower) {
 			issues = append(issues, surfaceClaimIssue{
 				Path:    rel,
 				Line:    clause.Line,
-				Rule:    "production Morph overclaim",
+				Rule:    "Surface beauty/quality claim without same-commit Morph rendered beauty evidence",
+				Snippet: strings.TrimSpace(clause.Text),
+			})
+		}
+		if containsProductionMorphClaim(lower) && !surfaceClaimExplicitNonClaimContext(lower) && !evidence.MorphRenderedBeautyProduct {
+			issues = append(issues, surfaceClaimIssue{
+				Path:    rel,
+				Line:    clause.Line,
+				Rule:    "production Morph overclaim without same-commit Morph rendered beauty product signoff",
 				Snippet: strings.TrimSpace(clause.Text),
 			})
 		}
@@ -497,6 +556,89 @@ func containsProductionMorphClaim(lower string) bool {
 		return true
 	}
 	return false
+}
+
+func containsSurfaceQualityClaim(lower string) bool {
+	if surfaceClaimArtifactContext(lower) {
+		return false
+	}
+	if containsRuntimeQualityClaim(lower, "electron") || containsRuntimeQualityClaim(lower, "react") {
+		return true
+	}
+	if containsPixelPerfectSurfaceClaim(lower) {
+		return true
+	}
+	if containsMorphBeautyClaim(lower) {
+		return true
+	}
+	return false
+}
+
+func surfaceClaimArtifactContext(lower string) bool {
+	return containsAnySubstring(lower, []string{
+		`"path"`,
+		`"root"`,
+		`"command_line"`,
+		"/reports/",
+		"reports/",
+		"--report-dir",
+	})
+}
+
+func containsRuntimeQualityClaim(lower string, runtime string) bool {
+	if !strings.Contains(lower, runtime) {
+		return false
+	}
+	if !containsAnySubstring(lower, []string{
+		runtime + "-quality",
+		runtime + " quality",
+		runtime + " grade",
+		runtime + "-grade",
+	}) {
+		return false
+	}
+	return containsAnySubstring(lower, []string{
+		"surface",
+		"tetra",
+		"ui",
+		"user interface",
+		"app shell",
+	})
+}
+
+func containsPixelPerfectSurfaceClaim(lower string) bool {
+	if !containsAnySubstring(lower, []string{"pixel-perfect", "pixel perfect"}) {
+		return false
+	}
+	return containsAnySubstring(lower, []string{
+		"surface",
+		"tetra",
+		"ui",
+		"user interface",
+		"morph",
+		"rendering",
+	})
+}
+
+func containsMorphBeautyClaim(lower string) bool {
+	if !strings.Contains(lower, "morph") || !strings.Contains(lower, "beauty") {
+		return false
+	}
+	return surfaceClaimPromotes(lower) ||
+		containsAnySubstring(lower, []string{
+			"beauty is proven",
+			"beauty is guaranteed",
+			"beauty is ready",
+			"beauty layer is proven",
+			"beauty layer is ready",
+			"can be described as the rendered beauty layer",
+			"is the rendered beauty layer",
+			"has morph rendered beauty",
+			"morph rendered beauty is proven",
+			"morph rendered beauty is available",
+			"production beauty",
+			"product beauty",
+		})
 }
 
 func containsTargetProductionClaim(lower string, target string) bool {

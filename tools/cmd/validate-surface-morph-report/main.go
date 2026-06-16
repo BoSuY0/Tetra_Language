@@ -59,7 +59,7 @@ func validateSurfaceMorphReportWithOptions(path string, options morphReportValid
 	if report.Morph.Schema != "tetra.surface.morph.v1" {
 		return fmt.Errorf("morph schema is %q, want tetra.surface.morph.v1", report.Morph.Schema)
 	}
-	if report.BlockSystem == nil {
+	if report.BlockSystem == nil && !isTargetMorphRuntimeReport(report) {
 		return fmt.Errorf("surface Morph report requires block_system evidence")
 	}
 	if err := validateMorphReportArtifactLocality(path, report.ArtifactScan, report.Artifacts); err != nil {
@@ -78,6 +78,60 @@ func validateSurfaceMorphReportWithOptions(path string, options morphReportValid
 		}
 	}
 	return nil
+}
+
+func isBrowserCanvasMorphRuntimeReport(report surface.Report) bool {
+	if report.Target != "wasm32-web" ||
+		report.Runtime != "surface-wasm32-web" ||
+		report.HostEvidence.Level != "wasm32-web-browser-canvas-input" ||
+		!report.HostEvidence.BrowserCanvas ||
+		!report.HostEvidence.BrowserInput ||
+		report.RenderCommandStream == nil ||
+		report.RenderCommandStream.Renderer != "browser-canvas-rgba" {
+		return false
+	}
+	for _, frame := range report.Frames {
+		if strings.EqualFold(strings.TrimSpace(frame.Producer), "app") &&
+			strings.EqualFold(strings.TrimSpace(frame.EvidenceRole), "product_visual") &&
+			strings.TrimSpace(frame.ArtifactPath) != "" &&
+			strings.TrimSpace(frame.RenderCommandStreamHash) == strings.TrimSpace(report.RenderCommandStream.CommandStreamHash) {
+			return true
+		}
+	}
+	return false
+}
+
+func isLinuxRealWindowMorphRuntimeReport(report surface.Report) bool {
+	if report.Target != "linux-x64" ||
+		report.Runtime != "surface-linux-x64" ||
+		report.HostEvidence.Level != "linux-x64-real-window" ||
+		report.HostEvidence.Backend != "wayland-shm-rgba" ||
+		!report.HostEvidence.RealWindow ||
+		!report.HostEvidence.NativeInput ||
+		report.RenderCommandStream == nil ||
+		report.RenderCommandStream.Renderer != "wayland-shm-rgba" {
+		return false
+	}
+	return hasSourceLinkedProductVisualFrame(report)
+}
+
+func isTargetMorphRuntimeReport(report surface.Report) bool {
+	return isBrowserCanvasMorphRuntimeReport(report) || isLinuxRealWindowMorphRuntimeReport(report)
+}
+
+func hasSourceLinkedProductVisualFrame(report surface.Report) bool {
+	if report.RenderCommandStream == nil {
+		return false
+	}
+	for _, frame := range report.Frames {
+		if strings.EqualFold(strings.TrimSpace(frame.Producer), "app") &&
+			strings.EqualFold(strings.TrimSpace(frame.EvidenceRole), "product_visual") &&
+			strings.TrimSpace(frame.ArtifactPath) != "" &&
+			strings.TrimSpace(frame.RenderCommandStreamHash) == strings.TrimSpace(report.RenderCommandStream.CommandStreamHash) {
+			return true
+		}
+	}
+	return false
 }
 
 func validateMorphReportPathSafety(reportPath string) error {

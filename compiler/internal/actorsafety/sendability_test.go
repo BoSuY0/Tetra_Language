@@ -61,6 +61,58 @@ func TestOwnedRegionMustMoveAndSenderUseAfterMoveRejects(t *testing.T) {
 	}
 }
 
+func TestActorSendabilityStableDiagnosticsMatrix(t *testing.T) {
+	cases := []struct {
+		name   string
+		values []Value
+		events []Event
+		want   []string
+	}{
+		{
+			name:   "borrowed typed payload requires copy",
+			values: []Value{{Name: "payload", Type: "[]u8", Kind: ValueBorrowed}},
+			events: []Event{{Kind: EventSend, Value: "payload", Mode: SendBorrowed, Site: "worker.t4:7"}},
+			want: []string{
+				"actor sendability",
+				"worker.t4:7",
+				"cannot send borrowed view across actor boundary; use .copy() for \"payload\"",
+			},
+		},
+		{
+			name:   "sender use-after-move names send and use sites",
+			values: []Value{{Name: "request_region", Type: "region", Kind: ValueOwnedRegion}},
+			events: []Event{
+				{Kind: EventSend, Value: "request_region", Mode: SendMove, Site: "worker.t4:12"},
+				{Kind: EventUse, Value: "request_region", Site: "worker.t4:13"},
+			},
+			want: []string{
+				"actor sendability",
+				"worker.t4:13",
+				"cannot use moved region after send",
+				"\"request_region\" was moved at worker.t4:12",
+			},
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			checker := NewChecker(tt.values)
+			err := checker.Check(tt.events)
+			if err == nil {
+				t.Fatalf("expected sendability diagnostic")
+			}
+			for _, want := range tt.want {
+				if !strings.Contains(err.Error(), want) {
+					t.Fatalf("error = %v, want text %q", err, want)
+				}
+			}
+			if strings.Contains(err.Error(), "MVP") {
+				t.Fatalf("error = %v, want stable non-versioned diagnostic", err)
+			}
+		})
+	}
+}
+
 func TestUnsafePointerRequiresExplicitUnsafeSendContract(t *testing.T) {
 	checker := NewChecker([]Value{{Name: "raw", Type: "ptr", Kind: ValueUnsafePtr}})
 	err := checker.Check([]Event{{Kind: EventSend, Value: "raw", Mode: SendUnsafe, Site: "app.tetra:20"}})

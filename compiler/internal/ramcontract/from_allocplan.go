@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"tetra_language/compiler/internal/allocplan"
@@ -70,18 +71,102 @@ func rowFromAllocation(function string, alloc allocplan.Allocation) (Row, ProofS
 		EscapeStatus:     escapeStatusFromAllocPlan(alloc.Escape),
 		Placement:        placement,
 		Blockers:         blockersFromAllocation(alloc, placement),
+		ReasonCodes:      append([]string(nil), alloc.ReasonCodes...),
+		HeapReasonCodes:  append([]string(nil), alloc.HeapReasonCodes...),
 		CopyReason:       copyReasonFromAllocation(alloc, intent, placement),
 		FreePoint:        freePointFromAllocation(alloc, function),
 		ContractGrade:    GradeForPlacement(placement),
 		ValidationStatus: validationStatusFromAllocation(alloc, placement),
 		SourceFactID:     "fact:ram:" + sanitizeID(alloc.SiteID),
 	}
+	row.Domain = memoryDomainFromAllocation(function, alloc, row)
 	if trustedPlacement(placement) && row.ValidationStatus == ValidationValidated {
 		proof := proofForAllocation(function, alloc, row)
 		row.ProofIDs = []string{proof.ProofID}
 		return row, proof
 	}
 	return row, ProofSummary{}
+}
+
+func memoryDomainFromAllocation(function string, alloc allocplan.Allocation, row Row) *MemoryDomain {
+	requested := row.RequestedBytes
+	reserved := int64(alloc.BytesReserved)
+	if reserved == 0 {
+		reserved = int64(allocationBytes(alloc))
+		if reserved == 0 {
+			reserved = requested
+		}
+	}
+	domain := &MemoryDomain{
+		DomainID:       "domain:process",
+		Kind:           DomainProcess,
+		OwnerKind:      "process",
+		OwnerID:        "current",
+		Lifetime:       "process",
+		BudgetBytes:    requested,
+		RequestedBytes: requested,
+		ReservedBytes:  reserved,
+		CommittedBytes: int64(alloc.BytesCommitted),
+		ReleasedBytes:  int64(alloc.BytesReleased),
+	}
+	if alloc.MemoryBackend != nil {
+		domain.CurrentBytes = alloc.MemoryBackend.FootprintCurrentBytes
+		domain.PeakBytes = alloc.MemoryBackend.FootprintPeakBytes
+	}
+	switch alloc.ActualLoweringStorage {
+	case allocplan.StorageExplicitIsland:
+		domain.Kind = DomainIsland
+		domain.DomainID = memoryDomainID("island", alloc.RegionID, alloc.SiteID)
+		domain.OwnerKind = "island"
+		domain.OwnerID = ownerIDFromRegion("island", alloc.RegionID, alloc.ValueID)
+		domain.Lifetime = row.Lifetime
+	case allocplan.StorageTaskRegion:
+		domain.Kind = DomainTask
+		domain.DomainID = memoryDomainID("task", alloc.RegionID, alloc.SiteID)
+		domain.OwnerKind = "task"
+		domain.OwnerID = ownerIDFromRegion("task", alloc.RegionID, function)
+		domain.Lifetime = row.Lifetime
+	case allocplan.StorageActorMoveRegion:
+		domain.Kind = DomainActor
+		domain.DomainID = memoryDomainID("actor", alloc.RegionID, alloc.SiteID)
+		domain.OwnerKind = "actor"
+		domain.OwnerID = ownerIDFromRegion("actor", alloc.RegionID, function)
+		domain.Lifetime = row.Lifetime
+	case allocplan.StorageExternal:
+		domain.Kind = DomainExternal
+		domain.DomainID = memoryDomainID("external", alloc.RegionID, alloc.SiteID)
+		domain.OwnerKind = "external"
+		domain.OwnerID = ownerIDFromRegion("external", alloc.RegionID, alloc.ValueID)
+		domain.Lifetime = row.Lifetime
+	}
+	if isCopyIntent(row.Intent) {
+		domain.CopyCount = 1
+		domain.BytesCopied = requested
+	}
+	return domain
+}
+
+func memoryDomainID(kind string, regionID string, fallback string) string {
+	regionID = strings.TrimSpace(regionID)
+	if regionID != "" {
+		return "domain:" + sanitizeID(regionID)
+	}
+	return "domain:" + kind + ":" + sanitizeID(fallback)
+}
+
+func ownerIDFromRegion(kind string, regionID string, fallback string) string {
+	regionID = strings.TrimSpace(regionID)
+	prefix := kind + ":"
+	if strings.HasPrefix(regionID, prefix) {
+		value := strings.TrimSpace(strings.TrimPrefix(regionID, prefix))
+		if value != "" {
+			return sanitizeID(value)
+		}
+	}
+	if regionID != "" {
+		return sanitizeID(regionID)
+	}
+	return sanitizeID(fallback)
 }
 
 func placementFromAllocation(alloc allocplan.Allocation) Placement {
@@ -347,6 +432,7 @@ func BuildHeapBlockerReport(report Report) BlockerReport {
 		GitHead:       report.GitHead,
 		Target:        report.Target,
 		GeneratedBy:   report.GeneratedBy,
+		Rows:          make([]BlockerRow, 0, len(report.Rows)),
 		NonClaims:     append([]string(nil), report.NonClaims...),
 	}
 	for _, row := range report.Rows {
@@ -365,6 +451,7 @@ func BuildCopyBlockerReport(report Report) BlockerReport {
 		GitHead:       report.GitHead,
 		Target:        report.Target,
 		GeneratedBy:   report.GeneratedBy,
+		Rows:          make([]BlockerRow, 0, len(report.Rows)),
 		NonClaims:     append([]string(nil), report.NonClaims...),
 	}
 	for _, row := range report.Rows {
@@ -377,15 +464,144 @@ func BuildCopyBlockerReport(report Report) BlockerReport {
 }
 
 func blockerRowFromRAMRow(row Row) BlockerRow {
-	return BlockerRow{
-		SiteID:        row.SiteID,
-		Function:      row.Function,
-		Intent:        row.Intent,
-		Placement:     row.Placement,
-		Blockers:      append([]string(nil), row.Blockers...),
-		CopyReason:    row.CopyReason,
-		ContractGrade: row.ContractGrade,
+	file, line, sourceStatus := sourceLocationFromSpan(row.SourceSpan)
+	blocker := BlockerRow{
+		SiteID:               row.SiteID,
+		Function:             row.Function,
+		Intent:               row.Intent,
+		Placement:            row.Placement,
+		Blockers:             append([]string(nil), row.Blockers...),
+		ReasonCodes:          append([]string(nil), row.ReasonCodes...),
+		HeapReasonCodes:      append([]string(nil), row.HeapReasonCodes...),
+		CopyReason:           row.CopyReason,
+		ContractGrade:        row.ContractGrade,
+		File:                 file,
+		Line:                 line,
+		Symbol:               row.Function,
+		SourceLocationStatus: sourceStatus,
+		Severity:             severityForRAMRow(row),
+		Reason:               blockerReasonForRAMRow(row),
+		SuggestedFix:         suggestedFixForRAMRow(row),
+		ProofID:              firstString(row.ProofIDs),
+		EvidenceID:           evidenceIDForRAMRow(row),
+		SafeToOptimize:       safeToOptimizeRAMRow(row),
 	}
+	if isCopyIntent(row.Intent) {
+		blocker.CopyKind = copyKindForRAMRow(row)
+		blocker.SourceValue = row.ValueID
+		blocker.DestinationValue = string(row.Placement)
+		blocker.BytesEstimate = row.RequestedBytes
+		blocker.SafetyReason = copySafetyReasonForRAMRow(row)
+	}
+	return blocker
+}
+
+func sourceLocationFromSpan(span string) (string, int, string) {
+	span = strings.TrimSpace(span)
+	if span == "" {
+		return "", 0, "unavailable"
+	}
+	parts := strings.Split(span, ":")
+	if len(parts) < 3 {
+		return "", 0, "unavailable"
+	}
+	line, err := strconv.Atoi(parts[len(parts)-2])
+	if err != nil || line <= 0 {
+		return "", 0, "unavailable"
+	}
+	file := strings.Join(parts[:len(parts)-2], ":")
+	if strings.TrimSpace(file) == "" {
+		return "", 0, "unavailable"
+	}
+	return file, line, "available"
+}
+
+func severityForRAMRow(row Row) string {
+	switch row.ContractGrade {
+	case GradeM5, GradeM6:
+		return "P1"
+	case GradeM4:
+		return "P2"
+	default:
+		return "P3"
+	}
+}
+
+func blockerReasonForRAMRow(row Row) string {
+	if isCopyIntent(row.Intent) && strings.TrimSpace(row.CopyReason) != "" {
+		return row.CopyReason
+	}
+	if len(row.Blockers) > 0 {
+		return strings.Join(row.Blockers, ",")
+	}
+	if strings.TrimSpace(string(row.ValidationStatus)) != "" {
+		return "validation_status:" + string(row.ValidationStatus)
+	}
+	return "conservative RAM contract blocker"
+}
+
+func suggestedFixForRAMRow(row Row) string {
+	if isCopyIntent(row.Intent) {
+		if row.Intent == IntentCopyEliminated {
+			return "no code change required; keep the copy-elimination proof covered by RAM contract tests"
+		}
+		return "add ownership/lifetime proof before replacing this copy with a borrowed or zero-copy path"
+	}
+	if isHeapPlacement(row.Placement) {
+		return "add no-escape, lifetime, or bounded allocation proof before changing this heap fallback"
+	}
+	return "preserve conservative RAM contract evidence before changing this placement"
+}
+
+func evidenceIDForRAMRow(row Row) string {
+	if strings.TrimSpace(row.SourceFactID) != "" {
+		return row.SourceFactID
+	}
+	if strings.TrimSpace(row.SiteID) != "" {
+		return "fact:ram:" + sanitizeID(row.SiteID)
+	}
+	return "fact:ram:unknown"
+}
+
+func safeToOptimizeRAMRow(row Row) bool {
+	return isCopyIntent(row.Intent) && row.Intent == IntentCopyEliminated
+}
+
+func copyKindForRAMRow(row Row) string {
+	switch row.Intent {
+	case IntentCopyEliminated:
+		return "ACCEPTABLE_SMALL_COPY"
+	case IntentCopyStackBacked:
+		if row.RequestedBytes > 4096 {
+			return "HOT_PATH_COPY"
+		}
+		return "ACCEPTABLE_SMALL_COPY"
+	case IntentCopyHeapBounded, IntentCopyHeapUnbounded:
+		return "HOT_PATH_COPY"
+	case IntentCopyRequiredBoundary, IntentCopyRequiredMutableAlias:
+		return "NEEDS_ZERO_COPY_OR_BORROWED_VIEW"
+	case IntentCopyIntoNoAllocation:
+		return "ACCEPTABLE_SMALL_COPY"
+	default:
+		return "NEEDS_ZERO_COPY_OR_BORROWED_VIEW"
+	}
+}
+
+func copySafetyReasonForRAMRow(row Row) string {
+	if safeToOptimizeRAMRow(row) {
+		return "copy is already eliminated by supported RAM contract evidence"
+	}
+	if row.ValidationStatus == ValidationValidated && row.EscapeStatus == EscapeNoEscape {
+		return "validated no-escape evidence exists, but ownership semantics still gate zero-copy changes"
+	}
+	return "copy preserves ownership or lifetime boundary until stronger proof is available"
+}
+
+func firstString(values []string) string {
+	if len(values) == 0 {
+		return ""
+	}
+	return values[0]
 }
 
 func allocationBytes(alloc allocplan.Allocation) int {

@@ -71,18 +71,39 @@ type allocationReportFunction struct {
 }
 
 type allocationReportAllocation struct {
-	ID                    string `json:"id"`
-	SiteID                string `json:"site_id"`
-	Builtin               string `json:"builtin,omitempty"`
-	LengthStatus          string `json:"length_status,omitempty"`
-	ZeroGuardStatus       string `json:"zero_guard_status,omitempty"`
-	NegativeGuardStatus   string `json:"negative_guard_status,omitempty"`
-	OverflowGuardStatus   string `json:"overflow_guard_status,omitempty"`
-	PlannedStorage        string `json:"planned_storage"`
-	ActualLoweringStorage string `json:"actual_lowering_storage"`
-	ValidationStatus      string `json:"validation_status,omitempty"`
-	LoweringStatus        string `json:"lowering_status,omitempty"`
-	Reason                string `json:"reason,omitempty"`
+	ID                    string                  `json:"id"`
+	SiteID                string                  `json:"site_id"`
+	Builtin               string                  `json:"builtin,omitempty"`
+	LengthStatus          string                  `json:"length_status,omitempty"`
+	ZeroGuardStatus       string                  `json:"zero_guard_status,omitempty"`
+	NegativeGuardStatus   string                  `json:"negative_guard_status,omitempty"`
+	OverflowGuardStatus   string                  `json:"overflow_guard_status,omitempty"`
+	PlannedStorage        string                  `json:"planned_storage"`
+	ActualLoweringStorage string                  `json:"actual_lowering_storage"`
+	ValidationStatus      string                  `json:"validation_status,omitempty"`
+	LoweringStatus        string                  `json:"lowering_status,omitempty"`
+	ReasonCodes           []string                `json:"reason_codes,omitempty"`
+	HeapReasonCodes       []string                `json:"heap_reason_codes,omitempty"`
+	Domain                *allocationMemoryDomain `json:"domain,omitempty"`
+	Reason                string                  `json:"reason,omitempty"`
+}
+
+type allocationMemoryDomain struct {
+	DomainID       string `json:"domain_id"`
+	ParentDomainID string `json:"parent_domain_id,omitempty"`
+	Kind           string `json:"kind"`
+	OwnerKind      string `json:"owner_kind"`
+	OwnerID        string `json:"owner_id"`
+	Lifetime       string `json:"lifetime"`
+	BudgetBytes    int64  `json:"budget_bytes,omitempty"`
+	RequestedBytes int64  `json:"requested_bytes,omitempty"`
+	ReservedBytes  int64  `json:"reserved_bytes,omitempty"`
+	CommittedBytes int64  `json:"committed_bytes,omitempty"`
+	ReleasedBytes  int64  `json:"released_bytes,omitempty"`
+	CurrentBytes   int64  `json:"current_bytes,omitempty"`
+	PeakBytes      int64  `json:"peak_bytes,omitempty"`
+	CopyCount      int    `json:"copy_count,omitempty"`
+	BytesCopied    int64  `json:"bytes_copied,omitempty"`
 }
 
 func main() {
@@ -228,6 +249,14 @@ func validateAllocationArtifactContract(prefix string, alloc allocationReportAll
 	} else if !knownAllocationRejectGuard(overflowGuard) {
 		issues = append(issues, fmt.Sprintf("%s: unknown overflow_guard_status %q", prefix, overflowGuard))
 	}
+	if allocationArtifactUsesHeap(alloc) {
+		if len(alloc.HeapReasonCodes) == 0 {
+			issues = append(issues, fmt.Sprintf("%s: heap allocation requires heap_reason_codes", prefix))
+		}
+		issues = append(issues, validateAllocationReasonCodes(prefix, alloc.ReasonCodes, alloc.HeapReasonCodes)...)
+	} else if len(alloc.HeapReasonCodes) > 0 {
+		issues = append(issues, fmt.Sprintf("%s: heap_reason_codes require heap storage", prefix))
+	}
 	if builtin == "" || zeroGuard == "" || negativeGuard == "" || overflowGuard == "" {
 		return issues
 	}
@@ -244,7 +273,123 @@ func validateAllocationArtifactContract(prefix string, alloc allocationReportAll
 	if overflowGuard != wantOverflow {
 		issues = append(issues, fmt.Sprintf("%s: builtin %q overflow_guard_status %q does not match contract %q", prefix, builtin, overflowGuard, wantOverflow))
 	}
+	issues = append(issues, validateAllocationMemoryDomain(prefix, alloc.Domain)...)
 	return issues
+}
+
+func validateAllocationMemoryDomain(prefix string, domain *allocationMemoryDomain) []string {
+	if domain == nil {
+		return nil
+	}
+	var issues []string
+	if strings.TrimSpace(domain.DomainID) == "" {
+		issues = append(issues, prefix+": domain_id is required")
+	}
+	if !knownAllocationDomainKind(domain.Kind) {
+		issues = append(issues, fmt.Sprintf("%s: unknown domain kind %q", prefix, domain.Kind))
+	}
+	if strings.TrimSpace(domain.OwnerKind) == "" {
+		issues = append(issues, prefix+": domain owner_kind is required")
+	}
+	if strings.TrimSpace(domain.OwnerID) == "" {
+		issues = append(issues, prefix+": domain owner_id is required")
+	}
+	if strings.TrimSpace(domain.Lifetime) == "" {
+		issues = append(issues, prefix+": domain lifetime is required")
+	}
+	for name, value := range map[string]int64{
+		"budget_bytes":    domain.BudgetBytes,
+		"requested_bytes": domain.RequestedBytes,
+		"reserved_bytes":  domain.ReservedBytes,
+		"committed_bytes": domain.CommittedBytes,
+		"released_bytes":  domain.ReleasedBytes,
+		"current_bytes":   domain.CurrentBytes,
+		"peak_bytes":      domain.PeakBytes,
+		"bytes_copied":    domain.BytesCopied,
+	} {
+		if value < 0 {
+			issues = append(issues, fmt.Sprintf("%s: domain %s must not be negative", prefix, name))
+		}
+	}
+	if domain.CopyCount < 0 {
+		issues = append(issues, prefix+": domain copy_count must not be negative")
+	}
+	if domain.PeakBytes < domain.CurrentBytes {
+		issues = append(issues, prefix+": domain peak_bytes must be >= current_bytes")
+	}
+	if domain.BytesCopied > 0 && domain.CopyCount == 0 {
+		issues = append(issues, prefix+": domain bytes_copied requires copy_count")
+	}
+	return issues
+}
+
+func allocationArtifactUsesHeap(alloc allocationReportAllocation) bool {
+	return alloc.PlannedStorage == "Heap" || alloc.ActualLoweringStorage == "Heap"
+}
+
+func validateAllocationReasonCodes(prefix string, reasonCodes []string, heapReasonCodes []string) []string {
+	var issues []string
+	seen := map[string]bool{}
+	for _, code := range reasonCodes {
+		if strings.TrimSpace(code) == "" {
+			issues = append(issues, fmt.Sprintf("%s: reason_codes contains an empty entry", prefix))
+			continue
+		}
+		if strings.TrimSpace(code) != code {
+			issues = append(issues, fmt.Sprintf("%s: reason_codes contains untrimmed entry %q", prefix, code))
+		}
+		if seen[code] {
+			issues = append(issues, fmt.Sprintf("%s: reason_codes contains duplicate entry %q", prefix, code))
+		}
+		seen[code] = true
+	}
+	heapSeen := map[string]bool{}
+	for _, code := range heapReasonCodes {
+		if strings.TrimSpace(code) == "" {
+			issues = append(issues, fmt.Sprintf("%s: heap_reason_codes contains an empty entry", prefix))
+			continue
+		}
+		if strings.TrimSpace(code) != code {
+			issues = append(issues, fmt.Sprintf("%s: heap_reason_codes contains untrimmed entry %q", prefix, code))
+		}
+		if heapSeen[code] {
+			issues = append(issues, fmt.Sprintf("%s: heap_reason_codes contains duplicate entry %q", prefix, code))
+		}
+		heapSeen[code] = true
+		if !knownHeapReasonCode(code) {
+			issues = append(issues, fmt.Sprintf("%s: unknown heap_reason_code %q", prefix, code))
+		}
+		if !seen[code] {
+			issues = append(issues, fmt.Sprintf("%s: heap_reason_code %q missing from reason_codes", prefix, code))
+		}
+	}
+	return issues
+}
+
+func knownHeapReasonCode(code string) bool {
+	switch code {
+	case "heap.required_escape_return",
+		"heap.required_unknown_call",
+		"heap.required_actor_boundary",
+		"heap.required_task_boundary",
+		"heap.required_dynamic_lifetime",
+		"heap.required_large_object",
+		"heap.required_ffi_external",
+		"heap.required_backend_lowering_unavailable",
+		"heap.required_region_lowering_unavailable":
+		return true
+	default:
+		return false
+	}
+}
+
+func knownAllocationDomainKind(kind string) bool {
+	switch kind {
+	case "process", "task", "actor", "island", "request", "external":
+		return true
+	default:
+		return false
+	}
 }
 
 func knownAllocationLengthStatus(status string) bool {

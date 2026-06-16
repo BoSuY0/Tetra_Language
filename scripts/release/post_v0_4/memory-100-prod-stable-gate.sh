@@ -42,6 +42,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 cd "$repo_root"
+gate_contract="scripts/release/post_v0_4/contracts/memory-100-prod-stable-linux-x64.json"
 source "$repo_root/scripts/release/surface/report-dir-guard.sh"
 if [[ -z "${GOCACHE:-}" ]]; then
   export GOCACHE="$repo_root/.cache/go-build-memory-100-prod-stable-gate"
@@ -50,6 +51,8 @@ if [[ -z "${GOTMPDIR:-}" ]]; then
   export GOTMPDIR="$repo_root/.cache/go-tmp-memory-100-prod-stable-gate"
 fi
 mkdir -p "$GOCACHE" "$GOTMPDIR"
+
+go run ./tools/cmd/run-gate --contract "$gate_contract" --report-dir "$report_dir_arg" --dry-run >/dev/null
 
 report_dir="$(surface_release_require_fresh_report_dir "$report_dir_arg" "$repo_root" "memory100_prod_stable_gate:")"
 memory_production_dir="$report_dir_arg/memory-production"

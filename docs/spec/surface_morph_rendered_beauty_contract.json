@@ -1,0 +1,87 @@
+{
+  "schema": "tetra.surface.morph-rendered-beauty.contract.v1",
+  "status": "experimental-contract",
+  "report_schema": "tetra.surface.morph-rendered-beauty.v1",
+  "surface_scope": "surface-morph-rendered-beauty-linux-web",
+  "pipeline": [
+    "morph_source",
+    "token_graph",
+    "recipe_expansions",
+    "resolved_morph_scene",
+    "block_scene_snapshot",
+    "render_command_stream",
+    "frame_artifact",
+    "pixel_golden_comparison",
+    "product_claim_gate"
+  ],
+  "core_primitives": [
+    "Block"
+  ],
+  "forbidden_core_primitives": [
+    "Button",
+    "Card",
+    "TextField",
+    "TextBox",
+    "Sidebar",
+    "Modal"
+  ],
+  "supported_targets": [
+    "headless",
+    "linux-x64-real-window",
+    "wasm32-web-browser-canvas"
+  ],
+  "unsupported_targets": [
+    "macos",
+    "windows",
+    "wasm32-wasi"
+  ],
+  "required_evidence": [
+    "morph_source_hash",
+    "token_graph_hash",
+    "token_coverage",
+    "recipe_coverage",
+    "recipe_expansions",
+    "resolved_morph_scene_hash",
+    "block_scene_snapshot_hash",
+    "block_scene_snapshot_rich_specs",
+    "render_command_stream_hash",
+    "source_linked_render_command_stream",
+    "text_icon_raster_evidence",
+    "app_produced_frame",
+    "morph_recipe_hash",
+    "pixel_block_scene_hash",
+    "pixel_render_command_stream_hash",
+    "frame_artifact_sha256",
+    "golden_artifact_sha256",
+    "pixel_diff_metrics",
+    "renderer_owned_stable_proof",
+    "target_and_scenario_name",
+    "same_commit_git_head",
+    "same_commit_git_commit"
+  ],
+  "negative_guards": {
+    "metadata_only_rejected": true,
+    "self_golden_rejected": true,
+    "precomputed_frame_rejected": true,
+    "missing_frame_artifact_rejected": true,
+    "no_dom_ui": true,
+    "no_css_runtime": true,
+    "no_react_runtime": true,
+    "no_electron_runtime": true,
+    "no_native_widgets": true,
+    "no_hidden_app_state": true,
+    "non_block_output_rejected": true,
+    "dirty_checkout_production_rejected": true,
+    "unsupported_target_rejected": true,
+    "renderer_owned_stable_proof_required": true
+  },
+  "nonclaims": [
+    "no Electron runtime claim",
+    "no React runtime claim",
+    "no CSS runtime claim",
+    "no DOM-authored UI claim",
+    "no GPU renderer production claim",
+    "no macOS production claim",
+    "no Windows production claim"
+  ]
+}

@@ -9,14 +9,14 @@ import (
 )
 
 func main() {
-	rows, err := parallelrt.PrototypeBenchmarks()
+	evidence, err := parallelrt.CollectPrototypeEvidence()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
-	if err := enc.Encode(rows); err != nil {
+	if err := enc.Encode(evidence); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}

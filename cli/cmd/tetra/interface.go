@@ -15,7 +15,7 @@ func runInterface(args []string, stdout io.Writer, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	outPath := fs.String("o", "", "output .t4i path; stdout when empty")
 	checkMode := fs.Bool("check", false, "check that the .t4i public API hash matches the source")
-	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text or json")
+	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text, json, or toon")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			return 0

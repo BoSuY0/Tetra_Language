@@ -15,6 +15,7 @@ var surfaceAppTemplateKinds = []string{
 	"settings",
 	"dashboard",
 	"editor-shell",
+	"studio-shell",
 	"multi-window-notes",
 	"web-canvas",
 }
@@ -143,6 +144,8 @@ func surfaceAppTemplateByKind(kind string) (surfaceAppTemplateSpec, bool) {
 		return surfaceAppTemplateSpec{Kind: "dashboard", TitleHash: 17, AccentAlpha: 36, Recipes: []string{"recipe_region_panel", "recipe_metric_tile", "recipe_list_row", "recipe_toast_notification"}, Actions: []int{401, 402, 403}}, true
 	case "editor-shell":
 		return surfaceAppTemplateSpec{Kind: "editor-shell", TitleHash: 12, AccentAlpha: 34, Recipes: []string{"recipe_nav_item", "recipe_tab_item", "recipe_command_item", "recipe_region_panel"}, Actions: []int{601, 602, 603}}, true
+	case "studio-shell":
+		return surfaceAppTemplateSpec{Kind: "studio-shell", TitleHash: 18, AccentAlpha: 42, Recipes: []string{"recipe_app_shell", "recipe_toolbar", "recipe_split_pane", "recipe_status_bar"}, Actions: []int{901, 902, 903}, AppShell: true}, true
 	case "multi-window-notes":
 		return surfaceAppTemplateSpec{Kind: "multi-window-notes", TitleHash: 9, AccentAlpha: 38, Recipes: []string{"recipe_region_panel", "recipe_list_row", "recipe_field_text", "recipe_control_action"}, Actions: []int{701, 702, 703}, AppShell: true}, true
 	case "web-canvas":

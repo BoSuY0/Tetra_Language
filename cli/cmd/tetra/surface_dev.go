@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -13,25 +14,27 @@ import (
 
 	"tetra_language/compiler"
 	ctarget "tetra_language/compiler/target"
+	"tetra_language/tools/validators/surface"
 )
 
 type surfaceDevReport struct {
-	Schema                 string                 `json:"schema"`
-	Model                  string                 `json:"model"`
-	ReleaseScope           string                 `json:"release_scope"`
-	Command                string                 `json:"command"`
-	Source                 string                 `json:"source"`
-	Target                 string                 `json:"target"`
-	Mode                   string                 `json:"mode"`
-	ReloadSemantics        string                 `json:"reload_semantics"`
-	ProcessRestartRequired bool                   `json:"process_restart_required"`
-	HotReloadClaim         bool                   `json:"hot_reload_claim"`
-	Watch                  bool                   `json:"watch"`
-	SupportedTargets       []string               `json:"supported_targets"`
-	Steps                  []surfaceDevStep       `json:"steps"`
-	SourceDiagnostics      []surfaceDevDiagnostic `json:"source_diagnostics"`
-	NegativeGuards         surfaceDevGuards       `json:"negative_guards"`
-	Pass                   bool                   `json:"pass"`
+	Schema                 string                            `json:"schema"`
+	Model                  string                            `json:"model"`
+	ReleaseScope           string                            `json:"release_scope"`
+	Command                string                            `json:"command"`
+	Source                 string                            `json:"source"`
+	Target                 string                            `json:"target"`
+	Mode                   string                            `json:"mode"`
+	ReloadSemantics        string                            `json:"reload_semantics"`
+	ProcessRestartRequired bool                              `json:"process_restart_required"`
+	HotReloadClaim         bool                              `json:"hot_reload_claim"`
+	Watch                  bool                              `json:"watch"`
+	SupportedTargets       []string                          `json:"supported_targets"`
+	Steps                  []surfaceDevStep                  `json:"steps"`
+	SourceDiagnostics      []surfaceDevDiagnostic            `json:"source_diagnostics"`
+	MorphToPixels          *surface.MorphToPixelsChainReport `json:"morph_to_pixels,omitempty"`
+	NegativeGuards         surfaceDevGuards                  `json:"negative_guards"`
+	Pass                   bool                              `json:"pass"`
 }
 
 type surfaceDevStep struct {
@@ -103,7 +106,8 @@ func runSurfaceDev(args []string, stdout io.Writer, stderr io.Writer) int {
 	targetFlag := fs.String("target", "", "target triple; current fast rebuild evidence is linux-x64")
 	outDirFlag := fs.String("out-dir", "", "directory for dev-loop build artifacts")
 	reportPath := fs.String("report", "", "write tetra.surface.dev-workflow.v1 JSON report")
-	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text or json")
+	morphRenderedBeautyReportPath := fs.String("morph-rendered-beauty-report", "", "attach validated tetra.surface.morph-rendered-beauty.v1 evidence to the dev report")
+	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text, json, or toon")
 	jobs := fs.Int("jobs", 1, "parallel module build jobs")
 	watch := fs.Bool("watch", false, "reserve watch-mode metadata; current command records one fast rebuild loop")
 	var changeFlags multiFlag
@@ -172,6 +176,14 @@ func runSurfaceDev(args []string, stdout io.Writer, stderr io.Writer) int {
 	defer cleanup()
 
 	report := newSurfaceDevReport(input, tgt, *watch)
+	if strings.TrimSpace(*morphRenderedBeautyReportPath) != "" {
+		chain, err := loadSurfaceDevMorphToPixelsChain(*morphRenderedBeautyReportPath, input)
+		if err != nil {
+			writeDiagnostic(stderr, *diagnostics, err)
+			return 1
+		}
+		report.MorphToPixels = chain
+	}
 	changes, err := parseSurfaceDevChanges(changeFlags)
 	if err != nil {
 		writeValidationDiagnostic(stderr, *diagnostics, err.Error())
@@ -464,7 +476,29 @@ func surfaceDevReportPass(report surfaceDevReport) bool {
 	for _, diag := range report.SourceDiagnostics {
 		diagKinds[diag.Kind] = diag.Pass
 	}
+	if report.MorphToPixels != nil && !report.MorphToPixels.Pass {
+		return false
+	}
 	return diagKinds["token"] && diagKinds["recipe"] && diagKinds["source"]
+}
+
+func loadSurfaceDevMorphToPixelsChain(path string, expectedSource string) (*surface.MorphToPixelsChainReport, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read Morph rendered beauty report %s: %w", path, err)
+	}
+	if err := surface.ValidateMorphRenderedBeautyReport(raw); err != nil {
+		return nil, fmt.Errorf("validate Morph rendered beauty report %s: %w", path, err)
+	}
+	var report surface.MorphRenderedBeautyReport
+	if err := json.Unmarshal(raw, &report); err != nil {
+		return nil, fmt.Errorf("decode Morph rendered beauty report %s: %w", path, err)
+	}
+	chain := surface.MorphToPixelsChainFromRenderedBeauty(filepath.ToSlash(path), report)
+	if err := surface.ValidateMorphToPixelsChainReport(chain, expectedSource); err != nil {
+		return nil, fmt.Errorf("validate Morph-to-pixels dev evidence %s: %w", path, err)
+	}
+	return &chain, nil
 }
 
 func writeSurfaceDevReportIfRequested(path string, report surfaceDevReport, stderr io.Writer) error {

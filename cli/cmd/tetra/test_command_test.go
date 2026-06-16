@@ -1099,6 +1099,54 @@ func TestTestCommandJSONReport(t *testing.T) {
 	}
 }
 
+func TestTestCommandTOONReport(t *testing.T) {
+	if _, ok := hostTarget(); !ok {
+		t.Skip("host target unsupported")
+	}
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "sample.tetra")
+	src := "test \"math\":\n    expect 40 + 2 == 42\n"
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var report struct {
+		Total   int    `json:"total"`
+		Passed  int    `json:"passed"`
+		Failed  int    `json:"failed"`
+		Target  string `json:"target"`
+		Results []struct {
+			Name   string `json:"name"`
+			Passed bool   `json:"passed"`
+		} `json:"results"`
+	}
+	target := mustHostTarget(t)
+	runCLITOONStdout(t, []string{"test", "--target", target, "--report=toon", srcPath}, 0, &report)
+	if report.Total != 1 || report.Passed != 1 || report.Failed != 0 || report.Target != target || len(report.Results) != 1 || report.Results[0].Name != "math" || !report.Results[0].Passed {
+		t.Fatalf("report = %#v", report)
+	}
+}
+
+func TestTestCommandTOONReportFormatAlias(t *testing.T) {
+	if _, ok := hostTarget(); !ok {
+		t.Skip("host target unsupported")
+	}
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "sample.tetra")
+	src := "test \"math\":\n    expect 40 + 2 == 42\n"
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var report struct {
+		Total  int `json:"total"`
+		Passed int `json:"passed"`
+		Failed int `json:"failed"`
+	}
+	runCLITOONStdout(t, []string{"test", "--target", mustHostTarget(t), "--format=toon", srcPath}, 0, &report)
+	if report.Total != 1 || report.Passed != 1 || report.Failed != 0 {
+		t.Fatalf("report = %#v", report)
+	}
+}
+
 func TestTestCommandJSONReportMultipleBlocks(t *testing.T) {
 	if _, ok := hostTarget(); !ok {
 		t.Skip("host target unsupported")

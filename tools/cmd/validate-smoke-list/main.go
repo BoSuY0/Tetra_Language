@@ -1,14 +1,14 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"tetra_language/tools/internal/reportdecode"
 )
 
 type smokeListReport struct {
@@ -41,8 +41,10 @@ const smokeListArtifact = "tetra.release.v0_2_0.smoke-list.v1"
 func main() {
 	var path string
 	var examplesRoot string
-	flag.StringVar(&path, "report", "", "path to tetra smoke --list --format=json output")
+	var format string
+	flag.StringVar(&path, "report", "", "path to tetra smoke --list structured output")
 	flag.StringVar(&examplesRoot, "examples-root", "", "optional examples directory to require smoke coverage or documented exclusion")
+	flag.StringVar(&format, "format", "auto", "report format: auto, json, or toon")
 	flag.Parse()
 	if path == "" {
 		fmt.Fprintln(os.Stderr, "error: --report is required")
@@ -53,7 +55,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err := validateSmokeListWithExamplesRoot(raw, examplesRoot); err != nil {
+	if err := validateSmokeListWithExamplesRootFormat(raw, examplesRoot, format); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -64,15 +66,17 @@ func isSmokeSourceFile(path string) bool {
 }
 
 func validateSmokeList(raw []byte) error {
-	return validateSmokeListWithExamplesRoot(raw, "")
+	return validateSmokeListWithExamplesRootFormat(raw, "", "auto")
 }
 
 func validateSmokeListWithExamplesRoot(raw []byte, examplesRoot string) error {
+	return validateSmokeListWithExamplesRootFormat(raw, examplesRoot, "auto")
+}
+
+func validateSmokeListWithExamplesRootFormat(raw []byte, examplesRoot string, format string) error {
 	var report smokeListReport
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&report); err != nil {
-		return fmt.Errorf("invalid smoke list JSON: %w", err)
+	if err := reportdecode.DecodeStrictFormat(raw, format, &report); err != nil {
+		return fmt.Errorf("invalid smoke list report: %w", err)
 	}
 	if report.Total != len(report.Cases) {
 		return fmt.Errorf("smoke list total = %d, want %d", report.Total, len(report.Cases))

@@ -1,0 +1,34 @@
+package buildapi
+
+import "tetra_language/compiler/internal/module"
+
+type BuildOptions struct {
+	Jobs                        int
+	IslandsDebug                bool
+	DebugInfo                   bool
+	ReleaseOptimize             bool
+	Explain                     bool
+	EmitPLIR                    bool
+	EmitProof                   bool
+	EmitAllocReport             bool
+	EmitBoundsReport            bool
+	EmitMemoryReport            bool
+	EmitRAMContractReport       bool
+	EmitRuntimeHeapTelemetry    bool
+	RuntimeHeapTelemetryDir     string
+	RuntimeHeapTelemetryProgram string
+	RuntimeHeapTelemetryMain    string
+	FailIfHeap                  bool
+	FailIfCopy                  bool
+	FailIfUnbounded             bool
+	MemoryBudgetBytes           int64
+	RAMContractFile             string
+	Emit                        EmitMode
+	Runtime                     RuntimeMode
+	RuntimeObjectPath           string
+	LinkObjectPaths             []string
+	ProjectRoot                 string
+	SourceRoots                 []string
+	DependencyRoots             []module.ModuleRoot
+	InterfaceOnly               bool
+}

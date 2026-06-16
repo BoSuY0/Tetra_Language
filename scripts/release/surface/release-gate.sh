@@ -43,14 +43,35 @@ while [[ $# -gt 0 ]]; do
 done
 
 cd "$repo_root"
+gate_contract="scripts/release/surface/contracts/surface-release-v1.json"
+gate_contract_id="surface-release-v1"
 source "$script_dir/report-dir-guard.sh"
 if [[ -z "${GOCACHE:-}" ]]; then
   export GOCACHE="$repo_root/.cache/go-build-surface-release"
 fi
-mkdir -p "$GOCACHE"
+if [[ -z "${GOTMPDIR:-}" ]]; then
+  export GOTMPDIR="$repo_root/.cache/go-tmp-surface-release"
+fi
+mkdir -p "$GOCACHE" "$GOTMPDIR"
 report_dir_arg="${report_dir%/}"
 report_dir="$report_dir_arg"
 report_dir="$(surface_release_require_fresh_report_dir "$report_dir" "$repo_root" "surface_release_gate:")"
+
+if [[ "${TETRA_RUN_GATE_CONTRACT_EXEC:-}" != "1" ]]; then
+  go run ./tools/cmd/run-gate --contract "$gate_contract" --report-dir "$report_dir_arg"
+  exit $?
+fi
+
+if [[ "${TETRA_RUN_GATE_CONTRACT_ID:-}" != "$gate_contract_id" ]]; then
+  echo "surface_release_gate: refusing guarded execution for contract ${TETRA_RUN_GATE_CONTRACT_ID:-<unset>}; want $gate_contract_id" >&2
+  exit 2
+fi
+if [[ -n "${TETRA_RUN_GATE_REPORT_DIR:-}" && "${TETRA_RUN_GATE_REPORT_DIR:-}" != "$report_dir_arg" ]]; then
+  echo "surface_release_gate: refusing guarded execution for report dir ${TETRA_RUN_GATE_REPORT_DIR}; want $report_dir_arg" >&2
+  exit 2
+fi
+
+go run ./tools/cmd/run-gate --contract "$gate_contract" --report-dir "$report_dir_arg" --dry-run >/dev/null
 block_system_report_dir="$report_dir_arg/block-system"
 morph_report_dir="$report_dir_arg/morph"
 

@@ -19,6 +19,7 @@ import (
 
 	"tetra_language/compiler"
 	ctarget "tetra_language/compiler/target"
+	"tetra_language/internal/outputformat"
 )
 
 var commandLookPath = exec.LookPath
@@ -137,6 +138,8 @@ func runBuild(args []string, stdout io.Writer, stderr io.Writer) int {
 	emitBoundsReport := fs.Bool("emit-bounds-report", false, "write bounds-check report")
 	emitMemoryReport := fs.Bool("emit-memory-report", false, "write schema-versioned memory fact report")
 	emitRAMContractReport := fs.Bool("emit-ram-contract-report", false, "write RAM contract, memory grade, proof-store, pipeline, and blocker reports")
+	emitRuntimeHeapTelemetry := fs.Bool("emit-runtime-heap-telemetry", false, "write linux-x64 runtime heap telemetry sidecars")
+	runtimeHeapTelemetryDir := fs.String("runtime-heap-telemetry-dir", "", "directory for linux-x64 runtime heap telemetry sidecars")
 	failIfHeap := fs.Bool("fail-if-heap", false, "fail build if RAM contract evidence contains heap placement")
 	failIfCopy := fs.Bool("fail-if-copy", false, "fail build if RAM contract evidence contains a required copy")
 	failIfUnbounded := fs.Bool("fail-if-unbounded", false, "fail build if RAM contract evidence contains unbounded or unknown memory")
@@ -146,7 +149,7 @@ func runBuild(args []string, stdout io.Writer, stderr io.Writer) int {
 	runtimeObject := fs.String("runtime-object", "", "actors runtime object override")
 	jobs := fs.Int("jobs", 1, "parallel module build jobs")
 	artifactsMode := fs.String("artifacts", "strict", "artifact handling: strict or auto")
-	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text or json")
+	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text, json, or toon")
 	var linkObjects multiFlag
 	fs.Var(&linkObjects, "link-object", "extra TOBJ object to link")
 	if err := fs.Parse(args); err != nil {
@@ -235,6 +238,9 @@ func runBuild(args []string, stdout io.Writer, stderr io.Writer) int {
 				return 1
 			}
 			opt.LinkObjectPaths = targetLinkObjects
+			if !applyRuntimeHeapTelemetryOptions(&opt, tgt.Triple, *emitRuntimeHeapTelemetry, *runtimeHeapTelemetryDir, *diagnostics, stderr) {
+				return 2
+			}
 			output := allTargetsOutput(*out, tgt, *emit)
 			if _, err := compiler.BuildFileWithStatsOpt(input, output, tgt.Triple, opt); err != nil {
 				writeDiagnostic(stderr, *diagnostics, err)
@@ -281,6 +287,9 @@ func runBuild(args []string, stdout io.Writer, stderr io.Writer) int {
 	if !applyRAMContractOptions(&opt, *failIfHeap, *failIfCopy, *failIfUnbounded, *memoryBudget, *ramContractFile, *diagnostics, stderr) {
 		return 2
 	}
+	if !applyRuntimeHeapTelemetryOptions(&opt, tgt.Triple, *emitRuntimeHeapTelemetry, *runtimeHeapTelemetryDir, *diagnostics, stderr) {
+		return 2
+	}
 	opt.ProjectRoot = worldOpt.Root
 	opt.SourceRoots = worldOpt.SourceRoots
 	opt.DependencyRoots = worldOpt.DependencyRoots
@@ -324,6 +333,29 @@ func applyRAMContractOptions(opt *compiler.BuildOptions, failIfHeap bool, failIf
 	return true
 }
 
+func applyRuntimeHeapTelemetryOptions(opt *compiler.BuildOptions, target string, enabled bool, telemetryDir string, diagnostics string, stderr io.Writer) bool {
+	if strings.TrimSpace(telemetryDir) != "" && !enabled {
+		writeValidationDiagnostic(stderr, diagnostics, "build --runtime-heap-telemetry-dir requires --emit-runtime-heap-telemetry")
+		return false
+	}
+	if !enabled {
+		opt.EmitRuntimeHeapTelemetry = false
+		opt.RuntimeHeapTelemetryDir = ""
+		return true
+	}
+	if target != "linux-x64" {
+		writeValidationDiagnostic(stderr, diagnostics, "build --emit-runtime-heap-telemetry currently supports linux-x64 only")
+		return false
+	}
+	if strings.TrimSpace(telemetryDir) == "" {
+		writeValidationDiagnostic(stderr, diagnostics, "build --emit-runtime-heap-telemetry requires --runtime-heap-telemetry-dir")
+		return false
+	}
+	opt.EmitRuntimeHeapTelemetry = true
+	opt.RuntimeHeapTelemetryDir = telemetryDir
+	return true
+}
+
 func parseMemoryBudgetBytes(raw string) (int64, error) {
 	value := strings.TrimSpace(strings.ToLower(raw))
 	if value == "" {
@@ -364,7 +396,7 @@ func runRun(args []string, stdout io.Writer, stderr io.Writer) int {
 	runtimeMode := fs.String("runtime", "auto", "actors runtime: auto, selfhost, or builtin")
 	runtimeObject := fs.String("runtime-object", "", "actors runtime object override")
 	jobs := fs.Int("jobs", 1, "parallel module build jobs")
-	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text or json")
+	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text, json, or toon")
 	var linkObjects multiFlag
 	fs.Var(&linkObjects, "link-object", "extra TOBJ object to link")
 	if err := fs.Parse(args); err != nil {
@@ -979,16 +1011,16 @@ func writeJSON(path string, value any) error {
 }
 
 func writeDiagnostic(w io.Writer, mode string, err error) {
-	if mode == "json" {
-		writeDiagnosticObject(w, compiler.DiagnosticFromError(err))
+	if outputformat.Structured(mode) {
+		writeDiagnosticObject(w, mode, compiler.DiagnosticFromError(err))
 		return
 	}
 	fmt.Fprintln(w, err)
 }
 
 func writeDiagnosticWithHint(w io.Writer, mode string, message string, hint string) {
-	if mode == "json" {
-		writeDiagnosticObject(w, compiler.Diagnostic{
+	if outputformat.Structured(mode) {
+		writeDiagnosticObject(w, mode, compiler.Diagnostic{
 			Code:     compiler.DiagnosticCodeParse,
 			Message:  message,
 			Severity: "error",
@@ -1000,8 +1032,8 @@ func writeDiagnosticWithHint(w io.Writer, mode string, message string, hint stri
 }
 
 func writeTargetRuntimeDiagnostic(w io.Writer, mode string, message string) {
-	if mode == "json" {
-		writeDiagnosticObject(w, compiler.Diagnostic{
+	if outputformat.Structured(mode) {
+		writeDiagnosticObject(w, mode, compiler.Diagnostic{
 			Code:     compiler.DiagnosticCodeTargetRuntime,
 			Message:  message,
 			Severity: "error",
@@ -1035,17 +1067,16 @@ func writeValidationDiagnostic(w io.Writer, mode string, message string) {
 }
 
 func validateDiagnosticsMode(w io.Writer, mode string) bool {
-	if mode == "text" || mode == "json" {
+	if mode == "text" || outputformat.Structured(mode) {
 		return true
 	}
 	fmt.Fprintln(w, "unsupported --diagnostics format")
 	return false
 }
 
-func writeDiagnosticObject(w io.Writer, diag compiler.Diagnostic) {
-	raw, err := json.Marshal(diag)
-	if err == nil {
-		fmt.Fprintln(w, string(raw))
+func writeDiagnosticObject(w io.Writer, mode string, diag compiler.Diagnostic) {
+	if err := outputformat.WriteStructured(w, mode, diag); err != nil {
+		fmt.Fprintln(w, err)
 	}
 }
 

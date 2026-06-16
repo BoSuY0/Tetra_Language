@@ -7,7 +7,6 @@ import (
 	"tetra_language/compiler/internal/backend/x64abi"
 	"tetra_language/compiler/internal/backend/x64obj"
 	"tetra_language/compiler/internal/ir"
-	"tetra_language/compiler/internal/runtimeabi"
 )
 
 type labelPatch struct {
@@ -51,6 +50,7 @@ func functionHasTempRegionIR(fn ir.IRFunc) bool {
 
 func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 	smallHeapStateDataIndex := -1
+	var runtimeHeapTelemetry *runtimeHeapTelemetryState
 	return func(
 		e *x64.Emitter,
 		fn ir.IRFunc,
@@ -100,6 +100,31 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 			smallHeapStateDataIndex = len(*dataBlobs) - 1
 			return smallHeapStateDataIndex
 		}
+		ensureRuntimeHeapTelemetryState := func() (*runtimeHeapTelemetryState, error) {
+			if runtimeHeapTelemetry != nil {
+				return runtimeHeapTelemetry, nil
+			}
+			blob, layout, err := buildRuntimeHeapTelemetryBlob(opt)
+			if err != nil {
+				return nil, err
+			}
+			*dataBlobs = append(*dataBlobs, blob)
+			runtimeHeapTelemetry = &runtimeHeapTelemetryState{
+				dataIndex: len(*dataBlobs) - 1,
+				layout:    layout,
+			}
+			return runtimeHeapTelemetry, nil
+		}
+		emitMainRuntimeHeapTelemetryFlush := runtimeHeapTelemetryFlushFunc(func() error {
+			if !opt.EmitRuntimeHeapTelemetry || fn.Name != opt.RuntimeHeapTelemetryMain {
+				return nil
+			}
+			telemetry, err := ensureRuntimeHeapTelemetryState()
+			if err != nil {
+				return err
+			}
+			return emitRuntimeHeapTelemetryFlush(e, abi, leaPatches, telemetry)
+		})
 
 		pop := func(n int) error {
 			if stackDepth < n {
@@ -325,29 +350,56 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 			e.MovzxEaxAx()
 			return nil
 		}
+		atomicOps := emitAtomicInstrOps{
+			pointerWidthBytes:                pointerWidthBytes,
+			pop:                              pop,
+			push:                             push,
+			guardAllocationBaseRawAccess:     guardAllocationBaseRawAccess,
+			emitPointerLoad:                  emitPointerLoad,
+			emitAtomicPointerStore:           emitAtomicPointerStore,
+			emitAtomicPointerExchange:        emitAtomicPointerExchange,
+			emitAtomicPointerFetchAdd:        emitAtomicPointerFetchAdd,
+			emitAtomicPointerFetchSub:        emitAtomicPointerFetchSub,
+			emitAtomicPointerFetchCASLoop:    emitAtomicPointerFetchCASLoop,
+			emitAtomicPointerCompareExchange: emitAtomicPointerCompareExchange,
+			emitAtomicI32CompareExchange:     emitAtomicI32CompareExchange,
+			emitAtomicI32FetchCASLoop:        emitAtomicI32FetchCASLoop,
+			emitAtomicI64CompareExchange:     emitAtomicI64CompareExchange,
+			emitAtomicI64FetchCASLoop:        emitAtomicI64FetchCASLoop,
+			emitAtomicI8CompareExchange:      emitAtomicI8CompareExchange,
+			emitAtomicI8FetchCASLoop:         emitAtomicI8FetchCASLoop,
+			emitAtomicI16CompareExchange:     emitAtomicI16CompareExchange,
+			emitAtomicI16FetchCASLoop:        emitAtomicI16FetchCASLoop,
+		}
 
-		if ok, err := emitVectorSliceSumRegisterFunction(e, fn, abi, opt); ok || err != nil {
+		if ok, err := emitVectorSliceSumRegisterFunction(e, fn, abi, opt, emitMainRuntimeHeapTelemetryFlush); ok || err != nil {
 			return err
 		}
-		if ok, err := emitVectorCopyU8RegisterFunction(e, fn, abi, opt); ok || err != nil {
+		if ok, err := emitVectorCopyU8RegisterFunction(e, fn, abi, opt, emitMainRuntimeHeapTelemetryFlush); ok || err != nil {
 			return err
 		}
-		if ok, err := emitVectorMapI32AddConstRegisterFunction(e, fn, abi, opt); ok || err != nil {
+		if ok, err := emitVectorMapI32AddConstRegisterFunction(e, fn, abi, opt, emitMainRuntimeHeapTelemetryFlush); ok || err != nil {
 			return err
 		}
-		if ok, err := emitVectorMemsetZeroU8RegisterFunction(e, fn, abi, opt); ok || err != nil {
+		if ok, err := emitVectorMemsetZeroU8RegisterFunction(e, fn, abi, opt, emitMainRuntimeHeapTelemetryFlush); ok || err != nil {
 			return err
 		}
-		if ok, err := emitScalarSliceSumRegisterFunction(e, fn, abi, opt); ok || err != nil {
+		if ok, err := emitScalarSliceSumRegisterFunction(e, fn, abi, opt, emitMainRuntimeHeapTelemetryFlush); ok || err != nil {
 			return err
 		}
-		if ok, err := emitScalarCallLoopRegisterFunction(e, fn, abi, callPatches, opt); ok || err != nil {
+		if ok, err := emitRecursionBenchmarkRegisterFunction(e, fn, abi, callPatches, opt, emitMainRuntimeHeapTelemetryFlush); ok || err != nil {
 			return err
 		}
-		if ok, err := emitScalarLoopRegisterFunction(e, fn, abi, opt); ok || err != nil {
+		if ok, err := emitScalarCallLoopRegisterFunction(e, fn, abi, callPatches, opt, emitMainRuntimeHeapTelemetryFlush); ok || err != nil {
 			return err
 		}
-		if ok, err := emitScalarRegisterFunction(e, fn, abi, callPatches, opt); ok || err != nil {
+		if ok, err := emitScalarConstModuloLoopRegisterFunction(e, fn, abi, opt, emitMainRuntimeHeapTelemetryFlush); ok || err != nil {
+			return err
+		}
+		if ok, err := emitScalarLoopRegisterFunction(e, fn, abi, opt, emitMainRuntimeHeapTelemetryFlush); ok || err != nil {
+			return err
+		}
+		if ok, err := emitScalarRegisterFunction(e, fn, abi, callPatches, opt, emitMainRuntimeHeapTelemetryFlush); ok || err != nil {
 			return err
 		}
 
@@ -664,6 +716,15 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 				default:
 					return fmt.Errorf("unsupported return slots %d in function %q", fn.ReturnSlots, fn.Name)
 				}
+				if opt.EmitRuntimeHeapTelemetry && fn.Name == opt.RuntimeHeapTelemetryMain {
+					telemetry, err := ensureRuntimeHeapTelemetryState()
+					if err != nil {
+						return err
+					}
+					if err := emitRuntimeHeapTelemetryFlush(e, abi, leaPatches, telemetry); err != nil {
+						return err
+					}
+				}
 				e.Leave()
 				e.Ret()
 			case ir.IRAllocBytes:
@@ -673,7 +734,15 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 			case ir.IRMakeSliceU8, ir.IRMakeSliceU16, ir.IRMakeSliceI32:
 				if emitSmallHeapMakeSliceEnabled(abi, opt, pointerWidthBytes) {
 					stateIndex := ensureSmallHeapState()
-					if err := emitSmallHeapMakeSlice(e, instr.Kind, &stackDepth, abi, importPatches, &smallHeapCalls, stateIndex); err != nil {
+					var telemetry *runtimeHeapTelemetryState
+					if opt.EmitRuntimeHeapTelemetry {
+						var err error
+						telemetry, err = ensureRuntimeHeapTelemetryState()
+						if err != nil {
+							return err
+						}
+					}
+					if err := emitSmallHeapMakeSlice(e, instr.Kind, &stackDepth, abi, importPatches, &smallHeapCalls, stateIndex, telemetry, leaPatches); err != nil {
 						return err
 					}
 					continue
@@ -984,660 +1053,31 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 				emitArchPointerStore()
 				e.PushR8()
 				push(1)
-			case ir.IRAtomicLoadPtr:
-				if err := pop(2); err != nil {
+			case ir.IRAtomicLoadPtr, ir.IRAtomicStorePtr, ir.IRAtomicExchangePtr,
+				ir.IRAtomicFetchAddPtr, ir.IRAtomicFetchSubPtr,
+				ir.IRAtomicFetchAndPtr, ir.IRAtomicFetchOrPtr, ir.IRAtomicFetchXorPtr,
+				ir.IRAtomicCompareExchangePtr,
+				ir.IRAtomicFenceSeqCst, ir.IRAtomicFenceRelaxed,
+				ir.IRAtomicFenceAcquire, ir.IRAtomicFenceRelease, ir.IRAtomicFenceAcqRel,
+				ir.IRAtomicLoadI32, ir.IRAtomicStoreI32, ir.IRAtomicExchangeI32,
+				ir.IRAtomicCompareExchangeI32, ir.IRAtomicFetchAddI32,
+				ir.IRAtomicFetchSubI32, ir.IRAtomicFetchAndI32,
+				ir.IRAtomicFetchOrI32, ir.IRAtomicFetchXorI32,
+				ir.IRAtomicLoadI64, ir.IRAtomicStoreI64, ir.IRAtomicExchangeI64,
+				ir.IRAtomicCompareExchangeI64, ir.IRAtomicFetchAddI64,
+				ir.IRAtomicFetchSubI64, ir.IRAtomicFetchAndI64,
+				ir.IRAtomicFetchOrI64, ir.IRAtomicFetchXorI64,
+				ir.IRAtomicLoadI8, ir.IRAtomicStoreI8, ir.IRAtomicExchangeI8,
+				ir.IRAtomicCompareExchangeI8, ir.IRAtomicFetchAddI8,
+				ir.IRAtomicFetchSubI8, ir.IRAtomicFetchAndI8,
+				ir.IRAtomicFetchOrI8, ir.IRAtomicFetchXorI8,
+				ir.IRAtomicLoadI16, ir.IRAtomicStoreI16, ir.IRAtomicExchangeI16,
+				ir.IRAtomicCompareExchangeI16, ir.IRAtomicFetchAddI16,
+				ir.IRAtomicFetchSubI16, ir.IRAtomicFetchAndI16,
+				ir.IRAtomicFetchOrI16, ir.IRAtomicFetchXorI16:
+				if err := emitAtomicInstr(e, instr, atomicOps); err != nil {
 					return err
 				}
-				e.PopRdx()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(pointerWidthBytes); err != nil {
-					return err
-				}
-				emitPointerLoad()
-				e.PushRax()
-				push(1)
-			case ir.IRAtomicStorePtr:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(pointerWidthBytes); err != nil {
-					return err
-				}
-				emitAtomicPointerStore()
-				e.PushR9()
-				push(1)
-			case ir.IRAtomicExchangePtr:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(pointerWidthBytes); err != nil {
-					return err
-				}
-				emitAtomicPointerExchange()
-				e.PushR8()
-				push(1)
-			case ir.IRAtomicFetchAddPtr:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(pointerWidthBytes); err != nil {
-					return err
-				}
-				emitAtomicPointerFetchAdd()
-				e.PushR8()
-				push(1)
-			case ir.IRAtomicFetchSubPtr:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(pointerWidthBytes); err != nil {
-					return err
-				}
-				emitAtomicPointerFetchSub()
-				e.PushR8()
-				push(1)
-			case ir.IRAtomicFetchAndPtr:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(pointerWidthBytes); err != nil {
-					return err
-				}
-				if err := emitAtomicPointerFetchCASLoop(e.AndR10dR8d, e.AndR10R8); err != nil {
-					return err
-				}
-				e.PushRax()
-				push(1)
-			case ir.IRAtomicFetchOrPtr:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(pointerWidthBytes); err != nil {
-					return err
-				}
-				if err := emitAtomicPointerFetchCASLoop(e.OrR10dR8d, e.OrR10R8); err != nil {
-					return err
-				}
-				e.PushRax()
-				push(1)
-			case ir.IRAtomicFetchXorPtr:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(pointerWidthBytes); err != nil {
-					return err
-				}
-				if err := emitAtomicPointerFetchCASLoop(e.XorR10dR8d, e.XorR10R8); err != nil {
-					return err
-				}
-				e.PushRax()
-				push(1)
-			case ir.IRAtomicCompareExchangePtr:
-				if err := pop(4); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopR9()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(pointerWidthBytes); err != nil {
-					return err
-				}
-				emitAtomicPointerCompareExchange()
-				e.PushRax()
-				push(1)
-			case ir.IRAtomicFenceSeqCst:
-				e.Mfence()
-			case ir.IRAtomicFenceRelaxed, ir.IRAtomicFenceAcquire,
-				ir.IRAtomicFenceRelease, ir.IRAtomicFenceAcqRel:
-				// x86-family TSO gives acquire/release fence semantics without
-				// a hardware fence; seq_cst remains the explicit mfence case.
-			case ir.IRAtomicLoadI32:
-				if err := pop(2); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(4); err != nil {
-					return err
-				}
-				e.MovEaxFromRaxPtr()
-				e.PushRax()
-				push(1)
-			case ir.IRAtomicStoreI32:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(4); err != nil {
-					return err
-				}
-				e.MovRdiRax()
-				e.MovR9R8()
-				e.XchgMem32RdiPtrR8d()
-				e.PushR9()
-				push(1)
-			case ir.IRAtomicExchangeI32:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(4); err != nil {
-					return err
-				}
-				e.MovRdiRax()
-				e.XchgMem32RdiPtrR8d()
-				e.PushR8()
-				push(1)
-			case ir.IRAtomicCompareExchangeI32:
-				if err := pop(4); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopR9()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(4); err != nil {
-					return err
-				}
-				emitAtomicI32CompareExchange()
-				e.PushRax()
-				push(1)
-			case ir.IRAtomicFetchAddI32:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(4); err != nil {
-					return err
-				}
-				e.MovRdiRax()
-				e.LockXaddMem32RdiPtrR8d()
-				e.PushR8()
-				push(1)
-			case ir.IRAtomicFetchSubI32:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(4); err != nil {
-					return err
-				}
-				e.MovRdiRax()
-				e.NegR8d()
-				e.LockXaddMem32RdiPtrR8d()
-				e.PushR8()
-				push(1)
-			case ir.IRAtomicFetchAndI32:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(4); err != nil {
-					return err
-				}
-				if err := emitAtomicI32FetchCASLoop(e.AndR10dR8d); err != nil {
-					return err
-				}
-				e.PushRax()
-				push(1)
-			case ir.IRAtomicFetchOrI32:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(4); err != nil {
-					return err
-				}
-				if err := emitAtomicI32FetchCASLoop(e.OrR10dR8d); err != nil {
-					return err
-				}
-				e.PushRax()
-				push(1)
-			case ir.IRAtomicFetchXorI32:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(4); err != nil {
-					return err
-				}
-				if err := emitAtomicI32FetchCASLoop(e.XorR10dR8d); err != nil {
-					return err
-				}
-				e.PushRax()
-				push(1)
-			case ir.IRAtomicLoadI64:
-				if err := pop(2); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(8); err != nil {
-					return err
-				}
-				e.MovRdiRax()
-				e.MovRaxFromRdiDisp(0)
-				e.PushRax()
-				push(1)
-			case ir.IRAtomicStoreI64:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(8); err != nil {
-					return err
-				}
-				e.MovRdiRax()
-				e.MovR9R8()
-				e.XchgMem64RdiPtrR8()
-				e.PushR9()
-				push(1)
-			case ir.IRAtomicExchangeI64:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(8); err != nil {
-					return err
-				}
-				e.MovRdiRax()
-				e.XchgMem64RdiPtrR8()
-				e.PushR8()
-				push(1)
-			case ir.IRAtomicCompareExchangeI64:
-				if err := pop(4); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopR9()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(8); err != nil {
-					return err
-				}
-				emitAtomicI64CompareExchange()
-				e.PushRax()
-				push(1)
-			case ir.IRAtomicFetchAddI64:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(8); err != nil {
-					return err
-				}
-				e.MovRdiRax()
-				e.LockXaddMem64RdiPtrR8()
-				e.PushR8()
-				push(1)
-			case ir.IRAtomicFetchSubI64:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(8); err != nil {
-					return err
-				}
-				e.MovRdiRax()
-				e.NegR8()
-				e.LockXaddMem64RdiPtrR8()
-				e.PushR8()
-				push(1)
-			case ir.IRAtomicFetchAndI64:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(8); err != nil {
-					return err
-				}
-				if err := emitAtomicI64FetchCASLoop(e.AndR10R8); err != nil {
-					return err
-				}
-				e.PushRax()
-				push(1)
-			case ir.IRAtomicFetchOrI64:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(8); err != nil {
-					return err
-				}
-				if err := emitAtomicI64FetchCASLoop(e.OrR10R8); err != nil {
-					return err
-				}
-				e.PushRax()
-				push(1)
-			case ir.IRAtomicFetchXorI64:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(8); err != nil {
-					return err
-				}
-				if err := emitAtomicI64FetchCASLoop(e.XorR10R8); err != nil {
-					return err
-				}
-				e.PushRax()
-				push(1)
-			case ir.IRAtomicLoadI8:
-				if err := pop(2); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(1); err != nil {
-					return err
-				}
-				e.MovzxEaxBytePtrRax()
-				e.PushRax()
-				push(1)
-			case ir.IRAtomicStoreI8:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(1); err != nil {
-					return err
-				}
-				e.MovRdiRax()
-				e.MovzxR8dR8b()
-				e.MovR9R8()
-				e.XchgMem8RdiPtrR8b()
-				e.PushR9()
-				push(1)
-			case ir.IRAtomicExchangeI8:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(1); err != nil {
-					return err
-				}
-				e.MovRdiRax()
-				e.XchgMem8RdiPtrR8b()
-				e.MovzxR8dR8b()
-				e.PushR8()
-				push(1)
-			case ir.IRAtomicCompareExchangeI8:
-				if err := pop(4); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopR9()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(1); err != nil {
-					return err
-				}
-				emitAtomicI8CompareExchange()
-				e.PushRax()
-				push(1)
-			case ir.IRAtomicFetchAddI8:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(1); err != nil {
-					return err
-				}
-				e.MovRdiRax()
-				e.LockXaddMem8RdiPtrR8b()
-				e.MovzxR8dR8b()
-				e.PushR8()
-				push(1)
-			case ir.IRAtomicFetchSubI8:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(1); err != nil {
-					return err
-				}
-				e.MovRdiRax()
-				e.NegR8b()
-				e.LockXaddMem8RdiPtrR8b()
-				e.MovzxR8dR8b()
-				e.PushR8()
-				push(1)
-			case ir.IRAtomicFetchAndI8:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(1); err != nil {
-					return err
-				}
-				if err := emitAtomicI8FetchCASLoop(e.AndR10dR8d); err != nil {
-					return err
-				}
-				e.PushRax()
-				push(1)
-			case ir.IRAtomicFetchOrI8:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(1); err != nil {
-					return err
-				}
-				if err := emitAtomicI8FetchCASLoop(e.OrR10dR8d); err != nil {
-					return err
-				}
-				e.PushRax()
-				push(1)
-			case ir.IRAtomicFetchXorI8:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(1); err != nil {
-					return err
-				}
-				if err := emitAtomicI8FetchCASLoop(e.XorR10dR8d); err != nil {
-					return err
-				}
-				e.PushRax()
-				push(1)
-			case ir.IRAtomicLoadI16:
-				if err := pop(2); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(2); err != nil {
-					return err
-				}
-				e.MovzxEaxWordPtrRax()
-				e.PushRax()
-				push(1)
-			case ir.IRAtomicStoreI16:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(2); err != nil {
-					return err
-				}
-				e.MovRdiRax()
-				e.MovzxR8dR8w()
-				e.MovR9R8()
-				e.XchgMem16RdiPtrR8w()
-				e.PushR9()
-				push(1)
-			case ir.IRAtomicExchangeI16:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(2); err != nil {
-					return err
-				}
-				e.MovRdiRax()
-				e.XchgMem16RdiPtrR8w()
-				e.MovzxR8dR8w()
-				e.PushR8()
-				push(1)
-			case ir.IRAtomicCompareExchangeI16:
-				if err := pop(4); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopR9()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(2); err != nil {
-					return err
-				}
-				emitAtomicI16CompareExchange()
-				e.PushRax()
-				push(1)
-			case ir.IRAtomicFetchAddI16:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(2); err != nil {
-					return err
-				}
-				e.MovRdiRax()
-				e.LockXaddMem16RdiPtrR8w()
-				e.MovzxR8dR8w()
-				e.PushR8()
-				push(1)
-			case ir.IRAtomicFetchSubI16:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(2); err != nil {
-					return err
-				}
-				e.MovRdiRax()
-				e.NegR8w()
-				e.LockXaddMem16RdiPtrR8w()
-				e.MovzxR8dR8w()
-				e.PushR8()
-				push(1)
-			case ir.IRAtomicFetchAndI16:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(2); err != nil {
-					return err
-				}
-				if err := emitAtomicI16FetchCASLoop(e.AndR10dR8d); err != nil {
-					return err
-				}
-				e.PushRax()
-				push(1)
-			case ir.IRAtomicFetchOrI16:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(2); err != nil {
-					return err
-				}
-				if err := emitAtomicI16FetchCASLoop(e.OrR10dR8d); err != nil {
-					return err
-				}
-				e.PushRax()
-				push(1)
-			case ir.IRAtomicFetchXorI16:
-				if err := pop(3); err != nil {
-					return err
-				}
-				e.PopRdx()
-				e.PopR8()
-				e.PopRax()
-				if err := guardAllocationBaseRawAccess(2); err != nil {
-					return err
-				}
-				if err := emitAtomicI16FetchCASLoop(e.XorR10dR8d); err != nil {
-					return err
-				}
-				e.PushRax()
-				push(1)
 			case ir.IRMemReadI32Offset:
 				if err := pop(3); err != nil {
 					return err
@@ -1883,449 +1323,4 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 
 		return nil
 	}
-}
-
-func emitSmallHeapMakeSliceEnabled(abi x64abi.ABI, opt x64.CodegenOptions, pointerWidthBytes int32) bool {
-	if !opt.EnableSmallHeap || opt.DisableSmallHeap || pointerWidthBytes != 8 {
-		return false
-	}
-	sysv, ok := abi.(*x64abi.SysVUnix)
-	return ok && sysv.SysMmap == 9 && sysv.SysExit == 60
-}
-
-func emitFunctionTempRegionMakeSlice(
-	e *x64.Emitter,
-	abi x64abi.ABI,
-	kind ir.IRInstrKind,
-	stackDepth *int,
-	baseOffset int32,
-	sizeOffset int32,
-	importPatches *[]x64obj.ImportPatch,
-) error {
-	_ = importPatches
-	sysv, ok := abi.(*x64abi.SysVUnix)
-	if !ok || sysv.SysMmap != 9 || sysv.SysMunmap != 11 || sysv.SysExit != 60 {
-		return fmt.Errorf("function-temp region lowering: unsupported ABI")
-	}
-	if stackDepth == nil {
-		return fmt.Errorf("internal error: missing stackDepth")
-	}
-	if *stackDepth < 1 {
-		return fmt.Errorf("stack underflow in function-temp region make_slice")
-	}
-	*stackDepth--
-	e.PopRax()
-	e.TestRaxRax()
-	negativeAt := e.JlRel32()
-	emptyAt := e.JzRel32()
-	overflowAt := -1
-	if max := functionTempRegionSliceMaxElements(kind); max != functionTempRegionSliceMaxElements(ir.IRRegionMakeSliceU8) {
-		e.CmpRaxImm32(max)
-		overflowAt = e.JgRel32()
-	}
-	e.PushRax()
-	*stackDepth++
-	switch kind {
-	case ir.IRRegionMakeSliceI32:
-		e.ShlRaxImm8(2)
-	case ir.IRRegionMakeSliceU16:
-		e.ShlRaxImm8(1)
-	}
-	cfg := runtimeabi.RuntimeRegionAllocatorConfig(false)
-	e.CmpRaxImm32(cfg.MaxPayloadBytes)
-	capacityAt := e.JgRel32()
-	e.AddRaxImm32(cfg.HeaderBytes)
-	e.PushRax()
-	*stackDepth++
-	e.MovRsiRax()
-	e.MovEdiImm32(0)
-	e.MovEdxImm32(3)
-	e.MovR10dImm32(0x22)
-	e.MovR8dImm32(0xFFFFFFFF)
-	e.MovR9dImm32(0)
-	e.MovEaxImm32(sysv.SysMmap)
-	e.Syscall()
-	if err := emitSysVMmapFailureGuard(e, sysv, *stackDepth); err != nil {
-		return err
-	}
-	*stackDepth--
-	e.PopRcx()
-	e.MovMem64RbpDispRcx(sizeOffset)
-	e.MovMem64RbpDispRax(baseOffset)
-	e.AddRaxImm32(cfg.HeaderBytes)
-	*stackDepth--
-	e.PopRcx()
-	e.PushRax()
-	*stackDepth++
-	e.PushRcx()
-	*stackDepth++
-	doneAt := e.JmpRel32()
-
-	lengthFailOff := len(e.Buf)
-	if err := sysv.EmitExit(e, 2, *stackDepth, nil); err != nil {
-		return err
-	}
-	emptyOff := len(e.Buf)
-	e.MovEaxImm32(0)
-	e.PushRax()
-	e.PushRax()
-	doneOff := len(e.Buf)
-	if err := x64.PatchRel32(e.Buf, negativeAt, lengthFailOff); err != nil {
-		return err
-	}
-	if overflowAt >= 0 {
-		if err := x64.PatchRel32(e.Buf, overflowAt, lengthFailOff); err != nil {
-			return err
-		}
-	}
-	if err := x64.PatchRel32(e.Buf, capacityAt, lengthFailOff); err != nil {
-		return err
-	}
-	if err := x64.PatchRel32(e.Buf, emptyAt, emptyOff); err != nil {
-		return err
-	}
-	if err := x64.PatchRel32(e.Buf, doneAt, doneOff); err != nil {
-		return err
-	}
-	return nil
-}
-
-func emitFunctionTempRegionReset(
-	e *x64.Emitter,
-	abi x64abi.ABI,
-	stackDepth *int,
-	baseOffset int32,
-	sizeOffset int32,
-	importPatches *[]x64obj.ImportPatch,
-) error {
-	_ = stackDepth
-	_ = importPatches
-	sysv, ok := abi.(*x64abi.SysVUnix)
-	if !ok || sysv.SysMunmap != 11 || sysv.SysExit != 60 {
-		return fmt.Errorf("function-temp region reset: unsupported ABI")
-	}
-	e.MovRaxFromRbpDisp(baseOffset)
-	e.TestRaxRax()
-	doneAt := e.JzRel32()
-	e.MovRdiRax()
-	e.MovRaxFromRbpDisp(sizeOffset)
-	e.MovRsiRax()
-	e.MovEaxImm32(sysv.SysMunmap)
-	e.Syscall()
-	e.MovMem64RbpDispImm(baseOffset, 0)
-	e.MovMem64RbpDispImm(sizeOffset, 0)
-	doneOff := len(e.Buf)
-	if err := x64.PatchRel32(e.Buf, doneAt, doneOff); err != nil {
-		return err
-	}
-	return nil
-}
-
-func emitSysVMmapFailureGuard(e *x64.Emitter, abi *x64abi.SysVUnix, stackSlots int) error {
-	e.CmpRaxImm32(-4095)
-	failAt := e.JaeRel32()
-	doneAt := e.JmpRel32()
-	failOff := len(e.Buf)
-	if err := abi.EmitExit(e, 2, stackSlots, nil); err != nil {
-		return err
-	}
-	doneOff := len(e.Buf)
-	if err := x64.PatchRel32(e.Buf, failAt, failOff); err != nil {
-		return err
-	}
-	if err := x64.PatchRel32(e.Buf, doneAt, doneOff); err != nil {
-		return err
-	}
-	return nil
-}
-
-func emitSmallHeapMakeSlice(
-	e *x64.Emitter,
-	kind ir.IRInstrKind,
-	stackDepth *int,
-	abi x64abi.ABI,
-	importPatches *[]x64obj.ImportPatch,
-	smallHeapCalls *[]int,
-	stateIndex int,
-) error {
-	_ = stateIndex
-	if stackDepth == nil {
-		return fmt.Errorf("internal error: missing stackDepth")
-	}
-	if *stackDepth < 1 {
-		return fmt.Errorf("stack underflow in make_slice")
-	}
-	*stackDepth--
-	e.PopRax()
-	e.TestRaxRax()
-	negativeAt := e.JlRel32()
-	emptyAt := e.JzRel32()
-	overflowAt := -1
-	if max := smallHeapMakeSliceMaxElements(kind); max != smallHeapMaxI32AllocationBytes {
-		e.CmpRaxImm32(max)
-		overflowAt = e.JgRel32()
-	}
-	e.PushRax()
-	*stackDepth++
-	if kind == ir.IRMakeSliceI32 {
-		e.ShlRaxImm8(2)
-	} else if kind == ir.IRMakeSliceU16 {
-		e.ShlRaxImm8(1)
-	}
-	e.MovRsiRax()
-	callAt := e.CallRel32()
-	*smallHeapCalls = append(*smallHeapCalls, callAt)
-	*stackDepth--
-	e.PopRcx()
-	e.PushRax()
-	*stackDepth++
-	e.PushRcx()
-	*stackDepth++
-	doneAt := e.JmpRel32()
-
-	lengthFailOff := len(e.Buf)
-	if err := abi.EmitExit(e, smallHeapAllocationLengthTrapExitCode, 0, importPatches); err != nil {
-		return err
-	}
-	emptyOff := len(e.Buf)
-	e.MovEaxImm32(0)
-	e.PushRax()
-	e.PushRax()
-	doneOff := len(e.Buf)
-	if err := x64.PatchRel32(e.Buf, negativeAt, lengthFailOff); err != nil {
-		return err
-	}
-	if overflowAt >= 0 {
-		if err := x64.PatchRel32(e.Buf, overflowAt, lengthFailOff); err != nil {
-			return err
-		}
-	}
-	if err := x64.PatchRel32(e.Buf, emptyAt, emptyOff); err != nil {
-		return err
-	}
-	if err := x64.PatchRel32(e.Buf, doneAt, doneOff); err != nil {
-		return err
-	}
-	return nil
-}
-
-func emitSmallHeapAllocatorHelper(
-	e *x64.Emitter,
-	abi x64abi.ABI,
-	stackDepth int,
-	importPatches *[]x64obj.ImportPatch,
-	leaPatches *[]x64obj.LeaPatch,
-	stateIndex int,
-) error {
-	sysv, ok := abi.(*x64abi.SysVUnix)
-	if !ok {
-		return fmt.Errorf("small heap allocator requires SysV ABI")
-	}
-	e.MovRaxRsi()
-	e.CmpRaxImm32(runtimeabi.SmallHeapMaxSmallBytes)
-	largeAt := e.JgRel32()
-
-	e.AddRsiImm32(runtimeabi.SmallHeapAlignment - 1)
-	e.AndRsiImm32(-runtimeabi.SmallHeapAlignment)
-	leaPos := e.LeaRaxRipDisp()
-	*leaPatches = append(*leaPatches, x64obj.LeaPatch{At: leaPos, DataIndex: stateIndex})
-	e.MovRdiRax()
-	e.MovRaxFromRdiDisp(0)
-	e.MovR8FromRdiDisp(8)
-	e.TestRaxRax()
-	emptyAt := e.JzRel32()
-	e.MovRdxRax()
-	e.AddRdxRsi()
-	e.CmpRdxR8()
-	fullAt := e.JaRel32()
-	e.MovMem64RdiDispRdx(0)
-	e.Ret()
-
-	refillOff := len(e.Buf)
-	e.PushRsi()
-	e.PushRdi()
-	e.MovEdiImm32(0)
-	e.MovEaxImm32(runtimeabi.SmallHeapChunkBytes)
-	e.MovRsiRax()
-	e.MovEdxImm32(3)
-	e.MovR10dImm32(0x22)
-	e.MovR8dImm32(0xFFFFFFFF)
-	e.MovR9dImm32(0)
-	e.MovEaxImm32(sysv.SysMmap)
-	e.Syscall()
-	if err := emitSmallHeapMmapFailureGuard(e, abi, stackDepth, importPatches); err != nil {
-		return err
-	}
-	e.PopRdi()
-	e.PopRsi()
-	e.MovRdxRax()
-	e.AddRdxRsi()
-	e.MovMem64RdiDispRdx(0)
-	e.MovRdxRax()
-	e.AddRdxImm32(runtimeabi.SmallHeapChunkBytes)
-	e.MovMem64RdiDispRdx(8)
-	e.Ret()
-
-	largeOff := len(e.Buf)
-	e.MovEdiImm32(0)
-	e.MovEdxImm32(3)
-	e.MovR10dImm32(0x22)
-	e.MovR8dImm32(0xFFFFFFFF)
-	e.MovR9dImm32(0)
-	e.MovEaxImm32(sysv.SysMmap)
-	e.Syscall()
-	if err := emitSmallHeapMmapFailureGuard(e, abi, stackDepth, importPatches); err != nil {
-		return err
-	}
-	e.Ret()
-
-	if err := x64.PatchRel32(e.Buf, largeAt, largeOff); err != nil {
-		return err
-	}
-	if err := x64.PatchRel32(e.Buf, emptyAt, refillOff); err != nil {
-		return err
-	}
-	if err := x64.PatchRel32(e.Buf, fullAt, refillOff); err != nil {
-		return err
-	}
-	return nil
-}
-
-func emitSmallHeapMmapFailureGuard(e *x64.Emitter, abi x64abi.ABI, stackDepth int, importPatches *[]x64obj.ImportPatch) error {
-	e.CmpRaxImm32(-4095)
-	failAt := e.JaeRel32()
-	doneAt := e.JmpRel32()
-	failOff := len(e.Buf)
-	if err := abi.EmitExit(e, 2, stackDepth, importPatches); err != nil {
-		return err
-	}
-	doneOff := len(e.Buf)
-	if err := x64.PatchRel32(e.Buf, failAt, failOff); err != nil {
-		return err
-	}
-	if err := x64.PatchRel32(e.Buf, doneAt, doneOff); err != nil {
-		return err
-	}
-	return nil
-}
-
-const (
-	smallHeapAllocationLengthTrapExitCode int32 = 2
-	smallHeapMaxI32AllocationBytes        int32 = 1<<31 - 1
-)
-
-func smallHeapMakeSliceMaxElements(kind ir.IRInstrKind) int32 {
-	switch kind {
-	case ir.IRMakeSliceU16:
-		return smallHeapMaxI32AllocationBytes / 2
-	case ir.IRMakeSliceI32:
-		return smallHeapMaxI32AllocationBytes / 4
-	default:
-		return smallHeapMaxI32AllocationBytes
-	}
-}
-
-func rawSliceMaxElements(shift int32) int32 {
-	if shift <= 0 {
-		return smallHeapMaxI32AllocationBytes
-	}
-	if shift >= 30 {
-		return 0
-	}
-	return smallHeapMaxI32AllocationBytes >> shift
-}
-
-func emitSliceView(
-	e *x64.Emitter,
-	kind ir.IRInstrKind,
-	shift byte,
-	pop func(int) error,
-	push func(int),
-	stackDepth *int,
-	abi x64abi.ABI,
-	importPatches *[]x64obj.ImportPatch,
-) error {
-	failPatches := []int{}
-	switch kind {
-	case ir.IRSliceWindow:
-		if err := pop(4); err != nil {
-			return err
-		}
-		failStackDepth := *stackDepth
-		e.PopRbx() // count
-		e.PopRdx() // start
-		e.PopRcx() // source len
-		e.PopRax() // source ptr
-		e.CmpEdxImm32(0)
-		failPatches = append(failPatches, e.JlRel32())
-		e.CmpEbxImm32(0)
-		failPatches = append(failPatches, e.JlRel32())
-		e.CmpEdxEcx()
-		failPatches = append(failPatches, e.JgRel32())
-		e.SubEcxEdx()
-		e.CmpEbxEcx()
-		failPatches = append(failPatches, e.JgRel32())
-		if shift > 0 {
-			e.ShlRdxImm8(shift)
-		}
-		e.AddRaxRdx()
-		e.PushRax()
-		e.PushRbx()
-		push(2)
-		return patchSliceViewFailure(e, failPatches, failStackDepth, abi, importPatches)
-	case ir.IRSlicePrefix:
-		if err := pop(3); err != nil {
-			return err
-		}
-		failStackDepth := *stackDepth
-		e.PopRbx() // count
-		e.PopRcx() // source len
-		e.PopRax() // source ptr
-		e.CmpEbxImm32(0)
-		failPatches = append(failPatches, e.JlRel32())
-		e.CmpEbxEcx()
-		failPatches = append(failPatches, e.JgRel32())
-		e.PushRax()
-		e.PushRbx()
-		push(2)
-		return patchSliceViewFailure(e, failPatches, failStackDepth, abi, importPatches)
-	case ir.IRSliceSuffix:
-		if err := pop(3); err != nil {
-			return err
-		}
-		failStackDepth := *stackDepth
-		e.PopRdx() // start
-		e.PopRcx() // source len
-		e.PopRax() // source ptr
-		e.CmpEdxImm32(0)
-		failPatches = append(failPatches, e.JlRel32())
-		e.CmpEdxEcx()
-		failPatches = append(failPatches, e.JgRel32())
-		e.SubEcxEdx()
-		if shift > 0 {
-			e.ShlRdxImm8(shift)
-		}
-		e.AddRaxRdx()
-		e.PushRax()
-		e.PushRcx()
-		push(2)
-		return patchSliceViewFailure(e, failPatches, failStackDepth, abi, importPatches)
-	default:
-		return fmt.Errorf("x64 backend: unsupported slice view kind %v", kind)
-	}
-}
-
-func patchSliceViewFailure(e *x64.Emitter, failPatches []int, failStackDepth int, abi x64abi.ABI, importPatches *[]x64obj.ImportPatch) error {
-	doneAt := e.JmpRel32()
-	failOff := len(e.Buf)
-	if err := abi.EmitExit(e, 1, failStackDepth, importPatches); err != nil {
-		return err
-	}
-	doneOff := len(e.Buf)
-	for _, at := range failPatches {
-		if err := x64.PatchRel32(e.Buf, at, failOff); err != nil {
-			return err
-		}
-	}
-	return x64.PatchRel32(e.Buf, doneAt, doneOff)
 }

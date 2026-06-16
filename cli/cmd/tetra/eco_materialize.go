@@ -1,12 +1,13 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"tetra_language/internal/outputformat"
 )
 
 type ecoMaterialization struct {
@@ -19,7 +20,7 @@ type ecoMaterialization struct {
 }
 
 func runEcoMaterialize(args []string, stdout io.Writer, stderr io.Writer) int {
-	pkgPath, target, trustPath, outDir, err := parseEcoMaterializeArgs(args)
+	pkgPath, target, trustPath, outDir, metadataFormat, err := parseEcoMaterializeArgs(args)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 2
@@ -55,7 +56,7 @@ func runEcoMaterialize(args []string, stdout io.Writer, stderr io.Writer) int {
 			return 1
 		}
 		var snapshot ecoTrustSnapshot
-		if err := json.Unmarshal(raw, &snapshot); err != nil {
+		if err := decodeEcoStructured(raw, outputformat.Auto, &snapshot); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}
@@ -66,7 +67,7 @@ func runEcoMaterialize(args []string, stdout io.Writer, stderr io.Writer) int {
 		meta.TrustSnapshot = filepath.Clean(trustPath)
 		meta.LockSHA256 = snapshot.LockSHA256
 	}
-	if err := writeJSONFile(filepath.Join(outDir, "tetra.materialization.json"), meta); err != nil {
+	if _, err := writeEcoStructuredFile(filepath.Join(outDir, "tetra.materialization.json"), metadataFormat, meta); err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
@@ -74,40 +75,47 @@ func runEcoMaterialize(args []string, stdout io.Writer, stderr io.Writer) int {
 	return 0
 }
 
-func parseEcoMaterializeArgs(args []string) (pkgPath string, target string, trustPath string, outDir string, err error) {
+func parseEcoMaterializeArgs(args []string) (pkgPath string, target string, trustPath string, outDir string, metadataFormat string, err error) {
 	outDir = "."
+	metadataFormat = outputformat.JSON
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--target":
 			i++
 			if i >= len(args) {
-				return "", "", "", "", fmt.Errorf("--target requires a value")
+				return "", "", "", "", "", fmt.Errorf("--target requires a value")
 			}
 			target = args[i]
 		case "--trust":
 			i++
 			if i >= len(args) {
-				return "", "", "", "", fmt.Errorf("--trust requires a value")
+				return "", "", "", "", "", fmt.Errorf("--trust requires a value")
 			}
 			trustPath = args[i]
 		case "-C", "--dir":
 			i++
 			if i >= len(args) {
-				return "", "", "", "", fmt.Errorf("%s requires a value", args[i-1])
+				return "", "", "", "", "", fmt.Errorf("%s requires a value", args[i-1])
 			}
 			outDir = args[i]
+		case "--metadata-format":
+			i++
+			if i >= len(args) {
+				return "", "", "", "", "", fmt.Errorf("--metadata-format requires a value")
+			}
+			metadataFormat = args[i]
 		default:
 			if strings.HasPrefix(args[i], "-") {
-				return "", "", "", "", fmt.Errorf("unknown option %s", args[i])
+				return "", "", "", "", "", fmt.Errorf("unknown option %s", args[i])
 			}
 			if pkgPath != "" {
-				return "", "", "", "", fmt.Errorf("eco materialize requires one package path")
+				return "", "", "", "", "", fmt.Errorf("eco materialize requires one package path")
 			}
 			pkgPath = args[i]
 		}
 	}
 	if pkgPath == "" {
-		return "", "", "", "", fmt.Errorf("eco materialize requires one package path")
+		return "", "", "", "", "", fmt.Errorf("eco materialize requires one package path")
 	}
-	return pkgPath, target, trustPath, outDir, nil
+	return pkgPath, target, trustPath, outDir, metadataFormat, nil
 }

@@ -334,7 +334,10 @@ func buildP24CompatibilityDiagnosticWitness() CompatibilityStabilityV1Witness {
 			validCodes = false
 		}
 	}
-	strictValidator := p24CompatibilityStabilityFileContains("tools/cmd/validate-diagnostic/main.go", "DisallowUnknownFields") &&
+	diagnosticStrictDecode := p24CompatibilityStabilityFileContains("tools/cmd/validate-diagnostic/main.go", "DisallowUnknownFields") ||
+		(p24CompatibilityStabilityFileContains("tools/cmd/validate-diagnostic/main.go", "reportdecode.DecodeStrict") &&
+			p24CompatibilityStabilityFileContains("tools/internal/reportdecode/reportdecode.go", "DisallowUnknownFields"))
+	strictValidator := diagnosticStrictDecode &&
 		p24CompatibilityStabilityFileContains("tools/cmd/validate-diagnostic/main.go", "tetra.release.v0_2_0.diagnostic-json.v1") &&
 		p24CompatibilityStabilityFileContains("tools/cmd/validate-diagnostic/main_test.go", "TestValidateDiagnosticAcceptsStableShape")
 	releaseDocs := p24CompatibilityStabilityFileContains("docs/roadmap_0_6_1_to_0_6_3.md", "TETRA0001") &&
@@ -363,6 +366,10 @@ func buildP24CompatibilitySchemaWitness() CompatibilityStabilityV1Witness {
 		"compiler/runtime_hardening_v1.go",
 		"compiler/compatibility_stability_v1.go",
 		"compiler/reports.go",
+		"compiler/internal/buildreports/types.go",
+		"compiler/internal/buildreports/layout.go",
+		"compiler/internal/buildreports/performance.go",
+		"compiler/reports_layout_perf.go",
 		"tools/cmd/validate-manifest/main.go",
 		"tools/cmd/validate-diagnostic/main.go",
 	}
@@ -387,11 +394,14 @@ func buildP24CompatibilitySchemaWitness() CompatibilityStabilityV1Witness {
 		}
 	}
 	sort.Strings(schemas)
-	strict := p24CompatibilityStabilityFileContains("compiler/reports.go", "schema_version") &&
-		p24CompatibilityStabilityFileContains("compiler/reports.go", "want 2") &&
-		p24CompatibilityStabilityFileContains("compiler/reports.go", "want 3") &&
+	diagnosticSchemaStrictDecode := p24CompatibilityStabilityFileContains("tools/cmd/validate-diagnostic/main.go", "DisallowUnknownFields") ||
+		(p24CompatibilityStabilityFileContains("tools/cmd/validate-diagnostic/main.go", "reportdecode.DecodeStrict") &&
+			p24CompatibilityStabilityFileContains("tools/internal/reportdecode/reportdecode.go", "DisallowUnknownFields"))
+	strict := p24CompatibilityStabilityFileContains("compiler/internal/buildreports/types.go", "schema_version") &&
+		p24CompatibilityStabilityFileContains("compiler/internal/buildreports/layout.go", "want 2") &&
+		p24CompatibilityStabilityFileContains("compiler/internal/buildreports/performance.go", "want 3") &&
 		p24CompatibilityStabilityFileContains("tools/cmd/validate-manifest/main.go", "DisallowUnknownFields") &&
-		p24CompatibilityStabilityFileContains("tools/cmd/validate-diagnostic/main.go", "DisallowUnknownFields")
+		diagnosticSchemaStrictDecode
 	return CompatibilityStabilityV1Witness{
 		ID:                             p24CompatibilitySchemaWitnessID,
 		Kind:                           "versioned_report_schemas",

@@ -77,6 +77,58 @@ func TestValidateVisualReportRejectsIncompleteEvidence(t *testing.T) {
 			},
 			want: "negative_guards",
 		},
+		{
+			name: "self golden artifact",
+			mutate: func(report *VisualRegressionReport) {
+				frame := &report.Apps[0].Targets[0].Frames[0]
+				frame.GoldenArtifactPath = frame.ArtifactPath
+			},
+			want: "self-golden",
+		},
+		{
+			name: "metadata checksum only",
+			mutate: func(report *VisualRegressionReport) {
+				frame := &report.Apps[0].Targets[0].Frames[0]
+				frame.ArtifactPath = ""
+				frame.ArtifactSHA256 = ""
+				frame.GoldenArtifactPath = ""
+				frame.GoldenArtifactSHA256 = ""
+			},
+			want: "artifact_path",
+		},
+		{
+			name: "fixture frame only",
+			mutate: func(report *VisualRegressionReport) {
+				frame := &report.Apps[0].Targets[0].Frames[0]
+				frame.ArtifactPath = "tools/validators/surface/testdata/fixture-frame.rgba"
+				frame.GoldenArtifactPath = "tools/validators/surface/testdata/fixture-frame.golden.rgba"
+			},
+			want: "fixture frame",
+		},
+		{
+			name: "missing png or rgba artifact",
+			mutate: func(report *VisualRegressionReport) {
+				frame := &report.Apps[0].Targets[0].Frames[0]
+				frame.ArtifactPath = "reports/surface-visual/headless/frame.json"
+				frame.GoldenArtifactPath = "reports/surface/goldens/headless/frame.json"
+				frame.ArtifactFormat = "json"
+			},
+			want: "png or rgba",
+		},
+		{
+			name: "artifact checksum mismatch",
+			mutate: func(report *VisualRegressionReport) {
+				report.Apps[0].Targets[0].Frames[0].ArtifactSHA256 = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+			},
+			want: "artifact_sha256",
+		},
+		{
+			name: "MRB05 guard missing",
+			mutate: func(report *VisualRegressionReport) {
+				report.NegativeGuards.SelfGoldenRejected = false
+			},
+			want: "negative_guards",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			raw := validSurfaceVisualReportJSON(t, tc.mutate)
@@ -129,6 +181,11 @@ func validSurfaceVisualReportJSON(t *testing.T, mutate func(*VisualRegressionRep
 								Stride:                1280,
 								Checksum:              "sha256:1111111111111111111111111111111111111111111111111111111111111111",
 								GoldenChecksum:        "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+								ArtifactPath:          "reports/surface-visual/headless/frames/initial.rgba",
+								ArtifactSHA256:        "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+								ArtifactFormat:        "rgba",
+								GoldenArtifactPath:    "reports/surface/goldens/headless/initial.rgba",
+								GoldenArtifactSHA256:  "sha256:1111111111111111111111111111111111111111111111111111111111111111",
 								DiffPixels:            0,
 								DiffRatioMilli:        0,
 								MaxChannelDelta:       0,
@@ -143,13 +200,17 @@ func validSurfaceVisualReportJSON(t *testing.T, mutate func(*VisualRegressionRep
 			},
 		},
 		NegativeGuards: VisualRegressionNegativeGuardsReport{
-			ScreenshotOnlyRejected:       true,
-			StaleGoldenRejected:          true,
-			MajorDriftRejected:           true,
-			MissingBlockGraphRejected:    true,
-			MissingLayoutRejected:        true,
-			MissingAccessibilityRejected: true,
-			MissingPerformanceRejected:   true,
+			ScreenshotOnlyRejected:           true,
+			StaleGoldenRejected:              true,
+			MajorDriftRejected:               true,
+			MissingBlockGraphRejected:        true,
+			MissingLayoutRejected:            true,
+			MissingAccessibilityRejected:     true,
+			MissingPerformanceRejected:       true,
+			SelfGoldenRejected:               true,
+			MetadataChecksumRejected:         true,
+			FixtureFrameOnlyRejected:         true,
+			MissingPNGOrRGBAArtifactRejected: true,
 		},
 	}
 	if mutate != nil {

@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"tetra_language/internal/toon"
 )
 
 func TestValidateManifestAcceptsGeneratedShape(t *testing.T) {
@@ -17,6 +19,20 @@ func TestValidateManifestAcceptsGeneratedShape(t *testing.T) {
 	out, err := runManifestValidator(t, string(raw))
 	if err != nil {
 		t.Fatalf("validator failed: %v\n%s", err, out)
+	}
+}
+
+func TestValidateManifestAcceptsTOONGeneratedShape(t *testing.T) {
+	raw, err := os.ReadFile(filepath.FromSlash("../../../docs/generated/manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	toonRaw, err := toon.ConvertJSONToTOON(raw, toon.Options{Strict: true, Deterministic: true})
+	if err != nil {
+		t.Fatalf("json->toon: %v", err)
+	}
+	if err := validateManifestFormat(toonRaw, "toon"); err != nil {
+		t.Fatalf("validateManifestFormat TOON: %v\n%s", err, toonRaw)
 	}
 }
 

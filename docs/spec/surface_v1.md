@@ -60,6 +60,13 @@ That gate runs the Surface release evidence, claim scanner, manifest validator,
 and docs verifier. It is not the P29 final audit and must not be used as a
 standalone final `PROD_STABLE_SCOPED` signoff.
 
+The Surface v1 docs/gate contract is mirrored by
+`scripts/release/surface/contracts/surface-release-v1.json`; for an empty
+report directory, the dry-run plan is
+`go run ./tools/cmd/run-gate --contract scripts/release/surface/contracts/surface-release-v1.json --report-dir reports/surface-product-v1 --dry-run --json`.
+The shell gates still produce evidence, and the dry-run path does not execute
+the gate, prove remote CI execution, or promote macOS/Windows runtime support.
+
 ## Block-First Surface System Direction
 
 The next Surface architecture track is the experimental
@@ -152,6 +159,14 @@ five polished Block-only examples from `surface-block-examples.json` across
 headless, linux-x64 real-window, and wasm32-web browser-canvas targets. It is
 visual infrastructure evidence, not a production beauty claim, not a GPU
 renderer claim, and not broad Electron renderer parity.
+
+Morph rendered beauty has its own experimental contract in
+`docs/spec/surface_morph_rendered_beauty.md`, with a machine-readable contract at
+`docs/spec/surface_morph_rendered_beauty_contract.json`. It requires source-
+linked Morph capsule/token/recipe evidence, a resolved Morph scene, a Block scene
+snapshot, render command stream evidence, real frame artifacts, separate pixel
+goldens, and product-claim guards before Morph can be described as the rendered
+beauty layer.
 
 The Morph token graph contract is validated by
 `tools/cmd/validate-surface-token-graph` against
@@ -827,8 +842,10 @@ The release gate must also include `surface-package.json` with
 `schema:"tetra.surface.package.v1"` and `model:"surface-package-v1"`. That
 report records `surface-app-package-v1` package manifests, local asset hashes,
 linux-x64 and wasm32-web tar.gz packages, installed linux-x64 package execution
-for a reference app, web bundle HTML/wasm/compiler-owned loader output, and a
-hash-pinned `tetra.surface.update-channel.v1` manifest. Signing,
+for the default reference app or explicitly named product-slice app,
+web bundle HTML/wasm/compiler-owned loader output, and a hash-pinned
+`tetra.surface.update-channel.v1` manifest. The `studio-shell` flagship package
+uses an explicit expected app-state exit code in its install smoke. Signing,
 notarization, automatic runtime updates, and network update fetching remain
 nonclaims until platform signing/notarization evidence and runtime updater
 evidence exist.

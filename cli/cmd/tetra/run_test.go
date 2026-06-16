@@ -25,6 +25,14 @@ func TestRunCommandJSONDiagnosticsForHostTargetMismatch(t *testing.T) {
 	}
 }
 
+func TestRunCommandTOONDiagnosticsForHostTargetMismatch(t *testing.T) {
+	target := nonHostTarget(t)
+	diag := runCLITOONDiagnostic(t, []string{"run", "--diagnostics=toon", "--target", target}, 2)
+	if diag.Code != compiler.DiagnosticCodeTargetRuntime || diag.Severity != "error" || !strings.Contains(diag.Message, "cannot run target "+target) {
+		t.Fatalf("diagnostic = %#v", diag)
+	}
+}
+
 func TestRunCommandJSONDiagnosticsForWASMWebRuntimeUnsupported(t *testing.T) {
 	dir := t.TempDir()
 	srcPath := filepath.Join(dir, "main.tetra")

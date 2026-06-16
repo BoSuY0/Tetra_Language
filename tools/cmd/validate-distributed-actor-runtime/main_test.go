@@ -71,9 +71,12 @@ func validDistributedActorRuntimeReportJSON() []byte {
     "runtime": "actornet",
     "transport": "loopback-tcp",
     "listen_addr": "127.0.0.1:47777",
-    "accepted_connections": 3,
+    "accepted_connections": 8,
     "routed_frames": 5,
-    "dropped_frames": 1
+    "dropped_frames": 3,
+    "decode_errors": 3,
+    "expected_decode_errors": 3,
+    "last_error": "actor wire: invalid slot count: 9"
   },
   "processes": [
     {"name":"broker","kind":"broker","path":"./tetra actor-net","ran":true,"pass":true,"exit_code":0},
@@ -88,15 +91,22 @@ func validDistributedActorRuntimeReportJSON() []byte {
     "send_i32": 1,
     "send_msg": 1,
     "send_typed": 1,
-    "node_down": 1
+    "node_down": 1,
+    "error": 2
   },
-  "frame_order": ["hello","hello_ack","spawn_req","spawn_ack","send_i32","send_msg","send_typed","node_down"],
+  "frame_order": ["hello","hello_ack","spawn_req","spawn_ack","send_i32","send_msg","send_typed","node_down","error","error"],
   "cases": [
     {"name":"cross-node i32 send/receive","ran":true,"pass":true,"expected_exit":0,"actual_exit":0,"node_processes":2},
     {"name":"cross-node tagged send/receive","ran":true,"pass":true,"expected_exit":0,"actual_exit":0,"node_processes":2},
     {"name":"cross-node typed send/receive","ran":true,"pass":true,"expected_exit":0,"actual_exit":0,"node_processes":2},
     {"name":"missing-node failure/status","ran":true,"pass":true,"expected_exit":0,"actual_exit":0,"node_processes":1},
-    {"name":"task cancel/join compatibility","ran":true,"pass":true,"expected_exit":0,"actual_exit":0,"node_processes":1}
+    {"name":"task cancel/join compatibility","ran":true,"pass":true,"expected_exit":0,"actual_exit":0,"node_processes":1},
+    {"name":"malformed frame length rejected","kind":"network_negative","ran":true,"pass":true,"expected_exit":0,"actual_exit":0,"node_processes":0},
+    {"name":"duplicate node rejected","kind":"network_negative","ran":true,"pass":true,"expected_exit":0,"actual_exit":0,"node_processes":0},
+    {"name":"unknown frame type rejected","kind":"network_negative","ran":true,"pass":true,"expected_exit":0,"actual_exit":0,"node_processes":0},
+    {"name":"bad typed slot count rejected","kind":"network_negative","ran":true,"pass":true,"expected_exit":0,"actual_exit":0,"node_processes":0},
+    {"name":"missing-node send after broker close","kind":"network_negative","ran":true,"pass":true,"expected_exit":0,"actual_exit":0,"node_processes":0},
+    {"name":"forged source node rejected","kind":"network_negative","ran":true,"pass":true,"expected_exit":0,"actual_exit":0,"node_processes":0}
   ]
 }
 `)

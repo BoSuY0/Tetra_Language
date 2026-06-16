@@ -94,17 +94,19 @@ Current entrypoints:
 - `surface-inspector-smoke.sh` writes and validates
   `tetra.surface.inspector.v1` / `surface-inspector-v1` static tool evidence.
   It aggregates headless Block-system, Morph, app-model, accessibility, and
-  event reports into `surface-inspector.json` plus optional
-  `surface-inspector.html`. The report exposes Block tree, Morph tokens,
-  layout, paint, accessibility, event route, focus, perf-counter, source
-  location, input report coverage, and hidden-state scan evidence. It is not
-  browser devtools, React devtools, DOM runtime UI, hidden app state, or
-  target-host accessibility proof by itself.
+  event reports plus Morph rendered beauty evidence into
+  `surface-inspector.json` plus optional `surface-inspector.html`. The report
+  exposes Block tree, Morph tokens, recipe expansions, Block scene nodes,
+  render commands, frame artifacts, golden diff result, layout, paint,
+  accessibility, event route, focus, perf-counter, source location, input
+  report coverage, and hidden-state scan evidence. It is not browser devtools,
+  React devtools, DOM runtime UI, hidden app state, or target-host accessibility
+  proof by itself.
 
 - `surface-template-smoke.sh` writes and validates
   `tetra.surface.template-smoke.v1` / `surface-template-smoke-v1` onboarding
   evidence. It runs `tetra new surface-app` for command palette, settings,
-  dashboard, editor shell, multi-window notes, and web-canvas templates, then
+  dashboard, editor shell, studio shell, multi-window notes, and web-canvas templates, then
   checks, builds, runs, inspects, visually tests, and packages the generated
   app paths. The report requires Block/Morph template source and rejects React,
   Electron, DOM-authored app UI trees, CSS runtime dependencies, core widget
@@ -125,10 +127,13 @@ Current entrypoints:
 
 - `surface-package-smoke.sh` writes and validates
   `tetra.surface.package.v1` / `surface-package-v1` packaging and update-story
-  evidence. It builds the command-palette reference app for linux-x64 and
-  wasm32-web, creates tar.gz packages with `surface-app-package-v1` manifests,
-  records local asset hashes, unpacks and runs the linux-x64 package, includes
-  web HTML/wasm/compiler-owned loader output, and writes a hash-pinned update
+  evidence. By default it builds the command-palette reference app for
+  linux-x64 and wasm32-web; with `--source <path> --app-id <id>
+  --app-title <title> --expected-exit-code <n>` it records the same evidence
+  for an explicitly named product-slice app such as `studio-shell`. It creates
+  tar.gz packages with `surface-app-package-v1` manifests, records local asset
+  hashes, unpacks and runs the linux-x64 package, includes web
+  HTML/wasm/compiler-owned loader output, and writes a hash-pinned update
   channel manifest. Signing, notarization, automatic runtime updates, network
   update fetching, React, Electron, CSS runtime, DOM-authored app UI trees,
   remote asset fetches, and user JavaScript app logic remain nonclaims.

@@ -10,7 +10,7 @@ Actor behavior and supported targets are documented in `docs/spec/actors.md`.
 
 ## Async Functions
 
-The current async function MVP is checked synchronous lowering, not an
+The current async function baseline is checked synchronous lowering, not an
 independent async scheduler guarantee. Compiler coverage verifies async parsing,
 `await` checking/lowering, rejection of `await` outside async functions, and
 linux/amd64 build/run coverage for the tracked examples.
@@ -60,9 +60,17 @@ select surface. Bounded stress evidence is
 `examples/task_bounded_stress.tetra`. These use the cooperative `task.i32`
 runtime path and require `uses runtime`.
 
+The current cancellation matrix is scoped. Task-group cancellation wakes
+`core.recv_until`, `core.recv_msg_until`, `core.task_join_result_i32`,
+`core.task_join_until_i32`, and `core.select2_i32` waiters with checked error
+`1`. Raw `core.task_join_i32` has no error field, so cancellation wakes it with
+raw value `0`; use the result or timed join APIs for a checked status.
+Non-timed actor receives such as `core.recv()` and `core.recv_msg()` do not
+publish a cancellation result in this profile.
+
 Typed task builtins are also covered by compiler tests:
 `core.task_spawn_i32_typed<E>("worker")` and
-`core.task_join_i32_typed<E>(task)`. Current MVP limits:
+`core.task_join_i32_typed<E>(task)`. Current limits:
 
 - typed task error argument must be an enum;
 - typed handle layout uses direct runtime wrappers for `2..4` and staged
@@ -117,6 +125,29 @@ mailbox metadata (`message_schema`, fixed local capacity, backpressure hook)
 and per-payload copy/move behavior, including scalar copies, island moves,
 explicit view copies, and zero-copy island-backed slice moves.
 
+The builtin Linux-x64 mailbox is bounded. Local `core.send`,
+`core.send_msg`, and `core.send_typed` return checked backpressure `-2` when
+the receiver mailbox is full. That failure is recoverable after the receiver
+drains messages; retry logic should yield, poll, or otherwise let the receiver
+run before sending again. A failed `send_typed` does not publish a partial enum
+payload. This is a local bounded mailbox contract, not automatic retry,
+reconnect, or distributed delivery.
+
+Actor lifecycle is intentionally narrow. A spawned actor runs until its entry
+function returns, then becomes `done`; zero and nonzero actor entry returns use
+the same user-visible state. Later local sends to that actor return checked
+failure `-4`. Messages already delivered to another actor remain receivable
+even if their sender is now done. Messages still sitting in a done actor's own
+mailbox are not drained by a shutdown phase. There is no actor status, actor
+join, actor exit-code, actor close API, supervision tree, restart behavior,
+linking, or OTP-style lifecycle contract in the current runtime.
+
+The current actor scheduler is single-threaded and cooperative. Executable
+runtime tests cover bounded progress for yielding runnable actors and
+deterministic deadline-order wake for sleeping actors. That evidence is a
+scoped fairness/starvation boundary for the current runtime, not a preemptive
+or production multi-threaded scheduler guarantee.
+
 The P6.3 per-core scheduler work is currently a checked prototype model in
 `compiler/internal/parallelrt`, validated by the parallel production smoke
 report. It covers single-core compatibility, two-core work stealing, bounded
@@ -130,9 +161,14 @@ mailbox send/receive for i32, tagged, and typed messages, missing-node
 failure/status propagation, and compatibility with existing cooperative task
 cancel/join handles.
 
+Missing-node/node_down remains checked status evidence, not a retry system.
+When the broker reports a missing destination, the runtime can expose node-down
+status after the network pump observes the frame. That does not imply automatic
+retry, reconnect, restart, supervision, or delivery retry.
+
 Non-goals for this release remain non-Linux-x64 distributed actor targets,
 production multi-threaded scheduling, full cancellation guarantees, and
-structured concurrency beyond the documented cooperative task group handles.
+structured concurrency beyond the documented cooperative task-group wake matrix.
 Transport-only
 `tetra.actors.transport.v1` evidence is still not proof of distributed runtime
 support; executable `tetra.actors.distributed-runtime.v1` smoke evidence is
@@ -162,6 +198,8 @@ and validates `reports/actor-runtime-foundation/final/artifact-hashes.json`,
 that through `.github/workflows/ci.yml`; package publishing records it through
 `.github/workflows/release-packages.yml` before upload/release/container/Homebrew
 publish steps.
+The machine-readable gate contract is
+`scripts/release/post_v0_4/contracts/actor-runtime-foundation-linux-x64.json`.
 
 Actor foundation nonclaims remain explicit: no full Erlang/OTP actor runtime
 claim, no cluster membership or reconnect/retry production claim, no non-Linux

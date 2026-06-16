@@ -1,11 +1,29 @@
 package main
 
-import "testing"
+import (
+	"testing"
+
+	"tetra_language/internal/toon"
+)
 
 func TestValidateDiagnosticAcceptsStableShape(t *testing.T) {
 	diag, err := parseDiagnostic([]byte(`{"code":"TETRA2001","message":"unknown function","file":"bad.tetra","line":2,"column":5,"severity":"error","hint":"check spelling"}`))
 	if err != nil {
 		t.Fatalf("parse diagnostic: %v", err)
+	}
+	if err := validateDiagnostic(diag, "TETRA2001", "error", "unknown function", true); err != nil {
+		t.Fatalf("validate diagnostic: %v", err)
+	}
+}
+
+func TestValidateDiagnosticAcceptsTOONStableShape(t *testing.T) {
+	raw, err := toon.ConvertJSONToTOON([]byte(`{"code":"TETRA2001","message":"unknown function","file":"bad.tetra","line":2,"column":5,"severity":"error","hint":"check spelling"}`), toon.Options{Deterministic: true, Strict: true})
+	if err != nil {
+		t.Fatalf("json->toon: %v", err)
+	}
+	diag, err := parseDiagnostic(raw)
+	if err != nil {
+		t.Fatalf("parse diagnostic: %v\n%s", err, raw)
 	}
 	if err := validateDiagnostic(diag, "TETRA2001", "error", "unknown function", true); err != nil {
 		t.Fatalf("validate diagnostic: %v", err)

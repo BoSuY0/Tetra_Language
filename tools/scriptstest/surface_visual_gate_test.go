@@ -35,6 +35,11 @@ func TestSurfaceVisualGateRunsBlockSystemVisualEvidence(t *testing.T) {
 		`go run ./tools/cmd/validate-surface-visual-report --report "$visual_report_path"`,
 		`go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"`,
 		`go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-hashes.json"`,
+		`"self_golden_rejected": true`,
+		`"metadata_checksum_rejected": true`,
+		`"fixture_frame_only_rejected": true`,
+		`"missing_png_or_rgba_artifact_rejected": true`,
+		`"write_golden_allowed": false`,
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("Surface visual gate missing %q", want)
@@ -50,6 +55,35 @@ func TestSurfaceVisualGateRunsBlockSystemVisualEvidence(t *testing.T) {
 	for _, forbidden := range []string{"continue-on-error", "|| true", "set +e"} {
 		if strings.Contains(text, forbidden) {
 			t.Fatalf("Surface visual gate must not contain bypass marker %q", forbidden)
+		}
+	}
+}
+
+func TestSurfaceVisualGateRejectsWriteGoldenMode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("bash release script test")
+	}
+
+	root := surfaceVisualGateFakeRoot(t)
+	out, err := runSurfaceVisualGate(t, root, "--write-golden")
+	if err == nil {
+		t.Fatalf("expected write-golden mode rejection\n%s", out)
+	}
+	for _, want := range []string{
+		"--write-golden is not allowed in scripts/release/surface/visual-gate.sh",
+		"Golden updates are not allowed in this release gate",
+	} {
+		if !strings.Contains(string(out), want) {
+			t.Fatalf("write-golden rejection output missing %q:\n%s", want, out)
+		}
+	}
+	for _, forbidden := range []string{
+		"block-system-gate.sh",
+		"go run ./tools/cmd/surface-visual-diff",
+		"go run",
+	} {
+		if strings.Contains(string(out), forbidden) {
+			t.Fatalf("visual gate should reject write-golden before sub-gates:\n%s", out)
 		}
 	}
 }

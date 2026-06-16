@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -9,6 +8,7 @@ import (
 	"path/filepath"
 
 	"tetra_language/compiler"
+	"tetra_language/internal/outputformat"
 )
 
 type ecoSeed struct {
@@ -49,6 +49,7 @@ func runEcoSeedExport(args []string, stdout io.Writer, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	target := fs.String("target", "", "validate capsule target compatibility")
 	outPath := fs.String("out", compiler.DefaultSeedFileName, "path to T4 seed output")
+	format := fs.String("format", outputformat.JSON, "seed output format: json, toon, or both")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			return 0
@@ -82,7 +83,7 @@ func runEcoSeedExport(args []string, stdout io.Writer, stderr io.Writer) int {
 			DependsOn:   append([]capsuleDependency(nil), capsule.Dependencies...),
 		})
 	}
-	if err := writeJSONFile(*outPath, seed); err != nil {
+	if _, err := writeEcoStructuredFile(*outPath, *format, seed); err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
@@ -94,7 +95,9 @@ func runEcoSeedImport(args []string, stdout io.Writer, stderr io.Writer) int {
 	fs := flag.NewFlagSet("eco seed import", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	seedPath := fs.String("seed", "", "path to seed JSON input")
+	seedFormat := fs.String("seed-format", outputformat.Auto, "seed input format: auto, json, or toon")
 	lockPath := fs.String("lock", "", "path to write lock JSON")
+	lockFormat := fs.String("lock-format", outputformat.JSON, "lock output format: json, toon, or both")
 	capsulesDir := fs.String("capsules-dir", "", "directory to write capsule manifests")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
@@ -116,7 +119,7 @@ func runEcoSeedImport(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 	var seed ecoSeed
-	if err := json.Unmarshal(raw, &seed); err != nil {
+	if err := decodeEcoStructured(raw, *seedFormat, &seed); err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
@@ -160,7 +163,7 @@ func runEcoSeedImport(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 2
 	}
 	if *lockPath != "" {
-		if err := writeJSONFile(*lockPath, lock); err != nil {
+		if _, err := writeEcoStructuredFile(*lockPath, *lockFormat, lock); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}

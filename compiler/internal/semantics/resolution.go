@@ -5,93 +5,26 @@ import (
 	"strings"
 
 	"tetra_language/compiler/internal/frontend"
+	semanticsexpressions "tetra_language/compiler/internal/semantics/expressions"
+	semanticsworld "tetra_language/compiler/internal/semantics/world"
 )
 
-const importSymbolPrefix = "\x00symbol:"
+const importSymbolPrefix = semanticsworld.ImportSymbolPrefix
 
 func collectImportAliases(file *frontend.FileAST) (map[string]string, error) {
-	aliases := make(map[string]string)
-	topLevel := topLevelDeclarationNames(file)
-	for _, imp := range file.Imports {
-		if imp.Path == "" {
-			return nil, fmt.Errorf("%s: import path required", frontend.FormatPos(imp.At))
-		}
-		if len(imp.Items) > 0 {
-			for _, item := range imp.Items {
-				if item == "" {
-					return nil, fmt.Errorf("%s: empty selective import", frontend.FormatPos(imp.At))
-				}
-				if _, exists := aliases[item]; exists {
-					return nil, fmt.Errorf("%s: duplicate import alias '%s'", frontend.FormatPos(imp.At), item)
-				}
-				if _, exists := topLevel[item]; exists {
-					return nil, fmt.Errorf("%s: import alias '%s' conflicts with declaration '%s'", frontend.FormatPos(imp.At), item, item)
-				}
-				aliases[item] = importSymbolPrefix + imp.Path + "." + item
-			}
-			continue
-		}
-		if imp.Alias == "" {
-			return nil, fmt.Errorf("%s: import alias required", frontend.FormatPos(imp.At))
-		}
-		if _, exists := aliases[imp.Alias]; exists {
-			return nil, fmt.Errorf("%s: duplicate import alias '%s'", frontend.FormatPos(imp.At), imp.Alias)
-		}
-		if _, exists := topLevel[imp.Alias]; exists {
-			return nil, fmt.Errorf("%s: import alias '%s' conflicts with declaration '%s'", frontend.FormatPos(imp.At), imp.Alias, imp.Alias)
-		}
-		aliases[imp.Alias] = imp.Path
-	}
-	return aliases, nil
+	return semanticsworld.CollectImportAliases(file)
 }
 
 func importSymbolTarget(target string) (string, bool) {
-	if !strings.HasPrefix(target, importSymbolPrefix) {
-		return "", false
-	}
-	return strings.TrimPrefix(target, importSymbolPrefix), true
+	return semanticsworld.ImportSymbolTarget(target)
 }
 
 func topLevelDeclarationNames(file *frontend.FileAST) map[string]struct{} {
-	names := map[string]struct{}{}
-	for _, fn := range file.Funcs {
-		names[fn.Name] = struct{}{}
-	}
-	for _, glob := range file.Globals {
-		names[glob.Name] = struct{}{}
-	}
-	for _, st := range file.Structs {
-		names[st.Name] = struct{}{}
-	}
-	for _, en := range file.Enums {
-		names[en.Name] = struct{}{}
-	}
-	for _, state := range file.States {
-		names[state.Name] = struct{}{}
-	}
-	for _, view := range file.Views {
-		names[view.Name] = struct{}{}
-	}
-	for _, actor := range file.Actors {
-		names[actor.Name] = struct{}{}
-	}
-	for _, proto := range file.Protocols {
-		names[proto.Name] = struct{}{}
-	}
-	for _, capsule := range file.Capsules {
-		if capsule == nil {
-			continue
-		}
-		names[capsule.Name] = struct{}{}
-	}
-	return names
+	return semanticsworld.TopLevelDeclarationNames(file)
 }
 
 func qualifyName(module, name string) string {
-	if module == "" {
-		return name
-	}
-	return module + "." + name
+	return semanticsworld.QualifyName(module, name)
 }
 
 func resolveTypeName(ref *frontend.TypeRef, module string, imports map[string]string) (string, error) {
@@ -620,19 +553,7 @@ func ResolveFieldAccessType(expr frontend.Expr, locals map[string]LocalInfo, glo
 }
 
 func splitFieldPath(expr frontend.Expr) (string, []string, frontend.Position, bool) {
-	switch e := expr.(type) {
-	case *frontend.IdentExpr:
-		return e.Name, nil, e.At, true
-	case *frontend.FieldAccessExpr:
-		baseName, fields, pos, ok := splitFieldPath(e.Base)
-		if !ok {
-			return "", nil, pos, false
-		}
-		fields = append(fields, e.Field)
-		return baseName, fields, e.At, true
-	default:
-		return "", nil, expr.Pos(), false
-	}
+	return semanticsexpressions.SplitFieldPath(expr)
 }
 
 func resolveFieldChain(typeName string, baseOffset int, fields []string, types map[string]*TypeInfo, pos frontend.Position) (string, int, int, error) {

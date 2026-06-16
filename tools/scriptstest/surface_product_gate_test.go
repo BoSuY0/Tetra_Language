@@ -90,8 +90,8 @@ func TestSurfaceProductGateWritesP29RequiredSummaryAliases(t *testing.T) {
 		`"$report_dir/package/package-summary.json"`,
 		`"$report_dir/reference-apps/reference-apps-summary.json"`,
 		`"$report_dir/claim-governance/claims-summary.json"`,
-		`"macos-surface-production"`,
-		`"windows-surface-production"`,
+		`"nonclaim-macos-surface-production-support"`,
+		`"nonclaim-windows-surface-production-support"`,
 		`"wasm32-wasi-surface-ui-runtime"`,
 		`"dom-authored-application-ui"`,
 		`"user-javascript-application-logic"`,
@@ -106,6 +106,125 @@ func TestSurfaceProductGateWritesP29RequiredSummaryAliases(t *testing.T) {
 		`write_product_category_summary \`,
 		`validate-artifact-hashes --write --root "$report_dir"`,
 	)
+}
+
+func TestSurfaceProductSliceGateRunsFlagshipEvidence(t *testing.T) {
+	root := repoRoot(t)
+	path := filepath.Join(root, "scripts", "release", "surface", "surface-product-slice-gate.sh")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read Surface product-slice gate: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		"Usage: bash scripts/release/surface/surface-product-slice-gate.sh [--report-dir DIR]",
+		`surface_release_require_fresh_report_dir "$report_dir_arg" "$repo_root" "surface_product_slice_gate:"`,
+		`flagship_source="examples/surface_morph_rendered_studio_shell.tetra"`,
+		`go run ./tools/cmd/surface-runtime-smoke --mode headless-block-system --source "$flagship_source"`,
+		`go run ./tools/cmd/surface-runtime-smoke --mode linux-x64-real-window-block-system --source "$flagship_source"`,
+		`go run ./tools/cmd/surface-runtime-smoke --mode wasm32-web-browser-canvas-block-system --source "$flagship_source"`,
+		`go run ./cli/cmd/tetra surface dev \`,
+		`--change-file "token:lib/core/morph.tetra"`,
+		`--change-file "recipe:lib/core/morph.tetra"`,
+		`bash scripts/release/surface/surface-package-smoke.sh \`,
+		`--app-id studio-shell`,
+		`--expected-exit-code 0`,
+		`bash scripts/release/surface/morph-rendered-beauty-gate.sh --report-dir "$mrb_gate_dir"`,
+		`go run ./tools/cmd/validate-surface-claims --root "$repo_root" --report-dir "$report_dir"`,
+		`go run ./tools/cmd/validate-manifest --manifest docs/generated/manifest.json`,
+		`go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`,
+		`"schema": "tetra.surface.product-slice-summary.v1"`,
+		`"flagship_source": $(json_string "$flagship_source")`,
+		`"morph_rendered_beauty": "validated"`,
+		`"morph_rendered_beauty_gate": "morph-rendered-beauty/morph-rendered-beauty-gate-summary.json"`,
+		`"category_flagship_runtime": "categories/flagship-runtime.json"`,
+		`"category_morph_beauty": "categories/morph-rendered-beauty.json"`,
+		`"no-electron-api-compatibility"`,
+		`go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"`,
+		`go run ./tools/cmd/validate-surface-product-slice --report-dir "$report_dir"`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("Surface product-slice gate missing %q", want)
+		}
+	}
+	assertOrderedFragments(t, text,
+		`surface_release_require_fresh_report_dir "$report_dir_arg"`,
+		`surface-runtime-smoke --mode headless-block-system`,
+		`surface-runtime-smoke --mode linux-x64-real-window-block-system`,
+		`surface-runtime-smoke --mode wasm32-web-browser-canvas-block-system`,
+		`go run ./cli/cmd/tetra surface dev`,
+		`surface-package-smoke.sh`,
+		`morph-rendered-beauty-gate.sh --report-dir "$mrb_gate_dir"`,
+		`validate-surface-claims --root "$repo_root" --report-dir "$report_dir"`,
+		`validate-manifest --manifest docs/generated/manifest.json`,
+		`verify-docs --manifest docs/generated/manifest.json`,
+		`cat > "$summary_path" <<JSON`,
+		`validate-artifact-hashes --write --root "$report_dir"`,
+		`validate-surface-product-slice --report-dir "$report_dir"`,
+	)
+	for _, forbidden := range []string{"continue-on-error", "|| true", "GOCACHE=/tmp", "GOTMPDIR=/tmp"} {
+		if strings.Contains(text, forbidden) {
+			t.Fatalf("Surface product-slice gate must not contain bypass or tmpfs cache marker %q", forbidden)
+		}
+	}
+}
+
+func TestSurfaceMorphRenderedBeautyGateRunsIntegratedEvidence(t *testing.T) {
+	root := repoRoot(t)
+	path := filepath.Join(root, "scripts", "release", "surface", "morph-rendered-beauty-gate.sh")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read Surface Morph rendered beauty gate: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		"Usage: bash scripts/release/surface/morph-rendered-beauty-gate.sh [--report-dir DIR]",
+		`surface_release_require_fresh_report_dir "$report_dir_arg" "$repo_root" "surface_morph_rendered_beauty_gate:"`,
+		`source_path="examples/surface_morph_rendered_studio_shell.tetra"`,
+		`go run ./tools/cmd/validate-surface-morph-rendered-beauty \`,
+		`--contract docs/spec/surface_morph_rendered_beauty_contract.json`,
+		`go run ./tools/cmd/validate-surface-block-contract \`,
+		`--contract docs/spec/surface_block_contract.json`,
+		`go run ./tools/cmd/surface-runtime-smoke \`,
+		`--mode headless-morph`,
+		`go run ./tools/cmd/surface-visual-diff \`,
+		`--morph-rendered-beauty-report "$mrb_report"`,
+		`--morph-to-pixels-chain-out "$morph_to_pixels_report"`,
+		`bash scripts/release/surface/surface-dev-workflow-smoke.sh --report-dir "$dev_dir"`,
+		`bash scripts/release/surface/surface-inspector-smoke.sh --report-dir "$inspector_dir"`,
+		`bash scripts/release/surface/surface-template-smoke.sh --report-dir "$template_dir"`,
+		`bash scripts/release/surface/surface-reference-apps-smoke.sh --report-dir "$reference_dir"`,
+		`bash scripts/release/surface/surface-docs-claims-gate.sh --report-dir "$report_dir"`,
+		`"schema": "tetra.surface.morph-rendered-beauty.gate.v1"`,
+		`"status": "validated_with_target_blockers"`,
+		`"product_claim": false`,
+		`"final_signoff": false`,
+		`"target_blockers": [`,
+		`go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("Surface Morph rendered beauty gate missing %q", want)
+		}
+	}
+	assertOrderedFragments(t, text,
+		`validate-surface-morph-rendered-beauty \`,
+		`validate-surface-block-contract \`,
+		`surface-runtime-smoke \`,
+		`surface-visual-diff \`,
+		`--morph-rendered-beauty-report "$mrb_report"`,
+		`surface-dev-workflow-smoke.sh`,
+		`surface-inspector-smoke.sh`,
+		`surface-template-smoke.sh`,
+		`surface-reference-apps-smoke.sh`,
+		`surface-docs-claims-gate.sh`,
+		`cat > "$summary_path" <<JSON`,
+		`validate-artifact-hashes --write --root "$report_dir"`,
+	)
+	for _, forbidden := range []string{"continue-on-error", "|| true", "set +e", "GOCACHE=/tmp", "GOTMPDIR=/tmp"} {
+		if strings.Contains(text, forbidden) {
+			t.Fatalf("Surface Morph rendered beauty gate must not contain bypass or tmpfs cache marker %q", forbidden)
+		}
+	}
 }
 
 func TestSurfaceProductGateRejectsStaleReportDir(t *testing.T) {

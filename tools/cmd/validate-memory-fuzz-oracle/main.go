@@ -16,6 +16,8 @@ import (
 	"tetra_language/compiler"
 )
 
+const maxMemoryFuzzJSONSchemaSniffBytes = 64 * 1024
+
 type memoryFuzzShortArtifactSummary struct {
 	SchemaVersion           string                           `json:"schema_version"`
 	Kind                    string                           `json:"kind"`
@@ -538,16 +540,22 @@ func hashMemoryFuzzArtifact(root string, rel string) (memoryFuzzHashedArtifact, 
 	if !info.Mode().IsRegular() {
 		return memoryFuzzHashedArtifact{}, fmt.Errorf("memory fuzz artifact %s is not a regular file", filepath.ToSlash(rel))
 	}
-	raw, err := os.ReadFile(path)
+	file, err := os.Open(path)
 	if err != nil {
 		return memoryFuzzHashedArtifact{}, err
 	}
-	sum := sha256.Sum256(raw)
+	defer file.Close()
+	h := sha256.New()
+	prefix := newMemoryFuzzSchemaSniffPrefix(maxMemoryFuzzJSONSchemaSniffBytes)
+	size, err := io.Copy(io.MultiWriter(h, prefix), file)
+	if err != nil {
+		return memoryFuzzHashedArtifact{}, err
+	}
 	return memoryFuzzHashedArtifact{
 		Path:   filepath.ToSlash(rel),
-		SHA256: "sha256:" + hex.EncodeToString(sum[:]),
-		Size:   int64(len(raw)),
-		Schema: detectMemoryFuzzJSONSchema(raw),
+		SHA256: "sha256:" + hex.EncodeToString(h.Sum(nil)),
+		Size:   size,
+		Schema: detectMemoryFuzzJSONSchemaFromPrefix(path, prefix.Bytes(), size > int64(prefix.Len())),
 	}, nil
 }
 
@@ -581,18 +589,174 @@ func listMemoryFuzzArtifactPaths(root string, manifestName string) ([]string, er
 	return paths, nil
 }
 
-func detectMemoryFuzzJSONSchema(raw []byte) string {
-	var envelope struct {
-		Schema        string `json:"schema"`
-		SchemaVersion string `json:"schema_version"`
-	}
-	if err := json.Unmarshal(raw, &envelope); err != nil {
+func detectMemoryFuzzJSONSchema(path string) string {
+	if filepath.Ext(path) != ".json" {
 		return ""
 	}
-	if envelope.Schema != "" {
-		return envelope.Schema
+	file, err := os.Open(path)
+	if err != nil {
+		return ""
 	}
-	return envelope.SchemaVersion
+	defer file.Close()
+	prefix, truncated, err := readMemoryFuzzSchemaSniffPrefix(file, maxMemoryFuzzJSONSchemaSniffBytes)
+	if err != nil {
+		return ""
+	}
+	return detectMemoryFuzzJSONSchemaFromPrefix(path, prefix, truncated)
+}
+
+func detectMemoryFuzzJSONSchemaBounded(r io.Reader, maxBytes int64) string {
+	if maxBytes <= 0 {
+		return ""
+	}
+	prefix, truncated, err := readMemoryFuzzSchemaSniffPrefix(r, maxBytes)
+	if err != nil {
+		return ""
+	}
+	return detectMemoryFuzzJSONSchemaPrefix(prefix, truncated)
+}
+
+func readMemoryFuzzSchemaSniffPrefix(r io.Reader, maxBytes int64) ([]byte, bool, error) {
+	if maxBytes <= 0 {
+		return nil, false, nil
+	}
+	raw, err := io.ReadAll(io.LimitReader(r, maxBytes+1))
+	if err != nil {
+		return nil, false, err
+	}
+	if int64(len(raw)) > maxBytes {
+		return raw[:maxBytes], true, nil
+	}
+	return raw, false, nil
+}
+
+func detectMemoryFuzzJSONSchemaFromPrefix(path string, prefix []byte, truncated bool) string {
+	if filepath.Ext(path) != ".json" {
+		return ""
+	}
+	return detectMemoryFuzzJSONSchemaPrefix(prefix, truncated)
+}
+
+func detectMemoryFuzzJSONSchemaPrefix(prefix []byte, truncated bool) string {
+	dec := json.NewDecoder(bytes.NewReader(prefix))
+	token, err := dec.Token()
+	if err != nil {
+		return memoryFuzzSchemaSniffAfterError("", truncated)
+	}
+	delim, ok := token.(json.Delim)
+	if !ok || delim != '{' {
+		return ""
+	}
+	var schema string
+	var schemaVersion string
+	for dec.More() {
+		token, err := dec.Token()
+		if err != nil {
+			return memoryFuzzSchemaSniffAfterError(schema, truncated)
+		}
+		key, ok := token.(string)
+		if !ok {
+			return ""
+		}
+		if key == "schema" || key == "schema_version" {
+			var raw json.RawMessage
+			if err := dec.Decode(&raw); err != nil {
+				return memoryFuzzSchemaSniffAfterError(schema, truncated)
+			}
+			value, ok, invalid := memoryFuzzSchemaSniffStringValue(raw)
+			if invalid {
+				return ""
+			}
+			if key == "schema" {
+				if ok {
+					schema = value
+				}
+			} else {
+				if ok {
+					schemaVersion = value
+				}
+			}
+			continue
+		}
+		var discard json.RawMessage
+		if err := dec.Decode(&discard); err != nil {
+			return memoryFuzzSchemaSniffAfterError(schema, truncated)
+		}
+	}
+	if _, err := dec.Token(); err != nil {
+		return memoryFuzzSchemaSniffAfterError(schema, truncated)
+	}
+	if truncated {
+		return ""
+	}
+	if err := memoryFuzzSchemaSniffRequireEOF(dec); err != nil {
+		return ""
+	}
+	return memoryFuzzSchemaSniffClosed(schema, schemaVersion)
+}
+
+type memoryFuzzSchemaSniffPrefix struct {
+	buf       bytes.Buffer
+	remaining int64
+}
+
+func newMemoryFuzzSchemaSniffPrefix(maxBytes int64) *memoryFuzzSchemaSniffPrefix {
+	return &memoryFuzzSchemaSniffPrefix{remaining: maxBytes}
+}
+
+func (w *memoryFuzzSchemaSniffPrefix) Write(p []byte) (int, error) {
+	if w.remaining > 0 {
+		n := len(p)
+		if int64(n) > w.remaining {
+			n = int(w.remaining)
+		}
+		_, _ = w.buf.Write(p[:n])
+		w.remaining -= int64(n)
+	}
+	return len(p), nil
+}
+
+func (w *memoryFuzzSchemaSniffPrefix) Bytes() []byte {
+	return w.buf.Bytes()
+}
+
+func (w *memoryFuzzSchemaSniffPrefix) Len() int {
+	return w.buf.Len()
+}
+
+func memoryFuzzSchemaSniffClosed(schema string, schemaVersion string) string {
+	if schema != "" {
+		return schema
+	}
+	return schemaVersion
+}
+
+func memoryFuzzSchemaSniffStringValue(raw json.RawMessage) (string, bool, bool) {
+	if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return "", false, false
+	}
+	var value string
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return "", false, true
+	}
+	return value, true, false
+}
+
+func memoryFuzzSchemaSniffRequireEOF(dec *json.Decoder) error {
+	if err := dec.Decode(&struct{}{}); err != io.EOF {
+		return fmt.Errorf("memory fuzz JSON schema sniff must contain a single JSON document")
+	}
+	return nil
+}
+
+func memoryFuzzSchemaSniffAfterError(schema string, truncated bool) string {
+	if !truncated {
+		return ""
+	}
+	if schema != "" {
+		return schema
+	}
+	return ""
 }
 
 func isMemoryFuzzGitHead(value string) bool {

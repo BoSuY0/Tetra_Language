@@ -40,6 +40,48 @@ func TestValidateRAMContractReleaseRejectsForbiddenManifestClaim(t *testing.T) {
 	}
 }
 
+func TestValidateRAMContractReleaseRejectsManifestCommandWithoutProducerOrValidatorPath(t *testing.T) {
+	for _, command := range []string{
+		"echo report ready",
+		"echo go run ./tools/cmd/validate-ram-contract-report --report ram-contract-report.json",
+		"true || go run ./tools/cmd/validate-ram-contract-report --report ram-contract-report.json",
+	} {
+		t.Run(command, func(t *testing.T) {
+			dir := t.TempDir()
+			writeValidRAMContractReleaseBundle(t, dir, []string{"no Memory 100% claim"})
+			replaceReleaseManifestCommands(t, dir, command)
+			err := validateRAMContractRelease(dir, "e2c19b8ee276158f8eb2c54cf61e11bd84952893")
+			if err == nil || !strings.Contains(err.Error(), "machine-checkable producer or validator command") {
+				t.Fatalf("validateRAMContractRelease error = %v, want weak manifest command rejection", err)
+			}
+		})
+	}
+}
+
+func replaceReleaseManifestCommands(t *testing.T, dir string, command string) {
+	t.Helper()
+	path := filepath.Join(dir, "ram-contract-release-manifest.json")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldCommands := `"commands":[
+    {"name":"validate-ram-contract-report","command":"go run ./tools/cmd/validate-ram-contract-report --report ram-contract-report.json"},
+    {"name":"validate-ram-contract-fuzz-oracle","command":"go run ./tools/cmd/validate-ram-contract-fuzz-oracle --report fuzz/ram-contract-fuzz-oracle.json"}
+  ]`
+	newCommands := `"commands":[
+    {"name":"claim-only","command":"` + command + `"}
+  ]`
+	text := strings.Replace(string(raw), oldCommands, newCommands, 1)
+	if text == string(raw) {
+		t.Fatalf("test fixture manifest command block was not replaced")
+	}
+	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeReleaseHashManifest(t, dir)
+}
+
 func TestValidateRAMContractReleaseRejectsMissingFuzzOracle(t *testing.T) {
 	dir := t.TempDir()
 	writeValidRAMContractReleaseBundle(t, dir, []string{"no Memory 100% claim"})
@@ -52,6 +94,28 @@ func TestValidateRAMContractReleaseRejectsMissingFuzzOracle(t *testing.T) {
 	}
 }
 
+func TestValidateRAMContractReleaseRejectsMissingRequiredRAMArtifacts(t *testing.T) {
+	for _, rel := range []string{
+		"memory-grade-report.json",
+		"proof-store-summary.json",
+		"validation-pipeline-coverage.json",
+		"heap-blockers.json",
+		"copy-blockers.json",
+	} {
+		t.Run(rel, func(t *testing.T) {
+			dir := t.TempDir()
+			writeValidRAMContractReleaseBundle(t, dir, []string{"no Memory 100% claim"})
+			if err := os.Remove(filepath.Join(dir, filepath.FromSlash(rel))); err != nil {
+				t.Fatal(err)
+			}
+			err := validateRAMContractRelease(dir, "e2c19b8ee276158f8eb2c54cf61e11bd84952893")
+			if err == nil || !strings.Contains(err.Error(), rel) {
+				t.Fatalf("validateRAMContractRelease error = %v, want missing %s rejection", err, rel)
+			}
+		})
+	}
+}
+
 func TestValidateRAMContractReleaseRejectsMissingReleaseManifest(t *testing.T) {
 	dir := t.TempDir()
 	writeValidRAMContractReleaseBundle(t, dir, []string{"no Memory 100% claim"})
@@ -61,6 +125,83 @@ func TestValidateRAMContractReleaseRejectsMissingReleaseManifest(t *testing.T) {
 	err := validateRAMContractRelease(dir, "e2c19b8ee276158f8eb2c54cf61e11bd84952893")
 	if err == nil || !strings.Contains(err.Error(), "ram-contract-release-manifest.json") {
 		t.Fatalf("validateRAMContractRelease error = %v, want missing release manifest rejection", err)
+	}
+}
+
+func TestValidateRAMContractReleaseRejectsManifestUnknownField(t *testing.T) {
+	dir := t.TempDir()
+	writeValidRAMContractReleaseBundle(t, dir, []string{"no Memory 100% claim"})
+	path := filepath.Join(dir, "ram-contract-release-manifest.json")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = []byte(strings.Replace(string(raw), `"status":"pass",`, `"status":"pass","unexpected":true,`, 1))
+	if err := os.WriteFile(path, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeReleaseHashManifest(t, dir)
+	err = validateRAMContractRelease(dir, "e2c19b8ee276158f8eb2c54cf61e11bd84952893")
+	if err == nil || !strings.Contains(err.Error(), "unknown field") {
+		t.Fatalf("validateRAMContractRelease error = %v, want release manifest unknown-field rejection", err)
+	}
+}
+
+func TestValidateRAMContractReleaseRejectsManifestDuplicateArtifact(t *testing.T) {
+	dir := t.TempDir()
+	writeValidRAMContractReleaseBundle(t, dir, []string{"no Memory 100% claim"})
+	path := filepath.Join(dir, "ram-contract-release-manifest.json")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	artifact := `{"path":"heap-blockers.json","kind":"heap_blockers","schema":"tetra.ram-blockers.v1"}`
+	raw = []byte(strings.Replace(string(raw), artifact, artifact+`,`+artifact, 1))
+	if err := os.WriteFile(path, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeReleaseHashManifest(t, dir)
+	err = validateRAMContractRelease(dir, "e2c19b8ee276158f8eb2c54cf61e11bd84952893")
+	if err == nil || !strings.Contains(err.Error(), "duplicate artifact") || !strings.Contains(err.Error(), "heap-blockers.json") {
+		t.Fatalf("validateRAMContractRelease error = %v, want duplicate manifest artifact rejection", err)
+	}
+}
+
+func TestValidateRAMContractReleaseRejectsManifestUnsafeArtifactPath(t *testing.T) {
+	dir := t.TempDir()
+	writeValidRAMContractReleaseBundle(t, dir, []string{"no Memory 100% claim"})
+	path := filepath.Join(dir, "ram-contract-release-manifest.json")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = []byte(strings.Replace(string(raw), `"path":"heap-blockers.json"`, `"path":"../heap-blockers.json"`, 1))
+	if err := os.WriteFile(path, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeReleaseHashManifest(t, dir)
+	err = validateRAMContractRelease(dir, "e2c19b8ee276158f8eb2c54cf61e11bd84952893")
+	if err == nil || !strings.Contains(err.Error(), "unsafe artifact path") {
+		t.Fatalf("validateRAMContractRelease error = %v, want unsafe manifest artifact path rejection", err)
+	}
+}
+
+func TestValidateRAMContractReleaseRejectsManifestArtifactSchemaDrift(t *testing.T) {
+	dir := t.TempDir()
+	writeValidRAMContractReleaseBundle(t, dir, []string{"no Memory 100% claim"})
+	path := filepath.Join(dir, "ram-contract-release-manifest.json")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = []byte(strings.Replace(string(raw), `"path":"heap-blockers.json","kind":"heap_blockers","schema":"tetra.ram-blockers.v1"`, `"path":"heap-blockers.json","kind":"heap_blockers","schema":"tetra.ram-blockers.v0"`, 1))
+	if err := os.WriteFile(path, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeReleaseHashManifest(t, dir)
+	err = validateRAMContractRelease(dir, "e2c19b8ee276158f8eb2c54cf61e11bd84952893")
+	if err == nil || !strings.Contains(err.Error(), "heap-blockers.json") || !strings.Contains(err.Error(), "schema") {
+		t.Fatalf("validateRAMContractRelease error = %v, want manifest artifact schema drift rejection", err)
 	}
 }
 
@@ -100,6 +241,158 @@ func TestValidateRAMContractReleaseRejectsGitHeadMismatchAcrossArtifacts(t *test
 	err := validateRAMContractRelease(dir, "e2c19b8ee276158f8eb2c54cf61e11bd84952893")
 	if err == nil || !strings.Contains(err.Error(), "proof-store-summary.json") || !strings.Contains(err.Error(), "git_head") {
 		t.Fatalf("validateRAMContractRelease error = %v, want proof-store git_head mismatch rejection", err)
+	}
+}
+
+func TestReleaseHashingSchemaSniffIsBounded(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "large-report.json")
+	largePrefix := strings.Repeat("x", maxReleaseJSONSchemaSniffBytes+1024)
+	raw := `{"padding":"` + largePrefix + `","schema":"too-late"}`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := hashReleaseArtifact(root, "large-report.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if artifact.Schema != "" {
+		t.Fatalf("artifact schema = %q, want empty schema when field is beyond bounded sniff window", artifact.Schema)
+	}
+}
+
+func TestReleaseHashingKeepsEarlySchemaForLargeJSON(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "schema-first-large.json")
+	largePayload := strings.Repeat("x", maxReleaseJSONSchemaSniffBytes+1024)
+	raw := `{"schema":"schema-first","payload":"` + largePayload + `"}`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := hashReleaseArtifact(root, "schema-first-large.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if artifact.Schema != "schema-first" {
+		t.Fatalf("artifact schema = %q, want early schema from bounded prefix", artifact.Schema)
+	}
+	if artifact.Size != int64(len(raw)) {
+		t.Fatalf("artifact size = %d, want %d", artifact.Size, len(raw))
+	}
+	sum := sha256.Sum256([]byte(raw))
+	if artifact.SHA256 != "sha256:"+hex.EncodeToString(sum[:]) {
+		t.Fatalf("artifact sha256 = %q, want streaming hash of whole artifact", artifact.SHA256)
+	}
+}
+
+func TestReleaseHashingDoesNotFallbackWhenSchemaMayBeLater(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "schema-version-first-large.json")
+	largePayload := strings.Repeat("x", maxReleaseJSONSchemaSniffBytes+1024)
+	raw := `{"schema_version":"version-first","payload":"` + largePayload + `","schema":"schema-too-late"}`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := hashReleaseArtifact(root, "schema-version-first-large.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if artifact.Schema != "" {
+		t.Fatalf("artifact schema = %q, want empty schema_version fallback when schema may be beyond bounded sniff window", artifact.Schema)
+	}
+}
+
+func TestReleaseHashingPreservesSchemaPrecedence(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "dual-schema.json")
+	raw := `{"schema_version":"version-first","schema":"schema-wins"}`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := hashReleaseArtifact(root, "dual-schema.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if artifact.Schema != "schema-wins" {
+		t.Fatalf("artifact schema = %q, want schema field to take precedence over schema_version", artifact.Schema)
+	}
+}
+
+func TestReleaseHashingFallsBackFromNullSchema(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "null-schema.json")
+	raw := `{"schema":null,"schema_version":"version-fallback"}`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := hashReleaseArtifact(root, "null-schema.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if artifact.Schema != "version-fallback" {
+		t.Fatalf("artifact schema = %q, want schema_version fallback when schema is null", artifact.Schema)
+	}
+}
+
+func TestReleaseHashingRejectsNonStringSchemaFallback(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "object-schema.json")
+	raw := `{"schema_version":"version-fallback","schema":{"bad":true}}`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := hashReleaseArtifact(root, "object-schema.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if artifact.Schema != "" {
+		t.Fatalf("artifact schema = %q, want empty schema for non-string schema field", artifact.Schema)
+	}
+}
+
+func TestReleaseHashingRejectsTrailingJunkAfterJSON(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "trailing-junk.json")
+	raw := `{"schema":"looks-valid"}junk`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := hashReleaseArtifact(root, "trailing-junk.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if artifact.Schema != "" {
+		t.Fatalf("artifact schema = %q, want empty schema for trailing junk after JSON object", artifact.Schema)
+	}
+}
+
+func TestReleaseJSONGitHeadScannerFindsLateGitHead(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "late-git-head.json")
+	largePayload := strings.Repeat("x", maxReleaseJSONSchemaSniffBytes+1024)
+	raw := `{"padding":"` + largePayload + `","git_head":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
+	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, ok, err := readReleaseJSONGitHead(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok || got != "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" {
+		t.Fatalf("readReleaseJSONGitHead = %q, %v; want late git_head", got, ok)
+	}
+}
+
+func TestValidateJSONArtifactGitHeadsRejectsLateMismatch(t *testing.T) {
+	root := t.TempDir()
+	largePayload := strings.Repeat("x", maxReleaseJSONSchemaSniffBytes+1024)
+	raw := `{"padding":"` + largePayload + `","git_head":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
+	if err := os.WriteFile(filepath.Join(root, "late-git-head.json"), []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err := validateJSONArtifactGitHeads(root, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+	if err == nil || !strings.Contains(err.Error(), "late-git-head.json") || !strings.Contains(err.Error(), "git_head") {
+		t.Fatalf("validateJSONArtifactGitHeads error = %v, want late git_head mismatch", err)
 	}
 }
 
@@ -169,7 +462,7 @@ func TestValidateRAMContractReleaseRejectsHeapBlockerRowNotInRAMReport(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw = []byte(strings.Replace(string(raw), `"rows":[`, `"rows":[{"site_id":"site:missing","function":"main","intent":"heap_fallback","placement":"heap_unbounded","blockers":["unknown_size"],"contract_grade":"M5"},`, 1))
+	raw = []byte(strings.Replace(string(raw), `"rows":[`, `"rows":[{"site_id":"site:missing","function":"main","intent":"heap_fallback","placement":"heap_unbounded","blockers":["unknown_size"],"contract_grade":"M5","file":"fixtures/main.tetra","line":4,"symbol":"main","source_location_status":"available","severity":"P1","reason":"unknown_size","suggested_fix":"add no-escape, lifetime, or bounded allocation proof before changing this heap fallback","evidence_id":"fact:ram:site:missing","safe_to_optimize":false},`, 1))
 	if err := os.WriteFile(path, raw, 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -177,6 +470,26 @@ func TestValidateRAMContractReleaseRejectsHeapBlockerRowNotInRAMReport(t *testin
 	err = validateRAMContractRelease(dir, "e2c19b8ee276158f8eb2c54cf61e11bd84952893")
 	if err == nil || !strings.Contains(err.Error(), "site:missing") {
 		t.Fatalf("validateRAMContractRelease error = %v, want extra heap blocker row rejection", err)
+	}
+}
+
+func TestValidateRAMContractReleaseRejectsDuplicateHeapBlockerSiteID(t *testing.T) {
+	dir := t.TempDir()
+	writeValidRAMContractReleaseBundle(t, dir, []string{"no Memory 100% claim"})
+	path := filepath.Join(dir, "heap-blockers.json")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	row := `{"site_id":"site:main:heap","function":"main","intent":"heap_fallback","placement":"heap_unbounded","blockers":["unknown_size"],"contract_grade":"M5","file":"fixtures/main.tetra","line":3,"symbol":"main","source_location_status":"available","severity":"P1","reason":"unknown_size","suggested_fix":"add no-escape, lifetime, or bounded allocation proof before changing this heap fallback","evidence_id":"fact:ram:site:main:heap","safe_to_optimize":false}`
+	raw = []byte(strings.Replace(string(raw), `"rows":[`+row+`]`, `"rows":[`+row+`,`+row+`]`, 1))
+	if err := os.WriteFile(path, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeReleaseHashManifest(t, dir)
+	err = validateRAMContractRelease(dir, "e2c19b8ee276158f8eb2c54cf61e11bd84952893")
+	if err == nil || !strings.Contains(err.Error(), "duplicate site_id") || !strings.Contains(err.Error(), "site:main:heap") {
+		t.Fatalf("validateRAMContractRelease error = %v, want duplicate heap blocker site_id rejection", err)
 	}
 }
 
@@ -188,7 +501,7 @@ func TestValidateRAMContractReleaseRejectsRAMHeapRowMissingFromHeapBlockers(t *t
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw = []byte(strings.Replace(string(raw), `"rows":[{"site_id":"site:main:heap","function":"main","intent":"heap_fallback","placement":"heap_unbounded","blockers":["unknown_size"],"contract_grade":"M5"}]`, `"rows":[]`, 1))
+	raw = []byte(strings.Replace(string(raw), `"rows":[{"site_id":"site:main:heap","function":"main","intent":"heap_fallback","placement":"heap_unbounded","blockers":["unknown_size"],"contract_grade":"M5","file":"fixtures/main.tetra","line":3,"symbol":"main","source_location_status":"available","severity":"P1","reason":"unknown_size","suggested_fix":"add no-escape, lifetime, or bounded allocation proof before changing this heap fallback","evidence_id":"fact:ram:site:main:heap","safe_to_optimize":false}]`, `"rows":[]`, 1))
 	if err := os.WriteFile(path, raw, 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -279,7 +592,7 @@ func writeValidRAMContractReleaseBundle(t *testing.T, dir string, manifestNonCla
   "git_head":"e2c19b8ee276158f8eb2c54cf61e11bd84952893",
   "target":"linux-x64",
   "generated_by":"test",
-  "rows":[{"site_id":"site:main:heap","function":"main","intent":"heap_fallback","placement":"heap_unbounded","blockers":["unknown_size"],"contract_grade":"M5"}],
+  "rows":[{"site_id":"site:main:heap","function":"main","intent":"heap_fallback","placement":"heap_unbounded","blockers":["unknown_size"],"contract_grade":"M5","file":"fixtures/main.tetra","line":3,"symbol":"main","source_location_status":"available","severity":"P1","reason":"unknown_size","suggested_fix":"add no-escape, lifetime, or bounded allocation proof before changing this heap fallback","evidence_id":"fact:ram:site:main:heap","safe_to_optimize":false}],
   "non_claims":["no Memory 100% claim"]
 }
 `,

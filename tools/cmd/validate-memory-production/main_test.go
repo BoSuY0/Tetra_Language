@@ -237,6 +237,160 @@ func TestValidateMemoryProductionReleaseManifestRejectsHashMismatchedArtifact(t 
 	}
 }
 
+func TestMemoryReleaseHashingSchemaSniffIsBounded(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "large-report.json")
+	largePrefix := strings.Repeat("x", maxMemoryReleaseJSONSchemaSniffBytes+1024)
+	raw := `{"padding":"` + largePrefix + `","schema":"too-late"}`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := hashMemoryReleaseFile(root, "large-report.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if artifact.Schema != "" {
+		t.Fatalf("artifact schema = %q, want empty schema when field is beyond bounded sniff window", artifact.Schema)
+	}
+}
+
+func TestMemoryReleaseHashingKeepsEarlySchemaForLargeJSON(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "schema-first-large.json")
+	largePayload := strings.Repeat("x", maxMemoryReleaseJSONSchemaSniffBytes+1024)
+	raw := `{"schema":"schema-first","payload":"` + largePayload + `"}`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := hashMemoryReleaseFile(root, "schema-first-large.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if artifact.Schema != "schema-first" {
+		t.Fatalf("artifact schema = %q, want early schema from bounded prefix", artifact.Schema)
+	}
+	if artifact.Size != int64(len(raw)) {
+		t.Fatalf("artifact size = %d, want %d", artifact.Size, len(raw))
+	}
+	sum := sha256.Sum256([]byte(raw))
+	if artifact.SHA256 != "sha256:"+hex.EncodeToString(sum[:]) {
+		t.Fatalf("artifact sha256 = %q, want streaming hash of whole artifact", artifact.SHA256)
+	}
+}
+
+func TestMemoryReleaseHashingDoesNotFallbackWhenSchemaMayBeLater(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "schema-version-first-large.json")
+	largePayload := strings.Repeat("x", maxMemoryReleaseJSONSchemaSniffBytes+1024)
+	raw := `{"schema_version":"version-first","payload":"` + largePayload + `","schema":"schema-too-late"}`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := hashMemoryReleaseFile(root, "schema-version-first-large.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if artifact.Schema != "" {
+		t.Fatalf("artifact schema = %q, want empty schema_version fallback when schema may be beyond bounded sniff window", artifact.Schema)
+	}
+}
+
+func TestMemoryReleaseHashingPreservesSchemaPrecedence(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "dual-schema.json")
+	raw := `{"schema_version":"version-first","schema":"schema-wins"}`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := hashMemoryReleaseFile(root, "dual-schema.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if artifact.Schema != "schema-wins" {
+		t.Fatalf("artifact schema = %q, want schema field to take precedence over schema_version", artifact.Schema)
+	}
+}
+
+func TestMemoryReleaseHashingFallsBackFromNullSchema(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "null-schema.json")
+	raw := `{"schema":null,"schema_version":"version-fallback"}`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := hashMemoryReleaseFile(root, "null-schema.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if artifact.Schema != "version-fallback" {
+		t.Fatalf("artifact schema = %q, want schema_version fallback when schema is null", artifact.Schema)
+	}
+}
+
+func TestMemoryReleaseHashingRejectsNonStringSchemaFallback(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "object-schema.json")
+	raw := `{"schema_version":"version-fallback","schema":{"bad":true}}`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := hashMemoryReleaseFile(root, "object-schema.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if artifact.Schema != "" {
+		t.Fatalf("artifact schema = %q, want empty schema for non-string schema field", artifact.Schema)
+	}
+}
+
+func TestMemoryReleaseHashingRejectsNonStringSchemaVersion(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "object-schema-version.json")
+	raw := `{"schema":"schema-first","schema_version":{"bad":true}}`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := hashMemoryReleaseFile(root, "object-schema-version.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if artifact.Schema != "" {
+		t.Fatalf("artifact schema = %q, want empty schema when schema_version has non-string type", artifact.Schema)
+	}
+}
+
+func TestMemoryReleaseHashingRejectsMalformedJSONTail(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "malformed-tail.json")
+	raw := `{"schema":"looks-valid","broken":`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := hashMemoryReleaseFile(root, "malformed-tail.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if artifact.Schema != "" {
+		t.Fatalf("artifact schema = %q, want empty schema for malformed JSON tail", artifact.Schema)
+	}
+}
+
+func TestMemoryReleaseHashingRejectsTrailingJunkAfterJSON(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "trailing-junk.json")
+	raw := `{"schema":"looks-valid"}junk`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := hashMemoryReleaseFile(root, "trailing-junk.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if artifact.Schema != "" {
+		t.Fatalf("artifact schema = %q, want empty schema for trailing junk after JSON object", artifact.Schema)
+	}
+}
+
 func TestValidateMemoryProductionReleaseManifestRejectsMissingGeneratorCommand(t *testing.T) {
 	reportDir, reportPath, manifestPath := writeMemoryProductionReleaseFixture(t, func(manifest *memoryReleaseTestManifest) {
 		for i := range manifest.Artifacts {
@@ -303,6 +457,112 @@ func TestValidateMemoryProductionReleaseManifestRejectsInvalidIslandProofVerifie
 	}
 }
 
+func TestValidateMemoryProductionReleaseManifestRejectsMissingRAMMeasurementArtifact(t *testing.T) {
+	reportDir, reportPath, manifestPath := writeMemoryProductionReleaseFixture(t, func(manifest *memoryReleaseTestManifest) {
+		manifest.Artifacts = removeMemoryReleaseTestArtifact(manifest.Artifacts, "ram_measurement_report")
+	})
+
+	err := validateMemoryProductionReleaseManifest(reportPath, manifestPath, reportDir, "")
+	if err == nil {
+		t.Fatalf("expected missing RAM measurement artifact to fail")
+	}
+	if !strings.Contains(err.Error(), "ram_measurement_report") {
+		t.Fatalf("error = %v, want missing ram_measurement_report", err)
+	}
+}
+
+func TestValidateMemoryProductionReleaseManifestRejectsMalformedRAMMeasurementArtifact(t *testing.T) {
+	reportDir, reportPath, manifestPath := writeMemoryProductionReleaseFixture(t, nil)
+	measurementPath := filepath.Join(reportDir, "ram-measurement.json")
+	raw := `{"schema":"tetra.memory.ram-measurement.v1","status":"pass","target":"linux-x64","evidence_class":"runtime_measured","method":"MemStats","snapshots":[{"name":"start"}]}`
+	if err := os.WriteFile(measurementPath, []byte(raw+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeMemoryReleaseTestHashManifest(t, reportDir, memoryReleaseTestHashPaths())
+
+	err := validateMemoryProductionReleaseManifest(reportPath, manifestPath, reportDir, "")
+	if err == nil {
+		t.Fatalf("expected malformed RAM measurement artifact to fail")
+	}
+	if got := err.Error(); !strings.Contains(got, "RAM measurement") || !strings.Contains(got, "snapshot") {
+		t.Fatalf("error = %v, want RAM measurement snapshot rejection", err)
+	}
+}
+
+func TestValidateMemoryProductionReleaseManifestAcceptsBlockedRAMMeasurementArtifact(t *testing.T) {
+	reportDir, reportPath, manifestPath := writeMemoryProductionReleaseFixture(t, nil)
+	measurementPath := filepath.Join(reportDir, "ram-measurement.json")
+	raw := `{"schema":"tetra.memory.ram-measurement.v1","status":"blocked","target":"linux-x64","evidence_class":"blocked","method":"time_v","blocked_reason":"/usr/bin/time unavailable"}`
+	if err := os.WriteFile(measurementPath, []byte(raw+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeMemoryReleaseTestHashManifest(t, reportDir, memoryReleaseTestHashPaths())
+
+	if err := validateMemoryProductionReleaseManifest(reportPath, manifestPath, reportDir, ""); err != nil {
+		t.Fatalf("blocked RAM measurement artifact should classify as blocked, not fail: %v", err)
+	}
+}
+
+func TestValidateMemoryProductionReleaseManifestRejectsBlockedRAMMeasurementAsPass(t *testing.T) {
+	reportDir, reportPath, manifestPath := writeMemoryProductionReleaseFixture(t, nil)
+	measurementPath := filepath.Join(reportDir, "ram-measurement.json")
+	raw := `{"schema":"tetra.memory.ram-measurement.v1","status":"pass","target":"linux-x64","evidence_class":"blocked","method":"time_v","blocked_reason":"/usr/bin/time unavailable"}`
+	if err := os.WriteFile(measurementPath, []byte(raw+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeMemoryReleaseTestHashManifest(t, reportDir, memoryReleaseTestHashPaths())
+
+	err := validateMemoryProductionReleaseManifest(reportPath, manifestPath, reportDir, "")
+	if err == nil {
+		t.Fatalf("expected fake pass for blocked RAM measurement to fail")
+	}
+	if got := err.Error(); !strings.Contains(got, "RAM measurement") || !strings.Contains(got, "evidence_class") {
+		t.Fatalf("error = %v, want RAM measurement evidence_class rejection", err)
+	}
+}
+
+func TestValidateMemoryProductionReleaseManifestRejectsMissingRAMMetricSamples(t *testing.T) {
+	reportDir, reportPath, manifestPath := writeMemoryProductionReleaseFixture(t, nil)
+	measurementPath := filepath.Join(reportDir, "ram-measurement.json")
+	start := strings.Index(validRAMMeasurementReport(), `  "metric_samples": [`)
+	end := strings.Index(validRAMMeasurementReport(), `  "snapshots": [`)
+	if start < 0 || end < 0 || end <= start {
+		t.Fatalf("valid RAM measurement fixture missing metric_samples/snapshots anchors")
+	}
+	raw := validRAMMeasurementReport()[:start] + `  "metric_samples": [],
+` + validRAMMeasurementReport()[end:]
+	if err := os.WriteFile(measurementPath, []byte(raw+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeMemoryReleaseTestHashManifest(t, reportDir, memoryReleaseTestHashPaths())
+
+	err := validateMemoryProductionReleaseManifest(reportPath, manifestPath, reportDir, "")
+	if err == nil {
+		t.Fatalf("expected missing RAM metric samples to fail")
+	}
+	if got := err.Error(); !strings.Contains(got, "RAM measurement") || !strings.Contains(got, "metric sample") {
+		t.Fatalf("error = %v, want RAM measurement metric sample rejection", err)
+	}
+}
+
+func TestValidateMemoryProductionReleaseManifestRejectsMemStatsRSSMeasuredClaim(t *testing.T) {
+	reportDir, reportPath, manifestPath := writeMemoryProductionReleaseFixture(t, nil)
+	measurementPath := filepath.Join(reportDir, "ram-measurement.json")
+	raw := strings.Replace(validRAMMeasurementReport(), `"name":"rss_current","evidence_class":"unsupported","method":"MemStats","unsupported_reason":"MemStats does not expose process RSS"`, `"name":"rss_current","evidence_class":"runtime_measured","method":"MemStats","current_bytes":2048`, 1)
+	if err := os.WriteFile(measurementPath, []byte(raw+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeMemoryReleaseTestHashManifest(t, reportDir, memoryReleaseTestHashPaths())
+
+	err := validateMemoryProductionReleaseManifest(reportPath, manifestPath, reportDir, "")
+	if err == nil {
+		t.Fatalf("expected MemStats RSS measured claim to fail")
+	}
+	if got := err.Error(); !strings.Contains(got, "rss_current") || !strings.Contains(got, "MemStats") {
+		t.Fatalf("error = %v, want MemStats RSS rejection", err)
+	}
+}
+
 func validMemoryProductionReport() string {
 	return `{
   "schema": "tetra.memory.production.v1",
@@ -319,7 +579,7 @@ func validMemoryProductionReport() string {
     {"name":"compiler resource finalization diagnostics","kind":"stress","path":"go test -buildvcs=false ./compiler/tests/runtime -run ^(TestTaskHandleFinalization|TestTaskGroupFinalization|TestIslandFinalization) -count=1","ran":true,"pass":true,"exit_code":0}
   ],
   "benchmarks": [
-    {"name":"small heap allocation syscall reduction","kind":"allocator","metric":"estimated_os_syscalls","unit":"syscalls","baseline_value":64,"measured_value":1,"improvement_ratio":64.0,"evidence":"allocation report schema v2 shows 64 per_core_small_heap rows with same_core_same_size_class_free_list reuse policy inside one 64KiB chunk refill","ran":true,"pass":true}
+    {"name":"small heap allocation syscall reduction","kind":"allocator","metric":"estimated_os_syscalls","unit":"syscalls","evidence_class":"allocation_report_estimate","method":"allocation_report_summary","baseline_value":64,"measured_value":1,"improvement_ratio":64.0,"evidence":"allocation report schema v2 estimates 64 per_core_small_heap allocation intents inside one 64KiB chunk refill; allocation_report_estimate only, not a runtime measurement","ran":true,"pass":true}
   ],
   "contracts": [
     {"name":"allocator runtime model","status":"pass","evidence":"allocator lifecycle returns deterministic handles and failure status"},
@@ -369,7 +629,7 @@ func validMemoryProductionReport() string {
     {"requirement":"runtime bounds checks and diagnostics","artifact":"docs/spec/runtime_abi.md; compiler/compiler_test.go; tools/cmd/memory-production-smoke","evidence":"slice bounds, ptr_add negative offset, allocation upper bound, i32 width, ptr width, and negative helper length diagnostics are required cases","result":"pass"},
     {"requirement":"raw pointer bounds metadata","artifact":"compiler/internal/runtimeabi/raw_pointer_bounds.go; compiler/internal/plir/plir.go; compiler/internal/allocplan/plan.go; tools/cmd/memory-production-smoke","evidence":"core.alloc_bytes allocation reports include allocation_base_metadata and external_unknown raw-slice policy; PLIR records derived_allocation_offset and checked_external_unknown raw pointer paths","result":"pass"},
     {"requirement":"stress/fuzz evidence","artifact":"tools/cmd/memory-production-smoke","evidence":"stress allocator reuse and deterministic memcpy/memset fuzz cases ran through the release-gate entrypoint","result":"pass"},
-    {"requirement":"measured memory benchmark improvement","artifact":"tools/cmd/memory-production-smoke; compiler allocation report schema v2","evidence":"small heap allocation syscall reduction benchmark reads the emitted allocation report, counts per_core_small_heap rows with same_core_same_size_class_free_list reuse policy, and compares estimated mmap-per-allocation baseline against 64KiB chunk refill calls","result":"pass"},
+    {"requirement":"allocator benchmark evidence classification","artifact":"tools/cmd/memory-production-smoke; compiler allocation report schema v2","evidence":"small heap allocation syscall reduction benchmark is classified as allocation_report_estimate from the emitted allocation report and does not claim runtime RSS, pprof, MemStats, time_v, or strace measurement","result":"pass"},
     {"requirement":"use-after-free, double-free, borrow escape, and aliasing safety","artifact":"compiler/tests/safety; compiler/tests/ownership; compiler","evidence":"required compiler safety cases reject use-after-free, double-free, borrow escape, and inout aliasing violations","result":"pass"},
     {"requirement":"actor/task transfer safety","artifact":"compiler/tests/ownership","evidence":"TestReleaseTraceabilityLifetimeAndRaceSafetyNegativeActorTaskOwnership rejects unsafe actor/task transfer boundaries","result":"pass"},
     {"requirement":"leak/resource finalization evidence","artifact":"cli/internal/actornet/broker_test.go; compiler/tests/runtime/resource_finalization_test.go; tools/cmd/memory-production-smoke","evidence":"release smoke runs actornet close-without-cancel watcher leak coverage and compiler TaskHandle/TaskGroup/Island resource finalization diagnostics for optional, enum, function-typed, branch, loop, match, join, close, and free paths","result":"pass"},
@@ -536,6 +796,9 @@ func writeMemoryProductionReleaseFixture(t *testing.T, mutate func(*memoryReleas
 	if err := os.WriteFile(filepath.Join(reportDir, "island-proof-memory-report.json"), []byte(validIslandProofMemoryReport()), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(reportDir, "ram-measurement.json"), []byte(validRAMMeasurementReport()), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	manifest := memoryReleaseTestManifest{
 		Schema:       "tetra.memory.release-manifest.v1",
 		Target:       "linux-x64",
@@ -556,6 +819,7 @@ func writeMemoryProductionReleaseFixture(t *testing.T, mutate func(*memoryReleas
 		},
 		Artifacts: []memoryReleaseTestArtifact{
 			{Path: "memory-production-linux-x64.json", Kind: "memory_production_report", Schema: "tetra.memory.production.v1", Target: "linux-x64", Command: "go run ./tools/cmd/memory-production-smoke --report $report_path"},
+			{Path: "ram-measurement.json", Kind: "ram_measurement_report", Schema: "tetra.memory.ram-measurement.v1", Target: "linux-x64", Command: "go run ./tools/cmd/memory-production-smoke --report $report_path --ram-measurement-report $report_dir/ram-measurement.json"},
 			{Path: "targets.json", Kind: "target_report", Target: "linux-x64", Command: "go run ./cli/cmd/tetra targets --format=json > $targets_path"},
 			{Path: "memory-fuzz-tier1/memory-fuzz-oracle.json", Kind: "memory_fuzz_oracle_report", Schema: "tetra.memory-fuzz.oracle.v1", Target: "linux-x64", Command: "go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir $memory_fuzz_dir"},
 			{Path: "memory-fuzz-tier1/summary.json", Kind: "memory_fuzz_summary", Schema: "tetra.memory-fuzz-short.summary.v1", Target: "linux-x64", Command: "go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir $memory_fuzz_dir"},
@@ -686,6 +950,7 @@ func memoryReleaseTestHashPaths() []string {
 		"memory-fuzz-tier1/summary.json",
 		"memory-production-linux-x64.json",
 		"memory-release-manifest.json",
+		"ram-measurement.json",
 		"ram-contract/artifact-hashes.json",
 		"ram-contract/copy-blockers.json",
 		"ram-contract/fuzz/ram-contract-fuzz-oracle.json",
@@ -697,6 +962,33 @@ func memoryReleaseTestHashPaths() []string {
 		"ram-contract/validation-pipeline-coverage.json",
 		"targets.json",
 	}
+}
+
+func validRAMMeasurementReport() string {
+	return `{
+  "schema": "tetra.memory.ram-measurement.v1",
+  "status": "pass",
+  "target": "linux-x64",
+  "evidence_class": "runtime_measured",
+  "method": "MemStats",
+  "tool": "tools/cmd/memory-production-smoke",
+  "git_head": "0123456789abcdef0123456789abcdef01234567",
+  "generated_at": "2026-06-07T20:15:00Z",
+  "summary": {"heap_alloc_bytes":1536,"bytes_requested":0,"bytes_reserved":0,"bytes_copied":0,"rss_current_bytes":0,"rss_peak_bytes":0,"per_actor_domain_bytes":[]},
+  "metric_samples": [
+    {"name":"heap_alloc_bytes","evidence_class":"runtime_measured","method":"MemStats","current_bytes":1536,"peak_bytes":1536},
+    {"name":"bytes_requested","evidence_class":"unsupported","method":"not_collected","unsupported_reason":"allocation report summary is not attached to ram-measurement.json"},
+    {"name":"bytes_reserved","evidence_class":"unsupported","method":"not_collected","unsupported_reason":"allocation report summary is not attached to ram-measurement.json"},
+    {"name":"bytes_copied","evidence_class":"unsupported","method":"not_collected","unsupported_reason":"copy report summary is not attached to ram-measurement.json"},
+    {"name":"rss_current","evidence_class":"unsupported","method":"MemStats","unsupported_reason":"MemStats does not expose process RSS"},
+    {"name":"rss_peak","evidence_class":"unsupported","method":"MemStats","unsupported_reason":"MemStats does not expose process RSS"},
+    {"name":"per_actor_domain_bytes","evidence_class":"unsupported","method":"not_collected","unsupported_reason":"actor memory domain report is not attached to ram-measurement.json"}
+  ],
+  "snapshots": [
+    {"name":"start","timestamp":"2026-06-07T20:15:01Z","alloc_bytes":1024,"total_alloc_bytes":2048,"sys_bytes":8192,"heap_alloc_bytes":1024,"heap_sys_bytes":4096,"heap_idle_bytes":1024,"heap_released_bytes":512,"num_gc":0,"gc_cpu_fraction":0},
+    {"name":"end","timestamp":"2026-06-07T20:15:02Z","alloc_bytes":1536,"total_alloc_bytes":4096,"sys_bytes":12288,"heap_alloc_bytes":1536,"heap_sys_bytes":8192,"heap_idle_bytes":2048,"heap_released_bytes":1024,"num_gc":1,"gc_cpu_fraction":0.001}
+  ]
+}` + "\n"
 }
 
 func writeMemoryReleaseTestHashManifest(t *testing.T, root string, paths []string) {

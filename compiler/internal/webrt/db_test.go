@@ -58,6 +58,50 @@ func TestServerDBEndpointUsesPoolAndSerializesWorld(t *testing.T) {
 	}
 }
 
+func TestServerDBEndpointsSupportExplicitTOONAccept(t *testing.T) {
+	db := newFakeWorldDB(t, map[int]int{3: 30, 5: 50})
+	defer db.Close()
+	pool, err := pgrt.NewPool(1, db.Connect)
+	if err != nil {
+		t.Fatalf("NewPool: %v", err)
+	}
+	defer pool.Close()
+	srv, stop := startDBBenchmarkServerWithRandom(t, pool, sequenceIDs(3, 5, 3, 5, 3), sequenceIDs(9001, 9002))
+	defer stop()
+
+	cases := []struct {
+		path string
+		want string
+	}{
+		{path: "/db", want: "id: 3"},
+		{path: "/queries?queries=2", want: "5,50"},
+		{path: "/updates?queries=2", want: ",9002"},
+	}
+	for _, tc := range cases {
+		conn := dialServer(t, srv.Port())
+		rawRequest := "GET " + tc.path + " HTTP/1.1\r\nHost: localhost\r\nAccept: text/toon\r\nConnection: close\r\n\r\n"
+		if _, err := conn.Write([]byte(rawRequest)); err != nil {
+			conn.Close()
+			t.Fatalf("client write %s: %v", tc.path, err)
+		}
+		got := readUntil(t, conn, func(s string) bool {
+			return strings.Contains(s, "Connection: close")
+		})
+		if err := conn.Close(); err != nil {
+			t.Fatalf("client close %s: %v", tc.path, err)
+		}
+		if !strings.Contains(got, "HTTP/1.1 200 OK") || !strings.Contains(got, "Content-Type: text/toon; charset=utf-8") {
+			t.Fatalf("%s TOON response metadata missing:\n%s", tc.path, got)
+		}
+		body := []byte(responseBody(t, got))
+		if !strings.Contains(string(body), tc.want) {
+			t.Fatalf("%s TOON body missing %q:\n%s", tc.path, tc.want, body)
+		}
+		var decoded any
+		decodeTOONPayload(t, body, &decoded)
+	}
+}
+
 func TestServerQueriesEndpointNormalizesCountAndSerializesWorldArray(t *testing.T) {
 	db := newFakeWorldDB(t, map[int]int{3: 30, 5: 50})
 	defer db.Close()

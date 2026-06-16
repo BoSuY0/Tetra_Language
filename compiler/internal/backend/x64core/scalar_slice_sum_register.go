@@ -7,7 +7,7 @@ import (
 	"tetra_language/compiler/internal/machine"
 )
 
-func emitScalarSliceSumRegisterFunction(e *x64.Emitter, fn ir.IRFunc, abi x64abi.ABI, opt x64.CodegenOptions) (bool, error) {
+func emitScalarSliceSumRegisterFunction(e *x64.Emitter, fn ir.IRFunc, abi x64abi.ABI, opt x64.CodegenOptions, flush runtimeHeapTelemetryFlushFunc) (bool, error) {
 	if opt.DisableMachinePaths {
 		return false, nil
 	}
@@ -54,6 +54,9 @@ func emitScalarSliceSumRegisterFunction(e *x64.Emitter, fn ir.IRFunc, abi x64abi
 		return true, err
 	}
 	e.MovEaxR10d()
+	if err := flush.emit(); err != nil {
+		return true, err
+	}
 	e.Leave()
 	e.Ret()
 	return true, nil

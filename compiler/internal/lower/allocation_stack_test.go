@@ -60,6 +60,33 @@ uses alloc, mem:
 	}
 }
 
+func TestLowerStackAllocationForImmutableLengthReadOnlyLocalCall(t *testing.T) {
+	prog := lowerStackAllocationProgram(t, `
+func lookup(keys: []i32, values: []i32, n: Int, key: Int) -> Int
+uses mem:
+    var i: Int = 0
+    while i < n:
+        if keys[i] == key:
+            return values[i]
+        i = i + 1
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    let n: Int = 4
+    var keys: []i32 = make_i32(n)
+    var values: []i32 = make_i32(n)
+    return lookup(keys, values, n, 2)
+`)
+	fn := findIRFunc(t, prog, "main")
+	if countInstrKind(fn, ir.IRStackSliceI32) != 2 {
+		t.Fatalf("main stack slice count = %d, want 2: %#v", countInstrKind(fn, ir.IRStackSliceI32), fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRMakeSliceI32) != 0 {
+		t.Fatalf("main still contains heap make slice: %#v", fn.Instrs)
+	}
+}
+
 func TestLowerKeepsEscapingAllocationOnHeap(t *testing.T) {
 	prog := lowerStackAllocationProgram(t, `
 func ret() -> []i32

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -13,6 +12,7 @@ import (
 
 	"tetra_language/compiler"
 	ctarget "tetra_language/compiler/target"
+	"tetra_language/internal/outputformat"
 )
 
 type smokeCaseReport struct {
@@ -92,9 +92,10 @@ func runSmoke(args []string, stdout io.Writer, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	target := fs.String("target", defaultTarget(), "target triple ("+supportedTargetsHelp+")")
 	runBuilt := fs.Bool("run", true, "run built binaries when host matches target")
-	reportPath := fs.String("report", "", "write JSON smoke report")
+	reportPath := fs.String("report", "", "write smoke report")
+	reportFormat := fs.String("report-format", outputformat.JSON, "smoke report format: json, toon, or both")
 	listCases := fs.Bool("list", false, "list smoke cases without building")
-	listFormat := fs.String("format", "text", "smoke list format: text or json")
+	listFormat := fs.String("format", outputformat.Text, "smoke list format: text, json, or toon")
 	islandsDebug := fs.Bool("islands-debug", false, "enable islands debug runtime checks")
 	runtimeMode := fs.String("runtime", "auto", "actors runtime: auto, selfhost, or builtin")
 	jobs := fs.Int("jobs", 1, "parallel module build jobs")
@@ -265,7 +266,7 @@ func runSmoke(args []string, stdout io.Writer, stderr io.Writer) int {
 	report.Failed = report.Total - report.Passed
 	fmt.Fprintf(stdout, "Smoke %s: %d/%d passed\n", tgt.Triple, passed, len(report.Cases))
 	if *reportPath != "" {
-		if err := writeJSON(*reportPath, report); err != nil {
+		if _, err := outputformat.WriteStructuredFiles(*reportPath, *reportFormat, report); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}
@@ -368,10 +369,8 @@ func writeSmokeList(stdout io.Writer, stderr io.Writer, cases []smokeCase, islan
 			}
 		}
 		return 0
-	case "json":
-		enc := json.NewEncoder(stdout)
-		enc.SetIndent("", "  ")
-		if err := enc.Encode(report); err != nil {
+	case outputformat.JSON, outputformat.TOON:
+		if err := outputformat.WriteStructured(stdout, format, report); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}

@@ -8,11 +8,11 @@ affordances, state lenses, motion presets, and recipes that expand into
 widget hierarchy, and not Surface v1 production support.
 
 Claim tier: `EXPERIMENTAL`. Morph evidence may inform future
-`PROD_STABLE_SCOPED` Surface authoring only after the product gate and a final
-same-commit audit prove the broader scope. Until then it remains a `NONCLAIM`
-for React API compatibility, CSS cascade/runtime compatibility, DOM-authored UI,
-platform-native widgets, GPU rendering, Windows/macOS production, and broad
-desktop parity.
+`PROD_STABLE_SCOPED` Surface authoring only after the MRB-11 claim gate and a
+final same-commit audit prove the broader scope. Until then it remains a
+`NONCLAIM` for React API compatibility, CSS cascade/runtime compatibility,
+DOM-authored UI, platform-native widgets, GPU rendering, Windows/macOS
+production, and broad desktop parity.
 
 Stable promotion is frozen separately in
 `docs/spec/surface_morph_stable_candidate.md`. The machine-readable contract is
@@ -20,6 +20,13 @@ Stable promotion is frozen separately in
 `tools/cmd/validate-surface-morph-stable-candidate`. That validator is a design
 freeze guard only; it is not the Surface product gate and does not promote
 Morph out of the `EXPERIMENTAL` tier.
+
+Rendered beauty proof is tracked separately by
+`docs/spec/surface_morph_rendered_beauty.md` and
+`docs/spec/surface_morph_rendered_beauty_contract.json`, validated through
+`tools/cmd/validate-surface-morph-rendered-beauty`. That contract requires the
+full Morph-to-Block-to-render-commands-to-pixels-to-golden evidence chain before
+any Morph beauty product claim.
 
 ## Scope
 
@@ -33,6 +40,7 @@ Morph v1 is validated by `tetra.surface.morph.v1` reports inside the normal
   - `examples/surface_morph_settings.tetra`
   - `examples/surface_morph_editor_shell.tetra`
   - `examples/surface_morph_glass_panel.tetra`
+  - `examples/surface_morph_studio_shell.tetra`
 - report validator: `tools/cmd/validate-surface-morph-report`
 - gate: `scripts/release/surface/morph-gate.sh`
 
@@ -88,9 +96,17 @@ The required recipe set is:
 - `toast.notification@1`
 - `tab.item@1`
 - `list.row@1`
+- `app.shell@1`
+- `toolbar@1`
+- `split.pane@1`
+- `status.bar@1`
+- `settings.form@1`
+- `log.row@1`
+- `empty.state@1`
+- `error.panel@1`
 
 The required affordance set is `action`, `field.text`, `toggle`, `navigation`,
-`region`, `overlay`, and `status`. The Morph report also records five
+`region`, `overlay`, and `status`. The Morph report also records six
 recipe-authored reference apps and rejects missing app rows, hidden app state,
 React/Electron/DOM runtime use, platform widgets, and non-`Block` output
 primitives. The user-facing cookbook is

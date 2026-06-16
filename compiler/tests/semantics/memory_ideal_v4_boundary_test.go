@@ -134,7 +134,38 @@ func main() -> Int
 uses actors, alloc, mem:
     var xs: []u8 = make_u8(2)
     return core.send_typed(core.self(), Msg.boxed(Box<[]u8>{value: xs.borrow()}))
-`, "cannot cross actor boundary")
+	`, "cannot cross actor boundary")
+	})
+
+	t.Run("function_payload_sent_to_actor_rejected", func(t *testing.T) {
+		testkit.RequireFileCheckErrorContains(t, `
+enum Msg:
+    case cb(fn() -> Int)
+
+func one() -> Int:
+    return 1
+
+func main() -> Int
+uses actors:
+    return core.send_typed(core.self(), Msg.cb(one))
+	`, "typed actor message payload must be value-only")
+	})
+
+	t.Run("function_wrapper_sent_to_actor_rejected", func(t *testing.T) {
+		testkit.RequireFileCheckErrorContains(t, `
+struct BoxFn:
+    cb: fn() -> Int
+
+enum Msg:
+    case wrapped(BoxFn)
+
+func one() -> Int:
+    return 1
+
+func main() -> Int
+uses actors:
+    return core.send_typed(core.self(), Msg.wrapped(BoxFn(cb: one)))
+	`, "typed actor message payload must be value-only")
 	})
 }
 

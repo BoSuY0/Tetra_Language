@@ -61,6 +61,7 @@ type SurfacePackageInstallSmoke struct {
 	InstalledBinary         string `json:"installed_binary"`
 	Command                 string `json:"command"`
 	ExitCode                int    `json:"exit_code"`
+	ExpectedExitCode        int    `json:"expected_exit_code"`
 	ArtifactHashVerified    bool   `json:"artifact_hash_verified"`
 	PackageManifestVerified bool   `json:"package_manifest_verified"`
 	AppRun                  bool   `json:"app_run"`
@@ -73,6 +74,7 @@ type SurfacePackageWebBundle struct {
 	WebEntry                string `json:"web_entry"`
 	WASMArtifact            string `json:"wasm_artifact"`
 	LoaderArtifact          string `json:"loader_artifact"`
+	BrowserCanvasHost       string `json:"browser_canvas_host"`
 	Command                 string `json:"command"`
 	ArtifactHashVerified    bool   `json:"artifact_hash_verified"`
 	PackageManifestVerified bool   `json:"package_manifest_verified"`
@@ -173,7 +175,7 @@ func validateSurfacePackageReport(report SurfacePackageReport) []string {
 	}
 	issues = append(issues, validateSurfacePackageArtifacts(report.Packages)...)
 	issues = append(issues, validateSurfacePackageAssets(report.Assets)...)
-	issues = append(issues, validateSurfacePackageInstallSmokes(report.InstallSmokes)...)
+	issues = append(issues, validateSurfacePackageInstallSmokes(report.ReferenceApp, report.InstallSmokes)...)
 	issues = append(issues, validateSurfacePackageWebBundles(report.WebBundles)...)
 	issues = append(issues, validateSurfacePackageUpdateStrategy(report.UpdateStrategy)...)
 	issues = append(issues, validateSurfacePackagePlatformProof("signing", report.Signing, false)...)
@@ -186,8 +188,17 @@ func validateSurfacePackageReport(report SurfacePackageReport) []string {
 }
 
 func surfacePackageSourceMatchesReferenceApp(referenceApp string, source string) bool {
-	want, ok := requiredSurfaceReferenceApps()[strings.TrimSpace(referenceApp)]
+	want, ok := requiredSurfacePackageApps()[strings.TrimSpace(referenceApp)]
 	return ok && normalizeEvidencePath(source) == want
+}
+
+func requiredSurfacePackageApps() map[string]string {
+	return map[string]string{
+		"command-palette": "examples/surface_reference_command_palette.tetra",
+		"localized-form":  "examples/surface_reference_localized_form.tetra",
+		"migration":       "examples/surface_reference_migration.tetra",
+		"studio-shell":    "examples/surface_morph_rendered_studio_shell.tetra",
+	}
 }
 
 func validateSurfacePackageArtifacts(packages []SurfacePackageArtifact) []string {
@@ -291,7 +302,7 @@ func validateSurfacePackageAssets(assets []SurfacePackageAsset) []string {
 	return issues
 }
 
-func validateSurfacePackageInstallSmokes(smokes []SurfacePackageInstallSmoke) []string {
+func validateSurfacePackageInstallSmokes(referenceApp string, smokes []SurfacePackageInstallSmoke) []string {
 	var issues []string
 	seenLinux := false
 	for _, smoke := range smokes {
@@ -314,8 +325,14 @@ func validateSurfacePackageInstallSmokes(smokes []SurfacePackageInstallSmoke) []
 		if !strings.Contains(smoke.Command, smoke.InstalledBinary) {
 			issues = append(issues, prefix+" command must execute installed_binary")
 		}
-		if smoke.ExitCode != 0 {
-			issues = append(issues, fmt.Sprintf("%s exit_code = %d, want 0", prefix, smoke.ExitCode))
+		if smoke.ExpectedExitCode < 0 {
+			issues = append(issues, fmt.Sprintf("%s expected_exit_code = %d, want non-negative", prefix, smoke.ExpectedExitCode))
+		}
+		if smoke.ExpectedExitCode != 0 {
+			issues = append(issues, fmt.Sprintf("%s expected_exit_code = %d, want 0 for Surface package evidence", prefix, smoke.ExpectedExitCode))
+		}
+		if smoke.ExitCode != smoke.ExpectedExitCode {
+			issues = append(issues, fmt.Sprintf("%s exit_code = %d, want expected_exit_code %d", prefix, smoke.ExitCode, smoke.ExpectedExitCode))
 		}
 		for _, check := range []struct {
 			name string
@@ -359,6 +376,9 @@ func validateSurfacePackageWebBundles(bundles []SurfacePackageWebBundle) []strin
 		}
 		if !safeRelativeReportPath(bundle.LoaderArtifact) || !strings.HasSuffix(bundle.LoaderArtifact, ".mjs") {
 			issues = append(issues, prefix+" loader_artifact must be a safe .mjs path")
+		}
+		if !safeRelativeReportPath(bundle.BrowserCanvasHost) || !strings.HasSuffix(bundle.BrowserCanvasHost, ".mjs") {
+			issues = append(issues, prefix+" browser_canvas_host must be a safe .mjs path")
 		}
 		if !strings.Contains(bundle.Command, "tetra build") || !strings.Contains(bundle.Command, "wasm32-web") {
 			issues = append(issues, prefix+" command must build wasm32-web")

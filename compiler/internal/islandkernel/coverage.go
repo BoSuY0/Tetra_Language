@@ -54,7 +54,7 @@ func DangerousDecisionRoutes() []DangerousDecisionRoute {
 			KernelFunction: "CanBorrow",
 			SourceFiles: []string{
 				"compiler/internal/islandkernel/kernel.go",
-				"compiler/internal/semantics/region.go",
+				"compiler/internal/semantics/region_tree_summary.go",
 				"compiler/internal/memoryfacts/from_plir.go",
 			},
 			TestFiles: []string{
@@ -210,13 +210,13 @@ func DangerousDecisionRoutes() []DangerousDecisionRoute {
 			KernelFunction: "CanClaimNoAlias",
 			SourceFiles: []string{
 				"compiler/internal/islandkernel/kernel.go",
-				"compiler/internal/memoryfacts/from_plir.go",
+				"compiler/internal/memoryfacts/from_plir_copy.go",
 				"compiler/internal/memoryfacts/graph.go",
 				"compiler/internal/memoryfacts/report.go",
 			},
 			TestFiles: []string{
 				"compiler/internal/islandkernel/kernel_test.go",
-				"compiler/internal/memoryfacts/from_plir_test.go",
+				"compiler/internal/memoryfacts/from_plir_boundaries_test.go",
 				"compiler/internal/memoryfacts/graph_test.go",
 				"compiler/internal/memoryfacts/report_test.go",
 			},
@@ -251,7 +251,7 @@ func DangerousDecisionRoutes() []DangerousDecisionRoute {
 			SourceFiles: []string{
 				"compiler/internal/islandkernel/kernel.go",
 				"compiler/internal/allocplan/plan.go",
-				"compiler/internal/lower/lower.go",
+				"compiler/internal/lower/lower_lets_match.go",
 				"compiler/internal/validation/validation.go",
 				"compiler/internal/memoryfacts/report.go",
 			},
@@ -272,13 +272,14 @@ func DangerousDecisionRoutes() []DangerousDecisionRoute {
 			KernelFunction: "CanPromoteUnsafeRoot",
 			SourceFiles: []string{
 				"compiler/internal/islandkernel/kernel.go",
-				"compiler/internal/memoryfacts/from_plir.go",
+				"compiler/internal/memoryfacts/from_plir_allocplan.go",
+				"compiler/internal/memoryfacts/from_plir_unsafe.go",
 				"compiler/internal/memoryfacts/graph.go",
 				"compiler/internal/memoryfacts/report.go",
 			},
 			TestFiles: []string{
 				"compiler/internal/islandkernel/kernel_test.go",
-				"compiler/internal/memoryfacts/from_plir_test.go",
+				"compiler/internal/memoryfacts/from_plir_boundaries_test.go",
 				"compiler/internal/memoryfacts/graph_test.go",
 				"compiler/internal/memoryfacts/report_test.go",
 			},

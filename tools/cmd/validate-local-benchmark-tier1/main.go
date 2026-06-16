@@ -4,16 +4,36 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"math"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 )
 
 const (
-	schemaLocalBenchmarkTier1  = "tetra.local_benchmark_tier1.v1"
-	scopeP25RealLocalBenchmark = "p25.0_real_local_benchmark_execution_v1"
+	schemaLocalBenchmarkTier1       = "tetra.local_benchmark_tier1.v1"
+	scopeP25RealLocalBenchmark      = "p25.0_real_local_benchmark_execution_v1"
+	schemaBenchmarkMemoryV1         = "tetra.local_benchmark.memory_evidence.v1"
+	schemaLocalRSSBudgetPolicyV1    = "tetra.local_benchmark.rss_budget_policy.v1"
+	runtimeFeatureEvidenceClass     = "lowered_ir_static_plan"
+	runtimeFeatureEvidenceMethod    = "backend_report_lowered_ir_scan_v1"
+	runtimeObjectPlanEvidenceClass  = "native_runtime_object_plan"
+	runtimeObjectPlanEvidenceMethod = "native_link_runtime_object_plan_v1"
 )
+
+var allowedHeapReasonCodes = map[string]bool{
+	"heap.required_escape_return":                true,
+	"heap.required_unknown_call":                 true,
+	"heap.required_actor_boundary":               true,
+	"heap.required_task_boundary":                true,
+	"heap.required_dynamic_lifetime":             true,
+	"heap.required_large_object":                 true,
+	"heap.required_ffi_external":                 true,
+	"heap.required_backend_lowering_unavailable": true,
+	"heap.required_region_lowering_unavailable":  true,
+}
 
 var requiredP20Categories = []string{
 	"integer loops",
@@ -33,6 +53,13 @@ var requiredP20Categories = []string{
 	"startup time",
 	"binary size",
 	"compile time",
+}
+
+var zeroHeapRequiredCategories = map[string]bool{
+	"integer loops":  true,
+	"function calls": true,
+	"hash table":     true,
+	"startup time":   true,
 }
 
 var requiredLanguages = []string{"tetra", "c", "cpp", "rust"}
@@ -63,6 +90,41 @@ var allowedBackendPaths = map[string]bool{
 	"fallback": true,
 }
 
+var allowedMemoryEvidenceClasses = map[string]bool{
+	"runtime_measured":           true,
+	"allocation_report_estimate": true,
+	"unsupported":                true,
+	"blocked":                    true,
+}
+
+var allowedMemoryBackendClasses = map[string]bool{
+	"none":              true,
+	"small_heap":        true,
+	"region":            true,
+	"large_backend":     true,
+	"external":          true,
+	"conservative_heap": true,
+	"unknown":           true,
+}
+
+var allowedMemoryBackendOperations = map[string]bool{
+	"reserve":   true,
+	"commit":    true,
+	"decommit":  true,
+	"release":   true,
+	"trim":      true,
+	"footprint": true,
+}
+
+var allowedMemoryDomainKinds = map[string]bool{
+	"process":  true,
+	"task":     true,
+	"actor":    true,
+	"island":   true,
+	"request":  true,
+	"external": true,
+}
+
 type tier1Report struct {
 	Schema              string              `json:"schema"`
 	Scope               string              `json:"scope"`
@@ -86,6 +148,30 @@ type tier1Policy struct {
 	Tier                string  `json:"tier"`
 	ComparableThreshold float64 `json:"comparable_threshold"`
 	Iterations          int     `json:"iterations"`
+}
+
+type localRSSBudgetPolicy struct {
+	Schema      string                `json:"schema"`
+	Target      string                `json:"target"`
+	HostProfile localRSSBudgetHost    `json:"host_profile"`
+	Budgets     []localRSSBudgetEntry `json:"budgets"`
+	NonClaims   []string              `json:"non_claims"`
+}
+
+type localRSSBudgetHost struct {
+	GOOS      string `json:"goos"`
+	GOARCH    string `json:"goarch"`
+	CPUs      int    `json:"cpus"`
+	TargetCPU string `json:"target_cpu"`
+	GitCommit string `json:"git_commit,omitempty"`
+}
+
+type localRSSBudgetEntry struct {
+	Category               string  `json:"category"`
+	Language               string  `json:"language"`
+	RSSPeakBudgetBytes     uint64  `json:"rss_peak_budget_bytes"`
+	AllowedVariancePercent float64 `json:"allowed_variance_percent"`
+	Reason                 string  `json:"reason"`
 }
 
 type optimizerValidation struct {
@@ -122,23 +208,99 @@ type benchmarkRow struct {
 }
 
 type tetraMetadata struct {
-	ProofReport                 string              `json:"proof_report"`
-	BoundsReport                string              `json:"bounds_report"`
-	AllocationReport            string              `json:"allocation_report"`
-	PerfBlockerReport           string              `json:"perf_blocker_report"`
-	BackendReport               string              `json:"backend_report"`
-	BackendPath                 string              `json:"backend_path"`
-	BoundsLeft                  int                 `json:"bounds_left"`
-	HeapAllocations             int                 `json:"heap_allocations"`
-	PerfBlockers                []string            `json:"perf_blockers"`
-	OptimizerValidationMetadata optimizerValidation `json:"optimizer_validation_metadata"`
+	ProofReport                 string                 `json:"proof_report"`
+	BoundsReport                string                 `json:"bounds_report"`
+	AllocationReport            string                 `json:"allocation_report"`
+	PerfBlockerReport           string                 `json:"perf_blocker_report"`
+	BackendReport               string                 `json:"backend_report"`
+	BackendPath                 string                 `json:"backend_path"`
+	RuntimeFeaturesRequired     []string               `json:"runtime_features_required"`
+	RuntimeFeaturesLinked       []string               `json:"runtime_features_linked"`
+	RuntimeFeaturesInitialized  []string               `json:"runtime_features_initialized"`
+	RuntimeLazyInitBlockers     []string               `json:"runtime_lazy_init_blockers"`
+	RuntimeFeatureEvidence      runtimeFeatureEvidence `json:"runtime_feature_evidence"`
+	RuntimeObjectPlan           runtimeObjectPlan      `json:"runtime_object_plan"`
+	BoundsLeft                  int                    `json:"bounds_left"`
+	HeapAllocations             int                    `json:"heap_allocations"`
+	HeapReasonCodes             []string               `json:"heap_reason_codes"`
+	PerfBlockers                []string               `json:"perf_blockers"`
+	OptimizerValidationMetadata optimizerValidation    `json:"optimizer_validation_metadata"`
+	MemoryEvidence              *memoryEvidence        `json:"memory_evidence,omitempty"`
+}
+
+type runtimeFeatureEvidence struct {
+	EvidenceClass     string `json:"evidence_class"`
+	Method            string `json:"method"`
+	SourceArtifact    string `json:"source_artifact,omitempty"`
+	BlockedReason     string `json:"blocked_reason,omitempty"`
+	UnsupportedReason string `json:"unsupported_reason,omitempty"`
+}
+
+type runtimeObjectPlan struct {
+	EvidenceClass                    string   `json:"evidence_class"`
+	EvidenceMethod                   string   `json:"evidence_method"`
+	RuntimeUsed                      bool     `json:"runtime_used"`
+	RuntimeObjectLinked              bool     `json:"runtime_object_linked"`
+	RuntimeObjectInitialized         bool     `json:"runtime_object_initialized"`
+	RuntimeObjectOverride            bool     `json:"runtime_object_override"`
+	TimeOnlyRuntime                  bool     `json:"time_only_runtime"`
+	LinuxMinimalRuntime              bool     `json:"linux_minimal_runtime"`
+	RuntimeObjectFeaturesRequired    []string `json:"runtime_object_features_required"`
+	RuntimeObjectFeaturesLinked      []string `json:"runtime_object_features_linked"`
+	RuntimeObjectFeaturesInitialized []string `json:"runtime_object_features_initialized"`
+	RuntimeObjectLazyInitBlockers    []string `json:"runtime_object_lazy_init_blockers"`
+	BlockedReason                    string   `json:"blocked_reason,omitempty"`
+	UnsupportedReason                string   `json:"unsupported_reason,omitempty"`
+}
+
+type memoryEvidence struct {
+	Schema              string             `json:"schema"`
+	HeapAllocBytes      memoryMetric       `json:"heap_alloc_bytes"`
+	BytesRequested      memoryMetric       `json:"bytes_requested"`
+	BytesReserved       memoryMetric       `json:"bytes_reserved"`
+	BytesCommitted      memoryMetric       `json:"bytes_committed"`
+	BytesReleased       memoryMetric       `json:"bytes_released"`
+	BytesCopied         memoryMetric       `json:"bytes_copied"`
+	RSSCurrent          memoryMetric       `json:"rss_current"`
+	RSSPeak             memoryMetric       `json:"rss_peak"`
+	DomainBytesEvidence memoryMetric       `json:"domain_bytes_evidence"`
+	DomainBytes         []memoryDomainByte `json:"domain_bytes"`
+}
+
+type memoryMetric struct {
+	Bytes             uint64 `json:"bytes,omitempty"`
+	CurrentBytes      uint64 `json:"current_bytes,omitempty"`
+	PeakBytes         uint64 `json:"peak_bytes,omitempty"`
+	TotalAllocBytes   uint64 `json:"total_alloc_bytes,omitempty"`
+	AllocationCount   uint64 `json:"allocation_count,omitempty"`
+	EvidenceClass     string `json:"evidence_class"`
+	Method            string `json:"method"`
+	SourceArtifact    string `json:"source_artifact,omitempty"`
+	UnsupportedReason string `json:"unsupported_reason,omitempty"`
+	BlockedReason     string `json:"blocked_reason,omitempty"`
+}
+
+type memoryDomainByte struct {
+	DomainID       string `json:"domain_id"`
+	Kind           string `json:"kind"`
+	RequestedBytes uint64 `json:"requested_bytes,omitempty"`
+	ReservedBytes  uint64 `json:"reserved_bytes,omitempty"`
+	CommittedBytes uint64 `json:"committed_bytes,omitempty"`
+	ReleasedBytes  uint64 `json:"released_bytes,omitempty"`
+	CurrentBytes   uint64 `json:"current_bytes,omitempty"`
+	PeakBytes      uint64 `json:"peak_bytes,omitempty"`
+	BytesCopied    uint64 `json:"bytes_copied,omitempty"`
+	EvidenceClass  string `json:"evidence_class"`
+	Method         string `json:"method"`
+	SourceArtifact string `json:"source_artifact,omitempty"`
 }
 
 func main() {
 	reportPath := flag.String("report", "", "P25.0 local Tier 1 benchmark report JSON")
+	rssBudgetPolicyPath := flag.String("rss-budget-policy", "", "optional local RSS budget policy JSON")
 	flag.Parse()
 	if *reportPath == "" {
-		fmt.Fprintln(os.Stderr, "usage: validate-local-benchmark-tier1 --report reports/local-benchmark-tier1-v1/report.json")
+		fmt.Fprintln(os.Stderr, "usage: validate-local-benchmark-tier1 --report reports/local-benchmark-tier1-v1/report.json [--rss-budget-policy docs/spec/local-rss-budget-policy.local.json]")
 		os.Exit(2)
 	}
 	raw, err := os.ReadFile(*reportPath)
@@ -151,8 +313,19 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err := ValidateReportBytes(raw, root); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+	var validateErr error
+	if *rssBudgetPolicyPath != "" {
+		policyRaw, err := os.ReadFile(*rssBudgetPolicyPath)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		validateErr = ValidateReportBytesWithRSSBudgetPolicy(raw, root, policyRaw)
+	} else {
+		validateErr = ValidateReportBytes(raw, root)
+	}
+	if validateErr != nil {
+		fmt.Fprintln(os.Stderr, validateErr)
 		os.Exit(1)
 	}
 }
@@ -163,6 +336,21 @@ func ValidateReportBytes(raw []byte, root string) error {
 		return err
 	}
 	return validateReport(report, root)
+}
+
+func ValidateReportBytesWithRSSBudgetPolicy(raw []byte, root string, policyRaw []byte) error {
+	var report tier1Report
+	if err := json.Unmarshal(raw, &report); err != nil {
+		return err
+	}
+	if err := validateReport(report, root); err != nil {
+		return err
+	}
+	var policy localRSSBudgetPolicy
+	if err := json.Unmarshal(policyRaw, &policy); err != nil {
+		return err
+	}
+	return validateLocalRSSBudgetPolicy(report, root, policy)
 }
 
 func validateReport(report tier1Report, root string) error {
@@ -176,6 +364,9 @@ func validateReport(report tier1Report, root string) error {
 		return fmt.Errorf("generated_at is required")
 	}
 	if err := validateHost(report.Host); err != nil {
+		return err
+	}
+	if err := validateReportGitHead(report.Host.GitCommit, root); err != nil {
 		return err
 	}
 	if err := validatePolicy(report.Policy); err != nil {
@@ -218,6 +409,27 @@ func validateHost(host tier1Host) error {
 		return fmt.Errorf("host metadata is incomplete: %+v", host)
 	}
 	return nil
+}
+
+func validateReportGitHead(reportHead string, root string) error {
+	current, ok := currentGitHead(root)
+	if !ok {
+		return nil
+	}
+	if reportHead != current {
+		return fmt.Errorf("stale report git_commit = %q, current HEAD = %q", reportHead, current)
+	}
+	return nil
+}
+
+func currentGitHead(root string) (string, bool) {
+	cmd := exec.Command("git", "-C", root, "rev-parse", "--verify", "HEAD")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", false
+	}
+	head := strings.TrimSpace(string(out))
+	return head, head != ""
 }
 
 func validatePolicy(policy tier1Policy) error {
@@ -267,6 +479,182 @@ func validateNonClaims(nonClaims []string) error {
 		}
 	}
 	return nil
+}
+
+func validateLocalRSSBudgetPolicy(report tier1Report, root string, policy localRSSBudgetPolicy) error {
+	if policy.Schema != schemaLocalRSSBudgetPolicyV1 {
+		return fmt.Errorf("rss budget policy schema = %q, want %q", policy.Schema, schemaLocalRSSBudgetPolicyV1)
+	}
+	if strings.TrimSpace(policy.Target) == "" {
+		return fmt.Errorf("rss budget policy target is required")
+	}
+	if err := validateLocalRSSBudgetNonClaims(policy.NonClaims); err != nil {
+		return err
+	}
+	if err := validateLocalRSSBudgetHost(policy.HostProfile); err != nil {
+		return err
+	}
+	if len(policy.Budgets) == 0 {
+		return fmt.Errorf("rss budget policy requires at least one budget")
+	}
+	for i, budget := range policy.Budgets {
+		if err := validateLocalRSSBudgetEntry(i, budget); err != nil {
+			return err
+		}
+	}
+	if !localRSSBudgetAppliesToReport(report, policy) {
+		return nil
+	}
+	for _, budget := range policy.Budgets {
+		if err := validateLocalRSSBudgetForEntry(report, root, budget); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateLocalRSSBudgetHost(host localRSSBudgetHost) error {
+	if strings.TrimSpace(host.GOOS) == "" {
+		return fmt.Errorf("rss budget policy host_profile missing goos")
+	}
+	if strings.TrimSpace(host.GOARCH) == "" {
+		return fmt.Errorf("rss budget policy host_profile missing goarch")
+	}
+	if host.CPUs <= 0 {
+		return fmt.Errorf("rss budget policy host_profile cpus must be positive")
+	}
+	if strings.TrimSpace(host.TargetCPU) == "" {
+		return fmt.Errorf("rss budget policy host_profile missing target_cpu")
+	}
+	return nil
+}
+
+func validateLocalRSSBudgetNonClaims(nonClaims []string) error {
+	required := []string{
+		"local rss budget only",
+		"no cross-machine rss claim",
+		"no official benchmark claim",
+	}
+	seen := map[string]bool{}
+	for _, claim := range nonClaims {
+		lower := strings.ToLower(strings.TrimSpace(claim))
+		if lower == "" {
+			return fmt.Errorf("rss budget policy non_claims contains an empty entry")
+		}
+		if strings.Contains(lower, "cross-machine") && !strings.Contains(lower, "no cross-machine") {
+			return fmt.Errorf("rss budget policy non_claims contains forbidden cross-machine claim: %q", claim)
+		}
+		if strings.Contains(lower, "official") && !strings.Contains(lower, "no official") {
+			return fmt.Errorf("rss budget policy non_claims contains forbidden official claim: %q", claim)
+		}
+		seen[lower] = true
+	}
+	for _, claim := range required {
+		if !seen[claim] {
+			return fmt.Errorf("rss budget policy missing non_claim %q", claim)
+		}
+	}
+	return nil
+}
+
+func validateLocalRSSBudgetEntry(index int, budget localRSSBudgetEntry) error {
+	if strings.TrimSpace(budget.Category) == "" {
+		return fmt.Errorf("rss budget policy budgets[%d] missing category", index)
+	}
+	if budget.Language == "" {
+		budget.Language = "tetra"
+	}
+	if strings.TrimSpace(budget.Language) == "" {
+		return fmt.Errorf("rss budget policy budgets[%d] missing language", index)
+	}
+	if budget.RSSPeakBudgetBytes == 0 {
+		return fmt.Errorf("rss budget policy budgets[%d] rss_peak_budget_bytes must be positive", index)
+	}
+	if budget.AllowedVariancePercent < 0 {
+		return fmt.Errorf("rss budget policy budgets[%d] allowed_variance_percent must be non-negative", index)
+	}
+	if strings.TrimSpace(budget.Reason) == "" {
+		return fmt.Errorf("rss budget policy budgets[%d] missing reason", index)
+	}
+	return nil
+}
+
+func localRSSBudgetAppliesToReport(report tier1Report, policy localRSSBudgetPolicy) bool {
+	if policy.Target != targetFromHost(report.Host) {
+		return false
+	}
+	host := policy.HostProfile
+	if host.GOOS != report.Host.GOOS || host.GOARCH != report.Host.GOARCH || host.CPUs != report.Host.CPUs || host.TargetCPU != report.Host.TargetCPU {
+		return false
+	}
+	if strings.TrimSpace(host.GitCommit) != "" && host.GitCommit != report.Host.GitCommit {
+		return false
+	}
+	return true
+}
+
+func targetFromHost(host tier1Host) string {
+	arch := host.GOARCH
+	if arch == "amd64" {
+		arch = "x64"
+	}
+	if host.GOOS == "" || arch == "" {
+		return ""
+	}
+	return host.GOOS + "-" + arch
+}
+
+func validateLocalRSSBudgetForEntry(report tier1Report, root string, budget localRSSBudgetEntry) error {
+	language := budget.Language
+	if language == "" {
+		language = "tetra"
+	}
+	row, ok := findBudgetRow(report, budget.Category, language)
+	if !ok {
+		return fmt.Errorf("rss budget policy category %q language %q has no matching benchmark row", budget.Category, language)
+	}
+	if row.Status != "measured" {
+		return fmt.Errorf("rss budget policy category %q language %q requires measured row, got %q", budget.Category, language, row.Status)
+	}
+	if row.TetraMetadata == nil || row.TetraMetadata.MemoryEvidence == nil {
+		return fmt.Errorf("rss budget policy category %q language %q missing memory evidence", budget.Category, language)
+	}
+	sample, err := validateRSSPeakMetric(row.Name, row.TetraMetadata.MemoryEvidence.RSSPeak, root)
+	if err != nil {
+		return fmt.Errorf("rss budget policy category %q language %q rss_peak: %w", budget.Category, language, err)
+	}
+	allowed := localRSSBudgetAllowedPeak(budget)
+	if sample.RSSPeakBytes > allowed {
+		return fmt.Errorf("rss budget category %q language %q rss_peak = %d bytes exceeds local budget %d bytes (allowed %d bytes with %.2f%% variance): %s",
+			budget.Category,
+			language,
+			sample.RSSPeakBytes,
+			budget.RSSPeakBudgetBytes,
+			allowed,
+			budget.AllowedVariancePercent,
+			budget.Reason,
+		)
+	}
+	return nil
+}
+
+func findBudgetRow(report tier1Report, category string, language string) (benchmarkRow, bool) {
+	for _, result := range report.Results {
+		if result.Category != category {
+			continue
+		}
+		for _, row := range result.Rows {
+			if row.Language == language {
+				return row, true
+			}
+		}
+	}
+	return benchmarkRow{}, false
+}
+
+func localRSSBudgetAllowedPeak(budget localRSSBudgetEntry) uint64 {
+	allowed := float64(budget.RSSPeakBudgetBytes) * (1 + budget.AllowedVariancePercent/100)
+	return uint64(math.Ceil(allowed))
 }
 
 func validateOptimizerValidation(label string, metadata optimizerValidation, root string) error {
@@ -372,7 +760,7 @@ func validateBenchmarkRow(row benchmarkRow, root string) error {
 		if row.TetraMetadata == nil {
 			return fmt.Errorf("benchmark %s missing tetra metadata", row.Name)
 		}
-		if err := validateTetraMetadata(row.Name, *row.TetraMetadata, root); err != nil {
+		if err := validateTetraMetadata(row.Name, row.Category, row.Status, *row.TetraMetadata, root); err != nil {
 			return err
 		}
 	} else if row.TetraMetadata != nil {
@@ -381,7 +769,31 @@ func validateBenchmarkRow(row benchmarkRow, root string) error {
 	return nil
 }
 
-func validateTetraMetadata(name string, metadata tetraMetadata, root string) error {
+func validateTetraMetadata(name string, category string, rowStatus string, metadata tetraMetadata, root string) error {
+	if rowStatus == "build_failed" && metadata.OptimizerValidationMetadata.Status == "missing_build_artifacts" {
+		if !allowedBackendPaths[metadata.BackendPath] {
+			return fmt.Errorf("benchmark %s tetra metadata backend_path %q is not allowed", name, metadata.BackendPath)
+		}
+		if metadata.BoundsLeft < 0 || metadata.HeapAllocations < 0 {
+			return fmt.Errorf("benchmark %s tetra metadata has negative bounds/heap totals", name)
+		}
+		if err := validateOptimizerValidation("benchmark "+name+" optimizer validation", metadata.OptimizerValidationMetadata, root); err != nil {
+			return err
+		}
+		if err := validateRuntimeFeatureEvidence(name, rowStatus, metadata, root); err != nil {
+			return err
+		}
+		if err := validateHeapReasonEvidence(name, rowStatus, metadata, root); err != nil {
+			return err
+		}
+		if err := validateAllocationMemoryBackendEvidence(name, rowStatus, metadata, root); err != nil {
+			return err
+		}
+		if err := validateMemoryEvidence(name, rowStatus, metadata.MemoryEvidence, root); err != nil {
+			return err
+		}
+		return validateZeroHeapRequirement(name, category, rowStatus, metadata, root)
+	}
 	for label, path := range map[string]string{
 		"proof report":        metadata.ProofReport,
 		"bounds report":       metadata.BoundsReport,
@@ -402,21 +814,38 @@ func validateTetraMetadata(name string, metadata tetraMetadata, root string) err
 	if err := validateOptimizerValidation("benchmark "+name+" optimizer validation", metadata.OptimizerValidationMetadata, root); err != nil {
 		return err
 	}
-	return nil
+	if err := validateRuntimeFeatureEvidence(name, rowStatus, metadata, root); err != nil {
+		return err
+	}
+	if err := validateHeapReasonEvidence(name, rowStatus, metadata, root); err != nil {
+		return err
+	}
+	if err := validateAllocationMemoryBackendEvidence(name, rowStatus, metadata, root); err != nil {
+		return err
+	}
+	if err := validateMemoryEvidence(name, rowStatus, metadata.MemoryEvidence, root); err != nil {
+		return err
+	}
+	return validateZeroHeapRequirement(name, category, rowStatus, metadata, root)
 }
 
 func requireExistingPath(root string, path string) error {
+	_, err := resolveExistingPath(root, path)
+	return err
+}
+
+func resolveExistingPath(root string, path string) (string, error) {
 	if strings.TrimSpace(path) == "" {
-		return fmt.Errorf("path is required")
+		return "", fmt.Errorf("path is required")
 	}
 	resolved := path
 	if !filepath.IsAbs(resolved) {
 		resolved = filepath.Join(root, path)
 	}
 	if _, err := os.Stat(resolved); err != nil {
-		return fmt.Errorf("%s does not exist", path)
+		return "", fmt.Errorf("%s does not exist", path)
 	}
-	return nil
+	return resolved, nil
 }
 
 func languageAllowed(language string) bool {

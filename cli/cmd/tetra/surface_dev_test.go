@@ -3,10 +3,13 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"tetra_language/tools/validators/surface"
 )
 
 func TestSurfaceDevCommandWritesFastRebuildReport(t *testing.T) {
@@ -17,6 +20,8 @@ func TestSurfaceDevCommandWritesFastRebuildReport(t *testing.T) {
 	dir := t.TempDir()
 	entry, tokens, recipes := writeSurfaceDevFixture(t, dir)
 	reportPath := filepath.Join(dir, "surface-dev-workflow.json")
+	morphRenderedBeautyReportPath := filepath.Join(dir, "surface-morph-rendered-beauty.json")
+	writeSurfaceDevMorphRenderedBeautyReport(t, morphRenderedBeautyReportPath, entry)
 	outDir := filepath.Join(dir, "dist")
 
 	var stdout, stderr bytes.Buffer
@@ -26,6 +31,7 @@ func TestSurfaceDevCommandWritesFastRebuildReport(t *testing.T) {
 		"--target", target,
 		"--out-dir", outDir,
 		"--report", reportPath,
+		"--morph-rendered-beauty-report", morphRenderedBeautyReportPath,
 		"--change-file", "token:" + tokens,
 		"--change-file", "recipe:" + recipes,
 		"--change-file", "source:" + entry,
@@ -64,6 +70,21 @@ func TestSurfaceDevCommandWritesFastRebuildReport(t *testing.T) {
 			Severity string `json:"severity"`
 			Pass     bool   `json:"pass"`
 		} `json:"source_diagnostics"`
+		MorphToPixels struct {
+			ChainID                 string `json:"chain_id"`
+			ReportPath              string `json:"report_path"`
+			Source                  string `json:"source"`
+			TokenCount              int    `json:"token_count"`
+			RecipeCount             int    `json:"recipe_count"`
+			RecipeExpansionCount    int    `json:"recipe_expansion_count"`
+			BlockSceneHash          string `json:"block_scene_hash"`
+			RenderCommandStreamHash string `json:"render_command_stream_hash"`
+			RenderCommandCount      int    `json:"render_command_count"`
+			FrameArtifact           string `json:"frame_artifact"`
+			GoldenArtifact          string `json:"golden_artifact"`
+			DiffPixels              int    `json:"diff_pixels"`
+			Pass                    bool   `json:"pass"`
+		} `json:"morph_to_pixels"`
 	}
 	if err := json.Unmarshal(raw, &report); err != nil {
 		t.Fatalf("decode report: %v\n%s", err, string(raw))
@@ -118,6 +139,19 @@ func TestSurfaceDevCommandWritesFastRebuildReport(t *testing.T) {
 		if !diagnosticKinds[want] {
 			t.Fatalf("missing %s source diagnostic in %#v", want, report.SourceDiagnostics)
 		}
+	}
+	if !report.MorphToPixels.Pass ||
+		report.MorphToPixels.ChainID == "" ||
+		filepath.Clean(report.MorphToPixels.Source) != filepath.Clean(entry) ||
+		report.MorphToPixels.TokenCount == 0 ||
+		report.MorphToPixels.RecipeCount == 0 ||
+		report.MorphToPixels.RecipeExpansionCount < report.MorphToPixels.RecipeCount ||
+		report.MorphToPixels.RenderCommandCount == 0 ||
+		report.MorphToPixels.BlockSceneHash == "" ||
+		report.MorphToPixels.RenderCommandStreamHash == "" ||
+		report.MorphToPixels.FrameArtifact == "" ||
+		report.MorphToPixels.GoldenArtifact == "" {
+		t.Fatalf("morph_to_pixels = %#v, want source-linked Morph-to-pixels chain", report.MorphToPixels)
 	}
 }
 
@@ -189,4 +223,145 @@ func writeSurfaceDevFixture(t *testing.T, dir string) (entry string, tokens stri
 	writeCLIProjectFile(t, dir, "design/recipes.tetra", "module design.recipes\n// "+unique+"\nfunc card() -> Int:\n    return 25\n")
 	writeCLIProjectFile(t, dir, "app/main.tetra", "module app.main\n// "+unique+"\nimport design.tokens as tokens\nimport design.recipes as recipes\nfunc main() -> Int:\n    return tokens.accent() + recipes.card()\n")
 	return entry, tokens, recipes
+}
+
+func writeSurfaceDevMorphRenderedBeautyReport(t *testing.T, path string, source string) {
+	t.Helper()
+	report := validSurfaceDevMorphRenderedBeautyReport(source)
+	raw, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal Morph rendered beauty report: %v", err)
+	}
+	if err := surface.ValidateMorphRenderedBeautyReport(raw); err != nil {
+		t.Fatalf("test Morph rendered beauty report invalid: %v\n%s", err, raw)
+	}
+	if err := os.WriteFile(path, append(raw, '\n'), 0o644); err != nil {
+		t.Fatalf("write Morph rendered beauty report: %v", err)
+	}
+}
+
+func validSurfaceDevMorphRenderedBeautyReport(source string) surface.MorphRenderedBeautyReport {
+	blockSceneHash := surfaceDevTestSHA(5)
+	commandStreamHash := surfaceDevTestSHA(7)
+	frameHash := surfaceDevTestSHA(60)
+	goldenHash := surfaceDevTestSHA(61)
+	commands := []string{"fill", "gradient", "image_fill", "border", "radius_clip", "shadow", "overlay", "outline", "text", "icon"}
+	renderCommands := make([]surface.MorphRenderedBeautyRenderCommand, 0, len(commands))
+	for i, command := range commands {
+		item := surface.MorphRenderedBeautyRenderCommand{
+			Order:        i + 1,
+			Command:      command,
+			Source:       source,
+			SourceNodeID: fmt.Sprintf("node-%d", i+1),
+			Recipe:       "studio_shell",
+			LayerID:      "layer-main",
+			BlockID:      i + 1,
+			Quality:      "deterministic",
+			Checksum:     surfaceDevTestSHA(100 + i),
+		}
+		if command == "text" {
+			item.RasterFormat = "builtin-5x7-alpha-mask-v1"
+			item.RasterHash = surfaceDevTestSHA(210)
+			item.RasterWidth = 5
+			item.RasterHeight = 7
+			item.RasterCoverage = 20
+		}
+		if command == "icon" {
+			item.RasterFormat = "builtin-icon-mask-raster-v1"
+			item.RasterHash = surfaceDevTestSHA(211)
+			item.RasterWidth = 16
+			item.RasterHeight = 16
+			item.RasterCoverage = 96
+		}
+		renderCommands = append(renderCommands, item)
+	}
+	return surface.MorphRenderedBeautyReport{
+		Schema:         surface.MorphRenderedBeautyReportSchemaV1,
+		Status:         "pass",
+		SurfaceScope:   surface.MorphRenderedBeautyScope,
+		Target:         "headless",
+		ScenarioName:   "headless-morph:" + source,
+		GitHead:        strings.Repeat("1", 40),
+		CorePrimitives: []string{"Block"},
+		MorphEvidence: surface.MorphRenderedBeautyMorphEvidence{
+			Source:                 source,
+			SourceSHA256:           surfaceDevTestSHA(1),
+			CapsuleHash:            surfaceDevTestSHA(2),
+			TokenGraphHash:         surfaceDevTestSHA(3),
+			TokenCount:             6,
+			TokenCategories:        []string{"color", "space", "radius", "typography", "motion", "assets"},
+			RecipeCount:            3,
+			RecipeExpansionCount:   4,
+			RecipeNames:            []string{"studio_shell", "hero_panel", "toolbar"},
+			ResolvedMorphSceneHash: surfaceDevTestSHA(4),
+			BlockSceneSnapshotHash: blockSceneHash,
+		},
+		BlockSceneSnapshot: surface.MorphRenderedBeautyBlockSceneSnapshot{
+			Schema:               "tetra.surface.block-scene-snapshot.v1",
+			SurfaceScope:         surface.MorphRenderedBeautyScope,
+			Source:               source,
+			QualityLevel:         "rich-renderable-block-scene-v1",
+			CorePrimitives:       []string{"Block"},
+			RecipeExpansionCount: 4,
+			NodeCount:            12,
+			RichSpecHash:         surfaceDevTestSHA(6),
+			BlockSceneHash:       blockSceneHash,
+			SpecCoverage: surface.MorphRenderedBeautyBlockSceneSpecCoverage{
+				Layout: true, Paint: true, Text: true, Image: true, Input: true, Event: true, State: true, Motion: true, Accessibility: true,
+			},
+		},
+		RenderEvidence: surface.MorphRenderedBeautyRenderEvidence{
+			CommandStreamHash: commandStreamHash,
+			CommandCount:      len(renderCommands),
+			Renderer:          "software-rgba-headless",
+		},
+		RenderCommandStream: surface.MorphRenderedBeautyRenderCommandStream{
+			Schema:                        "tetra.surface.render-command-stream.v1",
+			Source:                        source,
+			SurfaceScope:                  surface.MorphRenderedBeautyScope,
+			Producer:                      "surface-runtime-smoke",
+			QualityLevel:                  "deterministic-render-command-stream-v1",
+			Renderer:                      "software-rgba-headless",
+			DerivedFromBlockSceneSnapshot: true,
+			BlockSceneHash:                blockSceneHash,
+			FrameChecksum:                 frameHash,
+			CommandStreamHash:             commandStreamHash,
+			CommandCount:                  len(renderCommands),
+			SourceLinked:                  true,
+			Commands:                      renderCommands,
+		},
+		PixelEvidence: surface.MorphRenderedBeautyPixelEvidence{
+			FrameArtifact:           "reports/surface/dev-frame.rgba",
+			FrameArtifactSHA256:     frameHash,
+			FrameChecksum:           frameHash,
+			FrameProducer:           "app",
+			AppSource:               source,
+			MorphRecipeHash:         surfaceDevTestSHA(8),
+			BlockSceneHash:          blockSceneHash,
+			RenderCommandStreamHash: commandStreamHash,
+			GoldenArtifact:          "reports/surface/dev-golden.rgba",
+			GoldenArtifactSHA256:    goldenHash,
+			GoldenChecksum:          goldenHash,
+			DiffPixels:              1,
+			MaxChannelDelta:         1,
+		},
+		NegativeGuards: surface.MorphRenderedBeautyNegativeGuards{
+			MetadataOnlyRejected: true, SelfGoldenRejected: true, PrecomputedFrameRejected: true, MissingFrameArtifactRejected: true,
+			NoDOMUI: true, NoCSSRuntime: true, NoReactRuntime: true, NoElectronRuntime: true, NoNativeWidgets: true, NoHiddenAppState: true,
+			NonBlockOutputRejected: true, DirtyCheckoutProductionRejected: true, UnsupportedTargetRejected: true,
+		},
+		NonClaims: []string{
+			"no Electron runtime claim",
+			"no React runtime claim",
+			"no CSS runtime claim",
+			"no DOM-authored UI claim",
+			"no GPU renderer production claim",
+			"no macOS production claim",
+			"no Windows production claim",
+		},
+	}
+}
+
+func surfaceDevTestSHA(seed int) string {
+	return "sha256:" + fmt.Sprintf("%064x", seed)
 }

@@ -277,8 +277,8 @@ func TestPipelineNativeModulePlanInvalidatesWhenLinkedObjectContentChanges(t *te
 	if err != nil {
 		t.Fatalf("plan first build: %v", err)
 	}
-	if len(plan1.toCompile) != 1 {
-		t.Fatalf("first plan toCompile = %#v, want app.main", plan1.toCompile)
+	if len(plan1.ToCompile) != 1 {
+		t.Fatalf("first plan ToCompile = %#v, want app.main", plan1.ToCompile)
 	}
 	tgt, err := ctarget.Parse(target)
 	if err != nil {
@@ -301,8 +301,8 @@ func TestPipelineNativeModulePlanInvalidatesWhenLinkedObjectContentChanges(t *te
 	if err != nil {
 		t.Fatalf("plan cached build: %v", err)
 	}
-	if len(plan2.toCompile) != 0 || len(stats2.CacheHits) != 1 {
-		t.Fatalf("cached plan toCompile=%#v cacheHits=%#v, want one cache hit", plan2.toCompile, stats2.CacheHits)
+	if len(plan2.ToCompile) != 0 || len(stats2.CacheHits) != 1 {
+		t.Fatalf("cached plan ToCompile=%#v cacheHits=%#v, want one cache hit", plan2.ToCompile, stats2.CacheHits)
 	}
 
 	linkedB := []linkedObject{{path: "dep.tobj", obj: &Object{Module: "dep.lib"}, contentHash: sha256.Sum256([]byte("dep-v2"))}}
@@ -310,8 +310,8 @@ func TestPipelineNativeModulePlanInvalidatesWhenLinkedObjectContentChanges(t *te
 	if err != nil {
 		t.Fatalf("plan changed link object build: %v", err)
 	}
-	if len(plan3.toCompile) != 1 {
-		t.Fatalf("changed link object plan toCompile=%#v, want rebuild", plan3.toCompile)
+	if len(plan3.ToCompile) != 1 {
+		t.Fatalf("changed link object plan ToCompile=%#v, want rebuild", plan3.ToCompile)
 	}
 	if len(stats3.CacheHits) != 0 {
 		t.Fatalf("changed link object cache hits=%#v, want none", stats3.CacheHits)
@@ -349,9 +349,9 @@ func TestPipelineNativeModulePlanCacheStages(t *testing.T) {
 	if err != nil {
 		t.Fatalf("plan first build: %v", err)
 	}
-	testkit.AssertModules(t, plan1.modules, []string{"app.game", "engine.render"})
-	if len(plan1.toCompile) != 2 {
-		t.Fatalf("first plan toCompile = %#v, want two modules", plan1.toCompile)
+	testkit.AssertModules(t, plan1.Modules, []string{"app.game", "engine.render"})
+	if len(plan1.ToCompile) != 2 {
+		t.Fatalf("first plan ToCompile = %#v, want two modules", plan1.ToCompile)
 	}
 	if len(stats1.CacheHits) != 0 {
 		t.Fatalf("first plan cache hits = %#v, want none", stats1.CacheHits)
@@ -373,8 +373,8 @@ func TestPipelineNativeModulePlanCacheStages(t *testing.T) {
 	if err != nil {
 		t.Fatalf("plan cached build: %v", err)
 	}
-	if len(plan2.toCompile) != 0 {
-		t.Fatalf("cached plan toCompile = %#v, want none", plan2.toCompile)
+	if len(plan2.ToCompile) != 0 {
+		t.Fatalf("cached plan ToCompile = %#v, want none", plan2.ToCompile)
 	}
 	testkit.AssertModules(t, stats2.CacheHits, []string{"app.game", "engine.render"})
 	if err := compileNativeModulePlan(build.world, build.checked, native, opt, plan2, stats2); err != nil {

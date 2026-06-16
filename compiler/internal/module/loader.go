@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"tetra_language/compiler/internal/formats"
@@ -50,7 +51,7 @@ func LoadWorldOpt(entryPath string, opt LoadOptions) (*World, error) {
 		return nil, fmt.Errorf("resolve entry path: %w", err)
 	}
 
-	entryFile, err := parseFileFromPath(absEntry)
+	entryFile, err := parseModuleFileSetFromPath(absEntry)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +135,7 @@ func (w *World) loadModule(root, module string, state map[string]int, sourceRoot
 	if err != nil {
 		return fmt.Errorf("load module '%s': %w", module, err)
 	}
-	file, err := parseFileFromPath(path)
+	file, err := parseModuleFileSetFromPath(path)
 	if err != nil {
 		return fmt.Errorf("load module '%s': %w", module, err)
 	}
@@ -195,6 +196,139 @@ func parseFileFromPath(path string) (*frontend.FileAST, error) {
 		return nil, err
 	}
 	return file, nil
+}
+
+func parseModuleFileSetFromPath(path string) (*frontend.FileAST, error) {
+	file, err := parseFileFromPath(path)
+	if err != nil {
+		return nil, err
+	}
+	if file.Module == "" || file.InterfaceHash != "" {
+		return file, nil
+	}
+	fragmentPaths, err := moduleFragmentPaths(path)
+	if err != nil {
+		return nil, err
+	}
+	if len(fragmentPaths) == 0 {
+		return file, nil
+	}
+	fragments := make([]*frontend.FileAST, 0, len(fragmentPaths))
+	for _, fragmentPath := range fragmentPaths {
+		fragment, err := parseFileFromPath(fragmentPath)
+		if err != nil {
+			return nil, fmt.Errorf("load module fragment '%s': %w", fragmentPath, err)
+		}
+		if fragment.InterfaceHash != "" {
+			return nil, fmt.Errorf("%s: module fragments cannot be interface files", fragmentPath)
+		}
+		if fragment.Module != file.Module {
+			return nil, fmt.Errorf("%s: module fragment declaration '%s' does not match primary module '%s'", fragmentPath, fragment.Module, file.Module)
+		}
+		mergeModuleFragment(file, fragment)
+		fragments = append(fragments, fragment)
+	}
+	if err := validateImportPaths(file); err != nil {
+		return nil, err
+	}
+	file.Src = mergedModuleSource(file.Module, file.Imports, append([]*frontend.FileAST{file}, fragments...))
+	return file, nil
+}
+
+func moduleFragmentPaths(path string) ([]string, error) {
+	ext := filepath.Ext(path)
+	if ext != formats.T4SourceExtension && ext != formats.LegacyTetraSourceExtension {
+		return nil, nil
+	}
+	stem := strings.TrimSuffix(filepath.Base(path), ext)
+	matches, err := filepath.Glob(filepath.Join(filepath.Dir(path), stem+".parts", "*"+ext))
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(matches)
+	return matches, nil
+}
+
+func mergeModuleFragment(file, fragment *frontend.FileAST) {
+	file.Imports = append(file.Imports, fragment.Imports...)
+	file.Capsules = append(file.Capsules, fragment.Capsules...)
+	file.Enums = append(file.Enums, fragment.Enums...)
+	file.Structs = append(file.Structs, fragment.Structs...)
+	file.States = append(file.States, fragment.States...)
+	file.Views = append(file.Views, fragment.Views...)
+	file.Actors = append(file.Actors, fragment.Actors...)
+	file.Protocols = append(file.Protocols, fragment.Protocols...)
+	file.Extensions = append(file.Extensions, fragment.Extensions...)
+	file.Impls = append(file.Impls, fragment.Impls...)
+	file.Globals = append(file.Globals, fragment.Globals...)
+	file.Funcs = append(file.Funcs, fragment.Funcs...)
+	file.Tests = append(file.Tests, fragment.Tests...)
+}
+
+func mergedModuleSource(module string, imports []frontend.ImportDecl, files []*frontend.FileAST) []byte {
+	var b strings.Builder
+	fmt.Fprintf(&b, "module %s\n", module)
+	seenImports := map[string]struct{}{}
+	for _, imp := range imports {
+		line := formatImportDecl(imp)
+		if _, ok := seenImports[line]; ok {
+			continue
+		}
+		seenImports[line] = struct{}{}
+		b.WriteString(line)
+		b.WriteByte('\n')
+	}
+	b.WriteByte('\n')
+	for _, file := range files {
+		b.WriteString(stripModuleAndImportLines(string(file.Src)))
+		if !strings.HasSuffix(b.String(), "\n") {
+			b.WriteByte('\n')
+		}
+	}
+	return []byte(b.String())
+}
+
+func formatImportDecl(imp frontend.ImportDecl) string {
+	var b strings.Builder
+	if imp.Public {
+		b.WriteString("pub ")
+	}
+	b.WriteString("import ")
+	if len(imp.Items) > 0 {
+		b.WriteString(imp.Path)
+		b.WriteString(".{")
+		for i, item := range imp.Items {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			b.WriteString(item)
+		}
+		b.WriteByte('}')
+		return b.String()
+	}
+	b.WriteString(imp.Path)
+	if imp.Alias != "" {
+		parts := strings.Split(imp.Path, ".")
+		if imp.Alias != parts[len(parts)-1] {
+			b.WriteString(" as ")
+			b.WriteString(imp.Alias)
+		}
+	}
+	return b.String()
+}
+
+func stripModuleAndImportLines(src string) string {
+	var out []string
+	for _, line := range strings.Split(src, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "module ") ||
+			strings.HasPrefix(trimmed, "import ") ||
+			strings.HasPrefix(trimmed, "pub import ") {
+			continue
+		}
+		out = append(out, line)
+	}
+	return strings.Join(out, "\n")
 }
 
 func validateImportPaths(file *frontend.FileAST) error {

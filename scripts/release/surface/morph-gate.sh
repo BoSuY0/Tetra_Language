@@ -41,6 +41,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 cd "$repo_root"
+gate_contract="scripts/release/surface/contracts/morph-gate.json"
 source "$script_dir/report-dir-guard.sh"
 if [[ -z "${GOCACHE:-}" ]]; then
   export GOCACHE="$repo_root/.cache/go-build-surface-morph-gate"
@@ -48,6 +49,7 @@ fi
 mkdir -p "$GOCACHE"
 
 report_dir_arg="${report_dir%/}"
+go run ./tools/cmd/run-gate --contract "$gate_contract" --report-dir "$report_dir_arg" --dry-run >/dev/null
 report_dir="$(surface_release_require_fresh_report_dir "$report_dir_arg" "$repo_root" "surface_morph_gate:")"
 headless_report_dir="$report_dir_arg/headless"
 
@@ -127,13 +129,14 @@ cat > "$summary_path" <<JSON
   "token_graph_validator": "validate-surface-token-graph",
   "recipe_authoring_validator": "validate-surface-morph-report",
   "recipe_expansion_report": "headless/surface-headless-morph.json#morph.recipe_expansions",
-  "recipe_count": 11,
+  "recipe_count": 19,
   "reference_recipe_apps": [
     "examples/surface_morph_command_palette.tetra",
     "examples/surface_morph_project_dashboard.tetra",
     "examples/surface_morph_settings.tetra",
     "examples/surface_morph_editor_shell.tetra",
-    "examples/surface_morph_glass_panel.tetra"
+    "examples/surface_morph_glass_panel.tetra",
+    "examples/surface_morph_studio_shell.tetra"
   ],
   "dependency_gate": "tetra.surface.block-system.gate.v1",
   "same_commit_validated": true,
@@ -156,8 +159,22 @@ cat > "$summary_path" <<JSON
 }
 JSON
 
+go run ./tools/cmd/validate-surface-morph-gate-summary --summary "$report_dir/surface-morph-gate-summary.json" --same-commit "$git_head"
 go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"
 go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-hashes.json"
+
+final_required_reports=(
+  "surface-morph-gate-summary.json"
+  "headless/surface-headless-morph.json"
+  "headless/artifact-hashes.json"
+  "artifact-hashes.json"
+)
+for report in "${final_required_reports[@]}"; do
+  if [[ ! -s "$report_dir/$report" ]]; then
+    echo "error: required Surface Morph gate report missing or empty: $report_dir/$report" >&2
+    exit 1
+  fi
+done
 
 echo "Surface Morph Capsule gate reports: $report_dir"
 echo "Surface Morph Capsule gate summary: $summary_path"

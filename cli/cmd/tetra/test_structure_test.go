@@ -225,6 +225,8 @@ func TestCLITestsAreSplitByCommandSurface(t *testing.T) {
 			"TestCheckCommandJSONDiagnosticsForGenericResourceAliasFinalizationCodes",
 			"TestCheckCommandJSONDiagnosticsForTransitiveResourceAliasFinalizationCodes",
 			"TestCheckCommandJSONDiagnosticsForEnumConstructorReturnResourceAliasCodes",
+		},
+		"check_diagnostics_actor_transitive_test.go": {
 			"TestCheckCommandJSONDiagnosticsForTransitiveActorAliasUseAfterTransferCodes",
 			"TestCheckCommandJSONDiagnosticsForTaskGroupCancelReturnProvenanceCodes",
 			"TestCheckCommandJSONDiagnosticsForTaskHandleGroupOptionalPayloadJoinCloseAliasCodes",

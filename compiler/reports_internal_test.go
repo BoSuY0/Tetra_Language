@@ -176,7 +176,7 @@ func TestBuildLayoutReportRecordsP21DefaultReprCAndExportDecisions(t *testing.T)
 
 	report := buildLayoutReport("linux-x64", checked)
 	if report.SchemaVersion != 2 || report.Kind != "layout" || report.Policy != p21LayoutPolicy {
-		t.Fatalf("layout report header = %+v", report.reportEnvelope)
+		t.Fatalf("layout report header = %+v", report.ReportEnvelope)
 	}
 	if report.Summary.Structs != 2 || report.Summary.DefaultCompilerOwned != 1 || report.Summary.ReprCABILocked != 1 || report.Summary.ExportedPublicABI != 1 {
 		t.Fatalf("layout summary = %+v, want default/reprC/export counts", report.Summary)
@@ -208,7 +208,7 @@ func TestBuildLayoutReportRecordsP21DefaultReprCAndExportDecisions(t *testing.T)
 
 func TestValidateLayoutReportRejectsFakeP21Decisions(t *testing.T) {
 	report := layoutReport{
-		reportEnvelope: reportEnvelope{SchemaVersion: 2, Kind: "layout", Target: "linux-x64"},
+		ReportEnvelope: reportEnvelope{SchemaVersion: 2, Kind: "layout", Target: "linux-x64"},
 		Policy:         p21LayoutPolicy,
 		Summary: layoutSummary{
 			Structs:              2,
@@ -266,7 +266,7 @@ func TestValidateLayoutReportRejectsFakeP21Decisions(t *testing.T) {
 
 func buildMinimalValidLayoutReportForTest() layoutReport {
 	return layoutReport{
-		reportEnvelope: reportEnvelope{SchemaVersion: 2, Kind: "layout", Target: "linux-x64"},
+		ReportEnvelope: reportEnvelope{SchemaVersion: 2, Kind: "layout", Target: "linux-x64"},
 		Policy:         p21LayoutPolicy,
 		Summary: layoutSummary{
 			Structs:              2,
@@ -509,6 +509,252 @@ func TestBackendReportListsRegisterAndStackFallbackPaths(t *testing.T) {
 	}
 }
 
+func TestBackendReportPromotesFunctionCallsBenchmarkMainCallLoop(t *testing.T) {
+	src := `module p25.function_calls
+
+func mix(a: Int, b: Int) -> Int:
+    return (a * 3 + b) % 97
+
+func main() -> Int:
+    var i: Int = 0
+    var total: Int = 0
+    while i < 200000:
+        total = total + mix(i, total)
+        i = i + 1
+    if total >= 0:
+        return 0
+    return 1
+`
+	file, err := ParseFile([]byte(src), "function_calls.tetra")
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+	world := &World{
+		EntryModule: "p25.function_calls",
+		Files:       []*frontend.FileAST{file},
+		ByModule:    map[string]*frontend.FileAST{"p25.function_calls": file},
+	}
+	checked, err := CheckWorld(world)
+	if err != nil {
+		t.Fatalf("CheckWorld: %v", err)
+	}
+	prog, err := Lower(checked)
+	if err != nil {
+		t.Fatalf("Lower: %v", err)
+	}
+
+	report := buildBackendReport("linux-x64", prog)
+	rows := backendRowsByFunction(report.Functions)
+	assertBackendCoverageRow(t, rows["p25.function_calls.mix"], "register", "register_path", "eligible_machine_ir_subset")
+	assertBackendCoverageRow(t, rows["p25.function_calls.main"], "register", "register_path", "eligible_machine_ir_subset")
+	if rows["p25.function_calls.main"].Detail != "machine-ir-call-loop" {
+		t.Fatalf("function_calls main detail = %q, want machine-ir-call-loop (rows=%+v)", rows["p25.function_calls.main"].Detail, report.Functions)
+	}
+}
+
+func TestBackendReportPromotesCompileTimeBenchmarkMainEqualityTailCallLoop(t *testing.T) {
+	src := `module p25.compile_time
+
+func f0(x: Int) -> Int:
+    return x + 1
+
+func f1(x: Int) -> Int:
+    return f0(x) * 3
+
+func f2(x: Int) -> Int:
+    return f1(x) + f0(x)
+
+func main() -> Int:
+    var i: Int = 0
+    var total: Int = 0
+    while i < 200000:
+        total = total + f2(i)
+        i = i + 1
+    if total == 0:
+        return 1
+    return 0
+`
+	file, err := ParseFile([]byte(src), "compile_time.tetra")
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+	world := &World{
+		EntryModule: "p25.compile_time",
+		Files:       []*frontend.FileAST{file},
+		ByModule:    map[string]*frontend.FileAST{"p25.compile_time": file},
+	}
+	checked, err := CheckWorld(world)
+	if err != nil {
+		t.Fatalf("CheckWorld: %v", err)
+	}
+	prog, err := Lower(checked)
+	if err != nil {
+		t.Fatalf("Lower: %v", err)
+	}
+
+	report := buildBackendReport("linux-x64", prog)
+	rows := backendRowsByFunction(report.Functions)
+	assertBackendCoverageRow(t, rows["p25.compile_time.f0"], "register", "register_path", "eligible_machine_ir_subset")
+	assertBackendCoverageRow(t, rows["p25.compile_time.f1"], "register", "register_path", "eligible_machine_ir_subset")
+	assertBackendCoverageRow(t, rows["p25.compile_time.f2"], "register", "register_path", "eligible_machine_ir_subset")
+	assertBackendCoverageRow(t, rows["p25.compile_time.main"], "register", "register_path", "eligible_machine_ir_subset")
+	if rows["p25.compile_time.main"].Detail != "machine-ir-call-loop" {
+		t.Fatalf("compile_time main detail = %q, want machine-ir-call-loop (rows=%+v)", rows["p25.compile_time.main"].Detail, report.Functions)
+	}
+	machineRows := map[string]machineBackendFunctionReport{}
+	for _, row := range report.MachineFunctions {
+		machineRows[row.Function] = row
+	}
+	mainRow, ok := machineRows["p25.compile_time.main"]
+	if !ok {
+		t.Fatalf("machine report missing for p25.compile_time.main: %+v", report.MachineFunctions)
+	}
+	if mainRow.Path != "machine-ir-call-loop" || !mainRow.SSAVerified || mainRow.SSAPath != "value-ssa-v1" {
+		t.Fatalf("compile_time main machine row = %+v, want verified machine-ir-call-loop", mainRow)
+	}
+	if !containsReportString(mainRow.InstructionSelection, "call") {
+		t.Fatalf("compile_time main instruction selection = %+v, want call evidence", mainRow.InstructionSelection)
+	}
+	if mainRow.Validation.MachineVerifier != "pass" ||
+		mainRow.Validation.AllocationVerifier != "pass" ||
+		mainRow.Validation.CallClobbers != "validated" ||
+		mainRow.Validation.StackChurnOps != 0 {
+		t.Fatalf("compile_time main validation = %+v, want verifier/allocation/clobber pass and no push/pop churn", mainRow.Validation)
+	}
+}
+
+func TestBackendReportPromotesRecursionBenchmarkFibAndMain(t *testing.T) {
+	src := `module p25.recursion
+
+func fib(n: Int) -> Int:
+    if n < 2:
+        return n
+    return fib(n - 1) + fib(n - 2)
+
+func main() -> Int:
+    var i: Int = 0
+    var total: Int = 0
+    while i < 40:
+        total = total + fib(10)
+        i = i + 1
+    if total == 2200:
+        return 0
+    return 1
+`
+	file, err := ParseFile([]byte(src), "recursion.tetra")
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+	world := &World{
+		EntryModule: "p25.recursion",
+		Files:       []*frontend.FileAST{file},
+		ByModule:    map[string]*frontend.FileAST{"p25.recursion": file},
+	}
+	checked, err := CheckWorld(world)
+	if err != nil {
+		t.Fatalf("CheckWorld: %v", err)
+	}
+	prog, err := Lower(checked)
+	if err != nil {
+		t.Fatalf("Lower: %v", err)
+	}
+
+	report := buildBackendReport("linux-x64", prog)
+	rows := backendRowsByFunction(report.Functions)
+	assertBackendCoverageRow(t, rows["p25.recursion.fib"], "register", "register_path", "eligible_machine_ir_subset")
+	assertBackendCoverageRow(t, rows["p25.recursion.main"], "register", "register_path", "eligible_machine_ir_subset")
+	if rows["p25.recursion.fib"].Detail != "machine-ir-recursive-fib" {
+		t.Fatalf("recursion fib detail = %q, want machine-ir-recursive-fib (rows=%+v)", rows["p25.recursion.fib"].Detail, report.Functions)
+	}
+	if rows["p25.recursion.main"].Detail != "machine-ir-recursion-main-loop" {
+		t.Fatalf("recursion main detail = %q, want machine-ir-recursion-main-loop (rows=%+v)", rows["p25.recursion.main"].Detail, report.Functions)
+	}
+	machineRows := map[string]machineBackendFunctionReport{}
+	for _, row := range report.MachineFunctions {
+		machineRows[row.Function] = row
+	}
+	for name, wantPath := range map[string]string{
+		"p25.recursion.fib":  "machine-ir-recursive-fib",
+		"p25.recursion.main": "machine-ir-recursion-main-loop",
+	} {
+		row, ok := machineRows[name]
+		if !ok {
+			t.Fatalf("machine report missing for %s: %+v", name, report.MachineFunctions)
+		}
+		if row.Path != wantPath || !row.SSAVerified || row.SSAPath != "value-ssa-v1" {
+			t.Fatalf("machine row for %s = %+v, want verified %s", name, row, wantPath)
+		}
+		if !containsReportString(row.InstructionSelection, "call") {
+			t.Fatalf("machine row for %s instruction selection = %+v, want call evidence", name, row.InstructionSelection)
+		}
+		if row.Validation.MachineVerifier != "pass" ||
+			row.Validation.AllocationVerifier != "pass" ||
+			row.Validation.CallClobbers != "validated" ||
+			row.Validation.StackChurnOps != 0 {
+			t.Fatalf("machine row for %s validation = %+v, want verifier/allocation/clobber pass and no push/pop churn", name, row.Validation)
+		}
+	}
+}
+
+func TestBackendReportPromotesIntegerLoopsBenchmarkMainModuloLoop(t *testing.T) {
+	src := `module p25.integer_loops
+
+func main() -> Int:
+    var i: Int = 0
+    var total: Int = 0
+    while i < 200000:
+        total = total + (i % 7)
+        i = i + 1
+    if total >= 0:
+        return 0
+    return 1
+`
+	file, err := ParseFile([]byte(src), "integer_loops.tetra")
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+	world := &World{
+		EntryModule: "p25.integer_loops",
+		Files:       []*frontend.FileAST{file},
+		ByModule:    map[string]*frontend.FileAST{"p25.integer_loops": file},
+	}
+	checked, err := CheckWorld(world)
+	if err != nil {
+		t.Fatalf("CheckWorld: %v", err)
+	}
+	prog, err := Lower(checked)
+	if err != nil {
+		t.Fatalf("Lower: %v", err)
+	}
+
+	report := buildBackendReport("linux-x64", prog)
+	rows := backendRowsByFunction(report.Functions)
+	mainRow := rows["p25.integer_loops.main"]
+	assertBackendCoverageRow(t, mainRow, "register", "register_path", "eligible_machine_ir_subset")
+	if mainRow.Detail != "machine-ir-const-modulo-loop" {
+		t.Fatalf("integer_loops main detail = %q, want machine-ir-const-modulo-loop (rows=%+v)", mainRow.Detail, report.Functions)
+	}
+	for _, machineRow := range report.MachineFunctions {
+		if machineRow.Function != "p25.integer_loops.main" {
+			continue
+		}
+		if machineRow.Path != "machine-ir-const-modulo-loop" {
+			t.Fatalf("integer_loops machine path = %q, want machine-ir-const-modulo-loop", machineRow.Path)
+		}
+		if !machineRow.SSAVerified || machineRow.SSAPath != "value-ssa-v1" {
+			t.Fatalf("integer_loops SSA gate = verified:%v path:%q, want value-ssa-v1 verified", machineRow.SSAVerified, machineRow.SSAPath)
+		}
+		if !containsReportString(machineRow.InstructionSelection, "mod") {
+			t.Fatalf("integer_loops instruction selection = %+v, want mod evidence", machineRow.InstructionSelection)
+		}
+		if machineRow.Validation.StackChurnOps != 0 || machineRow.Validation.MachineVerifier != "pass" || machineRow.Validation.AllocationVerifier != "pass" {
+			t.Fatalf("integer_loops machine validation = %+v, want verifier pass and no push/pop stack churn", machineRow.Validation)
+		}
+		return
+	}
+	t.Fatalf("integer_loops machine report missing from %+v", report.MachineFunctions)
+}
+
 func TestBackendCoverageAuditClassifiesFallbackReasonsAndHotness(t *testing.T) {
 	prog := &ir.IRProgram{Funcs: []ir.IRFunc{
 		{
@@ -608,6 +854,70 @@ func TestBackendCoverageAuditClassifiesFallbackReasonsAndHotness(t *testing.T) {
 	}
 }
 
+func TestBackendCoverageStackSliceFallsThroughToControlFlowBlocker(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		kind ir.IRInstrKind
+	}{
+		{name: "stack_u8", kind: ir.IRStackSliceU8},
+		{name: "stack_u16", kind: ir.IRStackSliceU16},
+		{name: "stack_i32", kind: ir.IRStackSliceI32},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			report := buildBackendReport("linux-x64", &ir.IRProgram{Funcs: []ir.IRFunc{{
+				Name:        tc.name,
+				ReturnSlots: 1,
+				Instrs: []ir.IRInstr{
+					{Kind: ir.IRConstI32, Imm: 4},
+					{Kind: tc.kind, Local: 0, ArgSlots: 4, Imm: 4, Name: "xs"},
+					{Kind: ir.IRConstI32, Imm: 0},
+					{Kind: ir.IRJmpIfZero, Label: 1},
+					{Kind: ir.IRConstI32, Imm: 1},
+					{Kind: ir.IRReturn},
+					{Kind: ir.IRLabel, Label: 1},
+					{Kind: ir.IRConstI32, Imm: 2},
+					{Kind: ir.IRReturn},
+				},
+			}}})
+
+			rows := backendRowsByFunction(report.Functions)
+			assertBackendCoverageRow(t, rows[tc.name], "stack", "unsupported_control_flow", "unsupported_control_flow_uses_stack_fallback")
+		})
+	}
+}
+
+func TestBackendCoverageRuntimeAllocationIRStillBlocksBeforeControlFlow(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		kind ir.IRInstrKind
+	}{
+		{name: "heap_alloc", kind: ir.IRAllocBytes},
+		{name: "make_slice_i32", kind: ir.IRMakeSliceI32},
+		{name: "island_new", kind: ir.IRIslandNew},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			report := buildBackendReport("linux-x64", &ir.IRProgram{Funcs: []ir.IRFunc{{
+				Name:        tc.name,
+				ReturnSlots: 1,
+				Instrs: []ir.IRInstr{
+					{Kind: ir.IRConstI32, Imm: 4},
+					{Kind: tc.kind},
+					{Kind: ir.IRConstI32, Imm: 0},
+					{Kind: ir.IRJmpIfZero, Label: 1},
+					{Kind: ir.IRConstI32, Imm: 1},
+					{Kind: ir.IRReturn},
+					{Kind: ir.IRLabel, Label: 1},
+					{Kind: ir.IRConstI32, Imm: 2},
+					{Kind: ir.IRReturn},
+				},
+			}}})
+
+			rows := backendRowsByFunction(report.Functions)
+			assertBackendCoverageRow(t, rows[tc.name], "stack", "unsupported_effect_runtime_call", "unsupported_effect_runtime_call_uses_stack_fallback")
+		})
+	}
+}
+
 func TestBackendCoverageSummaryCountsRowsAndCategories(t *testing.T) {
 	report := buildBackendReport("linux-x64", &ir.IRProgram{Funcs: []ir.IRFunc{
 		{
@@ -639,6 +949,133 @@ func TestBackendCoverageSummaryCountsRowsAndCategories(t *testing.T) {
 	if report.Summary.HotnessSource != "benchmark-corpus-static-map" {
 		t.Fatalf("backend summary hotness source = %q, want benchmark corpus source marker", report.Summary.HotnessSource)
 	}
+}
+
+func TestBackendReportRuntimeFeaturesAreEmptyForSimpleScalar(t *testing.T) {
+	report := buildBackendReport("linux-x64", &ir.IRProgram{Funcs: []ir.IRFunc{{
+		Name:        "add",
+		ParamSlots:  2,
+		LocalSlots:  2,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRLoadLocal, Local: 1},
+			{Kind: ir.IRAddI32},
+			{Kind: ir.IRReturn},
+		},
+	}}})
+
+	assertRuntimeFeatureEvidenceMarker(t, report.Summary.RuntimeFeatureEvidenceClass, report.Summary.RuntimeFeatureEvidenceMethod)
+	assertStringSliceEqual(t, "summary runtime_features_required", report.Summary.RuntimeFeaturesRequired, []string{})
+	assertStringSliceEqual(t, "summary runtime_features_linked", report.Summary.RuntimeFeaturesLinked, []string{})
+	assertStringSliceEqual(t, "summary runtime_features_initialized", report.Summary.RuntimeFeaturesInitialized, []string{})
+	assertStringSliceEqual(t, "summary runtime_lazy_init_blockers", report.Summary.RuntimeLazyInitBlockers, []string{})
+
+	rows := backendRowsByFunction(report.Functions)
+	row := rows["add"]
+	assertRuntimeFeatureEvidenceMarker(t, row.RuntimeFeatureEvidenceClass, row.RuntimeFeatureEvidenceMethod)
+	assertStringSliceEqual(t, "add runtime_features_required", row.RuntimeFeaturesRequired, []string{})
+	assertStringSliceEqual(t, "add runtime_features_linked", row.RuntimeFeaturesLinked, []string{})
+	assertStringSliceEqual(t, "add runtime_features_initialized", row.RuntimeFeaturesInitialized, []string{})
+	assertStringSliceEqual(t, "add runtime_lazy_init_blockers", row.RuntimeLazyInitBlockers, []string{})
+}
+
+func TestBackendReportRuntimeFeaturesClassifyHeapActorTaskAndUnknownRuntime(t *testing.T) {
+	report := buildBackendReport("linux-x64", &ir.IRProgram{Funcs: []ir.IRFunc{
+		{
+			Name:        "heap_alloc",
+			ReturnSlots: 1,
+			Instrs: []ir.IRInstr{
+				{Kind: ir.IRConstI32, Imm: 8},
+				{Kind: ir.IRAllocBytes},
+				{Kind: ir.IRReturn},
+			},
+		},
+		{
+			Name:        "actor_send",
+			ReturnSlots: 1,
+			Instrs: []ir.IRInstr{
+				{Kind: ir.IRCall, Name: "__tetra_actor_send_i32", ArgSlots: 2, RetSlots: 1},
+				{Kind: ir.IRReturn},
+			},
+		},
+		{
+			Name:        "task_spawn",
+			ReturnSlots: 1,
+			Instrs: []ir.IRInstr{
+				{Kind: ir.IRCall, Name: "__tetra_task_spawn_i32", ArgSlots: 1, RetSlots: 1},
+				{Kind: ir.IRReturn},
+			},
+		},
+		{
+			Name:        "future_runtime",
+			ReturnSlots: 1,
+			Instrs: []ir.IRInstr{
+				{Kind: ir.IRCall, Name: "__tetra_future_runtime_probe", ArgSlots: 0, RetSlots: 1},
+				{Kind: ir.IRReturn},
+			},
+		},
+	}})
+
+	assertStringSliceEqual(t, "summary runtime_features_required", report.Summary.RuntimeFeaturesRequired, []string{"actor_runtime", "heap_runtime", "task_runtime", "unknown_runtime"})
+	assertStringSliceEqual(t, "summary runtime_features_linked", report.Summary.RuntimeFeaturesLinked, []string{"actor_runtime", "heap_runtime", "task_runtime"})
+	assertStringSliceEqual(t, "summary runtime_features_initialized", report.Summary.RuntimeFeaturesInitialized, []string{"actor_runtime", "heap_runtime", "task_runtime"})
+	assertStringSliceEqual(t, "summary runtime_lazy_init_blockers", report.Summary.RuntimeLazyInitBlockers, []string{"unknown_runtime_call:__tetra_future_runtime_probe"})
+
+	rows := backendRowsByFunction(report.Functions)
+	assertStringSliceEqual(t, "heap_alloc runtime_features_required", rows["heap_alloc"].RuntimeFeaturesRequired, []string{"heap_runtime"})
+	assertStringSliceEqual(t, "actor_send runtime_features_required", rows["actor_send"].RuntimeFeaturesRequired, []string{"actor_runtime"})
+	assertStringSliceEqual(t, "task_spawn runtime_features_required", rows["task_spawn"].RuntimeFeaturesRequired, []string{"task_runtime"})
+	assertStringSliceEqual(t, "future_runtime runtime_features_required", rows["future_runtime"].RuntimeFeaturesRequired, []string{"unknown_runtime"})
+	assertStringSliceEqual(t, "future_runtime runtime_features_linked", rows["future_runtime"].RuntimeFeaturesLinked, []string{})
+	assertStringSliceEqual(t, "future_runtime runtime_lazy_init_blockers", rows["future_runtime"].RuntimeLazyInitBlockers, []string{"unknown_runtime_call:__tetra_future_runtime_probe"})
+}
+
+func TestBackendReportRuntimeObjectPlanEvidenceForSimpleProgram(t *testing.T) {
+	checked, irProg := checkedAndLoweredProgram(t, `
+func main() -> Int:
+    return 0
+`)
+	report := buildBackendReport("linux-x64", irProg)
+	if err := annotateBackendReportRuntimeObjectPlan(&report, "linux-x64", checked, BuildOptions{}); err != nil {
+		t.Fatalf("annotateBackendReportRuntimeObjectPlan: %v", err)
+	}
+
+	plan := report.Summary.RuntimeObjectPlan
+	assertRuntimeObjectEvidenceMarker(t, plan)
+	if plan.RuntimeUsed || plan.RuntimeObjectLinked || plan.RuntimeObjectInitialized {
+		t.Fatalf("runtime object plan = %+v, want no runtime object for simple program", plan)
+	}
+	assertStringSliceEqual(t, "simple runtime_object_features_required", plan.RuntimeObjectFeaturesRequired, []string{})
+	assertStringSliceEqual(t, "simple runtime_object_features_linked", plan.RuntimeObjectFeaturesLinked, []string{})
+	assertStringSliceEqual(t, "simple runtime_object_features_initialized", plan.RuntimeObjectFeaturesInitialized, []string{})
+	assertStringSliceEqual(t, "simple runtime_object_lazy_init_blockers", plan.RuntimeObjectLazyInitBlockers, []string{})
+}
+
+func TestBackendReportRuntimeObjectPlanEvidenceForTaskRuntime(t *testing.T) {
+	checked, irProg := checkedAndLoweredProgram(t, `
+func worker() -> Int:
+    return 41
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    return core.task_join_i32(task)
+`)
+	report := buildBackendReport("linux-x64", irProg)
+	if err := annotateBackendReportRuntimeObjectPlan(&report, "linux-x64", checked, BuildOptions{}); err != nil {
+		t.Fatalf("annotateBackendReportRuntimeObjectPlan: %v", err)
+	}
+
+	plan := report.Summary.RuntimeObjectPlan
+	assertRuntimeObjectEvidenceMarker(t, plan)
+	if !plan.RuntimeUsed || !plan.RuntimeObjectLinked || !plan.RuntimeObjectInitialized {
+		t.Fatalf("runtime object plan = %+v, want linked/initialized task runtime object", plan)
+	}
+	assertStringSliceEqual(t, "task runtime_object_features_required", plan.RuntimeObjectFeaturesRequired, []string{"task_runtime"})
+	assertStringSliceEqual(t, "task runtime_object_features_linked", plan.RuntimeObjectFeaturesLinked, []string{"task_runtime"})
+	assertStringSliceEqual(t, "task runtime_object_features_initialized", plan.RuntimeObjectFeaturesInitialized, []string{"task_runtime"})
+	assertStringSliceEqual(t, "task runtime_object_lazy_init_blockers", plan.RuntimeObjectLazyInitBlockers, []string{})
 }
 
 func TestBackendMachineReportsRequireSSAVerifiedPath(t *testing.T) {
@@ -942,6 +1379,44 @@ func assertBackendCoverageRow(t *testing.T, row backendFunctionPathReport, path 
 	}
 }
 
+func assertRuntimeFeatureEvidenceMarker(t *testing.T, class string, method string) {
+	t.Helper()
+	if class != "lowered_ir_static_plan" || method != "backend_report_lowered_ir_scan_v1" {
+		t.Fatalf("runtime feature evidence marker = (%q, %q), want lowered_ir_static_plan/backend_report_lowered_ir_scan_v1", class, method)
+	}
+}
+
+func assertRuntimeObjectEvidenceMarker(t *testing.T, plan backendRuntimeObjectPlan) {
+	t.Helper()
+	if plan.EvidenceClass != "native_runtime_object_plan" || plan.EvidenceMethod != "native_link_runtime_object_plan_v1" {
+		t.Fatalf("runtime object evidence marker = (%q, %q), want native_runtime_object_plan/native_link_runtime_object_plan_v1", plan.EvidenceClass, plan.EvidenceMethod)
+	}
+}
+
+func assertStringSliceEqual(t *testing.T, label string, got []string, want []string) {
+	t.Helper()
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("%s = %#v, want %#v", label, got, want)
+	}
+}
+
+func checkedAndLoweredProgram(t *testing.T, src string) (*CheckedProgram, *IRProgram) {
+	t.Helper()
+	prog, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	checked, err := Check(prog)
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	irProg, err := Lower(checked)
+	if err != nil {
+		t.Fatalf("Lower: %v", err)
+	}
+	return checked, irProg
+}
+
 func containsReportString(values []string, want string) bool {
 	for _, value := range values {
 		if value == want {
@@ -966,6 +1441,16 @@ func TestBuildOptionsExposeNoBackendSemanticMode(t *testing.T) {
 	}
 }
 
+func TestNativeCodegenOptionsCarryRuntimeHeapTelemetry(t *testing.T) {
+	got := nativeCodegenOptions(BuildOptions{
+		EmitRuntimeHeapTelemetry: true,
+		RuntimeHeapTelemetryDir:  "reports/heap",
+	})
+	if !got.EmitRuntimeHeapTelemetry || got.RuntimeHeapTelemetryDir != "reports/heap" {
+		t.Fatalf("native codegen telemetry options = enabled:%v dir:%q", got.EmitRuntimeHeapTelemetry, got.RuntimeHeapTelemetryDir)
+	}
+}
+
 func TestPerformanceReportIncludesBlockerDiagnostics(t *testing.T) {
 	report := buildPerformanceReport("linux-x64")
 	got := map[string]bool{}
@@ -979,6 +1464,7 @@ func TestPerformanceReportIncludesBlockerDiagnostics(t *testing.T) {
 		"left bounds check: missing dominance",
 		"heap allocation: escapes through return",
 		"heap allocation: unknown call",
+		"heap allocation: local call boundary heap fallback",
 		"not vectorized: no noalias proof",
 		"not inlined: code-size budget",
 		"register spill: live range pressure",
@@ -1016,6 +1502,7 @@ func TestPerformanceReportCoversP20BenchmarkBlockers(t *testing.T) {
 		"bounds.missing_dominance":                    {message: "left bounds check: missing dominance", costClass: "dynamic_check_required"},
 		"allocation.return_escape":                    {message: "heap allocation: escapes through return", costClass: "conservative_fallback"},
 		"allocation.unknown_call":                     {message: "heap allocation: unknown call", costClass: "conservative_fallback"},
+		"allocation.local_call_heap_fallback":         {message: "heap allocation: local call boundary heap fallback", costClass: "conservative_fallback"},
 		"vector.no_noalias_proof":                     {message: "not vectorized: no noalias proof", costClass: "dynamic_check_required"},
 		"inline.code_size_budget":                     {message: "not inlined: code-size budget", costClass: "instrumentation_only"},
 		"register_spill.live_range_pressure":          {message: "register spill: live range pressure", costClass: "instrumentation_only"},
@@ -1073,6 +1560,10 @@ func TestPerformanceReportCoversP20BenchmarkBlockers(t *testing.T) {
 	}
 	if err := ValidatePerformanceBlockerReport(report); err != nil {
 		t.Fatalf("ValidatePerformanceBlockerReport: %v", err)
+	}
+	hash := gotBenchmarks["hash_table_tetra"]
+	if !containsReasonCode(hash.ReasonCodes, "allocation.local_call_heap_fallback") || containsReasonCode(hash.ReasonCodes, "allocation.unknown_call") {
+		t.Fatalf("hash_table_tetra reason codes = %+v, want local call heap fallback without unknown-call blocker", hash.ReasonCodes)
 	}
 }
 
@@ -1132,4 +1623,13 @@ func TestValidatePerformanceBlockerReportRejectsWeakP20Evidence(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "unsafe_unknown") {
 		t.Fatalf("accepted trusted unsafe_unknown claim: %v", err)
 	}
+}
+
+func containsReasonCode(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }

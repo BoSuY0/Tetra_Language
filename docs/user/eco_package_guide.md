@@ -94,6 +94,17 @@ Release checks use machine-validated artifacts:
 The validators enforce schema/path/hash constraints, reject malformed metadata,
 and keep local workflows deterministic.
 
+Selected Eco report artifacts support TOON as an opt-in mirror or input:
+
+- use `--lock-format=json|toon|both` with `eco verify`;
+- use `--format=json|toon|both` with `eco seed export`, `eco needmap`,
+  `eco trust snapshot`, and `eco tetrahub mirror|fetch`;
+- use `--seed-format=auto|json|toon` with `eco seed import`;
+- use `--metadata-format json|toon|both` with `eco materialize`.
+
+Todex archive metadata, TetraHub `metadata.json`, `tetra.package.json`, and
+vault `records.json` remain canonical JSON compatibility files.
+
 ## Packing Modes
 
 `tetra eco pack Capsule.t4 -o manifest-only.tdx` writes a manifest-only Todex

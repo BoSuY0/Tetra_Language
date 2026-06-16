@@ -80,6 +80,32 @@ func TestServerJSONEndpointKeepAliveAndPipelining(t *testing.T) {
 	}
 }
 
+func TestServerJSONEndpointSupportsExplicitTOONAccept(t *testing.T) {
+	srv, stop := startBenchmarkServer(t)
+	defer stop()
+
+	conn := dialServer(t, srv.Port())
+	defer conn.Close()
+	raw := "GET /json HTTP/1.1\r\nHost: localhost\r\nAccept: text/toon\r\nConnection: close\r\n\r\n"
+	if _, err := conn.Write([]byte(raw)); err != nil {
+		t.Fatalf("client write: %v", err)
+	}
+
+	got := readUntil(t, conn, func(s string) bool {
+		return strings.Contains(s, "HTTP/1.1 200 OK") &&
+			strings.Contains(s, "Content-Type: text/toon; charset=utf-8") &&
+			strings.Contains(s, `message: "Hello, World!"`)
+	})
+	body := []byte(responseBody(t, got))
+	var decoded struct {
+		Message string `json:"message"`
+	}
+	decodeTOONPayload(t, body, &decoded)
+	if decoded.Message != "Hello, World!" {
+		t.Fatalf("decoded TOON message = %q", decoded.Message)
+	}
+}
+
 func TestServerHandlesPartialRequestRead(t *testing.T) {
 	srv, stop := startBenchmarkServer(t)
 	defer stop()

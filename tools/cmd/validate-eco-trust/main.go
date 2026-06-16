@@ -10,6 +10,8 @@ import (
 	"io"
 	"os"
 	"strings"
+
+	"tetra_language/tools/internal/reportdecode"
 )
 
 const (
@@ -62,7 +64,9 @@ var knownCapsulePermissions = map[string]string{
 
 func main() {
 	var trustPath string
+	var reportFormat string
 	flag.StringVar(&trustPath, "trust", "", "path to tetra.eco.trust-snapshot.v1 JSON report")
+	flag.StringVar(&reportFormat, "format", "auto", "report format: auto, json, or toon")
 	flag.Parse()
 
 	if trustPath == "" {
@@ -74,15 +78,19 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err := validateEcoTrustSnapshot(raw); err != nil {
+	if err := validateEcoTrustSnapshotFormat(raw, reportFormat); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
 func validateEcoTrustSnapshot(raw []byte) error {
+	return validateEcoTrustSnapshotFormat(raw, "auto")
+}
+
+func validateEcoTrustSnapshotFormat(raw []byte, format string) error {
 	var report trustSnapshotReport
-	if err := decodeStrictJSON(raw, &report); err != nil {
+	if err := reportdecode.DecodeStrictFormat(raw, format, &report); err != nil {
 		return err
 	}
 	if report.Schema == "" {

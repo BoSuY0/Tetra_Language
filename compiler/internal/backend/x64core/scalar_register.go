@@ -10,7 +10,7 @@ import (
 	"tetra_language/compiler/internal/machine"
 )
 
-func emitScalarRegisterFunction(e *x64.Emitter, fn ir.IRFunc, abi x64abi.ABI, callPatches *[]x64obj.CallPatch, opt x64.CodegenOptions) (bool, error) {
+func emitScalarRegisterFunction(e *x64.Emitter, fn ir.IRFunc, abi x64abi.ABI, callPatches *[]x64obj.CallPatch, opt x64.CodegenOptions, flush runtimeHeapTelemetryFlushFunc) (bool, error) {
 	if opt.DisableMachinePaths {
 		return false, nil
 	}
@@ -154,6 +154,9 @@ func emitScalarRegisterFunction(e *x64.Emitter, fn ir.IRFunc, abi x64abi.ABI, ca
 			}
 			if depth != 0 {
 				return true, fmt.Errorf("x64 scalar register backend: %s return leaves %d extra values", fn.Name, depth)
+			}
+			if err := flush.emit(); err != nil {
+				return true, err
 			}
 			e.Leave()
 			e.Ret()

@@ -52,7 +52,7 @@ passes. Headless Surface is a release evidence target.
 - Surface project template evidence:
   `tetra.surface.template-smoke.v1` / `surface-template-smoke-v1` reports cover
   `tetra new surface-app` generation for command palette, settings, dashboard,
-  editor shell, multi-window notes, and web-canvas starts, including check,
+  editor shell, studio shell, multi-window notes, and web-canvas starts, including check,
   build, run, inspector, visual diff, and tar package evidence.
 - Surface reference app suite evidence:
   `tetra.surface.reference-app-suite.v1` /
@@ -65,11 +65,18 @@ passes. Headless Surface is a release evidence target.
   wasm32-web browser-canvas targets.
 - Surface packaging and update evidence:
   `tetra.surface.package.v1` / `surface-package-v1` reports cover linux-x64 and
-  wasm32-web tar.gz packages for the command-palette reference app, local asset
-  hashes, package manifests, installed linux-x64 package execution, web bundle
+  wasm32-web tar.gz packages for the command-palette reference app and the
+  product-slice `studio-shell` flagship source, local asset hashes, package
+  manifests, installed linux-x64 package execution, web bundle
   HTML/wasm/compiler-owned loader output, and a hash-pinned update channel
-  manifest. Signing, notarization, automatic runtime updates, and network
-  update fetching remain nonclaims without platform/runtime evidence.
+  manifest. The flagship install smoke records its current expected app-state
+  exit code explicitly. Signing, notarization, automatic runtime updates, and
+  network update fetching remain nonclaims without platform/runtime evidence.
+- Surface/Electron comparison guidance:
+  `docs/user/surface_electron_comparison.md` defines the bounded green/amber/red
+  product-slice story and keeps Electron API compatibility, all-platform parity,
+  GPU renderer parity, native widgets, signing/notarization, and automatic
+  network updates as explicit nonclaims.
 - Surface crash recovery and error-reporting evidence:
   `tetra.surface.crash-report.v1` / `surface-crash-report-v1` reports cover
   bounded linux-x64 command failure, host crash diagnostic capture, redacted
@@ -172,6 +179,23 @@ The release gate is the source of truth for release evidence and current
 candidate scope. Reports remain evidence, not modes; unsupported target claims
 remain invalid until target-specific evidence exists. P29 owns the final
 same-commit verdict.
+
+The machine-readable Surface v1 gate contract is
+`scripts/release/surface/contracts/surface-release-v1.json`
+(`schema:"tetra.gate-contract.v1"`, `id:"surface-release-v1"`). It mirrors the
+validation/report/upload contract with 33 required reports, 33 CI artifacts, 41
+ordered steps, 14 validators, claim ids `surface_release_required_reports`,
+`crash_reporting`, `surface_release_summary`, `artifact_hash_integrity`,
+`release_state_current`, and `unsupported_target_nonclaim_evidence`, plus
+nonclaim ids `not_remote_ci_execution` and
+`not_unsupported_target_runtime_support`. The shell release/product gates still
+produce evidence; `run-gate` is currently a dry-run plan and does not prove
+remote CI execution or macOS/Windows runtime support. Run it against an empty
+report directory:
+
+```sh
+go run ./tools/cmd/run-gate --contract scripts/release/surface/contracts/surface-release-v1.json --report-dir reports/surface-product-v1 --dry-run --json
+```
 
 The living release audit is `docs/release/surface_v1_release_audit.md`; it
 records which release checklist rows are proven now and which rows remain

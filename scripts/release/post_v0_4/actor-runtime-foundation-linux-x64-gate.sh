@@ -40,6 +40,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 cd "$repo_root"
+gate_contract="scripts/release/post_v0_4/contracts/actor-runtime-foundation-linux-x64.json"
 source "$repo_root/scripts/release/surface/report-dir-guard.sh"
 if [[ -z "${GOCACHE:-}" ]]; then
   export GOCACHE="$repo_root/.cache/go-build-actor-runtime-foundation-gate"
@@ -48,6 +49,8 @@ if [[ -z "${GOTMPDIR:-}" ]]; then
   export GOTMPDIR="$repo_root/.cache/go-tmp-actor-runtime-foundation-gate"
 fi
 mkdir -p "$GOCACHE" "$GOTMPDIR"
+
+go run ./tools/cmd/run-gate --contract "$gate_contract" --report-dir "$report_dir_arg" --dry-run >/dev/null
 
 report_dir="$(surface_release_require_fresh_report_dir "$report_dir_arg" "$repo_root" "actor_runtime_foundation_gate:")"
 distributed_report_dir="$report_dir_arg/distributed-actors-linux-x64"

@@ -16,76 +16,6 @@ import (
 	ctarget "tetra_language/compiler/target"
 )
 
-const (
-	workspaceFileName = "Tetra.workspace"
-	workspaceSchemaV1 = "tetra.workspace.v1"
-)
-
-type workspaceManifest struct {
-	Path    string
-	Root    string
-	Schema  string
-	Members []string
-}
-
-type workspaceReport struct {
-	Status        string                  `json:"status,omitempty"`
-	Root          string                  `json:"root"`
-	WorkspacePath string                  `json:"workspace_path"`
-	Members       []workspaceMemberReport `json:"members"`
-}
-
-type workspaceMemberReport struct {
-	Path         string `json:"path"`
-	ResolvedPath string `json:"resolved_path,omitempty"`
-	CapsulePath  string `json:"capsule_path,omitempty"`
-	CapsuleID    string `json:"capsule_id,omitempty"`
-	Version      string `json:"version,omitempty"`
-	Status       string `json:"status"`
-	Detail       string `json:"detail,omitempty"`
-}
-
-type workspaceGraphReport struct {
-	Status        string                  `json:"status,omitempty"`
-	Root          string                  `json:"root"`
-	WorkspacePath string                  `json:"workspace_path"`
-	Nodes         []workspaceMemberReport `json:"nodes"`
-	Edges         []workspaceGraphEdge    `json:"edges"`
-}
-
-type workspaceGraphEdge struct {
-	From string `json:"from"`
-	To   string `json:"to"`
-	ID   string `json:"id"`
-}
-
-type workspaceExecutionReport struct {
-	WorkspaceRoot string                           `json:"workspace_root"`
-	Command       string                           `json:"command"`
-	Target        string                           `json:"target,omitempty"`
-	Total         int                              `json:"total"`
-	Passed        int                              `json:"passed"`
-	Failed        int                              `json:"failed"`
-	Skipped       int                              `json:"skipped"`
-	Members       []workspaceExecutionMemberReport `json:"members"`
-}
-
-type workspaceExecutionMemberReport struct {
-	Path      string `json:"path"`
-	CapsuleID string `json:"capsule_id,omitempty"`
-	Status    string `json:"status"`
-	Detail    string `json:"detail,omitempty"`
-	ExitCode  *int   `json:"exit_code,omitempty"`
-}
-
-type workspaceGraph struct {
-	Workspace workspaceManifest
-	Nodes     []workspaceMemberReport
-	Edges     []workspaceGraphEdge
-	Issues    []workspaceMemberReport
-	ByRoot    map[string]workspaceMemberReport
-}
-
 func runWorkspace(args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, "usage: tetra workspace <init|add|remove|list|check|graph|sync|build|test|run> [options]")
@@ -456,7 +386,7 @@ func runWorkspaceBuild(args []string, stdout io.Writer, stderr io.Writer) int {
 	runtimeObject := fs.String("runtime-object", "", "actors runtime object override")
 	jobs := fs.Int("jobs", 1, "parallel module build jobs")
 	artifactsMode := fs.String("artifacts", "strict", "artifact handling: strict or auto")
-	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text or json")
+	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text, json, or toon")
 	format := fs.String("format", "text", "workspace report format: text or json")
 	outDir := ""
 	fs.StringVar(&outDir, "o", "", "workspace output directory")
@@ -647,7 +577,7 @@ func runWorkspaceTest(args []string, stdout io.Writer, stderr io.Writer) int {
 	target := fs.String("target", defaultTarget(), "target triple ("+supportedTargetsHelp+")")
 	failFast := fs.Bool("fail-fast", false, "stop after the first failed member")
 	format := fs.String("format", "text", "workspace report format: text or json")
-	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text or json")
+	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text, json, or toon")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			return 0

@@ -184,6 +184,19 @@ func TestFmtCheckJSONDiagnosticsForUnformattedFile(t *testing.T) {
 	}
 }
 
+func TestFmtCheckTOONDiagnosticsForUnformattedFile(t *testing.T) {
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "main.tetra")
+	src := "func main() -> Int uses io:\n    return 0\n"
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	diag := runCLITOONDiagnostic(t, []string{"fmt", "--check", "--diagnostics=toon", srcPath}, 1)
+	if diag.Code != "TETRA_FMT002" || diag.File != srcPath || diag.Message != "not formatted" || diag.Severity != "error" {
+		t.Fatalf("diagnostic = %#v", diag)
+	}
+}
+
 func TestFormatCommandCheckJSONDiagnosticsIncludesFirstDiffPosition(t *testing.T) {
 	dir := t.TempDir()
 	srcPath := filepath.Join(dir, "main.tetra")

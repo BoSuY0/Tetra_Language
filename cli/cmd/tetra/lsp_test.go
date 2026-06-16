@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"tetra_language/compiler"
+	"tetra_language/internal/toon"
 )
 
 func TestLSPCommandSmoke(t *testing.T) {
@@ -28,6 +29,42 @@ func TestLSPCommandSmoke(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), `"symbols"`) || !strings.Contains(stdout.String(), `"main"`) {
 		t.Fatalf("lsp stdout = %q", stdout.String())
+	}
+}
+
+func TestLSPCommandSmokeTOONFormat(t *testing.T) {
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "sample.tetra")
+	src := "func main() -> Int:\n    return 0\n"
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"lsp", "--stdio-smoke", srcPath, "--format=toon"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("lsp exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	jsonRaw, err := toon.ConvertTOONToJSON(stdout.Bytes(), toon.Options{Strict: true})
+	if err != nil {
+		t.Fatalf("TOON smoke output did not decode: %v\n%s", err, stdout.String())
+	}
+	var analysis compiler.LSPAnalysis
+	if err := json.Unmarshal(jsonRaw, &analysis); err != nil {
+		t.Fatalf("json.Unmarshal converted TOON: %v\nTOON:\n%s\nJSON:\n%s", err, stdout.String(), jsonRaw)
+	}
+	if len(analysis.Symbols) == 0 || analysis.Symbols[0].Name != "main" {
+		t.Fatalf("TOON smoke analysis missing main symbol: %#v", analysis)
+	}
+}
+
+func TestLSPStdioRejectsTOONFormat(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"lsp", "--stdio", "--format=toon"}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("lsp exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "stdio uses framed JSON-RPC") {
+		t.Fatalf("stderr missing JSON-RPC boundary explanation: %q", stderr.String())
 	}
 }
 

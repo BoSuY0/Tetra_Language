@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"tetra_language/compiler"
+	"tetra_language/internal/toon"
 )
 
 func TestSmokeCommandWritesReport(t *testing.T) {
@@ -49,6 +50,41 @@ func TestSmokeCommandWritesReport(t *testing.T) {
 	}
 	if smokeReport.Total != len(smokeReport.Cases) || smokeReport.Passed != len(smokeReport.Cases) || smokeReport.Failed != 0 {
 		t.Fatalf("smoke report counts = %#v", smokeReport)
+	}
+}
+
+func TestSmokeCommandWritesTOONReportMirror(t *testing.T) {
+	target, ok := hostTarget()
+	if !ok {
+		t.Skip("host target unsupported")
+	}
+	report := filepath.Join(t.TempDir(), "smoke.json")
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"smoke", "--target", target, "--run=false", "--report", report, "--report-format=both"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("smoke exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	toonPath := strings.TrimSuffix(report, ".json") + ".toon"
+	raw, err := os.ReadFile(toonPath)
+	if err != nil {
+		t.Fatalf("read TOON report: %v", err)
+	}
+	jsonRaw, err := toon.ConvertTOONToJSON(raw, toon.Options{Strict: true})
+	if err != nil {
+		t.Fatalf("decode TOON report: %v\n%s", err, raw)
+	}
+	var smokeReport struct {
+		Target string `json:"target"`
+		Total  int    `json:"total"`
+		Cases  []struct {
+			Name string `json:"name"`
+		} `json:"cases"`
+	}
+	if err := json.Unmarshal(jsonRaw, &smokeReport); err != nil {
+		t.Fatalf("decode smoke report JSON: %v\n%s", err, jsonRaw)
+	}
+	if smokeReport.Target != target || smokeReport.Total != len(smokeReport.Cases) || len(smokeReport.Cases) == 0 {
+		t.Fatalf("smoke TOON report shape = %#v", smokeReport)
 	}
 }
 
@@ -204,6 +240,17 @@ func TestSmokeCommandListsCasesAsJSON(t *testing.T) {
 	}
 	if !sawHelloT4Exclusion {
 		t.Fatalf("smoke list missing T4 example exclusion for hello_t4: %#v", report.ExcludedExamples)
+	}
+}
+
+func TestSmokeCommandListsCasesAsTOON(t *testing.T) {
+	var report smokeListReport
+	raw := runCLITOONStdout(t, []string{"smoke", "--list", "--format=toon"}, 0, &report)
+	if report.Target == "" || report.Total != len(report.Cases) || report.Total < 39 {
+		t.Fatalf("smoke TOON list shape = %#v\n%s", report, raw)
+	}
+	if !strings.Contains(raw, "cases[") {
+		t.Fatalf("smoke TOON list should use structured cases output:\n%s", raw)
 	}
 }
 

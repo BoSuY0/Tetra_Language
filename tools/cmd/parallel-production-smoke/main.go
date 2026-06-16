@@ -24,12 +24,13 @@ type smokeOptions struct {
 }
 
 type smokeRunner struct {
-	opt        smokeOptions
-	workDir    string
-	tetraPath  string
-	processes  []parallelprod.ProcessReport
-	benchmarks []parallelprod.BenchmarkReport
-	cases      []parallelprod.CaseReport
+	opt                smokeOptions
+	workDir            string
+	tetraPath          string
+	processes          []parallelprod.ProcessReport
+	benchmarks         []parallelprod.BenchmarkReport
+	actorMemoryDomains []parallelprod.ActorMemoryDomainReport
+	cases              []parallelprod.CaseReport
 }
 
 type processResult struct {
@@ -118,7 +119,7 @@ func (r *smokeRunner) runExecutableEvidence(ctx context.Context) error {
 		recordProcess: false,
 		cases: []parallelprod.CaseReport{
 			{Name: "deadline timeout", Kind: "negative", Ran: true, Pass: true, ExpectedError: "deadline"},
-			{Name: "timeouts stress", Kind: "stress", Ran: true, Pass: true},
+			stressCase("timeouts stress", 1, "deadline-aware-waits-v1", 10000),
 		},
 	}); err != nil {
 		return err
@@ -132,7 +133,7 @@ func (r *smokeRunner) runExecutableEvidence(ctx context.Context) error {
 		processKind:   "stress",
 		recordProcess: true,
 		cases: []parallelprod.CaseReport{
-			{Name: "many actor messages stress", Kind: "stress", Ran: true, Pass: true},
+			stressCase("many actor messages stress", 256, "actors-tagged-stress-v1", 10000),
 		},
 	}); err != nil {
 		return err
@@ -144,7 +145,7 @@ func (r *smokeRunner) runExecutableEvidence(ctx context.Context) error {
 		recordProcess: false,
 		cases: []parallelprod.CaseReport{
 			{Name: "scheduler fairness", Kind: "positive", Ran: true, Pass: true},
-			{Name: "many tasks stress", Kind: "stress", Ran: true, Pass: true},
+			stressCase("many tasks stress", 64, "task-bounded-stress-seed-17", 10000),
 		},
 	}); err != nil {
 		return err
@@ -182,7 +183,7 @@ func (r *smokeRunner) runExecutableEvidence(ctx context.Context) error {
 		expectedExit:  0,
 		recordProcess: false,
 		cases: []parallelprod.CaseReport{
-			{Name: "cancellation storm", Kind: "stress", Ran: true, Pass: true},
+			stressCase("cancellation storm", 16, "parallel-cancellation-storm-v1", 10000),
 		},
 	})
 }
@@ -229,6 +230,9 @@ func (r *smokeRunner) runCompilerEvidence(ctx context.Context) error {
 		pkg           string
 		pattern       string
 		expectedError string
+		iterations    int
+		seed          string
+		maxDurationMS int
 	}{
 		{name: "actor mailbox backpressure", kind: "negative", pkg: "./compiler", pattern: "TestActorMailboxFullReturnsCheckedBackpressure", expectedError: "mailbox full/backpressure"},
 		{name: "message pool exhaustion", kind: "negative", pkg: "./compiler", pattern: "TestActorMessagePoolExhaustionReturnsCheckedFailure", expectedError: "message pool exhausted"},
@@ -248,12 +252,17 @@ func (r *smokeRunner) runCompilerEvidence(ctx context.Context) error {
 		{name: "actor recv cancel wake", kind: "negative", pkg: "./compiler", pattern: "TestTaskGroupCancelWakesActorRecvUntilBeforeDeadlineBuildAndRun", expectedError: "actor recv cancel wake"},
 		{name: "nested cancellation propagation", kind: "positive", pkg: "./compiler", pattern: "TestTaskCancellationCheckpointInheritedByNestedChildBuildAndRun"},
 		{name: "task actor mailbox handoff", kind: "positive", pkg: "./compiler", pattern: "TestTaskSpawnsActorAndReceivesMailboxReplyBuildAndRun"},
+		{name: "actor fanout mailbox drain soak", kind: "stress", pkg: "./compiler", pattern: "TestActorFanoutMailboxDrainSoakBuildAndRun", iterations: 512, seed: "actor-fanout-mailbox-drain-v1", maxDurationMS: 90000},
 	}
 	for _, tc := range tests {
 		res := runCommand(ctx, 90*time.Second, "go", "test", tc.pkg, "-run", tc.pattern, "-count=1")
 		if res.err != nil || res.exitCode != 0 {
 			r.cases = append(r.cases, failedCase(tc.name, tc.kind, tc.expectedError, res.output))
 			return fmt.Errorf("%s evidence failed: %s", tc.name, res.output)
+		}
+		if tc.kind == "stress" {
+			r.cases = append(r.cases, stressCase(tc.name, tc.iterations, tc.seed, tc.maxDurationMS))
+			continue
 		}
 		r.cases = append(r.cases, parallelprod.CaseReport{Name: tc.name, Kind: tc.kind, Ran: true, Pass: true, ExpectedError: tc.expectedError})
 	}
@@ -287,6 +296,9 @@ func (r *smokeRunner) runBoundaryCoverageEvidence(ctx context.Context) error {
 
 func (r *smokeRunner) writeReport() error {
 	report := buildReportWithBenchmarks("tools/cmd/parallel-production-smoke", r.processes, r.cases, r.benchmarks)
+	if len(r.actorMemoryDomains) > 0 {
+		report.ActorMemoryDomains = append([]parallelprod.ActorMemoryDomainReport(nil), r.actorMemoryDomains...)
+	}
 	raw, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
 		return err
@@ -307,13 +319,14 @@ func buildReportWithBenchmarks(source string, processes []parallelprod.ProcessRe
 		benchmarks = parallelSchedulerBenchmarks()
 	}
 	return parallelprod.Report{
-		Schema:     parallelprod.SchemaV1,
-		Status:     "pass",
-		Target:     "linux-x64",
-		Host:       "linux-x64",
-		Runtime:    "parallel-linux-x64",
-		Source:     source,
-		Benchmarks: append([]parallelprod.BenchmarkReport(nil), benchmarks...),
+		Schema:             parallelprod.SchemaV1,
+		Status:             "pass",
+		Target:             "linux-x64",
+		Host:               "linux-x64",
+		Runtime:            "parallel-linux-x64",
+		Source:             source,
+		Benchmarks:         append([]parallelprod.BenchmarkReport(nil), benchmarks...),
+		ActorMemoryDomains: parallelSchedulerActorMemoryDomains(),
 		Processes: append([]parallelprod.ProcessReport(nil),
 			processes...,
 		),
@@ -461,23 +474,35 @@ func (r *smokeRunner) runSchedulerPrototypeEvidence(ctx context.Context) error {
 	if err := os.WriteFile(rawPath, []byte(evidence.output), 0o644); err != nil {
 		return fmt.Errorf("write parallel scheduler raw evidence: %w", err)
 	}
-	benchmarks, err := parseParallelSchedulerBenchmarks(evidence.output)
+	benchmarks, actorMemoryDomains, err := parseParallelSchedulerEvidence(evidence.output)
 	if err != nil {
 		return err
 	}
 	r.benchmarks = attachBenchmarkRawArtifacts(benchmarks, filepath.ToSlash(rawPath))
+	r.actorMemoryDomains = actorMemoryDomains
 	return nil
 }
 
-func parseParallelSchedulerBenchmarks(raw string) ([]parallelprod.BenchmarkReport, error) {
+func parseParallelSchedulerEvidence(raw string) ([]parallelprod.BenchmarkReport, []parallelprod.ActorMemoryDomainReport, error) {
+	var evidence struct {
+		Schema             string                                 `json:"schema"`
+		Benchmarks         []parallelprod.BenchmarkReport         `json:"benchmarks"`
+		ActorMemoryDomains []parallelprod.ActorMemoryDomainReport `json:"actor_memory_domains"`
+	}
+	if err := json.Unmarshal([]byte(raw), &evidence); err == nil && len(evidence.Benchmarks) > 0 {
+		if len(evidence.ActorMemoryDomains) == 0 {
+			return nil, nil, fmt.Errorf("parse parallel scheduler prototype evidence: actor_memory_domains is empty")
+		}
+		return evidence.Benchmarks, evidence.ActorMemoryDomains, nil
+	}
 	var benchmarks []parallelprod.BenchmarkReport
 	if err := json.Unmarshal([]byte(raw), &benchmarks); err != nil {
-		return nil, fmt.Errorf("parse parallel scheduler prototype benchmarks: %w", err)
+		return nil, nil, fmt.Errorf("parse parallel scheduler prototype evidence: %w", err)
 	}
 	if len(benchmarks) == 0 {
-		return nil, fmt.Errorf("parallel scheduler prototype benchmark evidence is empty")
+		return nil, nil, fmt.Errorf("parallel scheduler prototype benchmark evidence is empty")
 	}
-	return benchmarks, nil
+	return benchmarks, nil, nil
 }
 
 func attachBenchmarkRawArtifacts(benchmarks []parallelprod.BenchmarkReport, rawPath string) []parallelprod.BenchmarkReport {
@@ -534,7 +559,7 @@ func parallelSchedulerBenchmarks() []parallelprod.BenchmarkReport {
 			Unit:               "prep_only",
 			Evidence:           "compiler/internal/parallelrt ErrMailboxFull and blocking_recv_yield metadata define the local backpressure latency diagnostic candidate",
 			ClaimTier:          "tier0_local_smoke_only",
-			Claim:              "Actor backpressure latency benchmark prep row exists as Tier 0 local smoke only; no real-world SLA or latency advantage is claimed.",
+			Claim:              "Actor backpressure latency benchmark prep row exists as Tier 0 local smoke only; no real-world SLA is claimed.",
 			RawOutputArtifacts: []string{rawArtifact},
 			Ran:                false,
 			Pass:               true,
@@ -550,6 +575,118 @@ func parallelSchedulerBenchmarks() []parallelprod.BenchmarkReport {
 			RawOutputArtifacts: []string{rawArtifact},
 			Ran:                false,
 			Pass:               true,
+		},
+	}
+}
+
+func parallelSchedulerActorMemoryDomains() []parallelprod.ActorMemoryDomainReport {
+	return []parallelprod.ActorMemoryDomainReport{
+		{
+			SchemaVersion:        "tetra.actors.memory-domain.v1",
+			ActorID:              "actor-mailbox-copy",
+			EvidenceClass:        "local_parallelrt_model",
+			EvidenceMethod:       "parallelrt_typed_mailbox_memory_domain_v1",
+			RuntimeMeasured:      false,
+			RuntimeBlockedReason: "production actor runtime per-actor byte sampler is not implemented; this is local parallelrt model evidence",
+			Domain: parallelprod.MemoryDomainReport{
+				DomainID:       "domain:actor:actor-mailbox-copy",
+				Kind:           "actor",
+				OwnerKind:      "actor",
+				OwnerID:        "actor-mailbox-copy",
+				Lifetime:       "actor:actor-mailbox-copy",
+				BudgetBytes:    256,
+				RequestedBytes: 48,
+				ReservedBytes:  256,
+				CommittedBytes: 256,
+				CurrentBytes:   48,
+				PeakBytes:      48,
+				CopyCount:      1,
+				BytesCopied:    32,
+			},
+			Mailbox: parallelprod.ActorMailboxMemoryReport{
+				CapacityMessages: 4,
+				QueuedMessages:   1,
+				CapacityBytes:    256,
+				QueuedBytes:      48,
+				PeakQueuedBytes:  48,
+				MessageBytes:     16,
+				BackpressureMode: "blocking_recv_yield",
+			},
+			MessagePool: parallelprod.ActorMessagePoolReport{
+				SlabBytes:         64,
+				LiveBytes:         48,
+				CapacityBytes:     256,
+				MessageSlotsLive:  1,
+				MessageSlotsLimit: 4,
+			},
+			Backpressure: parallelprod.ActorBackpressureReport{
+				Mode:   "blocking_recv_yield",
+				Status: "available",
+			},
+			NonClaims: []string{
+				"full production actor runtime is not claimed",
+				"distributed actor zero-copy is not claimed",
+				"actor memory domain bytes are model/report evidence unless paired with runtime measurement",
+			},
+			ProductionRuntimeClaimed:   false,
+			DistributedZeroCopyClaimed: false,
+		},
+		{
+			SchemaVersion:        "tetra.actors.memory-domain.v1",
+			ActorID:              "actor-frame",
+			EvidenceClass:        "local_parallelrt_model",
+			EvidenceMethod:       "parallelrt_typed_mailbox_memory_domain_v1",
+			RuntimeMeasured:      false,
+			RuntimeBlockedReason: "production actor runtime per-actor byte sampler is not implemented; this is local parallelrt model evidence",
+			Domain: parallelprod.MemoryDomainReport{
+				DomainID:       "domain:actor:actor-frame",
+				Kind:           "actor",
+				OwnerKind:      "actor",
+				OwnerID:        "actor-frame",
+				Lifetime:       "actor:actor-frame",
+				BudgetBytes:    512,
+				RequestedBytes: 272,
+				ReservedBytes:  512,
+				CommittedBytes: 512,
+				CurrentBytes:   272,
+				PeakBytes:      272,
+			},
+			Mailbox: parallelprod.ActorMailboxMemoryReport{
+				CapacityMessages: 2,
+				QueuedMessages:   1,
+				CapacityBytes:    512,
+				QueuedBytes:      272,
+				PeakQueuedBytes:  272,
+				MessageBytes:     16,
+				BackpressureMode: "blocking_recv_yield",
+			},
+			MessagePool: parallelprod.ActorMessagePoolReport{
+				SlabBytes:         32,
+				LiveBytes:         272,
+				CapacityBytes:     512,
+				MessageSlotsLive:  1,
+				MessageSlotsLimit: 2,
+			},
+			OwnedRegions: []parallelprod.ActorOwnedRegionReport{
+				{
+					RegionName: "frame",
+					DomainID:   "domain:actor:actor-frame",
+					OwnerID:    "actor-frame",
+					Bytes:      256,
+				},
+			},
+			Backpressure: parallelprod.ActorBackpressureReport{
+				Mode:   "blocking_recv_yield",
+				Status: "byte_limit_reached",
+				Reason: "mailbox byte capacity reached",
+			},
+			NonClaims: []string{
+				"full production actor runtime is not claimed",
+				"distributed actor zero-copy is not claimed",
+				"actor memory domain bytes are model/report evidence unless paired with runtime measurement",
+			},
+			ProductionRuntimeClaimed:   false,
+			DistributedZeroCopyClaimed: false,
 		},
 	}
 }
@@ -581,10 +718,23 @@ func requiredPassingCases() []parallelprod.CaseReport {
 		{Name: "actor island boundary proof", Kind: "positive", Ran: true, Pass: true},
 		{Name: "actor broker leak cleanup", Kind: "positive", Ran: true, Pass: true},
 		{Name: "safe unsafe forbidden boundary coverage", Kind: "positive", Ran: true, Pass: true},
-		{Name: "many tasks stress", Kind: "stress", Ran: true, Pass: true},
-		{Name: "many actor messages stress", Kind: "stress", Ran: true, Pass: true},
-		{Name: "cancellation storm", Kind: "stress", Ran: true, Pass: true},
-		{Name: "timeouts stress", Kind: "stress", Ran: true, Pass: true},
+		stressCase("actor fanout mailbox drain soak", 512, "actor-fanout-mailbox-drain-v1", 90000),
+		stressCase("many tasks stress", 64, "task-bounded-stress-seed-17", 10000),
+		stressCase("many actor messages stress", 256, "actors-tagged-stress-v1", 10000),
+		stressCase("cancellation storm", 16, "parallel-cancellation-storm-v1", 10000),
+		stressCase("timeouts stress", 1, "deadline-aware-waits-v1", 10000),
+	}
+}
+
+func stressCase(name string, iterations int, seed string, maxDurationMS int) parallelprod.CaseReport {
+	return parallelprod.CaseReport{
+		Name:              name,
+		Kind:              "stress",
+		Ran:               true,
+		Pass:              true,
+		Iterations:        iterations,
+		DeterministicSeed: seed,
+		MaxDurationMS:     maxDurationMS,
 	}
 }
 
@@ -623,7 +773,7 @@ func parallelProductionAudit() []parallelprod.AuditReport {
 		{
 			Requirement: "stress evidence for tasks, actor messages, cancellation storms, and timeouts",
 			Artifact:    "examples/task_bounded_stress.tetra; examples/actors_tagged_stress.tetra; tools/cmd/parallel-production-smoke",
-			Evidence:    "many tasks stress, many actor messages stress, cancellation storm, timeouts stress, and actor broker leak cleanup cases ran",
+			Evidence:    "many tasks stress, many actor messages stress, actor fanout mailbox drain soak, cancellation storm, timeouts stress, and actor broker leak cleanup cases ran with bounded stress metadata",
 			Result:      "pass",
 		},
 		{
@@ -641,7 +791,7 @@ func parallelProductionAudit() []parallelprod.AuditReport {
 		{
 			Requirement: "actor benchmark Tier 0/Tier 1 preparation",
 			Artifact:    "compiler/internal/parallelrt; tools/cmd/parallel-production-smoke",
-			Evidence:    "parallelrt evidence emits Tier 0 actor ping-pong, fanout/fanin, mailbox throughput, backpressure latency, and zero_copy_move local typed mailbox prep rows with raw artifact references and no performance claim",
+			Evidence:    "parallelrt evidence emits Tier 0 actor ping-pong, fanout/fanin, mailbox throughput, backpressure latency, and zero_copy_move local typed mailbox prep rows with raw artifact references; Tier 1 remains preparation-only here, with no benchmark superiority, no C++/Rust parity, and no official benchmark claim",
 			Result:      "pass",
 		},
 		{

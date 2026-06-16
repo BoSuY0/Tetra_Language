@@ -82,8 +82,11 @@ uses actors:
 	if err == nil {
 		t.Fatalf("expected actor state type diagnostic")
 	}
-	if !strings.Contains(err.Error(), "type 'str' is not supported in this MVP") {
+	if !strings.Contains(err.Error(), "actor state field 'title' type 'str' is not supported; supported actor state field types are Int, Bool, UInt8, UInt16, and task.error") {
 		t.Fatalf("error = %v", err)
+	}
+	if strings.Contains(err.Error(), "MVP") {
+		t.Fatalf("error = %v, want stable non-versioned diagnostic", err)
 	}
 }
 
@@ -161,7 +164,111 @@ uses actors:
 	if err == nil {
 		t.Fatalf("expected actor state type diagnostic")
 	}
-	if !strings.Contains(err.Error(), "type 'ptr' is not supported in this MVP") {
+	if !strings.Contains(err.Error(), "actor state field 'raw' type 'ptr' is not supported; supported actor state field types are Int, Bool, UInt8, UInt16, and task.error") {
 		t.Fatalf("error = %v", err)
+	}
+	if strings.Contains(err.Error(), "MVP") {
+		t.Fatalf("error = %v, want stable non-versioned diagnostic", err)
+	}
+}
+
+func TestCheckActorStateStableDiagnosticsMatrix(t *testing.T) {
+	cases := []struct {
+		name       string
+		src        string
+		want       string
+		rejectText string
+	}{
+		{
+			name: "unsupported field type",
+			src: `
+actor Worker:
+    val title: String = "worker"
+    func run() -> Int:
+        return 0
+
+func main() -> Int
+uses actors:
+    let _peer: actor = core.spawn("Worker.run")
+    return 0
+`,
+			want:       "actor state field 'title' type 'str' is not supported; supported actor state field types are Int, Bool, UInt8, UInt16, and task.error",
+			rejectText: "MVP",
+		},
+		{
+			name: "dynamic initializer",
+			src: `
+actor Worker:
+    val count: Int = core.recv()
+    func run() -> Int:
+        return count
+
+func main() -> Int
+uses actors:
+    let _peer: actor = core.spawn("Worker.run")
+    return 0
+`,
+			want:       "actor state field 'count' initializer must be a compile-time constant Int/Bool expression",
+			rejectText: "MVP",
+		},
+		{
+			name: "missing initializer",
+			src: `
+actor Worker:
+    var count: Int
+    func run() -> Int:
+        return count
+
+func main() -> Int
+uses actors:
+    let _peer: actor = core.spawn("Worker.run")
+    return 0
+`,
+			want:       "actor state field 'count' requires a compile-time constant initializer",
+			rejectText: "MVP",
+		},
+		{
+			name: "slot count",
+			src: `
+actor Worker:
+    val s0: Int = 0
+    val s1: Int = 1
+    val s2: Int = 2
+    val s3: Int = 3
+    val s4: Int = 4
+    val s5: Int = 5
+    val s6: Int = 6
+    val s7: Int = 7
+    val s8: Int = 8
+    func run() -> Int:
+        return s0
+
+func main() -> Int
+uses actors:
+    let _peer: actor = core.spawn("Worker.run")
+    return 0
+`,
+			want:       "actor 'Worker' state supports at most 8 slots, got 9",
+			rejectText: "MVP",
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			prog, err := frontend.Parse([]byte(tt.src))
+			if err != nil {
+				t.Fatalf("Parse: %v", err)
+			}
+			_, err = Check(prog)
+			if err == nil {
+				t.Fatalf("expected actor state diagnostic containing %q", tt.want)
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %v, want %q", err, tt.want)
+			}
+			if tt.rejectText != "" && strings.Contains(err.Error(), tt.rejectText) {
+				t.Fatalf("error = %v, rejected text %q should not appear", err, tt.rejectText)
+			}
+		})
 	}
 }

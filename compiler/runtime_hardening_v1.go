@@ -262,7 +262,7 @@ func BuildP24RuntimeHardeningV1Report() (RuntimeHardeningV1Report, error) {
 			p24RuntimeHardeningRow(RuntimeHardeningActorMailboxOverflowPolicy, "Actor mailbox overflow policy", "reviewed_boundary_with_blocker",
 				[]string{
 					"parallelrt.NewTypedMailbox records bounded capacity, blocking_recv_yield backpressure metadata, FIFO receive, and recoverable ErrMailboxFull when the typed mailbox model is full.",
-					"actorsrt.ActorRuntimeProductionBoundaryAudit records that built-in message pool exhaustion returns checked -1 while message pool entries are not reclaimed during a run.",
+					"actorsrt.ActorRuntimeProductionBoundaryAudit records that built-in message pool exhaustion returns checked -1 for live overload and drained message pool entries are reclaimed after receive.",
 				},
 				[]string{
 					"go test ./compiler/internal/parallelrt ./compiler/internal/actorsrt -run 'Mailbox|ProductionBoundary|SchedulerModel' -count=1",
@@ -396,11 +396,16 @@ func ValidateP24RuntimeHardeningV1Report(report RuntimeHardeningV1Report) error 
 func buildP24RuntimeHardeningTrapWitness() RuntimeHardeningV1Witness {
 	paths := []string{
 		"compiler/internal/backend/wasm32_wasi/codegen.go",
+		"compiler/internal/backend/wasm32_wasi/codegen_helpers.go",
 		"compiler/internal/backend/wasm32_web/codegen.go",
+		"compiler/internal/backend/wasm32_web/codegen_helpers.go",
 		"docs/spec/current_supported_surface.md",
 	}
 	wasmTrapEmitters := 0
-	for _, path := range paths[:2] {
+	for _, path := range []string{
+		"compiler/internal/backend/wasm32_wasi/codegen_helpers.go",
+		"compiler/internal/backend/wasm32_web/codegen_helpers.go",
+	} {
 		if p24RuntimeHardeningFileContains(path, "emitWasmTrapIf") {
 			wasmTrapEmitters++
 		}
@@ -472,11 +477,11 @@ func buildP24RuntimeHardeningOverflowWitness() (RuntimeHardeningV1Witness, error
 	}
 	checkedNeg := p24RuntimeHardeningFileContains("compiler/internal/opt/scalar.go", "checkedNegI32")
 	foldConst := p24RuntimeHardeningFileContains("compiler/internal/opt/scalar.go", "foldConstBinaryI32")
-	constOverflow := p24RuntimeHardeningFileContains("compiler/internal/semantics/checker.go", "overflow in global const expression")
+	constOverflow := p24RuntimeHardeningFileContains("compiler/internal/semantics/checker_entry_helpers.go", "overflow in global const expression")
 	return RuntimeHardeningV1Witness{
 		ID:                              p24RuntimeHardeningOverflowWitnessID,
 		Kind:                            "integer_overflow_semantics",
-		Paths:                           []string{"compiler/internal/opt/scalar.go", "compiler/internal/opt/coverage.go", "compiler/internal/semantics/checker.go", "compiler/internal/allocplan/plan.go", "compiler/internal/runtimeabi/allocation_contract.go"},
+		Paths:                           []string{"compiler/internal/opt/scalar.go", "compiler/internal/opt/coverage.go", "compiler/internal/semantics/checker_entry_helpers.go", "compiler/internal/allocplan/plan.go", "compiler/internal/runtimeabi/allocation_contract.go"},
 		CheckedNegI32Present:            checkedNeg,
 		FoldConstBinaryI32Present:       foldConst,
 		ConstOverflowDiagnosticPresent:  constOverflow,
@@ -559,7 +564,7 @@ func buildP24RuntimeHardeningMailboxWitness() (RuntimeHardeningV1Witness, error)
 		return RuntimeHardeningV1Witness{}, err
 	}
 	builtinOverflowChecked := false
-	messagePoolNotReclaimed := false
+	drainedMessagesReclaimed := false
 	oldUncheckedOverflowClaim := false
 	for _, row := range audit.Rows {
 		text := strings.Join(row.RequiredFacts, " ") + " " + row.Evidence + " " + row.Boundary
@@ -569,8 +574,8 @@ func buildP24RuntimeHardeningMailboxWitness() (RuntimeHardeningV1Witness, error)
 		if strings.Contains(text, "message pool exhaustion returns checked -1") {
 			builtinOverflowChecked = true
 		}
-		if strings.Contains(text, "message pool entries are not reclaimed") {
-			messagePoolNotReclaimed = true
+		if strings.Contains(text, "drained message pool entries are reclaimed") {
+			drainedMessagesReclaimed = true
 		}
 	}
 	return RuntimeHardeningV1Witness{
@@ -589,7 +594,7 @@ func buildP24RuntimeHardeningMailboxWitness() (RuntimeHardeningV1Witness, error)
 			received && first.Name == "first" &&
 			len(audit.Rows) >= 4 &&
 			builtinOverflowChecked &&
-			messagePoolNotReclaimed &&
+			drainedMessagesReclaimed &&
 			!oldUncheckedOverflowClaim,
 	}, nil
 }

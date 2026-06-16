@@ -64,6 +64,10 @@ const (
 	AllocationReportReusePolicy           AllocationReportHook = "allocator_reuse_policy"
 	AllocationReportRegionID              AllocationReportHook = "region_id"
 	AllocationReportLifetime              AllocationReportHook = "lifetime"
+	AllocationReportDomainID              AllocationReportHook = "domain_id"
+	AllocationReportDomainKind            AllocationReportHook = "domain_kind"
+	AllocationReportDomainOwner           AllocationReportHook = "domain_owner"
+	AllocationReportDomainLifetime        AllocationReportHook = "domain_lifetime"
 	AllocationReportDebugMode             AllocationReportHook = "debug_mode"
 	AllocationReportRawPointerBounds      AllocationReportHook = "raw_pointer_bounds"
 	AllocationReportRawPointerBase        AllocationReportHook = "raw_pointer_base"
@@ -140,6 +144,10 @@ func RequiredAllocationReportHooks() []AllocationReportHook {
 		AllocationReportReusePolicy,
 		AllocationReportRegionID,
 		AllocationReportLifetime,
+		AllocationReportDomainID,
+		AllocationReportDomainKind,
+		AllocationReportDomainOwner,
+		AllocationReportDomainLifetime,
 		AllocationReportDebugMode,
 	}
 }

@@ -506,6 +506,77 @@ uses alloc, mem:
 	}
 }
 
+func TestWhileAllocationLengthAliasUsesProofTaggedUncheckedIndexLoad(t *testing.T) {
+	prog := lowerProofProgram(t, `
+func main() -> Int
+uses alloc, mem:
+    let n: Int = 4
+    var xs: []i32 = make_i32(n)
+    var i = 0
+    while i < n:
+        xs[i] = i
+        i = i + 1
+    var total = 0
+    i = 0
+    while i < n:
+        total = total + xs[i]
+        i = i + 1
+    return total
+`)
+	fn := findIRFunc(t, prog, "main")
+	if countInstrKind(fn, ir.IRIndexLoadI32) != 0 {
+		t.Fatalf("allocation length alias loop still contains checked i32 load: %#v", fn.Instrs)
+	}
+	if got := firstProofID(fn, ir.IRIndexLoadI32Unchecked); !strings.HasPrefix(got, "proof:while:") {
+		t.Fatalf("allocation length alias proof id = %q, want proof:while prefix; instrs=%#v", got, fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRIndexStoreI32) != 1 {
+		t.Fatalf("allocation length alias store should remain one checked store until unchecked-store IR exists: %#v", fn.Instrs)
+	}
+}
+
+func TestWhileMutableAllocationLengthAliasKeepsCheckedIndexLoad(t *testing.T) {
+	prog := lowerProofProgram(t, `
+func main() -> Int
+uses alloc, mem:
+    var n: Int = 4
+    var xs: []i32 = make_i32(n)
+    var total = 0
+    var i = 0
+    while i < n:
+        total = total + xs[i]
+        i = i + 1
+    return total
+`)
+	fn := findIRFunc(t, prog, "main")
+	if countInstrKind(fn, ir.IRIndexLoadI32) != 1 {
+		t.Fatalf("mutable allocation length alias should keep one checked i32 load: %#v", fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRIndexLoadI32Unchecked) != 0 {
+		t.Fatalf("mutable allocation length alias unexpectedly removed bounds check: %#v", fn.Instrs)
+	}
+}
+
+func TestAllocationLengthAliasRejectsMutableMakeLengthBuiltins(t *testing.T) {
+	for _, name := range []string{
+		"make_u8", "make_u16", "make_i32", "make_bool",
+		"core.make_u8", "core.make_u16", "core.make_i32", "core.make_bool",
+	} {
+		t.Run(name, func(t *testing.T) {
+			l := &lowerer{locals: map[string]semantics.LocalInfo{
+				"n": {Mutable: true},
+			}}
+			_, ok := l.allocationLengthBoundLocal(&frontend.CallExpr{
+				Name: name,
+				Args: []frontend.Expr{&frontend.IdentExpr{Name: "n"}},
+			})
+			if ok {
+				t.Fatalf("allocationLengthBoundLocal(%s, mutable n) accepted mutable length", name)
+			}
+		})
+	}
+}
+
 func TestNonDominatingIfGuardKeepsCheckedIndexLoad(t *testing.T) {
 	prog := lowerProofProgram(t, `
 func get(xs: []i32, i: Int) -> Int
