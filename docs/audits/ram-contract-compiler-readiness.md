@@ -1,8 +1,11 @@
 # RAM Contract Compiler Readiness Audit
 
-Git head: cafefd6865afca1de0d263b6cee71b2f8dcbc92e
-Working tree: clean detached worktree evidence for the P22 RAM Contract refresh; this is
-not a remote release-candidate checkout claim and not a historical dirty working tree cleanup claim for older RAM audits.
+Git head: e7e4c9653f0fd4d3f6c92fe32525024f04d111b9
+Working tree: audit snapshot metadata refreshed for the isolated Surface Morph
+Rendered Beauty promotion worktree; the RAM Contract evidence below remains the
+P22 clean detached worktree evidence and is not a remote release-candidate
+checkout claim or a historical dirty working tree cleanup claim for older RAM
+audits.
 Verdict: `SCOPED_READY`
 
 ## Scope
