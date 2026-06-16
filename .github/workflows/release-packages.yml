@@ -10,6 +10,11 @@ on:
         description: "Release version, e.g. v0.4.0"
         required: true
         default: "v0.4.0"
+      dry_run:
+        description: "Build packages and upload artifacts without publishing external release outputs"
+        required: true
+        type: boolean
+        default: true
       update_homebrew_tap:
         description: "Commit Formula/tetra.rb to the Homebrew tap repository"
         required: true
@@ -66,12 +71,14 @@ jobs:
           esac
           image_owner="$(printf '%s' "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
           image="ghcr.io/${image_owner}/tetra-language"
+          dry_run="${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}"
           publish_container="${{ github.event_name != 'workflow_dispatch' || inputs.publish_container }}"
           {
             echo "version=${version}"
             echo "image_version=${version#v}"
             echo "image=${image}"
             echo "out_dir=dist/releases/${version}"
+            echo "dry_run=${dry_run}"
             echo "publish_container=${publish_container}"
           } >> "$GITHUB_OUTPUT"
 
@@ -229,6 +236,7 @@ jobs:
             ${{ steps.meta.outputs.out_dir }}/memory-100-prod-stable/**
 
       - name: Create or update GitHub Release
+        if: steps.meta.outputs.dry_run != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -297,7 +305,7 @@ jobs:
           fi
 
       - name: Build container image
-        if: steps.meta.outputs.publish_container == 'true'
+        if: steps.meta.outputs.publish_container == 'true' && steps.meta.outputs.dry_run != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -308,7 +316,7 @@ jobs:
             .
 
       - name: Publish GHCR image
-        if: steps.meta.outputs.publish_container == 'true'
+        if: steps.meta.outputs.publish_container == 'true' && steps.meta.outputs.dry_run != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -319,7 +327,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
 
       - name: Update Homebrew tap
-        if: env.UPDATE_HOMEBREW_TAP == 'true'
+        if: env.UPDATE_HOMEBREW_TAP == 'true' && steps.meta.outputs.dry_run != 'true'
         shell: bash
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
