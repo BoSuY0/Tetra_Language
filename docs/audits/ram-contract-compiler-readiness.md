@@ -1,8 +1,8 @@
 # RAM Contract Compiler Readiness Audit
 
-Git head: b2eef6f1c5a0c1e177d08a3f52de7f1453945054
-Working tree: clean branch evidence for the P07 contract-runner-core PR hardening
-RAM Contract refresh; this is not a remote release-candidate checkout claim, not
+Git head: 5ccc6ce7d21fa377df88f71e32138cdd5c348f8a
+Working tree: final clean branch evidence for the P07 contract-runner-core PR
+hardening RAM Contract refresh; this is not a remote release-candidate checkout claim, not
 remote package proof, and not a historical dirty working tree cleanup claim for
 older RAM audits.
 Verdict: `SCOPED_READY`
@@ -15,14 +15,16 @@ contract. The release gate is
 `.github/workflows/ci.yml`, and package workflow wiring lives in
 `.github/workflows/release-packages.yml`.
 
-The P07 contract-runner-core PR hardening clean branch produced RAM Contract
-release evidence under
-`reports/contract-refactor-pr-hardening/P07-ram-contract-b2eef6f1/`.
+The P07 contract-runner-core PR hardening final clean branch produced RAM
+Contract release evidence under
+`reports/contract-refactor-pr-hardening/P07-final-ram-contract-5ccc6ce7/`.
 That RAM Contract slice was directly validated for
-`b2eef6f1c5a0c1e177d08a3f52de7f1453945054` on clean branch HEAD in worktree
+`5ccc6ce7d21fa377df88f71e32138cdd5c348f8a` on clean branch HEAD in worktree
 `/home/tetra/.codex/worktrees/Tetra_Language/contract-runner-core-pr-split-20260616`.
 Coordinator raw evidence records exit `0` at
-`/home/tetra/Desktop/Projects/Tetra_Language/reports/contract-refactor-pr-hardening/raw/p07-ram-refresh.exit`.
+`/home/tetra/Desktop/Projects/Tetra_Language/reports/contract-refactor-pr-hardening/raw/p07-final-ram-refresh.exit`
+with stdout at
+`/home/tetra/Desktop/Projects/Tetra_Language/reports/contract-refactor-pr-hardening/raw/p07-final-ram-refresh.stdout`.
 This audit does not claim remote CI, remote package proof, or package
 publication proof.
 
@@ -44,21 +46,21 @@ clean branch HEAD. The default release report path remains
 `reports/ram-contract-release`; this refresh used a fresh scoped report
 directory to avoid stale artifact reuse:
 
-- `GOCACHE="$PWD/.cache/go-build-p07-ram-refresh" GOTMPDIR="$PWD/.cache/go-tmp-p07-ram-refresh" bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir reports/contract-refactor-pr-hardening/P07-ram-contract-b2eef6f1`
-- `GOCACHE="$PWD/.cache/go-build-p07-doc-refresh" GOTMPDIR="$PWD/.cache/go-tmp-p07-doc-refresh" go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`
+- `GOCACHE="$PWD/.cache/go-build-p07-final-ram-refresh" GOTMPDIR="$PWD/.cache/go-tmp-p07-final-ram-refresh" bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir reports/contract-refactor-pr-hardening/P07-final-ram-contract-5ccc6ce7`
+- `GOCACHE="$PWD/.cache/go-build-p07-final-doc-refresh" GOTMPDIR="$PWD/.cache/go-tmp-p07-final-doc-refresh" go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`
 - `git diff --check`
 
 ## Artifact Evidence
 
-- `reports/contract-refactor-pr-hardening/P07-ram-contract-b2eef6f1/ram-contract-report.json`
-- `reports/contract-refactor-pr-hardening/P07-ram-contract-b2eef6f1/memory-grade-report.json`
-- `reports/contract-refactor-pr-hardening/P07-ram-contract-b2eef6f1/proof-store-summary.json`
-- `reports/contract-refactor-pr-hardening/P07-ram-contract-b2eef6f1/validation-pipeline-coverage.json`
-- `reports/contract-refactor-pr-hardening/P07-ram-contract-b2eef6f1/heap-blockers.json`
-- `reports/contract-refactor-pr-hardening/P07-ram-contract-b2eef6f1/copy-blockers.json`
-- `reports/contract-refactor-pr-hardening/P07-ram-contract-b2eef6f1/fuzz/ram-contract-fuzz-oracle.json`
-- `reports/contract-refactor-pr-hardening/P07-ram-contract-b2eef6f1/artifact-hashes.json`
-- `reports/contract-refactor-pr-hardening/P07-ram-contract-b2eef6f1/ram-contract-release-manifest.json`
+- `reports/contract-refactor-pr-hardening/P07-final-ram-contract-5ccc6ce7/ram-contract-report.json`
+- `reports/contract-refactor-pr-hardening/P07-final-ram-contract-5ccc6ce7/memory-grade-report.json`
+- `reports/contract-refactor-pr-hardening/P07-final-ram-contract-5ccc6ce7/proof-store-summary.json`
+- `reports/contract-refactor-pr-hardening/P07-final-ram-contract-5ccc6ce7/validation-pipeline-coverage.json`
+- `reports/contract-refactor-pr-hardening/P07-final-ram-contract-5ccc6ce7/heap-blockers.json`
+- `reports/contract-refactor-pr-hardening/P07-final-ram-contract-5ccc6ce7/copy-blockers.json`
+- `reports/contract-refactor-pr-hardening/P07-final-ram-contract-5ccc6ce7/fuzz/ram-contract-fuzz-oracle.json`
+- `reports/contract-refactor-pr-hardening/P07-final-ram-contract-5ccc6ce7/artifact-hashes.json`
+- `reports/contract-refactor-pr-hardening/P07-final-ram-contract-5ccc6ce7/ram-contract-release-manifest.json`
 
 ## Nonclaims
 
