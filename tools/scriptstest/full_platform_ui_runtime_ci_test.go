@@ -65,15 +65,19 @@ func TestFullPlatformUIRuntimeWorkflowRunsOnBranchPush(t *testing.T) {
 	}
 }
 
-func TestFullPlatformUIRuntimeWorkflowFetchesParentCommitForDocVerification(t *testing.T) {
+func TestFullPlatformUIRuntimeWorkflowFetchesHistoryForDocVerification(t *testing.T) {
 	path := filepath.Join(repoRoot(t), ".github", "workflows", "full-platform-ui-runtime.yml")
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read full-platform UI runtime workflow: %v", err)
 	}
 	text := string(raw)
-	if got := strings.Count(text, "fetch-depth: 2"); got < 2 {
-		t.Fatalf("full-platform UI runtime workflow must fetch HEAD^ for docs verification; got %d fetch-depth markers", got)
+	if !strings.Contains(text, "target-host-ui-runtime:") || !strings.Contains(text, "fetch-depth: 2") {
+		t.Fatalf("full-platform UI runtime target-host jobs must fetch HEAD^ for report git-head checks")
+	}
+	gateSection := workflowJobSection(text, "full-platform-ui-runtime-gate-linux:")
+	if !strings.Contains(gateSection, "fetch-depth: 0") {
+		t.Fatalf("full-platform UI runtime Linux aggregation gate must fetch full history for docs verification")
 	}
 }
 

@@ -1350,6 +1350,52 @@ func TestVerifyRAMContractCompilerDocsAcceptsDirectParentReadinessHead(t *testin
 	}
 }
 
+func TestRAMContractReadinessFreshnessAcceptsAncestorWithoutSurfaceChanges(t *testing.T) {
+	evidence := "1111111111111111111111111111111111111111"
+	current := "3333333333333333333333333333333333333333"
+	parent := "2222222222222222222222222222222222222222"
+	stale := ramContractReadinessGitHeadIsStale(evidence, ramContractGitFreshness{
+		current: func() (string, bool) {
+			return current, true
+		},
+		parent: func() (string, bool) {
+			return parent, true
+		},
+		surfaceUnchangedSince: func(head string) (bool, bool) {
+			if head != evidence {
+				t.Fatalf("surface check head = %s, want %s", head, evidence)
+			}
+			return true, true
+		},
+	})
+	if stale {
+		t.Fatalf("ancestor RAM evidence with unchanged RAM surface must not be stale")
+	}
+}
+
+func TestRAMContractReadinessFreshnessRejectsAncestorWithSurfaceChanges(t *testing.T) {
+	evidence := "1111111111111111111111111111111111111111"
+	current := "3333333333333333333333333333333333333333"
+	parent := "2222222222222222222222222222222222222222"
+	stale := ramContractReadinessGitHeadIsStale(evidence, ramContractGitFreshness{
+		current: func() (string, bool) {
+			return current, true
+		},
+		parent: func() (string, bool) {
+			return parent, true
+		},
+		surfaceUnchangedSince: func(head string) (bool, bool) {
+			if head != evidence {
+				t.Fatalf("surface check head = %s, want %s", head, evidence)
+			}
+			return false, true
+		},
+	})
+	if !stale {
+		t.Fatalf("ancestor RAM evidence with changed RAM surface must be stale")
+	}
+}
+
 func TestVerifyRAMContractCompilerDocsAcceptsScopedEvidence(t *testing.T) {
 	paths := writeRAMContractDocsSet(t, validRAMContractDocsBody())
 	if err := verifyRAMContractCompilerDocs(paths, []featureManifest{validVerifyDocsRAMContractFeature()}); err != nil {
