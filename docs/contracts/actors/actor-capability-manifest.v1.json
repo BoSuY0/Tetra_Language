@@ -1,0 +1,543 @@
+{
+  "schema": "tetra.actor.capability_manifest.v1",
+  "profile": "actor-runtime-foundation",
+  "required_capabilities": [
+    {
+      "id": "local_actor_runtime",
+      "status": "current_scoped",
+      "supported_targets": [
+        "linux-x64",
+        "macos-x64",
+        "windows-x64"
+      ]
+    },
+    {
+      "id": "distributed_actor_runtime_linux_x64",
+      "status": "current_scoped",
+      "supported_targets": [
+        "linux-x64"
+      ],
+      "required_transport_terms": [
+        "actornet",
+        "loopback-tcp"
+      ]
+    },
+    {
+      "id": "actor_runtime_foundation_linux_x64",
+      "status": "current_scoped",
+      "supported_targets": [
+        "linux-x64"
+      ],
+      "release_note_terms": [
+        "actor runtime foundation evidence",
+        "strict Linux-x64 gate",
+        "actor-runtime-foundation-manifest.json",
+        "distributed-actors-linux-x64/distributed-actors-linux-x64.json",
+        "parallel-production-linux-x64/parallel-production-linux-x64.json"
+      ]
+    },
+    {
+      "id": "actor_transport_evidence_contract",
+      "status": "current_scoped",
+      "supported_targets": [
+        "linux-x64"
+      ],
+      "required_transport_terms": [
+        "transport-only",
+        "not distributed runtime proof"
+      ]
+    },
+    {
+      "id": "scheduler_prototype",
+      "status": "current_scoped",
+      "supported_targets": [
+        "linux-x64"
+      ]
+    },
+    {
+      "id": "production_multithreaded_scheduler",
+      "status": "blocked",
+      "supported_targets": []
+    },
+    {
+      "id": "supervision_restart_tree",
+      "status": "blocked",
+      "supported_targets": []
+    },
+    {
+      "id": "actor_lifecycle_supervision",
+      "status": "blocked",
+      "supported_targets": []
+    },
+    {
+      "id": "cluster_membership",
+      "status": "blocked",
+      "supported_targets": []
+    },
+    {
+      "id": "reconnect_retry_tls_auth",
+      "status": "blocked",
+      "supported_targets": []
+    },
+    {
+      "id": "non_linux_distributed_runtime",
+      "status": "blocked",
+      "supported_targets": []
+    },
+    {
+      "id": "distributed_region_serialization",
+      "status": "blocked",
+      "supported_targets": []
+    },
+    {
+      "id": "full_structured_concurrency",
+      "status": "blocked",
+      "supported_targets": []
+    },
+    {
+      "id": "formal_race_liveness_proof",
+      "status": "blocked",
+      "supported_targets": []
+    },
+    {
+      "id": "production_broker_deployment",
+      "status": "blocked",
+      "supported_targets": []
+    }
+  ],
+  "required_nonclaim_terms": [
+    "erlang",
+    "cluster",
+    "reconnect",
+    "retry",
+    "non-linux",
+    "zero-copy",
+    "formal race"
+  ],
+  "required_nonclaims": [
+    "no full Erlang/OTP actor runtime claim",
+    "no cluster membership or reconnect/retry production claim",
+    "no non-Linux distributed actor runtime support claim",
+    "no distributed zero-copy pointer or region transfer claim",
+    "no formal race proof claim"
+  ],
+  "forbidden_claims": [
+    "full Erlang/OTP actor runtime",
+    "cluster membership",
+    "reconnect/retry production",
+    "non-Linux distributed actor runtime",
+    "distributed zero-copy pointer or region transfer",
+    "formal race proof"
+  ],
+  "docs_refs": [
+    "docs/spec/actors.md",
+    "docs/user/async_actors_guide.md",
+    "docs/audits/actor-runtime-production-boundary-v1.md",
+    "docs/design/actor_region_transfer.md"
+  ],
+  "validator_refs": [
+    {
+      "id": "validate-actor-runtime-foundation",
+      "path": "tools/cmd/validate-actor-runtime-foundation"
+    },
+    {
+      "id": "validate-distributed-actor-runtime",
+      "path": "tools/cmd/validate-distributed-actor-runtime"
+    },
+    {
+      "id": "actorprod",
+      "path": "tools/validators/actorprod"
+    },
+    {
+      "id": "actordist",
+      "path": "tools/validators/actordist"
+    }
+  ],
+  "gate_refs": [
+    {
+      "id": "actor-runtime-foundation-linux-x64-gate",
+      "path": "scripts/release/post_v0_4/actor-runtime-foundation-linux-x64-gate.sh",
+      "claim_check": true
+    },
+    {
+      "id": "distributed-actors-linux-x64-smoke",
+      "path": "scripts/release/v0_4_0/distributed-actors-linux-x64-smoke.sh"
+    },
+    {
+      "id": "parallel-production-linux-x64-smoke",
+      "path": "scripts/release/post_v0_4/parallel-production-linux-x64-smoke.sh"
+    },
+    {
+      "id": "ci-actor-runtime-foundation-linux",
+      "path": ".github/workflows/ci.yml"
+    },
+    {
+      "id": "actor-claims-regression-pr",
+      "path": ".github/workflows/actor-claims-regression.yml"
+    },
+    {
+      "id": "release-packages-actor-runtime-foundation",
+      "path": ".github/workflows/release-packages.yml",
+      "claim_check": true,
+      "release_note_check": true
+    }
+  ],
+  "contract_refs": [
+    {
+      "id": "actor-runtime-foundation-linux-x64-contract",
+      "path": "scripts/release/post_v0_4/contracts/actor-runtime-foundation-linux-x64.json",
+      "capability_id": "actor_runtime_foundation_linux_x64",
+      "claim_check": true,
+      "nonclaim_check": true,
+      "target_check": true,
+      "validator_check": true,
+      "required_reports": [
+        "actor-runtime-foundation-manifest.json",
+        "artifact-hashes.json",
+        "distributed-actors-linux-x64/distributed-actors-linux-x64.json",
+        "parallel-production-linux-x64/parallel-production-linux-x64.json"
+      ],
+      "required_gate_refs": [
+        "scripts/release/post_v0_4/actor-runtime-foundation-linux-x64-gate.sh",
+        "scripts/release/v0_4_0/distributed-actors-linux-x64-smoke.sh",
+        "scripts/release/post_v0_4/parallel-production-linux-x64-smoke.sh"
+      ]
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "local_actor_runtime",
+      "status": "current_scoped",
+      "supported_targets": [
+        "linux-x64",
+        "macos-x64",
+        "windows-x64"
+      ],
+      "runtime_boundary": "single-thread cooperative",
+      "claims": [
+        "x64 local actor runtime build/run surface with bounded cooperative scheduler evidence"
+      ],
+      "nonclaims": [
+        "no full Erlang/OTP actor runtime claim",
+        "no cluster membership or reconnect/retry production claim",
+        "no non-Linux distributed actor runtime support claim",
+        "no distributed zero-copy pointer or region transfer claim",
+        "no formal race proof claim"
+      ],
+      "evidence_refs": [
+        "docs/spec/actors.md"
+      ],
+      "validator_refs": [
+        "validate-actor-runtime-foundation"
+      ],
+      "docs_refs": [
+        "docs/spec/actors.md",
+        "docs/user/async_actors_guide.md"
+      ]
+    },
+    {
+      "id": "distributed_actor_runtime_linux_x64",
+      "status": "current_scoped",
+      "supported_targets": [
+        "linux-x64"
+      ],
+      "transport": "actornet loopback-tcp",
+      "claims": [
+        "linux-x64 loopback tcp distributed actor runtime smoke evidence with broker, process, frame, and negative-case validation"
+      ],
+      "nonclaims": [
+        "no transport-only evidence promotion to distributed runtime proof",
+        "no cluster membership or reconnect/retry production claim",
+        "no non-Linux distributed actor runtime support claim",
+        "no distributed zero-copy pointer or region transfer claim"
+      ],
+      "evidence_refs": [
+        "scripts/release/v0_4_0/distributed-actors-linux-x64-smoke.sh"
+      ],
+      "validator_refs": [
+        "validate-distributed-actor-runtime",
+        "actordist"
+      ],
+      "docs_refs": [
+        "docs/spec/actors.md",
+        "docs/user/async_actors_guide.md"
+      ]
+    },
+    {
+      "id": "actor_runtime_foundation_linux_x64",
+      "status": "current_scoped",
+      "supported_targets": [
+        "linux-x64"
+      ],
+      "claims": [
+        "linux-x64 scoped actor/task runtime foundation evidence"
+      ],
+      "nonclaims": [
+        "no full Erlang/OTP actor runtime claim",
+        "no cluster membership or reconnect/retry production claim",
+        "no non-Linux distributed actor runtime support claim",
+        "no distributed zero-copy pointer or region transfer claim",
+        "no formal race proof claim"
+      ],
+      "evidence_refs": [
+        "scripts/release/post_v0_4/actor-runtime-foundation-linux-x64-gate.sh"
+      ],
+      "validator_refs": [
+        "validate-actor-runtime-foundation",
+        "actorprod"
+      ],
+      "docs_refs": [
+        "docs/audits/actor-runtime-production-boundary-v1.md",
+        "docs/spec/actors.md"
+      ]
+    },
+    {
+      "id": "actor_transport_evidence_contract",
+      "status": "current_scoped",
+      "supported_targets": [
+        "linux-x64"
+      ],
+      "transport": "transport-only evidence contract; not distributed runtime proof",
+      "claims": [
+        "tetra.actors.transport.v1 validates actornet frame integrity and broker evidence boundaries"
+      ],
+      "nonclaims": [
+        "transport-only evidence is not distributed runtime proof",
+        "no cluster membership or reconnect/retry production claim",
+        "no non-Linux distributed actor runtime support claim"
+      ],
+      "evidence_refs": [
+        "docs/spec/actors.md"
+      ],
+      "validator_refs": [
+        "actordist"
+      ],
+      "docs_refs": [
+        "docs/spec/actors.md",
+        "docs/user/async_actors_guide.md"
+      ]
+    },
+    {
+      "id": "scheduler_prototype",
+      "status": "current_scoped",
+      "supported_targets": [
+        "linux-x64"
+      ],
+      "runtime_boundary": "prototype/model evidence only",
+      "claims": [
+        "per-core scheduler prototype/model evidence exists for bounded validation rows"
+      ],
+      "nonclaims": [
+        "no production multi-threaded actor scheduler claim",
+        "no full Erlang/OTP actor runtime claim",
+        "no formal race proof claim"
+      ],
+      "evidence_refs": [
+        "docs/audits/actor-runtime-production-boundary-v1.md",
+        "scripts/release/post_v0_4/parallel-production-linux-x64-smoke.sh"
+      ],
+      "validator_refs": [
+        "actorprod"
+      ],
+      "docs_refs": [
+        "docs/audits/actor-runtime-production-boundary-v1.md",
+        "docs/user/async_actors_guide.md"
+      ]
+    },
+    {
+      "id": "production_multithreaded_scheduler",
+      "status": "blocked",
+      "supported_targets": [],
+      "claims": [],
+      "nonclaims": [],
+      "evidence_refs": [],
+      "validator_refs": [],
+      "docs_refs": [
+        "docs/plans/2026-06-10-actor-runtime-post-scope-blockers.md"
+      ],
+      "promotion_requirements": [
+        "integrated runtime scheduler implementation",
+        "actor/task compatibility tests",
+        "stress tests",
+        "race-enabled evidence",
+        "validator rejection of prototype-only scheduler promotion"
+      ]
+    },
+    {
+      "id": "supervision_restart_tree",
+      "status": "blocked",
+      "supported_targets": [],
+      "claims": [],
+      "nonclaims": [],
+      "evidence_refs": [],
+      "validator_refs": [],
+      "docs_refs": [
+        "docs/plans/2026-06-10-actor-runtime-post-scope-blockers.md"
+      ],
+      "promotion_requirements": [
+        "source API/spec",
+        "runtime state machine",
+        "failure propagation",
+        "restart semantics",
+        "mailbox drain lifecycle",
+        "lifecycle tests",
+        "release-gated evidence"
+      ]
+    },
+    {
+      "id": "actor_lifecycle_supervision",
+      "status": "blocked",
+      "supported_targets": [],
+      "claims": [],
+      "nonclaims": [],
+      "evidence_refs": [],
+      "validator_refs": [],
+      "docs_refs": [
+        "docs/plans/2026-06-10-actor-runtime-post-scope-blockers.md"
+      ],
+      "promotion_requirements": [
+        "actor status API",
+        "actor join or wait API",
+        "exit code visibility",
+        "explicit failed/done states",
+        "lifecycle tests",
+        "release-gated evidence"
+      ]
+    },
+    {
+      "id": "cluster_membership",
+      "status": "blocked",
+      "supported_targets": [],
+      "claims": [],
+      "nonclaims": [],
+      "evidence_refs": [],
+      "validator_refs": [],
+      "docs_refs": [
+        "docs/plans/2026-06-10-actor-runtime-post-scope-blockers.md"
+      ],
+      "promotion_requirements": [
+        "membership protocol",
+        "node join/leave/failure semantics",
+        "partition behavior",
+        "executable multi-node evidence",
+        "validator non-fake checks"
+      ]
+    },
+    {
+      "id": "reconnect_retry_tls_auth",
+      "status": "blocked",
+      "supported_targets": [],
+      "claims": [],
+      "nonclaims": [],
+      "evidence_refs": [],
+      "validator_refs": [],
+      "docs_refs": [
+        "docs/plans/2026-06-10-actor-runtime-post-scope-blockers.md"
+      ],
+      "promotion_requirements": [
+        "reconnect and retry state machine",
+        "authenticated transport",
+        "TLS policy",
+        "credential handling",
+        "negative security tests",
+        "threat-model updates"
+      ]
+    },
+    {
+      "id": "non_linux_distributed_runtime",
+      "status": "blocked",
+      "supported_targets": [],
+      "claims": [],
+      "nonclaims": [],
+      "evidence_refs": [],
+      "validator_refs": [],
+      "docs_refs": [
+        "docs/plans/2026-06-10-actor-runtime-post-scope-blockers.md"
+      ],
+      "promotion_requirements": [
+        "target-specific runtime implementation",
+        "host execution evidence",
+        "same-head distributed reports",
+        "artifact hashes"
+      ]
+    },
+    {
+      "id": "distributed_region_serialization",
+      "status": "blocked",
+      "supported_targets": [],
+      "claims": [],
+      "nonclaims": [],
+      "evidence_refs": [],
+      "validator_refs": [],
+      "docs_refs": [
+        "docs/plans/2026-06-10-actor-runtime-post-scope-blockers.md"
+      ],
+      "promotion_requirements": [
+        "serialization contract for owned regions",
+        "receiver ownership reconstruction",
+        "lifetime/provenance checks",
+        "negative unsafe payload cases",
+        "distributed smoke evidence"
+      ]
+    },
+    {
+      "id": "full_structured_concurrency",
+      "status": "blocked",
+      "supported_targets": [],
+      "claims": [],
+      "nonclaims": [],
+      "evidence_refs": [],
+      "validator_refs": [],
+      "docs_refs": [
+        "docs/plans/2026-06-10-actor-runtime-post-scope-blockers.md"
+      ],
+      "promotion_requirements": [
+        "unified task/actor cancellation model",
+        "parent/child lifetime rules",
+        "deadline propagation",
+        "resource cleanup semantics",
+        "cross-API conformance tests"
+      ]
+    },
+    {
+      "id": "formal_race_liveness_proof",
+      "status": "blocked",
+      "supported_targets": [],
+      "claims": [],
+      "nonclaims": [],
+      "evidence_refs": [],
+      "validator_refs": [],
+      "docs_refs": [
+        "docs/plans/2026-06-10-actor-runtime-post-scope-blockers.md"
+      ],
+      "promotion_requirements": [
+        "expanded race/stress matrix",
+        "liveness properties",
+        "starvation/fairness checks",
+        "scheduler/transport adversarial tests",
+        "formal or machine-checkable proof artifacts where claimed"
+      ]
+    },
+    {
+      "id": "production_broker_deployment",
+      "status": "blocked",
+      "supported_targets": [],
+      "claims": [],
+      "nonclaims": [],
+      "evidence_refs": [],
+      "validator_refs": [],
+      "docs_refs": [
+        "docs/plans/2026-06-10-actor-runtime-post-scope-blockers.md"
+      ],
+      "promotion_requirements": [
+        "deployment profile",
+        "operational limits",
+        "observability",
+        "graceful upgrade and shutdown",
+        "external network hardening",
+        "security review",
+        "release-gated deployment smoke"
+      ]
+    }
+  ]
+}
