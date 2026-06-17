@@ -231,6 +231,7 @@ func TestReleasePackagesRunsActorRuntimeFoundationGateBeforePublishing(t *testin
 		"`distributed-actors-linux-x64/distributed-actors-linux-x64.json`",
 		"`parallel-production-linux-x64/parallel-production-linux-x64.json`",
 		"Actor runtime foundation evidence remains Linux-x64 scoped; Erlang/OTP, cluster membership, reconnect/retry production, non-Linux distributed runtime, distributed zero-copy transfer, and formal race proof are not claimed.",
+		`go run ./tools/cmd/validate-actor-capabilities --manifest docs/contracts/actors/actor-capability-manifest.v1.json --release-notes "$notes"`,
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("release-packages workflow missing actor runtime foundation gate detail %q", want)
@@ -256,6 +257,12 @@ func TestReleasePackagesRunsActorRuntimeFoundationGateBeforePublishing(t *testin
 	if section := releaseStepWindow(text, "name: Actor runtime foundation release gate", "name: Upload package artifacts"); strings.Contains(section, "continue-on-error") {
 		t.Fatalf("actor runtime foundation release gate must not use continue-on-error")
 	}
+	assertOrderedFragments(t, text,
+		`notes="$out_dir/release-notes.md"`,
+		"notes.write_text(textwrap.dedent",
+		`go run ./tools/cmd/validate-actor-capabilities --manifest docs/contracts/actors/actor-capability-manifest.v1.json --release-notes "$notes"`,
+		`gh release upload "$version"`,
+	)
 }
 
 func TestReleasePackagesRunsMemory100ProdStableGateBeforePublishing(t *testing.T) {

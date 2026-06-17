@@ -281,6 +281,7 @@ jobs:
           No fastest-language, official benchmark, target parity, or broad zero-cost performance claim is made by these package notes.
           """), encoding="utf-8")
           PY
+          go run ./tools/cmd/validate-actor-capabilities --manifest docs/contracts/actors/actor-capability-manifest.v1.json --release-notes "$notes"
           if gh release view "$version" >/dev/null 2>&1; then
             existing_target="$(gh release view "$version" --json targetCommitish -q .targetCommitish)"
             if [[ "$existing_target" != "$GITHUB_SHA" ]]; then
