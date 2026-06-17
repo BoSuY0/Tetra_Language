@@ -363,17 +363,102 @@ func staleRAMContractReadinessGitHead(text string) (string, bool) {
 	if len(match) != 2 {
 		return "", false
 	}
-	current, ok := currentGitHeadForDocs()
-	if !ok {
-		return "", false
-	}
-	if match[1] != current {
-		parent, ok := currentGitParentForDocs()
-		if !ok || match[1] != parent {
-			return match[1], true
-		}
+	if ramContractReadinessGitHeadIsStale(match[1], ramContractGitFreshness{
+		current:               currentGitHeadForDocs,
+		parent:                currentGitParentForDocs,
+		surfaceUnchangedSince: ramContractReadinessSurfaceUnchangedSince,
+	}) {
+		return match[1], true
 	}
 	return "", false
+}
+
+type ramContractGitFreshness struct {
+	current               func() (string, bool)
+	parent                func() (string, bool)
+	surfaceUnchangedSince func(string) (bool, bool)
+}
+
+func ramContractReadinessGitHeadIsStale(evidenceHead string, freshness ramContractGitFreshness) bool {
+	current, ok := freshness.current()
+	if !ok {
+		return false
+	}
+	if evidenceHead == current {
+		return false
+	}
+	parent, ok := freshness.parent()
+	if ok && evidenceHead == parent {
+		return false
+	}
+	if freshness.surfaceUnchangedSince != nil {
+		unchanged, ok := freshness.surfaceUnchangedSince(evidenceHead)
+		if ok && unchanged {
+			return false
+		}
+	}
+	return true
+}
+
+var ramContractReadinessPathFreshnessPaths = []string{
+	"cli/cmd/tetra/ram_contract_cli_test.go",
+	"compiler/ram_contract_build_test.go",
+	"compiler/internal/allocplan",
+	"compiler/internal/memoryfacts",
+	"compiler/internal/proof",
+	"compiler/internal/ramcontract",
+	"docs/audits/ram-contract-compiler-handoff.md",
+	"docs/design/ram_contract_compiler.md",
+	"docs/spec/ram_contract_report_schema.md",
+	"docs/user/ram_contracts.md",
+	"scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh",
+	"tools/cmd/ram-contract-fuzz-short",
+	"tools/cmd/validate-copy-blockers",
+	"tools/cmd/validate-heap-blockers",
+	"tools/cmd/validate-memory-grade-report",
+	"tools/cmd/validate-proof-store-summary",
+	"tools/cmd/validate-ram-contract-fuzz-oracle",
+	"tools/cmd/validate-ram-contract-release",
+	"tools/cmd/validate-ram-contract-report",
+	"tools/cmd/validate-validation-pipeline-coverage",
+	"tools/internal/ramvalidate",
+}
+
+var ramContractReadinessContentFreshnessPaths = []string{
+	".github/workflows/ci.yml",
+	".github/workflows/release-packages.yml",
+}
+
+var ramContractReadinessContentFreshnessTerms = []string{
+	"RAM Contract",
+	"ram-contract",
+	"ram_contract",
+}
+
+func ramContractReadinessSurfaceUnchangedSince(evidenceHead string) (bool, bool) {
+	if err := exec.Command("git", "merge-base", "--is-ancestor", evidenceHead, "HEAD").Run(); err != nil {
+		return false, true
+	}
+	args := append([]string{"diff", "--name-only", evidenceHead + "..HEAD", "--"}, ramContractReadinessPathFreshnessPaths...)
+	out, err := exec.Command("git", args...).Output()
+	if err != nil {
+		return false, false
+	}
+	if strings.TrimSpace(string(out)) != "" {
+		return false, true
+	}
+	args = append([]string{"diff", "--unified=0", evidenceHead + "..HEAD", "--"}, ramContractReadinessContentFreshnessPaths...)
+	out, err = exec.Command("git", args...).Output()
+	if err != nil {
+		return false, false
+	}
+	diff := string(out)
+	for _, term := range ramContractReadinessContentFreshnessTerms {
+		if strings.Contains(diff, term) {
+			return false, true
+		}
+	}
+	return true, true
 }
 
 func currentGitHeadForDocs() (string, bool) {
