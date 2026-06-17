@@ -144,8 +144,7 @@ envelope/trace/hash report, but distributed actor runtime support is proven by
 `scripts/release/v0_4_0/distributed-actors-linux-x64-smoke.sh` plus
 `tools/cmd/validate-distributed-actor-runtime`. The distributed runtime report
 must carry same-commit `git_head`, `artifact_hashes`, ordered frame evidence,
-and explicit nonclaims for cluster membership, reconnect/retry production, and
-non-Linux distributed actor runtime support.
+and the exact foundation nonclaims listed below.
 
 The scoped actor foundation gate also runs a race-enabled actor slice and
 requires `actor broker leak cleanup` in parallel production evidence. Treat that

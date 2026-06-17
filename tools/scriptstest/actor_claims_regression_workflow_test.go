@@ -38,3 +38,22 @@ func TestActorClaimsRegressionWorkflowRunsOnPRAndPushWithoutReleaseGate(t *testi
 		}
 	}
 }
+
+func TestActorClaimsRegressionWorkflowCoversLegacyActorDocs(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "actor-claims-regression.yml"))
+	if err != nil {
+		t.Fatalf("read actor claims regression workflow: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		`"docs/spec/runtime/actors.md"`,
+		`"docs/user/platform/async_actors_guide.md"`,
+		`"docs/audits/runtime/actors/**"`,
+		`"docs/plans/**actor**"`,
+		`"docs/plans/**actors**"`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("actor claims regression workflow missing actor docs path filter %q", want)
+		}
+	}
+}
