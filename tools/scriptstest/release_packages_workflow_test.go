@@ -230,7 +230,7 @@ func TestReleasePackagesRunsActorRuntimeFoundationGateBeforePublishing(t *testin
 		"`artifact-hashes.json`",
 		"`distributed-actors-linux-x64/distributed-actors-linux-x64.json`",
 		"`parallel-production-linux-x64/parallel-production-linux-x64.json`",
-		"Actor runtime foundation evidence remains Linux-x64 scoped; Erlang/OTP, cluster membership, reconnect/retry production, non-Linux distributed runtime, distributed zero-copy transfer, and formal race proof are not claimed.",
+		"Actor runtime foundation nonclaims remain explicit: no full Erlang/OTP actor runtime claim; no cluster membership or reconnect/retry production claim; no non-Linux distributed actor runtime support claim; no distributed zero-copy pointer or region transfer claim; and no formal race proof claim.",
 		`go run ./tools/cmd/validate-actor-capabilities --manifest docs/contracts/actors/actor-capability-manifest.v1.json --release-notes "$notes"`,
 	} {
 		if !strings.Contains(text, want) {

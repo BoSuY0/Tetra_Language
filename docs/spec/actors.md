@@ -17,8 +17,8 @@ Actors are supported on x64 targets:
 `host == target` (for example, `windows-x64` binaries are run only on Windows hosts).
 
 The scoped production foundation claim below is narrower than the build matrix:
-it is Linux-x64 actor/task runtime foundation evidence, not a Windows/macOS
-runtime production claim and not a non-Linux distributed actor runtime claim.
+it is Linux-x64 actor/task runtime foundation evidence, not Windows/macOS
+runtime production evidence and not a distributed actor target-parity claim.
 
 ## Goals
 
@@ -195,8 +195,8 @@ Typed actor messages are supported as an enum-only MVP:
   explicit `.copy()`, mutable global targets are rejected across actor/task
   boundaries, unsafe pointer payloads require an audited unsafe contract and
   remain rejected in safe typed actor payloads, and island region transfer is
-  handled by the scoped actor/island proof track. This provides no formal race
-  proof and no lock/atomic shared-memory model.
+  handled by the scoped actor/island proof track. This is not a formal
+  concurrency proof and provides no lock/atomic shared-memory model.
 - Linux-x64 parallel production evidence requires an `actor island boundary
   proof` case. That case exercises the Memory/Island handoff facts for
   actor/task/island boundaries and is validator-gated by `parallelprod`; it is
@@ -342,9 +342,8 @@ The current claim is deliberately platform-bounded. Non-Linux-x64 distributed
 actor runtimes, multi-threaded actor scheduling, and broader structured
 concurrency guarantees beyond the current cooperative task group handles require
 separate promotion evidence. The distributed runtime report also carries
-explicit nonclaims for cluster membership, reconnect/retry production, and
-non-Linux distributed actor runtime support; validators reject positive claims
-for those capabilities in this slice.
+the exact foundation nonclaims above; validators reject positive claims for
+those capabilities in this slice.
 
 ## Transport Evidence Contract
 
@@ -358,7 +357,7 @@ ordered trace that must contain a source `send` followed by a destination
 This validator is release-gate evidence for transport artifact shape and
 integrity only. It is not a distributed runtime implementation, network mailbox
 ABI, retry protocol, or ordering guarantee beyond the single recorded envelope.
-It provides no cluster membership protocol.
+It provides no membership protocol.
 
 ## Runtime ABI surface (internal)
 

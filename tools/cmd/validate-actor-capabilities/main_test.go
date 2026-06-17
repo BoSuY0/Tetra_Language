@@ -120,6 +120,58 @@ func TestValidateActorCapabilityRejectsDocsMissingRequiredNonclaimTerms(t *testi
 	}
 }
 
+func TestValidateActorCapabilityRejectsDocsMissingRequiredNonclaimPhrase(t *testing.T) {
+	fixture := writeMinimalActorCapabilitiesFixture(t, minimalActorCapabilitiesOptions{
+		DocText: strings.Join([]string{"erlang", "cluster", "reconnect", "retry", "non-linux", "zero-copy", "formal race"}, "\n"),
+	})
+	err := validateActorCapabilitiesManifestFile(fixture.ManifestPath, fixture.Root)
+	if err == nil {
+		t.Fatalf("expected docs exact nonclaim phrase rejection")
+	}
+	if !strings.Contains(err.Error(), "missing required nonclaim phrase") {
+		t.Fatalf("error = %v, want missing required nonclaim phrase", err)
+	}
+}
+
+func TestValidateActorCapabilityRejectsDocsForbiddenActorPromotionClaim(t *testing.T) {
+	fixture := writeMinimalActorCapabilitiesFixture(t, minimalActorCapabilitiesOptions{
+		DocText: minimalRequiredNonclaimsText() + "\nTetra now supports full Erlang/OTP actor runtime.",
+	})
+	err := validateActorCapabilitiesManifestFile(fixture.ManifestPath, fixture.Root)
+	if err == nil {
+		t.Fatalf("expected docs forbidden actor promotion rejection")
+	}
+	if !strings.Contains(err.Error(), "forbidden actor promotion claim") {
+		t.Fatalf("error = %v, want forbidden actor promotion claim", err)
+	}
+}
+
+func TestValidateActorCapabilityRejectsGateForbiddenActorPromotionClaim(t *testing.T) {
+	fixture := writeMinimalActorCapabilitiesFixture(t, minimalActorCapabilitiesOptions{
+		GateText: minimalRequiredNonclaimsText() + "\nTetra now supports cluster membership.",
+	})
+	err := validateActorCapabilitiesManifestFile(fixture.ManifestPath, fixture.Root)
+	if err == nil {
+		t.Fatalf("expected gate forbidden actor promotion rejection")
+	}
+	if !strings.Contains(err.Error(), "forbidden actor promotion claim") {
+		t.Fatalf("error = %v, want forbidden actor promotion claim", err)
+	}
+}
+
+func TestValidateActorCapabilityRejectsReleaseNotesForbiddenActorPromotionClaim(t *testing.T) {
+	fixture := writeMinimalActorCapabilitiesFixture(t, minimalActorCapabilitiesOptions{
+		ReleaseNotesText: minimalRequiredNonclaimsText() + "\nActor runtime foundation evidence.\nTetra now supports full Erlang/OTP actor runtime.",
+	})
+	err := validateActorCapabilitiesManifestFileWithOptions(fixture.ManifestPath, fixture.Root, actorCapabilityValidationOptions{ReleaseNotes: []string{fixture.ReleaseNotesPath}})
+	if err == nil {
+		t.Fatalf("expected release notes forbidden actor promotion rejection")
+	}
+	if !strings.Contains(err.Error(), "forbidden actor promotion claim") {
+		t.Fatalf("error = %v, want forbidden actor promotion claim", err)
+	}
+}
+
 func TestValidateActorCapabilityRejectsReleaseNotesMissingManifestTerms(t *testing.T) {
 	root := repoRoot(t)
 	manifest := filepath.Join(root, "docs", "contracts", "actors", "actor-capability-manifest.v1.json")
@@ -136,6 +188,32 @@ func TestValidateActorCapabilityRejectsReleaseNotesMissingManifestTerms(t *testi
 	}
 }
 
+func TestValidateActorCapabilityRejectsReleaseContractClaimDrift(t *testing.T) {
+	fixture := writeMinimalActorCapabilitiesFixture(t, minimalActorCapabilitiesOptions{
+		ContractClaims: []string{"full Erlang/OTP actor runtime"},
+	})
+	err := validateActorCapabilitiesManifestFile(fixture.ManifestPath, fixture.Root)
+	if err == nil {
+		t.Fatalf("expected release contract claim drift rejection")
+	}
+	if !strings.Contains(err.Error(), "contract") || !strings.Contains(err.Error(), "claim") {
+		t.Fatalf("error = %v, want contract claim drift", err)
+	}
+}
+
+func TestValidateActorCapabilityRejectsReleaseContractTargetDrift(t *testing.T) {
+	fixture := writeMinimalActorCapabilitiesFixture(t, minimalActorCapabilitiesOptions{
+		ContractTarget: "macos-x64",
+	})
+	err := validateActorCapabilitiesManifestFile(fixture.ManifestPath, fixture.Root)
+	if err == nil {
+		t.Fatalf("expected release contract target drift rejection")
+	}
+	if !strings.Contains(err.Error(), "contract") || !strings.Contains(err.Error(), "target") {
+		t.Fatalf("error = %v, want contract target drift", err)
+	}
+}
+
 func writeActorCapabilitiesFixture(t *testing.T, raw string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "actor-capability-manifest.v1.json")
@@ -143,6 +221,164 @@ func writeActorCapabilitiesFixture(t *testing.T, raw string) string {
 		t.Fatal(err)
 	}
 	return path
+}
+
+type minimalActorCapabilitiesFixture struct {
+	Root             string
+	ManifestPath     string
+	ReleaseNotesPath string
+}
+
+type minimalActorCapabilitiesOptions struct {
+	DocText          string
+	GateText         string
+	ReleaseNotesText string
+	ContractClaims   []string
+	ContractTarget   string
+}
+
+func writeMinimalActorCapabilitiesFixture(t *testing.T, options minimalActorCapabilitiesOptions) minimalActorCapabilitiesFixture {
+	t.Helper()
+	root := t.TempDir()
+	requiredNonclaims := minimalRequiredNonclaims()
+	docText := options.DocText
+	if docText == "" {
+		docText = minimalRequiredNonclaimsText()
+	}
+	gateText := options.GateText
+	if gateText == "" {
+		gateText = minimalRequiredNonclaimsText()
+	}
+	releaseNotesText := options.ReleaseNotesText
+	if releaseNotesText == "" {
+		releaseNotesText = minimalRequiredNonclaimsText() + "\nActor runtime foundation evidence."
+	}
+	contractClaims := options.ContractClaims
+	if len(contractClaims) == 0 {
+		contractClaims = []string{"linux-x64 scoped actor/task runtime foundation evidence"}
+	}
+	contractTarget := options.ContractTarget
+	if contractTarget == "" {
+		contractTarget = "linux-x64"
+	}
+
+	writeFixtureFile(t, root, "docs/actors.md", docText)
+	writeFixtureFile(t, root, "gates/actor-gate.sh", gateText)
+	writeFixtureFile(t, root, "release-notes.md", releaseNotesText)
+	if err := os.MkdirAll(filepath.Join(root, "tools", "validate-actor-runtime-foundation"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	contract := map[string]any{
+		"schema":        "tetra.actor.release_contract.v1",
+		"id":            "actor-runtime-foundation-linux-x64-contract",
+		"capability_id": "actor_runtime_foundation_linux_x64",
+		"target":        contractTarget,
+		"scope":         contractTarget,
+		"claims":        contractClaims,
+		"nonclaims":     requiredNonclaims,
+		"validators":    []string{"validate-actor-runtime-foundation"},
+		"reports":       []string{"actor-runtime-foundation-manifest.json"},
+		"gate_refs":     []string{"gates/actor-gate.sh"},
+	}
+	writeFixtureJSON(t, root, "contracts/actor-runtime-foundation-linux-x64.json", contract)
+
+	manifest := map[string]any{
+		"schema":  "tetra.actor.capability_manifest.v1",
+		"profile": "actor-runtime-foundation",
+		"required_capabilities": []any{
+			map[string]any{
+				"id":                "actor_runtime_foundation_linux_x64",
+				"status":            "current_scoped",
+				"supported_targets": []string{"linux-x64"},
+				"release_note_terms": []string{
+					"actor runtime foundation evidence",
+				},
+			},
+		},
+		"required_nonclaim_terms": []string{"erlang", "cluster", "reconnect", "retry", "non-linux", "zero-copy", "formal race"},
+		"required_nonclaims":      requiredNonclaims,
+		"forbidden_claims": []string{
+			"full Erlang/OTP actor runtime",
+			"cluster membership",
+			"reconnect/retry production",
+			"non-Linux distributed actor runtime",
+			"distributed zero-copy pointer or region transfer",
+			"formal race proof",
+		},
+		"docs_refs": []string{"docs/actors.md"},
+		"validator_refs": []any{
+			map[string]any{"id": "validate-actor-runtime-foundation", "path": "tools/validate-actor-runtime-foundation"},
+		},
+		"gate_refs": []any{
+			map[string]any{"id": "actor-gate", "path": "gates/actor-gate.sh", "claim_check": true},
+		},
+		"contract_refs": []any{
+			map[string]any{
+				"id":                 "actor-runtime-foundation-linux-x64-contract",
+				"path":               "contracts/actor-runtime-foundation-linux-x64.json",
+				"capability_id":      "actor_runtime_foundation_linux_x64",
+				"claim_check":        true,
+				"nonclaim_check":     true,
+				"target_check":       true,
+				"validator_check":    true,
+				"required_reports":   []string{"actor-runtime-foundation-manifest.json"},
+				"required_gate_refs": []string{"gates/actor-gate.sh"},
+			},
+		},
+		"capabilities": []any{
+			map[string]any{
+				"id":                "actor_runtime_foundation_linux_x64",
+				"status":            "current_scoped",
+				"supported_targets": []string{"linux-x64"},
+				"claims":            []string{"linux-x64 scoped actor/task runtime foundation evidence"},
+				"nonclaims":         requiredNonclaims,
+				"evidence_refs":     []string{"gates/actor-gate.sh"},
+				"validator_refs":    []string{"validate-actor-runtime-foundation"},
+				"docs_refs":         []string{"docs/actors.md"},
+			},
+		},
+	}
+	writeFixtureJSON(t, root, "actor-capability-manifest.v1.json", manifest)
+	return minimalActorCapabilitiesFixture{
+		Root:             root,
+		ManifestPath:     filepath.Join(root, "actor-capability-manifest.v1.json"),
+		ReleaseNotesPath: filepath.Join(root, "release-notes.md"),
+	}
+}
+
+func writeFixtureFile(t *testing.T, root, path, contents string) {
+	t.Helper()
+	fullPath := filepath.Join(root, filepath.FromSlash(path))
+	if err := os.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(fullPath, []byte(contents), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeFixtureJSON(t *testing.T, root, path string, value any) {
+	t.Helper()
+	raw, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFixtureFile(t, root, path, string(raw))
+}
+
+func minimalRequiredNonclaims() []string {
+	return []string{
+		"no full Erlang/OTP actor runtime claim",
+		"no cluster membership or reconnect/retry production claim",
+		"no non-Linux distributed actor runtime support claim",
+		"no distributed zero-copy pointer or region transfer claim",
+		"no formal race proof claim",
+	}
+}
+
+func minimalRequiredNonclaimsText() string {
+	return strings.Join(minimalRequiredNonclaims(), "\n")
 }
 
 func actorCapabilitiesFixtureWithoutCapability(t *testing.T, id string) string {

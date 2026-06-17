@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode"
 )
 
 const actorCapabilityManifestSchemaV1 = "tetra.actor.capability_manifest.v1"
@@ -24,6 +25,7 @@ type actorCapabilityManifest struct {
 	DocsRefs              []string                     `json:"docs_refs"`
 	ValidatorRefs         []manifestRef                `json:"validator_refs"`
 	GateRefs              []manifestRef                `json:"gate_refs"`
+	ContractRefs          []releaseContractRef         `json:"contract_refs"`
 	Capabilities          []actorCapability            `json:"capabilities"`
 }
 
@@ -42,6 +44,18 @@ type manifestRef struct {
 	ReleaseNoteCheck bool   `json:"release_note_check,omitempty"`
 }
 
+type releaseContractRef struct {
+	ID               string   `json:"id"`
+	Path             string   `json:"path"`
+	CapabilityID     string   `json:"capability_id"`
+	ClaimCheck       bool     `json:"claim_check,omitempty"`
+	NonclaimCheck    bool     `json:"nonclaim_check,omitempty"`
+	TargetCheck      bool     `json:"target_check,omitempty"`
+	ValidatorCheck   bool     `json:"validator_check,omitempty"`
+	RequiredReports  []string `json:"required_reports,omitempty"`
+	RequiredGateRefs []string `json:"required_gate_refs,omitempty"`
+}
+
 type actorCapability struct {
 	ID                    string   `json:"id"`
 	Status                string   `json:"status"`
@@ -54,6 +68,19 @@ type actorCapability struct {
 	ValidatorRefs         []string `json:"validator_refs"`
 	DocsRefs              []string `json:"docs_refs"`
 	PromotionRequirements []string `json:"promotion_requirements,omitempty"`
+}
+
+type actorReleaseContract struct {
+	Schema       string   `json:"schema"`
+	ID           string   `json:"id"`
+	CapabilityID string   `json:"capability_id"`
+	Target       string   `json:"target"`
+	Scope        string   `json:"scope"`
+	Claims       []string `json:"claims"`
+	Nonclaims    []string `json:"nonclaims"`
+	Validators   []string `json:"validators"`
+	Reports      []string `json:"reports"`
+	GateRefs     []string `json:"gate_refs"`
 }
 
 type actorCapabilityValidationOptions struct {
@@ -127,11 +154,13 @@ func validateActorCapabilitiesManifest(raw []byte, root string, options actorCap
 	issues = append(issues, validateRefs(root, "docs_refs", stringRefs(manifest.DocsRefs))...)
 	issues = append(issues, validateRefs(root, "validator_refs", manifest.ValidatorRefs)...)
 	issues = append(issues, validateRefs(root, "gate_refs", manifest.GateRefs)...)
-	issues = append(issues, validateDocsCarryRequiredNonclaims(root, manifest.DocsRefs, manifest.RequiredNonclaimTerms)...)
-	issues = append(issues, validateSelectedGateRefsCarryRequiredNonclaims(root, manifest.GateRefs, manifest.RequiredNonclaimTerms)...)
+	issues = append(issues, validateContractRefs(root, manifest.ContractRefs)...)
+	issues = append(issues, validateDocsCarryRequiredNonclaims(root, manifest.DocsRefs, manifest.RequiredNonclaims, manifest.RequiredNonclaimTerms, manifest.ForbiddenClaims)...)
+	issues = append(issues, validateSelectedGateRefsCarryRequiredNonclaims(root, manifest.GateRefs, manifest.RequiredNonclaims, manifest.RequiredNonclaimTerms, manifest.ForbiddenClaims)...)
 	issues = append(issues, validateReleaseNoteCheckRefs(root, manifest.GateRefs)...)
 	issues = append(issues, validateReleaseNotes(root, options.ReleaseNotes, manifest)...)
 	issues = append(issues, validateCapabilities(root, manifest.Capabilities, manifest.ForbiddenClaims, validatorIDs, manifest.RequiredCapabilities)...)
+	issues = append(issues, validateReleaseContracts(root, manifest, validatorIDs)...)
 	if len(issues) > 0 {
 		return errors.New(strings.Join(issues, "; "))
 	}
@@ -240,24 +269,53 @@ func validateRelativeSlashPath(path string) error {
 	return nil
 }
 
-func validateDocsCarryRequiredNonclaims(root string, refs []string, terms []string) []string {
+func validateContractRefs(root string, refs []releaseContractRef) []string {
+	if len(refs) == 0 {
+		return []string{"contract_refs is required"}
+	}
 	var issues []string
+	seen := map[string]bool{}
 	for _, ref := range refs {
-		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(ref)))
-		if err != nil {
+		if strings.TrimSpace(ref.ID) == "" {
+			issues = append(issues, "contract_refs id is required")
+		}
+		if strings.TrimSpace(ref.CapabilityID) == "" {
+			issues = append(issues, fmt.Sprintf("contract_refs %s capability_id is required", ref.ID))
+		}
+		path := strings.TrimSpace(ref.Path)
+		if path == "" {
+			issues = append(issues, fmt.Sprintf("contract_refs %s path is required", ref.ID))
 			continue
 		}
-		text := normalizeActorText(string(raw))
-		for _, term := range terms {
-			if !strings.Contains(text, normalizeActorText(term)) {
-				issues = append(issues, fmt.Sprintf("%s missing required nonclaim term %q", ref, term))
-			}
+		if seen[path] {
+			issues = append(issues, fmt.Sprintf("contract_refs duplicate path %s", path))
+		}
+		seen[path] = true
+		if err := validateRelativeSlashPath(path); err != nil {
+			issues = append(issues, fmt.Sprintf("contract_refs %s: %v", path, err))
+			continue
+		}
+		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(path))); err != nil {
+			issues = append(issues, fmt.Sprintf("contract_refs %s: %v", path, err))
 		}
 	}
 	return issues
 }
 
-func validateSelectedGateRefsCarryRequiredNonclaims(root string, refs []manifestRef, terms []string) []string {
+func validateDocsCarryRequiredNonclaims(root string, refs []string, requiredNonclaims, terms, forbiddenClaims []string) []string {
+	var issues []string
+	for _, ref := range refs {
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(ref)))
+		if err != nil {
+			issues = append(issues, fmt.Sprintf("%s: %v", ref, err))
+			continue
+		}
+		issues = append(issues, validateActorTextClaims(ref, string(raw), requiredNonclaims, terms, forbiddenClaims)...)
+	}
+	return issues
+}
+
+func validateSelectedGateRefsCarryRequiredNonclaims(root string, refs []manifestRef, requiredNonclaims, terms, forbiddenClaims []string) []string {
 	var issues []string
 	for _, ref := range refs {
 		if !ref.ClaimCheck {
@@ -265,14 +323,10 @@ func validateSelectedGateRefsCarryRequiredNonclaims(root string, refs []manifest
 		}
 		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(ref.Path)))
 		if err != nil {
+			issues = append(issues, fmt.Sprintf("%s: %v", ref.Path, err))
 			continue
 		}
-		text := normalizeActorText(string(raw))
-		for _, term := range terms {
-			if !strings.Contains(text, normalizeActorText(term)) {
-				issues = append(issues, fmt.Sprintf("%s missing required nonclaim term %q", ref.Path, term))
-			}
-		}
+		issues = append(issues, validateActorTextClaims(ref.Path, string(raw), requiredNonclaims, terms, forbiddenClaims)...)
 	}
 	return issues
 }
@@ -306,12 +360,8 @@ func validateReleaseNotes(root string, paths []string, manifest actorCapabilityM
 			issues = append(issues, fmt.Sprintf("release notes %s: %v", path, err))
 			continue
 		}
+		issues = append(issues, validateActorTextClaims("release notes "+path, string(raw), manifest.RequiredNonclaims, manifest.RequiredNonclaimTerms, manifest.ForbiddenClaims)...)
 		text := normalizeActorText(string(raw))
-		for _, term := range manifest.RequiredNonclaimTerms {
-			if !strings.Contains(text, normalizeActorText(term)) {
-				issues = append(issues, fmt.Sprintf("release notes %s missing required nonclaim term %q", path, term))
-			}
-		}
 		for _, req := range manifest.RequiredCapabilities {
 			for _, term := range req.ReleaseNoteTerms {
 				if !strings.Contains(text, normalizeActorText(term)) {
@@ -328,6 +378,42 @@ func resolveMaybeRelativePath(root, path string) string {
 		return path
 	}
 	return filepath.Join(root, filepath.FromSlash(path))
+}
+
+func validateActorTextClaims(label, text string, requiredNonclaims, terms, forbiddenClaims []string) []string {
+	var issues []string
+	normalized := normalizeActorText(text)
+	for _, phrase := range requiredNonclaims {
+		if !strings.Contains(normalized, normalizeActorText(phrase)) {
+			issues = append(issues, fmt.Sprintf("%s missing required nonclaim phrase %q", label, phrase))
+		}
+	}
+	for _, term := range terms {
+		if !strings.Contains(normalized, normalizeActorText(term)) {
+			issues = append(issues, fmt.Sprintf("%s missing required nonclaim term %q", label, term))
+		}
+	}
+	issues = append(issues, validateNoForbiddenActorPromotions(label, text, requiredNonclaims, forbiddenClaims)...)
+	return issues
+}
+
+func validateNoForbiddenActorPromotions(label, text string, allowedNonclaims, forbiddenClaims []string) []string {
+	normalized := normalizeActorText(text)
+	for _, allowed := range allowedNonclaims {
+		normalized = strings.ReplaceAll(normalized, normalizeActorText(allowed), " ")
+	}
+	normalized = normalizeActorText(normalized)
+	var issues []string
+	for _, forbidden := range forbiddenClaims {
+		forbiddenText := normalizeActorText(forbidden)
+		if forbiddenText == "" {
+			continue
+		}
+		if strings.Contains(normalized, forbiddenText) {
+			issues = append(issues, fmt.Sprintf("%s forbidden actor promotion claim %q", label, forbidden))
+		}
+	}
+	return issues
 }
 
 func validateCapabilities(root string, capabilities []actorCapability, forbiddenClaims []string, validatorIDs map[string]bool, required []requiredCapabilityContract) []string {
@@ -359,6 +445,99 @@ func validateCapabilities(root string, capabilities []actorCapability, forbidden
 			continue
 		}
 		issues = append(issues, validateCapabilityContract(cap, req)...)
+	}
+	return issues
+}
+
+func validateReleaseContracts(root string, manifest actorCapabilityManifest, validatorIDs map[string]bool) []string {
+	if len(manifest.ContractRefs) == 0 {
+		return []string{"contract_refs is required"}
+	}
+	capabilitiesByID := map[string]actorCapability{}
+	for _, cap := range manifest.Capabilities {
+		capabilitiesByID[cap.ID] = cap
+	}
+	gatePaths := map[string]bool{}
+	for _, ref := range manifest.GateRefs {
+		gatePaths[ref.Path] = true
+	}
+	var issues []string
+	for _, ref := range manifest.ContractRefs {
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(ref.Path)))
+		if err != nil {
+			issues = append(issues, fmt.Sprintf("contract %s: %v", ref.Path, err))
+			continue
+		}
+		var contract actorReleaseContract
+		if err := decodeStrictActorCapabilities(raw, &contract); err != nil {
+			issues = append(issues, fmt.Sprintf("contract %s: %v", ref.Path, err))
+			continue
+		}
+		issues = append(issues, validateReleaseContract(ref, contract, capabilitiesByID, validatorIDs, gatePaths, manifest.ForbiddenClaims)...)
+	}
+	return issues
+}
+
+func validateReleaseContract(ref releaseContractRef, contract actorReleaseContract, capabilitiesByID map[string]actorCapability, validatorIDs, gatePaths map[string]bool, forbiddenClaims []string) []string {
+	var issues []string
+	if contract.Schema != "tetra.actor.release_contract.v1" {
+		issues = append(issues, fmt.Sprintf("contract %s schema is %q, want tetra.actor.release_contract.v1", ref.Path, contract.Schema))
+	}
+	if contract.CapabilityID != ref.CapabilityID {
+		issues = append(issues, fmt.Sprintf("contract %s capability_id = %q, want %q", ref.Path, contract.CapabilityID, ref.CapabilityID))
+	}
+	capability, ok := capabilitiesByID[ref.CapabilityID]
+	if !ok {
+		issues = append(issues, fmt.Sprintf("contract %s capability %s not found in manifest", ref.Path, ref.CapabilityID))
+		return issues
+	}
+	if ref.TargetCheck {
+		if !stringInSet(contract.Target, capability.SupportedTargets) {
+			issues = append(issues, fmt.Sprintf("contract %s target = %q, want one of %v", ref.Path, contract.Target, capability.SupportedTargets))
+		}
+		if contract.Scope != "" && contract.Scope != contract.Target {
+			issues = append(issues, fmt.Sprintf("contract %s scope = %q, want target %q", ref.Path, contract.Scope, contract.Target))
+		}
+	}
+	if ref.ClaimCheck {
+		for _, claim := range contract.Claims {
+			if !normalizedStringInSet(claim, capability.Claims) {
+				issues = append(issues, fmt.Sprintf("contract %s claim %q is not declared by capability %s", ref.Path, claim, capability.ID))
+			}
+		}
+		issues = append(issues, validateNoForbiddenActorPromotions("contract "+ref.Path, strings.Join(contract.Claims, "\n"), capability.Nonclaims, forbiddenClaims)...)
+	}
+	if ref.NonclaimCheck {
+		for _, nonclaim := range capability.Nonclaims {
+			if !normalizedStringInSet(nonclaim, contract.Nonclaims) {
+				issues = append(issues, fmt.Sprintf("contract %s missing capability nonclaim %q", ref.Path, nonclaim))
+			}
+		}
+	}
+	if ref.ValidatorCheck {
+		for _, validator := range contract.Validators {
+			if !validatorIDs[validator] {
+				issues = append(issues, fmt.Sprintf("contract %s validator %s is not declared in validator_refs", ref.Path, validator))
+			}
+		}
+		for _, validator := range capability.ValidatorRefs {
+			if !stringInSet(validator, contract.Validators) {
+				issues = append(issues, fmt.Sprintf("contract %s missing capability validator %s", ref.Path, validator))
+			}
+		}
+	}
+	for _, report := range ref.RequiredReports {
+		if !stringInSet(report, contract.Reports) {
+			issues = append(issues, fmt.Sprintf("contract %s missing required report %s", ref.Path, report))
+		}
+	}
+	for _, gateRef := range ref.RequiredGateRefs {
+		if !stringInSet(gateRef, contract.GateRefs) {
+			issues = append(issues, fmt.Sprintf("contract %s missing required gate_ref %s", ref.Path, gateRef))
+		}
+		if !gatePaths[gateRef] {
+			issues = append(issues, fmt.Sprintf("contract %s required gate_ref %s is not declared in manifest gate_refs", ref.Path, gateRef))
+		}
 	}
 	return issues
 }
@@ -486,6 +665,25 @@ func hasDuplicateStrings(values []string) bool {
 	return false
 }
 
+func stringInSet(value string, set []string) bool {
+	for _, candidate := range set {
+		if value == candidate {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizedStringInSet(value string, set []string) bool {
+	normalized := normalizeActorText(value)
+	for _, candidate := range set {
+		if normalized == normalizeActorText(candidate) {
+			return true
+		}
+	}
+	return false
+}
+
 func stringRefs(paths []string) []manifestRef {
 	refs := make([]manifestRef, 0, len(paths))
 	for _, path := range paths {
@@ -495,6 +693,11 @@ func stringRefs(paths []string) []manifestRef {
 }
 
 func normalizeActorText(text string) string {
-	replacer := strings.NewReplacer("-", " ", "_", " ", "/", " ")
-	return strings.Join(strings.Fields(replacer.Replace(strings.ToLower(text))), " ")
+	mapped := strings.Map(func(r rune) rune {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			return unicode.ToLower(r)
+		}
+		return ' '
+	}, text)
+	return strings.Join(strings.Fields(mapped), " ")
 }
