@@ -1,8 +1,10 @@
 # RAM Contract Compiler Readiness Audit
 
-Git head: 5be23a6417b6aa1bdca888acb49a7431b9a07fa6
-Working tree: clean detached worktree evidence for the P34 RAM Contract refresh; this is
-not a remote release-candidate checkout claim and not a historical dirty working tree cleanup claim for older RAM audits.
+Git head: c622aa3147d724cbbce7f7b07fa5248f700a11d8
+Working tree: P08 dry-run workflow commit evidence for the
+contract-runner-core PR hardening RAM Contract refresh; this is not a remote
+release-candidate checkout claim, not remote package proof, and not a
+historical dirty working tree cleanup claim for older RAM audits.
 Verdict: `SCOPED_READY`
 
 ## Scope
@@ -13,14 +15,16 @@ contract. The release gate is
 `.github/workflows/ci.yml`, and package workflow wiring lives in
 `.github/workflows/release-packages.yml`.
 
-The P34 clean-worktree refresh produced direct-parent RAM Contract release
-evidence under
-`reports/surface-full-plan/P34-clean-worktree-ram-contract-5be23a64/`.
+The P08 contract-runner-core PR hardening dry-run workflow refresh produced RAM
+Contract release evidence under
+`reports/contract-refactor-pr-hardening/P08-ram-contract-c622aa31/`.
 That RAM Contract slice was directly validated for
-`5be23a6417b6aa1bdca888acb49a7431b9a07fa6` in detached clean worktree
-`/home/tetra/.codex/worktrees/Tetra_Language/ram-contract-clean-5be23a64`, then
-mirrored into this checkout's ignored `reports/` evidence directory. This audit
-does not claim remote CI or package publication proof.
+`c622aa3147d724cbbce7f7b07fa5248f700a11d8` on clean branch HEAD in worktree
+`/home/tetra/.codex/worktrees/Tetra_Language/contract-runner-core-pr-split-20260616`.
+The local RAM smoke completed with exit `0`; the scoped report directory is the
+persisted evidence for this refresh.
+This audit does not claim remote CI, remote package proof, or package
+publication proof.
 
 ## Command Evidence
 
@@ -35,27 +39,26 @@ quick CI coverage:
 - `go test -buildvcs=false ./compiler ./cli/cmd/tetra -run 'RAMContract|FailIfHeap|EmitRAM|RAMContractFlags|MemoryBudget|TETRA4100' -count=1`
 - `bash scripts/ci/test-all.sh --quick --keep-going --report-dir reports/ci-test-all-quick-p10`
 
-The direct-parent P34 refresh reran the release smoke and validators. The default
-release report path remains `reports/ram-contract-release`; this refresh used a
-fresh scoped report directory to avoid stale artifact reuse:
+The P08 contract-runner-core PR hardening dry-run workflow refresh reran the
+release smoke on clean branch HEAD. The default release report path remains
+`reports/ram-contract-release`; this refresh used a fresh scoped report
+directory to avoid stale artifact reuse:
 
-- `bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir reports/surface-full-plan/P34-clean-worktree-ram-contract-5be23a64`
-- `go run -buildvcs=false ./tools/cmd/validate-ram-contract-release --report-dir reports/surface-full-plan/P34-clean-worktree-ram-contract-5be23a64 --current-git-head 5be23a6417b6aa1bdca888acb49a7431b9a07fa6`
-- `go run -buildvcs=false ./tools/cmd/validate-artifact-hashes --manifest reports/surface-full-plan/P34-clean-worktree-ram-contract-5be23a64/artifact-hashes.json`
-- `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`
+- `GOCACHE="$PWD/.cache/go-build-p08-ram-refresh" GOTMPDIR="$PWD/.cache/go-tmp-p08-ram-refresh" bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir reports/contract-refactor-pr-hardening/P08-ram-contract-c622aa31`
+- `GOCACHE="$PWD/.cache/go-build-p08-doc-refresh" GOTMPDIR="$PWD/.cache/go-tmp-p08-doc-refresh" go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`
 - `git diff --check`
 
 ## Artifact Evidence
 
-- `reports/surface-full-plan/P34-clean-worktree-ram-contract-5be23a64/ram-contract-report.json`
-- `reports/surface-full-plan/P34-clean-worktree-ram-contract-5be23a64/memory-grade-report.json`
-- `reports/surface-full-plan/P34-clean-worktree-ram-contract-5be23a64/proof-store-summary.json`
-- `reports/surface-full-plan/P34-clean-worktree-ram-contract-5be23a64/validation-pipeline-coverage.json`
-- `reports/surface-full-plan/P34-clean-worktree-ram-contract-5be23a64/heap-blockers.json`
-- `reports/surface-full-plan/P34-clean-worktree-ram-contract-5be23a64/copy-blockers.json`
-- `reports/surface-full-plan/P34-clean-worktree-ram-contract-5be23a64/fuzz/ram-contract-fuzz-oracle.json`
-- `reports/surface-full-plan/P34-clean-worktree-ram-contract-5be23a64/artifact-hashes.json`
-- `reports/surface-full-plan/P34-clean-worktree-ram-contract-5be23a64/ram-contract-release-manifest.json`
+- `reports/contract-refactor-pr-hardening/P08-ram-contract-c622aa31/ram-contract-report.json`
+- `reports/contract-refactor-pr-hardening/P08-ram-contract-c622aa31/memory-grade-report.json`
+- `reports/contract-refactor-pr-hardening/P08-ram-contract-c622aa31/proof-store-summary.json`
+- `reports/contract-refactor-pr-hardening/P08-ram-contract-c622aa31/validation-pipeline-coverage.json`
+- `reports/contract-refactor-pr-hardening/P08-ram-contract-c622aa31/heap-blockers.json`
+- `reports/contract-refactor-pr-hardening/P08-ram-contract-c622aa31/copy-blockers.json`
+- `reports/contract-refactor-pr-hardening/P08-ram-contract-c622aa31/fuzz/ram-contract-fuzz-oracle.json`
+- `reports/contract-refactor-pr-hardening/P08-ram-contract-c622aa31/artifact-hashes.json`
+- `reports/contract-refactor-pr-hardening/P08-ram-contract-c622aa31/ram-contract-release-manifest.json`
 
 ## Nonclaims
 

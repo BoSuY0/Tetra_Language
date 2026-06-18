@@ -579,6 +579,71 @@ func TestReleasePackagesWorkflowMakesManualContainerPublishOptIn(t *testing.T) {
 	}
 }
 
+func TestReleasePackagesWorkflowSupportsSafeManualDryRun(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "release-packages.yml"))
+	if err != nil {
+		t.Fatalf("read release-packages workflow: %v", err)
+	}
+	text := string(raw)
+	dispatchSection := releaseStepWindow(text, "workflow_dispatch:", "permissions:")
+	dryRunInput := releaseStepWindow(dispatchSection, "dry_run:", "update_homebrew_tap:")
+	for _, want := range []string{
+		"dry_run:",
+		"description: \"Build packages and upload artifacts without publishing external release outputs\"",
+		"required: true",
+		"type: boolean",
+		"default: true",
+	} {
+		if !strings.Contains(dryRunInput, want) {
+			t.Fatalf("release-packages workflow missing dry_run workflow_dispatch input detail %q", want)
+		}
+	}
+	for _, want := range []string{
+		`dry_run="${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}"`,
+		`echo "dry_run=${dry_run}"`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("release-packages workflow missing dry_run metadata output detail %q", want)
+		}
+	}
+
+	releaseStep := releaseStepWindow(text, "name: Create or update GitHub Release", "name: Build container image")
+	if !strings.Contains(releaseStep, "if: steps.meta.outputs.dry_run != 'true'") {
+		t.Fatalf("GitHub Release publish step must be guarded by non-dry-run metadata output")
+	}
+	for _, step := range []string{"name: Build container image", "name: Publish GHCR image"} {
+		section := releaseStepWindow(text, step, "shell: bash")
+		if !strings.Contains(section, "if: steps.meta.outputs.publish_container == 'true' && steps.meta.outputs.dry_run != 'true'") {
+			t.Fatalf("%s must require publish intent and non-dry-run metadata output", step)
+		}
+	}
+	homebrewStep := releaseStepWindow(text, "name: Update Homebrew tap", "shell: bash")
+	if !strings.Contains(homebrewStep, "if: env.UPDATE_HOMEBREW_TAP == 'true' && steps.meta.outputs.dry_run != 'true'") {
+		t.Fatalf("Homebrew tap update step must require update intent and non-dry-run metadata output")
+	}
+
+	artifactIdx := strings.Index(text, "name: Upload package artifacts")
+	releaseIdx := strings.Index(text, "name: Create or update GitHub Release")
+	if artifactIdx < 0 || releaseIdx < 0 || artifactIdx > releaseIdx {
+		t.Fatalf("package artifacts must upload before publishing")
+	}
+	artifactStep := releaseStepWindow(text, "name: Upload package artifacts", "name: Create or update GitHub Release")
+	if strings.Contains(artifactStep, "dry_run") || strings.Contains(artifactStep, "if:") {
+		t.Fatalf("package artifact upload must remain active during dry-run")
+	}
+	for _, want := range []string{
+		"push:",
+		"tags:",
+		`- "v*.*.*"`,
+		`dry_run="${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}"`,
+		`publish_container="${{ github.event_name != 'workflow_dispatch' || inputs.publish_container }}"`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("release-packages workflow missing tag-push preservation detail %q", want)
+		}
+	}
+}
+
 func releaseStepWindow(workflow, start, end string) string {
 	startIdx := strings.Index(workflow, start)
 	if startIdx < 0 {

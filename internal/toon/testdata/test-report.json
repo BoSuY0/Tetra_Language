@@ -1,0 +1,27 @@
+{
+  "total": 1,
+  "passed": 1,
+  "failed": 0,
+  "target": "linux-x64",
+  "duration_ms": 1,
+  "files": [
+    {
+      "filename": "examples/toon/toon_report.tetra",
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "duration_ms": 1
+    }
+  ],
+  "results": [
+    {
+      "name": "toon report",
+      "filename": "examples/toon/toon_report.tetra",
+      "index": 0,
+      "function_name": "__tetra_test_0_toon_report",
+      "exit_code": 0,
+      "passed": true,
+      "duration_ms": 1
+    }
+  ]
+}

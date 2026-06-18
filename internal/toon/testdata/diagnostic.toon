@@ -1,0 +1,4 @@
+code: TETRA0001
+hint: run `tetra targets` to list valid targets
+message: "unsupported target: not-a-target; supported targets: linux-x64, windows-x64, macos-x64, wasm32-wasi, wasm32-web; build-only targets: linux-x86, linux-x32"
+severity: error

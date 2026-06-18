@@ -1,0 +1,12 @@
+ended_at: "2026-06-13T12:00:01Z"
+failed_count: 0
+mode: quick
+release_artifact: tetra.release.v0_2_0.test-all-summary.v1
+release_version: v0.2.0
+started_at: "2026-06-13T12:00:00Z"
+status: pass
+step_count: 3
+steps[3]{command,duration_seconds,exit_code,log,name,status}:
+  go test ./compiler/... ./cli/... ./tools/... -count=1,1,0,logs/01-go-test-all-packages.log,go test all packages,pass
+  check_json_diagnostic,1,0,logs/02-json-diagnostic-shape.log,json diagnostic shape,pass
+  check_host_smoke,1,0,logs/03-host-smoke-linux-x64.log,host smoke linux-x64,pass
