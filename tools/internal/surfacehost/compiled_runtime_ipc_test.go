@@ -61,7 +61,7 @@ uses surface, mem, alloc:
 
 	_, err = compiler.BuildFileWithStatsOpt(sourcePath, binaryPath, "linux-x64", compiler.BuildOptions{
 		SurfaceHostRequired:   true,
-		SurfaceHostBackend:    "wayland",
+		SurfaceHostDriver:     "wayland",
 		SurfaceHostProtocol:   ProtocolName,
 		SurfaceHostSocketPath: socketPath,
 	})
@@ -145,7 +145,7 @@ uses surface, mem, alloc:
 
 	_, err = compiler.BuildFileWithStatsOpt(sourcePath, binaryPath, "linux-x64", compiler.BuildOptions{
 		SurfaceHostRequired:   true,
-		SurfaceHostBackend:    "wayland",
+		SurfaceHostDriver:     "wayland",
 		SurfaceHostProtocol:   ProtocolName,
 		SurfaceHostSocketPath: socketPath,
 	})
@@ -246,7 +246,7 @@ uses surface, mem, alloc:
 
 	_, err = compiler.BuildFileWithStatsOpt(sourcePath, binaryPath, "linux-x64", compiler.BuildOptions{
 		SurfaceHostRequired:   true,
-		SurfaceHostBackend:    "wayland",
+		SurfaceHostDriver:     "wayland",
 		SurfaceHostProtocol:   ProtocolName,
 		SurfaceHostSocketPath: socketPath,
 	})
@@ -335,7 +335,7 @@ uses surface:
 
 	_, err = compiler.BuildFileWithStatsOpt(sourcePath, binaryPath, "linux-x64", compiler.BuildOptions{
 		SurfaceHostRequired:   true,
-		SurfaceHostBackend:    "wayland",
+		SurfaceHostDriver:     "wayland",
 		SurfaceHostProtocol:   ProtocolName,
 		SurfaceHostSocketPath: socketPath,
 	})
@@ -408,7 +408,7 @@ func TestCompiledSurfaceWindowCounterReachesPresentAgainstFakeHost(t *testing.T)
 		ProjectRoot:           root,
 		SourceRoots:           []string{root},
 		SurfaceHostRequired:   true,
-		SurfaceHostBackend:    "wayland",
+		SurfaceHostDriver:     "wayland",
 		SurfaceHostProtocol:   ProtocolName,
 		SurfaceHostSocketPath: socketPath,
 	})

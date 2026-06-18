@@ -28,7 +28,7 @@ type BuildOptions struct {
 	Runtime                          RuntimeMode
 	RuntimeObjectPath                string
 	SurfaceHostRequired              bool
-	SurfaceHostBackend               string
+	SurfaceHostDriver                string
 	SurfaceHostProtocol              string
 	SurfaceHostSocketPath            string
 	LinkObjectPaths                  []string

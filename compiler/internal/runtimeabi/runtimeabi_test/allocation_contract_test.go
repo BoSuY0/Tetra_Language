@@ -152,24 +152,6 @@ func TestRuntimeAllocationMemoryDomainHelpers(t *testing.T) {
 	}
 }
 
-func TestRuntimeAllocationMemoryDomainHelpers(t *testing.T) {
-	process := DefaultProcessMemoryDomain(17, 32)
-	if process.DomainID != "domain:process" || process.Kind != DomainProcess || process.RequestedBytes != 17 || process.ReservedBytes != 32 {
-		t.Fatalf("process domain = %+v, want process domain with requested/reserved bytes", process)
-	}
-	if err := ValidateMemoryDomain(process); err != nil {
-		t.Fatalf("ValidateMemoryDomain(process): %v", err)
-	}
-
-	island := IslandMemoryDomain("island:isl", "island:isl:scope", 17, 32)
-	if island.DomainID != "domain:island:isl" || island.Kind != DomainIsland || island.OwnerID != "isl" || island.Lifetime != "island:isl:scope" {
-		t.Fatalf("island domain = %+v, want island domain bound to region/lifetime", island)
-	}
-	if err := ValidateMemoryDomain(island); err != nil {
-		t.Fatalf("ValidateMemoryDomain(island): %v", err)
-	}
-}
-
 func TestRuntimeAllocationContractValidationRejectsWeakSpecs(t *testing.T) {
 	contract := RuntimeAllocationContract{
 		API:              "bad",

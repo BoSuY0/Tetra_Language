@@ -3320,7 +3320,7 @@ func main() -> Int:
 	}
 }
 
-func TestCheckJSONCrossModuleLifetimePtrOptionalGlobalEscapeCodes(
+func TestCheckCommandJSONDiagnosticsForCrossModuleLifetimeBorrowPtrOptionalAssignmentGlobalEscapeCodes(
 	t *testing.T,
 ) {
 	tests := []struct {
@@ -4953,7 +4953,7 @@ func main() -> Int:
 
 // ---- check_diagnostics_ownership_borrow_function_typed_test.go ----
 
-func TestCheckJSONOwnershipSliceFuncParamCallEscapeCodes(
+func TestCheckCommandJSONDiagnosticsForOwnershipBorrowSliceAggregateFunctionTypedParameterCallEscapeCodes(
 	t *testing.T,
 ) {
 	tests := []struct {
@@ -5042,7 +5042,7 @@ func main() -> Int:
 	}
 }
 
-func TestCheckJSONOwnershipSliceStructFieldCallEscapeCodes(
+func TestCheckCommandJSONDiagnosticsForOwnershipBorrowSliceAggregateFunctionTypedStructFieldCallEscapeCodes(
 	t *testing.T,
 ) {
 	tests := []struct {
@@ -5140,7 +5140,7 @@ func main() -> Int:
 	}
 }
 
-func TestCheckJSONCrossModuleOwnershipSliceStructFieldCallEscapeCodes(
+func TestCheckCommandJSONDiagnosticsForCrossModuleOwnershipBorrowSliceAggregateFunctionTypedStructFieldCallEscapeCodes(
 	t *testing.T,
 ) {
 	tests := []struct {
@@ -5262,7 +5262,7 @@ func main() -> Int:
 	}
 }
 
-func TestCheckJSONOwnershipSliceEnumPayloadCallEscapeCodes(
+func TestCheckCommandJSONDiagnosticsForOwnershipBorrowSliceAggregateFunctionTypedEnumPayloadCallEscapeCodes(
 	t *testing.T,
 ) {
 	tests := []struct {
@@ -5370,7 +5370,7 @@ func main() -> Int:
 	}
 }
 
-func TestCheckJSONCrossModuleOwnershipSliceEnumPayloadCallEscapeCodes(
+func TestCheckCommandJSONDiagnosticsForCrossModuleOwnershipBorrowSliceAggregateFunctionTypedEnumPayloadCallEscapeCodes(
 	t *testing.T,
 ) {
 	tests := []struct {
@@ -5676,7 +5676,7 @@ func main() -> Int:
 	}
 }
 
-func TestCheckJSONCrossModuleOptionalPtrCallbackCodes(
+func TestCheckCommandJSONDiagnosticsForCrossModuleOwnershipBorrowOptionalPtrFunctionTypedCallbackCodes(
 	t *testing.T,
 ) {
 	tests := []struct {
@@ -6024,7 +6024,7 @@ func main() -> Int:
 	)
 }
 
-func TestCheckJSONCrossModulePtrOptionalOwnedEscapeCode(
+func TestCheckCommandJSONDiagnosticsForCrossModuleOwnershipBorrowPtrOptionalPayloadOwnedCallEscapeCode(
 	t *testing.T,
 ) {
 	dir := t.TempDir()
@@ -6121,7 +6121,7 @@ func main() -> Int:
 	}
 }
 
-func TestCheckJSONCrossModulePtrOptionalConsumeInoutCodes(
+func TestCheckCommandJSONDiagnosticsForCrossModuleOwnershipBorrowPtrOptionalPayloadConsumeInoutCallEscapeCodes(
 	t *testing.T,
 ) {
 	tests := []struct {
@@ -6272,7 +6272,7 @@ func main() -> Int:
 	}
 }
 
-func TestCheckJSONCrossModuleSliceOptionalBindingEscapeCodes(
+func TestCheckCommandJSONDiagnosticsForCrossModuleOwnershipBorrowSliceOptionalPayloadBindingEscapeCodes(
 	t *testing.T,
 ) {
 	tests := []struct {
@@ -7122,7 +7122,7 @@ func main() -> Int:
 	}
 }
 
-func TestCheckJSONCrossModuleSliceGenericCallEscapeCodes(
+func TestCheckCommandJSONDiagnosticsForCrossModuleOwnershipBorrowSliceAggregateGenericCallEscapeCodes(
 	t *testing.T,
 ) {
 	tests := []struct {

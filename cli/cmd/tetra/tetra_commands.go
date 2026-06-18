@@ -18,6 +18,7 @@ import (
 	ctarget "tetra_language/compiler/target"
 	"tetra_language/internal/outputformat"
 	"tetra_language/tools/validators/surface"
+	"tetra_language/tools/validators/surfaceinspector"
 	"time"
 )
 
@@ -1977,10 +1978,14 @@ func runSurface(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 0
 	}
 	switch args[0] {
+	case "check":
+		return runCheck(args[1:], stdout, stderr)
 	case "run":
 		return runSurfaceRun(args[1:], stdout, stderr)
 	case "dev":
 		return runSurfaceDev(args[1:], stdout, stderr)
+	case "inspect":
+		return runSurfaceInspectCommand(args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "unknown surface command %q\n", args[0])
 		printSurfaceUsage(stderr)
@@ -1989,11 +1994,63 @@ func runSurface(args []string, stdout io.Writer, stderr io.Writer) int {
 }
 
 func printSurfaceUsage(w io.Writer) {
-	fmt.Fprintln(w, "usage: tetra surface <run|dev> [options]")
+	fmt.Fprintln(w, "usage: tetra surface <check|run|dev|inspect> [options]")
 	fmt.Fprintln(w, "")
 	fmt.Fprintln(w, "commands:")
+	fmt.Fprintln(w, "  check  run Surface-related semantic checks")
 	fmt.Fprintln(w, "  run    run a native Surface app through the Wayland host")
 	fmt.Fprintln(w, "  dev    run the scoped Surface fast rebuild developer loop")
+	fmt.Fprintln(w, "  inspect  build a Surface inspector snapshot from a runtime report")
+}
+
+func runSurfaceInspectCommand(args []string, stdout io.Writer, stderr io.Writer) int {
+	fs := flag.NewFlagSet("surface inspect", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	reportPath := fs.String("report", "", "Surface runtime report JSON")
+	outPath := fs.String("out", "", "write inspector snapshot JSON to this path; defaults to stdout")
+	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
+		return 2
+	}
+	if fs.NArg() != 0 {
+		fmt.Fprintln(stderr, "surface inspect does not accept positional arguments")
+		return 2
+	}
+	if *reportPath == "" {
+		fmt.Fprintln(stderr, "--report is required")
+		return 2
+	}
+	raw, err := os.ReadFile(*reportPath)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	snapshot, err := surfaceinspector.SnapshotFromReportRaw(raw, *reportPath)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	out, err := json.MarshalIndent(snapshot, "", "  ")
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	out = append(out, '\n')
+	if *outPath == "" {
+		if _, err := stdout.Write(out); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		return 0
+	}
+	if err := os.WriteFile(*outPath, out, 0o644); err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "wrote surface inspector snapshot to %s\n", *outPath)
+	return 0
 }
 
 func runSurfaceRun(args []string, stdout io.Writer, stderr io.Writer) int {

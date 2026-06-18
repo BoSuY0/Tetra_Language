@@ -317,10 +317,10 @@ func linkNativeExecutable(
 				native.triple,
 			)
 		}
-		if strings.TrimSpace(opt.SurfaceHostBackend) != "wayland" {
+		if strings.TrimSpace(opt.SurfaceHostDriver) != "wayland" {
 			return fmt.Errorf(
 				"surface host runtime requires backend wayland, got %q",
-				opt.SurfaceHostBackend,
+				opt.SurfaceHostDriver,
 			)
 		}
 		if strings.TrimSpace(opt.SurfaceHostProtocol) != "tetra.surface.host-ipc.v1" {

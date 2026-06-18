@@ -40,3 +40,7 @@ func validateDistributedActorRuntimeReport(path string, currentGitHead string) e
 	}
 	return actordist.ValidateReport(raw)
 }
+
+func validateDistributedActorRuntimeReportWithCurrentHead(path string, currentGitHead string) error {
+	return validateDistributedActorRuntimeReport(path, currentGitHead)
+}

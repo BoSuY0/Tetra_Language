@@ -62,7 +62,7 @@ func BuildTagFromOptions(opt buildapi.BuildOptions, linkedObjects []buildlink.Li
 	if opt.SurfaceHostRequired {
 		tags = append(
 			tags,
-			"surface-host="+opt.SurfaceHostBackend+":"+opt.SurfaceHostProtocol+":"+opt.SurfaceHostSocketPath,
+			"surface-host="+opt.SurfaceHostDriver+":"+opt.SurfaceHostProtocol+":"+opt.SurfaceHostSocketPath,
 		)
 	}
 	if len(linkedObjects) > 0 {

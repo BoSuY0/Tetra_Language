@@ -556,8 +556,8 @@ func morphResolutionFromReport(report surface.Report, builder *sourceLocationBui
 		}
 	}
 	schema := report.Morph.Schema
-	if report.Morph.StyleGraph != nil && report.Morph.StyleGraph.Schema != "" {
-		schema = report.Morph.StyleGraph.Schema
+	if report.Morph.TokenGraph != nil && report.Morph.TokenGraph.Schema != "" {
+		schema = report.Morph.TokenGraph.Schema
 	}
 	return MorphResolution{
 		Present:              true,

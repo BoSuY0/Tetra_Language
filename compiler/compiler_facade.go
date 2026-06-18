@@ -3921,9 +3921,82 @@ func FormatSource(src []byte, filename string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := validateFormatterBodyShapes(file); err != nil {
+		return nil, err
+	}
 	var p sourcePrinter
 	p.file(file)
 	return applyLineComments([]byte(p.b.String()), comments), nil
+}
+
+func validateFormatterBodyShapes(file *frontend.FileAST) error {
+	if file == nil {
+		return nil
+	}
+	for _, fn := range file.Funcs {
+		if err := requireFormatterBody(fn.Pos, len(fn.Body)); err != nil {
+			return err
+		}
+	}
+	for _, actor := range file.Actors {
+		for _, fn := range actor.Methods {
+			if err := requireFormatterBody(fn.Pos, len(fn.Body)); err != nil {
+				return err
+			}
+		}
+	}
+	for _, test := range file.Tests {
+		if err := requireFormatterBody(test.At, len(test.Body)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func requireFormatterBody(pos frontend.Position, bodyLen int) error {
+	if bodyLen != 0 {
+		return nil
+	}
+	return &frontend.DiagnosticError{Info: frontend.Diagnostic{
+		Code:     DiagnosticCodeParse,
+		Message:  "expected indented block after ':'",
+		File:     pos.File,
+		Line:     pos.Line + 1,
+		Column:   1,
+		Severity: "error",
+		Hint:     "Indent at least one statement under the declaration header.",
+	}}
+}
+
+func quoteTetraString(value []byte) string {
+	var b strings.Builder
+	b.Grow(len(value) + 2)
+	b.WriteByte('"')
+	const hex = "0123456789abcdef"
+	for _, ch := range value {
+		switch ch {
+		case '\n':
+			b.WriteString(`\n`)
+		case '\r':
+			b.WriteString(`\r`)
+		case '\t':
+			b.WriteString(`\t`)
+		case '\\':
+			b.WriteString(`\\`)
+		case '"':
+			b.WriteString(`\"`)
+		default:
+			if ch < 0x20 || ch == 0x7f {
+				b.WriteString(`\x`)
+				b.WriteByte(hex[ch>>4])
+				b.WriteByte(hex[ch&0x0f])
+				continue
+			}
+			b.WriteByte(ch)
+		}
+	}
+	b.WriteByte('"')
+	return b.String()
 }
 
 func stripStandaloneBlockComments(src []byte) []byte {
@@ -5064,7 +5137,7 @@ func (p *sourcePrinter) formatExprPrec(expr frontend.Expr, parent int) string {
 		}
 		return b.String()
 	case *frontend.StringLitExpr:
-		return strconv.Quote(string(e.Value))
+		return quoteTetraString(e.Value)
 	case *frontend.IdentExpr:
 		return e.Name
 	case *frontend.UnaryExpr:
@@ -6540,7 +6613,7 @@ func interfaceContractExpr(expr frontend.Expr) (string, bool) {
 	case *frontend.NoneLitExpr:
 		return "none", true
 	case *frontend.StringLitExpr:
-		return fmt.Sprintf("%q", string(e.Value)), true
+		return quoteTetraString(e.Value), true
 	case *frontend.TryExpr:
 		inner, ok := interfaceContractExpr(e.X)
 		if !ok {

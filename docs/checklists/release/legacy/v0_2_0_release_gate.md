@@ -36,6 +36,9 @@ Final handoff: `docs/release/v0_2_0_final_handoff.md`.
       (`logs/04-go-test-packages.log`)
 - [x] Epic 06 safety gate:
 
+  Coverage regex:
+  `Effect|Uses|Capability|Unsafe|Ownership|Borrow|Consume|Inout|Island|Region|Privacy|Budget`.
+
   ```sh
   SAFETY_RE="Effect|Uses|Capability|Unsafe|Ownership|Borrow|Consume"
   SAFETY_RE="${SAFETY_RE}|Inout|Island|Region|Privacy|Budget"

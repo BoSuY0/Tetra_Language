@@ -135,10 +135,14 @@ mailbox-drain shutdown. Other blocked, sleeping, or waiting actors continue acco
 message, timer, and task-wait readiness rules when one actor exits. In particular, nonzero actor
 entry returns become the same user-visible `done` state as zero returns: later local sends return
 `-4`, and there is no separate actor failure channel.
+In one line: message already queued in another actor's mailbox remains receivable after the sender is done.
+In one line: Pending mailbox entries are not drained or delivered after the actor reaches `done`; this is a bounded local completion state.
 
 There is currently no shutdown API, no actor close handle, and no actor status, actor join, actor
-exit-code, supervision, or restart API. There is also no supervision, restart, linking, or OTP-style
+exit-code, supervision, or restart API. In one line: no actor join, actor exit-code, supervision, or restart API.
+There is also no supervision, restart, linking, or OTP-style
 lifecycle guarantee.
+In one line: no supervision, restart, linking, or OTP-style lifecycle guarantee.
 
 ## Scheduling semantics
 
@@ -254,8 +258,10 @@ local runtime, not distributed scheduling or resource isolation guarantees.
   returns checked backpressure `-2` before allocating a message node. Receiving a message decrements
   the mailbox depth, so this backpressure is recoverable when the receiver drains messages. The same
   checked `-2` contract applies to local legacy, tagged, and typed sends; a failed typed send does
-  not enqueue a partial typed payload. This is a bounded local mailbox policy, not a generic
+  not enqueue a partial typed payload and does not enqueue an overflow message. This is a bounded
+  local mailbox policy, not a generic
   unbounded mailbox, automatic retry, or distributed delivery guarantee.
+  In short: a failed typed send does not enqueue a partial typed payload.
 - Built-in x64 runtime message pool: 64 KiB, with a bump allocator plus a free list for drained
   message nodes. The current message node size is 88 bytes because typed mailbox payload slots are
   stored as local 64-bit slots; this gives room for pointer-like local slice fields while keeping
@@ -272,6 +278,7 @@ local runtime, not distributed scheduling or resource isolation guarantees.
 - Built-in x64 runtime actor state: 8 state slots per actor, each one `i32` storage cell. The
   checker enforces this limit for actor declarations and rejects programs that require more than 8
   actor-state slots before lowering or runtime execution.
+  In one line: rejects programs that require more than 8 actor-state slots before lowering.
 - The self-host actor runtime is a compatibility/smoke path for the current self-hosted ABI surface.
   It uses a smaller fixed actor/mailbox model and a different actor-state backing store, so the
   built-in x64 capacities above are the release evidence for capacity-sensitive behavior.
@@ -324,6 +331,7 @@ destination with `node_down`, the Linux-x64 runtime can surface that as
 `core.actor_node_status(...) == 1` after the network pump observes the frame. This does not imply
 automatic retry, reconnect, restart, supervision, or delivery retry; later delivery attempts are
 user-driven sends against the same bounded distributed status surface.
+In one line: does not imply automatic retry, reconnect, restart, supervision, or delivery retry.
 
 Promotion evidence is executable, not report-only:
 `scripts/release/v0_4_0/distributed-actors-linux-x64-smoke.sh` builds a fresh CLI, starts

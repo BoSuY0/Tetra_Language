@@ -3092,6 +3092,8 @@ type MorphReport struct {
 	TokenGraphHash   string                             `json:"token_graph_hash"`
 	Capsule          MorphCapsuleReport                 `json:"capsule"`
 	TokenGraph       *MorphTokenGraphReport             `json:"token_graph,omitempty"`
+	StyleGraph       *MorphStyleGraphReport             `json:"style_graph,omitempty"`
+	Authoring        *MorphAuthoringReport              `json:"authoring,omitempty"`
 	Materials        []MorphMaterialReport              `json:"materials,omitempty"`
 	LayoutModes      []string                           `json:"layout_modes,omitempty"`
 	TypographyRoles  []string                           `json:"typography_roles,omitempty"`
@@ -3107,6 +3109,49 @@ type MorphReport struct {
 	MemoryBudget     MorphMemoryBudgetReport            `json:"memory_budget"`
 	NegativeGuards   MorphNegativeGuardsReport          `json:"negative_guards"`
 	NonClaims        []string                           `json:"nonclaims,omitempty"`
+}
+
+type MorphStyleGraphReport struct {
+	Schema                         string   `json:"schema"`
+	Namespace                      string   `json:"namespace"`
+	Version                        string   `json:"version"`
+	CSSReplacementLevel            string   `json:"css_replacement_level"`
+	VocabularyFrozen               bool     `json:"vocabulary_frozen"`
+	TokenCategories                []string `json:"token_categories"`
+	MaterialSlots                  []string `json:"material_slots"`
+	AffordanceRoles                []string `json:"affordance_roles"`
+	RecipeOutputs                  []string `json:"recipe_outputs"`
+	StateSelectors                 []string `json:"state_selectors"`
+	MotionProperties               []string `json:"motion_properties"`
+	OverrideOrder                  []string `json:"override_order"`
+	ConflictDiagnostics            []string `json:"conflict_diagnostics"`
+	ImportAllowlist                []string `json:"import_allowlist"`
+	CSSCascadeImportsRejected      bool     `json:"css_cascade_imports_rejected"`
+	DOMRuntimeImportsRejected      bool     `json:"dom_runtime_imports_rejected"`
+	ReactRuntimeImportsRejected    bool     `json:"react_runtime_imports_rejected"`
+	ElectronRuntimeImportsRejected bool     `json:"electron_runtime_imports_rejected"`
+	SelectorEngineAbsent           bool     `json:"selector_engine_absent"`
+	NoSpecificityScoring           bool     `json:"no_specificity_scoring"`
+	GlobalStyleLeakRejected        bool     `json:"global_style_leak_rejected"`
+	SpecificityAmbiguityRejected   bool     `json:"specificity_ambiguity_rejected"`
+	RawCSSRuntimeImportRejected    bool     `json:"raw_css_runtime_import_rejected"`
+}
+
+type MorphAuthoringReport struct {
+	Schema                   string   `json:"schema"`
+	Level                    string   `json:"level"`
+	RecipeCount              int      `json:"recipe_count"`
+	PolishedRecipeCount      int      `json:"polished_recipe_count"`
+	MaxAuthorFields          int      `json:"max_author_fields"`
+	RawBlockFieldCount       int      `json:"raw_block_field_count"`
+	Raw80FieldBlocksRejected bool     `json:"raw_80_field_blocks_rejected"`
+	RecipesRequired          bool     `json:"recipes_required"`
+	DirectBlockPropEditing   bool     `json:"direct_block_prop_editing"`
+	RecipeFirstAuthoring     bool     `json:"recipe_first_authoring"`
+	DesignerTokenInputs      bool     `json:"designer_token_inputs"`
+	GeneratedBlockPropsOnly  bool     `json:"generated_block_props_only"`
+	RawLiteralStylesRejected bool     `json:"raw_literal_styles_rejected"`
+	NonClaims                []string `json:"nonclaims"`
 }
 
 type MorphCapsuleReport struct {
@@ -3214,9 +3259,12 @@ type MorphMotionPresetReport struct {
 
 type MorphRecipeReport struct {
 	Name                   string   `json:"name"`
+	Family                 string   `json:"family,omitempty"`
 	Output                 string   `json:"output"`
 	Slots                  []string `json:"slots"`
 	Inputs                 []string `json:"inputs"`
+	State                  []string `json:"state,omitempty"`
+	Accessibility          []string `json:"accessibility,omitempty"`
 	ExpandsToBlockGraph    bool     `json:"expands_to_block_graph"`
 	HiddenAppState         bool     `json:"hidden_app_state"`
 	PlatformWidgets        bool     `json:"platform_widgets"`
@@ -3926,6 +3974,36 @@ func requiredMorphRecipeAppSources() []string {
 		"examples/surface/morph_core/surface_morph_studio_shell.tetra",
 		"examples/surface/morph_flagship/surface_morph_rendered_studio_shell.tetra",
 	}
+}
+
+func ValidateMorphStyleTokenBoundary(morph *MorphReport) error {
+	if morph == nil {
+		return fmt.Errorf("morph report is required")
+	}
+	if morph.StyleGraph == nil {
+		return fmt.Errorf("style_graph is required")
+	}
+	if morph.Authoring == nil {
+		return fmt.Errorf("authoring is required")
+	}
+	if !morph.StyleGraph.RawCSSRuntimeImportRejected {
+		return fmt.Errorf("raw css runtime import must be rejected")
+	}
+	if morph.Authoring.DirectBlockPropEditing {
+		return fmt.Errorf("direct block prop editing must be rejected")
+	}
+	if morph.Authoring.RecipeCount < 11 ||
+		morph.Authoring.PolishedRecipeCount < 11 ||
+		len(morph.Recipes) < 11 {
+		return fmt.Errorf("recipe_count is incomplete for stable Morph boundary")
+	}
+	if !morph.Authoring.RecipesRequired || !morph.Authoring.RecipeFirstAuthoring {
+		return fmt.Errorf("recipe-first authoring is required")
+	}
+	if !morph.Authoring.Raw80FieldBlocksRejected || !morph.Authoring.RawLiteralStylesRejected {
+		return fmt.Errorf("raw Block/style authoring must be rejected")
+	}
+	return nil
 }
 
 func validateMorphRecipes(recipes []MorphRecipeReport) []string {

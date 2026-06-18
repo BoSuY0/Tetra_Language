@@ -205,6 +205,9 @@ func recipe_split_pane_hash() -> Int:
 func recipe_status_bar_hash() -> Int:
     return 1115
 
+func recipe_status_message_hash() -> Int:
+    return 1120
+
 func recipe_settings_form_hash() -> Int:
     return 1116
 

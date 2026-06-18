@@ -9,6 +9,8 @@
 // ```
 module lib.core.i18n
 
+import lib.core.strings as strings
+
 struct Locale:
     language: Int
     region: Int
@@ -40,6 +42,36 @@ struct LocalizationPolicy:
     layout_direction: Int
     full_unicode_editor_claim: Bool
 
+struct StringTable:
+    locale_tag_hash: Int
+    fallback_tag_hash: Int
+    entry_count: Int
+    checksum: Int
+    primary: Bool
+
+struct StringLookupResult:
+    ok: Bool
+    missing_key: Bool
+    fallback_used: Bool
+    locale_tag_hash: Int
+    value_hash: Int
+    diagnostic: Int
+
+struct FormatHook:
+    kind_hash: Int
+    locale_tag_hash: Int
+    input_hash: Int
+    output_hash: Int
+    deterministic: Bool
+    icu_claim: Bool
+
+struct TextDirection:
+    direction: Int
+    rtl_placeholder: Bool
+    full_bidi_supported: Bool
+    full_bidi_claim: Bool
+    shaping_proof: Bool
+
 func language_en() -> Int:
     return 101
 
@@ -48,6 +80,9 @@ func language_es() -> Int:
 
 func language_ar() -> Int:
     return 103
+
+func language_uk() -> Int:
+    return 104
 
 func region_us() -> Int:
     return 201
@@ -58,11 +93,29 @@ func region_es() -> Int:
 func region_eg() -> Int:
     return 203
 
+func region_ua() -> Int:
+    return 204
+
 func direction_ltr() -> Int:
     return 1
 
 func direction_rtl() -> Int:
     return 2
+
+func diagnostic_none() -> Int:
+    return 0
+
+func diagnostic_missing_key() -> Int:
+    return 2001
+
+func hash_text(value: String) -> Int:
+    return strings.ascii_sum(value) * 31 + strings.ascii_len(value)
+
+func locale_en_us_hash() -> Int:
+    return hash_text("en-US")
+
+func locale_uk_ua_hash() -> Int:
+    return hash_text("uk-UA")
 
 func locale_en_us() -> Locale:
     return Locale(language: language_en(), region: region_us(), direction: direction_ltr())
@@ -73,10 +126,51 @@ func locale_es_es() -> Locale:
 func locale_ar_eg() -> Locale:
     return Locale(language: language_ar(), region: region_eg(), direction: direction_rtl())
 
+func locale_uk_ua() -> Locale:
+    return Locale(language: language_uk(), region: region_ua(), direction: direction_ltr())
+
+func locale_tag_hash(locale: Locale) -> Int:
+    if locale.language == language_en() && locale.region == region_us():
+        return locale_en_us_hash()
+    if locale.language == language_uk() && locale.region == region_ua():
+        return locale_uk_ua_hash()
+    return hash_text("unsupported")
+
+func table_en_us() -> StringTable:
+    return StringTable(locale_tag_hash: locale_en_us_hash(), fallback_tag_hash: locale_en_us_hash(), entry_count: 5, checksum: 1005, primary: true)
+
+func table_uk_ua() -> StringTable:
+    return StringTable(locale_tag_hash: locale_uk_ua_hash(), fallback_tag_hash: locale_en_us_hash(), entry_count: 4, checksum: 904, primary: false)
+
+func key_form_title() -> Int:
+    return hash_text("form.title")
+
+func key_form_name() -> Int:
+    return hash_text("form.name")
+
+func key_form_primary() -> Int:
+    return hash_text("form.primary")
+
+func key_form_secondary() -> Int:
+    return hash_text("form.secondary")
+
+func key_form_status() -> Int:
+    return hash_text("form.status")
+
+func key_form_unknown() -> Int:
+    return hash_text("form.unknown")
+
 func locale_valid(locale: Locale) -> Bool:
     if locale.language <= 0 || locale.region <= 0:
         return false
     return locale.direction == direction_ltr() || locale.direction == direction_rtl()
+
+func locale_supported(locale: Locale) -> Bool:
+    if !locale_valid(locale):
+        return false
+    let en_us: Bool = locale.language == language_en() && locale.region == region_us()
+    let uk_ua: Bool = locale.language == language_uk() && locale.region == region_ua()
+    return en_us || uk_ua
 
 func string_id(namespace: Int, key: Int) -> StringID:
     return StringID(namespace: namespace, key: key)
@@ -107,6 +201,45 @@ func localization_policy_valid(policy: LocalizationPolicy) -> Bool:
     if policy.layout_direction != direction_ltr() && policy.layout_direction != direction_rtl():
         return false
     return policy.resource_count >= 2 && policy.string_ids_required && policy.diagnostic_fallback
+
+func table_has_key(table: StringTable, key_hash: Int) -> Bool:
+    if table.locale_tag_hash == locale_en_us_hash():
+        return key_hash == key_form_title() || key_hash == key_form_name() || key_hash == key_form_primary() || key_hash == key_form_secondary() || key_hash == key_form_status()
+    if table.locale_tag_hash == locale_uk_ua_hash():
+        return key_hash == key_form_title() || key_hash == key_form_name() || key_hash == key_form_primary() || key_hash == key_form_status()
+    return false
+
+func localized_value_hash(table: StringTable, key_hash: Int) -> Int:
+    return table.locale_tag_hash + key_hash + table.checksum
+
+func lookup(table: StringTable, key_hash: Int) -> StringLookupResult:
+    if table_has_key(table, key_hash):
+        return StringLookupResult(ok: true, missing_key: false, fallback_used: false, locale_tag_hash: table.locale_tag_hash, value_hash: localized_value_hash(table, key_hash), diagnostic: diagnostic_none())
+    return StringLookupResult(ok: false, missing_key: true, fallback_used: false, locale_tag_hash: table.locale_tag_hash, value_hash: 0, diagnostic: diagnostic_missing_key())
+
+func lookup_with_fallback(table: StringTable, fallback: StringTable, key_hash: Int) -> StringLookupResult:
+    let primary: StringLookupResult = lookup(table, key_hash)
+    if primary.ok:
+        return primary
+    let fallback_result: StringLookupResult = lookup(fallback, key_hash)
+    if fallback_result.ok:
+        return StringLookupResult(ok: true, missing_key: false, fallback_used: true, locale_tag_hash: fallback.locale_tag_hash, value_hash: fallback_result.value_hash, diagnostic: diagnostic_none())
+    return StringLookupResult(ok: false, missing_key: true, fallback_used: true, locale_tag_hash: fallback.locale_tag_hash, value_hash: 0, diagnostic: diagnostic_missing_key())
+
+func date_format_hook(locale: Locale, value_hash: Int) -> FormatHook:
+    return FormatHook(kind_hash: hash_text("date"), locale_tag_hash: locale_tag_hash(locale), input_hash: value_hash, output_hash: value_hash, deterministic: true, icu_claim: false)
+
+func number_format_hook(locale: Locale, value_hash: Int) -> FormatHook:
+    return FormatHook(kind_hash: hash_text("number"), locale_tag_hash: locale_tag_hash(locale), input_hash: value_hash, output_hash: value_hash, deterministic: true, icu_claim: false)
+
+func direction_for(locale: Locale) -> TextDirection:
+    if locale.direction == direction_rtl():
+        return TextDirection(direction: direction_rtl(), rtl_placeholder: true, full_bidi_supported: false, full_bidi_claim: false, shaping_proof: false)
+    return TextDirection(direction: direction_ltr(), rtl_placeholder: false, full_bidi_supported: false, full_bidi_claim: false, shaping_proof: false)
+
+func rtl_placeholder_nonclaim() -> Bool:
+    let direction: TextDirection = direction_for(locale_ar_eg())
+    return direction.rtl_placeholder && !direction.full_bidi_supported && !direction.full_bidi_claim && !direction.shaping_proof
 
 func localized_text_len(resource: LocaleResource, id: StringID, fallback_len: Int) -> Int:
     if !locale_resource_valid(resource) || !string_id_valid(id):

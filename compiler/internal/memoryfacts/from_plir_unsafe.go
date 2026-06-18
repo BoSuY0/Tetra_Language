@@ -222,10 +222,6 @@ func candidateValueIDs(path string, values map[string]plir.Value) []string {
 	return out
 }
 
-func derivedFactID(parentID FactID, suffix string) FactID {
-	return FactID(fmt.Sprintf("%s:%s", parentID, suffix))
-}
-
 func ffiDerivedFactID(parentID FactID, opID string, suffix string) FactID {
 	return FactID(fmt.Sprintf("%s:%s:%s", parentID, safeFactIDPart(opID), suffix))
 }
@@ -425,13 +421,4 @@ func costClassForAllocFact(claim string, alloc allocplan.Allocation) CostClass {
 	default:
 		return CostInstrumentationOnly
 	}
-}
-
-func nonEmpty(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return value
-		}
-	}
-	return ""
 }

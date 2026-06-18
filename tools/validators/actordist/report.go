@@ -137,7 +137,7 @@ func ValidateReportForCurrentHead(raw []byte, currentGitHead string) error {
 	}
 	if report.GitHead != currentGitHead {
 		return fmt.Errorf(
-			"git_head %q does not match current git head %q",
+			"git_head %q does not match current git head %q (current-git-head)",
 			report.GitHead,
 			currentGitHead,
 		)

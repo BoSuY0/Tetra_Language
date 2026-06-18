@@ -763,7 +763,7 @@ func runRun(args []string, stdout io.Writer, stderr io.Writer) int {
 	opt.DependencyRoots = worldOpt.DependencyRoots
 	if strings.TrimSpace(*surfaceHost) != "" {
 		opt.SurfaceHostRequired = true
-		opt.SurfaceHostBackend = surfaceRunOpt.Backend
+		opt.SurfaceHostDriver = surfaceRunOpt.Backend
 		opt.SurfaceHostProtocol = surfaceRunOpt.Protocol
 		opt.SurfaceHostSocketPath = surfaceRunOpt.SocketPath
 	}
