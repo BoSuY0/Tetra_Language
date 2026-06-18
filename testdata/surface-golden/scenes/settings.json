@@ -1,0 +1,6 @@
+{
+  "id": "settings",
+  "title": "Settings",
+  "blocks": ["nav-list", "form-row", "toggle", "select", "save-action"],
+  "interaction": "focus edit save"
+}

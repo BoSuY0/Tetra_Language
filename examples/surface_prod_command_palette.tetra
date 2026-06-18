@@ -1,0 +1,38 @@
+// Production Surface example shape: command_palette.
+module examples.surface_prod_command_palette
+
+import lib.core.surface as surface
+import lib.core.block as block
+import lib.core.morph as morph
+
+func production_example_shape() -> Int:
+    return 3301
+
+func performance_budget_ok(block_count: Int, asset_count: Int) -> Bool:
+    return morph.memory_budget_ok(block_count, asset_count, 32768)
+
+func main() -> Int
+uses alloc, mem:
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 420, h: 260)
+    let item_rect: surface.Rect = surface.Rect(x: 28, y: 34, w: 364, h: 44)
+    let field_rect: surface.Rect = surface.Rect(x: 28, y: 92, w: 364, h: 42)
+    var tree: block.BlockTree = block.tree_init(4)
+    let root: Int = block.tree_add_root(tree, morph.expand_region_panel(1, -1, root_rect, 15), root_rect)
+    let item: Int = block.tree_add_child(tree, block.id(1), morph.expand_control_action(2, 1, item_rect, 17, 9101, true), item_rect)
+    let field: Int = block.tree_add_child(tree, block.id(1), morph.expand_field_text(3, 1, 4, field_rect, 22, 9), field_rect)
+    let recipe: morph.Recipe = morph.recipe_command_item()
+    let expansion: morph.RecipeExpansion = morph.recipe_expansion(recipe, block.id(2))
+    let event: block.EventSpec = block.event_click(block.action_primary())
+    let state: block.StateSelector = block.state_selector_focused()
+    let motion: block.MotionSpec = block.motion_fast()
+    if root == 1 && item == 2 && field == 3 &&
+       block.tree_validate(tree) == block.tree_error_ok() &&
+       morph.recipe_expands_to_block(recipe) &&
+       morph.expansion_valid(expansion) &&
+       event.click_action > 0 &&
+       block.state_selector_matches(state, state) &&
+       block.motion_duration(motion) > 0 &&
+       block.accessibility_focusable_has_name(block.accessibility_button(17)) &&
+       performance_budget_ok(3, 1):
+        return 0
+    return 1

@@ -56,6 +56,81 @@ struct CompositionTrace:
     commit: Bool
     cancel: Bool
 
+struct ShellWindowSpec:
+    title_len: Int
+    width: Int
+    height: Int
+    min_width: Int
+    min_height: Int
+    flags: Int
+
+struct ShellCapability:
+    kind: Int
+    supported: Bool
+    host_trace_required: Bool
+    diagnostic_required: Bool
+
+struct ShellActionTrace:
+    kind: Int
+    id: Int
+    delivered: Bool
+    rejected: Bool
+    diagnostic: Int
+
+struct ShellPermission:
+    kind: Int
+    mode: Int
+    granted: Bool
+    rejected: Bool
+    diagnostic: Int
+
+struct ShellDiagnostic:
+    capability: Int
+    code: Int
+    unsupported: Bool
+    rejected: Bool
+    silent_noop: Bool
+
+struct ShellDPI:
+    scale_mille: Int
+    width: Int
+    height: Int
+
+struct SurfaceSecurityPolicy:
+    filesystem_mode: Int
+    network_mode: Int
+    clipboard_mode: Int
+    user_js_allowed: Bool
+    remote_code_allowed: Bool
+
+struct SurfaceLifecyclePolicy:
+    app_main: Bool
+    ui_single_owner: Bool
+    background_services_supervised: Bool
+    dispatcher_required: Bool
+    crash_report_required: Bool
+
+struct SurfaceIPCMessagePolicy:
+    owned_data: Bool
+    typed: Bool
+    dispatcher_routed: Bool
+    contains_surface_handle: Bool
+    contains_surface_frame: Bool
+    contains_surface_event: Bool
+
+struct SurfaceUIUpdatePolicy:
+    background_source: Bool
+    mutates_ui: Bool
+    dispatcher_routed: Bool
+    allowed: Bool
+
+struct SurfaceCrashPolicy:
+    dev_overlay: Bool
+    production_error_hook: Bool
+    production_dev_overlay: Bool
+    secret_scrubbing: Bool
+    expected_crash_boundary: Bool
+
 func event_none() -> Int:
     return 0
 
@@ -97,6 +172,189 @@ func event_composition_commit() -> Int:
 
 func event_composition_cancel() -> Int:
     return 13
+
+func shell_cap_window() -> Int:
+    return 1
+
+func shell_cap_lifecycle() -> Int:
+    return 2
+
+func shell_cap_menu() -> Int:
+    return 3
+
+func shell_cap_context_menu() -> Int:
+    return 4
+
+func shell_cap_dialog() -> Int:
+    return 5
+
+func shell_cap_notification() -> Int:
+    return 6
+
+func shell_cap_tray() -> Int:
+    return 7
+
+func shell_cap_cursor() -> Int:
+    return 8
+
+func shell_cap_drag_drop() -> Int:
+    return 9
+
+func shell_cap_permission() -> Int:
+    return 10
+
+func shell_cap_clipboard() -> Int:
+    return 11
+
+func shell_cap_ime() -> Int:
+    return 12
+
+func shell_cap_dpi_scale() -> Int:
+    return 13
+
+func shell_cap_open_url() -> Int:
+    return 14
+
+func shell_cap_open_file() -> Int:
+    return 15
+
+func shell_cap_platform_widget_shell() -> Int:
+    return 90
+
+func shell_window_resizable() -> Int:
+    return 1
+
+func shell_window_fullscreen() -> Int:
+    return 2
+
+func shell_permission_scoped() -> Int:
+    return 1
+
+func shell_permission_denied() -> Int:
+    return 2
+
+func security_permission_denied() -> Int:
+    return 0
+
+func security_permission_app_bundle_readonly() -> Int:
+    return 1
+
+func security_permission_host_gated() -> Int:
+    return 2
+
+func security_policy(filesystem_mode: Int, network_mode: Int, clipboard_mode: Int, user_js_allowed: Bool, remote_code_allowed: Bool) -> SurfaceSecurityPolicy:
+    return SurfaceSecurityPolicy(filesystem_mode: filesystem_mode, network_mode: network_mode, clipboard_mode: clipboard_mode, user_js_allowed: user_js_allowed, remote_code_allowed: remote_code_allowed)
+
+func security_policy_valid(policy: SurfaceSecurityPolicy) -> Bool:
+    if policy.user_js_allowed || policy.remote_code_allowed:
+        return false
+    if policy.filesystem_mode < 0 || policy.network_mode < 0 || policy.clipboard_mode < 0:
+        return false
+    return true
+
+func security_host_call_allowed(permission_mode: Int, granted: Bool) -> Bool:
+    if !granted:
+        return false
+    return permission_mode != security_permission_denied()
+
+func security_asset_accept(trusted: Bool, hash_verified: Bool, sanitized: Bool, remote: Bool, user_script: Bool) -> Bool:
+    if remote || user_script:
+        return false
+    return trusted && hash_verified && sanitized
+
+func lifecycle_policy(app_main: Bool, ui_single_owner: Bool, background_services_supervised: Bool, dispatcher_required: Bool, crash_report_required: Bool) -> SurfaceLifecyclePolicy:
+    return SurfaceLifecyclePolicy(app_main: app_main, ui_single_owner: ui_single_owner, background_services_supervised: background_services_supervised, dispatcher_required: dispatcher_required, crash_report_required: crash_report_required)
+
+func lifecycle_policy_valid(policy: SurfaceLifecyclePolicy) -> Bool:
+    return policy.app_main && policy.ui_single_owner && policy.background_services_supervised && policy.dispatcher_required && policy.crash_report_required
+
+func ipc_message_policy(owned_data: Bool, typed: Bool, dispatcher_routed: Bool, contains_surface_handle: Bool, contains_surface_frame: Bool, contains_surface_event: Bool) -> SurfaceIPCMessagePolicy:
+    return SurfaceIPCMessagePolicy(owned_data: owned_data, typed: typed, dispatcher_routed: dispatcher_routed, contains_surface_handle: contains_surface_handle, contains_surface_frame: contains_surface_frame, contains_surface_event: contains_surface_event)
+
+func ipc_message_allowed(policy: SurfaceIPCMessagePolicy) -> Bool:
+    if policy.contains_surface_handle || policy.contains_surface_frame || policy.contains_surface_event:
+        return false
+    return policy.owned_data && policy.typed && policy.dispatcher_routed
+
+func ui_update_policy(background_source: Bool, mutates_ui: Bool, dispatcher_routed: Bool, allowed: Bool) -> SurfaceUIUpdatePolicy:
+    return SurfaceUIUpdatePolicy(background_source: background_source, mutates_ui: mutates_ui, dispatcher_routed: dispatcher_routed, allowed: allowed)
+
+func ui_update_allowed(policy: SurfaceUIUpdatePolicy) -> Bool:
+    if policy.background_source && policy.mutates_ui:
+        return policy.dispatcher_routed && policy.allowed
+    return policy.allowed
+
+func crash_isolation_valid(ui_state_preserved: Bool, background_service_restart: Bool, crash_report: Bool) -> Bool:
+    return ui_state_preserved && background_service_restart && crash_report
+
+func crash_policy(dev_overlay: Bool, production_error_hook: Bool, production_dev_overlay: Bool, secret_scrubbing: Bool, expected_crash_boundary: Bool) -> SurfaceCrashPolicy:
+    return SurfaceCrashPolicy(dev_overlay: dev_overlay, production_error_hook: production_error_hook, production_dev_overlay: production_dev_overlay, secret_scrubbing: secret_scrubbing, expected_crash_boundary: expected_crash_boundary)
+
+func crash_policy_valid(policy: SurfaceCrashPolicy) -> Bool:
+    if policy.production_dev_overlay:
+        return false
+    return policy.dev_overlay && policy.production_error_hook && policy.secret_scrubbing && policy.expected_crash_boundary
+
+func crash_report_valid(has_source_location: Bool, has_diagnostic_bundle: Bool, surfaced_to_user: Bool, secret_free: Bool, swallowed: Bool, same_commit: Bool) -> Bool:
+    if swallowed || !secret_free:
+        return false
+    return has_source_location && has_diagnostic_bundle && surfaced_to_user && same_commit
+
+func shell_window_spec(title_len: Int, width: Int, height: Int, min_width: Int, min_height: Int, flags: Int) -> ShellWindowSpec:
+    return ShellWindowSpec(title_len: title_len, width: width, height: height, min_width: min_width, min_height: min_height, flags: flags)
+
+func shell_window_spec_valid(spec: ShellWindowSpec) -> Bool:
+    return spec.title_len > 0 && spec.width >= spec.min_width && spec.height >= spec.min_height && spec.min_width > 0 && spec.min_height > 0
+
+func shell_capability(kind: Int, supported: Bool, host_trace_required: Bool, diagnostic_required: Bool) -> ShellCapability:
+    return ShellCapability(kind: kind, supported: supported, host_trace_required: host_trace_required, diagnostic_required: diagnostic_required)
+
+func shell_capability_valid(cap: ShellCapability) -> Bool:
+    if cap.kind <= 0:
+        return false
+    if cap.supported:
+        return cap.host_trace_required
+    return cap.diagnostic_required
+
+func shell_action_trace(kind: Int, id: Int, delivered: Bool, rejected: Bool, diagnostic: Int) -> ShellActionTrace:
+    return ShellActionTrace(kind: kind, id: id, delivered: delivered, rejected: rejected, diagnostic: diagnostic)
+
+func shell_action_trace_valid(trace: ShellActionTrace) -> Bool:
+    if trace.kind <= 0 || trace.id <= 0:
+        return false
+    if trace.delivered == trace.rejected:
+        return false
+    if trace.rejected && trace.diagnostic <= 0:
+        return false
+    return true
+
+func shell_permission(kind: Int, mode: Int, granted: Bool, rejected: Bool, diagnostic: Int) -> ShellPermission:
+    return ShellPermission(kind: kind, mode: mode, granted: granted, rejected: rejected, diagnostic: diagnostic)
+
+func shell_permission_valid(permission: ShellPermission) -> Bool:
+    if permission.kind <= 0 || permission.mode <= 0:
+        return false
+    if permission.granted == permission.rejected:
+        return false
+    if permission.rejected && permission.diagnostic <= 0:
+        return false
+    return true
+
+func shell_unsupported_diagnostic(capability: Int, code: Int) -> ShellDiagnostic:
+    return ShellDiagnostic(capability: capability, code: code, unsupported: true, rejected: true, silent_noop: false)
+
+func shell_diagnostic_valid(diagnostic: ShellDiagnostic) -> Bool:
+    if diagnostic.capability <= 0 || diagnostic.code <= 0:
+        return false
+    if diagnostic.unsupported && (!diagnostic.rejected || diagnostic.silent_noop):
+        return false
+    return true
+
+func shell_dpi(scale_mille: Int, width: Int, height: Int) -> ShellDPI:
+    return ShellDPI(scale_mille: scale_mille, width: width, height: height)
+
+func shell_dpi_valid(dpi: ShellDPI) -> Bool:
+    return dpi.scale_mille > 0 && dpi.width > 0 && dpi.height > 0
 
 func open(title: String, width: Int, height: Int) -> Surface
 uses surface:

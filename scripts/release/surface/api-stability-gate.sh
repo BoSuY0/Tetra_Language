@@ -84,8 +84,8 @@ if rg -n '^import lib\.experimental(\.|$)' examples/surface_release_*.tetra; the
 fi
 
 docs_path="$artifacts_dir/tetra-docs.md"
-./tetra doc lib/core examples >"$docs_path"
-go run ./tools/cmd/validate-api-docs --docs "$docs_path"
+go run -buildvcs=false ./cli/cmd/tetra doc lib/core examples >"$docs_path"
+go run -buildvcs=false ./tools/cmd/validate-api-docs --docs "$docs_path"
 
 for module in "${stable_modules[@]}"; do
 	if ! rg -n "^## ${module}$" "$docs_path" >/dev/null; then
@@ -143,6 +143,13 @@ cat >"$report_dir/surface-api-stability-summary.json" <<JSON
   "docs_manifest_validated": true
 }
 JSON
+
+parent_dir="$(dirname "$report_dir")"
+if [[ "$(basename "$parent_dir")" == "final" && "$(basename "$report_dir")" == "api-stability" ]]; then
+  go run -buildvcs=false ./tools/cmd/validate-artifact-hashes --write --root "$parent_dir" --out "$parent_dir/artifact-hashes.json"
+  go run -buildvcs=false ./tools/cmd/validate-artifact-hashes --manifest "$parent_dir/artifact-hashes.json"
+  echo "Surface production final artifact hashes: $parent_dir/artifact-hashes.json"
+fi
 
 echo "Surface API stability report: $report_dir/surface-api-stability-summary.json"
 echo "Surface API docs: $docs_path"

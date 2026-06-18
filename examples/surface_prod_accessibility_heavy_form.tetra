@@ -1,0 +1,43 @@
+// Production Surface example shape: accessibility_heavy_form.
+module examples.surface_prod_accessibility_heavy_form
+
+import lib.core.surface as surface
+import lib.core.block as block
+import lib.core.morph as morph
+
+func production_example_shape() -> Int:
+    return 3310
+
+func performance_budget_ok(block_count: Int, asset_count: Int) -> Bool:
+    return morph.memory_budget_ok(block_count, asset_count, 32768)
+
+func main() -> Int
+uses alloc, mem:
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 480, h: 340)
+    let label_rect: surface.Rect = surface.Rect(x: 34, y: 46, w: 160, h: 24)
+    let field_rect: surface.Rect = surface.Rect(x: 34, y: 80, w: 300, h: 44)
+    let submit_rect: surface.Rect = surface.Rect(x: 34, y: 148, w: 180, h: 44)
+    var tree: block.BlockTree = block.tree_init(6)
+    let root: Int = block.tree_add_root(tree, morph.expand_region_panel(1, -1, root_rect, 24), root_rect)
+    let label: Int = block.tree_add_child(tree, block.id(1), morph.expand_label(2, 1, 3, label_rect, 15), label_rect)
+    let field: Int = block.tree_add_child(tree, block.id(1), morph.expand_field_text(3, 1, 2, field_rect, 20, 12), field_rect)
+    let submit: Int = block.tree_add_child(tree, block.id(1), morph.expand_control_action(4, 1, submit_rect, 13, 9910, true), submit_rect)
+    let recipe: morph.Recipe = morph.recipe_field_text()
+    let expansion: morph.RecipeExpansion = morph.recipe_expansion(recipe, block.id(3))
+    let event: block.EventSpec = block.event_click(block.action_primary())
+    let state: block.StateSelector = block.state_selector_focused()
+    let motion: block.MotionSpec = block.motion_fast()
+    let labelled: Bool = morph.accessibility_projection_ok(2, 3, 15)
+    let reading: Bool = block.accessibility_reading_order_matches(0, 1)
+    if root == 1 && label == 2 && field == 3 && submit == 4 &&
+       block.tree_validate(tree) == block.tree_error_ok() &&
+       morph.recipe_expands_to_block(recipe) &&
+       morph.expansion_valid(expansion) &&
+       event.key_action > 0 &&
+       block.state_selector_matches(state, state) &&
+       block.motion_duration(motion) > 0 &&
+       labelled && reading &&
+       block.accessibility_focusable_has_name(block.accessibility_button(13)) &&
+       performance_budget_ok(4, 1):
+        return 0
+    return 1

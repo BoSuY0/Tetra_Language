@@ -1,0 +1,40 @@
+// Production Surface example shape: file_manager_shell.
+module examples.surface_prod_file_manager_shell
+
+import lib.core.surface as surface
+import lib.core.block as block
+import lib.core.morph as morph
+
+func production_example_shape() -> Int:
+    return 3305
+
+func performance_budget_ok(block_count: Int, asset_count: Int) -> Bool:
+    return morph.memory_budget_ok(block_count, asset_count, 32768)
+
+func main() -> Int
+uses alloc, mem:
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 620, h: 360)
+    let rail_rect: surface.Rect = surface.Rect(x: 18, y: 18, w: 150, h: 320)
+    let list_rect: surface.Rect = surface.Rect(x: 190, y: 36, w: 380, h: 250)
+    var tree: block.BlockTree = block.tree_init(5)
+    let root: Int = block.tree_add_root(tree, morph.expand_region_panel(1, -1, root_rect, 17), root_rect)
+    let rail: Int = block.tree_add_child(tree, block.id(1), morph.expand_control_action(2, 1, rail_rect, 11, 9501, true), rail_rect)
+    let list: Int = block.tree_add_child(tree, block.id(1), morph.expand_region_panel(3, 1, list_rect, 19), list_rect)
+    let recipe: morph.Recipe = morph.recipe_collection_list()
+    let expansion: morph.RecipeExpansion = morph.recipe_expansion(recipe, block.id(3))
+    let event: block.EventSpec = block.event_click(block.action_primary())
+    let state: block.StateSelector = block.state_selector_hover()
+    let motion: block.MotionSpec = block.motion_fast()
+    let permission: surface.ShellPermission = surface.shell_permission(surface.shell_cap_open_file(), surface.shell_permission_scoped(), true, false, 0)
+    if root == 1 && rail == 2 && list == 3 &&
+       block.tree_validate(tree) == block.tree_error_ok() &&
+       morph.recipe_expands_to_block(recipe) &&
+       morph.expansion_valid(expansion) &&
+       event.click_action > 0 &&
+       block.state_selector_matches(state, state) &&
+       block.motion_duration(motion) > 0 &&
+       block.accessibility_focusable_has_name(block.accessibility_button(11)) &&
+       surface.shell_permission_valid(permission) &&
+       performance_budget_ok(3, 2):
+        return 0
+    return 1

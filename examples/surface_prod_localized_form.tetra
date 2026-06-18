@@ -1,0 +1,46 @@
+// Production Surface example shape: localized_form.
+module examples.surface_prod_localized_form
+
+import lib.core.surface as surface
+import lib.core.block as block
+import lib.core.morph as morph
+import lib.core.i18n as i18n
+
+func production_example_shape() -> Int:
+    return 3309
+
+func performance_budget_ok(block_count: Int, asset_count: Int) -> Bool:
+    return morph.memory_budget_ok(block_count, asset_count, 32768)
+
+func main() -> Int
+uses alloc, mem:
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 440, h: 300)
+    let label_rect: surface.Rect = surface.Rect(x: 30, y: 40, w: 160, h: 24)
+    let field_rect: surface.Rect = surface.Rect(x: 30, y: 74, w: 300, h: 44)
+    var tree: block.BlockTree = block.tree_init(5)
+    let root: Int = block.tree_add_root(tree, morph.expand_region_panel(1, -1, root_rect, 16), root_rect)
+    let label: Int = block.tree_add_child(tree, block.id(1), morph.expand_label(2, 1, 3, label_rect, 12), label_rect)
+    let field: Int = block.tree_add_child(tree, block.id(1), morph.expand_field_text(3, 1, 2, field_rect, 22, 11), field_rect)
+    let recipe: morph.Recipe = morph.recipe_field_text()
+    let expansion: morph.RecipeExpansion = morph.recipe_expansion(recipe, block.id(3))
+    let event: block.EventSpec = block.event_text(block.action_primary())
+    let state: block.StateSelector = block.state_selector_focused()
+    let motion: block.MotionSpec = block.motion_fast()
+    let resource: i18n.LocaleResource = i18n.locale_resource(i18n.locale_es_es(), 4, 9901, true, true)
+    let localized_len: Int = i18n.localized_text_len(resource, i18n.string_id(33, 9), 12)
+    let policy: i18n.LocalizationPolicy = i18n.localization_policy(3, true, true, false, false, i18n.direction_ltr(), false)
+    if root == 1 && label == 2 && field == 3 &&
+       block.tree_validate(tree) == block.tree_error_ok() &&
+       morph.recipe_expands_to_block(recipe) &&
+       morph.expansion_valid(expansion) &&
+       event.text_action > 0 &&
+       block.state_selector_matches(state, state) &&
+       block.motion_duration(motion) > 0 &&
+       block.accessibility_focusable_has_name(block.accessibility_textbox_labelled_by(22, block.id(2))) &&
+       morph.accessibility_projection_ok(2, 3, 12) &&
+       i18n.locale_resource_valid(resource) &&
+       i18n.localization_policy_valid(policy) &&
+       localized_len > 0 &&
+       performance_budget_ok(3, 1):
+        return 0
+    return 1

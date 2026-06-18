@@ -11,6 +11,8 @@ module lib.core.widgets
 import lib.core.surface as surface
 import lib.core.component as component
 import lib.core.accessibility as accessibility
+import lib.core.block as block
+import lib.core.morph as morph
 
 struct Text:
     rect: surface.Rect
@@ -76,6 +78,94 @@ struct Scroll:
 struct Spacer:
     rect: surface.Rect
     min_size: surface.Size
+
+struct WidgetMigration:
+    widget_kind: Int
+    component_kind: Int
+    block_layout_mode: Int
+    recipe_hash: Int
+    compatibility_layer: Bool
+    block_equivalent: Bool
+    morph_recommended: Bool
+    deprecated: Bool
+    diagnostic_code: Int
+
+func migration_level() -> Int:
+    return 3201
+
+func migration_error_ok() -> Int:
+    return 0
+
+func migration_error_core_final_architecture_claim() -> Int:
+    return 1
+
+func migration_error_breaking_v1_example() -> Int:
+    return 2
+
+func migration_error_missing_mapping() -> Int:
+    return 3
+
+func widgets_are_compatibility_layer() -> Bool:
+    return true
+
+func widgets_are_core_final_architecture() -> Bool:
+    return false
+
+func migration_diagnostic_for_core_final_claim() -> Int:
+    return migration_error_core_final_architecture_claim()
+
+func migration_mapping(widget_kind: Int, component_kind: Int, block_layout_mode: Int, recipe_hash: Int) -> WidgetMigration:
+    return WidgetMigration(widget_kind: widget_kind, component_kind: component_kind, block_layout_mode: block_layout_mode, recipe_hash: recipe_hash, compatibility_layer: true, block_equivalent: true, morph_recommended: true, deprecated: false, diagnostic_code: migration_error_ok())
+
+func migration_valid(mapping: WidgetMigration) -> Bool:
+    return mapping.widget_kind > 0 &&
+           mapping.component_kind > 0 &&
+           mapping.block_layout_mode > 0 &&
+           mapping.recipe_hash > 0 &&
+           mapping.compatibility_layer &&
+           mapping.block_equivalent &&
+           mapping.morph_recommended &&
+           !mapping.deprecated &&
+           mapping.diagnostic_code == migration_error_ok()
+
+func widget_kind_panel() -> Int:
+    return 1
+
+func widget_kind_button() -> Int:
+    return 2
+
+func widget_kind_textbox() -> Int:
+    return 3
+
+func widget_kind_status_text() -> Int:
+    return 4
+
+func widget_kind_label() -> Int:
+    return 5
+
+func migration_panel() -> WidgetMigration:
+    return migration_mapping(widget_kind_panel(), component.kind_panel(), block.layout_mode_column(), morph.recipe_region_panel_hash())
+
+func migration_button() -> WidgetMigration:
+    return migration_mapping(widget_kind_button(), component.kind_button(), block.layout_mode_row(), morph.recipe_control_action_hash())
+
+func migration_textbox() -> WidgetMigration:
+    return migration_mapping(widget_kind_textbox(), component.kind_textbox(), block.layout_mode_row(), morph.recipe_field_text_hash())
+
+func migration_status_text() -> WidgetMigration:
+    return migration_mapping(widget_kind_status_text(), component.kind_text(), block.layout_mode_fixed(), morph.recipe_status_message_hash())
+
+func migration_label() -> WidgetMigration:
+    return migration_mapping(widget_kind_label(), component.kind_text(), block.layout_mode_fixed(), morph.recipe_status_message_hash())
+
+func migration_expand_button_to_block(id_value: Int, parent_value: Int, rect: surface.Rect, label_len: Int) -> block.Block:
+    return morph.expand_control_action(id_value, parent_value, rect, label_len, 9101, false)
+
+func migration_expand_textbox_to_block(id_value: Int, parent_value: Int, label_id_value: Int, rect: surface.Rect, text_len: Int, placeholder_len: Int) -> block.Block:
+    return morph.expand_field_text(id_value, parent_value, label_id_value, rect, text_len, placeholder_len)
+
+func migration_expand_panel_to_block(id_value: Int, parent_value: Int, rect: surface.Rect, label_len: Int) -> block.Block:
+    return morph.expand_region_panel(id_value, parent_value, rect, label_len)
 
 func role_label() -> Int:
     return component.accessibility_role_label()

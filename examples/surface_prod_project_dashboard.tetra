@@ -1,0 +1,40 @@
+// Production Surface example shape: project_dashboard.
+module examples.surface_prod_project_dashboard
+
+import lib.core.surface as surface
+import lib.core.block as block
+import lib.core.morph as morph
+
+func production_example_shape() -> Int:
+    return 3303
+
+func performance_budget_ok(block_count: Int, asset_count: Int) -> Bool:
+    return morph.memory_budget_ok(block_count, asset_count, 32768)
+
+func main() -> Int
+uses alloc, mem:
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 560, h: 340)
+    let nav_rect: surface.Rect = surface.Rect(x: 20, y: 20, w: 138, h: 300)
+    let metric_rect: surface.Rect = surface.Rect(x: 180, y: 28, w: 160, h: 64)
+    let table_rect: surface.Rect = surface.Rect(x: 180, y: 112, w: 340, h: 180)
+    var tree: block.BlockTree = block.tree_init(6)
+    let root: Int = block.tree_add_root(tree, morph.expand_region_panel(1, -1, root_rect, 17), root_rect)
+    let nav: Int = block.tree_add_child(tree, block.id(1), morph.expand_control_action(2, 1, nav_rect, 12, 9301, true), nav_rect)
+    let metric: Int = block.tree_add_child(tree, block.id(1), morph.expand_control_action(3, 1, metric_rect, 10, 9302, false), metric_rect)
+    let table: Int = block.tree_add_child(tree, block.id(1), morph.expand_region_panel(4, 1, table_rect, 18), table_rect)
+    let recipe: morph.Recipe = morph.recipe_collection_table_lite()
+    let expansion: morph.RecipeExpansion = morph.recipe_expansion(recipe, block.id(4))
+    let event: block.EventSpec = block.event_click(block.action_primary())
+    let state: block.StateSelector = block.state_selector_hover()
+    let motion: block.MotionSpec = block.motion_fast()
+    if root == 1 && nav == 2 && metric == 3 && table == 4 &&
+       block.tree_validate(tree) == block.tree_error_ok() &&
+       morph.recipe_expands_to_block(recipe) &&
+       morph.expansion_valid(expansion) &&
+       event.click_action > 0 &&
+       block.state_selector_matches(state, state) &&
+       block.motion_frame_timing_ok(0, 16) &&
+       block.accessibility_focusable_has_name(block.accessibility_button(12)) &&
+       performance_budget_ok(4, 2):
+        return 0
+    return 1

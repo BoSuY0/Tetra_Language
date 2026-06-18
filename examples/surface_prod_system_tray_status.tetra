@@ -1,0 +1,40 @@
+// Production Surface example shape: system_tray_status.
+module examples.surface_prod_system_tray_status
+
+import lib.core.surface as surface
+import lib.core.block as block
+import lib.core.morph as morph
+
+func production_example_shape() -> Int:
+    return 3307
+
+func performance_budget_ok(block_count: Int, asset_count: Int) -> Bool:
+    return morph.memory_budget_ok(block_count, asset_count, 32768)
+
+func main() -> Int
+uses alloc, mem:
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 360, h: 220)
+    let status_rect: surface.Rect = surface.Rect(x: 24, y: 34, w: 220, h: 44)
+    let action_rect: surface.Rect = surface.Rect(x: 24, y: 98, w: 180, h: 42)
+    var tree: block.BlockTree = block.tree_init(5)
+    let root: Int = block.tree_add_root(tree, morph.expand_region_panel(1, -1, root_rect, 12), root_rect)
+    let status: Int = block.tree_add_child(tree, block.id(1), morph.expand_control_action(2, 1, status_rect, 14, 9701, true), status_rect)
+    let action: Int = block.tree_add_child(tree, block.id(1), morph.expand_control_action(3, 1, action_rect, 9, 9702, false), action_rect)
+    let recipe: morph.Recipe = morph.recipe_status_message()
+    let expansion: morph.RecipeExpansion = morph.recipe_expansion(recipe, block.id(2))
+    let event: block.EventSpec = block.event_click(block.action_secondary())
+    let state: block.StateSelector = block.state_selector_selected()
+    let motion: block.MotionSpec = block.motion_fast()
+    let tray: surface.ShellCapability = surface.shell_capability(surface.shell_cap_tray(), true, true, true)
+    if root == 1 && status == 2 && action == 3 &&
+       block.tree_validate(tree) == block.tree_error_ok() &&
+       morph.recipe_expands_to_block(recipe) &&
+       morph.expansion_valid(expansion) &&
+       event.click_action > 0 &&
+       block.state_selector_matches(state, state) &&
+       block.motion_duration(motion) > 0 &&
+       block.accessibility_focusable_has_name(block.accessibility_button(14)) &&
+       surface.shell_capability_valid(tray) &&
+       performance_budget_ok(3, 2):
+        return 0
+    return 1
