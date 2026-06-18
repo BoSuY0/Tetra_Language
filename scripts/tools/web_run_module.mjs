@@ -1,16 +1,18 @@
 #!/usr/bin/env node
 
-import fs from 'node:fs';
-import crypto from 'node:crypto';
-import process from 'node:process';
+import fs from "node:fs";
+import crypto from "node:crypto";
+import process from "node:process";
 
-let wasmPath = '';
-let surfaceTracePath = '';
+let wasmPath = "";
+let surfaceTracePath = "";
 for (let i = 2; i < process.argv.length; i++) {
   const arg = process.argv[i];
-  if (arg === '--surface-trace') {
+  if (arg === "--surface-trace") {
     if (i + 1 >= process.argv.length) {
-      console.error('usage: node scripts/tools/web_run_module.mjs [--surface-trace trace.json] <module.wasm>');
+      console.error(
+        "usage: node scripts/tools/web_run_module.mjs [--surface-trace trace.json] <module.wasm>",
+      );
       process.exit(2);
     }
     surfaceTracePath = process.argv[++i];
@@ -20,17 +22,21 @@ for (let i = 2; i < process.argv.length; i++) {
     wasmPath = arg;
     continue;
   }
-  console.error('usage: node scripts/tools/web_run_module.mjs [--surface-trace trace.json] <module.wasm>');
+  console.error(
+    "usage: node scripts/tools/web_run_module.mjs [--surface-trace trace.json] <module.wasm>",
+  );
   process.exit(2);
 }
 if (!wasmPath) {
-  console.error('usage: node scripts/tools/web_run_module.mjs [--surface-trace trace.json] <module.wasm>');
+  console.error(
+    "usage: node scripts/tools/web_run_module.mjs [--surface-trace trace.json] <module.wasm>",
+  );
   process.exit(2);
 }
 
 let instanceRef = null;
 const surfaceTrace = {
-  schema: 'tetra.surface.web-runner-trace.v1',
+  schema: "tetra.surface.web-runner-trace.v1",
   wasm_path: wasmPath,
   frames: [],
 };
@@ -38,7 +44,7 @@ const surfaceTrace = {
 function memoryView() {
   const memory = instanceRef && instanceRef.exports && instanceRef.exports.memory;
   if (!(memory instanceof WebAssembly.Memory)) {
-    throw new Error('tetra_web_v0.4.0: missing exported memory');
+    throw new Error("tetra_web_v0.4.0: missing exported memory");
   }
   return new Uint8Array(memory.buffer);
 }
@@ -51,7 +57,7 @@ function readUTF8(ptr, len) {
 }
 
 function sha256Hex(bytes) {
-  return crypto.createHash('sha256').update(bytes).digest('hex');
+  return crypto.createHash("sha256").update(bytes).digest("hex");
 }
 
 function createSurfaceHost() {
@@ -60,7 +66,7 @@ function createSurfaceHost() {
   let clipboard = new Uint8Array([84, 101, 116]);
   return {
     __tetra_surface_open(titlePtr, titleLen, width, height) {
-      const title = instanceRef ? readUTF8(titlePtr | 0, titleLen | 0) : '';
+      const title = instanceRef ? readUTF8(titlePtr | 0, titleLen | 0) : "";
       const handle = nextHandle++;
       surfaces.set(handle, { title, width: width | 0, height: height | 0, presented: 0 });
       return handle | 0;
@@ -171,7 +177,11 @@ function createSurfaceHost() {
       surface.width = width | 0;
       surface.height = height | 0;
       surface.presented = (surface.presented + 1) | 0;
-      surface.lastFrame = { pixelsPtr: pixelsPtr | 0, pixelsLen: pixelsLen | 0, stride: stride | 0 };
+      surface.lastFrame = {
+        pixelsPtr: pixelsPtr | 0,
+        pixelsLen: pixelsLen | 0,
+        stride: stride | 0,
+      };
       if (surfaceTracePath) {
         const view = memoryView();
         const start = pixelsPtr >>> 0;
@@ -208,7 +218,7 @@ try {
         process.stdout.write(readUTF8(ptr | 0, len | 0));
       },
       panic(code, ptr, len) {
-        const message = instanceRef ? readUTF8(ptr | 0, len | 0) : 'panic';
+        const message = instanceRef ? readUTF8(ptr | 0, len | 0) : "panic";
         throw new Error(`tetra panic(${code | 0}): ${message}`);
       },
     },
@@ -216,8 +226,8 @@ try {
   });
   instanceRef = result.instance;
   const tetraMain = instanceRef.exports.tetra_main;
-  if (typeof tetraMain !== 'function') {
-    console.error('web module missing tetra_main export');
+  if (typeof tetraMain !== "function") {
+    console.error("web module missing tetra_main export");
     process.exit(1);
   }
   const exitCode = (tetraMain() | 0) & 0xff;

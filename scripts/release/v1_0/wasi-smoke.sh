@@ -11,7 +11,7 @@ mkdir -p "$GOCACHE"
 export GOCACHE
 
 usage() {
-  cat <<'USAGE'
+  cat << 'USAGE'
 Usage: bash scripts/release/v1_0/wasi-smoke.sh [--report PATH]
 
 Runs WASI smoke through the unified CLI runtime path.
@@ -56,7 +56,7 @@ while [[ $# -gt 0 ]]; do
       report_path="$2"
       shift 2
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;
@@ -74,7 +74,7 @@ fi
 report_path="$(normalize_relative_dash_path "$report_path")"
 prepare_output_file_path
 
-if ! command -v node >/dev/null 2>&1; then
+if ! command -v node > /dev/null 2>&1; then
   echo "release/v1_0/wasi-smoke: runtime prerequisite unavailable: node" >&2
   exit 1
 fi
@@ -85,7 +85,7 @@ trap 'rm -rf "$tmp_dir"' EXIT
 smoke_source_for_case() {
   local list_path="$1"
   local case_name="$2"
-  node - "$list_path" "$case_name" <<'JS'
+  node - "$list_path" "$case_name" << 'JS'
 const fs = require('fs');
 const listPath = process.argv[2];
 const caseName = process.argv[3];
@@ -100,7 +100,7 @@ JS
 }
 
 smoke_list="$tmp_dir/wasm32-wasi-smoke-list.json"
-./tetra smoke --list --target wasm32-wasi --format=json >"$smoke_list"
+./tetra smoke --list --target wasm32-wasi --format=json > "$smoke_list"
 go run ./tools/cmd/validate-smoke-list --report "$smoke_list"
 
 artifact_report="$tmp_dir/wasm32-wasi-artifact-preflight.json"
@@ -112,7 +112,7 @@ cp -- "$artifact_report" "${report_path%.json}.artifact.json"
 
 wasi_dogfood_src="$(smoke_source_for_case "$smoke_list" "dogfood_wasi")"
 wasi_ui_probe="$tmp_dir/dogfood_wasi_probe"
-if ./tetra build --target wasm32-wasi -o "$wasi_ui_probe" "$wasi_dogfood_src" >"$tmp_dir/dogfood_wasi_build.out" 2>"$tmp_dir/dogfood_wasi_build.err"; then
+if ./tetra build --target wasm32-wasi -o "$wasi_ui_probe" "$wasi_dogfood_src" > "$tmp_dir/dogfood_wasi_build.out" 2> "$tmp_dir/dogfood_wasi_build.err"; then
   go run ./tools/cmd/validate-wasm-imports --target wasm32-wasi "$wasi_ui_probe"
   for sidecar in "$wasi_ui_probe.ui.json" "$wasi_ui_probe.ui.web.mjs" "$wasi_ui_probe.ui.html" "$wasi_ui_probe.ui.shell.txt"; do
     if [[ -f "$sidecar" ]]; then
@@ -128,7 +128,7 @@ fi
 
 wasi_ui_src="$(smoke_source_for_case "$smoke_list" "ui_web_smoke")"
 wasi_ui_policy_probe="$tmp_dir/wasi_ui_policy_probe"
-if ./tetra build --target wasm32-wasi -o "$wasi_ui_policy_probe" "$wasi_ui_src" >"$tmp_dir/wasi_ui_policy_build.out" 2>"$tmp_dir/wasi_ui_policy_build.err"; then
+if ./tetra build --target wasm32-wasi -o "$wasi_ui_policy_probe" "$wasi_ui_src" > "$tmp_dir/wasi_ui_policy_build.out" 2> "$tmp_dir/wasi_ui_policy_build.err"; then
   go run ./tools/cmd/validate-wasm-imports --target wasm32-wasi "$wasi_ui_policy_probe"
   if [[ ! -f "$wasi_ui_policy_probe.ui.json" ]]; then
     echo "release/v1_0/wasi-smoke: expected WASI UI metadata sidecar: $wasi_ui_policy_probe.ui.json" >&2

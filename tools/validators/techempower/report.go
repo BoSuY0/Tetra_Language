@@ -127,12 +127,20 @@ func validateBenchmarkReport(raw []byte, opt Options) error {
 	if len(report.Limitations) == 0 {
 		issues = append(issues, "limitations are required")
 	}
-	if report.Environment.OS == "" || report.Environment.Arch == "" || report.Environment.GoVersion == "" || report.Environment.Hostname == "" {
+	if report.Environment.OS == "" || report.Environment.Arch == "" ||
+		report.Environment.GoVersion == "" ||
+		report.Environment.Hostname == "" {
 		issues = append(issues, "environment os/arch/go_version/hostname are required")
 	}
 	issues = append(issues, validateGitHead(report.Git.Head)...)
 	if report.Git.WorktreeStatus != "clean" && report.Git.WorktreeStatus != "dirty" {
-		issues = append(issues, fmt.Sprintf("git worktree_status is %q, want clean or dirty", report.Git.WorktreeStatus))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"git worktree_status is %q, want clean or dirty",
+				report.Git.WorktreeStatus,
+			),
+		)
 	}
 
 	totalRequests := 0
@@ -150,12 +158,22 @@ func validateBenchmarkReport(raw []byte, opt Options) error {
 		totalFailures += endpoint.Failures
 	}
 	issues = append(issues, validateEndpointSet(report, opt)...)
-	issues = append(issues, validateSummary(report.Summary, len(report.Endpoints), totalRequests, totalSuccesses, totalFailures)...)
+	issues = append(
+		issues,
+		validateSummary(
+			report.Summary,
+			len(report.Endpoints),
+			totalRequests,
+			totalSuccesses,
+			totalFailures,
+		)...)
 	issues = append(issues, validateBenchmarkCommandBaseURL(report.Command, report.BaseURL)...)
 	issues = append(issues, validateBenchmarkCommandRequests(report.Command, report.Endpoints)...)
 	issues = append(issues, validateBenchmarkCommandConcurrency(report.Command)...)
 	issues = append(issues, validateBenchmarkCommandSkipDB(report.Command, report.Endpoints)...)
-	issues = append(issues, validateBenchmarkCommandMinRPS(report.Command, report.Summary, report.Endpoints)...)
+	issues = append(
+		issues,
+		validateBenchmarkCommandMinRPS(report.Command, report.Summary, report.Endpoints)...)
 
 	if len(issues) > 0 {
 		return errors.New(strings.Join(issues, "; "))
@@ -174,14 +192,18 @@ func validateBenchmarkCommandBaseURL(command string, baseURL string) []string {
 	}
 	expected, err := canonicalBenchmarkBaseURL(rawBaseURL)
 	if err != nil {
-		return []string{fmt.Sprintf("benchmark command base-url %q is invalid: %v", rawBaseURL, err)}
+		return []string{
+			fmt.Sprintf("benchmark command base-url %q is invalid: %v", rawBaseURL, err),
+		}
 	}
 	actual, err := canonicalBenchmarkBaseURL(baseURL)
 	if err != nil {
 		return []string{fmt.Sprintf("benchmark base_url %q is invalid: %v", baseURL, err)}
 	}
 	if expected != actual {
-		return []string{fmt.Sprintf("benchmark command base-url = %q, want %q from base_url", expected, actual)}
+		return []string{
+			fmt.Sprintf("benchmark command base-url = %q, want %q from base_url", expected, actual),
+		}
 	}
 	return nil
 }
@@ -192,7 +214,12 @@ func validateBenchmarkCommandExecutable(command string) []string {
 		return []string{"command is required"}
 	}
 	if fields[0] != "tetra-techempower-bench" {
-		return []string{fmt.Sprintf("benchmark command executable is %q, want tetra-techempower-bench", fields[0])}
+		return []string{
+			fmt.Sprintf(
+				"benchmark command executable is %q, want tetra-techempower-bench",
+				fields[0],
+			),
+		}
 	}
 	return nil
 }
@@ -237,7 +264,15 @@ func validateBenchmarkCommandRequests(command string, endpoints []EndpointReport
 	var issues []string
 	for _, endpoint := range endpoints {
 		if endpoint.Requests != expected {
-			issues = append(issues, fmt.Sprintf("benchmark command requests for endpoint %s = %d, want %d from --requests", endpoint.Path, endpoint.Requests, expected))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"benchmark command requests for endpoint %s = %d, want %d from --requests",
+					endpoint.Path,
+					endpoint.Requests,
+					expected,
+				),
+			)
 		}
 	}
 	return issues
@@ -270,15 +305,23 @@ func validateBenchmarkCommandSkipDB(command string, endpoints []EndpointReport) 
 	reportSkipsDB := isSkipDBReport(seen)
 	_, commandSkipsDB := parseCommandFlags(command)["skip-db"]
 	if reportSkipsDB && !commandSkipsDB {
-		return []string{"benchmark command skip-db flag --skip-db is required for skip-db endpoint reports"}
+		return []string{
+			"benchmark command skip-db flag --skip-db is required for skip-db endpoint reports",
+		}
 	}
 	if !reportSkipsDB && commandSkipsDB {
-		return []string{"benchmark command skip-db flag --skip-db is present for a full endpoint report"}
+		return []string{
+			"benchmark command skip-db flag --skip-db is present for a full endpoint report",
+		}
 	}
 	return nil
 }
 
-func validateBenchmarkCommandMinRPS(command string, summary Summary, endpoints []EndpointReport) []string {
+func validateBenchmarkCommandMinRPS(
+	command string,
+	summary Summary,
+	endpoints []EndpointReport,
+) []string {
 	if strings.TrimSpace(command) == "" {
 		return nil
 	}
@@ -293,16 +336,39 @@ func validateBenchmarkCommandMinRPS(command string, summary Summary, endpoints [
 	}
 	var issues []string
 	if summary.MinRPS > 0 && math.Abs(summary.MinRPS-expected) > 0.001 {
-		issues = append(issues, fmt.Sprintf("benchmark command min-rps = %g, want %g from summary.min_rps", expected, summary.MinRPS))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"benchmark command min-rps = %g, want %g from summary.min_rps",
+				expected,
+				summary.MinRPS,
+			),
+		)
 	}
 	for _, endpoint := range endpoints {
 		threshold, err := parseBenchmarkMinRPSThreshold(endpoint.Threshold)
 		if err != nil {
-			issues = append(issues, fmt.Sprintf("endpoint %s threshold %q is invalid: %v", endpoint.Path, endpoint.Threshold, err))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"endpoint %s threshold %q is invalid: %v",
+					endpoint.Path,
+					endpoint.Threshold,
+					err,
+				),
+			)
 			continue
 		}
 		if math.Abs(threshold-expected) > 0.001 {
-			issues = append(issues, fmt.Sprintf("benchmark command min-rps for endpoint %s = %g, want %g from threshold", endpoint.Path, expected, threshold))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"benchmark command min-rps for endpoint %s = %g, want %g from threshold",
+					endpoint.Path,
+					expected,
+					threshold,
+				),
+			)
 		}
 	}
 	return issues
@@ -322,7 +388,14 @@ func parseBenchmarkMinRPSThreshold(threshold string) (float64, error) {
 
 func validateEndpointSet(report Report, opt Options) []string {
 	var issues []string
-	required := []string{"/plaintext", "/json", "/db", "/queries?queries=2", "/updates?queries=2", "/fortunes"}
+	required := []string{
+		"/plaintext",
+		"/json",
+		"/db",
+		"/queries?queries=2",
+		"/updates?queries=2",
+		"/fortunes",
+	}
 	allowed := map[string]bool{}
 	for _, path := range required {
 		allowed[path] = true
@@ -366,64 +439,143 @@ func hasSkipDBLimitation(limitations []string) bool {
 
 func validateEndpointReport(endpoint EndpointReport) []string {
 	var issues []string
-	if strings.TrimSpace(endpoint.Name) == "" || strings.TrimSpace(endpoint.Path) == "" || strings.TrimSpace(endpoint.Kind) == "" {
+	if strings.TrimSpace(endpoint.Name) == "" || strings.TrimSpace(endpoint.Path) == "" ||
+		strings.TrimSpace(endpoint.Kind) == "" {
 		issues = append(issues, "endpoint identity is required")
 	} else if expected, ok := expectedEndpointIdentity(endpoint.Path); ok {
 		if endpoint.Name != expected.name || endpoint.Kind != expected.kind {
-			issues = append(issues, fmt.Sprintf("endpoint identity for %s is name=%q kind=%q, want name=%q kind=%q", endpoint.Path, endpoint.Name, endpoint.Kind, expected.name, expected.kind))
+			issues = append(
+				issues,
+				fmt.Sprintf(("endpoint identity for %s is name=%q kind=%q, want name=%q "+
+					"kind=%q"), endpoint.Path, endpoint.Name, endpoint.Kind, expected.name, expected.kind),
+			)
 		}
 	}
 	if endpoint.Status != "pass" {
-		issues = append(issues, fmt.Sprintf("endpoint %s status is %q, want pass", endpoint.Path, endpoint.Status))
+		issues = append(
+			issues,
+			fmt.Sprintf("endpoint %s status is %q, want pass", endpoint.Path, endpoint.Status),
+		)
 	}
 	if endpoint.HTTPStatus != 200 {
-		issues = append(issues, fmt.Sprintf("endpoint %s http_status = %d, want 200", endpoint.Path, endpoint.HTTPStatus))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"endpoint %s http_status = %d, want 200",
+				endpoint.Path,
+				endpoint.HTTPStatus,
+			),
+		)
 	}
-	if endpoint.Requests <= 0 || endpoint.Successes < 0 || endpoint.Failures < 0 || endpoint.Successes+endpoint.Failures != endpoint.Requests {
-		issues = append(issues, fmt.Sprintf("endpoint %s request counters are inconsistent", endpoint.Path))
+	if endpoint.Requests <= 0 || endpoint.Successes < 0 || endpoint.Failures < 0 ||
+		endpoint.Successes+endpoint.Failures != endpoint.Requests {
+		issues = append(
+			issues,
+			fmt.Sprintf("endpoint %s request counters are inconsistent", endpoint.Path),
+		)
 	}
 	if endpoint.Failures != 0 {
-		issues = append(issues, fmt.Sprintf("endpoint %s failures = %d, want 0", endpoint.Path, endpoint.Failures))
+		issues = append(
+			issues,
+			fmt.Sprintf("endpoint %s failures = %d, want 0", endpoint.Path, endpoint.Failures),
+		)
 	}
 	if endpoint.Bytes <= 0 {
-		issues = append(issues, fmt.Sprintf("endpoint %s bytes = %d, want > 0", endpoint.Path, endpoint.Bytes))
+		issues = append(
+			issues,
+			fmt.Sprintf("endpoint %s bytes = %d, want > 0", endpoint.Path, endpoint.Bytes),
+		)
 	}
-	if endpoint.RPS <= 0 || endpoint.AvgLatencyMS < 0 || endpoint.P50LatencyMS < 0 || endpoint.P90LatencyMS < 0 || endpoint.P95LatencyMS < 0 || endpoint.P99LatencyMS < 0 || endpoint.P999LatencyMS < 0 || endpoint.MaxLatencyMS < 0 {
-		issues = append(issues, fmt.Sprintf("endpoint %s has invalid timing metrics", endpoint.Path))
+	if endpoint.RPS <= 0 || endpoint.AvgLatencyMS < 0 || endpoint.P50LatencyMS < 0 ||
+		endpoint.P90LatencyMS < 0 ||
+		endpoint.P95LatencyMS < 0 ||
+		endpoint.P99LatencyMS < 0 ||
+		endpoint.P999LatencyMS < 0 ||
+		endpoint.MaxLatencyMS < 0 {
+		issues = append(
+			issues,
+			fmt.Sprintf("endpoint %s has invalid timing metrics", endpoint.Path),
+		)
 	}
-	issues = append(issues, validateLatencyPercentiles("endpoint "+endpoint.Path, endpoint.P50LatencyMS, endpoint.P90LatencyMS, endpoint.P95LatencyMS, endpoint.P99LatencyMS, endpoint.P999LatencyMS, endpoint.MaxLatencyMS)...)
+	issues = append(
+		issues,
+		validateLatencyPercentiles(
+			"endpoint "+endpoint.Path,
+			endpoint.P50LatencyMS,
+			endpoint.P90LatencyMS,
+			endpoint.P95LatencyMS,
+			endpoint.P99LatencyMS,
+			endpoint.P999LatencyMS,
+			endpoint.MaxLatencyMS,
+		)...)
 	if endpoint.MaxLatencyMS > 0 && endpoint.P99LatencyMS > endpoint.MaxLatencyMS {
-		issues = append(issues, fmt.Sprintf("endpoint %s p99 latency exceeds max latency", endpoint.Path))
+		issues = append(
+			issues,
+			fmt.Sprintf("endpoint %s p99 latency exceeds max latency", endpoint.Path),
+		)
 	}
 	if endpoint.MaxLatencyMS > 0 && endpoint.P999LatencyMS > endpoint.MaxLatencyMS {
-		issues = append(issues, fmt.Sprintf("endpoint %s p999 latency exceeds max latency", endpoint.Path))
+		issues = append(
+			issues,
+			fmt.Sprintf("endpoint %s p999 latency exceeds max latency", endpoint.Path),
+		)
 	}
 	if strings.TrimSpace(endpoint.ObservedContentType) == "" {
-		issues = append(issues, fmt.Sprintf("endpoint %s missing observed content type", endpoint.Path))
-	} else if expected := expectedContentTypePrefix(endpoint.Path); expected != "" && !matchesContentType(endpoint.ObservedContentType, expected) {
-		issues = append(issues, fmt.Sprintf("endpoint %s observed content type = %q, want media type %q", endpoint.Path, endpoint.ObservedContentType, expected))
+		issues = append(
+			issues,
+			fmt.Sprintf("endpoint %s missing observed content type", endpoint.Path),
+		)
+	} else if expected := expectedContentTypePrefix(
+		endpoint.Path,
+	); expected != "" && !matchesContentType(
+		endpoint.ObservedContentType,
+		expected,
+	) {
+		issues = append(
+			issues,
+			fmt.Sprintf("endpoint %s observed content type = %q, want media type %q", endpoint.Path, endpoint.ObservedContentType, expected),
+		)
 	}
 	if len(endpoint.SemanticChecks) == 0 {
 		issues = append(issues, fmt.Sprintf("endpoint %s missing semantic checks", endpoint.Path))
 	} else {
 		issues = append(issues, validateSemanticChecks(endpoint.Path, endpoint.SemanticChecks)...)
 	}
-	if strings.TrimSpace(endpoint.Threshold) == "" || strings.TrimSpace(endpoint.Validation) == "" || strings.TrimSpace(endpoint.Evidence) == "" {
-		issues = append(issues, fmt.Sprintf("endpoint %s missing threshold/validation/evidence", endpoint.Path))
+	if strings.TrimSpace(endpoint.Threshold) == "" ||
+		strings.TrimSpace(endpoint.Validation) == "" ||
+		strings.TrimSpace(endpoint.Evidence) == "" {
+		issues = append(
+			issues,
+			fmt.Sprintf("endpoint %s missing threshold/validation/evidence", endpoint.Path),
+		)
 	}
 	if strings.TrimSpace(endpoint.Threshold) != "" {
 		threshold, err := parseBenchmarkMinRPSThreshold(endpoint.Threshold)
 		if err != nil {
-			issues = append(issues, fmt.Sprintf("endpoint %s threshold %q is invalid: %v", endpoint.Path, endpoint.Threshold, err))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"endpoint %s threshold %q is invalid: %v",
+					endpoint.Path,
+					endpoint.Threshold,
+					err,
+				),
+			)
 		} else if endpoint.RPS+0.001 < threshold {
-			issues = append(issues, fmt.Sprintf("endpoint %s rps = %g, below threshold %g", endpoint.Path, endpoint.RPS, threshold))
+			issues = append(
+				issues,
+				fmt.Sprintf("endpoint %s rps = %g, below threshold %g", endpoint.Path, endpoint.RPS, threshold),
+			)
 		}
 	}
 	if !endpoint.ThresholdPass {
 		issues = append(issues, fmt.Sprintf("endpoint %s threshold_pass is false", endpoint.Path))
 	}
 	if strings.TrimSpace(endpoint.Error) != "" {
-		issues = append(issues, fmt.Sprintf("endpoint %s has error: %s", endpoint.Path, endpoint.Error))
+		issues = append(
+			issues,
+			fmt.Sprintf("endpoint %s has error: %s", endpoint.Path, endpoint.Error),
+		)
 	}
 	return issues
 }
@@ -467,7 +619,17 @@ func validateLatencyPercentiles(label string, p50, p90, p95, p99, p999, max floa
 	var issues []string
 	for i := 1; i < len(ordered); i++ {
 		if ordered[i].value < ordered[i-1].value {
-			issues = append(issues, fmt.Sprintf("%s latency percentiles are not monotonic: %s=%g < %s=%g", label, ordered[i].name, ordered[i].value, ordered[i-1].name, ordered[i-1].value))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"%s latency percentiles are not monotonic: %s=%g < %s=%g",
+					label,
+					ordered[i].name,
+					ordered[i].value,
+					ordered[i-1].name,
+					ordered[i-1].value,
+				),
+			)
 			break
 		}
 	}
@@ -504,7 +666,10 @@ func validateSemanticChecks(path string, checks []string) []string {
 	joined := strings.ToLower(strings.Join(checks, "\n"))
 	for _, want := range requiredSemanticCheckMarkers(path) {
 		if !strings.Contains(joined, strings.ToLower(want)) {
-			issues = append(issues, fmt.Sprintf("endpoint %s semantic checks missing %q", path, want))
+			issues = append(
+				issues,
+				fmt.Sprintf("endpoint %s semantic checks missing %q", path, want),
+			)
 		}
 	}
 	return issues
@@ -515,36 +680,87 @@ func requiredSemanticCheckMarkers(path string) []string {
 	case "/plaintext":
 		return []string{"status 200", "content-type text/plain", "body equals Hello, World!"}
 	case "/json":
-		return []string{"status 200", "content-type application/json", "JSON message equals Hello, World!"}
+		return []string{
+			"status 200",
+			"content-type application/json",
+			"JSON message equals Hello, World!",
+		}
 	case "/db":
-		return []string{"status 200", "content-type application/json", "World object id/randomNumber range"}
+		return []string{
+			"status 200",
+			"content-type application/json",
+			"World object id/randomNumber range",
+		}
 	case "/queries?queries=2":
 		return []string{"status 200", "content-type application/json", "World array shape"}
 	case "/updates?queries=2":
 		return []string{"status 200", "content-type application/json", "World update array shape"}
 	case "/fortunes":
-		return []string{"status 200", "content-type text/html", "request-time fortune present", "HTML escaping sentinel", "sorted Fortune rows"}
+		return []string{
+			"status 200",
+			"content-type text/html",
+			"request-time fortune present",
+			"HTML escaping sentinel",
+			"sorted Fortune rows",
+		}
 	default:
 		return nil
 	}
 }
 
-func validateSummary(summary Summary, endpointCount int, totalRequests int, totalSuccesses int, totalFailures int) []string {
+func validateSummary(
+	summary Summary,
+	endpointCount int,
+	totalRequests int,
+	totalSuccesses int,
+	totalFailures int,
+) []string {
 	var issues []string
 	if summary.EndpointCount != endpointCount {
-		issues = append(issues, fmt.Sprintf("summary.endpoint_count = %d, want %d", summary.EndpointCount, endpointCount))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"summary.endpoint_count = %d, want %d",
+				summary.EndpointCount,
+				endpointCount,
+			),
+		)
 	}
 	if summary.TotalRequests != totalRequests {
-		issues = append(issues, fmt.Sprintf("summary.total_requests = %d, want %d", summary.TotalRequests, totalRequests))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"summary.total_requests = %d, want %d",
+				summary.TotalRequests,
+				totalRequests,
+			),
+		)
 	}
 	if summary.TotalSuccesses != totalSuccesses {
-		issues = append(issues, fmt.Sprintf("summary.total_successes = %d, want %d", summary.TotalSuccesses, totalSuccesses))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"summary.total_successes = %d, want %d",
+				summary.TotalSuccesses,
+				totalSuccesses,
+			),
+		)
 	}
 	if summary.TotalFailures != totalFailures {
-		issues = append(issues, fmt.Sprintf("summary.total_failures = %d, want %d", summary.TotalFailures, totalFailures))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"summary.total_failures = %d, want %d",
+				summary.TotalFailures,
+				totalFailures,
+			),
+		)
 	}
 	if summary.TotalFailures != 0 {
-		issues = append(issues, fmt.Sprintf("summary.total_failures = %d, want 0", summary.TotalFailures))
+		issues = append(
+			issues,
+			fmt.Sprintf("summary.total_failures = %d, want 0", summary.TotalFailures),
+		)
 	}
 	if summary.MinRPS <= 0 {
 		issues = append(issues, fmt.Sprintf("summary.min_rps = %g, want > 0", summary.MinRPS))
@@ -605,7 +821,13 @@ func rejectWeakEvidence(raw []byte) []string {
 	var issues []string
 	for _, marker := range forbidden {
 		if strings.Contains(lower, marker) {
-			issues = append(issues, fmt.Sprintf("report contains forbidden weak evidence marker %q", strings.TrimSpace(marker)))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"report contains forbidden weak evidence marker %q",
+					strings.TrimSpace(marker),
+				),
+			)
 		}
 	}
 	return issues

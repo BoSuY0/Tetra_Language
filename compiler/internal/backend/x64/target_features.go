@@ -63,7 +63,10 @@ func (o CodegenOptions) AllowsTargetFeature(feature TargetFeature) (bool, error)
 	return features.Has(feature), nil
 }
 
-func ResolveTargetFeatures(registerWidthBits int, requested TargetFeatures) (TargetFeatures, error) {
+func ResolveTargetFeatures(
+	registerWidthBits int,
+	requested TargetFeatures,
+) (TargetFeatures, error) {
 	baseline, err := portableBaselineTargetFeatures(registerWidthBits)
 	if err != nil {
 		return TargetFeatures{}, err
@@ -81,7 +84,9 @@ func ResolveTargetFeatures(registerWidthBits int, requested TargetFeatures) (Tar
 	switch source {
 	case TargetFeatureSourcePortableBaseline:
 		if len(requested.Features) != 0 {
-			return TargetFeatures{}, fmt.Errorf("target features: portable baseline source cannot include explicit features")
+			return TargetFeatures{}, fmt.Errorf(
+				"target features: portable baseline source cannot include explicit features",
+			)
 		}
 		return TargetFeatures{Source: TargetFeatureSourcePortableBaseline, Features: baseline}, nil
 	case TargetFeatureSourceExplicit:
@@ -158,7 +163,10 @@ func requirePortableBaseline(features []TargetFeature, baseline []TargetFeature)
 	have := TargetFeatures{Features: features}
 	for _, feature := range baseline {
 		if !have.Has(feature) {
-			return fmt.Errorf("target features: explicit set is below portable baseline: missing %s", feature)
+			return fmt.Errorf(
+				"target features: explicit set is below portable baseline: missing %s",
+				feature,
+			)
 		}
 	}
 	return nil

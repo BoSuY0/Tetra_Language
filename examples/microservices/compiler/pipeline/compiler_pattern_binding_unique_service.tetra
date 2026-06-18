@@ -1,0 +1,39 @@
+// Pattern-binding uniqueness compiler microservice smoke.
+//
+// The service keeps payload binding names unique across match, if-let, and
+// typed catch expressions while exercising their scoped pattern surfaces.
+module examples.microservices.compiler.pipeline.compiler_pattern_binding_unique_service
+enum Packet:
+    case ready(Int)
+    case empty
+
+enum RouteErr:
+    case failed(Int)
+    case stopped
+
+func fail(value: Int) -> Int throws RouteErr:
+    throw RouteErr.failed(value)
+
+func maybe(value: Int) -> Int?:
+    return value
+
+func main() -> Int:
+    let packet: Packet = Packet.ready(10)
+    let left: Int = match packet:
+    case Packet.ready(packet_value):
+        packet_value
+    case Packet.empty:
+        70
+    let middle_source: Int? = maybe(12)
+    var middle: Int = 0
+    if let middle_value = middle_source:
+        middle = middle_value
+    let right: Int = catch fail(20):
+    case RouteErr.failed(error_value):
+        error_value
+    case RouteErr.stopped:
+        80
+    let total: Int = left + middle + right
+    if total == 42:
+        return 0
+    return total

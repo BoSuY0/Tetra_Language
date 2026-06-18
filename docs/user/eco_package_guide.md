@@ -144,7 +144,8 @@ nearest `Capsule.t4`, writes or refreshes `Tetra.lock`, and generates `.t4i`,
 `.tobj`, and `.t4s` artifacts for local path dependencies when native object
 targets are available. `tetra project sync --check` is the dry-run form and
 reports pending lock/artifact writes without changing `interfaces/`,
-`artifacts/`, `seeds/`, `Capsule.t4`, or `Tetra.lock`. For runner-gated WASM targets, `project sync` still refreshes the lock and skips native `.tobj`
+`artifacts/`, `seeds/`, `Capsule.t4`, or `Tetra.lock`. For runner-gated WASM targets, `project sync`
+still refreshes the lock and skips native `.tobj`
 generation.
 
 Project locks are active when present. If `Tetra.lock` exists next to

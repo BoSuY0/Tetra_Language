@@ -6,7 +6,7 @@ repo_root="$(cd "$script_dir/../../.." && pwd)"
 report_dir="$repo_root/reports/post-v0.4/linux-native-targets"
 
 usage() {
-  cat <<'USAGE'
+  cat << 'USAGE'
 Usage: bash scripts/release/post_v0_4/linux-native-targets-smoke.sh [--report-dir DIR]
 
 Runs Linux native target metadata, ABI, atomic, fuzz, and brutal evidence gates
@@ -25,7 +25,7 @@ while [[ $# -gt 0 ]]; do
       report_dir="$2"
       shift 2
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;
@@ -43,26 +43,26 @@ export GOCACHE
 mkdir -p "$report_dir"
 
 if [[ -n "${TETRA_CMD:-}" ]]; then
-  read -r -a tetra_cmd <<<"$TETRA_CMD"
+  read -r -a tetra_cmd <<< "$TETRA_CMD"
 else
   tetra_cmd=(go run ./cli/cmd/tetra)
 fi
 
 targets_json="$report_dir/targets.json"
-"${tetra_cmd[@]}" targets --format=json >"$targets_json"
+"${tetra_cmd[@]}" targets --format=json > "$targets_json"
 go run ./tools/cmd/validate-targets --report "$targets_json"
 
 run_target_suites() {
   local raw_target="$1"
   local stem="$2"
 
-  "${tetra_cmd[@]}" test --target "$raw_target" --abi --report=json >"$report_dir/$stem-abi.json"
-  "${tetra_cmd[@]}" test --target "$raw_target" --atomic-stress --report=json >"$report_dir/$stem-atomic-stress.json"
-  "${tetra_cmd[@]}" test --target "$raw_target" --fuzz --report=json >"$report_dir/$stem-fuzz.json"
+  "${tetra_cmd[@]}" test --target "$raw_target" --abi --report=json > "$report_dir/$stem-abi.json"
+  "${tetra_cmd[@]}" test --target "$raw_target" --atomic-stress --report=json > "$report_dir/$stem-atomic-stress.json"
+  "${tetra_cmd[@]}" test --target "$raw_target" --fuzz --report=json > "$report_dir/$stem-fuzz.json"
 }
 
 runner_src="$report_dir/linux-native-runner-smoke.tetra"
-cat >"$runner_src" <<'TETRA'
+cat > "$runner_src" << 'TETRA'
 func runner_worker() -> Int:
     return 42
 
@@ -130,7 +130,7 @@ run_runner_smoke() {
   local report="$report_dir/$stem-runner.json"
   local err_report="$report_dir/$stem-runner.err.json"
 
-  if "${tetra_cmd[@]}" test --diagnostics=json --target "$raw_target" --format=json "$runner_src" >"$report" 2>"$err_report"; then
+  if "${tetra_cmd[@]}" test --diagnostics=json --target "$raw_target" --format=json "$runner_src" > "$report" 2> "$err_report"; then
     rm -f "$err_report"
     return 0
   fi
@@ -151,7 +151,7 @@ run_runner_smoke x86 linux-x86
 run_runner_smoke x32 linux-x32
 
 brutal_json="$report_dir/linux-native-targets-brutal.json"
-"${tetra_cmd[@]}" test --all-targets --brutal --format=json >"$brutal_json"
+"${tetra_cmd[@]}" test --all-targets --brutal --format=json > "$brutal_json"
 
 go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"
 go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-hashes.json"

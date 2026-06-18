@@ -1,6 +1,7 @@
 # Actors Linux Smoke Checklist
 
-> **Deprecated:** use `docs/checklists/actors_platform_smoke.md` (this file is kept for historical reference).
+> **Deprecated:** use `docs/checklists/actors_platform_smoke.md` (this file is kept for historical
+reference).
 
 Actor runtime foundation scoped release truth is now the Linux-x64 gate
 `scripts/release/post_v0_4/actor-runtime-foundation-linux-x64-gate.sh`, which

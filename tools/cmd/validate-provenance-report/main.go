@@ -172,19 +172,35 @@ func validateProvenanceReport(raw []byte, corpusDir string) error {
 		return err
 	}
 	if report.Corpus.ProofFiles != len(evidence.ProofFiles) {
-		return fmt.Errorf("corpus.proof_files = %d, want %d", report.Corpus.ProofFiles, len(evidence.ProofFiles))
+		return fmt.Errorf(
+			"corpus.proof_files = %d, want %d",
+			report.Corpus.ProofFiles,
+			len(evidence.ProofFiles),
+		)
 	}
 	if report.Corpus.BoundsFiles != len(evidence.BoundsFiles) {
-		return fmt.Errorf("corpus.bounds_files = %d, want %d", report.Corpus.BoundsFiles, len(evidence.BoundsFiles))
+		return fmt.Errorf(
+			"corpus.bounds_files = %d, want %d",
+			report.Corpus.BoundsFiles,
+			len(evidence.BoundsFiles),
+		)
 	}
 	if err := compareStats("totals", report.Totals, evidence.Totals, true); err != nil {
 		return err
 	}
 	if report.Totals.Artifacts != len(evidence.ProofFiles) {
-		return fmt.Errorf("totals.artifacts = %d, want %d", report.Totals.Artifacts, len(evidence.ProofFiles))
+		return fmt.Errorf(
+			"totals.artifacts = %d, want %d",
+			report.Totals.Artifacts,
+			len(evidence.ProofFiles),
+		)
 	}
 	if len(report.Artifacts) != len(evidence.Artifacts) {
-		return fmt.Errorf("artifacts length = %d, want %d", len(report.Artifacts), len(evidence.Artifacts))
+		return fmt.Errorf(
+			"artifacts length = %d, want %d",
+			len(report.Artifacts),
+			len(evidence.Artifacts),
+		)
 	}
 	for _, artifact := range report.Artifacts {
 		if strings.TrimSpace(artifact.Proof) == "" {
@@ -206,10 +222,18 @@ func validateProvenanceReport(raw []byte, corpusDir string) error {
 			return err
 		}
 	}
-	if err := compareReasonBuckets("unknown_reason_buckets", report.UnknownReasonBuckets, evidence.UnknownBuckets); err != nil {
+	if err := compareReasonBuckets(
+		"unknown_reason_buckets",
+		report.UnknownReasonBuckets,
+		evidence.UnknownBuckets,
+	); err != nil {
 		return err
 	}
-	if err := compareReasonBuckets("external_reason_buckets", report.ExternalReasonBuckets, evidence.ExternalBuckets); err != nil {
+	if err := compareReasonBuckets(
+		"external_reason_buckets",
+		report.ExternalReasonBuckets,
+		evidence.ExternalBuckets,
+	); err != nil {
 		return err
 	}
 	return nil
@@ -252,7 +276,9 @@ func collectCorpusEvidence(corpusDir string) (corpusEvidence, error) {
 	return evidence, nil
 }
 
-func scanProof(path string) (provenanceStats, map[string]reasonEvidence, map[string]reasonEvidence, error) {
+func scanProof(
+	path string,
+) (provenanceStats, map[string]reasonEvidence, map[string]reasonEvidence, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return provenanceStats{}, nil, nil, err
@@ -312,7 +338,12 @@ func addStats(total *provenanceStats, stats provenanceStats) {
 	}
 }
 
-func addReasonEvidence(buckets map[string]reasonEvidence, reason string, valueID string, artifact string) {
+func addReasonEvidence(
+	buckets map[string]reasonEvidence,
+	reason string,
+	valueID string,
+	artifact string,
+) {
 	bucket := buckets[reason]
 	if bucket.Values == nil {
 		bucket.Values = map[string]bool{}
@@ -344,7 +375,12 @@ func mergeReasonBuckets(dst map[string]reasonEvidence, src map[string]reasonEvid
 	}
 }
 
-func compareStats(label string, got provenanceStats, want provenanceStats, includeArtifacts bool) error {
+func compareStats(
+	label string,
+	got provenanceStats,
+	want provenanceStats,
+	includeArtifacts bool,
+) error {
 	if includeArtifacts && got.Artifacts != want.Artifacts {
 		return fmt.Errorf("%s.artifacts = %d, want %d", label, got.Artifacts, want.Artifacts)
 	}
@@ -359,7 +395,11 @@ func compareStats(label string, got provenanceStats, want provenanceStats, inclu
 			return fmt.Errorf("%s.%s = %d, want %d", label, field, pair[0], pair[1])
 		}
 	}
-	if err := compareCountMap(label+".provenance_counts", got.ProvenanceCounts, want.ProvenanceCounts); err != nil {
+	if err := compareCountMap(
+		label+".provenance_counts",
+		got.ProvenanceCounts,
+		want.ProvenanceCounts,
+	); err != nil {
 		return err
 	}
 	return nil
@@ -379,7 +419,11 @@ func compareCountMap(label string, got map[string]int, want map[string]int) erro
 	return nil
 }
 
-func compareReasonBuckets(label string, got []provenanceReasonBucket, want map[string]reasonEvidence) error {
+func compareReasonBuckets(
+	label string,
+	got []provenanceReasonBucket,
+	want map[string]reasonEvidence,
+) error {
 	if len(want) > 0 && len(got) == 0 {
 		return fmt.Errorf("%s must include %d reason bucket(s)", label, len(want))
 	}
@@ -394,10 +438,22 @@ func compareReasonBuckets(label string, got []provenanceReasonBucket, want map[s
 		}
 		seen[bucket.Reason] = true
 		if bucket.ValueCount != len(wantBucket.Values) {
-			return fmt.Errorf("%s[%q].value_count = %d, want %d", label, bucket.Reason, bucket.ValueCount, len(wantBucket.Values))
+			return fmt.Errorf(
+				"%s[%q].value_count = %d, want %d",
+				label,
+				bucket.Reason,
+				bucket.ValueCount,
+				len(wantBucket.Values),
+			)
 		}
 		if bucket.FactCount != wantBucket.Facts {
-			return fmt.Errorf("%s[%q].fact_count = %d, want %d", label, bucket.Reason, bucket.FactCount, wantBucket.Facts)
+			return fmt.Errorf(
+				"%s[%q].fact_count = %d, want %d",
+				label,
+				bucket.Reason,
+				bucket.FactCount,
+				wantBucket.Facts,
+			)
 		}
 		if len(bucket.Artifacts) == 0 {
 			return fmt.Errorf("%s[%q].artifacts must not be empty", label, bucket.Reason)

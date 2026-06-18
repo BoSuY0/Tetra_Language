@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	ctarget "tetra_language/compiler/target"
+	"tetra_language/tools/internal/reportdecode"
 )
 
 type manifestEnvelope struct {
@@ -119,7 +120,9 @@ const manifestArtifact = "tetra.release.v0_4_0.manifest-json.v1"
 
 func main() {
 	var manifestPath string
+	var reportFormat string
 	flag.StringVar(&manifestPath, "manifest", "", "path to generated manifest JSON")
+	flag.StringVar(&reportFormat, "format", "auto", "manifest format: auto, json, or toon")
 	flag.Parse()
 
 	if manifestPath == "" {
@@ -131,15 +134,19 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err := validateManifest(raw); err != nil {
+	if err := validateManifestFormat(raw, reportFormat); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
 func validateManifest(raw []byte) error {
+	return validateManifestFormat(raw, "auto")
+}
+
+func validateManifestFormat(raw []byte, format string) error {
 	var manifest manifestEnvelope
-	if err := decodeStrictJSON(raw, &manifest); err != nil {
+	if err := reportdecode.DecodeStrictFormat(raw, format, &manifest); err != nil {
 		return err
 	}
 	if manifest.CompilerVersion == "" {
@@ -183,11 +190,21 @@ func validateManifest(raw []byte) error {
 	supportedTargets := ctarget.SupportedTriples()
 	wantTargets := append([]string{}, ctarget.SupportedTriples()...)
 	wantTargets = append(wantTargets, ctarget.BuildOnlyTriples()...)
-	if !sameStringSet(targetTriples, supportedTargets) && !sameStringSet(targetTriples, wantTargets) {
-		return fmt.Errorf("targets got %s want %s", strings.Join(sortedStrings(targetTriples), ", "), strings.Join(sortedStrings(wantTargets), ", "))
+	if !sameStringSet(targetTriples, supportedTargets) &&
+		!sameStringSet(targetTriples, wantTargets) {
+		return fmt.Errorf(
+			"targets got %s want %s",
+			strings.Join(sortedStrings(targetTriples), ", "),
+			strings.Join(sortedStrings(wantTargets), ", "),
+		)
 	}
-	if !sameStringSequence(targetTriples, supportedTargets) && !sameStringSequence(targetTriples, wantTargets) {
-		return fmt.Errorf("targets must follow buildable target order: got %s want %s", strings.Join(targetTriples, ", "), strings.Join(wantTargets, ", "))
+	if !sameStringSequence(targetTriples, supportedTargets) &&
+		!sameStringSequence(targetTriples, wantTargets) {
+		return fmt.Errorf(
+			"targets must follow buildable target order: got %s want %s",
+			strings.Join(targetTriples, ", "),
+			strings.Join(wantTargets, ", "),
+		)
 	}
 	builtins := map[string]bool{}
 	for _, builtin := range manifest.Builtins {
@@ -208,7 +225,10 @@ func validateManifest(raw []byte) error {
 	if featureHasStatus(manifest.Features, "targets.wasm-artifact-preflight", "current") {
 		for _, triple := range ctarget.WASMTriples() {
 			if !targets[triple] {
-				return fmt.Errorf("targets.wasm-artifact-preflight is current but targets missing %s", triple)
+				return fmt.Errorf(
+					"targets.wasm-artifact-preflight is current but targets missing %s",
+					triple,
+				)
 			}
 		}
 	}
@@ -240,7 +260,18 @@ func validateFormats(formats []formatManifest) error {
 		".tneed":     "needmap",
 		"Tetra.lock": "semantic-lock",
 	}
-	officialOrder := []string{".t4", ".tetra", ".tdx", ".t4s", ".t4i", ".t4p", ".t4r", ".t4q", ".tneed", "Tetra.lock"}
+	officialOrder := []string{
+		".t4",
+		".tetra",
+		".tdx",
+		".t4s",
+		".t4i",
+		".t4p",
+		".t4r",
+		".t4q",
+		".tneed",
+		"Tetra.lock",
+	}
 	seen := map[string]bool{}
 	var order []string
 	for _, format := range formats {
@@ -287,8 +318,13 @@ func validateFormats(formats []formatManifest) error {
 			return fmt.Errorf("formats missing %s", key)
 		}
 	}
-	if len(order) >= len(officialOrder) && !sameStringSequence(order[:len(officialOrder)], officialOrder) {
-		return fmt.Errorf("formats must start with official T4 order: got %s want %s", strings.Join(order[:len(officialOrder)], ", "), strings.Join(officialOrder, ", "))
+	if len(order) >= len(officialOrder) &&
+		!sameStringSequence(order[:len(officialOrder)], officialOrder) {
+		return fmt.Errorf(
+			"formats must start with official T4 order: got %s want %s",
+			strings.Join(order[:len(officialOrder)], ", "),
+			strings.Join(officialOrder, ", "),
+		)
 	}
 	return nil
 }
@@ -331,85 +367,215 @@ func validateTarget(target targetManifest) error {
 	}
 	if tgt, err := ctarget.Parse(target.Triple); err == nil {
 		if target.Status != "" && target.Status != tgt.Status.String() {
-			return fmt.Errorf("target %s status = %s, want %s", target.Triple, target.Status, tgt.Status.String())
+			return fmt.Errorf(
+				"target %s status = %s, want %s",
+				target.Triple,
+				target.Status,
+				tgt.Status.String(),
+			)
 		}
 		if target.DataModel != "" && target.DataModel != tgt.DataModel.String() {
-			return fmt.Errorf("target %s data_model = %s, want %s", target.Triple, target.DataModel, tgt.DataModel.String())
+			return fmt.Errorf(
+				"target %s data_model = %s, want %s",
+				target.Triple,
+				target.DataModel,
+				tgt.DataModel.String(),
+			)
 		}
 		if target.RunMode != "" && target.RunMode != tgt.RunMode.String() {
-			return fmt.Errorf("target %s run_mode = %s, want %s", target.Triple, target.RunMode, tgt.RunMode.String())
+			return fmt.Errorf(
+				"target %s run_mode = %s, want %s",
+				target.Triple,
+				target.RunMode,
+				tgt.RunMode.String(),
+			)
 		}
-		if target.UIRuntimeStatus != "" && target.UIRuntimeStatus != ctarget.UIRuntimeStatus(target.Triple) {
-			return fmt.Errorf("target %s ui_runtime_status = %s, want %s", target.Triple, target.UIRuntimeStatus, ctarget.UIRuntimeStatus(target.Triple))
+		if target.UIRuntimeStatus != "" &&
+			target.UIRuntimeStatus != ctarget.UIRuntimeStatus(target.Triple) {
+			return fmt.Errorf(
+				"target %s ui_runtime_status = %s, want %s",
+				target.Triple,
+				target.UIRuntimeStatus,
+				ctarget.UIRuntimeStatus(target.Triple),
+			)
 		}
-		if target.UIRuntimeContract != "" && target.UIRuntimeContract != ctarget.UIRuntimeContract(target.Triple) {
-			return fmt.Errorf("target %s ui_runtime_contract = %s, want %s", target.Triple, target.UIRuntimeContract, ctarget.UIRuntimeContract(target.Triple))
+		if target.UIRuntimeContract != "" &&
+			target.UIRuntimeContract != ctarget.UIRuntimeContract(target.Triple) {
+			return fmt.Errorf(
+				"target %s ui_runtime_contract = %s, want %s",
+				target.Triple,
+				target.UIRuntimeContract,
+				ctarget.UIRuntimeContract(target.Triple),
+			)
 		}
 		if target.PointerWidthBits != 0 && target.PointerWidthBits != tgt.PointerWidthBits {
-			return fmt.Errorf("target %s pointer_width_bits = %d, want %d", target.Triple, target.PointerWidthBits, tgt.PointerWidthBits)
+			return fmt.Errorf(
+				"target %s pointer_width_bits = %d, want %d",
+				target.Triple,
+				target.PointerWidthBits,
+				tgt.PointerWidthBits,
+			)
 		}
 		if target.RegisterWidthBits != 0 && target.RegisterWidthBits != tgt.RegisterWidthBits {
-			return fmt.Errorf("target %s register_width_bits = %d, want %d", target.Triple, target.RegisterWidthBits, tgt.RegisterWidthBits)
+			return fmt.Errorf(
+				"target %s register_width_bits = %d, want %d",
+				target.Triple,
+				target.RegisterWidthBits,
+				tgt.RegisterWidthBits,
+			)
 		}
 		if target.NativeIntWidthBits != 0 && target.NativeIntWidthBits != tgt.NativeIntWidthBits {
-			return fmt.Errorf("target %s native_int_width_bits = %d, want %d", target.Triple, target.NativeIntWidthBits, tgt.NativeIntWidthBits)
+			return fmt.Errorf(
+				"target %s native_int_width_bits = %d, want %d",
+				target.Triple,
+				target.NativeIntWidthBits,
+				tgt.NativeIntWidthBits,
+			)
 		}
 		if target.Endian != "" && target.Endian != tgt.Endian.String() {
-			return fmt.Errorf("target %s endian = %s, want %s", target.Triple, target.Endian, tgt.Endian.String())
+			return fmt.Errorf(
+				"target %s endian = %s, want %s",
+				target.Triple,
+				target.Endian,
+				tgt.Endian.String(),
+			)
 		}
-		if target.StackAlignmentBytes != 0 && target.StackAlignmentBytes != tgt.StackAlignmentBytes {
-			return fmt.Errorf("target %s stack_alignment_bytes = %d, want %d", target.Triple, target.StackAlignmentBytes, tgt.StackAlignmentBytes)
+		if target.StackAlignmentBytes != 0 &&
+			target.StackAlignmentBytes != tgt.StackAlignmentBytes {
+			return fmt.Errorf(
+				"target %s stack_alignment_bytes = %d, want %d",
+				target.Triple,
+				target.StackAlignmentBytes,
+				tgt.StackAlignmentBytes,
+			)
 		}
 		if target.MaxAtomicWidthBits != 0 && target.MaxAtomicWidthBits != tgt.MaxAtomicWidthBits {
-			return fmt.Errorf("target %s max_atomic_width_bits = %d, want %d", target.Triple, target.MaxAtomicWidthBits, tgt.MaxAtomicWidthBits)
+			return fmt.Errorf(
+				"target %s max_atomic_width_bits = %d, want %d",
+				target.Triple,
+				target.MaxAtomicWidthBits,
+				tgt.MaxAtomicWidthBits,
+			)
 		}
-		if len(target.AtomicWidthBits) > 0 && !sameInts(target.AtomicWidthBits, tgt.AtomicWidthBits()) {
-			return fmt.Errorf("target %s atomic_width_bits = %v, want %v", target.Triple, target.AtomicWidthBits, tgt.AtomicWidthBits())
+		if len(target.AtomicWidthBits) > 0 &&
+			!sameInts(target.AtomicWidthBits, tgt.AtomicWidthBits()) {
+			return fmt.Errorf(
+				"target %s atomic_width_bits = %v, want %v",
+				target.Triple,
+				target.AtomicWidthBits,
+				tgt.AtomicWidthBits(),
+			)
 		}
 		if target.AtomicPointerWidthBits != 0 {
 			ptr, err := tgt.AtomicPointerLayout()
 			if err != nil {
-				return fmt.Errorf("target %s atomic_pointer_width_bits unsupported: %v", target.Triple, err)
+				return fmt.Errorf(
+					"target %s atomic_pointer_width_bits unsupported: %v",
+					target.Triple,
+					err,
+				)
 			}
 			if target.AtomicPointerWidthBits != ptr.WidthBits {
-				return fmt.Errorf("target %s atomic_pointer_width_bits = %d, want %d", target.Triple, target.AtomicPointerWidthBits, ptr.WidthBits)
+				return fmt.Errorf(
+					"target %s atomic_pointer_width_bits = %d, want %d",
+					target.Triple,
+					target.AtomicPointerWidthBits,
+					ptr.WidthBits,
+				)
 			}
 		}
 		if target.UnsupportedReason != "" && target.UnsupportedReason != tgt.UnsupportedReason {
-			return fmt.Errorf("target %s unsupported_reason = %q, want %q", target.Triple, target.UnsupportedReason, tgt.UnsupportedReason)
+			return fmt.Errorf(
+				"target %s unsupported_reason = %q, want %q",
+				target.Triple,
+				target.UnsupportedReason,
+				tgt.UnsupportedReason,
+			)
 		}
 		if target.RuntimeStatus != "" && target.RuntimeStatus != tgt.RuntimeStatus {
-			return fmt.Errorf("target %s runtime_status = %s, want %s", target.Triple, target.RuntimeStatus, tgt.RuntimeStatus)
+			return fmt.Errorf(
+				"target %s runtime_status = %s, want %s",
+				target.Triple,
+				target.RuntimeStatus,
+				tgt.RuntimeStatus,
+			)
 		}
 		if target.StdlibStatus != "" && target.StdlibStatus != tgt.StdlibStatus {
-			return fmt.Errorf("target %s stdlib_status = %s, want %s", target.Triple, target.StdlibStatus, tgt.StdlibStatus)
+			return fmt.Errorf(
+				"target %s stdlib_status = %s, want %s",
+				target.Triple,
+				target.StdlibStatus,
+				tgt.StdlibStatus,
+			)
 		}
 		if target.FFIStatus != "" && target.FFIStatus != tgt.FFIStatus {
-			return fmt.Errorf("target %s ffi_status = %s, want %s", target.Triple, target.FFIStatus, tgt.FFIStatus)
+			return fmt.Errorf(
+				"target %s ffi_status = %s, want %s",
+				target.Triple,
+				target.FFIStatus,
+				tgt.FFIStatus,
+			)
 		}
 		if target.RunnerProbeCommand != "" && target.RunnerProbeCommand != tgt.RunnerProbeCommand {
-			return fmt.Errorf("target %s runner_probe_command = %q, want %q", target.Triple, target.RunnerProbeCommand, tgt.RunnerProbeCommand)
+			return fmt.Errorf(
+				"target %s runner_probe_command = %q, want %q",
+				target.Triple,
+				target.RunnerProbeCommand,
+				tgt.RunnerProbeCommand,
+			)
 		}
 		if target.ReleaseGate != "" && target.ReleaseGate != tgt.ReleaseGate {
-			return fmt.Errorf("target %s release_gate = %q, want %q", target.Triple, target.ReleaseGate, tgt.ReleaseGate)
+			return fmt.Errorf(
+				"target %s release_gate = %q, want %q",
+				target.Triple,
+				target.ReleaseGate,
+				tgt.ReleaseGate,
+			)
 		}
-		if len(target.EvidenceArtifacts) > 0 && !sameStringSequence(target.EvidenceArtifacts, tgt.EvidenceArtifacts) {
-			return fmt.Errorf("target %s evidence_artifacts = %s, want %s", target.Triple, strings.Join(target.EvidenceArtifacts, ", "), strings.Join(tgt.EvidenceArtifacts, ", "))
+		if len(target.EvidenceArtifacts) > 0 &&
+			!sameStringSequence(target.EvidenceArtifacts, tgt.EvidenceArtifacts) {
+			return fmt.Errorf(
+				"target %s evidence_artifacts = %s, want %s",
+				target.Triple,
+				strings.Join(target.EvidenceArtifacts, ", "),
+				strings.Join(tgt.EvidenceArtifacts, ", "),
+			)
 		}
 		if err := validateTargetMemoryCapabilities(target, tgt); err != nil {
 			return err
 		}
 		if target.SyscallInstruction != "" && target.SyscallInstruction != tgt.SyscallInstruction {
-			return fmt.Errorf("target %s syscall_instruction = %q, want %q", target.Triple, target.SyscallInstruction, tgt.SyscallInstruction)
+			return fmt.Errorf(
+				"target %s syscall_instruction = %q, want %q",
+				target.Triple,
+				target.SyscallInstruction,
+				tgt.SyscallInstruction,
+			)
 		}
 		if target.SyscallNumbering != "" && target.SyscallNumbering != tgt.SyscallNumbering {
-			return fmt.Errorf("target %s syscall_numbering = %q, want %q", target.Triple, target.SyscallNumbering, tgt.SyscallNumbering)
+			return fmt.Errorf(
+				"target %s syscall_numbering = %q, want %q",
+				target.Triple,
+				target.SyscallNumbering,
+				tgt.SyscallNumbering,
+			)
 		}
-		if len(target.SyscallArgRegisters) > 0 && !sameStringSequence(target.SyscallArgRegisters, tgt.SyscallArgRegisters) {
-			return fmt.Errorf("target %s syscall_arg_registers = %s, want %s", target.Triple, strings.Join(target.SyscallArgRegisters, ", "), strings.Join(tgt.SyscallArgRegisters, ", "))
+		if len(target.SyscallArgRegisters) > 0 &&
+			!sameStringSequence(target.SyscallArgRegisters, tgt.SyscallArgRegisters) {
+			return fmt.Errorf(
+				"target %s syscall_arg_registers = %s, want %s",
+				target.Triple,
+				strings.Join(target.SyscallArgRegisters, ", "),
+				strings.Join(tgt.SyscallArgRegisters, ", "),
+			)
 		}
 		if target.SyscallErrorRange != "" && target.SyscallErrorRange != tgt.SyscallErrorRange {
-			return fmt.Errorf("target %s syscall_error_range = %q, want %q", target.Triple, target.SyscallErrorRange, tgt.SyscallErrorRange)
+			return fmt.Errorf(
+				"target %s syscall_error_range = %q, want %q",
+				target.Triple,
+				target.SyscallErrorRange,
+				tgt.SyscallErrorRange,
+			)
 		}
 	}
 	return nil
@@ -419,40 +585,88 @@ func validateTargetMemoryCapabilities(target targetManifest, tgt ctarget.Target)
 	if !targetHasMemoryCapabilityFields(target) && target.Status == "" {
 		return nil
 	}
-	if tgt.Status == ctarget.StatusBuildOnly && (target.MemoryRun == "yes" || target.MemoryClaimLevel == "production/host_runtime") {
-		return fmt.Errorf("target %s runtime memory claim requires target runtime evidence, but target is build-only", target.Triple)
+	if tgt.Status == ctarget.StatusBuildOnly &&
+		(target.MemoryRun == "yes" || target.MemoryClaimLevel == "production/host_runtime") {
+		return fmt.Errorf(
+			"target %s runtime memory claim requires target runtime evidence, but target is build-only",
+			target.Triple,
+		)
 	}
 	if target.MemoryRawDiagnostics == "yes" && target.Triple != "linux-x64" {
-		return fmt.Errorf("target %s raw diagnostics claim requires raw diagnostics evidence", target.Triple)
+		return fmt.Errorf(
+			"target %s raw diagnostics claim requires raw diagnostics evidence",
+			target.Triple,
+		)
 	}
 	if (target.MemoryRegionLowering == "yes" || target.MemoryRegionLowering == "yes/partial" || target.MemoryRegionLowering == "partial") &&
 		(target.Triple == "linux-x64" || target.Triple == "linux-x86" || target.Triple == "linux-x32") &&
 		!containsString(target.EvidenceArtifacts, target.Triple+"-abi.json") {
-		return fmt.Errorf("target %s region lowering claim requires lowered artifact evidence", target.Triple)
+		return fmt.Errorf(
+			"target %s region lowering claim requires lowered artifact evidence",
+			target.Triple,
+		)
 	}
 	if target.MemoryAlignmentSemantics == "yes" && (target.ABI == "" || target.DataModel == "") {
-		return fmt.Errorf("target %s alignment claim requires target-specific ABI evidence", target.Triple)
+		return fmt.Errorf(
+			"target %s alignment claim requires target-specific ABI evidence",
+			target.Triple,
+		)
 	}
 	if target.MemoryBuild != tgt.MemoryBuild {
-		return fmt.Errorf("target %s memory_build = %s, want %s", target.Triple, target.MemoryBuild, tgt.MemoryBuild)
+		return fmt.Errorf(
+			"target %s memory_build = %s, want %s",
+			target.Triple,
+			target.MemoryBuild,
+			tgt.MemoryBuild,
+		)
 	}
 	if target.MemoryLower != tgt.MemoryLower {
-		return fmt.Errorf("target %s memory_lower = %s, want %s", target.Triple, target.MemoryLower, tgt.MemoryLower)
+		return fmt.Errorf(
+			"target %s memory_lower = %s, want %s",
+			target.Triple,
+			target.MemoryLower,
+			tgt.MemoryLower,
+		)
 	}
 	if target.MemoryRun != tgt.MemoryRun {
-		return fmt.Errorf("target %s memory_run = %s, want %s", target.Triple, target.MemoryRun, tgt.MemoryRun)
+		return fmt.Errorf(
+			"target %s memory_run = %s, want %s",
+			target.Triple,
+			target.MemoryRun,
+			tgt.MemoryRun,
+		)
 	}
 	if target.MemoryRawDiagnostics != tgt.MemoryRawDiagnostics {
-		return fmt.Errorf("target %s memory_raw_diagnostics = %s, want %s", target.Triple, target.MemoryRawDiagnostics, tgt.MemoryRawDiagnostics)
+		return fmt.Errorf(
+			"target %s memory_raw_diagnostics = %s, want %s",
+			target.Triple,
+			target.MemoryRawDiagnostics,
+			tgt.MemoryRawDiagnostics,
+		)
 	}
 	if target.MemoryRegionLowering != tgt.MemoryRegionLowering {
-		return fmt.Errorf("target %s memory_region_lowering = %s, want %s", target.Triple, target.MemoryRegionLowering, tgt.MemoryRegionLowering)
+		return fmt.Errorf(
+			"target %s memory_region_lowering = %s, want %s",
+			target.Triple,
+			target.MemoryRegionLowering,
+			tgt.MemoryRegionLowering,
+		)
 	}
 	if target.MemoryAlignmentSemantics != tgt.MemoryAlignmentSemantics {
-		return fmt.Errorf("target %s memory_alignment_semantics = %s, want %s", target.Triple, target.MemoryAlignmentSemantics, tgt.MemoryAlignmentSemantics)
+		return fmt.Errorf(
+			"target %s memory_alignment_semantics = %s, want %s",
+			target.Triple,
+			target.MemoryAlignmentSemantics,
+			tgt.MemoryAlignmentSemantics,
+		)
 	}
 	if target.MemoryClaimLevel != tgt.MemoryClaimLevel {
-		return fmt.Errorf("target %s memory_claim_level = %s, want %s", target.Triple, target.MemoryClaimLevel, tgt.MemoryClaimLevel)
+		return fmt.Errorf(
+			"target %s memory_claim_level = %s, want %s",
+			target.Triple,
+			target.MemoryClaimLevel,
+			tgt.MemoryClaimLevel,
+		)
 	}
 	return nil
 }
@@ -492,7 +706,10 @@ func validateBuiltin(builtin builtinManifest) error {
 		return fmt.Errorf("builtin %s invalid unsafe_policy %q", builtin.Name, builtin.UnsafePolicy)
 	}
 	if builtin.UnsafePolicy == "conditional" && builtin.UnsafeDetails == "" {
-		return fmt.Errorf("builtin %s conditional unsafe_policy requires unsafe_details", builtin.Name)
+		return fmt.Errorf(
+			"builtin %s conditional unsafe_policy requires unsafe_details",
+			builtin.Name,
+		)
 	}
 	for _, effect := range builtin.Effects {
 		if effect == "" {
@@ -554,7 +771,12 @@ func validateFeatures(features []featureManifest) error {
 			return fmt.Errorf("feature %s invalid status %q", feature.ID, feature.Status)
 		}
 		if seenStatus, ok := seen[feature.ID]; ok {
-			return fmt.Errorf("duplicate feature %s (%s and %s)", feature.ID, seenStatus, feature.Status)
+			return fmt.Errorf(
+				"duplicate feature %s (%s and %s)",
+				feature.ID,
+				seenStatus,
+				feature.Status,
+			)
 		}
 		seen[feature.ID] = feature.Status
 		featureByID[feature.ID] = feature
@@ -565,11 +787,23 @@ func validateFeatures(features []featureManifest) error {
 		if len(feature.Docs) == 0 {
 			return fmt.Errorf("feature %s missing docs", feature.ID)
 		}
-		if claims := forbiddenPersistentObjectMemoryClaims(feature.Scope + " " + feature.Stability); len(claims) > 0 {
-			return fmt.Errorf("feature %s forbidden persistent/object memory claim %q", feature.ID, strings.Join(claims, ", "))
+		if claims := forbiddenPersistentObjectMemoryClaims(feature.Scope + " " + feature.Stability); len(
+			claims,
+		) > 0 {
+			return fmt.Errorf(
+				"feature %s forbidden persistent/object memory claim %q",
+				feature.ID,
+				strings.Join(claims, ", "),
+			)
 		}
-		if claims := forbiddenMemory100ManifestClaims(feature.Scope + " " + feature.Stability); len(claims) > 0 {
-			return fmt.Errorf("feature %s forbidden Memory100 claim %q", feature.ID, strings.Join(claims, ", "))
+		if claims := forbiddenMemory100ManifestClaims(feature.Scope + " " + feature.Stability); len(
+			claims,
+		) > 0 {
+			return fmt.Errorf(
+				"feature %s forbidden Memory100 claim %q",
+				feature.ID,
+				strings.Join(claims, ", "),
+			)
 		}
 		for _, doc := range feature.Docs {
 			docPath := filepath.ToSlash(doc)
@@ -577,7 +811,11 @@ func validateFeatures(features []featureManifest) error {
 				return fmt.Errorf("feature %s invalid doc reference %q", feature.ID, doc)
 			}
 			if !strings.HasPrefix(docPath, "docs/") || !strings.HasSuffix(docPath, ".md") {
-				return fmt.Errorf("feature %s doc reference %q must point at docs/*.md", feature.ID, doc)
+				return fmt.Errorf(
+					"feature %s doc reference %q must point at docs/*.md",
+					feature.ID,
+					doc,
+				)
 			}
 		}
 	}
@@ -726,17 +964,82 @@ func validateFeatureTruthBoundaries(features map[string]featureManifest) error {
 		},
 	}
 	docChecks := map[string][]string{
-		"language.generics-mvp":                   {"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_scope.md"},
-		"language.protocol-conformance-mvp":       {"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_scope.md"},
-		"language.ownership-markers-mvp":          {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
-		"language.resource-lifetime-mvp":          {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
-		"actors.task-transfer-safety":             {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
-		"language.lifetime-ssa":                   {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
-		"safety.production-core":                  {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/effects_capabilities_privacy_v1.md", "docs/spec/unsafe.md", "docs/spec/memory_report_schema_v1.md", "docs/spec/islands.md", "docs/design/memory_production_core_v1.md", "docs/design/memory_cost_model.md", "docs/audits/memory-fuzz-oracle-v1.md", "docs/audits/memory-production-core-v1-final.md", "docs/audits/memory-production-core-v1-artifact-map.md", "docs/audits/memory-production-core-v1-nonclaims.md", "docs/release/memory_islands_surface_scope.md", "docs/audits/memory-ideal-vslice-v0-baseline.md", "docs/audits/memory-ideal-vslice-v0-correlation.md", "docs/audits/memory-ideal-vslice-v0-final.md", "docs/audits/memory-ideal-vslice-v1-correlation.md", "docs/audits/memory-ideal-vslice-v1-final.md", "docs/audits/memory-ideal-vslice-v2-correlation.md", "docs/audits/memory-ideal-vslice-v2-final.md", "docs/audits/memory-ideal-vslice-v3-correlation.md", "docs/audits/memory-ideal-vslice-v3-final.md"},
-		"compiler.ram-contracts":                  {"docs/design/ram_contract_compiler.md", "docs/spec/ram_contract_report_schema.md", "docs/user/ram_contracts.md", "docs/audits/ram-contract-compiler-readiness.md", "docs/audits/ram-contract-compiler-handoff.md"},
-		"language.enum-payload-match":             {"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v0_3_scope.md"},
-		"language.protocol-bound-generics-static": {"docs/spec/current_supported_surface.md", "docs/spec/v0_3_scope.md", "docs/spec/flow_syntax_v1.md"},
-		"ui.toolkit-core":                         {"docs/spec/current_supported_surface.md", "docs/spec/ui_toolkit_core.md", "docs/spec/ui_v0.4.0.md"},
+		"language.generics-mvp": {
+			"docs/spec/core/current_supported_surface.md",
+			"docs/spec/flow/flow_syntax_v1.md",
+			"docs/spec/flow/v1_scope.md",
+		},
+		"language.protocol-conformance-mvp": {
+			"docs/spec/core/current_supported_surface.md",
+			"docs/spec/flow/flow_syntax_v1.md",
+			"docs/spec/flow/v1_scope.md",
+		},
+		"language.ownership-markers-mvp": {
+			"docs/spec/core/current_supported_surface.md",
+			"docs/spec/runtime/ownership_v1.md",
+			"docs/spec/flow/v1_scope.md",
+		},
+		"language.resource-lifetime-mvp": {
+			"docs/spec/core/current_supported_surface.md",
+			"docs/spec/runtime/ownership_v1.md",
+			"docs/spec/flow/v1_scope.md",
+		},
+		"actors.task-transfer-safety": {
+			"docs/spec/core/current_supported_surface.md",
+			"docs/spec/runtime/ownership_v1.md",
+			"docs/spec/flow/v1_scope.md",
+		},
+		"language.lifetime-ssa": {
+			"docs/spec/core/current_supported_surface.md",
+			"docs/spec/runtime/ownership_v1.md",
+			"docs/spec/flow/v1_scope.md",
+		},
+		"safety.production-core": {
+			"docs/spec/core/current_supported_surface.md",
+			"docs/spec/runtime/ownership_v1.md",
+			"docs/spec/runtime/effects_capabilities_privacy_v1.md",
+			"docs/spec/runtime/unsafe.md",
+			"docs/spec/memory/memory_report_schema_v1.md",
+			"docs/spec/memory/islands.md",
+			"docs/design/memory/memory_production_core_v1.md",
+			"docs/design/memory/memory_cost_model.md",
+			"docs/audits/memory/islands/memory-fuzz-oracle-v1.md",
+			"docs/audits/memory/production/memory-production-core-v1-final.md",
+			"docs/audits/memory/production/memory-production-core-v1-artifact-map.md",
+			"docs/audits/memory/production/memory-production-core-v1-nonclaims.md",
+			"docs/release/surface/memory_islands_surface_scope.md",
+			"docs/audits/memory/ideal-v0-v1/memory-ideal-vslice-v0-baseline.md",
+			"docs/audits/memory/ideal-v0-v1/memory-ideal-vslice-v0-correlation.md",
+			"docs/audits/memory/ideal-v0-v1/memory-ideal-vslice-v0-final.md",
+			"docs/audits/memory/ideal-v0-v1/memory-ideal-vslice-v1-correlation.md",
+			"docs/audits/memory/ideal-v0-v1/memory-ideal-vslice-v1-final.md",
+			"docs/audits/memory/ideal-v2-v4/memory-ideal-vslice-v2-correlation.md",
+			"docs/audits/memory/ideal-v2-v4/memory-ideal-vslice-v2-final.md",
+			"docs/audits/memory/ideal-v2-v4/memory-ideal-vslice-v3-correlation.md",
+			"docs/audits/memory/ideal-v2-v4/memory-ideal-vslice-v3-final.md",
+		},
+		"compiler.ram-contracts": {
+			"docs/design/ram_contract_compiler.md",
+			"docs/spec/memory/ram_contract_report_schema.md",
+			"docs/user/platform/ram_contracts.md",
+			"docs/audits/memory/ram-raw/ram-contract-compiler-readiness.md",
+			"docs/audits/memory/ram-raw/ram-contract-compiler-handoff.md",
+		},
+		"language.enum-payload-match": {
+			"docs/spec/core/current_supported_surface.md",
+			"docs/spec/flow/flow_syntax_v1.md",
+			"docs/spec/flow/v0_3_scope.md",
+		},
+		"language.protocol-bound-generics-static": {
+			"docs/spec/core/current_supported_surface.md",
+			"docs/spec/flow/v0_3_scope.md",
+			"docs/spec/flow/flow_syntax_v1.md",
+		},
+		"ui.toolkit-core": {
+			"docs/spec/core/current_supported_surface.md",
+			"docs/spec/ui/ui_toolkit_core.md",
+			"docs/spec/ui/ui_v0.4.0.md",
+		},
 	}
 	for id, required := range checks {
 		feature, ok := features[id]
@@ -778,34 +1081,150 @@ func validateSurfaceFeatureRows(features map[string]featureManifest) error {
 		"ui.surface-wasm32-wasi":      "unsupported",
 	}
 	docChecks := map[string][]string{
-		"ui.surface-core":             {"docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/release/surface_v1_release_contract.md"},
-		"ui.surface-block-system":     {"docs/spec/current_supported_surface.md", "docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/user/examples_index.md", "docs/release/surface_v1_release_contract.md", "docs/release/surface_v1_release_notes.md", "docs/release/surface_v1_release_audit.md"},
-		"ui.surface-morph-capsule":    {"docs/spec/surface_morph.md", "docs/spec/current_supported_surface.md", "docs/user/surface_guide.md", "docs/user/examples_index.md", "docs/user/standard_library_guide.md", "docs/release/surface_v1_release_contract.md", "docs/release/surface_v1_release_notes.md"},
-		"ui.surface-headless":         {"docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/release/surface_v1_release_contract.md"},
-		"ui.surface-linux-x64":        {"docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/release/surface_v1_release_contract.md"},
-		"ui.surface-web-wasm":         {"docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/release/surface_v1_release_contract.md"},
-		"ui.surface-component-model":  {"docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/release/surface_v1_release_contract.md"},
-		"ui.surface-toolkit-v1":       {"docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/user/examples_index.md"},
-		"ui.surface-text-input-v1":    {"docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/user/examples_index.md"},
-		"ui.surface-accessibility-v1": {"docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/user/examples_index.md"},
-		"ui.surface-macos-x64":        {"docs/spec/surface_v1.md", "docs/release/surface_v1_release_contract.md"},
-		"ui.surface-windows-x64":      {"docs/spec/surface_v1.md", "docs/release/surface_v1_release_contract.md"},
-		"ui.surface-wasm32-wasi":      {"docs/spec/surface_v1.md", "docs/release/surface_v1_release_contract.md"},
+		"ui.surface-core": {
+			"docs/spec/surface/surface_v1.md",
+			"docs/user/surface/surface_guide.md",
+			"docs/release/surface/surface_v1_release_contract.md",
+		},
+		"ui.surface-block-system": {
+			"docs/spec/core/current_supported_surface.md",
+			"docs/spec/surface/surface_v1.md",
+			"docs/user/surface/surface_guide.md",
+			"docs/user/reference/examples_index.md",
+			"docs/release/surface/surface_v1_release_contract.md",
+			"docs/release/surface/surface_v1_release_notes.md",
+			"docs/release/surface/surface_v1_release_audit.md",
+		},
+		"ui.surface-morph-capsule": {
+			"docs/spec/surface/morph/surface_morph.md",
+			"docs/spec/core/current_supported_surface.md",
+			"docs/user/surface/surface_guide.md",
+			"docs/user/reference/examples_index.md",
+			"docs/user/platform/standard_library_guide.md",
+			"docs/release/surface/surface_v1_release_contract.md",
+			"docs/release/surface/surface_v1_release_notes.md",
+		},
+		"ui.surface-headless": {
+			"docs/spec/surface/surface_v1.md",
+			"docs/user/surface/surface_guide.md",
+			"docs/release/surface/surface_v1_release_contract.md",
+		},
+		"ui.surface-linux-x64": {
+			"docs/spec/surface/surface_v1.md",
+			"docs/user/surface/surface_guide.md",
+			"docs/release/surface/surface_v1_release_contract.md",
+		},
+		"ui.surface-web-wasm": {
+			"docs/spec/surface/surface_v1.md",
+			"docs/user/surface/surface_guide.md",
+			"docs/release/surface/surface_v1_release_contract.md",
+		},
+		"ui.surface-component-model": {
+			"docs/spec/surface/surface_v1.md",
+			"docs/user/surface/surface_guide.md",
+			"docs/release/surface/surface_v1_release_contract.md",
+		},
+		"ui.surface-toolkit-v1": {
+			"docs/spec/surface/surface_v1.md",
+			"docs/user/surface/surface_guide.md",
+			"docs/user/reference/examples_index.md",
+		},
+		"ui.surface-text-input-v1": {
+			"docs/spec/surface/surface_v1.md",
+			"docs/user/surface/surface_guide.md",
+			"docs/user/reference/examples_index.md",
+		},
+		"ui.surface-accessibility-v1": {
+			"docs/spec/surface/surface_v1.md",
+			"docs/user/surface/surface_guide.md",
+			"docs/user/reference/examples_index.md",
+		},
+		"ui.surface-macos-x64": {
+			"docs/spec/surface/surface_v1.md",
+			"docs/release/surface/surface_v1_release_contract.md",
+		},
+		"ui.surface-windows-x64": {
+			"docs/spec/surface/surface_v1.md",
+			"docs/release/surface/surface_v1_release_contract.md",
+		},
+		"ui.surface-wasm32-wasi": {
+			"docs/spec/surface/surface_v1.md",
+			"docs/release/surface/surface_v1_release_contract.md",
+		},
 	}
 	phraseChecks := map[string][]string{
-		"ui.surface-core":             {"surface-v1-linux-web", "headless, linux-x64 real-window, and wasm32-web browser-canvas", "unsupported or future work"},
-		"ui.surface-block-system":     {"Block-first Surface architecture", "core Surface primitive", "recipes/compatibility", "tetra.surface.block-system.gate.v1", "block_system.memory_budget", "reports/surface-block/p18-budget", "same-commit target evidence", "not current", "not production support", "no production Block claim"},
-		"ui.surface-morph-capsule":    {"Morph Capsule", "lib.core.morph", "expands into Block", "tetra.surface.morph.gate.v1", "deterministic headless", "not Surface v1 production support", "does not add core widget primitives"},
-		"ui.surface-headless":         {"release evidence target", "not as an end-user platform claim"},
-		"ui.surface-linux-x64":        {"linux-x64-release-window-v1", "linux-app-shell-subset-v1", "electron-feature-ledger-v1", "tray/notification/file-picker/dialog support", "broad Electron shell parity"},
-		"ui.surface-web-wasm":         {"wasm32-web-browser-canvas-release-v1", "DOM host canvas only", "DOM-authored app UI trees", "Node-only promotion"},
-		"ui.surface-component-model":  {"component-tree-api release subset", "dynamic trait-object", "witness-table"},
-		"ui.surface-toolkit-v1":       {"production-widgets-v1", "no magical widgets, platform widgets, DOM UI, user JS"},
+		"ui.surface-core": {
+			"surface-v1-linux-web",
+			"headless, linux-x64 real-window, and wasm32-web browser-canvas",
+			"unsupported or future work",
+		},
+		"ui.surface-block-system": {
+			"Block-first Surface architecture",
+			"core Surface primitive",
+			"recipes/compatibility",
+			"tetra.surface.block-system.gate.v1",
+			"block_system.memory_budget",
+			"reports/surface-block/p18-budget",
+			"same-commit target evidence",
+			"not current",
+			"not production support",
+			"no production Block claim",
+		},
+		"ui.surface-morph-capsule": {
+			"Morph Capsule",
+			"lib.core.morph",
+			"expands into Block",
+			"tetra.surface.morph.gate.v1",
+			"deterministic headless",
+			"not Surface v1 production support",
+			"does not add core widget primitives",
+		},
+		"ui.surface-headless": {
+			"release evidence target",
+			"not as an end-user platform claim",
+		},
+		"ui.surface-linux-x64": {
+			"linux-x64-release-window-v1",
+			"linux-app-shell-subset-v1",
+			"electron-feature-ledger-v1",
+			"tray/notification/file-picker/dialog support",
+			"broad Electron shell parity",
+		},
+		"ui.surface-web-wasm": {
+			"wasm32-web-browser-canvas-release-v1",
+			"DOM host canvas only",
+			"DOM-authored app UI trees",
+			"Node-only promotion",
+		},
+		"ui.surface-component-model": {
+			"component-tree-api release subset",
+			"dynamic trait-object",
+			"witness-table",
+		},
+		"ui.surface-toolkit-v1": {
+			"production-widgets-v1",
+			"no magical widgets, platform widgets, DOM UI, user JS",
+		},
 		"ui.surface-text-input-v1":    {"production-text-input-v1", "rich text"},
 		"ui.surface-accessibility-v1": {"platform-bridge-v1", "screen-reader claims"},
-		"ui.surface-macos-x64":        {"unsupported for Surface v1", "no production target evidence", "tetra.surface.target-host-status.v1", "UNSUPPORTED", "build-only"},
-		"ui.surface-windows-x64":      {"unsupported for Surface v1", "no production target evidence", "tetra.surface.target-host-status.v1", "UNSUPPORTED", "build-only"},
-		"ui.surface-wasm32-wasi":      {"unsupported for Surface v1", "no production target evidence"},
+		"ui.surface-macos-x64": {
+			"unsupported for Surface v1",
+			"no production target evidence",
+			"tetra.surface.target-host-status.v1",
+			"UNSUPPORTED",
+			"build-only",
+		},
+		"ui.surface-windows-x64": {
+			"unsupported for Surface v1",
+			"no production target evidence",
+			"tetra.surface.target-host-status.v1",
+			"UNSUPPORTED",
+			"build-only",
+		},
+		"ui.surface-wasm32-wasi": {
+			"unsupported for Surface v1",
+			"no production target evidence",
+		},
 	}
 	for id, wantStatus := range requiredStatus {
 		feature, ok := features[id]
@@ -872,7 +1291,8 @@ func forbiddenPersistentObjectMemoryClaims(text string) []string {
 			}
 			absolute := searchFrom + index
 			clause := claimClauseAround(lower, absolute, len(phrase), 260)
-			if !explicitNonClaimContext(clause) && persistentObjectMemoryClaimContext(phrase, clause) {
+			if !explicitNonClaimContext(clause) &&
+				persistentObjectMemoryClaimContext(phrase, clause) {
 				claims = append(claims, phrase)
 			}
 			searchFrom = absolute + len(phrase)
@@ -922,7 +1342,10 @@ func forbiddenMemory100ManifestClaims(text string) []string {
 
 func persistentObjectMemoryClaimContext(phrase string, clause string) bool {
 	switch phrase {
-	case "object memory", "persistent memory", "persistent/object memory", "object/persistent memory":
+	case "object memory",
+		"persistent memory",
+		"persistent/object memory",
+		"object/persistent memory":
 		for _, qualifier := range []string{
 			"production",
 			"prod_ready",
@@ -1065,7 +1488,11 @@ func validateRuntimeABI(abi runtimeABIManifest, targets map[string]bool) error {
 		}
 	}
 	if !sameStringSet(abi.ActorsSupportedTargets, ctarget.ActorRuntimeTriples()) {
-		return fmt.Errorf("actors_supported_targets got %s want %s", strings.Join(sortedStrings(abi.ActorsSupportedTargets), ", "), strings.Join(sortedStrings(ctarget.ActorRuntimeTriples()), ", "))
+		return fmt.Errorf(
+			"actors_supported_targets got %s want %s",
+			strings.Join(sortedStrings(abi.ActorsSupportedTargets), ", "),
+			strings.Join(sortedStrings(ctarget.ActorRuntimeTriples()), ", "),
+		)
 	}
 	requiredRuntimeSymbols := []string{
 		"__tetra_entry",
@@ -1088,7 +1515,11 @@ func validateRuntimeABI(abi runtimeABIManifest, targets map[string]bool) error {
 		"__tetra_actor_yield_now",
 	}
 	if !sameStringSet(abi.ActorsRequiredSymbols, requiredRuntimeSymbols) {
-		return fmt.Errorf("actors_required_symbols got %s want %s", strings.Join(sortedStrings(abi.ActorsRequiredSymbols), ", "), strings.Join(sortedStrings(requiredRuntimeSymbols), ", "))
+		return fmt.Errorf(
+			"actors_required_symbols got %s want %s",
+			strings.Join(sortedStrings(abi.ActorsRequiredSymbols), ", "),
+			strings.Join(sortedStrings(requiredRuntimeSymbols), ", "),
+		)
 	}
 	requiredTimeSymbols := []string{
 		"__tetra_time_now_ms",
@@ -1155,50 +1586,82 @@ func validateRuntimeABI(abi runtimeABIManifest, targets map[string]bool) error {
 		return fmt.Errorf("time_required_symbols must not be empty")
 	}
 	if !sameStringSet(abi.TimeRequiredSymbols, requiredTimeSymbols) {
-		return fmt.Errorf("time_required_symbols got %s want %s", strings.Join(sortedStrings(abi.TimeRequiredSymbols), ", "), strings.Join(sortedStrings(requiredTimeSymbols), ", "))
+		return fmt.Errorf(
+			"time_required_symbols got %s want %s",
+			strings.Join(sortedStrings(abi.TimeRequiredSymbols), ", "),
+			strings.Join(sortedStrings(requiredTimeSymbols), ", "),
+		)
 	}
 	if len(abi.FilesystemRequiredSymbols) == 0 {
 		return fmt.Errorf("filesystem_required_symbols must not be empty")
 	}
 	if !sameStringSet(abi.FilesystemRequiredSymbols, requiredFilesystemSymbols) {
-		return fmt.Errorf("filesystem_required_symbols got %s want %s", strings.Join(sortedStrings(abi.FilesystemRequiredSymbols), ", "), strings.Join(sortedStrings(requiredFilesystemSymbols), ", "))
+		return fmt.Errorf(
+			"filesystem_required_symbols got %s want %s",
+			strings.Join(sortedStrings(abi.FilesystemRequiredSymbols), ", "),
+			strings.Join(sortedStrings(requiredFilesystemSymbols), ", "),
+		)
 	}
 	if len(abi.SurfaceRequiredSymbols) == 0 {
 		return fmt.Errorf("surface_required_symbols must not be empty")
 	}
 	if !sameStringSet(abi.SurfaceRequiredSymbols, requiredSurfaceSymbols) {
-		return fmt.Errorf("surface_required_symbols got %s want %s", strings.Join(sortedStrings(abi.SurfaceRequiredSymbols), ", "), strings.Join(sortedStrings(requiredSurfaceSymbols), ", "))
+		return fmt.Errorf(
+			"surface_required_symbols got %s want %s",
+			strings.Join(sortedStrings(abi.SurfaceRequiredSymbols), ", "),
+			strings.Join(sortedStrings(requiredSurfaceSymbols), ", "),
+		)
 	}
 	if len(abi.ActorStateRequiredSymbols) == 0 {
 		return fmt.Errorf("actor_state_required_symbols must not be empty")
 	}
 	if !sameStringSet(abi.ActorStateRequiredSymbols, requiredActorStateSymbols) {
-		return fmt.Errorf("actor_state_required_symbols got %s want %s", strings.Join(sortedStrings(abi.ActorStateRequiredSymbols), ", "), strings.Join(sortedStrings(requiredActorStateSymbols), ", "))
+		return fmt.Errorf(
+			"actor_state_required_symbols got %s want %s",
+			strings.Join(sortedStrings(abi.ActorStateRequiredSymbols), ", "),
+			strings.Join(sortedStrings(requiredActorStateSymbols), ", "),
+		)
 	}
 	if len(abi.TaskRequiredSymbols) == 0 {
 		return fmt.Errorf("task_required_symbols must not be empty")
 	}
 	if !sameStringSet(abi.TaskRequiredSymbols, requiredTaskSymbols) {
-		return fmt.Errorf("task_required_symbols got %s want %s", strings.Join(sortedStrings(abi.TaskRequiredSymbols), ", "), strings.Join(sortedStrings(requiredTaskSymbols), ", "))
+		return fmt.Errorf(
+			"task_required_symbols got %s want %s",
+			strings.Join(sortedStrings(abi.TaskRequiredSymbols), ", "),
+			strings.Join(sortedStrings(requiredTaskSymbols), ", "),
+		)
 	}
 	if len(abi.TaskGroupRequiredSymbols) == 0 {
 		return fmt.Errorf("task_group_required_symbols must not be empty")
 	}
 	if !sameStringSet(abi.TaskGroupRequiredSymbols, requiredTaskGroupSymbols) {
-		return fmt.Errorf("task_group_required_symbols got %s want %s", strings.Join(sortedStrings(abi.TaskGroupRequiredSymbols), ", "), strings.Join(sortedStrings(requiredTaskGroupSymbols), ", "))
+		return fmt.Errorf(
+			"task_group_required_symbols got %s want %s",
+			strings.Join(sortedStrings(abi.TaskGroupRequiredSymbols), ", "),
+			strings.Join(sortedStrings(requiredTaskGroupSymbols), ", "),
+		)
 	}
 	if len(abi.TypedTaskRequiredSymbols) == 0 {
 		return fmt.Errorf("typed_task_required_symbols must not be empty")
 	}
 	if !sameStringSet(abi.TypedTaskRequiredSymbols, requiredTypedTaskSymbols) {
-		return fmt.Errorf("typed_task_required_symbols got %s want %s", strings.Join(sortedStrings(abi.TypedTaskRequiredSymbols), ", "), strings.Join(sortedStrings(requiredTypedTaskSymbols), ", "))
+		return fmt.Errorf(
+			"typed_task_required_symbols got %s want %s",
+			strings.Join(sortedStrings(abi.TypedTaskRequiredSymbols), ", "),
+			strings.Join(sortedStrings(requiredTypedTaskSymbols), ", "),
+		)
 	}
 	requiredGlueSymbols := []string{
 		"__tetra_actor_dispatch",
 		"__tetra_actor_main_entry_id",
 	}
 	if !sameStringSet(abi.ActorsProgramGlueSymbols, requiredGlueSymbols) {
-		return fmt.Errorf("actors_program_glue_symbols got %s want %s", strings.Join(sortedStrings(abi.ActorsProgramGlueSymbols), ", "), strings.Join(sortedStrings(requiredGlueSymbols), ", "))
+		return fmt.Errorf(
+			"actors_program_glue_symbols got %s want %s",
+			strings.Join(sortedStrings(abi.ActorsProgramGlueSymbols), ", "),
+			strings.Join(sortedStrings(requiredGlueSymbols), ", "),
+		)
 	}
 	allSymbols := append([]string{}, abi.ActorsRequiredSymbols...)
 	allSymbols = append(allSymbols, abi.ActorStateRequiredSymbols...)
@@ -1214,8 +1677,13 @@ func validateRuntimeABI(abi runtimeABIManifest, targets map[string]bool) error {
 		if symbol == "" {
 			return fmt.Errorf("runtime_abi contains empty symbol")
 		}
-		if len(symbol) < len(abi.ReservedPrefix) || symbol[:len(abi.ReservedPrefix)] != abi.ReservedPrefix {
-			return fmt.Errorf("runtime symbol %s does not use reserved prefix %s", symbol, abi.ReservedPrefix)
+		if len(symbol) < len(abi.ReservedPrefix) ||
+			symbol[:len(abi.ReservedPrefix)] != abi.ReservedPrefix {
+			return fmt.Errorf(
+				"runtime symbol %s does not use reserved prefix %s",
+				symbol,
+				abi.ReservedPrefix,
+			)
 		}
 	}
 	return nil

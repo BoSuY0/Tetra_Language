@@ -1,0 +1,51 @@
+// PBBS-inspired small compressed-graph breadth-first search.
+module examples.benchmarks.parallel.pbbs_breadth_first_search
+
+func main() -> Int
+uses alloc, mem:
+    var row: []i32 = core.make_i32(7)
+    var to: []i32 = core.make_i32(7)
+    var dist: []i32 = core.make_i32(6)
+    var queue: []i32 = core.make_i32(6)
+    row[0] = 0
+    row[1] = 2
+    row[2] = 3
+    row[3] = 5
+    row[4] = 6
+    row[5] = 7
+    row[6] = 7
+    to[0] = 1
+    to[1] = 2
+    to[2] = 3
+    to[3] = 3
+    to[4] = 4
+    to[5] = 5
+    to[6] = 5
+    var i: Int = 0
+    while i < 6:
+        dist[i] = -1
+        queue[i] = 0
+        i = i + 1
+    dist[0] = 0
+    queue[0] = 0
+    var head: Int = 0
+    var tail: Int = 1
+    while head < tail:
+        let node: Int = queue[head]
+        var edge: Int = row[node]
+        while edge < row[node + 1]:
+            let next: Int = to[edge]
+            if dist[next] < 0:
+                dist[next] = dist[node] + 1
+                queue[tail] = next
+                tail = tail + 1
+            edge = edge + 1
+        head = head + 1
+    var checksum: Int = 0
+    i = 0
+    while i < 6:
+        checksum = checksum + dist[i]
+        i = i + 1
+    if checksum == 9:
+        return 0
+    return checksum

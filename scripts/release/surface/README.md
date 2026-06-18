@@ -33,7 +33,7 @@ Current entrypoints:
   verdict and audit remain owned by P29.
 
 - `surface-headless-smoke.sh` writes and validates `tetra.surface.runtime.v1`
-  headless evidence for `examples/surface_counter.tetra`. The gate builds and
+  headless evidence for `examples/surface/runtime/surface_counter.tetra`. The gate builds and
   runs the Surface component app, stores the executable under the report
   directory, writes a hashed compiler-owned `surface-runner-trace.json`, and
   records process, event, state-transition, and SHA-256 RGBA framebuffer
@@ -61,7 +61,7 @@ Current entrypoints:
   starter level if it claims real-window or native-input promotion.
 
 - `surface-linux-x64-real-window-smoke.sh` writes and validates Linux-x64
-  real-window evidence for `examples/surface_window_counter.tetra`. The gate
+  real-window evidence for `examples/surface/runtime/surface_window_counter.tetra`. The gate
   builds and runs the pure-Tetra counter/window app, then runs a Wayland shm
   probe that opens a real Linux window, sets a title, presents a Tetra-owned
   400x240 RGBA framebuffer, and exits `42`. Its report is marked
@@ -70,11 +70,25 @@ Current entrypoints:
   close event evidence, and keeps the same no-legacy-sidecar artifact scan.
   The validator rejects headless, memfd-only, docs-only, build-only,
   metadata-only, legacy `.ui.*`, DOM/web-only, fake, or stale evidence for this
-  promotion level.
+  promotion level. This gate remains probe/release evidence for
+  `surface-v1-linux-web`; it must not be cited as Native Surface Host v1 proof.
+
+- `surface-linux-x64-native-host-smoke.sh` writes and validates the stricter
+  Native Surface Host v1 report for
+  `examples/surface/runtime/surface_window_counter.tetra`. It builds the
+  official Wayland host, runs `tetra run --target linux-x64 --surface-host
+  wayland` for the compiled Tetra app, records the host-side report, merges it
+  into `tetra.surface.native-host.v1`, and validates with
+  `--release linux-x64-native-host`. While the window is open, a real pointer
+  event, key event, and close event must be delivered to the app. PNG/SVG/HTML,
+  browser-canvas captures, ImageMagick/viewer windows, probe frames, and
+  pre-rendered UI files are rejected substitutes. After strict runtime
+  validation passes, the gate writes and validates `artifact-hashes.json` for
+  the full native-host report directory.
 
 - `surface-linux-x64-release-app-shell-smoke.sh` writes and validates the
   scoped Linux app-shell release subset for
-  `examples/surface_linux_app_shell_notes.tetra`. The report uses
+  `examples/surface/toolkit/surface_linux_app_shell_notes.tetra`. The report uses
   `tetra.surface.linux-app-shell.v1` with
   `linux-app-shell-subset-v1` and proves target-host lifecycle open/close/
   reopen, two presented windows, resize/DPI/cursor traces, clipboard read/
@@ -94,17 +108,19 @@ Current entrypoints:
 - `surface-inspector-smoke.sh` writes and validates
   `tetra.surface.inspector.v1` / `surface-inspector-v1` static tool evidence.
   It aggregates headless Block-system, Morph, app-model, accessibility, and
-  event reports into `surface-inspector.json` plus optional
-  `surface-inspector.html`. The report exposes Block tree, Morph tokens,
-  layout, paint, accessibility, event route, focus, perf-counter, source
-  location, input report coverage, and hidden-state scan evidence. It is not
-  browser devtools, React devtools, DOM runtime UI, hidden app state, or
-  target-host accessibility proof by itself.
+  event reports plus Morph rendered beauty evidence into
+  `surface-inspector.json` plus optional `surface-inspector.html`. The report
+  exposes Block tree, Morph tokens, recipe expansions, Block scene nodes,
+  render commands, frame artifacts, golden diff result, layout, paint,
+  accessibility, event route, focus, perf-counter, source location, input
+  report coverage, and hidden-state scan evidence. It is not browser devtools,
+  React devtools, DOM runtime UI, hidden app state, or target-host accessibility
+  proof by itself.
 
 - `surface-template-smoke.sh` writes and validates
   `tetra.surface.template-smoke.v1` / `surface-template-smoke-v1` onboarding
   evidence. It runs `tetra new surface-app` for command palette, settings,
-  dashboard, editor shell, multi-window notes, and web-canvas templates, then
+  dashboard, editor shell, studio shell, multi-window notes, and web-canvas templates, then
   checks, builds, runs, inspects, visually tests, and packages the generated
   app paths. The report requires Block/Morph template source and rejects React,
   Electron, DOM-authored app UI trees, CSS runtime dependencies, core widget
@@ -125,10 +141,13 @@ Current entrypoints:
 
 - `surface-package-smoke.sh` writes and validates
   `tetra.surface.package.v1` / `surface-package-v1` packaging and update-story
-  evidence. It builds the command-palette reference app for linux-x64 and
-  wasm32-web, creates tar.gz packages with `surface-app-package-v1` manifests,
-  records local asset hashes, unpacks and runs the linux-x64 package, includes
-  web HTML/wasm/compiler-owned loader output, and writes a hash-pinned update
+  evidence. By default it builds the command-palette reference app for
+  linux-x64 and wasm32-web; with `--source <path> --app-id <id>
+  --app-title <title> --expected-exit-code <n>` it records the same evidence
+  for an explicitly named product-slice app such as `studio-shell`. It creates
+  tar.gz packages with `surface-app-package-v1` manifests, records local asset
+  hashes, unpacks and runs the linux-x64 package, includes web
+  HTML/wasm/compiler-owned loader output, and writes a hash-pinned update
   channel manifest. Signing, notarization, automatic runtime updates, network
   update fetching, React, Electron, CSS runtime, DOM-authored app UI trees,
   remote asset fetches, and user JavaScript app logic remain nonclaims.
@@ -174,7 +193,7 @@ Current entrypoints:
 
 - `surface-wasm32-web-browser-canvas-smoke.sh` writes and validates
   wasm32-web browser canvas/input evidence for
-  `examples/surface_browser_counter.tetra`. The gate builds the pure-Tetra app
+  `examples/surface/runtime/surface_browser_counter.tetra`. The gate builds the pure-Tetra app
   as `.wasm`, validates the exact Surface Host ABI imports, launches a real
   Chromium-compatible browser, opens an `HTMLCanvasElement`, presents
   Tetra-owned RGBA framebuffer bytes, reads the canvas pixels back, dispatches
@@ -188,7 +207,7 @@ Current entrypoints:
   `surface-linux-x64-real-window-text-focus-input-smoke.sh`, and
   `surface-wasm32-web-browser-canvas-text-focus-input-smoke.sh` write and
   validate TextBox focus/text input evidence for
-  `examples/surface_textbox_app.tetra`. The reports prove click focus, Tab
+  `examples/surface/runtime/surface_textbox_app.tetra`. The reports prove click focus, Tab
   focus transfer between `TextBox` and `SubmitButton`, focused keyboard
   routing, text insertion into component-owned storage, caret movement,
   backspace/delete, resize preserving focus, and visible RGBA framebuffer
@@ -205,7 +224,7 @@ Current entrypoints:
   `surface-linux-x64-real-window-component-tree-smoke.sh`, and
   `surface-wasm32-web-browser-canvas-component-tree-smoke.sh` write and
   validate the experimental Dynamic Component Tree milestone for
-  `examples/surface_tree_app.tetra`. The reports prove a pure-Tetra
+  `examples/surface/toolkit/surface_tree_app.tetra`. The reports prove a pure-Tetra
   semi-dynamic `ComponentTree`/`TreeNode` child list with stable node IDs,
   parent IDs, child indices, layout bounds, draw order, exact
   `TextBox -> SubmitButton -> ResetButton -> TextBox` focus cycling,
@@ -220,7 +239,7 @@ Current entrypoints:
   `surface-linux-x64-real-window-component-tree-api-smoke.sh`, and
   `surface-wasm32-web-browser-canvas-component-tree-api-smoke.sh` write and
   validate the Component Tree API Hardening milestone for the same
-  `examples/surface_tree_app.tetra` source. Reports keep the
+  `examples/surface/toolkit/surface_tree_app.tetra` source. Reports keep the
   `tetra.surface.component-tree.v1` tree block and add
   `component_tree_api.schema = tetra.surface.component-tree-api.v1` with
   `api_level = builder-layout-dispatch-v1` and
@@ -232,7 +251,7 @@ Current entrypoints:
 
 - `surface-headless-block-system-smoke.sh` writes and validates the
   experimental headless Block-system golden/checksum milestone for
-  `examples/surface_block_system.tetra`. Reports keep Block graph, software
+  `examples/surface/block_core/surface_block_system.tetra`. Reports keep Block graph, software
   paint, deterministic layout, and Block-derived accessibility evidence in the
   same `tetra.surface.runtime.v1` envelope and add
   `block_system.schema = tetra.surface.block-system.v1` with deterministic
@@ -242,15 +261,15 @@ Current entrypoints:
   evidence, not host display/browser promotion. The same gate also runs
   `validate-surface-block-examples` and writes `surface-block-examples.json`
   for the five polished Block-only examples:
-  `examples/surface_block_command_palette.tetra`,
-  `examples/surface_block_project_dashboard.tetra`,
-  `examples/surface_block_settings.tetra`,
-  `examples/surface_block_editor_shell.tetra`, and
-  `examples/surface_block_glass_panel.tetra`.
+  `examples/surface/block_apps/surface_block_command_palette.tetra`,
+  `examples/surface/block_apps/surface_block_project_dashboard.tetra`,
+  `examples/surface/block_apps/surface_block_settings.tetra`,
+  `examples/surface/block_apps/surface_block_editor_shell.tetra`, and
+  `examples/surface/block_apps/surface_block_glass_panel.tetra`.
 
 - `surface-headless-morph-smoke.sh` writes and validates the experimental
   headless Morph Capsule milestone for
-  `examples/surface_morph_command_palette.tetra`. Reports keep the normal
+  `examples/surface/morph_core/surface_morph_command_palette.tetra`. Reports keep the normal
   `tetra.surface.runtime.v1` envelope, include Block System evidence, and add
   `morph.schema = tetra.surface.morph.v1` with
   `quality_level = deterministic-headless-morph-capsule-v1`. The smoke proves
@@ -264,7 +283,7 @@ Current entrypoints:
   validation through `validate-surface-morph-report`, Block System dependency
   evidence in the same runtime envelope, P07 token graph validation through
   `validate-surface-token-graph` and
-  `docs/spec/surface_token_graph_contract.json`, final artifact hash integrity,
+  `docs/spec/surface/surface_token_graph_contract.json`, final artifact hash integrity,
   and a `tetra.surface.morph.gate.v1` summary. It is headless experimental
   evidence, not Surface v1 production support.
 
@@ -275,14 +294,14 @@ Current entrypoints:
   linux-x64 real-window, and wasm32-web browser-canvas Block System reports.
   The report records deterministic frame/golden/diff, token/theme, layout,
   accessibility, performance, and screenshot-only rejection evidence for
-  `examples/surface_block_system.tetra` plus the five polished Block-only
+  `examples/surface/block_core/surface_block_system.tetra` plus the five polished Block-only
   examples from `surface-block-examples.json`. This is visual infrastructure
   evidence, not a production beauty claim or broad Electron renderer parity
   claim.
 
 - `surface-linux-x64-real-window-block-system-smoke.sh` writes and validates
   the experimental linux-x64 real-window Block-system milestone for
-  `examples/surface_block_system.tetra`. It uses the existing Wayland shm RGBA
+  `examples/surface/block_core/surface_block_system.tetra`. It uses the existing Wayland shm RGBA
   real-window path, validates `block_system.schema =
   tetra.surface.block-system.v1` through `validate-surface-block-report`,
   records order-5 presented frame checksum evidence and native input/state
@@ -291,7 +310,7 @@ Current entrypoints:
 
 - `surface-wasm32-web-browser-canvas-block-system-smoke.sh` writes and
   validates the experimental wasm32-web browser-canvas Block-system milestone
-  for `examples/surface_block_system.tetra`. It requires a Chromium-compatible
+  for `examples/surface/block_core/surface_block_system.tetra`. It requires a Chromium-compatible
   browser runner, builds the wasm app with the compiler-owned loader, validates
   wasm imports, reads back browser canvas RGBA pixels, records browser input
   cases, rejects Node-only promotion, and keeps `no user JavaScript app logic`
@@ -303,7 +322,7 @@ Current entrypoints:
   `surface-linux-x64-real-window-minimal-toolkit-smoke.sh`, and
   `surface-wasm32-web-browser-canvas-minimal-toolkit-smoke.sh` write and
   validate the experimental minimal reusable widget toolkit milestone for
-  `examples/surface_toolkit_form.tetra`. Reports keep `component_tree` and
+  `examples/surface/toolkit/surface_toolkit_form.tetra`. Reports keep `component_tree` and
   `component_tree_api` evidence and add
   `toolkit.schema = tetra.surface.toolkit.v1` with
   `toolkit_level = minimal-widgets-v1`, `module = lib.core.widgets`,
@@ -320,7 +339,7 @@ Current entrypoints:
   `surface-linux-x64-real-window-toolkit-reuse-smoke.sh`, and
   `surface-wasm32-web-browser-canvas-toolkit-reuse-smoke.sh` write and
   validate the experimental toolkit-reuse-v1 milestone for
-  `examples/surface_toolkit_settings.tetra`. Reports keep `component_tree` and
+  `examples/surface/toolkit/surface_toolkit_settings.tetra`. Reports keep `component_tree` and
   `component_tree_api` evidence and extend `toolkit.schema =
   tetra.surface.toolkit.v1` with `toolkit_level = toolkit-reuse-v1`,
   `reuse_level = multi-form-widget-reuse-v1`, both toolkit example sources,
@@ -338,7 +357,7 @@ Current entrypoints:
   `surface-linux-x64-real-window-accessibility-metadata-smoke.sh`, and
   `surface-wasm32-web-browser-canvas-accessibility-metadata-smoke.sh` write and
   validate the experimental accessibility metadata tree milestone for
-  `examples/surface_accessibility_settings.tetra`. Reports keep
+  `examples/surface/toolkit/surface_accessibility_settings.tetra`. Reports keep
   `component_tree`, `component_tree_api`, and `toolkit` evidence and add
   `accessibility_tree.schema = tetra.surface.accessibility-tree.v1` with
   `accessibility_level = metadata-tree-v1`, `module = lib.core.accessibility`,

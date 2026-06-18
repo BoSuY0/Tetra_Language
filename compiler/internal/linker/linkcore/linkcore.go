@@ -40,7 +40,13 @@ type Result struct {
 	EntryOffset   int
 }
 
-func LinkX64Objects(objects []*tobj.Object, mainName string, entryStub []byte, entryStubCallAt int, entryOffset int) (*Result, error) {
+func LinkX64Objects(
+	objects []*tobj.Object,
+	mainName string,
+	entryStub []byte,
+	entryStubCallAt int,
+	entryOffset int,
+) (*Result, error) {
 	if mainName == "" {
 		return nil, fmt.Errorf("missing main entry name")
 	}
@@ -66,7 +72,12 @@ func LinkX64Objects(objects []*tobj.Object, mainName string, entryStub []byte, e
 		if target == "" {
 			target = obj.Target
 		} else if obj.Target != target {
-			return nil, fmt.Errorf("mixed object targets: '%s' vs '%s' (module '%s')", target, obj.Target, obj.Module)
+			return nil, fmt.Errorf(
+				"mixed object targets: '%s' vs '%s' (module '%s')",
+				target,
+				obj.Target,
+				obj.Module,
+			)
 		}
 		objs = append(objs, obj)
 	}
@@ -101,7 +112,11 @@ func LinkX64Objects(objects []*tobj.Object, mainName string, entryStub []byte, e
 				return nil, fmt.Errorf("empty symbol name in module '%s'", obj.Module)
 			}
 			if uint64(sym.Offset) >= uint64(len(obj.Code)) {
-				return nil, fmt.Errorf("symbol offset out of range for '%s' in module '%s'", sym.Name, obj.Module)
+				return nil, fmt.Errorf(
+					"symbol offset out of range for '%s' in module '%s'",
+					sym.Name,
+					obj.Module,
+				)
 			}
 			if _, exists := symbols[sym.Name]; exists {
 				return nil, fmt.Errorf("duplicate symbol '%s'", sym.Name)
@@ -122,7 +137,12 @@ func LinkX64Objects(objects []*tobj.Object, mainName string, entryStub []byte, e
 		return nil, fmt.Errorf("missing entry symbol '%s'", mainName)
 	}
 	if sig, ok := symbolSigs[mainName]; ok && (sig.ParamSlots != 0 || sig.ReturnSlots != 1) {
-		return nil, fmt.Errorf("entry symbol '%s' has incompatible signature params=%d returns=%d", mainName, sig.ParamSlots, sig.ReturnSlots)
+		return nil, fmt.Errorf(
+			"entry symbol '%s' has incompatible signature params=%d returns=%d",
+			mainName,
+			sig.ParamSlots,
+			sig.ReturnSlots,
+		)
 	}
 	if err := x64.PatchRel32(text, entryStubCallAt, mainOffset); err != nil {
 		return nil, err
@@ -140,10 +160,16 @@ func LinkX64Objects(objects []*tobj.Object, mainName string, entryStub []byte, e
 			switch reloc.Kind {
 			case tobj.RelocCallRel32:
 				if reloc.Name == "" {
-					return nil, fmt.Errorf("call relocation with empty symbol name in module '%s'", obj.Module)
+					return nil, fmt.Errorf(
+						"call relocation with empty symbol name in module '%s'",
+						obj.Module,
+					)
 				}
 				if reloc.Addend != 0 {
-					return nil, fmt.Errorf("call relocation addend must be zero in module '%s'", obj.Module)
+					return nil, fmt.Errorf(
+						"call relocation addend must be zero in module '%s'",
+						obj.Module,
+					)
 				}
 				target, ok := symbols[reloc.Name]
 				if !ok {
@@ -158,10 +184,16 @@ func LinkX64Objects(objects []*tobj.Object, mainName string, entryStub []byte, e
 				}
 			case tobj.RelocFuncAddrDisp32:
 				if reloc.Name == "" {
-					return nil, fmt.Errorf("function address relocation with empty symbol name in module '%s'", obj.Module)
+					return nil, fmt.Errorf(
+						"function address relocation with empty symbol name in module '%s'",
+						obj.Module,
+					)
 				}
 				if reloc.Addend != 0 {
-					return nil, fmt.Errorf("function address relocation addend must be zero in module '%s'", obj.Module)
+					return nil, fmt.Errorf(
+						"function address relocation addend must be zero in module '%s'",
+						obj.Module,
+					)
 				}
 				target, ok := symbols[reloc.Name]
 				if !ok {
@@ -169,17 +201,26 @@ func LinkX64Objects(objects []*tobj.Object, mainName string, entryStub []byte, e
 				}
 				at := textBase + int(reloc.At)
 				if at < 0 || at+4 > len(text) {
-					return nil, fmt.Errorf("function address relocation out of range for '%s'", reloc.Name)
+					return nil, fmt.Errorf(
+						"function address relocation out of range for '%s'",
+						reloc.Name,
+					)
 				}
 				if err := x64.PatchRel32(text, at, target); err != nil {
 					return nil, err
 				}
 			case tobj.RelocFuncAddrAbs32:
 				if reloc.Name == "" {
-					return nil, fmt.Errorf("function address relocation with empty symbol name in module '%s'", obj.Module)
+					return nil, fmt.Errorf(
+						"function address relocation with empty symbol name in module '%s'",
+						obj.Module,
+					)
 				}
 				if reloc.Addend != 0 {
-					return nil, fmt.Errorf("function address relocation addend must be zero in module '%s'", obj.Module)
+					return nil, fmt.Errorf(
+						"function address relocation addend must be zero in module '%s'",
+						obj.Module,
+					)
 				}
 				target, ok := symbols[reloc.Name]
 				if !ok {
@@ -187,7 +228,10 @@ func LinkX64Objects(objects []*tobj.Object, mainName string, entryStub []byte, e
 				}
 				at := textBase + int(reloc.At)
 				if at < 0 || at+4 > len(text) {
-					return nil, fmt.Errorf("function address relocation out of range for '%s'", reloc.Name)
+					return nil, fmt.Errorf(
+						"function address relocation out of range for '%s'",
+						reloc.Name,
+					)
 				}
 				funcAbsRelocs = append(funcAbsRelocs, FuncAbs32Reloc{
 					At:        at,
@@ -195,10 +239,16 @@ func LinkX64Objects(objects []*tobj.Object, mainName string, entryStub []byte, e
 				})
 			case tobj.RelocDataDisp32:
 				if reloc.Name != "" {
-					return nil, fmt.Errorf("data relocation symbol name must be empty in module '%s'", obj.Module)
+					return nil, fmt.Errorf(
+						"data relocation symbol name must be empty in module '%s'",
+						obj.Module,
+					)
 				}
 				if len(obj.Data) == 0 {
-					return nil, fmt.Errorf("data relocation in empty data section for '%s'", obj.Module)
+					return nil, fmt.Errorf(
+						"data relocation in empty data section for '%s'",
+						obj.Module,
+					)
 				}
 				if reloc.Addend >= uint32(len(obj.Data)) {
 					return nil, fmt.Errorf("data relocation out of range in '%s'", obj.Module)
@@ -213,10 +263,16 @@ func LinkX64Objects(objects []*tobj.Object, mainName string, entryStub []byte, e
 				})
 			case tobj.RelocDataAbs32:
 				if reloc.Name != "" {
-					return nil, fmt.Errorf("data relocation symbol name must be empty in module '%s'", obj.Module)
+					return nil, fmt.Errorf(
+						"data relocation symbol name must be empty in module '%s'",
+						obj.Module,
+					)
 				}
 				if len(obj.Data) == 0 {
-					return nil, fmt.Errorf("data relocation in empty data section for '%s'", obj.Module)
+					return nil, fmt.Errorf(
+						"data relocation in empty data section for '%s'",
+						obj.Module,
+					)
 				}
 				if reloc.Addend >= uint32(len(obj.Data)) {
 					return nil, fmt.Errorf("data relocation out of range in '%s'", obj.Module)
@@ -231,10 +287,16 @@ func LinkX64Objects(objects []*tobj.Object, mainName string, entryStub []byte, e
 				})
 			case tobj.RelocIATDisp32:
 				if reloc.Name == "" {
-					return nil, fmt.Errorf("IAT relocation with empty symbol name in module '%s'", obj.Module)
+					return nil, fmt.Errorf(
+						"IAT relocation with empty symbol name in module '%s'",
+						obj.Module,
+					)
 				}
 				if reloc.Addend != 0 {
-					return nil, fmt.Errorf("IAT relocation addend must be zero in module '%s'", obj.Module)
+					return nil, fmt.Errorf(
+						"IAT relocation addend must be zero in module '%s'",
+						obj.Module,
+					)
 				}
 				at := textBase + int(reloc.At)
 				if at < 0 || at+4 > len(text) {

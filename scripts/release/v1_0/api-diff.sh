@@ -12,7 +12,7 @@ write_baseline="false"
 release_artifact="tetra.release.v1_0.api-diff-report.v1alpha1"
 
 usage() {
-  cat <<'USAGE'
+  cat << 'USAGE'
 Usage: bash scripts/release/v1_0/api-diff.sh [--report-dir DIR] [--baseline PATH] [--enforce MODE] [--write-baseline]
 
 Options:
@@ -50,7 +50,7 @@ check_report_dir_fresh() {
     echo "release/v1_0/api-diff: choose a fresh --report-dir directory" >&2
     exit 2
   fi
-  if [[ ( -e "$report_dir" || -L "$report_dir" ) && ! -d "$report_dir" ]]; then
+  if [[ (-e "$report_dir" || -L "$report_dir") && ! -d "$report_dir" ]]; then
     echo "release/v1_0/api-diff: refusing to use non-directory report path: $report_dir" >&2
     echo "release/v1_0/api-diff: choose a fresh --report-dir directory" >&2
     exit 2
@@ -83,7 +83,7 @@ while [[ $# -gt 0 ]]; do
       write_baseline="true"
       shift
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;
@@ -118,7 +118,7 @@ if [[ "${#tracked_examples[@]}" -eq 0 ]]; then
   echo "release/v1_0/api-diff: no tracked examples found under examples/" >&2
   exit 1
 fi
-go run ./tools/cmd/gen-docs "${tracked_examples[@]}" >"$docs_out"
+go run ./tools/cmd/gen-docs "${tracked_examples[@]}" > "$docs_out"
 go run ./tools/cmd/validate-api-docs --docs "$docs_out"
 
 args=(

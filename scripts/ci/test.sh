@@ -18,18 +18,20 @@ release_slug="${release_slug//./_}"
 release_artifact="${TETRA_TEST_RELEASE_ARTIFACT:-tetra.release.v${release_slug}.go-test-suite.v1}"
 
 usage() {
-  cat <<'USAGE'
+  cat << 'USAGE'
 Usage: bash scripts/ci/test.sh [--frontend-focused]
 
 Runs the canonical Go test suite:
 - gofmt -l formatting gate for tracked and untracked Go files
+- line-length validator for maintained source, scripts, docs, and CI files
 - go test ./compiler/... -count=1
 - go test ./cli/... -count=1
 - go test ./tools/... -count=1
 
 Focused targets:
 - --frontend-focused:
-  - go test ./compiler/internal/frontend ./compiler -run 'Lex|Parser|Flow|Diagnostic|Stabilization' -count=1
+  - go test ./compiler/internal/frontend ./compiler
+    -run 'Lex|Parser|Flow|Diagnostic|Stabilization' -count=1
   - go test ./compiler/internal/backend/wasm32_web -count=1
 USAGE
 }
@@ -37,7 +39,7 @@ USAGE
 mode="canonical"
 if [[ $# -gt 0 ]]; then
   case "$1" in
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;
@@ -59,7 +61,7 @@ if [[ $# -gt 0 ]]; then
   exit 2
 fi
 
-if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+if git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
   unformatted="$(
     git ls-files -z --cached --others --exclude-standard '*.go' |
       while IFS= read -r -d '' path; do
@@ -70,7 +72,13 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
       xargs -0 gofmt -l
   )"
 else
-  unformatted="$(find . -name '*.go' -not -path './.gocache/*' -not -path './.cache/*' -print0 | xargs -0 gofmt -l)"
+  unformatted="$(
+    find . -name '*.go' \
+      -not -path './.gocache/*' \
+      -not -path './.cache/*' \
+      -print0 |
+      xargs -0 gofmt -l
+  )"
 fi
 
 if [[ -n "$unformatted" ]]; then
@@ -80,6 +88,14 @@ if [[ -n "$unformatted" ]]; then
   exit 1
 fi
 
+mkdir -p .cache/go-build-line-length .cache/go-tmp-line-length
+GOTELEMETRY=off \
+  GOCACHE="$repo_root/.cache/go-build-line-length" \
+  GOTMPDIR="$repo_root/.cache/go-tmp-line-length" \
+  go run -buildvcs=false ./tools/cmd/validate/line-length \
+  --max 100 \
+  --baseline tools/cmd/validate/line-length/baseline.json
+
 case "$mode" in
   canonical)
     go test ./compiler/... -count=1
@@ -87,7 +103,9 @@ case "$mode" in
     go test ./tools/... -count=1
     ;;
   frontend-focused)
-    go test ./compiler/internal/frontend ./compiler -run 'Lex|Parser|Flow|Diagnostic|Stabilization' -count=1
+    go test ./compiler/internal/frontend ./compiler \
+      -run 'Lex|Parser|Flow|Diagnostic|Stabilization' \
+      -count=1
     go test ./compiler/internal/backend/wasm32_web -count=1
     ;;
 esac

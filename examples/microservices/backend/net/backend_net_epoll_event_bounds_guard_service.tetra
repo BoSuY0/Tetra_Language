@@ -1,0 +1,42 @@
+// Backend net/epoll event helper bounds guard microservice.
+module examples.microservices.backend.net.backend_net_epoll_event_bounds_guard_service
+import lib.core.net as net
+
+func check_valid_event() -> Bool
+uses alloc, mem:
+    var event: []i32 = core.make_i32(2)
+    event[0] = 123
+    event[1] = net.epoll_event_in() + net.epoll_event_hup()
+    if net.epoll_event_fd(event) != 123:
+        return false
+    let flags: Int = net.epoll_event_flags(event)
+    if !net.epoll_event_readable(flags):
+        return false
+    if net.epoll_event_writable(flags):
+        return false
+    if net.epoll_event_has_error(flags):
+        return false
+    if !net.epoll_event_hung_up(flags):
+        return false
+    return true
+
+func check_malformed_events() -> Int
+uses alloc, mem:
+    var empty: []i32 = core.make_i32(0)
+    var one: []i32 = core.make_i32(1)
+    one[0] = 77
+    if net.epoll_event_fd(empty) != -1:
+        return 21
+    if net.epoll_event_fd(one) != 77:
+        return 22
+    if net.epoll_event_flags(empty) != -1:
+        return 23
+    if net.epoll_event_flags(one) != -1:
+        return 24
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    if !check_valid_event():
+        return 1
+    return check_malformed_events()

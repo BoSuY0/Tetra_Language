@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -11,6 +9,7 @@ import (
 	"time"
 
 	ctarget "tetra_language/compiler/target"
+	"tetra_language/tools/internal/reportdecode"
 )
 
 type smokeCaseReport struct {
@@ -83,7 +82,10 @@ func setHeaderField(md string, key string, value string) string {
 	return strings.Join(lines, "\n")
 }
 
-func extractSection(md string, heading string) (before string, section string, after string, err error) {
+func extractSection(
+	md string,
+	heading string,
+) (before string, section string, after string, err error) {
 	idx := strings.Index(md, heading+"\n")
 	if idx == -1 {
 		return "", "", "", fmt.Errorf("missing heading %q", heading)
@@ -190,7 +192,9 @@ func validateSmokeReportCounts(report *smokeReport) error {
 		return nil
 	}
 	if report.Total == nil || report.Passed == nil || report.Failed == nil {
-		return fmt.Errorf("smoke report counts incomplete: total, passed, and failed must appear together")
+		return fmt.Errorf(
+			"smoke report counts incomplete: total, passed, and failed must appear together",
+		)
 	}
 	passed := 0
 	for _, c := range report.Cases {
@@ -201,16 +205,27 @@ func validateSmokeReportCounts(report *smokeReport) error {
 	total := len(report.Cases)
 	failed := total - passed
 	if *report.Total != total || *report.Passed != passed || *report.Failed != failed {
-		return fmt.Errorf("smoke report counts mismatch: got total=%d passed=%d failed=%d, computed total=%d passed=%d failed=%d", *report.Total, *report.Passed, *report.Failed, total, passed, failed)
+		return fmt.Errorf(
+			("smoke report counts mismatch: got total=%d passed=%d failed=%d, " +
+				"computed total=%d passed=%d failed=%d"),
+			*report.Total,
+			*report.Passed,
+			*report.Failed,
+			total,
+			passed,
+			failed,
+		)
 	}
 	return nil
 }
 
 func parseSmokeReport(raw []byte) (*smokeReport, error) {
+	return parseSmokeReportFormat(raw, "auto")
+}
+
+func parseSmokeReportFormat(raw []byte, format string) (*smokeReport, error) {
 	var report smokeReport
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&report); err != nil {
+	if err := reportdecode.DecodeStrictFormat(raw, format, &report); err != nil {
 		return nil, err
 	}
 	return &report, nil
@@ -230,7 +245,12 @@ func validateSmokeReport(report *smokeReport) error {
 		return fmt.Errorf("smoke report unsupported target %s", report.Target)
 	}
 	if wantBuildOnly := ctarget.IsBuildOnlyTarget(report.Target); report.BuildOnly != wantBuildOnly {
-		return fmt.Errorf("smoke report build_only = %v, want %v for target %s", report.BuildOnly, wantBuildOnly, report.Target)
+		return fmt.Errorf(
+			"smoke report build_only = %v, want %v for target %s",
+			report.BuildOnly,
+			wantBuildOnly,
+			report.Target,
+		)
 	}
 	if report.Host == "" {
 		return fmt.Errorf("smoke report missing host")
@@ -262,41 +282,75 @@ func validateSmokeReport(report *smokeReport) error {
 		}
 		seenSources[c.SrcPath] = true
 		if c.ExpectedExit < 0 || c.ExpectedExit > 255 {
-			return fmt.Errorf("smoke report case %s expected_exit = %d, want 0..255", c.Name, c.ExpectedExit)
+			return fmt.Errorf(
+				"smoke report case %s expected_exit = %d, want 0..255",
+				c.Name,
+				c.ExpectedExit,
+			)
 		}
 		if c.Unsupported {
 			if c.ExpectedDiagnostic == "" {
-				return fmt.Errorf("unsupported smoke report case %s missing expected_diagnostic", c.Name)
+				return fmt.Errorf(
+					"unsupported smoke report case %s missing expected_diagnostic",
+					c.Name,
+				)
 			}
 			if c.Diagnostic == "" {
 				return fmt.Errorf("unsupported smoke report case %s missing diagnostic", c.Name)
 			}
 			if !strings.Contains(c.Diagnostic, c.ExpectedDiagnostic) {
-				return fmt.Errorf("unsupported smoke report case %s diagnostic = %q, want containing %q", c.Name, c.Diagnostic, c.ExpectedDiagnostic)
+				return fmt.Errorf(
+					"unsupported smoke report case %s diagnostic = %q, want containing %q",
+					c.Name,
+					c.Diagnostic,
+					c.ExpectedDiagnostic,
+				)
 			}
 			if c.Ran {
 				return fmt.Errorf("unsupported smoke report case %s ran unexpectedly", c.Name)
 			}
 			if c.ActualExit != nil {
-				return fmt.Errorf("unsupported smoke report case %s cannot include actual_exit", c.Name)
+				return fmt.Errorf(
+					"unsupported smoke report case %s cannot include actual_exit",
+					c.Name,
+				)
 			}
 			if c.OutPath != "" {
-				return fmt.Errorf("unsupported smoke report case %s cannot include out_path", c.Name)
+				return fmt.Errorf(
+					"unsupported smoke report case %s cannot include out_path",
+					c.Name,
+				)
 			}
 		} else if c.ExpectedDiagnostic != "" || c.Diagnostic != "" {
-			return fmt.Errorf("smoke report case %s has diagnostic metadata but is not marked unsupported", c.Name)
+			return fmt.Errorf(
+				"smoke report case %s has diagnostic metadata but is not marked unsupported",
+				c.Name,
+			)
 		}
 		if c.Ran && c.ActualExit == nil {
 			return fmt.Errorf("smoke report case %s ran without actual_exit", c.Name)
 		}
 		if report.BuildOnly && c.Ran && report.Runner == "" {
-			return fmt.Errorf("smoke report case %s ran for build-only target %s", c.Name, report.Target)
+			return fmt.Errorf(
+				"smoke report case %s ran for build-only target %s",
+				c.Name,
+				report.Target,
+			)
 		}
 		if c.ActualExit != nil && (*c.ActualExit < 0 || *c.ActualExit > 255) {
-			return fmt.Errorf("smoke report case %s actual_exit = %d, want 0..255", c.Name, *c.ActualExit)
+			return fmt.Errorf(
+				"smoke report case %s actual_exit = %d, want 0..255",
+				c.Name,
+				*c.ActualExit,
+			)
 		}
 		if c.Ran && c.Pass && c.ActualExit != nil && *c.ActualExit != c.ExpectedExit {
-			return fmt.Errorf("smoke report case %s passed with actual_exit %d, want %d", c.Name, *c.ActualExit, c.ExpectedExit)
+			return fmt.Errorf(
+				"smoke report case %s passed with actual_exit %d, want %d",
+				c.Name,
+				*c.ActualExit,
+				c.ExpectedExit,
+			)
 		}
 		if c.Pass && c.Error != "" {
 			return fmt.Errorf("smoke report case %s passed with error text", c.Name)
@@ -322,8 +376,12 @@ func validateIslandsDebugTrapEvidence(cases []smokeCaseReport) error {
 		if c.Name != trapName {
 			continue
 		}
-		if c.SrcPath != "examples/islands_overflow.tetra" {
-			return fmt.Errorf("islands_debug trap case %s src_path = %q, want examples/islands_overflow.tetra", trapName, c.SrcPath)
+		if c.SrcPath != "examples/memory/islands/islands_overflow.tetra" {
+			return fmt.Errorf(
+				"islands_debug trap case %s src_path = %q, want examples/memory/islands/islands_overflow.tetra",
+				trapName,
+				c.SrcPath,
+			)
 		}
 		if c.ExpectedExit == 0 {
 			return fmt.Errorf("islands_debug trap case %s expected_exit must be non-zero", trapName)
@@ -338,7 +396,12 @@ func validateIslandsDebugTrapEvidence(cases []smokeCaseReport) error {
 			return fmt.Errorf("islands_debug trap case %s did not pass", trapName)
 		}
 		if *c.ActualExit != c.ExpectedExit {
-			return fmt.Errorf("islands_debug trap case %s actual_exit = %d, want %d", trapName, *c.ActualExit, c.ExpectedExit)
+			return fmt.Errorf(
+				"islands_debug trap case %s actual_exit = %d, want %d",
+				trapName,
+				*c.ActualExit,
+				c.ExpectedExit,
+			)
 		}
 		return nil
 	}
@@ -356,7 +419,11 @@ var requiredIslandsDebugScopes = map[string]requiredIslandsDebugScope{
 	"use_after_free": {status: "static_only_nonclaim"},
 	"stale_epoch":    {status: "static_only_nonclaim"},
 	"wrong_island":   {status: "static_only_nonclaim"},
-	"overflow_trap":  {status: "live_trap", caseName: "islands_overflow", srcPath: "examples/islands_overflow.tetra"},
+	"overflow_trap": {
+		status:   "live_trap",
+		caseName: "islands_overflow",
+		srcPath:  "examples/memory/islands/islands_overflow.tetra",
+	},
 }
 
 var requiredIslandsDebugScopeOrder = []string{
@@ -379,13 +446,21 @@ func validateIslandsDebugScopeEvidence(cases []smokeCaseReport, rows []islandsDe
 		}
 		spec, ok := requiredIslandsDebugScopes[row.Name]
 		if !ok {
-			return fmt.Errorf("islands_debug scope row %q is not a supported scoped sanitizer evidence row", row.Name)
+			return fmt.Errorf(
+				"islands_debug scope row %q is not a supported scoped sanitizer evidence row",
+				row.Name,
+			)
 		}
 		if _, exists := seen[row.Name]; exists {
 			return fmt.Errorf("duplicate islands_debug scope row %s", row.Name)
 		}
 		if row.Status != spec.status {
-			return fmt.Errorf("islands_debug scope row %s status = %q, want %q", row.Name, row.Status, spec.status)
+			return fmt.Errorf(
+				"islands_debug scope row %s status = %q, want %q",
+				row.Name,
+				row.Status,
+				spec.status,
+			)
 		}
 		if strings.TrimSpace(row.Evidence) == "" {
 			return fmt.Errorf("islands_debug scope row %s missing evidence", row.Name)
@@ -396,19 +471,36 @@ func validateIslandsDebugScopeEvidence(cases []smokeCaseReport, rows []islandsDe
 		switch spec.status {
 		case "live_trap":
 			if row.CaseName != spec.caseName || row.SrcPath != spec.srcPath {
-				return fmt.Errorf("islands_debug live scope row %s must reference %s at %s", row.Name, spec.caseName, spec.srcPath)
+				return fmt.Errorf(
+					"islands_debug live scope row %s must reference %s at %s",
+					row.Name,
+					spec.caseName,
+					spec.srcPath,
+				)
 			}
 			c, ok := byCase[spec.caseName]
 			if !ok {
-				return fmt.Errorf("islands_debug live scope row %s references missing case %s", row.Name, spec.caseName)
+				return fmt.Errorf(
+					"islands_debug live scope row %s references missing case %s",
+					row.Name,
+					spec.caseName,
+				)
 			}
 			if !c.Ran || c.ActualExit == nil || !c.Pass || *c.ActualExit == 0 {
-				return fmt.Errorf("islands_debug live scope row %s requires ran/pass/non-zero trap evidence from %s", row.Name, spec.caseName)
+				return fmt.Errorf(
+					"islands_debug live scope row %s requires ran/pass/non-zero trap evidence from %s",
+					row.Name,
+					spec.caseName,
+				)
 			}
 		case "static_only_nonclaim":
 			reason := strings.ToLower(row.Reason)
-			if !strings.Contains(reason, "static") || !strings.Contains(reason, "no live") || !strings.Contains(reason, "claimed") {
-				return fmt.Errorf("islands_debug static-only scope row %s must explain static-only nonclaim status", row.Name)
+			if !strings.Contains(reason, "static") || !strings.Contains(reason, "no live") ||
+				!strings.Contains(reason, "claimed") {
+				return fmt.Errorf(
+					"islands_debug static-only scope row %s must explain static-only nonclaim status",
+					row.Name,
+				)
 			}
 		}
 		seen[row.Name] = row
@@ -448,14 +540,27 @@ func validateRequiredSmokeCases(target string, seen map[string]bool) error {
 		}
 		for _, name := range required {
 			if !seen[name] {
-				return fmt.Errorf("smoke report missing required smoke case %s for target %s", name, target)
+				return fmt.Errorf(
+					"smoke report missing required smoke case %s for target %s",
+					name,
+					target,
+				)
 			}
 		}
 	case "wasm32-wasi", "wasm32-web":
-		required := []string{"legacy_hello", "effects_io_smoke", "ui_web_smoke", "dogfood_wasi", "dogfood_web_ui"}
+		required := []string{
+			"legacy_hello",
+			"effects_io_smoke",
+			"ui_web_smoke",
+			"dogfood_wasi",
+			"dogfood_web_ui",
+		}
 		for _, name := range required {
 			if !seen[name] {
-				return fmt.Errorf("smoke report missing required smoke profile for target %s", target)
+				return fmt.Errorf(
+					"smoke report missing required smoke profile for target %s",
+					target,
+				)
 			}
 		}
 	default:
@@ -483,11 +588,28 @@ func main() {
 	var islandsChecklist string
 	var actorsChecklist string
 	var validateOnly bool
+	var format string
 
-	flag.StringVar(&reportPath, "report", "", "path to tetra smoke JSON report")
-	flag.StringVar(&islandsChecklist, "islands-checklist", filepath.FromSlash("docs/checklists/islands_platform_smoke.md"), "path to islands platform checklist")
-	flag.StringVar(&actorsChecklist, "actors-checklist", filepath.FromSlash("docs/checklists/actors_platform_smoke.md"), "path to actors platform checklist")
-	flag.BoolVar(&validateOnly, "validate-only", false, "validate smoke report JSON without updating checklists")
+	flag.StringVar(&reportPath, "report", "", "path to tetra smoke structured report")
+	flag.StringVar(
+		&islandsChecklist,
+		"islands-checklist",
+		filepath.FromSlash("docs/checklists/islands_platform_smoke.md"),
+		"path to islands platform checklist",
+	)
+	flag.StringVar(
+		&actorsChecklist,
+		"actors-checklist",
+		filepath.FromSlash("docs/checklists/actors_platform_smoke.md"),
+		"path to actors platform checklist",
+	)
+	flag.BoolVar(
+		&validateOnly,
+		"validate-only",
+		false,
+		"validate smoke report without updating checklists",
+	)
+	flag.StringVar(&format, "format", "auto", "report format: auto, json, or toon")
 	flag.Parse()
 
 	if reportPath == "" {
@@ -499,7 +621,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	report, err := parseSmokeReport(raw)
+	report, err := parseSmokeReportFormat(raw, format)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -520,7 +642,14 @@ func main() {
 	}
 
 	var islandsUpdates []checkboxUpdate
-	for _, name := range []string{"islands_hello", "islands_i32", "islands_overflow", "mmio_smoke", "cap_mem_smoke", "memset_smoke"} {
+	for _, name := range []string{
+		"islands_hello",
+		"islands_i32",
+		"islands_overflow",
+		"mmio_smoke",
+		"cap_mem_smoke",
+		"memset_smoke",
+	} {
 		if _, ok := passed[name]; !ok {
 			continue
 		}
@@ -543,7 +672,7 @@ func main() {
 	var actorsUpdates []checkboxUpdate
 	if _, ok := passed["actors_pingpong"]; ok {
 		actorsUpdates = append(actorsUpdates, checkboxUpdate{
-			Contains: "examples/actors_pingpong.tetra",
+			Contains: "examples/actors/actors_pingpong.tetra",
 			Checked:  passed["actors_pingpong"],
 		})
 		actorsUpdates = append(actorsUpdates, checkboxUpdate{

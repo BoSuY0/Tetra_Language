@@ -1,0 +1,446 @@
+// Planned Tetra Surface software RGBA draw helpers.
+// Effects: mem
+// ```tetra doctest
+// func draw_doctest() -> Int:
+//     let color: lib.core.draw.DebugColor = lib.core.draw.DebugColor(r: 1, g: 2, b: 3, a: 255)
+//     return color.r + color.g + color.b
+// ```
+module lib.core.draw
+
+import lib.core.surface as surface
+import lib.core.strings as strings
+
+struct DrawContext:
+    frame: surface.Frame
+
+struct DebugColor:
+    r: Int
+    g: Int
+    b: Int
+    a: Int
+
+struct Color:
+    r: Int
+    g: Int
+    b: Int
+    a: Int
+
+func rect4(x: Int, y: Int, w: Int, h: Int) -> surface.Rect:
+    return surface.Rect(x: x, y: y, w: w, h: h)
+
+func dot(x: Int, y: Int) -> surface.Rect:
+    return rect4(x, y, 1, 1)
+
+func ell_dot(bounds: surface.Rect, cw: Int, y: Int, offset: Int) -> surface.Rect:
+    return dot(bounds.x + bounds.w - cw + offset, y)
+
+func ellipsis(ctx: inout DrawContext, b: surface.Rect, cw: Int, y: Int, c: surface.Color) -> Int
+uses mem:
+    let e1: Int = rect(ctx, ell_dot(b, cw, y, 0), c)
+    let e2: Int = rect(ctx, ell_dot(b, cw, y, 2), c)
+    let e3: Int = rect(ctx, ell_dot(b, cw, y, 4), c)
+    return text_command_render() + e1 - e1 + e2 - e2 + e3 - e3
+
+func keep6(base: Int, a: Int, b: Int, c: Int, d: Int, e: Int, f: Int) -> Int:
+    return base + a - a + b - b + c - c + d - d + e - e + f - f
+
+func clear(ctx: inout DrawContext, color: surface.Color) -> Int
+uses mem:
+    var y: Int = 0
+    while y < ctx.frame.height:
+        var x: Int = 0
+        while x < ctx.frame.width:
+            let i: Int = y * ctx.frame.stride + x * 4
+            ctx.frame.pixels[i] = color.r
+            ctx.frame.pixels[i + 1] = color.g
+            ctx.frame.pixels[i + 2] = color.b
+            ctx.frame.pixels[i + 3] = color.a
+            x = x + 1
+        y = y + 1
+    return 0
+
+func rect(ctx: inout DrawContext, rect: surface.Rect, color: surface.Color) -> Int
+uses mem:
+    var y: Int = rect.y
+    let max_y: Int = rect.y + rect.h
+    let max_x: Int = rect.x + rect.w
+    while y < max_y:
+        var x: Int = rect.x
+        while x < max_x:
+            if x >= 0 && y >= 0 && x < ctx.frame.width && y < ctx.frame.height:
+                let i: Int = y * ctx.frame.stride + x * 4
+                ctx.frame.pixels[i] = color.r
+                ctx.frame.pixels[i + 1] = color.g
+                ctx.frame.pixels[i + 2] = color.b
+                ctx.frame.pixels[i + 3] = color.a
+            x = x + 1
+        y = y + 1
+    return 0
+
+func rect_outline(ctx: inout DrawContext, r: surface.Rect, color: surface.Color) -> Int
+uses mem:
+    let top: surface.Rect = surface.Rect(x: r.x, y: r.y, w: r.w, h: 1)
+    let bottom: surface.Rect = surface.Rect(x: r.x, y: r.y + r.h - 1, w: r.w, h: 1)
+    let left: surface.Rect = surface.Rect(x: r.x, y: r.y, w: 1, h: r.h)
+    let right: surface.Rect = surface.Rect(x: r.x + r.w - 1, y: r.y, w: 1, h: r.h)
+    let _: Int = rect(ctx, top, color)
+    let __: Int = rect(ctx, bottom, color)
+    let ___: Int = rect(ctx, left, color)
+    return rect(ctx, right, color)
+
+func line(ctx: inout DrawContext, x0: Int, y0: Int, x1: Int, y1: Int, color: surface.Color) -> Int
+uses mem:
+    if y0 == y1:
+        let x: Int = min_i32(x0, x1)
+        let w: Int = abs_i32(x1 - x0) + 1
+        return rect(ctx, surface.Rect(x: x, y: y0, w: w, h: 1), color)
+    if x0 == x1:
+        let y: Int = min_i32(y0, y1)
+        let h: Int = abs_i32(y1 - y0) + 1
+        return rect(ctx, surface.Rect(x: x0, y: y, w: 1, h: h), color)
+    let marker: surface.Rect = surface.Rect(x: x0, y: y0, w: 1, h: 1)
+    return rect(ctx, marker, color)
+
+func text(ctx: inout DrawContext, value: String, x: Int, y: Int, color: surface.Color) -> Int
+uses mem:
+    let text_len: Int = strings.ascii_len(value)
+    let bounds: surface.Rect = surface.Rect(x: x, y: y, w: max_i32(5, text_len * 6), h: 9)
+    return text_string_run(ctx, value, bounds, 6, 9, color)
+
+func text_command_measure() -> Int:
+    return 7
+
+func text_command_render() -> Int:
+    return 8
+
+func text_command_caret() -> Int:
+    return 9
+
+func text_string_run(ctx: inout DrawContext, value: String, bounds: surface.Rect, char_width: Int, line_height: Int, color: surface.Color) -> Int
+uses mem:
+    var safe_char_width: Int = char_width
+    if safe_char_width <= 0:
+        safe_char_width = 8
+    var safe_line_height: Int = line_height
+    if safe_line_height <= 0:
+        safe_line_height = 16
+    var x: Int = bounds.x
+    var y: Int = bounds.y
+    for ch in value:
+        if x + safe_char_width > bounds.x + bounds.w:
+            x = bounds.x
+            y = y + safe_line_height
+        if y + 7 > bounds.y + bounds.h:
+            let ellipsis_y: Int = bounds.y + bounds.h - 2
+            return ellipsis(ctx, bounds, safe_char_width, ellipsis_y, color)
+        let _glyph: Int = glyph_mask_5x7_char(ctx, x, y, ch, color)
+        x = x + safe_char_width
+    return text_command_render()
+
+func text_glyph_run(ctx: inout DrawContext, bounds: surface.Rect, text_len: Int, char_width: Int, line_height: Int, color: surface.Color) -> Int
+uses mem:
+    var safe_char_width: Int = char_width
+    if safe_char_width <= 0:
+        safe_char_width = 8
+    var safe_line_height: Int = line_height
+    if safe_line_height <= 0:
+        safe_line_height = 16
+    var x: Int = bounds.x
+    var y: Int = bounds.y
+    var i: Int = 0
+    while i < text_len:
+        if x + safe_char_width > bounds.x + bounds.w:
+            x = bounds.x
+            y = y + safe_line_height
+        if y + 7 > bounds.y + bounds.h:
+            let ellipsis_y: Int = bounds.y + bounds.h - 2
+            return ellipsis(ctx, bounds, safe_char_width, ellipsis_y, color)
+        let _glyph: Int = glyph_mask_5x7(ctx, x, y, i, color)
+        x = x + safe_char_width
+        i = i + 1
+    return text_command_render()
+
+func glyph_mask_5x7(ctx: inout DrawContext, x: Int, y: Int, glyph_index: Int, color: surface.Color) -> Int
+uses mem:
+    var row: Int = 0
+    var painted: Int = 0
+    while row < 7:
+        var col: Int = 0
+        while col < 5:
+            if glyph_pixel_on(glyph_index, row, col):
+                let _: Int = rect(ctx, dot(x + col, y + row), color)
+                painted = painted + 1
+            col = col + 1
+        row = row + 1
+    return painted
+
+func glyph_mask_5x7_char(ctx: inout DrawContext, x: Int, y: Int, ch: Int, color: surface.Color) -> Int
+uses mem:
+    var row: Int = 0
+    var painted: Int = 0
+    while row < 7:
+        let mask: Int = glyph_row_5x7(ch, row)
+        var col: Int = 0
+        while col < 5:
+            if glyph_mask_pixel_on(mask, col):
+                let _: Int = rect(ctx, dot(x + col, y + row), color)
+                painted = painted + 1
+            col = col + 1
+        row = row + 1
+    return painted
+
+func glyph_pixel_on(glyph_index: Int, row: Int, col: Int) -> Bool:
+    if row == 0 || row == 6:
+        return (glyph_index + col) % 3 != 1
+    if col == 0 || col == 4:
+        return (glyph_index + row) % 2 == 0
+    return (glyph_index + row * 2 + col * 3) % 4 == 0
+
+func glyph_mask_pixel_on(mask: Int, col: Int) -> Bool:
+    let bit: Int = glyph_bit_value(col)
+    return mask / bit % 2 == 1
+
+func glyph_bit_value(col: Int) -> Int:
+    if col == 0:
+        return 16
+    if col == 1:
+        return 8
+    if col == 2:
+        return 4
+    if col == 3:
+        return 2
+    return 1
+
+func glyph_row_5x7(ch: Int, row: Int) -> Int:
+    var code: Int = ch
+    if code >= 97 && code <= 122:
+        code = code - 32
+    if code == 32:
+        return 0
+    if code == 45:
+        return glyph_hyphen(row)
+    if code == 46:
+        return glyph_period(row)
+    if code == 58:
+        return glyph_colon(row)
+    if code >= 48 && code <= 57:
+        return glyph_digit_row(code, row)
+    if code >= 65 && code <= 90:
+        return glyph_letter_row(code, row)
+    return glyph_unknown(row)
+
+func glyph_digit_row(code: Int, row: Int) -> Int:
+    if code == 48:
+        return glyph_pick(row, 14, 17, 19, 21, 25, 17, 14)
+    if code == 49:
+        return glyph_pick(row, 4, 12, 4, 4, 4, 4, 14)
+    if code == 50:
+        return glyph_pick(row, 14, 17, 1, 2, 4, 8, 31)
+    if code == 51:
+        return glyph_pick(row, 30, 1, 1, 14, 1, 1, 30)
+    if code == 52:
+        return glyph_pick(row, 2, 6, 10, 18, 31, 2, 2)
+    if code == 53:
+        return glyph_pick(row, 31, 16, 30, 1, 1, 17, 14)
+    if code == 54:
+        return glyph_pick(row, 6, 8, 16, 30, 17, 17, 14)
+    if code == 55:
+        return glyph_pick(row, 31, 1, 2, 4, 8, 8, 8)
+    if code == 56:
+        return glyph_pick(row, 14, 17, 17, 14, 17, 17, 14)
+    return glyph_pick(row, 14, 17, 17, 15, 1, 2, 12)
+
+func glyph_letter_row(code: Int, row: Int) -> Int:
+    if code == 65:
+        return glyph_pick(row, 14, 17, 17, 31, 17, 17, 17)
+    if code == 66:
+        return glyph_pick(row, 30, 17, 17, 30, 17, 17, 30)
+    if code == 67:
+        return glyph_pick(row, 14, 17, 16, 16, 16, 17, 14)
+    if code == 68:
+        return glyph_pick(row, 30, 17, 17, 17, 17, 17, 30)
+    if code == 69:
+        return glyph_pick(row, 31, 16, 16, 30, 16, 16, 31)
+    if code == 70:
+        return glyph_pick(row, 31, 16, 16, 30, 16, 16, 16)
+    if code == 71:
+        return glyph_pick(row, 14, 17, 16, 23, 17, 17, 15)
+    if code == 72:
+        return glyph_pick(row, 17, 17, 17, 31, 17, 17, 17)
+    if code == 73:
+        return glyph_pick(row, 31, 4, 4, 4, 4, 4, 31)
+    if code == 74:
+        return glyph_pick(row, 7, 2, 2, 2, 18, 18, 12)
+    if code == 75:
+        return glyph_pick(row, 17, 18, 20, 24, 20, 18, 17)
+    if code == 76:
+        return glyph_pick(row, 16, 16, 16, 16, 16, 16, 31)
+    if code == 77:
+        return glyph_pick(row, 17, 27, 21, 21, 17, 17, 17)
+    if code == 78:
+        return glyph_pick(row, 17, 25, 21, 19, 17, 17, 17)
+    if code == 79:
+        return glyph_pick(row, 14, 17, 17, 17, 17, 17, 14)
+    if code == 80:
+        return glyph_pick(row, 30, 17, 17, 30, 16, 16, 16)
+    if code == 81:
+        return glyph_pick(row, 14, 17, 17, 17, 21, 18, 13)
+    if code == 82:
+        return glyph_pick(row, 30, 17, 17, 30, 20, 18, 17)
+    if code == 83:
+        return glyph_pick(row, 15, 16, 16, 14, 1, 1, 30)
+    if code == 84:
+        return glyph_pick(row, 31, 4, 4, 4, 4, 4, 4)
+    if code == 85:
+        return glyph_pick(row, 17, 17, 17, 17, 17, 17, 14)
+    if code == 86:
+        return glyph_pick(row, 17, 17, 17, 17, 17, 10, 4)
+    if code == 87:
+        return glyph_pick(row, 17, 17, 17, 21, 21, 21, 10)
+    if code == 88:
+        return glyph_pick(row, 17, 17, 10, 4, 10, 17, 17)
+    if code == 89:
+        return glyph_pick(row, 17, 17, 10, 4, 4, 4, 4)
+    return glyph_pick(row, 31, 1, 2, 4, 8, 16, 31)
+
+func glyph_pick(row: Int, r0: Int, r1: Int, r2: Int, r3: Int, r4: Int, r5: Int, r6: Int) -> Int:
+    if row == 0:
+        return r0
+    if row == 1:
+        return r1
+    if row == 2:
+        return r2
+    if row == 3:
+        return r3
+    if row == 4:
+        return r4
+    if row == 5:
+        return r5
+    return r6
+
+func glyph_hyphen(row: Int) -> Int:
+    return glyph_pick(row, 0, 0, 0, 31, 0, 0, 0)
+
+func glyph_period(row: Int) -> Int:
+    return glyph_pick(row, 0, 0, 0, 0, 0, 12, 12)
+
+func glyph_colon(row: Int) -> Int:
+    return glyph_pick(row, 0, 12, 12, 0, 12, 12, 0)
+
+func glyph_unknown(row: Int) -> Int:
+    return glyph_pick(row, 31, 1, 2, 4, 4, 0, 4)
+
+func text_caret(ctx: inout DrawContext, x: Int, y: Int, height: Int, color: surface.Color) -> Int
+uses mem:
+    let caret: surface.Rect = surface.Rect(x: x, y: y, w: 2, h: height)
+    let _: Int = rect(ctx, caret, color)
+    return text_command_caret()
+
+func paint_command_none() -> Int:
+    return 0
+
+func paint_command_fill() -> Int:
+    return 1
+
+func paint_command_gradient() -> Int:
+    return 2
+
+func paint_command_border() -> Int:
+    return 3
+
+func paint_command_shadow() -> Int:
+    return 4
+
+func paint_command_outline() -> Int:
+    return 6
+
+func rounded_rect(ctx: inout DrawContext, r: surface.Rect, radius: Int, color: surface.Color) -> Int
+uses mem:
+    let clipped: Int = clamp_radius(radius, r.w, r.h)
+    if clipped <= 0:
+        let _: Int = rect(ctx, r, color)
+        return paint_command_fill()
+    let center: surface.Rect = surface.Rect(x: r.x + clipped, y: r.y, w: r.w - clipped * 2, h: r.h)
+    let middle: surface.Rect = surface.Rect(x: r.x, y: r.y + clipped, w: r.w, h: r.h - clipped * 2)
+    let half: Int = clipped / 2
+    let corner_size: Int = half + 1
+    let right_x: Int = r.x + r.w - clipped - 1
+    let bottom_y: Int = r.y + r.h - clipped - 1
+    let left_top: surface.Rect = rect4(r.x + half, r.y + half, corner_size, corner_size)
+    let right_top: surface.Rect = rect4(right_x, r.y + half, corner_size, corner_size)
+    let left_bottom: surface.Rect = rect4(r.x + half, bottom_y, corner_size, corner_size)
+    let right_bottom: surface.Rect = rect4(right_x, bottom_y, corner_size, corner_size)
+    let _center: Int = rect(ctx, center, color)
+    let _middle: Int = rect(ctx, middle, color)
+    let _lt: Int = rect(ctx, left_top, color)
+    let _rt: Int = rect(ctx, right_top, color)
+    let _lb: Int = rect(ctx, left_bottom, color)
+    let _rb: Int = rect(ctx, right_bottom, color)
+    return keep6(paint_command_fill(), _center, _middle, _lt, _rt, _lb, _rb)
+
+func rounded_rect_outline(ctx: inout DrawContext, r: surface.Rect, radius: Int, width: Int, color: surface.Color) -> Int
+uses mem:
+    var i: Int = 0
+    var stroke_width: Int = width
+    if stroke_width <= 0:
+        stroke_width = 1
+    while i < stroke_width:
+        let rr: surface.Rect = surface.Rect(x: r.x + i, y: r.y + i, w: r.w - i * 2, h: r.h - i * 2)
+        let _: Int = rect_outline(ctx, rr, color)
+        i = i + 1
+    if radius > 0:
+        let marker: surface.Rect = dot(r.x + radius / 2, r.y + radius / 2)
+        let _corner: Int = rect(ctx, marker, color)
+    return paint_command_border()
+
+func rounded_rect_outer_outline(ctx: inout DrawContext, r: surface.Rect, radius: Int, width: Int, color: surface.Color) -> Int
+uses mem:
+    let _: Int = rounded_rect_outline(ctx, r, radius, width, color)
+    return paint_command_outline()
+
+func linear_gradient_rect(ctx: inout DrawContext, r: surface.Rect, start: surface.Color, end: surface.Color) -> Int
+uses mem:
+    let top_h: Int = r.h / 2
+    let top: surface.Rect = surface.Rect(x: r.x, y: r.y, w: r.w, h: top_h)
+    let bottom: surface.Rect = surface.Rect(x: r.x, y: r.y + top_h, w: r.w, h: r.h - top_h)
+    let _top: Int = rect(ctx, top, start)
+    let _bottom: Int = rect(ctx, bottom, end)
+    return paint_command_gradient() + _top - _top + _bottom - _bottom
+
+func box_shadow_approx(ctx: inout DrawContext, r: surface.Rect, radius: Int, blur: Int, offset_x: Int, offset_y: Int, color: surface.Color) -> Int
+uses mem:
+    var spread: Int = blur / 4
+    if spread < 1:
+        spread = 1
+    let outer_x: Int = r.x + offset_x - spread
+    let outer_y: Int = r.y + offset_y - spread
+    let outer: surface.Rect = rect4(outer_x, outer_y, r.w + spread * 2, r.h + spread * 2)
+    let middle_x: Int = r.x + offset_x - spread / 2
+    let middle_y: Int = r.y + offset_y - spread / 2
+    let middle: surface.Rect = rect4(middle_x, middle_y, r.w + spread, r.h + spread)
+    let _outer: Int = rounded_rect(ctx, outer, radius + spread, color)
+    let _middle: Int = rounded_rect(ctx, middle, radius + spread / 2, color)
+    return paint_command_shadow() + _outer - _outer + _middle - _middle
+
+func min_i32(a: Int, b: Int) -> Int:
+    if a < b:
+        return a
+    return b
+
+func max_i32(a: Int, b: Int) -> Int:
+    if a > b:
+        return a
+    return b
+
+func clamp_radius(radius: Int, w: Int, h: Int) -> Int:
+    if radius <= 0:
+        return 0
+    let max_radius: Int = min_i32(w / 2, h / 2)
+    if radius > max_radius:
+        return max_i32(max_radius, 0)
+    return radius
+
+func abs_i32(value: Int) -> Int:
+    if value < 0:
+        return 0 - value
+    return value

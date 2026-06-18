@@ -1,0 +1,25 @@
+// Task-group alias spawn microservice smoke.
+//
+// The service sends a task group through a non-generic identity helper, then
+// spawns a grouped worker from the returned handle.
+module examples.microservices.parallel.group_core.parallel_group_alias_spawn_service
+func worker() -> Int:
+    return 42
+
+func alias_group(group: task.group) -> task.group:
+    return group
+
+func main() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let returned: task.group = alias_group(group)
+    let task: task.i32 = core.task_spawn_group_i32(returned, "worker")
+    let result: task.result_i32 = core.task_join_result_i32(task)
+    let close_error: Int = core.task_group_close(returned)
+    if result.error != 0:
+        return 10 + result.error
+    if close_error != 0:
+        return 20 + close_error
+    if result.value == 42:
+        return 0
+    return result.value

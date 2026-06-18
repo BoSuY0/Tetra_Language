@@ -104,10 +104,16 @@ func DecideSpecialization(in SpecializationInput) SpecializationDecision {
 		return SpecializationDecision{Action: SpecializationDevirtualize}
 	}
 	if in.IdentityBody {
-		return SpecializationDecision{Action: SpecializationRemoveWrapper, PreservesProvenance: true}
+		return SpecializationDecision{
+			Action:              SpecializationRemoveWrapper,
+			PreservesProvenance: true,
+		}
 	}
 	if in.WrapperBody {
-		return SpecializationDecision{Action: SpecializationInlineWrapper, PreservesProvenance: in.SliceProvenance}
+		return SpecializationDecision{
+			Action:              SpecializationInlineWrapper,
+			PreservesProvenance: in.SliceProvenance,
+		}
 	}
 	return SpecializationDecision{Action: SpecializationKeep, PreservesProvenance: true}
 }

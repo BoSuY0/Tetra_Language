@@ -1,0 +1,23 @@
+// Selfhost deadline microservice smoke.
+//
+// The service stays inside the self-host runtime surface: untyped task spawn,
+// logical sleep, deadline-aware join, and a later poll of the completed task.
+module examples.microservices.parallel.task_core.parallel_selfhost_deadline_service
+func worker() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(2)
+    return 42
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let early: task.result_i32 = core.task_join_until_i32(task, core.deadline_ms(1))
+    if early.error != 2:
+        return 10 + early.error
+    let _sleep: Int = core.sleep_ms(2)
+    let late: task.result_i32 = core.task_poll_i32(task)
+    if late.error != 0:
+        return 20 + late.error
+    if late.value == 42:
+        return 0
+    return late.value

@@ -221,7 +221,12 @@ func TestCodegenObjectLinuxX86EmitsCtxSwitchI386Stub(t *testing.T) {
 	}
 	target := findCtxSwitchI386InternalTarget(t, obj.Code)
 	if target+len(want) > len(obj.Code) {
-		t.Fatalf("ctx_switch target slice out of bounds: target=%d want=%d len=%d", target, len(want), len(obj.Code))
+		t.Fatalf(
+			"ctx_switch target slice out of bounds: target=%d want=%d len=%d",
+			target,
+			len(want),
+			len(obj.Code),
+		)
 	}
 	if got := obj.Code[target : target+len(want)]; !bytes.Equal(got, want) {
 		t.Fatalf("ctx_switch i386 internal stub mismatch\n got=% x\nwant=% x", got, want)
@@ -278,7 +283,8 @@ func TestCodegenObjectLinuxX86EmitsCallerCleanedStackArguments(t *testing.T) {
 	if err != nil {
 		t.Fatalf("codegen call with stack args: %v", err)
 	}
-	if len(obj.Relocs) != 1 || obj.Relocs[0].Kind != tobj.RelocCallRel32 || obj.Relocs[0].Name != "callee" {
+	if len(obj.Relocs) != 1 || obj.Relocs[0].Kind != tobj.RelocCallRel32 ||
+		obj.Relocs[0].Name != "callee" {
 		t.Fatalf("call relocs = %#v, want one call reloc to callee", obj.Relocs)
 	}
 	for _, want := range [][]byte{
@@ -384,10 +390,56 @@ func TestCodegenObjectLinuxX86NarrowAtomicStoresReturnStoredValue(t *testing.T) 
 		t.Fatalf("codegen narrow atomic store object: %v", err)
 	}
 	for _, want := range [][]byte{
-		{0x5A, 0x59, 0x5F, 0x89, 0xC8, 0x0F, 0xB6, 0xC0, 0x86, 0x0F, 0x50},       // store u8: return zero-extended stored value
-		{0x5A, 0x59, 0x5F, 0x89, 0xC8, 0x0F, 0xB7, 0xC0, 0x66, 0x87, 0x0F, 0x50}, // store u16: return zero-extended stored value
-		{0x5A, 0x59, 0x5F, 0x86, 0x0F, 0x0F, 0xB6, 0xC0, 0x50},                   // exchange u8: return old value
-		{0x5A, 0x59, 0x5F, 0x66, 0x87, 0x0F, 0x0F, 0xB7, 0xC0, 0x50},             // exchange u16: return old value
+		{
+			0x5A,
+			0x59,
+			0x5F,
+			0x89,
+			0xC8,
+			0x0F,
+			0xB6,
+			0xC0,
+			0x86,
+			0x0F,
+			0x50,
+		}, // store u8: return zero-extended stored value
+		{
+			0x5A,
+			0x59,
+			0x5F,
+			0x89,
+			0xC8,
+			0x0F,
+			0xB7,
+			0xC0,
+			0x66,
+			0x87,
+			0x0F,
+			0x50,
+		}, // store u16: return zero-extended stored value
+		{
+			0x5A,
+			0x59,
+			0x5F,
+			0x86,
+			0x0F,
+			0x0F,
+			0xB6,
+			0xC0,
+			0x50,
+		}, // exchange u8: return old value
+		{
+			0x5A,
+			0x59,
+			0x5F,
+			0x66,
+			0x87,
+			0x0F,
+			0x0F,
+			0xB7,
+			0xC0,
+			0x50,
+		}, // exchange u16: return old value
 	} {
 		if !bytes.Contains(obj.Code, want) {
 			t.Fatalf("narrow atomic store/exchange code missing % x in:\n% x", want, obj.Code)
@@ -432,10 +484,18 @@ func TestCodegenObjectLinuxX86EmitsAbsoluteGlobalRelocs(t *testing.T) {
 	storeAt := int(storeReloc.At)
 	loadAt := int(loadReloc.At)
 	if storeAt <= 0 || storeAt+4 > len(obj.Code) || obj.Code[storeAt-1] != 0xA3 {
-		t.Fatalf("store global did not emit mov moffs32,eax before reloc at %d: % x", storeAt, obj.Code)
+		t.Fatalf(
+			"store global did not emit mov moffs32,eax before reloc at %d: % x",
+			storeAt,
+			obj.Code,
+		)
 	}
 	if loadAt <= 0 || loadAt+4 > len(obj.Code) || obj.Code[loadAt-1] != 0xA1 {
-		t.Fatalf("load global did not emit mov eax,moffs32 before reloc at %d: % x", loadAt, obj.Code)
+		t.Fatalf(
+			"load global did not emit mov eax,moffs32 before reloc at %d: % x",
+			loadAt,
+			obj.Code,
+		)
 	}
 }
 
@@ -467,7 +527,8 @@ func TestCodegenObjectLinuxX86EmitsAbsoluteFunctionAddressReloc(t *testing.T) {
 		t.Fatalf("relocs len = %d, want 1: %#v", len(obj.Relocs), obj.Relocs)
 	}
 	reloc := obj.Relocs[0]
-	if reloc.Kind != tobj.RelocFuncAddrAbs32 || reloc.Name != "callback_target" || reloc.Addend != 0 {
+	if reloc.Kind != tobj.RelocFuncAddrAbs32 || reloc.Name != "callback_target" ||
+		reloc.Addend != 0 {
 		t.Fatalf("function address reloc = %#v, want absolute function address reloc", reloc)
 	}
 	at := int(reloc.At)
@@ -613,7 +674,13 @@ func TestCodegenObjectLinuxX86MakeSliceLengthContractGuardsBeforeMmap(t *testing
 		t.Fatalf("x86 make_slice missing mmap2 path:\n% x", obj.Code)
 	}
 	if negativeAt > mmapAt || overflowAt > mmapAt {
-		t.Fatalf("x86 make_slice guards must precede mmap: neg=%d overflow=%d mmap=%d\n% x", negativeAt, overflowAt, mmapAt, obj.Code)
+		t.Fatalf(
+			"x86 make_slice guards must precede mmap: neg=%d overflow=%d mmap=%d\n% x",
+			negativeAt,
+			overflowAt,
+			mmapAt,
+			obj.Code,
+		)
 	}
 }
 
@@ -634,11 +701,17 @@ func TestCodegenObjectLinuxX86RawSliceFromPartsBuildsScopedView(t *testing.T) {
 	}
 	viewProjection := []byte{0x5A, 0x59, 0x58, 0x50, 0x51} // pop cap,len,ptr; push ptr,len
 	if !bytes.Contains(obj.Code, viewProjection) {
-		t.Fatalf("x86 raw_slice_from_parts missing scoped view projection % x in:\n% x", viewProjection, obj.Code)
+		t.Fatalf(
+			"x86 raw_slice_from_parts missing scoped view projection % x in:\n% x",
+			viewProjection,
+			obj.Code,
+		)
 	}
 }
 
-func TestCodegenObjectLinuxX86IslandMakeSliceLengthContractGuardsBeforeMetadataAccess(t *testing.T) {
+func TestCodegenObjectLinuxX86IslandMakeSliceLengthContractGuardsBeforeMetadataAccess(
+	t *testing.T,
+) {
 	obj, err := CodegenObjectLinuxX86([]ir.IRFunc{{
 		Name:        "island_make_i32_guarded",
 		ReturnSlots: 2,
@@ -668,7 +741,13 @@ func TestCodegenObjectLinuxX86IslandMakeSliceLengthContractGuardsBeforeMetadataA
 		t.Fatalf("x86 island_make_slice missing metadata read:\n% x", obj.Code)
 	}
 	if negativeAt > metadataAt || overflowAt > metadataAt {
-		t.Fatalf("x86 island_make_slice guards must precede metadata read: neg=%d overflow=%d metadata=%d\n% x", negativeAt, overflowAt, metadataAt, obj.Code)
+		t.Fatalf(
+			"x86 island_make_slice guards must precede metadata read: neg=%d overflow=%d metadata=%d\n% x",
+			negativeAt,
+			overflowAt,
+			metadataAt,
+			obj.Code,
+		)
 	}
 }
 
@@ -850,7 +929,23 @@ func TestCodegenObjectLinuxX86EmitsIslandAllocationAndFree(t *testing.T) {
 		{0xC7, 0x00, 0x10, 0x00, 0x00, 0x00},       // [island+0] next offset
 		{0x89, 0x48, 0x04, 0x89, 0x48, 0x08},       // [island+4]/[island+8] capacity/map length
 		{0x8B, 0x10, 0x8B, 0x58, 0x04},             // load next/capacity
-		{0x01, 0xCF, 0x83, 0xC7, 0x0F, 0x81, 0xE7, 0xF0, 0xFF, 0xFF, 0xFF, 0x39, 0xDF, 0x0F, 0x87}, // aligned next+bytes > capacity overflow
+		{
+			0x01,
+			0xCF,
+			0x83,
+			0xC7,
+			0x0F,
+			0x81,
+			0xE7,
+			0xF0,
+			0xFF,
+			0xFF,
+			0xFF,
+			0x39,
+			0xDF,
+			0x0F,
+			0x87,
+		}, // aligned next+bytes > capacity overflow
 		{0x89, 0x38}, // commit new bump offset
 		{0x8B, 0x4B, 0x08, 0xB8, 0x5B, 0x00, 0x00, 0x00, 0xCD, 0x80}, // munmap
 	} {
@@ -891,7 +986,13 @@ func TestCodegenObjectLinuxX86IslandNewLengthGuardsBeforeMmap(t *testing.T) {
 		t.Fatalf("x86 island_new missing mmap2 path:\n% x", obj.Code)
 	}
 	if negativeAt > mmapAt || overflowAt > mmapAt {
-		t.Fatalf("x86 island_new guards must precede mmap: neg=%d overflow=%d mmap=%d\n% x", negativeAt, overflowAt, mmapAt, obj.Code)
+		t.Fatalf(
+			"x86 island_new guards must precede mmap: neg=%d overflow=%d mmap=%d\n% x",
+			negativeAt,
+			overflowAt,
+			mmapAt,
+			obj.Code,
+		)
 	}
 }
 
@@ -911,15 +1012,59 @@ func TestCodegenObjectLinuxX86DebugIslandsEmitDoubleFreeGuardAndProtect(t *testi
 		t.Fatalf("codegen debug island object: %v", err)
 	}
 	for _, want := range [][]byte{
-		{0x81, 0xC1, 0x00, 0x10, 0x00, 0x00},                                     // add ecx,4096 debug header bytes
-		{0xC7, 0x00, 0x00, 0x10, 0x00, 0x00},                                     // [island+0] next offset = 4096
-		{0xC7, 0x40, 0x0C, 0x00, 0x00, 0x00, 0x00},                               // freed marker clear
-		{0x8B, 0x43, 0x0C, 0x85, 0xC0, 0x0F, 0x84},                               // load/test freed marker and branch if zero
+		{
+			0x81,
+			0xC1,
+			0x00,
+			0x10,
+			0x00,
+			0x00,
+		}, // add ecx,4096 debug header bytes
+		{
+			0xC7,
+			0x00,
+			0x00,
+			0x10,
+			0x00,
+			0x00,
+		}, // [island+0] next offset = 4096
+		{0xC7, 0x40, 0x0C, 0x00, 0x00, 0x00, 0x00}, // freed marker clear
+		{
+			0x8B,
+			0x43,
+			0x0C,
+			0x85,
+			0xC0,
+			0x0F,
+			0x84,
+		}, // load/test freed marker and branch if zero
 		{0xBB, 0x02, 0x00, 0x00, 0x00, 0xB8, 0x01, 0x00, 0x00, 0x00, 0xCD, 0x80}, // exit(2)
 		{0xC7, 0x43, 0x0C, 0x01, 0x00, 0x00, 0x00},                               // freed marker set
-		{0x8B, 0x4B, 0x08, 0x81, 0xE9, 0x00, 0x10, 0x00, 0x00},                   // mprotect length -= 4096
-		{0x81, 0xC3, 0x00, 0x10, 0x00, 0x00, 0xBA, 0x00, 0x00, 0x00, 0x00},       // payload base, PROT_NONE
-		{0xB8, 0x7D, 0x00, 0x00, 0x00, 0xCD, 0x80},                               // mprotect syscall
+		{
+			0x8B,
+			0x4B,
+			0x08,
+			0x81,
+			0xE9,
+			0x00,
+			0x10,
+			0x00,
+			0x00,
+		}, // mprotect length -= 4096
+		{
+			0x81,
+			0xC3,
+			0x00,
+			0x10,
+			0x00,
+			0x00,
+			0xBA,
+			0x00,
+			0x00,
+			0x00,
+			0x00,
+		}, // payload base, PROT_NONE
+		{0xB8, 0x7D, 0x00, 0x00, 0x00, 0xCD, 0x80}, // mprotect syscall
 	} {
 		if !bytes.Contains(obj.Code, want) {
 			t.Fatalf("debug island code missing % x in:\n% x", want, obj.Code)

@@ -6,7 +6,7 @@ repo_root="$(cd "$script_dir/../../.." && pwd)"
 report_dir="$repo_root/reports/full-platform-ui-runtime"
 
 usage() {
-  cat <<'USAGE'
+  cat << 'USAGE'
 Usage: bash scripts/release/full_platform/macos-ui-runtime-smoke.sh [--report-dir DIR]
 
 Writes the macOS platform UI runtime smoke report. The report is only a
@@ -26,7 +26,7 @@ while [[ $# -gt 0 ]]; do
       report_dir="$2"
       shift 2
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;
@@ -42,7 +42,7 @@ cd "$repo_root"
 mkdir -p "$report_dir"
 report_path="$report_dir/macos-ui-runtime.json"
 external_report="${TETRA_MACOS_UI_RUNTIME_REPORT:-}"
-expected_version="$("./tetra" version 2>/dev/null || go run ./cli/cmd/tetra version)"
+expected_version="$("./tetra" version 2> /dev/null || go run ./cli/cmd/tetra version)"
 expected_git_head="$(git rev-parse HEAD)"
 
 if [[ -n "$external_report" ]]; then

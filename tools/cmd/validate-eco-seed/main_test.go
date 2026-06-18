@@ -7,12 +7,27 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"tetra_language/internal/toon"
 )
 
 func TestValidateEcoSeedAcceptsValidReport(t *testing.T) {
 	out, err := runEcoSeedValidator(t, validSeedReport())
 	if err != nil {
 		t.Fatalf("validator failed: %v\n%s", err, out)
+	}
+}
+
+func TestValidateEcoSeedAcceptsTOON(t *testing.T) {
+	toonRaw, err := toon.ConvertJSONToTOON(
+		[]byte(validSeedReport()),
+		toon.Options{Strict: true, Deterministic: true},
+	)
+	if err != nil {
+		t.Fatalf("json->toon: %v", err)
+	}
+	if err := validateEcoSeedFormat(toonRaw, "toon"); err != nil {
+		t.Fatalf("validateEcoSeedFormat TOON: %v\n%s", err, toonRaw)
 	}
 }
 
@@ -27,7 +42,12 @@ func TestValidateEcoSeedRejectsMalformedJSON(t *testing.T) {
 }
 
 func TestValidateEcoSeedRejectsUnknownField(t *testing.T) {
-	seed := strings.Replace(validSeedReport(), "\n  \"capsules\":", "\n  \"unexpected\": true,\n  \"capsules\":", 1)
+	seed := strings.Replace(
+		validSeedReport(),
+		"\n  \"capsules\":",
+		"\n  \"unexpected\": true,\n  \"capsules\":",
+		1,
+	)
 	out, err := runEcoSeedValidator(t, seed)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
@@ -38,7 +58,12 @@ func TestValidateEcoSeedRejectsUnknownField(t *testing.T) {
 }
 
 func TestValidateEcoSeedRejectsUnknownCapsuleField(t *testing.T) {
-	seed := strings.Replace(validSeedReport(), `"permissions": ["io"]`, `"permissions": ["io"], "extra": true`, 1)
+	seed := strings.Replace(
+		validSeedReport(),
+		`"permissions": ["io"]`,
+		`"permissions": ["io"], "extra": true`,
+		1,
+	)
 	out, err := runEcoSeedValidator(t, seed)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
@@ -71,7 +96,8 @@ func TestValidateEcoSeedRejectsSeedLockMismatch(t *testing.T) {
 }
 
 func TestValidateEcoSeedRejectsDuplicateDependencyIDWithDifferentVersionAndPath(t *testing.T) {
-	seed := strings.Replace(validSeedReport(),
+	seed := strings.Replace(
+		validSeedReport(),
 		`"depends_on": [{"id": "tetra://core", "version": "0.1.0"}]`,
 		`"depends_on": [{"id": "tetra://core", "version": "0.1.0"}, {"id": "tetra://core", "version": "0.2.0", "path": "alt/Core.t4"}]`,
 		1,
@@ -86,7 +112,8 @@ func TestValidateEcoSeedRejectsDuplicateDependencyIDWithDifferentVersionAndPath(
 }
 
 func TestValidateEcoSeedRejectsDuplicateLockDependencyIDWithDifferentVersionAndPath(t *testing.T) {
-	seed := strings.Replace(validSeedReport(),
+	seed := strings.Replace(
+		validSeedReport(),
 		`"dependencies": [{"id": "tetra://core", "version": "0.1.0"}]`,
 		`"dependencies": [{"id": "tetra://core", "version": "0.1.0"}, {"id": "tetra://core", "version": "0.2.0", "path": "alt/Core.t4"}]`,
 		1,
@@ -127,12 +154,21 @@ func TestValidateEcoSeedRejectsInvalidLockCapsulePaths(t *testing.T) {
 		{name: "windows absolute", path: "C:/tmp/Capsule.t4", message: "path must be relative"},
 		{name: "traversal", path: "capsules/../Capsule.t4", message: "path must not contain .."},
 		{name: "empty normalization", path: ".", message: "path must not normalize to empty"},
-		{name: "invalid normalization", path: "capsules//Capsule.t4", message: "path must already be normalized"},
+		{
+			name:    "invalid normalization",
+			path:    "capsules//Capsule.t4",
+			message: "path must already be normalized",
+		},
 		{name: "backslash", path: `capsules\Capsule.t4`, message: "path must use forward slashes"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			seed := strings.Replace(validSeedReport(), `"path": "Capsule.t4"`, `"path": `+strconv.Quote(tt.path), 1)
+			seed := strings.Replace(
+				validSeedReport(),
+				`"path": "Capsule.t4"`,
+				`"path": `+strconv.Quote(tt.path),
+				1,
+			)
 			out, err := runEcoSeedValidator(t, seed)
 			if err == nil {
 				t.Fatalf("expected validator failure\n%s", out)
@@ -153,14 +189,21 @@ func TestValidateEcoSeedRejectsInvalidDependencyPaths(t *testing.T) {
 		{name: "absolute", path: "/tmp/Core.t4", message: "path must be relative"},
 		{name: "traversal", path: "deps/../Core.t4", message: "path must not contain .."},
 		{name: "empty", path: "", message: "path must not be empty"},
-		{name: "invalid normalization", path: "./Core.t4", message: "path must already be normalized"},
+		{
+			name:    "invalid normalization",
+			path:    "./Core.t4",
+			message: "path must already be normalized",
+		},
 		{name: "backslash", path: `deps\Core.t4`, message: "path must use forward slashes"},
 	}
 	for _, tt := range tests {
 		t.Run("lock "+tt.name, func(t *testing.T) {
-			seed := strings.Replace(validSeedReport(),
+			seed := strings.Replace(
+				validSeedReport(),
 				`"dependencies": [{"id": "tetra://core", "version": "0.1.0"}]`,
-				`"dependencies": [{"id": "tetra://core", "version": "0.1.0", "path": `+strconv.Quote(tt.path)+`}]`,
+				`"dependencies": [{"id": "tetra://core", "version": "0.1.0", "path": `+strconv.Quote(
+					tt.path,
+				)+`}]`,
 				1,
 			)
 			out, err := runEcoSeedValidator(t, seed)
@@ -172,9 +215,12 @@ func TestValidateEcoSeedRejectsInvalidDependencyPaths(t *testing.T) {
 			}
 		})
 		t.Run("seed "+tt.name, func(t *testing.T) {
-			seed := strings.Replace(validSeedReport(),
+			seed := strings.Replace(
+				validSeedReport(),
 				`"depends_on": [{"id": "tetra://core", "version": "0.1.0"}]`,
-				`"depends_on": [{"id": "tetra://core", "version": "0.1.0", "path": `+strconv.Quote(tt.path)+`}]`,
+				`"depends_on": [{"id": "tetra://core", "version": "0.1.0", "path": `+strconv.Quote(
+					tt.path,
+				)+`}]`,
 				1,
 			)
 			out, err := runEcoSeedValidator(t, seed)
@@ -196,10 +242,18 @@ func TestValidateEcoSeedRejectsInvalidArtifactPaths(t *testing.T) {
 	}{
 		{name: "absolute", path: "/tmp/App.t4i", message: "path must be relative"},
 		{name: "windows absolute slash", path: "C:/tmp/App.t4i", message: "path must be relative"},
-		{name: "windows absolute backslash", path: `C:\tmp\App.t4i`, message: "path must use forward slashes"},
+		{
+			name:    "windows absolute backslash",
+			path:    `C:\tmp\App.t4i`,
+			message: "path must use forward slashes",
+		},
 		{name: "traversal", path: "artifacts/../App.t4i", message: "path must not contain .."},
 		{name: "empty normalization", path: ".", message: "path must not normalize to empty"},
-		{name: "invalid normalization", path: "artifacts//App.t4i", message: "path must already be normalized"},
+		{
+			name:    "invalid normalization",
+			path:    "artifacts//App.t4i",
+			message: "path must already be normalized",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

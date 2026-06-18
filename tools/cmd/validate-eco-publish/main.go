@@ -73,7 +73,13 @@ func main() {
 	}
 }
 
-func validatePublishedPackage(registry string, id string, version string, target string, channel string) error {
+func validatePublishedPackage(
+	registry string,
+	id string,
+	version string,
+	target string,
+	channel string,
+) error {
 	if !isSupportedPublishChannel(channel) {
 		return fmt.Errorf("unsupported channel %q", channel)
 	}
@@ -134,7 +140,10 @@ func validatePublishedPackage(registry string, id string, version string, target
 		return fmt.Errorf("capsule targets missing selected target %s", target)
 	}
 	if meta.Trust != nil {
-		if err := validateRelativeMetadataPath(meta.Trust.SnapshotFile, "trust snapshot file"); err != nil {
+		if err := validateRelativeMetadataPath(
+			meta.Trust.SnapshotFile,
+			"trust snapshot file",
+		); err != nil {
 			return err
 		}
 		hexHash, err := parseSHA256Hash(meta.Trust.SnapshotHash)
@@ -160,7 +169,9 @@ func validatePublishedPackage(registry string, id string, version string, target
 	if meta.Package.Size < 0 {
 		return fmt.Errorf("package size must not be negative")
 	}
-	expectedDownloadPath := filepath.ToSlash(filepath.Join("packages", capsuleIDDirectory(id), version, target, meta.Package.File))
+	expectedDownloadPath := filepath.ToSlash(
+		filepath.Join("packages", capsuleIDDirectory(id), version, target, meta.Package.File),
+	)
 	if len(meta.Downloads) == 0 {
 		return fmt.Errorf("downloads must not be empty")
 	}
@@ -172,7 +183,11 @@ func validatePublishedPackage(registry string, id string, version string, target
 			return err
 		}
 		if download.Path != expectedDownloadPath {
-			return fmt.Errorf("download path mismatch: metadata has %s, expected %s", download.Path, expectedDownloadPath)
+			return fmt.Errorf(
+				"download path mismatch: metadata has %s, expected %s",
+				download.Path,
+				expectedDownloadPath,
+			)
 		}
 	}
 	pkgPath := filepath.Join(targetDir, filepath.FromSlash(meta.Package.File))
@@ -181,7 +196,11 @@ func validatePublishedPackage(registry string, id string, version string, target
 		return err
 	}
 	if int64(len(rawPkg)) != meta.Package.Size {
-		return fmt.Errorf("package size mismatch: metadata=%d actual=%d", meta.Package.Size, len(rawPkg))
+		return fmt.Errorf(
+			"package size mismatch: metadata=%d actual=%d",
+			meta.Package.Size,
+			len(rawPkg),
+		)
 	}
 	hexHash, err := parseSHA256Hash(meta.Package.SHA256)
 	if err != nil {

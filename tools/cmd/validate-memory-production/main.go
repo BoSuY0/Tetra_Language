@@ -20,8 +20,10 @@ import (
 )
 
 const (
-	memoryReleaseManifestSchema = "tetra.memory.release-manifest.v1"
-	memoryReleaseHashSchema     = "tetra.release-artifact-hashes.v1alpha1"
+	memoryReleaseManifestSchema          = "tetra.memory.release-manifest.v1"
+	memoryReleaseHashSchema              = "tetra.release-artifact-hashes.v1alpha1"
+	memoryRAMMeasurementSchema           = "tetra.memory.ram-measurement.v1"
+	maxMemoryReleaseJSONSchemaSniffBytes = 64 * 1024
 )
 
 type memoryReleaseManifest struct {
@@ -61,6 +63,61 @@ type memoryReleaseHashArtifact struct {
 	Schema string `json:"schema,omitempty"`
 }
 
+type memoryRAMMeasurementReport struct {
+	Schema        string                         `json:"schema"`
+	Status        string                         `json:"status"`
+	Target        string                         `json:"target"`
+	EvidenceClass string                         `json:"evidence_class"`
+	Method        string                         `json:"method"`
+	Tool          string                         `json:"tool,omitempty"`
+	GitHead       string                         `json:"git_head,omitempty"`
+	GeneratedAt   string                         `json:"generated_at,omitempty"`
+	BlockedReason string                         `json:"blocked_reason,omitempty"`
+	Summary       memoryRAMMeasurementSummary    `json:"summary,omitempty"`
+	MetricSamples []memoryRAMMetricSample        `json:"metric_samples,omitempty"`
+	Snapshots     []memoryRAMMeasurementSnapshot `json:"snapshots,omitempty"`
+}
+
+type memoryRAMMeasurementSummary struct {
+	HeapAllocBytes      uint64                       `json:"heap_alloc_bytes"`
+	BytesRequested      uint64                       `json:"bytes_requested"`
+	BytesReserved       uint64                       `json:"bytes_reserved"`
+	BytesCopied         uint64                       `json:"bytes_copied"`
+	RSSCurrentBytes     uint64                       `json:"rss_current_bytes"`
+	RSSPeakBytes        uint64                       `json:"rss_peak_bytes"`
+	PerActorDomainBytes []memoryRAMDomainMeasurement `json:"per_actor_domain_bytes,omitempty"`
+}
+
+type memoryRAMDomainMeasurement struct {
+	DomainID     string `json:"domain_id"`
+	CurrentBytes uint64 `json:"current_bytes"`
+	PeakBytes    uint64 `json:"peak_bytes,omitempty"`
+}
+
+type memoryRAMMetricSample struct {
+	Name              string `json:"name"`
+	EvidenceClass     string `json:"evidence_class"`
+	Method            string `json:"method"`
+	CurrentBytes      uint64 `json:"current_bytes,omitempty"`
+	PeakBytes         uint64 `json:"peak_bytes,omitempty"`
+	UnsupportedReason string `json:"unsupported_reason,omitempty"`
+	BlockedReason     string `json:"blocked_reason,omitempty"`
+}
+
+type memoryRAMMeasurementSnapshot struct {
+	Name              string  `json:"name"`
+	Timestamp         string  `json:"timestamp"`
+	AllocBytes        uint64  `json:"alloc_bytes"`
+	TotalAllocBytes   uint64  `json:"total_alloc_bytes"`
+	SysBytes          uint64  `json:"sys_bytes"`
+	HeapAllocBytes    uint64  `json:"heap_alloc_bytes"`
+	HeapSysBytes      uint64  `json:"heap_sys_bytes"`
+	HeapIdleBytes     uint64  `json:"heap_idle_bytes"`
+	HeapReleasedBytes uint64  `json:"heap_released_bytes"`
+	NumGC             uint32  `json:"num_gc"`
+	GCCPUFraction     float64 `json:"gc_cpu_fraction"`
+}
+
 type requiredMemoryReleaseArtifact struct {
 	Kind            string
 	Path            string
@@ -71,9 +128,17 @@ type requiredMemoryReleaseArtifact struct {
 
 func main() {
 	reportPath := flag.String("report", "", "path to tetra.memory.production.v1 JSON report")
-	manifestPath := flag.String("manifest", "", "path to tetra.memory.release-manifest.v1 JSON manifest")
+	manifestPath := flag.String(
+		"manifest",
+		"",
+		"path to tetra.memory.release-manifest.v1 JSON manifest",
+	)
 	reportDir := flag.String("report-dir", "", "memory release report directory")
-	currentGitHead := flag.String("current-git-head", "", "optional current git HEAD to require in release manifest provenance")
+	currentGitHead := flag.String(
+		"current-git-head",
+		"",
+		"optional current git HEAD to require in release manifest provenance",
+	)
 	flag.Parse()
 	if *reportPath == "" {
 		fmt.Fprintln(os.Stderr, "error: --report is required")
@@ -89,7 +154,12 @@ func main() {
 		if root == "" {
 			root = filepath.Dir(*manifestPath)
 		}
-		err = validateMemoryProductionReleaseManifest(*reportPath, *manifestPath, root, *currentGitHead)
+		err = validateMemoryProductionReleaseManifest(
+			*reportPath,
+			*manifestPath,
+			root,
+			*currentGitHead,
+		)
 	} else {
 		err = validateMemoryProductionReport(*reportPath)
 	}
@@ -107,7 +177,12 @@ func validateMemoryProductionReport(path string) error {
 	return memoryprod.ValidateReport(raw)
 }
 
-func validateMemoryProductionReleaseManifest(reportPath string, manifestPath string, reportDir string, currentGitHead string) error {
+func validateMemoryProductionReleaseManifest(
+	reportPath string,
+	manifestPath string,
+	reportDir string,
+	currentGitHead string,
+) error {
 	if strings.TrimSpace(manifestPath) == "" {
 		return fmt.Errorf("--manifest is required for release provenance validation")
 	}
@@ -132,11 +207,31 @@ func validateMemoryProductionReleaseManifest(reportPath string, manifestPath str
 	}
 
 	var issues []string
-	if cleanAbs(reportPathAbs) != cleanAbs(filepath.Join(reportDirAbs, "memory-production-linux-x64.json")) {
-		issues = append(issues, fmt.Sprintf("--report must be %s", filepath.Join(reportDir, "memory-production-linux-x64.json")))
+	if cleanAbs(
+		reportPathAbs,
+	) != cleanAbs(
+		filepath.Join(reportDirAbs, "memory-production-linux-x64.json"),
+	) {
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"--report must be %s",
+				filepath.Join(reportDir, "memory-production-linux-x64.json"),
+			),
+		)
 	}
-	if cleanAbs(manifestPathAbs) != cleanAbs(filepath.Join(reportDirAbs, "memory-release-manifest.json")) {
-		issues = append(issues, fmt.Sprintf("--manifest must be %s", filepath.Join(reportDir, "memory-release-manifest.json")))
+	if cleanAbs(
+		manifestPathAbs,
+	) != cleanAbs(
+		filepath.Join(reportDirAbs, "memory-release-manifest.json"),
+	) {
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"--manifest must be %s",
+				filepath.Join(reportDir, "memory-release-manifest.json"),
+			),
+		)
 	}
 
 	raw, err := os.ReadFile(manifestPath)
@@ -151,41 +246,75 @@ func validateMemoryProductionReleaseManifest(reportPath string, manifestPath str
 	issues = append(issues, validateMemoryReleaseCommands(manifest.Commands)...)
 	required := requiredMemoryReleaseArtifacts()
 	issues = append(issues, validateMemoryReleaseArtifacts(reportDirAbs, manifest, required)...)
-	issues = append(issues, validateMemoryReleaseHashManifest(reportDirAbs, manifest.HashManifest, required)...)
+	issues = append(
+		issues,
+		validateMemoryReleaseHashManifest(reportDirAbs, manifest.HashManifest, required)...)
 	issues = append(issues, validateMemoryReleaseIslandProofVerifier(reportDirAbs, manifest)...)
+	issues = append(issues, validateMemoryReleaseRAMMeasurement(reportDirAbs)...)
 	if len(issues) > 0 {
 		return errors.New(strings.Join(issues, "; "))
 	}
 	return nil
 }
 
-func validateMemoryReleaseManifestEnvelope(manifest memoryReleaseManifest, currentGitHead string) []string {
+func validateMemoryReleaseManifestEnvelope(
+	manifest memoryReleaseManifest,
+	currentGitHead string,
+) []string {
 	var issues []string
 	if manifest.Schema != memoryReleaseManifestSchema {
-		issues = append(issues, fmt.Sprintf("release manifest schema is %q, want %q", manifest.Schema, memoryReleaseManifestSchema))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"release manifest schema is %q, want %q",
+				manifest.Schema,
+				memoryReleaseManifestSchema,
+			),
+		)
 	}
 	if manifest.Target != "linux-x64" {
-		issues = append(issues, fmt.Sprintf("release manifest target is %q, want linux-x64", manifest.Target))
+		issues = append(
+			issues,
+			fmt.Sprintf("release manifest target is %q, want linux-x64", manifest.Target),
+		)
 	}
 	if !isMemoryReleaseGitHead(manifest.GitHead) {
-		issues = append(issues, "release manifest git_head must be a 40-character lowercase hex commit")
+		issues = append(
+			issues,
+			"release manifest git_head must be a 40-character lowercase hex commit",
+		)
 	}
 	currentGitHead = strings.TrimSpace(currentGitHead)
 	if currentGitHead != "" {
 		if !isMemoryReleaseGitHead(currentGitHead) {
 			issues = append(issues, "current git head must be a 40-character lowercase hex commit")
 		} else if manifest.GitHead != currentGitHead {
-			issues = append(issues, fmt.Sprintf("release manifest git_head %s does not match current git head %s", manifest.GitHead, currentGitHead))
+			issues = append(
+				issues,
+				fmt.Sprintf("release manifest git_head %s does not match current git head %s", manifest.GitHead, currentGitHead),
+			)
 		}
 	}
 	if _, err := time.Parse(time.RFC3339, manifest.GeneratedAt); err != nil {
-		issues = append(issues, fmt.Sprintf("release manifest generated_at must be RFC3339: %v", err))
+		issues = append(
+			issues,
+			fmt.Sprintf("release manifest generated_at must be RFC3339: %v", err),
+		)
 	}
 	if manifest.ReportDir != "." {
-		issues = append(issues, fmt.Sprintf("release manifest report_dir is %q, want .", manifest.ReportDir))
+		issues = append(
+			issues,
+			fmt.Sprintf("release manifest report_dir is %q, want .", manifest.ReportDir),
+		)
 	}
 	if manifest.HashManifest != "artifact-hashes.json" {
-		issues = append(issues, fmt.Sprintf("release manifest hash_manifest is %q, want artifact-hashes.json", manifest.HashManifest))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"release manifest hash_manifest is %q, want artifact-hashes.json",
+				manifest.HashManifest,
+			),
+		)
 	}
 	return issues
 }
@@ -216,10 +345,16 @@ func validateMemoryReleaseCommands(commands []memoryReleaseCommand) []string {
 		}
 		seen[name] = text
 		if text == "" {
-			issues = append(issues, fmt.Sprintf("release manifest command %s command is required", name))
+			issues = append(
+				issues,
+				fmt.Sprintf("release manifest command %s command is required", name),
+			)
 		}
 		if fragment, ok := required[name]; ok && !strings.Contains(text, fragment) {
-			issues = append(issues, fmt.Sprintf("release manifest command %s must contain %q", name, fragment))
+			issues = append(
+				issues,
+				fmt.Sprintf("release manifest command %s must contain %q", name, fragment),
+			)
 		}
 	}
 	for name, fragment := range required {
@@ -229,17 +364,27 @@ func validateMemoryReleaseCommands(commands []memoryReleaseCommand) []string {
 			continue
 		}
 		if strings.TrimSpace(text) == "" {
-			issues = append(issues, fmt.Sprintf("release manifest command %s command is required", name))
+			issues = append(
+				issues,
+				fmt.Sprintf("release manifest command %s command is required", name),
+			)
 			continue
 		}
 		if !strings.Contains(text, fragment) {
-			issues = append(issues, fmt.Sprintf("release manifest command %s must contain %q", name, fragment))
+			issues = append(
+				issues,
+				fmt.Sprintf("release manifest command %s must contain %q", name, fragment),
+			)
 		}
 	}
 	return issues
 }
 
-func validateMemoryReleaseArtifacts(reportDir string, manifest memoryReleaseManifest, required []requiredMemoryReleaseArtifact) []string {
+func validateMemoryReleaseArtifacts(
+	reportDir string,
+	manifest memoryReleaseManifest,
+	required []requiredMemoryReleaseArtifact,
+) []string {
 	var issues []string
 	byKind := map[string]memoryReleaseArtifact{}
 	seenPath := map[string]bool{}
@@ -249,19 +394,36 @@ func validateMemoryReleaseArtifacts(reportDir string, manifest memoryReleaseMani
 			continue
 		}
 		if _, ok := byKind[artifact.Kind]; ok {
-			issues = append(issues, fmt.Sprintf("duplicate release manifest artifact kind %s", artifact.Kind))
+			issues = append(
+				issues,
+				fmt.Sprintf("duplicate release manifest artifact kind %s", artifact.Kind),
+			)
 		}
 		byKind[artifact.Kind] = artifact
 		if err := validateMemoryReleaseSafeRel(artifact.Path); err != nil {
-			issues = append(issues, fmt.Sprintf("artifact %s path is invalid: %v", artifact.Kind, err))
+			issues = append(
+				issues,
+				fmt.Sprintf("artifact %s path is invalid: %v", artifact.Kind, err),
+			)
 			continue
 		}
 		if seenPath[artifact.Path] {
-			issues = append(issues, fmt.Sprintf("duplicate release manifest artifact path %s", artifact.Path))
+			issues = append(
+				issues,
+				fmt.Sprintf("duplicate release manifest artifact path %s", artifact.Path),
+			)
 		}
 		seenPath[artifact.Path] = true
 		if artifact.Target != manifest.Target {
-			issues = append(issues, fmt.Sprintf("%s target is %q, want %q", artifact.Kind, artifact.Target, manifest.Target))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"%s target is %q, want %q",
+					artifact.Kind,
+					artifact.Target,
+					manifest.Target,
+				),
+			)
 		}
 		if strings.TrimSpace(artifact.Command) == "" {
 			issues = append(issues, fmt.Sprintf("%s command is required", artifact.Kind))
@@ -274,30 +436,55 @@ func validateMemoryReleaseArtifacts(reportDir string, manifest memoryReleaseMani
 			continue
 		}
 		if artifact.Path != req.Path {
-			issues = append(issues, fmt.Sprintf("%s path is %q, want %s", req.Kind, artifact.Path, req.Path))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s path is %q, want %s", req.Kind, artifact.Path, req.Path),
+			)
 		}
 		if req.Schema != "" && artifact.Schema != req.Schema {
-			issues = append(issues, fmt.Sprintf("%s schema is %q, want %s", req.Kind, artifact.Schema, req.Schema))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s schema is %q, want %s", req.Kind, artifact.Schema, req.Schema),
+			)
 		}
-		if req.CommandFragment != "" && strings.TrimSpace(artifact.Command) != "" && !strings.Contains(artifact.Command, req.CommandFragment) {
-			issues = append(issues, fmt.Sprintf("%s command must contain %q", req.Kind, req.CommandFragment))
+		if req.CommandFragment != "" && strings.TrimSpace(artifact.Command) != "" &&
+			!strings.Contains(artifact.Command, req.CommandFragment) {
+			issues = append(
+				issues,
+				fmt.Sprintf("%s command must contain %q", req.Kind, req.CommandFragment),
+			)
 		}
 		path := filepath.Join(reportDir, filepath.FromSlash(req.Path))
 		if _, err := os.Stat(path); err != nil {
-			issues = append(issues, fmt.Sprintf("%s artifact %s is missing: %v", req.Kind, req.Path, err))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s artifact %s is missing: %v", req.Kind, req.Path, err),
+			)
 			continue
 		}
 		if req.Schema != "" {
 			actualSchema := detectMemoryReleaseJSONSchema(path)
 			if actualSchema != req.Schema {
-				issues = append(issues, fmt.Sprintf("%s artifact schema is %q, want %s", req.Kind, actualSchema, req.Schema))
+				issues = append(
+					issues,
+					fmt.Sprintf(
+						"%s artifact schema is %q, want %s",
+						req.Kind,
+						actualSchema,
+						req.Schema,
+					),
+				)
 			}
 		}
 	}
 	return issues
 }
 
-func validateMemoryReleaseHashManifest(reportDir string, manifestRel string, required []requiredMemoryReleaseArtifact) []string {
+func validateMemoryReleaseHashManifest(
+	reportDir string,
+	manifestRel string,
+	required []requiredMemoryReleaseArtifact,
+) []string {
 	if manifestRel == "" {
 		return []string{"release manifest hash_manifest is required"}
 	}
@@ -316,7 +503,14 @@ func validateMemoryReleaseHashManifest(reportDir string, manifestRel string, req
 
 	var issues []string
 	if manifest.Schema != memoryReleaseHashSchema {
-		issues = append(issues, fmt.Sprintf("artifact-hashes schema is %q, want %s", manifest.Schema, memoryReleaseHashSchema))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"artifact-hashes schema is %q, want %s",
+				manifest.Schema,
+				memoryReleaseHashSchema,
+			),
+		)
 	}
 	if manifest.Root != "." {
 		issues = append(issues, fmt.Sprintf("artifact-hashes root is %q, want .", manifest.Root))
@@ -329,7 +523,10 @@ func validateMemoryReleaseHashManifest(reportDir string, manifestRel string, req
 	lastPath := ""
 	for _, artifact := range manifest.Artifacts {
 		if err := validateMemoryReleaseSafeRel(artifact.Path); err != nil {
-			issues = append(issues, fmt.Sprintf("artifact-hashes path %q is invalid: %v", artifact.Path, err))
+			issues = append(
+				issues,
+				fmt.Sprintf("artifact-hashes path %q is invalid: %v", artifact.Path, err),
+			)
 			continue
 		}
 		if lastPath != "" && artifact.Path < lastPath {
@@ -337,7 +534,10 @@ func validateMemoryReleaseHashManifest(reportDir string, manifestRel string, req
 		}
 		lastPath = artifact.Path
 		if _, ok := byPath[artifact.Path]; ok {
-			issues = append(issues, fmt.Sprintf("duplicate hash manifest entry for %s", artifact.Path))
+			issues = append(
+				issues,
+				fmt.Sprintf("duplicate hash manifest entry for %s", artifact.Path),
+			)
 		}
 		if err := validateMemoryReleaseSHA256(artifact.SHA256, artifact.Path); err != nil {
 			issues = append(issues, err.Error())
@@ -368,13 +568,37 @@ func validateMemoryReleaseHashManifest(reportDir string, manifestRel string, req
 			continue
 		}
 		if actual.Size != expected.Size {
-			issues = append(issues, fmt.Sprintf("size mismatch for %s: got %d want %d", rel, actual.Size, expected.Size))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"size mismatch for %s: got %d want %d",
+					rel,
+					actual.Size,
+					expected.Size,
+				),
+			)
 		}
 		if actual.SHA256 != expected.SHA256 {
-			issues = append(issues, fmt.Sprintf("sha256 mismatch for %s: got %s want %s", rel, actual.SHA256, expected.SHA256))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"sha256 mismatch for %s: got %s want %s",
+					rel,
+					actual.SHA256,
+					expected.SHA256,
+				),
+			)
 		}
 		if actual.Schema != expected.Schema {
-			issues = append(issues, fmt.Sprintf("schema mismatch for %s: got %q want %q", rel, actual.Schema, expected.Schema))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"schema mismatch for %s: got %q want %q",
+					rel,
+					actual.Schema,
+					expected.Schema,
+				),
+			)
 		}
 	}
 	return issues
@@ -387,6 +611,13 @@ func requiredMemoryReleaseArtifacts() []requiredMemoryReleaseArtifact {
 			Path:            "memory-production-linux-x64.json",
 			Schema:          memoryprod.SchemaV1,
 			CommandFragment: "go run ./tools/cmd/memory-production-smoke",
+			RequireHash:     true,
+		},
+		{
+			Kind:            "ram_measurement_report",
+			Path:            "ram-measurement.json",
+			Schema:          memoryRAMMeasurementSchema,
+			CommandFragment: "--ram-measurement-report",
 			RequireHash:     true,
 		},
 		{
@@ -503,20 +734,359 @@ func requiredMemoryReleaseArtifacts() []requiredMemoryReleaseArtifact {
 	}
 }
 
-func validateMemoryReleaseIslandProofVerifier(reportDir string, manifest memoryReleaseManifest) []string {
+func validateMemoryReleaseRAMMeasurement(reportDir string) []string {
+	path := filepath.Join(reportDir, "ram-measurement.json")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return []string{
+			fmt.Sprintf("RAM measurement artifact ram-measurement.json is missing: %v", err),
+		}
+	}
+	var report memoryRAMMeasurementReport
+	if err := decodeMemoryReleaseStrictJSON(raw, &report); err != nil {
+		return []string{fmt.Sprintf("RAM measurement decode: %v", err)}
+	}
+	return validateMemoryRAMMeasurementReport(report)
+}
+
+func validateMemoryRAMMeasurementReport(report memoryRAMMeasurementReport) []string {
+	var issues []string
+	if report.Schema != memoryRAMMeasurementSchema {
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"RAM measurement schema is %q, want %s",
+				report.Schema,
+				memoryRAMMeasurementSchema,
+			),
+		)
+	}
+	if report.Target != "linux-x64" {
+		issues = append(
+			issues,
+			fmt.Sprintf("RAM measurement target is %q, want linux-x64", report.Target),
+		)
+	}
+	if !isMemoryRAMMeasurementMethod(report.Method) {
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"RAM measurement method is %q, want one of time_v, strace, MemStats, pprof",
+				report.Method,
+			),
+		)
+	}
+	switch report.Status {
+	case "blocked":
+		if report.EvidenceClass != "blocked" {
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"RAM measurement evidence_class is %q, want blocked for blocked status",
+					report.EvidenceClass,
+				),
+			)
+		}
+		if strings.TrimSpace(report.BlockedReason) == "" {
+			issues = append(issues, "RAM measurement blocked_reason is required for blocked status")
+		}
+		if len(report.Snapshots) != 0 {
+			issues = append(
+				issues,
+				"RAM measurement blocked status must not include runtime snapshots",
+			)
+		}
+		return issues
+	case "pass":
+		if report.EvidenceClass != "runtime_measured" {
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"RAM measurement evidence_class is %q, want runtime_measured for pass status",
+					report.EvidenceClass,
+				),
+			)
+		}
+		if strings.TrimSpace(report.BlockedReason) != "" {
+			issues = append(issues, "RAM measurement pass status must not include blocked_reason")
+		}
+	default:
+		issues = append(
+			issues,
+			fmt.Sprintf("RAM measurement status is %q, want pass or blocked", report.Status),
+		)
+		return issues
+	}
+	if strings.TrimSpace(report.GeneratedAt) == "" {
+		issues = append(issues, "RAM measurement generated_at is required for pass status")
+	} else if _, err := time.Parse(time.RFC3339, report.GeneratedAt); err != nil {
+		issues = append(issues, fmt.Sprintf("RAM measurement generated_at must be RFC3339: %v", err))
+	}
+	if report.Method != "MemStats" {
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"RAM measurement pass method %q has no parser in this validator yet",
+				report.Method,
+			),
+		)
+		return issues
+	}
+	issues = append(issues, validateMemoryRAMMeasurementSnapshots(report.Snapshots)...)
+	issues = append(
+		issues,
+		validateMemoryRAMMeasurementSummary(report.Summary, report.Snapshots)...)
+	issues = append(issues, validateMemoryRAMMetricSamples(report.MetricSamples)...)
+	return issues
+}
+
+func isMemoryRAMMeasurementMethod(method string) bool {
+	switch method {
+	case "time_v", "strace", "MemStats", "pprof":
+		return true
+	default:
+		return false
+	}
+}
+
+func validateMemoryRAMMeasurementSummary(
+	summary memoryRAMMeasurementSummary,
+	snapshots []memoryRAMMeasurementSnapshot,
+) []string {
+	var issues []string
+	if summary.HeapAllocBytes == 0 {
+		issues = append(issues, "RAM measurement summary heap_alloc_bytes must be positive")
+	}
+	if len(snapshots) > 0 {
+		last := snapshots[len(snapshots)-1]
+		if summary.HeapAllocBytes != last.HeapAllocBytes {
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"RAM measurement summary heap_alloc_bytes = %d, want last snapshot heap_alloc_bytes %d",
+					summary.HeapAllocBytes,
+					last.HeapAllocBytes,
+				),
+			)
+		}
+	}
+	if summary.RSSCurrentBytes != 0 || summary.RSSPeakBytes != 0 {
+		issues = append(
+			issues,
+			"RAM measurement summary RSS bytes require a runtime_measured RSS metric sample",
+		)
+	}
+	for _, domain := range summary.PerActorDomainBytes {
+		if strings.TrimSpace(domain.DomainID) == "" {
+			issues = append(issues, "RAM measurement per_actor_domain_bytes domain_id is required")
+		}
+		if domain.PeakBytes < domain.CurrentBytes {
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"RAM measurement actor domain %s peak_bytes must be >= current_bytes",
+					domain.DomainID,
+				),
+			)
+		}
+	}
+	return issues
+}
+
+func validateMemoryRAMMetricSamples(samples []memoryRAMMetricSample) []string {
+	required := map[string]bool{
+		"heap_alloc_bytes":       false,
+		"bytes_requested":        false,
+		"bytes_reserved":         false,
+		"bytes_copied":           false,
+		"rss_current":            false,
+		"rss_peak":               false,
+		"per_actor_domain_bytes": false,
+	}
+	var issues []string
+	if len(samples) == 0 {
+		return []string{"RAM measurement metric samples are required"}
+	}
+	seen := map[string]bool{}
+	for _, sample := range samples {
+		name := strings.TrimSpace(sample.Name)
+		if name == "" {
+			issues = append(issues, "RAM measurement metric sample name is required")
+			continue
+		}
+		if seen[name] {
+			issues = append(issues, fmt.Sprintf("RAM measurement duplicate metric sample %s", name))
+		}
+		seen[name] = true
+		if _, ok := required[name]; ok {
+			required[name] = true
+		}
+		issues = append(issues, validateMemoryRAMMetricSample(sample)...)
+	}
+	for name, ok := range required {
+		if !ok {
+			issues = append(issues, fmt.Sprintf("RAM measurement missing metric sample %s", name))
+		}
+	}
+	return issues
+}
+
+func validateMemoryRAMMetricSample(sample memoryRAMMetricSample) []string {
+	var issues []string
+	prefix := "RAM measurement metric sample " + strings.TrimSpace(sample.Name)
+	if strings.TrimSpace(sample.Method) == "" {
+		issues = append(issues, prefix+": method is required")
+	}
+	switch sample.EvidenceClass {
+	case "runtime_measured":
+		if !isMemoryRAMMeasurementMethod(sample.Method) {
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"%s: runtime_measured method is %q, want one of time_v, strace, MemStats, pprof",
+					prefix,
+					sample.Method,
+				),
+			)
+		}
+		if isRSSMetric(sample.Name) && sample.Method == "MemStats" {
+			issues = append(
+				issues,
+				fmt.Sprintf("%s: MemStats does not provide process RSS evidence", prefix),
+			)
+		}
+		if sample.CurrentBytes == 0 && sample.PeakBytes == 0 {
+			issues = append(
+				issues,
+				prefix+": runtime_measured sample requires current_bytes or peak_bytes",
+			)
+		}
+	case "allocation_report_estimate":
+		if sample.Method != "allocation_report_summary" {
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"%s: allocation_report_estimate method is %q, want allocation_report_summary",
+					prefix,
+					sample.Method,
+				),
+			)
+		}
+		if isRSSMetric(sample.Name) {
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"%s: allocation_report_estimate cannot be used as RSS evidence",
+					prefix,
+				),
+			)
+		}
+	case "unsupported":
+		if strings.TrimSpace(sample.UnsupportedReason) == "" {
+			issues = append(
+				issues,
+				prefix+": unsupported_reason is required for unsupported evidence",
+			)
+		}
+	case "blocked":
+		if strings.TrimSpace(sample.BlockedReason) == "" {
+			issues = append(issues, prefix+": blocked_reason is required for blocked evidence")
+		}
+	default:
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				("%s: evidence_class is %q, want runtime_measured, allocation_"+
+					"report_estimate, unsupported, or blocked"),
+				prefix,
+				sample.EvidenceClass,
+			),
+		)
+	}
+	return issues
+}
+
+func isRSSMetric(name string) bool {
+	return name == "rss_current" || name == "rss_peak"
+}
+
+func validateMemoryRAMMeasurementSnapshots(snapshots []memoryRAMMeasurementSnapshot) []string {
+	var issues []string
+	if len(snapshots) < 2 {
+		issues = append(
+			issues,
+			fmt.Sprintf("RAM measurement snapshots = %d, want at least 2", len(snapshots)),
+		)
+	}
+	seen := map[string]bool{}
+	for _, snapshot := range snapshots {
+		name := strings.TrimSpace(snapshot.Name)
+		if name == "" {
+			issues = append(issues, "RAM measurement snapshot name is required")
+		} else {
+			seen[name] = true
+		}
+		if strings.TrimSpace(snapshot.Timestamp) == "" {
+			issues = append(
+				issues,
+				fmt.Sprintf("RAM measurement snapshot %s timestamp is required", name),
+			)
+		} else if _, err := time.Parse(time.RFC3339, snapshot.Timestamp); err != nil {
+			issues = append(
+				issues,
+				fmt.Sprintf("RAM measurement snapshot %s timestamp must be RFC3339: %v", name, err),
+			)
+		}
+		if snapshot.SysBytes == 0 {
+			issues = append(
+				issues,
+				fmt.Sprintf("RAM measurement snapshot %s sys_bytes must be positive", name),
+			)
+		}
+		if snapshot.HeapSysBytes == 0 {
+			issues = append(
+				issues,
+				fmt.Sprintf("RAM measurement snapshot %s heap_sys_bytes must be positive", name),
+			)
+		}
+	}
+	for _, required := range []string{"start", "end"} {
+		if !seen[required] {
+			issues = append(issues, fmt.Sprintf("RAM measurement missing %s snapshot", required))
+		}
+	}
+	return issues
+}
+
+func validateMemoryReleaseIslandProofVerifier(
+	reportDir string,
+	manifest memoryReleaseManifest,
+) []string {
 	proofPath := filepath.Join(reportDir, "island-proof-verifier.json")
 	memoryPath := filepath.Join(reportDir, "island-proof-memory-report.json")
 	proofRaw, err := os.ReadFile(proofPath)
 	if err != nil {
-		return []string{fmt.Sprintf("island proof verifier artifact island-proof-verifier.json is missing: %v", err)}
+		return []string{
+			fmt.Sprintf(
+				"island proof verifier artifact island-proof-verifier.json is missing: %v",
+				err,
+			),
+		}
 	}
 	memoryRaw, err := os.ReadFile(memoryPath)
 	if err != nil {
-		return []string{fmt.Sprintf("island proof verifier memory report island-proof-memory-report.json is missing: %v", err)}
+		return []string{
+			fmt.Sprintf(
+				"island proof verifier memory report island-proof-memory-report.json is missing: %v",
+				err,
+			),
+		}
 	}
 	manifestRaw, err := json.Marshal(manifest)
 	if err != nil {
-		return []string{fmt.Sprintf("island proof verifier manifest metadata cannot be encoded: %v", err)}
+		return []string{
+			fmt.Sprintf("island proof verifier manifest metadata cannot be encoded: %v", err),
+		}
 	}
 	if err := islandproof.Validate(proofRaw, islandproof.Options{
 		MemoryReport:      memoryRaw,
@@ -577,16 +1147,27 @@ func validateMemoryReleaseSHA256(value string, path string) error {
 }
 
 func hashMemoryReleaseFile(root string, rel string) (memoryReleaseHashArtifact, error) {
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
+	path := filepath.Join(root, filepath.FromSlash(rel))
+	file, err := os.Open(path)
 	if err != nil {
 		return memoryReleaseHashArtifact{}, err
 	}
-	sum := sha256.Sum256(raw)
+	defer file.Close()
+	h := sha256.New()
+	prefix := newMemoryReleaseSchemaSniffPrefix(maxMemoryReleaseJSONSchemaSniffBytes)
+	size, err := io.Copy(io.MultiWriter(h, prefix), file)
+	if err != nil {
+		return memoryReleaseHashArtifact{}, err
+	}
 	return memoryReleaseHashArtifact{
 		Path:   rel,
-		SHA256: "sha256:" + hex.EncodeToString(sum[:]),
-		Size:   int64(len(raw)),
-		Schema: detectMemoryReleaseJSONSchema(filepath.Join(root, filepath.FromSlash(rel))),
+		SHA256: "sha256:" + hex.EncodeToString(h.Sum(nil)),
+		Size:   size,
+		Schema: detectMemoryReleaseJSONSchemaFromPrefix(
+			path,
+			prefix.Bytes(),
+			size > int64(prefix.Len()),
+		),
 	}, nil
 }
 
@@ -594,21 +1175,158 @@ func detectMemoryReleaseJSONSchema(path string) string {
 	if filepath.Ext(path) != ".json" {
 		return ""
 	}
-	raw, err := os.ReadFile(path)
+	file, err := os.Open(path)
 	if err != nil {
 		return ""
 	}
-	var envelope struct {
-		Schema        string `json:"schema"`
-		SchemaVersion string `json:"schema_version"`
-	}
-	if err := json.Unmarshal(raw, &envelope); err != nil {
+	defer file.Close()
+	prefix, truncated, err := readMemoryReleaseSchemaSniffPrefix(
+		file,
+		maxMemoryReleaseJSONSchemaSniffBytes,
+	)
+	if err != nil {
 		return ""
 	}
-	if envelope.Schema != "" {
-		return envelope.Schema
+	return detectMemoryReleaseJSONSchemaFromPrefix(path, prefix, truncated)
+}
+
+func readMemoryReleaseSchemaSniffPrefix(r io.Reader, maxBytes int64) ([]byte, bool, error) {
+	if maxBytes <= 0 {
+		return nil, false, nil
 	}
-	return envelope.SchemaVersion
+	raw, err := io.ReadAll(io.LimitReader(r, maxBytes+1))
+	if err != nil {
+		return nil, false, err
+	}
+	if int64(len(raw)) > maxBytes {
+		return raw[:maxBytes], true, nil
+	}
+	return raw, false, nil
+}
+
+func detectMemoryReleaseJSONSchemaFromPrefix(path string, prefix []byte, truncated bool) string {
+	if filepath.Ext(path) != ".json" {
+		return ""
+	}
+	return detectMemoryReleaseJSONSchemaPrefix(prefix, truncated)
+}
+
+func detectMemoryReleaseJSONSchemaPrefix(prefix []byte, truncated bool) string {
+	dec := json.NewDecoder(bytes.NewReader(prefix))
+	token, err := dec.Token()
+	if err != nil {
+		return memoryReleaseSchemaSniffAfterError("", truncated)
+	}
+	delim, ok := token.(json.Delim)
+	if !ok || delim != '{' {
+		return ""
+	}
+	var schema string
+	var schemaVersion string
+	for dec.More() {
+		token, err := dec.Token()
+		if err != nil {
+			return memoryReleaseSchemaSniffAfterError(schema, truncated)
+		}
+		key, ok := token.(string)
+		if !ok {
+			return ""
+		}
+		if key == "schema" || key == "schema_version" {
+			var raw json.RawMessage
+			if err := dec.Decode(&raw); err != nil {
+				return memoryReleaseSchemaSniffAfterError(schema, truncated)
+			}
+			value, ok, invalid := memoryReleaseSchemaSniffStringValue(raw)
+			if invalid {
+				return ""
+			}
+			if key == "schema" {
+				if ok {
+					schema = value
+				}
+			} else {
+				if ok {
+					schemaVersion = value
+				}
+			}
+			continue
+		}
+		var discard json.RawMessage
+		if err := dec.Decode(&discard); err != nil {
+			return memoryReleaseSchemaSniffAfterError(schema, truncated)
+		}
+	}
+	if _, err := dec.Token(); err != nil {
+		return memoryReleaseSchemaSniffAfterError(schema, truncated)
+	}
+	if truncated {
+		return ""
+	}
+	if err := memoryReleaseSchemaSniffRequireEOF(dec); err != nil {
+		return ""
+	}
+	if schema != "" {
+		return schema
+	}
+	return schemaVersion
+}
+
+type memoryReleaseSchemaSniffPrefix struct {
+	buf       bytes.Buffer
+	remaining int64
+}
+
+func newMemoryReleaseSchemaSniffPrefix(maxBytes int64) *memoryReleaseSchemaSniffPrefix {
+	return &memoryReleaseSchemaSniffPrefix{remaining: maxBytes}
+}
+
+func (w *memoryReleaseSchemaSniffPrefix) Write(p []byte) (int, error) {
+	if w.remaining > 0 {
+		n := len(p)
+		if int64(n) > w.remaining {
+			n = int(w.remaining)
+		}
+		_, _ = w.buf.Write(p[:n])
+		w.remaining -= int64(n)
+	}
+	return len(p), nil
+}
+
+func (w *memoryReleaseSchemaSniffPrefix) Bytes() []byte {
+	return w.buf.Bytes()
+}
+
+func (w *memoryReleaseSchemaSniffPrefix) Len() int {
+	return w.buf.Len()
+}
+
+func memoryReleaseSchemaSniffStringValue(raw json.RawMessage) (string, bool, bool) {
+	if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return "", false, false
+	}
+	var value string
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return "", false, true
+	}
+	return value, true, false
+}
+
+func memoryReleaseSchemaSniffRequireEOF(dec *json.Decoder) error {
+	if err := dec.Decode(&struct{}{}); err != io.EOF {
+		return fmt.Errorf("memory release JSON schema sniff must contain a single JSON document")
+	}
+	return nil
+}
+
+func memoryReleaseSchemaSniffAfterError(schema string, truncated bool) string {
+	if !truncated {
+		return ""
+	}
+	if schema != "" {
+		return schema
+	}
+	return ""
 }
 
 func isMemoryReleaseGitHead(value string) bool {

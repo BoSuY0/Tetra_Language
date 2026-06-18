@@ -1,0 +1,38 @@
+// Backend PostgreSQL frame total-length overflow guard microservice.
+module examples.microservices.backend.postgres.frame.backend_postgres_frame_total_overflow_guard_service
+import lib.core.postgres as pg
+
+func check_max_valid_total() -> Int
+uses alloc, mem:
+    var frame: []u8 = core.make_u8(5)
+    frame[0] = pg.frame_data_row()
+    if pg.write_i32_be_at(frame, 1, 2147483646) != 5:
+        return 10
+    if pg.frame_length_at(frame, 0) != 2147483646:
+        return 11
+    if pg.frame_payload_len_at(frame, 0) != 2147483642:
+        return 12
+    if pg.frame_total_len_at(frame, 0) != 2147483647:
+        return 13
+    return 0
+
+func check_overflow_total() -> Int
+uses alloc, mem:
+    var frame: []u8 = core.make_u8(5)
+    frame[0] = pg.frame_data_row()
+    if pg.write_i32_be_at(frame, 1, 2147483647) != 5:
+        return 20
+    if pg.frame_length_at(frame, 0) != 2147483647:
+        return 21
+    if pg.frame_payload_len_at(frame, 0) != 2147483643:
+        return 22
+    if pg.frame_total_len_at(frame, 0) != -1:
+        return 23
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    let max_valid: Int = check_max_valid_total()
+    if max_valid != 0:
+        return max_valid
+    return check_overflow_total()

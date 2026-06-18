@@ -20,7 +20,8 @@ const (
 	scopeP19PostgresSourceFirst = "p19.3_postgres_source_first"
 	scopeP20BenchmarkMatrix     = "p20.0_benchmark_matrix"
 	scopeP15ActorBenchmarkPrep  = "p15_actor_benchmark_prep"
-	p19GenericCollectionsAlgoID = "p19.1.generic_collections.hash_table.parallel_slice_linear_lookup_i32"
+	p19GenericCollectionsAlgoID = ("p19.1.generic_collections.hash_table.parallel_slice_" +
+		"linear_lookup_i32")
 )
 
 type Manifest struct {
@@ -91,7 +92,11 @@ type ReportArtifact struct {
 func main() {
 	manifestPath := flag.String("manifest", "", "benchmark manifest JSON")
 	outPath := flag.String("out", "", "output report JSON")
-	claimTiersOutPath := flag.String("claim-tiers-out", "", "write the P20.2 claim-tier policy report JSON")
+	claimTiersOutPath := flag.String(
+		"claim-tiers-out",
+		"",
+		"write the P20.2 claim-tier policy report JSON",
+	)
 	run := flag.Bool("run", false, "run build and benchmark commands instead of dry-run reporting")
 	timeout := flag.Duration("timeout", 30*time.Second, "per-command timeout")
 	flag.Parse()
@@ -114,7 +119,10 @@ func main() {
 		return
 	}
 	if *manifestPath == "" || *outPath == "" {
-		fmt.Fprintln(os.Stderr, "usage: truth-bench-harness --manifest manifest.json --out report.json [--run]")
+		fmt.Fprintln(
+			os.Stderr,
+			"usage: truth-bench-harness --manifest manifest.json --out report.json [--run]",
+		)
 		os.Exit(2)
 	}
 	manifest, err := readManifest(*manifestPath)
@@ -173,29 +181,61 @@ func validateManifest(manifest Manifest) error {
 			return fmt.Errorf("benchmark %d missing name", i)
 		}
 		if !policyCategory(policy, bench.Category) {
-			return fmt.Errorf("benchmark %s has unsupported category %q for scope %q", bench.Name, bench.Category, policy.Scope)
+			return fmt.Errorf(
+				"benchmark %s has unsupported category %q for scope %q",
+				bench.Name,
+				bench.Category,
+				policy.Scope,
+			)
 		}
 		if !policyLanguage(policy, bench.Language) {
-			return fmt.Errorf("benchmark %s has unsupported language %q for scope %q", bench.Name, bench.Language, policy.Scope)
+			return fmt.Errorf(
+				"benchmark %s has unsupported language %q for scope %q",
+				bench.Name,
+				bench.Language,
+				policy.Scope,
+			)
 		}
 		key := bench.Category + "\x00" + bench.Language
 		if seen[key] {
-			return fmt.Errorf("duplicate benchmark matrix row for category %q language %q", bench.Category, bench.Language)
+			return fmt.Errorf(
+				"duplicate benchmark matrix row for category %q language %q",
+				bench.Category,
+				bench.Language,
+			)
 		}
 		seen[key] = true
 		if policy.RequireEquivalenceMetadata {
 			if strings.TrimSpace(bench.AlgorithmID) == "" {
-				return fmt.Errorf("benchmark %s missing algorithm_id for scope %q", bench.Name, policy.Scope)
+				return fmt.Errorf(
+					"benchmark %s missing algorithm_id for scope %q",
+					bench.Name,
+					policy.Scope,
+				)
 			}
 			if strings.TrimSpace(bench.InputDescription) == "" {
-				return fmt.Errorf("benchmark %s missing input_description for scope %q", bench.Name, policy.Scope)
+				return fmt.Errorf(
+					"benchmark %s missing input_description for scope %q",
+					bench.Name,
+					policy.Scope,
+				)
 			}
 			if prev, ok := equivalence[bench.Category]; ok {
 				if bench.AlgorithmID != prev.algorithm {
-					return fmt.Errorf("benchmark %s algorithm_id = %q, want equivalent %q for category %q", bench.Name, bench.AlgorithmID, prev.algorithm, bench.Category)
+					return fmt.Errorf(
+						"benchmark %s algorithm_id = %q, want equivalent %q for category %q",
+						bench.Name,
+						bench.AlgorithmID,
+						prev.algorithm,
+						bench.Category,
+					)
 				}
 				if bench.InputDescription != prev.input {
-					return fmt.Errorf("benchmark %s input_description differs from equivalent category %q", bench.Name, bench.Category)
+					return fmt.Errorf(
+						"benchmark %s input_description differs from equivalent category %q",
+						bench.Name,
+						bench.Category,
+					)
 				}
 			} else {
 				equivalence[bench.Category] = struct {
@@ -214,17 +254,29 @@ func validateManifest(manifest Manifest) error {
 			return fmt.Errorf("benchmark %s missing run command", bench.Name)
 		}
 		if policy.RequireRawOutputArtifacts && len(bench.RawOutputArtifacts) == 0 {
-			return fmt.Errorf("benchmark %s missing raw output artifact paths for scope %q", bench.Name, policy.Scope)
+			return fmt.Errorf(
+				"benchmark %s missing raw output artifact paths for scope %q",
+				bench.Name,
+				policy.Scope,
+			)
 		}
 		if err := validateP8BuildCommand(bench); err != nil {
 			return err
 		}
 		if bench.Language == "tetra" {
-			if len(bench.TetraProofReports) == 0 || len(bench.TetraAllocationReports) == 0 || len(bench.TetraBoundsReports) == 0 {
-				return fmt.Errorf("benchmark %s is Tetra and must list proof, allocation, and bounds report artifacts", bench.Name)
+			if len(bench.TetraProofReports) == 0 || len(bench.TetraAllocationReports) == 0 ||
+				len(bench.TetraBoundsReports) == 0 {
+				return fmt.Errorf(
+					"benchmark %s is Tetra and must list proof, allocation, and bounds report artifacts",
+					bench.Name,
+				)
 			}
 			if policy.RequireTetraReports && len(bench.TetraReports) == 0 {
-				return fmt.Errorf("benchmark %s is Tetra and must list performance report artifacts for scope %q", bench.Name, policy.Scope)
+				return fmt.Errorf(
+					"benchmark %s is Tetra and must list performance report artifacts for scope %q",
+					bench.Name,
+					policy.Scope,
+				)
 			}
 		}
 	}
@@ -232,7 +284,11 @@ func validateManifest(manifest Manifest) error {
 		for _, language := range policy.Languages {
 			key := category + "\x00" + language
 			if !seen[key] {
-				return fmt.Errorf("missing benchmark matrix row for category %q language %q", category, language)
+				return fmt.Errorf(
+					"missing benchmark matrix row for category %q language %q",
+					category,
+					language,
+				)
 			}
 		}
 	}
@@ -247,8 +303,16 @@ func buildReport(manifest Manifest, run bool, timeout time.Duration) (Report, er
 		Schema:    schemaV1,
 		Scope:     normalizeBenchmarkScope(manifest.Scope),
 		Generated: time.Now().UTC().Format(time.RFC3339),
-		Host:      HostInfo{GOOS: runtime.GOOS, GOARCH: runtime.GOARCH, CPUs: runtime.NumCPU(), TargetCPU: detectTargetCPU()},
-		Claims:    []string{"No global performance claim is made by this harness; compare only recorded benchmark rows under their captured commands and host."},
+		Host: HostInfo{
+			GOOS:      runtime.GOOS,
+			GOARCH:    runtime.GOARCH,
+			CPUs:      runtime.NumCPU(),
+			TargetCPU: detectTargetCPU(),
+		},
+		Claims: []string{
+			("No global performance claim is made by this harness; compare " +
+				"only recorded benchmark rows under their captured commands and host."),
+		},
 	}
 	for _, bench := range manifest.Benchmarks {
 		row := BenchmarkResult{
@@ -305,7 +369,8 @@ func validateReport(report Report) error {
 	if strings.TrimSpace(report.Generated) == "" {
 		return fmt.Errorf("generated timestamp is required")
 	}
-	if report.Host.GOOS == "" || report.Host.GOARCH == "" || report.Host.CPUs <= 0 || strings.TrimSpace(report.Host.TargetCPU) == "" {
+	if report.Host.GOOS == "" || report.Host.GOARCH == "" || report.Host.CPUs <= 0 ||
+		strings.TrimSpace(report.Host.TargetCPU) == "" {
 		return fmt.Errorf("host metadata is incomplete: %+v", report.Host)
 	}
 	if err := validateClaims(report.Claims); err != nil {
@@ -317,27 +382,50 @@ func validateReport(report Report) error {
 		input     string
 	}{}
 	for _, row := range report.Benchmarks {
-		if row.Name == "" || !policyCategory(policy, row.Category) || !policyLanguage(policy, row.Language) {
+		if row.Name == "" || !policyCategory(policy, row.Category) ||
+			!policyLanguage(policy, row.Language) {
 			return fmt.Errorf("invalid benchmark row identity: %+v", row)
 		}
 		key := row.Category + "\x00" + row.Language
 		if seen[key] {
-			return fmt.Errorf("duplicate benchmark matrix row for category %q language %q", row.Category, row.Language)
+			return fmt.Errorf(
+				"duplicate benchmark matrix row for category %q language %q",
+				row.Category,
+				row.Language,
+			)
 		}
 		seen[key] = true
 		if policy.RequireEquivalenceMetadata {
 			if strings.TrimSpace(row.AlgorithmID) == "" {
-				return fmt.Errorf("benchmark %s missing algorithm_id for scope %q", row.Name, policy.Scope)
+				return fmt.Errorf(
+					"benchmark %s missing algorithm_id for scope %q",
+					row.Name,
+					policy.Scope,
+				)
 			}
 			if strings.TrimSpace(row.InputDescription) == "" {
-				return fmt.Errorf("benchmark %s missing input_description for scope %q", row.Name, policy.Scope)
+				return fmt.Errorf(
+					"benchmark %s missing input_description for scope %q",
+					row.Name,
+					policy.Scope,
+				)
 			}
 			if prev, ok := equivalence[row.Category]; ok {
 				if row.AlgorithmID != prev.algorithm {
-					return fmt.Errorf("benchmark %s algorithm_id = %q, want equivalent %q for category %q", row.Name, row.AlgorithmID, prev.algorithm, row.Category)
+					return fmt.Errorf(
+						"benchmark %s algorithm_id = %q, want equivalent %q for category %q",
+						row.Name,
+						row.AlgorithmID,
+						prev.algorithm,
+						row.Category,
+					)
 				}
 				if row.InputDescription != prev.input {
-					return fmt.Errorf("benchmark %s input_description differs from equivalent category %q", row.Name, row.Category)
+					return fmt.Errorf(
+						"benchmark %s input_description differs from equivalent category %q",
+						row.Name,
+						row.Category,
+					)
 				}
 			} else {
 				equivalence[row.Category] = struct {
@@ -350,7 +438,12 @@ func validateReport(report Report) error {
 			return fmt.Errorf("benchmark %s missing compiler version or target CPU", row.Name)
 		}
 		if row.TargetCPU != report.Host.TargetCPU {
-			return fmt.Errorf("benchmark %s target CPU = %q, want host target CPU %q", row.Name, row.TargetCPU, report.Host.TargetCPU)
+			return fmt.Errorf(
+				"benchmark %s target CPU = %q, want host target CPU %q",
+				row.Name,
+				row.TargetCPU,
+				report.Host.TargetCPU,
+			)
 		}
 		if strings.TrimSpace(row.BuildCommand) == "" || strings.TrimSpace(row.RunCommand) == "" {
 			return fmt.Errorf("benchmark %s missing build or run command", row.Name)
@@ -370,7 +463,11 @@ func validateReport(report Report) error {
 			if err := validateArtifactsExist(row.Name, "proof", row.TetraProofReports); err != nil {
 				return err
 			}
-			if err := validateArtifactsExist(row.Name, "allocation", row.TetraAllocationReports); err != nil {
+			if err := validateArtifactsExist(
+				row.Name,
+				"allocation",
+				row.TetraAllocationReports,
+			); err != nil {
 				return err
 			}
 			if err := validateArtifactsExist(row.Name, "bounds", row.TetraBoundsReports); err != nil {
@@ -387,7 +484,11 @@ func validateReport(report Report) error {
 		for _, language := range policy.Languages {
 			key := category + "\x00" + language
 			if !seen[key] {
-				return fmt.Errorf("missing benchmark matrix row for category %q language %q", category, language)
+				return fmt.Errorf(
+					"missing benchmark matrix row for category %q language %q",
+					category,
+					language,
+				)
 			}
 		}
 	}
@@ -465,8 +566,13 @@ func policyForBenchmarkScope(scope string) (benchmarkMatrixPolicy, error) {
 		}, nil
 	case scopeP19PostgresSourceFirst:
 		return benchmarkMatrixPolicy{
-			Scope:                      scopeP19PostgresSourceFirst,
-			Categories:                 []string{"DB single query", "DB multiple queries", "DB updates", "DB fortunes"},
+			Scope: scopeP19PostgresSourceFirst,
+			Categories: []string{
+				"DB single query",
+				"DB multiple queries",
+				"DB updates",
+				"DB fortunes",
+			},
 			Languages:                  []string{"tetra"},
 			RequireEquivalenceMetadata: true,
 			RequireTetraReports:        true,
@@ -597,7 +703,10 @@ func validateP8BuildCommand(bench BenchmarkSpec) error {
 	switch bench.Language {
 	case "tetra":
 		if bench.BuildCommand[0] != "tetra" || !containsArg(bench.BuildCommand, "--explain") {
-			return fmt.Errorf("benchmark %s Tetra build command must start with tetra and include --explain", bench.Name)
+			return fmt.Errorf(
+				"benchmark %s Tetra build command must start with tetra and include --explain",
+				bench.Name,
+			)
 		}
 	case "c":
 		if bench.BuildCommand[0] != "clang" || !containsArg(bench.BuildCommand, "-O3") {
@@ -609,7 +718,10 @@ func validateP8BuildCommand(bench BenchmarkSpec) error {
 		}
 	case "rust":
 		if bench.BuildCommand[0] != "rustc" || !containsRustOptLevel3(bench.BuildCommand) {
-			return fmt.Errorf("benchmark %s Rust build command must use rustc -C opt-level=3", bench.Name)
+			return fmt.Errorf(
+				"benchmark %s Rust build command must use rustc -C opt-level=3",
+				bench.Name,
+			)
 		}
 	}
 	return nil
@@ -646,7 +758,12 @@ func validateArtifactsExist(benchmark string, kind string, artifacts []ReportArt
 	}
 	for _, artifact := range artifacts {
 		if strings.TrimSpace(artifact.Path) == "" || !artifact.Exists {
-			return fmt.Errorf("benchmark %s has missing %s report artifact %q", benchmark, kind, artifact.Path)
+			return fmt.Errorf(
+				"benchmark %s has missing %s report artifact %q",
+				benchmark,
+				kind,
+				artifact.Path,
+			)
 		}
 	}
 	return nil
@@ -674,7 +791,13 @@ func containsForbiddenCPlusPlusRustParityClaim(lower string) bool {
 	if isExplicitNonClaimSentence(lower) {
 		return false
 	}
-	for _, safe := range []string{"not claimed", "not proven", "not implied", "does not claim", "no c++/rust parity"} {
+	for _, safe := range []string{
+		"not claimed",
+		"not proven",
+		"not implied",
+		"does not claim",
+		"no c++/rust parity",
+	} {
 		if strings.Contains(lower, safe) {
 			return false
 		}

@@ -9,7 +9,7 @@ branch=""
 remote_url=""
 
 usage() {
-  cat <<'USAGE'
+  cat << 'USAGE'
 Usage: bash scripts/release/full_platform/target-host-evidence-request.sh [--out-dir DIR] [--repo OWNER/REPO] [--branch BRANCH]
 
 Writes a target-host evidence request bundle for real Windows/macOS UI runtime
@@ -47,7 +47,7 @@ while [[ $# -gt 0 ]]; do
       branch="$2"
       shift 2
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;
@@ -62,7 +62,7 @@ done
 cd "$repo_root"
 
 if [[ -z "$repo" ]]; then
-  remote_url="$(git remote get-url origin 2>/dev/null || true)"
+  remote_url="$(git remote get-url origin 2> /dev/null || true)"
   repo="$(printf '%s' "$remote_url" | sed -E 's#^git@github.com:##; s#^https://github.com/##; s#\.git$##')"
 fi
 if [[ -z "$branch" ]]; then
@@ -72,14 +72,14 @@ if [[ -z "$repo" || "$repo" == "$remote_url" ]]; then
   echo "error: could not infer GitHub repo; pass --repo OWNER/REPO" >&2
   exit 2
 fi
-if ! command -v jq >/dev/null 2>&1; then
+if ! command -v jq > /dev/null 2>&1; then
   echo "error: jq is required for target-host evidence request generation" >&2
   exit 2
 fi
 
 mkdir -p "$out_dir"
 
-version="$("./tetra" version 2>/dev/null || go run ./cli/cmd/tetra version)"
+version="$("./tetra" version 2> /dev/null || go run ./cli/cmd/tetra version)"
 git_head="$(git rev-parse HEAD)"
 request_json="$out_dir/target-host-evidence-request.json"
 request_readme="$out_dir/README.md"
@@ -123,9 +123,9 @@ jq -n \
       host_requirement: "Linux aggregation host with the same Git commit checked out",
       command: $aggregationCommand
     }
-  }' >"$request_json"
+  }' > "$request_json"
 
-cat >"$request_readme" <<EOF
+cat > "$request_readme" << EOF
 # Full-Platform UI Runtime Target-Host Evidence Request
 
 This bundle is not runtime evidence. It records the exact commit and commands

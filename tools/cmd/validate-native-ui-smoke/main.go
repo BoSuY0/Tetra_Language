@@ -119,7 +119,11 @@ func validateNativeUISmoke(raw []byte) error {
 		return fmt.Errorf("native UI ui_schema = %q, want %q", report.UISchema, uiBundleSchemaV1)
 	}
 	if report.Runtime != nativeUIRuntimeDispatch {
-		return fmt.Errorf("native UI runtime = %q, want %q", report.Runtime, nativeUIRuntimeDispatch)
+		return fmt.Errorf(
+			"native UI runtime = %q, want %q",
+			report.Runtime,
+			nativeUIRuntimeDispatch,
+		)
 	}
 	if len(report.States) == 0 {
 		return fmt.Errorf("native UI report missing states")
@@ -206,11 +210,19 @@ func validateNativeUIView(view nativeUIViewTrace, stateNames map[string]bool) er
 			return fmt.Errorf("view %s event %s missing operations", view.Name, event.Name)
 		}
 		if len(event.Bindings) == 0 {
-			return fmt.Errorf("view %s event %s missing post-dispatch bindings", view.Name, event.Name)
+			return fmt.Errorf(
+				"view %s event %s missing post-dispatch bindings",
+				view.Name,
+				event.Name,
+			)
 		}
 		for _, op := range event.Operations {
 			if op.Kind == "" || op.Target == "" || op.StateField == "" || op.StateValue == "" {
-				return fmt.Errorf("view %s event %s has incomplete operation trace", view.Name, event.Name)
+				return fmt.Errorf(
+					"view %s event %s has incomplete operation trace",
+					view.Name,
+					event.Name,
+				)
 			}
 		}
 	}

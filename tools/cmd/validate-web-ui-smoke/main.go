@@ -120,13 +120,20 @@ func main() {
 	var reportPath string
 	var uiSchemaArtifactPath string
 	flag.StringVar(&reportPath, "report", "", "path to web UI smoke JSON report")
-	flag.StringVar(&uiSchemaArtifactPath, "ui-schema-artifact", defaultUIBundleSchemaArtifactPath, "path to tetra.ui.v1 JSON Schema artifact")
+	flag.StringVar(
+		&uiSchemaArtifactPath,
+		"ui-schema-artifact",
+		defaultUIBundleSchemaArtifactPath,
+		"path to tetra.ui.v1 JSON Schema artifact",
+	)
 	flag.Parse()
 	if reportPath == "" {
 		fmt.Fprintln(os.Stderr, "error: --report is required")
 		os.Exit(2)
 	}
-	if err := validateUIBundleSchemaArtifact(resolveUIBundleSchemaArtifactPath(uiSchemaArtifactPath)); err != nil {
+	if err := validateUIBundleSchemaArtifact(
+		resolveUIBundleSchemaArtifactPath(uiSchemaArtifactPath),
+	); err != nil {
 		fmt.Fprintf(os.Stderr, "web UI smoke UI metadata schema artifact invalid: %v\n", err)
 		os.Exit(1)
 	}
@@ -140,7 +147,11 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err := validateWebUISmokeReportAt(report, time.Now().UTC(), defaultMaxWebUISmokeAge); err != nil {
+	if err := validateWebUISmokeReportAt(
+		report,
+		time.Now().UTC(),
+		defaultMaxWebUISmokeAge,
+	); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -150,7 +161,11 @@ func validateWebUISmokeReport(report webUISmokeReport) error {
 	return validateWebUISmokeReportAt(report, time.Time{}, 0)
 }
 
-func validateWebUISmokeReportAt(report webUISmokeReport, now time.Time, maxAge time.Duration) error {
+func validateWebUISmokeReportAt(
+	report webUISmokeReport,
+	now time.Time,
+	maxAge time.Duration,
+) error {
 	if report.Schema != webUISmokeSchema {
 		return fmt.Errorf("web UI smoke schema = %q, want %q", report.Schema, webUISmokeSchema)
 	}
@@ -167,10 +182,18 @@ func validateWebUISmokeReportAt(report webUISmokeReport, now time.Time, maxAge t
 		}
 		now = now.UTC()
 		if generatedAt.After(now.Add(5 * time.Minute)) {
-			return fmt.Errorf("web UI smoke generated_at %s is in the future relative to %s", generatedAt.Format(time.RFC3339), now.Format(time.RFC3339))
+			return fmt.Errorf(
+				"web UI smoke generated_at %s is in the future relative to %s",
+				generatedAt.Format(time.RFC3339),
+				now.Format(time.RFC3339),
+			)
 		}
 		if now.Sub(generatedAt) > maxAge {
-			return fmt.Errorf("web UI smoke generated_at %s is stale; max age is %s", generatedAt.Format(time.RFC3339), maxAge)
+			return fmt.Errorf(
+				"web UI smoke generated_at %s is stale; max age is %s",
+				generatedAt.Format(time.RFC3339),
+				maxAge,
+			)
 		}
 	}
 	if report.Target != "wasm32-web" {
@@ -200,7 +223,11 @@ func validateWebUISmokeReportAt(report webUISmokeReport, now time.Time, maxAge t
 			return err
 		}
 		if report.UISchema != uiBundleSchema {
-			return fmt.Errorf("web UI smoke pass ui_schema = %q, want %q", report.UISchema, uiBundleSchema)
+			return fmt.Errorf(
+				"web UI smoke pass ui_schema = %q, want %q",
+				report.UISchema,
+				uiBundleSchema,
+			)
 		}
 		if report.UIBundlePath == "" || !strings.HasSuffix(report.UIBundlePath, ".ui.json") {
 			return fmt.Errorf("web UI smoke pass must include ui_bundle_path ending with .ui.json")
@@ -213,7 +240,9 @@ func validateWebUISmokeReportAt(report webUISmokeReport, now time.Time, maxAge t
 			return err
 		}
 		if report.UIModulePath == "" || !strings.HasSuffix(report.UIModulePath, ".ui.web.mjs") {
-			return fmt.Errorf("web UI smoke pass must include ui_module_path ending with .ui.web.mjs")
+			return fmt.Errorf(
+				"web UI smoke pass must include ui_module_path ending with .ui.web.mjs",
+			)
 		}
 		if err := requireRegularFile(report.UIModulePath, "ui_module_path"); err != nil {
 			return err
@@ -336,7 +365,16 @@ func validateUIBundleSchemaArtifact(path string) error {
 			return fmt.Errorf("%s missing property contract for %q", path, required)
 		}
 	}
-	for _, def := range []string{"state", "stateField", "view", "binding", "event", "command", "commandOperation", "typedValue"} {
+	for _, def := range []string{
+		"state",
+		"stateField",
+		"view",
+		"binding",
+		"event",
+		"command",
+		"commandOperation",
+		"typedValue",
+	} {
 		if _, ok := schema.Defs[def]; !ok {
 			return fmt.Errorf("%s missing $defs.%s", path, def)
 		}
@@ -358,17 +396,29 @@ func requireRegularFile(path string, field string) error {
 func validateUIBundleArtifact(path string) (uiBundleArtifact, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return uiBundleArtifact{}, fmt.Errorf("web UI smoke pass cannot read ui_bundle_path: %w", err)
+		return uiBundleArtifact{}, fmt.Errorf(
+			"web UI smoke pass cannot read ui_bundle_path: %w",
+			err,
+		)
 	}
 	var bundle uiBundleArtifact
 	if err := decodeStrictJSON(raw, &bundle); err != nil {
-		return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui_bundle_path is not strict tetra.ui.v1 metadata: %w", err)
+		return uiBundleArtifact{}, fmt.Errorf(
+			"web UI smoke ui_bundle_path is not strict tetra.ui.v1 metadata: %w",
+			err,
+		)
 	}
 	if bundle.Schema != uiBundleSchema {
-		return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle schema = %q, want %q", bundle.Schema, uiBundleSchema)
+		return uiBundleArtifact{}, fmt.Errorf(
+			"web UI smoke ui bundle schema = %q, want %q",
+			bundle.Schema,
+			uiBundleSchema,
+		)
 	}
 	if len(bundle.Views) == 0 {
-		return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle must include at least one view")
+		return uiBundleArtifact{}, fmt.Errorf(
+			"web UI smoke ui bundle must include at least one view",
+		)
 	}
 	stateNames := map[string]bool{}
 	for _, state := range bundle.States {
@@ -381,17 +431,31 @@ func validateUIBundleArtifact(path string) (uiBundleArtifact, error) {
 			state.Name = parts[len(parts)-1]
 		}
 		if stateNames[state.Name] {
-			return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle duplicate state %s", state.Name)
+			return uiBundleArtifact{}, fmt.Errorf(
+				"web UI smoke ui bundle duplicate state %s",
+				state.Name,
+			)
 		}
 		for _, field := range state.Fields {
 			if field.Name == "" {
-				return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle state %s has field missing name", state.Name)
+				return uiBundleArtifact{}, fmt.Errorf(
+					"web UI smoke ui bundle state %s has field missing name",
+					state.Name,
+				)
 			}
 			if field.Type == "" {
-				return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle state %s field %s missing type", state.Name, field.Name)
+				return uiBundleArtifact{}, fmt.Errorf(
+					"web UI smoke ui bundle state %s field %s missing type",
+					state.Name,
+					field.Name,
+				)
 			}
 			if field.Init == "" {
-				return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle state %s field %s missing init", state.Name, field.Name)
+				return uiBundleArtifact{}, fmt.Errorf(
+					"web UI smoke ui bundle state %s field %s missing init",
+					state.Name,
+					field.Name,
+				)
 			}
 		}
 		stateNames[state.Name] = true
@@ -406,108 +470,204 @@ func validateUIBundleArtifact(path string) (uiBundleArtifact, error) {
 			view.Name = parts[len(parts)-1]
 		}
 		if view.StateType == "" {
-			return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle view %s missing state_type", view.Name)
+			return uiBundleArtifact{}, fmt.Errorf(
+				"web UI smoke ui bundle view %s missing state_type",
+				view.Name,
+			)
 		}
 		if strings.Contains(view.StateType, ".") {
 			parts := strings.Split(view.StateType, ".")
 			view.StateType = parts[len(parts)-1]
 		}
 		if len(stateNames) > 0 && !stateNames[view.StateType] {
-			return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle view %s references unknown state_type %s", view.Name, view.StateType)
+			return uiBundleArtifact{}, fmt.Errorf(
+				"web UI smoke ui bundle view %s references unknown state_type %s",
+				view.Name,
+				view.StateType,
+			)
 		}
 		seenBindings := map[string]bool{}
 		for _, binding := range view.Bindings {
 			if binding.Name == "" {
-				return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle view %s has binding missing name", view.Name)
+				return uiBundleArtifact{}, fmt.Errorf(
+					"web UI smoke ui bundle view %s has binding missing name",
+					view.Name,
+				)
 			}
 			if binding.Type == "" {
-				return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle view %s binding %s missing type", view.Name, binding.Name)
+				return uiBundleArtifact{}, fmt.Errorf(
+					"web UI smoke ui bundle view %s binding %s missing type",
+					view.Name,
+					binding.Name,
+				)
 			}
 			if binding.Source == "" {
-				return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle view %s binding %s missing source", view.Name, binding.Name)
+				return uiBundleArtifact{}, fmt.Errorf(
+					"web UI smoke ui bundle view %s binding %s missing source",
+					view.Name,
+					binding.Name,
+				)
 			}
 			if seenBindings[binding.Name] {
-				return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle view %s duplicate binding %s", view.Name, binding.Name)
+				return uiBundleArtifact{}, fmt.Errorf(
+					"web UI smoke ui bundle view %s duplicate binding %s",
+					view.Name,
+					binding.Name,
+				)
 			}
 			seenBindings[binding.Name] = true
 		}
 		seenEvents := map[string]bool{}
 		for _, event := range view.Events {
 			if event.Name == "" {
-				return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle view %s has event missing name", view.Name)
+				return uiBundleArtifact{}, fmt.Errorf(
+					"web UI smoke ui bundle view %s has event missing name",
+					view.Name,
+				)
 			}
 			if event.Command == "" {
-				return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle view %s event %s missing command", view.Name, event.Name)
+				return uiBundleArtifact{}, fmt.Errorf(
+					"web UI smoke ui bundle view %s event %s missing command",
+					view.Name,
+					event.Name,
+				)
 			}
 			if seenEvents[event.Name] {
-				return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle view %s duplicate event %s", view.Name, event.Name)
+				return uiBundleArtifact{}, fmt.Errorf(
+					"web UI smoke ui bundle view %s duplicate event %s",
+					view.Name,
+					event.Name,
+				)
 			}
 			seenEvents[event.Name] = true
 		}
 		seenCommands := map[string]bool{}
 		for _, command := range view.Commands {
 			if command.Name == "" {
-				return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle view %s has command missing name", view.Name)
+				return uiBundleArtifact{}, fmt.Errorf(
+					"web UI smoke ui bundle view %s has command missing name",
+					view.Name,
+				)
 			}
 			if command.StatementCount < 0 {
-				return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle view %s command %s has negative statement_count", view.Name, command.Name)
+				return uiBundleArtifact{}, fmt.Errorf(
+					"web UI smoke ui bundle view %s command %s has negative statement_count",
+					view.Name,
+					command.Name,
+				)
 			}
 			for _, op := range command.Operations {
 				switch op.Kind {
 				case "state_add":
 					if op.Value == "" {
-						return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle view %s command %s state_add operation missing value", view.Name, command.Name)
+						return uiBundleArtifact{}, fmt.Errorf(
+							"web UI smoke ui bundle view %s command %s state_add operation missing value",
+							view.Name,
+							command.Name,
+						)
 					}
 				case "state_set":
 				default:
-					return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle view %s command %s has unsupported operation kind %q", view.Name, command.Name, op.Kind)
+					return uiBundleArtifact{}, fmt.Errorf(
+						"web UI smoke ui bundle view %s command %s has unsupported operation kind %q",
+						view.Name,
+						command.Name,
+						op.Kind,
+					)
 				}
 				if !strings.HasPrefix(op.Target, "state.") || len(op.Target) == len("state.") {
-					return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle view %s command %s has invalid operation target %q", view.Name, command.Name, op.Target)
+					return uiBundleArtifact{}, fmt.Errorf(
+						"web UI smoke ui bundle view %s command %s has invalid operation target %q",
+						view.Name,
+						command.Name,
+						op.Target,
+					)
 				}
 			}
 			if seenCommands[command.Name] {
-				return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle view %s duplicate command %s", view.Name, command.Name)
+				return uiBundleArtifact{}, fmt.Errorf(
+					"web UI smoke ui bundle view %s duplicate command %s",
+					view.Name,
+					command.Name,
+				)
 			}
 			seenCommands[command.Name] = true
 		}
 		for _, event := range view.Events {
 			if !seenCommands[event.Command] {
-				return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle view %s event %s references unknown command %s", view.Name, event.Name, event.Command)
+				return uiBundleArtifact{}, fmt.Errorf(
+					"web UI smoke ui bundle view %s event %s references unknown command %s",
+					view.Name,
+					event.Name,
+					event.Command,
+				)
 			}
 		}
 		seenStyles := map[string]bool{}
 		for _, style := range view.Styles {
 			if style.Name == "" {
-				return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle view %s has style missing name", view.Name)
+				return uiBundleArtifact{}, fmt.Errorf(
+					"web UI smoke ui bundle view %s has style missing name",
+					view.Name,
+				)
 			}
 			if style.Type == "" {
-				return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle view %s style %s missing type", view.Name, style.Name)
+				return uiBundleArtifact{}, fmt.Errorf(
+					"web UI smoke ui bundle view %s style %s missing type",
+					view.Name,
+					style.Name,
+				)
 			}
 			if style.Value == "" {
-				return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle view %s style %s missing value", view.Name, style.Name)
+				return uiBundleArtifact{}, fmt.Errorf(
+					"web UI smoke ui bundle view %s style %s missing value",
+					view.Name,
+					style.Name,
+				)
 			}
 			if seenStyles[style.Name] {
-				return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle view %s duplicate style %s", view.Name, style.Name)
+				return uiBundleArtifact{}, fmt.Errorf(
+					"web UI smoke ui bundle view %s duplicate style %s",
+					view.Name,
+					style.Name,
+				)
 			}
 			seenStyles[style.Name] = true
 		}
 		if len(view.Accessibility) == 0 {
-			return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle view %s missing accessibility metadata", view.Name)
+			return uiBundleArtifact{}, fmt.Errorf(
+				"web UI smoke ui bundle view %s missing accessibility metadata",
+				view.Name,
+			)
 		}
 		seenA11y := map[string]bool{}
 		for _, a11y := range view.Accessibility {
 			if a11y.Name == "" {
-				return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle view %s has accessibility entry missing name", view.Name)
+				return uiBundleArtifact{}, fmt.Errorf(
+					"web UI smoke ui bundle view %s has accessibility entry missing name",
+					view.Name,
+				)
 			}
 			if a11y.Type == "" {
-				return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle view %s accessibility %s missing type", view.Name, a11y.Name)
+				return uiBundleArtifact{}, fmt.Errorf(
+					"web UI smoke ui bundle view %s accessibility %s missing type",
+					view.Name,
+					a11y.Name,
+				)
 			}
 			if a11y.Value == "" {
-				return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle view %s accessibility %s missing value", view.Name, a11y.Name)
+				return uiBundleArtifact{}, fmt.Errorf(
+					"web UI smoke ui bundle view %s accessibility %s missing value",
+					view.Name,
+					a11y.Name,
+				)
 			}
 			if seenA11y[a11y.Name] {
-				return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle view %s duplicate accessibility metadata %s", view.Name, a11y.Name)
+				return uiBundleArtifact{}, fmt.Errorf(
+					"web UI smoke ui bundle view %s duplicate accessibility metadata %s",
+					view.Name,
+					a11y.Name,
+				)
 			}
 			seenA11y[a11y.Name] = true
 		}
@@ -540,11 +700,17 @@ func validateDOMSnapshotArtifact(path string, bundle uiBundleArtifact) error {
 		}
 		for _, binding := range view.Bindings {
 			if !hasDOMAttribute(dom, "data-tetra-binding", binding.Name) {
-				return fmt.Errorf(`web UI smoke dom_snapshot missing binding attribute data-tetra-binding=%q`, binding.Name)
+				return fmt.Errorf(
+					`web UI smoke dom_snapshot missing binding attribute data-tetra-binding=%q`,
+					binding.Name,
+				)
 			}
 			bindingMarker := fmt.Sprintf("bind %s: %s =", binding.Name, binding.Type)
 			if !strings.Contains(text, bindingMarker) {
-				return fmt.Errorf("web UI smoke dom_snapshot missing hydrated binding marker %q", bindingMarker)
+				return fmt.Errorf(
+					"web UI smoke dom_snapshot missing hydrated binding marker %q",
+					bindingMarker,
+				)
 			}
 		}
 		for _, event := range view.Events {

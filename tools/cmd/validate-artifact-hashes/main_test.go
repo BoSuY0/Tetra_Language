@@ -11,13 +11,21 @@ import (
 
 func TestArtifactHashManifestValidatesGeneratedFiles(t *testing.T) {
 	root := t.TempDir()
-	if err := os.WriteFile(filepath.Join(root, "summary.json"), []byte(`{"schema":"example"}`), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(root, "summary.json"),
+		[]byte(`{"schema":"example"}`),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Mkdir(filepath.Join(root, "api-diff"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, "api-diff", "api-docs.md"), []byte("# API\n"), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(root, "api-diff", "api-docs.md"),
+		[]byte("# API\n"),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -38,8 +46,45 @@ func TestArtifactHashManifestValidatesGeneratedFiles(t *testing.T) {
 	}
 }
 
+func TestWriteHashManifestFileKeepsIndentedJSONFormat(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(
+		filepath.Join(root, "summary.json"),
+		[]byte(`{"schema":"example"}`),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := buildHashManifest(root, "artifact-hashes.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	manifestPath := filepath.Join(root, "artifact-hashes.json")
+	if err := writeHashManifestFile(manifestPath, manifest); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasSuffix(string(raw), "\n") {
+		t.Fatalf("manifest JSON must end with newline")
+	}
+	if !strings.Contains(string(raw), "\n  \"schema\":") {
+		t.Fatalf("manifest JSON is not indented:\n%s", string(raw))
+	}
+	if err := validateHashManifest(manifestPath); err != nil {
+		t.Fatalf("validate hash manifest: %v", err)
+	}
+}
+
 func TestResolveHashManifestPathAcceptsRootOutValidationForm(t *testing.T) {
-	got, err := resolveHashManifestPath("", "reports/ui-toolkit-core", "reports/ui-toolkit-core/artifact-hashes.json")
+	got, err := resolveHashManifestPath(
+		"",
+		"reports/ui-toolkit-core",
+		"reports/ui-toolkit-core/artifact-hashes.json",
+	)
 	if err != nil {
 		t.Fatalf("resolveHashManifestPath: %v", err)
 	}
@@ -84,7 +129,11 @@ func TestArtifactHashManifestRecordsSchemaVersionReports(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(reportPath), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(reportPath, []byte(`{"schema_version":"tetra.memory-fuzz-short.summary.v1","tier":1}`), 0o644); err != nil {
+	if err := os.WriteFile(
+		reportPath,
+		[]byte(`{"schema_version":"tetra.memory-fuzz-short.summary.v1","tier":1}`),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 	manifest, err := buildHashManifest(root, "artifact-hashes.json")
@@ -96,6 +145,136 @@ func TestArtifactHashManifestRecordsSchemaVersionReports(t *testing.T) {
 	}
 	if got, want := manifest.Artifacts[0].Schema, "tetra.memory-fuzz-short.summary.v1"; got != want {
 		t.Fatalf("artifact schema = %q, want %q", got, want)
+	}
+}
+
+func TestArtifactHashManifestSchemaSniffIsBounded(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "large-report.json")
+	largePrefix := strings.Repeat("x", maxJSONSchemaSniffBytes+1024)
+	raw := `{"padding":"` + largePrefix + `","schema":"too-late"}`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := detectJSONSchema(reportPath); got != "" {
+		t.Fatalf(
+			"detectJSONSchema = %q, want empty schema when field is beyond bounded sniff window",
+			got,
+		)
+	}
+}
+
+func TestArtifactHashManifestSchemaSniffKeepsEarlySchemaForLargeJSON(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "large-schema-first.json")
+	largePayload := strings.Repeat("x", maxJSONSchemaSniffBytes+1024)
+	raw := `{"schema":"schema-first","payload":"` + largePayload + `"}`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := detectJSONSchema(reportPath); got != "schema-first" {
+		t.Fatalf(
+			"detectJSONSchema = %q, want schema from bounded prefix without parsing whole JSON",
+			got,
+		)
+	}
+}
+
+func TestArtifactHashManifestSchemaSniffDoesNotFallbackWhenSchemaMayBeLater(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "schema-version-first-large.json")
+	largePayload := strings.Repeat("x", maxJSONSchemaSniffBytes+1024)
+	raw := `{"schema_version":"version-first","payload":"` + largePayload + `","schema":"schema-too-late"}`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := detectJSONSchema(reportPath); got != "" {
+		t.Fatalf(
+			("detectJSONSchema = %q, want empty schema_version fallback when " +
+				"schema may be beyond bounded sniff window"),
+			got,
+		)
+	}
+}
+
+func TestArtifactHashManifestSchemaSniffPreservesSchemaPrecedence(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "dual-schema.json")
+	raw := `{"schema_version":"version-first","schema":"schema-wins"}`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := detectJSONSchema(reportPath); got != "schema-wins" {
+		t.Fatalf(
+			"detectJSONSchema = %q, want schema field to take precedence over schema_version",
+			got,
+		)
+	}
+}
+
+func TestArtifactHashManifestSchemaSniffFallsBackFromNullSchema(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "null-schema.json")
+	raw := `{"schema":null,"schema_version":"version-fallback"}`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := detectJSONSchema(reportPath); got != "version-fallback" {
+		t.Fatalf("detectJSONSchema = %q, want schema_version fallback when schema is null", got)
+	}
+}
+
+func TestArtifactHashManifestSchemaSniffRejectsNonStringSchemaFallback(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "object-schema.json")
+	raw := `{"schema_version":"version-fallback","schema":{"bad":true}}`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := detectJSONSchema(reportPath); got != "" {
+		t.Fatalf("detectJSONSchema = %q, want empty schema for non-string schema field", got)
+	}
+}
+
+func TestArtifactHashManifestSchemaSniffRejectsNonStringSchemaVersion(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "object-schema-version.json")
+	raw := `{"schema":"schema-first","schema_version":{"bad":true}}`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := detectJSONSchema(reportPath); got != "" {
+		t.Fatalf(
+			"detectJSONSchema = %q, want empty schema when schema_version has non-string type",
+			got,
+		)
+	}
+}
+
+func TestArtifactHashManifestSchemaSniffRejectsMalformedJSONTail(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "malformed-tail.json")
+	raw := `{"schema":"looks-valid","broken":`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := detectJSONSchema(reportPath); got != "" {
+		t.Fatalf("detectJSONSchema = %q, want empty schema for malformed JSON tail", got)
+	}
+}
+
+func TestArtifactHashManifestSchemaSniffRejectsTrailingJunkAfterJSON(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "trailing-junk.json")
+	raw := `{"schema":"looks-valid"}junk`
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := detectJSONSchema(reportPath); got != "" {
+		t.Fatalf(
+			"detectJSONSchema = %q, want empty schema for trailing junk after JSON object",
+			got,
+		)
 	}
 }
 
@@ -117,7 +296,11 @@ func TestArtifactHashManifestRejectsUnlistedArtifact(t *testing.T) {
 	if err := os.WriteFile(manifestPath, raw, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, "new-evidence.json"), []byte("{}\n"), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(root, "new-evidence.json"),
+		[]byte("{}\n"),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -181,7 +364,11 @@ func TestArtifactHashManifestRejectsInvalidHashFormat(t *testing.T) {
 
 func TestArtifactHashManifestRejectsTrailingJSONDocument(t *testing.T) {
 	root := t.TempDir()
-	if err := os.WriteFile(filepath.Join(root, "summary.json"), []byte(`{"schema":"example"}`), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(root, "summary.json"),
+		[]byte(`{"schema":"example"}`),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 	manifest, err := buildHashManifest(root, "artifact-hashes.json")
@@ -198,7 +385,8 @@ func TestArtifactHashManifestRejectsTrailingJSONDocument(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = validateHashManifest(manifestPath)
-	if err == nil || !strings.Contains(err.Error(), "manifest must contain a single JSON document") {
+	if err == nil ||
+		!strings.Contains(err.Error(), "manifest must contain a single JSON document") {
 		t.Fatalf("expected single-document failure, got %v", err)
 	}
 }
@@ -209,13 +397,21 @@ func TestArtifactHashManifestRejectsSymlinkArtifact(t *testing.T) {
 	}
 	root := t.TempDir()
 	outside := t.TempDir()
-	if err := os.WriteFile(filepath.Join(outside, "secret.txt"), []byte("secret outside root\n"), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(outside, "secret.txt"),
+		[]byte("secret outside root\n"),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Symlink(filepath.Join(outside, "secret.txt"), filepath.Join(root, "leak.txt")); err != nil {
+	if err := os.Symlink(
+		filepath.Join(outside, "secret.txt"),
+		filepath.Join(root, "leak.txt"),
+	); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := buildHashManifest(root, "artifact-hashes.json"); err == nil || !strings.Contains(err.Error(), "symlink artifact") {
+	if _, err := buildHashManifest(root, "artifact-hashes.json"); err == nil ||
+		!strings.Contains(err.Error(), "symlink artifact") {
 		t.Fatalf("expected symlink artifact rejection, got %v", err)
 	}
 }
@@ -225,14 +421,19 @@ func TestArtifactHashManifestRejectsSymlinkRoot(t *testing.T) {
 		t.Skip("symlink test")
 	}
 	target := t.TempDir()
-	if err := os.WriteFile(filepath.Join(target, "summary.json"), []byte(`{"schema":"example"}`), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(target, "summary.json"),
+		[]byte(`{"schema":"example"}`),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 	link := filepath.Join(t.TempDir(), "report-root-link")
 	if err := os.Symlink(target, link); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := buildHashManifest(link, "artifact-hashes.json"); err == nil || !strings.Contains(err.Error(), "symlink artifact root") {
+	if _, err := buildHashManifest(link, "artifact-hashes.json"); err == nil ||
+		!strings.Contains(err.Error(), "symlink artifact root") {
 		t.Fatalf("expected symlink root rejection, got %v", err)
 	}
 }

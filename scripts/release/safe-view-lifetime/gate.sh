@@ -6,7 +6,7 @@ repo_root="$(cd "$script_dir/../../.." && pwd)"
 report_dir="$repo_root/reports/safe-view-lifetime"
 
 usage() {
-  cat <<'USAGE'
+  cat << 'USAGE'
 Usage: bash scripts/release/safe-view-lifetime/gate.sh [--report-dir DIR]
 
 Runs the focused Safe View Lifetime Contracts v1 gate and writes proof,
@@ -25,7 +25,7 @@ while [[ $# -gt 0 ]]; do
       report_dir="$2"
       shift 2
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;
@@ -47,13 +47,13 @@ export GOCACHE="${GOCACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/tetra-language/go-bui
 safe_view_lifetime_active_pid=""
 
 cleanup() {
-  if [[ -n "${safe_view_lifetime_active_pid:-}" ]] && kill -0 "$safe_view_lifetime_active_pid" 2>/dev/null; then
-    kill -TERM "$safe_view_lifetime_active_pid" 2>/dev/null || true
+  if [[ -n "${safe_view_lifetime_active_pid:-}" ]] && kill -0 "$safe_view_lifetime_active_pid" 2> /dev/null; then
+    kill -TERM "$safe_view_lifetime_active_pid" 2> /dev/null || true
     sleep 1
-    kill -KILL "$safe_view_lifetime_active_pid" 2>/dev/null || true
+    kill -KILL "$safe_view_lifetime_active_pid" 2> /dev/null || true
   fi
   rm -rf "$tmp_dir"
-  GOCACHE="$GOCACHE" go clean -cache >/dev/null 2>&1 || true
+  GOCACHE="$GOCACHE" go clean -cache > /dev/null 2>&1 || true
 }
 trap safe_view_lifetime_cleanup EXIT
 
@@ -63,7 +63,7 @@ safe_view_lifetime_cleanup() {
 
 safe_view_lifetime_timeout_seconds() {
   local timeout_seconds="${SAFE_VIEW_LIFETIME_TIMEOUT_SECONDS:-180}"
-  if ! command -v timeout >/dev/null 2>&1; then
+  if ! command -v timeout > /dev/null 2>&1; then
     echo "error: missing timeout command for bounded safe-view lifetime gate" >&2
     exit 1
   fi
@@ -93,7 +93,7 @@ safe_view_lifetime_run_step() {
 
   echo "== $label =="
   set +e
-  timeout --kill-after=5s "${timeout_seconds}s" "$@" >"$log_path" 2>&1 &
+  timeout --kill-after=5s "${timeout_seconds}s" "$@" > "$log_path" 2>&1 &
   safe_view_lifetime_active_pid=$!
   wait "$safe_view_lifetime_active_pid"
   local status=$?
@@ -123,14 +123,14 @@ safe_view_lifetime_run_expected_failure() {
 
   echo "== $label =="
   set +e
-  timeout --kill-after=5s "${timeout_seconds}s" "$@" >"$log_path" 2>&1 &
+  timeout --kill-after=5s "${timeout_seconds}s" "$@" > "$log_path" 2>&1 &
   safe_view_lifetime_active_pid=$!
   wait "$safe_view_lifetime_active_pid"
   local status=$?
   safe_view_lifetime_active_pid=""
   set -e
 
-  cat "$log_path" >>"$output_path"
+  cat "$log_path" >> "$output_path"
   if [[ "$status" -eq 0 ]]; then
     echo "error: expected $label to fail; see $log_path" >&2
     exit 1
@@ -175,8 +175,8 @@ echo "== Surface lifetime/resource cleanup tests =="
 run_go_test "surface-close-frame-event-resize-resource-cleanup" -buildvcs=false ./compiler/tests/semantics ./compiler/internal/semantics ./tools/scriptstest -run 'SurfaceClose|FrameAfterClose|DoubleClose|BeginPresent|ResizeAfterClose|ResourceCleanup|BrowserProcessCleanup|SafeViewLifetime' -count=1
 
 echo "== Safe view proof/allocation report artifacts =="
-run_go "safe-view-borrow-return-build" ./cli/cmd/tetra build --target linux-x64 --emit-proof --emit-alloc-report -o "$report_dir/safe-view-borrow-return" examples/safe_view_borrow_return.tetra
-run_go "safe-view-copy-escape-build" ./cli/cmd/tetra build --target linux-x64 --emit-proof --emit-alloc-report -o "$report_dir/safe-view-copy-escape" examples/safe_view_copy_escape.tetra
+run_go "safe-view-borrow-return-build" ./cli/cmd/tetra build --target linux-x64 --emit-proof --emit-alloc-report -o "$report_dir/safe-view-borrow-return" examples/memory/safe_view/safe_view_borrow_return.tetra
+run_go "safe-view-copy-escape-build" ./cli/cmd/tetra build --target linux-x64 --emit-proof --emit-alloc-report -o "$report_dir/safe-view-copy-escape" examples/memory/safe_view/safe_view_copy_escape.tetra
 
 for artifact in \
   "$report_dir/safe-view-borrow-return.proof.json" \
@@ -197,9 +197,9 @@ require_contains "$report_dir/safe-view-copy-escape.alloc.json" '"length_expr": 
 
 echo "== Boundary negative diagnostics =="
 boundary_log="$report_dir/safe-view-boundary-negative.txt"
-: >"$boundary_log"
+: > "$boundary_log"
 
-cat >"$tmp_dir/bad-actor.tetra" <<'TETRA'
+cat > "$tmp_dir/bad-actor.tetra" << 'TETRA'
 enum Msg:
     case bytes([]u8)
 
@@ -210,7 +210,7 @@ uses actors, alloc, mem:
 TETRA
 safe_view_lifetime_run_expected_failure "boundary-negative-bad-actor" "$boundary_log" env GOCACHE="$GOCACHE" go run ./cli/cmd/tetra check "$tmp_dir/bad-actor.tetra"
 
-cat >"$tmp_dir/bad-task.tetra" <<'TETRA'
+cat > "$tmp_dir/bad-task.tetra" << 'TETRA'
 enum TaskErr:
     case bytes([]u8)
 
@@ -227,7 +227,7 @@ safe_view_lifetime_run_expected_failure "boundary-negative-bad-task" "$boundary_
 require_contains "$boundary_log" "cannot cross actor boundary without copy"
 require_contains "$boundary_log" "typed task error payload must be sendable across task boundary"
 
-cat >"$report_dir/safe-view-lifetime-summary.json" <<JSON
+cat > "$report_dir/safe-view-lifetime-summary.json" << JSON
 {
   "schema": "tetra.safe-view-lifetime.gate.v1",
   "status": "pass",

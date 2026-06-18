@@ -31,7 +31,11 @@ func TestBuildPlatformUIRuntimeReportPassesOnMatchingTargetHost(t *testing.T) {
 					AppExitCode:   0,
 				},
 			}
-			report, exitCode := buildPlatformUIRuntimeReportWithRunner(tc.target, hostRuntime{GOOS: tc.goos, GOARCH: tc.goarch}, runner)
+			report, exitCode := buildPlatformUIRuntimeReportWithRunner(
+				tc.target,
+				hostRuntime{GOOS: tc.goos, GOARCH: tc.goarch},
+				runner,
+			)
 			if exitCode != 0 {
 				t.Fatalf("exit code = %d, want 0: %#v", exitCode, report)
 			}
@@ -60,7 +64,11 @@ func TestBuildPlatformUIRuntimeReportUsesExecutedChildRuntimeEvidence(t *testing
 			AppExitCode:   0,
 		},
 	}
-	report, exitCode := buildPlatformUIRuntimeReportWithRunner("windows-x64", hostRuntime{GOOS: "windows", GOARCH: "amd64"}, runner)
+	report, exitCode := buildPlatformUIRuntimeReportWithRunner(
+		"windows-x64",
+		hostRuntime{GOOS: "windows", GOARCH: "amd64"},
+		runner,
+	)
 	if exitCode != 0 {
 		t.Fatalf("exit code = %d, want 0: %#v", exitCode, report)
 	}
@@ -73,8 +81,13 @@ func TestBuildPlatformUIRuntimeReportUsesExecutedChildRuntimeEvidence(t *testing
 	if report.Version == "" || report.GitHead == "" {
 		t.Fatalf("target-host report missing version/git_head: %#v", report)
 	}
-	if !strings.Contains(report.RuntimeTrace, "platform-window-api:ok") || !strings.Contains(report.RuntimeTrace, "window-create:ok") || !strings.Contains(report.RuntimeTrace, "error-recovery:ok") {
-		t.Fatalf("target-host report runtime_trace missing required markers: %q", report.RuntimeTrace)
+	if !strings.Contains(report.RuntimeTrace, "platform-window-api:ok") ||
+		!strings.Contains(report.RuntimeTrace, "window-create:ok") ||
+		!strings.Contains(report.RuntimeTrace, "error-recovery:ok") {
+		t.Fatalf(
+			"target-host report runtime_trace missing required markers: %q",
+			report.RuntimeTrace,
+		)
 	}
 	if got := report.Processes[1].Path; !strings.Contains(got, "--child-runtime") {
 		t.Fatalf("app process path = %q, want child runtime evidence", got)
@@ -93,7 +106,10 @@ func TestRunPlatformUIRuntimeChildUsesOSBackedWindowProbe(t *testing.T) {
 		if target != "windows-x64" {
 			t.Fatalf("probe target = %q, want windows-x64", target)
 		}
-		return platformWindowProbeResult{API: "test-window-api", Markers: validPlatformProbeMarkersForTest()}, nil
+		return platformWindowProbeResult{
+			API:     "test-window-api",
+			Markers: validPlatformProbeMarkersForTest(),
+		}, nil
 	}
 	t.Cleanup(func() { platformWindowProbe = old })
 
@@ -109,7 +125,11 @@ func TestRunPlatformUIRuntimeChildUsesOSBackedWindowProbe(t *testing.T) {
 }
 
 func TestBuildPlatformUIRuntimeReportFailsWhenOSBackedWindowProbeFails(t *testing.T) {
-	report, exitCode := buildPlatformUIRuntimeReportWithRunner("windows-x64", hostRuntime{GOOS: "windows", GOARCH: "amd64"}, processPlatformRuntimeRunner{})
+	report, exitCode := buildPlatformUIRuntimeReportWithRunner(
+		"windows-x64",
+		hostRuntime{GOOS: "windows", GOARCH: "amd64"},
+		processPlatformRuntimeRunner{},
+	)
 	if exitCode == 0 {
 		t.Fatalf("expected nonzero exit when OS-backed window probe fails: %#v", report)
 	}
@@ -162,7 +182,10 @@ func marshalReportForTest(t *testing.T, report platformui.Report) []byte {
 }
 
 func TestBuildPlatformUIRuntimeReportBlocksOnWrongHost(t *testing.T) {
-	report, exitCode := buildPlatformUIRuntimeReport("windows-x64", hostRuntime{GOOS: "linux", GOARCH: "amd64"})
+	report, exitCode := buildPlatformUIRuntimeReport(
+		"windows-x64",
+		hostRuntime{GOOS: "linux", GOARCH: "amd64"},
+	)
 	if exitCode == 0 {
 		t.Fatalf("expected blocked exit code, report=%#v", report)
 	}

@@ -122,7 +122,12 @@ func Validate(raw []byte, opts Options) error {
 	return ValidateReport(report, memory, manifest, opts)
 }
 
-func ValidateReport(report Report, memory memoryReport, manifest *releaseManifest, opts Options) error {
+func ValidateReport(
+	report Report,
+	memory memoryReport,
+	manifest *releaseManifest,
+	opts Options,
+) error {
 	var issues []string
 	if report.Schema != SchemaV1 {
 		issues = append(issues, fmt.Sprintf("schema is %q, want %q", report.Schema, SchemaV1))
@@ -137,13 +142,26 @@ func ValidateReport(report Report, memory memoryReport, manifest *releaseManifes
 		issues = append(issues, "git_head must be a 40-character lowercase hex commit")
 	}
 	if opts.RequireSameCommit && report.GitHead != strings.TrimSpace(opts.CurrentGitHead) {
-		issues = append(issues, fmt.Sprintf("git_head %q does not match current commit %q", report.GitHead, strings.TrimSpace(opts.CurrentGitHead)))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"git_head %q does not match current commit %q",
+				report.GitHead,
+				strings.TrimSpace(opts.CurrentGitHead),
+			),
+		)
 	}
 	if len(report.Proofs) == 0 {
 		issues = append(issues, "proofs are required")
 	}
 	if memory.SchemaVersion != "tetra.memory-report.v1" {
-		issues = append(issues, fmt.Sprintf("memory report schema_version is %q, want tetra.memory-report.v1", memory.SchemaVersion))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"memory report schema_version is %q, want tetra.memory-report.v1",
+				memory.SchemaVersion,
+			),
+		)
 	}
 	rows := memoryRowsBySourceFactID(memory.Rows)
 	for i, proof := range report.Proofs {
@@ -185,7 +203,10 @@ func validateProof(index int, proof Proof, rows map[string]memoryReportRow) []st
 	if strings.TrimSpace(proof.ProvenanceClass) == "" {
 		issues = append(issues, prefix+": provenance_class is required")
 	} else if !knownProvenanceClass(proof.ProvenanceClass) {
-		issues = append(issues, fmt.Sprintf("%s: unknown provenance_class %q", prefix, proof.ProvenanceClass))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s: unknown provenance_class %q", prefix, proof.ProvenanceClass),
+		)
 	}
 	if strings.TrimSpace(proof.UnsafeClass) == "" {
 		issues = append(issues, prefix+": unsafe_class is required")
@@ -193,10 +214,21 @@ func validateProof(index int, proof Proof, rows map[string]memoryReportRow) []st
 		issues = append(issues, fmt.Sprintf("%s: unknown unsafe_class %q", prefix, proof.UnsafeClass))
 	}
 	if proof.ValidatorName != ValidatorName {
-		issues = append(issues, fmt.Sprintf("%s: validator_name is %q, want %q", prefix, proof.ValidatorName, ValidatorName))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s: validator_name is %q, want %q",
+				prefix,
+				proof.ValidatorName,
+				ValidatorName,
+			),
+		)
 	}
 	if proof.ValidatorStatus != "pass" {
-		issues = append(issues, fmt.Sprintf("%s: validator_status is %q, want pass", prefix, proof.ValidatorStatus))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s: validator_status is %q, want pass", prefix, proof.ValidatorStatus),
+		)
 	}
 	if unsafeUnknown(proof.ProvenanceClass, proof.UnsafeClass) {
 		issues = append(issues, prefix+": unsafe_unknown cannot be promoted by island proof")
@@ -207,15 +239,39 @@ func validateProof(index int, proof Proof, rows map[string]memoryReportRow) []st
 	if boundsProof(proof) && strings.TrimSpace(proof.Dominance) == "" {
 		issues = append(issues, prefix+": bounds proof requires dominance evidence")
 	}
-	if storageProof(proof) && (strings.TrimSpace(proof.PlannedStorage) == "" || strings.TrimSpace(proof.ActualLoweringStorage) == "") {
-		issues = append(issues, prefix+": storage proof requires planned_storage and actual_lowering_storage")
+	if storageProof(proof) &&
+		(strings.TrimSpace(
+			proof.PlannedStorage,
+		) == "" || strings.TrimSpace(
+			proof.ActualLoweringStorage,
+		) == "") {
+		issues = append(
+			issues,
+			prefix+": storage proof requires planned_storage and actual_lowering_storage",
+		)
 	}
-	if storageProof(proof) && explicitIslandStorageFallback(proof.PlannedStorage, proof.ActualLoweringStorage) {
-		issues = append(issues, fmt.Sprintf("%s: storage proof planned %q but actual_lowering_storage is %q", prefix, proof.PlannedStorage, proof.ActualLoweringStorage))
+	if storageProof(proof) &&
+		explicitIslandStorageFallback(proof.PlannedStorage, proof.ActualLoweringStorage) {
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s: storage proof planned %q but actual_lowering_storage is %q",
+				prefix,
+				proof.PlannedStorage,
+				proof.ActualLoweringStorage,
+			),
+		)
 	}
 	row, ok := rows[strings.TrimSpace(proof.SourceFactID)]
 	if !ok {
-		issues = append(issues, fmt.Sprintf("%s: source_fact_id %q not found in memory facts report", prefix, proof.SourceFactID))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s: source_fact_id %q not found in memory facts report",
+				prefix,
+				proof.SourceFactID,
+			),
+		)
 		return issues
 	}
 	issues = append(issues, validateProofAgainstMemoryRow(prefix, proof, row)...)
@@ -225,53 +281,171 @@ func validateProof(index int, proof Proof, rows map[string]memoryReportRow) []st
 func validateProofAgainstMemoryRow(prefix string, proof Proof, row memoryReportRow) []string {
 	var issues []string
 	if row.Claim != "island_proof_verified" {
-		issues = append(issues, fmt.Sprintf("%s: memory row claim is %q, want island_proof_verified", prefix, row.Claim))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s: memory row claim is %q, want island_proof_verified",
+				prefix,
+				row.Claim,
+			),
+		)
 	}
 	if row.ClaimLevel != "validated" || row.ValidatorStatus != "pass" {
-		issues = append(issues, fmt.Sprintf("%s: memory row must be validated/pass, got %q/%q", prefix, row.ClaimLevel, row.ValidatorStatus))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s: memory row must be validated/pass, got %q/%q",
+				prefix,
+				row.ClaimLevel,
+				row.ValidatorStatus,
+			),
+		)
 	}
 	if row.ValidatorName != ValidatorName {
-		issues = append(issues, fmt.Sprintf("%s: memory row validator_name is %q, want %q", prefix, row.ValidatorName, ValidatorName))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s: memory row validator_name is %q, want %q",
+				prefix,
+				row.ValidatorName,
+				ValidatorName,
+			),
+		)
 	}
 	if missing := missingMemoryProofMetadata(row); len(missing) > 0 {
-		issues = append(issues, fmt.Sprintf("%s: memory row lost proof metadata: %s", prefix, strings.Join(missing, ", ")))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s: memory row lost proof metadata: %s",
+				prefix,
+				strings.Join(missing, ", "),
+			),
+		)
 	}
 	if row.ProofID != "" && row.ProofID != proof.ProofID {
-		issues = append(issues, fmt.Sprintf("%s: proof_id mismatch memory=%q proof=%q", prefix, row.ProofID, proof.ProofID))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s: proof_id mismatch memory=%q proof=%q",
+				prefix,
+				row.ProofID,
+				proof.ProofID,
+			),
+		)
 	}
 	if row.ProofOperation != "" && row.ProofOperation != proof.Operation {
-		issues = append(issues, fmt.Sprintf("%s: operation mismatch memory=%q proof=%q", prefix, row.ProofOperation, proof.Operation))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s: operation mismatch memory=%q proof=%q",
+				prefix,
+				row.ProofOperation,
+				proof.Operation,
+			),
+		)
 	}
 	if row.ProofKind != "" && row.ProofKind != proof.ProofKind {
-		issues = append(issues, fmt.Sprintf("%s: proof_kind mismatch memory=%q proof=%q", prefix, row.ProofKind, proof.ProofKind))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s: proof_kind mismatch memory=%q proof=%q",
+				prefix,
+				row.ProofKind,
+				proof.ProofKind,
+			),
+		)
 	}
 	if row.IslandID != proof.IslandID {
-		issues = append(issues, fmt.Sprintf("%s: island_id mismatch memory=%q proof=%q", prefix, row.IslandID, proof.IslandID))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s: island_id mismatch memory=%q proof=%q",
+				prefix,
+				row.IslandID,
+				proof.IslandID,
+			),
+		)
 	}
 	if row.Epoch != proof.Epoch {
-		issues = append(issues, fmt.Sprintf("%s: epoch mismatch memory=%d proof=%d", prefix, row.Epoch, proof.Epoch))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s: epoch mismatch memory=%d proof=%d", prefix, row.Epoch, proof.Epoch),
+		)
 	}
 	if row.BaseID != proof.SubjectBaseID {
-		issues = append(issues, fmt.Sprintf("%s: base_id mismatch memory=%q proof=%q", prefix, row.BaseID, proof.SubjectBaseID))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s: base_id mismatch memory=%q proof=%q",
+				prefix,
+				row.BaseID,
+				proof.SubjectBaseID,
+			),
+		)
 	}
 	if row.ProofSubjectBaseID != proof.SubjectBaseID {
-		issues = append(issues, fmt.Sprintf("%s: proof_subject_base_id mismatch memory=%q proof=%q", prefix, row.ProofSubjectBaseID, proof.SubjectBaseID))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s: proof_subject_base_id mismatch memory=%q proof=%q",
+				prefix,
+				row.ProofSubjectBaseID,
+				proof.SubjectBaseID,
+			),
+		)
 	}
 	if row.ProvenanceClass != proof.ProvenanceClass {
-		issues = append(issues, fmt.Sprintf("%s: provenance_class mismatch memory=%q proof=%q", prefix, row.ProvenanceClass, proof.ProvenanceClass))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s: provenance_class mismatch memory=%q proof=%q",
+				prefix,
+				row.ProvenanceClass,
+				proof.ProvenanceClass,
+			),
+		)
 	}
 	if row.UnsafeClass != proof.UnsafeClass {
-		issues = append(issues, fmt.Sprintf("%s: unsafe_class mismatch memory=%q proof=%q", prefix, row.UnsafeClass, proof.UnsafeClass))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s: unsafe_class mismatch memory=%q proof=%q",
+				prefix,
+				row.UnsafeClass,
+				proof.UnsafeClass,
+			),
+		)
 	}
 	if unsafeUnknown(row.ProvenanceClass, row.UnsafeClass) {
-		issues = append(issues, prefix+": memory row unsafe_unknown cannot support verified island proof")
+		issues = append(
+			issues,
+			prefix+": memory row unsafe_unknown cannot support verified island proof",
+		)
 	}
 	if noAliasProof(proof) && !validatedNoAliasState(row.AliasState) {
-		issues = append(issues, fmt.Sprintf("%s: noalias proof requires unique/mutable_exclusive memory alias_state, got %q", prefix, row.AliasState))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s: noalias proof requires unique/mutable_exclusive memory alias_state, got %q",
+				prefix,
+				row.AliasState,
+			),
+		)
 	}
 	if storageProof(proof) {
-		if row.PlannedStorage != proof.PlannedStorage || row.ActualLoweringStorage != proof.ActualLoweringStorage {
-			issues = append(issues, fmt.Sprintf("%s: storage mismatch memory=%q/%q proof=%q/%q", prefix, row.PlannedStorage, row.ActualLoweringStorage, proof.PlannedStorage, proof.ActualLoweringStorage))
+		if row.PlannedStorage != proof.PlannedStorage ||
+			row.ActualLoweringStorage != proof.ActualLoweringStorage {
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"%s: storage mismatch memory=%q/%q proof=%q/%q",
+					prefix,
+					row.PlannedStorage,
+					row.ActualLoweringStorage,
+					proof.PlannedStorage,
+					proof.ActualLoweringStorage,
+				),
+			)
 		}
 	}
 	return issues
@@ -358,7 +532,14 @@ func validateManifestAgainstReport(report Report, manifest releaseManifest) []st
 		issues = append(issues, "manifest schema is required")
 	}
 	if strings.TrimSpace(manifest.GitHead) != "" && manifest.GitHead != report.GitHead {
-		issues = append(issues, fmt.Sprintf("manifest git_head %q does not match proof git_head %q", manifest.GitHead, report.GitHead))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"manifest git_head %q does not match proof git_head %q",
+				manifest.GitHead,
+				report.GitHead,
+			),
+		)
 	}
 
 	commands := map[string]string{}
@@ -378,7 +559,10 @@ func validateManifestAgainstReport(report Report, manifest releaseManifest) []st
 	if strings.TrimSpace(verifierCommand) == "" {
 		issues = append(issues, "missing manifest command island-proof-verifier")
 	} else {
-		issues = append(issues, validateVerifierCommand("manifest command island-proof-verifier", verifierCommand, report.ProducerCommand)...)
+		issues = append(
+			issues,
+			validateVerifierCommand("manifest command island-proof-verifier", verifierCommand, report.ProducerCommand)...,
+		)
 	}
 
 	artifacts := map[string]releaseArtifact{}
@@ -393,12 +577,31 @@ func validateManifestAgainstReport(report Report, manifest releaseManifest) []st
 		}
 		artifacts[kind] = artifact
 	}
-	issues = append(issues, validateManifestArtifact(artifacts, "island_proof_verifier_report", SchemaV1, report.ProducerCommand)...)
-	issues = append(issues, validateManifestArtifact(artifacts, "island_proof_memory_report", "tetra.memory-report.v1", report.ProducerCommand)...)
+	issues = append(
+		issues,
+		validateManifestArtifact(
+			artifacts,
+			"island_proof_verifier_report",
+			SchemaV1,
+			report.ProducerCommand,
+		)...)
+	issues = append(
+		issues,
+		validateManifestArtifact(
+			artifacts,
+			"island_proof_memory_report",
+			"tetra.memory-report.v1",
+			report.ProducerCommand,
+		)...)
 	return issues
 }
 
-func validateManifestArtifact(artifacts map[string]releaseArtifact, kind string, schema string, producerCommand string) []string {
+func validateManifestArtifact(
+	artifacts map[string]releaseArtifact,
+	kind string,
+	schema string,
+	producerCommand string,
+) []string {
 	artifact, ok := artifacts[kind]
 	if !ok {
 		return []string{fmt.Sprintf("missing manifest artifact %s", kind)}
@@ -408,9 +611,19 @@ func validateManifestArtifact(artifacts map[string]releaseArtifact, kind string,
 		issues = append(issues, fmt.Sprintf("manifest artifact %s path is required", kind))
 	}
 	if schema != "" && artifact.Schema != schema {
-		issues = append(issues, fmt.Sprintf("manifest artifact %s schema is %q, want %s", kind, artifact.Schema, schema))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"manifest artifact %s schema is %q, want %s",
+				kind,
+				artifact.Schema,
+				schema,
+			),
+		)
 	}
-	issues = append(issues, validateVerifierCommand("manifest artifact "+kind, artifact.Command, producerCommand)...)
+	issues = append(
+		issues,
+		validateVerifierCommand("manifest artifact "+kind, artifact.Command, producerCommand)...)
 	return issues
 }
 
@@ -420,14 +633,21 @@ func validateVerifierCommand(label string, command string, producerCommand strin
 	if command == "" {
 		return []string{label + " command is required"}
 	}
-	for _, fragment := range []string{"go run ./tools/cmd/validate-island-proof", "--proof", "--memory-report"} {
+	for _, fragment := range []string{
+		"go run ./tools/cmd/validate-island-proof",
+		"--proof",
+		"--memory-report",
+	} {
 		if !strings.Contains(command, fragment) {
 			issues = append(issues, fmt.Sprintf("%s command must contain %q", label, fragment))
 		}
 	}
 	producerCommand = strings.TrimSpace(producerCommand)
 	if producerCommand != "" && !strings.Contains(command, producerCommand) {
-		issues = append(issues, fmt.Sprintf("%s command does not include producer_command %q", label, producerCommand))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s command does not include producer_command %q", label, producerCommand),
+		)
 	}
 	return issues
 }
@@ -449,19 +669,28 @@ func unsafeUnknown(provenance string, unsafeClass string) bool {
 }
 
 func noAliasProof(proof Proof) bool {
-	return strings.Contains(proof.Operation, "noalias") || strings.Contains(proof.Operation, "no_alias") || strings.Contains(proof.Claim, "noalias") || strings.Contains(proof.Claim, "no_alias")
+	return strings.Contains(proof.Operation, "noalias") ||
+		strings.Contains(proof.Operation, "no_alias") ||
+		strings.Contains(proof.Claim, "noalias") ||
+		strings.Contains(proof.Claim, "no_alias")
 }
 
 func boundsProof(proof Proof) bool {
-	return strings.Contains(proof.Operation, "bounds") || strings.Contains(proof.ProofKind, "bounds") || strings.Contains(proof.Claim, "bounds")
+	return strings.Contains(proof.Operation, "bounds") ||
+		strings.Contains(proof.ProofKind, "bounds") ||
+		strings.Contains(proof.Claim, "bounds")
 }
 
 func storageProof(proof Proof) bool {
-	return strings.Contains(proof.Operation, "storage") || strings.Contains(proof.Claim, "storage") || proof.PlannedStorage != "" || proof.ActualLoweringStorage != ""
+	return strings.Contains(proof.Operation, "storage") ||
+		strings.Contains(proof.Claim, "storage") ||
+		proof.PlannedStorage != "" ||
+		proof.ActualLoweringStorage != ""
 }
 
 func explicitIslandStorageFallback(planned string, actual string) bool {
-	return strings.TrimSpace(planned) == "ExplicitIsland" && strings.TrimSpace(actual) != "ExplicitIsland"
+	return strings.TrimSpace(planned) == "ExplicitIsland" &&
+		strings.TrimSpace(actual) != "ExplicitIsland"
 }
 
 func uniqueNonEmpty(values []string) []string {
@@ -484,7 +713,12 @@ func validatedNoAliasState(aliasState string) bool {
 
 func knownProvenanceClass(value string) bool {
 	switch value {
-	case "safe_known", "safe_borrowed", "safe_owned", "unsafe_unknown", "unsafe_checked", "unsafe_verified_root":
+	case "safe_known",
+		"safe_borrowed",
+		"safe_owned",
+		"unsafe_unknown",
+		"unsafe_checked",
+		"unsafe_verified_root":
 		return true
 	default:
 		return false

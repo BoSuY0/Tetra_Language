@@ -1,6 +1,7 @@
 # Allocation Planner Lowering Readiness
 
-Status: P2.0 readiness gate plus P2.1/P2.2/P2.3/P2.4/P2.5/P2.6 lowering and validation slices, with P5.1-P15.2 runtime allocation evidence.
+Status: P2.0 readiness gate plus P2.1/P2.2/P2.3/P2.4/P2.5/P2.6 lowering and validation slices, with
+P5.1-P15.2 runtime allocation evidence.
 
 Allocation planning is an explanatory compiler stage before storage-aware
 lowering. It records what storage the planner can justify today, and it records

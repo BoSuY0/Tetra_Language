@@ -60,7 +60,13 @@ func validNativeUISmokeReportFrom(t *testing.T, mutate func(*nativeUISmokeReport
 				StateType: "CounterState",
 				Bindings:  []nativeUIBindingTrace{{Name: "countValue", Type: "i32", Value: "0"}},
 				Widgets: []nativeUIWidgetTrace{
-					{ID: "CounterView.countValue", Kind: "value", Binding: "countValue", Type: "i32", Value: "0"},
+					{
+						ID:      "CounterView.countValue",
+						Kind:    "value",
+						Binding: "countValue",
+						Type:    "i32",
+						Value:   "0",
+					},
 					{ID: "CounterView.click", Kind: "action", Event: "click", Command: "increment"},
 				},
 				Events: []nativeUIEventTrace{
@@ -68,9 +74,17 @@ func validNativeUISmokeReportFrom(t *testing.T, mutate func(*nativeUISmokeReport
 						Name:    "click",
 						Command: "increment",
 						Operations: []nativeUIOperationTrace{
-							{Kind: "state_add", Target: "state.count", Value: "1", StateField: "count", StateValue: "1"},
+							{
+								Kind:       "state_add",
+								Target:     "state.count",
+								Value:      "1",
+								StateField: "count",
+								StateValue: "1",
+							},
 						},
-						Bindings: []nativeUIBindingTrace{{Name: "countValue", Type: "i32", Value: "1"}},
+						Bindings: []nativeUIBindingTrace{
+							{Name: "countValue", Type: "i32", Value: "1"},
+						},
 					},
 				},
 			},

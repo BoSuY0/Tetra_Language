@@ -70,13 +70,19 @@ func ValidateStableGenericCollectionsCoverage(report StableGenericCollectionsCov
 		return fmt.Errorf("stable generic collections coverage: schema = %q", report.SchemaVersion)
 	}
 	if report.CPlusPlusRustParityClaimed {
-		return fmt.Errorf("stable generic collections coverage: C++/Rust parity claim is forbidden for P19.1")
+		return fmt.Errorf(
+			"stable generic collections coverage: C++/Rust parity claim is forbidden for P19.1",
+		)
 	}
 	if report.BroadProductionStdlibClaimed {
-		return fmt.Errorf("stable generic collections coverage: broad production stdlib claim is forbidden for P19.1")
+		return fmt.Errorf(
+			"stable generic collections coverage: broad production stdlib claim is forbidden for P19.1",
+		)
 	}
 	if report.HiddenRuntimeAllocatorClaimed {
-		return fmt.Errorf("stable generic collections coverage: hidden runtime allocator claim is forbidden for P19.1")
+		return fmt.Errorf(
+			"stable generic collections coverage: hidden runtime allocator claim is forbidden for P19.1",
+		)
 	}
 	for _, want := range []string{
 		"C++/Rust parity is not claimed",
@@ -98,7 +104,11 @@ func ValidateStableGenericCollectionsCoverage(report StableGenericCollectionsCov
 		StableGenericCollectionsBenchmarkGate:           StableGenericCollectionsEvidenceOnly,
 	}
 	if len(report.Rows) != len(expectedStatus) {
-		return fmt.Errorf("stable generic collections coverage: row count = %d, want %d", len(report.Rows), len(expectedStatus))
+		return fmt.Errorf(
+			"stable generic collections coverage: row count = %d, want %d",
+			len(report.Rows),
+			len(expectedStatus),
+		)
 	}
 	rows := map[StableGenericCollectionsEvidenceID]StableGenericCollectionsEvidenceRow{}
 	for _, row := range report.Rows {
@@ -110,16 +120,31 @@ func ValidateStableGenericCollectionsCoverage(report StableGenericCollectionsCov
 			return fmt.Errorf("stable generic collections coverage: duplicate row %q", row.ID)
 		}
 		if strings.Contains(string(row.Status), "parity") {
-			return fmt.Errorf("stable generic collections coverage: benchmark parity status is forbidden for row %q", row.ID)
+			return fmt.Errorf(
+				"stable generic collections coverage: benchmark parity status is forbidden for row %q",
+				row.ID,
+			)
 		}
 		if row.Status != wantStatus {
-			return fmt.Errorf("stable generic collections coverage: row %q status = %q, want %q", row.ID, row.Status, wantStatus)
+			return fmt.Errorf(
+				"stable generic collections coverage: row %q status = %q, want %q",
+				row.ID,
+				row.Status,
+				wantStatus,
+			)
 		}
-		if strings.TrimSpace(row.Name) == "" || strings.TrimSpace(row.Evidence) == "" || strings.TrimSpace(row.Boundary) == "" {
-			return fmt.Errorf("stable generic collections coverage: row %q missing evidence or boundary", row.ID)
+		if strings.TrimSpace(row.Name) == "" || strings.TrimSpace(row.Evidence) == "" ||
+			strings.TrimSpace(row.Boundary) == "" {
+			return fmt.Errorf(
+				"stable generic collections coverage: row %q missing evidence or boundary",
+				row.ID,
+			)
 		}
 		if len(row.RequiredFacts) == 0 {
-			return fmt.Errorf("stable generic collections coverage: row %q missing required facts", row.ID)
+			return fmt.Errorf(
+				"stable generic collections coverage: row %q missing required facts",
+				row.ID,
+			)
 		}
 		rows[row.ID] = row
 	}
@@ -133,18 +158,51 @@ func ValidateStableGenericCollectionsCoverage(report StableGenericCollectionsCov
 		id    StableGenericCollectionsEvidenceID
 		wants []string
 	}{
-		{StableGenericCollectionsTetraSourceAPI, []string{"lib.core.collections.Vec<T>", "HashMap<K,V>", "caller-owned slices"}},
-		{StableGenericCollectionsValueRepresentation, []string{"genericTypeName", "mangleGenericName", "[]T"}},
-		{StableGenericCollectionsMonomorphizedOperations, []string{"vec_from_slice<T>", "hash_map_from_slices<K,V>", "concrete before lowering"}},
-		{StableGenericCollectionsCommonSpecializations, []string{"hash_map_get_i32_i32_or", "hash_map_get_u8_i32_or"}},
-		{StableGenericCollectionsAllocationReports, []string{"core.make_*", "allocation-plan reports", "no internal allocation"}},
-		{StableGenericCollectionsBenchmarkGate, []string{"truth-bench-harness", "p19.1_generic_collections", "reports/stable-generic-collections-v1/benchmarks/generic-collections-hash-table-manifest.json", "reports/stable-generic-collections-v1/benchmarks/generic-collections-hash-table-report.json", "Tetra/C++/Rust equivalents", "tetra", "cpp", "rust", "allocation/proof/bounds", "no parity claim"}},
+		{
+			StableGenericCollectionsTetraSourceAPI,
+			[]string{"lib.core.collections.Vec<T>", "HashMap<K,V>", "caller-owned slices"},
+		},
+		{
+			StableGenericCollectionsValueRepresentation,
+			[]string{"genericTypeName", "mangleGenericName", "[]T"},
+		},
+		{
+			StableGenericCollectionsMonomorphizedOperations,
+			[]string{"vec_from_slice<T>", "hash_map_from_slices<K,V>", "concrete before lowering"},
+		},
+		{
+			StableGenericCollectionsCommonSpecializations,
+			[]string{"hash_map_get_i32_i32_or", "hash_map_get_u8_i32_or"},
+		},
+		{
+			StableGenericCollectionsAllocationReports,
+			[]string{"core.make_*", "allocation-plan reports", "no internal allocation"},
+		},
+		{
+			StableGenericCollectionsBenchmarkGate,
+			[]string{
+				"truth-bench-harness",
+				"p19.1_generic_collections",
+				"reports/stable-generic-collections-v1/benchmarks/generic-collections-hash-table-manifest.json",
+				"reports/stable-generic-collections-v1/benchmarks/generic-collections-hash-table-report.json",
+				"Tetra/C++/Rust equivalents",
+				"tetra",
+				"cpp",
+				"rust",
+				"allocation/proof/bounds",
+				"no parity claim",
+			},
+		},
 	}
 	for _, check := range checks {
 		row := rows[check.id]
 		for _, want := range check.wants {
 			if !containsStableGenericCollectionsText(row.RequiredFacts, want) {
-				return fmt.Errorf("stable generic collections coverage: row %q missing fact %q", row.ID, want)
+				return fmt.Errorf(
+					"stable generic collections coverage: row %q missing fact %q",
+					row.ID,
+					want,
+				)
 			}
 		}
 	}
@@ -161,8 +219,12 @@ func stableGenericCollectionsTetraSourceAPIRow() StableGenericCollectionsEvidenc
 			"lib.core.collections.HashMap<K,V> stores caller-owned slices as keys: []K and values: []V",
 			"caller-owned slices prevent hidden allocator semantics in the v1 source API",
 		},
-		Evidence: "lib/core/collections.tetra::Vec<T>; lib/core/collections.tetra::HashMap<K,V>; compiler/tests/semantics/generics_test.go::TestStableGenericCollectionSourceAPIMonomorphizesVecAndHashMap",
-		Boundary: "source-level view API only; not a production allocator-backed Vec<T>/HashMap<K,V> runtime",
+		Evidence: ("lib/core/data/collections.tetra::Vec<T>; lib/core/data/" +
+			"collections.tetra::HashMap<K,V>; compiler/tests/semantics/semantics_" +
+			"types_protocols_" +
+			"test.go::TestStableGenericCollectionSourceAPIMonomorphizesVecAndHashMap"),
+		Boundary: ("source-level view API only; not a production allocator-backed " +
+			"Vec<T>/HashMap<K,V> runtime"),
 	}
 }
 
@@ -176,8 +238,13 @@ func stableGenericCollectionsValueRepresentationRow() StableGenericCollectionsEv
 			"mangleGenericName records deterministic concrete type arguments",
 			"generic struct instantiation substitutes []T fields before lowering",
 		},
-		Evidence: "compiler/internal/semantics/generics.go::genericTypeName; compiler/internal/semantics/generics.go::mangleGenericName; compiler/tests/semantics/generics_test.go::TestGenericFunctionInfersThroughGenericStructParameter",
-		Boundary: "static monomorphized representation only; no runtime generic value descriptor or dynamic dispatch table",
+		Evidence: ("compiler/internal/semantics/semantics_" +
+			"expressions.go::genericTypeName; compiler/internal/semantics/semantics_" +
+			"expressions.go::mangleGenericName; compiler/tests/semantics/semantics_" +
+			"types_protocols_" +
+			"test.go::TestGenericFunctionInfersThroughGenericStructParameter"),
+		Boundary: ("static monomorphized representation only; no runtime generic " +
+			"value descriptor or dynamic dispatch table"),
 	}
 }
 
@@ -188,11 +255,16 @@ func stableGenericCollectionsMonomorphizedOperationsRow() StableGenericCollectio
 		Status: StableGenericCollectionsImplementedNarrow,
 		RequiredFacts: []string{
 			"vec_from_slice<T> monomorphizes to concrete slice and Vec<T> instantiations",
-			"hash_map_from_slices<K,V> monomorphizes to concrete key/value slice and HashMap<K,V> instantiations",
+			("hash_map_from_slices<K,V> monomorphizes to concrete key/value " +
+				"slice and HashMap<K,V> instantiations"),
 			"collection operations are concrete before lowering",
 		},
-		Evidence: "compiler/internal/semantics/generics.go::bindGenericNamedTypeArgs; compiler/tests/semantics/generics_test.go::TestStableGenericCollectionSourceAPIMonomorphizesVecAndHashMap",
-		Boundary: "only operations inferable from arguments are promoted; return-only inference and nested generic struct fields remain unsupported",
+		Evidence: ("compiler/internal/semantics/semantics_" +
+			"expressions.go::bindGenericNamedTypeArgs; compiler/tests/semantics/" +
+			"semantics_types_protocols_" +
+			"test.go::TestStableGenericCollectionSourceAPIMonomorphizesVecAndHashMap"),
+		Boundary: ("only operations inferable from arguments are promoted; return-" +
+			"only inference and nested generic struct fields remain unsupported"),
 	}
 }
 
@@ -205,8 +277,10 @@ func stableGenericCollectionsCommonSpecializationsRow() StableGenericCollections
 			"hash_map_get_i32_i32_or provides equality lookup for HashMap<Int,Int>",
 			"hash_map_get_u8_i32_or provides equality lookup for HashMap<UInt8,Int>",
 		},
-		Evidence: "lib/core/collections.tetra::hash_map_get_i32_i32_or; lib/core/collections.tetra::hash_map_get_u8_i32_or",
-		Boundary: "no generic hashing/equality protocol, no collision strategy, and no resizing policy is claimed",
+		Evidence: ("lib/core/data/collections.tetra::hash_map_get_i32_i32_or; lib/" +
+			"core/data/collections.tetra::hash_map_get_u8_i32_or"),
+		Boundary: ("no generic hashing/equality protocol, no collision strategy, " +
+			"and no resizing policy is claimed"),
 	}
 }
 
@@ -220,8 +294,11 @@ func stableGenericCollectionsAllocationReportsRow() StableGenericCollectionsEvid
 			"allocation-plan reports already cover those slice constructors and their storage classes",
 			"stable generic collection helpers perform no internal allocation",
 		},
-		Evidence: "compiler/internal/allocplan/plan.go::FromPLIRWithOptions; compiler/reports.go::allocationPlanReport; lib/core/collections.tetra",
-		Boundary: "report linkage only; this row does not add a new allocator, runtime mode, or hidden heap path",
+		Evidence: ("compiler/internal/allocplan/plan.go::FromPLIRWithOptions; " +
+			"compiler/compiler_reports.go::allocationPlanReport; lib/core/data/" +
+			"collections.tetra"),
+		Boundary: ("report linkage only; this row does not add a new allocator, " +
+			"runtime mode, or hidden heap path"),
 	}
 }
 
@@ -231,14 +308,24 @@ func stableGenericCollectionsBenchmarkGateRow() StableGenericCollectionsEvidence
 		Name:   "Benchmark gate",
 		Status: StableGenericCollectionsEvidenceOnly,
 		RequiredFacts: []string{
-			"truth-bench-harness checks the P19.1 collection benchmark subset scope p19.1_generic_collections",
-			"reports/stable-generic-collections-v1/benchmarks/generic-collections-hash-table-manifest.json records hash table Tetra/C++/Rust equivalents",
-			"reports/stable-generic-collections-v1/benchmarks/generic-collections-hash-table-report.json validates tetra, cpp, and rust rows under schema tetra.truth.benchmark.v1",
-			"Tetra row includes allocation/proof/bounds report artifacts plus a Tetra performance report artifact",
+			("truth-bench-harness checks the P19.1 collection benchmark " +
+				"subset scope p19.1_generic_collections"),
+			("reports/stable-generic-collections-v1/benchmarks/generic-" +
+				"collections-hash-table-manifest.json records hash table Tetra/C++/Rust " +
+				"equivalents"),
+			("reports/stable-generic-collections-v1/benchmarks/generic-" +
+				"collections-hash-table-report.json validates tetra, cpp, and rust rows " +
+				"under schema tetra.truth.benchmark.v1"),
+			("Tetra row includes allocation/proof/bounds report artifacts " +
+				"plus a Tetra performance report artifact"),
 			"no parity claim is made by this P19.1 benchmark row",
 		},
-		Evidence: "tools/cmd/truth-bench-harness/main.go::scopeP19GenericCollections; reports/stable-generic-collections-v1/benchmarks/generic-collections-hash-table-report.json",
-		Boundary: "checked dry-run equivalent artifact only; no C++/Rust parity, speedup, measured runtime comparison, or official benchmark result is claimed",
+		Evidence: ("tools/cmd/truth-bench-harness/" +
+			"main.go::scopeP19GenericCollections; reports/stable-generic-collections-" +
+			"v1/benchmarks/generic-collections-hash-table-report.json"),
+		Boundary: ("checked dry-run equivalent artifact only; no C++/Rust parity, " +
+			"speedup, measured runtime comparison, or official benchmark result is " +
+			"claimed"),
 	}
 }
 

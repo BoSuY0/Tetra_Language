@@ -33,35 +33,47 @@ v0.4.0 checkpoint (current behavior in this repository):
   and records the validator-required production runtime trace markers.
 - WASI dogfood remains non-UI for this wave and must not emit web/native UI sidecars.
 
-Exact object/runtime/package/host-binding decisions are fixed in [WASM Object and Runtime Architecture](wasm_architecture.md) and should be treated as the prerequisite contract for target metadata and backend implementation changes.
+Exact object/runtime/package/host-binding decisions are fixed in [WASM Object and Runtime
+Architecture](wasm_architecture.md) and should be treated as the prerequisite contract for target
+metadata and backend implementation changes.
 
 ## Targets
 
-- `wasm32-wasi`: command-line and server-side runtime target. This target must produce a WASI-compatible module, pass artifact/import preflight, and pass runner smoke.
-- `wasm32-web`: browser runtime target. This target must produce a web-loadable module plus the minimal JS/runtime glue needed by UI smoke tests.
+- `wasm32-wasi`: command-line and server-side runtime target. This target must produce a
+  WASI-compatible module, pass artifact/import preflight, and pass runner smoke.
+- `wasm32-web`: browser runtime target. This target must produce a web-loadable module plus the
+  minimal JS/runtime glue needed by UI smoke tests.
 
 ## Shared Backend Shape
 
-The native backend already has an hourglass split for x64 codegen, ABI rules, object building, and executable linking. WASM should use the same boundary in spirit, but not reuse x64 object/link layers:
+The native backend already has an hourglass split for x64 codegen, ABI rules, object building, and
+executable linking. WASM should use the same boundary in spirit, but not reuse x64 object/link
+layers:
 
-- frontend, semantics, lowering, diagnostics, effects, ownership, and dependency analysis stay shared;
+- frontend, semantics, lowering, diagnostics, effects, ownership, and dependency analysis stay
+  shared;
 - IR-to-WASM emission is new target-specific code;
 - module assembly replaces TOBJ plus ELF/Mach-O/PE linking for these targets;
 - runtime imports are explicit and target-specific;
 - smoke reports use the same JSON report shape as native target smoke.
 
-The first supported WASM value surface should be deliberately small: `i32`, bool-like conditions, calls, returns, locals, string data where already lowered, slices only after the runtime layout is specified, and no implicit host access outside effect-gated imports.
+The first supported WASM value surface should be deliberately small: `i32`, bool-like conditions,
+calls, returns, locals, string data where already lowered, slices only after the runtime layout is
+specified, and no implicit host access outside effect-gated imports.
 
 ## Phase 0: Target contract
 
-Goal: replace planned-target diagnostics with a real target descriptor only when the backend has a minimal module writer.
+Goal: replace planned-target diagnostics with a real target descriptor only when the backend has a
+minimal module writer.
 
 Required work:
 
-- Extend target metadata so `wasm32-wasi` and `wasm32-web` have explicit OS, arch, ABI/runtime kind, artifact extension, and import policy.
+- Extend target metadata so `wasm32-wasi` and `wasm32-web` have explicit OS, arch, ABI/runtime kind,
+  artifact extension, and import policy.
 - Keep unsupported-feature diagnostics precise while each WASM slice is incomplete.
 - Add target-list tests that distinguish supported WASM from unknown targets.
-- Keep `tetra targets --format=json` and `go run ./tools/cmd/validate-targets` in the verification path.
+- Keep `tetra targets --format=json` and `go run ./tools/cmd/validate-targets` in the verification
+  path.
 
 Done when:
 
@@ -75,8 +87,10 @@ Goal: lower the existing compiler IR into deterministic WebAssembly modules.
 
 Required work:
 
-- Add an IR-to-WASM emitter with stable function ordering, local allocation, labels, branches, calls, returns, integer arithmetic, comparisons, and deterministic data segments.
-- Add a module writer for type, function, export, code, memory, data, and name/custom sections as needed.
+- Add an IR-to-WASM emitter with stable function ordering, local allocation, labels, branches,
+  calls, returns, integer arithmetic, comparisons, and deterministic data segments.
+- Add a module writer for type, function, export, code, memory, data, and name/custom sections as
+  needed.
 - Define the initial runtime import namespace separately for `wasm32-wasi` and `wasm32-web`.
 - Add golden or structural tests that reject nondeterministic module output.
 
@@ -100,9 +114,12 @@ Goal: make `wasm32-wasi` executable in the v1.0 gate, not only artifact-buildabl
 Required work:
 
 - Select and document the runner command, currently expected to be `wasmtime`.
-- Map process exit, stdout, stderr, memory, and any allowed filesystem access through explicit WASI imports.
-- Ensure effects and capabilities remain visible in diagnostics and docs before host access is allowed.
-- Add runner availability diagnostics so missing `wasmtime` is reported as an environment skip or hard release-gate failure according to the gate mode.
+- Map process exit, stdout, stderr, memory, and any allowed filesystem access through explicit WASI
+  imports.
+- Ensure effects and capabilities remain visible in diagnostics and docs before host access is
+  allowed.
+- Add runner availability diagnostics so missing `wasmtime` is reported as an environment skip or
+  hard release-gate failure according to the gate mode.
 
 Done when:
 
@@ -116,7 +133,8 @@ Goal: make `wasm32-web` usable by browser and UI smoke tests.
 
 Required work:
 
-- Define the browser import namespace for console/output, memory setup, event loop entry, and any UI runtime calls.
+- Define the browser import namespace for console/output, memory setup, event loop entry, and any UI
+  runtime calls.
 - Produce or locate the JS glue needed to instantiate the module deterministically.
 - Add a tiny web runner page that can load the compiled module.
 - Validate the smoke page through browser automation.

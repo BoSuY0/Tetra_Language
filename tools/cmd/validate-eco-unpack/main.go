@@ -151,7 +151,11 @@ func findCapsuleManifest(dir string) (string, error) {
 			return "", err
 		}
 	}
-	return "", fmt.Errorf("missing %s (or legacy %s)", compiler.CapsuleFileName, compiler.LegacyCapsuleFileName)
+	return "", fmt.Errorf(
+		"missing %s (or legacy %s)",
+		compiler.CapsuleFileName,
+		compiler.LegacyCapsuleFileName,
+	)
 }
 
 func validateManifestText(text string) (capsuleUnpackManifest, error) {
@@ -226,7 +230,8 @@ func unpackManifestSectionHeader(content string) (string, bool) {
 func appendUnpackSourceRoot(roots []string, value string) []string {
 	value = strings.Trim(value, `"`)
 	clean := filepath.ToSlash(filepath.Clean(value))
-	if clean == "." || clean == "" || clean == ".." || strings.HasPrefix(clean, "../") || filepath.IsAbs(clean) {
+	if clean == "." || clean == "" || clean == ".." || strings.HasPrefix(clean, "../") ||
+		filepath.IsAbs(clean) {
 		return roots
 	}
 	for _, root := range roots {
@@ -263,10 +268,16 @@ func validatePackageMetadata(dir string) error {
 		return fmt.Errorf("package metadata mtime_unix must be 0")
 	}
 	if metadata.ManifestSchema != "" && metadata.ManifestSchema != "tetra.capsule.v1" {
-		return fmt.Errorf("unsupported package metadata manifest_schema %q", metadata.ManifestSchema)
+		return fmt.Errorf(
+			"unsupported package metadata manifest_schema %q",
+			metadata.ManifestSchema,
+		)
 	}
 	if metadata.PermissionsModel != "" && metadata.PermissionsModel != "tetra.eco.permissions.v1" {
-		return fmt.Errorf("unsupported package metadata permissions_model %q", metadata.PermissionsModel)
+		return fmt.Errorf(
+			"unsupported package metadata permissions_model %q",
+			metadata.PermissionsModel,
+		)
 	}
 	if metadata.BuildInputsSHA != "" {
 		if _, err := parseSHA256Hash(metadata.BuildInputsSHA); err != nil {
@@ -274,7 +285,11 @@ func validatePackageMetadata(dir string) error {
 		}
 	}
 	if metadata.FileCount != len(metadata.Files) {
-		return fmt.Errorf("package metadata file_count mismatch: expected %d, got %d", len(metadata.Files), metadata.FileCount)
+		return fmt.Errorf(
+			"package metadata file_count mismatch: expected %d, got %d",
+			len(metadata.Files),
+			metadata.FileCount,
+		)
 	}
 	if metadata.FileCount <= 0 {
 		return fmt.Errorf("package metadata file_count must be positive")
@@ -311,7 +326,10 @@ func validatePackageMetadata(dir string) error {
 		if err != nil {
 			return fmt.Errorf("package metadata %s: %w", normalizedPath, err)
 		}
-		fileRaw, err := readRegularUnpackedFile(filepath.Join(dir, filepath.FromSlash(normalizedPath)), normalizedPath)
+		fileRaw, err := readRegularUnpackedFile(
+			filepath.Join(dir, filepath.FromSlash(normalizedPath)),
+			normalizedPath,
+		)
 		if err != nil {
 			if os.IsNotExist(err) {
 				return fmt.Errorf("package metadata references missing file %s", normalizedPath)

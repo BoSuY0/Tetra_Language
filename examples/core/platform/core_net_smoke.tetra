@@ -1,0 +1,77 @@
+// Stable core Linux TCP socket smoke.
+module examples.core.platform.core_net_smoke
+
+import lib.core.capability as capability
+import lib.core.net as net
+
+func main() -> Int
+uses alloc, capability, io, mem:
+    unsafe:
+        let io_cap: cap.io = capability.io()
+        let fd: Int = net.socket_tcp4(io_cap)
+        if fd < 0:
+            return 1
+        let nonblock: Int = net.set_nonblocking(fd, io_cap)
+        let reuseport: Int = net.set_reuseport(fd, io_cap)
+        let nodelay: Int = net.set_tcp_nodelay(fd, io_cap)
+        let bound: Int = net.bind_tcp4_loopback(fd, 0, io_cap)
+        let listening: Int = net.listen(fd, 8, io_cap)
+        let epfd: Int = net.epoll_create(io_cap)
+        if epfd < 0:
+            let close_epoll_server: Int = net.close(fd, io_cap)
+            return 5
+        let epoll_add: Int = net.epoll_ctl_add_read(epfd, fd, io_cap)
+        let epoll_delete_read: Int = net.epoll_ctl_delete(epfd, fd, io_cap)
+        let epoll_add_rw: Int = net.epoll_ctl_add_read_write(epfd, fd, io_cap)
+        let epoll_mod_rw: Int = net.epoll_ctl_mod_read_write(epfd, fd, io_cap)
+        let epoll_mod_read: Int = net.epoll_ctl_mod_read(epfd, fd, io_cap)
+        let epoll_delete: Int = net.epoll_ctl_delete(epfd, fd, io_cap)
+        var event: []i32 = core.make_i32(2)
+        let epoll_ready: Int = net.epoll_wait_one(epfd, 0, io_cap)
+        let epoll_event_ready: Int = net.epoll_wait_one_into(epfd, event, 0, io_cap)
+        event[0] = fd
+        event[1] = net.epoll_event_in() + net.epoll_event_hup()
+        let event_fd: Int = net.epoll_event_fd(event)
+        let event_flags: Int = net.epoll_event_flags(event)
+        let readable: Bool = net.epoll_event_readable(event_flags)
+        let writable: Bool = net.epoll_event_writable(event_flags)
+        let errored: Bool = net.epoll_event_has_error(event_flags)
+        let hung_up: Bool = net.epoll_event_hung_up(event_flags)
+        let epoll_closed: Int = net.close(epfd, io_cap)
+        let closed: Int = net.close(fd, io_cap)
+        if nonblock < 0:
+            return 2
+        if reuseport != 0:
+            return 9
+        if nodelay != 0:
+            return 10
+        if bound < 0:
+            return 3
+        if listening < 0:
+            return 4
+        if epoll_add < 0:
+            return 5
+        if epoll_delete_read < 0:
+            return 14
+        if epoll_add_rw < 0:
+            return 15
+        if epoll_mod_rw < 0:
+            return 11
+        if epoll_mod_read < 0:
+            return 12
+        if epoll_delete < 0:
+            return 13
+        if epoll_ready != 0:
+            return 6
+        if epoll_event_ready != 0:
+            return 16
+        if event_fd != fd:
+            return 17
+        if !readable || writable || errored || !hung_up:
+            return 18
+        if epoll_closed != 0:
+            return 7
+        if closed != 0:
+            return 8
+        return 42
+    return 9

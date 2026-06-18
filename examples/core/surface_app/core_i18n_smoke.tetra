@@ -1,0 +1,26 @@
+// Stable core i18n stdlib smoke.
+module examples.core.surface_app.core_i18n_smoke
+
+import lib.core.i18n as i18n
+
+func main() -> Int:
+    let requested: i18n.Locale = i18n.locale_uk_ua()
+    let fallback_locale: i18n.Locale = i18n.locale_en_us()
+    let primary_table: i18n.StringTable = i18n.table_uk_ua()
+    let fallback_table: i18n.StringTable = i18n.table_en_us()
+    let direct: i18n.StringLookupResult = i18n.lookup_with_fallback(primary_table, fallback_table, i18n.key_form_title())
+    let fallback: i18n.StringLookupResult = i18n.lookup_with_fallback(primary_table, fallback_table, i18n.key_form_secondary())
+    let missing: i18n.StringLookupResult = i18n.lookup_with_fallback(primary_table, fallback_table, i18n.key_form_unknown())
+    let date_hook: i18n.FormatHook = i18n.date_format_hook(requested, i18n.hash_text("2026-06-12"))
+    let number_hook: i18n.FormatHook = i18n.number_format_hook(requested, 4200)
+    if !i18n.locale_supported(requested) || !i18n.locale_supported(fallback_locale):
+        return 10
+    if !direct.ok || direct.fallback_used || !fallback.ok || !fallback.fallback_used:
+        return 20
+    if !missing.missing_key || missing.diagnostic != i18n.diagnostic_missing_key():
+        return 30
+    if !date_hook.deterministic || date_hook.icu_claim || !number_hook.deterministic || number_hook.icu_claim:
+        return 40
+    if !i18n.rtl_placeholder_nonclaim():
+        return 50
+    return 42

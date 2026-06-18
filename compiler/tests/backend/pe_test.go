@@ -47,11 +47,13 @@ func TestBuildWindowsPEHeaders(t *testing.T) {
 		findSection(t, info.sections, name)
 	}
 	idata := findSection(t, info.sections, ".idata")
-	if info.importRVA < idata.virtualAddress || info.importRVA >= idata.virtualAddress+idata.virtualSize {
+	if info.importRVA < idata.virtualAddress ||
+		info.importRVA >= idata.virtualAddress+idata.virtualSize {
 		t.Fatalf("import directory outside .idata section")
 	}
 	textSec := findSection(t, info.sections, ".text")
-	if info.entry < textSec.virtualAddress || info.entry >= textSec.virtualAddress+textSec.virtualSize {
+	if info.entry < textSec.virtualAddress ||
+		info.entry >= textSec.virtualAddress+textSec.virtualSize {
 		t.Fatalf("entrypoint outside .text section")
 	}
 
@@ -72,7 +74,7 @@ func TestBuildWindowsPEHeaders(t *testing.T) {
 
 func TestPEImportsIncludeIslands(t *testing.T) {
 	tmp := t.TempDir()
-	srcPath := testkit.RepoPath(t, "examples", "islands_hello.tetra")
+	srcPath := testkit.RepoPath(t, "examples", "memory", "islands", "islands_hello.tetra")
 	if _, err := os.Stat(srcPath); err != nil {
 		t.Fatalf("missing example: %v", err)
 	}
@@ -96,7 +98,7 @@ func TestPEImportsIncludeIslands(t *testing.T) {
 
 func TestBuildWindowsPEMmio(t *testing.T) {
 	tmp := t.TempDir()
-	srcPath := testkit.RepoPath(t, "examples", "mmio_smoke.tetra")
+	srcPath := testkit.RepoPath(t, "examples", "memory", "raw", "mmio_smoke.tetra")
 	if _, err := os.Stat(srcPath); err != nil {
 		t.Fatalf("missing example: %v", err)
 	}
@@ -111,7 +113,7 @@ func TestBuildWindowsPEMmio(t *testing.T) {
 
 func TestBuildWindowsPEActors(t *testing.T) {
 	tmp := t.TempDir()
-	srcPath := testkit.RepoPath(t, "examples", "actors_pingpong.tetra")
+	srcPath := testkit.RepoPath(t, "examples", "actors", "actors_pingpong.tetra")
 	if _, err := os.Stat(srcPath); err != nil {
 		t.Fatalf("missing example: %v", err)
 	}
@@ -191,7 +193,8 @@ func TestPERDataRelocPointsToRData(t *testing.T) {
 		disp := int32(binary.LittleEndian.Uint32(text[i+3 : i+7]))
 		next := int64(textSec.virtualAddress) + int64(i+7)
 		targetRVA := uint32(next + int64(disp))
-		if targetRVA < rdataSec.virtualAddress || targetRVA >= rdataSec.virtualAddress+rdataSec.virtualSize {
+		if targetRVA < rdataSec.virtualAddress ||
+			targetRVA >= rdataSec.virtualAddress+rdataSec.virtualSize {
 			continue
 		}
 		targetOff, ok := rvaToOffset(targetRVA, info.sections)
@@ -251,7 +254,8 @@ func TestPEHasRelocDirectoryAndRelocSection(t *testing.T) {
 		t.Fatalf("missing reloc directory")
 	}
 	relocSec := findSection(t, info.sections, ".reloc")
-	if info.relocRVA < relocSec.virtualAddress || info.relocRVA >= relocSec.virtualAddress+relocSec.virtualSize {
+	if info.relocRVA < relocSec.virtualAddress ||
+		info.relocRVA >= relocSec.virtualAddress+relocSec.virtualSize {
 		t.Fatalf("reloc directory outside .reloc section")
 	}
 }
@@ -312,7 +316,8 @@ fun main(): i32 {
 	}
 	info := parsePEInfo(t, data)
 	textSec := findSection(t, info.sections, ".text")
-	if info.entry < textSec.virtualAddress || info.entry >= textSec.virtualAddress+textSec.virtualSize {
+	if info.entry < textSec.virtualAddress ||
+		info.entry >= textSec.virtualAddress+textSec.virtualSize {
 		t.Fatalf("entrypoint outside .text for high-arity sample")
 	}
 }

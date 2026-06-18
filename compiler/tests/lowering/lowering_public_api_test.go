@@ -36,7 +36,12 @@ uses runtime:
 		t.Fatalf("Lower: %v", err)
 	}
 	if irProg.MainName != "main" || irProg.MainIndex < 0 || irProg.MainIndex >= len(irProg.Funcs) {
-		t.Fatalf("invalid main metadata: name=%q index=%d funcs=%d", irProg.MainName, irProg.MainIndex, len(irProg.Funcs))
+		t.Fatalf(
+			"invalid main metadata: name=%q index=%d funcs=%d",
+			irProg.MainName,
+			irProg.MainIndex,
+			len(irProg.Funcs),
+		)
 	}
 	moduleName := checked.Funcs[0].Module
 	modFuncs, err := compiler.LowerModule(checked, moduleName)
@@ -51,14 +56,25 @@ uses runtime:
 		t.Fatalf("LowerModules: %v", err)
 	}
 	if len(modules[moduleName]) != len(irProg.Funcs) {
-		t.Fatalf("LowerModules[%s] funcs = %d, want %d", moduleName, len(modules[moduleName]), len(irProg.Funcs))
+		t.Fatalf(
+			"LowerModules[%s] funcs = %d, want %d",
+			moduleName,
+			len(modules[moduleName]),
+			len(irProg.Funcs),
+		)
 	}
 	for _, fn := range irProg.Funcs {
 		if fn.Name == "" || len(fn.Instrs) == 0 {
 			t.Fatalf("invalid lowered function: %#v", fn)
 		}
 		if fn.ParamSlots < 0 || fn.LocalSlots < fn.ParamSlots || fn.ReturnSlots < 0 {
-			t.Fatalf("invalid slot metadata for %s: params=%d locals=%d returns=%d", fn.Name, fn.ParamSlots, fn.LocalSlots, fn.ReturnSlots)
+			t.Fatalf(
+				"invalid slot metadata for %s: params=%d locals=%d returns=%d",
+				fn.Name,
+				fn.ParamSlots,
+				fn.LocalSlots,
+				fn.ReturnSlots,
+			)
 		}
 	}
 }
@@ -109,7 +125,8 @@ func TestPublicIRVerifierRejectsProgramAndFunctionDriftWithStableDiagnostic(t *t
 		t.Fatalf("expected program verifier error")
 	}
 	programDiag := compiler.DiagnosticFromError(programErr)
-	if programDiag.Code != compiler.DiagnosticCodeIRVerifier || programDiag.Severity != "error" || programDiag.Hint == "" {
+	if programDiag.Code != compiler.DiagnosticCodeIRVerifier || programDiag.Severity != "error" ||
+		programDiag.Hint == "" {
 		t.Fatalf("program diagnostic = %#v", programDiag)
 	}
 
@@ -127,7 +144,9 @@ func TestPublicIRVerifierRejectsProgramAndFunctionDriftWithStableDiagnostic(t *t
 		t.Fatalf("expected function verifier error")
 	}
 	funcDiag := compiler.DiagnosticFromError(funcErr)
-	if funcDiag.Code != compiler.DiagnosticCodeIRVerifier || funcDiag.File != "api_bad_ir.t4" || funcDiag.Line != 12 || funcDiag.Column != 7 {
+	if funcDiag.Code != compiler.DiagnosticCodeIRVerifier || funcDiag.File != "api_bad_ir.t4" ||
+		funcDiag.Line != 12 ||
+		funcDiag.Column != 7 {
 		t.Fatalf("function diagnostic = %#v", funcDiag)
 	}
 }

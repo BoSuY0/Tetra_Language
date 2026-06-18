@@ -1,0 +1,55 @@
+// Backend HTTP response/framing guard microservice smoke.
+module examples.microservices.backend.http.response.backend_http_response_guard_service
+import lib.core.http as http
+
+func check_head(dst: []u8, written: Int) -> Bool
+uses mem:
+    if written <= 4:
+        return false
+    if dst[0] != 72 || dst[1] != 84 || dst[2] != 84 || dst[3] != 80:
+        return false
+    if dst[9] != 52 || dst[10] != 48 || dst[11] != 52:
+        return false
+    if dst[written - 4] != 13 || dst[written - 3] != 10:
+        return false
+    if dst[written - 2] != 13 || dst[written - 1] != 10:
+        return false
+    return true
+
+func main() -> Int
+uses alloc, mem:
+    var head: []u8 = core.make_u8(192)
+    let date: String = "Mon, 01 Jan 2024 00:00:00 GMT"
+    let expected_len: Int = http.response_head_len(404, "Not Found", "Tetra", date, "application/json", 0, false)
+    let written: Int = http.write_response_head(head, 404, "Not Found", "Tetra", date, "application/json", 0, false)
+    if written != expected_len:
+        return 1
+    if !check_head(head, written):
+        return 2
+    var req: []u8 = core.make_u8(192)
+    var pos: Int = http.write_ascii_at(req, 0, "xx")
+    let first_start: Int = pos
+    pos = http.write_ascii_at(req, pos, "GET /plaintext?debug=1 HTTP/1.1\r\nHost: local\r\n\r\n")
+    let first_len: Int = pos - first_start
+    let second_start: Int = pos
+    pos = http.write_ascii_at(req, pos, "GET /updates?queries=9 HTTP/1.1\r\nHost: local\r\nConnection: close\r\n\r\n")
+    let second_len: Int = pos - second_start
+    if http.request_head_len_bytes_at(req, first_start, first_len) != first_len:
+        return 3
+    if http.request_head_len_bytes_at(req, second_start, second_len) != second_len:
+        return 4
+    if http.request_head_len_bytes_at(req, first_start, first_len - 1) != 0:
+        return 5
+    if http.route_tech_empower_bytes_at(req, first_start, first_len) != http.route_plaintext():
+        return 6
+    if http.route_tech_empower_bytes_at(req, second_start, second_len) != http.route_updates():
+        return 7
+    if !http.request_keep_alive_bytes_at(req, first_start, first_len):
+        return 8
+    if http.request_keep_alive_bytes_at(req, second_start, second_len):
+        return 9
+    if http.route_tech_empower("GET /fortunes HTTP/1.1\r\nHost: local\r\n\r\n") != http.route_fortunes():
+        return 10
+    if http.route_tech_empower("GET /queries?queries=500 HTTP/1.1\r\nHost: local\r\n\r\n") != http.route_queries():
+        return 11
+    return 0

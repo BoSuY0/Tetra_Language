@@ -140,7 +140,10 @@ func ValidateReport(raw []byte, opts Options) error {
 		issues = append(issues, fmt.Sprintf("ui_schema is %q, want tetra.ui.v1", report.UISchema))
 	}
 	if report.EvidenceKind != "target-host-runtime" {
-		issues = append(issues, fmt.Sprintf("evidence_kind is %q, want target-host-runtime", report.EvidenceKind))
+		issues = append(
+			issues,
+			fmt.Sprintf("evidence_kind is %q, want target-host-runtime", report.EvidenceKind),
+		)
 	}
 	if strings.TrimSpace(report.Source) == "" {
 		issues = append(issues, "source is required")
@@ -183,11 +186,20 @@ func rejectNonRuntimeEvidence(report Report) []string {
 	var issues []string
 	for _, marker := range forbiddenPhrases {
 		if strings.Contains(text, marker) {
-			issues = append(issues, fmt.Sprintf("report contains forbidden non-runtime evidence marker %q", strings.Trim(marker, " /\"")))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"report contains forbidden non-runtime evidence marker %q",
+					strings.Trim(marker, " /\""),
+				),
+			)
 		}
 	}
 	for _, token := range forbiddenEvidenceTokens(text) {
-		issues = append(issues, fmt.Sprintf("report contains forbidden non-runtime evidence marker %q", token))
+		issues = append(
+			issues,
+			fmt.Sprintf("report contains forbidden non-runtime evidence marker %q", token),
+		)
 	}
 	return issues
 }
@@ -208,7 +220,13 @@ func forbiddenEvidenceTokens(text string) []string {
 }
 
 func reportEvidenceFields(report Report) []string {
-	fields := []string{report.Source, report.Blocker, report.EvidenceKind, report.Runtime, report.GeneratedAt}
+	fields := []string{
+		report.Source,
+		report.Blocker,
+		report.EvidenceKind,
+		report.Runtime,
+		report.GeneratedAt,
+	}
 	for _, p := range report.Processes {
 		fields = append(fields, p.Name, p.Kind, p.Path)
 	}
@@ -247,16 +265,33 @@ func validateGeneratedAt(value string, opts Options) []string {
 		maxAge = DefaultMaxEvidenceAge
 	}
 	if generatedAt.After(now.Add(5 * time.Minute)) {
-		return []string{fmt.Sprintf("generated_at %s is in the future relative to %s", generatedAt.Format(time.RFC3339), now.Format(time.RFC3339))}
+		return []string{
+			fmt.Sprintf(
+				"generated_at %s is in the future relative to %s",
+				generatedAt.Format(time.RFC3339),
+				now.Format(time.RFC3339),
+			),
+		}
 	}
 	if now.Sub(generatedAt) > maxAge {
-		return []string{fmt.Sprintf("generated_at %s is stale; max age is %s", generatedAt.Format(time.RFC3339), maxAge)}
+		return []string{
+			fmt.Sprintf(
+				"generated_at %s is stale; max age is %s",
+				generatedAt.Format(time.RFC3339),
+				maxAge,
+			),
+		}
 	}
 	return nil
 }
 
 func validateProcesses(processes []ProcessReport) []string {
-	requiredKinds := map[string]bool{"build": false, "app": false, "runtime": false, "stress": false}
+	requiredKinds := map[string]bool{
+		"build":   false,
+		"app":     false,
+		"runtime": false,
+		"stress":  false,
+	}
 	var issues []string
 	for _, p := range processes {
 		name := strings.TrimSpace(p.Name)
@@ -266,7 +301,10 @@ func validateProcesses(processes []ProcessReport) []string {
 		if _, ok := requiredKinds[p.Kind]; ok {
 			requiredKinds[p.Kind] = true
 		} else {
-			issues = append(issues, fmt.Sprintf("process %s kind is %q, want build, app, runtime, or stress", name, p.Kind))
+			issues = append(
+				issues,
+				fmt.Sprintf("process %s kind is %q, want build, app, runtime, or stress", name, p.Kind),
+			)
 		}
 		if strings.TrimSpace(p.Path) == "" {
 			issues = append(issues, fmt.Sprintf("process %s path is required", name))
@@ -302,7 +340,10 @@ func validateContracts(contracts []ContractReport) []string {
 			required[name] = true
 		}
 		if c.Status != "pass" {
-			issues = append(issues, fmt.Sprintf("contract %s status is %q, want pass", name, c.Status))
+			issues = append(
+				issues,
+				fmt.Sprintf("contract %s status is %q, want pass", name, c.Status),
+			)
 		}
 		if strings.TrimSpace(c.Evidence) == "" {
 			issues = append(issues, fmt.Sprintf("contract %s evidence is required", name))
@@ -317,7 +358,14 @@ func validateContracts(contracts []ContractReport) []string {
 }
 
 func validateWidgets(widgets []WidgetReport) (map[string]WidgetReport, []string) {
-	requiredKinds := map[string]bool{"window": false, "panel": false, "text": false, "button": false, "input": false, "list": false}
+	requiredKinds := map[string]bool{
+		"window": false,
+		"panel":  false,
+		"text":   false,
+		"button": false,
+		"input":  false,
+		"list":   false,
+	}
 	index := map[string]WidgetReport{}
 	var issues []string
 	for _, w := range widgets {
@@ -351,12 +399,29 @@ func validateWidgets(widgets []WidgetReport) (map[string]WidgetReport, []string)
 }
 
 func validateEvents(events []EventReport, widgets map[string]WidgetReport) []string {
-	requiredEvents := map[string]bool{"focus": false, "input": false, "change": false, "select": false, "click": false, "tick": false}
-	requiredOps := map[string]bool{"focus": false, "state_set": false, "change": false, "async_command": false, "timer_tick": false, "redraw": false}
+	requiredEvents := map[string]bool{
+		"focus":  false,
+		"input":  false,
+		"change": false,
+		"select": false,
+		"click":  false,
+		"tick":   false,
+	}
+	requiredOps := map[string]bool{
+		"focus":         false,
+		"state_set":     false,
+		"change":        false,
+		"async_command": false,
+		"timer_tick":    false,
+		"redraw":        false,
+	}
 	var issues []string
 	for _, event := range events {
 		if _, ok := widgets[event.WidgetID]; !ok {
-			issues = append(issues, fmt.Sprintf("event %d references unknown widget %s", event.Order, event.WidgetID))
+			issues = append(
+				issues,
+				fmt.Sprintf("event %d references unknown widget %s", event.Order, event.WidgetID),
+			)
 		}
 		if _, ok := requiredEvents[event.Event]; ok {
 			requiredEvents[event.Event] = true
@@ -365,10 +430,16 @@ func validateEvents(events []EventReport, widgets map[string]WidgetReport) []str
 			issues = append(issues, fmt.Sprintf("event %d did not pass", event.Order))
 		}
 		if len(event.BeforeState) == 0 || len(event.AfterState) == 0 {
-			issues = append(issues, fmt.Sprintf("event %d must include before/after state", event.Order))
+			issues = append(
+				issues,
+				fmt.Sprintf("event %d must include before/after state", event.Order),
+			)
 		}
 		if len(event.WidgetUpdates) == 0 {
-			issues = append(issues, fmt.Sprintf("event %d must include widget update evidence", event.Order))
+			issues = append(
+				issues,
+				fmt.Sprintf("event %d must include widget update evidence", event.Order),
+			)
 		}
 		for _, op := range event.Operations {
 			if _, ok := requiredOps[op.Kind]; ok {

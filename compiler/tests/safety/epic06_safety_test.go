@@ -390,7 +390,8 @@ func forward(buf: borrow []u8) -> Int:
 func main() -> Int:
     return 0
 `,
-			want: "borrowed value derived from 'buf' cannot be passed to non-borrow parameter 1 of 'use_buf'",
+			want: ("borrowed value derived from 'buf' cannot be passed to non-" +
+				"borrow parameter 1 of 'use_buf'"),
 		},
 		{
 			name: "borrowed island slice cannot pass as inout",
@@ -503,7 +504,8 @@ func apply(cb: fn(borrow Int) -> Int, value: Int) -> Int:
 func main() -> Int:
     return apply(owned, 1)
 `,
-			want: "callback function symbol 'owned' parameter 1 ownership mismatch: expected 'borrow', got 'owned'",
+			want: ("callback function symbol 'owned' parameter 1 ownership " +
+				"mismatch: expected 'borrow', got 'owned'"),
 		},
 		{
 			name: "function typed local ownership mismatch",
@@ -566,12 +568,12 @@ uses runtime:
 
 func TestEpic06CapabilityAndIslandExamplesUseAuditedEffects(t *testing.T) {
 	for _, path := range []string{
-		"examples/cap_mem_smoke.tetra",
-		"examples/cap_mem_ptr_smoke.tetra",
-		"examples/mmio_smoke.tetra",
-		"examples/islands_hello.tetra",
-		"examples/islands_i32.tetra",
-		"examples/islands_overflow.tetra",
+		"examples/memory/raw/cap_mem_smoke.tetra",
+		"examples/memory/raw/cap_mem_ptr_smoke.tetra",
+		"examples/memory/raw/mmio_smoke.tetra",
+		"examples/memory/islands/islands_hello.tetra",
+		"examples/memory/islands/islands_i32.tetra",
+		"examples/memory/islands/islands_overflow.tetra",
 	} {
 		path := path
 		t.Run(filepath.Base(path), func(t *testing.T) {
@@ -594,50 +596,55 @@ func TestEpic06CapabilityAndIslandExamplesUseAuditedEffects(t *testing.T) {
 		})
 	}
 	t.Run("islands_double_free.tetra", func(t *testing.T) {
-		src := readRepoFileForEpic06(t, "examples/islands_double_free.tetra")
+		src := readRepoFileForEpic06(t, "examples/memory/islands/islands_double_free.tetra")
 		testkit.RequireCheckErrorContains(t, src, "cannot use freed resource 'other'")
 		for _, want := range []string{"uses", "islands", "mem"} {
 			if !strings.Contains(src, want) {
-				t.Fatalf("examples/islands_double_free.tetra missing audited island marker %q", want)
+				t.Fatalf(
+					"examples/memory/islands/islands_double_free.tetra missing audited island marker %q",
+					want,
+				)
 			}
 		}
 	})
 }
 
-func TestEpic06DocsAndReleaseGateAlignWithUsesCapabilityUnsafeOwnershipIslandCoverage(t *testing.T) {
+func TestEpic06DocsAndReleaseGateAlignWithUsesCapabilityUnsafeOwnershipIslandCoverage(
+	t *testing.T,
+) {
 	docs := map[string][]string{
-		"docs/spec/effects_capabilities_privacy_v1.md": {
+		"docs/spec/runtime/effects_capabilities_privacy_v1.md": {
 			"Function calls propagate callee effects transitively",
 			"Privacy And Consent",
 			"Budget",
 			"Epic 06 release evidence",
 		},
-		"docs/spec/capabilities.md": {
+		"docs/spec/runtime/capabilities.md": {
 			"Capabilities are not constructible in safe code",
 			"capsule.mem",
 			"Epic 06 coverage",
 		},
-		"docs/spec/unsafe.md": {
+		"docs/spec/runtime/unsafe.md": {
 			"Unsafe-Only Builtins Registry",
 			"Relationship to `uses`",
 			"Epic 06 coverage",
 		},
-		"docs/spec/ownership_v1.md": {
+		"docs/spec/runtime/ownership_v1.md": {
 			"consume T",
 			"Actor And Task Transfer",
 			"Epic 06 coverage",
 		},
-		"docs/spec/islands.md": {
+		"docs/spec/memory/islands.md": {
 			"Region Typing",
 			"Scoped islands remain safe",
 			"Epic 06 coverage",
 		},
-		"docs/user/ownership_effects_guide.md": {
+		"docs/user/platform/ownership_effects_guide.md": {
 			"Allowed patterns",
 			"Forbidden patterns",
 			"go test ./compiler/...",
 		},
-		"docs/checklists/v0_2_0_release_gate.md": {
+		"docs/checklists/release/legacy/v0_2_0_release_gate.md": {
 			"Epic 06 safety gate",
 			"Effect|Uses|Capability|Unsafe|Ownership|Borrow|Consume|Inout|Island|Region|Privacy|Budget",
 		},

@@ -152,7 +152,8 @@ func TestValidateWASMImportsRejectsNonFunctionImports(t *testing.T) {
 	err := validateWASMImports(buildWASMModule([]wasmImport{
 		{Module: "wasi_snapshot_preview1", Name: "fd_write", Kind: wasmImportKindMemory},
 	}), "wasm32-wasi")
-	if err == nil || !strings.Contains(err.Error(), "non-function import wasi_snapshot_preview1.fd_write") {
+	if err == nil ||
+		!strings.Contains(err.Error(), "non-function import wasi_snapshot_preview1.fd_write") {
 		t.Fatalf("error = %v, want non-function import failure", err)
 	}
 }
@@ -173,7 +174,9 @@ func TestValidateWASMImportReportValidatesCaseOutPaths(t *testing.T) {
 		t.Fatalf("write wasm: %v", err)
 	}
 	reportPath := filepath.Join(dir, "report.json")
-	report := `{"target":"wasm32-web","cases":[{"name":"ok","out_path":` + quoteJSON(wasmPath) + `,"pass":true}]}`
+	report := `{"target":"wasm32-web","cases":[{"name":"ok","out_path":` + quoteJSON(
+		wasmPath,
+	) + `,"pass":true}]}`
 	if err := os.WriteFile(reportPath, []byte(report), 0o644); err != nil {
 		t.Fatalf("write report: %v", err)
 	}
@@ -192,12 +195,15 @@ func TestValidateWASMImportReportRejectsCaseExtraImport(t *testing.T) {
 		t.Fatalf("write wasm: %v", err)
 	}
 	reportPath := filepath.Join(dir, "report.json")
-	report := `{"target":"wasm32-web","cases":[{"name":"bad","out_path":` + quoteJSON(wasmPath) + `,"pass":true}]}`
+	report := `{"target":"wasm32-web","cases":[{"name":"bad","out_path":` + quoteJSON(
+		wasmPath,
+	) + `,"pass":true}]}`
 	if err := os.WriteFile(reportPath, []byte(report), 0o644); err != nil {
 		t.Fatalf("write report: %v", err)
 	}
 	err := validateWASMImportReport(reportPath, "wasm32-web")
-	if err == nil || !strings.Contains(err.Error(), "bad") || !strings.Contains(err.Error(), "disallowed import wasi_snapshot_preview1.fd_write") {
+	if err == nil || !strings.Contains(err.Error(), "bad") ||
+		!strings.Contains(err.Error(), "disallowed import wasi_snapshot_preview1.fd_write") {
 		t.Fatalf("error = %v, want case disallowed import failure", err)
 	}
 }

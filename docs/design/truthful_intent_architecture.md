@@ -54,7 +54,8 @@ Current implementation anchors:
   rows expose runtime path, allocator class, requested bytes, and reserved
   bytes for constant sizes. P15.2 upgrades that report contract to
   `per_core_small_heap` rows with allocator scope, chunk size, and
-  same-core same-size-class free-list reuse policy evidence. P5.2 hardens explicit island regions: island size
+  same-core same-size-class free-list reuse policy evidence. P5.2 hardens explicit island regions:
+  island size
   guards run before host allocator entry, each island slice bump is 16-byte
   aligned before capacity commit, PLIR ties the allocation row to the island
   handle region, and reports expose region id, lifetime, and debug-mode hooks.

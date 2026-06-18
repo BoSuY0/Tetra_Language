@@ -1,0 +1,67 @@
+// Backend PostgreSQL big-endian writer short-buffer guard microservice.
+module examples.microservices.backend.postgres.write.backend_postgres_write_short_guard_service
+import lib.core.postgres as pg
+
+func check_valid_writes() -> Bool
+uses alloc, mem:
+    var bytes: []u8 = core.make_u8(8)
+    if pg.write_i32_be_at(bytes, 0, 16909060) != 4:
+        return false
+    if pg.read_i32_be(bytes, 0) != 16909060:
+        return false
+    if pg.write_i16_be_at(bytes, 4, 258) != 6:
+        return false
+    if pg.read_i16_be(bytes, 4) != 258:
+        return false
+    return true
+
+func check_empty_writes() -> Int
+uses alloc, mem:
+    var empty: []u8 = core.make_u8(0)
+    if pg.write_i32_be_at(empty, 0, 16909060) != -1:
+        return 21
+    if pg.write_i16_be_at(empty, 0, 258) != -1:
+        return 22
+    return 0
+
+func check_truncated_i32_write() -> Int
+uses alloc, mem:
+    var bytes: []u8 = core.make_u8(3)
+    bytes[0] = 9
+    bytes[1] = 8
+    bytes[2] = 7
+    if pg.write_i32_be_at(bytes, 0, 16909060) != -1:
+        return 31
+    if bytes[0] != 9 || bytes[1] != 8 || bytes[2] != 7:
+        return 32
+    return 0
+
+func check_offset_truncated_writes() -> Int
+uses alloc, mem:
+    var bytes: []u8 = core.make_u8(5)
+    bytes[0] = 1
+    bytes[1] = 2
+    bytes[2] = 3
+    bytes[3] = 4
+    bytes[4] = 5
+    if pg.write_i32_be_at(bytes, 2, 16909060) != -1:
+        return 41
+    if bytes[2] != 3 || bytes[3] != 4 || bytes[4] != 5:
+        return 42
+    if pg.write_i16_be_at(bytes, 4, 258) != -1:
+        return 43
+    if bytes[4] != 5:
+        return 44
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    if !check_valid_writes():
+        return 1
+    let empty_result: Int = check_empty_writes()
+    if empty_result != 0:
+        return empty_result
+    let truncated_i32_result: Int = check_truncated_i32_write()
+    if truncated_i32_result != 0:
+        return truncated_i32_result
+    return check_offset_truncated_writes()

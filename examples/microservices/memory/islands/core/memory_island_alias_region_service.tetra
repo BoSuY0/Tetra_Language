@@ -1,0 +1,23 @@
+// Island alias memory microservice smoke.
+//
+// The service sends an island handle through a non-generic identity helper,
+// allocates a region-backed slice from the returned handle, and frees it.
+module examples.microservices.memory.islands.core.memory_island_alias_region_service
+func alias_region(region: island) -> island:
+    return region
+
+func main() -> Int
+uses alloc, islands, mem:
+    unsafe:
+        let region: island = core.island_new(128)
+        let returned: island = alias_region(region)
+        var bytes: []u8 = core.island_make_u8(returned, 3)
+        bytes[0] = 12
+        bytes[1] = 13
+        bytes[2] = 17
+        let total: Int = bytes[0] + bytes[1] + bytes[2]
+        free(returned)
+        if total == 42:
+            return 0
+        return total
+    return 99

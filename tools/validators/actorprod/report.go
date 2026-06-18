@@ -86,16 +86,29 @@ func ValidateReportWithOptions(raw []byte, opts Options) error {
 		issues = append(issues, fmt.Sprintf("host is %q, want linux-x64", report.Host))
 	}
 	if !isHexGitHead(report.GitHead) {
-		issues = append(issues, fmt.Sprintf("git_head is %q, want 40 lowercase hex characters", report.GitHead))
+		issues = append(
+			issues,
+			fmt.Sprintf("git_head is %q, want 40 lowercase hex characters", report.GitHead),
+		)
 	}
 	if opts.CurrentGitHead != "" && report.GitHead != opts.CurrentGitHead {
-		issues = append(issues, fmt.Sprintf("git_head %q does not match current git head %q", report.GitHead, opts.CurrentGitHead))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"git_head %q does not match current git head %q",
+				report.GitHead,
+				opts.CurrentGitHead,
+			),
+		)
 	}
 	if report.ReportDir != "." {
 		issues = append(issues, fmt.Sprintf("report_dir is %q, want .", report.ReportDir))
 	}
 	if report.ArtifactHashes != "artifact-hashes.json" {
-		issues = append(issues, fmt.Sprintf("artifact_hashes is %q, want artifact-hashes.json", report.ArtifactHashes))
+		issues = append(
+			issues,
+			fmt.Sprintf("artifact_hashes is %q, want artifact-hashes.json", report.ArtifactHashes),
+		)
 	}
 	issues = append(issues, validateClaims(report.Claims)...)
 	issues = append(issues, validateNonClaims(report.NonClaims)...)
@@ -120,10 +133,17 @@ func ValidateReportDir(dir string, opts Options) error {
 	if err := decodeStrict(raw, &report); err != nil {
 		return err
 	}
-	if err := validateSubreport(filepath.Join(dir, "parallel-production-linux-x64", "parallel-production-linux-x64.json"), parallelprod.ValidateReport); err != nil {
+	if err := validateSubreport(
+		filepath.Join(dir, "parallel-production-linux-x64", "parallel-production-linux-x64.json"),
+		parallelprod.ValidateReport,
+	); err != nil {
 		return err
 	}
-	distributedPath := filepath.Join(dir, "distributed-actors-linux-x64", "distributed-actors-linux-x64.json")
+	distributedPath := filepath.Join(
+		dir,
+		"distributed-actors-linux-x64",
+		"distributed-actors-linux-x64.json",
+	)
 	if err := validateSubreport(distributedPath, actordist.ValidateReport); err != nil {
 		return err
 	}
@@ -135,12 +155,18 @@ func ValidateReportDir(dir string, opts Options) error {
 	if err := validateArtifactHashManifest(dir, "artifact-hashes.json", expected); err != nil {
 		return err
 	}
-	if err := validateArtifactHashManifest(filepath.Join(dir, "parallel-production-linux-x64"), "artifact-hashes.json", map[string]string{
+	if err := validateArtifactHashManifest(filepath.Join(
+		dir,
+		"parallel-production-linux-x64",
+	), "artifact-hashes.json", map[string]string{
 		"parallel-production-linux-x64.json": "tetra.parallel.production.v1",
 	}); err != nil {
 		return err
 	}
-	if err := validateArtifactHashManifest(filepath.Join(dir, "distributed-actors-linux-x64"), "artifact-hashes.json", map[string]string{
+	if err := validateArtifactHashManifest(filepath.Join(
+		dir,
+		"distributed-actors-linux-x64",
+	), "artifact-hashes.json", map[string]string{
 		"distributed-actors-linux-x64.json": "tetra.actors.distributed-runtime.v1",
 	}); err != nil {
 		return err
@@ -169,7 +195,11 @@ func validateDistributedGitHead(path string, gitHead string) error {
 		return err
 	}
 	if report.GitHead != gitHead {
-		return fmt.Errorf("distributed actor git_head %q does not match foundation git_head %q", report.GitHead, gitHead)
+		return fmt.Errorf(
+			"distributed actor git_head %q does not match foundation git_head %q",
+			report.GitHead,
+			gitHead,
+		)
 	}
 	return nil
 }
@@ -202,7 +232,10 @@ func validateCommands(commands []CommandReport) []string {
 			required[name] = true
 		}
 		if c.Status != "pass" {
-			issues = append(issues, fmt.Sprintf("command %s status is %q, want pass", name, c.Status))
+			issues = append(
+				issues,
+				fmt.Sprintf("command %s status is %q, want pass", name, c.Status),
+			)
 		}
 		command := strings.TrimSpace(c.Command)
 		if command == "" {
@@ -216,7 +249,10 @@ func validateCommands(commands []CommandReport) []string {
 		}
 		for _, forbidden := range []string{"|| true", "continue-on-error", "set +e"} {
 			if strings.Contains(command, forbidden) {
-				issues = append(issues, fmt.Sprintf("command %s contains bypass marker %q", name, forbidden))
+				issues = append(
+					issues,
+					fmt.Sprintf("command %s contains bypass marker %q", name, forbidden),
+				)
 			}
 		}
 	}
@@ -250,7 +286,10 @@ func validateArtifacts(artifacts []ArtifactReport) []string {
 		}
 		seen[path] = true
 		if filepath.IsAbs(path) || strings.Contains(path, "..") || strings.Contains(path, "\\") {
-			issues = append(issues, fmt.Sprintf("artifact path %q must be relative slash path", path))
+			issues = append(
+				issues,
+				fmt.Sprintf("artifact path %q must be relative slash path", path),
+			)
 		}
 		if strings.TrimSpace(a.Kind) == "" {
 			issues = append(issues, fmt.Sprintf("artifact %s kind is required", path))
@@ -260,7 +299,10 @@ func validateArtifacts(artifacts []ArtifactReport) []string {
 		}
 		if want, ok := required[path]; ok {
 			if a.Schema != want {
-				issues = append(issues, fmt.Sprintf("artifact %s schema is %q, want %q", path, a.Schema, want))
+				issues = append(
+					issues,
+					fmt.Sprintf("artifact %s schema is %q, want %q", path, a.Schema, want),
+				)
 			}
 			delete(required, path)
 		}
@@ -275,20 +317,89 @@ func validateClaims(claims []string) []string {
 	var issues []string
 	for _, claim := range claims {
 		lower := strings.ToLower(claim)
-		for _, forbidden := range []string{"erlang/otp", "cluster", "reconnect", "retry", "non-linux", "formal race", "distributed zero-copy"} {
+		for _, forbidden := range []string{
+			"erlang/otp",
+			"cluster",
+			"reconnect",
+			"retry",
+			"non-linux",
+			"formal race",
+			"distributed zero-copy",
+		} {
 			if strings.Contains(lower, forbidden) {
-				issues = append(issues, fmt.Sprintf("forbidden actor foundation claim %q mentions %q", claim, forbidden))
+				issues = append(
+					issues,
+					fmt.Sprintf(
+						"forbidden actor foundation claim %q mentions %q",
+						claim,
+						forbidden,
+					),
+				)
 			}
 		}
+		if forbidden, ok := forbiddenZeroCopyFoundationClaim(lower); ok {
+			issues = append(
+				issues,
+				fmt.Sprintf("forbidden actor foundation claim %q mentions %q", claim, forbidden),
+			)
+		}
 		if strings.Contains(lower, "distributed actor") {
-			for _, unsupportedTarget := range []string{"windows", "win64", "macos", "darwin", "all-target", "all target", "cross-target", "cross target", "cross-platform", "cross platform"} {
+			for _, unsupportedTarget := range []string{
+				"windows",
+				"win64",
+				"macos",
+				"darwin",
+				"all-target",
+				"all target",
+				"cross-target",
+				"cross target",
+				"cross-platform",
+				"cross platform",
+			} {
 				if strings.Contains(lower, unsupportedTarget) {
-					issues = append(issues, fmt.Sprintf("cross-target distributed actor claim %q lacks target-host smoke evidence for %q", claim, unsupportedTarget))
+					issues = append(
+						issues,
+						fmt.Sprintf(
+							"cross-target distributed actor claim %q lacks target-host smoke evidence for %q",
+							claim,
+							unsupportedTarget,
+						),
+					)
 				}
 			}
 		}
 	}
 	return issues
+}
+
+func forbiddenZeroCopyFoundationClaim(lower string) (string, bool) {
+	normalized := normalizeClaimText(lower)
+	zeroCopyContext := strings.Contains(normalized, "zero copy") ||
+		strings.Contains(normalized, "copy free")
+	if !zeroCopyContext {
+		return "", false
+	}
+	for _, phrase := range []string{
+		"distributed",
+		"network",
+		"cross machine",
+		"cross node",
+		"inter node",
+		"across node",
+		"across nodes",
+		"remote node",
+		"remote nodes",
+	} {
+		if strings.Contains(normalized, phrase) {
+			return phrase + " zero-copy", true
+		}
+	}
+	return "", false
+}
+
+func normalizeClaimText(text string) string {
+	replacer := strings.NewReplacer("-", " ", "_", " ", "/", " ")
+	return strings.Join(strings.Fields(replacer.Replace(strings.ToLower(text))), " ")
 }
 
 func validateNonClaims(nonclaims []string) []string {
@@ -297,7 +408,15 @@ func validateNonClaims(nonclaims []string) []string {
 	}
 	joined := strings.ToLower(strings.Join(nonclaims, "\n"))
 	var issues []string
-	for _, required := range []string{"erlang", "cluster", "reconnect", "retry", "non-linux", "zero-copy", "formal race"} {
+	for _, required := range []string{
+		"erlang",
+		"cluster",
+		"reconnect",
+		"retry",
+		"non-linux",
+		"zero-copy",
+		"formal race",
+	} {
 		if !strings.Contains(joined, required) {
 			issues = append(issues, fmt.Sprintf("nonclaims missing %q boundary", required))
 		}
@@ -325,7 +444,10 @@ func validateArtifactHashManifest(root, rel string, expected map[string]string) 
 	}
 	var issues []string
 	if manifest.Schema != ArtifactHashSchema {
-		issues = append(issues, fmt.Sprintf("%s schema is %q, want %s", rel, manifest.Schema, ArtifactHashSchema))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s schema is %q, want %s", rel, manifest.Schema, ArtifactHashSchema),
+		)
 	}
 	if manifest.Root != "." {
 		issues = append(issues, fmt.Sprintf("%s root is %q, want .", rel, manifest.Root))
@@ -335,8 +457,12 @@ func validateArtifactHashManifest(root, rel string, expected map[string]string) 
 		if artifact.Path == rel {
 			issues = append(issues, fmt.Sprintf("%s must not list itself", rel))
 		}
-		if filepath.IsAbs(artifact.Path) || strings.Contains(artifact.Path, "..") || strings.Contains(artifact.Path, "\\") {
-			issues = append(issues, fmt.Sprintf("%s artifact path %q must be relative slash path", rel, artifact.Path))
+		if filepath.IsAbs(artifact.Path) || strings.Contains(artifact.Path, "..") ||
+			strings.Contains(artifact.Path, "\\") {
+			issues = append(
+				issues,
+				fmt.Sprintf("%s artifact path %q must be relative slash path", rel, artifact.Path),
+			)
 			continue
 		}
 		if seen[artifact.Path] {
@@ -345,7 +471,16 @@ func validateArtifactHashManifest(root, rel string, expected map[string]string) 
 		seen[artifact.Path] = true
 		if want, ok := expected[artifact.Path]; ok {
 			if artifact.Schema != want {
-				issues = append(issues, fmt.Sprintf("%s artifact %s schema is %q, want %q", rel, artifact.Path, artifact.Schema, want))
+				issues = append(
+					issues,
+					fmt.Sprintf(
+						"%s artifact %s schema is %q, want %q",
+						rel,
+						artifact.Path,
+						artifact.Schema,
+						want,
+					),
+				)
 			}
 			delete(expected, artifact.Path)
 		}
@@ -372,10 +507,26 @@ func validateHashedArtifact(root string, artifact hashArtifact) error {
 	wantSHA := fmt.Sprintf("sha256:%x", sum)
 	var issues []string
 	if artifact.SHA256 != wantSHA {
-		issues = append(issues, fmt.Sprintf("artifact-hashes.json sha256 mismatch for %s: got %s want %s", artifact.Path, artifact.SHA256, wantSHA))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"artifact-hashes.json sha256 mismatch for %s: got %s want %s",
+				artifact.Path,
+				artifact.SHA256,
+				wantSHA,
+			),
+		)
 	}
 	if artifact.Size != int64(len(raw)) {
-		issues = append(issues, fmt.Sprintf("artifact-hashes.json size mismatch for %s: got %d want %d", artifact.Path, artifact.Size, len(raw)))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"artifact-hashes.json size mismatch for %s: got %d want %d",
+				artifact.Path,
+				artifact.Size,
+				len(raw),
+			),
+		)
 	}
 	if len(issues) > 0 {
 		return errors.New(strings.Join(issues, "; "))
@@ -386,9 +537,24 @@ func validateHashedArtifact(root string, artifact hashArtifact) error {
 func rejectPaperEvidence(raw []byte) []string {
 	lower := strings.ToLower(string(raw))
 	var issues []string
-	for _, marker := range []string{"metadata-only", "build-only", "docs-only", "sidecar-only", " fake", "\"fake\"", "mock", "placeholder"} {
+	for _, marker := range []string{
+		"metadata-only",
+		"build-only",
+		"docs-only",
+		"sidecar-only",
+		" fake",
+		"\"fake\"",
+		"mock",
+		"placeholder",
+	} {
 		if strings.Contains(lower, marker) {
-			issues = append(issues, fmt.Sprintf("report contains forbidden non-production evidence marker %q", strings.Trim(marker, " \"")))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"report contains forbidden non-production evidence marker %q",
+					strings.Trim(marker, " \""),
+				),
+			)
 		}
 	}
 	return issues

@@ -76,28 +76,29 @@ const (
 )
 
 const (
-	ClaimSafeRepresentationMetadataNotUserAssignable = "safe_representation_metadata: not_user_assignable"
-	ClaimLenStable                                   = "len_stable"
-	ClaimIndexInRange                                = "index_in_range"
-	ClaimRegionAlive                                 = "region_alive"
-	ClaimNoEscape                                    = "no_escape"
-	ClaimNoAlias                                     = "no_alias"
-	ClaimNonNull                                     = "non_null"
-	ClaimMaybeNull                                   = "maybe_null"
-	ClaimAligned                                     = "aligned"
-	ClaimProvenanceKnown                             = "provenance_known"
-	ClaimProvenanceUnknown                           = "provenance_unknown"
-	ClaimOwned                                       = "owned"
-	ClaimBorrowedImm                                 = "borrowed_imm"
-	ClaimBorrowedMut                                 = "borrowed_mut"
-	ClaimMoved                                       = "moved"
-	ClaimPureCall                                    = "pure_call"
-	ClaimNoHeapAllocation                            = "no_heap_allocation"
-	ClaimNoMemWrite                                  = "no_mem_write"
-	ClaimNoActorSend                                 = "no_actor_send"
-	ClaimNoUnknownEscape                             = "no_unknown_escape"
-	ClaimDerivedWindow                               = "derived_window"
-	ClaimIslandEpochAdvanced                         = "island_epoch_advanced"
+	ClaimSafeRepresentationMetadataNotUserAssignable = ("safe_representation_metadata: not_" +
+		"user_assignable")
+	ClaimLenStable           = "len_stable"
+	ClaimIndexInRange        = "index_in_range"
+	ClaimRegionAlive         = "region_alive"
+	ClaimNoEscape            = "no_escape"
+	ClaimNoAlias             = "no_alias"
+	ClaimNonNull             = "non_null"
+	ClaimMaybeNull           = "maybe_null"
+	ClaimAligned             = "aligned"
+	ClaimProvenanceKnown     = "provenance_known"
+	ClaimProvenanceUnknown   = "provenance_unknown"
+	ClaimOwned               = "owned"
+	ClaimBorrowedImm         = "borrowed_imm"
+	ClaimBorrowedMut         = "borrowed_mut"
+	ClaimMoved               = "moved"
+	ClaimPureCall            = "pure_call"
+	ClaimNoHeapAllocation    = "no_heap_allocation"
+	ClaimNoMemWrite          = "no_mem_write"
+	ClaimNoActorSend         = "no_actor_send"
+	ClaimNoUnknownEscape     = "no_unknown_escape"
+	ClaimDerivedWindow       = "derived_window"
+	ClaimIslandEpochAdvanced = "island_epoch_advanced"
 
 	ClaimMayReturnRegion                          = "may_return_region"
 	ClaimMayConsumeParam                          = "may_consume_param"
@@ -172,8 +173,9 @@ const (
 
 	ClaimFFICallMayRetainBorrow                      = "ffi_call_may_retain_borrow"
 	ClaimFFINoaliasInvalidatedByExternalCall         = "ffi_noalias_invalidated_by_external_call"
-	ClaimSafeWrapperPromotionRejectedWithoutContract = "safe_wrapper_promotion_rejected_without_contract"
-	ClaimExternalPointerProvenanceRejected           = "external_pointer_provenance_rejected"
+	ClaimSafeWrapperPromotionRejectedWithoutContract = ("safe_wrapper_promotion_rejected_" +
+		"without_contract")
+	ClaimExternalPointerProvenanceRejected = "external_pointer_provenance_rejected"
 
 	ClaimCopyOwned                      = "copy_owned"
 	ClaimCopySourceFactID               = "copy_source_fact_id"
@@ -721,7 +723,11 @@ func UnsafeCheckedDisallowedClaim(provenanceClass string, unsafeClass string, cl
 	return !containsClaim(unsafeCheckedAllowedClaims, claim)
 }
 
-func UnsafeVerifiedRootDisallowedClaim(provenanceClass string, unsafeClass string, claim string) bool {
+func UnsafeVerifiedRootDisallowedClaim(
+	provenanceClass string,
+	unsafeClass string,
+	claim string,
+) bool {
 	if provenanceClass != ProvenanceUnsafeVerifiedRoot && unsafeClass != UnsafeVerifiedRoot {
 		return false
 	}
@@ -769,8 +775,14 @@ func UnsafeUnknownTrustedStorage(planned string, actual string) bool {
 	return contains(trustedStorageClasses, planned) || contains(trustedStorageClasses, actual)
 }
 
-func UnsafeExternalRootTrustedStorage(provenanceClass string, unsafeClass string, planned string, actual string) bool {
-	return UnsafeExternalRoot(provenanceClass, unsafeClass) && UnsafeUnknownTrustedStorage(planned, actual)
+func UnsafeExternalRootTrustedStorage(
+	provenanceClass string,
+	unsafeClass string,
+	planned string,
+	actual string,
+) bool {
+	return UnsafeExternalRoot(provenanceClass, unsafeClass) &&
+		UnsafeUnknownTrustedStorage(planned, actual)
 }
 
 func ValidatedTrustedStorageHeapFallback(planned string, actual string) bool {
@@ -778,7 +790,8 @@ func ValidatedTrustedStorageHeapFallback(planned string, actual string) bool {
 }
 
 func RuntimeProofRequiredStorage(planned string, actual string) bool {
-	return contains(runtimeProofRequiredStorageClasses, planned) || contains(runtimeProofRequiredStorageClasses, actual)
+	return contains(runtimeProofRequiredStorageClasses, planned) ||
+		contains(runtimeProofRequiredStorageClasses, actual)
 }
 
 func ZeroCostValidationRequiredClaim(claim string) bool {
@@ -792,7 +805,13 @@ func ZeroCostValidationRequiredClaim(claim string) bool {
 	}
 }
 
-func ZeroCostProvenClaimDisallowed(claim string, costClass string, claimLevel string, plannedStorage string, actualLoweringStorage string) bool {
+func ZeroCostProvenClaimDisallowed(
+	claim string,
+	costClass string,
+	claimLevel string,
+	plannedStorage string,
+	actualLoweringStorage string,
+) bool {
 	if costClass != CostZeroCostProven {
 		return false
 	}
@@ -808,7 +827,8 @@ func ZeroCostProvenClaimDisallowed(claim string, costClass string, claimLevel st
 		if RuntimeProofRequiredStorage(plannedStorage, actualLoweringStorage) {
 			return true
 		}
-		return actualLoweringStorage == StorageHeap && plannedStorage != "" && plannedStorage != StorageHeap
+		return actualLoweringStorage == StorageHeap && plannedStorage != "" &&
+			plannedStorage != StorageHeap
 	}
 	return !containsClaim(zeroCostProvenClaims, claim)
 }
@@ -821,7 +841,15 @@ func RowRequiresArtifact(plannedStorage string, actualLoweringStorage string, cl
 	return strings.Contains(claim, "lowering") || strings.Contains(claim, "storage")
 }
 
-func InferredCostClass(claim string, plannedStorage string, actualLoweringStorage string, claimLevelRejected bool, unsafeUnknown bool, escapeState string, aliasState string) string {
+func InferredCostClass(
+	claim string,
+	plannedStorage string,
+	actualLoweringStorage string,
+	claimLevelRejected bool,
+	unsafeUnknown bool,
+	escapeState string,
+	aliasState string,
+) string {
 	claim = normalizeClaim(claim)
 	if strings.HasPrefix(claim, "rejected_") || claimLevelRejected {
 		return CostUnsupportedRejected
@@ -845,12 +873,15 @@ func InferredCostClass(claim string, plannedStorage string, actualLoweringStorag
 		return CostUnsupportedRejected
 	}
 	if claim == ClaimStorageLowering {
-		if actualLoweringStorage == StorageHeap && plannedStorage != "" && plannedStorage != StorageHeap {
+		if actualLoweringStorage == StorageHeap && plannedStorage != "" &&
+			plannedStorage != StorageHeap {
 			return CostConservativeFallback
 		}
 		return CostZeroCostProven
 	}
-	if strings.Contains(claim, "unknown") || escapeState == "unknown" || aliasState == AliasUnknownConservative || plannedStorage == StorageUnknownConservative {
+	if strings.Contains(claim, "unknown") || escapeState == "unknown" ||
+		aliasState == AliasUnknownConservative ||
+		plannedStorage == StorageUnknownConservative {
 		return CostConservativeFallback
 	}
 	return CostInstrumentationOnly

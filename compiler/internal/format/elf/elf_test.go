@@ -85,7 +85,9 @@ func TestWriteELF32LinuxX32HeaderContract(t *testing.T) {
 		t.Fatalf("e_machine = %#x, want EM_X86_64", got)
 	}
 	layout := LinuxX32Layout(len(img.Code), len(img.Data))
-	if got := binary.LittleEndian.Uint32(data[24:28]); got != uint32(LinuxX32BaseVaddr+layout.CodeOffset) {
+	if got := binary.LittleEndian.Uint32(data[24:28]); got != uint32(
+		LinuxX32BaseVaddr+layout.CodeOffset,
+	) {
 		t.Fatalf("e_entry = %#x, want %#x", got, LinuxX32BaseVaddr+layout.CodeOffset)
 	}
 	if got := binary.LittleEndian.Uint32(data[28:32]); got != 52 {
@@ -145,7 +147,9 @@ func TestWriteELF32LinuxX86HeaderContract(t *testing.T) {
 		t.Fatalf("e_machine = %#x, want EM_386", got)
 	}
 	layout := LinuxX86Layout(len(img.Code), len(img.Data))
-	if got := binary.LittleEndian.Uint32(data[24:28]); got != uint32(LinuxX86BaseVaddr+layout.CodeOffset) {
+	if got := binary.LittleEndian.Uint32(data[24:28]); got != uint32(
+		LinuxX86BaseVaddr+layout.CodeOffset,
+	) {
 		t.Fatalf("e_entry = %#x, want %#x", got, LinuxX86BaseVaddr+layout.CodeOffset)
 	}
 	if got := binary.LittleEndian.Uint16(data[40:42]); got != 52 {
@@ -163,7 +167,8 @@ func TestWriteELF32LinuxX86HeaderContract(t *testing.T) {
 }
 
 func TestWriteELF32LinuxX32RejectsInvalidImage(t *testing.T) {
-	if err := WriteELF32LinuxX32(t.TempDir()+"/missing", nil); err == nil || !strings.Contains(err.Error(), "missing ELF image") {
+	if err := WriteELF32LinuxX32(t.TempDir()+"/missing", nil); err == nil ||
+		!strings.Contains(err.Error(), "missing ELF image") {
 		t.Fatalf("missing image error = %v", err)
 	}
 	err := WriteELF32LinuxX32(t.TempDir()+"/bad-entry", &Image{

@@ -105,56 +105,64 @@ const (
 type Outcome string
 
 const (
-	OutcomeValidBorrowLocal                          Outcome = "valid_borrow_local"
-	OutcomeInvalidBorrowReturnEscape                 Outcome = "invalid_borrow_return_escape"
-	OutcomeValidCopyEscape                           Outcome = "valid_copy_escape"
-	OutcomeInvalidBranchOwnerMix                     Outcome = "invalid_branch_owner_mix"
-	OutcomeInvalidUnsafeUnknownBorrow                Outcome = "invalid_unsafe_unknown_borrow"
-	OutcomeValidSequentialInout                      Outcome = "valid_sequential_inout"
-	OutcomeInvalidAliasReadDuringInout               Outcome = "invalid_alias_read_during_inout"
-	OutcomeInvalidAliasWriteDuringInout              Outcome = "invalid_alias_write_during_inout"
-	OutcomeInvalidUnknownCallDuringInout             Outcome = "invalid_unknown_call_during_inout"
-	OutcomeInvalidBranchMergedExclusive              Outcome = "invalid_branch_merged_mutable_exclusive"
-	OutcomeConservativeUnknownCallbackTarget         Outcome = "conservative_unknown_callback_target"
-	OutcomeInvalidCallbackInoutAlias                 Outcome = "invalid_callback_inout_alias"
-	OutcomeConservativeUnknownProtocolDispatch       Outcome = "conservative_unknown_protocol_dispatch"
-	OutcomeInvalidProtocolDispatchNoAlias            Outcome = "invalid_protocol_dispatch_noalias"
-	OutcomeConservativeAsyncBoundaryBorrow           Outcome = "conservative_async_boundary_borrow"
-	OutcomeInvalidTaskBoundaryBorrow                 Outcome = "invalid_task_boundary_borrow"
-	OutcomeInvalidActorBoundaryBorrow                Outcome = "invalid_actor_boundary_borrow"
-	OutcomeInvalidBoundaryNoAlias                    Outcome = "invalid_boundary_noalias"
-	OutcomeValidUnsafeVerifiedRootBounds             Outcome = "valid_unsafe_verified_root_bounds"
-	OutcomeValidUnsafeRuntimeContract                Outcome = "valid_unsafe_runtime_contract"
-	OutcomeInvalidUnsafeUnknownSafeFacts             Outcome = "invalid_unsafe_unknown_safe_facts"
-	OutcomeInvalidUnsafeUnknownNoAlias               Outcome = "invalid_unsafe_unknown_noalias"
-	OutcomeConservativeUnsafeStaticContract          Outcome = "conservative_unsafe_static_contract"
-	OutcomeConservativeRawSliceExternalUnknown       Outcome = "conservative_raw_slice_external_unknown"
-	OutcomeInvalidRawSliceTooLarge                   Outcome = "invalid_raw_slice_too_large"
-	OutcomeValidBoundsCheckRemovedWithProofID        Outcome = "valid_bounds_check_removed_with_proof_id"
-	OutcomeInvalidBoundsCheckMissingProofID          Outcome = "invalid_bounds_check_missing_proof_id"
-	OutcomeInvalidBoundsCheckMismatchedProofID       Outcome = "invalid_bounds_check_mismatched_proof_id"
-	OutcomeInvalidUnsafeUnknownBoundsElimination     Outcome = "invalid_unsafe_unknown_bounds_elimination"
-	OutcomeValidBoundsCheckRetainedDynamic           Outcome = "valid_bounds_check_retained_dynamic"
-	OutcomeConservativeRawBoundsRuntimeCheck         Outcome = "conservative_raw_bounds_runtime_check"
-	OutcomeConservativeExternalPointerUnknown        Outcome = "conservative_external_pointer_unknown"
-	OutcomeConservativeFFICallMayRetainBorrow        Outcome = "conservative_ffi_call_may_retain_borrow"
+	OutcomeValidBorrowLocal              Outcome = "valid_borrow_local"
+	OutcomeInvalidBorrowReturnEscape     Outcome = "invalid_borrow_return_escape"
+	OutcomeValidCopyEscape               Outcome = "valid_copy_escape"
+	OutcomeInvalidBranchOwnerMix         Outcome = "invalid_branch_owner_mix"
+	OutcomeInvalidUnsafeUnknownBorrow    Outcome = "invalid_unsafe_unknown_borrow"
+	OutcomeValidSequentialInout          Outcome = "valid_sequential_inout"
+	OutcomeInvalidAliasReadDuringInout   Outcome = "invalid_alias_read_during_inout"
+	OutcomeInvalidAliasWriteDuringInout  Outcome = "invalid_alias_write_during_inout"
+	OutcomeInvalidUnknownCallDuringInout Outcome = "invalid_unknown_call_during_inout"
+	OutcomeInvalidBranchMergedExclusive  Outcome = ("invalid_branch_merged_" +
+		"mutable_exclusive")
+	OutcomeConservativeUnknownCallbackTarget   Outcome = "conservative_unknown_callback_target"
+	OutcomeInvalidCallbackInoutAlias           Outcome = "invalid_callback_inout_alias"
+	OutcomeConservativeUnknownProtocolDispatch Outcome = "conservative_unknown_protocol_dispatch"
+	OutcomeInvalidProtocolDispatchNoAlias      Outcome = "invalid_protocol_dispatch_noalias"
+	OutcomeConservativeAsyncBoundaryBorrow     Outcome = "conservative_async_boundary_borrow"
+	OutcomeInvalidTaskBoundaryBorrow           Outcome = "invalid_task_boundary_borrow"
+	OutcomeInvalidActorBoundaryBorrow          Outcome = "invalid_actor_boundary_borrow"
+	OutcomeInvalidBoundaryNoAlias              Outcome = "invalid_boundary_noalias"
+	OutcomeValidUnsafeVerifiedRootBounds       Outcome = "valid_unsafe_verified_root_bounds"
+	OutcomeValidUnsafeRuntimeContract          Outcome = "valid_unsafe_runtime_contract"
+	OutcomeInvalidUnsafeUnknownSafeFacts       Outcome = "invalid_unsafe_unknown_safe_facts"
+	OutcomeInvalidUnsafeUnknownNoAlias         Outcome = "invalid_unsafe_unknown_noalias"
+	OutcomeConservativeUnsafeStaticContract    Outcome = "conservative_unsafe_static_contract"
+	OutcomeConservativeRawSliceExternalUnknown Outcome = ("conservative_raw_slice_" +
+		"external_unknown")
+	OutcomeInvalidRawSliceTooLarge            Outcome = "invalid_raw_slice_too_large"
+	OutcomeValidBoundsCheckRemovedWithProofID Outcome = ("valid_bounds_check_removed_" +
+		"with_proof_id")
+	OutcomeInvalidBoundsCheckMissingProofID    Outcome = "invalid_bounds_check_missing_proof_id"
+	OutcomeInvalidBoundsCheckMismatchedProofID Outcome = ("invalid_bounds_check_" +
+		"mismatched_proof_id")
+	OutcomeInvalidUnsafeUnknownBoundsElimination Outcome = ("invalid_unsafe_unknown_" +
+		"bounds_elimination")
+	OutcomeValidBoundsCheckRetainedDynamic    Outcome = "valid_bounds_check_retained_dynamic"
+	OutcomeConservativeRawBoundsRuntimeCheck  Outcome = "conservative_raw_bounds_runtime_check"
+	OutcomeConservativeExternalPointerUnknown Outcome = "conservative_external_pointer_unknown"
+	OutcomeConservativeFFICallMayRetainBorrow Outcome = ("conservative_ffi_call_may_" +
+		"retain_borrow")
 	OutcomeInvalidSafeWrapperPromotion               Outcome = "invalid_safe_wrapper_promotion"
 	OutcomeInvalidExternalCallNoAlias                Outcome = "invalid_external_call_noalias"
 	OutcomeInvalidEscapedTrustedStorage              Outcome = "invalid_escaped_trusted_storage"
-	OutcomeInvalidTrustedStorageMissingNoEscapeProof Outcome = "invalid_trusted_storage_missing_no_escape_proof"
-	OutcomeValidHeapFallbackReasonPreserved          Outcome = "valid_heap_fallback_reason_preserved"
-	OutcomeInvalidHeapFallbackEvidence               Outcome = "invalid_heap_fallback_evidence"
-	OutcomeConservativeBoundaryStorage               Outcome = "conservative_boundary_storage"
-	OutcomeValidPreAwaitLocalBorrow                  Outcome = "valid_pre_await_local_borrow"
-	OutcomeConservativePostAwaitBorrow               Outcome = "conservative_post_await_borrow"
-	OutcomeInvalidCancellationBorrowLifetime         Outcome = "invalid_cancellation_borrow_lifetime"
-	OutcomeConservativeTaskGroupNoAlias              Outcome = "conservative_task_group_noalias"
-	OutcomeConservativeActorReentrantCallback        Outcome = "conservative_actor_reentrant_callback"
-	OutcomeConservativeDynamicExistentialBorrow      Outcome = "conservative_dynamic_existential_borrow"
-	OutcomeValidStaticWitnessBorrowFact              Outcome = "valid_static_witness_borrow_fact"
-	OutcomeInvalidStaticWitnessMissingParent         Outcome = "invalid_static_witness_missing_parent"
-	OutcomeInvalidDynamicProtocolNoAlias             Outcome = "invalid_dynamic_protocol_noalias"
-	OutcomeInvalidWitnessProvenancePromotion         Outcome = "invalid_witness_provenance_promotion"
+	OutcomeInvalidTrustedStorageMissingNoEscapeProof Outcome = ("invalid_trusted_storage_" +
+		"missing_no_escape_proof")
+	OutcomeValidHeapFallbackReasonPreserved     Outcome = "valid_heap_fallback_reason_preserved"
+	OutcomeInvalidHeapFallbackEvidence          Outcome = "invalid_heap_fallback_evidence"
+	OutcomeConservativeBoundaryStorage          Outcome = "conservative_boundary_storage"
+	OutcomeValidPreAwaitLocalBorrow             Outcome = "valid_pre_await_local_borrow"
+	OutcomeConservativePostAwaitBorrow          Outcome = "conservative_post_await_borrow"
+	OutcomeInvalidCancellationBorrowLifetime    Outcome = "invalid_cancellation_borrow_lifetime"
+	OutcomeConservativeTaskGroupNoAlias         Outcome = "conservative_task_group_noalias"
+	OutcomeConservativeActorReentrantCallback   Outcome = "conservative_actor_reentrant_callback"
+	OutcomeConservativeDynamicExistentialBorrow Outcome = ("conservative_dynamic_" +
+		"existential_borrow")
+	OutcomeValidStaticWitnessBorrowFact      Outcome = "valid_static_witness_borrow_fact"
+	OutcomeInvalidStaticWitnessMissingParent Outcome = "invalid_static_witness_missing_parent"
+	OutcomeInvalidDynamicProtocolNoAlias     Outcome = "invalid_dynamic_protocol_noalias"
+	OutcomeInvalidWitnessProvenancePromotion Outcome = "invalid_witness_provenance_promotion"
 )
 
 type Scenario struct {
@@ -188,7 +196,10 @@ type Result struct {
 
 func Evaluate(s Scenario) Result {
 	if storagePlanIsTrusted(s.StoragePlan) && escapeCrossesStorageBoundary(s.Escape) {
-		return Result{Outcome: OutcomeInvalidEscapedTrustedStorage, Reason: "escaped value cannot lower as trusted stack, region, task, actor, or island storage"}
+		return Result{
+			Outcome: OutcomeInvalidEscapedTrustedStorage,
+			Reason:  "escaped value cannot lower as trusted stack, region, task, actor, or island storage",
+		}
 	}
 	if result, ok := evaluateDynamicProtocolV11(s); ok {
 		return result
@@ -212,63 +223,135 @@ func Evaluate(s Scenario) Result {
 		return result
 	}
 	if distinctNonEmpty(s.BranchOwners) > 1 {
-		return Result{Outcome: OutcomeInvalidBranchOwnerMix, Reason: "borrowed value has multiple visible branch owners"}
+		return Result{
+			Outcome: OutcomeInvalidBranchOwnerMix,
+			Reason:  "borrowed value has multiple visible branch owners",
+		}
 	}
 	if s.Source == SourceUnsafeUnknown {
-		return Result{Outcome: OutcomeInvalidUnsafeUnknownBorrow, Reason: "unsafe_unknown cannot produce trusted borrowed ownership"}
+		return Result{
+			Outcome: OutcomeInvalidUnsafeUnknownBorrow,
+			Reason:  "unsafe_unknown cannot produce trusted borrowed ownership",
+		}
 	}
 	if s.Wrapper == WrapperCallbackArg && !s.CallbackTargetKnown {
-		return Result{Outcome: OutcomeConservativeUnknownCallbackTarget, Reason: "unknown callback target cannot produce trusted borrow facts"}
+		return Result{
+			Outcome: OutcomeConservativeUnknownCallbackTarget,
+			Reason:  "unknown callback target cannot produce trusted borrow facts",
+		}
 	}
 	if s.Wrapper == WrapperProtocolDispatch && !s.DispatchTargetKnown {
-		return Result{Outcome: OutcomeConservativeUnknownProtocolDispatch, Reason: "unknown protocol dispatch target cannot produce trusted borrow facts"}
+		return Result{
+			Outcome: OutcomeConservativeUnknownProtocolDispatch,
+			Reason:  "unknown protocol dispatch target cannot produce trusted borrow facts",
+		}
 	}
-	if s.Copied && (s.Escape == EscapeReturn || s.Escape == EscapeStore || s.Escape == EscapeTaskBoundary || s.Escape == EscapeActorBoundary) {
-		return Result{Outcome: OutcomeValidCopyEscape, Valid: true, Reason: "copy creates owned provenance before escape"}
+	if s.Copied &&
+		(s.Escape == EscapeReturn || s.Escape == EscapeStore || s.Escape == EscapeTaskBoundary || s.Escape == EscapeActorBoundary) {
+		return Result{
+			Outcome: OutcomeValidCopyEscape,
+			Valid:   true,
+			Reason:  "copy creates owned provenance before escape",
+		}
 	}
-	if s.Source == SourceBorrowedView && s.Wrapper == WrapperAsyncBoundary && s.Escape == EscapeAcrossAwait {
-		return Result{Outcome: OutcomeConservativeAsyncBoundaryBorrow, Reason: "borrowed view crossing async suspension remains conservative unless proven local and non-escaping"}
+	if s.Source == SourceBorrowedView && s.Wrapper == WrapperAsyncBoundary &&
+		s.Escape == EscapeAcrossAwait {
+		return Result{
+			Outcome: OutcomeConservativeAsyncBoundaryBorrow,
+			Reason: ("borrowed view crossing async suspension remains conservative " +
+				"unless proven local and non-escaping"),
+		}
 	}
-	if s.Source == SourceBorrowedView && s.Wrapper == WrapperTaskBoundary && s.Escape == EscapeTaskBoundary {
-		return Result{Outcome: OutcomeInvalidTaskBoundaryBorrow, Reason: "borrowed view cannot cross task boundary without explicit copy"}
+	if s.Source == SourceBorrowedView && s.Wrapper == WrapperTaskBoundary &&
+		s.Escape == EscapeTaskBoundary {
+		return Result{
+			Outcome: OutcomeInvalidTaskBoundaryBorrow,
+			Reason:  "borrowed view cannot cross task boundary without explicit copy",
+		}
 	}
-	if s.Source == SourceBorrowedView && s.Wrapper == WrapperActorBoundary && s.Escape == EscapeActorBoundary {
-		return Result{Outcome: OutcomeInvalidActorBoundaryBorrow, Reason: "borrowed view cannot cross actor boundary without explicit copy"}
+	if s.Source == SourceBorrowedView && s.Wrapper == WrapperActorBoundary &&
+		s.Escape == EscapeActorBoundary {
+		return Result{
+			Outcome: OutcomeInvalidActorBoundaryBorrow,
+			Reason:  "borrowed view cannot cross actor boundary without explicit copy",
+		}
 	}
-	if s.Source == SourceBorrowedView && s.Wrapper != WrapperNone && (s.Escape == EscapeReturn || s.Escape == EscapeStore) {
-		return Result{Outcome: OutcomeInvalidBorrowReturnEscape, Reason: "borrowed aggregate cannot escape its owner"}
+	if s.Source == SourceBorrowedView && s.Wrapper != WrapperNone &&
+		(s.Escape == EscapeReturn || s.Escape == EscapeStore) {
+		return Result{
+			Outcome: OutcomeInvalidBorrowReturnEscape,
+			Reason:  "borrowed aggregate cannot escape its owner",
+		}
 	}
-	return Result{Outcome: OutcomeValidBorrowLocal, Valid: true, Reason: "borrowed view stays in local scope"}
+	return Result{
+		Outcome: OutcomeValidBorrowLocal,
+		Valid:   true,
+		Reason:  "borrowed view stays in local scope",
+	}
 }
 
 func evaluateDynamicProtocolV11(s Scenario) (Result, bool) {
 	if s.Source == SourceBorrowedView && s.Wrapper == WrapperDynamicExistential {
-		return Result{Outcome: OutcomeConservativeDynamicExistentialBorrow, Reason: "dynamic existential or protocol borrow carrier remains conservative unless statically resolved"}, true
+		return Result{
+			Outcome: OutcomeConservativeDynamicExistentialBorrow,
+			Reason: ("dynamic existential or protocol borrow carrier remains " +
+				"conservative unless statically resolved"),
+		}, true
 	}
 	if s.Source == SourceBorrowedView && s.Wrapper == WrapperStaticWitness {
 		if s.SourceFactIDPresent {
-			return Result{Outcome: OutcomeValidStaticWitnessBorrowFact, Valid: true, Reason: "static witness proof carries borrow facts only with compiler-owned parent fact"}, true
+			return Result{
+				Outcome: OutcomeValidStaticWitnessBorrowFact,
+				Valid:   true,
+				Reason:  "static witness proof carries borrow facts only with compiler-owned parent fact",
+			}, true
 		}
-		return Result{Outcome: OutcomeInvalidStaticWitnessMissingParent, Reason: "static witness proof requires compiler-owned parent fact"}, true
+		return Result{
+			Outcome: OutcomeInvalidStaticWitnessMissingParent,
+			Reason:  "static witness proof requires compiler-owned parent fact",
+		}, true
 	}
-	if s.Wrapper == WrapperWitnessTableLookup && (s.Source == SourceUnsafeUnknown || s.Source == SourceExternalPointer) {
-		return Result{Outcome: OutcomeInvalidWitnessProvenancePromotion, Reason: "witness table lookup cannot promote unsafe or unknown provenance to safe_known"}, true
+	if s.Wrapper == WrapperWitnessTableLookup &&
+		(s.Source == SourceUnsafeUnknown || s.Source == SourceExternalPointer) {
+		return Result{
+			Outcome: OutcomeInvalidWitnessProvenancePromotion,
+			Reason:  "witness table lookup cannot promote unsafe or unknown provenance to safe_known",
+		}, true
 	}
 	return Result{}, false
 }
 
 func evaluateAsyncV10(s Scenario) (Result, bool) {
-	if s.Source == SourceBorrowedView && s.Wrapper == WrapperAsyncBoundary && s.Escape == EscapeBeforeSuspension && s.NoEscapeProof {
-		return Result{Outcome: OutcomeValidPreAwaitLocalBorrow, Valid: true, Reason: "borrowed value is used before suspension with compiler-owned local no-escape proof"}, true
+	if s.Source == SourceBorrowedView && s.Wrapper == WrapperAsyncBoundary &&
+		s.Escape == EscapeBeforeSuspension &&
+		s.NoEscapeProof {
+		return Result{
+			Outcome: OutcomeValidPreAwaitLocalBorrow,
+			Valid:   true,
+			Reason:  "borrowed value is used before suspension with compiler-owned local no-escape proof",
+		}, true
 	}
-	if s.Source == SourceBorrowedView && s.Wrapper == WrapperAsyncBoundary && s.Escape == EscapeAfterCancellation {
-		return Result{Outcome: OutcomeConservativePostAwaitBorrow, Reason: "borrowed value used after suspension or cancellation remains conservative"}, true
+	if s.Source == SourceBorrowedView && s.Wrapper == WrapperAsyncBoundary &&
+		s.Escape == EscapeAfterCancellation {
+		return Result{
+			Outcome: OutcomeConservativePostAwaitBorrow,
+			Reason:  "borrowed value used after suspension or cancellation remains conservative",
+		}, true
 	}
-	if s.Source == SourceBorrowedView && s.Wrapper == WrapperTaskBoundary && s.Escape == EscapeCancellation {
-		return Result{Outcome: OutcomeInvalidCancellationBorrowLifetime, Reason: "cancellation invalidates task-owned borrowed lifetime assumptions"}, true
+	if s.Source == SourceBorrowedView && s.Wrapper == WrapperTaskBoundary &&
+		s.Escape == EscapeCancellation {
+		return Result{
+			Outcome: OutcomeInvalidCancellationBorrowLifetime,
+			Reason:  "cancellation invalidates task-owned borrowed lifetime assumptions",
+		}, true
 	}
-	if s.Source == SourceBorrowedView && s.Wrapper == WrapperActorReentrantCallback && s.Escape == EscapeActorBoundary {
-		return Result{Outcome: OutcomeConservativeActorReentrantCallback, Reason: "actor reentrant callback keeps borrowed state and storage conservative without separate proof"}, true
+	if s.Source == SourceBorrowedView && s.Wrapper == WrapperActorReentrantCallback &&
+		s.Escape == EscapeActorBoundary {
+		return Result{
+			Outcome: OutcomeConservativeActorReentrantCallback,
+			Reason: ("actor reentrant callback keeps borrowed state and storage " +
+				"conservative without separate proof"),
+		}, true
 	}
 	return Result{}, false
 }
@@ -278,19 +361,36 @@ func evaluateStorage(s Scenario) (Result, bool) {
 		return Result{}, false
 	}
 	if storagePlanIsTrusted(s.StoragePlan) && escapeCrossesStorageBoundary(s.Escape) {
-		return Result{Outcome: OutcomeInvalidEscapedTrustedStorage, Reason: "escaped value cannot lower as trusted stack, region, task, actor, or island storage"}, true
+		return Result{
+			Outcome: OutcomeInvalidEscapedTrustedStorage,
+			Reason:  "escaped value cannot lower as trusted stack, region, task, actor, or island storage",
+		}, true
 	}
 	if storagePlanIsTrusted(s.StoragePlan) && !s.NoEscapeProof {
-		return Result{Outcome: OutcomeInvalidTrustedStorageMissingNoEscapeProof, Reason: "trusted stack or region storage requires compiler-owned no-escape proof"}, true
+		return Result{
+			Outcome: OutcomeInvalidTrustedStorageMissingNoEscapeProof,
+			Reason:  "trusted stack or region storage requires compiler-owned no-escape proof",
+		}, true
 	}
 	if s.StoragePlan == StoragePlanHeapFallback {
 		if !s.SourceFactIDPresent || !s.StorageFallbackReasonPresent {
-			return Result{Outcome: OutcomeInvalidHeapFallbackEvidence, Reason: "heap fallback must preserve source_fact_id and a reviewable reason"}, true
+			return Result{
+				Outcome: OutcomeInvalidHeapFallbackEvidence,
+				Reason:  "heap fallback must preserve source_fact_id and a reviewable reason",
+			}, true
 		}
-		if escapeCrossesAsyncTaskActorFFIOrUnknownBoundary(s.Escape) || s.Wrapper == WrapperFFICall {
-			return Result{Outcome: OutcomeConservativeBoundaryStorage, Reason: "async, task, actor, FFI, or unknown-call boundary keeps storage conservative"}, true
+		if escapeCrossesAsyncTaskActorFFIOrUnknownBoundary(s.Escape) ||
+			s.Wrapper == WrapperFFICall {
+			return Result{
+				Outcome: OutcomeConservativeBoundaryStorage,
+				Reason:  "async, task, actor, FFI, or unknown-call boundary keeps storage conservative",
+			}, true
 		}
-		return Result{Outcome: OutcomeValidHeapFallbackReasonPreserved, Valid: true, Reason: "heap fallback preserves source_fact_id and reason"}, true
+		return Result{
+			Outcome: OutcomeValidHeapFallbackReasonPreserved,
+			Valid:   true,
+			Reason:  "heap fallback preserves source_fact_id and reason",
+		}, true
 	}
 	return Result{}, false
 }
@@ -307,7 +407,12 @@ func storagePlanIsTrusted(plan StoragePlanKind) bool {
 
 func escapeCrossesStorageBoundary(escape EscapeKind) bool {
 	switch escape {
-	case EscapeReturn, EscapeStore, EscapeAcrossAwait, EscapeTaskBoundary, EscapeActorBoundary, EscapeFFIBoundary:
+	case EscapeReturn,
+		EscapeStore,
+		EscapeAcrossAwait,
+		EscapeTaskBoundary,
+		EscapeActorBoundary,
+		EscapeFFIBoundary:
 		return true
 	default:
 		return false
@@ -324,20 +429,40 @@ func escapeCrossesAsyncTaskActorFFIOrUnknownBoundary(escape EscapeKind) bool {
 }
 
 func evaluateFFI(s Scenario) (Result, bool) {
-	if s.Wrapper == WrapperFFICall && s.Copied && (s.Escape == EscapeFFIBoundary || s.Escape == EscapeReturn || s.Escape == EscapeStore) {
-		return Result{Outcome: OutcomeValidCopyEscape, Valid: true, Reason: "explicit copy creates owned provenance before crossing FFI"}, true
+	if s.Wrapper == WrapperFFICall && s.Copied &&
+		(s.Escape == EscapeFFIBoundary || s.Escape == EscapeReturn || s.Escape == EscapeStore) {
+		return Result{
+			Outcome: OutcomeValidCopyEscape,
+			Valid:   true,
+			Reason:  "explicit copy creates owned provenance before crossing FFI",
+		}, true
 	}
 	if s.Source == SourceExternalPointer && s.Wrapper == WrapperSafeWrapperPromotion {
-		return Result{Outcome: OutcomeInvalidSafeWrapperPromotion, Reason: "safe wrapper promotion from external pointer requires compiler-owned proof"}, true
+		return Result{
+			Outcome: OutcomeInvalidSafeWrapperPromotion,
+			Reason:  "safe wrapper promotion from external pointer requires compiler-owned proof",
+		}, true
 	}
 	if s.Source == SourceUnsafeUnknown && s.Wrapper == WrapperSafeWrapperPromotion {
-		return Result{Outcome: OutcomeInvalidSafeWrapperPromotion, Reason: "unsafe_unknown cannot be promoted into a safe wrapper without proof"}, true
+		return Result{
+			Outcome: OutcomeInvalidSafeWrapperPromotion,
+			Reason:  "unsafe_unknown cannot be promoted into a safe wrapper without proof",
+		}, true
 	}
-	if s.Wrapper == WrapperFFICall && s.Source == SourceBorrowedView && s.Escape == EscapeFFIBoundary {
-		return Result{Outcome: OutcomeConservativeFFICallMayRetainBorrow, Reason: "external call may retain borrowed pointer unless a compiler-owned contract proves otherwise"}, true
+	if s.Wrapper == WrapperFFICall && s.Source == SourceBorrowedView &&
+		s.Escape == EscapeFFIBoundary {
+		return Result{
+			Outcome: OutcomeConservativeFFICallMayRetainBorrow,
+			Reason: ("external call may retain borrowed pointer unless a compiler-" +
+				"owned contract proves otherwise"),
+		}, true
 	}
-	if s.Source == SourceExternalPointer && (s.Wrapper == WrapperRawPointer || s.Wrapper == WrapperRawSliceFromParts || s.Wrapper == WrapperFFICall) {
-		return Result{Outcome: OutcomeConservativeExternalPointerUnknown, Reason: "external pointer remains unsafe_unknown without compiler-owned provenance"}, true
+	if s.Source == SourceExternalPointer &&
+		(s.Wrapper == WrapperRawPointer || s.Wrapper == WrapperRawSliceFromParts || s.Wrapper == WrapperFFICall) {
+		return Result{
+			Outcome: OutcomeConservativeExternalPointerUnknown,
+			Reason:  "external pointer remains unsafe_unknown without compiler-owned provenance",
+		}, true
 	}
 	return Result{}, false
 }
@@ -349,23 +474,49 @@ func evaluateBoundsProof(s Scenario) (Result, bool) {
 	switch s.BoundsProof {
 	case BoundsProofPresent:
 		if s.ProofIDMatches {
-			return Result{Outcome: OutcomeValidBoundsCheckRemovedWithProofID, Valid: true, Reason: "removed bounds check has compiler-owned proof id linked to PLIR proof guards"}, true
+			return Result{
+				Outcome: OutcomeValidBoundsCheckRemovedWithProofID,
+				Valid:   true,
+				Reason:  "removed bounds check has compiler-owned proof id linked to PLIR proof guards",
+			}, true
 		}
-		return Result{Outcome: OutcomeInvalidBoundsCheckMismatchedProofID, Reason: "removed bounds check proof id does not match live PLIR proof guards"}, true
+		return Result{
+			Outcome: OutcomeInvalidBoundsCheckMismatchedProofID,
+			Reason:  "removed bounds check proof id does not match live PLIR proof guards",
+		}, true
 	case BoundsProofMissing:
-		return Result{Outcome: OutcomeInvalidBoundsCheckMissingProofID, Reason: "removed bounds check without proof id is rejected"}, true
+		return Result{
+			Outcome: OutcomeInvalidBoundsCheckMissingProofID,
+			Reason:  "removed bounds check without proof id is rejected",
+		}, true
 	case BoundsProofUnsafeUnknown:
-		return Result{Outcome: OutcomeInvalidUnsafeUnknownBoundsElimination, Reason: "unsafe_unknown cannot authorize eliminated bounds checks"}, true
+		return Result{
+			Outcome: OutcomeInvalidUnsafeUnknownBoundsElimination,
+			Reason:  "unsafe_unknown cannot authorize eliminated bounds checks",
+		}, true
 	case BoundsProofRetainedDynamic:
 		if s.NormalBuildCheck {
-			return Result{Outcome: OutcomeValidBoundsCheckRetainedDynamic, Valid: true, Reason: "missing proof keeps bounds check in the normal build"}, true
+			return Result{
+				Outcome: OutcomeValidBoundsCheckRetainedDynamic,
+				Valid:   true,
+				Reason:  "missing proof keeps bounds check in the normal build",
+			}, true
 		}
-		return Result{Outcome: OutcomeInvalidBoundsCheckMissingProofID, Reason: "retained dynamic bounds check requires normal_build_check evidence"}, true
+		return Result{
+			Outcome: OutcomeInvalidBoundsCheckMissingProofID,
+			Reason:  "retained dynamic bounds check requires normal_build_check evidence",
+		}, true
 	case BoundsProofRawOverflow:
 		if s.BoundsOverflow || s.NormalBuildCheck {
-			return Result{Outcome: OutcomeConservativeRawBoundsRuntimeCheck, Reason: "raw bounds width or overflow uncertainty keeps a normal-build check or trap"}, true
+			return Result{
+				Outcome: OutcomeConservativeRawBoundsRuntimeCheck,
+				Reason:  "raw bounds width or overflow uncertainty keeps a normal-build check or trap",
+			}, true
 		}
-		return Result{Outcome: OutcomeInvalidBoundsCheckMismatchedProofID, Reason: "raw bounds uncertainty cannot become zero-cost eliminated without proof"}, true
+		return Result{
+			Outcome: OutcomeInvalidBoundsCheckMismatchedProofID,
+			Reason:  "raw bounds uncertainty cannot become zero-cost eliminated without proof",
+		}, true
 	default:
 		return Result{}, false
 	}
@@ -376,28 +527,59 @@ func evaluateRawUnsafe(s Scenario) (Result, bool) {
 		return Result{}, false
 	}
 	if s.Source == SourceUnsafeUnknown && s.UnsafeContract == ContractNoAlias {
-		return Result{Outcome: OutcomeInvalidUnsafeUnknownNoAlias, Reason: "unsafe_unknown raw pointer cannot emit noalias facts"}, true
+		return Result{
+			Outcome: OutcomeInvalidUnsafeUnknownNoAlias,
+			Reason:  "unsafe_unknown raw pointer cannot emit noalias facts",
+		}, true
 	}
 	if s.Wrapper == WrapperRawSliceFromParts && s.Source == SourceUnsafeUnknown {
-		return Result{Outcome: OutcomeConservativeRawSliceExternalUnknown, Reason: "raw_slice_from_parts over unknown pointer remains external_unknown"}, true
+		return Result{
+			Outcome: OutcomeConservativeRawSliceExternalUnknown,
+			Reason:  "raw_slice_from_parts over unknown pointer remains external_unknown",
+		}, true
 	}
 	if s.UnsafeContract == ContractNoAlias || s.UnsafeContract == ContractLifetimeRegion {
-		return Result{Outcome: OutcomeConservativeUnsafeStaticContract, Reason: "unsafe noalias/lifetime/region contracts remain static-untrusted unless separately proven"}, true
+		return Result{
+			Outcome: OutcomeConservativeUnsafeStaticContract,
+			Reason: ("unsafe noalias/lifetime/region contracts remain static-" +
+				"untrusted unless separately proven"),
+		}, true
 	}
 	if s.UnsafeContract == ContractNonNullAlignmentLength && s.RuntimeCheckable {
-		return Result{Outcome: OutcomeValidUnsafeRuntimeContract, Valid: true, Reason: "nonnull, alignment, and length are runtime-checkable unsafe contracts"}, true
+		return Result{
+			Outcome: OutcomeValidUnsafeRuntimeContract,
+			Valid:   true,
+			Reason:  "nonnull, alignment, and length are runtime-checkable unsafe contracts",
+		}, true
 	}
 	if s.Wrapper == WrapperRawSliceFromParts && s.Source == SourceUnsafeVerifiedRoot {
 		if s.RawSliceLengthFits {
-			return Result{Outcome: OutcomeValidUnsafeVerifiedRootBounds, Valid: true, Reason: "raw_slice_from_parts fits verified allocation-root bounds"}, true
+			return Result{
+				Outcome: OutcomeValidUnsafeVerifiedRootBounds,
+				Valid:   true,
+				Reason:  "raw_slice_from_parts fits verified allocation-root bounds",
+			}, true
 		}
-		return Result{Outcome: OutcomeInvalidRawSliceTooLarge, Reason: "raw_slice_from_parts length exceeds verified allocation-root bounds"}, true
+		return Result{
+			Outcome: OutcomeInvalidRawSliceTooLarge,
+			Reason:  "raw_slice_from_parts length exceeds verified allocation-root bounds",
+		}, true
 	}
-	if s.Source == SourceUnsafeVerifiedRoot && s.Wrapper == WrapperRawPointer && s.Escape == EscapeRawPtrAdd && s.PointerInBounds {
-		return Result{Outcome: OutcomeValidUnsafeVerifiedRootBounds, Valid: true, Reason: "ptr_add stays within core.alloc_bytes verified allocation-root bounds"}, true
+	if s.Source == SourceUnsafeVerifiedRoot && s.Wrapper == WrapperRawPointer &&
+		s.Escape == EscapeRawPtrAdd &&
+		s.PointerInBounds {
+		return Result{
+			Outcome: OutcomeValidUnsafeVerifiedRootBounds,
+			Valid:   true,
+			Reason:  "ptr_add stays within core.alloc_bytes verified allocation-root bounds",
+		}, true
 	}
-	if s.Source == SourceUnsafeUnknown && (s.Wrapper == WrapperRawPointer || s.Escape == EscapeRawPtrAdd || s.UnsafeContract != ContractNone) {
-		return Result{Outcome: OutcomeInvalidUnsafeUnknownSafeFacts, Reason: "unsafe_unknown raw pointer cannot produce safe_known or provenance_known facts"}, true
+	if s.Source == SourceUnsafeUnknown &&
+		(s.Wrapper == WrapperRawPointer || s.Escape == EscapeRawPtrAdd || s.UnsafeContract != ContractNone) {
+		return Result{
+			Outcome: OutcomeInvalidUnsafeUnknownSafeFacts,
+			Reason:  "unsafe_unknown raw pointer cannot produce safe_known or provenance_known facts",
+		}, true
 	}
 	return Result{}, false
 }
@@ -418,52 +600,89 @@ func evaluateInout(events []InoutEvent) Result {
 		switch event {
 		case EventStartInout:
 			if active {
-				return Result{Outcome: OutcomeInvalidBranchMergedExclusive, Reason: "inout interval started while another exclusive interval is active"}
+				return Result{
+					Outcome: OutcomeInvalidBranchMergedExclusive,
+					Reason:  "inout interval started while another exclusive interval is active",
+				}
 			}
 			active = true
 		case EventEndInout:
 			active = false
 		case EventAliasRead:
 			if active {
-				return Result{Outcome: OutcomeInvalidAliasReadDuringInout, Reason: "read alias used during active inout interval"}
+				return Result{
+					Outcome: OutcomeInvalidAliasReadDuringInout,
+					Reason:  "read alias used during active inout interval",
+				}
 			}
 		case EventAliasWrite:
 			if active {
-				return Result{Outcome: OutcomeInvalidAliasWriteDuringInout, Reason: "write alias used during active inout interval"}
+				return Result{
+					Outcome: OutcomeInvalidAliasWriteDuringInout,
+					Reason:  "write alias used during active inout interval",
+				}
 			}
 		case EventUnknownCall:
 			if active {
-				return Result{Outcome: OutcomeInvalidUnknownCallDuringInout, Reason: "unknown call may retain an exclusive inout pointer"}
+				return Result{
+					Outcome: OutcomeInvalidUnknownCallDuringInout,
+					Reason:  "unknown call may retain an exclusive inout pointer",
+				}
 			}
 		case EventCallbackReentrantCall:
 			if active {
-				return Result{Outcome: OutcomeInvalidCallbackInoutAlias, Reason: "callback or reentrant call invalidates broad inout noalias"}
+				return Result{
+					Outcome: OutcomeInvalidCallbackInoutAlias,
+					Reason:  "callback or reentrant call invalidates broad inout noalias",
+				}
 			}
 		case EventProtocolDispatchCall:
 			if active {
-				return Result{Outcome: OutcomeInvalidProtocolDispatchNoAlias, Reason: "protocol or interface dispatch invalidates broad inout noalias"}
+				return Result{
+					Outcome: OutcomeInvalidProtocolDispatchNoAlias,
+					Reason:  "protocol or interface dispatch invalidates broad inout noalias",
+				}
 			}
 		case EventDynamicProtocolDispatchCall:
 			if active {
-				return Result{Outcome: OutcomeInvalidDynamicProtocolNoAlias, Reason: "dynamic protocol dispatch cannot validate broad noalias"}
+				return Result{
+					Outcome: OutcomeInvalidDynamicProtocolNoAlias,
+					Reason:  "dynamic protocol dispatch cannot validate broad noalias",
+				}
 			}
 		case EventTaskGroupBoundaryCall:
 			if active {
-				return Result{Outcome: OutcomeConservativeTaskGroupNoAlias, Reason: "task group or structured concurrency boundary cannot validate broad inout noalias"}
+				return Result{
+					Outcome: OutcomeConservativeTaskGroupNoAlias,
+					Reason:  "task group or structured concurrency boundary cannot validate broad inout noalias",
+				}
 			}
 		case EventTaskBoundaryCall, EventActorBoundaryCall:
 			if active {
-				return Result{Outcome: OutcomeInvalidBoundaryNoAlias, Reason: "task or actor boundary invalidates broad inout noalias"}
+				return Result{
+					Outcome: OutcomeInvalidBoundaryNoAlias,
+					Reason:  "task or actor boundary invalidates broad inout noalias",
+				}
 			}
 		case EventExternalCall:
 			if active {
-				return Result{Outcome: OutcomeInvalidExternalCallNoAlias, Reason: "external call invalidates broad inout noalias"}
+				return Result{
+					Outcome: OutcomeInvalidExternalCallNoAlias,
+					Reason:  "external call invalidates broad inout noalias",
+				}
 			}
 		case EventBranchMerge:
-			return Result{Outcome: OutcomeInvalidBranchMergedExclusive, Reason: "branch-merged mutable_exclusive state is conservative"}
+			return Result{
+				Outcome: OutcomeInvalidBranchMergedExclusive,
+				Reason:  "branch-merged mutable_exclusive state is conservative",
+			}
 		}
 	}
-	return Result{Outcome: OutcomeValidSequentialInout, Valid: true, Reason: "all inout intervals ended before the next exclusive use"}
+	return Result{
+		Outcome: OutcomeValidSequentialInout,
+		Valid:   true,
+		Reason:  "all inout intervals ended before the next exclusive use",
+	}
 }
 
 func distinctNonEmpty(values []string) int {

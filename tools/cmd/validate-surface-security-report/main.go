@@ -17,7 +17,11 @@ func main() {
 
 func run(args []string) error {
 	fs := flag.NewFlagSet("validate-surface-security-report", flag.ContinueOnError)
-	reportPath := fs.String("report", "", "path to tetra.surface.security-permission.v1 or runtime report")
+	reportPath := fs.String(
+		"report",
+		"",
+		"path to tetra.surface.security-permission.v1 or runtime report",
+	)
 	if err := fs.Parse(args); err != nil {
 		return err
 	}

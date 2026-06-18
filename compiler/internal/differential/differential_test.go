@@ -39,7 +39,12 @@ func TestCheckScalarI32ComparesSourceStackRegisterAndOptimizedResults(t *testing
 	if report.SchemaVersion != "tetra.differential.scalar_i32.v1" {
 		t.Fatalf("schema = %q", report.SchemaVersion)
 	}
-	for _, want := range []Lane{LaneSourceInterpreter, LaneStackBackend, LaneRegisterBackend, LaneOptimizedBackend} {
+	for _, want := range []Lane{
+		LaneSourceInterpreter,
+		LaneStackBackend,
+		LaneRegisterBackend,
+		LaneOptimizedBackend,
+	} {
 		if !report.HasLane(want) {
 			t.Fatalf("report lanes = %v, missing %s", report.Lanes, want)
 		}
@@ -170,7 +175,10 @@ func TestCheckBackendMatrixCoversCallLoopSliceAndNativeLanes(t *testing.T) {
 		},
 		Native: func(tc BackendMatrixCase, sample MatrixSample) (int32, error) {
 			funcs := append([]ir.IRFunc{}, tc.Functions...)
-			funcs = append(funcs, mainCallingSliceSum("main", tc.Entry, sample.I32Slices[sample.Args[0]]))
+			funcs = append(
+				funcs,
+				mainCallingSliceSum("main", tc.Entry, sample.I32Slices[sample.Args[0]]),
+			)
 			return EvalNativeLinuxX64Exit(funcs, "main", t.TempDir(), tc.Name+"-"+sample.Name)
 		},
 	})
@@ -181,8 +189,12 @@ func TestCheckBackendMatrixCoversCallLoopSliceAndNativeLanes(t *testing.T) {
 		t.Fatalf("slice stable subset = %q", sliceReport.StableSubset)
 	}
 	requireMatrixSamplesAgree(t, sliceReport)
-	if sliceReport.Matrix.Cases["slice_sum_i32"] != 1 || sliceReport.Matrix.Cases["call_loop_i32"] != 0 {
-		t.Fatalf("slice matrix cases = %+v, want slice_sum_i32=1 and call_loop_i32=0", sliceReport.Matrix.Cases)
+	if sliceReport.Matrix.Cases["slice_sum_i32"] != 1 ||
+		sliceReport.Matrix.Cases["call_loop_i32"] != 0 {
+		t.Fatalf(
+			"slice matrix cases = %+v, want slice_sum_i32=1 and call_loop_i32=0",
+			sliceReport.Matrix.Cases,
+		)
 	}
 }
 
@@ -215,12 +227,17 @@ func TestCheckBackendMatrixRecordsRandomizedSamplesAndMismatchReducer(t *testing
 		t.Fatalf("CheckBackendMatrix error = %v, want differential mismatch", err)
 	}
 	if report.Randomized.Seed != 16 || report.Randomized.Generated != 3 {
-		t.Fatalf("randomized metadata = %+v, want seed 16 and 3 generated samples", report.Randomized)
+		t.Fatalf(
+			"randomized metadata = %+v, want seed 16 and 3 generated samples",
+			report.Randomized,
+		)
 	}
-	if report.Mismatch == nil || report.Mismatch.ReducerStatus != "reduced_to_single_sample" || report.Mismatch.SampleName != "fixed" {
+	if report.Mismatch == nil || report.Mismatch.ReducerStatus != "reduced_to_single_sample" ||
+		report.Mismatch.SampleName != "fixed" {
 		t.Fatalf("mismatch reducer = %+v, want reduced fixed sample", report.Mismatch)
 	}
-	if !strings.Contains(report.Mismatch.Reproducer, "bad-add-oracle") || !strings.Contains(report.Mismatch.Reproducer, "args=[4 3]") {
+	if !strings.Contains(report.Mismatch.Reproducer, "bad-add-oracle") ||
+		!strings.Contains(report.Mismatch.Reproducer, "args=[4 3]") {
 		t.Fatalf("mismatch reproducer = %q, want case and args", report.Mismatch.Reproducer)
 	}
 }
@@ -362,7 +379,13 @@ func mainCallingSliceSum(name string, callee string, values []int32) ir.IRFunc {
 	backingBase := 2
 	instrs := []ir.IRInstr{
 		{Kind: ir.IRConstI32, Imm: int32(len(values))},
-		{Kind: ir.IRStackSliceI32, Local: backingBase, ArgSlots: len(values), Imm: int32(len(values)), Name: "matrix.xs"},
+		{
+			Kind:     ir.IRStackSliceI32,
+			Local:    backingBase,
+			ArgSlots: len(values),
+			Imm:      int32(len(values)),
+			Name:     "matrix.xs",
+		},
 		{Kind: ir.IRStoreLocal, Local: 1},
 		{Kind: ir.IRStoreLocal, Local: 0},
 	}
@@ -381,7 +404,12 @@ func mainCallingSliceSum(name string, callee string, values []int32) ir.IRFunc {
 		ir.IRInstr{Kind: ir.IRCall, Name: callee, ArgSlots: 2, RetSlots: 1},
 		ir.IRInstr{Kind: ir.IRReturn},
 	)
-	return ir.IRFunc{Name: name, LocalSlots: backingBase + len(values), ReturnSlots: 1, Instrs: instrs}
+	return ir.IRFunc{
+		Name:        name,
+		LocalSlots:  backingBase + len(values),
+		ReturnSlots: 1,
+		Instrs:      instrs,
+	}
 }
 
 func requireMatrixSamplesAgree(t *testing.T, report MatrixReport) {
@@ -391,7 +419,15 @@ func requireMatrixSamplesAgree(t *testing.T, report MatrixReport) {
 		source := values[LaneSourceInterpreter]
 		for _, lane := range report.Lanes {
 			if values[lane] != source {
-				t.Fatalf("%s sample %s lane %s = %d, source = %d; results=%+v", report.Case, sample.Name, lane, values[lane], source, sample.Results)
+				t.Fatalf(
+					"%s sample %s lane %s = %d, source = %d; results=%+v",
+					report.Case,
+					sample.Name,
+					lane,
+					values[lane],
+					source,
+					sample.Results,
+				)
 			}
 		}
 	}

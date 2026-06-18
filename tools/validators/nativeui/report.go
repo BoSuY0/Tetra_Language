@@ -115,10 +115,16 @@ func ValidateReport(raw []byte) error {
 		issues = append(issues, fmt.Sprintf("host is %q, want linux-x64", report.Host))
 	}
 	if report.Runtime != "native-ui-linux-x64" {
-		issues = append(issues, fmt.Sprintf("runtime is %q, want native-ui-linux-x64", report.Runtime))
+		issues = append(
+			issues,
+			fmt.Sprintf("runtime is %q, want native-ui-linux-x64", report.Runtime),
+		)
 	}
 	if report.UISchema != UIBundleSchema {
-		issues = append(issues, fmt.Sprintf("ui_schema is %q, want %s", report.UISchema, UIBundleSchema))
+		issues = append(
+			issues,
+			fmt.Sprintf("ui_schema is %q, want %s", report.UISchema, UIBundleSchema),
+		)
 	}
 	if strings.TrimSpace(report.Source) == "" {
 		issues = append(issues, "source is required")
@@ -152,7 +158,13 @@ func rejectPaperEvidence(raw []byte) []string {
 	var issues []string
 	for _, marker := range forbidden {
 		if strings.Contains(lower, marker) {
-			issues = append(issues, fmt.Sprintf("report contains forbidden non-runtime evidence marker %q", strings.Trim(marker, " /\"")))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"report contains forbidden non-runtime evidence marker %q",
+					strings.Trim(marker, " /\""),
+				),
+			)
 		}
 	}
 	return issues
@@ -161,7 +173,13 @@ func rejectPaperEvidence(raw []byte) []string {
 func validateProcesses(processes []ProcessReport) []string {
 	var issues []string
 	if len(processes) < 2 {
-		issues = append(issues, fmt.Sprintf("process evidence has %d entries, want app and runtime processes", len(processes)))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"process evidence has %d entries, want app and runtime processes",
+				len(processes),
+			),
+		)
 	}
 	seenApp := false
 	seenRuntime := false
@@ -182,7 +200,10 @@ func validateProcesses(processes []ProcessReport) []string {
 		case "runtime":
 			seenRuntime = true
 		default:
-			issues = append(issues, fmt.Sprintf("process %s kind is %q, want build, app, or runtime", p.Name, p.Kind))
+			issues = append(
+				issues,
+				fmt.Sprintf("process %s kind is %q, want build, app, or runtime", p.Name, p.Kind),
+			)
 		}
 		if strings.TrimSpace(p.Path) == "" {
 			issues = append(issues, fmt.Sprintf("process %s path is required", p.Name))
@@ -214,7 +235,13 @@ func validateProcesses(processes []ProcessReport) []string {
 func validateWidgets(widgets []WidgetReport) (map[string]WidgetReport, map[string]bool, []string) {
 	var issues []string
 	if len(widgets) < 3 {
-		issues = append(issues, fmt.Sprintf("widget evidence has %d entries, want view, state binding, and action widgets", len(widgets)))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"widget evidence has %d entries, want view, state binding, and action widgets",
+				len(widgets),
+			),
+		)
 	}
 	index := map[string]WidgetReport{}
 	actions := map[string]bool{}
@@ -233,13 +260,28 @@ func validateWidgets(widgets []WidgetReport) (map[string]WidgetReport, map[strin
 			issues = append(issues, fmt.Sprintf("widget %s kind is required", w.ID))
 		}
 		if !w.Enabled {
-			issues = append(issues, fmt.Sprintf("widget %s must record enabled=true for passing runtime evidence", w.ID))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"widget %s must record enabled=true for passing runtime evidence",
+					w.ID,
+				),
+			)
 		}
 		if !w.Visible {
-			issues = append(issues, fmt.Sprintf("widget %s must record visible=true for passing runtime evidence", w.ID))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"widget %s must record visible=true for passing runtime evidence",
+					w.ID,
+				),
+			)
 		}
 		if w.Bounds.Width <= 0 || w.Bounds.Height <= 0 {
-			issues = append(issues, fmt.Sprintf("widget %s bounds must have positive width and height", w.ID))
+			issues = append(
+				issues,
+				fmt.Sprintf("widget %s bounds must have positive width and height", w.ID),
+			)
 		}
 		switch w.Kind {
 		case "view":
@@ -260,7 +302,14 @@ func validateWidgets(widgets []WidgetReport) (map[string]WidgetReport, map[strin
 				issues = append(issues, fmt.Sprintf("action widget %s command is required", w.ID))
 			}
 		default:
-			issues = append(issues, fmt.Sprintf("widget %s kind is %q, want view, value, text, input, or action", w.ID, w.Kind))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"widget %s kind is %q, want view, value, text, input, or action",
+					w.ID,
+					w.Kind,
+				),
+			)
 		}
 	}
 	for _, w := range widgets {
@@ -283,15 +332,32 @@ func validateWidgets(widgets []WidgetReport) (map[string]WidgetReport, map[strin
 	return index, actions, issues
 }
 
-func validateEvents(events []EventReport, widgets map[string]WidgetReport, actionIDs map[string]bool) []string {
+func validateEvents(
+	events []EventReport,
+	widgets map[string]WidgetReport,
+	actionIDs map[string]bool,
+) []string {
 	var issues []string
 	if len(events) < 2 {
-		issues = append(issues, fmt.Sprintf("event state transition evidence has %d events, want at least 2", len(events)))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"event state transition evidence has %d events, want at least 2",
+				len(events),
+			),
+		)
 	}
 	lastOrder := 0
 	for _, event := range events {
 		if event.Order <= lastOrder {
-			issues = append(issues, fmt.Sprintf("event order %d is not strictly greater than previous order %d", event.Order, lastOrder))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"event order %d is not strictly greater than previous order %d",
+					event.Order,
+					lastOrder,
+				),
+			)
 		}
 		lastOrder = event.Order
 		widget, exists := widgets[event.WidgetID]
@@ -300,23 +366,39 @@ func validateEvents(events []EventReport, widgets map[string]WidgetReport, actio
 		} else if !exists {
 			issues = append(issues, fmt.Sprintf("event widget_id %s is not in widget tree", event.WidgetID))
 		} else if !actionIDs[event.WidgetID] {
-			issues = append(issues, fmt.Sprintf("event widget_id %s must reference an action widget", event.WidgetID))
+			issues = append(
+				issues,
+				fmt.Sprintf("event widget_id %s must reference an action widget", event.WidgetID),
+			)
 		}
 		switch event.Event {
 		case "click", "activate", "input", "change", "focus":
 		default:
-			issues = append(issues, fmt.Sprintf("event %d kind is %q, want click, activate, input, change, or focus", event.Order, event.Event))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"event %d kind is %q, want click, activate, input, change, or focus",
+					event.Order,
+					event.Event,
+				),
+			)
 		}
 		if strings.TrimSpace(event.Command) == "" {
 			issues = append(issues, fmt.Sprintf("event %d command is required", event.Order))
 		} else if exists && widget.Command != "" && event.Command != widget.Command {
-			issues = append(issues, fmt.Sprintf("event %d command is %q, want widget command %q", event.Order, event.Command, widget.Command))
+			issues = append(
+				issues,
+				fmt.Sprintf("event %d command is %q, want widget command %q", event.Order, event.Command, widget.Command),
+			)
 		}
 		if !event.Pass {
 			issues = append(issues, fmt.Sprintf("event %d did not pass", event.Order))
 		}
 		if len(event.BeforeState) == 0 || len(event.AfterState) == 0 {
-			issues = append(issues, fmt.Sprintf("event %d must include before_state and after_state", event.Order))
+			issues = append(
+				issues,
+				fmt.Sprintf("event %d must include before_state and after_state", event.Order),
+			)
 		} else if !stateChanged(event.BeforeState, event.AfterState) {
 			issues = append(issues, fmt.Sprintf("event %d has no observable state change", event.Order))
 		}
@@ -349,7 +431,11 @@ func validateOperations(order int, operations []OperationReport) []string {
 	return issues
 }
 
-func validateWidgetUpdates(order int, updates []WidgetUpdateReport, widgets map[string]WidgetReport) []string {
+func validateWidgetUpdates(
+	order int,
+	updates []WidgetUpdateReport,
+	widgets map[string]WidgetReport,
+) []string {
 	var issues []string
 	if len(updates) == 0 {
 		issues = append(issues, fmt.Sprintf("event %d widget_updates are required", order))

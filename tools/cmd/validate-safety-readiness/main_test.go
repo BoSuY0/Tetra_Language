@@ -1,55 +1,190 @@
 package main
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
 
+func mustJSON(v interface{}) []byte {
+	raw, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		panic(err)
+	}
+	return append(raw, '\n')
+}
+
+func joined(parts ...string) string {
+	return strings.Join(parts, " ")
+}
+
+func textLines(lines ...string) []byte {
+	return []byte(strings.Join(lines, "\n") + "\n")
+}
+
 func productionSafetyFeatures() []byte {
-	return []byte(`{
-  "schema": "tetra.features.v1",
-  "version": "v0.4.0",
-  "features": [
-    {
-      "id": "safety.production-core",
-      "name": "Production safety core",
-      "status": "current",
-      "since": "v0.4.0",
-      "scope": "production local safety model for ownership/lifetime/borrow/consume/inout checks, resource finalization, callable escape diagnostics, effects/capabilities/privacy/consent/budget policy, unsafe boundaries, actor/task transfer safety, and pointer/MMIO/memory capability gates",
-      "stability": "release-gated current profile with explicit diagnostics for unsupported distributed, cryptographic, formal-proof, and runtime-wide guarantees",
-      "docs": ["docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/effects_capabilities_privacy_v1.md"]
-    },
-    {"id":"safety.effects-mvp","name":"Effects","status":"current","since":"v0.3.0","scope":"stable uses effect names and groups with transitive call propagation","stability":"missing uses declarations are diagnostics","docs":["docs/spec/effects_capabilities_privacy_v1.md"]},
-    {"id":"safety.capabilities-mvp","name":"Capabilities","status":"current","since":"v0.3.0","scope":"cap.io and cap.mem opaque tokens are obtained only inside unsafe blocks","stability":"raw memory/MMIO operations require matching uses effects, unsafe boundary, and capability argument","docs":["docs/spec/effects_capabilities_privacy_v1.md"]},
-    {"id":"safety.privacy-consent-mvp","name":"Privacy","status":"current","since":"v0.3.0","scope":"uses privacy requires privacy semantic clauses; secret.i32/SecretInt signatures require consent token","stability":"static auditing and call-shape enforcement","docs":["docs/spec/effects_capabilities_privacy_v1.md"]},
-    {"id":"safety.budget-mvp","name":"Budget","status":"current","since":"v0.3.0","scope":"budget requires uses budget and deterministic budget guard instructions","stability":"static cross-edge guardrail","docs":["docs/spec/effects_capabilities_privacy_v1.md"]},
-    {"id":"language.ownership-markers-mvp","name":"Ownership","status":"current","since":"v0.2.0","scope":"conservative borrow/inout/consume marker checks for local calls, aliasing, use-after-consume, and borrow escape diagnostics","stability":"current bounded surface","docs":["docs/spec/ownership_v1.md"]},
-    {"id":"language.resource-lifetime-mvp","name":"Resources","status":"current","since":"v0.2.0","scope":"conservative resource finalization checks for task handles, task groups, island handles, region-backed slices, and structs containing them","stability":"double-use and ambiguous provenance diagnostics","docs":["docs/spec/ownership_v1.md"]},
-    {"id":"language.lifetime-ssa","name":"Lifetime SSA","status":"current","since":"v0.4.0","scope":"production SSA-like local lifetime join analysis for ownership consume state, resource finalization state, branch/match/loop flow snapshots, and maybe-consumed diagnostics","stability":"current local/control-flow solver","docs":["docs/spec/ownership_v1.md"]},
-    {"id":"actors.task-transfer-safety","name":"Actor/task transfer","status":"current","since":"v0.2.0","scope":"conservative actor/task ownership transfer checks for worker entrypoints, handle transfer, and use-after-transfer diagnostics","stability":"current local transfer contract","docs":["docs/spec/ownership_v1.md"]},
-    {"id":"language.full-first-class-callables","name":"Callables","status":"current","since":"v0.4.0","scope":"production first-class callable/function-value semantics with stable diagnostics for mutable by-reference captures, pointer/resource captures, and thread-boundary callable escape","stability":"current safe capture model","docs":["docs/spec/current_supported_surface.md"]}
-  ]
-}`)
+	coreDocs := []string{"docs/spec/core/current_supported_surface.md"}
+	ownershipDocs := []string{"docs/spec/runtime/ownership_v1.md"}
+	effectsDocs := []string{"docs/spec/runtime/effects_capabilities_privacy_v1.md"}
+	return mustJSON(featuresReport{
+		Schema:  "tetra.features.v1",
+		Version: "v0.4.0",
+		Features: []featureEntry{
+			{
+				ID:     "safety.production-core",
+				Name:   "Production safety core",
+				Status: "current",
+				Since:  "v0.4.0",
+				Scope: joined(
+					"production local safety model for ownership/lifetime/borrow/consume/inout",
+					"checks, resource finalization, callable escape diagnostics,",
+					"effects/capabilities/privacy/consent/budget policy, unsafe boundaries,",
+					"actor/task transfer safety, and pointer/MMIO/memory capability gates",
+				),
+				Stability: joined(
+					"release-gated current profile with explicit diagnostics for unsupported",
+					"distributed, cryptographic, formal-proof, and runtime-wide guarantees",
+				),
+				Docs: append(append(coreDocs, ownershipDocs...), effectsDocs...),
+			},
+			{
+				ID:     "safety.effects-mvp",
+				Name:   "Effects",
+				Status: "current",
+				Since:  "v0.3.0",
+				Scope:  "stable uses effect names and groups with transitive call propagation",
+				Stability: joined(
+					"missing uses declarations are diagnostics",
+				),
+				Docs: effectsDocs,
+			},
+			{
+				ID:     "safety.capabilities-mvp",
+				Name:   "Capabilities",
+				Status: "current",
+				Since:  "v0.3.0",
+				Scope:  "cap.io and cap.mem opaque tokens are obtained only inside unsafe blocks",
+				Stability: joined(
+					"raw memory/MMIO operations require matching uses effects, unsafe boundary,",
+					"and capability argument",
+				),
+				Docs: effectsDocs,
+			},
+			{
+				ID:     "safety.privacy-consent-mvp",
+				Name:   "Privacy",
+				Status: "current",
+				Since:  "v0.3.0",
+				Scope: joined(
+					"uses privacy requires privacy semantic clauses;",
+					"secret.i32/SecretInt signatures require consent token",
+				),
+				Stability: "static auditing and call-shape enforcement",
+				Docs:      effectsDocs,
+			},
+			{
+				ID:        "safety.budget-mvp",
+				Name:      "Budget",
+				Status:    "current",
+				Since:     "v0.3.0",
+				Scope:     "budget requires uses budget and deterministic budget guard instructions",
+				Stability: "static cross-edge guardrail",
+				Docs:      effectsDocs,
+			},
+			{
+				ID:     "language.ownership-markers-mvp",
+				Name:   "Ownership",
+				Status: "current",
+				Since:  "v0.2.0",
+				Scope: joined(
+					"conservative borrow/inout/consume marker checks for local calls, aliasing,",
+					"use-after-consume, and borrow escape diagnostics",
+				),
+				Stability: "current bounded surface",
+				Docs:      ownershipDocs,
+			},
+			{
+				ID:     "language.resource-lifetime-mvp",
+				Name:   "Resources",
+				Status: "current",
+				Since:  "v0.2.0",
+				Scope: joined(
+					"conservative resource finalization checks for task handles, task groups,",
+					"island handles, region-backed slices, and structs containing them",
+				),
+				Stability: "double-use and ambiguous provenance diagnostics",
+				Docs:      ownershipDocs,
+			},
+			{
+				ID:     "language.lifetime-ssa",
+				Name:   "Lifetime SSA",
+				Status: "current",
+				Since:  "v0.4.0",
+				Scope: joined(
+					"production SSA-like local lifetime join analysis for ownership consume",
+					"state, resource finalization state, branch/match/loop flow snapshots,",
+					"and maybe-consumed diagnostics",
+				),
+				Stability: "current local/control-flow solver",
+				Docs:      ownershipDocs,
+			},
+			{
+				ID:     "actors.task-transfer-safety",
+				Name:   "Actor/task transfer",
+				Status: "current",
+				Since:  "v0.2.0",
+				Scope: joined(
+					"conservative actor/task ownership transfer checks for worker entrypoints,",
+					"handle transfer, and use-after-transfer diagnostics",
+				),
+				Stability: "current local transfer contract",
+				Docs:      ownershipDocs,
+			},
+			{
+				ID:     "language.full-first-class-callables",
+				Name:   "Callables",
+				Status: "current",
+				Since:  "v0.4.0",
+				Scope: joined(
+					"production first-class callable/function-value semantics with stable",
+					"diagnostics for mutable by-reference captures, pointer/resource",
+					"captures, and thread-boundary callable escape",
+				),
+				Stability: "current safe capture model",
+				Docs:      coreDocs,
+			},
+		},
+	})
 }
 
 func productionSafetyEvidence() safetyEvidence {
 	return safetyEvidence{
 		Features: productionSafetyFeatures(),
-		CurrentSurface: []byte(`Safety production core is current.
-Lifetime SSA local join solver is current since ` + "`v0.4.0`" + ` for branch, match, and loop flow snapshots.
-Mutable by-reference captures, including callable mutable-capture global-escape, pointer/resource captures, and thread-boundary callable escape keep stable JSON diagnostics.
-`),
-		OwnershipSpec: []byte(`Ownership markers are part of the checked function-call contract in the current production surface.
-The local lifetime solver is SSA-like for branch, match, and loop joins.
-It rejects borrow escape diagnostics, use-after-transfer diagnostics, and worker effect boundary violations.
-Resource lifetime checks reject double-use and ambiguous provenance.
-`),
-		EffectsSpec: []byte(`Canonical ` + "`uses`" + ` effect names are actors, alloc, budget, capability, io, mem, mmio, privacy, runtime.
-Unsafe Policy Public API Boundary exports unsafe_policy for builtins.
-Privacy And Consent requires consent.token for secret-bearing signatures.
-Budget exhaustion uses the stable local policy-failure ABI.
-Pointer/MMIO/memory operations require matching ` + "`uses`" + ` effects, unsafe boundaries, and capability tokens.
-`),
+		CurrentSurface: textLines(
+			"Safety production core is current.",
+			"Lifetime SSA local join solver is current since `v0.4.0` for branch,",
+			"match, and loop flow snapshots.",
+			"Mutable by-reference captures, including callable mutable-capture global-escape,",
+			"pointer/resource captures, and thread-boundary callable escape keep",
+			"stable JSON diagnostics.",
+		),
+		OwnershipSpec: textLines(
+			"Ownership markers are part of the checked function-call contract in the",
+			"current production surface.",
+			"The local lifetime solver is SSA-like for branch, match, and loop joins.",
+			"It rejects borrow escape diagnostics, use-after-transfer diagnostics,",
+			"and worker effect boundary violations.",
+			"Resource lifetime checks reject double-use and ambiguous provenance.",
+		),
+		EffectsSpec: textLines(
+			"Canonical `uses` effect names are actors, alloc, budget, capability, io,",
+			"mem, mmio, privacy, runtime.",
+			"Unsafe Policy Public API Boundary exports unsafe_policy for builtins.",
+			"Privacy And Consent requires consent.token for secret-bearing signatures.",
+			"Budget exhaustion uses the stable local policy-failure ABI.",
+			"Pointer/MMIO/memory operations require matching `uses` effects,",
+			"unsafe boundaries, and capability tokens.",
+		),
 	}
 }
 
@@ -61,12 +196,17 @@ func TestValidateSafetyReadinessAcceptsProductionEvidence(t *testing.T) {
 
 func TestValidateSafetyReadinessAllowsValidatorRejectionLanguage(t *testing.T) {
 	evidence := productionSafetyEvidence()
-	evidence.CurrentSurface = []byte(`Safety production core is current.
-Lifetime SSA local join solver is current since ` + "`v0.4.0`" + ` for branch, match, and loop flow snapshots.
-Mutable by-reference captures, including callable mutable-capture global-escape, pointer/resource captures, and thread-boundary callable escape keep stable JSON diagnostics.
-The native runtime validator rejects metadata-only, web-only, native-shell sidecar-only,
-fake/mock/placeholder, missing event execution, and missing state-transition reports.
-`)
+	evidence.CurrentSurface = textLines(
+		"Safety production core is current.",
+		"Lifetime SSA local join solver is current since `v0.4.0` for branch,",
+		"match, and loop flow snapshots.",
+		"Mutable by-reference captures, including callable mutable-capture global-escape,",
+		"pointer/resource captures, and thread-boundary callable escape keep",
+		"stable JSON diagnostics.",
+		"The native runtime validator rejects metadata-only, web-only,",
+		"native-shell sidecar-only, fake/mock/placeholder, missing event execution,",
+		"and missing state-transition reports.",
+	)
 
 	if err := validateSafetyReadiness(evidence); err != nil {
 		t.Fatalf("validateSafetyReadiness rejected negative validator wording: %v", err)
@@ -75,11 +215,37 @@ fake/mock/placeholder, missing event execution, and missing state-transition rep
 
 func TestValidateSafetyReadinessRejectsMissingProductionCore(t *testing.T) {
 	evidence := productionSafetyEvidence()
-	evidence.Features = []byte(`{"schema":"tetra.features.v1","version":"v0.4.0","features":[
-    {"id":"safety.effects-mvp","name":"Effects","status":"current","since":"v0.3.0","scope":"stable uses effect names and groups","stability":"current","docs":["docs/spec/effects_capabilities_privacy_v1.md"]},
-    {"id":"language.full-v1-guarantees","name":"Full v1","status":"planned","scope":"future","stability":"planned","docs":["docs/spec/v1_scope.md"]},
-    {"id":"eco.distributed-network","name":"Eco","status":"post-v1","scope":"future","stability":"post-v1","docs":["docs/spec/current_supported_surface.md"]}
-  ]}`)
+	evidence.Features = mustJSON(featuresReport{
+		Schema:  "tetra.features.v1",
+		Version: "v0.4.0",
+		Features: []featureEntry{
+			{
+				ID:        "safety.effects-mvp",
+				Name:      "Effects",
+				Status:    "current",
+				Since:     "v0.3.0",
+				Scope:     "stable uses effect names and groups",
+				Stability: "current",
+				Docs:      []string{"docs/spec/runtime/effects_capabilities_privacy_v1.md"},
+			},
+			{
+				ID:        "language.full-v1-guarantees",
+				Name:      "Full v1",
+				Status:    "planned",
+				Scope:     "future",
+				Stability: "planned",
+				Docs:      []string{"docs/spec/flow/v1_scope.md"},
+			},
+			{
+				ID:        "eco.distributed-network",
+				Name:      "Eco",
+				Status:    "post-v1",
+				Scope:     "future",
+				Stability: "post-v1",
+				Docs:      []string{"docs/spec/core/current_supported_surface.md"},
+			},
+		},
+	})
 
 	err := validateSafetyReadiness(evidence)
 	if err == nil {
@@ -92,7 +258,10 @@ func TestValidateSafetyReadinessRejectsMissingProductionCore(t *testing.T) {
 
 func TestValidateSafetyReadinessRejectsStaleLifetimeClaim(t *testing.T) {
 	evidence := productionSafetyEvidence()
-	evidence.CurrentSurface = []byte("Lifetime SSA solving is planned future work: the current ownership/resource safety implementation is a conservative MVP.")
+	evidence.CurrentSurface = []byte(
+		("Lifetime SSA solving is planned future work: the current " +
+			"ownership/resource safety implementation is a conservative MVP."),
+	)
 
 	err := validateSafetyReadiness(evidence)
 	if err == nil {

@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"tetra_language/tools/internal/reportdecode"
 )
 
 type lspSmokeEnvelope struct {
@@ -44,7 +46,9 @@ type lspHover struct {
 
 func main() {
 	var reportPath string
+	var reportFormat string
 	flag.StringVar(&reportPath, "report", "", "path to tetra lsp --stdio-smoke JSON report")
+	flag.StringVar(&reportFormat, "format", "auto", "report format: auto, json, or toon")
 	flag.Parse()
 
 	if reportPath == "" {
@@ -56,15 +60,19 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err := validateLSPSmoke(raw); err != nil {
+	if err := validateLSPSmokeFormat(raw, reportFormat); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
 func validateLSPSmoke(raw []byte) error {
+	return validateLSPSmokeFormat(raw, "auto")
+}
+
+func validateLSPSmokeFormat(raw []byte, format string) error {
 	var report lspSmokeEnvelope
-	if err := strictDecodeJSON(raw, &report); err != nil {
+	if err := reportdecode.DecodeStrictFormat(raw, format, &report); err != nil {
 		return err
 	}
 	if report.URI == "" {
@@ -89,7 +97,11 @@ func validateLSPSmoke(raw []byte) error {
 		switch diagnostic.Severity {
 		case "error", "warning", "info", "hint":
 		default:
-			return fmt.Errorf("diagnostic %q has invalid severity %q", diagnostic.Message, diagnostic.Severity)
+			return fmt.Errorf(
+				"diagnostic %q has invalid severity %q",
+				diagnostic.Message,
+				diagnostic.Severity,
+			)
 		}
 		if diagnostic.Line <= 0 || diagnostic.Column <= 0 {
 			return fmt.Errorf("diagnostic %q has invalid position", diagnostic.Message)
@@ -106,9 +118,20 @@ func validateLSPSmoke(raw []byte) error {
 		if symbol.Line <= 0 || symbol.Column <= 0 {
 			return fmt.Errorf("symbol %s has invalid position", symbol.Name)
 		}
-		key := fmt.Sprintf("%s\x00%s\x00%d\x00%d", symbol.Name, symbol.Kind, symbol.Line, symbol.Column)
+		key := fmt.Sprintf(
+			"%s\x00%s\x00%d\x00%d",
+			symbol.Name,
+			symbol.Kind,
+			symbol.Line,
+			symbol.Column,
+		)
 		if seenSymbols[key] {
-			return fmt.Errorf("duplicate symbol %s at %d:%d", symbol.Name, symbol.Line, symbol.Column)
+			return fmt.Errorf(
+				"duplicate symbol %s at %d:%d",
+				symbol.Name,
+				symbol.Line,
+				symbol.Column,
+			)
 		}
 		seenSymbols[key] = true
 	}
@@ -133,7 +156,12 @@ func validateLSPSmoke(raw []byte) error {
 		}
 		seenHovers[key] = true
 		if !symbolPositions[key] {
-			return fmt.Errorf("hover %s at %d:%d has no matching symbol", hover.Name, hover.Line, hover.Column)
+			return fmt.Errorf(
+				"hover %s at %d:%d has no matching symbol",
+				hover.Name,
+				hover.Line,
+				hover.Column,
+			)
 		}
 	}
 	return nil

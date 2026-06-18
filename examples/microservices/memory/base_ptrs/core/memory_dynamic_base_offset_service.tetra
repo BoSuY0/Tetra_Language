@@ -1,0 +1,25 @@
+// Dynamic base-offset memory microservice smoke.
+//
+// The service keeps looped raw pointer arithmetic anchored at the allocation
+// base, which is the supported workaround for dynamic offsets from derived
+// pointer locals.
+module examples.microservices.memory.base_ptrs.core.memory_dynamic_base_offset_service
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let payload: ptr = core.alloc_bytes(8)
+        let cell_two: ptr = core.ptr_add(payload, 2, memory_cap)
+        let cell_three: ptr = core.ptr_add(payload, 3, memory_cap)
+        let _write_two: UInt8 = core.store_u8(cell_two, 20, memory_cap)
+        let _write_three: UInt8 = core.store_u8(cell_three, 22, memory_cap)
+        var offset: Int = 2
+        var total: Int = 0
+        while offset < 4:
+            let cell: ptr = core.ptr_add(payload, offset, memory_cap)
+            total = total + core.load_u8(cell, memory_cap)
+            offset = offset + 1
+        if total == 42:
+            return 0
+        return total
+    return 99

@@ -1,0 +1,52 @@
+// Backend experimental route-policy mirror microservice smoke.
+module examples.microservices.backend.misc.backend_experimental_route_policy_service
+import lib.experimental.filesystem as filesystem
+import lib.experimental.io as exp_io
+import lib.experimental.networking as networking
+import lib.experimental.strings as strings
+import lib.experimental.sync as sync_lib
+import lib.experimental.testing as testing
+import lib.experimental.time as time_lib
+
+func main() -> Int
+uses capability, io:
+    let route: String = "POST /v1/jobs"
+    if strings.ascii_len(route) != 13:
+        return 1
+    if strings.ascii_sum(route) != 1049:
+        return 2
+    if testing.assert_false(strings.is_empty(route)) != 0:
+        return 3
+    let path: String = "/api//v1/jobs/"
+    if testing.assert_true(filesystem.has_leading_slash(path)) != 0:
+        return 4
+    if testing.assert_true(filesystem.ends_with_slash(path)) != 0:
+        return 5
+    if filesystem.slash_count(path) != 5:
+        return 6
+    if filesystem.directory_depth(path) != 3:
+        return 7
+    if filesystem.is_root(path):
+        return 8
+    if !filesystem.is_root("/"):
+        return 9
+    let port: Int = networking.choose_port(0, networking.default_port_https())
+    if port != 443:
+        return 10
+    if networking.choose_port(-1, 70000) != 65535:
+        return 11
+    if networking.retry_backoff_ms(4, 15, 100) != 100:
+        return 12
+    if time_lib.seconds_from_millis(time_lib.millis_from_seconds(9)) != 9:
+        return 13
+    if time_lib.clamp_timeout_ms(-2, 10, 20) != 10:
+        return 14
+    if sync_lib.merge_status(0, testing.combine(0, 0)) != 0:
+        return 15
+    if sync_lib.merge_status(0, testing.assert_true(false)) != 1:
+        return 16
+    unsafe:
+        let io_cap: cap.io = exp_io.capability_io()
+        if filesystem.exists("__tetra_missing_exp_route_policy__", io_cap):
+            return 17
+    return 0

@@ -90,7 +90,11 @@ type Classifier struct {
 
 func NewClassifier(tgt ctarget.Target) (Classifier, error) {
 	if tgt.Arch != ctarget.ArchX64 {
-		return Classifier{}, fmt.Errorf("x64abi classifier requires x64 ISA, got %s for %s", tgt.Arch, tgt.Triple)
+		return Classifier{}, fmt.Errorf(
+			"x64abi classifier requires x64 ISA, got %s for %s",
+			tgt.Arch,
+			tgt.Triple,
+		)
 	}
 	switch tgt.ABI {
 	case ctarget.ABISysV, ctarget.ABIX32SysV:
@@ -114,7 +118,11 @@ func NewClassifier(tgt ctarget.Target) (Classifier, error) {
 			stackSlot:    8,
 		}, nil
 	default:
-		return Classifier{}, fmt.Errorf("x64abi classifier does not support ABI %s for %s", tgt.ABI, tgt.Triple)
+		return Classifier{}, fmt.Errorf(
+			"x64abi classifier does not support ABI %s for %s",
+			tgt.ABI,
+			tgt.Triple,
+		)
 	}
 }
 
@@ -127,7 +135,11 @@ func (c Classifier) UsesX64Registers() bool {
 }
 
 func (c Classifier) ClassifySignature(sig ABISignature) (ABIPlan, error) {
-	if err := validateVariadicSignature(sig.Variadic, sig.FixedParamCount, len(sig.Params)); err != nil {
+	if err := validateVariadicSignature(
+		sig.Variadic,
+		sig.FixedParamCount,
+		len(sig.Params),
+	); err != nil {
 		return ABIPlan{}, err
 	}
 	plan := ABIPlan{
@@ -239,7 +251,12 @@ func (c Classifier) ClassifySignature(sig ABISignature) (ABIPlan, error) {
 	return plan, nil
 }
 
-func (c Classifier) recordVarargFloatMetadata(plan *ABIPlan, sig ABISignature, paramIndex int, loc ABILocation) {
+func (c Classifier) recordVarargFloatMetadata(
+	plan *ABIPlan,
+	sig ABISignature,
+	paramIndex int,
+	loc ABILocation,
+) {
 	if !sig.Variadic {
 		return
 	}
@@ -251,7 +268,8 @@ func (c Classifier) recordVarargFloatMetadata(plan *ABIPlan, sig ABISignature, p
 			plan.VarargRegisterSaveBytes = 176
 		}
 	case ctarget.ABIWin64:
-		if paramIndex < sig.FixedParamCount || loc.Register == "" || !strings.HasPrefix(loc.Register, "xmm") {
+		if paramIndex < sig.FixedParamCount || loc.Register == "" ||
+			!strings.HasPrefix(loc.Register, "xmm") {
 			return
 		}
 		if gp, ok := c.win64MirrorRegisterForParam(paramIndex); ok {
@@ -277,7 +295,11 @@ func (c Classifier) classifyValue(param ABIParam) (ABILocation, error) {
 	}
 	layout, ok := c.target.ScalarLayout(param.Type)
 	if !ok {
-		return ABILocation{}, fmt.Errorf("%s cannot classify ABI type %q", c.target.Triple, param.Type)
+		return ABILocation{}, fmt.Errorf(
+			"%s cannot classify ABI type %q",
+			c.target.Triple,
+			param.Type,
+		)
 	}
 	class := ABIClassInteger
 	registerWidth := c.target.RegisterWidthBits
@@ -308,7 +330,12 @@ func (c Classifier) classifyAggregate(param ABIParam) (ABILocation, error) {
 		layout, err = c.target.StructLayout(param.Fields)
 	}
 	if err != nil {
-		return ABILocation{}, fmt.Errorf("%s cannot classify ABI aggregate %q: %w", c.target.Triple, param.Type, err)
+		return ABILocation{}, fmt.Errorf(
+			"%s cannot classify ABI aggregate %q: %w",
+			c.target.Triple,
+			param.Type,
+			err,
+		)
 	}
 	loc := ABILocation{
 		Name:              param.Name,
@@ -363,7 +390,11 @@ func isWin64IntegerAggregateSize(size int) bool {
 	}
 }
 
-func aggregateHasUnalignedLeaf(tgt ctarget.Target, fields []ctarget.FieldLayout, baseOffset int) bool {
+func aggregateHasUnalignedLeaf(
+	tgt ctarget.Target,
+	fields []ctarget.FieldLayout,
+	baseOffset int,
+) bool {
 	for _, field := range fields {
 		fieldOffset := baseOffset + field.OffsetBytes
 		if len(field.Fields) > 0 {
@@ -391,7 +422,11 @@ func naturalFieldAlign(tgt ctarget.Target, typ string) int {
 	return layout.AlignBytes
 }
 
-func (c Classifier) assignAggregateArgRegisters(loc *ABILocation, intRegs *int, floatRegs *int) bool {
+func (c Classifier) assignAggregateArgRegisters(
+	loc *ABILocation,
+	intRegs *int,
+	floatRegs *int,
+) bool {
 	needInt, needFloat := aggregateRegisterNeeds(loc.Classes)
 	if *intRegs+needInt > len(c.intArgRegs) || *floatRegs+needFloat > len(c.floatArgRegs) {
 		return false
@@ -529,7 +564,11 @@ func validateVariadicSignature(variadic bool, fixedParamCount int, paramCount in
 		return nil
 	}
 	if fixedParamCount < 0 || fixedParamCount > paramCount {
-		return fmt.Errorf("invalid variadic fixed parameter count %d for %d parameters", fixedParamCount, paramCount)
+		return fmt.Errorf(
+			"invalid variadic fixed parameter count %d for %d parameters",
+			fixedParamCount,
+			paramCount,
+		)
 	}
 	return nil
 }

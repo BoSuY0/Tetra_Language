@@ -1,6 +1,9 @@
 # Storage Classes
 
-Status: P2.0 report schema with P2.1/P2.2 stack-backed slices, P2.3 scalar replacement, P2.4 explicit island validation, P2.5 copy/copy_into integration, P2.6 cross-stage allocation validation, the P5.0 runtime allocation contract, and P15.2 `linux-x64` per-core small-heap safe-slice runtime evidence.
+Status: P2.0 report schema with P2.1/P2.2 stack-backed slices, P2.3 scalar replacement, P2.4
+explicit island validation, P2.5 copy/copy_into integration, P2.6 cross-stage allocation validation,
+the P5.0 runtime allocation contract, and P15.2 `linux-x64` per-core small-heap safe-slice runtime
+evidence.
 
 Allocation storage classes are planner facts first and backend-lowering facts
 second. Reports therefore expose both `planned_storage` and

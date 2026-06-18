@@ -1,0 +1,22 @@
+{
+  "schema": "tetra.directory-budget.v1",
+  "limit": 6,
+  "roots": [
+    "compiler",
+    "cli",
+    "tools",
+    "lib",
+    "examples",
+    "docs"
+  ],
+  "extensions": [
+    ".go",
+    ".js",
+    ".mjs",
+    ".sh",
+    ".tetra",
+    ".ts",
+    "docs:.md"
+  ],
+  "allowances": {}
+}

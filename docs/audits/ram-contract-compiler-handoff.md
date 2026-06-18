@@ -33,4 +33,7 @@ validator exits, and cross-file heap/copy/grade contradictions.
 
 ## Handoff Boundaries
 
-This handoff gives downstream release packaging a scoped RAM contract evidence bundle. It does not claim production object memory, production persistent memory, zero heap for all programs, zero-copy for all programs, full formal proof, or all-target RAM parity. Explicitly: no all-target RAM parity claim.
+This handoff gives downstream release packaging a scoped RAM contract evidence bundle. It does not
+claim production object memory, production persistent memory, zero heap for all programs, zero-copy
+for all programs, full formal proof, or all-target RAM parity. Explicitly: no all-target RAM parity
+claim.

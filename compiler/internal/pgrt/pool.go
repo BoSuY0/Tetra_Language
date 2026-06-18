@@ -3,16 +3,26 @@ package pgrt
 import (
 	"context"
 	"errors"
+	"net"
 	"sync"
+	"time"
 )
 
 var (
-	ErrPoolExhausted = errors.New("PostgreSQL pool exhausted")
-	ErrPoolClosed    = errors.New("PostgreSQL pool closed")
-	ErrBadConn       = errors.New("PostgreSQL connection is bad")
+	ErrMissingAddress = errors.New("PostgreSQL dial address is empty")
+	ErrPoolExhausted  = errors.New("PostgreSQL pool exhausted")
+	ErrPoolClosed     = errors.New("PostgreSQL pool closed")
+	ErrBadConn        = errors.New("PostgreSQL connection is bad")
 )
 
 type Connector func(context.Context) (*Conn, error)
+
+type DialConfig struct {
+	Network string
+	Address string
+	Timeout time.Duration
+	Startup StartupConfig
+}
 
 type Pool struct {
 	mu        sync.Mutex
@@ -35,6 +45,40 @@ type PooledConn struct {
 	Conn     *Conn
 	pool     *Pool
 	released bool
+}
+
+func Dial(ctx context.Context, cfg DialConfig) (*Conn, error) {
+	if cfg.Address == "" {
+		return nil, ErrMissingAddress
+	}
+	network := cfg.Network
+	if network == "" {
+		network = "tcp"
+	}
+	dialer := net.Dialer{}
+	if cfg.Timeout > 0 {
+		dialer.Timeout = cfg.Timeout
+	}
+	rwc, err := dialer.DialContext(ctx, network, cfg.Address)
+	if err != nil {
+		return nil, err
+	}
+	conn, err := Connect(ctx, rwc, cfg.Startup)
+	if err != nil {
+		_ = rwc.Close()
+		return nil, err
+	}
+	return conn, nil
+}
+
+func DialConnector(cfg DialConfig) Connector {
+	return func(ctx context.Context) (*Conn, error) {
+		return Dial(ctx, cfg)
+	}
+}
+
+func NewDialPool(maxOpen int, cfg DialConfig) (*Pool, error) {
+	return NewPool(maxOpen, DialConnector(cfg))
 }
 
 func NewPool(maxOpen int, connector Connector) (*Pool, error) {

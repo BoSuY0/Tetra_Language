@@ -1,0 +1,27 @@
+// Experimental stdlib smoke: memcpy/memset helpers.
+module examples.experimental.experimental_memcpy_smoke
+
+import lib.experimental.memory as mem
+
+func main() -> i32
+uses alloc, capability, mem:
+    var out: i32 = 1
+    unsafe:
+        var cap: cap.mem = core.cap_mem()
+        var src: ptr = core.alloc_bytes(8)
+        var dst: ptr = core.alloc_bytes(8)
+        var _z: i32 = mem.memset_u8(dst, 0, 8, cap)
+        var _s: i32 = mem.memset_u8(src, 7, 8, cap)
+        var _c: i32 = mem.memcpy_u8(dst, src, 8, cap)
+        var sum: i32 = 0
+        var i: i32 = 0
+        while i < 8:
+            var p: ptr = core.ptr_add(dst, i, cap)
+            var v: u8 = core.load_u8(p, cap)
+            sum = sum + v
+            i = i + 1
+        if sum == 56:
+            out = 93
+        else:
+            out = 2
+    return out

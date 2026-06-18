@@ -13,7 +13,12 @@ func AddBoundsProofFacts(graph *Graph, report validation.ProofReport) error {
 	}
 	for _, removed := range report.RemovedChecks {
 		if strings.TrimSpace(removed.ProofID) == "" {
-			if err := AddBoundsProofRejectionFact(graph, removed.Function, boundsSiteID(removed.Function, removed.Site), "removed bounds check without proof id"); err != nil {
+			if err := AddBoundsProofRejectionFact(
+				graph,
+				removed.Function,
+				boundsSiteID(removed.Function, removed.Site),
+				"removed bounds check without proof id",
+			); err != nil {
 				return err
 			}
 			continue
@@ -22,7 +27,10 @@ func AddBoundsProofFacts(graph *Graph, report validation.ProofReport) error {
 		if err != nil {
 			return err
 		}
-		if _, err := graph.DeriveFact(parentID, boundsRemovedWithProofFact(parentID, removed)); err != nil {
+		if _, err := graph.DeriveFact(
+			parentID,
+			boundsRemovedWithProofFact(parentID, removed),
+		); err != nil {
 			return err
 		}
 	}
@@ -31,14 +39,22 @@ func AddBoundsProofFacts(graph *Graph, report validation.ProofReport) error {
 		if err != nil {
 			return err
 		}
-		if _, err := graph.DeriveFact(parentID, boundsRetainedDynamicFact(parentID, report.LeftChecks)); err != nil {
+		if _, err := graph.DeriveFact(
+			parentID,
+			boundsRetainedDynamicFact(parentID, report.LeftChecks),
+		); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func AddBoundsProofRejectionFact(graph *Graph, functionID string, siteID string, reason string) error {
+func AddBoundsProofRejectionFact(
+	graph *Graph,
+	functionID string,
+	siteID string,
+	reason string,
+) error {
 	if graph == nil {
 		return fmt.Errorf("memoryfacts: nil graph")
 	}
@@ -49,7 +65,9 @@ func AddBoundsProofRejectionFact(graph *Graph, functionID string, siteID string,
 		reason = "removed bounds check without compiler-owned proof id"
 	}
 	_, err := graph.AddFact(Fact{
-		ID:              FactID(fmt.Sprintf("validation:%s:%s:missing_proof", nonEmpty(functionID, "unknown"), siteID)),
+		ID: FactID(
+			fmt.Sprintf("validation:%s:%s:missing_proof", nonEmpty(functionID, "unknown"), siteID),
+		),
 		FunctionID:      functionID,
 		SiteID:          siteID,
 		SourceStage:     StageValidation,
@@ -77,7 +95,12 @@ func boundsProofGuardFact(removed validation.RemovedCheck) Fact {
 		ValidationState: ValidationPass,
 		ValidatorName:   "bounds_proof_id_validator",
 		CostClass:       CostInstrumentationOnly,
-		Reason:          fmt.Sprintf("proof id %s validates %s using %s", removed.ProofID, removed.Kind, strings.Join(removed.FactsUsed, ",")),
+		Reason: fmt.Sprintf(
+			"proof id %s validates %s using %s",
+			removed.ProofID,
+			removed.Kind,
+			strings.Join(removed.FactsUsed, ","),
+		),
 	}
 	attachBoundsProofTerm(&fact, removed)
 	return fact
@@ -96,7 +119,11 @@ func boundsRemovedWithProofFact(parentID FactID, removed validation.RemovedCheck
 		ValidationState: ValidationPass,
 		ValidatorName:   "bounds_proof_id_validator",
 		CostClass:       CostZeroCostProven,
-		Reason:          fmt.Sprintf("removed %s bounds check carries compiler-owned proof id %s", removed.Kind, removed.ProofID),
+		Reason: fmt.Sprintf(
+			"removed %s bounds check carries compiler-owned proof id %s",
+			removed.Kind,
+			removed.ProofID,
+		),
 	}
 	attachBoundsProofTerm(&fact, removed)
 	return fact
@@ -104,7 +131,9 @@ func boundsRemovedWithProofFact(parentID FactID, removed validation.RemovedCheck
 
 func boundsRetainedDynamicGuardFact(leftChecks int) Fact {
 	return Fact{
-		ID:              FactID(fmt.Sprintf("validation:bounds:retained_dynamic:%d:guard", leftChecks)),
+		ID: FactID(
+			fmt.Sprintf("validation:bounds:retained_dynamic:%d:guard", leftChecks),
+		),
 		SiteID:          "bounds:retained_dynamic",
 		SourceStage:     StageValidation,
 		ProvenanceClass: ProvenanceSafeKnown,
@@ -134,7 +163,14 @@ func boundsRetainedDynamicFact(parentID FactID, leftChecks int) Fact {
 }
 
 func boundsProofGuardFactID(removed validation.RemovedCheck) FactID {
-	return FactID(fmt.Sprintf("validation:%s:%d:%s:proof_guard", nonEmpty(removed.Function, "unknown"), removed.Site, sanitizeFactIDPart(removed.ProofID)))
+	return FactID(
+		fmt.Sprintf(
+			"validation:%s:%d:%s:proof_guard",
+			nonEmpty(removed.Function, "unknown"),
+			removed.Site,
+			sanitizeFactIDPart(removed.ProofID),
+		),
+	)
 }
 
 func boundsSiteID(functionID string, site int) string {
@@ -148,6 +184,19 @@ func sanitizeFactIDPart(value string) string {
 	}
 	replacer := strings.NewReplacer(" ", "_", "\t", "_", "\n", "_")
 	return replacer.Replace(value)
+}
+
+func derivedFactID(parentID FactID, suffix string) FactID {
+	return FactID(fmt.Sprintf("%s:%s", parentID, suffix))
+}
+
+func nonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func attachBoundsProofTerm(fact *Fact, removed validation.RemovedCheck) {

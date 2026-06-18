@@ -84,7 +84,10 @@ func TestModuleDependencySkipsLocalFunctionTypedCallbackCallee(t *testing.T) {
 
 	got := CollectExternalCalleesByModule(checked)
 	if len(got["lib.callbacks"]) != 0 {
-		t.Fatalf("lib.callbacks deps = %#v, want none for local callback callee", got["lib.callbacks"])
+		t.Fatalf(
+			"lib.callbacks deps = %#v, want none for local callback callee",
+			got["lib.callbacks"],
+		)
 	}
 }
 
@@ -121,7 +124,10 @@ func TestModuleDependencySkipsTargetSetFunctionTypedStructFieldCall(t *testing.T
 
 	got := CollectExternalCalleesByModule(checked)
 	if len(got["lib.callbacks"]) != 0 {
-		t.Fatalf("lib.callbacks deps = %#v, want none for target-set function field callee", got["lib.callbacks"])
+		t.Fatalf(
+			"lib.callbacks deps = %#v, want none for target-set function field callee",
+			got["lib.callbacks"],
+		)
 	}
 }
 
@@ -224,7 +230,10 @@ func TestModuleDependencyCollectsImportedFunctionTypedGlobalBackingSymbol(t *tes
 		t.Fatalf("app.main deps = %#v, want lib.math.add2", got["app.main"])
 	}
 	if _, ok := got["app.main"]["lib.math.cb"]; ok {
-		t.Fatalf("app.main deps = %#v, did not want pseudo global symbol lib.math.cb", got["app.main"])
+		t.Fatalf(
+			"app.main deps = %#v, did not want pseudo global symbol lib.math.cb",
+			got["app.main"],
+		)
 	}
 }
 
@@ -278,8 +287,10 @@ func TestModuleDependencySkipsSelectiveImportedEnumConstructorCall(t *testing.T)
 		},
 		Funcs: []semantics.CheckedFunc{
 			{
-				Module:  "app.main",
-				Imports: map[string]string{"MaybeCallback": "\x00symbol:lib.callbacks.MaybeCallback"},
+				Module: "app.main",
+				Imports: map[string]string{
+					"MaybeCallback": "\x00symbol:lib.callbacks.MaybeCallback",
+				},
 				Decl: &frontend.FuncDecl{
 					Body: []frontend.Stmt{
 						&frontend.ReturnStmt{
@@ -296,7 +307,10 @@ func TestModuleDependencySkipsSelectiveImportedEnumConstructorCall(t *testing.T)
 
 	got := CollectExternalCalleesByModule(checked)
 	if len(got["app.main"]) != 0 {
-		t.Fatalf("app.main deps = %#v, want none for selective imported enum constructor", got["app.main"])
+		t.Fatalf(
+			"app.main deps = %#v, want none for selective imported enum constructor",
+			got["app.main"],
+		)
 	}
 }
 
@@ -310,7 +324,10 @@ func TestTypeDependencyCollectExternalTypesByModule(t *testing.T) {
 					Fields: []frontend.FieldDecl{
 						{
 							Name: "vec",
-							Type: frontend.TypeRef{Kind: frontend.TypeRefNamed, Name: "engine.math.Vec2"},
+							Type: frontend.TypeRef{
+								Kind: frontend.TypeRefNamed,
+								Name: "engine.math.Vec2",
+							},
 						},
 					},
 				},
@@ -320,11 +337,17 @@ func TestTypeDependencyCollectExternalTypesByModule(t *testing.T) {
 			{
 				Module: "app.main",
 				Decl: &frontend.FuncDecl{
-					ReturnType: frontend.TypeRef{Kind: frontend.TypeRefNamed, Name: "engine.math.Vec2"},
+					ReturnType: frontend.TypeRef{
+						Kind: frontend.TypeRefNamed,
+						Name: "engine.math.Vec2",
+					},
 					Params: []frontend.ParamDecl{
 						{
 							Name: "input",
-							Type: frontend.TypeRef{Kind: frontend.TypeRefNamed, Name: "engine.math.Vec2"},
+							Type: frontend.TypeRef{
+								Kind: frontend.TypeRefNamed,
+								Name: "engine.math.Vec2",
+							},
 						},
 					},
 				},
@@ -332,7 +355,10 @@ func TestTypeDependencyCollectExternalTypesByModule(t *testing.T) {
 			{
 				Module: "engine.math",
 				Decl: &frontend.FuncDecl{
-					ReturnType: frontend.TypeRef{Kind: frontend.TypeRefNamed, Name: "engine.math.Vec2"},
+					ReturnType: frontend.TypeRef{
+						Kind: frontend.TypeRefNamed,
+						Name: "engine.math.Vec2",
+					},
 				},
 			},
 		},

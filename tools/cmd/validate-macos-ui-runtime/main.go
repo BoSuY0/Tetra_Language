@@ -13,8 +13,16 @@ import (
 
 func main() {
 	reportPath := flag.String("report", "", "path to macOS UI runtime report")
-	expectedVersion := flag.String("expected-version", compiler.Version(), "expected compiler/runtime version")
-	expectedGitHead := flag.String("expected-git-head", "", "expected git HEAD; defaults to current repository HEAD")
+	expectedVersion := flag.String(
+		"expected-version",
+		compiler.Version(),
+		"expected compiler/runtime version",
+	)
+	expectedGitHead := flag.String(
+		"expected-git-head",
+		"",
+		"expected git HEAD; defaults to current repository HEAD",
+	)
 	flag.Parse()
 	if *reportPath == "" {
 		fmt.Fprintln(os.Stderr, "error: --report is required")

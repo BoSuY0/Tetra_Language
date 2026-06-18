@@ -55,7 +55,8 @@ func TestIncrementalModuleSummaryV1RecordsDependencyHashContractAndRejectsConsum
 	if summary.SchemaVersion != IncrementalModuleSummarySchemaVersion {
 		t.Fatalf("schema = %q", summary.SchemaVersion)
 	}
-	if summary.Module != "app.main" || summary.Target != "linux-x64" || summary.BuildTag != "alloc-stack-v1" {
+	if summary.Module != "app.main" || summary.Target != "linux-x64" ||
+		summary.BuildTag != "alloc-stack-v1" {
 		t.Fatalf("summary identity = %#v", summary)
 	}
 	if !strings.HasPrefix(summary.SourceHash, "sha256:") {
@@ -70,7 +71,13 @@ func TestIncrementalModuleSummaryV1RecordsDependencyHashContractAndRejectsConsum
 	if summary.CodegenConsumer || summary.LinkerConsumer {
 		t.Fatalf("summary must be non-consumer evidence only: %#v", summary)
 	}
-	for _, row := range []string{"source_hash", "dependency_hash_contract", "public_api_hash", "cross_module_signature_inputs", "non_consumer_boundary"} {
+	for _, row := range []string{
+		"source_hash",
+		"dependency_hash_contract",
+		"public_api_hash",
+		"cross_module_signature_inputs",
+		"non_consumer_boundary",
+	} {
 		if !containsString(summary.ValidationRows, row) {
 			t.Fatalf("summary missing validation row %q: %#v", row, summary.ValidationRows)
 		}
@@ -89,7 +96,11 @@ func TestIncrementalModuleSummaryV1RecordsDependencyHashContractAndRejectsConsum
 		t.Fatalf("MarshalIncrementalModuleSummary(decoded): %v", err)
 	}
 	if string(encoded) != string(reencoded) {
-		t.Fatalf("summary JSON not canonical:\n got %s\nwant %s", string(reencoded), string(encoded))
+		t.Fatalf(
+			"summary JSON not canonical:\n got %s\nwant %s",
+			string(reencoded),
+			string(encoded),
+		)
 	}
 
 	for name, mutate := range map[string]func(IncrementalModuleSummary) IncrementalModuleSummary{
@@ -102,7 +113,12 @@ func TestIncrementalModuleSummaryV1RecordsDependencyHashContractAndRejectsConsum
 			return s
 		},
 		"missing dependency validation row": func(s IncrementalModuleSummary) IncrementalModuleSummary {
-			s.ValidationRows = []string{"source_hash", "public_api_hash", "cross_module_signature_inputs", "non_consumer_boundary"}
+			s.ValidationRows = []string{
+				"source_hash",
+				"public_api_hash",
+				"cross_module_signature_inputs",
+				"non_consumer_boundary",
+			}
 			return s
 		},
 		"codegen consumer": func(s IncrementalModuleSummary) IncrementalModuleSummary {

@@ -76,17 +76,21 @@ func serve(parent context.Context, cfg appConfig) error {
 	}
 	defer pool.Close()
 
-	workers, err := webrt.ListenWorkers(cfg.Workers, cfg.ListenPort, func(_ int, port int) (*webrt.Server, error) {
-		return webrt.NewTechEmpowerServer(webrt.TechEmpowerServerConfig{
-			Address:    cfg.ListenAddress,
-			Port:       port,
-			Backlog:    cfg.Backlog,
-			ServerName: cfg.ServerName,
-			Pool:       pool,
-			NextID:     ids.Next,
-			NextRandom: ids.Next,
-		})
-	})
+	workers, err := webrt.ListenWorkers(
+		cfg.Workers,
+		cfg.ListenPort,
+		func(_ int, port int) (*webrt.Server, error) {
+			return webrt.NewTechEmpowerServer(webrt.TechEmpowerServerConfig{
+				Address:    cfg.ListenAddress,
+				Port:       port,
+				Backlog:    cfg.Backlog,
+				ServerName: cfg.ServerName,
+				Pool:       pool,
+				NextID:     ids.Next,
+				NextRandom: ids.Next,
+			})
+		},
+	)
 	if err != nil {
 		return err
 	}
@@ -99,7 +103,12 @@ func serve(parent context.Context, cfg appConfig) error {
 	}
 	defer shutdownPprofServer(pprofServer)
 
-	fmt.Fprintf(os.Stderr, "tetra-techempower listening on %d with %d workers\n", workers.Port(), workers.Count())
+	fmt.Fprintf(
+		os.Stderr,
+		"tetra-techempower listening on %d with %d workers\n",
+		workers.Port(),
+		workers.Count(),
+	)
 	err = workers.Serve(ctx)
 	if errors.Is(err, context.Canceled) {
 		return nil
@@ -121,7 +130,10 @@ func configFromEnv(getenv func(string) string) (appConfig, error) {
 		return appConfig{}, fmt.Errorf("TETRA_TE_BACKLOG: %w", err)
 	}
 	workerDefault := runtime.GOMAXPROCS(0)
-	workers, err := parsePositiveInt(envOr(getenv, "TETRA_TE_WORKERS", strconv.Itoa(workerDefault)), 1<<20)
+	workers, err := parsePositiveInt(
+		envOr(getenv, "TETRA_TE_WORKERS", strconv.Itoa(workerDefault)),
+		1<<20,
+	)
 	if err != nil {
 		return appConfig{}, fmt.Errorf("TETRA_TE_WORKERS: %w", err)
 	}
@@ -130,7 +142,10 @@ func configFromEnv(getenv func(string) string) (appConfig, error) {
 		return appConfig{}, fmt.Errorf("TETRA_TE_PG_PORT: %w", err)
 	}
 	poolSizeDefault := 256
-	poolSize, err := parsePositiveInt(envOr(getenv, "TETRA_TE_PG_POOL", strconv.Itoa(poolSizeDefault)), 1<<20)
+	poolSize, err := parsePositiveInt(
+		envOr(getenv, "TETRA_TE_PG_POOL", strconv.Itoa(poolSizeDefault)),
+		1<<20,
+	)
 	if err != nil {
 		return appConfig{}, fmt.Errorf("TETRA_TE_PG_POOL: %w", err)
 	}

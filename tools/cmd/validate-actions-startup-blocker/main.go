@@ -79,7 +79,10 @@ func validateStartupBlocker(raw []byte) error {
 	}
 	var issues []string
 	if report.Schema != startupBlockerSchema {
-		issues = append(issues, fmt.Sprintf("schema is %q, want %q", report.Schema, startupBlockerSchema))
+		issues = append(
+			issues,
+			fmt.Sprintf("schema is %q, want %q", report.Schema, startupBlockerSchema),
+		)
 	}
 	if report.Status != "blocked" {
 		issues = append(issues, fmt.Sprintf("status is %q, want blocked", report.Status))
@@ -95,17 +98,25 @@ func validateStartupBlocker(raw []byte) error {
 			issues = append(issues, name+" is required")
 		}
 	}
-	if !strings.Contains(strings.ToLower(report.NextAction), "manual") && !strings.Contains(strings.ToLower(report.NextAction), "self-hosted") {
-		issues = append(issues, "next_action must direct manual or self-hosted target-host evidence")
+	if !strings.Contains(strings.ToLower(report.NextAction), "manual") &&
+		!strings.Contains(strings.ToLower(report.NextAction), "self-hosted") {
+		issues = append(
+			issues,
+			"next_action must direct manual or self-hosted target-host evidence",
+		)
 	}
-	if strings.Contains(strings.ToLower(report.NextAction), "ready") || strings.Contains(strings.ToLower(report.Summary), "ready") {
+	if strings.Contains(strings.ToLower(report.NextAction), "ready") ||
+		strings.Contains(strings.ToLower(report.Summary), "ready") {
 		issues = append(issues, "startup blocker report must not claim READY")
 	}
 	if report.Diagnostics == nil {
 		issues = append(issues, "diagnostics is required")
 	} else {
 		if !report.Diagnostics.RepoActionsEnabled {
-			issues = append(issues, "diagnostics.repo_actions_enabled must be true for an Actions startup blocker")
+			issues = append(
+				issues,
+				"diagnostics.repo_actions_enabled must be true for an Actions startup blocker",
+			)
 		}
 		if strings.TrimSpace(report.Diagnostics.RepoAllowedActions) == "" {
 			issues = append(issues, "diagnostics.repo_allowed_actions is required")
@@ -160,7 +171,10 @@ func validateStartupRun(run startupBlockerRun, path string) []string {
 		issues = append(issues, fmt.Sprintf("%s.event is required", path))
 	}
 	if run.Conclusion != "startup_failure" {
-		issues = append(issues, fmt.Sprintf("%s.conclusion is %q, want startup_failure", path, run.Conclusion))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s.conclusion is %q, want startup_failure", path, run.Conclusion),
+		)
 	}
 	if strings.TrimSpace(run.HeadSHA) == "" {
 		issues = append(issues, fmt.Sprintf("%s.head_sha is required", path))

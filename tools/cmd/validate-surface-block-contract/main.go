@@ -46,11 +46,26 @@ type blockContractReport struct {
 	BlockAccessibilityTree *json.RawMessage  `json:"block_accessibility_tree,omitempty"`
 }
 
-var blockForbiddenCorePrimitives = []string{"Button", "Card", "TextField", "TextBox", "Sidebar", "Modal"}
+var blockForbiddenCorePrimitives = []string{
+	"Button",
+	"Card",
+	"TextField",
+	"TextBox",
+	"Sidebar",
+	"Modal",
+}
 
 func main() {
-	contractPath := flag.String("contract", "", "path to tetra.surface.block.contract.v1 contract JSON")
-	reportPath := flag.String("report", "", "optional Surface report JSON to validate against the independent Block contract shape")
+	contractPath := flag.String(
+		"contract",
+		"",
+		"path to tetra.surface.block.contract.v1 contract JSON",
+	)
+	reportPath := flag.String(
+		"report",
+		"",
+		"optional Surface report JSON to validate against the independent Block contract shape",
+	)
 	flag.Parse()
 	if strings.TrimSpace(*contractPath) == "" && strings.TrimSpace(*reportPath) == "" {
 		fmt.Fprintln(os.Stderr, "error: --contract or --report is required")
@@ -87,15 +102,26 @@ func validateSurfaceBlockContract(path string) error {
 func validateSurfaceBlockContractValue(contract blockContract) error {
 	var issues []string
 	if contract.Schema != "tetra.surface.block.contract.v1" {
-		issues = append(issues, fmt.Sprintf("schema is %q, want tetra.surface.block.contract.v1", contract.Schema))
+		issues = append(
+			issues,
+			fmt.Sprintf("schema is %q, want tetra.surface.block.contract.v1", contract.Schema),
+		)
 	}
 	if contract.Status != "contract-freeze" {
 		issues = append(issues, fmt.Sprintf("status is %q, want contract-freeze", contract.Status))
 	}
 	if contract.SurfaceScope != "surface-block-system-linux-web" {
-		issues = append(issues, fmt.Sprintf("surface_scope is %q, want surface-block-system-linux-web", contract.SurfaceScope))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"surface_scope is %q, want surface-block-system-linux-web",
+				contract.SurfaceScope,
+			),
+		)
 	}
-	issues = append(issues, validateBlockCorePrimitiveSet(contract.CorePrimitives, contract.ForbiddenCorePrimitives)...)
+	issues = append(
+		issues,
+		validateBlockCorePrimitiveSet(contract.CorePrimitives, contract.ForbiddenCorePrimitives)...)
 	issues = append(issues, validateBlockABIContract(contract.ABI)...)
 	issues = append(issues, validateBlockReportSchemas(contract.ReportSchemas)...)
 	issues = append(issues, validateBlockRendererContract(contract.RendererContract)...)
@@ -123,7 +149,9 @@ func validateSurfaceBlockContractReport(path string) error {
 		issues = append(issues, "schema is required")
 	}
 	if len(report.CorePrimitives) > 0 {
-		issues = append(issues, validateBlockCorePrimitiveSet(report.CorePrimitives, blockForbiddenCorePrimitives)...)
+		issues = append(
+			issues,
+			validateBlockCorePrimitiveSet(report.CorePrimitives, blockForbiddenCorePrimitives)...)
 	}
 	if report.BlockGraph != nil {
 		if len(report.PaintCommands) == 0 {
@@ -162,10 +190,16 @@ func validateBlockCorePrimitiveSet(core []string, forbidden []string) []string {
 func validateBlockABIContract(abi blockABIContract) []string {
 	var issues []string
 	if abi.Schema != "tetra.surface.block.abi.v1" {
-		issues = append(issues, fmt.Sprintf("abi.schema is %q, want tetra.surface.block.abi.v1", abi.Schema))
+		issues = append(
+			issues,
+			fmt.Sprintf("abi.schema is %q, want tetra.surface.block.abi.v1", abi.Schema),
+		)
 	}
 	if abi.MaxReturnSlots != 10 {
-		issues = append(issues, fmt.Sprintf("abi.max_return_slots is %d, want 10", abi.MaxReturnSlots))
+		issues = append(
+			issues,
+			fmt.Sprintf("abi.max_return_slots is %d, want 10", abi.MaxReturnSlots),
+		)
 	}
 	for _, field := range []string{"id", "parent_id", "props"} {
 		if !containsBlockTextFold(abi.BlockSlots, field) {
@@ -173,9 +207,21 @@ func validateBlockABIContract(abi blockABIContract) []string {
 		}
 	}
 	if len(abi.BlockPropsSlots) != 8 {
-		issues = append(issues, fmt.Sprintf("abi.block_props_slots length is %d, want 8", len(abi.BlockPropsSlots)))
+		issues = append(
+			issues,
+			fmt.Sprintf("abi.block_props_slots length is %d, want 8", len(abi.BlockPropsSlots)),
+		)
 	}
-	for _, field := range []string{"layout_mode", "paint_layers", "text_len", "visual_asset", "interaction_flags", "state_flags", "motion_ms", "accessibility_role"} {
+	for _, field := range []string{
+		"layout_mode",
+		"paint_layers",
+		"text_len",
+		"visual_asset",
+		"interaction_flags",
+		"state_flags",
+		"motion_ms",
+		"accessibility_role",
+	} {
 		if !containsBlockTextFold(abi.BlockPropsSlots, field) {
 			issues = append(issues, fmt.Sprintf("abi.block_props_slots missing %s", field))
 		}
@@ -194,7 +240,10 @@ func validateBlockReportSchemas(schemas map[string]string) []string {
 	}
 	for name, want := range required {
 		if schemas[name] != want {
-			issues = append(issues, fmt.Sprintf("report_schemas.%s is %q, want %s", name, schemas[name], want))
+			issues = append(
+				issues,
+				fmt.Sprintf("report_schemas.%s is %q, want %s", name, schemas[name], want),
+			)
 		}
 	}
 	return issues
@@ -205,14 +254,29 @@ func validateBlockRendererContract(contract blockRendererContract) []string {
 	if !contract.SoftwareRenderer {
 		issues = append(issues, "renderer_contract software_renderer must be true")
 	}
-	for _, renderer := range []string{"software-rgba-headless", "wayland-shm-rgba", "browser-canvas-rgba"} {
+	for _, renderer := range []string{
+		"software-rgba-headless",
+		"wayland-shm-rgba",
+		"browser-canvas-rgba",
+	} {
 		if !containsBlockTextFold(contract.AllowedRenderers, renderer) {
-			issues = append(issues, fmt.Sprintf("renderer_contract allowed_renderers missing %s", renderer))
+			issues = append(
+				issues,
+				fmt.Sprintf("renderer_contract allowed_renderers missing %s", renderer),
+			)
 		}
 	}
-	for _, section := range []string{"block_graph", "paint_commands", "layout_passes", "block_accessibility_tree"} {
+	for _, section := range []string{
+		"block_graph",
+		"paint_commands",
+		"layout_passes",
+		"block_accessibility_tree",
+	} {
 		if !containsBlockTextFold(contract.RequiredReportSections, section) {
-			issues = append(issues, fmt.Sprintf("renderer_contract required_report_sections missing %s", section))
+			issues = append(
+				issues,
+				fmt.Sprintf("renderer_contract required_report_sections missing %s", section),
+			)
 		}
 	}
 	return issues
@@ -230,7 +294,11 @@ func validateBlockCompatibilityWrappers(wrappers []string) []string {
 
 func validateBlockContractNonClaims(nonclaims []string) []string {
 	var issues []string
-	for _, nonclaim := range []string{"no core Button primitive", "no CSS layout parity", "no GPU renderer production claim"} {
+	for _, nonclaim := range []string{
+		"no core Button primitive",
+		"no CSS layout parity",
+		"no GPU renderer production claim",
+	} {
 		if !containsBlockTextFold(nonclaims, nonclaim) {
 			issues = append(issues, fmt.Sprintf("nonclaims missing %q", nonclaim))
 		}

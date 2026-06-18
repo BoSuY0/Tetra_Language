@@ -163,13 +163,15 @@ func (s *Server) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, conn := range s.conns {
-		if err := netrt.Close(conn.fd); err != nil && !errors.Is(err, syscall.EBADF) && firstErr == nil {
+		if err := netrt.Close(conn.fd); err != nil && !errors.Is(err, syscall.EBADF) &&
+			firstErr == nil {
 			firstErr = err
 		}
 	}
 	s.conns = map[int]*connState{}
 	if s.listener.FD > 0 {
-		if err := netrt.Close(s.listener.FD); err != nil && !errors.Is(err, syscall.EBADF) && firstErr == nil {
+		if err := netrt.Close(s.listener.FD); err != nil && !errors.Is(err, syscall.EBADF) &&
+			firstErr == nil {
 			firstErr = err
 		}
 		s.listener = netrt.TCPListener{}
@@ -182,7 +184,10 @@ func (s *Server) Close() error {
 
 func (s *Server) acceptReady() error {
 	for {
-		fd, err := netrt.Accept(s.listener.FD, netrt.AcceptConfig{Nonblocking: true, CloseOnExec: true, NoDelay: true})
+		fd, err := netrt.Accept(
+			s.listener.FD,
+			netrt.AcceptConfig{Nonblocking: true, CloseOnExec: true, NoDelay: true},
+		)
 		if err != nil {
 			return err
 		}

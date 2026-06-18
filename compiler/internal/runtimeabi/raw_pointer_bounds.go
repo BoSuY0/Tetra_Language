@@ -93,7 +93,9 @@ func NewRawAllocationBounds(baseID string, byteSize int64) (RawPointerBoundsMeta
 		return RawPointerBoundsMetadata{}, fmt.Errorf("raw pointer bounds: base id is required")
 	}
 	if byteSize <= 0 {
-		return RawPointerBoundsMetadata{}, fmt.Errorf("raw pointer bounds: allocation byte size must be positive")
+		return RawPointerBoundsMetadata{}, fmt.Errorf(
+			"raw pointer bounds: allocation byte size must be positive",
+		)
 	}
 	return RawPointerBoundsMetadata{
 		Status:                 RawPointerBoundsAllocationBase,
@@ -115,7 +117,11 @@ func UnknownRawPointerBounds(reason string) RawPointerBoundsMetadata {
 	}
 }
 
-func DeriveRawPointerBounds(base RawPointerBoundsMetadata, offsetBytes int64, accessWidthBytes int64) (RawPointerBoundsMetadata, *RawPointerDiagnostic) {
+func DeriveRawPointerBounds(
+	base RawPointerBoundsMetadata,
+	offsetBytes int64,
+	accessWidthBytes int64,
+) (RawPointerBoundsMetadata, *RawPointerDiagnostic) {
 	if !base.VerifiedAllocationRoot || base.BaseID == "" || base.BaseBytes <= 0 {
 		out := UnknownRawPointerBounds("ptr_add source is not a verified allocation root")
 		out.OffsetBytes = offsetBytes
@@ -126,28 +132,48 @@ func DeriveRawPointerBounds(base RawPointerBoundsMetadata, offsetBytes int64, ac
 		accessWidthBytes = 1
 	}
 	if offsetBytes < 0 {
-		return rejectedRawPointerBounds(base, offsetBytes, accessWidthBytes, RawPointerBoundsRejectedNegativeOffset), &RawPointerDiagnostic{
-			Code:    RawPointerDiagnosticNegativePtrAdd,
-			Message: "negative ptr_add offset is impossible for allocation-base metadata",
-		}
+		return rejectedRawPointerBounds(
+				base,
+				offsetBytes,
+				accessWidthBytes,
+				RawPointerBoundsRejectedNegativeOffset,
+			), &RawPointerDiagnostic{
+				Code:    RawPointerDiagnosticNegativePtrAdd,
+				Message: "negative ptr_add offset is impossible for allocation-base metadata",
+			}
 	}
 	if offsetBytes >= base.BaseBytes {
-		return rejectedRawPointerBounds(base, offsetBytes, accessWidthBytes, RawPointerBoundsRejectedUpperBound), &RawPointerDiagnostic{
-			Code:    RawPointerDiagnosticAllocationUpperBound,
-			Message: "ptr_add offset reaches allocation upper bound",
-		}
+		return rejectedRawPointerBounds(
+				base,
+				offsetBytes,
+				accessWidthBytes,
+				RawPointerBoundsRejectedUpperBound,
+			), &RawPointerDiagnostic{
+				Code:    RawPointerDiagnosticAllocationUpperBound,
+				Message: "ptr_add offset reaches allocation upper bound",
+			}
 	}
 	if accessWidthBytes > 0 && offsetBytes > math.MaxInt64-accessWidthBytes {
-		return rejectedRawPointerBounds(base, offsetBytes, accessWidthBytes, RawPointerBoundsRejectedAccessWidthOverflow), &RawPointerDiagnostic{
-			Code:    RawPointerDiagnosticAccessWidth,
-			Message: "raw access width overflows pointer offset",
-		}
+		return rejectedRawPointerBounds(
+				base,
+				offsetBytes,
+				accessWidthBytes,
+				RawPointerBoundsRejectedAccessWidthOverflow,
+			), &RawPointerDiagnostic{
+				Code:    RawPointerDiagnosticAccessWidth,
+				Message: "raw access width overflows pointer offset",
+			}
 	}
 	if offsetBytes+accessWidthBytes > base.BaseBytes {
-		return rejectedRawPointerBounds(base, offsetBytes, accessWidthBytes, RawPointerBoundsRejectedAccessWidthOverflow), &RawPointerDiagnostic{
-			Code:    RawPointerDiagnosticAccessWidth,
-			Message: "raw access width exceeds allocation",
-		}
+		return rejectedRawPointerBounds(
+				base,
+				offsetBytes,
+				accessWidthBytes,
+				RawPointerBoundsRejectedAccessWidthOverflow,
+			), &RawPointerDiagnostic{
+				Code:    RawPointerDiagnosticAccessWidth,
+				Message: "raw access width exceeds allocation",
+			}
 	}
 	return RawPointerBoundsMetadata{
 		Status:                 RawPointerBoundsDerivedOffset,
@@ -160,7 +186,11 @@ func DeriveRawPointerBounds(base RawPointerBoundsMetadata, offsetBytes int64, ac
 	}, nil
 }
 
-func RawSliceBoundsFromParts(ptr RawPointerBoundsMetadata, length int64, elemSize int64) RawSliceBoundsMetadata {
+func RawSliceBoundsFromParts(
+	ptr RawPointerBoundsMetadata,
+	length int64,
+	elemSize int64,
+) RawSliceBoundsMetadata {
 	if elemSize <= 0 {
 		return RawSliceBoundsMetadata{
 			Status:        RawSliceBoundsRejectedInvalidElement,
@@ -220,11 +250,17 @@ func RawSliceBoundsFromParts(ptr RawPointerBoundsMetadata, length int64, elemSiz
 		BaseID:        ptr.BaseID,
 		BaseBytes:     ptr.BaseBytes,
 		LengthBytes:   lengthBytes,
-		Reason:        "raw slice remains external/unknown unless constructed from verified allocation root",
+		Reason: ("raw slice remains external/unknown unless constructed from " +
+			"verified allocation root"),
 	}
 }
 
-func rejectedRawPointerBounds(base RawPointerBoundsMetadata, offsetBytes int64, accessWidthBytes int64, status RawPointerBoundsStatus) RawPointerBoundsMetadata {
+func rejectedRawPointerBounds(
+	base RawPointerBoundsMetadata,
+	offsetBytes int64,
+	accessWidthBytes int64,
+	status RawPointerBoundsStatus,
+) RawPointerBoundsMetadata {
 	if status == "" {
 		status = RawPointerBoundsRejected
 	}

@@ -7,7 +7,7 @@
   "cases": [
     {
       "name": "islands_hello",
-      "src_path": "examples/islands_hello.tetra",
+      "src_path": "examples/memory/islands/islands_hello.tetra",
       "out_path": "/tmp/tetra-smoke-1957332995/islands_hello.exe",
       "expected_exit": 0,
       "ran": false,
@@ -15,7 +15,7 @@
     },
     {
       "name": "islands_i32",
-      "src_path": "examples/islands_i32.tetra",
+      "src_path": "examples/memory/islands/islands_i32.tetra",
       "out_path": "/tmp/tetra-smoke-1957332995/islands_i32.exe",
       "expected_exit": 55,
       "ran": false,
@@ -23,7 +23,7 @@
     },
     {
       "name": "islands_overflow",
-      "src_path": "examples/islands_overflow.tetra",
+      "src_path": "examples/memory/islands/islands_overflow.tetra",
       "out_path": "/tmp/tetra-smoke-1957332995/islands_overflow.exe",
       "expected_exit": 1,
       "ran": false,
@@ -31,7 +31,7 @@
     },
     {
       "name": "mmio_smoke",
-      "src_path": "examples/mmio_smoke.tetra",
+      "src_path": "examples/memory/raw/mmio_smoke.tetra",
       "out_path": "/tmp/tetra-smoke-1957332995/mmio_smoke.exe",
       "expected_exit": 123,
       "ran": false,
@@ -39,7 +39,7 @@
     },
     {
       "name": "cap_mem_smoke",
-      "src_path": "examples/cap_mem_smoke.tetra",
+      "src_path": "examples/memory/raw/cap_mem_smoke.tetra",
       "out_path": "/tmp/tetra-smoke-1957332995/cap_mem_smoke.exe",
       "expected_exit": 77,
       "ran": false,
@@ -47,7 +47,7 @@
     },
     {
       "name": "memset_smoke",
-      "src_path": "examples/memset_smoke.tetra",
+      "src_path": "examples/memory/raw/memset_smoke.tetra",
       "out_path": "/tmp/tetra-smoke-1957332995/memset_smoke.exe",
       "expected_exit": 88,
       "ran": false,
@@ -55,7 +55,7 @@
     },
     {
       "name": "actors_pingpong",
-      "src_path": "examples/actors_pingpong.tetra",
+      "src_path": "examples/actors/actors_pingpong.tetra",
       "out_path": "/tmp/tetra-smoke-1957332995/actors_pingpong.exe",
       "expected_exit": 0,
       "ran": false,

@@ -1,1 +1,5 @@
-{"validator":"release-summary","mutation":"stale_git_head","expected_error":"git_head"}
+{
+  "validator": "release-summary",
+  "mutation": "stale_git_head",
+  "expected_error": "git_head"
+}

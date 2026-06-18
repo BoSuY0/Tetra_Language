@@ -60,7 +60,10 @@ func TestValidateResidualRisksRejectsUnownedCriticalRisk(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected validator failure")
 	}
-	if !strings.Contains(err.Error(), "critical residual risk risk-1 requires known status and owner") {
+	if !strings.Contains(
+		err.Error(),
+		"critical residual risk risk-1 requires known status and owner",
+	) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

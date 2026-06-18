@@ -1,1 +1,5 @@
-{"validator":"browser-release","mutation":"dom_ui_claims_surface","expected_error":"dom"}
+{
+  "validator": "browser-release",
+  "mutation": "dom_ui_claims_surface",
+  "expected_error": "dom"
+}

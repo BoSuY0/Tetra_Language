@@ -31,14 +31,15 @@ type Report struct {
 }
 
 type BrokerReport struct {
-	Runtime             string `json:"runtime"`
-	Transport           string `json:"transport"`
-	ListenAddr          string `json:"listen_addr"`
-	AcceptedConnections int64  `json:"accepted_connections"`
-	RoutedFrames        int64  `json:"routed_frames"`
-	DroppedFrames       int64  `json:"dropped_frames"`
-	DecodeErrors        int64  `json:"decode_errors,omitempty"`
-	LastError           string `json:"last_error,omitempty"`
+	Runtime              string `json:"runtime"`
+	Transport            string `json:"transport"`
+	ListenAddr           string `json:"listen_addr"`
+	AcceptedConnections  int64  `json:"accepted_connections"`
+	RoutedFrames         int64  `json:"routed_frames"`
+	DroppedFrames        int64  `json:"dropped_frames"`
+	DecodeErrors         int64  `json:"decode_errors,omitempty"`
+	ExpectedDecodeErrors int64  `json:"expected_decode_errors,omitempty"`
+	LastError            string `json:"last_error,omitempty"`
 }
 
 type ProcessReport struct {
@@ -59,10 +60,12 @@ type FrameCounts struct {
 	SendMsg   int64 `json:"send_msg"`
 	SendTyped int64 `json:"send_typed"`
 	NodeDown  int64 `json:"node_down"`
+	Error     int64 `json:"error,omitempty"`
 }
 
 type CaseReport struct {
 	Name          string `json:"name"`
+	Kind          string `json:"kind,omitempty"`
 	Ran           bool   `json:"ran"`
 	Pass          bool   `json:"pass"`
 	ExpectedExit  int    `json:"expected_exit"`
@@ -96,10 +99,16 @@ func ValidateReport(raw []byte) error {
 		issues = append(issues, fmt.Sprintf("transport is %q, want loopback-tcp", report.Transport))
 	}
 	if !isHexGitHead(report.GitHead) {
-		issues = append(issues, fmt.Sprintf("git_head is %q, want 40 hex characters", report.GitHead))
+		issues = append(
+			issues,
+			fmt.Sprintf("git_head is %q, want 40 hex characters", report.GitHead),
+		)
 	}
 	if report.ArtifactHashes != "artifact-hashes.json" {
-		issues = append(issues, fmt.Sprintf("artifact_hashes is %q, want artifact-hashes.json", report.ArtifactHashes))
+		issues = append(
+			issues,
+			fmt.Sprintf("artifact_hashes is %q, want artifact-hashes.json", report.ArtifactHashes),
+		)
 	}
 	issues = append(issues, validateClaims(report.Claims)...)
 	issues = append(issues, validateNonClaims(report.NonClaims)...)
@@ -127,7 +136,11 @@ func ValidateReportForCurrentHead(raw []byte, currentGitHead string) error {
 		return err
 	}
 	if report.GitHead != currentGitHead {
-		return fmt.Errorf("git_head %q does not match current git head %q", report.GitHead, currentGitHead)
+		return fmt.Errorf(
+			"git_head %q does not match current git head %q",
+			report.GitHead,
+			currentGitHead,
+		)
 	}
 	return nil
 }
@@ -138,28 +151,81 @@ func validateBroker(b BrokerReport) []string {
 		issues = append(issues, fmt.Sprintf("broker runtime is %q, want actornet", b.Runtime))
 	}
 	if b.Transport != "loopback-tcp" {
-		issues = append(issues, fmt.Sprintf("broker transport is %q, want loopback-tcp", b.Transport))
+		issues = append(
+			issues,
+			fmt.Sprintf("broker transport is %q, want loopback-tcp", b.Transport),
+		)
 	}
 	host, _, err := net.SplitHostPort(b.ListenAddr)
 	if err != nil {
-		issues = append(issues, fmt.Sprintf("broker listen_addr must be loopback host:port: %v", err))
+		issues = append(
+			issues,
+			fmt.Sprintf("broker listen_addr must be loopback host:port: %v", err),
+		)
 	} else if host != "127.0.0.1" && host != "localhost" && host != "::1" {
 		issues = append(issues, fmt.Sprintf("broker listen_addr host is %q, want loopback", host))
 	}
 	if b.AcceptedConnections < 2 {
-		issues = append(issues, fmt.Sprintf("broker accepted_connections = %d, want at least 2", b.AcceptedConnections))
+		issues = append(
+			issues,
+			fmt.Sprintf("broker accepted_connections = %d, want at least 2", b.AcceptedConnections),
+		)
 	}
 	if b.RoutedFrames < 3 {
-		issues = append(issues, fmt.Sprintf("broker routed_frames = %d, want real cross-node frame routing", b.RoutedFrames))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"broker routed_frames = %d, want real cross-node frame routing",
+				b.RoutedFrames,
+			),
+		)
 	}
 	if b.DroppedFrames < 1 {
-		issues = append(issues, fmt.Sprintf("broker dropped_frames = %d, want missing-node negative evidence", b.DroppedFrames))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"broker dropped_frames = %d, want missing-node negative evidence",
+				b.DroppedFrames,
+			),
+		)
 	}
-	if b.DecodeErrors != 0 {
-		issues = append(issues, fmt.Sprintf("broker decode_errors = %d, want 0", b.DecodeErrors))
-	}
-	if strings.TrimSpace(b.LastError) != "" {
-		issues = append(issues, "broker last_error must be empty for passing evidence")
+	if b.ExpectedDecodeErrors < 0 {
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"broker expected_decode_errors = %d, want non-negative",
+				b.ExpectedDecodeErrors,
+			),
+		)
+	} else if b.ExpectedDecodeErrors > 0 {
+		if b.DecodeErrors != b.ExpectedDecodeErrors {
+			issues = append(
+				issues,
+				fmt.Sprintf(("broker decode_errors = %d, want expected_decode_errors %d from "+
+					"malformed-frame negative evidence"), b.DecodeErrors, b.ExpectedDecodeErrors),
+			)
+		}
+		if strings.TrimSpace(b.LastError) == "" {
+			issues = append(
+				issues,
+				("broker last_error is required when expected_decode_errors " +
+					"records malformed-frame negative evidence"),
+			)
+		}
+	} else {
+		if b.DecodeErrors != 0 {
+			issues = append(
+				issues,
+				fmt.Sprintf(("broker decode_errors = %d, want 0 without expected malformed-"+
+					"frame evidence"), b.DecodeErrors),
+			)
+		}
+		if strings.TrimSpace(b.LastError) != "" {
+			issues = append(
+				issues,
+				"broker last_error must be empty without expected malformed-frame evidence",
+			)
+		}
 	}
 	return issues
 }
@@ -179,7 +245,9 @@ func isHexGitHead(value string) bool {
 
 func validateNonClaims(nonclaims []string) []string {
 	if len(nonclaims) == 0 {
-		return []string{"nonclaims must include cluster, reconnect/retry, and non-linux scope boundaries"}
+		return []string{
+			"nonclaims must include cluster, reconnect/retry, and non-linux scope boundaries",
+		}
 	}
 	joined := strings.ToLower(strings.Join(nonclaims, "\n"))
 	var issues []string
@@ -195,9 +263,25 @@ func validateClaims(claims []string) []string {
 	var issues []string
 	for _, claim := range claims {
 		lower := strings.ToLower(claim)
-		for _, forbidden := range []string{"cluster", "reconnect", "retry", "non-linux"} {
+		for _, forbidden := range []string{
+			"cluster",
+			"reconnect",
+			"retry",
+			"non-linux",
+			"transport-only",
+			"transport only",
+			"envelope-only",
+			"envelope only",
+		} {
 			if strings.Contains(lower, forbidden) {
-				issues = append(issues, fmt.Sprintf("forbidden distributed actor claim %q mentions %q", claim, forbidden))
+				issues = append(
+					issues,
+					fmt.Sprintf(
+						"forbidden distributed actor claim %q mentions %q",
+						claim,
+						forbidden,
+					),
+				)
 			}
 		}
 	}
@@ -207,7 +291,13 @@ func validateClaims(claims []string) []string {
 func validateProcesses(processes []ProcessReport) []string {
 	var issues []string
 	if len(processes) < 3 {
-		issues = append(issues, fmt.Sprintf("process evidence has %d entries, want broker plus at least two node processes", len(processes)))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"process evidence has %d entries, want broker plus at least two node processes",
+				len(processes),
+			),
+		)
 	}
 	seenBroker := false
 	nodeCount := 0
@@ -225,7 +315,10 @@ func validateProcesses(processes []ProcessReport) []string {
 		case "node":
 			nodeCount++
 		default:
-			issues = append(issues, fmt.Sprintf("process %s kind is %q, want broker or node", p.Name, p.Kind))
+			issues = append(
+				issues,
+				fmt.Sprintf("process %s kind is %q, want broker or node", p.Name, p.Kind),
+			)
 		}
 		if strings.TrimSpace(p.Path) == "" {
 			issues = append(issues, fmt.Sprintf("process %s path is required", p.Name))
@@ -246,7 +339,10 @@ func validateProcesses(processes []ProcessReport) []string {
 		issues = append(issues, "process evidence missing broker process")
 	}
 	if nodeCount < 2 {
-		issues = append(issues, fmt.Sprintf("process evidence has %d node processes, want at least 2", nodeCount))
+		issues = append(
+			issues,
+			fmt.Sprintf("process evidence has %d node processes, want at least 2", nodeCount),
+		)
 	}
 	return issues
 }
@@ -265,6 +361,7 @@ func validateFrameCounts(counts FrameCounts) []string {
 		{name: "send_msg frame count", got: counts.SendMsg},
 		{name: "send_typed frame count", got: counts.SendTyped},
 		{name: "node_down frame count", got: counts.NodeDown},
+		{name: "error frame count", got: counts.Error},
 	}
 	for _, item := range required {
 		if item.got < 1 {
@@ -288,16 +385,29 @@ func validateFrameOrder(order []string) []string {
 		"send_msg":   true,
 		"send_typed": true,
 		"node_down":  true,
+		"error":      true,
 	}
 	for i, name := range order {
 		name = strings.TrimSpace(name)
 		if name == "" {
 			issues = append(issues, fmt.Sprintf("frame_order[%d] is empty", i))
 		} else if !allowed[name] {
-			issues = append(issues, fmt.Sprintf("frame_order[%d] = %q is not a known actorwire frame", i, name))
+			issues = append(
+				issues,
+				fmt.Sprintf("frame_order[%d] = %q is not a known actorwire frame", i, name),
+			)
 		}
 	}
-	required := []string{"hello", "hello_ack", "spawn_req", "spawn_ack", "send_i32", "send_msg", "send_typed", "node_down"}
+	required := []string{
+		"hello",
+		"hello_ack",
+		"spawn_req",
+		"spawn_ack",
+		"send_i32",
+		"send_msg",
+		"send_typed",
+		"node_down",
+	}
 	next := 0
 	for _, name := range order {
 		if next < len(required) && strings.TrimSpace(name) == required[next] {
@@ -305,27 +415,43 @@ func validateFrameOrder(order []string) []string {
 		}
 	}
 	if next < len(required) {
-		issues = append(issues, fmt.Sprintf("frame_order missing ordered loopback sequence at %q", required[next]))
+		issues = append(
+			issues,
+			fmt.Sprintf("frame_order missing ordered loopback sequence at %q", required[next]),
+		)
 	}
 	return issues
 }
 
 func validateCases(cases []CaseReport) []string {
 	var issues []string
-	required := map[string]bool{
+	requiredPositive := map[string]bool{
 		"cross-node i32 send/receive":    false,
 		"cross-node tagged send/receive": false,
 		"cross-node typed send/receive":  false,
 		"missing-node failure/status":    false,
 		"task cancel/join compatibility": false,
 	}
+	requiredNegative := map[string]bool{
+		"malformed frame length rejected":      false,
+		"duplicate node rejected":              false,
+		"unknown frame type rejected":          false,
+		"bad typed slot count rejected":        false,
+		"missing-node send after broker close": false,
+		"forged source node rejected":          false,
+	}
 	for _, c := range cases {
 		if strings.TrimSpace(c.Name) == "" {
 			issues = append(issues, "case name is required")
 			continue
 		}
-		if _, ok := required[c.Name]; ok {
-			required[c.Name] = true
+		_, isPositive := requiredPositive[c.Name]
+		_, isNegative := requiredNegative[c.Name]
+		if isPositive {
+			requiredPositive[c.Name] = true
+		}
+		if isNegative {
+			requiredNegative[c.Name] = true
 		}
 		if !c.Ran {
 			issues = append(issues, fmt.Sprintf("case %s did not run", c.Name))
@@ -336,16 +462,54 @@ func validateCases(cases []CaseReport) []string {
 		if c.ActualExit == nil {
 			issues = append(issues, fmt.Sprintf("case %s missing actual_exit", c.Name))
 		} else if *c.ActualExit != c.ExpectedExit {
-			issues = append(issues, fmt.Sprintf("case %s actual_exit = %d, want %d", c.Name, *c.ActualExit, c.ExpectedExit))
+			issues = append(
+				issues,
+				fmt.Sprintf("case %s actual_exit = %d, want %d", c.Name, *c.ActualExit, c.ExpectedExit),
+			)
 		}
-		if c.NodeProcesses < 1 {
-			issues = append(issues, fmt.Sprintf("case %s node_processes = %d, want executable node process evidence", c.Name, c.NodeProcesses))
+		switch {
+		case isNegative:
+			if c.Kind != "network_negative" {
+				issues = append(
+					issues,
+					fmt.Sprintf("case %s kind is %q, want network_negative", c.Name, c.Kind),
+				)
+			}
+			if c.NodeProcesses != 0 {
+				issues = append(
+					issues,
+					fmt.Sprintf(
+						"case %s node_processes = %d, want network-only evidence",
+						c.Name,
+						c.NodeProcesses,
+					),
+				)
+			}
+		case c.NodeProcesses < 1:
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"case %s node_processes = %d, want executable node process evidence",
+					c.Name,
+					c.NodeProcesses,
+				),
+			)
+		case c.Kind != "" && c.Kind != "positive":
+			issues = append(
+				issues,
+				fmt.Sprintf("case %s kind is %q, want positive or empty", c.Name, c.Kind),
+			)
 		}
 		if strings.TrimSpace(c.Error) != "" {
 			issues = append(issues, fmt.Sprintf("case %s has error text", c.Name))
 		}
 	}
-	for name, seen := range required {
+	for name, seen := range requiredPositive {
+		if !seen {
+			issues = append(issues, fmt.Sprintf("missing required case %s", name))
+		}
+	}
+	for name, seen := range requiredNegative {
 		if !seen {
 			issues = append(issues, fmt.Sprintf("missing required case %s", name))
 		}

@@ -1,0 +1,79 @@
+// Backend PostgreSQL text writer short-buffer guard microservice.
+module examples.microservices.backend.postgres.write.backend_postgres_text_write_short_guard_service
+import lib.core.postgres as pg
+
+func check_valid_writes() -> Bool
+uses alloc, mem:
+    var bytes: []u8 = core.make_u8(12)
+    if pg.write_ascii_at(bytes, 0, "OK") != 2:
+        return false
+    if bytes[0] != 79 || bytes[1] != 75:
+        return false
+    if pg.write_cstring_at(bytes, 2, "x") != 4:
+        return false
+    if bytes[2] != 120 || bytes[3] != 0:
+        return false
+    if pg.write_cstring_pair_at(bytes, 4, "a", "b") != 8:
+        return false
+    if bytes[4] != 97 || bytes[5] != 0 || bytes[6] != 98 || bytes[7] != 0:
+        return false
+    return true
+
+func check_empty_writes() -> Int
+uses alloc, mem:
+    var empty: []u8 = core.make_u8(0)
+    if pg.write_ascii_at(empty, 0, "Z") != -1:
+        return 21
+    if pg.write_cstring_at(empty, 0, "Z") != -1:
+        return 22
+    if pg.write_cstring_pair_at(empty, 0, "a", "b") != -1:
+        return 23
+    return 0
+
+func check_truncated_ascii_write() -> Int
+uses alloc, mem:
+    var bytes: []u8 = core.make_u8(2)
+    bytes[0] = 9
+    bytes[1] = 8
+    if pg.write_ascii_at(bytes, 0, "XYZ") != -1:
+        return 31
+    if bytes[0] != 9 || bytes[1] != 8:
+        return 32
+    return 0
+
+func check_truncated_cstring_write() -> Int
+uses alloc, mem:
+    var bytes: []u8 = core.make_u8(1)
+    bytes[0] = 7
+    if pg.write_cstring_at(bytes, 0, "x") != -1:
+        return 41
+    if bytes[0] != 7:
+        return 42
+    return 0
+
+func check_truncated_pair_write() -> Int
+uses alloc, mem:
+    var bytes: []u8 = core.make_u8(3)
+    bytes[0] = 1
+    bytes[1] = 2
+    bytes[2] = 3
+    if pg.write_cstring_pair_at(bytes, 0, "a", "b") != -1:
+        return 51
+    if bytes[0] != 1 || bytes[1] != 2 || bytes[2] != 3:
+        return 52
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    if !check_valid_writes():
+        return 1
+    let empty_result: Int = check_empty_writes()
+    if empty_result != 0:
+        return empty_result
+    let ascii_result: Int = check_truncated_ascii_write()
+    if ascii_result != 0:
+        return ascii_result
+    let cstring_result: Int = check_truncated_cstring_write()
+    if cstring_result != 0:
+        return cstring_result
+    return check_truncated_pair_write()

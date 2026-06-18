@@ -1,0 +1,52 @@
+// Memory typed-actor struct payload-offset microservice smoke.
+//
+// The service receives a typed actor struct payload, aliases its scalar field
+// into a local offset, and uses that local for checked raw-memory access.
+module examples.microservices.memory.actor_offsets.typed.memory_actor_typed_struct_payload_offset_service
+import lib.core.capability as cap
+
+enum OffsetMsg:
+    case request(OffsetBox)
+    case reply(OffsetBox)
+    case failed(Int)
+
+struct OffsetBox:
+    offset: Int
+
+func worker() -> Int
+uses actors:
+    let msg: OffsetMsg = core.recv_typed<OffsetMsg>()
+    match msg:
+    case OffsetMsg.request(request_box):
+        let _reply: Int = core.send_typed(core.sender(), OffsetMsg.reply(request_box))
+        return 0
+    case OffsetMsg.reply(reply_box):
+        let _failed: Int = core.send_typed(core.sender(), OffsetMsg.failed(reply_box.offset))
+        return 0
+    case OffsetMsg.failed(code):
+        let _failed_again: Int = core.send_typed(core.sender(), OffsetMsg.failed(code))
+        return 0
+
+func main() -> Int
+uses actors, alloc, capability, mem:
+    let peer: actor = core.spawn("worker")
+    let payload: OffsetBox = OffsetBox(offset: 4)
+    let _sent: Int = core.send_typed(peer, OffsetMsg.request(payload))
+    let reply: OffsetMsg = core.recv_typed<OffsetMsg>()
+    match reply:
+    case OffsetMsg.reply(reply_box):
+        let offset: Int = reply_box.offset
+        unsafe:
+            let memory_cap: cap.mem = core.cap_mem()
+            let base: ptr = core.alloc_bytes(8)
+            let cell: ptr = core.ptr_add(base, offset, memory_cap)
+            let _write: Int = core.store_i32(cell, 42, memory_cap)
+            let value: Int = core.load_i32(cell, memory_cap)
+            if value == 42:
+                return 0
+            return value
+        return 99
+    case OffsetMsg.request(unexpected_box):
+        return 50 + unexpected_box.offset
+    case OffsetMsg.failed(code):
+        return 80 + code

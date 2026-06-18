@@ -49,7 +49,8 @@ uses mem, io:
 	if got.Symbols[4].Detail != "func add(v: borrow Vec2) -> i32 uses io, mem" {
 		t.Fatalf("function detail = %q", got.Symbols[4].Detail)
 	}
-	if got.Symbols[5].Kind != "extension-method" || got.Symbols[5].Detail != "func Vec2.draw(self: Vec2) -> i32" {
+	if got.Symbols[5].Kind != "extension-method" ||
+		got.Symbols[5].Detail != "func Vec2.draw(self: Vec2) -> i32" {
 		t.Fatalf("extension method symbol = %#v", got.Symbols[5])
 	}
 	if len(got.Hovers) < 6 {
@@ -71,7 +72,10 @@ func TestAnalyzeLSPSourceActorDeclarationDiagnostic(t *testing.T) {
 	if got.Diagnostics[0].File != "bad.tetra" || got.Diagnostics[0].Line != 2 {
 		t.Fatalf("diagnostic = %#v", got.Diagnostics[0])
 	}
-	if !strings.Contains(got.Diagnostics[0].Message, "actor state fields must use 'val' or 'const'") {
+	if !strings.Contains(
+		got.Diagnostics[0].Message,
+		"actor state fields must use 'val' or 'const'",
+	) {
 		t.Fatalf("diagnostic = %#v", got.Diagnostics[0])
 	}
 }
@@ -85,7 +89,8 @@ func TestAnalyzeLSPSourceSemanticDiagnostics(t *testing.T) {
 		t.Fatalf("diagnostics = %#v", got.Diagnostics)
 	}
 	diag := got.Diagnostics[0]
-	if diag.Code != compiler.DiagnosticCodeSafetyEffect || diag.File != "bad_semantic.tetra" || diag.Line != 2 {
+	if diag.Code != compiler.DiagnosticCodeSafetyEffect || diag.File != "bad_semantic.tetra" ||
+		diag.Line != 2 {
 		t.Fatalf("diagnostic = %#v", diag)
 	}
 	if diag.Message != "function 'main' uses effect 'io' but does not declare it" {
@@ -105,7 +110,9 @@ uses privacy:
 		t.Fatalf("diagnostics = %#v", got.Diagnostics)
 	}
 	diag := got.Diagnostics[0]
-	if diag.Code != compiler.DiagnosticCodeSafetyPrivacy || diag.File != "bad_privacy_semantic.tetra" || diag.Line != 1 {
+	if diag.Code != compiler.DiagnosticCodeSafetyPrivacy ||
+		diag.File != "bad_privacy_semantic.tetra" ||
+		diag.Line != 1 {
 		t.Fatalf("diagnostic = %#v", diag)
 	}
 	if diag.Message != "uses effect 'privacy' requires semantic clause 'privacy'" {
@@ -121,7 +128,9 @@ func TestAnalyzeLSPSourceRecursiveSecretSignatureDiagnosticCode(t *testing.T) {
 		t.Fatalf("diagnostics = %#v", got.Diagnostics)
 	}
 	diag := got.Diagnostics[0]
-	if diag.Code != compiler.DiagnosticCodeSafetyPrivacy || diag.File != "bad_secret_signature.tetra" || diag.Line != 1 {
+	if diag.Code != compiler.DiagnosticCodeSafetyPrivacy ||
+		diag.File != "bad_secret_signature.tetra" ||
+		diag.Line != 1 {
 		t.Fatalf("diagnostic = %#v", diag)
 	}
 	if diag.Message != "secret types in function signature require semantic clause 'privacy'" {
@@ -136,7 +145,10 @@ func answer() -> Int:
     return math.add_i32(40, 2)
 `), "module_with_import.tetra")
 	if len(got.Diagnostics) != 0 {
-		t.Fatalf("single-file LSP should not report unresolved imports without a workspace graph: %#v", got.Diagnostics)
+		t.Fatalf(
+			"single-file LSP should not report unresolved imports without a workspace graph: %#v",
+			got.Diagnostics,
+		)
 	}
 	if len(got.Symbols) != 1 || got.Symbols[0].Name != "answer" {
 		t.Fatalf("symbols = %#v", got.Symbols)
@@ -175,7 +187,8 @@ func answer() -> Int:
 		t.Fatalf("diagnostics = %#v", got.Diagnostics)
 	}
 	diag := got.Diagnostics[0]
-	if diag.Code != "TETRA2001" || !strings.Contains(diag.Message, "unknown function 'app.helper.missing'") {
+	if diag.Code != "TETRA2001" ||
+		!strings.Contains(diag.Message, "unknown function 'app.helper.missing'") {
 		t.Fatalf("diagnostic = %#v", diag)
 	}
 	if len(got.Symbols) != 1 || got.Symbols[0].Name != "answer" {

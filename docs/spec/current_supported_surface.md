@@ -33,8 +33,17 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
   as proof of `v1.0.0` readiness while the repository remains on `v0.4.0`.
 - Future v1 safety evidence closure is documented in `docs/spec/v1_scope.md`
   and `docs/checklists/v1_0_release_gate.md`. It requires the same-branch
-  aggregate compiler command
-  `go test ./compiler/... -run 'Ownership|Borrow|Consume|Inout|Lifetime|Resource|Island|Actor|Task|Unsafe|Capability|Effect|Privacy|Consent|Budget|MMIO|Mem' -count=1`
+  aggregate compiler command:
+
+```bash
+V1_SAFETY='Ownership|Borrow|Consume|Inout|Lifetime|Resource|Island|Actor|Task'
+V1_SAFETY="$V1_SAFETY|Unsafe|Capability|Effect|Privacy|Consent|Budget|MMIO|Mem"
+
+go test ./compiler/... \
+  -run "$V1_SAFETY" \
+  -count=1
+```
+
   plus `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`
   before any `v1.0.0` safety claim can close; this is not additional current
   `v0.4.0` support.
@@ -98,7 +107,8 @@ audit proves that separate checkout state.
   pointer/native-int facts. The current stdlib/runtime capability matrix lives
   in `docs/spec/linux_native_target_stdlib_matrix.md`. `linux-x86` now has a
   build-verified self-host logical time-runtime smoke for time-only programs,
-  bounded two-spawn actor/task/task-group smokes, single-spawn typed-task/staged typed-task/typed task-group/actor-state smokes, and an x86
+  bounded two-spawn actor/task/task-group smokes, single-spawn typed-task/staged typed-task/typed
+  task-group/actor-state smokes, and an x86
   filesystem+scheduler composition smoke. x86/x32 no-runtime executable ABI
   smokes cover stdout writes plus string-literal data, and the ABI reports now
   include `core.net_write(2)` stderr fd runtime smokes and allocator
@@ -107,8 +117,10 @@ audit proves that separate checkout state.
   executable smokes for `ptr_add` plus byte store/load, raw pointer-slot
   executable smokes for base and direct-`ptr_add` offset `store_ptr`/`load_ptr`,
   as well as scoped
-  island/free executable smokes in normal and debug modes. `linux-x32` now has ABI-report self-host time/
-  bounded two-spawn actor/task/task-group smokes plus single-spawn typed-task/staged typed-task/typed task-group/actor-state runtime smokes,
+  island/free executable smokes in normal and debug modes. `linux-x32` now has ABI-report self-host
+  time/
+  bounded two-spawn actor/task/task-group smokes plus single-spawn typed-task/staged
+  typed-task/typed task-group/actor-state runtime smokes,
   an x32 filesystem+scheduler composition smoke, plus an x32 `ctx_switch`
   object smoke, and minimal `fs_exists` filesystem runtime smokes now cover
   both `linux-x86` and `linux-x32`. Both build-only targets also have
@@ -233,7 +245,8 @@ audit proves that separate checkout state.
 - Static protocol conformance: protocol declarations and `impl Type: Protocol`
   are checked against extension/static methods, including compatible effects,
   async, throws, parameter ownership markers, params, return types, and MVP
-  generic requirement signature shape (`func req<T>(...)`). This is static conformance only: no witness
+  generic requirement signature shape (`func req<T>(...)`). This is static conformance only: no
+  witness
   tables, trait objects, runtime protocol values, or dynamic dispatch model are
   introduced.
 - Generic protocol requirement parsing/checking in MVP form (`func req<T>(...)`)
@@ -241,7 +254,8 @@ audit proves that separate checkout state.
 - Static protocol-bound generics: generic function type parameters with protocol
   bounds are validated during monomorphization, including same-module and
   cross-module impl conformance with parameter ownership markers, requirement
-  signature shape, and visibility diagnostics. This does not introduce calls through generic protocol bounds,
+  signature shape, and visibility diagnostics. This does not introduce calls through generic
+  protocol bounds,
   witness tables, trait objects, runtime protocol values, or dynamic dispatch.
 - P22.2 records the protocol / trait-object decision as an evidence-only
   report, `tetra.language.protocol_trait_object_decision.v1` /
@@ -294,7 +308,8 @@ audit proves that separate checkout state.
   initializers, and
   signature-compatible mutable local reassignment among supported
   function-typed values, including target-set-backed parameter-return calls such
-  as `identity(captured)` or `callbacks.identity(captured)`. Closure literals assigned to a declared function type
+  as `identity(captured)` or `callbacks.identity(captured)`. Closure literals assigned to a declared
+  function type
   or passed directly as callback arguments must match the declared parameter
   arity exactly before lowering. Capturing closure literals carry conservative
   lifetime/ABI evidence through the Level 2 `fnptr` fast path and the
@@ -325,7 +340,8 @@ audit proves that separate checkout state.
   and enum-payload pattern-bound direct-try dispatch for concrete throwing
   symbols, plus immutable same-module or imported-public function-typed global
   direct-try dispatch, local aliases, mutable local reassignment, direct callback arguments, local
-  struct-field initializer/reassignment, and enum-payload reassignment for concrete throwing symbols, plus same-module
+  struct-field initializer/reassignment, and enum-payload reassignment for concrete throwing
+  symbols, plus same-module
   mutable function-typed global direct-try dispatch and direct throwing callback
   arguments, plus local struct-field/enum-payload storage direct-try after
   compatible concrete throwing-symbol initialization or reassignment, plus
@@ -505,7 +521,8 @@ audit proves that separate checkout state.
   slice allocation by element width, `island_free` no-op).
 - Ownership markers MVP for `borrow`, `inout`, and `consume` call-site
   contracts. The current checker covers local-call marker validation,
-  ownership-path alias rejection, same-module/cross-module struct-field and enum-payload partial consume
+  ownership-path alias rejection, same-module/cross-module struct-field and enum-payload partial
+  consume
   with sibling-path reuse and whole-value call/let/return rejection with stable
   `TETRA2101` CLI JSON diagnostics, including stable CLI JSON evidence for
   same-module/cross-module whole-copy rejection after partial struct/enum consume,
@@ -537,7 +554,8 @@ audit proves that separate checkout state.
   including scalar return, owned/consume/inout call, inout-assignment, and
   global-assignment escapes, with stable TETRA2102 JSON diagnostic evidence for
   same-module/cross-module ptr enum-payload return/global/inout assignment
-  escapes, same-module/cross-module ptr optional-payload return/global/inout assignment escapes with stable TETRA2102 JSON diagnostic evidence plus
+  escapes, same-module/cross-module ptr optional-payload return/global/inout assignment escapes with
+  stable TETRA2102 JSON diagnostic evidence plus
   same-module/cross-module ptr-containing/nested aggregate owned/consume/inout
   call rejections with stable TETRA2101 JSON diagnostic evidence,
   same-module/cross-module ptr enum-payload owned/consume/inout call
@@ -589,13 +607,15 @@ audit proves that separate checkout state.
   owned/consume/inout instantiations with stable `TETRA2101` CLI JSON evidence,
   local aliases returned
   directly, inside ptr-containing aggregate literals, or through ptr-containing
-  struct-field or enum-payload aggregate aliases, passed as ptr-containing struct/enum aggregate arguments to
+  struct-field or enum-payload aggregate aliases, passed as ptr-containing struct/enum aggregate
+  arguments to
   direct
   owned/consume/inout parameters, including same-module/cross-module
   monomorphized generic aggregate parameters and optional `ptr?` generic
   owned/consume/inout instantiations with stable `TETRA2101` CLI JSON
   evidence plus same-module/cross-module generic borrow-aggregate/optional-ptr
-  return diagnostics with stable `TETRA2102` CLI JSON evidence and imported direct owned/consume/inout
+  return diagnostics with stable `TETRA2102` CLI JSON evidence and imported direct
+  owned/consume/inout
   call boundaries for optional ptr, struct, enum-payload, and nested
   ptr-containing aggregate arguments, including imported direct ptr-containing/nested
   aggregate owned/consume/inout call rejections with stable TETRA2101 JSON
@@ -603,7 +623,8 @@ audit proves that separate checkout state.
   same-module/cross-module protocol impl parameter ownership matching plus
   same-module/cross-module protocol impl parameter ownership mismatch
   diagnostics with stable TETRA2001 CLI JSON evidence, and
-  same-module/cross-module generic protocol requirement parameter ownership mismatch diagnostics with stable TETRA2001 JSON diagnostic evidence,
+  same-module/cross-module generic protocol requirement parameter ownership mismatch diagnostics
+  with stable TETRA2001 JSON diagnostic evidence,
   or function-typed callback value/struct-field/enum-payload
   owned/consume/inout parameters including same-module/cross-module
   function-typed value/struct-field/enum-payload optional `ptr?`
@@ -611,7 +632,8 @@ audit proves that separate checkout state.
   assigned into ptr-containing `inout` aggregate
   parameters, or assigned to globals.
 - Resource lifetime MVP for task handles, task groups, island handles,
-  region-backed slices, optional region wrappers, and structs containing those resources. Common local
+  region-backed slices, optional region wrappers, and structs containing those resources. Common
+  local
   scopes and control-flow merges are checked conservatively; branch/match/loop
   task-handle maybe-joined, task-group maybe-closed, and island maybe-freed
   merge diagnostics, branch/match/loop resource finalization merge diagnostics
@@ -632,12 +654,14 @@ audit proves that separate checkout state.
   same-module/cross-module transitive interprocedural task-handle/task-group/island
   resource aliases with stable TETRA2101 CLI JSON evidence,
   same-module/cross-module task-handle/task-group optional-payload join/close
-  aliases with stable TETRA2101 CLI JSON evidence, ambiguous provenance, and ambiguous lifetime merges are diagnostics
+  aliases with stable TETRA2101 CLI JSON evidence, ambiguous provenance, and ambiguous lifetime
+  merges are diagnostics
   rather than proof obligations solved by a full SSA analysis.
 - Lifetime SSA local join solver is current since `v0.4.0` for branch, match,
   and loop flow snapshots over ownership consume state, resource finalization
   state, optional region-wrapper escapes with stable `TETRA2102` diagnostics,
-  same-module and interface-only cross-module per-field interprocedural region summaries for aggregate returns
+  same-module and interface-only cross-module per-field interprocedural region summaries for
+  aggregate returns
   from multiple island parameters, including optional aggregate wrappers,
   enum payload wrappers, branch aggregate wrappers, match aggregate wrappers,
   if-let aggregate wrappers, mixed safe/provenance aggregate branch and match
@@ -682,7 +706,8 @@ audit proves that separate checkout state.
   diagnostics with stable TETRA2101 JSON diagnostic evidence,
   release-covered cooperative `core.task_group_cancel` wake/join behavior,
   same-module/cross-module task_group_cancel return provenance diagnostics with
-  stable TETRA2101 CLI JSON evidence, and task group lifecycle status/close smokes. Worker entrypoints
+  stable TETRA2101 CLI JSON evidence, and task group lifecycle status/close smokes. Worker
+  entrypoints
   are additionally checked at the
   declared effect boundary: actor/runtime scheduling effects remain allowed for
   the MVP scheduler surface, while raw memory allocation/access, capability,
@@ -788,7 +813,8 @@ audit proves that separate checkout state.
   `p19.2_http_json_source_first`
   truth-bench-harness dry-run artifact. That artifact has Tetra-only
   `HTTP plaintext` and `HTTP JSON` rows and Tetra proof/allocation/bounds/P19.2
-  coverage paths. It is not a full production web-stack promotion. It makes no official result claim for TechEmpower, no PostgreSQL production-stack claim, no
+  coverage paths. It is not a full production web-stack promotion. It makes no official result claim
+  for TechEmpower, no PostgreSQL production-stack claim, no
   P20 performance matrix claim, no C++/Rust parity claim, no source-level
   cached-date API claim, no cross-worker Date cache claim, no `webrt.flush`
   scatter/gather integration claim, no HTTP static-file sendfile path claim, no
@@ -1011,10 +1037,12 @@ audit proves that separate checkout state.
   payloads carrying direct closure literals, or
   generated `.t4i` interface-only stubs preserving the corresponding returned
   direct enum or aggregate payload metadata for API-only validation, or
-  return alias chains that return captured closure snapshots assigned into same-module mutable global
+  return alias chains that return captured closure snapshots assigned into same-module mutable
+  global
   function-typed values are stored as bounded
   by-value `fnptr` snapshots and may be called later through that global, passed as synchronous
-  callback arguments, returned from same-module or imported functions, passed as callback arguments or reassigned into mutable locals after cross-module returns, stored
+  callback arguments, returned from same-module or imported functions, passed as callback arguments
+  or reassigned into mutable locals after cross-module returns, stored
   in local struct fields or enum payloads, or dispatched through `try cb(...)`
   when the global type declares the same throws type. Captured `fnptr`
   values reached through mutable function-typed whole-struct reassignments not
@@ -1038,11 +1066,13 @@ audit proves that separate checkout state.
   struct-parameter field returns such as `pick(holder) -> holder.cb` and nested paths such as
   `pick(box) -> box.holder.cb`, same-module, imported source, or generated
   `.t4i` interface-only whole struct-parameter returns such as
-  `echo(box) -> box` that preserve nested function-field target sets, same-module or imported enum-parameter payload
+  `echo(box) -> box` that preserve nested function-field target sets, same-module or imported
+  enum-parameter payload
   returns or whole enum-parameter returns such as `echo(choice) -> choice`,
   returns, including inline imported struct/enum constructors carrying captured
   closure literals, with those returned captured `fnptr` values usable for
-  local direct calls or direct synchronous callback arguments, function-typed returns from local struct-field aliases or reassignments,
+  local direct calls or direct synchronous callback arguments, function-typed returns from local
+  struct-field aliases or reassignments,
   enum-payload bindings or reassignments, or through returned struct fields
   including nested paths and enum payloads built from
   function-typed parameters, local aliases of those parameters, or local
@@ -1100,7 +1130,8 @@ audit proves that separate checkout state.
   fields, symbol-backed enum payload bindings, or from known function-typed
   returns with stable targets or target-set-backed function-typed
   parameter-return calls such as `Holder(cb: identity(captured))` or
-  `Holder(cb: callbacks.identity(captured))`, including multi-target return target sets with mutable-global-target classification,
+  `Holder(cb: callbacks.identity(captured))`, including multi-target return target sets with
+  mutable-global-target classification,
   returned from function-typed return paths,
   preserved through known struct returns that carry stable function-field
   metadata, including after local struct field reassignment before return, and
@@ -1140,7 +1171,8 @@ audit proves that separate checkout state.
   fields or symbol-backed enum payload bindings, or known function-typed
   returns with stable targets or target-set-backed function-typed
   parameter-return calls such as `MaybeCallback.some(identity(captured))` or
-  `MaybeCallback.some(callbacks.identity(captured))`, including multi-target return target sets with mutable-global-target classification,
+  `MaybeCallback.some(callbacks.identity(captured))`, including multi-target return target sets with
+  mutable-global-target classification,
   preserved through known enum returns carrying
   stable function-payload metadata for local bindings and direct
   `match makeChoice()` scrutinees, including multiple known targets collected
@@ -1163,7 +1195,8 @@ audit proves that separate checkout state.
   Mutable local enum values may be reassigned from
   supported enum constructors carrying direct named functions, direct closure
   literals, known function-typed returns with stable targets including
-  multi-target return target sets with mutable-global-target classification, or whole-enum aliases before a local
+  multi-target return target sets with mutable-global-target classification, or whole-enum aliases
+  before a local
   `match`; multiple known branch targets dispatch
   through the same stable symbol-address target-set path used by callback
   values, including when the pattern-bound payload is passed to a synchronous
@@ -1222,39 +1255,192 @@ audit proves that separate checkout state.
   Surface, Windows Surface, and wasm32-wasi Surface UI are unsupported in this
   release.
 
-  | Feature | Status | Scope |
-  | --- | --- | --- |
-  | Surface core | current | pure-Tetra UI, Host ABI |
-  | Surface Block System | experimental | Block-first Surface architecture; `lib.core.block` exists; Block is the core Surface primitive direction; helpers are recipes/compatibility; same-commit `tetra.surface.block-system.gate.v1` reports include `block_system.memory_budget` under `reports/surface-block/p18-budget`; not production support and no production Block claim |
-  | Surface Morph Capsule | experimental | `lib.core.morph` capsule/token/material/affordance/recipe layer over Block; eleven recipes expand to Block evidence for five `examples/surface_morph_*.tetra` reference apps; `tetra.surface.morph.gate.v1` is deterministic headless evidence only and includes token graph plus recipe expansion validation; not production support |
-  | Headless Surface | current/test | deterministic evidence target |
-  | Linux-x64 Surface | current | Wayland shm real-window release path |
-  | Linux app-shell subset | current | `linux-app-shell-subset-v1` lifecycle, multi-window notes, resize/DPI/cursor, clipboard, IME, accessibility bridge, scoped app-menu, and blocked-pass dialog/notification evidence |
-  | Surface developer fast loop | current | `tetra surface dev` emits `tetra.surface.dev-workflow.v1` / `surface-dev-workflow-v1` fast rebuild evidence for initial, warm-cache, token-change, recipe-change, and source-change steps with source diagnostics |
-  | Surface inspector | current | `tools/cmd/surface-inspector` emits `tetra.surface.inspector.v1` / `surface-inspector-v1` static JSON plus optional HTML tool reports for Block tree, Morph tokens, layout, paint, accessibility, event routes, focus, perf counters, source locations, and hidden-state scan evidence |
-  | Surface project templates | current | `tetra new surface-app --template <kind>` generates command palette, settings, dashboard, editor shell, multi-window notes, and web-canvas Block/Morph projects; `surface-template-smoke-v1` checks generation, build/run, inspection, visual diff, and tar package artifacts |
-  | Surface reference app suite | current | `surface-reference-app-suite-v1` validates ten Block/Morph product shapes: command palette, settings, dashboard, editor shell, file manager/list-detail, dialog/notification, localized form, accessibility-heavy form, multi-window notes, and migration; every app checks, builds, runs, resolves Morph recipes to Block, and records visual/interaction/accessibility/performance evidence for headless, linux-x64 real-window, and wasm32-web browser-canvas targets |
-  | Surface packaging and update story | current | `surface-package-v1` packages the command-palette reference app as linux-x64 and wasm32-web tar.gz artifacts, verifies package manifests, local asset hashes, installed linux-x64 binary execution, web bundle HTML/wasm/compiler-owned loader output, and a hash-pinned update channel manifest; signing, notarization, automatic runtime update, and network update fetching are nonclaims without platform/runtime evidence |
-  | Surface crash recovery and error reporting | current | `surface-crash-report-v1` records bounded linux-x64 command failure, host crash diagnostic capture, local ring-buffer trace/log collection, redacted `tetra.surface.diagnostic.v1` artifacts, and scoped restart evidence; validators reject user data leaks, network upload, Electron crash reporter dependency, docs-only crash claims, and restart claims without before/report/after proof |
-  | Surface internationalization and localization | current | `surface-i18n-v1` records bounded string tables, `uk-UA` locale selection, `en-US` fallback, missing-key diagnostics, deterministic formatting hooks, localized-form reference app execution, and RTL placeholder nonclaim evidence; validators reject full ICU, full bidi shaping, RTL production text layout, third-party intl runtime, platform locale dependency, docs-only localization, and silent missing-key fallback |
-  | Surface widget migration compatibility | current | `surface-widget-migration-v1` keeps `lib.core.widgets` supported as a Surface v1 compatibility layer, preserves the release widget set, proves Panel/Button/TextBox equivalence rows against Morph recipes that resolve to Block, runs the migration reference app, and rejects future core widget primitive promotion, primary future-widget-core claims, breaking API changes, docs-only migration, and platform toolkit/runtime claims |
-  | wasm32-web Surface | current | browser canvas release path |
-  | Surface toolkit v1 | current | Text/Label/Button/TextBox/Checkbox/Row/Column/Panel/Stack/Scroll/Spacer |
-  | Surface text input v1 | current | UTF-8/invalid-UTF-8/multiline/caret/selection/clipboard/composition scoped baseline |
-  | Surface accessibility v1 | current | metadata plus platform bridge for supported targets |
-  | macOS Surface | unsupported | no production target evidence |
-  | Windows Surface | unsupported | no production target evidence |
-  | wasm32-wasi Surface UI | unsupported | no production UI runtime evidence |
+  ### Surface Core
+
+  - Status: current.
+  - Scope: pure-Tetra UI and Host ABI.
+
+  ### Surface Block System
+
+  - Status: experimental.
+  - Scope: Block-first Surface architecture; `lib.core.block` exists.
+  - Direction: Block is the core Surface primitive direction; helpers are
+    recipes/compatibility.
+  - Evidence: same-commit `tetra.surface.block-system.gate.v1` reports include
+    `block_system.memory_budget` under `reports/surface-block/p18-budget`.
+  - Boundary: not production support and no production Block claim.
+
+  ### Surface Morph Capsule
+
+  - Status: experimental.
+  - Scope: `lib.core.morph` capsule/token/material/affordance/recipe layer over
+    Block.
+  - Evidence: eleven recipes expand to Block evidence for five
+    `examples/surface_morph_*.tetra` reference apps.
+  - Gate: `tetra.surface.morph.gate.v1` is deterministic headless evidence
+    only and includes token graph plus recipe expansion validation.
+  - Boundary: not production support.
+
+  ### Headless Surface
+
+  - Status: current/test.
+  - Scope: deterministic evidence target.
+
+  ### Linux-x64 Surface
+
+  - Status: current.
+  - Scope: Wayland shm real-window release path.
+
+  ### Linux App-Shell Subset
+
+  - Status: current.
+  - Scope: `linux-app-shell-subset-v1` lifecycle, multi-window notes,
+    resize/DPI/cursor, clipboard, IME, accessibility bridge, scoped app-menu,
+    and blocked-pass dialog/notification evidence.
+
+  ### Surface Developer Fast Loop
+
+  - Status: current.
+  - Scope: `tetra surface dev` emits `tetra.surface.dev-workflow.v1` /
+    `surface-dev-workflow-v1` fast rebuild evidence.
+  - Evidence: initial, warm-cache, token-change, recipe-change, and
+    source-change steps with source diagnostics.
+
+  ### Surface Inspector
+
+  - Status: current.
+  - Scope: `tools/cmd/surface-inspector` emits `tetra.surface.inspector.v1` /
+    `surface-inspector-v1` static JSON plus optional HTML tool reports.
+  - Evidence: Block tree, Morph tokens, layout, paint, accessibility, event
+    routes, focus, perf counters, source locations, and hidden-state scans.
+
+  ### Surface Project Templates
+
+  - Status: current.
+  - Scope: `tetra new surface-app --template <kind>` generates command palette,
+    settings, dashboard, editor shell, multi-window notes, and web-canvas
+    Block/Morph projects.
+  - Evidence: `surface-template-smoke-v1` checks generation, build/run,
+    inspection, visual diff, and tar package artifacts.
+
+  ### Surface Reference App Suite
+
+  - Status: current.
+  - Scope: `surface-reference-app-suite-v1` validates ten Block/Morph product
+    shapes.
+  - Shapes: command palette, settings, dashboard, editor shell, file
+    manager/list-detail, dialog/notification, localized form,
+    accessibility-heavy form, multi-window notes, and migration.
+  - Evidence: each app checks, builds, runs, resolves Morph recipes to Block,
+    and records visual/interaction/accessibility/performance evidence.
+  - Targets: headless, linux-x64 real-window, and wasm32-web browser-canvas.
+
+  ### Surface Packaging And Update Story
+
+  - Status: current.
+  - Scope: `surface-package-v1` packages the command-palette reference app as
+    linux-x64 and wasm32-web tar.gz artifacts.
+  - Evidence: package manifests, local asset hashes, installed linux-x64 binary
+    execution, web bundle HTML/wasm/compiler-owned loader output, and a
+    hash-pinned update channel manifest.
+  - Boundary: signing, notarization, automatic runtime update, and network
+    update fetching are nonclaims without platform/runtime evidence.
+
+  ### Surface Crash Recovery And Error Reporting
+
+  - Status: current.
+  - Scope: `surface-crash-report-v1` records bounded linux-x64 command failure,
+    host crash diagnostic capture, local ring-buffer trace/log collection,
+    redacted `tetra.surface.diagnostic.v1` artifacts, and scoped restart
+    evidence.
+  - Validators reject user data leaks, network upload, Electron crash reporter
+    dependency, docs-only crash claims, and restart claims without proof.
+
+  ### Surface Internationalization And Localization
+
+  - Status: current.
+  - Scope: `surface-i18n-v1` records bounded string tables, `uk-UA` locale
+    selection, `en-US` fallback, missing-key diagnostics, deterministic
+    formatting hooks, localized-form reference app execution, and RTL
+    placeholder nonclaim evidence.
+  - Validators reject full ICU, full bidi shaping, RTL production text layout,
+    third-party intl runtime, platform locale dependency, docs-only
+    localization, and silent missing-key fallback.
+
+  ### Surface Widget Migration Compatibility
+
+  - Status: current.
+  - Scope: `surface-widget-migration-v1` keeps `lib.core.widgets` supported as
+    a Surface v1 compatibility layer.
+  - Evidence: preserves the release widget set, proves Panel/Button/TextBox
+    equivalence rows against Morph recipes that resolve to Block, and runs the
+    migration reference app.
+  - Boundary: rejects future core widget primitive promotion,
+    primary future-widget-core claims, breaking API changes, docs-only
+    migration, and platform toolkit/runtime claims.
+
+  ### wasm32-web Surface
+
+  - Status: current.
+  - Scope: browser canvas release path.
+
+  ### Surface Toolkit v1
+
+  - Status: current.
+  - Scope: Text/Label/Button/TextBox/Checkbox/Row/Column/Panel/Stack/Scroll/
+    Spacer.
+
+  ### Surface Text Input v1
+
+  - Status: current.
+  - Scope: UTF-8/invalid-UTF-8/multiline/caret/selection/clipboard/composition
+    scoped baseline.
+
+  ### Surface Accessibility v1
+
+  - Status: current.
+  - Scope: metadata plus platform bridge for supported targets.
+
+  ### macOS Surface
+
+  - Status: unsupported.
+  - Scope: no production target evidence.
+
+  ### Windows Surface
+
+  - Status: unsupported.
+  - Scope: no production target evidence.
+
+  ### wasm32-wasi Surface UI
+
+  - Status: unsupported.
+  - Scope: no production UI runtime evidence.
 
   Surface claim tiers use this vocabulary:
 
-  | Tier | Meaning |
-  | --- | --- |
-  | `PROD_STABLE_SCOPED` | current production claim only inside the named evidence scope, currently `surface-v1-linux-web` |
-  | `BETA_TARGET_HOST` | target-host evidence may exist, but it is not part of the production Surface v1 claim |
-  | `EXPERIMENTAL` | implementation/evidence track that must not be described as production support |
-  | `UNSUPPORTED` | no current release support or production target evidence |
-  | `NONCLAIM` | explicit boundary language used to prevent implied Electron, React, CSS, platform, or target claims |
+  ### `PROD_STABLE_SCOPED`
+
+  - Meaning: current production claim only inside the named evidence scope,
+    currently `surface-v1-linux-web`.
+
+  ### `BETA_TARGET_HOST`
+
+  - Meaning: target-host evidence may exist, but it is not part of the
+    production Surface v1 claim.
+
+  ### `EXPERIMENTAL`
+
+  - Meaning: implementation/evidence track that must not be described as
+    production support.
+
+  ### `UNSUPPORTED`
+
+  - Meaning: no current release support or production target evidence.
+
+  ### `NONCLAIM`
+
+  - Meaning: explicit boundary language used to prevent implied Electron,
+    React, CSS, platform, or target claims.
 
   P28 docs governance requires this vocabulary to stay present in the Surface
   release docs, generated manifest references, examples index, and user guide.

@@ -10,7 +10,7 @@ current_release_version() {
     version="$(sed -nE 's/^const CompilerVersion = "([^"]+)"/\1/p' compiler/internal/version/version.go | head -n 1)"
   fi
   if [[ -z "$version" && -x ./tetra ]]; then
-    version="$(./tetra version 2>/dev/null || true)"
+    version="$(./tetra version 2> /dev/null || true)"
   fi
   if [[ -z "$version" ]]; then
     echo "security_review: cannot determine current release version" >&2
@@ -52,7 +52,7 @@ prepare_template_path() {
 }
 
 usage() {
-  cat <<'USAGE'
+  cat << 'USAGE'
 Usage:
   bash scripts/release/v1_0/security-review.sh --signoff PATH
   bash scripts/release/v1_0/security-review.sh --write-template PATH
@@ -74,7 +74,7 @@ while [[ $# -gt 0 ]]; do
       template_path="$2"
       shift 2
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;
@@ -101,7 +101,7 @@ if [[ -n "$template_path" ]]; then
   prepare_template_path
   release_version="$(current_release_version)"
   template_tmp="$(mktemp)"
-  cat >"$template_tmp" <<'TEMPLATE'
+  cat > "$template_tmp" << 'TEMPLATE'
 # @RELEASE_VERSION@ Security Review Signoff
 
 Reviewer: <name and contact>
@@ -126,7 +126,7 @@ Decision: <approved for @RELEASE_VERSION@ release | blocked>
 
 - <accepted residual risk or "None">
 TEMPLATE
-  sed "s/@RELEASE_VERSION@/$release_version/g" "$template_tmp" >"$template_path"
+  sed "s/@RELEASE_VERSION@/$release_version/g" "$template_tmp" > "$template_path"
   rm -f -- "$template_tmp"
   echo "security review signoff template: $template_path"
   exit 0

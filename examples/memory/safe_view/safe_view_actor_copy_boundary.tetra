@@ -1,0 +1,14 @@
+module examples.memory.safe_view.safe_view_actor_copy_boundary
+
+enum Msg:
+    case bytes([]u8)
+
+func main() -> Int
+uses actors, alloc, mem:
+    var xs: []u8 = make_u8(2)
+    xs[0] = 40
+    xs[1] = 2
+    let sent: Int = core.send_typed(core.self(), Msg.bytes(__method.copy(xs.borrow())))
+    if sent < 0:
+        return 1
+    return 0

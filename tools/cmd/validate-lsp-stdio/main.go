@@ -197,7 +197,9 @@ func validateLSPTranscript(raw []byte) error {
 		return fmt.Errorf("missing textDocument/publishDiagnostics notification")
 	}
 	if sawDidChange && awaitingDidChangeDiagnostics {
-		return fmt.Errorf("missing textDocument/publishDiagnostics notification after textDocument/didChange")
+		return fmt.Errorf(
+			"missing textDocument/publishDiagnostics notification after textDocument/didChange",
+		)
 	}
 	for _, expected := range []struct {
 		id   int
@@ -233,13 +235,21 @@ func validateLSPTranscript(raw []byte) error {
 func validateRequestMethod(id lspID, method string) error {
 	if numericID, hasNumericID := id.numericValue(); hasNumericID {
 		if expected, ok := expectedRequestMethod(numericID); ok && method != expected {
-			return fmt.Errorf("request id %s method %s, expected %s", id.displayString(), method, expected)
+			return fmt.Errorf(
+				"request id %s method %s, expected %s",
+				id.displayString(),
+				method,
+				expected,
+			)
 		}
 	}
 	return nil
 }
 
-func validateRequestResponseCorrelation(requestMethods map[string]string, requestIDDisplays map[string]string) error {
+func validateRequestResponseCorrelation(
+	requestMethods map[string]string,
+	requestIDDisplays map[string]string,
+) error {
 	if len(requestMethods) == 0 {
 		return nil
 	}
@@ -249,7 +259,12 @@ func validateRequestResponseCorrelation(requestMethods map[string]string, reques
 			continue
 		}
 		if previousID, exists := methodIDs[method]; exists {
-			return fmt.Errorf("duplicate %s request ids %s and %s", method, previousID, requestIDDisplays[key])
+			return fmt.Errorf(
+				"duplicate %s request ids %s and %s",
+				method,
+				previousID,
+				requestIDDisplays[key],
+			)
 		}
 		methodIDs[method] = requestIDDisplays[key]
 	}
@@ -458,7 +473,11 @@ func parseLSPTranscript(raw []byte) ([]lspMessage, error) {
 			return nil, err
 		}
 		if length > maxLSPFrameContentLength {
-			return nil, fmt.Errorf("Content-Length %d too large (max %d)", length, maxLSPFrameContentLength)
+			return nil, fmt.Errorf(
+				"Content-Length %d too large (max %d)",
+				length,
+				maxLSPFrameContentLength,
+			)
 		}
 		body := make([]byte, length)
 		if _, err := io.ReadFull(reader, body); err != nil {

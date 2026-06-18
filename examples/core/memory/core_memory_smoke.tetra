@@ -1,0 +1,20 @@
+// v0.5 stable core capability/memory smoke.
+module examples.core.memory.core_memory_smoke
+
+import lib.core.capability as cap
+import lib.core.memory as mem
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let c: cap.mem = cap.mem()
+        let src: ptr = core.alloc_bytes(4)
+        let dst: ptr = core.alloc_bytes(4)
+        // Capability-bound helpers do not add bounds checks; callers choose
+        // valid regions. memset_u8 is the clear/fill path.
+        let clear_status: Int = mem.memset_u8(dst, 0, 4, c)
+        let seed_status: Int = mem.memset_u8(src, 42, 4, c)
+        // memcpy_u8 copies bytes between caller-provided regions.
+        let copy_status: Int = mem.memcpy_u8(dst, src, 4, c)
+        return core.load_u8(dst, c)
+    return 0

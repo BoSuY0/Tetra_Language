@@ -78,11 +78,16 @@ func Enforce(report Report, opt EnforcementOptions) error {
 		if contract.MemoryBudgetBytes > 0 {
 			opt.MemoryBudgetBytes = contract.MemoryBudgetBytes
 		}
-		if contract.MaxGrade != "" && gradeRank(report.Summary.ArtifactGrade) > gradeRank(contract.MaxGrade) {
+		if contract.MaxGrade != "" &&
+			gradeRank(report.Summary.ArtifactGrade) > gradeRank(contract.MaxGrade) {
 			return EnforcementError{
-				Rule:    "RAM_CONTRACT_GRADE",
-				Grade:   report.Summary.ArtifactGrade,
-				Message: fmt.Sprintf("RAM_CONTRACT_GRADE artifact grade %s exceeds contract max_grade %s", report.Summary.ArtifactGrade, contract.MaxGrade),
+				Rule:  "RAM_CONTRACT_GRADE",
+				Grade: report.Summary.ArtifactGrade,
+				Message: fmt.Sprintf(
+					"RAM_CONTRACT_GRADE artifact grade %s exceeds contract max_grade %s",
+					report.Summary.ArtifactGrade,
+					contract.MaxGrade,
+				),
 			}
 		}
 	}
@@ -91,20 +96,43 @@ func Enforce(report Report, opt EnforcementOptions) error {
 	}
 	if opt.MemoryBudgetBytes > 0 && report.Summary.BudgetBytes > opt.MemoryBudgetBytes {
 		return EnforcementError{
-			Rule:    "RAM_CONTRACT_BUDGET",
-			Grade:   report.Summary.ArtifactGrade,
-			Message: fmt.Sprintf("RAM_CONTRACT_BUDGET budget_bytes %d exceeds memory_budget %d", report.Summary.BudgetBytes, opt.MemoryBudgetBytes),
+			Rule:  "RAM_CONTRACT_BUDGET",
+			Grade: report.Summary.ArtifactGrade,
+			Message: fmt.Sprintf(
+				"RAM_CONTRACT_BUDGET budget_bytes %d exceeds memory_budget %d",
+				report.Summary.BudgetBytes,
+				opt.MemoryBudgetBytes,
+			),
 		}
 	}
 	for _, row := range report.Rows {
 		if opt.FailIfHeap && isHeapPlacement(row.Placement) {
-			return EnforcementError{Rule: "RAM_CONTRACT_HEAP", SiteID: row.SiteID, Function: row.Function, Grade: row.ContractGrade, Blockers: row.Blockers}
+			return EnforcementError{
+				Rule:     "RAM_CONTRACT_HEAP",
+				SiteID:   row.SiteID,
+				Function: row.Function,
+				Grade:    row.ContractGrade,
+				Blockers: row.Blockers,
+			}
 		}
 		if opt.FailIfCopy && isCopyIntent(row.Intent) {
-			return EnforcementError{Rule: "RAM_CONTRACT_COPY", SiteID: row.SiteID, Function: row.Function, Grade: row.ContractGrade, Blockers: append(row.Blockers, row.CopyReason)}
+			return EnforcementError{
+				Rule:     "RAM_CONTRACT_COPY",
+				SiteID:   row.SiteID,
+				Function: row.Function,
+				Grade:    row.ContractGrade,
+				Blockers: append(row.Blockers, row.CopyReason),
+			}
 		}
-		if opt.FailIfUnbounded && (row.Placement == PlacementHeapUnbounded || row.ContractGrade == GradeM5 || row.ContractGrade == GradeM6) {
-			return EnforcementError{Rule: "RAM_CONTRACT_UNBOUNDED", SiteID: row.SiteID, Function: row.Function, Grade: row.ContractGrade, Blockers: row.Blockers}
+		if opt.FailIfUnbounded &&
+			(row.Placement == PlacementHeapUnbounded || row.ContractGrade == GradeM5 || row.ContractGrade == GradeM6) {
+			return EnforcementError{
+				Rule:     "RAM_CONTRACT_UNBOUNDED",
+				SiteID:   row.SiteID,
+				Function: row.Function,
+				Grade:    row.ContractGrade,
+				Blockers: row.Blockers,
+			}
 		}
 	}
 	return nil
@@ -120,13 +148,21 @@ func ReadContractFile(path string) (ContractFile, error) {
 		return ContractFile{}, err
 	}
 	if contract.SchemaVersion != "" && contract.SchemaVersion != "tetra.ram-contract-file.v1" {
-		return ContractFile{}, fmt.Errorf("ram contract file schema_version is %q, want tetra.ram-contract-file.v1", contract.SchemaVersion)
+		return ContractFile{}, fmt.Errorf(
+			"ram contract file schema_version is %q, want tetra.ram-contract-file.v1",
+			contract.SchemaVersion,
+		)
 	}
 	if contract.MaxGrade != "" && !knownGrade(contract.MaxGrade) {
-		return ContractFile{}, fmt.Errorf("ram contract file max_grade %q is unknown", contract.MaxGrade)
+		return ContractFile{}, fmt.Errorf(
+			"ram contract file max_grade %q is unknown",
+			contract.MaxGrade,
+		)
 	}
 	if contract.MemoryBudgetBytes < 0 {
-		return ContractFile{}, errors.New("ram contract file memory_budget_bytes must not be negative")
+		return ContractFile{}, errors.New(
+			"ram contract file memory_budget_bytes must not be negative",
+		)
 	}
 	return contract, nil
 }

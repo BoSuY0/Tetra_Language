@@ -83,7 +83,12 @@ type Classifier struct {
 
 func NewClassifier(tgt ctarget.Target) (Classifier, error) {
 	if tgt.Arch != ctarget.ArchX86 || tgt.ABI != ctarget.ABI386SysV {
-		return Classifier{}, fmt.Errorf("x86abi classifier requires x86 i386-sysv, got arch=%s abi=%s for %s", tgt.Arch, tgt.ABI, tgt.Triple)
+		return Classifier{}, fmt.Errorf(
+			"x86abi classifier requires x86 i386-sysv, got arch=%s abi=%s for %s",
+			tgt.Arch,
+			tgt.ABI,
+			tgt.Triple,
+		)
 	}
 	return Classifier{
 		target:    tgt,
@@ -101,7 +106,11 @@ func (c Classifier) StackCleanup() StackCleanup {
 }
 
 func (c Classifier) ClassifySignature(sig ABISignature) (ABIPlan, error) {
-	if err := validateVariadicSignature(sig.Variadic, sig.FixedParamCount, len(sig.Params)); err != nil {
+	if err := validateVariadicSignature(
+		sig.Variadic,
+		sig.FixedParamCount,
+		len(sig.Params),
+	); err != nil {
 		return ABIPlan{}, err
 	}
 	plan := ABIPlan{
@@ -147,7 +156,11 @@ func (c Classifier) classifyValue(param ABIParam) (ABILocation, error) {
 	}
 	layout, ok := c.target.ScalarLayout(param.Type)
 	if !ok {
-		return ABILocation{}, fmt.Errorf("%s cannot classify ABI type %q", c.target.Triple, param.Type)
+		return ABILocation{}, fmt.Errorf(
+			"%s cannot classify ABI type %q",
+			c.target.Triple,
+			param.Type,
+		)
 	}
 	class := ABIClassInteger
 	registerWidth := c.target.RegisterWidthBits
@@ -178,7 +191,12 @@ func (c Classifier) classifyAggregate(param ABIParam) (ABILocation, error) {
 		layout, err = c.target.StructLayout(param.Fields)
 	}
 	if err != nil {
-		return ABILocation{}, fmt.Errorf("%s cannot classify ABI aggregate %q: %w", c.target.Triple, param.Type, err)
+		return ABILocation{}, fmt.Errorf(
+			"%s cannot classify ABI aggregate %q: %w",
+			c.target.Triple,
+			param.Type,
+			err,
+		)
 	}
 	return ABILocation{
 		Name:              param.Name,
@@ -251,7 +269,11 @@ func validateVariadicSignature(variadic bool, fixedParamCount int, paramCount in
 		return nil
 	}
 	if fixedParamCount < 0 || fixedParamCount > paramCount {
-		return fmt.Errorf("invalid variadic fixed parameter count %d for %d parameters", fixedParamCount, paramCount)
+		return fmt.Errorf(
+			"invalid variadic fixed parameter count %d for %d parameters",
+			fixedParamCount,
+			paramCount,
+		)
 	}
 	return nil
 }

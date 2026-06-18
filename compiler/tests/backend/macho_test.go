@@ -131,7 +131,7 @@ func TestMachOCStringRelocPointsToCstring(t *testing.T) {
 
 func TestBuildMachOMmio(t *testing.T) {
 	tmp := t.TempDir()
-	srcPath := testkit.RepoPath(t, "examples", "mmio_smoke.tetra")
+	srcPath := testkit.RepoPath(t, "examples", "memory", "raw", "mmio_smoke.tetra")
 	if _, err := os.Stat(srcPath); err != nil {
 		t.Fatalf("missing example: %v", err)
 	}
@@ -146,7 +146,7 @@ func TestBuildMachOMmio(t *testing.T) {
 
 func TestBuildMachOActors(t *testing.T) {
 	tmp := t.TempDir()
-	srcPath := testkit.RepoPath(t, "examples", "actors_pingpong.tetra")
+	srcPath := testkit.RepoPath(t, "examples", "actors", "actors_pingpong.tetra")
 	if _, err := os.Stat(srcPath); err != nil {
 		t.Fatalf("missing example: %v", err)
 	}
@@ -187,7 +187,7 @@ func TestMachOIslandsRuntimeOnDarwin(t *testing.T) {
 		t.Skip("darwin only")
 	}
 	tmp := t.TempDir()
-	srcPath := testkit.RepoPath(t, "examples", "islands_i32.tetra")
+	srcPath := testkit.RepoPath(t, "examples", "memory", "islands", "islands_i32.tetra")
 	if _, err := os.Stat(srcPath); err != nil {
 		t.Fatalf("missing example: %v", err)
 	}

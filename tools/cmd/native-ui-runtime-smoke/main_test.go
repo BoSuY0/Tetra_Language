@@ -20,11 +20,32 @@ func TestRunRuntimeScenarioProducesValidNativeRuntimeEvidence(t *testing.T) {
 		Host:     "linux-x64",
 		Runtime:  "native-ui-linux-x64",
 		UISchema: uiBundleSchemaV1,
-		Source:   "examples/ui_native_shell_smoke.tetra",
+		Source:   "examples/ui/ui_native_shell_smoke.tetra",
 		Processes: []nativeui.ProcessReport{
-			{Name: "tetra build", Kind: "build", Path: "/tmp/tetra", Ran: true, Pass: true, ExitCode: intPtr(0)},
-			{Name: "native app", Kind: "app", Path: "/tmp/ui-native", Ran: true, Pass: true, ExitCode: intPtr(0)},
-			{Name: "native ui runtime", Kind: "runtime", Path: "tools/cmd/native-ui-runtime-smoke", Ran: true, Pass: true, ExitCode: intPtr(0)},
+			{
+				Name:     "tetra build",
+				Kind:     "build",
+				Path:     "/tmp/tetra",
+				Ran:      true,
+				Pass:     true,
+				ExitCode: intPtr(0),
+			},
+			{
+				Name:     "native app",
+				Kind:     "app",
+				Path:     "/tmp/ui-native",
+				Ran:      true,
+				Pass:     true,
+				ExitCode: intPtr(0),
+			},
+			{
+				Name:     "native ui runtime",
+				Kind:     "runtime",
+				Path:     "tools/cmd/native-ui-runtime-smoke",
+				Ran:      true,
+				Pass:     true,
+				ExitCode: intPtr(0),
+			},
 		},
 		Widgets: widgets,
 		Events:  events,
@@ -38,7 +59,10 @@ func TestRunRuntimeScenarioProducesValidNativeRuntimeEvidence(t *testing.T) {
 		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
 	}
 	if events[1].AfterState["ShellState.toggles"] != "2" {
-		t.Fatalf("second click after_state toggles = %q, want 2", events[1].AfterState["ShellState.toggles"])
+		t.Fatalf(
+			"second click after_state toggles = %q, want 2",
+			events[1].AfterState["ShellState.toggles"],
+		)
 	}
 }
 
@@ -47,13 +71,16 @@ func TestNativeRuntimeRejectsInvalidDispatchPaths(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadNativeRuntime failed: %v", err)
 	}
-	if _, err := rt.dispatch("__missing__", "click", "", 1); err == nil || !strings.Contains(err.Error(), "unknown widget") {
+	if _, err := rt.dispatch("__missing__", "click", "", 1); err == nil ||
+		!strings.Contains(err.Error(), "unknown widget") {
 		t.Fatalf("invalid widget error = %v, want unknown widget", err)
 	}
-	if _, err := rt.dispatch("ShellView.submit", "hover", "", 1); err == nil || !strings.Contains(err.Error(), "unsupported event") {
+	if _, err := rt.dispatch("ShellView.submit", "hover", "", 1); err == nil ||
+		!strings.Contains(err.Error(), "unsupported event") {
 		t.Fatalf("unsupported event error = %v, want unsupported event", err)
 	}
-	if _, err := rt.dispatch("ShellView.submit", "click", "__missing__", 1); err == nil || !strings.Contains(err.Error(), "unknown command") {
+	if _, err := rt.dispatch("ShellView.submit", "click", "__missing__", 1); err == nil ||
+		!strings.Contains(err.Error(), "unknown command") {
 		t.Fatalf("unknown command error = %v, want unknown command", err)
 	}
 }

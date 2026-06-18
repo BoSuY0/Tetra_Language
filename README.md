@@ -62,8 +62,8 @@ uses io:
 
 ```sh
 bash scripts/dev/bootstrap.sh
-./tetra check examples/flow_hello.tetra
-./tetra build --target linux-x64 -o app examples/flow_hello.tetra
+./tetra check examples/flow/flow_hello.tetra
+./tetra build --target linux-x64 -o app examples/flow/flow_hello.tetra
 ```
 
 `check` and `build` are the core user workflow: `check` gives the same
@@ -110,7 +110,7 @@ tetra version
 
 The binary release baseline is `linux-x64`. Other target/runtime claims remain
 gated by the evidence named in the release docs. Private release downloads need
-a GitHub token; see `docs/user/install.md`.
+a GitHub token; see `docs/user/start/install.md`.
 
 ---
 
@@ -134,7 +134,7 @@ uses io:
 | Area | Current truth |
 | --- | --- |
 | Compiler profile | `v0.4.0` local compiler/tooling profile |
-| Release truth | `docs/spec/current_supported_surface.md` |
+| Release truth | `docs/spec/core/current_supported_surface.md` |
 | Core CLI workflow | `check`, `build` |
 | Tooling commands | `run`, `fmt`, `test`, `doc`, `doctor`, `targets`, `features`, `formats`, `lsp`, `workspace`, `smoke`, `eco` |
 | Memory/Islands evidence | `MemoryFactGraph`, `tetra.memory-report.v1`, `validate-island-proof`, `--islands-debug`, proof-fuzz, leak/resource, and integrated `memory-islands-surface-production-gate.sh` evidence; no broad "Memory 100%" claim |
@@ -148,17 +148,17 @@ uses io:
 
 | Topic | File |
 | --- | --- |
-| Language tour | `docs/user/language_tour.md` |
-| Install | `docs/user/install.md` |
-| Flow syntax | `docs/spec/flow_syntax_v1.md` |
-| Ownership/effects | `docs/user/ownership_effects_guide.md` |
-| Async/actors | `docs/user/async_actors_guide.md` |
-| Standard library | `docs/user/standard_library_guide.md` |
-| Examples | `docs/user/examples_index.md` |
-| Current surface | `docs/spec/current_supported_surface.md` |
-| Memory/Islands/Surface release scope | `docs/release/memory_islands_surface_scope.md` |
+| Language tour | `docs/user/start/language_tour.md` |
+| Install | `docs/user/start/install.md` |
+| Flow syntax | `docs/spec/flow/flow_syntax_v1.md` |
+| Ownership/effects | `docs/user/platform/ownership_effects_guide.md` |
+| Async/actors | `docs/user/platform/async_actors_guide.md` |
+| Standard library | `docs/user/platform/standard_library_guide.md` |
+| Examples | `docs/user/reference/examples_index.md` |
+| Current surface | `docs/spec/core/current_supported_surface.md` |
+| Memory/Islands/Surface release scope | `docs/release/surface/memory_islands_surface_scope.md` |
 | Release gate | `scripts/release/v0_4_0/gate.sh` |
-| v1.0 scope | `docs/spec/v1_scope.md` |
+| v1.0 scope | `docs/spec/flow/v1_scope.md` |
 
 ---
 

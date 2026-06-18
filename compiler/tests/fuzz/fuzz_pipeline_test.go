@@ -70,14 +70,32 @@ func loweringFuzzSource(data []byte) string {
 
 	switch byteAt(data, 3) % 4 {
 	case 0:
-		return fmt.Sprintf("func main() -> Int:\n    let x: Int = %d\n    let y: Int = %d\n    return x + y\n", a, b)
+		return fmt.Sprintf(
+			"func main() -> Int:\n    let x: Int = %d\n    let y: Int = %d\n    return x + y\n",
+			a,
+			b,
+		)
 	case 1:
-		return fmt.Sprintf("func main() -> Int:\n    if %d < %d:\n        return %d\n    return %d\n", a, b, b, a)
+		return fmt.Sprintf(
+			"func main() -> Int:\n    if %d < %d:\n        return %d\n    return %d\n",
+			a,
+			b,
+			b,
+			a,
+		)
 	case 2:
-		return fmt.Sprintf("func add(a: Int, b: Int) -> Int:\n    return a + b\n\nfunc main() -> Int:\n    return add(%d, %d)\n", a, b)
+		return fmt.Sprintf(
+			"func add(a: Int, b: Int) -> Int:\n    return a + b\n\nfunc main() -> Int:\n    return add(%d, %d)\n",
+			a,
+			b,
+		)
 	default:
 		limit := c % 8
-		return fmt.Sprintf("func main() -> Int:\n    var total: Int = %d\n    for i in 0..<%d:\n        total = total + i\n    return total\n", a, limit)
+		return fmt.Sprintf(
+			"func main() -> Int:\n    var total: Int = %d\n    for i in 0..<%d:\n        total = total + i\n    return total\n",
+			a,
+			limit,
+		)
 	}
 }
 

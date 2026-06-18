@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"tetra_language/internal/toon"
 )
 
 func TestValidateEcoLockAcceptsDependencyGraph(t *testing.T) {
@@ -36,6 +38,19 @@ func TestValidateEcoLockAcceptsDependencyGraph(t *testing.T) {
 	out, err := runEcoLockValidator(t, lock)
 	if err != nil {
 		t.Fatalf("validator failed: %v\n%s", err, out)
+	}
+}
+
+func TestValidateEcoLockAcceptsTOON(t *testing.T) {
+	toonRaw, err := toon.ConvertJSONToTOON(
+		[]byte(validLockReport()),
+		toon.Options{Strict: true, Deterministic: true},
+	)
+	if err != nil {
+		t.Fatalf("json->toon: %v", err)
+	}
+	if err := validateEcoLockFormat(toonRaw, "toon"); err != nil {
+		t.Fatalf("validateEcoLockFormat TOON: %v\n%s", err, toonRaw)
 	}
 }
 
@@ -337,4 +352,22 @@ func runEcoLockValidator(t *testing.T, lock string) ([]byte, error) {
 	cmd := exec.Command("go", "run", ".", "--lock", path)
 	cmd.Dir = "."
 	return cmd.CombinedOutput()
+}
+
+func validLockReport() string {
+	return `{
+  "schema": "tetra.eco.lock.v1",
+  "manifest_schema": "tetra.capsule.v1",
+  "permissions_model": "tetra.eco.permissions.v1",
+  "capsules": [
+    {
+      "id": "tetra://demo",
+      "name": "Demo",
+      "version": "0.1.0",
+      "path": "Capsule.t4",
+      "targets": ["linux-x64"],
+      "permissions": ["io"]
+    }
+  ]
+}`
 }

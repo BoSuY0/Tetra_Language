@@ -1,1 +1,5 @@
-{"validator":"text-input","mutation":"clipboard_without_transfer","expected_error":"clipboard_owned_copy"}
+{
+  "validator": "text-input",
+  "mutation": "clipboard_without_transfer",
+  "expected_error": "clipboard_owned_copy"
+}

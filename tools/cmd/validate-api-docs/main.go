@@ -121,14 +121,26 @@ func validateAPIDocs(md string) error {
 		return fmt.Errorf("missing API entry bullets")
 	}
 	if metadata.ModuleCount != len(modules) {
-		return fmt.Errorf("API metadata module_count mismatch: expected %d, got %d", len(modules), metadata.ModuleCount)
+		return fmt.Errorf(
+			"API metadata module_count mismatch: expected %d, got %d",
+			len(modules),
+			metadata.ModuleCount,
+		)
 	}
 	if metadata.EntryCount != entryCount {
-		return fmt.Errorf("API metadata entry_count mismatch: expected %d, got %d", entryCount, metadata.EntryCount)
+		return fmt.Errorf(
+			"API metadata entry_count mismatch: expected %d, got %d",
+			entryCount,
+			metadata.EntryCount,
+		)
 	}
 	wantHash := "sha256:" + hashAPISurface(surface)
 	if metadata.APIHash != wantHash {
-		return fmt.Errorf("API metadata api_hash mismatch: expected %s, got %s", wantHash, metadata.APIHash)
+		return fmt.Errorf(
+			"API metadata api_hash mismatch: expected %s, got %s",
+			wantHash,
+			metadata.APIHash,
+		)
 	}
 	if err := validateInternalLinks(lines); err != nil {
 		return err
@@ -190,10 +202,13 @@ func parseAPIMetadata(lines []string) (apiMetadata, error) {
 		if strings.HasPrefix(trimmed, "## ") {
 			return apiMetadata{}, fmt.Errorf("missing tetra-api-metadata")
 		}
-		if !strings.HasPrefix(trimmed, "<!-- tetra-api-metadata:") || !strings.HasSuffix(trimmed, "-->") {
+		if !strings.HasPrefix(trimmed, "<!-- tetra-api-metadata:") ||
+			!strings.HasSuffix(trimmed, "-->") {
 			return apiMetadata{}, fmt.Errorf("missing tetra-api-metadata")
 		}
-		raw := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(trimmed, "<!-- tetra-api-metadata:"), "-->"))
+		raw := strings.TrimSpace(
+			strings.TrimSuffix(strings.TrimPrefix(trimmed, "<!-- tetra-api-metadata:"), "-->"),
+		)
 		var metadata apiMetadata
 		if err := decodeStrictJSON([]byte(raw), &metadata); err != nil {
 			return apiMetadata{}, fmt.Errorf("invalid tetra-api-metadata: %v", err)

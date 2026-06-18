@@ -64,7 +64,10 @@ func ListenTCP4(cfg TCPListenConfig) (TCPListener, error) {
 		}
 		inet, ok := sa.(*syscall.SockaddrInet4)
 		if !ok {
-			return TCPListener{}, fmt.Errorf("getsockname returned %T, want *syscall.SockaddrInet4", sa)
+			return TCPListener{}, fmt.Errorf(
+				"getsockname returned %T, want *syscall.SockaddrInet4",
+				sa,
+			)
 		}
 		port = inet.Port
 	}
@@ -134,7 +137,12 @@ func Writev(fd int, chunks [][]byte) (int, error) {
 	if len(iovecs) == 0 {
 		return 0, nil
 	}
-	n, _, errno := syscall.Syscall(syscall.SYS_WRITEV, uintptr(fd), uintptr(unsafe.Pointer(&iovecs[0])), uintptr(len(iovecs)))
+	n, _, errno := syscall.Syscall(
+		syscall.SYS_WRITEV,
+		uintptr(fd),
+		uintptr(unsafe.Pointer(&iovecs[0])),
+		uintptr(len(iovecs)),
+	)
 	if errno != 0 {
 		return int(n), errno
 	}

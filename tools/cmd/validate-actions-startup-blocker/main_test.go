@@ -116,7 +116,13 @@ func TestValidateStartupBlockerRejectsPassingOrJobBackedEvidence(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected passing/job-backed startup blocker report to fail")
 	}
-	for _, want := range []string{"status", "startup_failure", "jobs", "logs_available", "next_action"} {
+	for _, want := range []string{
+		"status",
+		"startup_failure",
+		"jobs",
+		"logs_available",
+		"next_action",
+	} {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("error missing %q: %v", want, err)
 		}

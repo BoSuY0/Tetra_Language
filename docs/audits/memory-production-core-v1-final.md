@@ -28,26 +28,161 @@ Linked docs:
 
 ## Final Classification
 
-| Row | Area | Final status | Evidence refs | Scope notes | Overclaim risk |
-| --- | --- | --- | --- | --- | --- |
-| MPC-0 | Baseline and gap map | `implemented` | `docs/audits/memory-production-core-v1-baseline.md`, `docs/audits/memory-production-core-v1-gap-map.md` | Establishes current surface and gaps; not a proof of future rows. | low |
-| MPC-1 | Memory Fact Graph v0 | `validated` | `compiler/internal/memoryfacts`, `docs/spec/memory_report_schema_v1.md`, final command `go test ./compiler/internal/memoryfacts -count=1` | Compiler-owned fact graph is the truth source for report projection. | medium |
-| MPC-2 | Memory Report Schema v1 and validator | `validated` | `tools/cmd/validate-memory-report`, `compiler/internal/memoryfacts/report.go`, `docs/spec/memory_report_schema_v1.md` | Schema validation rejects invalid projections; it does not infer facts the compiler did not own. | medium |
-| Raw-bounds closure | Verified `core.alloc_bytes` roots and conservative unknown raw pointers | `validated` | `compiler/internal/runtimeabi/raw_pointer_bounds.go`, `compiler/internal/plir`, `reports/memory-production-core-v1/mpc8/memory-production-linux-x64.json` | Runtime evidence is linux-x64 scoped unless a target-specific row says otherwise. | high |
-| MPC-3 | Safe representation invariant hardening | `validated` | `compiler/internal/semantics`, `compiler/tests/semantics`, `docs/audits/memory-production-core-v1-supported-surface.md` | Safe metadata assignment is rejected before lowering. | medium |
-| MPC-4 | Borrow/lifetime supported surface hardening | `implemented_narrow` | `compiler/tests/safety`, `compiler/tests/semantics`, `compiler/internal/memoryfacts` | Covers documented slice/String and local supported cases, not full Rust-like lifetime parity. | high |
-| MPC-5 | Mutable alias / inout conservative subset | `conservative` | `compiler/internal/memoryfacts`, `tools/cmd/validate-memory-report`, `docs/audits/memory-production-core-v1-supported-surface.md` | Unknown/maybe/call-invalidated alias state blocks noalias promotion. | high |
-| MPC-6 | Provenance/resource summaries v2 | `implemented_narrow` | `compiler/internal/memoryfacts/from_plir.go`, `tools/cmd/validate-memory-report`, summary tests | Summary vocabulary covers PLIR-visible supported cases; unknown external/resource returns remain conservative. | medium |
-| MPC-7 | Unsafe fact classes | `validated` | `compiler/internal/memoryfacts`, `compiler/internal/plir`, `docs/spec/unsafe.md` | `unsafe_unknown` cannot become safe provenance, noalias, trusted storage, or removed-check evidence. | high |
-| MPC-8 | Raw pointer verified-root bounds | `validated` | `compiler/internal/runtimeabi`, `compiler/internal/plir`, `reports/memory-production-core-v1/mpc8/memory-production-linux-x64.json` | Verified roots are allocation-base scoped; arbitrary external raw pointers remain conservative. | high |
-| MPC-9 | Raw slice gateway hardening | `validated` | `compiler/internal/runtimeabi`, `compiler/internal/lower`, `reports/memory-production-core-v1/mpc9/memory-production-linux-x64.json` | Raw slice runtime trap evidence is linux-x64 scoped; non-x64 rows remain target-tiered. | high |
-| MPC-10 | Storage truth: stack/heap/explicit island | `validated` | `compiler/internal/allocplan`, `compiler/internal/lower`, `compiler/internal/validation`, `compiler/internal/memoryfacts` | Planned storage and actual lowering storage remain separate; heap fallback is not a validated stack/region claim. | high |
-| MPC-11 | Function-temp implicit region narrow slice | `implemented_narrow` | `compiler/internal/allocplan`, `compiler/internal/lower`, `compiler/internal/validation`, `compiler/internal/backend/x64core` | One narrow linux-x64 function-temp region path; broad region reuse/control-flow cleanup remains future. | medium |
-| MPC-12 | Actor/task/request conservative memory rules | `conservative` | `compiler/tests/safety`, `compiler/tests/semantics`, `compiler/internal/actorsafety`, `compiler/internal/parallelrt`, `compiler/internal/httprt` | Actor zero-copy move rows are evidence-only; full production actor runtime is not claimed. | high |
-| MPC-13 | Target capability matrix | `validated` | `docs/audits/memory-target-capability-matrix.md`, `compiler/target`, `tools/cmd/validate-targets` | No cross-target memory production claim without target evidence. | high |
-| MPC-14 | Memory cost model | `validated` | `docs/design/memory_cost_model.md`, `compiler/internal/memoryfacts`, `compiler/reports.go`, `tools/cmd/validate-memory-report` | Cost classes classify evidence; fake zero-cost or trusted unsafe optimization wording is rejected. | medium |
-| MPC-15 | Memory fuzz/property/stress with oracle | `validated` | `docs/audits/memory-fuzz-oracle-v1.md`, `compiler/memory_fuzz_oracle_v1.go`, `tools/cmd/memory-fuzz-short`, `reports/memory-fuzz-short/mpc15/memory-fuzz-oracle.json` | Tier 1 is deterministic oracle smoke; random generation is not proof by itself. | medium |
-| MPC-16 | Production gate and final audit | `validated` | This doc, `docs/audits/memory-production-core-v1-artifact-map.md`, `docs/audits/memory-production-core-v1-nonclaims.md`, `reports/memory-production-core-v1/test-all-quick/summary.json`, `reports/memory-production-core-v1/test-all-quick/summary.md` | Full MPC-16 command set passed; quick output remains quick evidence, not a full/stabilization or benchmark claim. | high |
+Final row records:
+
+- Row: MPC-0.
+  Area: baseline and gap map.
+  Final status: `implemented`.
+  Evidence refs: `docs/audits/memory-production-core-v1-baseline.md`,
+  `docs/audits/memory-production-core-v1-gap-map.md`.
+  Scope notes: establishes current surface and gaps; not a proof of future
+  rows.
+  Overclaim risk: low.
+- Row: MPC-1.
+  Area: Memory Fact Graph v0.
+  Final status: `validated`.
+  Evidence refs: `compiler/internal/memoryfacts`,
+  `docs/spec/memory_report_schema_v1.md`, final command
+  `go test ./compiler/internal/memoryfacts -count=1`.
+  Scope notes: compiler-owned fact graph is the truth source for report
+  projection.
+  Overclaim risk: medium.
+- Row: MPC-2.
+  Area: Memory Report Schema v1 and validator.
+  Final status: `validated`.
+  Evidence refs: `tools/cmd/validate-memory-report`,
+  `compiler/internal/memoryfacts/report.go`,
+  `docs/spec/memory_report_schema_v1.md`.
+  Scope notes: schema validation rejects invalid projections; it does not
+  infer facts the compiler did not own.
+  Overclaim risk: medium.
+- Row: Raw-bounds closure.
+  Area: verified `core.alloc_bytes` roots and conservative unknown raw
+  pointers.
+  Final status: `validated`.
+  Evidence refs: `compiler/internal/runtimeabi/raw_pointer_bounds.go`,
+  `compiler/internal/plir`,
+  `reports/memory-production-core-v1/mpc8/memory-production-linux-x64.json`.
+  Scope notes: runtime evidence is linux-x64 scoped unless a target-specific
+  row says otherwise.
+  Overclaim risk: high.
+- Row: MPC-3.
+  Area: safe representation invariant hardening.
+  Final status: `validated`.
+  Evidence refs: `compiler/internal/semantics`, `compiler/tests/semantics`,
+  `docs/audits/memory-production-core-v1-supported-surface.md`.
+  Scope notes: safe metadata assignment is rejected before lowering.
+  Overclaim risk: medium.
+- Row: MPC-4.
+  Area: borrow/lifetime supported surface hardening.
+  Final status: `implemented_narrow`.
+  Evidence refs: `compiler/tests/safety`, `compiler/tests/semantics`,
+  `compiler/internal/memoryfacts`.
+  Scope notes: covers documented slice/String and local supported cases, not
+  full Rust-like lifetime parity.
+  Overclaim risk: high.
+- Row: MPC-5.
+  Area: mutable alias / inout conservative subset.
+  Final status: `conservative`.
+  Evidence refs: `compiler/internal/memoryfacts`,
+  `tools/cmd/validate-memory-report`,
+  `docs/audits/memory-production-core-v1-supported-surface.md`.
+  Scope notes: unknown/maybe/call-invalidated alias state blocks noalias
+  promotion.
+  Overclaim risk: high.
+- Row: MPC-6.
+  Area: provenance/resource summaries v2.
+  Final status: `implemented_narrow`.
+  Evidence refs: `compiler/internal/memoryfacts/from_plir.go`,
+  `tools/cmd/validate-memory-report`, summary tests.
+  Scope notes: summary vocabulary covers PLIR-visible supported cases;
+  unknown external/resource returns remain conservative.
+  Overclaim risk: medium.
+- Row: MPC-7.
+  Area: unsafe fact classes.
+  Final status: `validated`.
+  Evidence refs: `compiler/internal/memoryfacts`, `compiler/internal/plir`,
+  `docs/spec/unsafe.md`.
+  Scope notes: `unsafe_unknown` cannot become safe provenance, noalias,
+  trusted storage, or removed-check evidence.
+  Overclaim risk: high.
+- Row: MPC-8.
+  Area: raw pointer verified-root bounds.
+  Final status: `validated`.
+  Evidence refs: `compiler/internal/runtimeabi`, `compiler/internal/plir`,
+  `reports/memory-production-core-v1/mpc8/memory-production-linux-x64.json`.
+  Scope notes: verified roots are allocation-base scoped; arbitrary external
+  raw pointers remain conservative.
+  Overclaim risk: high.
+- Row: MPC-9.
+  Area: raw slice gateway hardening.
+  Final status: `validated`.
+  Evidence refs: `compiler/internal/runtimeabi`, `compiler/internal/lower`,
+  `reports/memory-production-core-v1/mpc9/memory-production-linux-x64.json`.
+  Scope notes: raw slice runtime trap evidence is linux-x64 scoped; non-x64
+  rows remain target-tiered.
+  Overclaim risk: high.
+- Row: MPC-10.
+  Area: storage truth: stack/heap/explicit island.
+  Final status: `validated`.
+  Evidence refs: `compiler/internal/allocplan`, `compiler/internal/lower`,
+  `compiler/internal/validation`, `compiler/internal/memoryfacts`.
+  Scope notes: planned storage and actual lowering storage remain separate;
+  heap fallback is not a validated stack/region claim.
+  Overclaim risk: high.
+- Row: MPC-11.
+  Area: function-temp implicit region narrow slice.
+  Final status: `implemented_narrow`.
+  Evidence refs: `compiler/internal/allocplan`, `compiler/internal/lower`,
+  `compiler/internal/validation`, `compiler/internal/backend/x64core`.
+  Scope notes: one narrow linux-x64 function-temp region path; broad region
+  reuse/control-flow cleanup remains future.
+  Overclaim risk: medium.
+- Row: MPC-12.
+  Area: actor/task/request conservative memory rules.
+  Final status: `conservative`.
+  Evidence refs: `compiler/tests/safety`, `compiler/tests/semantics`,
+  `compiler/internal/actorsafety`, `compiler/internal/parallelrt`,
+  `compiler/internal/httprt`.
+  Scope notes: actor zero-copy move rows are evidence-only; full production
+  actor runtime is not claimed.
+  Overclaim risk: high.
+- Row: MPC-13.
+  Area: target capability matrix.
+  Final status: `validated`.
+  Evidence refs: `docs/audits/memory-target-capability-matrix.md`,
+  `compiler/target`, `tools/cmd/validate-targets`.
+  Scope notes: no cross-target memory production claim without target evidence.
+  Overclaim risk: high.
+- Row: MPC-14.
+  Area: memory cost model.
+  Final status: `validated`.
+  Evidence refs: `docs/design/memory_cost_model.md`,
+  `compiler/internal/memoryfacts`, `compiler/reports.go`,
+  `tools/cmd/validate-memory-report`.
+  Scope notes: cost classes classify evidence; fake zero-cost or trusted
+  unsafe optimization wording is rejected.
+  Overclaim risk: medium.
+- Row: MPC-15.
+  Area: memory fuzz/property/stress with oracle.
+  Final status: `validated`.
+  Evidence refs: `docs/audits/memory-fuzz-oracle-v1.md`,
+  `compiler/memory_fuzz_oracle_v1.go`, `tools/cmd/memory-fuzz-short`,
+  `reports/memory-fuzz-short/mpc15/memory-fuzz-oracle.json`.
+  Scope notes: Tier 1 is deterministic oracle smoke; random generation is not
+  proof by itself.
+  Overclaim risk: medium.
+- Row: MPC-16.
+  Area: production gate and final audit.
+  Final status: `validated`.
+  Evidence refs: this doc,
+  `docs/audits/memory-production-core-v1-artifact-map.md`,
+  `docs/audits/memory-production-core-v1-nonclaims.md`,
+  `reports/memory-production-core-v1/test-all-quick/summary.json`,
+  `reports/memory-production-core-v1/test-all-quick/summary.md`.
+  Scope notes: full MPC-16 command set passed; quick output remains quick
+  evidence, not a full/stabilization or benchmark claim.
+  Overclaim risk: high.
 
 ## Conservative Boundaries
 
@@ -64,13 +199,76 @@ The command evidence is recorded in `GOAL.md` progress and mirrored by
 `docs/audits/memory-production-core-v1-artifact-map.md`. The required commands
 passed:
 
-- `GOTELEMETRY=off GOCACHE=$(pwd)/.cache/go-build-mpc16-core go test -p=1 ./compiler/internal/memoryfacts ./compiler/internal/plir ./compiler/internal/validation ./compiler/internal/allocplan ./compiler/internal/lower -count=1`
-- `GOTELEMETRY=off GOCACHE=$(pwd)/.cache/go-build-mpc16-compiler go test -p=1 ./compiler -run 'Memory|Borrow|Lifetime|Alias|Unsafe|Bounds|Alloc|Region|Island|Report' -count=1`
-- `GOTELEMETRY=off GOCACHE=$(pwd)/.cache/go-build-mpc16 go test -p=1 ./compiler/... ./cli/... ./tools/... -count=1`
-- `GOTELEMETRY=off GOCACHE=$(pwd)/.cache/go-build-mpc16 bash scripts/ci/test.sh`
-- `GOTELEMETRY=off GOCACHE=$(pwd)/.cache/go-build-mpc16-test-all bash scripts/ci/test-all.sh --quick --keep-going --report-dir reports/memory-production-core-v1/test-all-quick`
-- `GOTELEMETRY=off GOCACHE=$(pwd)/.cache/go-build-mpc16-test-all go run ./tools/cmd/validate-test-all-summary --summary reports/memory-production-core-v1/test-all-quick/summary.json --report-dir reports/memory-production-core-v1/test-all-quick`
-- `GOTELEMETRY=off GOCACHE=$(pwd)/.cache/go-build-mpc16-docs go run ./tools/cmd/validate-manifest --manifest docs/generated/manifest.json`
-- `GOTELEMETRY=off GOCACHE=$(pwd)/.cache/go-build-mpc16-docs go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`
+- Core package tests:
+
+  ```sh
+  GOTELEMETRY=off GOCACHE=$(pwd)/.cache/go-build-mpc16-core \
+    go test -p=1 \
+    ./compiler/internal/memoryfacts \
+    ./compiler/internal/plir \
+    ./compiler/internal/validation \
+    ./compiler/internal/allocplan \
+    ./compiler/internal/lower \
+    -count=1
+  ```
+
+- Compiler memory evidence subset:
+
+  ```sh
+  GOTELEMETRY=off GOCACHE=$(pwd)/.cache/go-build-mpc16-compiler \
+    go test -p=1 ./compiler \
+    -run 'Memory|Borrow|Lifetime|Alias|Unsafe|Bounds|Alloc|Region|Island|Report' \
+    -count=1
+  ```
+
+- Broad compiler/CLI/tools test:
+
+  ```sh
+  GOTELEMETRY=off GOCACHE=$(pwd)/.cache/go-build-mpc16 \
+    go test -p=1 ./compiler/... ./cli/... ./tools/... -count=1
+  ```
+
+- CI smoke:
+
+  ```sh
+  GOTELEMETRY=off GOCACHE=$(pwd)/.cache/go-build-mpc16 \
+    bash scripts/ci/test.sh
+  ```
+
+- Quick test-all evidence:
+
+  ```sh
+  GOTELEMETRY=off GOCACHE=$(pwd)/.cache/go-build-mpc16-test-all \
+    bash scripts/ci/test-all.sh \
+    --quick \
+    --keep-going \
+    --report-dir reports/memory-production-core-v1/test-all-quick
+  ```
+
+- Test-all summary validation:
+
+  ```sh
+  GOTELEMETRY=off GOCACHE=$(pwd)/.cache/go-build-mpc16-test-all \
+    go run ./tools/cmd/validate-test-all-summary \
+    --summary reports/memory-production-core-v1/test-all-quick/summary.json \
+    --report-dir reports/memory-production-core-v1/test-all-quick
+  ```
+
+- Manifest validation:
+
+  ```sh
+  GOTELEMETRY=off GOCACHE=$(pwd)/.cache/go-build-mpc16-docs \
+    go run ./tools/cmd/validate-manifest \
+    --manifest docs/generated/manifest.json
+  ```
+
+- Docs verification:
+
+  ```sh
+  GOTELEMETRY=off GOCACHE=$(pwd)/.cache/go-build-mpc16-docs \
+    go run ./tools/cmd/verify-docs \
+    --manifest docs/generated/manifest.json
+  ```
+
 - `git diff --check`
 - `graphify update .`

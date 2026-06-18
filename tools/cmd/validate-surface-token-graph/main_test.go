@@ -12,13 +12,25 @@ import (
 
 func TestValidateSurfaceTokenGraphAcceptsContractAndReport(t *testing.T) {
 	root := t.TempDir()
-	writeTokenGraphCLIFile(t, filepath.Join(root, "examples", "surface_morph_command_palette.tetra"), "import lib.core.morph as morph\nfunc main() -> Int:\n    return morph.schema_v1()\n")
+	writeTokenGraphCLIFile(
+		t,
+		filepath.Join(
+			root,
+			"examples",
+			"surface",
+			"morph_core",
+			"surface_morph_command_palette.tetra",
+		),
+		"import lib.core.morph as morph\nfunc main() -> Int:\n    return morph.schema_v1()\n",
+	)
 	contractPath := filepath.Join(root, "surface-token-graph-contract.json")
 	reportPath := filepath.Join(root, "surface-headless-morph.json")
 	writeTokenGraphCLIFile(t, contractPath, string(validTokenGraphCLIContractRaw(t)))
 	writeTokenGraphCLIFile(t, reportPath, string(validTokenGraphCLIReportRaw(t)))
 
-	if err := validateSurfaceTokenGraph(tokenGraphCLIOptions{ContractPath: contractPath, ReportPath: reportPath, Root: root}); err != nil {
+	if err := validateSurfaceTokenGraph(
+		tokenGraphCLIOptions{ContractPath: contractPath, ReportPath: reportPath, Root: root},
+	); err != nil {
 		t.Fatalf("validateSurfaceTokenGraph failed: %v", err)
 	}
 }
@@ -47,11 +59,11 @@ func validTokenGraphCLIContractRaw(t *testing.T) []byte {
   },
   "required_categories": ["color", "space", "radius", "border", "elevation", "opacity", "typography", "motion", "z", "assets", "density"],
   "required_tokens": ["color.bg", "color.surface", "color.surfaceAlpha", "color.accent", "color.muted", "color.warning", "space.3", "radius.sm", "radius.md", "radius.lg", "border.subtle", "border.glass", "elevation.2", "elevation.3", "opacity.disabled", "type.label", "motion.fast", "motion.soft", "z.base", "assets.gradient.vertical", "assets.icon.fallback", "density.1x"],
-  "reference_sources": ["examples/surface_morph_command_palette.tetra"],
+  "reference_sources": ["examples/surface/morph_core/surface_morph_command_palette.tetra"],
   "allowed_raw_literal_scopes": [
-    {"path": "lib/core/morph.tetra", "reason": "canonical token graph source"},
-    {"path": "lib/core/style.tetra", "reason": "legacy Surface v1 style compatibility"},
-    {"path": "examples/surface_block_*.tetra", "reason": "experimental raw Block fixture until recipe migration"}
+    {"path": "lib/core/morph/morph.tetra", "reason": "canonical token graph source"},
+    {"path": "lib/core/widgets/style.tetra", "reason": "legacy Surface v1 style compatibility"},
+    {"path": "examples/surface/block_*/surface_block_*.tetra", "reason": "experimental raw Block fixture until recipe migration"}
   ],
   "forbidden_runtime_models": ["CSS cascade runtime", "DOM style runtime", "React runtime", "Electron runtime", "platform-native widgets"],
   "override_order": ["base", "theme", "density", "variant", "state", "local"],
@@ -82,7 +94,7 @@ func validTokenGraphCLIReportRaw(t *testing.T) []byte {
 	hash := func(seed string) string { return "sha256:" + strings.Repeat(seed, 64) }
 	report := surface.Report{
 		Schema: "tetra.surface.runtime.v1",
-		Source: "examples/surface_morph_command_palette.tetra",
+		Source: "examples/surface/morph_core/surface_morph_command_palette.tetra",
 		Morph: &surface.MorphReport{
 			Module:         "lib.core.morph",
 			TokenGraphHash: hash("b"),
@@ -92,15 +104,34 @@ func validTokenGraphCLIReportRaw(t *testing.T) []byte {
 				NoGlobalCascade: true,
 			},
 			TokenGraph: &surface.MorphTokenGraphReport{
-				Schema:                     "tetra.surface.morph.token-graph.v1",
-				Namespace:                  "tetra.surface.morph.app",
-				Version:                    "1",
-				Hash:                       hash("b"),
-				SourceOfTruth:              "capsule",
-				ExplicitImports:            true,
-				NoGlobalCascade:            true,
-				FixedOverrideOrder:         []string{"base", "theme", "density", "variant", "state", "local"},
-				Categories:                 []string{"color", "space", "radius", "border", "elevation", "opacity", "typography", "motion", "z", "assets", "density"},
+				Schema:          "tetra.surface.morph.token-graph.v1",
+				Namespace:       "tetra.surface.morph.app",
+				Version:         "1",
+				Hash:            hash("b"),
+				SourceOfTruth:   "capsule",
+				ExplicitImports: true,
+				NoGlobalCascade: true,
+				FixedOverrideOrder: []string{
+					"base",
+					"theme",
+					"density",
+					"variant",
+					"state",
+					"local",
+				},
+				Categories: []string{
+					"color",
+					"space",
+					"radius",
+					"border",
+					"elevation",
+					"opacity",
+					"typography",
+					"motion",
+					"z",
+					"assets",
+					"density",
+				},
 				Tokens:                     validTokenGraphCLITokens(),
 				DensityDPI:                 validTokenGraphCLIDensityDPI(),
 				Diagnostics:                validTokenGraphCLIDiagnostics(),
@@ -126,36 +157,208 @@ func validTokenGraphCLIReportRaw(t *testing.T) []byte {
 func validTokenGraphCLITokens() []surface.MorphTokenReport {
 	hash := func(seed string) string { return "sha256:" + strings.Repeat(seed, 64) }
 	return []surface.MorphTokenReport{
-		{ID: "color.bg", Category: "color", Kind: "rgba", Value: "#0b0f14ff", Source: "capsule", Hash: hash("1")},
-		{ID: "color.surface", Category: "color", Kind: "rgba", Value: "#181f26ff", Source: "capsule", Hash: hash("2")},
-		{ID: "color.surfaceAlpha", Category: "color", Kind: "rgba", Value: "#181f26da", Source: "capsule", Hash: hash("3")},
-		{ID: "color.accent", Category: "color", Kind: "rgba", Value: "#60aef4ff", Source: "capsule", Hash: hash("4")},
-		{ID: "color.muted", Category: "color", Kind: "rgba", Value: "#7e90a3ff", Source: "capsule", Hash: hash("5")},
-		{ID: "color.warning", Category: "color", Kind: "rgba", Value: "#f4cd5cff", Source: "capsule", Hash: hash("6")},
-		{ID: "space.3", Category: "space", Kind: "px", Value: "12", Source: "capsule", Hash: hash("7")},
-		{ID: "radius.sm", Category: "radius", Kind: "px", Value: "8", Source: "capsule", Hash: hash("8")},
-		{ID: "radius.md", Category: "radius", Kind: "px", Value: "10", Source: "capsule", Hash: hash("9")},
-		{ID: "radius.lg", Category: "radius", Kind: "px", Value: "18", Source: "capsule", Hash: hash("a")},
-		{ID: "border.subtle", Category: "border", Kind: "px", Value: "1", Source: "capsule", Hash: hash("b")},
-		{ID: "border.glass", Category: "border", Kind: "px", Value: "1", Source: "capsule", Hash: hash("c")},
-		{ID: "elevation.2", Category: "elevation", Kind: "shadow", Value: "0 3 10 72", Source: "capsule", Hash: hash("d")},
-		{ID: "elevation.3", Category: "elevation", Kind: "shadow", Value: "0 10 24 128", Source: "capsule", Hash: hash("e")},
-		{ID: "opacity.disabled", Category: "opacity", Kind: "alpha", Value: "128", Source: "capsule", Hash: hash("f")},
-		{ID: "type.label", Category: "typography", Kind: "font", Value: "Tetra UI 13 600 18", Source: "capsule", Hash: hash("1")},
-		{ID: "motion.fast", Category: "motion", Kind: "transition", Value: "120 ease.out", Source: "capsule", Hash: hash("2")},
-		{ID: "motion.soft", Category: "motion", Kind: "transition", Value: "180 ease.inOut", Source: "capsule", Hash: hash("3")},
-		{ID: "z.base", Category: "z", Kind: "layer", Value: "0", Source: "capsule", Hash: hash("4")},
-		{ID: "assets.gradient.vertical", Category: "assets", Kind: "gradient", Value: "vertical", Source: "capsule", Hash: hash("5")},
-		{ID: "assets.icon.fallback", Category: "assets", Kind: "icon", Value: "fallback", Source: "capsule", Hash: hash("6")},
-		{ID: "density.1x", Category: "density", Kind: "dpi", Value: "96/1000", Source: "capsule", Hash: hash("7")},
+		{
+			ID:       "color.bg",
+			Category: "color",
+			Kind:     "rgba",
+			Value:    "#0b0f14ff",
+			Source:   "capsule",
+			Hash:     hash("1"),
+		},
+		{
+			ID:       "color.surface",
+			Category: "color",
+			Kind:     "rgba",
+			Value:    "#181f26ff",
+			Source:   "capsule",
+			Hash:     hash("2"),
+		},
+		{
+			ID:       "color.surfaceAlpha",
+			Category: "color",
+			Kind:     "rgba",
+			Value:    "#181f26da",
+			Source:   "capsule",
+			Hash:     hash("3"),
+		},
+		{
+			ID:       "color.accent",
+			Category: "color",
+			Kind:     "rgba",
+			Value:    "#60aef4ff",
+			Source:   "capsule",
+			Hash:     hash("4"),
+		},
+		{
+			ID:       "color.muted",
+			Category: "color",
+			Kind:     "rgba",
+			Value:    "#7e90a3ff",
+			Source:   "capsule",
+			Hash:     hash("5"),
+		},
+		{
+			ID:       "color.warning",
+			Category: "color",
+			Kind:     "rgba",
+			Value:    "#f4cd5cff",
+			Source:   "capsule",
+			Hash:     hash("6"),
+		},
+		{
+			ID:       "space.3",
+			Category: "space",
+			Kind:     "px",
+			Value:    "12",
+			Source:   "capsule",
+			Hash:     hash("7"),
+		},
+		{
+			ID:       "radius.sm",
+			Category: "radius",
+			Kind:     "px",
+			Value:    "8",
+			Source:   "capsule",
+			Hash:     hash("8"),
+		},
+		{
+			ID:       "radius.md",
+			Category: "radius",
+			Kind:     "px",
+			Value:    "10",
+			Source:   "capsule",
+			Hash:     hash("9"),
+		},
+		{
+			ID:       "radius.lg",
+			Category: "radius",
+			Kind:     "px",
+			Value:    "18",
+			Source:   "capsule",
+			Hash:     hash("a"),
+		},
+		{
+			ID:       "border.subtle",
+			Category: "border",
+			Kind:     "px",
+			Value:    "1",
+			Source:   "capsule",
+			Hash:     hash("b"),
+		},
+		{
+			ID:       "border.glass",
+			Category: "border",
+			Kind:     "px",
+			Value:    "1",
+			Source:   "capsule",
+			Hash:     hash("c"),
+		},
+		{
+			ID:       "elevation.2",
+			Category: "elevation",
+			Kind:     "shadow",
+			Value:    "0 3 10 72",
+			Source:   "capsule",
+			Hash:     hash("d"),
+		},
+		{
+			ID:       "elevation.3",
+			Category: "elevation",
+			Kind:     "shadow",
+			Value:    "0 10 24 128",
+			Source:   "capsule",
+			Hash:     hash("e"),
+		},
+		{
+			ID:       "opacity.disabled",
+			Category: "opacity",
+			Kind:     "alpha",
+			Value:    "128",
+			Source:   "capsule",
+			Hash:     hash("f"),
+		},
+		{
+			ID:       "type.label",
+			Category: "typography",
+			Kind:     "font",
+			Value:    "Tetra UI 13 600 18",
+			Source:   "capsule",
+			Hash:     hash("1"),
+		},
+		{
+			ID:       "motion.fast",
+			Category: "motion",
+			Kind:     "transition",
+			Value:    "120 ease.out",
+			Source:   "capsule",
+			Hash:     hash("2"),
+		},
+		{
+			ID:       "motion.soft",
+			Category: "motion",
+			Kind:     "transition",
+			Value:    "180 ease.inOut",
+			Source:   "capsule",
+			Hash:     hash("3"),
+		},
+		{
+			ID:       "z.base",
+			Category: "z",
+			Kind:     "layer",
+			Value:    "0",
+			Source:   "capsule",
+			Hash:     hash("4"),
+		},
+		{
+			ID:       "assets.gradient.vertical",
+			Category: "assets",
+			Kind:     "gradient",
+			Value:    "vertical",
+			Source:   "capsule",
+			Hash:     hash("5"),
+		},
+		{
+			ID:       "assets.icon.fallback",
+			Category: "assets",
+			Kind:     "icon",
+			Value:    "fallback",
+			Source:   "capsule",
+			Hash:     hash("6"),
+		},
+		{
+			ID:       "density.1x",
+			Category: "density",
+			Kind:     "dpi",
+			Value:    "96/1000",
+			Source:   "capsule",
+			Hash:     hash("7"),
+		},
 	}
 }
 
 func validTokenGraphCLIDensityDPI() []surface.MorphDensityDPIReport {
 	return []surface.MorphDensityDPIReport{
-		{Target: "headless", Token: "density.1x", TargetDPI: 96, ScaleMilli: 1000, RoundingPolicy: "integer-half-up-v1"},
-		{Target: "linux-x64-real-window", Token: "density.1x", TargetDPI: 96, ScaleMilli: 1000, RoundingPolicy: "integer-half-up-v1"},
-		{Target: "wasm32-web-browser-canvas", Token: "density.1x", TargetDPI: 96, ScaleMilli: 1000, RoundingPolicy: "integer-half-up-v1"},
+		{
+			Target:         "headless",
+			Token:          "density.1x",
+			TargetDPI:      96,
+			ScaleMilli:     1000,
+			RoundingPolicy: "integer-half-up-v1",
+		},
+		{
+			Target:         "linux-x64-real-window",
+			Token:          "density.1x",
+			TargetDPI:      96,
+			ScaleMilli:     1000,
+			RoundingPolicy: "integer-half-up-v1",
+		},
+		{
+			Target:         "wasm32-web-browser-canvas",
+			Token:          "density.1x",
+			TargetDPI:      96,
+			ScaleMilli:     1000,
+			RoundingPolicy: "integer-half-up-v1",
+		},
 	}
 }
 
@@ -175,8 +378,24 @@ func validTokenGraphCLIDiagnostics() surface.MorphTokenGraphDiagnosticsReport {
 
 func validTokenGraphCLIMaterials() []surface.MorphMaterialReport {
 	return []surface.MorphMaterialReport{
-		{Name: "surface.base", PaintStack: []string{"fill", "border", "radius"}, Fill: "color.surface", Border: "border.subtle", Radius: "radius.md", UnsupportedBlurRejected: true},
-		{Name: "translucent.panel", PaintStack: []string{"fill", "border", "radius", "shadow", "overlay"}, Fill: "color.surfaceAlpha", Border: "border.glass", Radius: "radius.lg", Shadow: "elevation.3", Overlay: "assets.gradient.vertical", UnsupportedBlurRejected: true},
+		{
+			Name:                    "surface.base",
+			PaintStack:              []string{"fill", "border", "radius"},
+			Fill:                    "color.surface",
+			Border:                  "border.subtle",
+			Radius:                  "radius.md",
+			UnsupportedBlurRejected: true,
+		},
+		{
+			Name:                    "translucent.panel",
+			PaintStack:              []string{"fill", "border", "radius", "shadow", "overlay"},
+			Fill:                    "color.surfaceAlpha",
+			Border:                  "border.glass",
+			Radius:                  "radius.lg",
+			Shadow:                  "elevation.3",
+			Overlay:                 "assets.gradient.vertical",
+			UnsupportedBlurRejected: true,
+		},
 	}
 }
 

@@ -13,7 +13,11 @@ func TestValidateReadinessBlockersAcceptsBlockedV040Artifact(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(logPath, []byte("validate-v0-4-readiness: feature blocker\n"), 0o644); err != nil {
+	if err := os.WriteFile(
+		logPath,
+		[]byte("validate-v0-4-readiness: feature blocker\n"),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 	artifact := writeReadinessBlockers(t, dir, `{

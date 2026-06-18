@@ -1,22 +1,71 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"tetra_language/tools/validators/memoryprod"
 )
 
 func TestBuildReportProducesValidMemoryProductionEvidence(t *testing.T) {
 	report := buildReport("tools/cmd/memory-production-smoke", []memoryprod.ProcessReport{
-		{Name: "tetra build", Kind: "build", Path: "/tmp/tetra", Ran: true, Pass: true, ExitCode: intPtr(0)},
-		{Name: "memory smoke app", Kind: "app", Path: "/tmp/memory-smoke", Ran: true, Pass: true, ExitCode: intPtr(0)},
-		{Name: "memory stress", Kind: "stress", Path: "/tmp/memory-stress", Ran: true, Pass: true, ExitCode: intPtr(0)},
-		{Name: "memory fuzz", Kind: "stress", Path: "/tmp/memory-fuzz", Ran: true, Pass: true, ExitCode: intPtr(0)},
-		{Name: "actornet close-without-cancel leak coverage", Kind: "stress", Path: "go test -buildvcs=false ./cli/internal/actornet -run TestBrokerCloseWithoutCancelStopsServeWatcher -count=1", Ran: true, Pass: true, ExitCode: intPtr(0)},
-		{Name: "compiler resource finalization diagnostics", Kind: "stress", Path: "go test -buildvcs=false ./compiler/tests/runtime -run ^(TestTaskHandleFinalization|TestTaskGroupFinalization|TestIslandFinalization) -count=1", Ran: true, Pass: true, ExitCode: intPtr(0)},
+		{
+			Name:     "tetra build",
+			Kind:     "build",
+			Path:     "/tmp/tetra",
+			Ran:      true,
+			Pass:     true,
+			ExitCode: intPtr(0),
+		},
+		{
+			Name:     "memory smoke app",
+			Kind:     "app",
+			Path:     "/tmp/memory-smoke",
+			Ran:      true,
+			Pass:     true,
+			ExitCode: intPtr(0),
+		},
+		{
+			Name:     "memory stress",
+			Kind:     "stress",
+			Path:     "/tmp/memory-stress",
+			Ran:      true,
+			Pass:     true,
+			ExitCode: intPtr(0),
+		},
+		{
+			Name:     "memory fuzz",
+			Kind:     "stress",
+			Path:     "/tmp/memory-fuzz",
+			Ran:      true,
+			Pass:     true,
+			ExitCode: intPtr(0),
+		},
+		{
+			Name: "actornet close-without-cancel leak coverage",
+			Kind: "stress",
+			Path: ("go test -buildvcs=false ./cli/internal/actornet -run " +
+				"TestBrokerCloseWithoutCancelStopsServeWatcher -count=1"),
+			Ran:      true,
+			Pass:     true,
+			ExitCode: intPtr(0),
+		},
+		{
+			Name: "compiler resource finalization diagnostics",
+			Kind: "stress",
+			Path: ("go test -buildvcs=false ./compiler/tests/runtime -run " +
+				"^(TestTaskHandleFinalization|TestTaskGroupFinalization|TestIslandFinaliz" +
+				"ation) -count=1"),
+			Ran:      true,
+			Pass:     true,
+			ExitCode: intPtr(0),
+		},
 	}, requiredPassingBenchmarks(), requiredPassingCases())
 	raw, err := json.Marshal(report)
 	if err != nil {
@@ -24,6 +73,178 @@ func TestBuildReportProducesValidMemoryProductionEvidence(t *testing.T) {
 	}
 	if err := memoryprod.ValidateReport(raw); err != nil {
 		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
+	}
+}
+
+func TestSmokeRunnerWriteReportStreamsValidatedReport(t *testing.T) {
+	exit0 := 0
+	reportPath := filepath.Join(t.TempDir(), "memory-production-linux-x64.json")
+	r := &smokeRunner{
+		opt: smokeOptions{
+			ReportPath: reportPath,
+			GitHead:    "0123456789abcdef0123456789abcdef01234567",
+		},
+		processes: []memoryprod.ProcessReport{
+			{
+				Name:     "tetra build",
+				Kind:     "build",
+				Path:     "go build ./cli/cmd/tetra",
+				Ran:      true,
+				Pass:     true,
+				ExitCode: &exit0,
+			},
+			{
+				Name:     "memory smoke app",
+				Kind:     "app",
+				Path:     "examples/core_memory_smoke",
+				Ran:      true,
+				Pass:     true,
+				ExitCode: &exit0,
+			},
+			{
+				Name:     "memory stress",
+				Kind:     "stress",
+				Path:     "tools/cmd/memory-production-smoke",
+				Ran:      true,
+				Pass:     true,
+				ExitCode: &exit0,
+			},
+			{
+				Name: "actornet close-without-cancel leak coverage",
+				Kind: "stress",
+				Path: ("go test -buildvcs=false ./cli/internal/actornet -run " +
+					"TestBrokerCloseWithoutCancelStopsServeWatcher -count=1"),
+				Ran:      true,
+				Pass:     true,
+				ExitCode: &exit0,
+			},
+			{
+				Name: "compiler resource finalization diagnostics",
+				Kind: "stress",
+				Path: ("go test -buildvcs=false ./compiler/tests/runtime -run " +
+					"^(TestTaskHandleFinalization|TestTaskGroupFinalization|TestIslandFinaliz" +
+					"ation) -count=1"),
+				Ran:      true,
+				Pass:     true,
+				ExitCode: &exit0,
+			},
+		},
+		benchmarks: requiredPassingBenchmarks(),
+		cases:      requiredPassingCases(),
+	}
+	if err := r.writeReport(); err != nil {
+		t.Fatalf("writeReport: %v", err)
+	}
+	raw, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatalf("read report: %v", err)
+	}
+	if !strings.HasSuffix(string(raw), "\n") {
+		t.Fatalf("written report should end with newline")
+	}
+	if err := memoryprod.ValidateReport(raw); err != nil {
+		t.Fatalf("ValidateReport failed for streamed report: %v\n%s", err, raw)
+	}
+}
+
+func TestWriteMemoryProductionJSONFileKeepsIndentedJSONFormat(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "report.json")
+	value := struct {
+		Schema string   `json:"schema"`
+		Rows   []string `json:"rows"`
+	}{
+		Schema: "tetra.test.schema.v1",
+		Rows:   []string{"one", "two"},
+	}
+	if err := writeMemoryProductionJSONFile(path, value); err != nil {
+		t.Fatalf("writeMemoryProductionJSONFile: %v", err)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read written json: %v", err)
+	}
+	want := "{\n  \"schema\": \"tetra.test.schema.v1\",\n  \"rows\": [\n    \"one\",\n    \"two\"\n  ]\n}\n"
+	if string(raw) != want {
+		t.Fatalf("written JSON = %q, want %q", raw, want)
+	}
+}
+
+func TestWriteRAMMeasurementReportCapturesMemStatsSnapshots(t *testing.T) {
+	reportPath := filepath.Join(t.TempDir(), "ram-measurement.json")
+	r := &smokeRunner{
+		opt: smokeOptions{
+			RAMMeasurementPath: reportPath,
+			GitHead:            "0123456789abcdef0123456789abcdef01234567",
+		},
+	}
+	r.recordRAMSnapshot("start")
+	r.recordRAMSnapshot("end")
+	if err := r.writeRAMMeasurementReport(); err != nil {
+		t.Fatalf("writeRAMMeasurementReport: %v", err)
+	}
+	raw, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatalf("read RAM measurement report: %v", err)
+	}
+	var report ramMeasurementReport
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("decode RAM measurement report: %v\n%s", err, raw)
+	}
+	if report.Schema != ramMeasurementSchema {
+		t.Fatalf("schema = %q, want %q", report.Schema, ramMeasurementSchema)
+	}
+	if report.Status != "pass" || report.EvidenceClass != "runtime_measured" ||
+		report.Method != "MemStats" {
+		t.Fatalf(
+			"classification = status %q evidence_class %q method %q",
+			report.Status,
+			report.EvidenceClass,
+			report.Method,
+		)
+	}
+	if len(report.Snapshots) != 2 {
+		t.Fatalf("snapshots = %d, want 2", len(report.Snapshots))
+	}
+	if report.Snapshots[0].Name != "start" || report.Snapshots[1].Name != "end" {
+		t.Fatalf("snapshot names = %#v", report.Snapshots)
+	}
+	if report.Snapshots[0].SysBytes == 0 || report.Snapshots[1].HeapSysBytes == 0 {
+		t.Fatalf("snapshots missing MemStats byte values: %#v", report.Snapshots)
+	}
+	if report.Summary.HeapAllocBytes == 0 {
+		t.Fatalf("summary missing heap_alloc_bytes: %#v", report.Summary)
+	}
+	samples := map[string]ramMeasurementMetricSample{}
+	for _, sample := range report.MetricSamples {
+		samples[sample.Name] = sample
+	}
+	for _, name := range []string{
+		"heap_alloc_bytes",
+		"bytes_requested",
+		"bytes_reserved",
+		"bytes_copied",
+		"rss_current",
+		"rss_peak",
+		"per_actor_domain_bytes",
+	} {
+		if _, ok := samples[name]; !ok {
+			t.Fatalf("metric_samples missing %s: %#v", name, report.MetricSamples)
+		}
+	}
+	if samples["heap_alloc_bytes"].EvidenceClass != "runtime_measured" ||
+		samples["heap_alloc_bytes"].Method != "MemStats" {
+		t.Fatalf(
+			"heap metric sample = %+v, want runtime_measured MemStats",
+			samples["heap_alloc_bytes"],
+		)
+	}
+	if samples["rss_current"].EvidenceClass != "unsupported" ||
+		samples["rss_peak"].EvidenceClass != "unsupported" {
+		t.Fatalf(
+			"rss samples = current %+v peak %+v, want unsupported",
+			samples["rss_current"],
+			samples["rss_peak"],
+		)
 	}
 }
 
@@ -75,9 +296,30 @@ func TestRequiredPassingCasesIncludeMemoryProductionEdgeCases(t *testing.T) {
 func TestResourceFinalizationCoverageIsReleaseBlocking(t *testing.T) {
 	exit0 := 0
 	report := buildReport("tools/cmd/memory-production-smoke", []memoryprod.ProcessReport{
-		{Name: "tetra build", Kind: "build", Path: "go build ./cli/cmd/tetra", Ran: true, Pass: true, ExitCode: &exit0},
-		{Name: "memory smoke app", Kind: "app", Path: "examples/core_memory_smoke", Ran: true, Pass: true, ExitCode: &exit0},
-		{Name: "memory stress", Kind: "stress", Path: "tools/cmd/memory-production-smoke", Ran: true, Pass: true, ExitCode: &exit0},
+		{
+			Name:     "tetra build",
+			Kind:     "build",
+			Path:     "go build ./cli/cmd/tetra",
+			Ran:      true,
+			Pass:     true,
+			ExitCode: &exit0,
+		},
+		{
+			Name:     "memory smoke app",
+			Kind:     "app",
+			Path:     "examples/core_memory_smoke",
+			Ran:      true,
+			Pass:     true,
+			ExitCode: &exit0,
+		},
+		{
+			Name:     "memory stress",
+			Kind:     "stress",
+			Path:     "tools/cmd/memory-production-smoke",
+			Ran:      true,
+			Pass:     true,
+			ExitCode: &exit0,
+		},
 	}, requiredPassingBenchmarks(), requiredPassingCases())
 	raw, err := json.Marshal(report)
 	if err != nil {
@@ -98,13 +340,28 @@ func TestResourceFinalizationCoverageIsReleaseBlocking(t *testing.T) {
 }
 
 func TestRuntimeDiagnosticPassRequiresExpectedErrorText(t *testing.T) {
-	if runtimeDiagnosticPass(processResult{exitCode: 2, output: "different runtime trap"}, 2, "negative ptr_add offset", true) {
+	if runtimeDiagnosticPass(
+		processResult{exitCode: 2, output: "different runtime trap"},
+		2,
+		"negative ptr_add offset",
+		true,
+	) {
 		t.Fatalf("runtimeDiagnosticPass accepted matching exit code without expected error text")
 	}
-	if !runtimeDiagnosticPass(processResult{exitCode: 2, output: "fatal: negative ptr_add offset"}, 2, "negative ptr_add offset", true) {
+	if !runtimeDiagnosticPass(
+		processResult{exitCode: 2, output: "fatal: negative ptr_add offset"},
+		2,
+		"negative ptr_add offset",
+		true,
+	) {
 		t.Fatalf("runtimeDiagnosticPass rejected matching exit code and expected error text")
 	}
-	if !runtimeDiagnosticPass(processResult{exitCode: 2, output: ""}, 2, "legacy diagnostic", false) {
+	if !runtimeDiagnosticPass(
+		processResult{exitCode: 2, output: ""},
+		2,
+		"legacy diagnostic",
+		false,
+	) {
 		t.Fatalf("runtimeDiagnosticPass rejected legacy exit-code-only diagnostic")
 	}
 }
@@ -118,13 +375,25 @@ func TestRawSliceRuntimeDiagnosticSourcesAvoidPreCallAllocationTrap(t *testing.T
 		{name: "i32 byte overflow", source: rawSliceI32LengthOverflowSource},
 	} {
 		if strings.Contains(tc.source, "alloc_bytes") {
-			t.Fatalf("%s raw slice diagnostic source must not contain a pre-call alloc trap:\n%s", tc.name, tc.source)
+			t.Fatalf(
+				"%s raw slice diagnostic source must not contain a pre-call alloc trap:\n%s",
+				tc.name,
+				tc.source,
+			)
 		}
 		if !strings.Contains(tc.source, "let p: ptr = 0") {
-			t.Fatalf("%s raw slice diagnostic source must use a non-trapping null raw pointer:\n%s", tc.name, tc.source)
+			t.Fatalf(
+				"%s raw slice diagnostic source must use a non-trapping null raw pointer:\n%s",
+				tc.name,
+				tc.source,
+			)
 		}
 		if !strings.Contains(tc.source, "return xs.len + 98") {
-			t.Fatalf("%s raw slice diagnostic source must keep a fallthrough data dependency on xs.len:\n%s", tc.name, tc.source)
+			t.Fatalf(
+				"%s raw slice diagnostic source must keep a fallthrough data dependency on xs.len:\n%s",
+				tc.name,
+				tc.source,
+			)
 		}
 	}
 }
@@ -208,10 +477,16 @@ func TestParseAllocationReportSummaryIncludesLengthContractRows(t *testing.T) {
 		t.Fatalf("parsed allocation rows = %+v, want function allocations", report.Functions)
 	}
 	if report.Functions[0].Allocations[0].LengthStatus != "valid_empty_allocation" {
-		t.Fatalf("first allocation length_status = %q", report.Functions[0].Allocations[0].LengthStatus)
+		t.Fatalf(
+			"first allocation length_status = %q",
+			report.Functions[0].Allocations[0].LengthStatus,
+		)
 	}
 	if report.Functions[0].Allocations[1].OverflowGuardStatus != "reject_before_metadata_access" {
-		t.Fatalf("second allocation overflow_guard_status = %q", report.Functions[0].Allocations[1].OverflowGuardStatus)
+		t.Fatalf(
+			"second allocation overflow_guard_status = %q",
+			report.Functions[0].Allocations[1].OverflowGuardStatus,
+		)
 	}
 }
 
@@ -240,7 +515,10 @@ func TestParseAllocationReportSummaryAllowsReportsWithoutAllocatorReusePolicy(t 
 			}
 		]
 	}`)); err != nil {
-		t.Fatalf("parseAllocationReportSummary rejected allocation report without allocator_reuse_policies: %v", err)
+		t.Fatalf(
+			"parseAllocationReportSummary rejected allocation report without allocator_reuse_policies: %v",
+			err,
+		)
 	}
 }
 
@@ -253,7 +531,11 @@ func TestRawPointerBoundsMetadataSourceCoversRuntimeRawFailureClasses(t *testing
 		"let raw_slice_overflow: []i32 = core.raw_slice_i32_from_parts(raw_slice_base, 536870912, mem)",
 	} {
 		if !strings.Contains(rawPointerBoundsMetadataSource, want) {
-			t.Fatalf("rawPointerBoundsMetadataSource missing runtime-correlated source %q:\n%s", want, rawPointerBoundsMetadataSource)
+			t.Fatalf(
+				"rawPointerBoundsMetadataSource missing runtime-correlated source %q:\n%s",
+				want,
+				rawPointerBoundsMetadataSource,
+			)
 		}
 	}
 }
@@ -291,27 +573,47 @@ func TestValidateRawPointerBoundsCorrelationRejectsClaimOnlyRows(t *testing.T) {
 		]
 	}`))
 	if err == nil || !strings.Contains(err.Error(), "source_fact_id") {
-		t.Fatalf("validateRawPointerBoundsCorrelation error = %v, want source_fact_id rejection", err)
+		t.Fatalf(
+			"validateRawPointerBoundsCorrelation error = %v, want source_fact_id rejection",
+			err,
+		)
 	}
 }
 
 func TestValidateRawPointerBoundsCorrelationRequiresParentedNormalBuildChecks(t *testing.T) {
-	err := validateRawPointerBoundsCorrelation(requiredPassingCases(), []byte(correlatedRawBoundsMemoryReport(false)))
-	if err == nil || !strings.Contains(err.Error(), "raw_bounds_runtime_check_normal_build") || !strings.Contains(err.Error(), "normal_build_check") {
-		t.Fatalf("validateRawPointerBoundsCorrelation error = %v, want parented normal-build check rejection", err)
+	err := validateRawPointerBoundsCorrelation(
+		requiredPassingCases(),
+		[]byte(correlatedRawBoundsMemoryReport(false)),
+	)
+	if err == nil || !strings.Contains(err.Error(), "raw_bounds_runtime_check_normal_build") ||
+		!strings.Contains(err.Error(), "normal_build_check") {
+		t.Fatalf(
+			"validateRawPointerBoundsCorrelation error = %v, want parented normal-build check rejection",
+			err,
+		)
 	}
 }
 
 func TestValidateRawPointerBoundsCorrelationAcceptsRuntimeAndReportEvidence(t *testing.T) {
-	if err := validateRawPointerBoundsCorrelation(requiredPassingCases(), []byte(correlatedRawBoundsMemoryReport(true))); err != nil {
+	if err := validateRawPointerBoundsCorrelation(
+		requiredPassingCases(),
+		[]byte(correlatedRawBoundsMemoryReport(true)),
+	); err != nil {
 		t.Fatalf("validateRawPointerBoundsCorrelation: %v", err)
 	}
 }
 
 func TestValidateRawPointerBoundsCorrelationRejectsCapMemProofRows(t *testing.T) {
-	err := validateRawPointerBoundsCorrelation(requiredPassingCases(), []byte(correlatedRawBoundsMemoryReportWithCapMemProof()))
-	if err == nil || !strings.Contains(err.Error(), "cap.mem") || !strings.Contains(err.Error(), "no_alias") {
-		t.Fatalf("validateRawPointerBoundsCorrelation error = %v, want cap.mem no_alias proof rejection", err)
+	err := validateRawPointerBoundsCorrelation(
+		requiredPassingCases(),
+		[]byte(correlatedRawBoundsMemoryReportWithCapMemProof()),
+	)
+	if err == nil || !strings.Contains(err.Error(), "cap.mem") ||
+		!strings.Contains(err.Error(), "no_alias") {
+		t.Fatalf(
+			"validateRawPointerBoundsCorrelation error = %v, want cap.mem no_alias proof rejection",
+			err,
+		)
 	}
 }
 
@@ -327,21 +629,86 @@ func TestValidateRawSliceGatewayCorrelationRejectsClaimOnlyRows(t *testing.T) {
 		]
 	}`))
 	if err == nil || !strings.Contains(err.Error(), "source_fact_id") {
-		t.Fatalf("validateRawSliceGatewayCorrelation error = %v, want source_fact_id rejection", err)
+		t.Fatalf(
+			"validateRawSliceGatewayCorrelation error = %v, want source_fact_id rejection",
+			err,
+		)
 	}
 }
 
 func TestValidateRawSliceGatewayCorrelationRequiresParentedOverflowCheck(t *testing.T) {
-	err := validateRawSliceGatewayCorrelation(requiredPassingCases(), []byte(correlatedRawBoundsMemoryReport(false)))
-	if err == nil || !strings.Contains(err.Error(), "rejected_length_overflow") || !strings.Contains(err.Error(), "raw_bounds_runtime_check_normal_build") {
-		t.Fatalf("validateRawSliceGatewayCorrelation error = %v, want raw-slice overflow normal-build check rejection", err)
+	err := validateRawSliceGatewayCorrelation(
+		requiredPassingCases(),
+		[]byte(correlatedRawBoundsMemoryReport(false)),
+	)
+	if err == nil || !strings.Contains(err.Error(), "rejected_length_overflow") ||
+		!strings.Contains(err.Error(), "raw_bounds_runtime_check_normal_build") {
+		t.Fatalf(
+			("validateRawSliceGatewayCorrelation error = %v, want raw-slice " +
+				"overflow normal-build check rejection"),
+			err,
+		)
 	}
 }
 
 func TestValidateRawSliceGatewayCorrelationAcceptsRuntimeAndReportEvidence(t *testing.T) {
-	if err := validateRawSliceGatewayCorrelation(requiredPassingCases(), []byte(correlatedRawBoundsMemoryReport(true))); err != nil {
+	if err := validateRawSliceGatewayCorrelation(
+		requiredPassingCases(),
+		[]byte(correlatedRawBoundsMemoryReport(true)),
+	); err != nil {
 		t.Fatalf("validateRawSliceGatewayCorrelation: %v", err)
 	}
+}
+
+func TestRunCommandKeepsBoundedOutputTailForSpam(t *testing.T) {
+	res := runCommand(
+		context.Background(),
+		5*time.Second,
+		os.Args[0],
+		"-test.run=TestMemoryProductionSmokeHelperProcess",
+		"--",
+		"spam-output",
+	)
+	if res.err != nil || res.exitCode != 0 {
+		t.Fatalf(
+			"runCommand helper failed: exit=%d err=%v output=%q",
+			res.exitCode,
+			res.err,
+			res.output,
+		)
+	}
+	if len(res.output) > 96*1024 {
+		t.Fatalf("runCommand output length = %d, want bounded tail <= 96KiB", len(res.output))
+	}
+	if !strings.Contains(res.output, "output truncated") {
+		t.Fatalf("runCommand output missing truncation marker; len=%d", len(res.output))
+	}
+	if strings.Contains(res.output, "spam-prefix") {
+		t.Fatalf("runCommand kept the beginning of spam output instead of tail")
+	}
+	if !strings.Contains(res.output, "spam-tail") {
+		t.Fatalf("runCommand output missing tail marker")
+	}
+}
+
+func TestMemoryProductionSmokeHelperProcess(t *testing.T) {
+	helperArg := ""
+	for i, arg := range os.Args {
+		if arg == "--" && i+1 < len(os.Args) {
+			helperArg = os.Args[i+1]
+			break
+		}
+	}
+	if helperArg != "spam-output" {
+		return
+	}
+	fmt.Fprintln(os.Stdout, "spam-prefix")
+	chunk := strings.Repeat("x", 1024)
+	for i := 0; i < 2048; i++ {
+		fmt.Fprint(os.Stdout, chunk)
+	}
+	fmt.Fprintln(os.Stdout, "spam-tail")
+	os.Exit(0)
 }
 
 func requiredPassingBenchmarks() []memoryprod.BenchmarkReport {
@@ -350,13 +717,51 @@ func requiredPassingBenchmarks() []memoryprod.BenchmarkReport {
 		Kind:             "allocator",
 		Metric:           "estimated_os_syscalls",
 		Unit:             "syscalls",
+		EvidenceClass:    "allocation_report_estimate",
+		Method:           "allocation_report_summary",
 		BaselineValue:    64,
 		MeasuredValue:    1,
 		ImprovementRatio: 64,
-		Evidence:         "allocation report schema v2 shows 64 per_core_small_heap rows with same_core_same_size_class_free_list reuse policy inside one 64KiB chunk refill",
-		Ran:              true,
-		Pass:             true,
+		Evidence: ("allocation report schema v2 estimates 64 per_core_small_heap " +
+			"allocation intents inside one 64KiB chunk refill; allocation_report_" +
+			"estimate only, not a runtime measurement"),
+		Ran:  true,
+		Pass: true,
 	}}
+}
+
+func TestRequiredPassingBenchmarksClassifySmallHeapEvidence(t *testing.T) {
+	benchmarks := requiredPassingBenchmarks()
+	if len(benchmarks) != 1 {
+		t.Fatalf("requiredPassingBenchmarks returned %d rows, want 1", len(benchmarks))
+	}
+	row := benchmarks[0]
+	if row.EvidenceClass != "allocation_report_estimate" {
+		t.Fatalf("EvidenceClass = %q, want allocation_report_estimate", row.EvidenceClass)
+	}
+	if row.Method != "allocation_report_summary" {
+		t.Fatalf("Method = %q, want allocation_report_summary", row.Method)
+	}
+	if row.MeasurementArtifact != "" {
+		t.Fatalf(
+			"MeasurementArtifact = %q, want empty for allocation report estimate",
+			row.MeasurementArtifact,
+		)
+	}
+	lower := strings.ToLower(row.Evidence)
+	for _, forbidden := range []string{
+		"same_core_same_size_class_free_list",
+		"free-list",
+		"reuse policy",
+	} {
+		if strings.Contains(lower, forbidden) {
+			t.Fatalf(
+				"Evidence = %q, contains runtime free-list wording %q",
+				row.Evidence,
+				forbidden,
+			)
+		}
+	}
 }
 
 func hasCase(cases []memoryprod.CaseReport, name string) bool {
@@ -371,19 +776,149 @@ func hasCase(cases []memoryprod.CaseReport, name string) bool {
 func correlatedRawBoundsMemoryReport(includeChecks bool) string {
 	rows := []string{
 		capMemAuthorizationReportRow("fact:cap-mem-authorization"),
-		rawMemoryReportRow("fact:alloc", "", "allocation_base_metadata", "validated", "unsafe_verified_root", "unsafe_verified_root", "zero_cost_proven", false, "raw_bounds_validator"),
-		rawMemoryReportRow("fact:derived", "", "derived_allocation_offset", "evidence_only", "unsafe_checked", "unsafe_checked", "dynamic_check_required", true, "raw_bounds_validator"),
-		rawMemoryReportRow("fact:negative", "", "rejected_negative_offset", "evidence_only", "unsafe_checked", "unsafe_checked", "unsupported_rejected", false, "raw_bounds_validator"),
-		rawMemoryReportRow("fact:upper", "", "rejected_upper_bound", "evidence_only", "unsafe_checked", "unsafe_checked", "unsupported_rejected", false, "raw_bounds_validator"),
-		rawMemoryReportRow("fact:width-load-i32", "", "rejected_access_width_overflow", "evidence_only", "unsafe_checked", "unsafe_checked", "unsupported_rejected", false, "raw_bounds_validator"),
-		rawMemoryReportRow("fact:width-store-ptr", "", "rejected_access_width_overflow", "evidence_only", "unsafe_checked", "unsafe_checked", "unsupported_rejected", false, "raw_bounds_validator"),
-		rawMemoryReportRow("fact:width-store-i32", "", "rejected_access_width_overflow", "evidence_only", "unsafe_checked", "unsafe_checked", "unsupported_rejected", false, "raw_bounds_validator"),
-		rawMemoryReportRow("fact:width-load-ptr", "", "rejected_access_width_overflow", "evidence_only", "unsafe_checked", "unsafe_checked", "unsupported_rejected", false, "raw_bounds_validator"),
-		rawMemoryReportRow("fact:unknown", "", "checked_external_unknown", "conservative", "unsafe_unknown", "unsafe_unknown", "conservative_fallback", false, "raw_bounds_validator"),
-		rawMemoryReportRow("fact:external-slice", "", "external_unknown", "conservative", "unsafe_unknown", "unsafe_unknown", "conservative_fallback", false, "raw_bounds_validator"),
-		rawMemoryReportRow("fact:raw-slice-root", "", "raw_slice_verified_allocation_root", "evidence_only", "unsafe_checked", "unsafe_checked", "dynamic_check_required", true, "raw_bounds_validator"),
-		rawMemoryReportRow("fact:raw-slice-negative", "", "rejected_negative_length", "evidence_only", "unsafe_checked", "unsafe_checked", "unsupported_rejected", false, "raw_bounds_validator"),
-		rawMemoryReportRow("fact:raw-slice-overflow", "", "rejected_length_overflow", "evidence_only", "unsafe_checked", "unsafe_checked", "unsupported_rejected", false, "raw_bounds_validator"),
+		rawMemoryReportRow(
+			"fact:alloc",
+			"",
+			"allocation_base_metadata",
+			"validated",
+			"unsafe_verified_root",
+			"unsafe_verified_root",
+			"zero_cost_proven",
+			false,
+			"raw_bounds_validator",
+		),
+		rawMemoryReportRow(
+			"fact:derived",
+			"",
+			"derived_allocation_offset",
+			"evidence_only",
+			"unsafe_checked",
+			"unsafe_checked",
+			"dynamic_check_required",
+			true,
+			"raw_bounds_validator",
+		),
+		rawMemoryReportRow(
+			"fact:negative",
+			"",
+			"rejected_negative_offset",
+			"evidence_only",
+			"unsafe_checked",
+			"unsafe_checked",
+			"unsupported_rejected",
+			false,
+			"raw_bounds_validator",
+		),
+		rawMemoryReportRow(
+			"fact:upper",
+			"",
+			"rejected_upper_bound",
+			"evidence_only",
+			"unsafe_checked",
+			"unsafe_checked",
+			"unsupported_rejected",
+			false,
+			"raw_bounds_validator",
+		),
+		rawMemoryReportRow(
+			"fact:width-load-i32",
+			"",
+			"rejected_access_width_overflow",
+			"evidence_only",
+			"unsafe_checked",
+			"unsafe_checked",
+			"unsupported_rejected",
+			false,
+			"raw_bounds_validator",
+		),
+		rawMemoryReportRow(
+			"fact:width-store-ptr",
+			"",
+			"rejected_access_width_overflow",
+			"evidence_only",
+			"unsafe_checked",
+			"unsafe_checked",
+			"unsupported_rejected",
+			false,
+			"raw_bounds_validator",
+		),
+		rawMemoryReportRow(
+			"fact:width-store-i32",
+			"",
+			"rejected_access_width_overflow",
+			"evidence_only",
+			"unsafe_checked",
+			"unsafe_checked",
+			"unsupported_rejected",
+			false,
+			"raw_bounds_validator",
+		),
+		rawMemoryReportRow(
+			"fact:width-load-ptr",
+			"",
+			"rejected_access_width_overflow",
+			"evidence_only",
+			"unsafe_checked",
+			"unsafe_checked",
+			"unsupported_rejected",
+			false,
+			"raw_bounds_validator",
+		),
+		rawMemoryReportRow(
+			"fact:unknown",
+			"",
+			"checked_external_unknown",
+			"conservative",
+			"unsafe_unknown",
+			"unsafe_unknown",
+			"conservative_fallback",
+			false,
+			"raw_bounds_validator",
+		),
+		rawMemoryReportRow(
+			"fact:external-slice",
+			"",
+			"external_unknown",
+			"conservative",
+			"unsafe_unknown",
+			"unsafe_unknown",
+			"conservative_fallback",
+			false,
+			"raw_bounds_validator",
+		),
+		rawMemoryReportRow(
+			"fact:raw-slice-root",
+			"",
+			"raw_slice_verified_allocation_root",
+			"evidence_only",
+			"unsafe_checked",
+			"unsafe_checked",
+			"dynamic_check_required",
+			true,
+			"raw_bounds_validator",
+		),
+		rawMemoryReportRow(
+			"fact:raw-slice-negative",
+			"",
+			"rejected_negative_length",
+			"evidence_only",
+			"unsafe_checked",
+			"unsafe_checked",
+			"unsupported_rejected",
+			false,
+			"raw_bounds_validator",
+		),
+		rawMemoryReportRow(
+			"fact:raw-slice-overflow",
+			"",
+			"rejected_length_overflow",
+			"evidence_only",
+			"unsafe_checked",
+			"unsafe_checked",
+			"unsupported_rejected",
+			false,
+			"raw_bounds_validator",
+		),
 	}
 	if includeChecks {
 		for _, parent := range []string{
@@ -393,7 +928,20 @@ func correlatedRawBoundsMemoryReport(includeChecks bool) string {
 			"fact:width-load-ptr",
 			"fact:raw-slice-overflow",
 		} {
-			rows = append(rows, rawMemoryReportRow("fact:check:"+parent, parent, "raw_bounds_runtime_check_normal_build", "validated", "unsafe_checked", "unsafe_checked", "dynamic_check_required", true, "raw_bounds_width_validator"))
+			rows = append(
+				rows,
+				rawMemoryReportRow(
+					"fact:check:"+parent,
+					parent,
+					"raw_bounds_runtime_check_normal_build",
+					"validated",
+					"unsafe_checked",
+					"unsafe_checked",
+					"dynamic_check_required",
+					true,
+					"raw_bounds_width_validator",
+				),
+			)
 		}
 	}
 	return `{
@@ -406,7 +954,17 @@ func correlatedRawBoundsMemoryReport(includeChecks bool) string {
 
 func correlatedRawBoundsMemoryReportWithCapMemProof() string {
 	report := correlatedRawBoundsMemoryReport(true)
-	badRow := rawMemoryReportRow("fact:cap-mem-noalias", "", "no_alias", "validated", "safe_known", "safe", "zero_cost_proven", false, "cap_mem_authorization_validator")
+	badRow := rawMemoryReportRow(
+		"fact:cap-mem-noalias",
+		"",
+		"no_alias",
+		"validated",
+		"safe_known",
+		"safe",
+		"zero_cost_proven",
+		false,
+		"cap_mem_authorization_validator",
+	)
 	return strings.Replace(report, "\n\t\t]\n\t}", ",\n"+badRow+"\n\t\t]\n\t}", 1)
 }
 
@@ -424,7 +982,11 @@ func capMemAuthorizationReportRow(sourceFactID string) string {
 		}`, sourceFactID)
 }
 
-func rawMemoryReportRow(sourceFactID, parentFactID, claim, claimLevel, provenance, unsafeClass, cost string, normalBuildCheck bool, validator string) string {
+func rawMemoryReportRow(
+	sourceFactID, parentFactID, claim, claimLevel, provenance, unsafeClass, cost string,
+	normalBuildCheck bool,
+	validator string,
+) string {
 	parent := ""
 	if parentFactID != "" {
 		parent = fmt.Sprintf(`,

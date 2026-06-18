@@ -1,7 +1,0 @@
-// Experimental stdlib smoke: imports a library module from the repo root.
-module examples.experimental_math_smoke
-
-import lib.experimental.math as math
-
-func main() -> i32:
-    return math.add_i32(40, 2)

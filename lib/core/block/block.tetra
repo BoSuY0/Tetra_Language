@@ -1,0 +1,1292 @@
+// Experimental Surface Block System core data model.
+// Effects: alloc, mem
+// ```tetra doctest
+// func block_doctest() -> Int:
+//     let rect: lib.core.surface.Rect = lib.core.surface.Rect(x: 0, y: 0, w: 100, h: 40)
+//     let id: lib.core.block.BlockID = lib.core.block.id(1)
+//     let props: lib.core.block.BlockProps = lib.core.block.props_default(rect)
+//     let root: lib.core.block.Block = lib.core.block.make(id, lib.core.block.id_none(), props)
+//     return lib.core.block.id_value(root.id)
+// ```
+module lib.core.block
+
+import lib.core.surface as surface
+
+struct BlockID:
+    value: Int
+
+struct AssetRef:
+    kind: Int
+    index: Int
+    width: Int
+    height: Int
+    hash: Int
+
+struct AssetManifest:
+    font_hash: Int
+    icon_hash: Int
+    image_hash: Int
+    font_count: Int
+    icon_count: Int
+    image_count: Int
+    budget_bytes: Int
+    max_entries: Int
+    local_only: Bool
+    remote_count: Int
+
+struct LayoutSpec:
+    mode: Int
+    x: Int
+    y: Int
+    w: Int
+    h: Int
+    min_w: Int
+    min_h: Int
+    max_w: Int
+    max_h: Int
+    flags: Int
+
+struct PaintLayer:
+    kind: Int
+    r: Int
+    g: Int
+    b: Int
+    a: Int
+    radius: Int
+    width: Int
+    blur: Int
+    offset_x: Int
+    offset_y: Int
+
+struct PaintSpec:
+    layer_count: Int
+    layer0_kind: Int
+    layer1_kind: Int
+    layer2_kind: Int
+    layer3_kind: Int
+    checksum: Int
+
+struct TextSpec:
+    text_len: Int
+    r: Int
+    g: Int
+    b: Int
+    a: Int
+    font_size: Int
+    font_weight: Int
+    line_height: Int
+    flags: Int
+    placeholder_len: Int
+
+struct ImageSpec:
+    asset_kind: Int
+    asset_index: Int
+    width: Int
+    height: Int
+    fit: Int
+    opacity: Int
+    tint_r: Int
+    tint_g: Int
+    tint_b: Int
+    tint_a: Int
+
+struct InputSpec:
+    accepts_pointer: Bool
+    accepts_keyboard: Bool
+    accepts_text: Bool
+    focusable: Bool
+    disabled: Bool
+    cursor: Int
+
+struct EventSpec:
+    click_action: Int
+    pointer_action: Int
+    key_action: Int
+    text_action: Int
+    submit_action: Int
+
+struct StateSelector:
+    hovered: Bool
+    pressed: Bool
+    focused: Bool
+    selected: Bool
+    disabled: Bool
+    error: Bool
+    loading: Bool
+
+struct StateSpec:
+    selector_flags: Int
+    variant: Int
+    selected: Bool
+    disabled: Bool
+    error: Bool
+    loading: Bool
+
+struct MotionSpec:
+    duration_ms: Int
+    delay_ms: Int
+    easing: Int
+    reduced: Bool
+    animate_opacity: Bool
+    animate_color: Bool
+    animate_transform: Bool
+    translate_x: Int
+    translate_y: Int
+    scale: Int
+
+struct AccessibilitySpec:
+    role: Int
+    label_len: Int
+    labelled_by: BlockID
+    described_by: BlockID
+    focus_order: Int
+    reading_order: Int
+    actions: Int
+    hidden: Bool
+
+// Compact enough to keep Block returns inside the current 10-slot ABI limit.
+struct BlockProps:
+    layout_mode: Int
+    paint_layers: Int
+    text_len: Int
+    visual_asset: Int
+    interaction_flags: Int
+    state_flags: Int
+    motion_ms: Int
+    accessibility_role: Int
+
+struct Block:
+    id: BlockID
+    parent_id: BlockID
+    props: BlockProps
+
+struct BlockTree:
+    storage: []i32
+    len: Int
+    capacity: Int
+    root_id: Int
+    last_error: Int
+
+struct BlockGraph:
+    tree: BlockTree
+    schema_version: Int
+
+func id(value: Int) -> BlockID:
+    return BlockID(value: value)
+
+func id_none() -> BlockID:
+    return BlockID(value: -1)
+
+func id_value(block_id: BlockID) -> Int:
+    return block_id.value
+
+func asset_kind_none() -> Int:
+    return 0
+
+func asset_kind_font() -> Int:
+    return 1
+
+func asset_kind_image() -> Int:
+    return 2
+
+func asset_kind_icon() -> Int:
+    return 3
+
+func asset_quality_level() -> Int:
+    return 1
+
+func asset_error_ok() -> Int:
+    return 0
+
+func asset_error_unbounded_cache() -> Int:
+    return 1
+
+func asset_error_over_budget() -> Int:
+    return 2
+
+func asset_error_too_many_entries() -> Int:
+    return 3
+
+func asset_error_missing_fallback() -> Int:
+    return 4
+
+func asset_error_network_rejected() -> Int:
+    return 5
+
+func asset_none() -> AssetRef:
+    return AssetRef(kind: asset_kind_none(), index: -1, width: 0, height: 0, hash: 0)
+
+func asset_embedded(kind: Int, index: Int, width: Int, height: Int, hash: Int) -> AssetRef:
+    return AssetRef(kind: kind, index: index, width: width, height: height, hash: hash)
+
+func asset_font(index: Int, hash: Int) -> AssetRef:
+    return asset_embedded(asset_kind_font(), index, 0, 0, hash)
+
+func asset_icon(index: Int, width: Int, height: Int, hash: Int) -> AssetRef:
+    return asset_embedded(asset_kind_icon(), index, width, height, hash)
+
+func asset_image(index: Int, width: Int, height: Int, hash: Int) -> AssetRef:
+    return asset_embedded(asset_kind_image(), index, width, height, hash)
+
+func asset_missing(kind: Int, index: Int) -> AssetRef:
+    return AssetRef(kind: kind, index: index, width: 0, height: 0, hash: -1)
+
+func asset_remote_url(kind: Int, index: Int) -> AssetRef:
+    return AssetRef(kind: kind, index: index, width: 0, height: 0, hash: -2)
+
+func asset_kind(asset: AssetRef) -> Int:
+    return asset.kind
+
+func asset_hash(asset: AssetRef) -> Int:
+    return asset.hash
+
+func asset_width(asset: AssetRef) -> Int:
+    return asset.width
+
+func asset_height(asset: AssetRef) -> Int:
+    return asset.height
+
+func asset_is_embedded(asset: AssetRef) -> Bool:
+    return asset.hash > 0 && asset.index >= 0
+
+func asset_is_local(asset: AssetRef) -> Bool:
+    return asset.hash > 0
+
+func asset_is_remote_url(asset: AssetRef) -> Bool:
+    return asset.hash == -2
+
+func asset_resolve_status(asset: AssetRef) -> Int:
+    if asset.hash == -2:
+        return asset_error_network_rejected()
+    if asset.hash < 0:
+        return asset_error_missing_fallback()
+    return asset_error_ok()
+
+func asset_cache_budget_bytes() -> Int:
+    return 65536
+
+func asset_cache_entry_limit() -> Int:
+    return 16
+
+func asset_cache_validate(budget_bytes: Int, used_bytes: Int, entry_count: Int, repeated_loads: Int) -> Int:
+    if budget_bytes <= 0 || budget_bytes > asset_cache_budget_bytes():
+        return asset_error_unbounded_cache()
+    if used_bytes < 0 || used_bytes > budget_bytes:
+        return asset_error_over_budget()
+    if entry_count < 0 || entry_count > asset_cache_entry_limit():
+        return asset_error_too_many_entries()
+    if repeated_loads < entry_count:
+        return asset_error_unbounded_cache()
+    return asset_error_ok()
+
+func asset_manifest(font: AssetRef, icon: AssetRef, image: AssetRef, budget_bytes: Int, max_entries: Int) -> AssetManifest:
+    var local_only: Bool = true
+    if !asset_is_local(font):
+        local_only = false
+    if !asset_is_local(icon):
+        local_only = false
+    if !asset_is_local(image):
+        local_only = false
+    return AssetManifest(
+        font_hash: font.hash,
+        icon_hash: icon.hash,
+        image_hash: image.hash,
+        font_count: 1,
+        icon_count: 1,
+        image_count: 1,
+        budget_bytes: budget_bytes,
+        max_entries: max_entries,
+        local_only: local_only,
+        remote_count: 0,
+    )
+
+func asset_manifest_hash(manifest: AssetManifest) -> Int:
+    let asset_hashes: Int = manifest.font_hash + manifest.icon_hash + manifest.image_hash
+    let asset_counts: Int = manifest.font_count + manifest.icon_count + manifest.image_count
+    return asset_hashes + asset_counts
+
+func asset_manifest_validate(manifest: AssetManifest) -> Int:
+    if !manifest.local_only || manifest.remote_count != 0:
+        return asset_error_network_rejected()
+    if manifest.font_count <= 0 || manifest.icon_count <= 0 || manifest.image_count <= 0:
+        return asset_error_missing_fallback()
+    if manifest.font_hash <= 0 || manifest.icon_hash <= 0 || manifest.image_hash <= 0:
+        return asset_error_missing_fallback()
+    let entries: Int = manifest.font_count + manifest.icon_count + manifest.image_count
+    return asset_cache_validate(manifest.budget_bytes, entries, entries, entries)
+
+func asset_diagnostic_missing_asset() -> Int:
+    return 1
+
+func asset_diagnostic_network_rejected() -> Int:
+    return 2
+
+func layout_mode_fixed() -> Int:
+    return 1
+
+func layout_mode_stack() -> Int:
+    return 2
+
+func layout_mode_row() -> Int:
+    return 3
+
+func layout_mode_column() -> Int:
+    return 4
+
+func layout_mode_overlay() -> Int:
+    return 5
+
+func layout_mode_absolute() -> Int:
+    return 6
+
+func layout_mode_grid() -> Int:
+    return 7
+
+func layout_mode_dock() -> Int:
+    return 8
+
+func layout_mode_scroll() -> Int:
+    return 9
+
+func layout_size_fixed() -> Int:
+    return 1
+
+func layout_size_fit() -> Int:
+    return 2
+
+func layout_size_fill() -> Int:
+    return 3
+
+func layout_align_start() -> Int:
+    return 1
+
+func layout_align_center() -> Int:
+    return 2
+
+func layout_align_end() -> Int:
+    return 3
+
+func layout_align_stretch() -> Int:
+    return 4
+
+func layout_justify_start() -> Int:
+    return 1
+
+func layout_justify_center() -> Int:
+    return 2
+
+func layout_justify_end() -> Int:
+    return 3
+
+func layout_justify_space_between() -> Int:
+    return 4
+
+func layout_overflow_visible() -> Int:
+    return 1
+
+func layout_overflow_clip() -> Int:
+    return 2
+
+func layout_overflow_scroll() -> Int:
+    return 3
+
+func layout_dock_left() -> Int:
+    return 1
+
+func layout_dock_right() -> Int:
+    return 2
+
+func layout_dock_top() -> Int:
+    return 3
+
+func layout_dock_bottom() -> Int:
+    return 4
+
+func layout_dock_fill() -> Int:
+    return 5
+
+func layout_density_dpi_default() -> Int:
+    return 96
+
+func layout_density_scale_default() -> Int:
+    return 1000
+
+func layout_density_scale_retina() -> Int:
+    return 2000
+
+func layout_error_ok() -> Int:
+    return 0
+
+func layout_error_invalid() -> Int:
+    return 1
+
+func layout_error_bounds() -> Int:
+    return 2
+
+func layout_clamp_small(value: Int, min_value: Int, max_value: Int) -> Int:
+    if value < min_value:
+        return min_value
+    if value > max_value:
+        return max_value
+    return value
+
+func layout_stable_round_div(value: Int, divisor: Int) -> Int:
+    if divisor <= 0:
+        return 0
+    if value <= 0:
+        return 0
+    return (value + divisor / 2) / divisor
+
+func layout_scale_px(value: Int, scale_milli: Int) -> Int:
+    let safe_scale: Int = layout_clamp_small(scale_milli, 250, 4000)
+    return layout_stable_round_div(value * safe_scale, 1000)
+
+func layout_pack_flags(padding: Int, gap: Int, align: Int, justify: Int, overflow: Int, z_index: Int, width_policy: Int, height_policy: Int) -> Int:
+    let safe_padding: Int = layout_clamp_small(padding, 0, 99)
+    let safe_gap: Int = layout_clamp_small(gap, 0, 99)
+    let safe_align: Int = layout_clamp_small(align, layout_align_start(), layout_align_stretch())
+    let justify_start: Int = layout_justify_start()
+    let justify_space: Int = layout_justify_space_between()
+    let safe_justify: Int = layout_clamp_small(justify, justify_start, justify_space)
+    let overflow_visible: Int = layout_overflow_visible()
+    let overflow_scroll: Int = layout_overflow_scroll()
+    let safe_overflow: Int = layout_clamp_small(overflow, overflow_visible, overflow_scroll)
+    let safe_z: Int = layout_clamp_small(z_index, 0, 9)
+    let size_fixed: Int = layout_size_fixed()
+    let size_fill: Int = layout_size_fill()
+    let safe_width_policy: Int = layout_clamp_small(width_policy, size_fixed, size_fill)
+    let safe_height_policy: Int = layout_clamp_small(height_policy, size_fixed, size_fill)
+    var packed: Int = safe_padding + safe_gap * 100
+    packed = packed + safe_align * 10000 + safe_justify * 100000
+    packed = packed + safe_overflow * 1000000 + safe_z * 10000000
+    packed = packed + safe_width_policy * 100000000
+    return packed + safe_height_policy * 400000000
+
+func layout_padding(spec: LayoutSpec) -> Int:
+    return spec.flags % 100
+
+func layout_gap(spec: LayoutSpec) -> Int:
+    return spec.flags / 100 % 100
+
+func layout_align_value(spec: LayoutSpec) -> Int:
+    let value: Int = spec.flags / 10000 % 10
+    if value <= 0:
+        return layout_align_start()
+    return value
+
+func layout_justify_value(spec: LayoutSpec) -> Int:
+    let value: Int = spec.flags / 100000 % 10
+    if value <= 0:
+        return layout_justify_start()
+    return value
+
+func layout_overflow_value(spec: LayoutSpec) -> Int:
+    let value: Int = spec.flags / 1000000 % 10
+    if value <= 0:
+        return layout_overflow_visible()
+    return value
+
+func layout_z_index(spec: LayoutSpec) -> Int:
+    return spec.flags / 10000000 % 10
+
+func layout_width_policy(spec: LayoutSpec) -> Int:
+    let value: Int = spec.flags / 100000000 % 4
+    if value <= 0:
+        return layout_size_fixed()
+    return value
+
+func layout_height_policy(spec: LayoutSpec) -> Int:
+    let value: Int = spec.flags / 400000000 % 4
+    if value <= 0:
+        return layout_size_fixed()
+    return value
+
+func layout_base(mode: Int, rect: surface.Rect) -> LayoutSpec:
+    return LayoutSpec(
+        mode: mode,
+        x: rect.x,
+        y: rect.y,
+        w: rect.w,
+        h: rect.h,
+        min_w: 0,
+        min_h: 0,
+        max_w: rect.w,
+        max_h: rect.h,
+        flags: 0,
+    )
+
+func layout_constrained(mode: Int, rect: surface.Rect, width_policy: Int, height_policy: Int, min_w: Int, min_h: Int, max_w: Int, max_h: Int, padding: Int, gap: Int, align: Int, justify: Int, overflow: Int, z_index: Int) -> LayoutSpec:
+    var safe_max_w: Int = max_w
+    var safe_max_h: Int = max_h
+    if safe_max_w <= 0:
+        safe_max_w = rect.w
+    if safe_max_h <= 0:
+        safe_max_h = rect.h
+    let wp: Int = width_policy
+    let hp: Int = height_policy
+    let flags: Int = layout_pack_flags(padding, gap, align, justify, overflow, z_index, wp, hp)
+    return LayoutSpec(
+        mode: mode,
+        x: rect.x,
+        y: rect.y,
+        w: rect.w,
+        h: rect.h,
+        min_w: min_w,
+        min_h: min_h,
+        max_w: safe_max_w,
+        max_h: safe_max_h,
+        flags: flags,
+    )
+
+func layout_fixed(rect: surface.Rect) -> LayoutSpec:
+    let fixed: Int = layout_size_fixed()
+    let align: Int = layout_align_start()
+    let justify: Int = layout_justify_start()
+    let overflow: Int = layout_overflow_visible()
+    let flags: Int = layout_pack_flags(0, 0, align, justify, overflow, 0, fixed, fixed)
+    return LayoutSpec(
+        mode: layout_mode_fixed(),
+        x: rect.x,
+        y: rect.y,
+        w: rect.w,
+        h: rect.h,
+        min_w: rect.w,
+        min_h: rect.h,
+        max_w: rect.w,
+        max_h: rect.h,
+        flags: flags,
+    )
+
+func layout_stack(rect: surface.Rect, gap: Int) -> LayoutSpec:
+    let fixed: Int = layout_size_fixed()
+    let align: Int = layout_align_start()
+    let justify: Int = layout_justify_start()
+    let overflow: Int = layout_overflow_visible()
+    let flags: Int = layout_pack_flags(0, gap, align, justify, overflow, 0, fixed, fixed)
+    return LayoutSpec(
+        mode: layout_mode_stack(),
+        x: rect.x,
+        y: rect.y,
+        w: rect.w,
+        h: rect.h,
+        min_w: 0,
+        min_h: 0,
+        max_w: rect.w,
+        max_h: rect.h,
+        flags: flags,
+    )
+
+func layout_row(rect: surface.Rect, gap: Int) -> LayoutSpec:
+    let fixed: Int = layout_size_fixed()
+    let align: Int = layout_align_center()
+    let justify: Int = layout_justify_start()
+    let overflow: Int = layout_overflow_visible()
+    let flags: Int = layout_pack_flags(0, gap, align, justify, overflow, 0, fixed, fixed)
+    return LayoutSpec(
+        mode: layout_mode_row(),
+        x: rect.x,
+        y: rect.y,
+        w: rect.w,
+        h: rect.h,
+        min_w: 0,
+        min_h: 0,
+        max_w: rect.w,
+        max_h: rect.h,
+        flags: flags,
+    )
+
+func layout_column(rect: surface.Rect, gap: Int) -> LayoutSpec:
+    let fixed: Int = layout_size_fixed()
+    let align: Int = layout_align_stretch()
+    let justify: Int = layout_justify_start()
+    let overflow: Int = layout_overflow_visible()
+    let flags: Int = layout_pack_flags(0, gap, align, justify, overflow, 0, fixed, fixed)
+    return LayoutSpec(
+        mode: layout_mode_column(),
+        x: rect.x,
+        y: rect.y,
+        w: rect.w,
+        h: rect.h,
+        min_w: 0,
+        min_h: 0,
+        max_w: rect.w,
+        max_h: rect.h,
+        flags: flags,
+    )
+
+func layout_absolute(rect: surface.Rect, z_index: Int) -> LayoutSpec:
+    let fixed: Int = layout_size_fixed()
+    let align: Int = layout_align_start()
+    let justify: Int = layout_justify_start()
+    let overflow: Int = layout_overflow_visible()
+    let flags: Int = layout_pack_flags(0, 0, align, justify, overflow, z_index, fixed, fixed)
+    return LayoutSpec(
+        mode: layout_mode_absolute(),
+        x: rect.x,
+        y: rect.y,
+        w: rect.w,
+        h: rect.h,
+        min_w: rect.w,
+        min_h: rect.h,
+        max_w: rect.w,
+        max_h: rect.h,
+        flags: flags,
+    )
+
+func layout_overlay(rect: surface.Rect, z_index: Int) -> LayoutSpec:
+    let fixed: Int = layout_size_fixed()
+    let align: Int = layout_align_end()
+    let justify: Int = layout_justify_start()
+    let overflow: Int = layout_overflow_visible()
+    let flags: Int = layout_pack_flags(0, 0, align, justify, overflow, z_index, fixed, fixed)
+    return LayoutSpec(
+        mode: layout_mode_overlay(),
+        x: rect.x,
+        y: rect.y,
+        w: rect.w,
+        h: rect.h,
+        min_w: rect.w,
+        min_h: rect.h,
+        max_w: rect.w,
+        max_h: rect.h,
+        flags: flags,
+    )
+
+func layout_grid(rect: surface.Rect, columns: Int, rows: Int, gap: Int) -> LayoutSpec:
+    let safe_columns: Int = layout_clamp_small(columns, 1, 12)
+    let safe_rows: Int = layout_clamp_small(rows, 1, 12)
+    let fill: Int = layout_size_fill()
+    let align: Int = layout_align_stretch()
+    let justify: Int = layout_justify_start()
+    let overflow: Int = layout_overflow_clip()
+    let flags: Int = layout_pack_flags(0, gap, align, justify, overflow, 0, fill, fill)
+    return LayoutSpec(
+        mode: layout_mode_grid(),
+        x: rect.x,
+        y: rect.y,
+        w: rect.w,
+        h: rect.h,
+        min_w: safe_columns,
+        min_h: safe_rows,
+        max_w: rect.w,
+        max_h: rect.h,
+        flags: flags,
+    )
+
+func layout_dock(rect: surface.Rect, edge: Int, size: Int) -> LayoutSpec:
+    let safe_edge: Int = layout_clamp_small(edge, layout_dock_left(), layout_dock_fill())
+    let safe_size: Int = layout_clamp_small(size, 0, 4096)
+    let fixed: Int = layout_size_fixed()
+    let align: Int = layout_align_stretch()
+    let justify: Int = layout_justify_start()
+    let overflow: Int = layout_overflow_clip()
+    let flags: Int = layout_pack_flags(0, 0, align, justify, overflow, 0, fixed, fixed)
+    return LayoutSpec(
+        mode: layout_mode_dock(),
+        x: rect.x,
+        y: rect.y,
+        w: rect.w,
+        h: rect.h,
+        min_w: safe_edge,
+        min_h: safe_size,
+        max_w: rect.w,
+        max_h: rect.h,
+        flags: flags,
+    )
+
+func layout_scroll(rect: surface.Rect, content_w: Int, content_h: Int, offset_y: Int) -> LayoutSpec:
+    let safe_content_w: Int = layout_clamp_small(content_w, rect.w, 16384)
+    let safe_content_h: Int = layout_clamp_small(content_h, rect.h, 16384)
+    let safe_offset_y: Int = layout_clamp_small(offset_y, 0, safe_content_h)
+    let fixed: Int = layout_size_fixed()
+    let align: Int = layout_align_start()
+    let justify: Int = layout_justify_start()
+    let overflow: Int = layout_overflow_scroll()
+    let flags: Int = layout_pack_flags(0, 0, align, justify, overflow, 0, fixed, fixed)
+    return LayoutSpec(
+        mode: layout_mode_scroll(),
+        x: rect.x,
+        y: rect.y,
+        w: rect.w,
+        h: rect.h,
+        min_w: safe_content_w,
+        min_h: safe_content_h,
+        max_w: rect.w,
+        max_h: safe_offset_y,
+        flags: flags,
+    )
+
+func layout_rect(spec: LayoutSpec) -> surface.Rect:
+    return surface.Rect(x: spec.x, y: spec.y, w: spec.w, h: spec.h)
+
+func layout_resize(spec: LayoutSpec, width: Int, height: Int) -> LayoutSpec:
+    var next: LayoutSpec = spec
+    next.w = width
+    next.h = height
+    return next
+
+func layout_resize_density(spec: LayoutSpec, width: Int, height: Int, scale_milli: Int) -> LayoutSpec:
+    let scaled_w: Int = layout_scale_px(width, scale_milli)
+    let scaled_h: Int = layout_scale_px(height, scale_milli)
+    return layout_resize(spec, scaled_w, scaled_h)
+
+func layout_aspect_fit(rect: surface.Rect, aspect_w: Int, aspect_h: Int) -> LayoutSpec:
+    let safe_aspect_w: Int = layout_clamp_small(aspect_w, 1, 1000)
+    let safe_aspect_h: Int = layout_clamp_small(aspect_h, 1, 1000)
+    var out_w: Int = rect.w
+    var out_h: Int = layout_stable_round_div(rect.w * safe_aspect_h, safe_aspect_w)
+    if out_h > rect.h:
+        out_h = rect.h
+        out_w = layout_stable_round_div(rect.h * safe_aspect_w, safe_aspect_h)
+    let out_rect: surface.Rect = surface.Rect(x: rect.x, y: rect.y, w: out_w, h: out_h)
+    let fixed: Int = layout_size_fixed()
+    let align: Int = layout_align_start()
+    let justify: Int = layout_justify_start()
+    let overflow: Int = layout_overflow_clip()
+    let flags: Int = layout_pack_flags(0, 0, align, justify, overflow, 0, fixed, fixed)
+    return LayoutSpec(
+        mode: layout_mode_fixed(),
+        x: out_rect.x,
+        y: out_rect.y,
+        w: out_rect.w,
+        h: out_rect.h,
+        min_w: out_w,
+        min_h: out_h,
+        max_w: out_w,
+        max_h: out_h,
+        flags: flags,
+    )
+
+func layout_clamp_dimension(value: Int, min_value: Int, max_value: Int) -> Int:
+    var out: Int = value
+    if min_value > 0 && out < min_value:
+        out = min_value
+    if max_value > 0 && out > max_value:
+        out = max_value
+    if out < 0:
+        return 0
+    return out
+
+func layout_effective_width(spec: LayoutSpec, measured: surface.Size, available: Int) -> Int:
+    var width: Int = spec.w
+    if layout_width_policy(spec) == layout_size_fit():
+        width = measured.w + layout_padding(spec) * 2
+    if layout_width_policy(spec) == layout_size_fill():
+        width = available
+    if width <= 0:
+        width = measured.w
+    return layout_clamp_dimension(width, spec.min_w, spec.max_w)
+
+func layout_effective_height(spec: LayoutSpec, measured: surface.Size, available: Int) -> Int:
+    var height: Int = spec.h
+    if layout_height_policy(spec) == layout_size_fit():
+        height = measured.h + layout_padding(spec) * 2
+    if layout_height_policy(spec) == layout_size_fill():
+        height = available
+    if height <= 0:
+        height = measured.h
+    return layout_clamp_dimension(height, spec.min_h, spec.max_h)
+
+func layout_grid_columns(spec: LayoutSpec) -> Int:
+    return layout_clamp_small(spec.min_w, 1, 12)
+
+func layout_grid_rows(spec: LayoutSpec) -> Int:
+    return layout_clamp_small(spec.min_h, 1, 12)
+
+func layout_scroll_max_offset(spec: LayoutSpec) -> Int:
+    if spec.mode != layout_mode_scroll():
+        return 0
+    let max_offset: Int = spec.min_h - spec.h
+    if max_offset < 0:
+        return 0
+    return max_offset
+
+func layout_scroll_offset_y(spec: LayoutSpec) -> Int:
+    return layout_clamp_small(spec.max_h, 0, layout_scroll_max_offset(spec))
+
+func layout_validate_constraints(spec: LayoutSpec) -> Int:
+    if spec.mode < layout_mode_fixed() || spec.mode > layout_mode_scroll():
+        return layout_error_invalid()
+    let negative_size: Bool = spec.w < 0 || spec.h < 0
+    let negative_min: Bool = spec.min_w < 0 || spec.min_h < 0
+    let negative_max: Bool = spec.max_w < 0 || spec.max_h < 0
+    if negative_size || negative_min || negative_max:
+        return layout_error_bounds()
+    let flexible_mode: Bool = spec.mode == layout_mode_grid() || spec.mode == layout_mode_dock()
+    let scroll_mode: Bool = spec.mode == layout_mode_scroll()
+    if spec.max_w > 0 && spec.min_w > spec.max_w && !flexible_mode && !scroll_mode:
+        return layout_error_bounds()
+    if spec.max_h > 0 && spec.min_h > spec.max_h && !flexible_mode && !scroll_mode:
+        return layout_error_bounds()
+    return layout_error_ok()
+
+func layout_resolve_child(parent: LayoutSpec, child: LayoutSpec, index: Int, child_count: Int, measured: surface.Size) -> surface.Rect:
+    let parent_padding: Int = layout_padding(parent)
+    let parent_gap: Int = layout_gap(parent)
+    var safe_count: Int = child_count
+    if safe_count < 1:
+        safe_count = 1
+    let gap_total: Int = parent_gap * (safe_count - 1)
+    let raw_available_w: Int = parent.w - parent_padding * 2 - gap_total
+    let raw_available_h: Int = parent.h - parent_padding * 2 - gap_total
+    let available_w: Int = layout_clamp_dimension(raw_available_w, 0, parent.w)
+    let available_h: Int = layout_clamp_dimension(raw_available_h, 0, parent.h)
+    var width: Int = layout_effective_width(child, measured, available_w)
+    var height: Int = layout_effective_height(child, measured, available_h)
+    var x: Int = parent.x + parent_padding + child.x
+    var y: Int = parent.y + parent_padding + child.y
+    if parent.mode == layout_mode_row():
+        if layout_width_policy(child) == layout_size_fill():
+            width = layout_stable_round_div(available_w, safe_count)
+        x = parent.x + parent_padding + index * (width + parent_gap)
+        y = parent.y + parent_padding
+        if layout_align_value(parent) == layout_align_center():
+            y = parent.y + parent_padding + (parent.h - parent_padding * 2 - height) / 2
+    if parent.mode == layout_mode_column() || parent.mode == layout_mode_stack():
+        if layout_width_policy(child) == layout_size_fill():
+            width = parent.w - parent_padding * 2
+        y = parent.y + parent_padding + index * (height + parent_gap)
+        x = parent.x + parent_padding
+        if layout_align_value(parent) == layout_align_center():
+            x = parent.x + parent_padding + (parent.w - parent_padding * 2 - width) / 2
+        if layout_align_value(parent) == layout_align_end():
+            x = parent.x + parent.w - parent_padding - width
+        if layout_align_value(parent) == layout_align_stretch():
+            width = parent.w - parent_padding * 2
+    if child.mode == layout_mode_absolute():
+        x = parent.x + child.x
+        y = parent.y + child.y
+    if child.mode == layout_mode_overlay():
+        x = child.x
+        y = child.y
+    if child.mode == layout_mode_grid():
+        let columns: Int = layout_grid_columns(child)
+        let rows: Int = layout_grid_rows(child)
+        let gap: Int = layout_gap(child)
+        let col: Int = index % columns
+        let row: Int = index / columns
+        width = layout_stable_round_div(child.w - gap * (columns - 1), columns)
+        height = layout_stable_round_div(child.h - gap * (rows - 1), rows)
+        x = child.x + col * (width + gap)
+        y = child.y + row * (height + gap)
+    if child.mode == layout_mode_dock():
+        let edge: Int = child.min_w
+        let size: Int = child.min_h
+        x = child.x
+        y = child.y
+        width = child.w
+        height = child.h
+        if edge == layout_dock_top():
+            height = size
+        if edge == layout_dock_bottom():
+            y = child.y + child.h - size
+            height = size
+        if edge == layout_dock_left():
+            width = size
+        if edge == layout_dock_right():
+            x = child.x + child.w - size
+            width = size
+        if edge == layout_dock_fill():
+            width = child.w
+            height = child.h
+    if child.mode == layout_mode_scroll():
+        x = child.x
+        y = child.y
+        width = child.w
+        height = child.h
+    return surface.Rect(x: x, y: y, w: width, h: height)
+
+func paint_layer_kind_none() -> Int:
+    return 0
+
+func paint_layer_kind_fill() -> Int:
+    return 1
+
+func paint_layer_kind_border() -> Int:
+    return 2
+
+func paint_layer_kind_shadow() -> Int:
+    return 3
+
+func paint_layer_kind_gradient() -> Int:
+    return 4
+
+func paint_layer_kind_overlay() -> Int:
+    return 5
+
+func paint_layer_kind_outline() -> Int:
+    return 6
+
+func paint_layer_kind_blur() -> Int:
+    return 7
+
+func paint_feature_fill() -> Int:
+    return 1
+
+func paint_feature_border() -> Int:
+    return 2
+
+func paint_feature_radius() -> Int:
+    return 4
+
+func paint_feature_shadow() -> Int:
+    return 8
+
+func paint_feature_outline() -> Int:
+    return 16
+
+func paint_feature_gradient() -> Int:
+    return 32
+
+func paint_feature_overlay() -> Int:
+    return 64
+
+func paint_feature_unsupported_blur() -> Int:
+    return 128
+
+func paint_command_none() -> Int:
+    return 0
+
+func paint_command_fill() -> Int:
+    return 1
+
+func paint_command_gradient() -> Int:
+    return 2
+
+func paint_command_border() -> Int:
+    return 3
+
+func paint_command_shadow() -> Int:
+    return 4
+
+func paint_command_overlay() -> Int:
+    return 5
+
+func paint_command_outline() -> Int:
+    return 6
+
+func paint_error_ok() -> Int:
+    return 0
+
+func paint_error_invalid() -> Int:
+    return 1
+
+func paint_error_unsupported_blur() -> Int:
+    return 2
+
+func paint_error_missing_fill() -> Int:
+    return 3
+
+func paint_error_missing_border() -> Int:
+    return 4
+
+func paint_error_missing_radius() -> Int:
+    return 5
+
+func paint_error_missing_shadow() -> Int:
+    return 6
+
+func paint_error_missing_outline() -> Int:
+    return 7
+
+func paint_layer_none() -> PaintLayer:
+    return PaintLayer(
+        kind: paint_layer_kind_none(),
+        r: 0,
+        g: 0,
+        b: 0,
+        a: 0,
+        radius: 0,
+        width: 0,
+        blur: 0,
+        offset_x: 0,
+        offset_y: 0,
+    )
+
+func paint_layer_fill(color: surface.Color) -> PaintLayer:
+    return PaintLayer(
+        kind: paint_layer_kind_fill(),
+        r: color.r,
+        g: color.g,
+        b: color.b,
+        a: color.a,
+        radius: 0,
+        width: 0,
+        blur: 0,
+        offset_x: 0,
+        offset_y: 0,
+    )
+
+func paint_layer_fill_radius(color: surface.Color, radius: Int) -> PaintLayer:
+    return PaintLayer(
+        kind: paint_layer_kind_fill(),
+        r: color.r,
+        g: color.g,
+        b: color.b,
+        a: color.a,
+        radius: radius,
+        width: 0,
+        blur: 0,
+        offset_x: 0,
+        offset_y: 0,
+    )
+
+func paint_layer_border(color: surface.Color, width: Int, radius: Int) -> PaintLayer:
+    return PaintLayer(
+        kind: paint_layer_kind_border(),
+        r: color.r,
+        g: color.g,
+        b: color.b,
+        a: color.a,
+        radius: radius,
+        width: width,
+        blur: 0,
+        offset_x: 0,
+        offset_y: 0,
+    )
+
+func paint_layer_shadow(color: surface.Color, blur: Int, offset_x: Int, offset_y: Int) -> PaintLayer:
+    return PaintLayer(
+        kind: paint_layer_kind_shadow(),
+        r: color.r,
+        g: color.g,
+        b: color.b,
+        a: color.a,
+        radius: 0,
+        width: 0,
+        blur: blur,
+        offset_x: offset_x,
+        offset_y: offset_y,
+    )
+
+func paint_layer_linear_gradient(start: surface.Color, end: surface.Color, radius: Int) -> PaintLayer:
+    return PaintLayer(
+        kind: paint_layer_kind_gradient(),
+        r: start.r,
+        g: start.g,
+        b: start.b,
+        a: start.a,
+        radius: radius,
+        width: end.r,
+        blur: end.g,
+        offset_x: end.b,
+        offset_y: end.a,
+    )
+
+func paint_layer_overlay(color: surface.Color, opacity: Int, radius: Int) -> PaintLayer:
+    return PaintLayer(
+        kind: paint_layer_kind_overlay(),
+        r: color.r,
+        g: color.g,
+        b: color.b,
+        a: color.a,
+        radius: radius,
+        width: opacity,
+        blur: 0,
+        offset_x: 0,
+        offset_y: 0,
+    )
+
+func paint_layer_outline(color: surface.Color, width: Int, radius: Int) -> PaintLayer:
+    return PaintLayer(
+        kind: paint_layer_kind_outline(),
+        r: color.r,
+        g: color.g,
+        b: color.b,
+        a: color.a,
+        radius: radius,
+        width: width,
+        blur: 0,
+        offset_x: 0,
+        offset_y: 0,
+    )
+
+func paint_layer_blur(radius: Int) -> PaintLayer:
+    return PaintLayer(
+        kind: paint_layer_kind_blur(),
+        r: 0,
+        g: 0,
+        b: 0,
+        a: 0,
+        radius: radius,
+        width: 0,
+        blur: radius,
+        offset_x: 0,
+        offset_y: 0,
+    )
+
+func paint_has_feature(flags: Int, feature: Int) -> Bool:
+    if feature <= 0:
+        return false
+    return flags / feature % 2 == 1
+
+func paint_add_feature(flags: Int, feature: Int) -> Int:
+    if paint_has_feature(flags, feature):
+        return flags
+    return flags + feature
+
+func paint_max(a: Int, b: Int) -> Int:
+    if a > b:
+        return a
+    return b
+
+func paint_layer_checksum(layer: PaintLayer) -> Int:
+    let base: Int = layer.kind * 31 + layer.r * 29 + layer.g * 23
+    let color: Int = layer.b * 19 + layer.a * 17
+    let shape: Int = layer.radius * 13 + layer.width * 11 + layer.blur * 7
+    let offset: Int = layer.offset_x * 5 + layer.offset_y * 3
+    return base + color + shape + offset
+
+func paint_layer_features(layer: PaintLayer) -> Int:
+    var flags: Int = 0
+    if layer.kind == paint_layer_kind_fill():
+        flags = paint_add_feature(flags, paint_feature_fill())
+    if layer.kind == paint_layer_kind_border():
+        flags = paint_add_feature(flags, paint_feature_border())
+    if layer.kind == paint_layer_kind_shadow():
+        flags = paint_add_feature(flags, paint_feature_shadow())
+    if layer.kind == paint_layer_kind_gradient():
+        flags = paint_add_feature(flags, paint_feature_fill())
+        flags = paint_add_feature(flags, paint_feature_gradient())
+    if layer.kind == paint_layer_kind_overlay():
+        flags = paint_add_feature(flags, paint_feature_overlay())
+    if layer.kind == paint_layer_kind_outline():
+        flags = paint_add_feature(flags, paint_feature_outline())
+    if layer.kind == paint_layer_kind_blur():
+        flags = paint_add_feature(flags, paint_feature_unsupported_blur())
+    if layer.radius > 0:
+        flags = paint_add_feature(flags, paint_feature_radius())
+    return flags
+
+func paint_merge_features(flags: Int, next: Int) -> Int:
+    var merged: Int = flags
+    if paint_has_feature(next, paint_feature_fill()):
+        merged = paint_add_feature(merged, paint_feature_fill())
+    if paint_has_feature(next, paint_feature_border()):
+        merged = paint_add_feature(merged, paint_feature_border())
+    if paint_has_feature(next, paint_feature_radius()):
+        merged = paint_add_feature(merged, paint_feature_radius())
+    if paint_has_feature(next, paint_feature_shadow()):
+        merged = paint_add_feature(merged, paint_feature_shadow())
+    if paint_has_feature(next, paint_feature_outline()):
+        merged = paint_add_feature(merged, paint_feature_outline())
+    if paint_has_feature(next, paint_feature_gradient()):
+        merged = paint_add_feature(merged, paint_feature_gradient())
+    if paint_has_feature(next, paint_feature_overlay()):
+        merged = paint_add_feature(merged, paint_feature_overlay())
+    if paint_has_feature(next, paint_feature_unsupported_blur()):
+        merged = paint_add_feature(merged, paint_feature_unsupported_blur())
+    return merged
+
+func paint_make(layer_count: Int, layer0: PaintLayer, layer1: PaintLayer, layer2: PaintLayer, layer3: PaintLayer, layer4: PaintLayer) -> PaintSpec:
+    var flags: Int = 0
+    flags = paint_merge_features(flags, paint_layer_features(layer0))
+    flags = paint_merge_features(flags, paint_layer_features(layer1))
+    flags = paint_merge_features(flags, paint_layer_features(layer2))
+    flags = paint_merge_features(flags, paint_layer_features(layer3))
+    flags = paint_merge_features(flags, paint_layer_features(layer4))
+    let checksum: Int = flags + paint_layer_checksum(layer0) * 0
+    return PaintSpec(
+        layer_count: layer_count,
+        layer0_kind: layer0.kind,
+        layer1_kind: layer1.kind,
+        layer2_kind: layer2.kind,
+        layer3_kind: layer3.kind,
+        checksum: checksum,
+    )
+
+func paint_empty() -> PaintSpec:
+    return PaintSpec(
+        layer_count: 0,
+        layer0_kind: paint_layer_kind_none(),
+        layer1_kind: paint_layer_kind_none(),
+        layer2_kind: paint_layer_kind_none(),
+        layer3_kind: paint_layer_kind_none(),
+        checksum: 0,
+    )
+
+func paint_from_layer(layer: PaintLayer) -> PaintSpec:
+    let empty_layer: PaintLayer = paint_layer_none()
+    return paint_make(1, layer, empty_layer, empty_layer, empty_layer, empty_layer)
+
+func paint_stack2(layer0: PaintLayer, layer1: PaintLayer) -> PaintSpec:
+    return paint_make(2, layer0, layer1, paint_layer_none(), paint_layer_none(), paint_layer_none())
+
+func paint_stack3(layer0: PaintLayer, layer1: PaintLayer, layer2: PaintLayer) -> PaintSpec:
+    return paint_make(3, layer0, layer1, layer2, paint_layer_none(), paint_layer_none())
+
+func paint_stack4(layer0: PaintLayer, layer1: PaintLayer, layer2: PaintLayer, layer3: PaintLayer) -> PaintSpec:
+    return paint_make(4, layer0, layer1, layer2, layer3, paint_layer_none())
+
+func paint_stack5(layer0: PaintLayer, layer1: PaintLayer, layer2: PaintLayer, layer3: PaintLayer, layer4: PaintLayer) -> PaintSpec:
+    return paint_make(5, layer0, layer1, layer2, layer3, layer4)
+
+func paint_feature_flags(paint: PaintSpec) -> Int:
+    return paint.checksum
+
+func paint_command_count(paint: PaintSpec) -> Int:
+    var count: Int = 0
+    if paint_has_feature(paint.checksum, paint_feature_fill()):
+        count = count + 1
+    if paint_has_feature(paint.checksum, paint_feature_gradient()):
+        count = count + 1
+    if paint_has_feature(paint.checksum, paint_feature_border()):
+        count = count + 1
+    if paint_has_feature(paint.checksum, paint_feature_shadow()):
+        count = count + 1
+    if paint_has_feature(paint.checksum, paint_feature_overlay()):
+        count = count + 1
+    if paint_has_feature(paint.checksum, paint_feature_outline()):
+        count = count + 1
+    return count
+
+func paint_resolve_command(paint: PaintSpec, index: Int) -> Int:
+    if index < 0:
+        return paint_command_none()
+    var slot: Int = 0
+    if paint_has_feature(paint.checksum, paint_feature_fill()):
+        if index == slot:
+            return paint_command_fill()
+        slot = slot + 1
+    if paint_has_feature(paint.checksum, paint_feature_gradient()):
+        if index == slot:
+            return paint_command_gradient()
+        slot = slot + 1
+    if paint_has_feature(paint.checksum, paint_feature_border()):
+        if index == slot:
+            return paint_command_border()
+        slot = slot + 1
+    if paint_has_feature(paint.checksum, paint_feature_shadow()):
+        if index == slot:
+            return paint_command_shadow()
+        slot = slot + 1
+    if paint_has_feature(paint.checksum, paint_feature_overlay()):
+        if index == slot:
+            return paint_command_overlay()
+        slot = slot + 1
+    if paint_has_feature(paint.checksum, paint_feature_outline()):
+        if index == slot:
+            return paint_command_outline()
+    return paint_command_none()
+
+func paint_validate(paint: PaintSpec) -> Int:
+    if paint.layer_count < 0 || paint.layer_count > 5:
+        return paint_error_invalid()
+    if paint_has_feature(paint.checksum, paint_feature_unsupported_blur()):
+        return paint_error_unsupported_blur()
+    return paint_error_ok()
+func paint_validate_visual_grammar(paint: PaintSpec) -> Int:
+    let base: Int = paint_validate(paint)
+    if base != paint_error_ok():
+        return base
+    if !paint_has_feature(paint.checksum, paint_feature_fill()):
+        return paint_error_missing_fill()
+    if !paint_has_feature(paint.checksum, paint_feature_border()):
+        return paint_error_missing_border()
+    if !paint_has_feature(paint.checksum, paint_feature_radius()):
+        return paint_error_missing_radius()
+    if !paint_has_feature(paint.checksum, paint_feature_shadow()):
+        return paint_error_missing_shadow()
+    if !paint_has_feature(paint.checksum, paint_feature_outline()):
+        return paint_error_missing_outline()
+    return paint_error_ok()

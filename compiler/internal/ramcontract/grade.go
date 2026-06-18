@@ -30,6 +30,7 @@ func MaxGrade(a, b MemoryGrade) MemoryGrade {
 
 func SummarizeRows(rows []Row) Summary {
 	summary := Summary{ArtifactGrade: GradeM0}
+	domains := map[string]MemoryDomainSummary{}
 	for _, row := range rows {
 		summary.RowCount++
 		summary.ArtifactGrade = MaxGrade(summary.ArtifactGrade, row.ContractGrade)
@@ -39,14 +40,57 @@ func SummarizeRows(rows []Row) Summary {
 		if isCopyIntent(row.Intent) {
 			summary.CopyRows++
 		}
-		if row.Placement == PlacementHeapUnbounded || row.ContractGrade == GradeM5 || row.ContractGrade == GradeM6 {
+		if row.Placement == PlacementHeapUnbounded || row.ContractGrade == GradeM5 ||
+			row.ContractGrade == GradeM6 {
 			summary.UnboundedRows++
 		}
 		if row.RequestedBytes > 0 {
 			summary.BudgetBytes += row.RequestedBytes
 		}
+		if row.Domain != nil {
+			key := memoryDomainSummaryKey(*row.Domain)
+			domain := domains[key]
+			if domain.DomainID == "" {
+				domain.DomainID = row.Domain.DomainID
+				domain.ParentDomainID = row.Domain.ParentDomainID
+				domain.Kind = row.Domain.Kind
+				domain.OwnerKind = row.Domain.OwnerKind
+				domain.OwnerID = row.Domain.OwnerID
+				domain.Lifetime = row.Domain.Lifetime
+			}
+			domain.RowCount++
+			domain.BudgetBytes += row.Domain.BudgetBytes
+			domain.RequestedBytes += row.Domain.RequestedBytes
+			domain.ReservedBytes += row.Domain.ReservedBytes
+			domain.CommittedBytes += row.Domain.CommittedBytes
+			domain.ReleasedBytes += row.Domain.ReleasedBytes
+			domain.CurrentBytes += row.Domain.CurrentBytes
+			if row.Domain.PeakBytes > domain.PeakBytes {
+				domain.PeakBytes = row.Domain.PeakBytes
+			}
+			domain.CopyCount += row.Domain.CopyCount
+			domain.BytesCopied += row.Domain.BytesCopied
+			domains[key] = domain
+		}
+	}
+	if len(domains) > 0 {
+		keys := make([]string, 0, len(domains))
+		for key := range domains {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		summary.Domains = make([]MemoryDomainSummary, 0, len(keys))
+		for _, key := range keys {
+			summary.Domains = append(summary.Domains, domains[key])
+		}
 	}
 	return summary
+}
+
+func memoryDomainSummaryKey(domain MemoryDomain) string {
+	return string(
+		domain.Kind,
+	) + "\x00" + domain.DomainID + "\x00" + domain.ParentDomainID + "\x00" + domain.OwnerKind + "\x00" + domain.OwnerID + "\x00" + domain.Lifetime
 }
 
 func SummarizeFunctions(rows []Row) []FunctionRow {
@@ -101,8 +145,14 @@ func BuildGradeReport(report Report) GradeReport {
 
 func isCopyIntent(intent Intent) bool {
 	switch intent {
-	case IntentCopy, IntentCopyEliminated, IntentCopyStackBacked, IntentCopyHeapBounded, IntentCopyHeapUnbounded,
-		IntentCopyRequiredBoundary, IntentCopyRequiredMutableAlias, IntentCopyIntoNoAllocation:
+	case IntentCopy,
+		IntentCopyEliminated,
+		IntentCopyStackBacked,
+		IntentCopyHeapBounded,
+		IntentCopyHeapUnbounded,
+		IntentCopyRequiredBoundary,
+		IntentCopyRequiredMutableAlias,
+		IntentCopyIntoNoAllocation:
 		return true
 	default:
 		return false

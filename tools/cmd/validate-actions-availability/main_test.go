@@ -122,7 +122,15 @@ func TestValidateActionsAvailabilityRejectsZeroJobStartupFailure(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected startup_failure availability report to fail")
 	}
-	for _, want := range []string{"status", "success", "jobs", "logs_available", "billing_actions_status", "BuildFailed", "check_suite"} {
+	for _, want := range []string{
+		"status",
+		"success",
+		"jobs",
+		"logs_available",
+		"billing_actions_status",
+		"BuildFailed",
+		"check_suite",
+	} {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("availability error missing %q: %v", want, err)
 		}
@@ -184,7 +192,13 @@ func TestValidateActionsAvailabilityRejectsStaleWorkflowRun(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected stale workflow run to fail")
 	}
-	for _, want := range []string{"run_selection", "workflow_name_stale", "run.head_sha", "run.check_suite.head_sha", "expected_git_head"} {
+	for _, want := range []string{
+		"run_selection",
+		"workflow_name_stale",
+		"run.head_sha",
+		"run.check_suite.head_sha",
+		"expected_git_head",
+	} {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("availability error missing %q: %v", want, err)
 		}

@@ -12,7 +12,7 @@ release_artifact="tetra.release.v0_3_0.gate-report.v1"
 release_gate_command="bash scripts/release/v0_3_0/gate.sh"
 
 usage() {
-  cat <<'USAGE'
+  cat << 'USAGE'
 Usage: bash scripts/release/v0_3_0/gate.sh [--report-dir DIR] [--require-clean]
 
 Notes:
@@ -45,7 +45,7 @@ while [[ $# -gt 0 ]]; do
       require_clean=1
       shift
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;
@@ -62,7 +62,7 @@ if [[ -z "$report_dir" ]]; then
 fi
 
 check_report_dir_fresh() {
-  if [[ ( -e "$report_dir" || -L "$report_dir" ) && ! -d "$report_dir" ]]; then
+  if [[ (-e "$report_dir" || -L "$report_dir") && ! -d "$report_dir" ]]; then
     echo "release_v0_3_0_gate: refusing to use non-directory report path: $report_dir" >&2
     echo "release_v0_3_0_gate: choose a fresh --report-dir directory" >&2
     exit 2
@@ -94,7 +94,8 @@ check_tag_ready_clean_worktree() {
   fi
   if [[ -n "$status" ]]; then
     echo "release_v0_3_0_gate: blocked: tag-ready clean worktree required (--require-clean)" >&2
-    echo "release_v0_3_0_gate: git status --porcelain --untracked-files=all reported dirty state:" >&2
+    echo "release_v0_3_0_gate: git status --porcelain --untracked-files=all" \
+      "reported dirty state:" >&2
     printf '%s\n' "$status" >&2
     return 1
   fi
@@ -115,8 +116,8 @@ staged_security_review_signoff=""
 ci_missing_security_signoff=0
 
 mkdir -p "$logs_dir" "$artifacts_dir"
-: >"$tmp_dir/steps.md"
-: >"$tmp_dir/steps.jsonl"
+: > "$tmp_dir/steps.md"
+: > "$tmp_dir/steps.jsonl"
 
 started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 step_count=0
@@ -132,7 +133,7 @@ json_escape() {
 
 sha256_file() {
   local path="$1"
-  if command -v sha256sum >/dev/null 2>&1; then
+  if command -v sha256sum > /dev/null 2>&1; then
     sha256sum "$path" | awk '{print "sha256:" $1}'
     return
   fi
@@ -151,14 +152,26 @@ record_step() {
   local log_rel="$5"
   local command="$6"
 
-  printf -- '- `%s`: `%s` in %ss, exit `%s`, command `%s` ([%s](%s))\n' "$name" "$status" "$seconds" "$exit_code" "$command" "$log_rel" "$log_rel" >>"$tmp_dir/steps.md"
-  printf '{"name":"%s","status":"%s","duration_seconds":%s,"exit_code":%s,"command":"%s","log":"%s"}\n' \
+  printf -- \
+    '- `%s`: `%s` in %ss, exit `%s`, command `%s` ([%s](%s))\n' \
+    "$name" \
+    "$status" \
+    "$seconds" \
+    "$exit_code" \
+    "$command" \
+    "$log_rel" \
+    "$log_rel" >> "$tmp_dir/steps.md"
+
+  local step_json_format
+  step_json_format='{"name":"%s","status":"%s","duration_seconds":%s,'
+  step_json_format+='"exit_code":%s,"command":"%s","log":"%s"}\n'
+  printf "$step_json_format" \
     "$(json_escape "$name")" \
     "$(json_escape "$status")" \
     "$seconds" \
     "$exit_code" \
     "$(json_escape "$command")" \
-    "$(json_escape "$log_rel")" >>"$tmp_dir/steps.jsonl"
+    "$(json_escape "$log_rel")" >> "$tmp_dir/steps.jsonl"
 }
 
 run_step() {
@@ -183,7 +196,7 @@ run_step() {
   printf '== [%s] %s ==\n' "$id" "$name"
   start_s="$(date +%s)"
 
-  if "$@" >"$log_path" 2>&1; then
+  if "$@" > "$log_path" 2>&1; then
     end_s="$(date +%s)"
     record_step "$name" "pass" "$((end_s - start_s))" 0 "$log_rel" "$command"
     printf '   pass (%ss)\n' "$((end_s - start_s))"
@@ -220,7 +233,7 @@ record_failed_step() {
     printf 'command: %s\n' "$command"
     printf 'exit_code: %s\n' "$exit_code"
     printf 'reason: %s\n' "$message"
-  } >"$log_path"
+  } > "$log_path"
 
   record_step "$name" "fail" 0 "$exit_code" "$log_rel" "$command"
   failed_count=$((failed_count + 1))
@@ -247,7 +260,7 @@ write_summary() {
     echo "## Steps"
     echo
     cat "$tmp_dir/steps.md"
-  } >"$summary_md"
+  } > "$summary_md"
 
   {
     echo "{"
@@ -261,19 +274,33 @@ write_summary() {
     printf '  "failed_count": %s,\n' "$failed_count"
     printf '  "report_dir": "%s",\n' "$(json_escape "$report_dir")"
     echo '  "steps": ['
-    awk 'NR > 1 { printf ",\n" } { printf "    %s", $0 } END { if (NR > 0) printf "\n" }' "$tmp_dir/steps.jsonl"
+    awk '
+      NR > 1 {
+        printf ",\n"
+      }
+      {
+        printf "    %s", $0
+      }
+      END {
+        if (NR > 0) {
+          printf "\n"
+        }
+      }
+    ' "$tmp_dir/steps.jsonl"
     echo '  ]'
     echo "}"
-  } >"$summary_json"
+  } > "$summary_json"
 }
 
 validate_summary() {
-  go run ./tools/cmd/validate-release-gate-summary --summary "$summary_json" --report-dir "$report_dir"
+  go run ./tools/cmd/validate-release-gate-summary \
+    --summary "$summary_json" \
+    --report-dir "$report_dir"
 }
 
 check_release_version() {
   local version
-  version="$(./tetra version 2>/dev/null || true)"
+  version="$(./tetra version 2> /dev/null || true)"
   if [[ "$version" != "$release_version" ]]; then
     echo "expected ./tetra version to be $release_version, got '${version:-<missing>}'" >&2
     return 1
@@ -283,10 +310,11 @@ check_release_version() {
 check_short_alias_version() {
   local version
   local short_version
-  version="$(./tetra version 2>/dev/null || true)"
-  short_version="$(./t version 2>/dev/null || true)"
+  version="$(./tetra version 2> /dev/null || true)"
+  short_version="$(./t version 2> /dev/null || true)"
   if [[ "$short_version" != "$version" ]]; then
-    echo "expected ./t version to match ./tetra version ($version), got '${short_version:-<missing>}'" >&2
+    echo "expected ./t version to match ./tetra version ($version)," \
+      "got '${short_version:-<missing>}'" >&2
     return 1
   fi
 }
@@ -302,22 +330,31 @@ check_go_test_packages() {
 }
 
 check_release_state() {
-  go run ./tools/cmd/validate-release-state --expected-version "$release_version" --format=json --report-dir "$report_dir" >"$artifacts_dir/release-state.json"
-  go run ./tools/cmd/validate-release-state --expected-version "$release_version" --format=text --report-dir "$report_dir" >"$artifacts_dir/release-state.txt"
+  go run ./tools/cmd/validate-release-state \
+    --expected-version "$release_version" \
+    --format=json \
+    --report-dir "$report_dir" > "$artifacts_dir/release-state.json"
+  go run ./tools/cmd/validate-release-state \
+    --expected-version "$release_version" \
+    --format=text \
+    --report-dir "$report_dir" > "$artifacts_dir/release-state.txt"
 }
 
 check_artifact_hash_manifest() {
-  go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"
+  go run ./tools/cmd/validate-artifact-hashes \
+    --write \
+    --root "$report_dir" \
+    --out "$report_dir/artifact-hashes.json"
   canonicalize_artifact_hash_manifest "$report_dir/artifact-hashes.json"
   go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-hashes.json"
 }
 
 resolve_python() {
-  if command -v python3 >/dev/null 2>&1; then
+  if command -v python3 > /dev/null 2>&1; then
     command -v python3
     return 0
   fi
-  if command -v python >/dev/null 2>&1; then
+  if command -v python > /dev/null 2>&1; then
     command -v python
     return 0
   fi
@@ -336,7 +373,7 @@ canonicalize_artifact_hash_manifest() {
     return 1
   fi
 
-  "$python_bin" - "$manifest_path" <<'PY'
+  "$python_bin" - "$manifest_path" << 'PY'
 import json
 import os
 import sys
@@ -399,7 +436,8 @@ check_unstable_seed_triage() {
       data_row++
       n = split($0, cells, /\|/)
       if (n != 8) {
-        printf "release_v0_3_0_gate: unstable-seeds.md triage data row %d malformed table row\n", data_row > "/dev/stderr"
+        printf "release_v0_3_0_gate: unstable-seeds.md triage " \
+          "data row %d malformed table row\n", data_row > "/dev/stderr"
         failed = 1
         next
       }
@@ -414,26 +452,34 @@ check_unstable_seed_triage() {
         seed_label = package_name "/" fuzz_target
       }
       if (status == "") {
-        printf "release_v0_3_0_gate: unstable-seeds.md triage data row %d missing status for seed %s\n", data_row, seed_label > "/dev/stderr"
+        printf "release_v0_3_0_gate: unstable-seeds.md triage " \
+          "data row %d missing status for seed %s\n", data_row, seed_label \
+          > "/dev/stderr"
         failed = 1
       }
       if (owner == "") {
-        printf "release_v0_3_0_gate: unstable-seeds.md triage data row %d missing owner for seed %s\n", data_row, seed_label > "/dev/stderr"
+        printf "release_v0_3_0_gate: unstable-seeds.md triage " \
+          "data row %d missing owner for seed %s\n", data_row, seed_label \
+          > "/dev/stderr"
         failed = 1
       }
       if (next_command == "") {
-        printf "release_v0_3_0_gate: unstable-seeds.md triage data row %d missing next command for seed %s\n", data_row, seed_label > "/dev/stderr"
+        printf "release_v0_3_0_gate: unstable-seeds.md triage " \
+          "data row %d missing next command for seed %s\n", data_row, seed_label \
+          > "/dev/stderr"
         failed = 1
       }
       next
     }
     END {
       if (!header_seen) {
-        print "release_v0_3_0_gate: unstable-seeds.md triage blocked: missing triage table header" > "/dev/stderr"
+        print "release_v0_3_0_gate: unstable-seeds.md triage blocked: " \
+          "missing triage table header" > "/dev/stderr"
         failed = 1
       }
       if (!separator_seen) {
-        print "release_v0_3_0_gate: unstable-seeds.md triage blocked: missing triage table separator" > "/dev/stderr"
+        print "release_v0_3_0_gate: unstable-seeds.md triage blocked: " \
+          "missing triage table separator" > "/dev/stderr"
         failed = 1
       }
       exit failed
@@ -450,7 +496,7 @@ check_residual_risks() {
     fi
     cp -- "$source_path" "$residual_risks_json" || return
   else
-    cat >"$residual_risks_json" <<EOF
+    cat > "$residual_risks_json" << EOF
 {
   "schema": "tetra.release.residual-risks.v1",
   "release_version": "$release_version",
@@ -466,7 +512,7 @@ EOF
   fi
 
   local validator_go="$tmp_dir/validate_residual_risks.go"
-  cat >"$validator_go" <<'GO'
+  cat > "$validator_go" << 'GO'
 package main
 
 import (
@@ -477,6 +523,8 @@ import (
 	"os"
 	"strings"
 )
+
+const residualRiskPrefix = "release_v0_3_0_gate: residual-risks.json "
 
 func main() {
 	if len(os.Args) != 3 {
@@ -501,26 +549,46 @@ func main() {
 		os.Exit(1)
 	}
 	if root == nil {
-		fmt.Fprintln(os.Stderr, "release_v0_3_0_gate: residual-risks.json invalid JSON structure: top-level object required")
+		fmt.Fprintln(
+			os.Stderr,
+			residualRiskPrefix+"invalid JSON structure: top-level object required",
+		)
 		os.Exit(1)
 	}
 
 	var schema string
 	if rawSchema, ok := root["schema"]; !ok {
-		fmt.Fprintln(os.Stderr, "release_v0_3_0_gate: residual-risks.json missing schema tetra.release.residual-risks.v1")
+		fmt.Fprintln(
+			os.Stderr,
+			residualRiskPrefix+"missing schema tetra.release.residual-risks.v1",
+		)
 		os.Exit(1)
-	} else if err := json.Unmarshal(rawSchema, &schema); err != nil || schema != "tetra.release.residual-risks.v1" {
-		fmt.Fprintln(os.Stderr, "release_v0_3_0_gate: residual-risks.json missing schema tetra.release.residual-risks.v1")
+	} else if err := json.Unmarshal(rawSchema, &schema); err != nil ||
+		schema != "tetra.release.residual-risks.v1" {
+		fmt.Fprintln(
+			os.Stderr,
+			residualRiskPrefix+"missing schema tetra.release.residual-risks.v1",
+		)
 		os.Exit(1)
 	}
 
 	expectedReleaseVersion := os.Args[2]
 	var releaseVersion string
 	if rawReleaseVersion, ok := root["release_version"]; !ok {
-		fmt.Fprintf(os.Stderr, "release_v0_3_0_gate: residual-risks.json missing release_version %s\n", expectedReleaseVersion)
+		fmt.Fprintf(
+			os.Stderr,
+			residualRiskPrefix+"missing release_version %s\n",
+			expectedReleaseVersion,
+		)
 		os.Exit(1)
-	} else if err := json.Unmarshal(rawReleaseVersion, &releaseVersion); err != nil || releaseVersion != expectedReleaseVersion {
-		fmt.Fprintf(os.Stderr, "release_v0_3_0_gate: residual-risks.json release_version must be %s, got %q\n", expectedReleaseVersion, releaseVersion)
+	} else if err := json.Unmarshal(rawReleaseVersion, &releaseVersion); err != nil ||
+		releaseVersion != expectedReleaseVersion {
+		fmt.Fprintf(
+			os.Stderr,
+			residualRiskPrefix+"release_version must be %s, got %q\n",
+			expectedReleaseVersion,
+			releaseVersion,
+		)
 		os.Exit(1)
 	}
 
@@ -530,12 +598,18 @@ func main() {
 		os.Exit(1)
 	}
 	if trimmedRisks := bytes.TrimSpace(rawRisks); len(trimmedRisks) == 0 || trimmedRisks[0] != '[' {
-		fmt.Fprintln(os.Stderr, "release_v0_3_0_gate: residual-risks.json invalid JSON structure: risks array required")
+		fmt.Fprintln(
+			os.Stderr,
+			residualRiskPrefix+"invalid JSON structure: risks array required",
+		)
 		os.Exit(1)
 	}
 	var risks []json.RawMessage
 	if err := json.Unmarshal(rawRisks, &risks); err != nil {
-		fmt.Fprintln(os.Stderr, "release_v0_3_0_gate: residual-risks.json invalid JSON structure: risks array required")
+		fmt.Fprintln(
+			os.Stderr,
+			residualRiskPrefix+"invalid JSON structure: risks array required",
+		)
 		os.Exit(1)
 	}
 
@@ -543,7 +617,11 @@ func main() {
 	for idx, rawRisk := range risks {
 		var risk map[string]json.RawMessage
 		if err := json.Unmarshal(rawRisk, &risk); err != nil || risk == nil {
-			fmt.Fprintf(os.Stderr, "release_v0_3_0_gate: residual-risks.json malformed risk object at index %d\n", idx)
+			fmt.Fprintf(
+				os.Stderr,
+				residualRiskPrefix+"malformed risk object at index %d\n",
+				idx,
+			)
 			failed = true
 			continue
 		}
@@ -555,7 +633,12 @@ func main() {
 
 		for _, field := range []string{"id", "severity", "owner", "status"} {
 			if _, ok := risk[field]; !ok {
-				fmt.Fprintf(os.Stderr, "release_v0_3_0_gate: residual-risks.json risk %s missing required field %s\n", id, field)
+				fmt.Fprintf(
+					os.Stderr,
+					residualRiskPrefix+"risk %s missing required field %s\n",
+					id,
+					field,
+				)
 				failed = true
 				continue
 			}
@@ -576,15 +659,32 @@ func main() {
 			continue
 		}
 		if !knownSeverity(severity) {
-			fmt.Fprintf(os.Stderr, "release_v0_3_0_gate: residual-risks.json risk %s has unknown severity %s\n", id, severity)
+			fmt.Fprintf(
+				os.Stderr,
+				residualRiskPrefix+"risk %s has unknown severity %s\n",
+				id,
+				severity,
+			)
 			failed = true
 			continue
 		}
 
 		owner := optionalString(risk, "owner")
 		status := optionalString(risk, "status")
-		if (severity == "high" || severity == "medium" || severity == "critical") && (missingOrUnknown(owner) || missingOrUnknown(status)) {
-			fmt.Fprintf(os.Stderr, "release_v0_3_0_gate: residual-risks.json %s residual risk %s requires known status and owner (owner=%s, status=%s)\n", severity, id, owner, status)
+		requiresKnownOwner := severity == "high" ||
+			severity == "medium" ||
+			severity == "critical"
+		if requiresKnownOwner && (missingOrUnknown(owner) || missingOrUnknown(status)) {
+			fmt.Fprintf(
+				os.Stderr,
+				residualRiskPrefix+
+					"%s residual risk %s requires known status and owner "+
+					"(owner=%s, status=%s)\n",
+				severity,
+				id,
+				owner,
+				status,
+			)
 			failed = true
 		}
 	}
@@ -613,7 +713,12 @@ func requiredString(risk map[string]json.RawMessage, field, id string) (string, 
 	}
 	var out string
 	if err := json.Unmarshal(value, &out); err != nil {
-		fmt.Fprintf(os.Stderr, "release_v0_3_0_gate: residual-risks.json risk %s field %s must be a string\n", id, field)
+		fmt.Fprintf(
+			os.Stderr,
+			residualRiskPrefix+"risk %s field %s must be a string\n",
+			id,
+			field,
+		)
 		return "", false
 	}
 	return out, true
@@ -647,15 +752,19 @@ validate_runtime_smoke_report_source() {
 
   if [[ -z "$source_path" ]]; then
     echo "release_v0_3_0_gate: missing runtime execution evidence for $target" >&2
-    echo "release_v0_3_0_gate: set TETRA_MACOS_RUNTIME_SMOKE_REPORT and TETRA_WINDOWS_RUNTIME_SMOKE_REPORT to host-gated --run=true smoke reports" >&2
+    echo "release_v0_3_0_gate: set TETRA_MACOS_RUNTIME_SMOKE_REPORT and" \
+      "TETRA_WINDOWS_RUNTIME_SMOKE_REPORT to host-gated --run=true smoke reports" >&2
     return 1
   fi
   if [[ ! -f "$source_path" ]]; then
-    echo "release_v0_3_0_gate: runtime execution evidence for $target does not exist: $source_path" >&2
+    echo "release_v0_3_0_gate: runtime execution evidence for $target does not exist:" \
+      "$source_path" >&2
     return 1
   fi
 
-  go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$source_path" || return
+  go run ./tools/cmd/smoke-report-to-checklist \
+    --validate-only \
+    --report "$source_path" || return
   validate_runtime_smoke_report "$source_path" "$target" "$release_version" "$expected_git_head"
 }
 
@@ -669,7 +778,7 @@ validate_runtime_smoke_report() {
   if ! python_bin="$(resolve_python)"; then
     return 1
   fi
-  "$python_bin" - "$report_path" "$expected_target" "$expected_version" "$expected_git_head" <<'PY'
+  "$python_bin" - "$report_path" "$expected_target" "$expected_version" "$expected_git_head" << 'PY'
 import json
 import re
 import sys
@@ -690,7 +799,11 @@ timestamp = report.get("timestamp")
 try:
     if not isinstance(timestamp, str):
         raise ValueError("timestamp must be a string")
-    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})", timestamp):
+    timestamp_pattern = (
+        r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}"
+        r"(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})"
+    )
+    if not re.fullmatch(timestamp_pattern, timestamp):
         raise ValueError("timestamp must use RFC3339 separators and timezone")
     parsed_timestamp = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
     if parsed_timestamp.tzinfo is None:
@@ -735,7 +848,10 @@ if not isinstance(passed, int) or isinstance(passed, bool):
 if not isinstance(failed, int) or isinstance(failed, bool):
     fail("failed must be an integer")
 if total != len(cases) or passed != len(cases) or failed != 0:
-    fail(f"counts got total={total!r} passed={passed!r} failed={failed!r}, want total=passed={len(cases)} failed=0")
+    fail(
+        f"counts got total={total!r} passed={passed!r} failed={failed!r}, "
+        f"want total=passed={len(cases)} failed=0"
+    )
 required_cases = [
     "actors_pingpong",
     "actor_sleep_pingpong",
@@ -768,12 +884,17 @@ for case in cases:
         fail(f"case {name} did not run")
     if "actual_exit" not in case:
         fail(f"case {name} is missing actual_exit")
-    if not isinstance(case.get("expected_exit"), int) or isinstance(case.get("expected_exit"), bool):
+    expected_exit = case.get("expected_exit")
+    actual_exit = case.get("actual_exit")
+    if not isinstance(expected_exit, int) or isinstance(expected_exit, bool):
         fail(f"case {name} expected_exit must be an integer")
-    if not isinstance(case.get("actual_exit"), int) or isinstance(case.get("actual_exit"), bool):
+    if not isinstance(actual_exit, int) or isinstance(actual_exit, bool):
         fail(f"case {name} actual_exit must be an integer")
-    if case.get("actual_exit") != case.get("expected_exit"):
-        fail(f"case {name} actual_exit={case.get('actual_exit')!r}, want expected_exit={case.get('expected_exit')!r}")
+    if actual_exit != expected_exit:
+        fail(
+            f"case {name} actual_exit={actual_exit!r}, "
+            f"want expected_exit={expected_exit!r}"
+        )
     if str(case.get("error", "")).strip():
         fail(f"case {name} has error text")
 for required in required_cases:
@@ -784,20 +905,33 @@ PY
 
 check_runtime_execution_evidence() {
   local current_git_head
-  if ! current_git_head="$(git rev-parse --short HEAD 2>/dev/null)"; then
-    echo "release_v0_3_0_gate: unable to determine current Git head for runtime execution evidence" >&2
+  if ! current_git_head="$(git rev-parse --short HEAD 2> /dev/null)"; then
+    echo "release_v0_3_0_gate: unable to determine current Git head for" \
+      "runtime execution evidence" >&2
     return 1
   fi
-  validate_runtime_smoke_report_source "macos-x64" "${TETRA_MACOS_RUNTIME_SMOKE_REPORT:-}" "$current_git_head" || return
-  validate_runtime_smoke_report_source "windows-x64" "${TETRA_WINDOWS_RUNTIME_SMOKE_REPORT:-}" "$current_git_head" || return
+  validate_runtime_smoke_report_source \
+    "macos-x64" \
+    "${TETRA_MACOS_RUNTIME_SMOKE_REPORT:-}" \
+    "$current_git_head" || return
+  validate_runtime_smoke_report_source \
+    "windows-x64" \
+    "${TETRA_WINDOWS_RUNTIME_SMOKE_REPORT:-}" \
+    "$current_git_head" || return
   local runtime_tmp_dir="$tmp_dir/runtime-smoke-artifacts"
   local macos_tmp="$runtime_tmp_dir/macos-runtime-smoke.json"
   local windows_tmp="$runtime_tmp_dir/windows-runtime-smoke.json"
+  local runtime_artifacts=(
+    "$macos_tmp"
+    "$windows_tmp"
+    "$artifacts_dir/macos-runtime-smoke.json"
+    "$artifacts_dir/windows-runtime-smoke.json"
+  )
   mkdir -p "$runtime_tmp_dir"
-  rm -f "$macos_tmp" "$windows_tmp" "$artifacts_dir/macos-runtime-smoke.json" "$artifacts_dir/windows-runtime-smoke.json"
+  rm -f "${runtime_artifacts[@]}"
   cp -- "${TETRA_MACOS_RUNTIME_SMOKE_REPORT:-}" "$macos_tmp" || return
   cp -- "${TETRA_WINDOWS_RUNTIME_SMOKE_REPORT:-}" "$windows_tmp" || {
-    rm -f "$macos_tmp" "$windows_tmp" "$artifacts_dir/macos-runtime-smoke.json" "$artifacts_dir/windows-runtime-smoke.json"
+    rm -f "${runtime_artifacts[@]}"
     return 1
   }
   mv "$macos_tmp" "$artifacts_dir/macos-runtime-smoke.json" || return
@@ -810,8 +944,9 @@ check_runtime_execution_evidence() {
 check_security_review_signoff() {
   local signoff_path="${TETRA_SECURITY_REVIEW_SIGNOFF:-}"
   if [[ -z "$signoff_path" ]]; then
-    if [[ "$require_clean" -eq 0 && "${TETRA_RELEASE_GATE_CI_ALLOW_MISSING_SECURITY_SIGNOFF:-}" == "1" ]]; then
-      cat >"$artifacts_dir/security-review.md" <<EOF
+    if [[ "$require_clean" -eq 0 \
+      && "${TETRA_RELEASE_GATE_CI_ALLOW_MISSING_SECURITY_SIGNOFF:-}" == "1" ]]; then
+      cat > "$artifacts_dir/security-review.md" << EOF
 # $release_version Security Review CI Placeholder
 
 Decision: blocked: missing human security signoff
@@ -824,15 +959,19 @@ This artifact records the CI release-gate contract:
 - TETRA_RELEASE_GATE_CI_ALLOW_MISSING_SECURITY_SIGNOFF=1
 - TETRA_SECURITY_REVIEW_SIGNOFF was not set
 - This is not a full release evidence pass.
-- CI release-gate runs may collect evidence without hard-blocking on the missing human security signoff.
+- CI release-gate runs may collect evidence without hard-blocking on the
+  missing human security signoff.
 - Tag-ready release promotion must provide TETRA_SECURITY_REVIEW_SIGNOFF=<security-review.md>.
 EOF
       ci_missing_security_signoff=1
-      echo "release_v0_3_0_gate: CI mode recorded missing security signoff; release evidence remains incomplete"
+      echo "release_v0_3_0_gate: CI mode recorded missing security signoff;" \
+        "release evidence remains incomplete"
       return 0
     fi
     echo "release_v0_3_0_gate: missing TETRA_SECURITY_REVIEW_SIGNOFF=<security-review.md>" >&2
-    echo "release_v0_3_0_gate: create a signoff with: bash scripts/release/v0_3_0/security-review.sh --write-template <security-review.md>" >&2
+    echo "release_v0_3_0_gate: create a signoff with:" \
+      "bash scripts/release/v0_3_0/security-review.sh" \
+      "--write-template <security-review.md>" >&2
     return 1
   fi
   if [[ ! -f "$signoff_path" ]]; then
@@ -870,12 +1009,14 @@ write_final_security_review_signoff() {
   local canonical_signoff_report_dir
   local canonical_report_dir
   if ! canonical_signoff_report_dir="$(canonical_dir "$signoff_report_dir")"; then
-    echo "release_v0_3_0_gate: security signoff Report directory does not exist: $signoff_report_dir" >&2
+    echo "release_v0_3_0_gate: security signoff Report directory does not exist:" \
+      "$signoff_report_dir" >&2
     return 1
   fi
   canonical_report_dir="$(canonical_dir "$report_dir")"
   if [[ "$canonical_signoff_report_dir" != "$canonical_report_dir" ]]; then
-    echo "release_v0_3_0_gate: security signoff Report directory mismatch: got '$signoff_report_dir', want '$report_dir'" >&2
+    echo "release_v0_3_0_gate: security signoff Report directory mismatch:" \
+      "got '$signoff_report_dir', want '$report_dir'" >&2
     return 1
   fi
 
@@ -904,7 +1045,9 @@ write_final_security_review_signoff() {
         print ""
         print "## Archived Artifacts"
         print ""
-        print "- artifacts/security-review.md is generated by scripts/release/v0_3_0/gate.sh from TETRA_SECURITY_REVIEW_SIGNOFF after same-run canonical artifacts exist."
+        print "- artifacts/security-review.md is generated by " \
+          "scripts/release/v0_3_0/gate.sh from " \
+          "TETRA_SECURITY_REVIEW_SIGNOFF after same-run canonical artifacts exist."
         in_hashes = 1
         inserted = 1
         next
@@ -923,7 +1066,7 @@ write_final_security_review_signoff() {
           exit 3
         }
       }
-    ' "$staged_security_review_signoff" >"$final_tmp"; then
+    ' "$staged_security_review_signoff" > "$final_tmp"; then
     echo "release_v0_3_0_gate: security signoff missing ## Artifact Hashes section" >&2
     return 1
   fi
@@ -944,16 +1087,18 @@ write_security_review_detached_hash() {
     echo "release_v0_3_0_gate: cannot hash final security review: $review_path" >&2
     return 1
   fi
-  printf '%s  artifacts/security-review.md\n' "$review_hash" >"$detached_hash_path"
+  printf '%s  artifacts/security-review.md\n' "$review_hash" > "$detached_hash_path"
 }
 
 echo "release_v0_3_0_gate: bootstrapping local binaries before version preflight" >&2
 bash scripts/dev/bootstrap.sh >&2
 
-version="$(./tetra version 2>/dev/null || true)"
+version="$(./tetra version 2> /dev/null || true)"
 if [[ "$version" != "$release_version" ]]; then
-  echo "release_v0_3_0_gate: blocked: expected ./tetra version to be $release_version, got '${version:-<missing>}'" >&2
-  echo "release_v0_3_0_gate: keep the repository on the current release line until v0.3.0 evidence is complete." >&2
+  echo "release_v0_3_0_gate: blocked: expected ./tetra version to be" \
+    "$release_version, got '${version:-<missing>}'" >&2
+  echo "release_v0_3_0_gate: keep the repository on the current release line" \
+    "until v0.3.0 evidence is complete." >&2
   write_summary "blocked"
   validate_summary
   exit 1
@@ -963,12 +1108,22 @@ echo "release_v0_3_0_gate: artifact mapping $release_artifact" >&2
 run_step "version preflight ($release_version required)" check_release_version
 run_step "short alias version parity" check_short_alias_version
 run_step "go test packages" check_go_test_packages
-run_step "stabilization wrapper" env TETRA_TEST_ALL_RELEASE_VERSION="$release_version" bash scripts/ci/test-all.sh --stabilization --keep-going --report-dir "$artifacts_dir/test-all"
-run_step "short fuzz smoke" bash scripts/dev/fuzz-nightly.sh --short --out-dir "$artifacts_dir/fuzz-short"
+run_step "stabilization wrapper" \
+  env TETRA_TEST_ALL_RELEASE_VERSION="$release_version" \
+  bash scripts/ci/test-all.sh \
+  --stabilization \
+  --keep-going \
+  --report-dir "$artifacts_dir/test-all"
+run_step "short fuzz smoke" \
+  bash scripts/dev/fuzz-nightly.sh \
+  --short \
+  --out-dir "$artifacts_dir/fuzz-short"
 run_step "fuzz artifact validation" check_short_fuzz_summary
 run_step "unstable seed triage" check_unstable_seed_triage
 run_step "docs verification" go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
-run_step "manifest validation" go run ./tools/cmd/validate-manifest --manifest docs/generated/manifest.json
+run_step "manifest validation" \
+  go run ./tools/cmd/validate-manifest \
+  --manifest docs/generated/manifest.json
 run_step "security review signoff" check_security_review_signoff
 run_step "residual risk validation" check_residual_risks
 run_step "macOS and Windows runtime execution evidence" check_runtime_execution_evidence
@@ -984,11 +1139,16 @@ if [[ "$failed_count" -eq 0 && "$ci_missing_security_signoff" -eq 1 ]]; then
     :
   else
     rc="$?"
-    record_failed_step "CI missing-signoff detached security review hash" "write_security_review_detached_hash" "$rc" "CI missing-security-signoff detached security review hash generation failed"
+    record_failed_step \
+      "CI missing-signoff detached security review hash" \
+      "write_security_review_detached_hash" \
+      "$rc" \
+      "CI missing-security-signoff detached security review hash generation failed"
     write_summary "blocked"
     validate_summary
     check_release_state || true
-    echo "release_v0_3_0_gate: blocked: CI missing-security-signoff detached security review hash generation failed" >&2
+    echo "release_v0_3_0_gate: blocked: CI missing-security-signoff detached" \
+      "security review hash generation failed" >&2
     echo "summary: $summary_md" >&2
     echo "json: $summary_json" >&2
     exit 1
@@ -1008,7 +1168,11 @@ if [[ "$failed_count" -eq 0 && "$ci_missing_security_signoff" -eq 1 ]]; then
     :
   else
     rc="$?"
-    record_failed_step "CI missing-signoff release-state artifact refresh" "check_release_state" "$rc" "CI missing-security-signoff release-state artifact generation failed"
+    record_failed_step \
+      "CI missing-signoff release-state artifact refresh" \
+      "check_release_state" \
+      "$rc" \
+      "CI missing-security-signoff release-state artifact generation failed"
     write_summary "blocked"
     validate_summary
     echo "release_v0_3_0_gate: blocked: release-state artifact generation failed" >&2
@@ -1020,16 +1184,22 @@ if [[ "$failed_count" -eq 0 && "$ci_missing_security_signoff" -eq 1 ]]; then
     :
   else
     rc="$?"
-    record_failed_step "CI missing-signoff artifact hash refresh" "check_artifact_hash_manifest" "$rc" "CI missing-security-signoff artifact hash refresh failed"
+    record_failed_step \
+      "CI missing-signoff artifact hash refresh" \
+      "check_artifact_hash_manifest" \
+      "$rc" \
+      "CI missing-security-signoff artifact hash refresh failed"
     write_summary "blocked"
     validate_summary
     check_release_state || true
-    echo "release_v0_3_0_gate: blocked: CI missing-security-signoff artifact hash refresh failed" >&2
+    echo "release_v0_3_0_gate: blocked: CI missing-security-signoff" \
+      "artifact hash refresh failed" >&2
     echo "summary: $summary_md" >&2
     echo "json: $summary_json" >&2
     exit 1
   fi
-  echo "release_v0_3_0_gate: CI missing security signoff recorded; not a full release evidence pass"
+  echo "release_v0_3_0_gate: CI missing security signoff recorded;" \
+    "not a full release evidence pass"
   echo "summary: $summary_md"
   echo "json: $summary_json"
   exit 0
@@ -1053,7 +1223,11 @@ if check_release_state; then
   :
 else
   rc="$?"
-  record_failed_step "final release-state artifact refresh" "check_release_state" "$rc" "final release-state artifact generation failed"
+  record_failed_step \
+    "final release-state artifact refresh" \
+    "check_release_state" \
+    "$rc" \
+    "final release-state artifact generation failed"
   write_summary "blocked"
   validate_summary
   echo "release_v0_3_0_gate: blocked: final release-state artifact generation failed" >&2
@@ -1065,7 +1239,11 @@ if check_artifact_hash_manifest; then
   :
 else
   rc="$?"
-  record_failed_step "final artifact hash manifest refresh" "check_artifact_hash_manifest" "$rc" "final release artifact hash validation failed"
+  record_failed_step \
+    "final artifact hash manifest refresh" \
+    "check_artifact_hash_manifest" \
+    "$rc" \
+    "final release artifact hash validation failed"
   write_summary "blocked"
   validate_summary
   check_release_state || true
@@ -1078,7 +1256,11 @@ if write_final_security_review_signoff; then
   :
 else
   rc="$?"
-  record_failed_step "final security signoff validation" "write_final_security_review_signoff" "$rc" "final security signoff validation failed"
+  record_failed_step \
+    "final security signoff validation" \
+    "write_final_security_review_signoff" \
+    "$rc" \
+    "final security signoff validation failed"
   write_summary "blocked"
   validate_summary
   check_release_state || true
@@ -1091,7 +1273,11 @@ if write_security_review_detached_hash; then
   :
 else
   rc="$?"
-  record_failed_step "detached security review hash generation" "write_security_review_detached_hash" "$rc" "detached security review hash generation failed"
+  record_failed_step \
+    "detached security review hash generation" \
+    "write_security_review_detached_hash" \
+    "$rc" \
+    "detached security review hash generation failed"
   write_summary "blocked"
   validate_summary
   check_release_state || true
@@ -1104,7 +1290,11 @@ if check_artifact_hash_manifest; then
   :
 else
   rc="$?"
-  record_failed_step "final artifact hash manifest validation" "check_artifact_hash_manifest" "$rc" "final release artifact hash validation failed"
+  record_failed_step \
+    "final artifact hash manifest validation" \
+    "check_artifact_hash_manifest" \
+    "$rc" \
+    "final release artifact hash validation failed"
   write_summary "blocked"
   validate_summary
   check_release_state || true

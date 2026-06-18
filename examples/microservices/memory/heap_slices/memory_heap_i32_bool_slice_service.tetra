@@ -1,0 +1,18 @@
+// Heap i32/bool slice memory microservice smoke.
+//
+// The service combines heap-backed integer and boolean slices and verifies
+// indexed read-after-write across both element kinds.
+module examples.microservices.memory.heap_slices.memory_heap_i32_bool_slice_service
+func main() -> Int
+uses alloc, mem:
+    var nums: []i32 = core.make_i32(3)
+    var flags: []bool = core.make_bool(3)
+    nums[0] = 10
+    nums[1] = 11
+    nums[2] = nums[0] + nums[1] + 21
+    flags[0] = true
+    flags[1] = nums[2] == 42
+    flags[2] = flags[0] && flags[1]
+    if flags[2]:
+        return 0
+    return nums[2]

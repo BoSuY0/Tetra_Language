@@ -48,45 +48,56 @@ func MinimumSpec() Spec {
 		},
 		Rules: []Rule{
 			{
-				Name:         "values-have-stable-observable-result",
-				Concepts:     []Concept{ConceptValues},
-				Statement:    "A supported stable i32 value has one observable result across source, Stack IR, optimized Stack IR, SSA, Machine IR, and native execution evidence lanes.",
+				Name:     "values-have-stable-observable-result",
+				Concepts: []Concept{ConceptValues},
+				Statement: ("A supported stable i32 value has one observable result across " +
+					"source, Stack IR, optimized Stack IR, SSA, Machine IR, and native " +
+					"execution evidence lanes."),
 				MachineCheck: "compiler/internal/differential.CheckBackendMatrix",
 			},
 			{
-				Name:         "proof-before-check-elimination",
-				Concepts:     []Concept{ConceptBoundsProof, ConceptCheckEliminationValidity},
-				Statement:    "An unchecked lowered index load is valid only when it keeps a proof id whose guard dominates the use.",
+				Name:     "proof-before-check-elimination",
+				Concepts: []Concept{ConceptBoundsProof, ConceptCheckEliminationValidity},
+				Statement: ("An unchecked lowered index load is valid only when it keeps a " +
+					"proof id whose guard dominates the use."),
 				MachineCheck: "compiler/internal/validation.CheckBoundsProofsWithPLIR",
 			},
 			{
-				Name:         "allocation-intent-preserves-provenance",
-				Concepts:     []Concept{ConceptAllocationIntent, ConceptProvenance, ConceptRegions},
-				Statement:    "A storage plan may change representation only when the allocation intent, provenance, and validation evidence still match the lowered IR.",
+				Name:     "allocation-intent-preserves-provenance",
+				Concepts: []Concept{ConceptAllocationIntent, ConceptProvenance, ConceptRegions},
+				Statement: ("A storage plan may change representation only when the " +
+					"allocation intent, provenance, and validation evidence still match the " +
+					"lowered IR."),
 				MachineCheck: "compiler/internal/validation.ValidateAllocationLowering",
 			},
 			{
-				Name:         "regions-remain-explicit-on-memory-values",
-				Concepts:     []Concept{ConceptRegions, ConceptProvenance, ConceptBorrowCopy},
-				Statement:    "Region-bearing memory values must keep explicit region identities through provenance-preserving views and borrows.",
+				Name:     "regions-remain-explicit-on-memory-values",
+				Concepts: []Concept{ConceptRegions, ConceptProvenance, ConceptBorrowCopy},
+				Statement: ("Region-bearing memory values must keep explicit region " +
+					"identities through provenance-preserving views and borrows."),
 				MachineCheck: "compiler/internal/plir.VerifyProgram",
 			},
 			{
-				Name:         "allocation-length-contract-before-storage",
-				Concepts:     []Concept{ConceptAllocationIntent, ConceptAllocationLengthContract},
-				Statement:    "Allocation length contracts classify valid empty, normal, negative, overflow, and invalid lengths before any storage claim is trusted.",
+				Name:     "allocation-length-contract-before-storage",
+				Concepts: []Concept{ConceptAllocationIntent, ConceptAllocationLengthContract},
+				Statement: ("Allocation length contracts classify valid empty, normal, " +
+					"negative, overflow, and invalid lengths before any storage claim is " +
+					"trusted."),
 				MachineCheck: "compiler/internal/allocplan.VerifyPlan",
 			},
 			{
-				Name:         "raw-pointer-bounds-stay-metadata-bound",
-				Concepts:     []Concept{ConceptRawPointerBoundsMetadata, ConceptProvenance},
-				Statement:    "Raw pointer arithmetic may keep allocation-base metadata, derive checked offsets, reject impossible offsets, or remain checked external/unknown without forging provenance.",
+				Name:     "raw-pointer-bounds-stay-metadata-bound",
+				Concepts: []Concept{ConceptRawPointerBoundsMetadata, ConceptProvenance},
+				Statement: ("Raw pointer arithmetic may keep allocation-base metadata, " +
+					"derive checked offsets, reject impossible offsets, or remain checked " +
+					"external/unknown without forging provenance."),
 				MachineCheck: "compiler/internal/runtimeabi.RawPointerBoundsMetadata",
 			},
 			{
-				Name:         "borrow-copy-does-not-forge-ownership",
-				Concepts:     []Concept{ConceptBorrowCopy, ConceptProvenance, ConceptRegions},
-				Statement:    "Borrowed views preserve source provenance, while copy creates owned provenance and cannot erase required escape checks.",
+				Name:     "borrow-copy-does-not-forge-ownership",
+				Concepts: []Concept{ConceptBorrowCopy, ConceptProvenance, ConceptRegions},
+				Statement: ("Borrowed views preserve source provenance, while copy creates " +
+					"owned provenance and cannot erase required escape checks."),
 				MachineCheck: "compiler/internal/plir.VerifyProgram",
 			},
 		},
@@ -104,7 +115,10 @@ func (s Spec) Covers(concept Concept) bool {
 
 func ValidateSpec(spec Spec) error {
 	if spec.SchemaVersion != "tetra.formal_core.v1" {
-		return fmt.Errorf("formal core: schema_version is %q, want tetra.formal_core.v1", spec.SchemaVersion)
+		return fmt.Errorf(
+			"formal core: schema_version is %q, want tetra.formal_core.v1",
+			spec.SchemaVersion,
+		)
 	}
 	for _, concept := range []Concept{
 		ConceptValues,
@@ -143,7 +157,11 @@ func ValidateSpec(spec Spec) error {
 		}
 		for _, concept := range rule.Concepts {
 			if !known[concept] {
-				return fmt.Errorf("formal core: rule %q references unknown concept %s", rule.Name, concept)
+				return fmt.Errorf(
+					"formal core: rule %q references unknown concept %s",
+					rule.Name,
+					concept,
+				)
 			}
 		}
 	}

@@ -1,0 +1,17 @@
+module examples.core.memory.core_memory_negative_length_smoke
+
+import lib.core.memory as memory
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let mem: cap.mem = core.cap_mem()
+        let src: ptr = core.alloc_bytes(4)
+        let dst: ptr = core.alloc_bytes(4)
+        let memset_status: Int = memory.memset_u8(dst, 0, 0 - 1, mem)
+        let memcpy_status: Int = memory.memcpy_u8(dst, src, 0 - 1, mem)
+        if memset_status == 2:
+            if memcpy_status == 2:
+                return 2
+        return 1
+    return 1

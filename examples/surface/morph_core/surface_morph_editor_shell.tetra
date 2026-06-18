@@ -1,0 +1,47 @@
+// Editor shell authored through Morph recipes that expand to Block.
+module examples.surface.morph_core.surface_morph_editor_shell
+
+import lib.core.surface as surface
+import lib.core.block as block
+import lib.core.morph as morph
+
+struct MorphEditorShellApp:
+    expanded_recipe_count: Int
+    block_count: Int
+    a11y_projection: Bool
+
+func root_block(rect: surface.Rect) -> block.Block:
+    let paint: block.PaintSpec = block.paint_stack2(block.paint_layer_fill_radius(morph.theme_dark(), 0), block.paint_layer_overlay(morph.accent(), 34, 0))
+    let props: block.BlockProps = block.props(block.layout_overlay(rect, 0), paint, block.text_none(), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_region(12), block.asset_none())
+    return block.make(block.id(1), block.id_none(), props)
+
+func main() -> Int
+uses alloc, mem:
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 400, h: 260)
+    let panel_rect: surface.Rect = surface.Rect(x: 20, y: 20, w: 360, h: 220)
+    let label_rect: surface.Rect = surface.Rect(x: 32, y: 24, w: 120, h: 18)
+    let field_rect: surface.Rect = surface.Rect(x: 28, y: 32, w: 344, h: 42)
+    let nav_rect: surface.Rect = surface.Rect(x: 28, y: 88, w: 344, h: 44)
+    let tab_rect: surface.Rect = surface.Rect(x: 28, y: 138, w: 344, h: 44)
+    let command_rect: surface.Rect = surface.Rect(x: 28, y: 188, w: 344, h: 28)
+    let nav_recipe: morph.Recipe = morph.recipe_nav_item()
+    let tab_recipe: morph.Recipe = morph.recipe_tab_item()
+    let command_recipe: morph.Recipe = morph.recipe_command_item()
+    let panel_recipe: morph.Recipe = morph.recipe_region_panel()
+    var tree: block.BlockTree = block.tree_init(8)
+    let root: Int = block.tree_add_root(tree, root_block(root_rect), root_rect)
+    let panel: Int = block.tree_add_child(tree, block.id(1), morph.expand_region_panel(2, 1, panel_rect, 12), panel_rect)
+    let label: Int = block.tree_add_child(tree, block.id(2), morph.expand_label(3, 2, 4, label_rect, 6), label_rect)
+    let field: Int = block.tree_add_child(tree, block.id(2), morph.expand_field_text(4, 2, 3, field_rect, 18, 8), field_rect)
+    let nav: Int = block.tree_add_child(tree, block.id(2), morph.expand_control_action(5, 2, nav_rect, 11, 601, true), nav_rect)
+    let tab: Int = block.tree_add_child(tree, block.id(2), morph.expand_control_action(6, 2, tab_rect, 10, 602, false), tab_rect)
+    let command: Int = block.tree_add_child(tree, block.id(2), morph.expand_control_action(7, 2, command_rect, 14, 603, false), command_rect)
+    let nav_expansion: morph.RecipeExpansion = morph.recipe_expansion(nav_recipe, block.id(5))
+    let tab_expansion: morph.RecipeExpansion = morph.recipe_expansion(tab_recipe, block.id(6))
+    let command_expansion: morph.RecipeExpansion = morph.recipe_expansion(command_recipe, block.id(7))
+    let panel_expansion: morph.RecipeExpansion = morph.recipe_expansion(panel_recipe, block.id(2))
+    let app: MorphEditorShellApp = MorphEditorShellApp(expanded_recipe_count: 4, block_count: block.tree_len(tree), a11y_projection: morph.accessibility_projection_ok(3, 4, 6))
+    let valid: Int = block.tree_validate(tree)
+    if root == 1 && panel == 2 && label == 3 && field == 4 && nav == 5 && tab == 6 && command == 7 && valid == block.tree_error_ok() && app.expanded_recipe_count == 4 && app.block_count == 7 && app.a11y_projection && morph.capsule_self_check() && morph.expansion_valid(nav_expansion) && morph.expansion_valid(tab_expansion) && morph.expansion_valid(command_expansion) && morph.expansion_valid(panel_expansion):
+        return 0
+    return 1

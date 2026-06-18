@@ -4,9 +4,7 @@ Shared compiler test helpers live here once they are extracted from package-leve
 tests. Keep this package behavior-free: helpers may build fixtures, run compiler
 pipelines, and assert diagnostics, but must not encode scenario ownership.
 
-Initial migration targets:
+Available helper families:
 
-- `buildAndRun` and `buildAndRunFiles` style helpers
 - temporary module/fixture writers
 - reusable diagnostic assertion helpers
-

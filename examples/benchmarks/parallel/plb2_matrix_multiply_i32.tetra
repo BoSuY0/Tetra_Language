@@ -1,0 +1,34 @@
+// PLB2 matmul-inspired 3x3 Int matrix multiply.
+module examples.benchmarks.parallel.plb2_matrix_multiply_i32
+
+func main() -> Int
+uses alloc, mem:
+    var a: []i32 = core.make_i32(9)
+    var b: []i32 = core.make_i32(9)
+    var c: []i32 = core.make_i32(9)
+    var i: Int = 0
+    while i < 9:
+        a[i] = i + 1
+        b[i] = 9 - i
+        c[i] = 0
+        i = i + 1
+    var row: Int = 0
+    while row < 3:
+        var col: Int = 0
+        while col < 3:
+            var k: Int = 0
+            var total: Int = 0
+            while k < 3:
+                total = total + a[row * 3 + k] * b[k * 3 + col]
+                k = k + 1
+            c[row * 3 + col] = total
+            col = col + 1
+        row = row + 1
+    var checksum: Int = 0
+    i = 0
+    while i < 9:
+        checksum = checksum + c[i]
+        i = i + 1
+    if checksum == 621:
+        return 0
+    return checksum

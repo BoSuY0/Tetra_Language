@@ -1,6 +1,7 @@
 # Using RAM Contracts
 
-RAM contracts are opt-in compiler reports for memory allocation and copy evidence. They are useful when a release gate, library boundary, or application profile wants an explicit RAM budget.
+RAM contracts are opt-in compiler reports for memory allocation and copy evidence. They are useful
+when a release gate, library boundary, or application profile wants an explicit RAM budget.
 
 ## Build Flags
 
@@ -35,4 +36,6 @@ go run ./tools/cmd/validate-ram-contract-fuzz-oracle --report reports/ram-contra
 
 ## Nonclaims
 
-RAM contracts are evidence and enforcement controls, not a global optimizer promise: no zero heap for all programs claim, no zero-copy for all programs claim, no all-target RAM parity claim, and no performance claim.
+RAM contracts are evidence and enforcement controls, not a global optimizer promise: no zero heap
+for all programs claim, no zero-copy for all programs claim, no all-target RAM parity claim, and no
+performance claim.

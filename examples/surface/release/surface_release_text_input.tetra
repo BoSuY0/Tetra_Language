@@ -1,0 +1,242 @@
+// Surface v1 release text/input baseline example.
+module examples.surface.release.surface_release_text_input
+
+import lib.core.surface as surface
+import lib.core.draw as draw
+import lib.core.widgets as widgets
+import lib.core.text as text
+import lib.core.style as style
+
+struct TextInputReleaseApp:
+    width: Int
+    height: Int
+    status_code: Int
+
+func r(x: Int, y: Int, w: Int, h: Int) -> surface.Rect:
+    return surface.Rect(x: x, y: y, w: w, h: h)
+
+func focused_textbox_colors() -> style.WidgetColors:
+    let theme: style.Theme = style.default_theme()
+    return style.style_for_state(theme.textbox, style.state_focused())
+
+func caret_color() -> surface.Color:
+    return surface.Color(r: 244, g: 204, b: 80, a: 255)
+
+func marker_rect(box: borrow widgets.TextBox) -> surface.Rect:
+    let marker_x: Int = box.rect.x + 12
+    let marker_y: Int = box.rect.y + 15
+    return r(marker_x, marker_y, box.text_len * 10, 12)
+
+func caret_rect(box: borrow widgets.TextBox) -> surface.Rect:
+    let caret_x: Int = box.rect.x + 12 + box.caret * 6
+    let caret_y: Int = box.rect.y + 8
+    return r(caret_x, caret_y, 2, 28)
+
+func col(rect: surface.Rect) -> widgets.Column:
+    let pad: Int = widgets.default_padding()
+    let gap: Int = widgets.default_gap()
+    return widgets.Column(rect: rect, padding: pad, gap: gap)
+
+func btn(rect: surface.Rect, action: Int) -> widgets.Button:
+    return widgets.Button(rect: rect, focused: false, press_count: 0, action: action)
+
+func tb(rect: surface.Rect, focused: Bool, buffer: []u8) -> widgets.TextBox:
+    return widgets.TextBox(rect: rect, focused: focused, text_len: 0, caret: 0, buffer: buffer)
+
+func init_panel(panel: inout widgets.Panel, rect: surface.Rect) -> Int:
+    return widgets.panel_init(panel, rect, widgets.default_padding())
+
+func init_col(column: inout widgets.Column, rect: surface.Rect) -> Int:
+    return widgets.column_init(column, rect, widgets.default_padding(), widgets.default_gap())
+
+func init_row(row: inout widgets.Row, rect: surface.Rect) -> Int:
+    return widgets.row_init(row, rect, widgets.default_gap())
+
+func init_button(button: inout widgets.Button, rect: surface.Rect, action: Int) -> Int:
+    return widgets.button_init(button, rect, action)
+
+func init_box(box: inout widgets.TextBox, rect: surface.Rect, buffer: []u8) -> Int:
+    return widgets.textbox_init(box, rect, buffer)
+
+func box_draw(c: inout draw.DrawContext, box: borrow widgets.TextBox, a: surface.Color) -> Int
+uses mem:
+    let textbox_colors: style.WidgetColors = focused_textbox_colors()
+    let bg: surface.Color = surface.Color(r: 26, g: 34, b: 40, a: 255)
+    let fg: surface.Color = surface.Color(r: 232, g: 236, b: 240, a: 255)
+    let fill_status: Int = draw.rect(c, box.rect, bg)
+    let border_status: Int = draw.rect_outline(c, box.rect, fg)
+    if box.text_len > 0:
+        let marker: surface.Rect = marker_rect(box)
+        let caret: surface.Rect = caret_rect(box)
+        let marker_status: Int = draw.rect(c, marker, a)
+        let caret_status: Int = draw.rect(c, caret, caret_color())
+        let base_status: Int = fill_status + border_status
+        let edit_status: Int = marker_status + caret_status
+        return base_status + edit_status + textbox_colors.bg - textbox_colors.bg
+    return fill_status + border_status + textbox_colors.bg - textbox_colors.bg
+
+func sd(n: borrow widgets.TextBox, e: borrow widgets.TextBox, c: inout draw.DrawContext) -> Int
+uses mem:
+    let bg: surface.Color = surface.Color(r: 18, g: 24, b: 28, a: 255)
+    let fg: surface.Color = surface.Color(r: 232, g: 236, b: 240, a: 255)
+    let name_color: surface.Color = surface.Color(r: 50, g: 150, b: 106, a: 255)
+    let email_color: surface.Color = surface.Color(r: 66, g: 132, b: 220, a: 255)
+    let clear_status: Int = draw.clear(c, bg)
+    let title_status: Int = draw.text(c, "Surface Text Input v1", 24, 24, fg)
+    let name_label: Int = draw.text(c, "Name", 24, 56, fg)
+    let name_status: Int = box_draw(c, n, name_color)
+    let email_label: Int = draw.text(c, "Email", 24, 126, fg)
+    let email_status: Int = box_draw(c, e, email_color)
+    let status_status: Int = draw.text(c, "Ready", 24, 204, fg)
+    var total: Int = clear_status + title_status
+    total = total + name_label + name_status
+    total = total + email_label + email_status
+    return total + status_status
+
+func main() -> Int
+uses alloc, mem, surface:
+    var name_storage: []u8 = core.make_u8(64)
+    var email_storage: []u8 = core.make_u8(64)
+    var ascii: []u8 = core.make_u8(5)
+    ascii[0] = 84
+    ascii[1] = 101
+    ascii[2] = 116
+    ascii[3] = 114
+    ascii[4] = 97
+    var utf8: []u8 = core.make_u8(2)
+    utf8[0] = 195
+    utf8[1] = 169
+    var newline: []u8 = core.make_u8(1)
+    newline[0] = 10
+    var invalid_utf8: []u8 = core.make_u8(1)
+    invalid_utf8[0] = 255
+    var clipboard: []u8 = core.make_u8(3)
+    clipboard[0] = ascii[0]
+    clipboard[1] = ascii[1]
+    clipboard[2] = ascii[2]
+    var host_clip: []u8 = core.make_u8(3)
+    var sel_clip: []u8 = core.make_u8(2)
+    var slots: []i32 = core.make_i32(4)
+    var replacement: []u8 = core.make_u8(2)
+    replacement[0] = 79
+    replacement[1] = 75
+    var name_buf: text.TextBuffer = text.buffer_init(name_storage)
+    var name_cur: text.TextCursor = text.caret_start(name_buf)
+    var name_sel: text.TextSelection = text.clear_selection()
+    var composition: text.TextComposition = text.composition_clear()
+    var email_buf: text.TextBuffer = text.buffer_init(email_storage)
+    var email_cur: text.TextCursor = text.caret_start(email_buf)
+    var email_sel: text.TextSelection = text.clear_selection()
+    var app: TextInputReleaseApp = TextInputReleaseApp(width: 480, height: 320, status_code: 1)
+    let panel_rect: surface.Rect = r(12, 12, 456, 296)
+    let column_rect: surface.Rect = r(24, 48, 432, 224)
+    let row_rect: surface.Rect = r(24, 188, 432, 44)
+    let copy_rect: surface.Rect = r(24, 188, 120, 44)
+    let paste_rect: surface.Rect = r(156, 188, 120, 44)
+    let clear_rect: surface.Rect = r(288, 188, 120, 44)
+    let name_rect: surface.Rect = r(24, 76, 320, 44)
+    let email_rect: surface.Rect = r(24, 146, 320, 44)
+    var panel: widgets.Panel = widgets.Panel(rect: panel_rect, padding: widgets.default_padding())
+    var column: widgets.Column = col(column_rect)
+    var row: widgets.Row = widgets.Row(rect: row_rect, gap: widgets.default_gap())
+    var copy_button: widgets.Button = btn(copy_rect, widgets.action_submit())
+    var paste_button: widgets.Button = btn(paste_rect, widgets.action_reset())
+    var clear_button: widgets.Button = btn(clear_rect, widgets.action_save())
+    var name_box: widgets.TextBox = tb(name_rect, true, name_storage)
+    var email_box: widgets.TextBox = tb(email_rect, false, email_storage)
+    let panel_init_status: Int = init_panel(panel, panel_rect)
+    let column_init_status: Int = init_col(column, column_rect)
+    let row_init_status: Int = init_row(row, row_rect)
+    let copy_init_status: Int = init_button(copy_button, copy_rect, widgets.action_submit())
+    let paste_init_status: Int = init_button(paste_button, paste_rect, widgets.action_reset())
+    let clear_init_status: Int = init_button(clear_button, clear_rect, widgets.action_save())
+    let name_init_status: Int = init_box(name_box, name_rect, name_storage)
+    let email_init_status: Int = init_box(email_box, email_rect, email_storage)
+    let focus_init_status: Int = widgets.textbox_set_focus(name_box, true)
+    let shell_init_status: Int = panel_init_status + column_init_status + row_init_status
+    let action_init_status: Int = copy_init_status + paste_init_status + clear_init_status
+    let field_init_status: Int = name_init_status + email_init_status + focus_init_status
+    let widget_init_status: Int = shell_init_status + action_init_status + field_init_status
+    var win: surface.Surface = surface.open("Surface Release Text Input", app.width, app.height)
+    var before_frame: surface.Frame = surface.begin_frame(win)
+    var before_ctx: draw.DrawContext = draw.DrawContext(frame: before_frame)
+    let before_draw_status: Int = sd(name_box, email_box, before_ctx)
+    let first_presented: Int = surface.present(before_ctx.frame)
+    let clipboard_written: Int = surface.clipboard_write_text(win, clipboard)
+    let clipboard_read: Int = surface.clipboard_read_text_into(win, host_clip)
+    let host_comp_copied: Int = surface.poll_composition_into(win, slots)
+    let host_trace: surface.CompositionTrace = surface.poll_composition(win)
+    let ascii_insert: text.TextEditResult = text.insert_bytes(name_buf, name_cur, ascii)
+    let utf8_insert: text.TextEditResult = text.insert_bytes(name_buf, name_cur, utf8)
+    let left: text.TextCursor = text.move_left(name_buf, name_cur)
+    let right: text.TextCursor = text.move_right(name_buf, left)
+    let home: text.TextCursor = text.move_home(name_buf, right)
+    name_cur = text.move_end(name_buf, home)
+    let exclaim: text.TextEditResult = text.insert_string(name_buf, name_cur, "!")
+    let backed: text.TextEditResult = text.backspace(name_buf, name_cur, name_sel)
+    name_cur = text.move_left(name_buf, name_cur)
+    let deleted: text.TextEditResult = text.delete(name_buf, name_cur, name_sel)
+    name_sel = text.select_range(name_buf, 0, 2)
+    let copied_selection: text.TextEditResult = text.copy_selection(name_buf, name_sel, sel_clip)
+    let replaced = text.replace_selection(name_buf, name_cur, name_sel, replacement)
+    let newline_insert: text.TextEditResult = text.insert_bytes(name_buf, name_cur, newline)
+    let invalid_insert: text.TextEditResult = text.insert_bytes(name_buf, name_cur, invalid_utf8)
+    let pasted: text.TextEditResult = text.paste_bytes(email_buf, email_cur, email_sel, host_clip)
+    let before_comp_len: Int = text.len_bytes(name_buf)
+    composition = text.composition_start(name_cur)
+    let preview_state: text.TextComposition = text.composition_update(composition, 2)
+    let preview_only: Bool = text.len_bytes(name_buf) == before_comp_len && preview_state.active
+    let committed_text: text.TextEditResult = text.insert_bytes(name_buf, name_cur, utf8)
+    let committed: text.TextEditResult = text.composition_commit(composition)
+    var cancel_comp: text.TextComposition = text.composition_start(name_cur)
+    let cancel_preview: text.TextComposition = text.composition_update(cancel_comp, 1)
+    let cancel_result: text.TextEditResult = text.composition_cancel(cancel_comp)
+    let cancelled: Bool = cancel_result.ok && !cancel_comp.active && cancel_preview.preview_len == 1
+    let line_count: Int = text.line_count(name_buf)
+    name_box.text_len = text.len_bytes(name_buf)
+    name_box.caret = name_cur.byte_index
+    email_box.text_len = text.len_bytes(email_buf)
+    email_box.caret = email_cur.byte_index
+    var frame: surface.Frame = surface.begin_frame(win)
+    var ctx: draw.DrawContext = draw.DrawContext(frame: frame)
+    let draw_status: Int = sd(name_box, email_box, ctx)
+    let presented: Int = surface.present(ctx.frame)
+    let closed: Int = surface.close(win)
+    let shell_shape_ok: Bool = panel.rect.w == 456 && column.rect.w == 432 && row.rect.h == 44
+    let action_shape_ok: Bool = copy_button.action == 1 && paste_button.action == 2
+    let shape_ok: Bool = shell_shape_ok && action_shape_ok && clear_button.action == 3
+    let edit_insert_ok: Bool = ascii_insert.ok && utf8_insert.ok && exclaim.ok && backed.ok
+    let edit_tail_ok: Bool = deleted.ok && copied_selection.ok && replaced.ok
+    let invalid_ok: Bool = !invalid_insert.ok && invalid_insert.error == text.error_invalid_utf8()
+    let edit_extra_ok: Bool = newline_insert.ok && invalid_ok && pasted.ok
+    let edits_ok: Bool = edit_insert_ok && edit_tail_ok && edit_extra_ok
+    let commit_ok: Bool = committed_text.ok && committed.ok
+    let text_ok: Bool = name_box.text_len > 0 && email_box.text_len == 3
+    let cursor_ok: Bool = name_cur.byte_index > 0
+    let host_clip_ok: Bool = host_clip[0] == 84 && host_clip[1] == 101 && host_clip[2] == 116
+    let sel_clip_ok: Bool = sel_clip[0] == 84 && sel_clip[1] == 101
+    let clip_io_ok: Bool = clipboard_written == 3 && clipboard_read == 3
+    let clipboard_ok: Bool = clip_io_ok && host_clip_ok && sel_clip_ok
+    let slots_head_ok: Bool = slots[0] == 1 && slots[1] == 1
+    let slots_tail_ok: Bool = slots[2] == 1 && slots[3] == 1
+    let trace_head_ok: Bool = host_trace.start && host_trace.update
+    let trace_tail_ok: Bool = host_trace.commit && host_trace.cancel
+    let composition_slots_ok: Bool = host_comp_copied == 4 && slots_head_ok && slots_tail_ok
+    let host_composition_ok: Bool = composition_slots_ok && trace_head_ok && trace_tail_ok
+    let planned_scope: Bool = line_count >= 2 && text.text_shaping_plan_v1() == 1
+    let multiline_ok: Bool = text.multiline_storage_supported()
+    let no_rich_text: Bool = !text.full_rich_text_supported()
+    let no_bidi: Bool = !text.full_bidi_supported()
+    let no_grapheme: Bool = !text.grapheme_cluster_caret_supported()
+    let supported_scope: Bool = multiline_ok && no_rich_text
+    let limited_scope: Bool = no_bidi && no_grapheme
+    let scope_ok: Bool = planned_scope && supported_scope && limited_scope
+    let edit_ok: Bool = edits_ok && commit_ok && preview_only && cancelled
+    let input_ok: Bool = text_ok && cursor_ok && clipboard_ok && host_composition_ok
+    let frame_ok: Bool = first_presented == 0 && presented == 0 && closed == 0
+    if shape_ok && edit_ok && input_ok && scope_ok && frame_ok:
+        let before_delta: Int = before_draw_status - before_draw_status
+        let draw_delta: Int = draw_status - draw_status
+        let init_delta: Int = widget_init_status - widget_init_status
+        return 1 + before_delta + draw_delta + init_delta
+    return 3

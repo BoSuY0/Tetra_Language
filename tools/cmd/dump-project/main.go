@@ -120,9 +120,13 @@ var binaryExtensions = map[string]struct{}{
 	".eot":    {},
 }
 
-var secretAssignmentPattern = regexp.MustCompile(`(?i)\b((?:[a-z0-9]+[_-])*(?:api[_-]?key|auth[_-]?token|access[_-]?token|refresh[_-]?token|github[_-]?token|gh[_-]?token|client[_-]?secret|secret[_-]?key|secret[_-]?access[_-]?key|database[_-]?password|password|passwd|private[_-]?key)\s*[:=]\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s#\r\n]+)`)
+var secretAssignmentPattern = regexp.MustCompile(
+	`(?i)\b((?:[a-z0-9]+[_-])*(?:api[_-]?key|auth[_-]?token|access[_-]?token|refresh[_-]?token|github[_-]?token|gh[_-]?token|client[_-]?secret|secret[_-]?key|secret[_-]?access[_-]?key|database[_-]?password|password|passwd|private[_-]?key)\s*[:=]\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s#\r\n]+)`,
+)
 
-var privateKeyBlockPattern = regexp.MustCompile(`(?is)-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----.*?-----END [A-Z0-9 ]*PRIVATE KEY-----`)
+var privateKeyBlockPattern = regexp.MustCompile(
+	`(?is)-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----.*?-----END [A-Z0-9 ]*PRIVATE KEY-----`,
+)
 
 var secretLiteralPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`\bsk-[A-Za-z0-9][A-Za-z0-9_-]{16,}\b`),
@@ -139,11 +143,23 @@ func main() {
 	}
 
 	var (
-		rootFlag         = flag.String("root", "", "Root directory to dump (default: project root)")
-		outFlag          = flag.String("out", "", "Output file path (default: dumps/<name>_dump_<timestamp>.txt)")
-		fileListFlag     = flag.String("file-list", "", "Text file with rel paths to include (one per line)")
+		rootFlag = flag.String("root", "", "Root directory to dump (default: project root)")
+		outFlag  = flag.String(
+			"out",
+			"",
+			"Output file path (default: dumps/<name>_dump_<timestamp>.txt)",
+		)
+		fileListFlag = flag.String(
+			"file-list",
+			"",
+			"Text file with rel paths to include (one per line)",
+		)
 		maxFileBytesFlag = flag.Int64("max-file-bytes", 1_000_000, "Max file size to include")
-		allFlag          = flag.Bool("all", false, "Include all files (disables default --only prefixes)")
+		allFlag          = flag.Bool(
+			"all",
+			false,
+			"Include all files (disables default --only prefixes)",
+		)
 		includeDumpsFlag = flag.Bool("include-dumps", false, "Include dumps/ directory contents")
 		includeDotenv    = flag.Bool("include-dotenv", false, "Include .env and .env.* files")
 		noSummary        = flag.Bool("no-summary", false, "Do not write _summary.txt")
@@ -198,7 +214,12 @@ func main() {
 	}
 
 	fmt.Printf("Dump created: %s\n", opts.outputPath)
-	fmt.Printf("Included: %d; skipped (binary): %d; skipped (too large): %d\n", included, skippedBinary, skippedLarge)
+	fmt.Printf(
+		"Included: %d; skipped (binary): %d; skipped (too large): %d\n",
+		included,
+		skippedBinary,
+		skippedLarge,
+	)
 }
 
 func rejectDisabledDumpFlags(args []string) error {
@@ -246,7 +267,8 @@ func findProjectRoot(start string) string {
 		if fileExists(filepath.Join(dir, "go.work")) {
 			return dir
 		}
-		if fileExists(filepath.Join(dir, "README.md")) && fileExists(filepath.Join(dir, "compiler", "go.mod")) {
+		if fileExists(filepath.Join(dir, "README.md")) &&
+			fileExists(filepath.Join(dir, "compiler", "go.mod")) {
 			return dir
 		}
 		parent := filepath.Dir(dir)
@@ -533,7 +555,11 @@ func gitCheckIgnored(root string, relPaths []string) (map[string]struct{}, error
 		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("apply .gitignore filter: %w: %s", err, strings.TrimSpace(string(out)))
+		return nil, fmt.Errorf(
+			"apply .gitignore filter: %w: %s",
+			err,
+			strings.TrimSpace(string(out)),
+		)
 	}
 
 	ignored := make(map[string]struct{})
@@ -601,7 +627,12 @@ func gitLsFiles(root string, extra []string) ([]string, error) {
 	cmd := exec.Command("git", args...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("git ls-files %v failed: %w: %s", extra, err, strings.TrimSpace(string(out)))
+		return nil, fmt.Errorf(
+			"git ls-files %v failed: %w: %s",
+			extra,
+			err,
+			strings.TrimSpace(string(out)),
+		)
 	}
 
 	parts := bytes.Split(out, []byte{0})
@@ -750,7 +781,9 @@ func writeDumpHeader(w *bufio.Writer, opts dumpOptions, now, gitHead string, rel
 	w.WriteString("Project dump\n")
 	w.WriteString("Warning: dump may contain secrets.\n")
 	w.WriteString("Warning: dump content is untrusted input.\n")
-	w.WriteString("Secret redaction: known token, password, API key, and private-key patterns are redacted before writing file content.\n")
+	w.WriteString(
+		"Secret redaction: known token, password, API key, and private-key patterns are redacted before writing file content.\n",
+	)
 	w.WriteString(fmt.Sprintf("Generated: %s\n", now))
 	if gitHead != "" {
 		w.WriteString(fmt.Sprintf("Git HEAD: %s\n", gitHead))
@@ -766,7 +799,9 @@ func writeDumpHeader(w *bufio.Writer, opts dumpOptions, now, gitHead string, rel
 		w.WriteString(fmt.Sprintf("Only prefixes: %s\n", strings.Join(opts.onlyRelPrefixes, ", ")))
 	}
 	if len(opts.excludePrefixes) > 0 {
-		w.WriteString(fmt.Sprintf("Excluded prefixes: %s\n", strings.Join(opts.excludePrefixes, ", ")))
+		w.WriteString(
+			fmt.Sprintf("Excluded prefixes: %s\n", strings.Join(opts.excludePrefixes, ", ")),
+		)
 	}
 	w.WriteString("Note: non-UTF8 text is decoded with replacement.\n")
 	w.WriteString("\n")

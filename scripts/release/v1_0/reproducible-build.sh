@@ -2,12 +2,12 @@
 set -euo pipefail
 
 report_path=""
-source_path="examples/ui_web_smoke.tetra"
+source_path="examples/ui/ui_web_smoke.tetra"
 targets=("linux-x64" "macos-x64" "windows-x64" "wasm32-wasi" "wasm32-web")
 
 usage() {
-  cat <<'USAGE'
-Usage: bash scripts/release/v1_0/reproducible-build.sh --report PATH [--source examples/ui_web_smoke.tetra]
+  cat << 'USAGE'
+Usage: bash scripts/release/v1_0/reproducible-build.sh --report PATH [--source examples/ui/ui_web_smoke.tetra]
 
 Produces a reproducibility proof JSON for every v1 build-only/release target.
 USAGE
@@ -53,7 +53,7 @@ while [[ $# -gt 0 ]]; do
       source_path="$2"
       shift 2
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;
@@ -94,15 +94,15 @@ json_escape() {
 
 sha256_file() {
   local file="$1"
-  if command -v sha256sum >/dev/null 2>&1; then
+  if command -v sha256sum > /dev/null 2>&1; then
     sha256sum "$file" | awk '{print $1}'
     return 0
   fi
-  if command -v shasum >/dev/null 2>&1; then
+  if command -v shasum > /dev/null 2>&1; then
     shasum -a 256 "$file" | awk '{print $1}'
     return 0
   fi
-  if command -v openssl >/dev/null 2>&1; then
+  if command -v openssl > /dev/null 2>&1; then
     openssl dgst -sha256 "$file" | awk '{print $NF}'
     return 0
   fi
@@ -115,7 +115,7 @@ target_ext() {
     windows-x64)
       printf '.exe'
       ;;
-    wasm32-wasi|wasm32-web)
+    wasm32-wasi | wasm32-web)
       printf '.wasm'
       ;;
     *)
@@ -127,7 +127,7 @@ target_ext() {
 artifact_base_path() {
   local path="$1"
   case "$path" in
-    *.wasm|*.WASM|*.exe|*.EXE)
+    *.wasm | *.WASM | *.exe | *.EXE)
       printf '%s' "${path%.*}"
       ;;
     *)
@@ -189,11 +189,11 @@ record_artifact_pair() {
   local size_b_json="null"
   if [[ "$exists_a" == "true" ]]; then
     hash_a_json="\"sha256:$(sha256_file "$path_a")\""
-    size_a_json="$(wc -c <"$path_a" | tr -d '[:space:]')"
+    size_a_json="$(wc -c < "$path_a" | tr -d '[:space:]')"
   fi
   if [[ "$exists_b" == "true" ]]; then
     hash_b_json="\"sha256:$(sha256_file "$path_b")\""
-    size_b_json="$(wc -c <"$path_b" | tr -d '[:space:]')"
+    size_b_json="$(wc -c < "$path_b" | tr -d '[:space:]')"
   fi
 
   local match="false"
@@ -218,14 +218,14 @@ record_artifact_pair() {
     "$size_a_json" \
     "$size_b_json" \
     "$match")"
-  printf '%s\n' "$last_artifact_json" >>"$artifacts_json"
+  printf '%s\n' "$last_artifact_json" >> "$artifacts_json"
   last_artifact_recorded="true"
 }
 
 artifacts_json="$tmp_dir/artifacts.jsonl"
 native_targets_json="$tmp_dir/native-targets.jsonl"
-: >"$artifacts_json"
-: >"$native_targets_json"
+: > "$artifacts_json"
+: > "$native_targets_json"
 all_match="true"
 legacy_native_json=""
 legacy_wasm_json=""
@@ -234,7 +234,7 @@ mismatched_count=0
 source_sha256="sha256:$(sha256_file "$source_path")"
 compiler_version="$(./tetra version)"
 required_ui_sidecars="false"
-if [[ "$source_path" == "examples/ui_web_smoke.tetra" ]]; then
+if [[ "$source_path" == "examples/ui/ui_web_smoke.tetra" ]]; then
   required_ui_sidecars="true"
 fi
 
@@ -249,8 +249,8 @@ for target in "${targets[@]}"; do
   record_artifact_pair "$target" "$out_a" "$out_b" "false"
   artifact_json="$last_artifact_json"
   case "$target" in
-    linux-*|macos-*|windows-*)
-      printf '%s\n' "$artifact_json" >>"$native_targets_json"
+    linux-* | macos-* | windows-*)
+      printf '%s\n' "$artifact_json" >> "$native_targets_json"
       ;;
   esac
   if [[ "$target" == "linux-x64" ]]; then
@@ -303,9 +303,9 @@ done
   echo '  "artifacts": ['
   awk 'NR > 1 { printf ",\n" } { printf "    %s", $0 } END { if (NR > 0) printf "\n" }' "$artifacts_json"
   echo '  ],'
-  printf '  "status": "%s"\n' "$( [[ "$all_match" == "true" ]] && echo pass || echo fail )"
+  printf '  "status": "%s"\n' "$([[ "$all_match" == "true" ]] && echo pass || echo fail)"
   echo "}"
-} >"$report_path"
+} > "$report_path"
 
 if [[ "$all_match" != "true" ]]; then
   echo "release/v1_0/reproducible-build: reproducible build mismatch" >&2

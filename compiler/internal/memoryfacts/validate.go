@@ -19,7 +19,11 @@ func hasSafeProvenanceFromUnsafeUnknown(provenance ProvenanceClass, unsafe Unsaf
 }
 
 func requiresLoweredArtifact(f Fact) bool {
-	return memoryvocab.RowRequiresArtifact(string(f.StoragePlan), string(f.ActualLoweringStorage), f.Claim)
+	return memoryvocab.RowRequiresArtifact(
+		string(f.StoragePlan),
+		string(f.ActualLoweringStorage),
+		f.Claim,
+	)
 }
 
 func unsafeUnknownOptimizationClaim(claim string, alias AliasState) bool {
@@ -38,7 +42,11 @@ func dynamicRawRuntimeCheckCostDisallowed(claim string, cost CostClass) bool {
 	return memoryvocab.DynamicRawRuntimeCheckCostDisallowed(claim, string(cost))
 }
 
-func unsafeCheckedDisallowedClaim(provenance ProvenanceClass, unsafe UnsafeClass, claim string) bool {
+func unsafeCheckedDisallowedClaim(
+	provenance ProvenanceClass,
+	unsafe UnsafeClass,
+	claim string,
+) bool {
 	return memoryvocab.UnsafeCheckedDisallowedClaim(string(provenance), string(unsafe), claim)
 }
 
@@ -58,7 +66,8 @@ func inferCostClass(f Fact) CostClass {
 		string(f.StoragePlan),
 		string(f.ActualLoweringStorage),
 		f.ClaimLevelRejected(),
-		isUnsafeUnknown(f) || f.ProvenanceClass == ProvenanceUnsafeUnknown || f.UnsafeClass == UnsafeUnknown,
+		isUnsafeUnknown(f) || f.ProvenanceClass == ProvenanceUnsafeUnknown ||
+			f.UnsafeClass == UnsafeUnknown,
 		string(f.EscapeState),
 		string(f.AliasState),
 	))
@@ -68,7 +77,11 @@ func (f Fact) ClaimLevelRejected() bool {
 	return f.ValidationState == ValidationFail || f.ValidationState == ValidationInvalidated
 }
 
-func unsafeVerifiedRootDisallowedClaim(provenance ProvenanceClass, unsafe UnsafeClass, claim string) bool {
+func unsafeVerifiedRootDisallowedClaim(
+	provenance ProvenanceClass,
+	unsafe UnsafeClass,
+	claim string,
+) bool {
 	return memoryvocab.UnsafeVerifiedRootDisallowedClaim(string(provenance), string(unsafe), claim)
 }
 
@@ -108,8 +121,17 @@ func unsafeUnknownTrustedStorage(planned, actual StorageClass) bool {
 	return memoryvocab.UnsafeUnknownTrustedStorage(string(planned), string(actual))
 }
 
-func unsafeExternalRootTrustedStorage(provenance ProvenanceClass, unsafe UnsafeClass, planned, actual StorageClass) bool {
-	return memoryvocab.UnsafeExternalRootTrustedStorage(string(provenance), string(unsafe), string(planned), string(actual))
+func unsafeExternalRootTrustedStorage(
+	provenance ProvenanceClass,
+	unsafe UnsafeClass,
+	planned, actual StorageClass,
+) bool {
+	return memoryvocab.UnsafeExternalRootTrustedStorage(
+		string(provenance),
+		string(unsafe),
+		string(planned),
+		string(actual),
+	)
 }
 
 func validatedTrustedStorageHeapFallback(planned, actual StorageClass) bool {

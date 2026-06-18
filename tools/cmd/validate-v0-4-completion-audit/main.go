@@ -55,8 +55,16 @@ var requiredCompletionAuditRequirements = []string{
 }
 
 func main() {
-	auditPath := flag.String("audit", "docs/release/v0_4_0_completion_audit.md", "v0.4.0 completion audit Markdown")
-	expectedStatus := flag.String("expected-status", "not-achieved", "expected audit status: not-achieved or achieved")
+	auditPath := flag.String(
+		"audit",
+		"docs/release/v0_4/v0_4_0_completion_audit.md",
+		"v0.4.0 completion audit Markdown",
+	)
+	expectedStatus := flag.String(
+		"expected-status",
+		"not-achieved",
+		"expected audit status: not-achieved or achieved",
+	)
 	flag.Parse()
 
 	raw, err := os.ReadFile(*auditPath)
@@ -64,7 +72,10 @@ func main() {
 		fmt.Fprintf(os.Stderr, "validate-v0-4-completion-audit: read audit: %v\n", err)
 		os.Exit(2)
 	}
-	if err := validateCompletionAudit(raw, completionAuditOptions{ExpectedStatus: *expectedStatus}); err != nil {
+	if err := validateCompletionAudit(
+		raw,
+		completionAuditOptions{ExpectedStatus: *expectedStatus},
+	); err != nil {
 		fmt.Fprintf(os.Stderr, "validate-v0-4-completion-audit: %v\n", err)
 		os.Exit(1)
 	}
@@ -98,7 +109,8 @@ func validateCompletionAudit(raw []byte, options completionAuditOptions) error {
 	if err := validateReleaseEvidenceRows(releaseRows, expectedStatus); err != nil {
 		return err
 	}
-	if expectedStatus == "not-achieved" && !hasCompletionAuditSection(text, "Missing Work Summary") {
+	if expectedStatus == "not-achieved" &&
+		!hasCompletionAuditSection(text, "Missing Work Summary") {
 		return fmt.Errorf("missing work summary is required for not-achieved audit")
 	}
 	return nil
@@ -123,22 +135,12 @@ func parseCompletionAuditRows(text string) ([]completionAuditRow, error) {
 	if err != nil {
 		return nil, err
 	}
+	tableRows, err := logicalCompletionAuditTableRows(section, 4, "checklist")
+	if err != nil {
+		return nil, err
+	}
 	var rows []completionAuditRow
-	for _, line := range strings.Split(section, "\n") {
-		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, "|") {
-			continue
-		}
-		cells := splitCompletionAuditTableRow(line)
-		if len(cells) != 4 {
-			return nil, fmt.Errorf("checklist table row has %d cells, want 4: %s", len(cells), line)
-		}
-		if strings.EqualFold(cells[0], "Requirement") {
-			continue
-		}
-		if isCompletionAuditSeparatorRow(cells) {
-			continue
-		}
+	for _, cells := range tableRows {
 		rows = append(rows, completionAuditRow{
 			Requirement: cells[0],
 			Artifact:    cells[1],
@@ -157,22 +159,12 @@ func parseReleaseEvidenceRows(text string) ([]releaseEvidenceRow, error) {
 	if err != nil {
 		return nil, err
 	}
+	tableRows, err := logicalCompletionAuditTableRows(section, 6, "release evidence matrix")
+	if err != nil {
+		return nil, err
+	}
 	var rows []releaseEvidenceRow
-	for _, line := range strings.Split(section, "\n") {
-		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, "|") {
-			continue
-		}
-		cells := splitCompletionAuditTableRow(line)
-		if len(cells) != 6 {
-			return nil, fmt.Errorf("release evidence matrix row has %d cells, want 6: %s", len(cells), line)
-		}
-		if strings.EqualFold(cells[0], "Requirement") {
-			continue
-		}
-		if isCompletionAuditSeparatorRow(cells) {
-			continue
-		}
+	for _, cells := range tableRows {
 		rows = append(rows, releaseEvidenceRow{
 			Requirement: cells[0],
 			Files:       cells[1],
@@ -196,7 +188,10 @@ func validateCompletionAuditRows(rows []completionAuditRow, expectedStatus strin
 			return fmt.Errorf("checklist row has empty requirement")
 		}
 		if row.Artifact == "" {
-			return fmt.Errorf("checklist row %q has empty required artifact or command", row.Requirement)
+			return fmt.Errorf(
+				"checklist row %q has empty required artifact or command",
+				row.Requirement,
+			)
 		}
 		if row.Evidence == "" {
 			return fmt.Errorf("checklist row %q has empty current evidence", row.Requirement)
@@ -208,7 +203,11 @@ func validateCompletionAuditRows(rows []completionAuditRow, expectedStatus strin
 		if classification != "pass" {
 			nonPassingRows++
 			if expectedStatus == "achieved" {
-				return fmt.Errorf("achieved audit has non-passing checklist row %q with result %q", row.Requirement, row.Result)
+				return fmt.Errorf(
+					"achieved audit has non-passing checklist row %q with result %q",
+					row.Requirement,
+					row.Result,
+				)
 			}
 		}
 		seen[row.Requirement] = true
@@ -238,25 +237,43 @@ func validateReleaseEvidenceRows(rows []releaseEvidenceRow, expectedStatus strin
 			return fmt.Errorf("release evidence row %q has an empty evidence cell", row.Requirement)
 		}
 		if !containsEvidenceKey(row.Files, "implementation") {
-			return fmt.Errorf("release evidence row %q files must include implementation:", row.Requirement)
+			return fmt.Errorf(
+				"release evidence row %q files must include implementation:",
+				row.Requirement,
+			)
 		}
 		if !containsEvidenceKey(row.Tests, "positive") {
-			return fmt.Errorf("release evidence row %q tests must include positive:", row.Requirement)
+			return fmt.Errorf(
+				"release evidence row %q tests must include positive:",
+				row.Requirement,
+			)
 		}
 		if !containsEvidenceKey(row.Tests, "negative") {
-			return fmt.Errorf("release evidence row %q tests must include negative:", row.Requirement)
+			return fmt.Errorf(
+				"release evidence row %q tests must include negative:",
+				row.Requirement,
+			)
 		}
 		if !containsEvidenceKey(row.Docs, "docs") {
 			return fmt.Errorf("release evidence row %q docs must include docs:", row.Requirement)
 		}
 		if !containsEvidenceKey(row.Docs, "manifest") {
-			return fmt.Errorf("release evidence row %q docs must include manifest:", row.Requirement)
+			return fmt.Errorf(
+				"release evidence row %q docs must include manifest:",
+				row.Requirement,
+			)
 		}
 		if !containsEvidenceKey(row.Evidence, "report") {
-			return fmt.Errorf("release evidence row %q evidence must include report:", row.Requirement)
+			return fmt.Errorf(
+				"release evidence row %q evidence must include report:",
+				row.Requirement,
+			)
 		}
 		if !containsEvidenceKey(row.Evidence, "graphify") {
-			return fmt.Errorf("release evidence row %q evidence must include graphify:", row.Requirement)
+			return fmt.Errorf(
+				"release evidence row %q evidence must include graphify:",
+				row.Requirement,
+			)
 		}
 		if !containsEvidenceKey(row.Evidence, "ci") {
 			return fmt.Errorf("release evidence row %q evidence must include ci:", row.Requirement)
@@ -266,10 +283,17 @@ func validateReleaseEvidenceRows(rows []releaseEvidenceRow, expectedStatus strin
 			return fmt.Errorf("release evidence row %q: %w", row.Requirement, err)
 		}
 		if classification == "pass" && releaseEvidenceContainsBlocker(row.Evidence) {
-			return fmt.Errorf("release evidence row %q pass status contains blocker evidence", row.Requirement)
+			return fmt.Errorf(
+				"release evidence row %q pass status contains blocker evidence",
+				row.Requirement,
+			)
 		}
 		if expectedStatus == "achieved" && classification != "pass" {
-			return fmt.Errorf("achieved audit has non-passing release evidence row %q with status %q", row.Requirement, row.Status)
+			return fmt.Errorf(
+				"achieved audit has non-passing release evidence row %q with status %q",
+				row.Requirement,
+				row.Status,
+			)
 		}
 	}
 	return nil
@@ -355,6 +379,59 @@ func splitCompletionAuditTableRow(line string) []string {
 		parts[i] = strings.TrimSpace(parts[i])
 	}
 	return parts
+}
+
+func logicalCompletionAuditTableRows(
+	section string,
+	wantCells int,
+	tableName string,
+) ([][]string, error) {
+	var rows [][]string
+	for _, line := range strings.Split(section, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "|") {
+			continue
+		}
+		cells := splitCompletionAuditTableRow(line)
+		if len(cells) != wantCells {
+			return nil, fmt.Errorf(
+				"%s table row has %d cells, want %d: %s",
+				tableName,
+				len(cells),
+				wantCells,
+				line,
+			)
+		}
+		if strings.EqualFold(cells[0], "Requirement") {
+			continue
+		}
+		if isCompletionAuditSeparatorRow(cells) {
+			continue
+		}
+		if cells[0] == "" {
+			if len(rows) == 0 {
+				return nil, fmt.Errorf("%s table starts with continuation row", tableName)
+			}
+			appendCompletionAuditCells(rows[len(rows)-1], cells)
+			continue
+		}
+		rows = append(rows, cells)
+	}
+	return rows, nil
+}
+
+func appendCompletionAuditCells(dst []string, extra []string) {
+	for i := range dst {
+		extraCell := strings.TrimSpace(extra[i])
+		if extraCell == "" {
+			continue
+		}
+		if dst[i] == "" {
+			dst[i] = extraCell
+			continue
+		}
+		dst[i] = dst[i] + " " + extraCell
+	}
 }
 
 func isCompletionAuditSeparatorRow(cells []string) bool {

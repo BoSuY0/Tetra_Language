@@ -29,10 +29,22 @@ func TestBuildOptimizationValidationMetadataRecordsMachineCheckableEvidence(t *t
 		InvalidatedFacts:          []string{"liveness"},
 		ProofRule:                 "preserve_bounds_proofs_invalidate_liveness",
 		TranslationValidationHook: "validation.ValidateTranslation",
-		ReportRows:                []string{"input_verifier", "output_verifier", "proof_rule", "translation_validation_hook", "translation_report", "validation_metadata", "before_dump", "after_dump", "profile_input_policy"},
-		NegativeTestMarker:        "compiler/internal/opt/manager_test.go::TestManagerRejectsIncompletePassContractEvidence",
-		ProfileInputPolicy:        "unused",
-		ProfileInputDigest:        "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+		ReportRows: []string{
+			"input_verifier",
+			"output_verifier",
+			"proof_rule",
+			"translation_validation_hook",
+			"translation_report",
+			"validation_metadata",
+			"before_dump",
+			"after_dump",
+			"profile_input_policy",
+		},
+		NegativeTestMarker: ("compiler/internal/opt/opt_suite_" +
+			"test.go::TestManagerRejectsIncompletePassContractEvidence"),
+		ProfileInputPolicy: "unused",
+		ProfileInputDigest: ("sha256:1111111111111111111111111111111111111111111111111111" +
+			"111111111111"),
 		ProfileInputSchemaVersion: "tetra.optimizer.profile.v1",
 	})
 	if err != nil {
@@ -41,22 +53,31 @@ func TestBuildOptimizationValidationMetadataRecordsMachineCheckableEvidence(t *t
 	if meta.SchemaVersion != "tetra.translation.validation.metadata.v1" {
 		t.Fatalf("schema = %q", meta.SchemaVersion)
 	}
-	if meta.PassName != "basic-scalar" || meta.InputKind != "stack_ir" || meta.OutputKind != "optimized_ir" {
+	if meta.PassName != "basic-scalar" || meta.InputKind != "stack_ir" ||
+		meta.OutputKind != "optimized_ir" {
 		t.Fatalf("metadata identity = %+v", meta)
 	}
-	if meta.InputVerifier != "lower.VerifyProgram" || meta.OutputVerifier != "lower.VerifyProgram" || meta.ProofRule == "" || meta.TranslationValidationHook != "validation.ValidateTranslation" {
+	if meta.InputVerifier != "lower.VerifyProgram" ||
+		meta.OutputVerifier != "lower.VerifyProgram" ||
+		meta.ProofRule == "" ||
+		meta.TranslationValidationHook != "validation.ValidateTranslation" {
 		t.Fatalf("contract metadata = %+v", meta)
 	}
-	if meta.ProfileInputPolicy != "unused" || meta.ProfileInputDigest != "sha256:1111111111111111111111111111111111111111111111111111111111111111" || meta.ProfileInputSchemaVersion != "tetra.optimizer.profile.v1" {
+	if meta.ProfileInputPolicy != "unused" ||
+		meta.ProfileInputDigest != ("sha256:1111111111111111111111111111111111111111111111111111"+
+			"111111111111") ||
+		meta.ProfileInputSchemaVersion != "tetra.optimizer.profile.v1" {
 		t.Fatalf("profile metadata = %+v", meta)
 	}
-	if !strings.HasPrefix(meta.BeforeHash, "sha256:") || !strings.HasPrefix(meta.AfterHash, "sha256:") {
+	if !strings.HasPrefix(meta.BeforeHash, "sha256:") ||
+		!strings.HasPrefix(meta.AfterHash, "sha256:") {
 		t.Fatalf("hashes = before %q after %q", meta.BeforeHash, meta.AfterHash)
 	}
 	if len(meta.Functions) != 1 || meta.Functions[0] != "main" {
 		t.Fatalf("functions = %v", meta.Functions)
 	}
-	if meta.Translation.FunctionsCompared != 1 || meta.Translation.SemanticLocalChecks == 0 || meta.Translation.DifferentialSamples == 0 {
+	if meta.Translation.FunctionsCompared != 1 || meta.Translation.SemanticLocalChecks == 0 ||
+		meta.Translation.DifferentialSamples == 0 {
 		t.Fatalf("translation evidence = %+v", meta.Translation)
 	}
 	if err := ValidateOptimizationValidationMetadata(meta); err != nil {
@@ -81,8 +102,9 @@ func TestBuildOptimizationValidationMetadataRejectsSemanticMismatch(t *testing.T
 		ProofRule:                 "preserve_bounds_proofs_invalidate_liveness",
 		TranslationValidationHook: "validation.ValidateTranslation",
 		ReportRows:                []string{"input_verifier"},
-		NegativeTestMarker:        "compiler/internal/opt/manager_test.go::TestManagerRejectsIncompletePassContractEvidence",
-		ProfileInputPolicy:        "unused",
+		NegativeTestMarker: ("compiler/internal/opt/opt_suite_" +
+			"test.go::TestManagerRejectsIncompletePassContractEvidence"),
+		ProfileInputPolicy: "unused",
 	})
 	if err == nil || !strings.Contains(err.Error(), "semantic local equivalence") {
 		t.Fatalf("BuildOptimizationValidationMetadata error = %v, want semantic mismatch", err)

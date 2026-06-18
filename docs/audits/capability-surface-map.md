@@ -11,52 +11,165 @@ Primary sources:
 
 ## Capability Types
 
-| Capability | Grants | Does not grant | Acquisition |
-| --- | --- | --- | --- |
-| `cap.mem` | Permission to enter raw memory operations requiring memory capability. | Pointer validity, provenance, allocation lifetime, bounds, alias exclusivity, actor sendability. | `core.cap_mem()` inside `unsafe`. |
-| `cap.io` | Permission to enter MMIO-style operations requiring IO capability. | General host IO authority, network access, runtime scheduling authority. | `core.cap_io()` inside `unsafe`. |
-| `consent.token` | Static privacy/consent call-shape authorization for the v1 privacy surface. | Cryptographic secrecy, distributed consent enforcement, durable secret storage isolation. | Privacy surface via `core.consent_token()`. |
-| `capsule.mem` | Attenuation permission key for memory-sensitive capability groups. | Alias for `mem` effect or automatic `cap.mem` token. | Capsule/effect metadata policy. |
-| `capsule.io` | Attenuation permission key for IO-sensitive capability groups. | Alias for `io` effect or automatic `cap.io` token. | Capsule/effect metadata policy. |
+### `cap.mem`
+
+- Grants: permission to enter raw memory operations requiring memory capability.
+- Does not grant: pointer validity, provenance, allocation lifetime, bounds,
+  alias exclusivity, or actor sendability.
+- Acquisition: `core.cap_mem()` inside `unsafe`.
+
+### `cap.io`
+
+- Grants: permission to enter MMIO-style operations requiring IO capability.
+- Does not grant: general host IO authority, network access, or runtime
+  scheduling authority.
+- Acquisition: `core.cap_io()` inside `unsafe`.
+
+### `consent.token`
+
+- Grants: static privacy/consent call-shape authorization for the v1 privacy
+  surface.
+- Does not grant: cryptographic secrecy, distributed consent enforcement, or
+  durable secret storage isolation.
+- Acquisition: privacy surface via `core.consent_token()`.
+
+### `capsule.mem`
+
+- Grants: attenuation permission key for memory-sensitive capability groups.
+- Does not grant: alias for `mem` effect or automatic `cap.mem` token.
+- Acquisition: capsule/effect metadata policy.
+
+### `capsule.io`
+
+- Grants: attenuation permission key for IO-sensitive capability groups.
+- Does not grant: alias for `io` effect or automatic `cap.io` token.
+- Acquisition: capsule/effect metadata policy.
 
 ## Effect And Permission Rules
 
-| Rule | Evidence |
-| --- | --- |
-| Canonical `uses` names include `actors`, `alloc`, `budget`, `capability`, `control`, `io`, `islands`, `link`, `mem`, `mmio`, `privacy`, `runtime`, `capsule.io`, and `capsule.mem`. | `docs/spec/effects_capabilities_privacy_v1.md` |
-| `cap.io` aliases `io` and `cap.mem` aliases `mem` only as accepted `uses` spelling. | `docs/spec/effects_capabilities_privacy_v1.md` |
-| `capsule.io` and `capsule.mem` are permission keys, not effect aliases. | `docs/spec/effects_capabilities_privacy_v1.md` |
-| Declaring `uses mem` or `uses io` does not create `cap.mem` or `cap.io`. | `docs/spec/capabilities.md` |
-| Capability attenuation checks apply when a function declares attenuation groups such as `effects.cap.mem`, `effects.cap.io`, or `effects.all`. | `docs/spec/effects_capabilities_privacy_v1.md` |
-| Stable `lib/core` modules carry `// Effects:` metadata and docs verification fails if public `uses` declarations drift. | `docs/spec/effects_capabilities_privacy_v1.md` |
+### Canonical `uses` Names
+
+- Rule: canonical names include `actors`, `alloc`, `budget`, `capability`,
+  `control`, `io`, `islands`, `link`, `mem`, `mmio`, `privacy`, `runtime`,
+  `capsule.io`, and `capsule.mem`.
+- Evidence: `docs/spec/effects_capabilities_privacy_v1.md`.
+
+### Capability Alias Spelling
+
+- Rule: `cap.io` aliases `io`, and `cap.mem` aliases `mem`, only as accepted
+  `uses` spelling.
+- Evidence: `docs/spec/effects_capabilities_privacy_v1.md`.
+
+### Capsule Permission Keys
+
+- Rule: `capsule.io` and `capsule.mem` are permission keys, not effect aliases.
+- Evidence: `docs/spec/effects_capabilities_privacy_v1.md`.
+
+### Uses Does Not Create Tokens
+
+- Rule: declaring `uses mem` or `uses io` does not create `cap.mem` or
+  `cap.io`.
+- Evidence: `docs/spec/capabilities.md`.
+
+### Attenuation Groups
+
+- Rule: capability attenuation checks apply when a function declares groups
+  such as `effects.cap.mem`, `effects.cap.io`, or `effects.all`.
+- Evidence: `docs/spec/effects_capabilities_privacy_v1.md`.
+
+### Public Metadata Drift
+
+- Rule: stable `lib/core` modules carry `// Effects:` metadata, and docs
+  verification fails if public `uses` declarations drift.
+- Evidence: `docs/spec/effects_capabilities_privacy_v1.md`.
 
 ## Eco Permission Surface
 
-| Surface | Evidence | Boundary |
-| --- | --- | --- |
-| Capsule manifest | `tetra.capsule.v1` fields in `docs/spec/eco_publishing_v1.md` | Local manifest parsing and compatibility; not remote registry identity. |
-| Permissions model | `tetra.eco.permissions.v1` | Dependency checks prevent permission escalation by requiring dependers to include dependency permissions. |
-| Lock graph | `Tetra.lock` policy/artifact hash fields | Lock hash includes policy keys, dependency edges, targets, modules, public API hashes, and artifact SHA-256 values. |
-| Package publish | `tetra.eco.publish.v1`; `validate-eco-publish` | Stable metadata validates schema/channel, paths, package bytes, and optional trust snapshot hash. |
-| Vault/trust | `tetra.eco.trust-snapshot.v1`; `validate-eco-vault` | Local object store hashes and trust metadata; not a global trust federation. |
-| Mirror/fetch | `tetra.eco.mirror.v1`; `validate-eco-mirror` | Transport result is validated by package/metadata/trust hashes before local store writes. |
+### Capsule Manifest
+
+- Evidence: `tetra.capsule.v1` fields in `docs/spec/eco_publishing_v1.md`.
+- Boundary: local manifest parsing and compatibility; not remote registry
+  identity.
+
+### Permissions Model
+
+- Evidence: `tetra.eco.permissions.v1`.
+- Boundary: dependency checks prevent permission escalation by requiring
+  dependers to include dependency permissions.
+
+### Lock Graph
+
+- Evidence: `Tetra.lock` policy/artifact hash fields.
+- Boundary: lock hash includes policy keys, dependency edges, targets, modules,
+  public API hashes, and artifact SHA-256 values.
+
+### Package Publish
+
+- Evidence: `tetra.eco.publish.v1`; `validate-eco-publish`.
+- Boundary: stable metadata validates schema/channel, paths, package bytes, and
+  optional trust snapshot hash.
+
+### Vault/Trust
+
+- Evidence: `tetra.eco.trust-snapshot.v1`; `validate-eco-vault`.
+- Boundary: local object store hashes and trust metadata; not a global trust
+  federation.
+
+### Mirror/Fetch
+
+- Evidence: `tetra.eco.mirror.v1`; `validate-eco-mirror`.
+- Boundary: transport result is validated by package/metadata/trust hashes
+  before local store writes.
 
 ## Abuse Cases
 
-| Abuse case | Expected outcome |
-| --- | --- |
-| Safe source declares `uses mem` and calls `core.load_i32` without `unsafe` or `cap.mem`. | Checker rejects the operation. |
-| Source obtains `cap.mem` and passes a stale or out-of-bounds pointer. | Capability policy does not prove validity; runtime raw-pointer metadata handles only supported verified roots. |
-| A capsule dependency requires permissions absent from the depender. | Eco permission validation rejects escalation. |
-| Publish metadata contains `../` or absolute paths. | Eco publish/download/mirror validators reject unsafe paths. |
-| Trust snapshot hash does not match bytes in the local store or fetched package. | Eco validators reject the mismatch before local trust is recorded. |
+### Safe Source Calls Raw Memory
+
+- Abuse case: safe source declares `uses mem` and calls `core.load_i32` without
+  `unsafe` or `cap.mem`.
+- Expected outcome: checker rejects the operation.
+
+### Stale Or Out-Of-Bounds Pointer
+
+- Abuse case: source obtains `cap.mem` and passes a stale or out-of-bounds
+  pointer.
+- Expected outcome: capability policy does not prove validity; runtime
+  raw-pointer metadata handles only supported verified roots.
+
+### Capsule Permission Escalation
+
+- Abuse case: a capsule dependency requires permissions absent from the
+  depender.
+- Expected outcome: Eco permission validation rejects escalation.
+
+### Unsafe Publish Paths
+
+- Abuse case: publish metadata contains `../` or absolute paths.
+- Expected outcome: Eco publish/download/mirror validators reject unsafe paths.
+
+### Trust Snapshot Hash Mismatch
+
+- Abuse case: trust snapshot hash does not match bytes in the local store or
+  fetched package.
+- Expected outcome: Eco validators reject the mismatch before local trust is
+  recorded.
 
 ## Focused Verification
 
 ```sh
-GOCACHE=$(pwd)/.cache/go-build-ideal-plan go test ./compiler/... -run 'Capability|Effect|Uses|Privacy|Consent|Budget|Capsule' -count=1
-GOCACHE=$(pwd)/.cache/go-build-ideal-plan go test ./cli/... ./tools/... -run 'Eco|Permission|Capsule|Trust' -count=1
-GOCACHE=$(pwd)/.cache/go-build-ideal-plan go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
+GOCACHE=$(pwd)/.cache/go-build-ideal-plan \
+go test ./compiler/... \
+  -run 'Capability|Effect|Uses|Privacy|Consent|Budget|Capsule' \
+  -count=1
+
+GOCACHE=$(pwd)/.cache/go-build-ideal-plan \
+go test ./cli/... ./tools/... \
+  -run 'Eco|Permission|Capsule|Trust' \
+  -count=1
+
+GOCACHE=$(pwd)/.cache/go-build-ideal-plan \
+go run ./tools/cmd/verify-docs \
+  --manifest docs/generated/manifest.json
 ```
 
 ## Non-Claims

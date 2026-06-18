@@ -12,38 +12,137 @@ nonclaim, and target-tier boundaries needed for the v0 slice.
 
 All required baseline documents exist in the live checkout:
 
-| Document | A0-lite role |
-| --- | --- |
-| `docs/audits/memory-production-core-v1-final.md` | Final MPC v1 classification and command evidence. |
-| `docs/audits/memory-production-core-v1-artifact-map.md` | Artifact map for fact graph, validators, docs, and evidence. |
-| `docs/audits/memory-production-core-v1-nonclaims.md` | Explicit nonclaims and overclaim boundaries. |
-| `docs/audits/memory-production-core-v1-supported-surface.md` | Supported safe surface, unsafe boundary, and report surface. |
-| `docs/audits/memory-production-core-v1-gap-map.md` | Remaining gaps and narrow/partial classifications. |
-| `docs/spec/memory_report_schema_v1.md` | Memory report projection schema and validator invariants. |
-| `docs/design/memory_production_core_v1.md` | Design law for compiler-owned facts and report projection. |
+### Final Audit
+
+- Document: `docs/audits/memory-production-core-v1-final.md`.
+- A0-lite role: final MPC v1 classification and command evidence.
+
+### Artifact Map
+
+- Document: `docs/audits/memory-production-core-v1-artifact-map.md`.
+- A0-lite role: artifact map for fact graph, validators, docs, and evidence.
+
+### Nonclaims
+
+- Document: `docs/audits/memory-production-core-v1-nonclaims.md`.
+- A0-lite role: explicit nonclaims and overclaim boundaries.
+
+### Supported Surface
+
+- Document: `docs/audits/memory-production-core-v1-supported-surface.md`.
+- A0-lite role: supported safe surface, unsafe boundary, and report surface.
+
+### Gap Map
+
+- Document: `docs/audits/memory-production-core-v1-gap-map.md`.
+- A0-lite role: remaining gaps and narrow/partial classifications.
+
+### Report Schema
+
+- Document: `docs/spec/memory_report_schema_v1.md`.
+- A0-lite role: memory report projection schema and validator invariants.
+
+### Design Law
+
+- Document: `docs/design/memory_production_core_v1.md`.
+- A0-lite role: design law for compiler-owned facts and report projection.
 
 Verification command:
 
 ```bash
-ls docs/audits/memory-production-core-v1-final.md docs/audits/memory-production-core-v1-artifact-map.md docs/audits/memory-production-core-v1-nonclaims.md docs/audits/memory-production-core-v1-supported-surface.md docs/audits/memory-production-core-v1-gap-map.md docs/spec/memory_report_schema_v1.md docs/design/memory_production_core_v1.md
+ls \
+  docs/audits/memory-production-core-v1-final.md \
+  docs/audits/memory-production-core-v1-artifact-map.md \
+  docs/audits/memory-production-core-v1-nonclaims.md \
+  docs/audits/memory-production-core-v1-supported-surface.md \
+  docs/audits/memory-production-core-v1-gap-map.md \
+  docs/spec/memory_report_schema_v1.md \
+  docs/design/memory_production_core_v1.md
 ```
 
 Result: all seven paths were present.
 
 ## Baseline Assertions
 
-| Assertion | Status | Evidence |
-| --- | --- | --- |
-| `MemoryFactGraph` is documented as the truth source. | validated | `docs/design/memory_production_core_v1.md:8` maps compiler facts to `MemoryFactGraph`; `docs/audits/memory-production-core-v1-final.md:34` classifies the graph as the truth source for report projection. |
-| Reports are projections, not truth. | validated | `docs/design/memory_production_core_v1.md:12` says reports must not reconstruct facts the compiler did not own; `docs/spec/memory_report_schema_v1.md:5` says the report is a projection and not a source of truth. |
-| `unsafe_unknown` cannot become safe facts. | validated | `docs/design/memory_production_core_v1.md:27` rejects unsafe-to-safe promotion; `docs/spec/memory_report_schema_v1.md:171` rejects safe provenance paired with `unsafe_unknown`. |
-| Safe metadata assignment is rejected before lowering. | validated | `docs/design/memory_production_core_v1.md:139` says `FieldInfo` entries are not `UserAssignable`; `docs/design/memory_production_core_v1.md:141` says assignment-target guards reject writes before lowering. |
-| Borrow/copy/copy_into are supported for safe byte-view surface. | validated | `docs/audits/memory-production-core-v1-supported-surface.md:11` lists `borrow`, `copy`, and `copy_into`; `docs/design/memory_production_core_v1.md:54` describes the supported borrow/copy/copy_into projection. |
-| Mutable alias/inout is conservative. | validated | `docs/design/memory_production_core_v1.md:64` scopes mutable alias/inout as conservative; `docs/audits/memory-production-core-v1-final.md:39` classifies MPC-5 as `conservative`. |
-| Full Rust-like borrow checker parity is a nonclaim. | validated | `docs/audits/memory-production-core-v1-nonclaims.md:8` and `docs/audits/memory-production-core-v1-supported-surface.md:134` list full Rust-like borrow checker parity as a nonclaim. |
-| Arbitrary unsafe pointer safety is a nonclaim. | validated | `docs/audits/memory-production-core-v1-nonclaims.md:10` excludes arbitrary unsafe external pointer safety; `docs/audits/memory-production-core-v1-supported-surface.md:143` repeats that boundary. |
-| Full actor runtime is a nonclaim. | validated | `docs/audits/memory-production-core-v1-nonclaims.md:12` excludes full production actor runtime; `docs/audits/memory-production-core-v1-final.md:57` repeats that full actor runtime guarantees are explicit non-goals outside documented slices. |
-| Target parity is a nonclaim. | validated | `docs/audits/memory-production-core-v1-nonclaims.md:13` excludes full target runtime parity; `docs/audits/memory-production-core-v1-supported-surface.md:144` excludes cross-target runtime memory parity without target evidence. |
+### MemoryFactGraph Truth Source
+
+- Status: validated.
+- Evidence: `docs/design/memory_production_core_v1.md:8` maps compiler facts to
+  `MemoryFactGraph`.
+- Evidence: `docs/audits/memory-production-core-v1-final.md:34` classifies the
+  graph as the truth source for report projection.
+
+### Reports Are Projections
+
+- Status: validated.
+- Evidence: `docs/design/memory_production_core_v1.md:12` says reports must not
+  reconstruct facts the compiler did not own.
+- Evidence: `docs/spec/memory_report_schema_v1.md:5` says the report is a
+  projection and not a source of truth.
+
+### Unsafe Unknown Boundary
+
+- Status: validated.
+- Evidence: `docs/design/memory_production_core_v1.md:27` rejects
+  unsafe-to-safe promotion.
+- Evidence: `docs/spec/memory_report_schema_v1.md:171` rejects safe provenance
+  paired with `unsafe_unknown`.
+
+### Safe Metadata Assignment
+
+- Status: validated.
+- Evidence: `docs/design/memory_production_core_v1.md:139` says `FieldInfo`
+  entries are not `UserAssignable`.
+- Evidence: `docs/design/memory_production_core_v1.md:141` says
+  assignment-target guards reject writes before lowering.
+
+### Borrow/Copy/Copy Into
+
+- Status: validated.
+- Evidence: `docs/audits/memory-production-core-v1-supported-surface.md:11`
+  lists `borrow`, `copy`, and `copy_into`.
+- Evidence: `docs/design/memory_production_core_v1.md:54` describes the
+  supported borrow/copy/copy_into projection.
+
+### Mutable Alias/Inout
+
+- Status: validated.
+- Evidence: `docs/design/memory_production_core_v1.md:64` scopes mutable
+  alias/inout as conservative.
+- Evidence: `docs/audits/memory-production-core-v1-final.md:39` classifies
+  MPC-5 as `conservative`.
+
+### Borrow Checker Parity Nonclaim
+
+- Status: validated.
+- Evidence: `docs/audits/memory-production-core-v1-nonclaims.md:8` lists full
+  Rust-like borrow checker parity as a nonclaim.
+- Evidence: `docs/audits/memory-production-core-v1-supported-surface.md:134`
+  repeats that boundary.
+
+### Arbitrary Unsafe Pointer Safety Nonclaim
+
+- Status: validated.
+- Evidence: `docs/audits/memory-production-core-v1-nonclaims.md:10` excludes
+  arbitrary unsafe external pointer safety.
+- Evidence: `docs/audits/memory-production-core-v1-supported-surface.md:143`
+  repeats that boundary.
+
+### Full Actor Runtime Nonclaim
+
+- Status: validated.
+- Evidence: `docs/audits/memory-production-core-v1-nonclaims.md:12` excludes
+  full production actor runtime.
+- Evidence: `docs/audits/memory-production-core-v1-final.md:57` repeats that
+  full actor runtime guarantees are explicit non-goals.
+
+### Target Parity Nonclaim
+
+- Status: validated.
+- Evidence: `docs/audits/memory-production-core-v1-nonclaims.md:13` excludes
+  full target runtime parity.
+- Evidence: `docs/audits/memory-production-core-v1-supported-surface.md:144`
+  excludes cross-target runtime memory parity without target evidence.
 
 ## Classification
 

@@ -1,0 +1,31 @@
+// Backend sync/async status microservice smoke.
+module examples.microservices.backend.misc.backend_sync_async_status_service
+import lib.core.async as async_lib
+import lib.core.sync as sync_lib
+
+async func async_status_probe(left: Int, right: Int) -> Int:
+    let total: Int = await async_lib.pair_sum(left, right)
+    return async_lib.select_or(total, 42)
+
+func main() -> Int:
+    let merged_ok: Int = sync_lib.merge_status(0, 0)
+    let merged_error: Int = sync_lib.merge_status(17, 0)
+    if merged_ok != 0 || merged_error != 17:
+        return 1
+    if !sync_lib.all_ready(true, true):
+        return 2
+    if sync_lib.all_ready(true, false):
+        return 3
+    if sync_lib.spin_countdown(9, 4) != 5:
+        return 4
+    if sync_lib.spin_countdown(3, 9) != 0:
+        return 5
+    if sync_lib.barrier_target(-4) != 0:
+        return 6
+    if sync_lib.barrier_target(5) != 5:
+        return 7
+    if async_lib.select_or(0, 42) != 42:
+        return 8
+    if async_lib.select_or(11, 42) != 11:
+        return 9
+    return 0

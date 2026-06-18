@@ -9,7 +9,8 @@ Status: current scoped schema contract.
 - `tetra.proof-store-summary.v1` is written as `proof-store-summary.json`.
 - `tetra.validation-pipeline-coverage.v1` is written as `validation-pipeline-coverage.json`.
 - `tetra.ram-blockers.v1` is written as `heap-blockers.json` and `copy-blockers.json`.
-- `fuzz/ram-contract-fuzz-oracle.json` is the deterministic RAM contract fuzz oracle artifact in release bundles.
+- `fuzz/ram-contract-fuzz-oracle.json` is the deterministic RAM contract fuzz oracle artifact in
+  release bundles.
 
 ## Validators
 

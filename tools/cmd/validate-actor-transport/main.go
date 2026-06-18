@@ -129,7 +129,11 @@ func validateActorTransportTrace(report actorTransportReport) error {
 			sendSeen = true
 		case "receive":
 			if event.Node != report.DestinationNode {
-				return fmt.Errorf("receive trace node = %s, want %s", event.Node, report.DestinationNode)
+				return fmt.Errorf(
+					"receive trace node = %s, want %s",
+					event.Node,
+					report.DestinationNode,
+				)
 			}
 			if !sendSeen {
 				return fmt.Errorf("receive trace event precedes send")

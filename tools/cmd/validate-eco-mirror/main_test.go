@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"tetra_language/internal/toon"
 )
 
 func TestValidateEcoMirrorAcceptsValidReport(t *testing.T) {
@@ -15,8 +17,26 @@ func TestValidateEcoMirrorAcceptsValidReport(t *testing.T) {
 	}
 }
 
+func TestValidateEcoMirrorAcceptsTOON(t *testing.T) {
+	toonRaw, err := toon.ConvertJSONToTOON(
+		[]byte(validMirrorReport()),
+		toon.Options{Strict: true, Deterministic: true},
+	)
+	if err != nil {
+		t.Fatalf("json->toon: %v", err)
+	}
+	if err := validateEcoMirrorFormat(toonRaw, "toon"); err != nil {
+		t.Fatalf("validateEcoMirrorFormat TOON: %v\n%s", err, toonRaw)
+	}
+}
+
 func TestValidateEcoMirrorAcceptsHTTPSourceStore(t *testing.T) {
-	report := strings.Replace(validMirrorReport(), `"source_store": "tetrahub-a"`, `"source_store": "http://127.0.0.1:8080/tetrahub"`, 1)
+	report := strings.Replace(
+		validMirrorReport(),
+		`"source_store": "tetrahub-a"`,
+		`"source_store": "http://127.0.0.1:8080/tetrahub"`,
+		1,
+	)
 	out, err := runEcoMirrorValidator(t, report)
 	if err != nil {
 		t.Fatalf("validator failed: %v\n%s", err, out)
@@ -24,7 +44,12 @@ func TestValidateEcoMirrorAcceptsHTTPSourceStore(t *testing.T) {
 }
 
 func TestValidateEcoMirrorRejectsUnknownField(t *testing.T) {
-	report := strings.Replace(validMirrorReport(), "\n  \"id\":", "\n  \"unexpected\": true,\n  \"id\":", 1)
+	report := strings.Replace(
+		validMirrorReport(),
+		"\n  \"id\":",
+		"\n  \"unexpected\": true,\n  \"id\":",
+		1,
+	)
 	out, err := runEcoMirrorValidator(t, report)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
@@ -35,7 +60,12 @@ func TestValidateEcoMirrorRejectsUnknownField(t *testing.T) {
 }
 
 func TestValidateEcoMirrorRejectsBadHash(t *testing.T) {
-	report := strings.Replace(validMirrorReport(), `"package_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"`, `"package_sha256": "sha256:not-hex"`, 1)
+	report := strings.Replace(
+		validMirrorReport(),
+		`"package_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"`,
+		`"package_sha256": "sha256:not-hex"`,
+		1,
+	)
 	out, err := runEcoMirrorValidator(t, report)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
@@ -46,7 +76,12 @@ func TestValidateEcoMirrorRejectsBadHash(t *testing.T) {
 }
 
 func TestValidateEcoMirrorRejectsPathMismatch(t *testing.T) {
-	report := strings.Replace(validMirrorReport(), `"package_path": "packages/tetra_demo/0.1.0/linux-x64/package.todex"`, `"package_path": "packages/tetra_demo/0.1.0/windows-x64/package.todex"`, 1)
+	report := strings.Replace(
+		validMirrorReport(),
+		`"package_path": "packages/tetra_demo/0.1.0/linux-x64/package.todex"`,
+		`"package_path": "packages/tetra_demo/0.1.0/windows-x64/package.todex"`,
+		1,
+	)
 	out, err := runEcoMirrorValidator(t, report)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
@@ -57,7 +92,12 @@ func TestValidateEcoMirrorRejectsPathMismatch(t *testing.T) {
 }
 
 func TestValidateEcoMirrorRejectsOneSidedTrustHash(t *testing.T) {
-	report := strings.Replace(validMirrorReport(), "  \"trust_snapshot_path\": \"packages/tetra_demo/0.1.0/linux-x64/trust.snapshot.json\",\n", "", 1)
+	report := strings.Replace(
+		validMirrorReport(),
+		"  \"trust_snapshot_path\": \"packages/tetra_demo/0.1.0/linux-x64/trust.snapshot.json\",\n",
+		"",
+		1,
+	)
 	out, err := runEcoMirrorValidator(t, report)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)

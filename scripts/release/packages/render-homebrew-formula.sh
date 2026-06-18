@@ -11,7 +11,7 @@ source_sha256=""
 out_path=""
 
 usage() {
-  cat <<'USAGE'
+  cat << 'USAGE'
 Usage: bash scripts/release/packages/render-homebrew-formula.sh \
   --version vX.Y.Z \
   --source-url URL \
@@ -40,7 +40,7 @@ while [[ $# -gt 0 ]]; do
       shift
       out_path="${1:-}"
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;

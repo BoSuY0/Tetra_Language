@@ -1,0 +1,94 @@
+// Backend net/epoll lifecycle microservice smoke.
+module examples.microservices.backend.net.backend_net_epoll_lifecycle_service
+import lib.core.capability as capability
+import lib.core.net as net
+
+func check_event_flags(fd: Int) -> Bool
+uses alloc, mem:
+    var event: []i32 = core.make_i32(2)
+    event[0] = fd
+    event[1] = net.epoll_event_in() + net.epoll_event_hup()
+    if net.epoll_event_fd(event) != fd:
+        return false
+    let flags: Int = net.epoll_event_flags(event)
+    if !net.epoll_event_readable(flags):
+        return false
+    if net.epoll_event_writable(flags):
+        return false
+    if net.epoll_event_has_error(flags):
+        return false
+    if !net.epoll_event_hung_up(flags):
+        return false
+    if net.flag_set(-1, net.epoll_event_in()):
+        return false
+    if net.flag_set(flags, 0):
+        return false
+    return true
+
+func main() -> Int
+uses alloc, capability, io, mem:
+    unsafe:
+        let io_cap: cap.io = capability.io()
+        let server: Int = net.socket_tcp4(io_cap)
+        if server < 0:
+            return 1
+        if net.set_nonblocking(server, io_cap) < 0:
+            let close_nonblocking: Int = net.close(server, io_cap)
+            return 2
+        if net.set_reuseport(server, io_cap) != 0:
+            let close_reuse: Int = net.close(server, io_cap)
+            return 3
+        if net.set_tcp_nodelay(server, io_cap) != 0:
+            let close_nodelay: Int = net.close(server, io_cap)
+            return 4
+        if net.bind_tcp4_loopback(server, 0, io_cap) < 0:
+            let close_bind: Int = net.close(server, io_cap)
+            return 5
+        if net.listen(server, 16, io_cap) < 0:
+            let close_listen: Int = net.close(server, io_cap)
+            return 6
+        let epfd: Int = net.epoll_create(io_cap)
+        if epfd < 0:
+            let close_epoll_server: Int = net.close(server, io_cap)
+            return 7
+        if net.epoll_ctl_add_read(epfd, server, io_cap) < 0:
+            let close_add_epfd: Int = net.close(epfd, io_cap)
+            let close_add_server: Int = net.close(server, io_cap)
+            return 8
+        if net.epoll_wait_one(epfd, 0, io_cap) != 0:
+            let close_ready_epfd: Int = net.close(epfd, io_cap)
+            let close_ready_server: Int = net.close(server, io_cap)
+            return 9
+        var event: []i32 = core.make_i32(2)
+        if net.epoll_wait_one_into(epfd, event, 0, io_cap) != 0:
+            let close_event_epfd: Int = net.close(epfd, io_cap)
+            let close_event_server: Int = net.close(server, io_cap)
+            return 10
+        if net.epoll_ctl_mod_read_write(epfd, server, io_cap) < 0:
+            let close_mod_rw_epfd: Int = net.close(epfd, io_cap)
+            let close_mod_rw_server: Int = net.close(server, io_cap)
+            return 11
+        if net.epoll_ctl_mod_read(epfd, server, io_cap) < 0:
+            let close_mod_read_epfd: Int = net.close(epfd, io_cap)
+            let close_mod_read_server: Int = net.close(server, io_cap)
+            return 12
+        let no_client: Int = net.accept_nonblocking(server, io_cap)
+        if no_client >= 0:
+            let close_unexpected_client: Int = net.close(no_client, io_cap)
+            let close_unexpected_epfd: Int = net.close(epfd, io_cap)
+            let close_unexpected_server: Int = net.close(server, io_cap)
+            return 13
+        if !check_event_flags(server):
+            let close_flags_epfd: Int = net.close(epfd, io_cap)
+            let close_flags_server: Int = net.close(server, io_cap)
+            return 14
+        if net.epoll_ctl_delete(epfd, server, io_cap) < 0:
+            let close_delete_epfd: Int = net.close(epfd, io_cap)
+            let close_delete_server: Int = net.close(server, io_cap)
+            return 15
+        let epfd_closed: Int = net.close(epfd, io_cap)
+        let server_closed: Int = net.close(server, io_cap)
+        if epfd_closed != 0 || server_closed != 0:
+            return 16
+        return 0
+    return 17

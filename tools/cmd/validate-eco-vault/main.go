@@ -133,12 +133,21 @@ func validateVaultRecord(store string, record vaultRecord) error {
 		return err
 	}
 	if len(raw) != record.Size {
-		return fmt.Errorf("record %s size mismatch: got %d, object has %d", record.Hash, record.Size, len(raw))
+		return fmt.Errorf(
+			"record %s size mismatch: got %d, object has %d",
+			record.Hash,
+			record.Size,
+			len(raw),
+		)
 	}
 	sum := sha256.Sum256(raw)
 	actual := hex.EncodeToString(sum[:])
 	if actual != hexHash {
-		return fmt.Errorf("record %s hash mismatch: object hashes to sha256:%s", record.Hash, actual)
+		return fmt.Errorf(
+			"record %s hash mismatch: object hashes to sha256:%s",
+			record.Hash,
+			actual,
+		)
 	}
 	return nil
 }

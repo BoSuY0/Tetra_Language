@@ -42,7 +42,12 @@ func (a *Win64) SpillParams(e *x64.Emitter, fn ir.IRFunc) {
 	}
 }
 
-func (a *Win64) EmitCall(e *x64.Emitter, instr ir.IRInstr, stackDepth *int, callPatches *[]x64obj.CallPatch) error {
+func (a *Win64) EmitCall(
+	e *x64.Emitter,
+	instr ir.IRInstr,
+	stackDepth *int,
+	callPatches *[]x64obj.CallPatch,
+) error {
 	if stackDepth == nil || callPatches == nil {
 		return fmt.Errorf("internal error: missing stackDepth/callPatches")
 	}
@@ -50,10 +55,20 @@ func (a *Win64) EmitCall(e *x64.Emitter, instr ir.IRInstr, stackDepth *int, call
 		return fmt.Errorf("call is missing target name")
 	}
 	if instr.ArgSlots < 0 || instr.RetSlots < 0 {
-		return fmt.Errorf("call %q has negative ABI slots args=%d rets=%d", instr.Name, instr.ArgSlots, instr.RetSlots)
+		return fmt.Errorf(
+			"call %q has negative ABI slots args=%d rets=%d",
+			instr.Name,
+			instr.ArgSlots,
+			instr.RetSlots,
+		)
 	}
 	if instr.RetSlots > maxCallReturnSlots {
-		return fmt.Errorf("call %q has unsupported return slots %d (max=%d)", instr.Name, instr.RetSlots, maxCallReturnSlots)
+		return fmt.Errorf(
+			"call %q has unsupported return slots %d (max=%d)",
+			instr.Name,
+			instr.RetSlots,
+			maxCallReturnSlots,
+		)
 	}
 	if *stackDepth < instr.ArgSlots {
 		return fmt.Errorf("stack underflow in function '%s'", instr.Name)
@@ -144,7 +159,11 @@ func (a *Win64) EmitCall(e *x64.Emitter, instr ir.IRInstr, stackDepth *int, call
 	return nil
 }
 
-func (a *Win64) EmitWriteStdout(e *x64.Emitter, stackDepth *int, importPatches *[]x64obj.ImportPatch) error {
+func (a *Win64) EmitWriteStdout(
+	e *x64.Emitter,
+	stackDepth *int,
+	importPatches *[]x64obj.ImportPatch,
+) error {
 	if stackDepth == nil || importPatches == nil {
 		return fmt.Errorf("internal error: missing stackDepth/importPatches")
 	}
@@ -157,7 +176,10 @@ func (a *Win64) EmitWriteStdout(e *x64.Emitter, stackDepth *int, importPatches *
 		e.SubRspImm32(frameBytes)
 		e.MovEcxImm32(0xFFFFFFF5)
 		at := e.CallRipDisp32()
-		*importPatches = append(*importPatches, x64obj.ImportPatch{At: at, Name: winImportGetStdHandle})
+		*importPatches = append(
+			*importPatches,
+			x64obj.ImportPatch{At: at, Name: winImportGetStdHandle},
+		)
 		e.AddRspImm32(frameBytes)
 	}
 
@@ -182,14 +204,22 @@ func (a *Win64) EmitWriteStdout(e *x64.Emitter, stackDepth *int, importPatches *
 		e.MovMem32RspDispEax(32)
 		e.MovMem32RspDispEax(36)
 		at := e.CallRipDisp32()
-		*importPatches = append(*importPatches, x64obj.ImportPatch{At: at, Name: winImportWriteFile})
+		*importPatches = append(
+			*importPatches,
+			x64obj.ImportPatch{At: at, Name: winImportWriteFile},
+		)
 		e.AddRspImm32(frameBytes)
 	}
 
 	return nil
 }
 
-func (a *Win64) EmitExit(e *x64.Emitter, code int32, stackSlots int, importPatches *[]x64obj.ImportPatch) error {
+func (a *Win64) EmitExit(
+	e *x64.Emitter,
+	code int32,
+	stackSlots int,
+	importPatches *[]x64obj.ImportPatch,
+) error {
 	if importPatches == nil {
 		return fmt.Errorf("internal error: missing importPatches")
 	}
@@ -205,7 +235,12 @@ func (a *Win64) EmitExit(e *x64.Emitter, code int32, stackSlots int, importPatch
 	return nil
 }
 
-func (a *Win64) EmitAllocBytes(e *x64.Emitter, stackDepth *int, opt x64.CodegenOptions, importPatches *[]x64obj.ImportPatch) error {
+func (a *Win64) EmitAllocBytes(
+	e *x64.Emitter,
+	stackDepth *int,
+	opt x64.CodegenOptions,
+	importPatches *[]x64obj.ImportPatch,
+) error {
 	_ = opt
 	if stackDepth == nil || importPatches == nil {
 		return fmt.Errorf("internal error: missing stackDepth/importPatches")
@@ -231,7 +266,13 @@ func (a *Win64) EmitAllocBytes(e *x64.Emitter, stackDepth *int, opt x64.CodegenO
 	return nil
 }
 
-func (a *Win64) EmitMakeSlice(e *x64.Emitter, kind ir.IRInstrKind, stackDepth *int, opt x64.CodegenOptions, importPatches *[]x64obj.ImportPatch) error {
+func (a *Win64) EmitMakeSlice(
+	e *x64.Emitter,
+	kind ir.IRInstrKind,
+	stackDepth *int,
+	opt x64.CodegenOptions,
+	importPatches *[]x64obj.ImportPatch,
+) error {
 	_ = opt
 	if stackDepth == nil || importPatches == nil {
 		return fmt.Errorf("internal error: missing stackDepth/importPatches")
@@ -301,7 +342,12 @@ func (a *Win64) EmitMakeSlice(e *x64.Emitter, kind ir.IRInstrKind, stackDepth *i
 	return nil
 }
 
-func (a *Win64) EmitIslandNew(e *x64.Emitter, stackDepth *int, opt x64.CodegenOptions, importPatches *[]x64obj.ImportPatch) error {
+func (a *Win64) EmitIslandNew(
+	e *x64.Emitter,
+	stackDepth *int,
+	opt x64.CodegenOptions,
+	importPatches *[]x64obj.ImportPatch,
+) error {
 	if stackDepth == nil || importPatches == nil {
 		return fmt.Errorf("internal error: missing stackDepth/importPatches")
 	}
@@ -363,7 +409,13 @@ func (a *Win64) EmitIslandNew(e *x64.Emitter, stackDepth *int, opt x64.CodegenOp
 	return nil
 }
 
-func (a *Win64) EmitIslandMakeSlice(e *x64.Emitter, kind ir.IRInstrKind, stackDepth *int, opt x64.CodegenOptions, importPatches *[]x64obj.ImportPatch) error {
+func (a *Win64) EmitIslandMakeSlice(
+	e *x64.Emitter,
+	kind ir.IRInstrKind,
+	stackDepth *int,
+	opt x64.CodegenOptions,
+	importPatches *[]x64obj.ImportPatch,
+) error {
 	_ = opt
 	if stackDepth == nil || importPatches == nil {
 		return fmt.Errorf("internal error: missing stackDepth/importPatches")
@@ -445,7 +497,12 @@ func (a *Win64) EmitIslandMakeSlice(e *x64.Emitter, kind ir.IRInstrKind, stackDe
 	return nil
 }
 
-func (a *Win64) EmitIslandFree(e *x64.Emitter, stackDepth *int, opt x64.CodegenOptions, importPatches *[]x64obj.ImportPatch) error {
+func (a *Win64) EmitIslandFree(
+	e *x64.Emitter,
+	stackDepth *int,
+	opt x64.CodegenOptions,
+	importPatches *[]x64obj.ImportPatch,
+) error {
 	if stackDepth == nil || importPatches == nil {
 		return fmt.Errorf("internal error: missing stackDepth/importPatches")
 	}
@@ -483,7 +540,10 @@ func (a *Win64) EmitIslandFree(e *x64.Emitter, stackDepth *int, opt x64.CodegenO
 		e.MovR8dImm32(0x01)
 		e.LeaR9RspDisp(0)
 		at := e.CallRipDisp32()
-		*importPatches = append(*importPatches, x64obj.ImportPatch{At: at, Name: winImportVirtualProtect})
+		*importPatches = append(
+			*importPatches,
+			x64obj.ImportPatch{At: at, Name: winImportVirtualProtect},
+		)
 		e.AddRspImm32(frameBytes)
 		return nil
 	}
@@ -501,7 +561,12 @@ func (a *Win64) EmitIslandFree(e *x64.Emitter, stackDepth *int, opt x64.CodegenO
 	return nil
 }
 
-func (a *Win64) EmitIslandReset(e *x64.Emitter, stackDepth *int, opt x64.CodegenOptions, importPatches *[]x64obj.ImportPatch) error {
+func (a *Win64) EmitIslandReset(
+	e *x64.Emitter,
+	stackDepth *int,
+	opt x64.CodegenOptions,
+	importPatches *[]x64obj.ImportPatch,
+) error {
 	if stackDepth == nil || importPatches == nil {
 		return fmt.Errorf("internal error: missing stackDepth/importPatches")
 	}

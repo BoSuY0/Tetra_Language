@@ -1,20 +1,26 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
 	"unicode/utf8"
+
+	"tetra_language/tools/validators/surface"
 )
 
 type surfaceClaimOptions struct {
 	Root       string
 	ReportDirs []string
+	GitHead    string
 }
 
 type stringListFlag []string
@@ -47,6 +53,9 @@ type surfaceClaimClause struct {
 type surfaceClaimEvidence struct {
 	WindowsProductionTargetHost bool
 	MacOSProductionTargetHost   bool
+	MorphRenderedBeautySameHead bool
+	MorphRenderedBeautyProduct  bool
+	NativeSurfaceHostStrict     bool
 }
 
 var defaultSurfaceClaimScanPaths = []string{
@@ -60,7 +69,7 @@ var defaultSurfaceClaimScanPaths = []string{
 	"docs/checklists",
 	"docs/generated/manifest.json",
 	"docs/generated/v1_0/manifest.json",
-	"compiler/features.go",
+	"compiler/compiler_facade.go",
 	"examples",
 	"lib/core",
 	"scripts/release/surface",
@@ -70,6 +79,7 @@ var defaultSurfaceClaimScanPaths = []string{
 	"tools/cmd/validate-surface-block-report",
 	"tools/cmd/validate-surface-block-examples",
 	"tools/cmd/validate-surface-morph-report",
+	"tools/cmd/validate-surface-morph-rendered-beauty",
 }
 
 func main() {
@@ -98,7 +108,11 @@ func validateSurfaceClaims(opt surfaceClaimOptions) error {
 	if err != nil {
 		return err
 	}
-	evidence := collectSurfaceClaimEvidence(files)
+	gitHead := strings.TrimSpace(opt.GitHead)
+	if gitHead == "" {
+		gitHead = currentSurfaceClaimGitHead(absRoot)
+	}
+	evidence := collectSurfaceClaimEvidence(files, gitHead)
 	var issues []surfaceClaimIssue
 	for _, path := range files {
 		raw, err := os.ReadFile(path)
@@ -200,7 +214,7 @@ func shouldScanSurfaceClaimFile(path string) bool {
 	}
 }
 
-func collectSurfaceClaimEvidence(files []string) surfaceClaimEvidence {
+func collectSurfaceClaimEvidence(files []string, gitHead string) surfaceClaimEvidence {
 	var evidence surfaceClaimEvidence
 	for _, path := range files {
 		if !strings.Contains(filepath.ToSlash(path), "/reports/") {
@@ -217,8 +231,50 @@ func collectSurfaceClaimEvidence(files []string) surfaceClaimEvidence {
 		if hasTargetHostProductionEvidence(lower, "macos") {
 			evidence.MacOSProductionTargetHost = true
 		}
+		if report, ok := morphRenderedBeautyClaimReport(raw); ok && report.GitHead == gitHead &&
+			report.GitCommit == gitHead {
+			evidence.MorphRenderedBeautySameHead = true
+			if report.ProductClaim && report.FinalSignoff {
+				evidence.MorphRenderedBeautyProduct = true
+			}
+		}
+		if hasStrictNativeSurfaceHostEvidence(raw) {
+			evidence.NativeSurfaceHostStrict = true
+		}
 	}
 	return evidence
+}
+
+func currentSurfaceClaimGitHead(root string) string {
+	cmd := exec.Command("git", "rev-parse", "HEAD")
+	cmd.Dir = root
+	raw, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(raw))
+}
+
+func morphRenderedBeautyClaimReport(raw []byte) (surface.MorphRenderedBeautyReport, bool) {
+	var meta struct {
+		Schema string `json:"schema"`
+	}
+	if err := json.Unmarshal(raw, &meta); err != nil {
+		return surface.MorphRenderedBeautyReport{}, false
+	}
+	if meta.Schema != surface.MorphRenderedBeautyReportSchemaV1 {
+		return surface.MorphRenderedBeautyReport{}, false
+	}
+	var report surface.MorphRenderedBeautyReport
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&report); err != nil {
+		return surface.MorphRenderedBeautyReport{}, false
+	}
+	if err := surface.ValidateMorphRenderedBeautyReportValue(report); err != nil {
+		return surface.MorphRenderedBeautyReport{}, false
+	}
+	return report, true
 }
 
 func hasTargetHostProductionEvidence(lower string, target string) bool {
@@ -229,7 +285,12 @@ func hasTargetHostProductionEvidence(lower string, target string) bool {
 		strings.Contains(lower, "true")
 }
 
-func inspectSurfaceClaimText(root string, path string, text string, evidence surfaceClaimEvidence) []surfaceClaimIssue {
+func inspectSurfaceClaimText(
+	root string,
+	path string,
+	text string,
+	evidence surfaceClaimEvidence,
+) []surfaceClaimIssue {
 	rel := relativeSurfaceClaimPath(root, path)
 	var issues []surfaceClaimIssue
 	if containsStaleProductionEvidence(text) {
@@ -246,24 +307,40 @@ func inspectSurfaceClaimText(root string, path string, text string, evidence sur
 			continue
 		}
 		for _, runtime := range []string{"electron", "react", "css"} {
-			if containsRuntimeReplacementClaim(lower, runtime) && !surfaceClaimExplicitNonClaimContext(lower) {
+			if containsRuntimeReplacementClaim(lower, runtime) &&
+				!surfaceClaimExplicitNonClaimContext(lower) {
 				issues = append(issues, surfaceClaimIssue{
-					Path:    rel,
-					Line:    clause.Line,
-					Rule:    fmt.Sprintf("%s replacement overclaim", surfaceClaimRuntimeLabel(runtime)),
+					Path: rel,
+					Line: clause.Line,
+					Rule: fmt.Sprintf(
+						"%s replacement overclaim",
+						surfaceClaimRuntimeLabel(runtime),
+					),
 					Snippet: strings.TrimSpace(clause.Text),
 				})
 			}
 		}
-		if containsProductionMorphClaim(lower) && !surfaceClaimExplicitNonClaimContext(lower) {
+		if containsSurfaceQualityClaim(lower) && !evidence.MorphRenderedBeautySameHead &&
+			!surfaceClaimExplicitNonClaimContext(lower) {
 			issues = append(issues, surfaceClaimIssue{
 				Path:    rel,
 				Line:    clause.Line,
-				Rule:    "production Morph overclaim",
+				Rule:    "Surface beauty/quality claim without same-commit Morph rendered beauty evidence",
 				Snippet: strings.TrimSpace(clause.Text),
 			})
 		}
-		if containsTargetProductionClaim(lower, "windows") && !evidence.WindowsProductionTargetHost && !surfaceClaimExplicitNonClaimContext(lower) {
+		if containsProductionMorphClaim(lower) && !surfaceClaimExplicitNonClaimContext(lower) &&
+			!evidence.MorphRenderedBeautyProduct {
+			issues = append(issues, surfaceClaimIssue{
+				Path:    rel,
+				Line:    clause.Line,
+				Rule:    "production Morph overclaim without same-commit Morph rendered beauty product signoff",
+				Snippet: strings.TrimSpace(clause.Text),
+			})
+		}
+		if containsTargetProductionClaim(lower, "windows") &&
+			!evidence.WindowsProductionTargetHost &&
+			!surfaceClaimExplicitNonClaimContext(lower) {
 			issues = append(issues, surfaceClaimIssue{
 				Path:    rel,
 				Line:    clause.Line,
@@ -271,7 +348,8 @@ func inspectSurfaceClaimText(root string, path string, text string, evidence sur
 				Snippet: strings.TrimSpace(clause.Text),
 			})
 		}
-		if containsTargetProductionClaim(lower, "macos") && !evidence.MacOSProductionTargetHost && !surfaceClaimExplicitNonClaimContext(lower) {
+		if containsTargetProductionClaim(lower, "macos") && !evidence.MacOSProductionTargetHost &&
+			!surfaceClaimExplicitNonClaimContext(lower) {
 			issues = append(issues, surfaceClaimIssue{
 				Path:    rel,
 				Line:    clause.Line,
@@ -295,8 +373,69 @@ func inspectSurfaceClaimText(root string, path string, text string, evidence sur
 				Snippet: strings.TrimSpace(clause.Text),
 			})
 		}
+		if containsNativeSurfaceHostPromotionClaim(lower) &&
+			!surfaceClaimExplicitNonClaimContext(lower) &&
+			!evidence.NativeSurfaceHostStrict {
+			issues = append(issues, surfaceClaimIssue{
+				Path:    rel,
+				Line:    clause.Line,
+				Rule:    "Native Surface Host v1 promotion without strict native-host evidence",
+				Snippet: strings.TrimSpace(clause.Text),
+			})
+		}
 	}
 	return issues
+}
+
+func hasStrictNativeSurfaceHostEvidence(raw []byte) bool {
+	var report struct {
+		Schema       string `json:"schema"`
+		Target       string `json:"target"`
+		Runtime      string `json:"runtime"`
+		HostEvidence struct {
+			Level                     string `json:"level"`
+			Backend                   string `json:"backend"`
+			Framebuffer               bool   `json:"framebuffer"`
+			RealWindow                bool   `json:"real_window"`
+			NativeInput               bool   `json:"native_input"`
+			UserFacingPlatformWidgets bool   `json:"user_facing_platform_widgets"`
+		} `json:"host_evidence"`
+		NativeSurfaceHost *surface.NativeSurfaceHostReport `json:"native_surface_host"`
+	}
+	if err := json.Unmarshal(raw, &report); err != nil {
+		return false
+	}
+	evidence := report.NativeSurfaceHost
+	if report.Schema != surface.SchemaV1 || evidence == nil {
+		return false
+	}
+	return report.Target == "linux-x64" &&
+		report.Runtime == "surface-linux-x64" &&
+		report.HostEvidence.Level == surface.NativeSurfaceHostLevelLinuxX64 &&
+		report.HostEvidence.Backend == surface.NativeSurfaceHostBackendWayland &&
+		report.HostEvidence.Framebuffer &&
+		report.HostEvidence.RealWindow &&
+		report.HostEvidence.NativeInput &&
+		!report.HostEvidence.UserFacingPlatformWidgets &&
+		evidence.Schema == surface.NativeSurfaceHostSchemaV1 &&
+		evidence.Host == "wayland" &&
+		evidence.Protocol == surface.NativeSurfaceHostProtocolV1 &&
+		evidence.AppProcessKind == "compiled-linux-x64-tetra-app" &&
+		evidence.HostProcessKind == "tetra-surface-host-wayland" &&
+		evidence.AppPID > 0 &&
+		evidence.HostPID > 0 &&
+		evidence.AppPID != evidence.HostPID &&
+		evidence.SurfaceOpenFromApp &&
+		evidence.PollEventFromHost &&
+		evidence.PresentFromAppRGBA &&
+		evidence.AppLoopObserved &&
+		evidence.RealWindow &&
+		evidence.RealCloseEvent &&
+		evidence.RealPointerEventCount > 0 &&
+		evidence.RealKeyEventCount > 0 &&
+		evidence.PresentedFrameCount >= 2 &&
+		!evidence.PreRenderedFrameSource &&
+		evidence.DeliveryPath == "compiled-tetra-app-to-wayland-surface"
 }
 
 func relativeSurfaceClaimPath(root string, path string) string {
@@ -362,6 +501,8 @@ func surfaceClaimClauseSafe(lower string) bool {
 		"require target-host",
 		"only with target",
 		"only with real",
+		"only after",
+		"only when",
 		"evidence before",
 		"must be false",
 		"productionclaim",
@@ -388,8 +529,11 @@ func surfaceClaimExplicitNonClaimContext(lower string) bool {
 		"reject",
 		"rejected",
 		"absent",
+		"until",
 		"does not",
 		"do not",
+		"only after",
+		"only when",
 		"must be false",
 		"productionclaim",
 		"production_claim\": false",
@@ -446,6 +590,27 @@ func containsDocsOnlyProductionClaim(lower string) bool {
 		surfaceClaimPromotes(lower)
 }
 
+func containsNativeSurfaceHostPromotionClaim(lower string) bool {
+	if surfaceClaimArtifactContext(lower) {
+		return false
+	}
+	if !containsNativeSurfaceHostReference(lower) {
+		return false
+	}
+	return surfaceClaimPromotes(lower)
+}
+
+func containsNativeSurfaceHostReference(lower string) bool {
+	return containsAnySubstring(lower, []string{
+		"native surface host",
+		"native-host",
+		"native host v1",
+		"tetra.surface.native-host.v1",
+		"linux-x64-native-surface-host-v1",
+		"linux-x64-native-host",
+	})
+}
+
 func containsStaleProductionEvidence(text string) bool {
 	compact := compactSurfaceClaimText(text)
 	return strings.Contains(compact, `"production_claim":true`) &&
@@ -497,6 +662,90 @@ func containsProductionMorphClaim(lower string) bool {
 		return true
 	}
 	return false
+}
+
+func containsSurfaceQualityClaim(lower string) bool {
+	if surfaceClaimArtifactContext(lower) {
+		return false
+	}
+	if containsRuntimeQualityClaim(lower, "electron") ||
+		containsRuntimeQualityClaim(lower, "react") {
+		return true
+	}
+	if containsPixelPerfectSurfaceClaim(lower) {
+		return true
+	}
+	if containsMorphBeautyClaim(lower) {
+		return true
+	}
+	return false
+}
+
+func surfaceClaimArtifactContext(lower string) bool {
+	return containsAnySubstring(lower, []string{
+		`"path"`,
+		`"root"`,
+		`"command_line"`,
+		"/reports/",
+		"reports/",
+		"--report-dir",
+	})
+}
+
+func containsRuntimeQualityClaim(lower string, runtime string) bool {
+	if !strings.Contains(lower, runtime) {
+		return false
+	}
+	if !containsAnySubstring(lower, []string{
+		runtime + "-quality",
+		runtime + " quality",
+		runtime + " grade",
+		runtime + "-grade",
+	}) {
+		return false
+	}
+	return containsAnySubstring(lower, []string{
+		"surface",
+		"tetra",
+		"ui",
+		"user interface",
+		"app shell",
+	})
+}
+
+func containsPixelPerfectSurfaceClaim(lower string) bool {
+	if !containsAnySubstring(lower, []string{"pixel-perfect", "pixel perfect"}) {
+		return false
+	}
+	return containsAnySubstring(lower, []string{
+		"surface",
+		"tetra",
+		"ui",
+		"user interface",
+		"morph",
+		"rendering",
+	})
+}
+
+func containsMorphBeautyClaim(lower string) bool {
+	if !strings.Contains(lower, "morph") || !strings.Contains(lower, "beauty") {
+		return false
+	}
+	return surfaceClaimPromotes(lower) ||
+		containsAnySubstring(lower, []string{
+			"beauty is proven",
+			"beauty is guaranteed",
+			"beauty is ready",
+			"beauty layer is proven",
+			"beauty layer is ready",
+			"can be described as the rendered beauty layer",
+			"is the rendered beauty layer",
+			"has morph rendered beauty",
+			"morph rendered beauty is proven",
+			"morph rendered beauty is available",
+			"production beauty",
+			"product beauty",
+		})
 }
 
 func containsTargetProductionClaim(lower string, target string) bool {

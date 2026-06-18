@@ -1,1 +1,5 @@
-{"validator":"release-summary","mutation":"experimental_true","expected_error":"experimental"}
+{
+  "validator": "release-summary",
+  "mutation": "experimental_true",
+  "expected_error": "experimental"
+}

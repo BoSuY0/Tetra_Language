@@ -1,0 +1,23 @@
+// Typed task error microservice smoke.
+//
+// The service spawns a throwing worker through the typed task ABI and converts
+// the typed payload into a deterministic service status.
+module examples.microservices.parallel.tasks.typed.typed_task_error_service
+enum TaskErr:
+    case rejected(Int)
+    case stopped
+
+func payment_worker() -> Int throws TaskErr:
+    throw TaskErr.rejected(42)
+
+func main() -> Int
+uses runtime:
+    let task = core.task_spawn_i32_typed<TaskErr>("payment_worker")
+    let status: Int = catch core.task_join_i32_typed<TaskErr>(task):
+    case TaskErr.rejected(code):
+        code
+    case TaskErr.stopped:
+        7
+    if status == 42:
+        return 0
+    return status

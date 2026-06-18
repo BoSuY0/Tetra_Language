@@ -120,8 +120,73 @@ func ModuleRelPath(module string, extension string) string {
 }
 
 func ModuleCandidateRelPaths(module string) []string {
-	return []string{
+	candidates := []string{
 		ModuleRelPath(module, T4SourceExtension),
 		ModuleRelPath(module, LegacyTetraSourceExtension),
+	}
+	if extra := standardLibraryModuleRelPath(module); extra != "" {
+		candidates = append(candidates,
+			filepath.FromSlash(extra+T4SourceExtension),
+			filepath.FromSlash(extra+LegacyTetraSourceExtension),
+		)
+	}
+	return candidates
+}
+
+func standardLibraryModuleRelPath(module string) string {
+	if strings.HasPrefix(module, "lib.core.") {
+		name := strings.TrimPrefix(module, "lib.core.")
+		if bucket := coreStdlibBucket(name); bucket != "" {
+			return "lib/core/" + bucket + "/" + name
+		}
+	}
+	if strings.HasPrefix(module, "lib.experimental.") {
+		name := strings.TrimPrefix(module, "lib.experimental.")
+		if bucket := experimentalStdlibBucket(name); bucket != "" {
+			return "lib/experimental/" + bucket + "/" + name
+		}
+	}
+	return ""
+}
+
+func coreStdlibBucket(name string) string {
+	switch name {
+	case "capability", "math", "strings", "sync", "testing", "time":
+		return "base"
+	case "collections", "crypto", "json", "serialization", "slices":
+		return "data"
+	case "filesystem", "http", "io", "net", "networking", "postgres":
+		return "io"
+	case "memory":
+		return "memory"
+	case "async":
+		return "async"
+	case "accessibility", "component", "draw", "i18n", "surface", "text":
+		return "surface"
+	case "style", "surface_app", "surface_app_shell", "widgets":
+		return "widgets"
+	case "block":
+		return "block"
+	case "morph":
+		return "morph"
+	default:
+		return ""
+	}
+}
+
+func experimentalStdlibBucket(name string) string {
+	switch name {
+	case "math", "strings", "sync", "testing", "time":
+		return "base"
+	case "collections", "crypto", "serialization", "slices":
+		return "data"
+	case "filesystem", "io", "networking":
+		return "io"
+	case "memory":
+		return "memory"
+	case "async":
+		return "async"
+	default:
+		return ""
 	}
 }

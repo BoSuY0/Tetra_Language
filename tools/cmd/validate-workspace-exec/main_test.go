@@ -319,7 +319,9 @@ func TestValidateWorkspaceExecRejectsInvalidMemberPaths(t *testing.T) {
   "failed": 0,
   "skipped": 0,
   "members": [
-    {"path": ` + strconv.Quote(tt.memberPath) + `, "capsule_id": "tetra://app", "status": "pass", "exit_code": 0}
+    {"path": ` + strconv.Quote(
+				tt.memberPath,
+			) + `, "capsule_id": "tetra://app", "status": "pass", "exit_code": 0}
   ]
 }`)
 			err := validateWorkspaceExecReport(raw)

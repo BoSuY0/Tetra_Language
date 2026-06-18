@@ -92,19 +92,29 @@ func ValidateRegionAwareStdlibCoverage(report RegionAwareStdlibCoverageReport) e
 		return fmt.Errorf("region-aware stdlib coverage: schema = %q", report.SchemaVersion)
 	}
 	if report.FullProductionWebStackClaimed {
-		return fmt.Errorf("region-aware stdlib coverage: full production web stack claim is forbidden for P19.0")
+		return fmt.Errorf(
+			"region-aware stdlib coverage: full production web stack claim is forbidden for P19.0",
+		)
 	}
 	if report.OfficialTechEmpowerResultClaimed {
-		return fmt.Errorf("region-aware stdlib coverage: official TechEmpower result claim is forbidden for P19.0")
+		return fmt.Errorf(
+			"region-aware stdlib coverage: official TechEmpower result claim is forbidden for P19.0",
+		)
 	}
 	if report.ProductionPostgreSQLStackClaimed {
-		return fmt.Errorf("region-aware stdlib coverage: production PostgreSQL stack claim is forbidden for P19.0")
+		return fmt.Errorf(
+			"region-aware stdlib coverage: production PostgreSQL stack claim is forbidden for P19.0",
+		)
 	}
 	if report.GenericCollectionAPIClaimed {
-		return fmt.Errorf("region-aware stdlib coverage: generic collection API claim is forbidden for P19.0")
+		return fmt.Errorf(
+			"region-aware stdlib coverage: generic collection API claim is forbidden for P19.0",
+		)
 	}
 	if report.RuntimeBehaviorChanged {
-		return fmt.Errorf("region-aware stdlib coverage: runtime behavior change claim is forbidden for P19.0")
+		return fmt.Errorf(
+			"region-aware stdlib coverage: runtime behavior change claim is forbidden for P19.0",
+		)
 	}
 	for _, want := range []string{
 		"full production web stack is not claimed",
@@ -133,7 +143,11 @@ func ValidateRegionAwareStdlibCoverage(report RegionAwareStdlibCoverageReport) e
 		RegionStdlibProductionBoundaries: RegionAwareStdlibBoundaryDocumented,
 	}
 	if len(report.Rows) != len(expectedStatus) {
-		return fmt.Errorf("region-aware stdlib coverage: row count = %d, want %d", len(report.Rows), len(expectedStatus))
+		return fmt.Errorf(
+			"region-aware stdlib coverage: row count = %d, want %d",
+			len(report.Rows),
+			len(expectedStatus),
+		)
 	}
 	rows := map[RegionAwareStdlibEvidenceID]RegionAwareStdlibEvidenceRow{}
 	for _, row := range report.Rows {
@@ -146,16 +160,28 @@ func ValidateRegionAwareStdlibCoverage(report RegionAwareStdlibCoverageReport) e
 		}
 		rows[row.ID] = row
 		if row.Status != wantStatus {
-			return fmt.Errorf("region-aware stdlib coverage: row %q status = %q, want %q", row.ID, row.Status, wantStatus)
+			return fmt.Errorf(
+				"region-aware stdlib coverage: row %q status = %q, want %q",
+				row.ID,
+				row.Status,
+				wantStatus,
+			)
 		}
-		if strings.TrimSpace(row.Name) == "" || strings.TrimSpace(row.Evidence) == "" || strings.TrimSpace(row.Boundary) == "" {
-			return fmt.Errorf("region-aware stdlib coverage: row %q missing evidence or boundary", row.ID)
+		if strings.TrimSpace(row.Name) == "" || strings.TrimSpace(row.Evidence) == "" ||
+			strings.TrimSpace(row.Boundary) == "" {
+			return fmt.Errorf(
+				"region-aware stdlib coverage: row %q missing evidence or boundary",
+				row.ID,
+			)
 		}
 		if len(row.RequiredFacts) == 0 {
 			return fmt.Errorf("region-aware stdlib coverage: row %q missing required facts", row.ID)
 		}
 		if row.HiddenHeapInHotPath {
-			return fmt.Errorf("region-aware stdlib coverage: row %q claims hidden heap in hot path", row.ID)
+			return fmt.Errorf(
+				"region-aware stdlib coverage: row %q claims hidden heap in hot path",
+				row.ID,
+			)
 		}
 	}
 	for id := range expectedStatus {
@@ -168,24 +194,50 @@ func ValidateRegionAwareStdlibCoverage(report RegionAwareStdlibCoverageReport) e
 		id    RegionAwareStdlibEvidenceID
 		wants []string
 	}{
-		{RegionStdlibStringBuilder, []string{"NewStringBuilder", "StorageRegion", "borrowed BytesView"}},
+		{
+			RegionStdlibStringBuilder,
+			[]string{"NewStringBuilder", "StorageRegion", "borrowed BytesView"},
+		},
 		{RegionStdlibVecArray, []string{"NewVecBytes", "Vec/Array equivalent", "CopyOperations"}},
 		{RegionStdlibHashMap, []string{"NewHashMapBytes", "open addressing", "BytesCopied"}},
-		{RegionStdlibJSONParserBuilder, []string{"ParseValueView", "AppendValue", "BorrowedStrings", "CopiedStrings"}},
-		{RegionStdlibHTTPParserBuilder, []string{"ParseRequestViewInRegion", "AppendResponseWithReport", "HeaderViewsBorrowed"}},
-		{RegionStdlibPostgreSQLProtocol, []string{"AppendBindFormat", "DecodeDataRowBorrowed", "RowDecodeReport"}},
+		{
+			RegionStdlibJSONParserBuilder,
+			[]string{"ParseValueView", "AppendValue", "BorrowedStrings", "CopiedStrings"},
+		},
+		{
+			RegionStdlibHTTPParserBuilder,
+			[]string{"ParseRequestViewInRegion", "AppendResponseWithReport", "HeaderViewsBorrowed"},
+		},
+		{
+			RegionStdlibPostgreSQLProtocol,
+			[]string{"AppendBindFormat", "DecodeDataRowBorrowed", "RowDecodeReport"},
+		},
 		{RegionStdlibBuffers, []string{"NewByteBuffer", "StorageReport"}},
 		{RegionStdlibRingBuffers, []string{"NewRingBuffer", "wrapped readable window", "Copied"}},
 		{RegionStdlibBorrowedViews, []string{"BytesView", "StorageBorrowed", "StorageRegion"}},
-		{RegionStdlibCopyReports, []string{"copy only when needed", "CopyOperations", "BytesCopied"}},
+		{
+			RegionStdlibCopyReports,
+			[]string{"copy only when needed", "CopyOperations", "BytesCopied"},
+		},
 		{RegionStdlibNoHiddenHeapReports, []string{"HiddenHeap=false", "HeapAllocations=0"}},
-		{RegionStdlibProductionBoundaries, []string{"no full production web stack", "no official TechEmpower", "no production PostgreSQL"}},
+		{
+			RegionStdlibProductionBoundaries,
+			[]string{
+				"no full production web stack",
+				"no official TechEmpower",
+				"no production PostgreSQL",
+			},
+		},
 	}
 	for _, check := range checks {
 		row := rows[check.id]
 		for _, want := range check.wants {
 			if !containsRegionStdlibText(row.RequiredFacts, want) {
-				return fmt.Errorf("region-aware stdlib coverage: row %q missing fact %q", row.ID, want)
+				return fmt.Errorf(
+					"region-aware stdlib coverage: row %q missing fact %q",
+					row.ID,
+					want,
+				)
 			}
 		}
 	}
@@ -202,8 +254,11 @@ func regionStdlibStringBuilderRow() RegionAwareStdlibEvidenceRow {
 			"StringBuilder.View returns a borrowed BytesView over region storage",
 			"StorageReport records HiddenHeap=false for region-backed StringBuilder hot paths",
 		},
-		Evidence:            "compiler/internal/stdlibrt/collections.go::NewStringBuilder; compiler/internal/stdlibrt/collections_test.go::TestRegionAwareStdlibHelpersUseRegionReportsAndBorrowedViews",
-		Boundary:            "byte-oriented StringBuilder helper only; this is not a public generic string API or Unicode rope implementation",
+		Evidence: ("compiler/internal/stdlibrt/collections.go::NewStringBuilder; " +
+			"compiler/internal/stdlibrt/collections_" +
+			"test.go::TestRegionAwareStdlibHelpersUseRegionReportsAndBorrowedViews"),
+		Boundary: ("byte-oriented StringBuilder helper only; this is not a public " +
+			"generic string API or Unicode rope implementation"),
 		RegionFirst:         true,
 		BorrowedViews:       true,
 		CopyOnlyWhenNeeded:  true,
@@ -221,8 +276,11 @@ func regionStdlibVecArrayRow() RegionAwareStdlibEvidenceRow {
 			"AppendBorrowed reports CopyOperations only when borrowed bytes must be retained",
 			"VecBytes.View returns a borrowed BytesView over region storage",
 		},
-		Evidence:            "compiler/internal/stdlibrt/collections.go::NewVecBytes; compiler/internal/stdlibrt/collections_test.go::TestRegionAwareStdlibHelpersUseRegionReportsAndBorrowedViews",
-		Boundary:            "VecBytes is a narrow runtime helper for bytes; broad generic Vec<T> syntax/API remains outside P19.0",
+		Evidence: ("compiler/internal/stdlibrt/collections.go::NewVecBytes; " +
+			"compiler/internal/stdlibrt/collections_" +
+			"test.go::TestRegionAwareStdlibHelpersUseRegionReportsAndBorrowedViews"),
+		Boundary: ("VecBytes is a narrow runtime helper for bytes; broad generic " +
+			"Vec<T> syntax/API remains outside P19.0"),
 		RegionFirst:         true,
 		BorrowedViews:       true,
 		CopyOnlyWhenNeeded:  true,
@@ -237,11 +295,16 @@ func regionStdlibHashMapRow() RegionAwareStdlibEvidenceRow {
 		Status: RegionAwareStdlibImplementedNarrow,
 		RequiredFacts: []string{
 			"NewHashMapBytes stores fixed-capacity byte keys and values with open addressing",
-			"HashMapBytes.Put records BytesCopied and CopyOperations because retained key/value bytes must be copied",
+			("HashMapBytes.Put records BytesCopied and CopyOperations because " +
+				"retained key/value bytes must be copied"),
 			"HashMapBytes.Get returns a borrowed BytesView over retained region storage",
 		},
-		Evidence:            "compiler/internal/stdlibrt/collections.go::NewHashMapBytes; compiler/internal/stdlibrt/collections_test.go::TestRegionAwareStdlibHelpersUseRegionReportsAndBorrowedViews",
-		Boundary:            "HashMapBytes is a fixed-capacity byte-key helper; generic HashMap<K,V>, deletion, resizing, and hashing policy tuning remain future work",
+		Evidence: ("compiler/internal/stdlibrt/collections.go::NewHashMapBytes; " +
+			"compiler/internal/stdlibrt/collections_" +
+			"test.go::TestRegionAwareStdlibHelpersUseRegionReportsAndBorrowedViews"),
+		Boundary: ("HashMapBytes is a fixed-capacity byte-key helper; generic " +
+			"HashMap<K,V>, deletion, resizing, and hashing policy tuning remain " +
+			"future work"),
 		RegionFirst:         true,
 		BorrowedViews:       true,
 		CopyOnlyWhenNeeded:  true,
@@ -256,11 +319,17 @@ func regionStdlibJSONParserBuilderRow() RegionAwareStdlibEvidenceRow {
 		Status: RegionAwareStdlibImplementedNarrow,
 		RequiredFacts: []string{
 			"ParseValueView borrows unescaped JSON strings and reports BorrowedStrings",
-			"escaped JSON strings copy into the request Region and report CopiedStrings without HeapAllocations when a Region is supplied",
-			"AppendValue and AppendString provide deterministic JSON builder evidence; generic ParseValue remains heap-backed and is not the hot borrowed-view path",
+			("escaped JSON strings copy into the request Region and report " +
+				"CopiedStrings without HeapAllocations when a Region is supplied"),
+			("AppendValue and AppendString provide deterministic JSON builder " +
+				"evidence; generic ParseValue remains heap-backed and is not the hot " +
+				"borrowed-view path"),
 		},
-		Evidence:            "compiler/internal/jsonrt/view.go::ParseValueView; compiler/internal/jsonrt/json.go::AppendValue; compiler/internal/jsonrt/json.go::AppendString; compiler/internal/jsonrt/view_test.go",
-		Boundary:            "JSON evidence is a narrow parser/builder slice; it is not a complete DOM-free streaming JSON runtime",
+		Evidence: ("compiler/internal/jsonrt/view.go::ParseValueView; compiler/" +
+			"internal/jsonrt/json.go::AppendValue; compiler/internal/jsonrt/" +
+			"json.go::AppendString; compiler/internal/jsonrt/view_test.go"),
+		Boundary: ("JSON evidence is a narrow parser/builder slice; it is not a " +
+			"complete DOM-free streaming JSON runtime"),
 		RegionFirst:         true,
 		BorrowedViews:       true,
 		CopyOnlyWhenNeeded:  true,
@@ -274,12 +343,18 @@ func regionStdlibHTTPParserBuilderRow() RegionAwareStdlibEvidenceRow {
 		Name:   "Region-aware HTTP parser/builder",
 		Status: RegionAwareStdlibImplementedNarrow,
 		RequiredFacts: []string{
-			"ParseRequestViewInRegion reports request-region storage while request/header slices remain borrowed",
+			("ParseRequestViewInRegion reports request-region storage while " +
+				"request/header slices remain borrowed"),
 			"RequestParseReport records HeaderViewsBorrowed and HeaderValuesCopied",
-			"AppendResponseWithReport records region response-buffer storage and HeapAllocations=0 for caller-provided region buffers",
+			("AppendResponseWithReport records region response-buffer storage " +
+				"and HeapAllocations=0 for caller-provided region buffers"),
 		},
-		Evidence:            "compiler/internal/httprt/request_view.go::ParseRequestViewInRegion; compiler/internal/httprt/request_view.go::AppendResponseWithReport; compiler/internal/httprt/request_region.go::RequestRegionScope",
-		Boundary:            "HTTP evidence covers request-head/body views and response building; it is not a full production web stack or router claim",
+		Evidence: ("compiler/internal/httprt/request_" +
+			"view.go::ParseRequestViewInRegion; compiler/internal/httprt/request_" +
+			"view.go::AppendResponseWithReport; compiler/internal/httprt/request_" +
+			"region.go::RequestRegionScope"),
+		Boundary: ("HTTP evidence covers request-head/body views and response " +
+			"building; it is not a full production web stack or router claim"),
 		RegionFirst:         true,
 		BorrowedViews:       true,
 		CopyOnlyWhenNeeded:  true,
@@ -297,8 +372,11 @@ func regionStdlibPostgreSQLProtocolRow() RegionAwareStdlibEvidenceRow {
 			"DecodeDataRowBorrowed returns borrowed cell slices and a RowDecodeReport",
 			"RowDecodeReport records borrowed cells without promoting a production PostgreSQL stack",
 		},
-		Evidence:            "compiler/internal/pgrt/wire.go::AppendBindFormat; compiler/internal/pgrt/wire.go::DecodeDataRowBorrowed; compiler/internal/pgrt/row_decode_test.go::TestDecodeDataRowBorrowedDoesNotCopyCells",
-		Boundary:            "PostgreSQL evidence covers protocol helpers and borrowed row decoding; production pooling/driver readiness is not claimed",
+		Evidence: ("compiler/internal/pgrt/wire.go::AppendBindFormat; compiler/" +
+			"internal/pgrt/wire.go::DecodeDataRowBorrowed; compiler/internal/pgrt/" +
+			"row_decode_test.go::TestDecodeDataRowBorrowedDoesNotCopyCells"),
+		Boundary: ("PostgreSQL evidence covers protocol helpers and borrowed row " +
+			"decoding; production pooling/driver readiness is not claimed"),
 		RegionFirst:         true,
 		BorrowedViews:       true,
 		CopyOnlyWhenNeeded:  true,
@@ -316,8 +394,11 @@ func regionStdlibBuffersRow() RegionAwareStdlibEvidenceRow {
 			"ByteBuffer.View returns borrowed BytesView slices",
 			"StorageReport records StorageRegion, RegionID, HiddenHeap=false, BytesReserved, and BytesUsed",
 		},
-		Evidence:            "compiler/internal/stdlibrt/collections.go::NewByteBuffer; compiler/internal/stdlibrt/collections_test.go::TestByteBufferViewsPreserveRegionProvenance",
-		Boundary:            "ByteBuffer is a bounded region helper; dynamic resizing and generic buffer abstractions remain future work",
+		Evidence: ("compiler/internal/stdlibrt/collections.go::NewByteBuffer; " +
+			"compiler/internal/stdlibrt/collections_" +
+			"test.go::TestByteBufferViewsPreserveRegionProvenance"),
+		Boundary: ("ByteBuffer is a bounded region helper; dynamic resizing and " +
+			"generic buffer abstractions remain future work"),
 		RegionFirst:         true,
 		BorrowedViews:       true,
 		CopyOnlyWhenNeeded:  true,
@@ -335,8 +416,11 @@ func regionStdlibRingBuffersRow() RegionAwareStdlibEvidenceRow {
 			"PeekView borrows contiguous readable windows and copies only a wrapped readable window",
 			"wrapped views set BytesView.Copied and update CopyOperations/BytesCopied",
 		},
-		Evidence:            "compiler/internal/stdlibrt/collections.go::NewRingBuffer; compiler/internal/stdlibrt/collections_test.go::TestRegionAwareStdlibHelpersUseRegionReportsAndBorrowedViews",
-		Boundary:            "RingBuffer is bounded FIFO byte storage; multi-producer concurrency and network-reactor integration remain outside P19.0",
+		Evidence: ("compiler/internal/stdlibrt/collections.go::NewRingBuffer; " +
+			"compiler/internal/stdlibrt/collections_" +
+			"test.go::TestRegionAwareStdlibHelpersUseRegionReportsAndBorrowedViews"),
+		Boundary: ("RingBuffer is bounded FIFO byte storage; multi-producer " +
+			"concurrency and network-reactor integration remain outside P19.0"),
 		RegionFirst:         true,
 		BorrowedViews:       true,
 		CopyOnlyWhenNeeded:  true,
@@ -354,8 +438,11 @@ func regionStdlibBorrowedViewsRow() RegionAwareStdlibEvidenceRow {
 			"BytesView carries StorageRegion and RegionID for region-owned collection views",
 			"borrowed views preserve provenance and do not imply escaped ownership",
 		},
-		Evidence:            "compiler/internal/stdlibrt/collections.go::BytesView; compiler/internal/jsonrt/view.go::parseString; compiler/internal/httprt/request_view.go::parseHeaderLineView",
-		Boundary:            "borrowed-view evidence is runtime helper metadata, not a new lifetime type-system feature",
+		Evidence: ("compiler/internal/stdlibrt/collections.go::BytesView; compiler/" +
+			"internal/jsonrt/view.go::parseString; compiler/internal/httprt/request_" +
+			"view.go::parseHeaderLineView"),
+		Boundary: ("borrowed-view evidence is runtime helper metadata, not a new " +
+			"lifetime type-system feature"),
 		RegionFirst:         true,
 		BorrowedViews:       true,
 		CopyOnlyWhenNeeded:  true,
@@ -373,8 +460,11 @@ func regionStdlibCopyReportsRow() RegionAwareStdlibEvidenceRow {
 			"JSON view parsing reports CopiedStrings only for escaped strings that must be decoded",
 			"RingBuffer wrapped views report Copied because a contiguous borrowed view is impossible",
 		},
-		Evidence:            "compiler/internal/stdlibrt/collections.go::StorageReport; compiler/internal/jsonrt/view.go::ParseViewReport; compiler/internal/stdlibrt/collections.go::RingBuffer.PeekView",
-		Boundary:            "copy reports are evidence rows; they do not promise global zero-copy behavior",
+		Evidence: ("compiler/internal/stdlibrt/collections.go::StorageReport; " +
+			"compiler/internal/jsonrt/view.go::ParseViewReport; compiler/internal/" +
+			"stdlibrt/collections.go::RingBuffer.PeekView"),
+		Boundary: ("copy reports are evidence rows; they do not promise global zero-" +
+			"copy behavior"),
 		RegionFirst:         true,
 		BorrowedViews:       true,
 		CopyOnlyWhenNeeded:  true,
@@ -392,8 +482,11 @@ func regionStdlibNoHiddenHeapReportsRow() RegionAwareStdlibEvidenceRow {
 			"HTTP/JSON hot-path reports require HeapAllocations=0 when region buffers are supplied",
 			"heap fallback remains report-visible through HiddenHeap=true or HeapAllocations>0",
 		},
-		Evidence:            "compiler/internal/stdlibrt/collections.go::StorageReport; compiler/internal/jsonrt/view.go::ParseViewReport; compiler/internal/httprt/request_view.go::ResponseBufferReport",
-		Boundary:            "this is report-visible helper evidence, not a proof that all Go tests or all future stdlib code allocate zero heap",
+		Evidence: ("compiler/internal/stdlibrt/collections.go::StorageReport; " +
+			"compiler/internal/jsonrt/view.go::ParseViewReport; compiler/internal/" +
+			"httprt/request_view.go::ResponseBufferReport"),
+		Boundary: ("this is report-visible helper evidence, not a proof that all Go " +
+			"tests or all future stdlib code allocate zero heap"),
 		RegionFirst:         true,
 		BorrowedViews:       true,
 		CopyOnlyWhenNeeded:  true,
@@ -411,8 +504,11 @@ func regionStdlibProductionBoundariesRow() RegionAwareStdlibEvidenceRow {
 			"no official TechEmpower result is claimed by P19.0",
 			"no production PostgreSQL stack is claimed by P19.0",
 		},
-		Evidence:            "compiler/internal/stdlibrt/region_aware_coverage.go::ValidateRegionAwareStdlibCoverage; docs/plans/2026-06-03-region-aware-stdlib-v1-design.md",
-		Boundary:            "P19.0 is runtime-helper evidence only; P19.2/P19.3 and later gates must prove any production web/database promotion separately",
+		Evidence: ("compiler/internal/stdlibrt/region_aware_" +
+			"coverage.go::ValidateRegionAwareStdlibCoverage; docs/plans/2026-06-03/" +
+			"backend-stdlib/2026-06-03-region-aware-stdlib-v1-design.md"),
+		Boundary: ("P19.0 is runtime-helper evidence only; P19.2/P19.3 and later " +
+			"gates must prove any production web/database promotion separately"),
 		RegionFirst:         true,
 		BorrowedViews:       true,
 		CopyOnlyWhenNeeded:  true,

@@ -85,7 +85,9 @@ func Render(bundle *lower.UILoweredBundle) []byte {
 		return []byte("Tetra Native UI Shell\n(no UI metadata)\n")
 	}
 	if bundle.Schema != lower.UIBundleSchema {
-		return []byte("Tetra Native UI Shell\nunsupported UI schema: " + bundle.Schema + "\nruntime: unavailable\n")
+		return []byte(
+			"Tetra Native UI Shell\nunsupported UI schema: " + bundle.Schema + "\nruntime: unavailable\n",
+		)
 	}
 	state := initialState(bundle)
 	lines := []string{
@@ -110,7 +112,10 @@ func Render(bundle *lower.UILoweredBundle) []byte {
 		lines = append(lines, "")
 		lines = append(lines, "view "+view.Name+" (state: "+view.StateType+")")
 		for _, binding := range view.Bindings {
-			lines = append(lines, "  bind "+binding.Name+": "+binding.Type+" = "+bindingValue(state, view, binding))
+			lines = append(
+				lines,
+				"  bind "+binding.Name+": "+binding.Type+" = "+bindingValue(state, view, binding),
+			)
 		}
 		for _, event := range view.Events {
 			lines = append(lines, "  event "+event.Name+" -> "+event.Command)
@@ -178,7 +183,10 @@ func buildReport(bundle *lower.UILoweredBundle) shellReport {
 			Styles:    append([]lower.UILoweredStyle(nil), view.Styles...),
 		}
 		for _, entry := range view.Accessibility {
-			viewTrace.A11y = append(viewTrace.A11y, shellAccessibilityItem{Name: entry.Name, Type: entry.Type, Value: entry.Value})
+			viewTrace.A11y = append(
+				viewTrace.A11y,
+				shellAccessibilityItem{Name: entry.Name, Type: entry.Type, Value: entry.Value},
+			)
 		}
 		viewTrace.Widgets = widgetTraces(state, view, viewTrace.A11y)
 		for _, event := range view.Events {
@@ -203,7 +211,11 @@ func buildReport(bundle *lower.UILoweredBundle) shellReport {
 	return report
 }
 
-func widgetTraces(state map[string]map[string]string, view lower.UILoweredView, a11y []shellAccessibilityItem) []shellWidgetTrace {
+func widgetTraces(
+	state map[string]map[string]string,
+	view lower.UILoweredView,
+	a11y []shellAccessibilityItem,
+) []shellWidgetTrace {
 	out := make([]shellWidgetTrace, 0, len(view.Bindings)+len(view.Events))
 	for _, binding := range view.Bindings {
 		out = append(out, shellWidgetTrace{
@@ -234,10 +246,20 @@ func widgetKind(typ string) string {
 	return "value"
 }
 
-func bindingTraces(state map[string]map[string]string, view lower.UILoweredView) []shellBindingTrace {
+func bindingTraces(
+	state map[string]map[string]string,
+	view lower.UILoweredView,
+) []shellBindingTrace {
 	out := make([]shellBindingTrace, 0, len(view.Bindings))
 	for _, binding := range view.Bindings {
-		out = append(out, shellBindingTrace{Name: binding.Name, Type: binding.Type, Value: bindingValue(state, view, binding)})
+		out = append(
+			out,
+			shellBindingTrace{
+				Name:  binding.Name,
+				Type:  binding.Type,
+				Value: bindingValue(state, view, binding),
+			},
+		)
 	}
 	return out
 }
@@ -255,13 +277,18 @@ func initialState(bundle *lower.UILoweredBundle) map[string]map[string]string {
 }
 
 func parseInit(field lower.UILoweredStateField) string {
-	if field.Type == "str" && len(field.Init) >= 2 && strings.HasPrefix(field.Init, `"`) && strings.HasSuffix(field.Init, `"`) {
+	if field.Type == "str" && len(field.Init) >= 2 && strings.HasPrefix(field.Init, `"`) &&
+		strings.HasSuffix(field.Init, `"`) {
 		return strings.TrimSuffix(strings.TrimPrefix(field.Init, `"`), `"`)
 	}
 	return field.Init
 }
 
-func bindingValue(state map[string]map[string]string, view lower.UILoweredView, binding lower.UILoweredBinding) string {
+func bindingValue(
+	state map[string]map[string]string,
+	view lower.UILoweredView,
+	binding lower.UILoweredBinding,
+) string {
 	if field, ok := stateFieldName(binding.Source); ok {
 		return stateForView(state, view)[field]
 	}
@@ -282,7 +309,10 @@ func dispatchTranscript(state map[string]map[string]string, view lower.UILowered
 			}
 		}
 		for _, binding := range view.Bindings {
-			lines = append(lines, "  bind "+binding.Name+": "+binding.Type+" = "+bindingValue(state, view, binding))
+			lines = append(
+				lines,
+				"  bind "+binding.Name+": "+binding.Type+" = "+bindingValue(state, view, binding),
+			)
 		}
 	}
 	return lines
@@ -306,7 +336,10 @@ func stateForView(state map[string]map[string]string, view lower.UILoweredView) 
 	return fields
 }
 
-func applyOperation(fields map[string]string, op lower.UILoweredCommandOperation) (string, string, bool) {
+func applyOperation(
+	fields map[string]string,
+	op lower.UILoweredCommandOperation,
+) (string, string, bool) {
 	field, ok := stateFieldName(op.Target)
 	if !ok {
 		return "", "", false

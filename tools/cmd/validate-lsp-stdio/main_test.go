@@ -11,17 +11,64 @@ import (
 )
 
 func TestValidateLSPStdioAcceptsExpectedTranscript(t *testing.T) {
-	transcript := lspFrame(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"hoverProvider":true,"definitionProvider":true,"referencesProvider":true,"renameProvider":true,"completionProvider":{"resolveProvider":false},"documentFormattingProvider":true,"codeActionProvider":true}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///sample.tetra","diagnostics":[]}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":2,"result":[{"name":"answer","kind":14,"range":{"start":{"line":0,"character":6},"end":{"line":0,"character":12}},"selectionRange":{"start":{"line":0,"character":6},"end":{"line":0,"character":12}}}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":3,"result":{"contents":{"kind":"markdown","value":"const answer: i32"}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":4,"result":[{"label":"answer","kind":21,"detail":"const answer: i32"}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":5,"result":[{"uri":"file:///sample.tetra","range":{"start":{"line":0,"character":6},"end":{"line":0,"character":12}}}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":6,"result":[{"uri":"file:///sample.tetra","range":{"start":{"line":0,"character":6},"end":{"line":0,"character":12}}},{"uri":"file:///sample.tetra","range":{"start":{"line":3,"character":11},"end":{"line":3,"character":17}}}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":7,"result":{"changes":{"file:///sample.tetra":[{"range":{"start":{"line":0,"character":6},"end":{"line":0,"character":12}},"newText":"value"}]}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":8,"result":[{"range":{"start":{"line":0,"character":0},"end":{"line":4,"character":0}},"newText":"const answer: Int = 42\n\nfunc main() -> Int:\n    return answer\n"}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":9,"result":[{"title":"Add uses io to function main","kind":"quickfix","edit":{"changes":{"file:///sample.tetra":[{"range":{"start":{"line":2,"character":18},"end":{"line":2,"character":18}},"newText":" uses io"}]}}}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":10,"result":null}`)
+	transcript := lspFrame(
+		("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"capabilities\":" +
+			"{\"textDocumentSync\":1,\"documentSymbolProvider\":true," +
+			"\"hoverProvider\":true,\"definitionProvider\":true," +
+			"\"referencesProvider\":true,\"renameProvider\":true," +
+			"\"completionProvider\":{\"resolveProvider\":false}," +
+			"\"documentFormattingProvider\":true,\"codeActionProvider\":" +
+			"true}}}"),
+	) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\"," +
+				"\"params\":{\"uri\":\"file:///sample.tetra\",\"diagnostics\":[]}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":[{\"name\":\"answer\",\"kind\":" +
+				"14,\"range\":{\"start\":{\"line\":0,\"character\":6},\"end\":{\"line\":" +
+				"0,\"character\":12}},\"selectionRange\":{\"start\":{\"line\":0," +
+				"\"character\":6},\"end\":{\"line\":0,\"character\":12}}}]}"),
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":3,"result":{"contents":{"kind":"markdown","value":"const answer: i32"}}}`,
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":4,"result":[{"label":"answer","kind":21,"detail":"const answer: i32"}]}`,
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":5,\"result\":[{\"uri\":\"file:" +
+				"///sample.tetra\",\"range\":{\"start\":{\"line\":0,\"character\":6}," +
+				"\"end\":{\"line\":0,\"character\":12}}}]}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":6,\"result\":[{\"uri\":\"file:" +
+				"///sample.tetra\",\"range\":{\"start\":{\"line\":0,\"character\":6}," +
+				"\"end\":{\"line\":0,\"character\":12}}},{\"uri\":\"file:" +
+				"///sample.tetra\",\"range\":{\"start\":{\"line\":3,\"character\":11}," +
+				"\"end\":{\"line\":3,\"character\":17}}}]}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":7,\"result\":{\"changes\":{\"file:" +
+				"///sample.tetra\":[{\"range\":{\"start\":{\"line\":0,\"character\":" +
+				"6},\"end\":{\"line\":0,\"character\":12}},\"newText\":\"value\"}]}}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":8,\"result\":[{\"range\":{\"start\":{\"line\":" +
+				"0,\"character\":0},\"end\":{\"line\":4,\"character\":0}},\"newText\":" +
+				"\"const answer: Int = 42\\n\\nfunc main() -> Int:\\n    return " +
+				"answer\\n\"}]}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":9,\"result\":[{\"title\":\"Add uses io to " +
+				"function main\",\"kind\":\"quickfix\",\"edit\":{\"changes\":{\"file:" +
+				"///sample.tetra\":[{\"range\":{\"start\":{\"line\":2,\"character\":" +
+				"18},\"end\":{\"line\":2,\"character\":18}},\"newText\":\" uses io\"}]" +
+				"}}}]}"),
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":10,"result":null}`,
+		)
 	out, err := runStdioValidator(t, transcript)
 	if err != nil {
 		t.Fatalf("validator failed: %v\n%s", err, out)
@@ -54,27 +101,127 @@ func TestValidateLSPStdioAcceptsNumericLookingStringIDCorrelation(t *testing.T) 
 
 func TestValidateLSPStdioRejectsSwappedRequestMethods(t *testing.T) {
 	transcript := lspFrame(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"hoverProvider":true,"definitionProvider":true,"referencesProvider":true,"renameProvider":true,"completionProvider":{"resolveProvider":false},"documentFormattingProvider":true,"codeActionProvider":true}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///sample.tetra","languageId":"tetra","version":1,"text":"const answer: Int = 42\n\nfunc main() -> Int:\n  return answer\n"}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///sample.tetra","diagnostics":[]}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":2,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///sample.tetra"},"position":{"line":0,"character":6}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":3,"method":"textDocument/documentSymbol","params":{"textDocument":{"uri":"file:///sample.tetra"}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":2,"result":[{"name":"answer","kind":14,"range":{"start":{"line":0,"character":6},"end":{"line":0,"character":12}},"selectionRange":{"start":{"line":0,"character":6},"end":{"line":0,"character":12}}}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":3,"result":{"contents":{"kind":"markdown","value":"const answer: i32"}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":4,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///sample.tetra"},"position":{"line":3,"character":9}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":4,"result":[{"label":"answer","kind":21,"detail":"const answer: i32"}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":5,"method":"textDocument/definition","params":{"textDocument":{"uri":"file:///sample.tetra"},"position":{"line":3,"character":9}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":5,"result":[{"uri":"file:///sample.tetra","range":{"start":{"line":0,"character":6},"end":{"line":0,"character":12}}}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":6,"method":"textDocument/references","params":{"textDocument":{"uri":"file:///sample.tetra"},"position":{"line":3,"character":9},"context":{"includeDeclaration":true}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":6,"result":[{"uri":"file:///sample.tetra","range":{"start":{"line":0,"character":6},"end":{"line":0,"character":12}}},{"uri":"file:///sample.tetra","range":{"start":{"line":3,"character":11},"end":{"line":3,"character":17}}}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":7,"method":"textDocument/rename","params":{"textDocument":{"uri":"file:///sample.tetra"},"position":{"line":3,"character":9},"newName":"value"}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":7,"result":{"changes":{"file:///sample.tetra":[{"range":{"start":{"line":0,"character":6},"end":{"line":0,"character":12}},"newText":"value"}]}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":8,"method":"textDocument/formatting","params":{"textDocument":{"uri":"file:///sample.tetra"},"options":{"tabSize":4,"insertSpaces":true}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":8,"result":[{"range":{"start":{"line":0,"character":0},"end":{"line":4,"character":0}},"newText":"const answer: Int = 42\n\nfunc main() -> Int:\n    return answer\n"}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":"file:///sample.tetra","version":2},"contentChanges":[{"text":"const answer: Int = 42\n\nfunc main() -> Int:\n    print(\"x\")\n    return answer\n"}]}}`) +
-		lspFrame(`{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///sample.tetra","diagnostics":[{"range":{"start":{"line":3,"character":4},"end":{"line":3,"character":9}},"severity":1,"code":"TETRA2001","source":"tetra","message":"function 'main' uses effect 'io' but does not declare it"}]}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":9,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///sample.tetra"},"range":{"start":{"line":3,"character":4},"end":{"line":3,"character":9}},"context":{"diagnostics":[{"range":{"start":{"line":3,"character":4},"end":{"line":3,"character":9}},"severity":1,"code":"TETRA2001","source":"tetra","message":"function 'main' uses effect 'io' but does not declare it"}]}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":9,"result":[{"title":"Add uses io to function main","kind":"quickfix","edit":{"changes":{"file:///sample.tetra":[{"range":{"start":{"line":2,"character":18},"end":{"line":2,"character":18}},"newText":" uses io"}]}}}]}`) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"capabilities\":" +
+				"{\"textDocumentSync\":1,\"documentSymbolProvider\":true," +
+				"\"hoverProvider\":true,\"definitionProvider\":true," +
+				"\"referencesProvider\":true,\"renameProvider\":true," +
+				"\"completionProvider\":{\"resolveProvider\":false}," +
+				"\"documentFormattingProvider\":true,\"codeActionProvider\":" +
+				"true}}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didOpen\",\"params\":" +
+				"{\"textDocument\":{\"uri\":\"file:///sample.tetra\",\"languageId\":" +
+				"\"tetra\",\"version\":1,\"text\":\"const answer: Int = 42\\n\\nfunc " +
+				"main() -> Int:\\n  return answer\\n\"}}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\"," +
+				"\"params\":{\"uri\":\"file:///sample.tetra\",\"diagnostics\":[]}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"textDocument/hover\"," +
+				"\"params\":{\"textDocument\":{\"uri\":\"file:///sample.tetra\"}," +
+				"\"position\":{\"line\":0,\"character\":6}}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":" +
+				"\"textDocument/documentSymbol\",\"params\":{\"textDocument\":" +
+				"{\"uri\":\"file:///sample.tetra\"}}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":[{\"name\":\"answer\",\"kind\":" +
+				"14,\"range\":{\"start\":{\"line\":0,\"character\":6},\"end\":{\"line\":" +
+				"0,\"character\":12}},\"selectionRange\":{\"start\":{\"line\":0," +
+				"\"character\":6},\"end\":{\"line\":0,\"character\":12}}}]}"),
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":3,"result":{"contents":{"kind":"markdown","value":"const answer: i32"}}}`,
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"textDocument/completion\"," +
+				"\"params\":{\"textDocument\":{\"uri\":\"file:///sample.tetra\"}," +
+				"\"position\":{\"line\":3,\"character\":9}}}"),
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":4,"result":[{"label":"answer","kind":21,"detail":"const answer: i32"}]}`,
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"textDocument/definition\"," +
+				"\"params\":{\"textDocument\":{\"uri\":\"file:///sample.tetra\"}," +
+				"\"position\":{\"line\":3,\"character\":9}}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":5,\"result\":[{\"uri\":\"file:" +
+				"///sample.tetra\",\"range\":{\"start\":{\"line\":0,\"character\":6}," +
+				"\"end\":{\"line\":0,\"character\":12}}}]}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"textDocument/references\"," +
+				"\"params\":{\"textDocument\":{\"uri\":\"file:///sample.tetra\"}," +
+				"\"position\":{\"line\":3,\"character\":9},\"context\":" +
+				"{\"includeDeclaration\":true}}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":6,\"result\":[{\"uri\":\"file:" +
+				"///sample.tetra\",\"range\":{\"start\":{\"line\":0,\"character\":6}," +
+				"\"end\":{\"line\":0,\"character\":12}}},{\"uri\":\"file:" +
+				"///sample.tetra\",\"range\":{\"start\":{\"line\":3,\"character\":11}," +
+				"\"end\":{\"line\":3,\"character\":17}}}]}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"textDocument/rename\"," +
+				"\"params\":{\"textDocument\":{\"uri\":\"file:///sample.tetra\"}," +
+				"\"position\":{\"line\":3,\"character\":9},\"newName\":\"value\"}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":7,\"result\":{\"changes\":{\"file:" +
+				"///sample.tetra\":[{\"range\":{\"start\":{\"line\":0,\"character\":" +
+				"6},\"end\":{\"line\":0,\"character\":12}},\"newText\":\"value\"}]}}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"textDocument/formatting\"," +
+				"\"params\":{\"textDocument\":{\"uri\":\"file:///sample.tetra\"}," +
+				"\"options\":{\"tabSize\":4,\"insertSpaces\":true}}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":8,\"result\":[{\"range\":{\"start\":{\"line\":" +
+				"0,\"character\":0},\"end\":{\"line\":4,\"character\":0}},\"newText\":" +
+				"\"const answer: Int = 42\\n\\nfunc main() -> Int:\\n    return " +
+				"answer\\n\"}]}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didChange\",\"params\":" +
+				"{\"textDocument\":{\"uri\":\"file:///sample.tetra\",\"version\":2}," +
+				"\"contentChanges\":[{\"text\":\"const answer: Int = 42\\n\\nfunc " +
+				"main() -> Int:\\n    print(\\\"x\\\")\\n    return answer\\n\"}]}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\"," +
+				"\"params\":{\"uri\":\"file:///sample.tetra\",\"diagnostics\":" +
+				"[{\"range\":{\"start\":{\"line\":3,\"character\":4},\"end\":{\"line\":3," +
+				"\"character\":9}},\"severity\":1,\"code\":\"TETRA2001\",\"source\":" +
+				"\"tetra\",\"message\":\"function 'main' uses effect 'io' but " +
+				"does not declare it\"}]}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"textDocument/codeAction\"," +
+				"\"params\":{\"textDocument\":{\"uri\":\"file:///sample.tetra\"}," +
+				"\"range\":{\"start\":{\"line\":3,\"character\":4},\"end\":{\"line\":3," +
+				"\"character\":9}},\"context\":{\"diagnostics\":[{\"range\":{\"start\":" +
+				"{\"line\":3,\"character\":4},\"end\":{\"line\":3,\"character\":9}}," +
+				"\"severity\":1,\"code\":\"TETRA2001\",\"source\":\"tetra\",\"message\":" +
+				"\"function 'main' uses effect 'io' but does not declare it\"}]" +
+				"}}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":9,\"result\":[{\"title\":\"Add uses io to " +
+				"function main\",\"kind\":\"quickfix\",\"edit\":{\"changes\":{\"file:" +
+				"///sample.tetra\":[{\"range\":{\"start\":{\"line\":2,\"character\":" +
+				"18},\"end\":{\"line\":2,\"character\":18}},\"newText\":\" uses io\"}]" +
+				"}}}]}"),
+		) +
 		lspFrame(`{"jsonrpc":"2.0","id":10,"method":"shutdown","params":{}}`) +
 		lspFrame(`{"jsonrpc":"2.0","id":10,"result":null}`) +
 		lspFrame(`{"jsonrpc":"2.0","method":"exit","params":{}}`)
@@ -82,33 +229,74 @@ func TestValidateLSPStdioRejectsSwappedRequestMethods(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
 	}
-	if !strings.Contains(string(out), "request id 2 method textDocument/hover, expected textDocument/documentSymbol") {
+	if !strings.Contains(
+		string(out),
+		"request id 2 method textDocument/hover, expected textDocument/documentSymbol",
+	) {
 		t.Fatalf("unexpected output:\n%s", out)
 	}
 }
 
 func TestValidateLSPStdioRejectsMissingDiagnosticsAfterDidChange(t *testing.T) {
-	transcript := strings.Replace(validRequestResponseTranscript(), postChangeDiagnosticsFrame(), "", 1)
+	transcript := strings.Replace(
+		validRequestResponseTranscript(),
+		postChangeDiagnosticsFrame(),
+		"",
+		1,
+	)
 	out, err := runStdioValidator(t, transcript)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
 	}
-	if !strings.Contains(string(out), "missing textDocument/publishDiagnostics notification after textDocument/didChange") {
+	if !strings.Contains(
+		string(out),
+		"missing textDocument/publishDiagnostics notification after textDocument/didChange",
+	) {
 		t.Fatalf("unexpected output:\n%s", out)
 	}
 }
 
 func TestValidateLSPStdioRejectsMissingHoverResponse(t *testing.T) {
-	transcript := lspFrame(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"hoverProvider":true,"definitionProvider":true,"referencesProvider":true,"renameProvider":true,"completionProvider":{"resolveProvider":false},"documentFormattingProvider":true,"codeActionProvider":true}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///sample.tetra","diagnostics":[]}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":2,"result":[{"name":"answer","kind":14,"range":{"start":{"line":0,"character":6},"end":{"line":0,"character":12}},"selectionRange":{"start":{"line":0,"character":6},"end":{"line":0,"character":12}}}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":4,"result":[{"label":"answer","kind":21}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":5,"result":[{"uri":"file:///sample.tetra"}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":6,"result":[{"uri":"file:///sample.tetra"}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":7,"result":{"changes":{"file:///sample.tetra":[]}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":8,"result":[{"newText":"formatted"}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":9,"result":[{"title":"Add uses io to function main","kind":"quickfix"}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":10,"result":null}`)
+	transcript := lspFrame(
+		("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"capabilities\":" +
+			"{\"textDocumentSync\":1,\"documentSymbolProvider\":true," +
+			"\"hoverProvider\":true,\"definitionProvider\":true," +
+			"\"referencesProvider\":true,\"renameProvider\":true," +
+			"\"completionProvider\":{\"resolveProvider\":false}," +
+			"\"documentFormattingProvider\":true,\"codeActionProvider\":" +
+			"true}}}"),
+	) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\"," +
+				"\"params\":{\"uri\":\"file:///sample.tetra\",\"diagnostics\":[]}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":[{\"name\":\"answer\",\"kind\":" +
+				"14,\"range\":{\"start\":{\"line\":0,\"character\":6},\"end\":{\"line\":" +
+				"0,\"character\":12}},\"selectionRange\":{\"start\":{\"line\":0," +
+				"\"character\":6},\"end\":{\"line\":0,\"character\":12}}}]}"),
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":4,"result":[{"label":"answer","kind":21}]}`,
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":5,"result":[{"uri":"file:///sample.tetra"}]}`,
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":6,"result":[{"uri":"file:///sample.tetra"}]}`,
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":7,"result":{"changes":{"file:///sample.tetra":[]}}}`,
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":8,"result":[{"newText":"formatted"}]}`,
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":9,"result":[{"title":"Add uses io to function main","kind":"quickfix"}]}`,
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":10,"result":null}`,
+		)
 	out, err := runStdioValidator(t, transcript)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
@@ -119,8 +307,18 @@ func TestValidateLSPStdioRejectsMissingHoverResponse(t *testing.T) {
 }
 
 func TestValidateLSPStdioRejectsMissingDiagnosticsNotification(t *testing.T) {
-	transcript := lspFrame(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"hoverProvider":true,"definitionProvider":true,"referencesProvider":true,"renameProvider":true,"completionProvider":{"resolveProvider":false},"documentFormattingProvider":true,"codeActionProvider":true}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":2,"result":null}`)
+	transcript := lspFrame(
+		("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"capabilities\":" +
+			"{\"textDocumentSync\":1,\"documentSymbolProvider\":true," +
+			"\"hoverProvider\":true,\"definitionProvider\":true," +
+			"\"referencesProvider\":true,\"renameProvider\":true," +
+			"\"completionProvider\":{\"resolveProvider\":false}," +
+			"\"documentFormattingProvider\":true,\"codeActionProvider\":" +
+			"true}}}"),
+	) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":2,"result":null}`,
+		)
 	out, err := runStdioValidator(t, transcript)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
@@ -131,9 +329,21 @@ func TestValidateLSPStdioRejectsMissingDiagnosticsNotification(t *testing.T) {
 }
 
 func TestValidateLSPStdioRejectsMissingHoverCapability(t *testing.T) {
-	transcript := lspFrame(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"definitionProvider":true,"referencesProvider":true,"renameProvider":true,"completionProvider":{"resolveProvider":false},"documentFormattingProvider":true,"codeActionProvider":true}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///sample.tetra","diagnostics":[]}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":2,"result":null}`)
+	transcript := lspFrame(
+		("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"capabilities\":" +
+			"{\"textDocumentSync\":1,\"documentSymbolProvider\":true," +
+			"\"definitionProvider\":true,\"referencesProvider\":true," +
+			"\"renameProvider\":true,\"completionProvider\":" +
+			"{\"resolveProvider\":false},\"documentFormattingProvider\":true," +
+			"\"codeActionProvider\":true}}}"),
+	) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\"," +
+				"\"params\":{\"uri\":\"file:///sample.tetra\",\"diagnostics\":[]}}"),
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":2,"result":null}`,
+		)
 	out, err := runStdioValidator(t, transcript)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
@@ -144,9 +354,21 @@ func TestValidateLSPStdioRejectsMissingHoverCapability(t *testing.T) {
 }
 
 func TestValidateLSPStdioRejectsMissingCompletionCapability(t *testing.T) {
-	transcript := lspFrame(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"hoverProvider":true,"definitionProvider":true,"referencesProvider":true,"renameProvider":true,"documentFormattingProvider":true,"codeActionProvider":true}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///sample.tetra","diagnostics":[]}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":2,"result":null}`)
+	transcript := lspFrame(
+		("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"capabilities\":" +
+			"{\"textDocumentSync\":1,\"documentSymbolProvider\":true," +
+			"\"hoverProvider\":true,\"definitionProvider\":true," +
+			"\"referencesProvider\":true,\"renameProvider\":true," +
+			"\"documentFormattingProvider\":true,\"codeActionProvider\":" +
+			"true}}}"),
+	) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\"," +
+				"\"params\":{\"uri\":\"file:///sample.tetra\",\"diagnostics\":[]}}"),
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":2,"result":null}`,
+		)
 	out, err := runStdioValidator(t, transcript)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
@@ -157,9 +379,21 @@ func TestValidateLSPStdioRejectsMissingCompletionCapability(t *testing.T) {
 }
 
 func TestValidateLSPStdioRejectsMissingFormattingCapability(t *testing.T) {
-	transcript := lspFrame(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"hoverProvider":true,"definitionProvider":true,"referencesProvider":true,"renameProvider":true,"completionProvider":{"resolveProvider":false},"codeActionProvider":true}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///sample.tetra","diagnostics":[]}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":2,"result":null}`)
+	transcript := lspFrame(
+		("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"capabilities\":" +
+			"{\"textDocumentSync\":1,\"documentSymbolProvider\":true," +
+			"\"hoverProvider\":true,\"definitionProvider\":true," +
+			"\"referencesProvider\":true,\"renameProvider\":true," +
+			"\"completionProvider\":{\"resolveProvider\":false}," +
+			"\"codeActionProvider\":true}}}"),
+	) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\"," +
+				"\"params\":{\"uri\":\"file:///sample.tetra\",\"diagnostics\":[]}}"),
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":2,"result":null}`,
+		)
 	out, err := runStdioValidator(t, transcript)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
@@ -170,9 +404,21 @@ func TestValidateLSPStdioRejectsMissingFormattingCapability(t *testing.T) {
 }
 
 func TestValidateLSPStdioRejectsMissingCodeActionCapability(t *testing.T) {
-	transcript := lspFrame(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"hoverProvider":true,"definitionProvider":true,"referencesProvider":true,"renameProvider":true,"completionProvider":{"resolveProvider":false},"documentFormattingProvider":true}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///sample.tetra","diagnostics":[]}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":2,"result":null}`)
+	transcript := lspFrame(
+		("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"capabilities\":" +
+			"{\"textDocumentSync\":1,\"documentSymbolProvider\":true," +
+			"\"hoverProvider\":true,\"definitionProvider\":true," +
+			"\"referencesProvider\":true,\"renameProvider\":true," +
+			"\"completionProvider\":{\"resolveProvider\":false}," +
+			"\"documentFormattingProvider\":true}}}"),
+	) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\"," +
+				"\"params\":{\"uri\":\"file:///sample.tetra\",\"diagnostics\":[]}}"),
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":2,"result":null}`,
+		)
 	out, err := runStdioValidator(t, transcript)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
@@ -183,9 +429,21 @@ func TestValidateLSPStdioRejectsMissingCodeActionCapability(t *testing.T) {
 }
 
 func TestValidateLSPStdioRejectsMissingDefinitionCapability(t *testing.T) {
-	transcript := lspFrame(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"hoverProvider":true,"referencesProvider":true,"renameProvider":true,"completionProvider":{"resolveProvider":false},"documentFormattingProvider":true,"codeActionProvider":true}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///sample.tetra","diagnostics":[]}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":2,"result":null}`)
+	transcript := lspFrame(
+		("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"capabilities\":" +
+			"{\"textDocumentSync\":1,\"documentSymbolProvider\":true," +
+			"\"hoverProvider\":true,\"referencesProvider\":true," +
+			"\"renameProvider\":true,\"completionProvider\":" +
+			"{\"resolveProvider\":false},\"documentFormattingProvider\":true," +
+			"\"codeActionProvider\":true}}}"),
+	) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\"," +
+				"\"params\":{\"uri\":\"file:///sample.tetra\",\"diagnostics\":[]}}"),
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":2,"result":null}`,
+		)
 	out, err := runStdioValidator(t, transcript)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
@@ -232,9 +490,21 @@ func TestParseLSPTranscriptAcceptsNormalContentLength(t *testing.T) {
 }
 
 func TestValidateLSPStdioRejectsMissingReferencesCapability(t *testing.T) {
-	transcript := lspFrame(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"hoverProvider":true,"definitionProvider":true,"renameProvider":true,"completionProvider":{"resolveProvider":false},"documentFormattingProvider":true,"codeActionProvider":true}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///sample.tetra","diagnostics":[]}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":2,"result":null}`)
+	transcript := lspFrame(
+		("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"capabilities\":" +
+			"{\"textDocumentSync\":1,\"documentSymbolProvider\":true," +
+			"\"hoverProvider\":true,\"definitionProvider\":true," +
+			"\"renameProvider\":true,\"completionProvider\":" +
+			"{\"resolveProvider\":false},\"documentFormattingProvider\":true," +
+			"\"codeActionProvider\":true}}}"),
+	) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\"," +
+				"\"params\":{\"uri\":\"file:///sample.tetra\",\"diagnostics\":[]}}"),
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":2,"result":null}`,
+		)
 	out, err := runStdioValidator(t, transcript)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
@@ -245,9 +515,21 @@ func TestValidateLSPStdioRejectsMissingReferencesCapability(t *testing.T) {
 }
 
 func TestValidateLSPStdioRejectsMissingRenameCapability(t *testing.T) {
-	transcript := lspFrame(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"hoverProvider":true,"definitionProvider":true,"referencesProvider":true,"completionProvider":{"resolveProvider":false},"documentFormattingProvider":true,"codeActionProvider":true}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///sample.tetra","diagnostics":[]}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":2,"result":null}`)
+	transcript := lspFrame(
+		("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"capabilities\":" +
+			"{\"textDocumentSync\":1,\"documentSymbolProvider\":true," +
+			"\"hoverProvider\":true,\"definitionProvider\":true," +
+			"\"referencesProvider\":true,\"completionProvider\":" +
+			"{\"resolveProvider\":false},\"documentFormattingProvider\":true," +
+			"\"codeActionProvider\":true}}}"),
+	) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\"," +
+				"\"params\":{\"uri\":\"file:///sample.tetra\",\"diagnostics\":[]}}"),
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":2,"result":null}`,
+		)
 	out, err := runStdioValidator(t, transcript)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
@@ -258,18 +540,50 @@ func TestValidateLSPStdioRejectsMissingRenameCapability(t *testing.T) {
 }
 
 func TestValidateLSPStdioRejectsDuplicateDocumentSymbolResponse(t *testing.T) {
-	transcript := lspFrame(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"hoverProvider":true,"definitionProvider":true,"referencesProvider":true,"renameProvider":true,"completionProvider":{"resolveProvider":false},"documentFormattingProvider":true,"codeActionProvider":true}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///sample.tetra","diagnostics":[]}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":2,"result":[{"name":"answer","kind":14}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":2,"result":[{"name":"duplicate","kind":14}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":3,"result":{"contents":{"kind":"markdown","value":"const answer: i32"}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":4,"result":[{"label":"answer","kind":21}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":5,"result":[{"uri":"file:///sample.tetra"}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":6,"result":[{"uri":"file:///sample.tetra"},{"uri":"file:///sample.tetra"}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":7,"result":{"changes":{"file:///sample.tetra":[]}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":8,"result":[{"newText":"formatted"}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":9,"result":[{"title":"Add uses io to function main","kind":"quickfix"}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":10,"result":null}`)
+	transcript := lspFrame(
+		("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"capabilities\":" +
+			"{\"textDocumentSync\":1,\"documentSymbolProvider\":true," +
+			"\"hoverProvider\":true,\"definitionProvider\":true," +
+			"\"referencesProvider\":true,\"renameProvider\":true," +
+			"\"completionProvider\":{\"resolveProvider\":false}," +
+			"\"documentFormattingProvider\":true,\"codeActionProvider\":" +
+			"true}}}"),
+	) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\"," +
+				"\"params\":{\"uri\":\"file:///sample.tetra\",\"diagnostics\":[]}}"),
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":2,"result":[{"name":"answer","kind":14}]}`,
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":2,"result":[{"name":"duplicate","kind":14}]}`,
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":3,"result":{"contents":{"kind":"markdown","value":"const answer: i32"}}}`,
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":4,"result":[{"label":"answer","kind":21}]}`,
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":5,"result":[{"uri":"file:///sample.tetra"}]}`,
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":6,\"result\":[{\"uri\":\"file:" +
+				"///sample.tetra\"},{\"uri\":\"file:///sample.tetra\"}]}"),
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":7,"result":{"changes":{"file:///sample.tetra":[]}}}`,
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":8,"result":[{"newText":"formatted"}]}`,
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":9,"result":[{"title":"Add uses io to function main","kind":"quickfix"}]}`,
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":10,"result":null}`,
+		)
 	out, err := runStdioValidator(t, transcript)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
@@ -280,18 +594,50 @@ func TestValidateLSPStdioRejectsDuplicateDocumentSymbolResponse(t *testing.T) {
 }
 
 func TestValidateLSPStdioRejectsDuplicateShutdownResponse(t *testing.T) {
-	transcript := lspFrame(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"hoverProvider":true,"definitionProvider":true,"referencesProvider":true,"renameProvider":true,"completionProvider":{"resolveProvider":false},"documentFormattingProvider":true,"codeActionProvider":true}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///sample.tetra","diagnostics":[]}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":2,"result":[{"name":"answer","kind":14}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":3,"result":{"contents":{"kind":"markdown","value":"const answer: i32"}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":4,"result":[{"label":"answer","kind":21}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":5,"result":[{"uri":"file:///sample.tetra"}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":6,"result":[{"uri":"file:///sample.tetra"},{"uri":"file:///sample.tetra"}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":7,"result":{"changes":{"file:///sample.tetra":[]}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":8,"result":[{"newText":"formatted"}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":9,"result":[{"title":"Add uses io to function main","kind":"quickfix"}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":10,"result":null}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":10,"result":null}`)
+	transcript := lspFrame(
+		("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"capabilities\":" +
+			"{\"textDocumentSync\":1,\"documentSymbolProvider\":true," +
+			"\"hoverProvider\":true,\"definitionProvider\":true," +
+			"\"referencesProvider\":true,\"renameProvider\":true," +
+			"\"completionProvider\":{\"resolveProvider\":false}," +
+			"\"documentFormattingProvider\":true,\"codeActionProvider\":" +
+			"true}}}"),
+	) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\"," +
+				"\"params\":{\"uri\":\"file:///sample.tetra\",\"diagnostics\":[]}}"),
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":2,"result":[{"name":"answer","kind":14}]}`,
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":3,"result":{"contents":{"kind":"markdown","value":"const answer: i32"}}}`,
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":4,"result":[{"label":"answer","kind":21}]}`,
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":5,"result":[{"uri":"file:///sample.tetra"}]}`,
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":6,\"result\":[{\"uri\":\"file:" +
+				"///sample.tetra\"},{\"uri\":\"file:///sample.tetra\"}]}"),
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":7,"result":{"changes":{"file:///sample.tetra":[]}}}`,
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":8,"result":[{"newText":"formatted"}]}`,
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":9,"result":[{"title":"Add uses io to function main","kind":"quickfix"}]}`,
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":10,"result":null}`,
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":10,"result":null}`,
+		)
 	out, err := runStdioValidator(t, transcript)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
@@ -307,27 +653,120 @@ func lspFrame(body string) string {
 
 func validRequestResponseTranscript() string {
 	return lspFrame(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"hoverProvider":true,"definitionProvider":true,"referencesProvider":true,"renameProvider":true,"completionProvider":{"resolveProvider":false},"documentFormattingProvider":true,"codeActionProvider":true}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///sample.tetra","languageId":"tetra","version":1,"text":"const answer: Int = 42\n\nfunc main() -> Int:\n  return answer\n"}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///sample.tetra","diagnostics":[]}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":2,"method":"textDocument/documentSymbol","params":{"textDocument":{"uri":"file:///sample.tetra"}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":2,"result":[{"name":"answer","kind":14,"range":{"start":{"line":0,"character":6},"end":{"line":0,"character":12}},"selectionRange":{"start":{"line":0,"character":6},"end":{"line":0,"character":12}}}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":3,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///sample.tetra"},"position":{"line":0,"character":6}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":3,"result":{"contents":{"kind":"markdown","value":"const answer: i32"}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":4,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///sample.tetra"},"position":{"line":3,"character":9}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":4,"result":[{"label":"answer","kind":21,"detail":"const answer: i32"}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":5,"method":"textDocument/definition","params":{"textDocument":{"uri":"file:///sample.tetra"},"position":{"line":3,"character":9}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":5,"result":[{"uri":"file:///sample.tetra","range":{"start":{"line":0,"character":6},"end":{"line":0,"character":12}}}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":6,"method":"textDocument/references","params":{"textDocument":{"uri":"file:///sample.tetra"},"position":{"line":3,"character":9},"context":{"includeDeclaration":true}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":6,"result":[{"uri":"file:///sample.tetra","range":{"start":{"line":0,"character":6},"end":{"line":0,"character":12}}},{"uri":"file:///sample.tetra","range":{"start":{"line":3,"character":11},"end":{"line":3,"character":17}}}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":7,"method":"textDocument/rename","params":{"textDocument":{"uri":"file:///sample.tetra"},"position":{"line":3,"character":9},"newName":"value"}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":7,"result":{"changes":{"file:///sample.tetra":[{"range":{"start":{"line":0,"character":6},"end":{"line":0,"character":12}},"newText":"value"}]}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":8,"method":"textDocument/formatting","params":{"textDocument":{"uri":"file:///sample.tetra"},"options":{"tabSize":4,"insertSpaces":true}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":8,"result":[{"range":{"start":{"line":0,"character":0},"end":{"line":4,"character":0}},"newText":"const answer: Int = 42\n\nfunc main() -> Int:\n    return answer\n"}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":"file:///sample.tetra","version":2},"contentChanges":[{"text":"const answer: Int = 42\n\nfunc main() -> Int:\n    print(\"x\")\n    return answer\n"}]}}`) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"capabilities\":" +
+				"{\"textDocumentSync\":1,\"documentSymbolProvider\":true," +
+				"\"hoverProvider\":true,\"definitionProvider\":true," +
+				"\"referencesProvider\":true,\"renameProvider\":true," +
+				"\"completionProvider\":{\"resolveProvider\":false}," +
+				"\"documentFormattingProvider\":true,\"codeActionProvider\":" +
+				"true}}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didOpen\",\"params\":" +
+				"{\"textDocument\":{\"uri\":\"file:///sample.tetra\",\"languageId\":" +
+				"\"tetra\",\"version\":1,\"text\":\"const answer: Int = 42\\n\\nfunc " +
+				"main() -> Int:\\n  return answer\\n\"}}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\"," +
+				"\"params\":{\"uri\":\"file:///sample.tetra\",\"diagnostics\":[]}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":" +
+				"\"textDocument/documentSymbol\",\"params\":{\"textDocument\":" +
+				"{\"uri\":\"file:///sample.tetra\"}}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":[{\"name\":\"answer\",\"kind\":" +
+				"14,\"range\":{\"start\":{\"line\":0,\"character\":6},\"end\":{\"line\":" +
+				"0,\"character\":12}},\"selectionRange\":{\"start\":{\"line\":0," +
+				"\"character\":6},\"end\":{\"line\":0,\"character\":12}}}]}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"textDocument/hover\"," +
+				"\"params\":{\"textDocument\":{\"uri\":\"file:///sample.tetra\"}," +
+				"\"position\":{\"line\":0,\"character\":6}}}"),
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":3,"result":{"contents":{"kind":"markdown","value":"const answer: i32"}}}`,
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"textDocument/completion\"," +
+				"\"params\":{\"textDocument\":{\"uri\":\"file:///sample.tetra\"}," +
+				"\"position\":{\"line\":3,\"character\":9}}}"),
+		) +
+		lspFrame(
+			`{"jsonrpc":"2.0","id":4,"result":[{"label":"answer","kind":21,"detail":"const answer: i32"}]}`,
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"textDocument/definition\"," +
+				"\"params\":{\"textDocument\":{\"uri\":\"file:///sample.tetra\"}," +
+				"\"position\":{\"line\":3,\"character\":9}}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":5,\"result\":[{\"uri\":\"file:" +
+				"///sample.tetra\",\"range\":{\"start\":{\"line\":0,\"character\":6}," +
+				"\"end\":{\"line\":0,\"character\":12}}}]}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"textDocument/references\"," +
+				"\"params\":{\"textDocument\":{\"uri\":\"file:///sample.tetra\"}," +
+				"\"position\":{\"line\":3,\"character\":9},\"context\":" +
+				"{\"includeDeclaration\":true}}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":6,\"result\":[{\"uri\":\"file:" +
+				"///sample.tetra\",\"range\":{\"start\":{\"line\":0,\"character\":6}," +
+				"\"end\":{\"line\":0,\"character\":12}}},{\"uri\":\"file:" +
+				"///sample.tetra\",\"range\":{\"start\":{\"line\":3,\"character\":11}," +
+				"\"end\":{\"line\":3,\"character\":17}}}]}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"textDocument/rename\"," +
+				"\"params\":{\"textDocument\":{\"uri\":\"file:///sample.tetra\"}," +
+				"\"position\":{\"line\":3,\"character\":9},\"newName\":\"value\"}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":7,\"result\":{\"changes\":{\"file:" +
+				"///sample.tetra\":[{\"range\":{\"start\":{\"line\":0,\"character\":" +
+				"6},\"end\":{\"line\":0,\"character\":12}},\"newText\":\"value\"}]}}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"textDocument/formatting\"," +
+				"\"params\":{\"textDocument\":{\"uri\":\"file:///sample.tetra\"}," +
+				"\"options\":{\"tabSize\":4,\"insertSpaces\":true}}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":8,\"result\":[{\"range\":{\"start\":{\"line\":" +
+				"0,\"character\":0},\"end\":{\"line\":4,\"character\":0}},\"newText\":" +
+				"\"const answer: Int = 42\\n\\nfunc main() -> Int:\\n    return " +
+				"answer\\n\"}]}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didChange\",\"params\":" +
+				"{\"textDocument\":{\"uri\":\"file:///sample.tetra\",\"version\":2}," +
+				"\"contentChanges\":[{\"text\":\"const answer: Int = 42\\n\\nfunc " +
+				"main() -> Int:\\n    print(\\\"x\\\")\\n    return answer\\n\"}]}}"),
+		) +
 		postChangeDiagnosticsFrame() +
-		lspFrame(`{"jsonrpc":"2.0","id":9,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///sample.tetra"},"range":{"start":{"line":3,"character":4},"end":{"line":3,"character":9}},"context":{"diagnostics":[{"range":{"start":{"line":3,"character":4},"end":{"line":3,"character":9}},"severity":1,"code":"TETRA2001","source":"tetra","message":"function 'main' uses effect 'io' but does not declare it"}]}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":9,"result":[{"title":"Add uses io to function main","kind":"quickfix","edit":{"changes":{"file:///sample.tetra":[{"range":{"start":{"line":2,"character":18},"end":{"line":2,"character":18}},"newText":" uses io"}]}}}]}`) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"textDocument/codeAction\"," +
+				"\"params\":{\"textDocument\":{\"uri\":\"file:///sample.tetra\"}," +
+				"\"range\":{\"start\":{\"line\":3,\"character\":4},\"end\":{\"line\":3," +
+				"\"character\":9}},\"context\":{\"diagnostics\":[{\"range\":{\"start\":" +
+				"{\"line\":3,\"character\":4},\"end\":{\"line\":3,\"character\":9}}," +
+				"\"severity\":1,\"code\":\"TETRA2001\",\"source\":\"tetra\",\"message\":" +
+				"\"function 'main' uses effect 'io' but does not declare it\"}]" +
+				"}}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":9,\"result\":[{\"title\":\"Add uses io to " +
+				"function main\",\"kind\":\"quickfix\",\"edit\":{\"changes\":{\"file:" +
+				"///sample.tetra\":[{\"range\":{\"start\":{\"line\":2,\"character\":" +
+				"18},\"end\":{\"line\":2,\"character\":18}},\"newText\":\" uses io\"}]" +
+				"}}}]}"),
+		) +
 		lspFrame(`{"jsonrpc":"2.0","id":10,"method":"shutdown","params":{}}`) +
 		lspFrame(`{"jsonrpc":"2.0","id":10,"result":null}`) +
 		lspFrame(`{"jsonrpc":"2.0","method":"exit","params":{}}`)
@@ -335,27 +774,127 @@ func validRequestResponseTranscript() string {
 
 func stringIDRequestResponseTranscript() string {
 	return lspFrame(`{"jsonrpc":"2.0","id":"init-1","method":"initialize","params":{}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":"init-1","result":{"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"hoverProvider":true,"definitionProvider":true,"referencesProvider":true,"renameProvider":true,"completionProvider":{"resolveProvider":false},"documentFormattingProvider":true,"codeActionProvider":true}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///sample.tetra","languageId":"tetra","version":1,"text":"const answer: Int = 42\n\nfunc main() -> Int:\n  return answer\n"}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///sample.tetra","diagnostics":[]}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":"symbols-1","method":"textDocument/documentSymbol","params":{"textDocument":{"uri":"file:///sample.tetra"}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":"symbols-1","result":[{"name":"answer","kind":14,"range":{"start":{"line":0,"character":6},"end":{"line":0,"character":12}},"selectionRange":{"start":{"line":0,"character":6},"end":{"line":0,"character":12}}}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":"hover-1","method":"textDocument/hover","params":{"textDocument":{"uri":"file:///sample.tetra"},"position":{"line":0,"character":6}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":"hover-1","result":{"contents":{"kind":"markdown","value":"const answer: i32"}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":"completion-1","method":"textDocument/completion","params":{"textDocument":{"uri":"file:///sample.tetra"},"position":{"line":3,"character":9}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":"completion-1","result":[{"label":"answer","kind":21,"detail":"const answer: i32"}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":"definition-1","method":"textDocument/definition","params":{"textDocument":{"uri":"file:///sample.tetra"},"position":{"line":3,"character":9}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":"definition-1","result":[{"uri":"file:///sample.tetra","range":{"start":{"line":0,"character":6},"end":{"line":0,"character":12}}}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":"references-1","method":"textDocument/references","params":{"textDocument":{"uri":"file:///sample.tetra"},"position":{"line":3,"character":9},"context":{"includeDeclaration":true}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":"references-1","result":[{"uri":"file:///sample.tetra","range":{"start":{"line":0,"character":6},"end":{"line":0,"character":12}}},{"uri":"file:///sample.tetra","range":{"start":{"line":3,"character":11},"end":{"line":3,"character":17}}}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":"rename-1","method":"textDocument/rename","params":{"textDocument":{"uri":"file:///sample.tetra"},"position":{"line":3,"character":9},"newName":"value"}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":"rename-1","result":{"changes":{"file:///sample.tetra":[{"range":{"start":{"line":0,"character":6},"end":{"line":0,"character":12}},"newText":"value"}]}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":"formatting-1","method":"textDocument/formatting","params":{"textDocument":{"uri":"file:///sample.tetra"},"options":{"tabSize":4,"insertSpaces":true}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":"formatting-1","result":[{"range":{"start":{"line":0,"character":0},"end":{"line":4,"character":0}},"newText":"const answer: Int = 42\n\nfunc main() -> Int:\n    return answer\n"}]}`) +
-		lspFrame(`{"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":"file:///sample.tetra","version":2},"contentChanges":[{"text":"const answer: Int = 42\n\nfunc main() -> Int:\n    print(\"x\")\n    return answer\n"}]}}`) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":\"init-1\",\"result\":{\"capabilities\":" +
+				"{\"textDocumentSync\":1,\"documentSymbolProvider\":true," +
+				"\"hoverProvider\":true,\"definitionProvider\":true," +
+				"\"referencesProvider\":true,\"renameProvider\":true," +
+				"\"completionProvider\":{\"resolveProvider\":false}," +
+				"\"documentFormattingProvider\":true,\"codeActionProvider\":" +
+				"true}}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didOpen\",\"params\":" +
+				"{\"textDocument\":{\"uri\":\"file:///sample.tetra\",\"languageId\":" +
+				"\"tetra\",\"version\":1,\"text\":\"const answer: Int = 42\\n\\nfunc " +
+				"main() -> Int:\\n  return answer\\n\"}}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\"," +
+				"\"params\":{\"uri\":\"file:///sample.tetra\",\"diagnostics\":[]}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":\"symbols-1\",\"method\":" +
+				"\"textDocument/documentSymbol\",\"params\":{\"textDocument\":" +
+				"{\"uri\":\"file:///sample.tetra\"}}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":\"symbols-1\",\"result\":[{\"name\":" +
+				"\"answer\",\"kind\":14,\"range\":{\"start\":{\"line\":0,\"character\":" +
+				"6},\"end\":{\"line\":0,\"character\":12}},\"selectionRange\":" +
+				"{\"start\":{\"line\":0,\"character\":6},\"end\":{\"line\":0," +
+				"\"character\":12}}}]}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":\"hover-1\",\"method\":" +
+				"\"textDocument/hover\",\"params\":{\"textDocument\":{\"uri\":\"file:" +
+				"///sample.tetra\"},\"position\":{\"line\":0,\"character\":6}}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":\"hover-1\",\"result\":{\"contents\":" +
+				"{\"kind\":\"markdown\",\"value\":\"const answer: i32\"}}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":\"completion-1\",\"method\":" +
+				"\"textDocument/completion\",\"params\":{\"textDocument\":{\"uri\":" +
+				"\"file:///sample.tetra\"},\"position\":{\"line\":3,\"character\":" +
+				"9}}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":\"completion-1\",\"result\":[{\"label\":" +
+				"\"answer\",\"kind\":21,\"detail\":\"const answer: i32\"}]}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":\"definition-1\",\"method\":" +
+				"\"textDocument/definition\",\"params\":{\"textDocument\":{\"uri\":" +
+				"\"file:///sample.tetra\"},\"position\":{\"line\":3,\"character\":" +
+				"9}}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":\"definition-1\",\"result\":[{\"uri\":\"file:" +
+				"///sample.tetra\",\"range\":{\"start\":{\"line\":0,\"character\":6}," +
+				"\"end\":{\"line\":0,\"character\":12}}}]}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":\"references-1\",\"method\":" +
+				"\"textDocument/references\",\"params\":{\"textDocument\":{\"uri\":" +
+				"\"file:///sample.tetra\"},\"position\":{\"line\":3,\"character\":9}," +
+				"\"context\":{\"includeDeclaration\":true}}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":\"references-1\",\"result\":[{\"uri\":\"file:" +
+				"///sample.tetra\",\"range\":{\"start\":{\"line\":0,\"character\":6}," +
+				"\"end\":{\"line\":0,\"character\":12}}},{\"uri\":\"file:" +
+				"///sample.tetra\",\"range\":{\"start\":{\"line\":3,\"character\":11}," +
+				"\"end\":{\"line\":3,\"character\":17}}}]}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":\"rename-1\",\"method\":" +
+				"\"textDocument/rename\",\"params\":{\"textDocument\":{\"uri\":\"file:" +
+				"///sample.tetra\"},\"position\":{\"line\":3,\"character\":9}," +
+				"\"newName\":\"value\"}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":\"rename-1\",\"result\":{\"changes\":{\"file:" +
+				"///sample.tetra\":[{\"range\":{\"start\":{\"line\":0,\"character\":" +
+				"6},\"end\":{\"line\":0,\"character\":12}},\"newText\":\"value\"}]}}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":\"formatting-1\",\"method\":" +
+				"\"textDocument/formatting\",\"params\":{\"textDocument\":{\"uri\":" +
+				"\"file:///sample.tetra\"},\"options\":{\"tabSize\":4," +
+				"\"insertSpaces\":true}}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":\"formatting-1\",\"result\":[{\"range\":" +
+				"{\"start\":{\"line\":0,\"character\":0},\"end\":{\"line\":4," +
+				"\"character\":0}},\"newText\":\"const answer: Int = 42\\n\\nfunc " +
+				"main() -> Int:\\n    return answer\\n\"}]}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didChange\",\"params\":" +
+				"{\"textDocument\":{\"uri\":\"file:///sample.tetra\",\"version\":2}," +
+				"\"contentChanges\":[{\"text\":\"const answer: Int = 42\\n\\nfunc " +
+				"main() -> Int:\\n    print(\\\"x\\\")\\n    return answer\\n\"}]}}"),
+		) +
 		postChangeDiagnosticsFrame() +
-		lspFrame(`{"jsonrpc":"2.0","id":"code-action-1","method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///sample.tetra"},"range":{"start":{"line":3,"character":4},"end":{"line":3,"character":9}},"context":{"diagnostics":[{"range":{"start":{"line":3,"character":4},"end":{"line":3,"character":9}},"severity":1,"code":"TETRA2001","source":"tetra","message":"function 'main' uses effect 'io' but does not declare it"}]}}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":"code-action-1","result":[{"title":"Add uses io to function main","kind":"quickfix","edit":{"changes":{"file:///sample.tetra":[{"range":{"start":{"line":2,"character":18},"end":{"line":2,"character":18}},"newText":" uses io"}]}}}]}`) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":\"code-action-1\",\"method\":" +
+				"\"textDocument/codeAction\",\"params\":{\"textDocument\":{\"uri\":" +
+				"\"file:///sample.tetra\"},\"range\":{\"start\":{\"line\":3," +
+				"\"character\":4},\"end\":{\"line\":3,\"character\":9}},\"context\":" +
+				"{\"diagnostics\":[{\"range\":{\"start\":{\"line\":3,\"character\":4}," +
+				"\"end\":{\"line\":3,\"character\":9}},\"severity\":1,\"code\":" +
+				"\"TETRA2001\",\"source\":\"tetra\",\"message\":\"function 'main' " +
+				"uses effect 'io' but does not declare it\"}]}}}"),
+		) +
+		lspFrame(
+			("{\"jsonrpc\":\"2.0\",\"id\":\"code-action-1\",\"result\":[{\"title\":" +
+				"\"Add uses io to function main\",\"kind\":\"quickfix\",\"edit\":" +
+				"{\"changes\":{\"file:///sample.tetra\":[{\"range\":{\"start\":" +
+				"{\"line\":2,\"character\":18},\"end\":{\"line\":2,\"character\":18}}," +
+				"\"newText\":\" uses io\"}]}}}]}"),
+		) +
 		lspFrame(`{"jsonrpc":"2.0","id":"shutdown-1","method":"shutdown","params":{}}`) +
 		lspFrame(`{"jsonrpc":"2.0","id":"shutdown-1","result":null}`) +
 		lspFrame(`{"jsonrpc":"2.0","method":"exit","params":{}}`)
@@ -378,7 +917,14 @@ func numericLookingStringIDRequestResponseTranscript() string {
 }
 
 func postChangeDiagnosticsFrame() string {
-	return lspFrame(`{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///sample.tetra","diagnostics":[{"range":{"start":{"line":3,"character":4},"end":{"line":3,"character":9}},"severity":1,"code":"TETRA2001","source":"tetra","message":"function 'main' uses effect 'io' but does not declare it"}]}}`)
+	return lspFrame(
+		("{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\"," +
+			"\"params\":{\"uri\":\"file:///sample.tetra\",\"diagnostics\":" +
+			"[{\"range\":{\"start\":{\"line\":3,\"character\":4},\"end\":{\"line\":3," +
+			"\"character\":9}},\"severity\":1,\"code\":\"TETRA2001\",\"source\":" +
+			"\"tetra\",\"message\":\"function 'main' uses effect 'io' but " +
+			"does not declare it\"}]}}"),
+	)
 }
 
 func replaceLSPFrameBodies(transcript string, replacer *strings.Replacer) string {

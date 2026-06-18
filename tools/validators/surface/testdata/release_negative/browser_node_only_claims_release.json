@@ -1,1 +1,5 @@
-{"validator":"browser-release","mutation":"node_only_claims_release","expected_error":"Chromium-compatible"}
+{
+  "validator": "browser-release",
+  "mutation": "node_only_claims_release",
+  "expected_error": "Chromium-compatible"
+}

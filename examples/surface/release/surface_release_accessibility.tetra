@@ -1,0 +1,72 @@
+// Pure Tetra Surface v1 release accessibility bridge smoke entrypoint.
+// Runtime reports validate the platform-bridge-v1 tree, Linux bridge/probe,
+// and browser accessibility mirror evidence for this source.
+module examples.surface.release.surface_release_accessibility
+
+import lib.core.surface as surface
+import lib.core.draw as draw
+import lib.core.component as component
+import lib.core.widgets as widgets
+import lib.core.accessibility as accessibility
+import lib.core.style as style
+
+struct SurfaceReleaseAccessibilityApp:
+    width: Int
+    height: Int
+    tree: component.ComponentTree
+
+func draw_release_accessibility_scene(app: borrow SurfaceReleaseAccessibilityApp, ctx: inout draw.DrawContext) -> Int
+uses mem:
+    let theme: style.Theme = style.default_theme()
+    let focus_colors: style.WidgetColors = style.style_for_state(theme.button, style.state_focused())
+    let bg: surface.Color = surface.Color(r: 14, g: 24, b: 28, a: 255)
+    let fg: surface.Color = surface.Color(r: 234, g: 242, b: 238, a: 255)
+    let panel: surface.Color = surface.Color(r: 24, g: 34, b: 38, a: 255)
+    let focus: surface.Color = surface.Color(r: 236, g: 197, b: 64, a: 255)
+    let status: surface.Color = surface.Color(r: 78, g: 166, b: 128, a: 255)
+    let clear_status: Int = draw.clear(ctx, bg)
+    let panel_status: Int = draw.rect(ctx, surface.Rect(x: 0, y: 0, w: app.width, h: app.height), panel)
+    let title_status: Int = draw.rect(ctx, surface.Rect(x: 20, y: 20, w: 140, h: 10), fg)
+    let name_label_status: Int = draw.rect(ctx, surface.Rect(x: 20, y: 52, w: 44, h: 8), fg)
+    let name_box_status: Int = draw.rect_outline(ctx, surface.Rect(x: 20, y: 84, w: app.width - 40, h: 44), fg)
+    let email_label_status: Int = draw.rect(ctx, surface.Rect(x: 20, y: 136, w: 52, h: 8), fg)
+    let email_box_status: Int = draw.rect_outline(ctx, surface.Rect(x: 20, y: 168, w: app.width - 40, h: 44), fg)
+    let save_status: Int = draw.rect(ctx, surface.Rect(x: 20, y: 224, w: 132, h: 44), status)
+    let reset_status: Int = draw.rect_outline(ctx, surface.Rect(x: 164, y: 224, w: 132, h: 44), fg)
+    let status_status: Int = draw.rect(ctx, surface.Rect(x: 20, y: 280, w: app.width - 40, h: 10), status)
+    let focus_status: Int = draw.rect_outline(ctx, surface.Rect(x: 16, y: 80, w: app.width - 32, h: 52), focus)
+    return clear_status + panel_status + title_status + name_label_status + name_box_status + email_label_status + email_box_status + save_status + reset_status + status_status + focus_status + focus_colors.bg - focus_colors.bg
+
+func main() -> Int
+uses alloc, mem, surface:
+    var app: SurfaceReleaseAccessibilityApp = SurfaceReleaseAccessibilityApp(width: 320, height: 240, tree: component.tree_init_api(24))
+    let counts_status: Int = accessibility.validate_settings_counts(12, 4, 2, 2, 2, 1)
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: app.width, h: app.height)
+    let root_id: Int = component.tree_add_root(app.tree, component.kind_root(), root_rect)
+    let panel_id: Int = widgets.add_panel(app.tree, root_id, root_rect)
+    let column_id: Int = widgets.add_column(app.tree, panel_id, root_rect)
+    let name_label_id: Int = widgets.add_text(app.tree, column_id, surface.Rect(x: 20, y: 52, w: 280, h: 24))
+    let name_id: Int = widgets.add_accessible_textbox(app.tree, column_id, surface.Rect(x: 20, y: 84, w: 280, h: 44), name_label_id)
+    let email_label_id: Int = widgets.add_text(app.tree, column_id, surface.Rect(x: 20, y: 136, w: 280, h: 24))
+    let email_id: Int = widgets.add_accessible_textbox(app.tree, column_id, surface.Rect(x: 20, y: 168, w: 280, h: 44), email_label_id)
+    let save_id: Int = widgets.add_accessible_button(app.tree, column_id, surface.Rect(x: 20, y: 224, w: 132, h: 44), widgets.action_save())
+    let reset_id: Int = widgets.add_accessible_button(app.tree, column_id, surface.Rect(x: 164, y: 224, w: 132, h: 44), widgets.action_reset())
+    let status_id: Int = widgets.add_accessible_status(app.tree, column_id, surface.Rect(x: 20, y: 280, w: 280, h: 24))
+    var win: surface.Surface = surface.open("Surface Release Accessibility", app.width, app.height)
+    var before_frame: surface.Frame = surface.begin_frame(win)
+    var before_ctx: draw.DrawContext = draw.DrawContext(frame: before_frame)
+    let draw_status: Int = draw_release_accessibility_scene(app, before_ctx)
+    let presented1: Int = surface.present(before_ctx.frame)
+    app.width = 480
+    app.height = 320
+    win.width = app.width
+    win.height = app.height
+    var after_frame: surface.Frame = surface.begin_frame(win)
+    var after_ctx: draw.DrawContext = draw.DrawContext(frame: after_frame)
+    let draw_after_status: Int = draw_release_accessibility_scene(app, after_ctx)
+    let presented2: Int = surface.present(after_ctx.frame)
+    let closed: Int = surface.close(win)
+    let ids_status: Int = root_id + panel_id + column_id + name_label_id + name_id + email_label_id + email_id + save_id + reset_id + status_id
+    if counts_status != 0:
+        return counts_status
+    return 1 + presented1 - presented1 + presented2 - presented2 + closed - closed + draw_status - draw_status + draw_after_status - draw_after_status + ids_status - ids_status

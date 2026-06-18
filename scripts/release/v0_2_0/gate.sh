@@ -10,7 +10,7 @@ release_artifact="tetra.release.v0_2_0.gate-report.v1"
 formatter_gate_command='./tetra fmt --check examples lib __rt compiler/selfhostrt && go test ./compiler/... ./cli/... -run "Format|Formatter|Comment" -count=1'
 
 usage() {
-  cat <<'USAGE'
+  cat << 'USAGE'
 Usage: bash scripts/release/v0_2_0/gate.sh [--report-dir DIR]
 
 Notes:
@@ -22,7 +22,7 @@ USAGE
 }
 
 check_report_dir_fresh() {
-  if [[ ( -e "$report_dir" || -L "$report_dir" ) && ! -d "$report_dir" ]]; then
+  if [[ (-e "$report_dir" || -L "$report_dir") && ! -d "$report_dir" ]]; then
     echo "release_v0_2_0_gate: refusing to use non-directory report path: $report_dir" >&2
     echo "release_v0_2_0_gate: choose a fresh --report-dir directory" >&2
     exit 2
@@ -54,7 +54,7 @@ while [[ $# -gt 0 ]]; do
       report_dir="$2"
       shift 2
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;
@@ -76,7 +76,7 @@ fi
 echo "release_v0_2_0_gate: bootstrapping local binaries before version preflight" >&2
 bash scripts/dev/bootstrap.sh >&2
 
-version="$(./tetra version 2>/dev/null || true)"
+version="$(./tetra version 2> /dev/null || true)"
 if [[ "$version" != "v0.2.0" ]]; then
   echo "release_v0_2_0_gate: blocked: expected ./tetra version to be v0.2.0, got '${version:-<missing>}'" >&2
   echo "release_v0_2_0_gate: promote version metadata and rerun bootstrap before final release checks." >&2

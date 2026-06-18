@@ -10,6 +10,8 @@ import (
 	"io"
 	"os"
 	"strings"
+
+	"tetra_language/tools/internal/reportdecode"
 )
 
 const (
@@ -62,7 +64,9 @@ var knownCapsulePermissions = map[string]string{
 
 func main() {
 	var trustPath string
+	var reportFormat string
 	flag.StringVar(&trustPath, "trust", "", "path to tetra.eco.trust-snapshot.v1 JSON report")
+	flag.StringVar(&reportFormat, "format", "auto", "report format: auto, json, or toon")
 	flag.Parse()
 
 	if trustPath == "" {
@@ -74,15 +78,19 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err := validateEcoTrustSnapshot(raw); err != nil {
+	if err := validateEcoTrustSnapshotFormat(raw, reportFormat); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
 func validateEcoTrustSnapshot(raw []byte) error {
+	return validateEcoTrustSnapshotFormat(raw, "auto")
+}
+
+func validateEcoTrustSnapshotFormat(raw []byte, format string) error {
 	var report trustSnapshotReport
-	if err := decodeStrictJSON(raw, &report); err != nil {
+	if err := reportdecode.DecodeStrictFormat(raw, format, &report); err != nil {
 		return err
 	}
 	if report.Schema == "" {
@@ -117,7 +125,11 @@ func validateEcoTrustSnapshot(raw []byte) error {
 		return err
 	}
 	if *report.RecordCount != len(report.Capsules) {
-		return fmt.Errorf("record_count mismatch: got %d, capsules has %d", *report.RecordCount, len(report.Capsules))
+		return fmt.Errorf(
+			"record_count mismatch: got %d, capsules has %d",
+			*report.RecordCount,
+			len(report.Capsules),
+		)
 	}
 	if len(report.Capsules) == 0 {
 		return fmt.Errorf("capsules must not be empty")
@@ -184,11 +196,22 @@ func validateTrustSnapshotCapsules(capsules []trustSnapshotItem) error {
 		}
 		expectedTier := trustTierForScore(*capsule.TrustScore)
 		if capsule.TrustTier != expectedTier {
-			return fmt.Errorf("capsule %s trust_tier mismatch: score %d expects %s, got %s", capsule.ID, *capsule.TrustScore, expectedTier, capsule.TrustTier)
+			return fmt.Errorf(
+				"capsule %s trust_tier mismatch: score %d expects %s, got %s",
+				capsule.ID,
+				*capsule.TrustScore,
+				expectedTier,
+				capsule.TrustTier,
+			)
 		}
 		expectedScore := trustScoreForPermissions(capsule.Permissions)
 		if *capsule.TrustScore != expectedScore {
-			return fmt.Errorf("capsule %s trust_score mismatch: permissions expect %d, got %d", capsule.ID, expectedScore, *capsule.TrustScore)
+			return fmt.Errorf(
+				"capsule %s trust_score mismatch: permissions expect %d, got %d",
+				capsule.ID,
+				expectedScore,
+				*capsule.TrustScore,
+			)
 		}
 		if len(capsule.TrustReasons) == 0 {
 			return fmt.Errorf("capsule %s trust_reasons must not be empty", capsule.ID)

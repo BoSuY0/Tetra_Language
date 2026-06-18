@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"tetra_language/internal/toon"
 )
 
 func nativeSmokeReportForTest(omit string) *smokeReport {
@@ -16,26 +18,26 @@ func nativeSmokeReportForTest(omit string) *smokeReport {
 		srcPath      string
 		expectedExit int
 	}{
-		{"flow_hello", "examples/flow_hello.tetra", 0},
-		{"flow_struct_smoke", "examples/flow_struct_smoke.tetra", 42},
-		{"flow_islands_smoke", "examples/flow_islands_smoke.tetra", 0},
-		{"flow_unsafe_cap_mem_smoke", "examples/flow_unsafe_cap_mem_smoke.tetra", 42},
-		{"core_async_smoke", "examples/core_async_smoke.tetra", 42},
-		{"core_capability_smoke", "examples/core_capability_smoke.tetra", 42},
-		{"core_collections_smoke", "examples/core_collections_smoke.tetra", 42},
-		{"core_component_smoke", "examples/core_component_smoke.tetra", 42},
-		{"core_crypto_smoke", "examples/core_crypto_smoke.tetra", 42},
-		{"core_filesystem_smoke", "examples/core_filesystem_smoke.tetra", 42},
-		{"core_io_smoke", "examples/core_io_smoke.tetra", 42},
-		{"core_math_smoke", "examples/core_math_smoke.tetra", 42},
-		{"core_memory_smoke", "examples/core_memory_smoke.tetra", 42},
-		{"core_networking_smoke", "examples/core_networking_smoke.tetra", 42},
-		{"core_serialization_smoke", "examples/core_serialization_smoke.tetra", 42},
-		{"core_slices_smoke", "examples/core_slices_smoke.tetra", 42},
-		{"core_strings_smoke", "examples/core_strings_smoke.tetra", 42},
-		{"core_sync_smoke", "examples/core_sync_smoke.tetra", 42},
-		{"core_testing_smoke", "examples/core_testing_smoke.tetra", 42},
-		{"core_time_smoke", "examples/core_time_smoke.tetra", 42},
+		{"flow_hello", "examples/flow/flow_hello.tetra", 0},
+		{"flow_struct_smoke", "examples/flow/flow_struct_smoke.tetra", 42},
+		{"flow_islands_smoke", "examples/flow/flow_islands_smoke.tetra", 0},
+		{"flow_unsafe_cap_mem_smoke", "examples/flow/flow_unsafe_cap_mem_smoke.tetra", 42},
+		{"core_async_smoke", "examples/async/core_async_smoke.tetra", 42},
+		{"core_capability_smoke", "examples/core/memory/core_capability_smoke.tetra", 42},
+		{"core_collections_smoke", "examples/core/data/core_collections_smoke.tetra", 42},
+		{"core_component_smoke", "examples/core/surface/core_component_smoke.tetra", 42},
+		{"core_crypto_smoke", "examples/core/memory/core_crypto_smoke.tetra", 42},
+		{"core_filesystem_smoke", "examples/core/platform/core_filesystem_smoke.tetra", 42},
+		{"core_io_smoke", "examples/core/platform/core_io_smoke.tetra", 42},
+		{"core_math_smoke", "examples/core/data/core_math_smoke.tetra", 42},
+		{"core_memory_smoke", "examples/core/memory/core_memory_smoke.tetra", 42},
+		{"core_networking_smoke", "examples/core/platform/core_networking_smoke.tetra", 42},
+		{"core_serialization_smoke", "examples/core/data/core_serialization_smoke.tetra", 42},
+		{"core_slices_smoke", "examples/core/data/core_slices_smoke.tetra", 42},
+		{"core_strings_smoke", "examples/core/data/core_strings_smoke.tetra", 42},
+		{"core_sync_smoke", "examples/core/runtime/core_sync_smoke.tetra", 42},
+		{"core_testing_smoke", "examples/core/runtime/core_testing_smoke.tetra", 42},
+		{"core_time_smoke", "examples/core/platform/core_time_smoke.tetra", 42},
 	}
 	reportCases := make([]smokeCaseReport, 0, len(cases))
 	for _, c := range cases {
@@ -124,10 +126,10 @@ func TestValidateSmokeReportRejectsUnknownFields(t *testing.T) {
   "passed": 4,
   "failed": 0,
   "cases": [
-    {"name":"flow_hello","src_path":"examples/flow_hello.tetra","expected_exit":0,"ran":false,"pass":true,"extra":true},
-    {"name":"flow_struct_smoke","src_path":"examples/flow_struct_smoke.tetra","expected_exit":42,"ran":false,"pass":true},
-    {"name":"flow_islands_smoke","src_path":"examples/flow_islands_smoke.tetra","expected_exit":0,"ran":false,"pass":true},
-    {"name":"flow_unsafe_cap_mem_smoke","src_path":"examples/flow_unsafe_cap_mem_smoke.tetra","expected_exit":42,"ran":false,"pass":true}
+    {"name":"flow_hello","src_path":"examples/flow/flow_hello.tetra","expected_exit":0,"ran":false,"pass":true,"extra":true},
+    {"name":"flow_struct_smoke","src_path":"examples/flow/flow_struct_smoke.tetra","expected_exit":42,"ran":false,"pass":true},
+    {"name":"flow_islands_smoke","src_path":"examples/flow/flow_islands_smoke.tetra","expected_exit":0,"ran":false,"pass":true},
+    {"name":"flow_unsafe_cap_mem_smoke","src_path":"examples/flow/flow_unsafe_cap_mem_smoke.tetra","expected_exit":42,"ran":false,"pass":true}
   ]
 }`)
 	if _, err := parseSmokeReport(raw); err == nil {
@@ -179,6 +181,24 @@ func TestValidateSmokeReportShapeAcceptsNativeRequiredProfile(t *testing.T) {
 	}
 }
 
+func TestParseSmokeReportAcceptsTOONFormat(t *testing.T) {
+	raw, err := json.Marshal(nativeSmokeReportForTest(""))
+	if err != nil {
+		t.Fatalf("marshal smoke report: %v", err)
+	}
+	toonRaw, err := toon.ConvertJSONToTOON(raw, toon.Options{Deterministic: true, Strict: true})
+	if err != nil {
+		t.Fatalf("convert smoke report to TOON: %v", err)
+	}
+	report, err := parseSmokeReportFormat(toonRaw, "toon")
+	if err != nil {
+		t.Fatalf("parse TOON smoke report: %v\n%s", err, toonRaw)
+	}
+	if err := validateSmokeReport(report); err != nil {
+		t.Fatalf("validate TOON smoke report: %v", err)
+	}
+}
+
 func TestValidateSmokeReportShapeRejectsMissingCoreStdlibCase(t *testing.T) {
 	err := validateSmokeReport(nativeSmokeReportForTest("core_crypto_smoke"))
 	if err == nil {
@@ -201,8 +221,20 @@ func TestValidateSmokeReportShapeRejectsDuplicateCaseName(t *testing.T) {
 		Passed:  &passed,
 		Failed:  &failed,
 		Cases: []smokeCaseReport{
-			{Name: "dup", SrcPath: "examples/one.tetra", Pass: true, Ran: true, ActualExit: intPtr(0)},
-			{Name: "dup", SrcPath: "examples/two.tetra", Pass: true, Ran: true, ActualExit: intPtr(0)},
+			{
+				Name:       "dup",
+				SrcPath:    "examples/one.tetra",
+				Pass:       true,
+				Ran:        true,
+				ActualExit: intPtr(0),
+			},
+			{
+				Name:       "dup",
+				SrcPath:    "examples/two.tetra",
+				Pass:       true,
+				Ran:        true,
+				ActualExit: intPtr(0),
+			},
 		},
 	}
 	if err := validateSmokeReport(report); err == nil {
@@ -263,11 +295,36 @@ func TestValidateSmokeReportShapeAcceptsWASMSupportedArtifactTarget(t *testing.T
 		Passed:  &passed,
 		Failed:  &failed,
 		Cases: []smokeCaseReport{
-			{Name: "legacy_hello", SrcPath: "examples/hello.tetra", ExpectedExit: 0, Pass: true},
-			{Name: "effects_io_smoke", SrcPath: "examples/effects_io_smoke.tetra", ExpectedExit: 0, Pass: true},
-			{Name: "ui_web_smoke", SrcPath: "examples/ui_web_smoke.tetra", ExpectedExit: 0, Pass: true},
-			{Name: "dogfood_wasi", SrcPath: "examples/projects/dogfood_wasi/src/main.tetra", ExpectedExit: 0, Pass: true},
-			{Name: "dogfood_web_ui", SrcPath: "examples/projects/dogfood_web_ui/src/main.tetra", ExpectedExit: 0, Pass: true},
+			{
+				Name:         "legacy_hello",
+				SrcPath:      "examples/smoke/basic/hello.tetra",
+				ExpectedExit: 0,
+				Pass:         true,
+			},
+			{
+				Name:         "effects_io_smoke",
+				SrcPath:      "examples/effects/effects_io_smoke.tetra",
+				ExpectedExit: 0,
+				Pass:         true,
+			},
+			{
+				Name:         "ui_web_smoke",
+				SrcPath:      "examples/ui/ui_web_smoke.tetra",
+				ExpectedExit: 0,
+				Pass:         true,
+			},
+			{
+				Name:         "dogfood_wasi",
+				SrcPath:      "examples/projects/dogfood_wasi/src/main.tetra",
+				ExpectedExit: 0,
+				Pass:         true,
+			},
+			{
+				Name:         "dogfood_web_ui",
+				SrcPath:      "examples/projects/dogfood_web_ui/src/main.tetra",
+				ExpectedExit: 0,
+				Pass:         true,
+			},
 		},
 	}
 	if err := validateSmokeReport(report); err != nil {
@@ -287,9 +344,24 @@ func TestValidateSmokeReportShapeRejectsWASMMissingDogfoodProfile(t *testing.T) 
 		Passed:  &passed,
 		Failed:  &failed,
 		Cases: []smokeCaseReport{
-			{Name: "flow_hello", SrcPath: "examples/flow_hello.tetra", ExpectedExit: 0, Pass: true},
-			{Name: "effects_io_smoke", SrcPath: "examples/effects_io_smoke.tetra", ExpectedExit: 0, Pass: true},
-			{Name: "ui_web_smoke", SrcPath: "examples/ui_web_smoke.tetra", ExpectedExit: 0, Pass: true},
+			{
+				Name:         "flow_hello",
+				SrcPath:      "examples/flow/flow_hello.tetra",
+				ExpectedExit: 0,
+				Pass:         true,
+			},
+			{
+				Name:         "effects_io_smoke",
+				SrcPath:      "examples/effects/effects_io_smoke.tetra",
+				ExpectedExit: 0,
+				Pass:         true,
+			},
+			{
+				Name:         "ui_web_smoke",
+				SrcPath:      "examples/ui/ui_web_smoke.tetra",
+				ExpectedExit: 0,
+				Pass:         true,
+			},
 		},
 	}
 	err := validateSmokeReport(report)
@@ -311,11 +383,36 @@ func TestValidateSmokeReportShapeRejectsStaleBuildOnlyFlagForSupportedWASMTarget
 		Passed:    &passed,
 		Failed:    &failed,
 		Cases: []smokeCaseReport{
-			{Name: "legacy_hello", SrcPath: "examples/hello.tetra", ExpectedExit: 0, Pass: true},
-			{Name: "effects_io_smoke", SrcPath: "examples/effects_io_smoke.tetra", ExpectedExit: 0, Pass: true},
-			{Name: "ui_web_smoke", SrcPath: "examples/ui_web_smoke.tetra", ExpectedExit: 0, Pass: true},
-			{Name: "dogfood_wasi", SrcPath: "examples/projects/dogfood_wasi/src/main.tetra", ExpectedExit: 0, Pass: true},
-			{Name: "dogfood_web_ui", SrcPath: "examples/projects/dogfood_web_ui/src/main.tetra", ExpectedExit: 0, Pass: true},
+			{
+				Name:         "legacy_hello",
+				SrcPath:      "examples/smoke/basic/hello.tetra",
+				ExpectedExit: 0,
+				Pass:         true,
+			},
+			{
+				Name:         "effects_io_smoke",
+				SrcPath:      "examples/effects/effects_io_smoke.tetra",
+				ExpectedExit: 0,
+				Pass:         true,
+			},
+			{
+				Name:         "ui_web_smoke",
+				SrcPath:      "examples/ui/ui_web_smoke.tetra",
+				ExpectedExit: 0,
+				Pass:         true,
+			},
+			{
+				Name:         "dogfood_wasi",
+				SrcPath:      "examples/projects/dogfood_wasi/src/main.tetra",
+				ExpectedExit: 0,
+				Pass:         true,
+			},
+			{
+				Name:         "dogfood_web_ui",
+				SrcPath:      "examples/projects/dogfood_web_ui/src/main.tetra",
+				ExpectedExit: 0,
+				Pass:         true,
+			},
 		},
 	}
 	err := validateSmokeReport(report)
@@ -336,11 +433,38 @@ func TestValidateSmokeReportShapeAcceptsRanWASMCaseForSupportedTarget(t *testing
 		Passed:  &passed,
 		Failed:  &failed,
 		Cases: []smokeCaseReport{
-			{Name: "legacy_hello", SrcPath: "examples/hello.tetra", ExpectedExit: 0, Pass: true},
-			{Name: "effects_io_smoke", SrcPath: "examples/effects_io_smoke.tetra", ExpectedExit: 0, Pass: true},
-			{Name: "ui_web_smoke", SrcPath: "examples/ui_web_smoke.tetra", ExpectedExit: 0, Ran: true, ActualExit: intPtr(0), Pass: true},
-			{Name: "dogfood_wasi", SrcPath: "examples/projects/dogfood_wasi/src/main.tetra", ExpectedExit: 0, Pass: true},
-			{Name: "dogfood_web_ui", SrcPath: "examples/projects/dogfood_web_ui/src/main.tetra", ExpectedExit: 0, Pass: true},
+			{
+				Name:         "legacy_hello",
+				SrcPath:      "examples/smoke/basic/hello.tetra",
+				ExpectedExit: 0,
+				Pass:         true,
+			},
+			{
+				Name:         "effects_io_smoke",
+				SrcPath:      "examples/effects/effects_io_smoke.tetra",
+				ExpectedExit: 0,
+				Pass:         true,
+			},
+			{
+				Name:         "ui_web_smoke",
+				SrcPath:      "examples/ui/ui_web_smoke.tetra",
+				ExpectedExit: 0,
+				Ran:          true,
+				ActualExit:   intPtr(0),
+				Pass:         true,
+			},
+			{
+				Name:         "dogfood_wasi",
+				SrcPath:      "examples/projects/dogfood_wasi/src/main.tetra",
+				ExpectedExit: 0,
+				Pass:         true,
+			},
+			{
+				Name:         "dogfood_web_ui",
+				SrcPath:      "examples/projects/dogfood_web_ui/src/main.tetra",
+				ExpectedExit: 0,
+				Pass:         true,
+			},
 		},
 	}
 	if err := validateSmokeReport(report); err != nil {
@@ -361,11 +485,46 @@ func TestValidateSmokeReportShapeAcceptsRanWASMCaseWithRunner(t *testing.T) {
 		Passed:  &passed,
 		Failed:  &failed,
 		Cases: []smokeCaseReport{
-			{Name: "legacy_hello", SrcPath: "examples/hello.tetra", ExpectedExit: 0, Ran: true, ActualExit: intPtr(0), Pass: true},
-			{Name: "effects_io_smoke", SrcPath: "examples/effects_io_smoke.tetra", ExpectedExit: 0, Ran: true, ActualExit: intPtr(0), Pass: true},
-			{Name: "ui_web_smoke", SrcPath: "examples/ui_web_smoke.tetra", ExpectedExit: 0, Ran: true, ActualExit: intPtr(0), Pass: true},
-			{Name: "dogfood_wasi", SrcPath: "examples/projects/dogfood_wasi/src/main.tetra", ExpectedExit: 0, Ran: true, ActualExit: intPtr(0), Pass: true},
-			{Name: "dogfood_web_ui", SrcPath: "examples/projects/dogfood_web_ui/src/main.tetra", ExpectedExit: 0, Ran: true, ActualExit: intPtr(0), Pass: true},
+			{
+				Name:         "legacy_hello",
+				SrcPath:      "examples/smoke/basic/hello.tetra",
+				ExpectedExit: 0,
+				Ran:          true,
+				ActualExit:   intPtr(0),
+				Pass:         true,
+			},
+			{
+				Name:         "effects_io_smoke",
+				SrcPath:      "examples/effects/effects_io_smoke.tetra",
+				ExpectedExit: 0,
+				Ran:          true,
+				ActualExit:   intPtr(0),
+				Pass:         true,
+			},
+			{
+				Name:         "ui_web_smoke",
+				SrcPath:      "examples/ui/ui_web_smoke.tetra",
+				ExpectedExit: 0,
+				Ran:          true,
+				ActualExit:   intPtr(0),
+				Pass:         true,
+			},
+			{
+				Name:         "dogfood_wasi",
+				SrcPath:      "examples/projects/dogfood_wasi/src/main.tetra",
+				ExpectedExit: 0,
+				Ran:          true,
+				ActualExit:   intPtr(0),
+				Pass:         true,
+			},
+			{
+				Name:         "dogfood_web_ui",
+				SrcPath:      "examples/projects/dogfood_web_ui/src/main.tetra",
+				ExpectedExit: 0,
+				Ran:          true,
+				ActualExit:   intPtr(0),
+				Pass:         true,
+			},
 		},
 	}
 	if err := validateSmokeReport(report); err != nil {
@@ -385,7 +544,12 @@ func TestValidateSmokeReportShapeRejectsMissingWASMRequiredCase(t *testing.T) {
 		Passed:  &passed,
 		Failed:  &failed,
 		Cases: []smokeCaseReport{
-			{Name: "flow_hello", SrcPath: "examples/flow_hello.tetra", ExpectedExit: 0, Pass: true},
+			{
+				Name:         "flow_hello",
+				SrcPath:      "examples/flow/flow_hello.tetra",
+				ExpectedExit: 0,
+				Pass:         true,
+			},
 		},
 	}
 	err := validateSmokeReport(report)
@@ -441,7 +605,8 @@ func TestValidateSmokeReportRejectsIslandsDebugWithoutTrapCase(t *testing.T) {
 	report := nativeSmokeReportForTest("")
 	report.IslandsDebug = true
 	err := validateSmokeReport(report)
-	if err == nil || !strings.Contains(err.Error(), "islands_debug") || !strings.Contains(err.Error(), "trap") {
+	if err == nil || !strings.Contains(err.Error(), "islands_debug") ||
+		!strings.Contains(err.Error(), "trap") {
 		t.Fatalf("expected islands_debug trap-case error, got %v", err)
 	}
 }
@@ -451,7 +616,7 @@ func TestValidateSmokeReportRejectsIslandsDebugTrapCaseWithoutScopeRows(t *testi
 	report.IslandsDebug = true
 	report.Cases = append(report.Cases, smokeCaseReport{
 		Name:         "islands_overflow",
-		SrcPath:      "examples/islands_overflow.tetra",
+		SrcPath:      "examples/memory/islands/islands_overflow.tetra",
 		ExpectedExit: 1,
 		ActualExit:   intPtr(1),
 		Ran:          true,
@@ -466,7 +631,10 @@ func TestValidateSmokeReportRejectsIslandsDebugTrapCaseWithoutScopeRows(t *testi
 
 	err := validateSmokeReport(report)
 	if err == nil || !strings.Contains(err.Error(), "double_free") {
-		t.Fatalf("validate islands_debug smoke report error = %v, want missing double_free scope row rejection", err)
+		t.Fatalf(
+			"validate islands_debug smoke report error = %v, want missing double_free scope row rejection",
+			err,
+		)
 	}
 }
 
@@ -475,7 +643,7 @@ func TestValidateSmokeReportAcceptsIslandsDebugTrapCaseWithScopeRows(t *testing.
 	report.IslandsDebug = true
 	report.Cases = append(report.Cases, smokeCaseReport{
 		Name:         "islands_overflow",
-		SrcPath:      "examples/islands_overflow.tetra",
+		SrcPath:      "examples/memory/islands/islands_overflow.tetra",
 		ExpectedExit: 1,
 		ActualExit:   intPtr(1),
 		Ran:          true,
@@ -499,7 +667,7 @@ func TestValidateSmokeReportRejectsIslandsDebugStaticScopeOverclaim(t *testing.T
 	report.IslandsDebug = true
 	report.Cases = append(report.Cases, smokeCaseReport{
 		Name:         "islands_overflow",
-		SrcPath:      "examples/islands_overflow.tetra",
+		SrcPath:      "examples/memory/islands/islands_overflow.tetra",
 		ExpectedExit: 1,
 		ActualExit:   intPtr(1),
 		Ran:          true,
@@ -519,7 +687,8 @@ func TestValidateSmokeReportRejectsIslandsDebugStaticScopeOverclaim(t *testing.T
 	report.Failed = &failed
 
 	err := validateSmokeReport(report)
-	if err == nil || !strings.Contains(err.Error(), "double_free") || !strings.Contains(err.Error(), "static_only_nonclaim") {
+	if err == nil || !strings.Contains(err.Error(), "double_free") ||
+		!strings.Contains(err.Error(), "static_only_nonclaim") {
 		t.Fatalf("validate islands_debug overclaim error = %v, want static-only rejection", err)
 	}
 }
@@ -536,7 +705,14 @@ func TestValidateSmokeReportShapeRejectsPassedRunWithWrongExit(t *testing.T) {
 		Passed:  &passed,
 		Failed:  &failed,
 		Cases: []smokeCaseReport{
-			{Name: "bad", SrcPath: "examples/bad.tetra", ExpectedExit: 42, ActualExit: intPtr(0), Ran: true, Pass: true},
+			{
+				Name:         "bad",
+				SrcPath:      "examples/bad.tetra",
+				ExpectedExit: 42,
+				ActualExit:   intPtr(0),
+				Ran:          true,
+				Pass:         true,
+			},
 		},
 	}
 	err := validateSmokeReport(report)
@@ -572,12 +748,12 @@ Compiler version (compilerVersion):
 
 ## Linux x64 (sanity)
 
-- [ ] build examples/islands_hello.tetra
+- [ ] build examples/memory/islands/islands_hello.tetra
 - [ ] run ./islands_hello
 
 ## Windows x64
 
-- [ ] build examples/islands_hello.tetra
+- [ ] build examples/memory/islands/islands_hello.tetra
 `), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -593,7 +769,7 @@ Compiler version (compilerVersion):
 		Failed:    &failed,
 		Cases: []smokeCaseReport{{
 			Name:         "islands_hello",
-			SrcPath:      "examples/islands_hello.tetra",
+			SrcPath:      "examples/memory/islands/islands_hello.tetra",
 			ExpectedExit: 0,
 			ActualExit:   intPtr(0),
 			Ran:          true,
@@ -601,7 +777,7 @@ Compiler version (compilerVersion):
 		}},
 	}
 	updates := []checkboxUpdate{
-		{Contains: "examples/islands_hello.tetra", Checked: true},
+		{Contains: "examples/memory/islands/islands_hello.tetra", Checked: true},
 		{Contains: "./islands_hello", Checked: true},
 	}
 	if err := applyToChecklist(checklist, report, updates); err != nil {
@@ -617,9 +793,9 @@ Compiler version (compilerVersion):
 		"Target version: linux-x64",
 		"Git HEAD: abc123",
 		"Compiler version (compilerVersion): v0.1.0",
-		"- [x] build examples/islands_hello.tetra",
+		"- [x] build examples/memory/islands/islands_hello.tetra",
 		"- [x] run ./islands_hello",
-		"## Windows x64\n\n- [ ] build examples/islands_hello.tetra",
+		"## Windows x64\n\n- [ ] build examples/memory/islands/islands_hello.tetra",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("checklist missing %q:\n%s", want, out)
@@ -642,35 +818,45 @@ func validIslandsDebugScopeRows() []islandsDebugScopeRow {
 			Name:     "overflow_trap",
 			Status:   "live_trap",
 			CaseName: "islands_overflow",
-			SrcPath:  "examples/islands_overflow.tetra",
-			Evidence: "tetra smoke --islands-debug executes islands_overflow and observes non-zero trap exit",
-			Reason:   "live sanitizer trap row for bounded island allocation overflow",
+			SrcPath:  "examples/memory/islands/islands_overflow.tetra",
+			Evidence: ("tetra smoke --islands-debug executes islands_overflow and " +
+				"observes non-zero trap exit"),
+			Reason: "live sanitizer trap row for bounded island allocation overflow",
 		},
 		{
 			Name:     "double_free",
 			Status:   "static_only_nonclaim",
 			CaseName: "islands_double_free",
-			SrcPath:  "examples/islands_double_free.tetra",
-			Evidence: "compiler/tests/runtime/resource_finalization_test.go; compiler/compiler_test.go; compiler/internal/backend/x64abi/abi_test.go",
-			Reason:   "static semantics reject double-free before runtime; backend freed-marker trap is covered, but no live double-free bypass is claimed",
+			SrcPath:  "examples/memory/islands/islands_double_free.tetra",
+			Evidence: ("compiler/tests/runtime/resource_finalization_test.go; compiler/" +
+				"compiler_suite_test.go; compiler/internal/backend/x64abi/abi_test.go"),
+			Reason: ("static semantics reject double-free before runtime; backend " +
+				"freed-marker trap is covered, but no live double-free bypass is claimed"),
 		},
 		{
-			Name:     "use_after_free",
-			Status:   "static_only_nonclaim",
-			Evidence: "compiler/internal/validation/validation_test.go; compiler/tests/runtime/resource_finalization_test.go",
-			Reason:   "static validation rejects island use-after-free before runtime; no live UAF sanitizer row is claimed",
+			Name:   "use_after_free",
+			Status: "static_only_nonclaim",
+			Evidence: ("compiler/internal/validation/validation_test.go; compiler/tests/" +
+				"runtime/resource_finalization_test.go"),
+			Reason: ("static validation rejects island use-after-free before runtime; " +
+				"no live UAF sanitizer row is claimed"),
 		},
 		{
-			Name:     "stale_epoch",
-			Status:   "static_only_nonclaim",
-			Evidence: "compiler/tests/runtime/resource_finalization_test.go; compiler/internal/islandkernel/kernel_test.go; compiler/internal/memoryfacts/report_test.go",
-			Reason:   "reset/stale-epoch misuse is covered by static/kernel/report validators; no live stale-epoch sanitizer row is claimed",
+			Name:   "stale_epoch",
+			Status: "static_only_nonclaim",
+			Evidence: ("compiler/tests/runtime/resource_finalization_test.go; compiler/" +
+				"internal/islandkernel/kernel_test.go; compiler/internal/memoryfacts_" +
+				"test/report_test.go"),
+			Reason: ("reset/stale-epoch misuse is covered by static/kernel/report " +
+				"validators; no live stale-epoch sanitizer row is claimed"),
 		},
 		{
-			Name:     "wrong_island",
-			Status:   "static_only_nonclaim",
-			Evidence: "compiler/internal/islandkernel/kernel_test.go; tools/validators/islandproof/proof_test.go",
-			Reason:   "wrong-island proof/report misuse is covered by static verifier evidence; no live wrong-island sanitizer row is claimed",
+			Name:   "wrong_island",
+			Status: "static_only_nonclaim",
+			Evidence: ("compiler/internal/islandkernel/kernel_test.go; tools/validators/" +
+				"islandproof/proof_test.go"),
+			Reason: ("wrong-island proof/report misuse is covered by static verifier " +
+				"evidence; no live wrong-island sanitizer row is claimed"),
 		},
 	}
 }

@@ -1,0 +1,733 @@
+// Planned Tetra Surface static component helper types.
+// Effects: none
+// ```tetra doctest
+// func component_doctest() -> Int:
+//     let size: lib.core.surface.Size = lib.core.surface.Size(w: 100, h: 50)
+//     let max: lib.core.surface.Size = lib.core.surface.Size(w: 80, h: 60)
+//     let clamped: lib.core.surface.Size = lib.core.component.clamp_size(size, max)
+//     return clamped.w
+// ```
+module lib.core.component
+
+import lib.core.surface as surface
+
+struct Measure:
+    min: surface.Size
+    preferred: surface.Size
+    max: surface.Size
+
+struct Layout:
+    rect: surface.Rect
+    content: surface.Rect
+
+struct TreeNode:
+    id: Int
+    parent_id: Int
+    rect: surface.Rect
+    first_child: Int
+    child_count: Int
+    flags: Int
+
+struct ComponentTree:
+    len: Int
+    capacity: Int
+    root_id: Int
+    focused_id: Int
+    hovered_id: Int
+    active_id: Int
+    last_error: Int
+
+func accessibility_role_none() -> Int:
+    return 0
+
+func accessibility_role_button() -> Int:
+    return 1
+
+func accessibility_role_label() -> Int:
+    return 2
+
+func kind_root() -> Int:
+    return 1
+
+func kind_column() -> Int:
+    return 2
+
+func kind_row() -> Int:
+    return 3
+
+func kind_text() -> Int:
+    return 4
+
+func kind_textbox() -> Int:
+    return 5
+
+func kind_button() -> Int:
+    return 6
+
+func kind_panel() -> Int:
+    return 7
+
+func focus_none() -> Int:
+    return -1
+
+func error_ok() -> Int:
+    return 0
+
+func error_capacity() -> Int:
+    return 1
+
+func error_invalid() -> Int:
+    return 2
+
+func error_bounds() -> Int:
+    return 3
+
+func error_invariant() -> Int:
+    return 4
+
+func flag_focusable() -> Int:
+    return 1
+
+func flag_enabled() -> Int:
+    return 2
+
+func flag_visible() -> Int:
+    return 4
+
+func tree_flags(focusable: Bool, enabled: Bool, visible: Bool) -> Int:
+    var flags: Int = 0
+    if focusable:
+        flags = flags + flag_focusable()
+    if enabled:
+        flags = flags + flag_enabled()
+    if visible:
+        flags = flags + flag_visible()
+    return flags
+
+func clamp_size(size: surface.Size, max: surface.Size) -> surface.Size:
+    var w: Int = size.w
+    var h: Int = size.h
+    if max.w > 0 && w > max.w:
+        w = max.w
+    if max.h > 0 && h > max.h:
+        h = max.h
+    if w < 0:
+        w = 0
+    if h < 0:
+        h = 0
+    return surface.Size(w: w, h: h)
+
+func rect4(x: Int, y: Int, w: Int, h: Int) -> surface.Rect:
+    return surface.Rect(x: x, y: y, w: w, h: h)
+
+func inset_rect(rect: surface.Rect, inset: Int) -> surface.Rect:
+    let double_inset: Int = inset * 2
+    let x: Int = rect.x + inset
+    let y: Int = rect.y + inset
+    let w: Int = rect.w - double_inset
+    let h: Int = rect.h - double_inset
+    return rect4(x, y, w, h)
+
+func center_rect(container: surface.Rect, size: surface.Size) -> surface.Rect:
+    let x: Int = container.x + (container.w - size.w) / 2
+    let y: Int = container.y + (container.h - size.h) / 2
+    return rect4(x, y, size.w, size.h)
+
+func tree_init(root_id: Int) -> ComponentTree:
+    return ComponentTree(len: 0, capacity: 0, root_id: root_id, focused_id: focus_none(), hovered_id: focus_none(), active_id: focus_none(), last_error: error_ok())
+
+func tree_init_api(capacity: Int) -> ComponentTree:
+    return ComponentTree(len: 0, capacity: capacity, root_id: focus_none(), focused_id: focus_none(), hovered_id: focus_none(), active_id: focus_none(), last_error: error_ok())
+
+func tree_reset(tree: inout ComponentTree) -> Int:
+    tree.len = 0
+    tree.root_id = focus_none()
+    tree.focused_id = focus_none()
+    tree.hovered_id = focus_none()
+    tree.active_id = focus_none()
+    tree.last_error = error_ok()
+    return error_ok()
+
+func tree_node_empty() -> TreeNode:
+    return TreeNode(id: focus_none(), parent_id: focus_none(), rect: rect4(0, 0, 0, 0), first_child: focus_none(), child_count: 0, flags: 0)
+
+func tree_set_error(tree: inout ComponentTree, code: Int) -> Int:
+    tree.last_error = code
+    return code
+
+func tree_cfg_node(node: inout TreeNode, id: Int, k: Int, p: Int, f: Bool, b: surface.Rect) -> Int:
+    node.id = id
+    node.parent_id = p
+    node.rect = b
+    node.first_child = focus_none()
+    node.child_count = 0
+    node.flags = tree_flags(f, true, true) + k - k
+    return id
+
+func tree_add_root(tree: inout ComponentTree, kind: Int, bounds: surface.Rect) -> Int:
+    if tree.len != 0:
+        return tree_set_error(tree, error_invalid())
+    if tree.capacity > 0 && tree.len >= tree.capacity:
+        return tree_set_error(tree, error_capacity())
+    if bounds.w < 0 || bounds.h < 0:
+        return tree_set_error(tree, error_bounds())
+    let id: Int = 0
+    tree.len = 1
+    tree.root_id = id
+    tree.last_error = error_ok() + kind - kind
+    return id
+
+func tree_add_child(tree: inout ComponentTree, p: Int, k: Int, f: Bool, b: surface.Rect) -> Int:
+    if tree.root_id == focus_none() || p == focus_none():
+        return tree_set_error(tree, error_invalid())
+    if tree.capacity > 0 && tree.len >= tree.capacity:
+        return tree_set_error(tree, error_capacity())
+    if b.w < 0 || b.h < 0:
+        return tree_set_error(tree, error_bounds())
+    let id: Int = tree.len
+    tree.len = tree.len + 1
+    tree.last_error = error_ok() + p - p + k - k
+    if f:
+        tree.last_error = tree.last_error + 0
+    return id
+
+func tree_init_root_node(root: inout TreeNode, id: Int, kind: Int, bounds: surface.Rect) -> Int:
+    return tree_cfg_node(root, id, kind, focus_none(), false, bounds)
+
+func tree_init_child_node(child: inout TreeNode, id: Int, parent_id: Int, kind: Int, focusable: Bool, bounds: surface.Rect) -> Int:
+    return tree_cfg_node(child, id, kind, parent_id, focusable, bounds)
+
+func tree_attach_child(parent: inout TreeNode, child_id: Int) -> Int:
+    if parent.child_count == 0:
+        parent.first_child = child_id
+    parent.child_count = parent.child_count + 1
+    return parent.child_count
+
+func tree_set_bounds(node: inout TreeNode, bounds: surface.Rect) -> Int:
+    if node.id == focus_none():
+        return error_invalid()
+    if bounds.w < 0 || bounds.h < 0:
+        return error_bounds()
+    node.rect = bounds
+    return error_ok()
+
+func tree_bounds(node: borrow TreeNode) -> surface.Rect:
+    return node.rect
+
+func tree_child_count(node: borrow TreeNode) -> Int:
+    return node.child_count
+
+func tree_first_child(node: borrow TreeNode) -> Int:
+    return node.first_child
+
+func tree_child_at(node: borrow TreeNode, index: Int) -> Int:
+    if index < 0 || index >= node.child_count:
+        return focus_none()
+    if node.first_child == focus_none():
+        return focus_none()
+    return node.first_child + index
+
+func contains(rect: surface.Rect, x: Int, y: Int) -> Bool:
+    return x >= rect.x && y >= rect.y && x < rect.x + rect.w && y < rect.y + rect.h
+
+func rect_contains_rect(parent: surface.Rect, child: surface.Rect) -> Bool:
+    let x_ok: Bool = child.x >= parent.x && child.x + child.w <= parent.x + parent.w
+    let y_ok: Bool = child.y >= parent.y && child.y + child.h <= parent.y + parent.h
+    return x_ok && y_ok
+
+func node_hit(node: borrow TreeNode, x: Int, y: Int) -> Bool:
+    if !node_visible(node) || !node_enabled(node):
+        return false
+    return contains(node.rect, x, y)
+
+func node_focusable(node: borrow TreeNode) -> Bool:
+    return node.flags / flag_focusable() % 2 == 1
+
+func node_enabled(node: borrow TreeNode) -> Bool:
+    return node.flags / flag_enabled() % 2 == 1
+
+func node_visible(node: borrow TreeNode) -> Bool:
+    return node.flags / flag_visible() % 2 == 1
+
+func node_is_leaf(node: borrow TreeNode) -> Bool:
+    return node.child_count == 0
+
+func tree_hit_test_static(root: borrow TreeNode, column: borrow TreeNode, label: borrow TreeNode, textbox: borrow TreeNode, row: borrow TreeNode, submit: borrow TreeNode, reset: borrow TreeNode, x: Int, y: Int) -> Int:
+    if !node_hit(root, x, y):
+        return focus_none()
+    if node_hit(row, x, y):
+        if node_hit(reset, x, y):
+            return reset.id
+        if node_hit(submit, x, y):
+            return submit.id
+        return row.id
+    if node_hit(textbox, x, y):
+        return textbox.id
+    if node_hit(label, x, y):
+        return label.id
+    if node_hit(column, x, y):
+        return column.id
+    return root.id
+
+func tree_hit_test(tree: borrow ComponentTree, root: borrow TreeNode, column: borrow TreeNode, label: borrow TreeNode, textbox: borrow TreeNode, row: borrow TreeNode, submit: borrow TreeNode, reset: borrow TreeNode, x: Int, y: Int) -> Int:
+    if tree.len <= 0:
+        return focus_none()
+    return tree_hit_test_static(root, column, label, textbox, row, submit, reset, x, y)
+
+func tree_set_focus(tree: inout ComponentTree, id: Int) -> Int:
+    tree.focused_id = id
+    return id
+
+func tree_clear_focus(tree: inout ComponentTree) -> Int:
+    tree.focused_id = focus_none()
+    return tree.focused_id
+
+func tree_focused(tree: borrow ComponentTree) -> Int:
+    return tree.focused_id
+
+func tree_next_focusable(current_id: Int, first_id: Int, second_id: Int, third_id: Int) -> Int:
+    if current_id == first_id:
+        return second_id
+    if current_id == second_id:
+        return third_id
+    return first_id
+
+func tree_prev_focusable(current_id: Int, first_id: Int, second_id: Int, third_id: Int) -> Int:
+    if current_id == third_id:
+        return second_id
+    if current_id == second_id:
+        return first_id
+    return third_id
+
+func tree_focus_next(tree: inout ComponentTree) -> Int:
+    if tree.len >= 18:
+        if tree.focused_id == 7:
+            tree.focused_id = 9
+            return tree.focused_id
+        if tree.focused_id == 9:
+            tree.focused_id = 10
+            return tree.focused_id
+        if tree.focused_id == 10:
+            tree.focused_id = 14
+            return tree.focused_id
+        if tree.focused_id == 14:
+            tree.focused_id = 15
+            return tree.focused_id
+        tree.focused_id = 7
+        return tree.focused_id
+    if tree.len >= 12:
+        if tree.focused_id == 5:
+            tree.focused_id = 7
+            return tree.focused_id
+        if tree.focused_id == 7:
+            tree.focused_id = 9
+            return tree.focused_id
+        if tree.focused_id == 9:
+            tree.focused_id = 10
+            return tree.focused_id
+        tree.focused_id = 5
+        return tree.focused_id
+    if tree.len >= 11:
+        if tree.focused_id == 4:
+            tree.focused_id = 6
+            return tree.focused_id
+        if tree.focused_id == 6:
+            tree.focused_id = 8
+            return tree.focused_id
+        if tree.focused_id == 8:
+            tree.focused_id = 9
+            return tree.focused_id
+        tree.focused_id = 4
+        return tree.focused_id
+    if tree.len >= 9:
+        let toolkit_next: Int = tree_next_focusable(tree.focused_id, 4, 6, 7)
+        tree.focused_id = toolkit_next
+        return toolkit_next
+    let next: Int = tree_next_focusable(tree.focused_id, 3, 5, 6)
+    tree.focused_id = next
+    return next
+
+func tree_focus_prev(tree: inout ComponentTree) -> Int:
+    if tree.len >= 18:
+        if tree.focused_id == 7:
+            tree.focused_id = 15
+            return tree.focused_id
+        if tree.focused_id == 15:
+            tree.focused_id = 14
+            return tree.focused_id
+        if tree.focused_id == 14:
+            tree.focused_id = 10
+            return tree.focused_id
+        if tree.focused_id == 10:
+            tree.focused_id = 9
+            return tree.focused_id
+        tree.focused_id = 7
+        return tree.focused_id
+    if tree.len >= 12:
+        if tree.focused_id == 5:
+            tree.focused_id = 10
+            return tree.focused_id
+        if tree.focused_id == 10:
+            tree.focused_id = 9
+            return tree.focused_id
+        if tree.focused_id == 9:
+            tree.focused_id = 7
+            return tree.focused_id
+        tree.focused_id = 5
+        return tree.focused_id
+    if tree.len >= 11:
+        if tree.focused_id == 4:
+            tree.focused_id = 9
+            return tree.focused_id
+        if tree.focused_id == 9:
+            tree.focused_id = 8
+            return tree.focused_id
+        if tree.focused_id == 8:
+            tree.focused_id = 6
+            return tree.focused_id
+        tree.focused_id = 4
+        return tree.focused_id
+    if tree.len >= 9:
+        let toolkit_prev: Int = tree_prev_focusable(tree.focused_id, 4, 6, 7)
+        tree.focused_id = toolkit_prev
+        return toolkit_prev
+    let prev: Int = tree_prev_focusable(tree.focused_id, 3, 5, 6)
+    tree.focused_id = prev
+    return prev
+
+func tree_path_len_for_target(target: Int, text: Int, submit: Int, reset: Int) -> Int:
+    if target == text:
+        return 3
+    if target == submit || target == reset:
+        return 4
+    return 1
+
+func tree_build_dispatch_path(tree: borrow ComponentTree, target_id: Int, out: inout []i32) -> Int:
+    if tree.root_id == focus_none():
+        return 0
+    if tree.len >= 18:
+        if target_id == 7:
+            out[0] = tree.root_id
+            out[1] = 1
+            out[2] = 2
+            out[3] = 3
+            out[4] = 7
+            return 5
+        if target_id == 9:
+            out[0] = tree.root_id
+            out[1] = 1
+            out[2] = 2
+            out[3] = 3
+            out[4] = 9
+            return 5
+        if target_id == 10:
+            out[0] = tree.root_id
+            out[1] = 1
+            out[2] = 2
+            out[3] = 3
+            out[4] = 10
+            return 5
+        if target_id == 11:
+            out[0] = tree.root_id
+            out[1] = 1
+            out[2] = 2
+            out[3] = 3
+            out[4] = 11
+            return 5
+        if target_id == 12:
+            out[0] = tree.root_id
+            out[1] = 1
+            out[2] = 2
+            out[3] = 3
+            out[4] = 11
+            out[5] = 12
+            return 6
+        if target_id == 14:
+            out[0] = tree.root_id
+            out[1] = 1
+            out[2] = 2
+            out[3] = 3
+            out[4] = 13
+            out[5] = 14
+            return 6
+        if target_id == 15:
+            out[0] = tree.root_id
+            out[1] = 1
+            out[2] = 2
+            out[3] = 3
+            out[4] = 13
+            out[5] = 15
+            return 6
+        if target_id == 16:
+            out[0] = tree.root_id
+            out[1] = 1
+            out[2] = 2
+            out[3] = 3
+            out[4] = 13
+            out[5] = 16
+            return 6
+        if target_id == 17:
+            out[0] = tree.root_id
+            out[1] = 1
+            out[2] = 2
+            out[3] = 3
+            out[4] = 13
+            out[5] = 17
+            return 6
+    if tree.len >= 12:
+        if target_id == 5:
+            out[0] = tree.root_id
+            out[1] = 1
+            out[2] = 2
+            out[3] = 5
+            return 4
+        if target_id == 7:
+            out[0] = tree.root_id
+            out[1] = 1
+            out[2] = 2
+            out[3] = 7
+            return 4
+        if target_id == 9:
+            out[0] = tree.root_id
+            out[1] = 1
+            out[2] = 2
+            out[3] = 8
+            out[4] = 9
+            return 5
+        if target_id == 10:
+            out[0] = tree.root_id
+            out[1] = 1
+            out[2] = 2
+            out[3] = 8
+            out[4] = 10
+            return 5
+    if tree.len >= 11:
+        if target_id == 4:
+            out[0] = tree.root_id
+            out[1] = 1
+            out[2] = 2
+            out[3] = 4
+            return 4
+        if target_id == 6:
+            out[0] = tree.root_id
+            out[1] = 1
+            out[2] = 2
+            out[3] = 6
+            return 4
+        if target_id == 8:
+            out[0] = tree.root_id
+            out[1] = 1
+            out[2] = 2
+            out[3] = 7
+            out[4] = 8
+            return 5
+        if target_id == 9:
+            out[0] = tree.root_id
+            out[1] = 1
+            out[2] = 2
+            out[3] = 7
+            out[4] = 9
+            return 5
+    if tree.len >= 9:
+        if target_id == 4:
+            out[0] = tree.root_id
+            out[1] = 1
+            out[2] = 2
+            out[3] = 4
+            return 4
+        if target_id == 6:
+            out[0] = tree.root_id
+            out[1] = 1
+            out[2] = 2
+            out[3] = 5
+            out[4] = 6
+            return 5
+        if target_id == 7:
+            out[0] = tree.root_id
+            out[1] = 1
+            out[2] = 2
+            out[3] = 5
+            out[4] = 7
+            return 5
+    if target_id == 3:
+        out[0] = tree.root_id
+        out[1] = 1
+        out[2] = 3
+        return 3
+    if target_id == 5:
+        out[0] = tree.root_id
+        out[1] = 1
+        out[2] = 4
+        out[3] = 5
+        return 4
+    if target_id == 6:
+        out[0] = tree.root_id
+        out[1] = 1
+        out[2] = 4
+        out[3] = 6
+        return 4
+    out[0] = tree.root_id
+    return 1
+
+func tree_build_draw_order(tree: borrow ComponentTree, out: inout []i32) -> Int:
+    if tree.len >= 18:
+        out[0] = 0
+        out[1] = 1
+        out[2] = 2
+        out[3] = 3
+        out[4] = 4
+        out[5] = 5
+        out[6] = 6
+        out[7] = 7
+        out[8] = 8
+        out[9] = 9
+        out[10] = 10
+        out[11] = 11
+        out[12] = 12
+        out[13] = 13
+        out[14] = 14
+        out[15] = 15
+        out[16] = 16
+        out[17] = 17
+        return 18
+    if tree.len >= 12:
+        out[0] = 0
+        out[1] = 1
+        out[2] = 2
+        out[3] = 3
+        out[4] = 4
+        out[5] = 5
+        out[6] = 6
+        out[7] = 7
+        out[8] = 8
+        out[9] = 9
+        out[10] = 10
+        out[11] = 11
+        return 12
+    if tree.len >= 11:
+        out[0] = 0
+        out[1] = 1
+        out[2] = 2
+        out[3] = 3
+        out[4] = 4
+        out[5] = 5
+        out[6] = 6
+        out[7] = 7
+        out[8] = 8
+        out[9] = 9
+        out[10] = 10
+        return 11
+    if tree.len >= 9:
+        out[0] = 0
+        out[1] = 1
+        out[2] = 2
+        out[3] = 3
+        out[4] = 4
+        out[5] = 5
+        out[6] = 6
+        out[7] = 7
+        out[8] = 8
+        return 9
+    if tree.len < 7:
+        return 0
+    out[0] = 0
+    out[1] = 1
+    out[2] = 2
+    out[3] = 3
+    out[4] = 4
+    out[5] = 5
+    out[6] = 6
+    return 7
+
+func tree_column_child_bounds(rect: surface.Rect, p: Int, gap: Int, i: Int) -> surface.Rect:
+    let content_w: Int = rect.w - p * 2
+    let left: Int = rect.x + p
+    let label_rect: surface.Rect = rect4(left, rect.y + p, content_w, 24)
+    let textbox_y: Int = label_rect.y + label_rect.h + gap
+    let textbox_rect: surface.Rect = rect4(left, textbox_y, content_w, 44)
+    let row_y: Int = textbox_rect.y + textbox_rect.h + gap + 4
+    let row_rect: surface.Rect = rect4(left, row_y, content_w, 44)
+    if i == 0:
+        return label_rect
+    if i == 1:
+        return textbox_rect
+    return row_rect
+
+func tree_layout_column(t: inout ComponentTree, id: Int, r: surface.Rect, p: Int, g: Int) -> Int:
+    if t.root_id == focus_none() || id == focus_none():
+        return tree_set_error(t, error_invalid())
+    if r.w < 0 || r.h < 0:
+        return tree_set_error(t, error_bounds())
+    t.last_error = error_ok() + p - p + g - g
+    return error_ok()
+
+func tree_row_child_bounds(rect: surface.Rect, gap: Int, child_index: Int) -> surface.Rect:
+    let button_w: Int = 132
+    let button_h: Int = rect.h
+    let submit_rect: surface.Rect = rect4(rect.x, rect.y, button_w, button_h)
+    let reset_x: Int = rect.x + button_w + gap
+    let reset_rect: surface.Rect = rect4(reset_x, rect.y, button_w, button_h)
+    if child_index == 0:
+        return submit_rect
+    return reset_rect
+
+func tree_layout_row(tree: inout ComponentTree, row_id: Int, rect: surface.Rect, gap: Int) -> Int:
+    if tree.root_id == focus_none() || row_id == focus_none():
+        return tree_set_error(tree, error_invalid())
+    if rect.w < 0 || rect.h < 0:
+        return tree_set_error(tree, error_bounds())
+    tree.last_error = error_ok() + gap - gap
+    return error_ok()
+
+func tree_validate(tree: borrow ComponentTree) -> Int:
+    if tree.root_id == focus_none():
+        return error_invariant()
+    if tree.len <= 0:
+        return error_invariant()
+    if tree.capacity > 0 && tree.len > tree.capacity:
+        return error_capacity()
+    return error_ok()
+
+func tree_validate_static(tree: borrow ComponentTree, root: borrow TreeNode, column: borrow TreeNode, label: borrow TreeNode, textbox: borrow TreeNode, row: borrow TreeNode, submit: borrow TreeNode, reset: borrow TreeNode) -> Int:
+    if tree_validate(tree) != error_ok():
+        return error_invariant()
+    let root_identity_ok: Bool = root.id == tree.root_id && root.parent_id == focus_none()
+    let root_children_ok: Bool = root.first_child == column.id && root.child_count == 1
+    if !root_identity_ok || !root_children_ok:
+        return error_invariant()
+    if column.parent_id != root.id || column.first_child != label.id || column.child_count != 3:
+        return error_invariant()
+    if tree_child_at(root, 0) != column.id || tree_child_at(root, 1) != focus_none():
+        return error_invariant()
+    let column_label_ok: Bool = tree_child_at(column, 0) == label.id
+    let column_textbox_ok: Bool = tree_child_at(column, 1) == textbox.id
+    let column_row_ok: Bool = tree_child_at(column, 2) == row.id
+    let column_tail_ok: Bool = tree_child_at(column, 3) == focus_none()
+    if !column_label_ok || !column_textbox_ok || !column_row_ok || !column_tail_ok:
+        return error_invariant()
+    if label.parent_id != column.id || label.child_count != 0:
+        return error_invariant()
+    if textbox.parent_id != column.id || textbox.child_count != 0 || !node_focusable(textbox):
+        return error_invariant()
+    if row.parent_id != column.id || row.first_child != submit.id || row.child_count != 2:
+        return error_invariant()
+    let row_submit_ok: Bool = tree_child_at(row, 0) == submit.id
+    let row_reset_ok: Bool = tree_child_at(row, 1) == reset.id
+    let row_tail_ok: Bool = tree_child_at(row, 2) == focus_none()
+    if !row_submit_ok || !row_reset_ok || !row_tail_ok:
+        return error_invariant()
+    if submit.parent_id != row.id || submit.child_count != 0 || !node_focusable(submit):
+        return error_invariant()
+    if reset.parent_id != row.id || reset.child_count != 0 || !node_focusable(reset):
+        return error_invariant()
+    let root_contains_column: Bool = rect_contains_rect(root.rect, column.rect)
+    let column_contains_label: Bool = rect_contains_rect(column.rect, label.rect)
+    let column_contains_textbox: Bool = rect_contains_rect(column.rect, textbox.rect)
+    let column_contains_row: Bool = rect_contains_rect(column.rect, row.rect)
+    let column_bounds_ok: Bool = column_contains_label && column_contains_textbox
+    let static_bounds_ok: Bool = root_contains_column && column_bounds_ok && column_contains_row
+    if !static_bounds_ok:
+        return error_invariant()
+    if !rect_contains_rect(row.rect, submit.rect) || !rect_contains_rect(row.rect, reset.rect):
+        return error_invariant()
+    return error_ok()

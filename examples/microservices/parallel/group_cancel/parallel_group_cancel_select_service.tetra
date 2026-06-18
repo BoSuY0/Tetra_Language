@@ -1,0 +1,23 @@
+// Task-group cancel/select microservice smoke.
+//
+// The service cancels a group before select2_i32 waits on the grouped task and
+// verifies the wait observes the stopped task result without sleeping until the
+// deadline.
+module examples.microservices.parallel.group_cancel.parallel_group_cancel_select_service
+func worker() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(5)
+    return 99
+
+func main() -> Int
+uses runtime:
+    var group: task.group = core.task_group_open()
+    let task: task.i32 = core.task_spawn_group_i32(group, "worker")
+    group = core.task_group_cancel(group)
+    let selected: task.result_i32 = core.select2_i32(task, core.deadline_ms(10))
+    let close_error: Int = core.task_group_close(group)
+    if close_error != 0:
+        return 20 + close_error
+    if selected.error == 1:
+        return 0
+    return 40 + selected.error

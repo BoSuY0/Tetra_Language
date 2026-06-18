@@ -68,24 +68,38 @@ func TestValidateReleaseGateSummaryAcceptsV040ReportWithExpectedIdentity(t *test
     {"name":"readiness preflight","status":"fail","duration_seconds":1,"exit_code":1,"command":"go run ./tools/cmd/validate-v0-4-readiness","log":"logs/01-readiness-preflight.log"}
   ]
 }`, "logs/01-readiness-preflight.log")
-	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, releaseGateSummaryExpectations{
-		ReleaseVersion:     "v0.4.0",
-		ReleaseArtifact:    "tetra.release.v0_4_0.gate-report.v1",
-		ReleaseGateCommand: "bash scripts/release/v0_4_0/gate.sh",
-	})
+	err := validateReleaseGateSummaryFileWithExpectations(
+		filepath.Join(dir, "summary.json"),
+		dir,
+		releaseGateSummaryExpectations{
+			ReleaseVersion:     "v0.4.0",
+			ReleaseArtifact:    "tetra.release.v0_4_0.gate-report.v1",
+			ReleaseGateCommand: "bash scripts/release/v0_4_0/gate.sh",
+		},
+	)
 	if err != nil {
 		t.Fatalf("validator failed: %v", err)
 	}
 }
 
-func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutCompilerProductionArtifact(t *testing.T) {
+func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutCompilerProductionArtifact(
+	t *testing.T,
+) {
 	dir := makeV040PassingReleaseGateSummaryReport(t)
-	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestExcept("artifacts/compiler-production-linux-x64.json"))
-	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, releaseGateSummaryExpectations{
-		ReleaseVersion:     "v0.4.0",
-		ReleaseArtifact:    "tetra.release.v0_4_0.gate-report.v1",
-		ReleaseGateCommand: "bash scripts/release/v0_4_0/gate.sh",
-	})
+	writeReleaseGateArtifactHashes(
+		t,
+		dir,
+		v040ArtifactHashesManifestExcept("artifacts/compiler-production-linux-x64.json"),
+	)
+	err := validateReleaseGateSummaryFileWithExpectations(
+		filepath.Join(dir, "summary.json"),
+		dir,
+		releaseGateSummaryExpectations{
+			ReleaseVersion:     "v0.4.0",
+			ReleaseArtifact:    "tetra.release.v0_4_0.gate-report.v1",
+			ReleaseGateCommand: "bash scripts/release/v0_4_0/gate.sh",
+		},
+	)
 	if err == nil {
 		t.Fatalf("expected validator failure")
 	}
@@ -94,10 +108,16 @@ func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutCompilerProduc
 	}
 }
 
-func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutTechEmpowerReportStep(t *testing.T) {
+func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutTechEmpowerReportStep(
+	t *testing.T,
+) {
 	dir := makeV040PassingReleaseGateSummaryReportExcept(t, "techempower report schemas")
 	writeReleaseGateArtifactHashes(t, dir, v040ProductionArtifactHashesManifest())
-	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
+	err := validateReleaseGateSummaryFileWithExpectations(
+		filepath.Join(dir, "summary.json"),
+		dir,
+		v040ReleaseGateSummaryExpectations(),
+	)
 	if err == nil {
 		t.Fatalf("expected validator failure")
 	}
@@ -106,10 +126,16 @@ func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutTechEmpowerRep
 	}
 }
 
-func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutDocsVerificationStep(t *testing.T) {
+func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutDocsVerificationStep(
+	t *testing.T,
+) {
 	dir := makeV040PassingReleaseGateSummaryReportExcept(t, "docs verification")
 	writeReleaseGateArtifactHashes(t, dir, v040ProductionArtifactHashesManifest())
-	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
+	err := validateReleaseGateSummaryFileWithExpectations(
+		filepath.Join(dir, "summary.json"),
+		dir,
+		v040ReleaseGateSummaryExpectations(),
+	)
 	if err == nil {
 		t.Fatalf("expected validator failure")
 	}
@@ -118,27 +144,47 @@ func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutDocsVerificati
 	}
 }
 
-func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithReorderedRequiredSteps(t *testing.T) {
+func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithReorderedRequiredSteps(
+	t *testing.T,
+) {
 	order := v040GateStepNames()
 	order[3], order[4] = order[4], order[3]
 	dir := makeV040PassingReleaseGateSummaryReportInOrder(t, order)
 	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestForSummary(t, dir))
-	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
+	err := validateReleaseGateSummaryFileWithExpectations(
+		filepath.Join(dir, "summary.json"),
+		dir,
+		v040ReleaseGateSummaryExpectations(),
+	)
 	if err == nil {
 		t.Fatalf("expected validator failure")
 	}
-	if !strings.Contains(err.Error(), `required step 04 = "techempower report schemas", want "docs verification"`) {
+	if !strings.Contains(
+		err.Error(),
+		`required step 04 = "techempower report schemas", want "docs verification"`,
+	) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithWrongRequiredStepCommand(t *testing.T) {
+func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithWrongRequiredStepCommand(
+	t *testing.T,
+) {
 	dir := makeV040PassingReleaseGateSummaryReport(t)
-	mutateV040ReleaseGateSummaryStep(t, dir, "validate memory production", func(step *releaseGateStep) {
-		step.Command = "go run ./tools/cmd/validate-memory-production"
-	})
+	mutateV040ReleaseGateSummaryStep(
+		t,
+		dir,
+		"validate memory production",
+		func(step *releaseGateStep) {
+			step.Command = "go run ./tools/cmd/validate-memory-production"
+		},
+	)
 	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestForSummary(t, dir))
-	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
+	err := validateReleaseGateSummaryFileWithExpectations(
+		filepath.Join(dir, "summary.json"),
+		dir,
+		v040ReleaseGateSummaryExpectations(),
+	)
 	if err == nil {
 		t.Fatalf("expected validator failure")
 	}
@@ -147,18 +193,27 @@ func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithWrongRequiredStep
 	}
 }
 
-func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithWrongRequiredStepLogPath(t *testing.T) {
+func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithWrongRequiredStepLogPath(
+	t *testing.T,
+) {
 	dir := makeV040PassingReleaseGateSummaryReport(t)
 	mutateV040ReleaseGateSummaryStep(t, dir, "docs verification", func(step *releaseGateStep) {
 		step.Log = "logs/04-docs.log"
 	})
 	writeReleaseGateLog(t, dir, "logs/04-docs.log")
 	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestForSummary(t, dir))
-	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
+	err := validateReleaseGateSummaryFileWithExpectations(
+		filepath.Join(dir, "summary.json"),
+		dir,
+		v040ReleaseGateSummaryExpectations(),
+	)
 	if err == nil {
 		t.Fatalf("expected validator failure")
 	}
-	if !strings.Contains(err.Error(), `required step "docs verification" log = "logs/04-docs.log", want "logs/04-docs-verification.log"`) {
+	if !strings.Contains(
+		err.Error(),
+		`required step "docs verification" log = "logs/04-docs.log", want "logs/04-docs-verification.log"`,
+	) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -175,7 +230,11 @@ func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithMismatchedReportD
 		}
 	})
 	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestForSummary(t, dir))
-	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
+	err := validateReleaseGateSummaryFileWithExpectations(
+		filepath.Join(dir, "summary.json"),
+		dir,
+		v040ReleaseGateSummaryExpectations(),
+	)
 	if err == nil {
 		t.Fatalf("expected validator failure")
 	}
@@ -184,10 +243,16 @@ func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithMismatchedReportD
 	}
 }
 
-func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithNonDotArtifactHashRoot(t *testing.T) {
+func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithNonDotArtifactHashRoot(
+	t *testing.T,
+) {
 	dir := makeV040PassingReleaseGateSummaryReport(t)
 	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestWithRoot(t, dir, "artifacts"))
-	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
+	err := validateReleaseGateSummaryFileWithExpectations(
+		filepath.Join(dir, "summary.json"),
+		dir,
+		v040ReleaseGateSummaryExpectations(),
+	)
 	if err == nil {
 		t.Fatalf("expected validator failure")
 	}
@@ -196,34 +261,66 @@ func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithNonDotArtifactHas
 	}
 }
 
-func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithDuplicateArtifactHashPath(t *testing.T) {
+func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithDuplicateArtifactHashPath(
+	t *testing.T,
+) {
 	dir := makeV040PassingReleaseGateSummaryReport(t)
-	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestWithDuplicatePath(t, dir, "artifacts/features.json"))
-	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
+	writeReleaseGateArtifactHashes(
+		t,
+		dir,
+		v040ArtifactHashesManifestWithDuplicatePath(t, dir, "artifacts/features.json"),
+	)
+	err := validateReleaseGateSummaryFileWithExpectations(
+		filepath.Join(dir, "summary.json"),
+		dir,
+		v040ReleaseGateSummaryExpectations(),
+	)
 	if err == nil {
 		t.Fatalf("expected validator failure")
 	}
-	if !strings.Contains(err.Error(), `duplicate artifact path "artifacts/features.json" in artifact-hashes.json`) {
+	if !strings.Contains(
+		err.Error(),
+		`duplicate artifact path "artifacts/features.json" in artifact-hashes.json`,
+	) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithUnsafeArtifactHashPath(t *testing.T) {
+func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithUnsafeArtifactHashPath(
+	t *testing.T,
+) {
 	dir := makeV040PassingReleaseGateSummaryReport(t)
-	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestWithExtraPath(t, dir, "../outside.txt"))
-	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
+	writeReleaseGateArtifactHashes(
+		t,
+		dir,
+		v040ArtifactHashesManifestWithExtraPath(t, dir, "../outside.txt"),
+	)
+	err := validateReleaseGateSummaryFileWithExpectations(
+		filepath.Join(dir, "summary.json"),
+		dir,
+		v040ReleaseGateSummaryExpectations(),
+	)
 	if err == nil {
 		t.Fatalf("expected validator failure")
 	}
-	if !strings.Contains(err.Error(), `unsafe artifact path "../outside.txt" in artifact-hashes.json`) {
+	if !strings.Contains(
+		err.Error(),
+		`unsafe artifact path "../outside.txt" in artifact-hashes.json`,
+	) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithUnsortedArtifactHashPaths(t *testing.T) {
+func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithUnsortedArtifactHashPaths(
+	t *testing.T,
+) {
 	dir := makeV040PassingReleaseGateSummaryReport(t)
 	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestWithUnsortedPaths(t, dir))
-	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
+	err := validateReleaseGateSummaryFileWithExpectations(
+		filepath.Join(dir, "summary.json"),
+		dir,
+		v040ReleaseGateSummaryExpectations(),
+	)
 	if err == nil {
 		t.Fatalf("expected validator failure")
 	}
@@ -232,26 +329,59 @@ func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithUnsortedArtifactH
 	}
 }
 
-func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithInvalidArtifactHashDigest(t *testing.T) {
+func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithInvalidArtifactHashDigest(
+	t *testing.T,
+) {
 	dir := makeV040PassingReleaseGateSummaryReport(t)
-	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestWithMutatedArtifact(t, dir, "artifacts/features.json", func(artifact *releaseHashArtifact) {
-		artifact.SHA256 = "not-a-digest"
-	}))
-	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
+	writeReleaseGateArtifactHashes(
+		t,
+		dir,
+		v040ArtifactHashesManifestWithMutatedArtifact(
+			t,
+			dir,
+			"artifacts/features.json",
+			func(artifact *releaseHashArtifact) {
+				artifact.SHA256 = "not-a-digest"
+			},
+		),
+	)
+	err := validateReleaseGateSummaryFileWithExpectations(
+		filepath.Join(dir, "summary.json"),
+		dir,
+		v040ReleaseGateSummaryExpectations(),
+	)
 	if err == nil {
 		t.Fatalf("expected validator failure")
 	}
-	if !strings.Contains(err.Error(), `artifact artifacts/features.json has invalid sha256 format`) {
+	if !strings.Contains(
+		err.Error(),
+		`artifact artifacts/features.json has invalid sha256 format`,
+	) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithNegativeArtifactHashSize(t *testing.T) {
+func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithNegativeArtifactHashSize(
+	t *testing.T,
+) {
 	dir := makeV040PassingReleaseGateSummaryReport(t)
-	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestWithMutatedArtifact(t, dir, "artifacts/features.json", func(artifact *releaseHashArtifact) {
-		artifact.Size = -1
-	}))
-	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
+	writeReleaseGateArtifactHashes(
+		t,
+		dir,
+		v040ArtifactHashesManifestWithMutatedArtifact(
+			t,
+			dir,
+			"artifacts/features.json",
+			func(artifact *releaseHashArtifact) {
+				artifact.Size = -1
+			},
+		),
+	)
+	err := validateReleaseGateSummaryFileWithExpectations(
+		filepath.Join(dir, "summary.json"),
+		dir,
+		v040ReleaseGateSummaryExpectations(),
+	)
 	if err == nil {
 		t.Fatalf("expected validator failure")
 	}
@@ -260,11 +390,22 @@ func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithNegativeArtifactH
 	}
 }
 
-func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithMismatchedSecurityReviewDetachedHash(t *testing.T) {
+func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithMismatchedSecurityReviewDetachedHash(
+	t *testing.T,
+) {
 	dir := makeV040PassingReleaseGateSummaryReport(t)
-	writeV040SecurityReviewDetachedHash(t, dir, "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff  artifacts/security-review.md")
+	writeV040SecurityReviewDetachedHash(
+		t,
+		dir,
+		("sha256:fffffffffffffffffffffffffffffffffffffffffffffffffffffffff" +
+			"fffffff  artifacts/security-review.md"),
+	)
 	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestForSummary(t, dir))
-	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
+	err := validateReleaseGateSummaryFileWithExpectations(
+		filepath.Join(dir, "summary.json"),
+		dir,
+		v040ReleaseGateSummaryExpectations(),
+	)
 	if err == nil {
 		t.Fatalf("expected validator failure")
 	}
@@ -275,8 +416,16 @@ func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithMismatchedSecurit
 
 func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutFeaturesArtifact(t *testing.T) {
 	dir := makeV040PassingReleaseGateSummaryReport(t)
-	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestExcept("artifacts/features.json"))
-	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
+	writeReleaseGateArtifactHashes(
+		t,
+		dir,
+		v040ArtifactHashesManifestExcept("artifacts/features.json"),
+	)
+	err := validateReleaseGateSummaryFileWithExpectations(
+		filepath.Join(dir, "summary.json"),
+		dir,
+		v040ReleaseGateSummaryExpectations(),
+	)
 	if err == nil {
 		t.Fatalf("expected validator failure")
 	}
@@ -287,8 +436,16 @@ func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutFeaturesArtifa
 
 func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutStepLogArtifact(t *testing.T) {
 	dir := makeV040PassingReleaseGateSummaryReport(t)
-	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestExcept("logs/04-docs-verification.log"))
-	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
+	writeReleaseGateArtifactHashes(
+		t,
+		dir,
+		v040ArtifactHashesManifestExcept("logs/04-docs-verification.log"),
+	)
+	err := validateReleaseGateSummaryFileWithExpectations(
+		filepath.Join(dir, "summary.json"),
+		dir,
+		v040ReleaseGateSummaryExpectations(),
+	)
 	if err == nil {
 		t.Fatalf("expected validator failure")
 	}
@@ -297,10 +454,20 @@ func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutStepLogArtifac
 	}
 }
 
-func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutMemoryProductionArtifact(t *testing.T) {
+func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutMemoryProductionArtifact(
+	t *testing.T,
+) {
 	dir := makeV040PassingReleaseGateSummaryReport(t)
-	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestExcept("artifacts/memory-production-linux-x64.json"))
-	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
+	writeReleaseGateArtifactHashes(
+		t,
+		dir,
+		v040ArtifactHashesManifestExcept("artifacts/memory-production-linux-x64.json"),
+	)
+	err := validateReleaseGateSummaryFileWithExpectations(
+		filepath.Join(dir, "summary.json"),
+		dir,
+		v040ReleaseGateSummaryExpectations(),
+	)
 	if err == nil {
 		t.Fatalf("expected validator failure")
 	}
@@ -309,10 +476,20 @@ func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutMemoryProducti
 	}
 }
 
-func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutParallelProductionArtifact(t *testing.T) {
+func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutParallelProductionArtifact(
+	t *testing.T,
+) {
 	dir := makeV040PassingReleaseGateSummaryReport(t)
-	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestExcept("artifacts/parallel-production-linux-x64.json"))
-	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
+	writeReleaseGateArtifactHashes(
+		t,
+		dir,
+		v040ArtifactHashesManifestExcept("artifacts/parallel-production-linux-x64.json"),
+	)
+	err := validateReleaseGateSummaryFileWithExpectations(
+		filepath.Join(dir, "summary.json"),
+		dir,
+		v040ReleaseGateSummaryExpectations(),
+	)
 	if err == nil {
 		t.Fatalf("expected validator failure")
 	}
@@ -321,14 +498,20 @@ func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutParallelProduc
 	}
 }
 
-func TestValidateReleaseGateSummaryAcceptsPassingV040ReportWithCompilerProductionArtifact(t *testing.T) {
+func TestValidateReleaseGateSummaryAcceptsPassingV040ReportWithCompilerProductionArtifact(
+	t *testing.T,
+) {
 	dir := makeV040PassingReleaseGateSummaryReport(t)
 	writeReleaseGateArtifactHashes(t, dir, v040ProductionArtifactHashesManifest())
-	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, releaseGateSummaryExpectations{
-		ReleaseVersion:     "v0.4.0",
-		ReleaseArtifact:    "tetra.release.v0_4_0.gate-report.v1",
-		ReleaseGateCommand: "bash scripts/release/v0_4_0/gate.sh",
-	})
+	err := validateReleaseGateSummaryFileWithExpectations(
+		filepath.Join(dir, "summary.json"),
+		dir,
+		releaseGateSummaryExpectations{
+			ReleaseVersion:     "v0.4.0",
+			ReleaseArtifact:    "tetra.release.v0_4_0.gate-report.v1",
+			ReleaseGateCommand: "bash scripts/release/v0_4_0/gate.sh",
+		},
+	)
 	if err != nil {
 		t.Fatalf("validator failed: %v", err)
 	}
@@ -486,7 +669,11 @@ func makeReleaseGateSummaryReport(t *testing.T, summary string, logs ...string) 
 	t.Helper()
 	dir := t.TempDir()
 	if len(logs) == 0 {
-		logs = []string{"logs/01-version-preflight.log", "logs/02-docs-verification.log", "logs/01-one.log"}
+		logs = []string{
+			"logs/01-version-preflight.log",
+			"logs/02-docs-verification.log",
+			"logs/01-one.log",
+		}
 	}
 	if err := os.MkdirAll(filepath.Join(dir, "logs"), 0o755); err != nil {
 		t.Fatal(err)
@@ -577,11 +764,20 @@ func makeV040PassingReleaseGateSummaryReportInOrder(t *testing.T, order []string
 	if err := os.WriteFile(filepath.Join(dir, "summary.json"), raw, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	writeV040SecurityReviewDetachedHash(t, dir, v040FixtureSHA(v040SecurityReviewArtifactPath)+"  "+v040SecurityReviewArtifactPath)
+	writeV040SecurityReviewDetachedHash(
+		t,
+		dir,
+		v040FixtureSHA(v040SecurityReviewArtifactPath)+"  "+v040SecurityReviewArtifactPath,
+	)
 	return dir
 }
 
-func mutateV040ReleaseGateSummaryStep(t *testing.T, dir string, name string, mutate func(*releaseGateStep)) {
+func mutateV040ReleaseGateSummaryStep(
+	t *testing.T,
+	dir string,
+	name string,
+	mutate func(*releaseGateStep),
+) {
 	t.Helper()
 	mutateV040ReleaseGateSummary(t, dir, func(summary *releaseGateSummary) {
 		for i := range summary.Steps {
@@ -615,7 +811,11 @@ func mutateV040ReleaseGateSummary(t *testing.T, dir string, mutate func(*release
 	}
 }
 
-func v040GateStepsForOrder(t *testing.T, order []string, reportDir string) ([]releaseGateStep, []string) {
+func v040GateStepsForOrder(
+	t *testing.T,
+	order []string,
+	reportDir string,
+) ([]releaseGateStep, []string) {
 	t.Helper()
 	var steps []releaseGateStep
 	var logs []string
@@ -785,7 +985,12 @@ func v040ArtifactHashesManifestWithUnsortedPaths(t *testing.T, dir string) strin
 	return string(out)
 }
 
-func v040ArtifactHashesManifestWithMutatedArtifact(t *testing.T, dir string, path string, mutate func(*releaseHashArtifact)) string {
+func v040ArtifactHashesManifestWithMutatedArtifact(
+	t *testing.T,
+	dir string,
+	path string,
+	mutate func(*releaseHashArtifact),
+) string {
 	t.Helper()
 	raw := v040ArtifactHashesManifestForSummary(t, dir)
 	var manifest releaseArtifactHashesManifest
@@ -871,7 +1076,10 @@ var v040ArtifactHashFixtures = []releaseHashArtifact{
 	{Path: "artifacts/memory-production-linux-x64.json", Schema: "tetra.memory.production.v1"},
 	{Path: "artifacts/parallel-production-linux-x64.json", Schema: "tetra.parallel.production.v1"},
 	{Path: "artifacts/compiler-production-linux-x64.json", Schema: "tetra.compiler.production.v1"},
-	{Path: "artifacts/distributed-actors-linux-x64.json", Schema: "tetra.actors.distributed-runtime.v1"},
+	{
+		Path:   "artifacts/distributed-actors-linux-x64.json",
+		Schema: "tetra.actors.distributed-runtime.v1",
+	},
 	{Path: "artifacts/native-ui-linux-x64.json", Schema: "tetra.ui.native-runtime.v1"},
 	{Path: "artifacts/release-state.json", Schema: "tetra.release.v0_4_0.release-state.v1"},
 	{Path: "artifacts/release-state.txt"},
@@ -890,7 +1098,11 @@ func v040FixtureSHA(path string) string {
 
 func writeReleaseGateArtifactHashes(t *testing.T, dir string, manifest string) {
 	t.Helper()
-	if err := os.WriteFile(filepath.Join(dir, "artifact-hashes.json"), []byte(manifest), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(dir, "artifact-hashes.json"),
+		[]byte(manifest),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 }

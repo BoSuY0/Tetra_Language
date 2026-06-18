@@ -88,15 +88,40 @@ func main() {
 	var opt surfaceFinalReadinessOptions
 	var gitDirty string
 	flag.StringVar(&opt.ReportDir, "report-dir", "", "Surface final readiness report directory")
-	flag.StringVar(&opt.ProductReportDir, "product-report-dir", "", "Surface product report directory used as prerequisite evidence")
-	flag.StringVar(&opt.ExpectedScope, "expected-scope", surfaceFinalReadinessScope, "expected Surface release scope")
+	flag.StringVar(
+		&opt.ProductReportDir,
+		"product-report-dir",
+		"",
+		"Surface product report directory used as prerequisite evidence",
+	)
+	flag.StringVar(
+		&opt.ExpectedScope,
+		"expected-scope",
+		surfaceFinalReadinessScope,
+		"expected Surface release scope",
+	)
 	flag.BoolVar(&opt.RequireClean, "require-clean", false, "require clean same-commit evidence")
 	flag.BoolVar(&opt.RequireCI, "require-ci", false, "require exact-head CI proof")
 	flag.BoolVar(&opt.RequirePackage, "require-package", false, "require package proof")
 	flag.BoolVar(&opt.Write, "write", false, "write final-readiness.json before validation")
-	flag.StringVar(&opt.ActionsPermissionsPath, "actions-permissions", "", "optional GitHub Actions permissions JSON")
-	flag.StringVar(&opt.CIRunsPath, "ci-runs", "", "optional GitHub Actions runs JSON for the current head")
-	flag.StringVar(&opt.CurrentGitHead, "current-git-head", "", "override current git head when writing")
+	flag.StringVar(
+		&opt.ActionsPermissionsPath,
+		"actions-permissions",
+		"",
+		"optional GitHub Actions permissions JSON",
+	)
+	flag.StringVar(
+		&opt.CIRunsPath,
+		"ci-runs",
+		"",
+		"optional GitHub Actions runs JSON for the current head",
+	)
+	flag.StringVar(
+		&opt.CurrentGitHead,
+		"current-git-head",
+		"",
+		"override current git head when writing",
+	)
 	flag.StringVar(&gitDirty, "git-dirty", "", "override current git dirty state when writing")
 	flag.Parse()
 
@@ -142,20 +167,40 @@ func validateSurfaceFinalReadiness(opt surfaceFinalReadinessOptions) error {
 	var issues []string
 	issues = append(issues, validateSurfaceFinalReadinessFields(report, expectedScope)...)
 	issues = append(issues, validateSurfaceFinalReadinessNonclaims(report.Nonclaims)...)
-	issues = append(issues, validateSurfaceFinalReadinessHashManifest(filepath.Join(reportDir, "artifact-hashes.json"))...)
+	issues = append(
+		issues,
+		validateSurfaceFinalReadinessHashManifest(
+			filepath.Join(reportDir, "artifact-hashes.json"),
+		)...)
 	if opt.RequireClean {
 		if report.GitDirty == nil || *report.GitDirty {
 			issues = append(issues, "final-readiness.json --require-clean requires git_dirty=false")
 		}
 		if report.CleanSameCommitProven == nil || !*report.CleanSameCommitProven {
-			issues = append(issues, "final-readiness.json --require-clean requires clean_same_commit_proven=true")
+			issues = append(
+				issues,
+				"final-readiness.json --require-clean requires clean_same_commit_proven=true",
+			)
 		}
 	}
 	if opt.RequireCI && report.CIProofStatus != "validated" {
-		issues = append(issues, fmt.Sprintf("final-readiness.json ci_proof_status is %q, want validated because --require-ci was set", report.CIProofStatus))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"final-readiness.json ci_proof_status is %q, want validated because --require-ci was set",
+				report.CIProofStatus,
+			),
+		)
 	}
 	if opt.RequirePackage && report.PackageProofStatus != "validated" {
-		issues = append(issues, fmt.Sprintf("final-readiness.json package_proof_status is %q, want validated because --require-package was set", report.PackageProofStatus))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				("final-readiness.json package_proof_status is %q, want validated "+
+					"because --require-package was set"),
+				report.PackageProofStatus,
+			),
+		)
 	}
 	if len(issues) > 0 {
 		return errors.New(strings.Join(issues, "; "))
@@ -176,7 +221,9 @@ func writeSurfaceFinalReadiness(opt surfaceFinalReadinessOptions) error {
 	if expectedScope == "" {
 		expectedScope = surfaceFinalReadinessScope
 	}
-	product, err := readSurfaceFinalProductSummary(filepath.Join(productDir, "product-summary.json"))
+	product, err := readSurfaceFinalProductSummary(
+		filepath.Join(productDir, "product-summary.json"),
+	)
 	if err != nil {
 		return err
 	}
@@ -197,7 +244,8 @@ func writeSurfaceFinalReadiness(opt surfaceFinalReadinessOptions) error {
 		}
 	}
 
-	cleanSameCommit := !gitDirty && product.GitDirty != nil && !*product.GitDirty && head == product.GitHead
+	cleanSameCommit := !gitDirty && product.GitDirty != nil && !*product.GitDirty &&
+		head == product.GitHead
 	packageStatus := packageProofStatus(productDir, product)
 	ciStatus, actionsEnabled := ciProofStatus(opt.ActionsPermissionsPath, opt.CIRunsPath)
 	status := "blocked_final_requirements"
@@ -264,7 +312,10 @@ func writeSurfaceFinalReadiness(opt surfaceFinalReadinessOptions) error {
 	return nil
 }
 
-func validateSurfaceFinalReadinessFields(report surfaceFinalReadinessReport, expectedScope string) []string {
+func validateSurfaceFinalReadinessFields(
+	report surfaceFinalReadinessReport,
+	expectedScope string,
+) []string {
 	var issues []string
 	for _, check := range []struct {
 		field string
@@ -278,7 +329,15 @@ func validateSurfaceFinalReadinessFields(report surfaceFinalReadinessReport, exp
 		{field: "artifact_hash_manifest", got: report.ArtifactHashManifest, want: "artifact-hashes.json"},
 	} {
 		if check.got != check.want {
-			issues = append(issues, fmt.Sprintf("final-readiness.json %s is %q, want %q", check.field, check.got, check.want))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"final-readiness.json %s is %q, want %q",
+					check.field,
+					check.got,
+					check.want,
+				),
+			)
 		}
 	}
 	for _, check := range []struct {
@@ -295,39 +354,100 @@ func validateSurfaceFinalReadinessFields(report surfaceFinalReadinessReport, exp
 		{field: "package_report", got: report.PackageReport},
 	} {
 		if strings.TrimSpace(check.got) == "" {
-			issues = append(issues, fmt.Sprintf("final-readiness.json %s must not be empty", check.field))
+			issues = append(
+				issues,
+				fmt.Sprintf("final-readiness.json %s must not be empty", check.field),
+			)
 		}
 	}
 	if report.Status != "blocked_final_requirements" && report.Status != "ready" {
-		issues = append(issues, fmt.Sprintf("final-readiness.json status is %q, want blocked_final_requirements or ready", report.Status))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"final-readiness.json status is %q, want blocked_final_requirements or ready",
+				report.Status,
+			),
+		)
 	}
-	if report.ProductGateStatus != "product_gate_passed_p29_final_audit_required" && report.ProductGateStatus != "product_gate_passed_clean_same_commit_blocked" {
-		issues = append(issues, fmt.Sprintf("final-readiness.json product_gate_status is %q, want product-gate final audit status", report.ProductGateStatus))
+	if report.ProductGateStatus != "product_gate_passed_p29_final_audit_required" &&
+		report.ProductGateStatus != "product_gate_passed_clean_same_commit_blocked" {
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"final-readiness.json product_gate_status is %q, want product-gate final audit status",
+				report.ProductGateStatus,
+			),
+		)
 	}
-	if report.ProductFinalVerdict != "P29_FINAL_AUDIT_REQUIRED" && report.ProductFinalVerdict != "BLOCKED_DIRTY_CHECKOUT" {
-		issues = append(issues, fmt.Sprintf("final-readiness.json product_final_verdict is %q, want P29 final audit verdict", report.ProductFinalVerdict))
+	if report.ProductFinalVerdict != "P29_FINAL_AUDIT_REQUIRED" &&
+		report.ProductFinalVerdict != "BLOCKED_DIRTY_CHECKOUT" {
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"final-readiness.json product_final_verdict is %q, want P29 final audit verdict",
+				report.ProductFinalVerdict,
+			),
+		)
 	}
-	if report.GitHead != "" && report.ProductSummaryGitHead != "" && report.GitHead != report.ProductSummaryGitHead {
+	if report.GitHead != "" && report.ProductSummaryGitHead != "" &&
+		report.GitHead != report.ProductSummaryGitHead {
 		issues = append(issues, "final-readiness.json git_head must match product_summary_git_head")
 	}
 	issues = append(issues, requireSurfaceFinalBool("git_dirty", report.GitDirty)...)
-	issues = append(issues, requireSurfaceFinalBoolValue("product_final_signoff", report.ProductFinalSignoff, false)...)
-	issues = append(issues, requireSurfaceFinalBoolValue("clean_same_commit_required", report.CleanSameCommitRequired, true)...)
-	issues = append(issues, requireSurfaceFinalBool("clean_same_commit_proven", report.CleanSameCommitProven)...)
-	issues = append(issues, requireSurfaceFinalBoolValue("ci_required_gate", report.CIRequiredGate, true)...)
-	issues = append(issues, requireSurfaceFinalBoolValue("ci_proof_required", report.CIProofRequired, true)...)
-	issues = append(issues, requireSurfaceFinalBoolValue("package_proof_required", report.PackageProofRequired, true)...)
+	issues = append(
+		issues,
+		requireSurfaceFinalBoolValue("product_final_signoff", report.ProductFinalSignoff, false)...)
+	issues = append(
+		issues,
+		requireSurfaceFinalBoolValue(
+			"clean_same_commit_required",
+			report.CleanSameCommitRequired,
+			true,
+		)...)
+	issues = append(
+		issues,
+		requireSurfaceFinalBool("clean_same_commit_proven", report.CleanSameCommitProven)...)
+	issues = append(
+		issues,
+		requireSurfaceFinalBoolValue("ci_required_gate", report.CIRequiredGate, true)...)
+	issues = append(
+		issues,
+		requireSurfaceFinalBoolValue("ci_proof_required", report.CIProofRequired, true)...)
+	issues = append(
+		issues,
+		requireSurfaceFinalBoolValue(
+			"package_proof_required",
+			report.PackageProofRequired,
+			true,
+		)...)
 	issues = append(issues, requireSurfaceFinalBool("production_claim", report.ProductionClaim)...)
 	issues = append(issues, requireSurfaceFinalBool("final_signoff", report.FinalSignoff)...)
-	if report.CIProofStatus != "validated" && report.CIProofStatus != "missing" && report.CIProofStatus != "blocked_actions_disabled" {
-		issues = append(issues, fmt.Sprintf("final-readiness.json ci_proof_status is %q, want validated, missing, or blocked_actions_disabled", report.CIProofStatus))
+	if report.CIProofStatus != "validated" && report.CIProofStatus != "missing" &&
+		report.CIProofStatus != "blocked_actions_disabled" {
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				("final-readiness.json ci_proof_status is %q, want validated, "+
+					"missing, or blocked_actions_disabled"),
+				report.CIProofStatus,
+			),
+		)
 	}
 	if report.PackageProofStatus != "validated" && report.PackageProofStatus != "missing" {
-		issues = append(issues, fmt.Sprintf("final-readiness.json package_proof_status is %q, want validated or missing", report.PackageProofStatus))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"final-readiness.json package_proof_status is %q, want validated or missing",
+				report.PackageProofStatus,
+			),
+		)
 	}
 	if report.FinalSignoff != nil && !*report.FinalSignoff {
 		if report.ProductionClaim != nil && *report.ProductionClaim {
-			issues = append(issues, "final-readiness.json production_claim must be false without final_signoff")
+			issues = append(
+				issues,
+				"final-readiness.json production_claim must be false without final_signoff",
+			)
 		}
 		if report.Status == "ready" {
 			issues = append(issues, "final-readiness.json ready status requires final_signoff=true")
@@ -338,19 +458,34 @@ func validateSurfaceFinalReadinessFields(report surfaceFinalReadinessReport, exp
 			issues = append(issues, "final-readiness.json final_signoff=true requires ready status")
 		}
 		if report.ProductionClaim == nil || !*report.ProductionClaim {
-			issues = append(issues, "final-readiness.json final_signoff=true requires production_claim=true")
+			issues = append(
+				issues,
+				"final-readiness.json final_signoff=true requires production_claim=true",
+			)
 		}
 		if report.CleanSameCommitProven == nil || !*report.CleanSameCommitProven {
-			issues = append(issues, "final-readiness.json final_signoff=true requires clean_same_commit_proven=true")
+			issues = append(
+				issues,
+				"final-readiness.json final_signoff=true requires clean_same_commit_proven=true",
+			)
 		}
 		if report.CIProofStatus != "validated" {
-			issues = append(issues, "final-readiness.json final_signoff=true requires ci_proof_status=validated")
+			issues = append(
+				issues,
+				"final-readiness.json final_signoff=true requires ci_proof_status=validated",
+			)
 		}
 		if report.PackageProofStatus != "validated" {
-			issues = append(issues, "final-readiness.json final_signoff=true requires package_proof_status=validated")
+			issues = append(
+				issues,
+				"final-readiness.json final_signoff=true requires package_proof_status=validated",
+			)
 		}
 		if len(report.Blockers) > 0 {
-			issues = append(issues, "final-readiness.json final_signoff=true requires empty blockers")
+			issues = append(
+				issues,
+				"final-readiness.json final_signoff=true requires empty blockers",
+			)
 		}
 	}
 	if report.Status == "blocked_final_requirements" && len(report.Blockers) == 0 {
@@ -367,7 +502,10 @@ func validateSurfaceFinalReadinessNonclaims(nonclaims []string) []string {
 	var issues []string
 	for _, required := range surfaceFinalReadinessNonclaims() {
 		if !set[required] {
-			issues = append(issues, fmt.Sprintf("final-readiness.json nonclaims missing %q", required))
+			issues = append(
+				issues,
+				fmt.Sprintf("final-readiness.json nonclaims missing %q", required),
+			)
 		}
 	}
 	return issues
@@ -384,7 +522,14 @@ func validateSurfaceFinalReadinessHashManifest(path string) []string {
 	}
 	var issues []string
 	if manifest.Schema != surfaceFinalReadinessHashSchema {
-		issues = append(issues, fmt.Sprintf("artifact-hashes.json schema is %q, want %q", manifest.Schema, surfaceFinalReadinessHashSchema))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"artifact-hashes.json schema is %q, want %q",
+				manifest.Schema,
+				surfaceFinalReadinessHashSchema,
+			),
+		)
 	}
 	covered := false
 	for _, artifact := range manifest.Artifacts {
@@ -406,13 +551,22 @@ func readSurfaceFinalProductSummary(path string) (surfaceFinalProductSummary, er
 	}
 	var summary surfaceFinalProductSummary
 	if err := json.Unmarshal(raw, &summary); err != nil {
-		return surfaceFinalProductSummary{}, fmt.Errorf("product-summary.json decode failed: %w", err)
+		return surfaceFinalProductSummary{}, fmt.Errorf(
+			"product-summary.json decode failed: %w",
+			err,
+		)
 	}
 	if summary.ReleaseScope != surfaceFinalReadinessScope {
-		return surfaceFinalProductSummary{}, fmt.Errorf("product-summary.json release_scope is %q, want %q", summary.ReleaseScope, surfaceFinalReadinessScope)
+		return surfaceFinalProductSummary{}, fmt.Errorf(
+			"product-summary.json release_scope is %q, want %q",
+			summary.ReleaseScope,
+			surfaceFinalReadinessScope,
+		)
 	}
 	if strings.TrimSpace(summary.GitHead) == "" {
-		return surfaceFinalProductSummary{}, errors.New("product-summary.json git_head must not be empty")
+		return surfaceFinalProductSummary{}, errors.New(
+			"product-summary.json git_head must not be empty",
+		)
 	}
 	return summary, nil
 }
@@ -510,8 +664,8 @@ func boolPtr(value bool) *bool {
 func surfaceFinalReadinessNonclaims() []string {
 	return []string{
 		"all-platform-surface-parity",
-		"macos-surface-production",
-		"windows-surface-production",
+		"nonclaim-macos-surface-production-support",
+		"nonclaim-windows-surface-production-support",
 		"wasm32-wasi-surface-ui-runtime",
 		"gpu-renderer",
 		"full-rich-text-editor",

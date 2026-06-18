@@ -12,7 +12,8 @@ It is primarily used by:
 
 Symbols starting with `__tetra_` are reserved for the toolchain/runtime.
 
-User code may only export reserved names from internal runtime modules (modules whose name starts with `__`) via
+User code may only export reserved names from internal runtime modules (modules whose name starts
+with `__`) via
 `@export("...")`. See `@export` rules in the language semantics.
 
 The compiler rejects non-runtime modules that export a reserved `__tetra_*`
@@ -131,22 +132,31 @@ protocol is implemented.
 
 Native x64-family internal returns currently support direct internal register
 returns with 0 through 10 slots: slot 1 in `rax`/`eax`, slot 2 in `rdx`/`edx`, slot 3 in `r8`/`r8d`,
-slot 4 in `r9`/`r9d`, slot 5 in `r10`/`r10d`, slot 6 in `r11`/`r11d`, slot 7 in `r12`/`r12d`, slot 8 in `r13`/`r13d`, slot 9 in `r14`/`r14d`, and slot 10 in `rbx`/`ebx`. The built-in actors scheduler owns
+slot 4 in `r9`/`r9d`, slot 5 in `r10`/`r10d`, slot 6 in `r11`/`r11d`, slot 7 in `r12`/`r12d`, slot 8
+in `r13`/`r13d`, slot 9 in `r14`/`r14d`, and slot 10 in `rbx`/`ebx`. The built-in actors scheduler
+owns
 `r15` while runtime-backed code is executing, so internal return-slot expansion
 must not use `r15` as a user return register. Runtime surfaces that need 3-slot returns, such as
-`actor.recv_msg_result`, use that same register order; 4-slot direct returns are supported for the current typed runtime
-envelopes, 9-slot direct returns support the current eight-environment-slot `fnptr` callable payload slice, and 10-slot direct returns
+`actor.recv_msg_result`, use that same register order; 4-slot direct returns are supported for the
+current typed runtime
+envelopes, 9-slot direct returns support the current eight-environment-slot `fnptr` callable payload
+slice, and 10-slot direct returns
 support the current enum tag plus nine-slot `fnptr` callable payload slice. Wider
-runtime results continue to use an explicit staged buffer protocol instead of additional return registers. The backend spills incoming
+runtime results continue to use an explicit staged buffer protocol instead of additional return
+registers. The backend spills incoming
 arguments into Tetra local slots in declaration order before lowering the function body.
 
 Stack arguments begin after the register argument window:
 
-- SysV (`linux-x64`, `macos-x64`): argument 7 is read from `[rbp+16]`, argument 8 from `[rbp+24]`, and so on.
-- Win64 (`windows-x64`): argument 5 is read from `[rbp+48]` after the return address and the 32-byte shadow space.
+- SysV (`linux-x64`, `macos-x64`): argument 7 is read from `[rbp+16]`, argument 8 from `[rbp+24]`,
+  and so on.
+- Win64 (`windows-x64`): argument 5 is read from `[rbp+48]` after the return address and the 32-byte
+  shadow space.
 
-Calls preserve the platform alignment contract. SysV calls align `rsp` to 16 bytes before `call`; Win64 calls reserve
-the mandatory 32-byte shadow space and aligns around additional stack arguments. Current ABI regression tests cover calls
+Calls preserve the platform alignment contract. SysV calls align `rsp` to 16 bytes before `call`;
+Win64 calls reserve
+the mandatory 32-byte shadow space and aligns around additional stack arguments. Current ABI
+regression tests cover calls
 with 0 through 8 arguments and return layouts with 0 through 10 slots.
 
 Unsupported ABI/runtime combinations are hard errors. `ctx_switch` has
@@ -166,8 +176,10 @@ unsupported ABI`.
 The Linux backend emits a minimal ELF64 executable:
 
 - ELF magic/version identify a little-endian x86-64 executable.
-- The file has two `PT_LOAD` program headers: one RX segment for headers/text and one RW segment for data.
-- The current writer intentionally does not emit an ELF section header table; release validation treats the program
+- The file has two `PT_LOAD` program headers: one RX segment for headers/text and one RW segment for
+  data.
+- The current writer intentionally does not emit an ELF section header table; release validation
+  treats the program
   headers as the executable layout contract.
 - String/data relocations point into the RW segment, not the RX text bytes.
 - Output files are written executable.
@@ -180,7 +192,8 @@ The macOS backend emits a build-verified Mach-O 64-bit x86-64 executable:
 - The load command contract is `__TEXT`, `__DATA`, and `LC_MAIN`.
 - `__TEXT,__text` contains executable code and `__DATA,__cstring` contains string data.
 - Data relocations point to `__DATA,__cstring`.
-- Cross-host execution is not attempted on non-macOS hosts; release evidence is build-only unless collected on macOS.
+- Cross-host execution is not attempted on non-macOS hosts; release evidence is build-only unless
+  collected on macOS.
 
 ### `windows-x64`
 
@@ -189,10 +202,13 @@ The Windows backend emits a PE32+ x86-64 executable:
 - Required sections are `.text`, `.rdata`, `.idata`, and `.reloc`.
 - The entrypoint is inside `.text`.
 - The import directory is inside `.idata`.
-- The default import contract is `KERNEL32.dll` with `ExitProcess`, `GetStdHandle`, and `WriteFile`; runtime features add
+- The default import contract is `KERNEL32.dll` with `ExitProcess`, `GetStdHandle`, and `WriteFile`;
+  runtime features add
   imports such as `VirtualAlloc`, `VirtualFree`, and `VirtualProtect`.
-- PE output enables NX-compatible and dynamic-base characteristics and includes a relocation directory.
-- Cross-host execution is not attempted on non-Windows hosts; release evidence is build-only unless collected on Windows.
+- PE output enables NX-compatible and dynamic-base characteristics and includes a relocation
+  directory.
+- Cross-host execution is not attempted on non-Windows hosts; release evidence is build-only unless
+  collected on Windows.
 
 ## Linux-x64 Memory Production ABI
 
@@ -364,7 +380,8 @@ The WASI backend emits a deterministic WebAssembly module with:
 - WASM magic `\0asm` and version 1.
 - Imports from `wasi_snapshot_preview1`: `fd_write` and `proc_exit`.
 - Exports: `memory` and `_start`.
-- Unsupported native runtime instructions are rejected at link/codegen time with an explicit `wasm backend` diagnostic.
+- Unsupported native runtime instructions are rejected at link/codegen time with an explicit
+  `wasm backend` diagnostic.
 
 `tetra smoke --target wasm32-wasi --run=false` is artifact/import preflight
 evidence, not runtime proof.
@@ -380,9 +397,11 @@ The web backend emits a deterministic WebAssembly module plus a JavaScript loade
 
 - Imports from `tetra_web_v0.4.0`: `console_log(ptr, len)` and `panic(code, ptr, len)`.
 - Exports: `memory` and `tetra_main`.
-- The loader fetches the `.wasm` module relative to `import.meta.url`, wires `tetra_web_v0.4.0`, and exposes
+- The loader fetches the `.wasm` module relative to `import.meta.url`, wires `tetra_web_v0.4.0`, and
+  exposes
   `instantiateTetra()` plus `runTetra()`.
-- Unsupported native runtime instructions are rejected at link/codegen time with an explicit `wasm backend` diagnostic.
+- Unsupported native runtime instructions are rejected at link/codegen time with an explicit
+  `wasm backend` diagnostic.
 
 `tetra smoke --target wasm32-web --run=false` is artifact/import preflight
 evidence, not runtime proof.
@@ -467,7 +486,8 @@ Commits the active multi-slot actor message send.
 
 ### `__tetra_actor_recv() -> i32`
 
-Receives a message value from the current actor mailbox (blocking/yielding cooperatively until a message exists).
+Receives a message value from the current actor mailbox (blocking/yielding cooperatively until a
+message exists).
 
 ### `__tetra_actor_recv_msg() -> actor.msg`
 
@@ -521,7 +541,8 @@ Returns the current actor handle in `eax`.
 
 ### `__tetra_actor_sender() -> actor`
 
-Returns the sender of the most recently received message in `eax` (valid only after a successful recv).
+Returns the sender of the most recently received message in `eax` (valid only after a successful
+recv).
 
 ### `__tetra_actor_yield_now() -> i32`
 
@@ -622,7 +643,8 @@ build-only evidence for non-host targets unless a platform runner is explicitly
 available. The Linux native release runner report, when it is a passing
 execution report rather than a no-host-fallback diagnostic, must include
 arithmetic, allocator/raw-memory, filesystem, stderr fd, time, network socket
-open/close, network options, and task-join smoke results for the target. The ABI/report path keeps canonical pointer `@export` object smokes
+open/close, network options, and task-join smoke results for the target. The ABI/report path keeps
+canonical pointer `@export` object smokes
 for `linux-x86`, `linux-x64`, and `linux-x32`; `linux-x64` also keeps explicit
 filesystem+scheduler composition and scheduler-restriction regression smokes
 so build-only target restrictions cannot become production Linux behavior.
@@ -630,12 +652,14 @@ so build-only target restrictions cannot become production Linux behavior.
 time-only programs, validated as an ELF32 `EM_386` smoke and run only when the
 host can execute i386 binaries. When a program uses the supported actor/task
 surface, `linux-x86` can also build and run the i386 self-host runtime for two
-spawned actors/tasks/task-group workers, actor-state method, `task.i32`, typed-task handles through the
+spawned actors/tasks/task-group workers, actor-state method, `task.i32`, typed-task handles through
+the
 8-slot staged envelope, or typed task-group composition, including filesystem+scheduler
 composition; `linux-x32` has matching
 build-only ABI-report smokes for no-runtime stdout/string-literal executables,
 self-host time, two spawned actors/tasks/task-group workers, actor-state
-method, `task.i32`, typed-task handles through the 8-slot staged envelope, typed task-group composition, and filesystem+scheduler composition. A pure filesystem existence
+method, `task.i32`, typed-task handles through the 8-slot staged envelope, typed task-group
+composition, and filesystem+scheduler composition. A pure filesystem existence
 probe can build and run through minimal target-specific `__tetra_fs_exists`
 runtime objects on `linux-x86` and `linux-x32`. The x86 and x32 scheduler slices
 can compose that filesystem symbol with their self-host schedulers. The same ABI
@@ -1018,21 +1042,25 @@ This function is called by the runtime using the **platform ABI**:
 
 ### `__tetra_actor_main_entry_id() -> i32`
 
-Returns the FNV-1a 32-bit entry ID for the program main entry function (the same value as `FNV1a32(<main symbol name>)`).
+Returns the FNV-1a 32-bit entry ID for the program main entry function (the same value as
+`FNV1a32(<main symbol name>)`).
 
-This is provided so that alternate runtimes (including self-hosted ones) can spawn/run the main entry without hardcoding
+This is provided so that alternate runtimes (including self-hosted ones) can spawn/run the main
+entry without hardcoding
 the program symbol name.
 
 ## Actor entry IDs
 
-`core.spawn(name: str)` is lowered by the compiler into a call to `__tetra_actor_spawn(entryID)` where `entryID` is the
+`core.spawn(name: str)` is lowered by the compiler into a call to `__tetra_actor_spawn(entryID)`
+where `entryID` is the
 FNV-1a 32-bit hash of the string literal used as `name`.
 
 The runtime uses the same hash scheme to dispatch actor entrypoints.
 
 ## Internal runtime helpers
 
-The toolchain may expose a small set of `core.*` builtins for internal runtime modules (modules whose name starts with `__`)
+The toolchain may expose a small set of `core.*` builtins for internal runtime modules (modules
+whose name starts with `__`)
 to call program-provided glue symbols without requiring explicit declarations:
 
 - `core.actor_dispatch(entryID: i32) -> i32` (calls `__tetra_actor_dispatch`)
@@ -1048,7 +1076,8 @@ They are called by the runtime using the platform ABI for the current target.
 
 ## Runtime override and target matching
 
-When using `--runtime-object`, the runtime `.tobj` must match the program target (for example, a `windows-x64` runtime
+When using `--runtime-object`, the runtime `.tobj` must match the program target (for example, a
+`windows-x64` runtime
 object must not be linked into a `linux-x64` executable).
 
 Runtime override objects must also export every required runtime symbol set
@@ -1059,7 +1088,8 @@ runtime symbols when the program calls `core.time_now_ms`, `core.sleep_ms`,
 `core.sleep_until`, or `core.deadline_ms`, and filesystem runtime symbols when
 the program calls `core.fs_exists`, and networking runtime symbols when the
 program calls `core.net_socket_tcp4`, `core.net_bind_tcp4_loopback`,
-`core.net_connect_tcp4_loopback`, `core.net_listen`, `core.net_accept4`, `core.net_read`, `core.net_recv`, `core.net_write`, `core.net_send`,
+`core.net_connect_tcp4_loopback`, `core.net_listen`, `core.net_accept4`, `core.net_read`,
+`core.net_recv`, `core.net_write`, `core.net_send`,
 `core.net_epoll_create`, `core.net_epoll_ctl_add_read`,
 `core.net_epoll_ctl_add_read_write`, `core.net_epoll_ctl_mod_read`,
 `core.net_epoll_ctl_mod_read_write`, `core.net_epoll_ctl_delete`,
@@ -1105,7 +1135,8 @@ Actor/task programs with fanout above 2 fail before runtime selection with targe
 diagnostics (`actor fanout above 2 runtime not supported on linux-x86`/`linux-x32`)
 instead of falling through to a generic builtin-runtime error.
 
-Native execution is only supported when `host == target`; cross-target builds are build-verified but not run on
+Native execution is only supported when `host == target`; cross-target builds are build-verified but
+not run on
 non-matching hosts.
 
 ## ABI compatibility policy
@@ -1132,8 +1163,10 @@ build-verifies runtime override objects for `linux-x64`, `macos-x64`, and
 
 ## Additional linked objects
 
-`--link-object path.tobj` appends an additional target-matching TOBJ library to the final link. The flag is repeatable.
-Linked objects participate in the same symbol table as compiler-generated objects, so duplicate exported symbols and
+`--link-object path.tobj` appends an additional target-matching TOBJ library to the final link. The
+flag is repeatable.
+Linked objects participate in the same symbol table as compiler-generated objects, so duplicate
+exported symbols and
 unresolved relocations are reported by the linker.
 
 When a program imports a module through `.t4i`, a regular native build may use
@@ -1167,11 +1200,14 @@ and unresolved symbols are hard errors.
 
 ## Native x64 build-only and mismatch policy (Epic 09)
 
-- `linux-x64`, `macos-x64`, and `windows-x64` native outputs are build-verified in the same matrix for ABI/object/link
+- `linux-x64`, `macos-x64`, and `windows-x64` native outputs are build-verified in the same matrix
+  for ABI/object/link
   contracts; execution is still host-gated.
 - Platform linker wrappers enforce target identity at link entry:
   - Linux linker accepts only `linux-x64` objects,
   - macOS linker accepts only `macos-x64` objects,
   - Windows linker accepts only `windows-x64` objects.
-- Cross-target object usage through wrong linker path is a hard diagnostic (`linker target mismatch`).
-- Compiler-level `--link-object`/`--runtime-object` target checks remain in force and fail before final image writing.
+- Cross-target object usage through wrong linker path is a hard diagnostic
+  (`linker target mismatch`).
+- Compiler-level `--link-object`/`--runtime-object` target checks remain in force and fail before
+  final image writing.

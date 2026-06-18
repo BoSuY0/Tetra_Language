@@ -74,7 +74,12 @@ type fuzzSummaryJSONStep struct {
 
 func main() {
 	var reportDir string
-	flag.StringVar(&reportDir, "report-dir", "", "fuzz report directory containing summary.md, unstable-seeds.md, and logs")
+	flag.StringVar(
+		&reportDir,
+		"report-dir",
+		"",
+		"fuzz report directory containing summary.md, unstable-seeds.md, and logs",
+	)
 	flag.Parse()
 	if reportDir == "" {
 		fmt.Fprintln(os.Stderr, "error: --report-dir is required")
@@ -130,7 +135,12 @@ func validateFuzzReport(reportDir string) error {
 }
 
 func requiredFuzzArtifacts() []string {
-	artifacts := []string{"summary.md", "summary.json", "crasher-inventory.json", "unstable-seeds.md"}
+	artifacts := []string{
+		"summary.md",
+		"summary.json",
+		"crasher-inventory.json",
+		"unstable-seeds.md",
+	}
 	for _, name := range fuzzStepNames {
 		artifacts = append(artifacts, filepath.ToSlash(filepath.Join("logs", name+".log")))
 	}
@@ -162,7 +172,11 @@ func parseFuzzSummary(text string) (fuzzSummary, error) {
 	}
 	wantLineCount := 8 + len(fuzzStepNames)
 	if len(lines) != wantLineCount {
-		return fuzzSummary{}, fmt.Errorf("summary.md has malformed shape: got %d non-empty lines, want %d", len(lines), wantLineCount)
+		return fuzzSummary{}, fmt.Errorf(
+			"summary.md has malformed shape: got %d non-empty lines, want %d",
+			len(lines),
+			wantLineCount,
+		)
 	}
 	if lines[0] != "# Fuzz Nightly Summary" {
 		return fuzzSummary{}, fmt.Errorf("summary.md missing title")
@@ -225,13 +239,24 @@ func validateFuzzSummary(summary fuzzSummary, reportDir string) error {
 		return fmt.Errorf("output_dir = %q, want %q", summary.OutputDir, reportDir)
 	}
 	if summary.CrasherArchive != "<package>/testdata/fuzz/<FuzzName>/" {
-		return fmt.Errorf("crasher_archive_path = %q, want <package>/testdata/fuzz/<FuzzName>/", summary.CrasherArchive)
+		return fmt.Errorf(
+			"crasher_archive_path = %q, want <package>/testdata/fuzz/<FuzzName>/",
+			summary.CrasherArchive,
+		)
 	}
 	if !samePath(summary.CrasherInventory, filepath.Join(reportDir, "crasher-inventory.json")) {
-		return fmt.Errorf("crasher_inventory_json = %q, want %q", summary.CrasherInventory, filepath.Join(reportDir, "crasher-inventory.json"))
+		return fmt.Errorf(
+			"crasher_inventory_json = %q, want %q",
+			summary.CrasherInventory,
+			filepath.Join(reportDir, "crasher-inventory.json"),
+		)
 	}
 	if !samePath(summary.UnstableSeedLog, filepath.Join(reportDir, "unstable-seeds.md")) {
-		return fmt.Errorf("unstable_seed_log = %q, want %q", summary.UnstableSeedLog, filepath.Join(reportDir, "unstable-seeds.md"))
+		return fmt.Errorf(
+			"unstable_seed_log = %q, want %q",
+			summary.UnstableSeedLog,
+			filepath.Join(reportDir, "unstable-seeds.md"),
+		)
 	}
 	if len(summary.Steps) != len(fuzzStepNames) {
 		return fmt.Errorf("step count = %d, want %d", len(summary.Steps), len(fuzzStepNames))
@@ -245,7 +270,12 @@ func validateFuzzSummary(summary fuzzSummary, reportDir string) error {
 			return fmt.Errorf("step %s has invalid or failing status %q", step.Name, step.Status)
 		}
 		if step.Command != expectedFuzzCommand(step.Name, summary.Fuzztime, summary.Mode) {
-			return fmt.Errorf("step %s command = %q, want %q", step.Name, step.Command, expectedFuzzCommand(step.Name, summary.Fuzztime, summary.Mode))
+			return fmt.Errorf(
+				"step %s command = %q, want %q",
+				step.Name,
+				step.Command,
+				expectedFuzzCommand(step.Name, summary.Fuzztime, summary.Mode),
+			)
 		}
 		wantLog := filepath.Join(reportDir, "logs", step.Name+".log")
 		if !samePath(step.Log, wantLog) {
@@ -255,7 +285,11 @@ func validateFuzzSummary(summary fuzzSummary, reportDir string) error {
 	return nil
 }
 
-func validateFuzzSummaryJSON(summaryJSON fuzzSummaryJSON, summary fuzzSummary, reportDir string) error {
+func validateFuzzSummaryJSON(
+	summaryJSON fuzzSummaryJSON,
+	summary fuzzSummary,
+	reportDir string,
+) error {
 	if summaryJSON.Mode != summary.Mode {
 		return fmt.Errorf("summary.json mode = %q, want %q", summaryJSON.Mode, summary.Mode)
 	}
@@ -266,34 +300,75 @@ func validateFuzzSummaryJSON(summaryJSON fuzzSummaryJSON, summary fuzzSummary, r
 		return fmt.Errorf("summary.json exit_code = %d, want 0", summaryJSON.ExitCode)
 	}
 	if summaryJSON.Fuzztime != summary.Fuzztime {
-		return fmt.Errorf("summary.json fuzztime = %q, want %q", summaryJSON.Fuzztime, summary.Fuzztime)
+		return fmt.Errorf(
+			"summary.json fuzztime = %q, want %q",
+			summaryJSON.Fuzztime,
+			summary.Fuzztime,
+		)
 	}
 	if summaryJSON.StepCount != len(fuzzStepNames) {
-		return fmt.Errorf("summary.json step_count = %d, want %d", summaryJSON.StepCount, len(fuzzStepNames))
+		return fmt.Errorf(
+			"summary.json step_count = %d, want %d",
+			summaryJSON.StepCount,
+			len(fuzzStepNames),
+		)
 	}
 	if summaryJSON.FailedCount != 0 {
 		return fmt.Errorf("summary.json failed_count = %d, want 0", summaryJSON.FailedCount)
 	}
 	if len(summaryJSON.Steps) != summaryJSON.StepCount {
-		return fmt.Errorf("summary.json steps length = %d, want %d", len(summaryJSON.Steps), summaryJSON.StepCount)
+		return fmt.Errorf(
+			"summary.json steps length = %d, want %d",
+			len(summaryJSON.Steps),
+			summaryJSON.StepCount,
+		)
 	}
 	if !samePath(summaryJSON.Artifacts.SummaryMD, filepath.Join(reportDir, "summary.md")) {
-		return fmt.Errorf("summary.json artifacts.summary_md = %q, want %q", summaryJSON.Artifacts.SummaryMD, filepath.Join(reportDir, "summary.md"))
+		return fmt.Errorf(
+			"summary.json artifacts.summary_md = %q, want %q",
+			summaryJSON.Artifacts.SummaryMD,
+			filepath.Join(reportDir, "summary.md"),
+		)
 	}
 	if !samePath(summaryJSON.Artifacts.SummaryJSON, filepath.Join(reportDir, "summary.json")) {
-		return fmt.Errorf("summary.json artifacts.summary_json = %q, want %q", summaryJSON.Artifacts.SummaryJSON, filepath.Join(reportDir, "summary.json"))
+		return fmt.Errorf(
+			"summary.json artifacts.summary_json = %q, want %q",
+			summaryJSON.Artifacts.SummaryJSON,
+			filepath.Join(reportDir, "summary.json"),
+		)
 	}
-	if !samePath(summaryJSON.Artifacts.CrasherInventoryJSON, filepath.Join(reportDir, "crasher-inventory.json")) {
-		return fmt.Errorf("summary.json artifacts.crasher_inventory_json = %q, want %q", summaryJSON.Artifacts.CrasherInventoryJSON, filepath.Join(reportDir, "crasher-inventory.json"))
+	if !samePath(
+		summaryJSON.Artifacts.CrasherInventoryJSON,
+		filepath.Join(reportDir, "crasher-inventory.json"),
+	) {
+		return fmt.Errorf(
+			"summary.json artifacts.crasher_inventory_json = %q, want %q",
+			summaryJSON.Artifacts.CrasherInventoryJSON,
+			filepath.Join(reportDir, "crasher-inventory.json"),
+		)
 	}
 	if !samePath(summaryJSON.Artifacts.LogsDir, filepath.Join(reportDir, "logs")) {
-		return fmt.Errorf("summary.json artifacts.logs_dir = %q, want %q", summaryJSON.Artifacts.LogsDir, filepath.Join(reportDir, "logs"))
+		return fmt.Errorf(
+			"summary.json artifacts.logs_dir = %q, want %q",
+			summaryJSON.Artifacts.LogsDir,
+			filepath.Join(reportDir, "logs"),
+		)
 	}
-	if !samePath(summaryJSON.Artifacts.UnstableSeedLog, filepath.Join(reportDir, "unstable-seeds.md")) {
-		return fmt.Errorf("summary.json artifacts.unstable_seed_log = %q, want %q", summaryJSON.Artifacts.UnstableSeedLog, filepath.Join(reportDir, "unstable-seeds.md"))
+	if !samePath(
+		summaryJSON.Artifacts.UnstableSeedLog,
+		filepath.Join(reportDir, "unstable-seeds.md"),
+	) {
+		return fmt.Errorf(
+			"summary.json artifacts.unstable_seed_log = %q, want %q",
+			summaryJSON.Artifacts.UnstableSeedLog,
+			filepath.Join(reportDir, "unstable-seeds.md"),
+		)
 	}
 	if summaryJSON.Artifacts.CrasherArchivePath != "<package>/testdata/fuzz/<FuzzName>/" {
-		return fmt.Errorf("summary.json artifacts.crasher_archive_path = %q, want <package>/testdata/fuzz/<FuzzName>/", summaryJSON.Artifacts.CrasherArchivePath)
+		return fmt.Errorf(
+			"summary.json artifacts.crasher_archive_path = %q, want <package>/testdata/fuzz/<FuzzName>/",
+			summaryJSON.Artifacts.CrasherArchivePath,
+		)
 	}
 	for i, step := range summaryJSON.Steps {
 		wantName := fuzzStepNames[i]
@@ -304,17 +379,35 @@ func validateFuzzSummaryJSON(summaryJSON fuzzSummaryJSON, summary fuzzSummary, r
 			return fmt.Errorf("summary.json step %s status = %q, want pass", step.Name, step.Status)
 		}
 		if step.ExitCode != 0 {
-			return fmt.Errorf("summary.json step %s exit_code = %d, want 0", step.Name, step.ExitCode)
+			return fmt.Errorf(
+				"summary.json step %s exit_code = %d, want 0",
+				step.Name,
+				step.ExitCode,
+			)
 		}
 		if step.DurationSeconds < 0 {
-			return fmt.Errorf("summary.json step %s duration_seconds = %d, want >= 0", step.Name, step.DurationSeconds)
+			return fmt.Errorf(
+				"summary.json step %s duration_seconds = %d, want >= 0",
+				step.Name,
+				step.DurationSeconds,
+			)
 		}
 		if step.Command != expectedFuzzCommand(step.Name, summary.Fuzztime, summary.Mode) {
-			return fmt.Errorf("summary.json step %s command = %q, want %q", step.Name, step.Command, expectedFuzzCommand(step.Name, summary.Fuzztime, summary.Mode))
+			return fmt.Errorf(
+				"summary.json step %s command = %q, want %q",
+				step.Name,
+				step.Command,
+				expectedFuzzCommand(step.Name, summary.Fuzztime, summary.Mode),
+			)
 		}
 		wantLog := filepath.ToSlash(filepath.Join("logs", step.Name+".log"))
 		if step.Log != wantLog {
-			return fmt.Errorf("summary.json step %s log = %q, want %q", step.Name, step.Log, wantLog)
+			return fmt.Errorf(
+				"summary.json step %s log = %q, want %q",
+				step.Name,
+				step.Log,
+				wantLog,
+			)
 		}
 	}
 	return nil
@@ -327,27 +420,38 @@ func expectedFuzzCommand(name string, fuzztime string, mode string) string {
 	}
 	switch name {
 	case "compiler-frontend-lexer":
-		return "go test ./compiler/internal/frontend -run \\^\\$ -fuzz=FuzzLexer -fuzztime=" + fuzztime + parallel
+		return ("go test ./compiler/internal/frontend -run \\^\\$ -fuzz=FuzzLexer -" +
+			"fuzztime=") + fuzztime + parallel
 	case "compiler-frontend-parser":
-		return "go test ./compiler/internal/frontend -run \\^\\$ -fuzz=FuzzParser -fuzztime=" + fuzztime + parallel
+		return ("go test ./compiler/internal/frontend -run \\^\\$ -fuzz=FuzzParser " +
+			"-fuzztime=") + fuzztime + parallel
 	case "compiler-format":
-		return "go test ./compiler/tests/fuzz -run \\^\\$ -fuzz=FuzzFormatSourceIdempotent -fuzztime=" + fuzztime + parallel
+		return ("go test ./compiler/tests/fuzz -run \\^\\$ -" +
+			"fuzz=FuzzFormatSourceIdempotent -fuzztime=") + fuzztime + parallel
 	case "compiler-lowering":
-		return "go test ./compiler/tests/fuzz -run \\^\\$ -fuzz=FuzzLoweringPipelineVerifiesIR -fuzztime=" + fuzztime + parallel
+		return ("go test ./compiler/tests/fuzz -run \\^\\$ -" +
+			"fuzz=FuzzLoweringPipelineVerifiesIR -fuzztime=") + fuzztime + parallel
 	case "compiler-linker-linkcore":
-		return "go test ./compiler/internal/linker/linkcore -run \\^\\$ -fuzz=FuzzLinkX64ObjectsDoesNotPanic -fuzztime=" + fuzztime + parallel
+		return ("go test ./compiler/internal/linker/linkcore -run \\^\\$ -" +
+			"fuzz=FuzzLinkX64ObjectsDoesNotPanic -fuzztime=") + fuzztime + parallel
 	case "http-runtime":
-		return "go test ./compiler/internal/httprt -run \\^\\$ -fuzz=FuzzHTTPParseRequest -fuzztime=" + fuzztime + parallel
+		return ("go test ./compiler/internal/httprt -run \\^\\$ -" +
+			"fuzz=FuzzHTTPParseRequest -fuzztime=") + fuzztime + parallel
 	case "json-runtime":
-		return "go test ./compiler/internal/jsonrt -run \\^\\$ -fuzz=FuzzAppendStringProducesValidJSON -fuzztime=" + fuzztime + parallel
+		return ("go test ./compiler/internal/jsonrt -run \\^\\$ -" +
+			"fuzz=FuzzAppendStringProducesValidJSON -fuzztime=") + fuzztime + parallel
 	case "postgres-wire":
-		return "go test ./compiler/internal/pgrt -run \\^\\$ -fuzz=FuzzReadFrameDoesNotPanic -fuzztime=" + fuzztime + parallel
+		return ("go test ./compiler/internal/pgrt -run \\^\\$ -" +
+			"fuzz=FuzzReadFrameDoesNotPanic -fuzztime=") + fuzztime + parallel
 	case "validate-manifest":
-		return "go test ./tools/cmd/validate-manifest -run \\^\\$ -fuzz=. -fuzztime=" + fuzztime + parallel
+		return ("go test ./tools/cmd/validate-manifest -run \\^\\$ -fuzz=. -" +
+			"fuzztime=") + fuzztime + parallel
 	case "eco-capsule":
-		return "go test ./cli/cmd/tetra -run \\^\\$ -fuzz=FuzzParseCapsuleDoesNotPanic -fuzztime=" + fuzztime + parallel
+		return ("go test ./cli/cmd/tetra -run \\^\\$ -" +
+			"fuzz=FuzzParseCapsuleDoesNotPanic -fuzztime=") + fuzztime + parallel
 	case "property-stress-regressions":
-		return "go test ./compiler/... ./cli/... ./tools/cmd/validate-manifest -run Fuzz\\|Property\\|Stress -count=1"
+		return ("go test ./compiler/... ./cli/... ./tools/cmd/validate-manifest -" +
+			"run Fuzz\\|Property\\|Stress -count=1")
 	default:
 		return ""
 	}
@@ -357,7 +461,10 @@ func validateUnstableSeeds(text string) error {
 	if !strings.Contains(text, "# Unstable Fuzz Seeds") {
 		return fmt.Errorf("unstable-seeds.md missing title")
 	}
-	if !strings.Contains(text, "| package | fuzz target | seed/crasher path | status | owner | next command |") {
+	if !strings.Contains(
+		text,
+		"| package | fuzz target | seed/crasher path | status | owner | next command |",
+	) {
 		return fmt.Errorf("unstable-seeds.md missing table header")
 	}
 	if !strings.Contains(text, "| --- | --- | --- | --- | --- | --- |") {

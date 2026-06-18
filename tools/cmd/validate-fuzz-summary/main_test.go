@@ -60,7 +60,11 @@ func TestValidateFuzzSummaryRejectsMissingSummaryJSON(t *testing.T) {
 
 func TestValidateFuzzSummaryRejectsMalformedSummaryJSON(t *testing.T) {
 	dir := makeFuzzReport(t, nil)
-	if err := os.WriteFile(filepath.Join(dir, "summary.json"), []byte("{not json\n"), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(dir, "summary.json"),
+		[]byte("{not json\n"),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 	out, err := runFuzzValidator(t, dir)
@@ -87,7 +91,11 @@ func TestValidateFuzzSummaryRejectsMalformedMetadata(t *testing.T) {
 
 func TestValidateFuzzSummaryRejectsFailingStep(t *testing.T) {
 	dir := makeFuzzReport(t, map[string]string{
-		"step-validate-manifest": "- `validate-manifest`: fail exit `1`, command `go test ./tools/cmd/validate-manifest -run \\^\\$ -fuzz=. -fuzztime=2s -parallel=1`, log `" + filepath.ToSlash(filepath.Join("OUT_DIR", "logs", "validate-manifest.log")) + "`",
+		"step-validate-manifest": ("- `validate-manifest`: fail exit `1`, command `go test ./" +
+			"tools/cmd/validate-manifest -run \\^\\$ -fuzz=. -fuzztime=2s -parallel=1`," +
+			" log `") + filepath.ToSlash(
+			filepath.Join("OUT_DIR", "logs", "validate-manifest.log"),
+		) + "`",
 	})
 	out, err := runFuzzValidator(t, dir)
 	if err == nil {
@@ -100,7 +108,10 @@ func TestValidateFuzzSummaryRejectsFailingStep(t *testing.T) {
 
 func TestValidateFuzzSummaryRejectsUnknownStep(t *testing.T) {
 	dir := makeFuzzReport(t, map[string]string{
-		"step-validate-manifest": "- `surprise`: pass, command `go test ./tools/cmd/validate-manifest -run \\^\\$ -fuzz=. -fuzztime=2s -parallel=1`, log `" + filepath.ToSlash(filepath.Join("OUT_DIR", "logs", "validate-manifest.log")) + "`",
+		"step-validate-manifest": ("- `surprise`: pass, command `go test ./tools/cmd/validate-" +
+			"manifest -run \\^\\$ -fuzz=. -fuzztime=2s -parallel=1`, log `") + filepath.ToSlash(
+			filepath.Join("OUT_DIR", "logs", "validate-manifest.log"),
+		) + "`",
 	})
 	out, err := runFuzzValidator(t, dir)
 	if err == nil {
@@ -113,7 +124,11 @@ func TestValidateFuzzSummaryRejectsUnknownStep(t *testing.T) {
 
 func TestValidateFuzzSummaryRejectsMalformedUnstableSeedLog(t *testing.T) {
 	dir := makeFuzzReport(t, nil)
-	if err := os.WriteFile(filepath.Join(dir, "unstable-seeds.md"), []byte("# Unstable Fuzz Seeds\n"), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(dir, "unstable-seeds.md"),
+		[]byte("# Unstable Fuzz Seeds\n"),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 	out, err := runFuzzValidator(t, dir)
@@ -165,23 +180,69 @@ during this run.
 	}
 
 	lines := map[string]string{
-		"mode":                             "- mode: `short`",
-		"fuzztime":                         "- fuzztime: `2s`",
-		"output_dir":                       "- output_dir: `" + filepath.ToSlash(dir) + "`",
-		"crasher_archive_path":             "- crasher_archive_path: `<package>/testdata/fuzz/<FuzzName>/`",
-		"crasher_inventory_json":           "- crasher_inventory_json: `" + filepath.ToSlash(filepath.Join(dir, "crasher-inventory.json")) + "`",
-		"unstable_seed_log":                "- unstable_seed_log: `" + filepath.ToSlash(filepath.Join(dir, "unstable-seeds.md")) + "`",
-		"step-compiler-frontend-lexer":     "- `compiler-frontend-lexer`: pass, command `go test ./compiler/internal/frontend -run \\^\\$ -fuzz=FuzzLexer -fuzztime=2s -parallel=1`, log `" + filepath.ToSlash(filepath.Join(dir, "logs", "compiler-frontend-lexer.log")) + "`",
-		"step-compiler-frontend-parser":    "- `compiler-frontend-parser`: pass, command `go test ./compiler/internal/frontend -run \\^\\$ -fuzz=FuzzParser -fuzztime=2s -parallel=1`, log `" + filepath.ToSlash(filepath.Join(dir, "logs", "compiler-frontend-parser.log")) + "`",
-		"step-compiler-format":             "- `compiler-format`: pass, command `go test ./compiler/tests/fuzz -run \\^\\$ -fuzz=FuzzFormatSourceIdempotent -fuzztime=2s -parallel=1`, log `" + filepath.ToSlash(filepath.Join(dir, "logs", "compiler-format.log")) + "`",
-		"step-compiler-lowering":           "- `compiler-lowering`: pass, command `go test ./compiler/tests/fuzz -run \\^\\$ -fuzz=FuzzLoweringPipelineVerifiesIR -fuzztime=2s -parallel=1`, log `" + filepath.ToSlash(filepath.Join(dir, "logs", "compiler-lowering.log")) + "`",
-		"step-compiler-linker-linkcore":    "- `compiler-linker-linkcore`: pass, command `go test ./compiler/internal/linker/linkcore -run \\^\\$ -fuzz=FuzzLinkX64ObjectsDoesNotPanic -fuzztime=2s -parallel=1`, log `" + filepath.ToSlash(filepath.Join(dir, "logs", "compiler-linker-linkcore.log")) + "`",
-		"step-http-runtime":                "- `http-runtime`: pass, command `go test ./compiler/internal/httprt -run \\^\\$ -fuzz=FuzzHTTPParseRequest -fuzztime=2s -parallel=1`, log `" + filepath.ToSlash(filepath.Join(dir, "logs", "http-runtime.log")) + "`",
-		"step-json-runtime":                "- `json-runtime`: pass, command `go test ./compiler/internal/jsonrt -run \\^\\$ -fuzz=FuzzAppendStringProducesValidJSON -fuzztime=2s -parallel=1`, log `" + filepath.ToSlash(filepath.Join(dir, "logs", "json-runtime.log")) + "`",
-		"step-postgres-wire":               "- `postgres-wire`: pass, command `go test ./compiler/internal/pgrt -run \\^\\$ -fuzz=FuzzReadFrameDoesNotPanic -fuzztime=2s -parallel=1`, log `" + filepath.ToSlash(filepath.Join(dir, "logs", "postgres-wire.log")) + "`",
-		"step-validate-manifest":           "- `validate-manifest`: pass, command `go test ./tools/cmd/validate-manifest -run \\^\\$ -fuzz=. -fuzztime=2s -parallel=1`, log `" + filepath.ToSlash(filepath.Join(dir, "logs", "validate-manifest.log")) + "`",
-		"step-eco-capsule":                 "- `eco-capsule`: pass, command `go test ./cli/cmd/tetra -run \\^\\$ -fuzz=FuzzParseCapsuleDoesNotPanic -fuzztime=2s -parallel=1`, log `" + filepath.ToSlash(filepath.Join(dir, "logs", "eco-capsule.log")) + "`",
-		"step-property-stress-regressions": "- `property-stress-regressions`: pass, command `go test ./compiler/... ./cli/... ./tools/cmd/validate-manifest -run Fuzz\\|Property\\|Stress -count=1`, log `" + filepath.ToSlash(filepath.Join(dir, "logs", "property-stress-regressions.log")) + "`",
+		"mode":                 "- mode: `short`",
+		"fuzztime":             "- fuzztime: `2s`",
+		"output_dir":           "- output_dir: `" + filepath.ToSlash(dir) + "`",
+		"crasher_archive_path": "- crasher_archive_path: `<package>/testdata/fuzz/<FuzzName>/`",
+		"crasher_inventory_json": "- crasher_inventory_json: `" + filepath.ToSlash(
+			filepath.Join(dir, "crasher-inventory.json"),
+		) + "`",
+		"unstable_seed_log": "- unstable_seed_log: `" + filepath.ToSlash(
+			filepath.Join(dir, "unstable-seeds.md"),
+		) + "`",
+		"step-compiler-frontend-lexer": ("- `compiler-frontend-lexer`: pass, command `go test ./" +
+			"compiler/internal/frontend -run \\^\\$ -fuzz=FuzzLexer -fuzztime=2s -" +
+			"parallel=1`, log `") + filepath.ToSlash(
+			filepath.Join(dir, "logs", "compiler-frontend-lexer.log"),
+		) + "`",
+		"step-compiler-frontend-parser": ("- `compiler-frontend-parser`: pass, command `go test " +
+			"./compiler/internal/frontend -run \\^\\$ -fuzz=FuzzParser -fuzztime=2s -" +
+			"parallel=1`, log `") + filepath.ToSlash(
+			filepath.Join(dir, "logs", "compiler-frontend-parser.log"),
+		) + "`",
+		"step-compiler-format": ("- `compiler-format`: pass, command `go test ./compiler/tests/" +
+			"fuzz -run \\^\\$ -fuzz=FuzzFormatSourceIdempotent -fuzztime=2s -" +
+			"parallel=1`, log `") + filepath.ToSlash(
+			filepath.Join(dir, "logs", "compiler-format.log"),
+		) + "`",
+		"step-compiler-lowering": ("- `compiler-lowering`: pass, command `go test ./compiler/" +
+			"tests/fuzz -run \\^\\$ -fuzz=FuzzLoweringPipelineVerifiesIR -fuzztime=2s -" +
+			"parallel=1`, log `") + filepath.ToSlash(
+			filepath.Join(dir, "logs", "compiler-lowering.log"),
+		) + "`",
+		"step-compiler-linker-linkcore": ("- `compiler-linker-linkcore`: pass, command `go test " +
+			"./compiler/internal/linker/linkcore -run \\^\\$ -" +
+			"fuzz=FuzzLinkX64ObjectsDoesNotPanic -fuzztime=2s -parallel=1`, log `") + filepath.ToSlash(
+			filepath.Join(dir, "logs", "compiler-linker-linkcore.log"),
+		) + "`",
+		"step-http-runtime": ("- `http-runtime`: pass, command `go test ./compiler/internal/" +
+			"httprt -run \\^\\$ -fuzz=FuzzHTTPParseRequest -fuzztime=2s -parallel=1`, " +
+			"log `") + filepath.ToSlash(
+			filepath.Join(dir, "logs", "http-runtime.log"),
+		) + "`",
+		"step-json-runtime": ("- `json-runtime`: pass, command `go test ./compiler/internal/" +
+			"jsonrt -run \\^\\$ -fuzz=FuzzAppendStringProducesValidJSON -fuzztime=2s -" +
+			"parallel=1`, log `") + filepath.ToSlash(
+			filepath.Join(dir, "logs", "json-runtime.log"),
+		) + "`",
+		"step-postgres-wire": ("- `postgres-wire`: pass, command `go test ./compiler/internal/" +
+			"pgrt -run \\^\\$ -fuzz=FuzzReadFrameDoesNotPanic -fuzztime=2s -" +
+			"parallel=1`, log `") + filepath.ToSlash(
+			filepath.Join(dir, "logs", "postgres-wire.log"),
+		) + "`",
+		"step-validate-manifest": ("- `validate-manifest`: pass, command `go test ./tools/cmd/" +
+			"validate-manifest -run \\^\\$ -fuzz=. -fuzztime=2s -parallel=1`, log `") + filepath.ToSlash(
+			filepath.Join(dir, "logs", "validate-manifest.log"),
+		) + "`",
+		"step-eco-capsule": ("- `eco-capsule`: pass, command `go test ./cli/cmd/tetra -run " +
+			"\\^\\$ -fuzz=FuzzParseCapsuleDoesNotPanic -fuzztime=2s -parallel=1`, log `") + filepath.ToSlash(
+			filepath.Join(dir, "logs", "eco-capsule.log"),
+		) + "`",
+		"step-property-stress-regressions": ("- `property-stress-regressions`: pass, command " +
+			"`go test ./compiler/... ./cli/... ./tools/cmd/validate-manifest -run " +
+			"Fuzz\\|Property\\|Stress -count=1`, log `") + filepath.ToSlash(
+			filepath.Join(dir, "logs", "property-stress-regressions.log"),
+		) + "`",
 	}
 	for key, value := range overrides {
 		lines[key] = strings.ReplaceAll(value, "OUT_DIR", filepath.ToSlash(dir))
@@ -226,7 +287,9 @@ during this run.
 	"artifacts": {
 	    "summary_md": "` + filepath.ToSlash(filepath.Join(dir, "summary.md")) + `",
 	    "summary_json": "` + filepath.ToSlash(filepath.Join(dir, "summary.json")) + `",
-	    "crasher_inventory_json": "` + filepath.ToSlash(filepath.Join(dir, "crasher-inventory.json")) + `",
+	    "crasher_inventory_json": "` + filepath.ToSlash(
+		filepath.Join(dir, "crasher-inventory.json"),
+	) + `",
 	    "logs_dir": "` + filepath.ToSlash(filepath.Join(dir, "logs")) + `",
     "unstable_seed_log": "` + filepath.ToSlash(filepath.Join(dir, "unstable-seeds.md")) + `",
     "crasher_archive_path": "<package>/testdata/fuzz/<FuzzName>/"
@@ -246,7 +309,11 @@ during this run.
   ]
 }
 `
-	if err := os.WriteFile(filepath.Join(dir, "summary.json"), []byte(summaryJSON), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(dir, "summary.json"),
+		[]byte(summaryJSON),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 	return dir

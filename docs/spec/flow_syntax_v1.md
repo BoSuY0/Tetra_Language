@@ -149,11 +149,13 @@ Callable boundary levels in this wave:
   symbol-backed same-module and namespace/selective imported public
   function-typed globals for direct calls, direct callback
   arguments, same-module mutable global reassignment with direct calls or
-  synchronous callback arguments and local or nested local struct-field/enum-payload storage/reassignment/returned-aggregate propagation,
+  synchronous callback arguments and local or nested local struct-field/enum-payload
+  storage/reassignment/returned-aggregate propagation,
   stable diagnostics for imported mutable function-typed globals that would
   require cross-module global-data ABI,
   actor/task boundary diagnostics when a worker directly dispatches through a mutable
-  function-typed global or passes it as a synchronous callback argument, passes a symbol-backed callback argument whose target touches mutable globals,
+  function-typed global or passes it as a synchronous callback argument, passes a symbol-backed
+  callback argument whose target touches mutable globals,
   imported functions accepting structs with function-typed fields and
   dispatching through caller-supplied local struct values or namespace/selective
   imported direct struct constructors carrying closure literals or captured
@@ -291,11 +293,16 @@ Callable boundary levels in this wave:
   function-typed locals, local struct fields, local enum payloads, whole local
   or nested structs with function fields reassigned from struct literals
   containing direct closure literals or direct return calls, whole local enums
-  reassigned from enum constructors containing direct closure literals or direct return calls, or same-module or source-imported returned enum payloads or returned struct enum
-  payloads carrying direct closure literals, or return alias chains that return captured closure snapshots assigned into same-module
-  mutable global function-typed values are stored as bounded by-value `fnptr` snapshots and may be called later through that global,
+  reassigned from enum constructors containing direct closure literals or direct return calls, or
+  same-module or source-imported returned enum payloads or returned struct enum
+  payloads carrying direct closure literals, or return alias chains that return captured closure
+  snapshots assigned into same-module
+  mutable global function-typed values are stored as bounded by-value `fnptr` snapshots and may be
+  called later through that global,
   passed as synchronous callback arguments, returned from same-module or
-  imported functions, passed as callback arguments or reassigned into mutable locals after cross-module returns, stored in local struct fields or enum payloads, including after cross-module function-typed returns, or
+  imported functions, passed as callback arguments or reassigned into mutable locals after
+  cross-module returns, stored in local struct fields or enum payloads, including after cross-module
+  function-typed returns, or
   dispatched through `try cb(...)` when the global type declares the same
   throws type.
   Captured `fnptr` values reached through mutable function-typed whole-struct
@@ -321,7 +328,8 @@ Callable boundary levels in this wave:
   returns such as `pick(holder) -> holder.cb` and nested paths such as
   `pick(box) -> box.holder.cb`, through same-module, imported source, or
   generated `.t4i` interface-only whole struct-parameter returns such as
-  `echo(box) -> box` that preserve nested function-field target sets, through same-module or imported
+  `echo(box) -> box` that preserve nested function-field target sets, through same-module or
+  imported
   enum-parameter payload returns or whole enum-parameter returns such as
   `echo(choice) -> choice`, including inline imported struct/enum
   constructors carrying captured closure literals, with those returned captured
@@ -804,7 +812,8 @@ The v1 protocols contract accepts declarations with typed required function
 signatures, validates referenced types, and exposes them to formatter,
 generated docs, and LSP symbols. `impl Type: Protocol` checks that matching
 extension/static methods exist with compatible signatures, including effects,
-async, throws, parameter ownership markers, params, and return type. Duplicate impls are rejected. Protocol
+async, throws, parameter ownership markers, params, and return type. Duplicate impls are rejected.
+Protocol
 conformance is a static compile-time contract in this MVP: no witness tables,
 trait objects, runtime protocol values, existential containers, or dynamic
 dispatch model are introduced.

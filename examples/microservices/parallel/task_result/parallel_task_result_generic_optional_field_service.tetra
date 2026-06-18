@@ -1,0 +1,27 @@
+// Generic optional task-result field microservice smoke.
+//
+// The service carries a joined task result through a generic optional field and
+// unwraps the field payload before checking the result value.
+module examples.microservices.parallel.task_result.parallel_task_result_generic_optional_field_service
+struct MaybeBox<T>:
+    value: T?
+
+func worker() -> Int:
+    return 42
+
+func keep_box(box: MaybeBox<task.result_i32>) -> MaybeBox<task.result_i32>:
+    return box
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let joined: task.result_i32 = core.task_join_result_i32(task)
+    let maybe: task.result_i32? = joined
+    let box: MaybeBox<task.result_i32> = keep_box(MaybeBox<task.result_i32>(value: maybe))
+    if let result = box.value:
+        if result.error != 0:
+            return 10 + result.error
+        if result.value == 42:
+            return 0
+        return result.value
+    return 99

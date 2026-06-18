@@ -132,7 +132,13 @@ func validateResidualRisk(risk residualRisk, index int) error {
 	status := strings.TrimSpace(risk.Status)
 	if severity == "medium" || severity == "high" || severity == "critical" {
 		if missingOrUnknown(owner) || missingOrUnknown(status) {
-			return fmt.Errorf("%s residual risk %s requires known status and owner (owner=%s, status=%s)", severity, id, owner, status)
+			return fmt.Errorf(
+				"%s residual risk %s requires known status and owner (owner=%s, status=%s)",
+				severity,
+				id,
+				owner,
+				status,
+			)
 		}
 	}
 	return nil

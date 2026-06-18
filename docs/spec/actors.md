@@ -1,6 +1,7 @@
 # Actors Runtime v1
 
-Actors are an isolation + message-passing concurrency model built on top of Tetra’s existing foundations:
+Actors are an isolation + message-passing concurrency model built on top of Tetra’s existing
+foundations:
 Islands (region memory), and the explicit safe/unsafe boundary.
 
 This document specifies the actor runtime and language surface included in the
@@ -13,7 +14,8 @@ Actors are supported on x64 targets:
 - `macos-x64`
 - `windows-x64`
 
-**Build vs run:** the toolchain can always *build* these targets, but executing produced binaries is only supported when
+**Build vs run:** the toolchain can always *build* these targets, but executing produced binaries is
+only supported when
 `host == target` (for example, `windows-x64` binaries are run only on Windows hosts).
 
 The scoped production foundation claim below is narrower than the build matrix:
@@ -118,7 +120,8 @@ Returns the handle of the current actor.
 - Cooperative: actors yield only when:
   - explicitly calling `core.yield()`,
   - blocked in `core.recv()`, `core.recv_until(deadline)`, or `core.recv_msg_until(deadline)`,
-  - waiting in `core.task_join_i32()`, `core.task_join_result_i32()`, `core.task_join_until_i32(task, deadline)`, or `core.select2_i32(task, deadline)`,
+  - waiting in `core.task_join_i32()`, `core.task_join_result_i32()`,
+    `core.task_join_until_i32(task, deadline)`, or `core.select2_i32(task, deadline)`,
   - sleeping in `core.sleep_ms()` or `core.sleep_until(deadline)`,
   - finished execution.
 - Scheduler policy: round-robin over runnable actors (MVP).

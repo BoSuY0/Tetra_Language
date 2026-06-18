@@ -35,6 +35,12 @@ func RequiredActorSymbols() []string {
 	}
 }
 
+func RequiredActorTelemetrySymbols() []string {
+	return []string{
+		"__tetra_actor_memory_snapshot",
+	}
+}
+
 func RequiredActorStateSymbols() []string {
 	return []string{
 		"__tetra_actor_state_load",
@@ -194,6 +200,8 @@ func SignatureForSymbol(name string) (Signature, bool) {
 		return Signature{ParamSlots: 0, ReturnSlots: 1}, true
 	case "__tetra_actor_yield_now":
 		return Signature{ParamSlots: 0, ReturnSlots: 1}, true
+	case "__tetra_actor_memory_snapshot":
+		return Signature{ParamSlots: 1, ReturnSlots: 1}, true
 	case "__tetra_actor_state_load":
 		return Signature{ParamSlots: 1, ReturnSlots: 1}, true
 	case "__tetra_actor_state_store":
@@ -250,7 +258,10 @@ func SignatureForSymbol(name string) (Signature, bool) {
 		return Signature{ParamSlots: 3, ReturnSlots: 1}, true
 	case "__tetra_net_socket_tcp4":
 		return Signature{ParamSlots: 1, ReturnSlots: 1}, true
-	case "__tetra_net_bind_tcp4_loopback", "__tetra_net_connect_tcp4_loopback", "__tetra_net_listen", "__tetra_net_accept4":
+	case "__tetra_net_bind_tcp4_loopback",
+		"__tetra_net_connect_tcp4_loopback",
+		"__tetra_net_listen",
+		"__tetra_net_accept4":
 		return Signature{ParamSlots: 3, ReturnSlots: 1}, true
 	case "__tetra_net_read", "__tetra_net_recv", "__tetra_net_write", "__tetra_net_send":
 		return Signature{ParamSlots: 6, ReturnSlots: 1}, true
@@ -262,18 +273,29 @@ func SignatureForSymbol(name string) (Signature, bool) {
 		return Signature{ParamSlots: 3, ReturnSlots: 1}, true
 	case "__tetra_net_epoll_wait_one_into":
 		return Signature{ParamSlots: 5, ReturnSlots: 1}, true
-	case "__tetra_net_set_nonblocking", "__tetra_net_set_reuseport", "__tetra_net_set_tcp_nodelay", "__tetra_net_close":
+	case "__tetra_net_set_nonblocking",
+		"__tetra_net_set_reuseport",
+		"__tetra_net_set_tcp_nodelay",
+		"__tetra_net_close":
 		return Signature{ParamSlots: 2, ReturnSlots: 1}, true
 	case "__tetra_surface_open":
 		return Signature{ParamSlots: 4, ReturnSlots: 1}, true
-	case "__tetra_surface_close", "__tetra_surface_poll_event_kind", "__tetra_surface_poll_event_x", "__tetra_surface_poll_event_y",
-		"__tetra_surface_poll_event_button", "__tetra_surface_poll_event_text_len", "__tetra_surface_begin_frame", "__tetra_surface_request_redraw":
+	case "__tetra_surface_close",
+		"__tetra_surface_poll_event_kind",
+		"__tetra_surface_poll_event_x",
+		"__tetra_surface_poll_event_y",
+		"__tetra_surface_poll_event_button",
+		"__tetra_surface_poll_event_text_len",
+		"__tetra_surface_begin_frame",
+		"__tetra_surface_request_redraw":
 		return Signature{ParamSlots: 1, ReturnSlots: 1}, true
 	case "__tetra_surface_poll_event_text_into":
 		return Signature{ParamSlots: 3, ReturnSlots: 1}, true
 	case "__tetra_surface_poll_event_into":
 		return Signature{ParamSlots: 3, ReturnSlots: 1}, true
-	case "__tetra_surface_clipboard_write_text", "__tetra_surface_clipboard_read_text_into", "__tetra_surface_poll_composition_into":
+	case "__tetra_surface_clipboard_write_text",
+		"__tetra_surface_clipboard_read_text_into",
+		"__tetra_surface_poll_composition_into":
 		return Signature{ParamSlots: 3, ReturnSlots: 1}, true
 	case "__tetra_surface_present_rgba":
 		return Signature{ParamSlots: 6, ReturnSlots: 1}, true

@@ -5,7 +5,7 @@
 //
 // This runtime is intentionally minimal: it supports exactly two actors:
 // - actor 0: the program main entry
-// - actor 1: the first spawned actor (e.g. "pong" in examples/actors_pingpong.tetra)
+// - actor 1: the first spawned actor (e.g. "pong" in examples/actors/actors_pingpong.tetra)
 module __rt.actors_poc_win64
 
 val STATUS_READY: i32 = 0

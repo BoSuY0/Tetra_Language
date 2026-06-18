@@ -41,7 +41,11 @@ type oracleSummary struct {
 }
 
 func main() {
-	reportDir := flag.String("report-dir", "", "directory to write deterministic RAM contract fuzz artifacts")
+	reportDir := flag.String(
+		"report-dir",
+		"",
+		"directory to write deterministic RAM contract fuzz artifacts",
+	)
 	gitHead := flag.String("git-head", "unknown", "git head to stamp into artifacts")
 	flag.Parse()
 	if *reportDir == "" {
@@ -117,7 +121,14 @@ func runMutationObservations(reportDir string, gitHead string) ([]oracleObservat
 				if err != nil {
 					return "", nil, err
 				}
-				return path, []string{"go", "run", "-buildvcs=false", "./tools/cmd/validate-ram-contract-report", "--report", abs}, nil
+				return path, []string{
+					"go",
+					"run",
+					"-buildvcs=false",
+					"./tools/cmd/validate-ram-contract-report",
+					"--report",
+					abs,
+				}, nil
 			},
 		},
 		{
@@ -132,7 +143,14 @@ func runMutationObservations(reportDir string, gitHead string) ([]oracleObservat
 				if err != nil {
 					return "", nil, err
 				}
-				return path, []string{"go", "run", "-buildvcs=false", "./tools/cmd/validate-memory-grade-report", "--report", abs}, nil
+				return path, []string{
+					"go",
+					"run",
+					"-buildvcs=false",
+					"./tools/cmd/validate-memory-grade-report",
+					"--report",
+					abs,
+				}, nil
 			},
 		},
 		{
@@ -147,7 +165,14 @@ func runMutationObservations(reportDir string, gitHead string) ([]oracleObservat
 				if err != nil {
 					return "", nil, err
 				}
-				return path, []string{"go", "run", "-buildvcs=false", "./tools/cmd/validate-heap-blockers", "--report", abs}, nil
+				return path, []string{
+					"go",
+					"run",
+					"-buildvcs=false",
+					"./tools/cmd/validate-heap-blockers",
+					"--report",
+					abs,
+				}, nil
 			},
 		},
 		{
@@ -155,14 +180,25 @@ func runMutationObservations(reportDir string, gitHead string) ([]oracleObservat
 			validator: "validate-ram-contract-report",
 			mutate: func(repoRoot string, mutationDir string, gitHead string) (string, []string, error) {
 				path := filepath.Join(mutationDir, "ram-contract-report.json")
-				if err := replaceInFile(path, `"summary":{"row_count":1,"artifact_grade":"M5","heap_rows":1,"copy_rows":0,"unbounded_rows":1,"budget_bytes":8192}`, `"summary":{"row_count":1,"artifact_grade":"M5","heap_rows":1,"copy_rows":0,"unbounded_rows":1,"budget_bytes":8193}`); err != nil {
+				if err := replaceInFile(
+					path,
+					`"summary":{"row_count":1,"artifact_grade":"M5","heap_rows":1,"copy_rows":0,"unbounded_rows":1,"budget_bytes":8192}`,
+					`"summary":{"row_count":1,"artifact_grade":"M5","heap_rows":1,"copy_rows":0,"unbounded_rows":1,"budget_bytes":8193}`,
+				); err != nil {
 					return "", nil, err
 				}
 				abs, err := filepath.Abs(path)
 				if err != nil {
 					return "", nil, err
 				}
-				return path, []string{"go", "run", "-buildvcs=false", "./tools/cmd/validate-ram-contract-report", "--report", abs}, nil
+				return path, []string{
+					"go",
+					"run",
+					"-buildvcs=false",
+					"./tools/cmd/validate-ram-contract-report",
+					"--report",
+					abs,
+				}, nil
 			},
 		},
 		{
@@ -174,18 +210,41 @@ func runMutationObservations(reportDir string, gitHead string) ([]oracleObservat
 					return "", nil, err
 				}
 				manifest := filepath.Join(absDir, "artifact-hashes.json")
-				exitCode, output, err := runCommand(repoRoot, []string{"go", "run", "-buildvcs=false", "./tools/cmd/validate-artifact-hashes", "--write", "--root", absDir, "--out", manifest})
+				exitCode, output, err := runCommand(
+					repoRoot,
+					[]string{
+						"go",
+						"run",
+						"-buildvcs=false",
+						"./tools/cmd/validate-artifact-hashes",
+						"--write",
+						"--root",
+						absDir,
+						"--out",
+						manifest,
+					},
+				)
 				if err != nil {
 					return "", nil, err
 				}
 				if exitCode != 0 {
-					return "", nil, fmt.Errorf("artifact hash manifest write failed: %s", excerptOutput(output))
+					return "", nil, fmt.Errorf(
+						"artifact hash manifest write failed: %s",
+						excerptOutput(output),
+					)
 				}
 				path := filepath.Join(mutationDir, "ram-contract-fuzz-summary.md")
 				if err := appendToFile(path, "\nForged after hash manifest.\n"); err != nil {
 					return "", nil, err
 				}
-				return path, []string{"go", "run", "-buildvcs=false", "./tools/cmd/validate-artifact-hashes", "--manifest", manifest}, nil
+				return path, []string{
+					"go",
+					"run",
+					"-buildvcs=false",
+					"./tools/cmd/validate-artifact-hashes",
+					"--manifest",
+					manifest,
+				}, nil
 			},
 		},
 		{
@@ -205,7 +264,14 @@ func runMutationObservations(reportDir string, gitHead string) ([]oracleObservat
 				if err != nil {
 					return "", nil, err
 				}
-				return path, []string{"go", "run", "-buildvcs=false", "./tools/cmd/validate-ram-contract-fuzz-oracle", "--report", abs}, nil
+				return path, []string{
+					"go",
+					"run",
+					"-buildvcs=false",
+					"./tools/cmd/validate-ram-contract-fuzz-oracle",
+					"--report",
+					abs,
+				}, nil
 			},
 		},
 	}
@@ -238,7 +304,12 @@ func runMutationObservations(reportDir string, gitHead string) ([]oracleObservat
 			ExitCode:         exitCode,
 			OutputExcerpt:    excerptOutput(output),
 			MutatedFile:      filepath.ToSlash(rel),
-			Reason:           fmt.Sprintf("%s rejected by %s with exit code %d", tc.name, tc.validator, exitCode),
+			Reason: fmt.Sprintf(
+				"%s rejected by %s with exit code %d",
+				tc.name,
+				tc.validator,
+				exitCode,
+			),
 		}
 		if !obs.Rejected {
 			return nil, fmt.Errorf("mutation %s was accepted by %s", tc.name, tc.validator)
@@ -297,7 +368,9 @@ func findRepoRoot() (string, error) {
 	}
 	for {
 		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			if _, err := os.Stat(filepath.Join(dir, "tools", "cmd", "validate-ram-contract-report")); err == nil {
+			if _, err := os.Stat(
+				filepath.Join(dir, "tools", "cmd", "validate-ram-contract-report"),
+			); err == nil {
 				return dir, nil
 			}
 		}
@@ -477,7 +550,7 @@ func validHeapBlockers(gitHead string) string {
   "git_head":%q,
   "target":"linux-x64",
   "generated_by":"ram-contract-fuzz-short",
-  "rows":[{"site_id":"site:main:heap","function":"main","intent":"heap_fallback","placement":"heap_unbounded","blockers":["unknown_size"],"contract_grade":"M5"}],
+  "rows":[{"site_id":"site:main:heap","function":"main","intent":"heap_fallback","placement":"heap_unbounded","blockers":["unknown_size"],"contract_grade":"M5","file":"fixtures/main.tetra","line":3,"symbol":"main","source_location_status":"available","severity":"P1","reason":"unknown_size","suggested_fix":"add no-escape, lifetime, or bounded allocation proof before changing this heap fallback","evidence_id":"fact:ram:site:main:heap","safe_to_optimize":false}],
   "non_claims":["no Memory 100%% claim"]
 }
 `, gitHead)

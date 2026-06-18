@@ -1,0 +1,17 @@
+// Energy-Languages-inspired time/memory checksum kernel.
+module examples.benchmarks.classic.energy_languages_checksum
+
+func mix(seed: Int, value: Int) -> Int:
+    return (seed * 33 + value * 17 + 19) % 100000
+
+func main() -> Int:
+    var i: Int = 0
+    var seed: Int = 7
+    var checksum: Int = 0
+    while i < 96:
+        seed = mix(seed, i)
+        checksum = (checksum + seed + i % 5) % 100000
+        i = i + 1
+    if checksum == 26494:
+        return 0
+    return checksum % 251

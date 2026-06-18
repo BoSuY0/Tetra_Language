@@ -1,0 +1,100 @@
+module examples.core.runtime.core_postgres_prepared_smoke
+
+import lib.core.postgres as pg
+
+func check_parse() -> Int
+uses alloc, mem:
+    var param_oids: []i32 = core.make_i32(1)
+    param_oids[0] = pg.int4_oid()
+    let statement: String = "world_by_id"
+    let prepared_query: String = "SELECT id, randomNumber FROM World WHERE id=$1"
+    var parse: []u8 = core.make_u8(pg.parse_frame_len(statement, prepared_query, param_oids))
+    let parse_written: Int = pg.write_parse(parse, statement, prepared_query, param_oids)
+    if parse_written != pg.parse_frame_len(statement, prepared_query, param_oids):
+        return 1
+    if parse[0] != pg.frame_parse():
+        return 2
+    if pg.read_i32_be(parse, 1) != pg.parse_payload_len(statement, prepared_query, param_oids):
+        return 3
+    if pg.read_i16_be(parse, parse_written - 6) != 1:
+        return 4
+    if pg.read_i32_be(parse, parse_written - 4) != pg.int4_oid():
+        return 5
+    return 0
+
+func check_bind() -> Int
+uses alloc, mem:
+    let statement: String = "world_by_id"
+    var bind: []u8 = core.make_u8(pg.bind_text_1_frame_len("", statement, "42"))
+    let bind_written: Int = pg.write_bind_text_1(bind, "", statement, "42")
+    if bind_written != pg.bind_text_1_frame_len("", statement, "42"):
+        return 6
+    if bind[0] != pg.frame_bind():
+        return 7
+    if pg.read_i32_be(bind, 1) != pg.bind_text_1_payload_len("", statement, "42"):
+        return 8
+    let value_count_offset: Int = 1 + 4 + pg.cstring_pair_len("", statement) + 2
+    let value_len_offset: Int = value_count_offset + 2
+    let value_offset: Int = value_len_offset + 4
+    if pg.read_i16_be(bind, value_count_offset) != 1:
+        return 9
+    if pg.read_i32_be(bind, value_len_offset) != 2:
+        return 10
+    if bind[value_offset] != 52 || bind[value_offset + 1] != 50:
+        return 11
+    return 0
+
+func check_bind_two_params() -> Int
+uses alloc, mem:
+    let statement: String = "update_world_random"
+    var bind: []u8 = core.make_u8(pg.bind_text_2_frame_len("", statement, "9001", "7"))
+    let bind_written: Int = pg.write_bind_text_2(bind, "", statement, "9001", "7")
+    if bind_written != pg.bind_text_2_frame_len("", statement, "9001", "7"):
+        return 12
+    if pg.read_i32_be(bind, 1) != pg.bind_text_2_payload_len("", statement, "9001", "7"):
+        return 13
+    let value_count_offset: Int = 1 + 4 + pg.cstring_pair_len("", statement) + 2
+    if pg.read_i16_be(bind, value_count_offset) != 2:
+        return 14
+    return 0
+
+func check_describe_execute_sync() -> Int
+uses alloc, mem:
+    let portal: String = "p"
+    var describe: []u8 = core.make_u8(pg.describe_portal_frame_len(portal))
+    let describe_written: Int = pg.write_describe_portal(describe, portal)
+    if describe_written != pg.describe_portal_frame_len(portal):
+        return 15
+    if describe[0] != pg.frame_describe() || describe[5] != pg.describe_kind_portal():
+        return 16
+    var execute: []u8 = core.make_u8(pg.execute_frame_len(portal, 0))
+    let execute_written: Int = pg.write_execute(execute, portal, 0)
+    if execute_written != pg.execute_frame_len(portal, 0):
+        return 17
+    if execute[0] != pg.frame_execute():
+        return 18
+    if pg.read_i32_be(execute, execute_written - 4) != 0:
+        return 19
+    var sync: []u8 = core.make_u8(pg.sync_frame_len())
+    let sync_written: Int = pg.write_sync(sync)
+    if sync_written != pg.sync_frame_len():
+        return 20
+    if sync[0] != pg.frame_sync() || pg.read_i32_be(sync, 1) != 4:
+        return 21
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    let parse: Int = check_parse()
+    if parse != 0:
+        return parse
+    let bind: Int = check_bind()
+    if bind != 0:
+        return bind
+    let bind_two: Int = check_bind_two_params()
+    if bind_two != 0:
+        return bind_two
+    let extended: Int = check_describe_execute_sync()
+    if extended != 0:
+        return extended
+    return 42

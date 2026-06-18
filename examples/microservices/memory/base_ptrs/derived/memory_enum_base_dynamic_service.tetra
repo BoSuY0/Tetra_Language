@@ -1,0 +1,32 @@
+// Enum base-pointer dynamic memory microservice smoke.
+//
+// The service routes an allocation-base pointer through an enum payload and
+// runs a dynamic load loop after extracting the base.
+module examples.microservices.memory.base_ptrs.derived.memory_enum_base_dynamic_service
+enum PtrRoute:
+    case raw(ptr)
+    case empty
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let payload: ptr = core.alloc_bytes(4)
+        let payload_one: ptr = core.ptr_add(payload, 1, memory_cap)
+        let _write_zero: UInt8 = core.store_u8(payload, 20, memory_cap)
+        let _write_one: UInt8 = core.store_u8(payload_one, 22, memory_cap)
+        let route: PtrRoute = PtrRoute.raw(payload)
+        match route:
+        case PtrRoute.raw(raw_base):
+            var offset: Int = 0
+            var total: Int = 0
+            while offset < 2:
+                let cell: ptr = core.ptr_add(raw_base, offset, memory_cap)
+                total = total + core.load_u8(cell, memory_cap)
+                offset = offset + 1
+            if total == 42:
+                return 0
+            return total
+        case PtrRoute.empty:
+            return 99
+    return 98

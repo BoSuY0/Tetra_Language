@@ -176,7 +176,12 @@ func main() {
 	flag.StringVar(&format, "format", "text", "output format: text or json")
 	flag.StringVar(&repoRoot, "repo", ".", "repository root")
 	flag.StringVar(&reportDir, "report-dir", "", "current release gate report directory")
-	flag.StringVar(&expectedVersion, "expected-version", defaultExpectedVersion, "expected version boundary for release-state validation")
+	flag.StringVar(
+		&expectedVersion,
+		"expected-version",
+		defaultExpectedVersion,
+		"expected version boundary for release-state validation",
+	)
 	flag.Parse()
 
 	repoRoot = filepath.Clean(repoRoot)
@@ -216,7 +221,10 @@ func main() {
 		report.Issues = append(report.Issues, fmt.Sprintf("git branch failed: %v", branchErr))
 	}
 	if gitHeadErr != nil {
-		report.Issues = append(report.Issues, fmt.Sprintf("git rev-parse HEAD failed: %v", gitHeadErr))
+		report.Issues = append(
+			report.Issues,
+			fmt.Sprintf("git rev-parse HEAD failed: %v", gitHeadErr),
+		)
 	}
 	if versionErr != nil {
 		report.Issues = append(report.Issues, fmt.Sprintf("./tetra version failed: %v", versionErr))
@@ -251,14 +259,35 @@ func buildReleaseStateReport(input releaseStateInputs) releaseStateReport {
 	if expectedVersion == "" {
 		expectedVersion = defaultExpectedVersion
 	}
-	generated := inspectRequiredArtifacts(input.StatFile, requiredReleaseArtifactPaths(expectedVersion, input.ReportDir))
+	generated := inspectRequiredArtifacts(
+		input.StatFile,
+		requiredReleaseArtifactPaths(expectedVersion, input.ReportDir),
+	)
 	issues := []string{}
 	freshness := append([]freshnessCheck{}, input.Freshness...)
 	if expectedVersion == "v1.0.0" {
-		freshness = append(freshness, checkV1EvidenceMetadata(input.ReadFile, expectedVersion, input.GitHead, input.ReportDir))
+		freshness = append(
+			freshness,
+			checkV1EvidenceMetadata(
+				input.ReadFile,
+				expectedVersion,
+				input.GitHead,
+				input.ReportDir,
+			),
+		)
 	}
-	runtimeExecution := inspectRuntimeExecutionEvidence(input.ReadFile, expectedVersion, input.ReportDir, input.GitHead)
-	securityReview := inspectSecurityReviewEvidence(input.ReadFile, expectedVersion, input.ReportDir, input.GitHead)
+	runtimeExecution := inspectRuntimeExecutionEvidence(
+		input.ReadFile,
+		expectedVersion,
+		input.ReportDir,
+		input.GitHead,
+	)
+	securityReview := inspectSecurityReviewEvidence(
+		input.ReadFile,
+		expectedVersion,
+		input.ReportDir,
+		input.GitHead,
+	)
 	gate := inspectLastGateEvidence(input.ReadFile, expectedVersion, input.ReportDir)
 	if input.Version == "" {
 		issues = append(issues, "version is missing")
@@ -266,7 +295,10 @@ func buildReleaseStateReport(input releaseStateInputs) releaseStateReport {
 		issues = append(issues, fmt.Sprintf("version %q is not %q", input.Version, expectedVersion))
 	}
 	if isPromotedReleaseVersion(expectedVersion) && strings.TrimSpace(input.ReportDir) == "" {
-		issues = append(issues, fmt.Sprintf("report-dir is required for %s release validation", expectedVersion))
+		issues = append(
+			issues,
+			fmt.Sprintf("report-dir is required for %s release validation", expectedVersion),
+		)
 	}
 	for _, missing := range generated.Missing {
 		issues = append(issues, "missing required release artifact: "+missing)
@@ -292,27 +324,60 @@ func buildReleaseStateReport(input releaseStateInputs) releaseStateReport {
 	} else if gate.FailedCount != 0 {
 		issues = append(issues, fmt.Sprintf("last gate evidence has %d failed step(s)", gate.FailedCount))
 	} else if minimumSteps := minimumReleaseGateSteps(expectedVersion); gate.StepCount < minimumSteps {
-		issues = append(issues, fmt.Sprintf("last gate evidence has %d step(s), want at least %d", gate.StepCount, minimumSteps))
+		issues = append(
+			issues,
+			fmt.Sprintf("last gate evidence has %d step(s), want at least %d", gate.StepCount, minimumSteps),
+		)
 	}
 	if isPromotedReleaseVersion(expectedVersion) {
 		expectedArtifact := expectedReleaseArtifact(expectedVersion)
 		expectedGateCommand := expectedReleaseGateCommand(expectedVersion)
 		if gate.ReleaseVersion != expectedVersion {
-			issues = append(issues, fmt.Sprintf("last gate evidence release_version is %q, want %q", gate.ReleaseVersion, expectedVersion))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"last gate evidence release_version is %q, want %q",
+					gate.ReleaseVersion,
+					expectedVersion,
+				),
+			)
 		}
 		if gate.ReleaseArtifact != expectedArtifact {
-			issues = append(issues, fmt.Sprintf("last gate evidence release_artifact is %q, want %q", gate.ReleaseArtifact, expectedArtifact))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"last gate evidence release_artifact is %q, want %q",
+					gate.ReleaseArtifact,
+					expectedArtifact,
+				),
+			)
 		}
 		if gate.ReleaseGateCommand != expectedGateCommand {
-			issues = append(issues, fmt.Sprintf("last gate evidence release_gate_command is %q, want %q", gate.ReleaseGateCommand, expectedGateCommand))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"last gate evidence release_gate_command is %q, want %q",
+					gate.ReleaseGateCommand,
+					expectedGateCommand,
+				),
+			)
 		}
 		if err := validateGateEvidenceTimestamps(gate); err != nil {
 			issues = append(issues, "last gate evidence "+err.Error())
 		}
 		if strings.TrimSpace(gate.ReportDir) == "" {
 			issues = append(issues, "last gate evidence report_dir is missing")
-		} else if strings.TrimSpace(input.ReportDir) != "" && filepath.Clean(gate.ReportDir) != filepath.Clean(input.ReportDir) {
-			issues = append(issues, fmt.Sprintf("last gate evidence report_dir is %q, want %q", gate.ReportDir, input.ReportDir))
+		} else if strings.TrimSpace(
+			input.ReportDir,
+		) != "" && filepath.Clean(
+			gate.ReportDir,
+		) != filepath.Clean(
+			input.ReportDir,
+		) {
+			issues = append(
+				issues,
+				fmt.Sprintf("last gate evidence report_dir is %q, want %q", gate.ReportDir, input.ReportDir),
+			)
 		}
 	}
 	for _, fresh := range freshness {
@@ -394,7 +459,10 @@ func isReleaseArtifactPath(path string) bool {
 		strings.HasPrefix(slash, "docs/release/")
 }
 
-func inspectRequiredArtifacts(statFile func(string) (fileInfo, error), paths []string) generatedArtifactsReport {
+func inspectRequiredArtifacts(
+	statFile func(string) (fileInfo, error),
+	paths []string,
+) generatedArtifactsReport {
 	report := generatedArtifactsReport{}
 	for _, path := range paths {
 		info, err := statFile(path)
@@ -458,7 +526,11 @@ func v1ReportDirRequiredArtifacts(reportDir string) []string {
 	}
 }
 
-func inspectLastGateEvidence(readFile func(string) ([]byte, error), expectedVersion string, reportDir string) gateEvidenceReport {
+func inspectLastGateEvidence(
+	readFile func(string) ([]byte, error),
+	expectedVersion string,
+	reportDir string,
+) gateEvidenceReport {
 	path := releaseGateSummaryPath(expectedVersion, reportDir)
 	report := gateEvidenceReport{SummaryPath: path}
 	raw, err := readFile(path)
@@ -493,23 +565,42 @@ func inspectLastGateEvidence(readFile func(string) ([]byte, error), expectedVers
 	return report
 }
 
-func inspectRuntimeExecutionEvidence(readFile func(string) ([]byte, error), expectedVersion string, reportDir string, currentGitHead string) runtimeExecutionEvidenceReport {
+func inspectRuntimeExecutionEvidence(
+	readFile func(string) ([]byte, error),
+	expectedVersion string,
+	reportDir string,
+	currentGitHead string,
+) runtimeExecutionEvidenceReport {
 	if expectedVersion != "v0.3.0" {
 		return runtimeExecutionEvidenceReport{}
 	}
 	report := runtimeExecutionEvidenceReport{}
 	for _, target := range []string{"macos-x64", "windows-x64"} {
 		path := runtimeExecutionEvidencePath(reportDir, target)
-		check := runtimeExecutionEvidenceCheck{Target: target, Path: path, Status: "pass", EvidenceCommand: runtimeExecutionEvidenceCommand(target, path)}
+		check := runtimeExecutionEvidenceCheck{
+			Target:          target,
+			Path:            path,
+			Status:          "pass",
+			EvidenceCommand: runtimeExecutionEvidenceCommand(target, path),
+		}
 		raw, err := readFile(path)
 		if err != nil {
 			report.Missing = append(report.Missing, path)
 			check.Status = "missing"
-			check.Issues = append(check.Issues, fmt.Sprintf("%s read failed: %v", filepath.Base(path), err))
+			check.Issues = append(
+				check.Issues,
+				fmt.Sprintf("%s read failed: %v", filepath.Base(path), err),
+			)
 			report.Required = append(report.Required, check)
 			continue
 		}
-		smoke, smokeIssues := validateRuntimeSmokeReport(raw, path, target, expectedVersion, currentGitHead)
+		smoke, smokeIssues := validateRuntimeSmokeReport(
+			raw,
+			path,
+			target,
+			expectedVersion,
+			currentGitHead,
+		)
 		check.Host = smoke.Host
 		check.Issues = append(check.Issues, smokeIssues...)
 		if len(check.Issues) > 0 {
@@ -520,13 +611,23 @@ func inspectRuntimeExecutionEvidence(readFile func(string) ([]byte, error), expe
 	return report
 }
 
-func inspectSecurityReviewEvidence(readFile func(string) ([]byte, error), expectedVersion string, reportDir string, currentGitHead string) securityReviewEvidenceReport {
+func inspectSecurityReviewEvidence(
+	readFile func(string) ([]byte, error),
+	expectedVersion string,
+	reportDir string,
+	currentGitHead string,
+) securityReviewEvidenceReport {
 	if !requiresSecurityReviewEvidence(expectedVersion) {
 		return securityReviewEvidenceReport{}
 	}
 	path := securityReviewEvidencePath(reportDir)
 	hashPath := path + ".sha256"
-	report := securityReviewEvidenceReport{Path: path, HashPath: hashPath, Status: "pass", ValidatorCommand: securityReviewValidatorCommand(expectedVersion, path)}
+	report := securityReviewEvidenceReport{
+		Path:             path,
+		HashPath:         hashPath,
+		Status:           "pass",
+		ValidatorCommand: securityReviewValidatorCommand(expectedVersion, path),
+	}
 	raw, err := readFile(path)
 	hashRaw, hashErr := readFile(hashPath)
 	if err != nil && hashErr != nil && strings.TrimSpace(reportDir) != "" {
@@ -540,7 +641,17 @@ func inspectSecurityReviewEvidence(readFile func(string) ([]byte, error), expect
 		report.Missing = append(report.Missing, hashPath)
 	}
 	if err == nil && hashErr == nil {
-		report.Issues = append(report.Issues, validateSecurityReviewEvidence(raw, hashRaw, path, hashPath, expectedVersion, reportDir, currentGitHead)...)
+		report.Issues = append(
+			report.Issues,
+			validateSecurityReviewEvidence(
+				raw,
+				hashRaw,
+				path,
+				hashPath,
+				expectedVersion,
+				reportDir,
+				currentGitHead,
+			)...)
 	}
 	if len(report.Missing) > 0 || len(report.Issues) > 0 {
 		report.Status = "fail"
@@ -578,37 +689,74 @@ func securityReviewValidatorScript(version string) string {
 	return "scripts/release_" + strings.ReplaceAll(version, ".", "_") + "_security_review.sh"
 }
 
-func validateSecurityReviewEvidence(raw []byte, hashRaw []byte, path string, hashPath string, expectedVersion string, reportDir string, currentGitHead string) []string {
+func validateSecurityReviewEvidence(
+	raw []byte,
+	hashRaw []byte,
+	path string,
+	hashPath string,
+	expectedVersion string,
+	reportDir string,
+	currentGitHead string,
+) []string {
 	var issues []string
 	label := filepath.Base(path)
 	text := string(raw)
 	expectedDecision := fmt.Sprintf("approved for %s release", expectedVersion)
 	decision := securityReviewLineValue(text, "Decision:")
 	if decision != expectedDecision {
-		issues = append(issues, fmt.Sprintf("%s decision is not an approval for %s", label, expectedVersion))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s decision is not an approval for %s", label, expectedVersion),
+		)
 	}
-	if strings.Contains(text, "missing-security-signoff") || strings.Contains(strings.ToLower(text), "blocked: missing human security signoff") {
-		issues = append(issues, fmt.Sprintf("%s contains missing security signoff placeholder text", label))
+	if strings.Contains(text, "missing-security-signoff") ||
+		strings.Contains(strings.ToLower(text), "blocked: missing human security signoff") {
+		issues = append(
+			issues,
+			fmt.Sprintf("%s contains missing security signoff placeholder text", label),
+		)
 	}
 	if strings.Contains(text, "TODO") || strings.Contains(text, "TBD") {
 		issues = append(issues, fmt.Sprintf("%s contains unresolved placeholder text", label))
 	}
-	if strings.Contains(text, "sha256:0000000000000000000000000000000000000000000000000000000000000000") {
+	if strings.Contains(
+		text,
+		"sha256:0000000000000000000000000000000000000000000000000000000000000000",
+	) {
 		issues = append(issues, fmt.Sprintf("%s contains placeholder artifact hash", label))
 	}
 	reviewedCommit := securityReviewLineValue(text, "Reviewed commit:")
 	if !gitHeadMatches(reviewedCommit, currentGitHead) {
-		issues = append(issues, fmt.Sprintf("%s reviewed commit is %q, want %q", label, reviewedCommit, currentGitHead))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s reviewed commit is %q, want %q", label, reviewedCommit, currentGitHead),
+		)
 	}
 	reviewReportDir := securityReviewLineValue(text, "Report directory:")
 	if strings.TrimSpace(reviewReportDir) == "" {
 		issues = append(issues, fmt.Sprintf("%s report directory is missing", label))
-	} else if strings.TrimSpace(reportDir) != "" && filepath.Clean(reviewReportDir) != filepath.Clean(reportDir) {
-		issues = append(issues, fmt.Sprintf("%s report directory is %q, want %q", label, reviewReportDir, reportDir))
+	} else if strings.TrimSpace(
+		reportDir,
+	) != "" && filepath.Clean(
+		reviewReportDir,
+	) != filepath.Clean(
+		reportDir,
+	) {
+		issues = append(
+			issues,
+			fmt.Sprintf("%s report directory is %q, want %q", label, reviewReportDir, reportDir),
+		)
 	}
-	for _, section := range []string{"## Evidence Commands", "## Artifact Hashes", "## Residual Risks"} {
+	for _, section := range []string{
+		"## Evidence Commands",
+		"## Artifact Hashes",
+		"## Residual Risks",
+	} {
 		if !strings.Contains(text, section) {
-			issues = append(issues, fmt.Sprintf("%s missing %s section", label, strings.TrimPrefix(section, "## ")))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s missing %s section", label, strings.TrimPrefix(section, "## ")),
+			)
 		}
 	}
 	issues = append(issues, validateSecurityReviewDetachedHash(raw, hashRaw, hashPath)...)
@@ -619,14 +767,33 @@ func validateSecurityReviewDetachedHash(raw []byte, hashRaw []byte, hashPath str
 	line := strings.TrimSpace(string(hashRaw))
 	fields := strings.Fields(line)
 	if len(fields) != 2 {
-		return []string{fmt.Sprintf("%s must contain '<sha256>  artifacts/security-review.md'", filepath.Base(hashPath))}
+		return []string{
+			fmt.Sprintf(
+				"%s must contain '<sha256>  artifacts/security-review.md'",
+				filepath.Base(hashPath),
+			),
+		}
 	}
 	if fields[1] != "artifacts/security-review.md" {
-		return []string{fmt.Sprintf("%s path is %q, want %q", filepath.Base(hashPath), fields[1], "artifacts/security-review.md")}
+		return []string{
+			fmt.Sprintf(
+				"%s path is %q, want %q",
+				filepath.Base(hashPath),
+				fields[1],
+				"artifacts/security-review.md",
+			),
+		}
 	}
 	expected := fmt.Sprintf("%x", sha256.Sum256(raw))
 	if fields[0] != expected {
-		return []string{fmt.Sprintf("%s hash mismatch: got %s, want %s", filepath.Base(hashPath), fields[0], expected)}
+		return []string{
+			fmt.Sprintf(
+				"%s hash mismatch: got %s, want %s",
+				filepath.Base(hashPath),
+				fields[0],
+				expected,
+			),
+		}
 	}
 	return nil
 }
@@ -680,36 +847,59 @@ type runtimeSmokeCaseReport struct {
 	Error        string `json:"error,omitempty"`
 }
 
-func validateRuntimeSmokeReport(raw []byte, path string, expectedTarget string, expectedVersion string, currentGitHead string) (runtimeSmokeReport, []string) {
+func validateRuntimeSmokeReport(
+	raw []byte,
+	path string,
+	expectedTarget string,
+	expectedVersion string,
+	currentGitHead string,
+) (runtimeSmokeReport, []string) {
 	var issues []string
 	var report runtimeSmokeReport
 	if err := json.Unmarshal(raw, &report); err != nil {
-		return runtimeSmokeReport{}, []string{fmt.Sprintf("%s is not valid JSON: %v", filepath.Base(path), err)}
+		return runtimeSmokeReport{}, []string{
+			fmt.Sprintf("%s is not valid JSON: %v", filepath.Base(path), err),
+		}
 	}
 	label := filepath.Base(path)
 	if _, err := time.Parse(time.RFC3339, report.Timestamp); err != nil {
 		issues = append(issues, fmt.Sprintf("%s timestamp is not RFC3339: %v", label, err))
 	}
 	if report.Target != expectedTarget {
-		issues = append(issues, fmt.Sprintf("%s target is %q, want %q", label, report.Target, expectedTarget))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s target is %q, want %q", label, report.Target, expectedTarget),
+		)
 	}
 	if report.Host != expectedTarget {
-		issues = append(issues, fmt.Sprintf("%s host is %q, want %q", label, report.Host, expectedTarget))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s host is %q, want %q", label, report.Host, expectedTarget),
+		)
 	}
 	if report.BuildOnly {
 		issues = append(issues, fmt.Sprintf("%s build_only is true, want false", label))
 	}
 	if report.Runner != "" {
-		issues = append(issues, fmt.Sprintf("%s runner is %q, want empty host-native runtime", label, report.Runner))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s runner is %q, want empty host-native runtime", label, report.Runner),
+		)
 	}
 	if report.Unsupported {
 		issues = append(issues, fmt.Sprintf("%s unsupported is true, want false", label))
 	}
 	if report.Version != expectedVersion {
-		issues = append(issues, fmt.Sprintf("%s version is %q, want %q", label, report.Version, expectedVersion))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s version is %q, want %q", label, report.Version, expectedVersion),
+		)
 	}
 	if !gitHeadMatches(report.GitHead, currentGitHead) {
-		issues = append(issues, fmt.Sprintf("%s git_head is %q, want %q", label, report.GitHead, currentGitHead))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s git_head is %q, want %q", label, report.GitHead, currentGitHead),
+		)
 	}
 	passed := 0
 	for _, c := range report.Cases {
@@ -720,7 +910,19 @@ func validateRuntimeSmokeReport(raw []byte, path string, expectedTarget string, 
 	total := len(report.Cases)
 	failed := total - passed
 	if report.Total != total || report.Passed != passed || report.Failed != failed {
-		issues = append(issues, fmt.Sprintf("%s counts mismatch: got total=%d passed=%d failed=%d, computed total=%d passed=%d failed=%d", label, report.Total, report.Passed, report.Failed, total, passed, failed))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s counts mismatch: got total=%d passed=%d failed=%d, computed total=%d passed=%d failed=%d",
+				label,
+				report.Total,
+				report.Passed,
+				report.Failed,
+				total,
+				passed,
+				failed,
+			),
+		)
 	}
 	byName := map[string]runtimeSmokeCaseReport{}
 	for _, c := range report.Cases {
@@ -752,7 +954,10 @@ func validateRuntimeSmokeReport(raw []byte, path string, expectedTarget string, 
 		if c.ActualExit == nil {
 			issues = append(issues, fmt.Sprintf("%s case %s missing actual_exit", label, name))
 		} else if *c.ActualExit != c.ExpectedExit {
-			issues = append(issues, fmt.Sprintf("%s case %s actual_exit is %d, want %d", label, name, *c.ActualExit, c.ExpectedExit))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s case %s actual_exit is %d, want %d", label, name, *c.ActualExit, c.ExpectedExit),
+			)
 		}
 		if strings.TrimSpace(c.Error) != "" {
 			issues = append(issues, fmt.Sprintf("%s case %s has error text", label, name))
@@ -850,27 +1055,101 @@ type validationCommand struct {
 var v1GeneratedEvidenceRules = []generatedEvidenceRule{
 	{Path: "docs/generated/manifest.json", VersionField: "compiler_version"},
 	{Path: "docs/generated/v1_0/manifest.json", VersionField: "compiler_version"},
-	{Path: "docs/generated/v1_0/binary-size-thresholds.json", Schema: "tetra.binary-size-thresholds.v1alpha1", VersionField: "compiler_version"},
-	{Path: "docs/generated/v1_0/reproducible-build.json", Schema: "tetra.reproducible-build-proof.v1alpha1", VersionField: "compiler_version"},
-	{Path: "docs/generated/v1_0/performance-regression.json", Schema: "tetra.performance-regression.v1", RequireGitHead: true},
+	{
+		Path:         "docs/generated/v1_0/binary-size-thresholds.json",
+		Schema:       "tetra.binary-size-thresholds.v1alpha1",
+		VersionField: "compiler_version",
+	},
+	{
+		Path:         "docs/generated/v1_0/reproducible-build.json",
+		Schema:       "tetra.reproducible-build-proof.v1alpha1",
+		VersionField: "compiler_version",
+	},
+	{
+		Path:           "docs/generated/v1_0/performance-regression.json",
+		Schema:         "tetra.performance-regression.v1",
+		RequireGitHead: true,
+	},
 	{Path: "docs/generated/v1_0/api-diff/api-diff.json", Schema: "tetra.api.diff.v1alpha1"},
-	{Path: "docs/generated/v1_0/release-state.json", Schema: releaseStateSchema, VersionField: "version"},
-	{Path: "docs/generated/v1_0/release_gate_summary.json", StartEndFields: true, ReleaseSummary: true},
+	{
+		Path:         "docs/generated/v1_0/release-state.json",
+		Schema:       releaseStateSchema,
+		VersionField: "version",
+	},
+	{
+		Path:           "docs/generated/v1_0/release_gate_summary.json",
+		StartEndFields: true,
+		ReleaseSummary: true,
+	},
 	{Path: "docs/generated/v1_0/test_all_full_summary.json", StartEndFields: true},
 	{Path: "docs/generated/v1_0/test-all/summary.json", StartEndFields: true},
-	{Path: "docs/generated/v1_0/host-smoke.json", VersionField: "version", RequireGitHead: true, TimestampFields: []string{"timestamp"}},
-	{Path: "docs/generated/v1_0/linux-smoke.json", VersionField: "version", RequireGitHead: true, TimestampFields: []string{"timestamp"}},
-	{Path: "docs/generated/v1_0/macos-smoke.json", VersionField: "version", RequireGitHead: true, TimestampFields: []string{"timestamp"}},
-	{Path: "docs/generated/v1_0/windows-smoke.json", VersionField: "version", RequireGitHead: true, TimestampFields: []string{"timestamp"}},
-	{Path: "docs/generated/v1_0/wasm32-wasi-artifact-smoke.json", VersionField: "version", RequireGitHead: true, TimestampFields: []string{"timestamp"}},
-	{Path: "docs/generated/v1_0/wasm32-web-artifact-smoke.json", VersionField: "version", RequireGitHead: true, TimestampFields: []string{"timestamp"}},
-	{Path: "docs/generated/v1_0/wasi-smoke.artifact.json", VersionField: "version", RequireGitHead: true, TimestampFields: []string{"timestamp"}},
-	{Path: "docs/generated/v1_0/wasi-smoke.json", VersionField: "version", RequireGitHead: true, TimestampFields: []string{"timestamp"}},
-	{Path: "docs/generated/v1_0/test-all/host-smoke.json", VersionField: "version", RequireGitHead: true, TimestampFields: []string{"timestamp"}},
-	{Path: "docs/generated/v1_0/web-ui-smoke.json", Schema: "tetra.web-ui-smoke.v1alpha1", TimestampFields: []string{"generated_at"}},
+	{
+		Path:            "docs/generated/v1_0/host-smoke.json",
+		VersionField:    "version",
+		RequireGitHead:  true,
+		TimestampFields: []string{"timestamp"},
+	},
+	{
+		Path:            "docs/generated/v1_0/linux-smoke.json",
+		VersionField:    "version",
+		RequireGitHead:  true,
+		TimestampFields: []string{"timestamp"},
+	},
+	{
+		Path:            "docs/generated/v1_0/macos-smoke.json",
+		VersionField:    "version",
+		RequireGitHead:  true,
+		TimestampFields: []string{"timestamp"},
+	},
+	{
+		Path:            "docs/generated/v1_0/windows-smoke.json",
+		VersionField:    "version",
+		RequireGitHead:  true,
+		TimestampFields: []string{"timestamp"},
+	},
+	{
+		Path:            "docs/generated/v1_0/wasm32-wasi-artifact-smoke.json",
+		VersionField:    "version",
+		RequireGitHead:  true,
+		TimestampFields: []string{"timestamp"},
+	},
+	{
+		Path:            "docs/generated/v1_0/wasm32-web-artifact-smoke.json",
+		VersionField:    "version",
+		RequireGitHead:  true,
+		TimestampFields: []string{"timestamp"},
+	},
+	{
+		Path:            "docs/generated/v1_0/wasi-smoke.artifact.json",
+		VersionField:    "version",
+		RequireGitHead:  true,
+		TimestampFields: []string{"timestamp"},
+	},
+	{
+		Path:            "docs/generated/v1_0/wasi-smoke.json",
+		VersionField:    "version",
+		RequireGitHead:  true,
+		TimestampFields: []string{"timestamp"},
+	},
+	{
+		Path:            "docs/generated/v1_0/test-all/host-smoke.json",
+		VersionField:    "version",
+		RequireGitHead:  true,
+		TimestampFields: []string{"timestamp"},
+	},
+	{
+		Path:            "docs/generated/v1_0/web-ui-smoke.json",
+		Schema:          "tetra.web-ui-smoke.v1alpha1",
+		TimestampFields: []string{"generated_at"},
+	},
 }
 
-func checkV1EvidenceMetadata(readFile func(string) ([]byte, error), expectedVersion string, currentGitHead string, reportDir string) freshnessCheck {
+func checkV1EvidenceMetadata(
+	readFile func(string) ([]byte, error),
+	expectedVersion string,
+	currentGitHead string,
+	reportDir string,
+) freshnessCheck {
 	name := "docs/generated/v1_0 metadata"
 	rules := v1GeneratedEvidenceRules
 	if strings.TrimSpace(reportDir) != "" {
@@ -910,9 +1189,15 @@ func checkV1EvidenceMetadata(readFile func(string) ([]byte, error), expectedVers
 			if err != nil {
 				issues = append(issues, err.Error())
 			} else if !ok {
-				issues = append(issues, fmt.Sprintf("%s %s is missing, want %q", rule.Path, rule.VersionField, expectedVersion))
+				issues = append(
+					issues,
+					fmt.Sprintf("%s %s is missing, want %q", rule.Path, rule.VersionField, expectedVersion),
+				)
 			} else if value != expectedVersion {
-				issues = append(issues, fmt.Sprintf("%s %s is %q, want %q", rule.Path, rule.VersionField, value, expectedVersion))
+				issues = append(
+					issues,
+					fmt.Sprintf("%s %s is %q, want %q", rule.Path, rule.VersionField, value, expectedVersion),
+				)
 			}
 		}
 		if rule.RequireGitHead {
@@ -920,9 +1205,15 @@ func checkV1EvidenceMetadata(readFile func(string) ([]byte, error), expectedVers
 			if err != nil {
 				issues = append(issues, err.Error())
 			} else if !ok {
-				issues = append(issues, fmt.Sprintf("%s git_head is missing, want %q", rule.Path, currentGitHead))
+				issues = append(
+					issues,
+					fmt.Sprintf("%s git_head is missing, want %q", rule.Path, currentGitHead),
+				)
 			} else if !gitHeadMatches(value, currentGitHead) {
-				issues = append(issues, fmt.Sprintf("%s git_head is %q, want %q", rule.Path, value, currentGitHead))
+				issues = append(
+					issues,
+					fmt.Sprintf("%s git_head is %q, want %q", rule.Path, value, currentGitHead),
+				)
 			}
 		}
 		for _, field := range rule.TimestampFields {
@@ -936,7 +1227,9 @@ func checkV1EvidenceMetadata(readFile func(string) ([]byte, error), expectedVers
 			}
 		}
 		if rule.ReleaseSummary {
-			issues = append(issues, validateReleaseSummaryMetadata(obj, rule.Path, expectedVersion)...)
+			issues = append(
+				issues,
+				validateReleaseSummaryMetadata(obj, rule.Path, expectedVersion)...)
 		}
 	}
 	if len(issues) > 0 {
@@ -954,26 +1247,91 @@ func v1ReportDirEvidenceRules(reportDir string) []generatedEvidenceRule {
 	}
 	return []generatedEvidenceRule{
 		{Path: join("artifacts", "manifest.json"), VersionField: "compiler_version"},
-		{Path: join("artifacts", "binary-size-thresholds.json"), Schema: "tetra.binary-size-thresholds.v1alpha1", VersionField: "compiler_version"},
-		{Path: join("artifacts", "reproducible-build.json"), Schema: "tetra.reproducible-build-proof.v1alpha1", VersionField: "compiler_version"},
-		{Path: join("artifacts", "performance-regression.json"), Schema: "tetra.performance-regression.v1", RequireGitHead: true},
+		{
+			Path:         join("artifacts", "binary-size-thresholds.json"),
+			Schema:       "tetra.binary-size-thresholds.v1alpha1",
+			VersionField: "compiler_version",
+		},
+		{
+			Path:         join("artifacts", "reproducible-build.json"),
+			Schema:       "tetra.reproducible-build-proof.v1alpha1",
+			VersionField: "compiler_version",
+		},
+		{
+			Path:           join("artifacts", "performance-regression.json"),
+			Schema:         "tetra.performance-regression.v1",
+			RequireGitHead: true,
+		},
 		{Path: join("artifacts", "api-diff", "api-diff.json"), Schema: "tetra.api.diff.v1alpha1"},
 		{Path: join("summary.json"), StartEndFields: true, ReleaseSummary: true},
 		{Path: join("artifacts", "test-all", "summary.json"), StartEndFields: true},
-		{Path: join("artifacts", "host-smoke.json"), VersionField: "version", RequireGitHead: true, TimestampFields: []string{"timestamp"}},
-		{Path: join("artifacts", "linux-smoke.json"), VersionField: "version", RequireGitHead: true, TimestampFields: []string{"timestamp"}},
-		{Path: join("artifacts", "macos-smoke.json"), VersionField: "version", RequireGitHead: true, TimestampFields: []string{"timestamp"}},
-		{Path: join("artifacts", "windows-smoke.json"), VersionField: "version", RequireGitHead: true, TimestampFields: []string{"timestamp"}},
-		{Path: join("artifacts", "wasm32-wasi-artifact-smoke.json"), VersionField: "version", RequireGitHead: true, TimestampFields: []string{"timestamp"}},
-		{Path: join("artifacts", "wasm32-web-artifact-smoke.json"), VersionField: "version", RequireGitHead: true, TimestampFields: []string{"timestamp"}},
-		{Path: join("artifacts", "wasi-smoke.artifact.json"), VersionField: "version", RequireGitHead: true, TimestampFields: []string{"timestamp"}},
-		{Path: join("artifacts", "wasi-smoke.json"), VersionField: "version", RequireGitHead: true, TimestampFields: []string{"timestamp"}},
-		{Path: join("artifacts", "test-all", "host-smoke.json"), VersionField: "version", RequireGitHead: true, TimestampFields: []string{"timestamp"}},
-		{Path: join("artifacts", "web-ui-smoke.json"), Schema: "tetra.web-ui-smoke.v1alpha1", TimestampFields: []string{"generated_at"}},
+		{
+			Path:            join("artifacts", "host-smoke.json"),
+			VersionField:    "version",
+			RequireGitHead:  true,
+			TimestampFields: []string{"timestamp"},
+		},
+		{
+			Path:            join("artifacts", "linux-smoke.json"),
+			VersionField:    "version",
+			RequireGitHead:  true,
+			TimestampFields: []string{"timestamp"},
+		},
+		{
+			Path:            join("artifacts", "macos-smoke.json"),
+			VersionField:    "version",
+			RequireGitHead:  true,
+			TimestampFields: []string{"timestamp"},
+		},
+		{
+			Path:            join("artifacts", "windows-smoke.json"),
+			VersionField:    "version",
+			RequireGitHead:  true,
+			TimestampFields: []string{"timestamp"},
+		},
+		{
+			Path:            join("artifacts", "wasm32-wasi-artifact-smoke.json"),
+			VersionField:    "version",
+			RequireGitHead:  true,
+			TimestampFields: []string{"timestamp"},
+		},
+		{
+			Path:            join("artifacts", "wasm32-web-artifact-smoke.json"),
+			VersionField:    "version",
+			RequireGitHead:  true,
+			TimestampFields: []string{"timestamp"},
+		},
+		{
+			Path:            join("artifacts", "wasi-smoke.artifact.json"),
+			VersionField:    "version",
+			RequireGitHead:  true,
+			TimestampFields: []string{"timestamp"},
+		},
+		{
+			Path:            join("artifacts", "wasi-smoke.json"),
+			VersionField:    "version",
+			RequireGitHead:  true,
+			TimestampFields: []string{"timestamp"},
+		},
+		{
+			Path:            join("artifacts", "test-all", "host-smoke.json"),
+			VersionField:    "version",
+			RequireGitHead:  true,
+			TimestampFields: []string{"timestamp"},
+		},
+		{
+			Path:            join("artifacts", "web-ui-smoke.json"),
+			Schema:          "tetra.web-ui-smoke.v1alpha1",
+			TimestampFields: []string{"generated_at"},
+		},
 	}
 }
 
-func validateReleaseSummaryMetadata(obj map[string]json.RawMessage, path string, expectedVersion string) []string {
+func validateReleaseSummaryMetadata(
+	obj map[string]json.RawMessage,
+	path string,
+	expectedVersion string,
+) []string {
 	var issues []string
 	expectedArtifact := expectedReleaseArtifact(expectedVersion)
 	expectedGateCommand := expectedReleaseGateCommand(expectedVersion)
@@ -989,9 +1347,15 @@ func validateReleaseSummaryMetadata(obj map[string]json.RawMessage, path string,
 		if err != nil {
 			issues = append(issues, err.Error())
 		} else if !ok {
-			issues = append(issues, fmt.Sprintf("%s %s is missing, want %q", path, expected.field, expected.value))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s %s is missing, want %q", path, expected.field, expected.value),
+			)
 		} else if value != expected.value {
-			issues = append(issues, fmt.Sprintf("%s %s is %q, want %q", path, expected.field, value, expected.value))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s %s is %q, want %q", path, expected.field, value, expected.value),
+			)
 		}
 	}
 	return issues
@@ -1064,7 +1428,11 @@ func validateRFC3339JSONField(obj map[string]json.RawMessage, path string, field
 	return nil
 }
 
-func jsonStringField(obj map[string]json.RawMessage, path string, field string) (string, bool, error) {
+func jsonStringField(
+	obj map[string]json.RawMessage,
+	path string,
+	field string,
+) (string, bool, error) {
 	raw, ok := obj[field]
 	if !ok {
 		return "", false, nil
@@ -1086,7 +1454,8 @@ func gitHeadMatches(artifactHead string, currentHead string) bool {
 		return true
 	}
 	if len(artifactHead) >= 7 && len(currentHead) >= 7 {
-		return strings.HasPrefix(artifactHead, currentHead) || strings.HasPrefix(currentHead, artifactHead)
+		return strings.HasPrefix(artifactHead, currentHead) ||
+			strings.HasPrefix(currentHead, artifactHead)
 	}
 	return false
 }
@@ -1094,7 +1463,11 @@ func gitHeadMatches(artifactHead string, currentHead string) bool {
 func checkGeneratedManifestFreshness(repoRoot string) freshnessCheck {
 	tmp, err := os.CreateTemp("", "tetra-manifest-*.json")
 	if err != nil {
-		return freshnessCheck{Name: "docs/generated/manifest.json", Status: "fail", Detail: err.Error()}
+		return freshnessCheck{
+			Name:   "docs/generated/manifest.json",
+			Status: "fail",
+			Detail: err.Error(),
+		}
 	}
 	tmpPath := tmp.Name()
 	_ = tmp.Close()
@@ -1102,18 +1475,34 @@ func checkGeneratedManifestFreshness(repoRoot string) freshnessCheck {
 	cmd := exec.Command("go", "run", "./tools/cmd/gen-manifest", "-o", tmpPath)
 	cmd.Dir = repoRoot
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return freshnessCheck{Name: "docs/generated/manifest.json", Status: "fail", Detail: strings.TrimSpace(string(out)) + err.Error()}
+		return freshnessCheck{
+			Name:   "docs/generated/manifest.json",
+			Status: "fail",
+			Detail: strings.TrimSpace(string(out)) + err.Error(),
+		}
 	}
 	current, err := os.ReadFile(filepath.Join(repoRoot, "docs/generated/manifest.json"))
 	if err != nil {
-		return freshnessCheck{Name: "docs/generated/manifest.json", Status: "fail", Detail: err.Error()}
+		return freshnessCheck{
+			Name:   "docs/generated/manifest.json",
+			Status: "fail",
+			Detail: err.Error(),
+		}
 	}
 	generated, err := os.ReadFile(tmpPath)
 	if err != nil {
-		return freshnessCheck{Name: "docs/generated/manifest.json", Status: "fail", Detail: err.Error()}
+		return freshnessCheck{
+			Name:   "docs/generated/manifest.json",
+			Status: "fail",
+			Detail: err.Error(),
+		}
 	}
 	if !bytes.Equal(bytes.TrimSpace(current), bytes.TrimSpace(generated)) {
-		return freshnessCheck{Name: "docs/generated/manifest.json", Status: "fail", Detail: "manifest differs from generator output"}
+		return freshnessCheck{
+			Name:   "docs/generated/manifest.json",
+			Status: "fail",
+			Detail: "manifest differs from generator output",
+		}
 	}
 	return freshnessCheck{Name: "docs/generated/manifest.json", Status: "pass"}
 }
@@ -1121,9 +1510,17 @@ func checkGeneratedManifestFreshness(repoRoot string) freshnessCheck {
 func checkArtifactHashManifest(repoRoot string, reportDir string) freshnessCheck {
 	manifestPath := "docs/generated/v1_0/artifact-hashes.json"
 	if strings.TrimSpace(reportDir) != "" {
-		manifestPath = filepath.ToSlash(filepath.Join(reportDir, "artifacts", "artifact-hashes.json"))
+		manifestPath = filepath.ToSlash(
+			filepath.Join(reportDir, "artifacts", "artifact-hashes.json"),
+		)
 	}
-	cmd := exec.Command("go", "run", "./tools/cmd/validate-artifact-hashes", "--manifest", manifestPath)
+	cmd := exec.Command(
+		"go",
+		"run",
+		"./tools/cmd/validate-artifact-hashes",
+		"--manifest",
+		manifestPath,
+	)
 	cmd.Dir = repoRoot
 	if out, err := cmd.CombinedOutput(); err != nil {
 		detail := strings.TrimSpace(string(out))
@@ -1145,21 +1542,127 @@ func checkSmokeEvidenceFreshness(repoRoot string, reportDir string) freshnessChe
 		name = "v1 report-dir smoke evidence"
 	}
 	return checkValidationCommands(repoRoot, name, []validationCommand{
-		{Name: "go", Args: []string{"run", "./tools/cmd/validate-smoke-list", "--report", filepath.ToSlash(filepath.Join(prefix, "smoke-list.json")), "--examples-root", "examples"}},
-		{Name: "go", Args: []string{"run", "./tools/cmd/validate-smoke-list", "--report", filepath.ToSlash(filepath.Join(prefix, "test-all", "smoke-list.json")), "--examples-root", "examples"}},
-		{Name: "go", Args: []string{"run", "./tools/cmd/smoke-report-to-checklist", "--validate-only", "--report", filepath.ToSlash(filepath.Join(prefix, "host-smoke.json"))}},
-		{Name: "go", Args: []string{"run", "./tools/cmd/smoke-report-to-checklist", "--validate-only", "--report", filepath.ToSlash(filepath.Join(prefix, "linux-smoke.json"))}},
-		{Name: "go", Args: []string{"run", "./tools/cmd/smoke-report-to-checklist", "--validate-only", "--report", filepath.ToSlash(filepath.Join(prefix, "macos-smoke.json"))}},
-		{Name: "go", Args: []string{"run", "./tools/cmd/smoke-report-to-checklist", "--validate-only", "--report", filepath.ToSlash(filepath.Join(prefix, "windows-smoke.json"))}},
-		{Name: "go", Args: []string{"run", "./tools/cmd/smoke-report-to-checklist", "--validate-only", "--report", filepath.ToSlash(filepath.Join(prefix, "wasm32-wasi-artifact-smoke.json"))}},
-		{Name: "go", Args: []string{"run", "./tools/cmd/smoke-report-to-checklist", "--validate-only", "--report", filepath.ToSlash(filepath.Join(prefix, "wasm32-web-artifact-smoke.json"))}},
-		{Name: "go", Args: []string{"run", "./tools/cmd/smoke-report-to-checklist", "--validate-only", "--report", filepath.ToSlash(filepath.Join(prefix, "wasi-smoke.artifact.json"))}},
-		{Name: "go", Args: []string{"run", "./tools/cmd/smoke-report-to-checklist", "--validate-only", "--report", filepath.ToSlash(filepath.Join(prefix, "wasi-smoke.json"))}},
-		{Name: "go", Args: []string{"run", "./tools/cmd/smoke-report-to-checklist", "--validate-only", "--report", filepath.ToSlash(filepath.Join(prefix, "test-all", "host-smoke.json"))}},
+		{
+			Name: "go",
+			Args: []string{
+				"run",
+				"./tools/cmd/validate-smoke-list",
+				"--report",
+				filepath.ToSlash(filepath.Join(prefix, "smoke-list.json")),
+				"--examples-root",
+				"examples",
+			},
+		},
+		{
+			Name: "go",
+			Args: []string{
+				"run",
+				"./tools/cmd/validate-smoke-list",
+				"--report",
+				filepath.ToSlash(filepath.Join(prefix, "test-all", "smoke-list.json")),
+				"--examples-root",
+				"examples",
+			},
+		},
+		{
+			Name: "go",
+			Args: []string{
+				"run",
+				"./tools/cmd/smoke-report-to-checklist",
+				"--validate-only",
+				"--report",
+				filepath.ToSlash(filepath.Join(prefix, "host-smoke.json")),
+			},
+		},
+		{
+			Name: "go",
+			Args: []string{
+				"run",
+				"./tools/cmd/smoke-report-to-checklist",
+				"--validate-only",
+				"--report",
+				filepath.ToSlash(filepath.Join(prefix, "linux-smoke.json")),
+			},
+		},
+		{
+			Name: "go",
+			Args: []string{
+				"run",
+				"./tools/cmd/smoke-report-to-checklist",
+				"--validate-only",
+				"--report",
+				filepath.ToSlash(filepath.Join(prefix, "macos-smoke.json")),
+			},
+		},
+		{
+			Name: "go",
+			Args: []string{
+				"run",
+				"./tools/cmd/smoke-report-to-checklist",
+				"--validate-only",
+				"--report",
+				filepath.ToSlash(filepath.Join(prefix, "windows-smoke.json")),
+			},
+		},
+		{
+			Name: "go",
+			Args: []string{
+				"run",
+				"./tools/cmd/smoke-report-to-checklist",
+				"--validate-only",
+				"--report",
+				filepath.ToSlash(filepath.Join(prefix, "wasm32-wasi-artifact-smoke.json")),
+			},
+		},
+		{
+			Name: "go",
+			Args: []string{
+				"run",
+				"./tools/cmd/smoke-report-to-checklist",
+				"--validate-only",
+				"--report",
+				filepath.ToSlash(filepath.Join(prefix, "wasm32-web-artifact-smoke.json")),
+			},
+		},
+		{
+			Name: "go",
+			Args: []string{
+				"run",
+				"./tools/cmd/smoke-report-to-checklist",
+				"--validate-only",
+				"--report",
+				filepath.ToSlash(filepath.Join(prefix, "wasi-smoke.artifact.json")),
+			},
+		},
+		{
+			Name: "go",
+			Args: []string{
+				"run",
+				"./tools/cmd/smoke-report-to-checklist",
+				"--validate-only",
+				"--report",
+				filepath.ToSlash(filepath.Join(prefix, "wasi-smoke.json")),
+			},
+		},
+		{
+			Name: "go",
+			Args: []string{
+				"run",
+				"./tools/cmd/smoke-report-to-checklist",
+				"--validate-only",
+				"--report",
+				filepath.ToSlash(filepath.Join(prefix, "test-all", "host-smoke.json")),
+			},
+		},
 	}, commandOutput)
 }
 
-func checkValidationCommands(repoRoot string, name string, commands []validationCommand, run func(string, string, ...string) (string, error)) freshnessCheck {
+func checkValidationCommands(
+	repoRoot string,
+	name string,
+	commands []validationCommand,
+	run func(string, string, ...string) (string, error),
+) freshnessCheck {
 	check := freshnessCheck{Name: name, Status: "pass"}
 	if run == nil {
 		check.Status = "fail"
@@ -1176,7 +1679,13 @@ func checkValidationCommands(repoRoot string, name string, commands []validation
 			} else {
 				detail += ": " + err.Error()
 			}
-			issues = append(issues, strings.Join(append([]string{validation.Name}, validation.Args...), " ")+": "+detail)
+			issues = append(
+				issues,
+				strings.Join(
+					append([]string{validation.Name}, validation.Args...),
+					" ",
+				)+": "+detail,
+			)
 		}
 	}
 	if len(issues) > 0 {
@@ -1206,12 +1715,21 @@ func formatTextReport(report releaseStateReport) string {
 	fmt.Fprintf(&b, "untracked release artifacts: %d\n", len(report.Git.UntrackedReleaseArtifacts))
 	fmt.Fprintf(&b, "required artifacts: %d\n", len(report.GeneratedArtifacts.Required))
 	fmt.Fprintf(&b, "missing artifacts: %d\n", len(report.GeneratedArtifacts.Missing))
-	fmt.Fprintf(&b, "last gate evidence: %s (%d failed of %d steps, %s)\n", valueOrUnknown(report.LastGateEvidence.Status), report.LastGateEvidence.FailedCount, report.LastGateEvidence.StepCount, valueOrUnknown(report.LastGateEvidence.SummaryPath))
+	fmt.Fprintf(
+		&b,
+		"last gate evidence: %s (%d failed of %d steps, %s)\n",
+		valueOrUnknown(report.LastGateEvidence.Status),
+		report.LastGateEvidence.FailedCount,
+		report.LastGateEvidence.StepCount,
+		valueOrUnknown(report.LastGateEvidence.SummaryPath),
+	)
 	if report.LastGateEvidence.ReleaseVersion != "" {
 		fmt.Fprintf(&b, "last gate release_version: %s\n", report.LastGateEvidence.ReleaseVersion)
 	}
 	if isPromotedReleaseVersion(report.ExpectedVersion) {
-		fmt.Fprintf(&b, "last gate identity: %s (release_version=%s, release_artifact=%s, release_gate_command=%s)\n",
+		fmt.Fprintf(
+			&b,
+			"last gate identity: %s (release_version=%s, release_artifact=%s, release_gate_command=%s)\n",
 			lastGateIdentityStatus(report),
 			valueOrUnknown(report.LastGateEvidence.ReleaseVersion),
 			valueOrUnknown(report.LastGateEvidence.ReleaseArtifact),
@@ -1220,7 +1738,13 @@ func formatTextReport(report releaseStateReport) string {
 	}
 	if len(report.RuntimeExecution.Required) > 0 || len(report.RuntimeExecution.Missing) > 0 {
 		passed, failed := runtimeExecutionEvidenceCounts(report.RuntimeExecution)
-		fmt.Fprintf(&b, "runtime execution evidence: %d/%d pass, %d missing", passed, len(report.RuntimeExecution.Required), len(report.RuntimeExecution.Missing))
+		fmt.Fprintf(
+			&b,
+			"runtime execution evidence: %d/%d pass, %d missing",
+			passed,
+			len(report.RuntimeExecution.Required),
+			len(report.RuntimeExecution.Missing),
+		)
 		if failed > 0 {
 			fmt.Fprintf(&b, ", %d fail", failed)
 		}
@@ -1233,9 +1757,18 @@ func formatTextReport(report releaseStateReport) string {
 		}
 	}
 	if report.SecurityReview.Status != "" {
-		fmt.Fprintf(&b, "security review evidence: %s (%s)\n", report.SecurityReview.Status, valueOrUnknown(report.SecurityReview.Path))
+		fmt.Fprintf(
+			&b,
+			"security review evidence: %s (%s)\n",
+			report.SecurityReview.Status,
+			valueOrUnknown(report.SecurityReview.Path),
+		)
 		if report.SecurityReview.ValidatorCommand != "" {
-			fmt.Fprintf(&b, "security review validator: %s\n", report.SecurityReview.ValidatorCommand)
+			fmt.Fprintf(
+				&b,
+				"security review validator: %s\n",
+				report.SecurityReview.ValidatorCommand,
+			)
 		}
 	}
 	for _, fresh := range report.Freshness {
@@ -1254,7 +1787,9 @@ func formatTextReport(report releaseStateReport) string {
 	return b.String()
 }
 
-func runtimeExecutionEvidenceCounts(report runtimeExecutionEvidenceReport) (passed int, failed int) {
+func runtimeExecutionEvidenceCounts(
+	report runtimeExecutionEvidenceReport,
+) (passed int, failed int) {
 	for _, check := range report.Required {
 		switch check.Status {
 		case "pass":
@@ -1291,8 +1826,12 @@ func runtimeExecutionEvidenceCommands(report runtimeExecutionEvidenceReport) str
 
 func lastGateIdentityStatus(report releaseStateReport) string {
 	if report.LastGateEvidence.ReleaseVersion == report.ExpectedVersion &&
-		report.LastGateEvidence.ReleaseArtifact == expectedReleaseArtifact(report.ExpectedVersion) &&
-		report.LastGateEvidence.ReleaseGateCommand == expectedReleaseGateCommand(report.ExpectedVersion) {
+		report.LastGateEvidence.ReleaseArtifact == expectedReleaseArtifact(
+			report.ExpectedVersion,
+		) &&
+		report.LastGateEvidence.ReleaseGateCommand == expectedReleaseGateCommand(
+			report.ExpectedVersion,
+		) {
 		return "pass"
 	}
 	return "fail"

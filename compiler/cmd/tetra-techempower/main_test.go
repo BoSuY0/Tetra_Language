@@ -23,7 +23,10 @@ func TestConfigFromEnvDefaults(t *testing.T) {
 	if cfg.Workers != runtime.GOMAXPROCS(0) {
 		t.Fatalf("workers default = %d, want GOMAXPROCS", cfg.Workers)
 	}
-	if cfg.PostgresHost != "tfb-database" || cfg.PostgresPort != 5432 || cfg.PostgresUser != "benchmarkdbuser" || cfg.PostgresDatabase != "hello_world" || cfg.PostgresPassword != "" {
+	if cfg.PostgresHost != "tfb-database" || cfg.PostgresPort != 5432 ||
+		cfg.PostgresUser != "benchmarkdbuser" ||
+		cfg.PostgresDatabase != "hello_world" ||
+		cfg.PostgresPassword != "" {
 		t.Fatalf("postgres defaults = %#v", cfg)
 	}
 	if cfg.PostgresPoolSize != 256 || cfg.PostgresDialTimeout != 2*time.Second {
@@ -54,10 +57,15 @@ func TestConfigFromEnvOverrides(t *testing.T) {
 	if err != nil {
 		t.Fatalf("configFromEnv overrides: %v", err)
 	}
-	if cfg.ListenAddress != [4]byte{127, 0, 0, 1} || cfg.ListenPort != 9090 || cfg.Backlog != 128 || cfg.Workers != 3 || cfg.ServerName != "Tetra-Test" {
+	if cfg.ListenAddress != [4]byte{127, 0, 0, 1} || cfg.ListenPort != 9090 || cfg.Backlog != 128 ||
+		cfg.Workers != 3 ||
+		cfg.ServerName != "Tetra-Test" {
 		t.Fatalf("listen overrides = %#v", cfg)
 	}
-	if cfg.PostgresHost != "127.0.0.1" || cfg.PostgresPort != 15432 || cfg.PostgresUser != "custom" || cfg.PostgresDatabase != "bench" || cfg.PostgresPassword != "secret" {
+	if cfg.PostgresHost != "127.0.0.1" || cfg.PostgresPort != 15432 ||
+		cfg.PostgresUser != "custom" ||
+		cfg.PostgresDatabase != "bench" ||
+		cfg.PostgresPassword != "secret" {
 		t.Fatalf("postgres overrides = %#v", cfg)
 	}
 	if cfg.PostgresPoolSize != 4 || cfg.PostgresDialTimeout != 1500*time.Millisecond {

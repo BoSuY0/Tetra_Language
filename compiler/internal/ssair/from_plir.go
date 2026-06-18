@@ -107,7 +107,17 @@ func FromPLIRFunction(fn plir.Function) (Function, error) {
 			if result != "" {
 				addValue(result, outputType(op, known), "plir_output")
 			}
-			entry.Instrs = append(entry.Instrs, Instr{ID: op.ID, Kind: OpOpaque, Result: result, Type: known[result], Args: valueIDs(op.Inputs), Note: op.Note})
+			entry.Instrs = append(
+				entry.Instrs,
+				Instr{
+					ID:     op.ID,
+					Kind:   OpOpaque,
+					Result: result,
+					Type:   known[result],
+					Args:   valueIDs(op.Inputs),
+					Note:   op.Note,
+				},
+			)
 		}
 	}
 	if entry.Term.Kind == TermInvalid {

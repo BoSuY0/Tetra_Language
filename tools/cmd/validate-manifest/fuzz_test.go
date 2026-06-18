@@ -21,8 +21,12 @@ func FuzzValidateManifestDoesNotPanic(f *testing.F) {
 func TestManifestNegativePropertySuite(t *testing.T) {
 	tests := map[string][]byte{
 		"missing compiler": []byte(`{"targets":[],"builtins":[],"runtime_abi":{}}`),
-		"targets null":     []byte(`{"compiler_version":"v0.1.0","targets":null,"builtins":[],"runtime_abi":{}}`),
-		"builtins null":    []byte(`{"compiler_version":"v0.1.0","targets":[],"builtins":null,"runtime_abi":{}}`),
+		"targets null": []byte(
+			`{"compiler_version":"v0.1.0","targets":null,"builtins":[],"runtime_abi":{}}`,
+		),
+		"builtins null": []byte(
+			`{"compiler_version":"v0.1.0","targets":[],"builtins":null,"runtime_abi":{}}`,
+		),
 	}
 	for name, raw := range tests {
 		t.Run(name, func(t *testing.T) {

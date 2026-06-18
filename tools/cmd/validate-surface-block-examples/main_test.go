@@ -6,7 +6,7 @@ import (
 )
 
 func validBlockBeautySource(extra string) string {
-	return `module examples.surface_block_command_palette
+	return `module examples.surface.block_apps.surface_block_command_palette
 
 import lib.core.surface as surface
 import lib.core.block as block
@@ -34,35 +34,58 @@ func scene_checksum() -> Int:
 }
 
 func TestValidateExampleSourceRejectsCoreWidgetButtonUsage(t *testing.T) {
-	err := validateExampleSource("examples/surface_block_command_palette.tetra", validBlockBeautySource(`
+	err := validateExampleSource(
+		"examples/surface/block_apps/surface_block_command_palette.tetra",
+		validBlockBeautySource(`
 import lib.core.widgets as widgets
 
 func forbidden() -> Int:
     return widgets.action_save()
-`))
+`),
+	)
 	if err == nil || !strings.Contains(err.Error(), "forbidden") {
 		t.Fatalf("validateExampleSource widget usage err = %v, want forbidden marker error", err)
 	}
 }
 
 func TestValidateExampleSourceRejectsMissingAccessibilityRoles(t *testing.T) {
-	source := strings.ReplaceAll(validBlockBeautySource(""), "block.accessibility_button(12)", "block.accessibility_none()")
-	err := validateExampleSource("examples/surface_block_command_palette.tetra", source)
+	source := strings.ReplaceAll(
+		validBlockBeautySource(""),
+		"block.accessibility_button(12)",
+		"block.accessibility_none()",
+	)
+	err := validateExampleSource(
+		"examples/surface/block_apps/surface_block_command_palette.tetra",
+		source,
+	)
 	if err == nil || !strings.Contains(err.Error(), "accessibility") {
-		t.Fatalf("validateExampleSource missing accessibility err = %v, want accessibility error", err)
+		t.Fatalf(
+			"validateExampleSource missing accessibility err = %v, want accessibility error",
+			err,
+		)
 	}
 }
 
 func TestValidateExampleSourceRejectsMissingHoverFocusPressedEvidence(t *testing.T) {
-	source := strings.ReplaceAll(validBlockBeautySource(""), "    let pressed: block.StateSelector = block.state_selector_pressed()\n", "")
-	err := validateExampleSource("examples/surface_block_command_palette.tetra", source)
+	source := strings.ReplaceAll(
+		validBlockBeautySource(""),
+		"    let pressed: block.StateSelector = block.state_selector_pressed()\n",
+		"",
+	)
+	err := validateExampleSource(
+		"examples/surface/block_apps/surface_block_command_palette.tetra",
+		source,
+	)
 	if err == nil || !strings.Contains(err.Error(), "state") {
 		t.Fatalf("validateExampleSource missing state err = %v, want state evidence error", err)
 	}
 }
 
 func TestValidateExampleSourceAcceptsBlockOnlyBeautyEvidence(t *testing.T) {
-	if err := validateExampleSource("examples/surface_block_command_palette.tetra", validBlockBeautySource("")); err != nil {
+	if err := validateExampleSource(
+		"examples/surface/block_apps/surface_block_command_palette.tetra",
+		validBlockBeautySource(""),
+	); err != nil {
 		t.Fatalf("validateExampleSource valid Block-only beauty source: %v", err)
 	}
 }

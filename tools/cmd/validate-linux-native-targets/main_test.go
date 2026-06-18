@@ -14,17 +14,42 @@ import (
 
 func TestValidateLinuxNativeTargetsAcceptsStrictFamilyEvidence(t *testing.T) {
 	dir := t.TempDir()
-	targetsPath := writeTestFile(t, dir, "targets.json", targetsReportWithHostProbeRunSupported(t, "linux-x86", "linux-x32"))
+	targetsPath := writeTestFile(
+		t,
+		dir,
+		"targets.json",
+		targetsReportWithHostProbeRunSupported(t, "linux-x86", "linux-x32"),
+	)
 	abiX64 := writeTestFile(t, dir, "linux-x64-abi.json", targetABIReport("linux-x64"))
-	atomicX64 := writeTestFile(t, dir, "linux-x64-atomic-stress.json", targetAtomicReport("linux-x64"))
+	atomicX64 := writeTestFile(
+		t,
+		dir,
+		"linux-x64-atomic-stress.json",
+		targetAtomicReport("linux-x64"),
+	)
 	fuzzX64 := writeTestFile(t, dir, "linux-x64-fuzz.json", targetFuzzReport("linux-x64"))
 	abiX86 := writeTestFile(t, dir, "linux-x86-abi.json", targetABIReport("linux-x86"))
-	atomicX86 := writeTestFile(t, dir, "linux-x86-atomic-stress.json", targetAtomicReport("linux-x86"))
+	atomicX86 := writeTestFile(
+		t,
+		dir,
+		"linux-x86-atomic-stress.json",
+		targetAtomicReport("linux-x86"),
+	)
 	fuzzX86 := writeTestFile(t, dir, "linux-x86-fuzz.json", targetFuzzReport("linux-x86"))
 	abiX32 := writeTestFile(t, dir, "linux-x32-abi.json", targetABIReport("linux-x32"))
-	atomicX32 := writeTestFile(t, dir, "linux-x32-atomic-stress.json", targetAtomicReport("linux-x32"))
+	atomicX32 := writeTestFile(
+		t,
+		dir,
+		"linux-x32-atomic-stress.json",
+		targetAtomicReport("linux-x32"),
+	)
 	fuzzX32 := writeTestFile(t, dir, "linux-x32-fuzz.json", targetFuzzReport("linux-x32"))
-	brutal := writeTestFile(t, dir, "linux-native-targets-brutal.json", suiteReport(requiredBrutalNames()...))
+	brutal := writeTestFile(
+		t,
+		dir,
+		"linux-native-targets-brutal.json",
+		suiteReport(requiredBrutalNames()...),
+	)
 	runnerX64 := writeTestFile(t, dir, "linux-x64-runner.json", runnerReport("linux-x64", "runner"))
 	runnerX86 := writeTestFile(t, dir, "linux-x86-runner.json", runnerReport("linux-x86", "runner"))
 	runnerX32 := writeTestFile(t, dir, "linux-x32-runner.json", runnerReport("linux-x32", "runner"))
@@ -88,13 +113,31 @@ func TestValidateLinuxNativeTargetsRequiresArtifactHashManifest(t *testing.T) {
 	err := validateLinuxNativeTargets(validateOptions{
 		TargetsReport: targetsPath,
 		TargetReports: []targetReportInput{{
-			Triple:       "linux-x64",
-			ABIReport:    writeTestFile(t, dir, "linux-x64-abi.json", targetABIReport("linux-x64")),
-			AtomicReport: writeTestFile(t, dir, "linux-x64-atomic-stress.json", targetAtomicReport("linux-x64")),
-			FuzzReport:   writeTestFile(t, dir, "linux-x64-fuzz.json", targetFuzzReport("linux-x64")),
+			Triple:    "linux-x64",
+			ABIReport: writeTestFile(t, dir, "linux-x64-abi.json", targetABIReport("linux-x64")),
+			AtomicReport: writeTestFile(
+				t,
+				dir,
+				"linux-x64-atomic-stress.json",
+				targetAtomicReport("linux-x64"),
+			),
+			FuzzReport: writeTestFile(
+				t,
+				dir,
+				"linux-x64-fuzz.json",
+				targetFuzzReport("linux-x64"),
+			),
 		}},
 		RunnerReports: []targetRunnerInput{
-			{Triple: "linux-x64", Report: writeTestFile(t, dir, "linux-x64-runner.json", runnerReport("linux-x64", "runner"))},
+			{
+				Triple: "linux-x64",
+				Report: writeTestFile(
+					t,
+					dir,
+					"linux-x64-runner.json",
+					runnerReport("linux-x64", "runner"),
+				),
+			},
 		},
 	})
 	if err == nil {
@@ -109,13 +152,28 @@ func TestValidateLinuxNativeTargetsRequiresBrutalReportForFullFamilyEvidence(t *
 	dir := t.TempDir()
 	targetsPath := writeTestFile(t, dir, "targets.json", validTargetsReport())
 	abiX64 := writeTestFile(t, dir, "linux-x64-abi.json", targetABIReport("linux-x64"))
-	atomicX64 := writeTestFile(t, dir, "linux-x64-atomic-stress.json", targetAtomicReport("linux-x64"))
+	atomicX64 := writeTestFile(
+		t,
+		dir,
+		"linux-x64-atomic-stress.json",
+		targetAtomicReport("linux-x64"),
+	)
 	fuzzX64 := writeTestFile(t, dir, "linux-x64-fuzz.json", targetFuzzReport("linux-x64"))
 	abiX86 := writeTestFile(t, dir, "linux-x86-abi.json", targetABIReport("linux-x86"))
-	atomicX86 := writeTestFile(t, dir, "linux-x86-atomic-stress.json", targetAtomicReport("linux-x86"))
+	atomicX86 := writeTestFile(
+		t,
+		dir,
+		"linux-x86-atomic-stress.json",
+		targetAtomicReport("linux-x86"),
+	)
 	fuzzX86 := writeTestFile(t, dir, "linux-x86-fuzz.json", targetFuzzReport("linux-x86"))
 	abiX32 := writeTestFile(t, dir, "linux-x32-abi.json", targetABIReport("linux-x32"))
-	atomicX32 := writeTestFile(t, dir, "linux-x32-atomic-stress.json", targetAtomicReport("linux-x32"))
+	atomicX32 := writeTestFile(
+		t,
+		dir,
+		"linux-x32-atomic-stress.json",
+		targetAtomicReport("linux-x32"),
+	)
 	fuzzX32 := writeTestFile(t, dir, "linux-x32-fuzz.json", targetFuzzReport("linux-x32"))
 	runnerX64 := writeTestFile(t, dir, "linux-x64-runner.json", runnerReport("linux-x64", "runner"))
 	runnerX86 := writeTestFile(t, dir, "linux-x86-runner.json", runnerReport("linux-x86", "runner"))
@@ -139,7 +197,10 @@ func TestValidateLinuxNativeTargetsRequiresBrutalReportForFullFamilyEvidence(t *
 	if err == nil {
 		t.Fatalf("expected missing brutal report to fail for full-family evidence")
 	}
-	if !strings.Contains(err.Error(), "linux native brutal report is required for full-family evidence") {
+	if !strings.Contains(
+		err.Error(),
+		"linux native brutal report is required for full-family evidence",
+	) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -148,9 +209,19 @@ func TestValidateLinuxNativeTargetsRejectsRunnerReportForWrongTarget(t *testing.
 	dir := t.TempDir()
 	targetsPath := writeTestFile(t, dir, "targets.json", validTargetsReport())
 	abiPath := writeTestFile(t, dir, "linux-x86-abi.json", targetABIReport("linux-x86"))
-	atomicPath := writeTestFile(t, dir, "linux-x86-atomic-stress.json", targetAtomicReport("linux-x86"))
+	atomicPath := writeTestFile(
+		t,
+		dir,
+		"linux-x86-atomic-stress.json",
+		targetAtomicReport("linux-x86"),
+	)
 	fuzzPath := writeTestFile(t, dir, "linux-x86-fuzz.json", targetFuzzReport("linux-x86"))
-	runnerPath := writeTestFile(t, dir, "linux-x86-runner.json", suiteReportForTarget("linux-x64", "runner"))
+	runnerPath := writeTestFile(
+		t,
+		dir,
+		"linux-x86-runner.json",
+		suiteReportForTarget("linux-x64", "runner"),
+	)
 	hashes := writeArtifactHashManifest(t, dir)
 
 	err := validateLinuxNativeTargets(validateOptions{
@@ -167,7 +238,10 @@ func TestValidateLinuxNativeTargetsRejectsRunnerReportForWrongTarget(t *testing.
 	if err == nil {
 		t.Fatalf("expected wrong-target runner report to fail")
 	}
-	if !strings.Contains(err.Error(), `linux-x86 runner report target = "linux-x64", want linux-x86`) {
+	if !strings.Contains(
+		err.Error(),
+		`linux-x86 runner report target = "linux-x64", want linux-x86`,
+	) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -175,10 +249,35 @@ func TestValidateLinuxNativeTargetsRejectsRunnerReportForWrongTarget(t *testing.
 func TestValidateLinuxNativeTargetsRejectsSuiteReportForWrongTarget(t *testing.T) {
 	dir := t.TempDir()
 	targetsPath := writeTestFile(t, dir, "targets.json", validTargetsReport())
-	abiPath := writeTestFile(t, dir, "linux-x86-abi.json", suiteReportForTarget("linux-x64", requiredABINames("linux-x86")...))
-	atomicPath := writeTestFile(t, dir, "linux-x86-atomic-stress.json", suiteReportForTarget("linux-x86", "x86 atomic object matrix", "x86 pointer atomic object width", "x86 atomic concurrency stress oracle"))
-	fuzzPath := writeTestFile(t, dir, "linux-x86-fuzz.json", suiteReportForTarget("linux-x86", "x86 layout fuzz", "x86 object signature fuzz"))
-	runnerPath := writeTestFile(t, dir, "linux-x86-runner.json", runnerReport("linux-x86", "runner"))
+	abiPath := writeTestFile(
+		t,
+		dir,
+		"linux-x86-abi.json",
+		suiteReportForTarget("linux-x64", requiredABINames("linux-x86")...),
+	)
+	atomicPath := writeTestFile(
+		t,
+		dir,
+		"linux-x86-atomic-stress.json",
+		suiteReportForTarget(
+			"linux-x86",
+			"x86 atomic object matrix",
+			"x86 pointer atomic object width",
+			"x86 atomic concurrency stress oracle",
+		),
+	)
+	fuzzPath := writeTestFile(
+		t,
+		dir,
+		"linux-x86-fuzz.json",
+		suiteReportForTarget("linux-x86", "x86 layout fuzz", "x86 object signature fuzz"),
+	)
+	runnerPath := writeTestFile(
+		t,
+		dir,
+		"linux-x86-runner.json",
+		runnerReport("linux-x86", "runner"),
+	)
 	hashes := writeArtifactHashManifest(t, dir)
 
 	err := validateLinuxNativeTargets(validateOptions{
@@ -204,11 +303,25 @@ func TestValidateLinuxNativeTargetsRejectsStaleArtifactHashManifest(t *testing.T
 	dir := t.TempDir()
 	targetsPath := writeTestFile(t, dir, "targets.json", validTargetsReport())
 	abiPath := writeTestFile(t, dir, "linux-x64-abi.json", targetABIReport("linux-x64"))
-	atomicPath := writeTestFile(t, dir, "linux-x64-atomic-stress.json", targetAtomicReport("linux-x64"))
+	atomicPath := writeTestFile(
+		t,
+		dir,
+		"linux-x64-atomic-stress.json",
+		targetAtomicReport("linux-x64"),
+	)
 	fuzzPath := writeTestFile(t, dir, "linux-x64-fuzz.json", targetFuzzReport("linux-x64"))
-	runnerPath := writeTestFile(t, dir, "linux-x64-runner.json", runnerReport("linux-x64", "runner"))
+	runnerPath := writeTestFile(
+		t,
+		dir,
+		"linux-x64-runner.json",
+		runnerReport("linux-x64", "runner"),
+	)
 	hashes := writeArtifactHashManifest(t, dir)
-	if err := os.WriteFile(abiPath, []byte(suiteReportForTarget("linux-x64", "x64 target model")), 0o644); err != nil {
+	if err := os.WriteFile(
+		abiPath,
+		[]byte(suiteReportForTarget("linux-x64", "x64 target model")),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -231,13 +344,25 @@ func TestValidateLinuxNativeTargetsRejectsStaleArtifactHashManifest(t *testing.T
 	}
 }
 
-func TestValidateLinuxNativeTargetsRejectsArtifactHashManifestThatDoesNotCoverEvidenceFiles(t *testing.T) {
+func TestValidateLinuxNativeTargetsRejectsArtifactHashManifestThatDoesNotCoverEvidenceFiles(
+	t *testing.T,
+) {
 	dir := t.TempDir()
 	targetsPath := writeTestFile(t, dir, "targets.json", validTargetsReport())
 	abiPath := writeTestFile(t, dir, "linux-x64-abi.json", targetABIReport("linux-x64"))
-	atomicPath := writeTestFile(t, dir, "linux-x64-atomic-stress.json", targetAtomicReport("linux-x64"))
+	atomicPath := writeTestFile(
+		t,
+		dir,
+		"linux-x64-atomic-stress.json",
+		targetAtomicReport("linux-x64"),
+	)
 	fuzzPath := writeTestFile(t, dir, "linux-x64-fuzz.json", targetFuzzReport("linux-x64"))
-	runnerPath := writeTestFile(t, dir, "linux-x64-runner.json", runnerReport("linux-x64", "runner"))
+	runnerPath := writeTestFile(
+		t,
+		dir,
+		"linux-x64-runner.json",
+		runnerReport("linux-x64", "runner"),
+	)
 
 	hashDir := filepath.Join(dir, "hashes")
 	if err := os.Mkdir(hashDir, 0o755); err != nil {
@@ -260,7 +385,10 @@ func TestValidateLinuxNativeTargetsRejectsArtifactHashManifestThatDoesNotCoverEv
 	if err == nil {
 		t.Fatalf("expected artifact hash manifest that does not cover evidence files to fail")
 	}
-	if !strings.Contains(err.Error(), "artifact hash manifest does not cover required evidence file") {
+	if !strings.Contains(
+		err.Error(),
+		"artifact hash manifest does not cover required evidence file",
+	) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -302,13 +430,27 @@ func TestValidateLinuxNativeTargetsRejectsABIReportMissingCurrentSuiteResults(t 
 			FuzzReport:   writeTestFile(t, dir, "x86-fuzz.json", targetFuzzReport("linux-x86")),
 		}},
 		RunnerReports: []targetRunnerInput{
-			{Triple: "linux-x86", Report: writeTestFile(t, dir, "linux-x86-runner.json", runnerDiagnostic("cannot run tests for target linux-x86: host does not support Linux i386 execution; no host fallback is allowed"))},
+			{
+				Triple: "linux-x86",
+				Report: writeTestFile(
+					t,
+					dir,
+					"linux-x86-runner.json",
+					runnerDiagnostic(
+						("cannot run tests for target linux-x86: host does not support " +
+							"Linux i386 execution; no host fallback is allowed"),
+					),
+				),
+			},
 		},
 	})
 	if err == nil {
 		t.Fatalf("expected legacy-subset x86 ABI report to fail")
 	}
-	if !strings.Contains(err.Error(), `linux-x86 ABI report missing required result "x86 i386 SysV classifier"`) {
+	if !strings.Contains(
+		err.Error(),
+		`linux-x86 ABI report missing required result "x86 i386 SysV classifier"`,
+	) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -318,10 +460,25 @@ func TestValidateLinuxNativeTargetsRejectsX64BuildOnlyBoundaryDiagnostics(t *tes
 	targetsPath := writeTestFile(t, dir, "targets.json", validTargetsReport())
 	x64Names := append([]string{}, requiredABINames("linux-x64")...)
 	x64Names = append(x64Names, "x64 target runtime boundary diagnostics")
-	abiPath := writeTestFile(t, dir, "linux-x64-abi.json", suiteReportForTarget("linux-x64", x64Names...))
-	atomicPath := writeTestFile(t, dir, "linux-x64-atomic-stress.json", targetAtomicReport("linux-x64"))
+	abiPath := writeTestFile(
+		t,
+		dir,
+		"linux-x64-abi.json",
+		suiteReportForTarget("linux-x64", x64Names...),
+	)
+	atomicPath := writeTestFile(
+		t,
+		dir,
+		"linux-x64-atomic-stress.json",
+		targetAtomicReport("linux-x64"),
+	)
 	fuzzPath := writeTestFile(t, dir, "linux-x64-fuzz.json", targetFuzzReport("linux-x64"))
-	runnerPath := writeTestFile(t, dir, "linux-x64-runner.json", runnerReport("linux-x64", "runner"))
+	runnerPath := writeTestFile(
+		t,
+		dir,
+		"linux-x64-runner.json",
+		runnerReport("linux-x64", "runner"),
+	)
 	hashes := writeArtifactHashManifest(t, dir)
 
 	err := validateLinuxNativeTargets(validateOptions{
@@ -338,16 +495,26 @@ func TestValidateLinuxNativeTargetsRejectsX64BuildOnlyBoundaryDiagnostics(t *tes
 	if err == nil {
 		t.Fatalf("expected x64 ABI report with build-only boundary diagnostics to fail")
 	}
-	if !strings.Contains(err.Error(), `linux-x64 ABI report contains build-only boundary result "x64 target runtime boundary diagnostics"`) {
+	if !strings.Contains(
+		err.Error(),
+		`linux-x64 ABI report contains build-only boundary result "x64 target runtime boundary diagnostics"`,
+	) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-func TestValidateLinuxNativeTargetsRejectsBrutalReportMissingPerTargetRequiredResults(t *testing.T) {
+func TestValidateLinuxNativeTargetsRejectsBrutalReportMissingPerTargetRequiredResults(
+	t *testing.T,
+) {
 	dir := t.TempDir()
 	targetsPath := writeTestFile(t, dir, "targets.json", validTargetsReport())
 	abiX86 := writeTestFile(t, dir, "linux-x86-abi.json", targetABIReport("linux-x86"))
-	atomicX86 := writeTestFile(t, dir, "linux-x86-atomic-stress.json", targetAtomicReport("linux-x86"))
+	atomicX86 := writeTestFile(
+		t,
+		dir,
+		"linux-x86-atomic-stress.json",
+		targetAtomicReport("linux-x86"),
+	)
 	fuzzX86 := writeTestFile(t, dir, "linux-x86-fuzz.json", targetFuzzReport("linux-x86"))
 	brutal := writeTestFile(t, dir, "linux-native-targets-brutal.json", suiteReport(
 		"x86 target model",
@@ -398,27 +565,63 @@ func TestValidateLinuxNativeTargetsRejectsBrutalReportMissingPerTargetRequiredRe
 			{Triple: "linux-x86", ABIReport: abiX86, AtomicReport: atomicX86, FuzzReport: fuzzX86},
 		},
 		RunnerReports: []targetRunnerInput{
-			{Triple: "linux-x86", Report: writeTestFile(t, dir, "linux-x86-runner.json", runnerDiagnostic("cannot run tests for target linux-x86: host does not support Linux i386 execution; no host fallback is allowed"))},
+			{
+				Triple: "linux-x86",
+				Report: writeTestFile(
+					t,
+					dir,
+					"linux-x86-runner.json",
+					runnerDiagnostic(
+						("cannot run tests for target linux-x86: host does not support " +
+							"Linux i386 execution; no host fallback is allowed"),
+					),
+				),
+			},
 		},
 	})
 	if err == nil {
 		t.Fatalf("expected incomplete brutal report to fail")
 	}
-	if !strings.Contains(err.Error(), `linux native brutal report missing required result "x86 i386 SysV classifier"`) {
+	if !strings.Contains(
+		err.Error(),
+		`linux native brutal report missing required result "x86 i386 SysV classifier"`,
+	) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
 func TestValidateLinuxNativeTargetsRejectsX32CollapsedToX64(t *testing.T) {
 	dir := t.TempDir()
-	targets := strings.Replace(validTargetsReport(), `"abi":"x32-sysv","data_model":"x32"`, `"abi":"sysv","data_model":"lp64"`, 1)
-	targets = strings.Replace(targets, `"pointer_width_bits":32,"register_width_bits":64,"native_int_width_bits":32`, `"pointer_width_bits":64,"register_width_bits":64,"native_int_width_bits":64`, 1)
+	targets := strings.Replace(
+		validTargetsReport(),
+		`"abi":"x32-sysv","data_model":"x32"`,
+		`"abi":"sysv","data_model":"lp64"`,
+		1,
+	)
+	targets = strings.Replace(
+		targets,
+		`"pointer_width_bits":32,"register_width_bits":64,"native_int_width_bits":32`,
+		`"pointer_width_bits":64,"register_width_bits":64,"native_int_width_bits":64`,
+		1,
+	)
 	targetsPath := writeTestFile(t, dir, "targets.json", targets)
-	report := writeTestFile(t, dir, "x32-abi.json", suiteReportForTarget("linux-x32", "x32 target model", "x32 object ABI smoke", "x32 executable matrix smoke"))
+	report := writeTestFile(
+		t,
+		dir,
+		"x32-abi.json",
+		suiteReportForTarget(
+			"linux-x32",
+			"x32 target model",
+			"x32 object ABI smoke",
+			"x32 executable matrix smoke",
+		),
+	)
 
 	err := validateLinuxNativeTargets(validateOptions{
 		TargetsReport: targetsPath,
-		TargetReports: []targetReportInput{{Triple: "linux-x32", ABIReport: report, AtomicReport: report, FuzzReport: report}},
+		TargetReports: []targetReportInput{
+			{Triple: "linux-x32", ABIReport: report, AtomicReport: report, FuzzReport: report},
+		},
 	})
 	if err == nil {
 		t.Fatalf("expected x32 collapse to fail")
@@ -430,32 +633,72 @@ func TestValidateLinuxNativeTargetsRejectsX32CollapsedToX64(t *testing.T) {
 
 func TestValidateLinuxNativeTargetsRejectsX32PlainX64SyscallPack(t *testing.T) {
 	dir := t.TempDir()
-	targets := strings.Replace(validTargetsReport(), `"syscall_numbering":"x32_syscall_bit"`, `"syscall_numbering":"x86_64"`, 1)
+	targets := strings.Replace(
+		validTargetsReport(),
+		`"syscall_numbering":"x32_syscall_bit"`,
+		`"syscall_numbering":"x86_64"`,
+		1,
+	)
 	targetsPath := writeTestFile(t, dir, "targets.json", targets)
-	report := writeTestFile(t, dir, "x32-abi.json", suiteReportForTarget("linux-x32", "x32 target model", "x32 object ABI smoke", "x32 executable matrix smoke"))
+	report := writeTestFile(
+		t,
+		dir,
+		"x32-abi.json",
+		suiteReportForTarget(
+			"linux-x32",
+			"x32 target model",
+			"x32 object ABI smoke",
+			"x32 executable matrix smoke",
+		),
+	)
 
 	err := validateLinuxNativeTargets(validateOptions{
 		TargetsReport: targetsPath,
-		TargetReports: []targetReportInput{{Triple: "linux-x32", ABIReport: report, AtomicReport: report, FuzzReport: report}},
+		TargetReports: []targetReportInput{
+			{Triple: "linux-x32", ABIReport: report, AtomicReport: report, FuzzReport: report},
+		},
 	})
 	if err == nil {
 		t.Fatalf("expected x32 plain x64 syscall pack to fail")
 	}
-	if !strings.Contains(err.Error(), "linux-x32") || !strings.Contains(err.Error(), "x32_syscall_bit") {
+	if !strings.Contains(err.Error(), "linux-x32") ||
+		!strings.Contains(err.Error(), "x32_syscall_bit") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
 func TestValidateLinuxNativeTargetsRejectsPrematureX86Promotion(t *testing.T) {
 	dir := t.TempDir()
-	targets := strings.Replace(validTargetsReport(), `"triple":"linux-x86","status":"build_only"`, `"triple":"linux-x86","status":"supported"`, 1)
-	targets = strings.Replace(targets, `"build_only":true,"run_mode":"host_probed"`, `"build_only":false,"run_mode":"host_native"`, 1)
+	targets := strings.Replace(
+		validTargetsReport(),
+		`"triple":"linux-x86","status":"build_only"`,
+		`"triple":"linux-x86","status":"supported"`,
+		1,
+	)
+	targets = strings.Replace(
+		targets,
+		`"build_only":true,"run_mode":"host_probed"`,
+		`"build_only":false,"run_mode":"host_native"`,
+		1,
+	)
 	targetsPath := writeTestFile(t, dir, "targets.json", targets)
-	report := writeTestFile(t, dir, "x86-abi.json", suiteReportForTarget("linux-x86", "x86 target model", "x86 object ABI smoke", "x86 executable matrix smoke"))
+	report := writeTestFile(
+		t,
+		dir,
+		"x86-abi.json",
+		suiteReportForTarget(
+			"linux-x86",
+			"x86 target model",
+			"x86 object ABI smoke",
+			"x86 executable matrix smoke",
+		),
+	)
 
 	err := validateLinuxNativeTargets(validateOptions{
 		TargetsReport: targetsPath,
-		TargetReports: []targetReportInput{{Triple: "linux-x86", ABIReport: report, AtomicReport: report, FuzzReport: report}},
+		TargetReports: []targetReportInput{
+			{Triple: "linux-x86", ABIReport: report, AtomicReport: report, FuzzReport: report},
+		},
 	})
 	if err == nil {
 		t.Fatalf("expected premature x86 promotion to fail")
@@ -480,7 +723,9 @@ func TestValidateLinuxNativeTargetsRejectsPaperEvidence(t *testing.T) {
 
 	err := validateLinuxNativeTargets(validateOptions{
 		TargetsReport: targetsPath,
-		TargetReports: []targetReportInput{{Triple: "linux-x64", ABIReport: report, AtomicReport: report, FuzzReport: report}},
+		TargetReports: []targetReportInput{
+			{Triple: "linux-x64", ABIReport: report, AtomicReport: report, FuzzReport: report},
+		},
 	})
 	if err == nil {
 		t.Fatalf("expected paper evidence to fail")
@@ -490,17 +735,34 @@ func TestValidateLinuxNativeTargetsRejectsPaperEvidence(t *testing.T) {
 	}
 }
 
-func TestValidateLinuxNativeTargetsRejectsBrutalReportWithX64BuildOnlyBoundaryDiagnostics(t *testing.T) {
+func TestValidateLinuxNativeTargetsRejectsBrutalReportWithX64BuildOnlyBoundaryDiagnostics(
+	t *testing.T,
+) {
 	dir := t.TempDir()
 	targetsPath := writeTestFile(t, dir, "targets.json", validTargetsReport())
 	abiX64 := writeTestFile(t, dir, "linux-x64-abi.json", targetABIReport("linux-x64"))
-	atomicX64 := writeTestFile(t, dir, "linux-x64-atomic-stress.json", targetAtomicReport("linux-x64"))
+	atomicX64 := writeTestFile(
+		t,
+		dir,
+		"linux-x64-atomic-stress.json",
+		targetAtomicReport("linux-x64"),
+	)
 	fuzzX64 := writeTestFile(t, dir, "linux-x64-fuzz.json", targetFuzzReport("linux-x64"))
 	abiX86 := writeTestFile(t, dir, "linux-x86-abi.json", targetABIReport("linux-x86"))
-	atomicX86 := writeTestFile(t, dir, "linux-x86-atomic-stress.json", targetAtomicReport("linux-x86"))
+	atomicX86 := writeTestFile(
+		t,
+		dir,
+		"linux-x86-atomic-stress.json",
+		targetAtomicReport("linux-x86"),
+	)
 	fuzzX86 := writeTestFile(t, dir, "linux-x86-fuzz.json", targetFuzzReport("linux-x86"))
 	abiX32 := writeTestFile(t, dir, "linux-x32-abi.json", targetABIReport("linux-x32"))
-	atomicX32 := writeTestFile(t, dir, "linux-x32-atomic-stress.json", targetAtomicReport("linux-x32"))
+	atomicX32 := writeTestFile(
+		t,
+		dir,
+		"linux-x32-atomic-stress.json",
+		targetAtomicReport("linux-x32"),
+	)
 	fuzzX32 := writeTestFile(t, dir, "linux-x32-fuzz.json", targetFuzzReport("linux-x32"))
 	brutalNames := append([]string{}, requiredBrutalNames()...)
 	brutalNames = append(brutalNames, "x64 target runtime boundary diagnostics")
@@ -528,7 +790,10 @@ func TestValidateLinuxNativeTargetsRejectsBrutalReportWithX64BuildOnlyBoundaryDi
 	if err == nil {
 		t.Fatalf("expected brutal report with x64 build-only boundary diagnostics to fail")
 	}
-	if !strings.Contains(err.Error(), `linux native brutal report contains build-only boundary result "x64 target runtime boundary diagnostics"`) {
+	if !strings.Contains(
+		err.Error(),
+		`linux native brutal report contains build-only boundary result "x64 target runtime boundary diagnostics"`,
+	) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -557,7 +822,12 @@ func TestValidateLinuxNativeTargetsRequiresRunnerEvidenceForTargetReport(t *test
 func TestValidateLinuxNativeTargetsRejectsRunnerReportWithoutRunnerSmoke(t *testing.T) {
 	dir := t.TempDir()
 	targetsPath := writeTestFile(t, dir, "targets.json", validTargetsReport())
-	report := writeTestFile(t, dir, "x64-runner.json", runnerReport("linux-x64", "not the runner smoke"))
+	report := writeTestFile(
+		t,
+		dir,
+		"x64-runner.json",
+		runnerReport("linux-x64", "not the runner smoke"),
+	)
 
 	err := validateLinuxNativeTargets(validateOptions{
 		TargetsReport: targetsPath,
@@ -581,9 +851,19 @@ func TestValidateLinuxNativeTargetsRejectsRunnerReportMissingRuntimeSmokeResults
 	dir := t.TempDir()
 	targetsPath := writeTestFile(t, dir, "targets.json", validTargetsReport())
 	abiPath := writeTestFile(t, dir, "linux-x86-abi.json", targetABIReport("linux-x86"))
-	atomicPath := writeTestFile(t, dir, "linux-x86-atomic-stress.json", targetAtomicReport("linux-x86"))
+	atomicPath := writeTestFile(
+		t,
+		dir,
+		"linux-x86-atomic-stress.json",
+		targetAtomicReport("linux-x86"),
+	)
 	fuzzPath := writeTestFile(t, dir, "linux-x86-fuzz.json", targetFuzzReport("linux-x86"))
-	runnerPath := writeTestFile(t, dir, "linux-x86-runner.json", suiteReportForTarget("linux-x86", "runner"))
+	runnerPath := writeTestFile(
+		t,
+		dir,
+		"linux-x86-runner.json",
+		suiteReportForTarget("linux-x86", "runner"),
+	)
 	hashes := writeArtifactHashManifest(t, dir)
 
 	err := validateLinuxNativeTargets(validateOptions{
@@ -607,12 +887,27 @@ func TestValidateLinuxNativeTargetsRejectsRunnerReportMissingRuntimeSmokeResults
 
 func TestValidateLinuxNativeTargetsRejectsRunnerReportMissingTimeSmoke(t *testing.T) {
 	dir := t.TempDir()
-	targetsPath := writeTestFile(t, dir, "targets.json", targetsReportWithHostProbeRunSupported(t, "linux-x86"))
+	targetsPath := writeTestFile(
+		t,
+		dir,
+		"targets.json",
+		targetsReportWithHostProbeRunSupported(t, "linux-x86"),
+	)
 	names := withoutString(requiredRunnerNames("linux-x86"), "runner time")
 	abiPath := writeTestFile(t, dir, "linux-x86-abi.json", targetABIReport("linux-x86"))
-	atomicPath := writeTestFile(t, dir, "linux-x86-atomic-stress.json", targetAtomicReport("linux-x86"))
+	atomicPath := writeTestFile(
+		t,
+		dir,
+		"linux-x86-atomic-stress.json",
+		targetAtomicReport("linux-x86"),
+	)
 	fuzzPath := writeTestFile(t, dir, "linux-x86-fuzz.json", targetFuzzReport("linux-x86"))
-	runnerPath := writeTestFile(t, dir, "linux-x86-runner.json", suiteReportForTarget("linux-x86", names...))
+	runnerPath := writeTestFile(
+		t,
+		dir,
+		"linux-x86-runner.json",
+		suiteReportForTarget("linux-x86", names...),
+	)
 	hashes := writeArtifactHashManifest(t, dir)
 
 	err := validateLinuxNativeTargets(validateOptions{
@@ -636,12 +931,27 @@ func TestValidateLinuxNativeTargetsRejectsRunnerReportMissingTimeSmoke(t *testin
 
 func TestValidateLinuxNativeTargetsRejectsRunnerReportMissingNetworkSocketSmoke(t *testing.T) {
 	dir := t.TempDir()
-	targetsPath := writeTestFile(t, dir, "targets.json", targetsReportWithHostProbeRunSupported(t, "linux-x32"))
+	targetsPath := writeTestFile(
+		t,
+		dir,
+		"targets.json",
+		targetsReportWithHostProbeRunSupported(t, "linux-x32"),
+	)
 	names := withoutString(requiredRunnerNames("linux-x32"), "runner network socket")
 	abiPath := writeTestFile(t, dir, "linux-x32-abi.json", targetABIReport("linux-x32"))
-	atomicPath := writeTestFile(t, dir, "linux-x32-atomic-stress.json", targetAtomicReport("linux-x32"))
+	atomicPath := writeTestFile(
+		t,
+		dir,
+		"linux-x32-atomic-stress.json",
+		targetAtomicReport("linux-x32"),
+	)
 	fuzzPath := writeTestFile(t, dir, "linux-x32-fuzz.json", targetFuzzReport("linux-x32"))
-	runnerPath := writeTestFile(t, dir, "linux-x32-runner.json", suiteReportForTarget("linux-x32", names...))
+	runnerPath := writeTestFile(
+		t,
+		dir,
+		"linux-x32-runner.json",
+		suiteReportForTarget("linux-x32", names...),
+	)
 	hashes := writeArtifactHashManifest(t, dir)
 
 	err := validateLinuxNativeTargets(validateOptions{
@@ -665,12 +975,27 @@ func TestValidateLinuxNativeTargetsRejectsRunnerReportMissingNetworkSocketSmoke(
 
 func TestValidateLinuxNativeTargetsRejectsRunnerReportMissingNetworkOptionsSmoke(t *testing.T) {
 	dir := t.TempDir()
-	targetsPath := writeTestFile(t, dir, "targets.json", targetsReportWithHostProbeRunSupported(t, "linux-x86"))
+	targetsPath := writeTestFile(
+		t,
+		dir,
+		"targets.json",
+		targetsReportWithHostProbeRunSupported(t, "linux-x86"),
+	)
 	names := withoutString(requiredRunnerNames("linux-x86"), "runner network options")
 	abiPath := writeTestFile(t, dir, "linux-x86-abi.json", targetABIReport("linux-x86"))
-	atomicPath := writeTestFile(t, dir, "linux-x86-atomic-stress.json", targetAtomicReport("linux-x86"))
+	atomicPath := writeTestFile(
+		t,
+		dir,
+		"linux-x86-atomic-stress.json",
+		targetAtomicReport("linux-x86"),
+	)
 	fuzzPath := writeTestFile(t, dir, "linux-x86-fuzz.json", targetFuzzReport("linux-x86"))
-	runnerPath := writeTestFile(t, dir, "linux-x86-runner.json", suiteReportForTarget("linux-x86", names...))
+	runnerPath := writeTestFile(
+		t,
+		dir,
+		"linux-x86-runner.json",
+		suiteReportForTarget("linux-x86", names...),
+	)
 	hashes := writeArtifactHashManifest(t, dir)
 
 	err := validateLinuxNativeTargets(validateOptions{
@@ -695,7 +1020,15 @@ func TestValidateLinuxNativeTargetsRejectsRunnerReportMissingNetworkOptionsSmoke
 func TestValidateLinuxNativeTargetsAcceptsBuildOnlyNoHostFallbackRunnerDiagnostic(t *testing.T) {
 	dir := t.TempDir()
 	targetsPath := writeTestFile(t, dir, "targets.json", validTargetsReport())
-	diagPath := writeTestFile(t, dir, "x32-runner-blocked.json", runnerDiagnostic("cannot run tests for target linux-x32: host does not support Linux x32 ABI execution; no host fallback is allowed"))
+	diagPath := writeTestFile(
+		t,
+		dir,
+		"x32-runner-blocked.json",
+		runnerDiagnostic(
+			("cannot run tests for target linux-x32: host does not support " +
+				"Linux x32 ABI execution; no host fallback is allowed"),
+		),
+	)
 	abiPath := writeTestFile(t, dir, "x32-abi.json", targetABIReport("linux-x32"))
 	atomicPath := writeTestFile(t, dir, "x32-atomic.json", targetAtomicReport("linux-x32"))
 	fuzzPath := writeTestFile(t, dir, "x32-fuzz.json", targetFuzzReport("linux-x32"))
@@ -717,10 +1050,25 @@ func TestValidateLinuxNativeTargetsAcceptsBuildOnlyNoHostFallbackRunnerDiagnosti
 	}
 }
 
-func TestValidateLinuxNativeTargetsRejectsNoHostRunnerDiagnosticWhenMetadataRunSupported(t *testing.T) {
+func TestValidateLinuxNativeTargetsRejectsNoHostRunnerDiagnosticWhenMetadataRunSupported(
+	t *testing.T,
+) {
 	dir := t.TempDir()
-	targetsPath := writeTestFile(t, dir, "targets.json", targetsReportWithHostProbeRunSupported(t, "linux-x32"))
-	diagPath := writeTestFile(t, dir, "x32-runner-blocked.json", runnerDiagnostic("cannot run tests for target linux-x32: host does not support Linux x32 ABI execution; no host fallback is allowed"))
+	targetsPath := writeTestFile(
+		t,
+		dir,
+		"targets.json",
+		targetsReportWithHostProbeRunSupported(t, "linux-x32"),
+	)
+	diagPath := writeTestFile(
+		t,
+		dir,
+		"x32-runner-blocked.json",
+		runnerDiagnostic(
+			("cannot run tests for target linux-x32: host does not support " +
+				"Linux x32 ABI execution; no host fallback is allowed"),
+		),
+	)
 	abiPath := writeTestFile(t, dir, "x32-abi.json", targetABIReport("linux-x32"))
 	atomicPath := writeTestFile(t, dir, "x32-atomic.json", targetAtomicReport("linux-x32"))
 	fuzzPath := writeTestFile(t, dir, "x32-fuzz.json", targetFuzzReport("linux-x32"))
@@ -740,12 +1088,15 @@ func TestValidateLinuxNativeTargetsRejectsNoHostRunnerDiagnosticWhenMetadataRunS
 	if err == nil {
 		t.Fatalf("expected no-host runner diagnostic to fail when metadata says run_supported=true")
 	}
-	if !strings.Contains(err.Error(), "run_supported=true") || !strings.Contains(err.Error(), "no-host") {
+	if !strings.Contains(err.Error(), "run_supported=true") ||
+		!strings.Contains(err.Error(), "no-host") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-func TestValidateLinuxNativeTargetsRejectsPassingRunnerReportWhenMetadataRunUnsupported(t *testing.T) {
+func TestValidateLinuxNativeTargetsRejectsPassingRunnerReportWhenMetadataRunUnsupported(
+	t *testing.T,
+) {
 	dir := t.TempDir()
 	targetsPath := writeTestFile(t, dir, "targets.json", validTargetsReport())
 	runnerPath := writeTestFile(t, dir, "x86-runner.json", runnerReport("linux-x86", "runner"))
@@ -768,7 +1119,8 @@ func TestValidateLinuxNativeTargetsRejectsPassingRunnerReportWhenMetadataRunUnsu
 	if err == nil {
 		t.Fatalf("expected passing runner report to fail when metadata says run_supported=false")
 	}
-	if !strings.Contains(err.Error(), "run_supported=false") || !strings.Contains(err.Error(), "passing runner") {
+	if !strings.Contains(err.Error(), "run_supported=false") ||
+		!strings.Contains(err.Error(), "passing runner") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -776,7 +1128,12 @@ func TestValidateLinuxNativeTargetsRejectsPassingRunnerReportWhenMetadataRunUnsu
 func TestValidateLinuxNativeTargetsRejectsGenericBuildOnlyRunnerDiagnosticCode(t *testing.T) {
 	dir := t.TempDir()
 	targetsPath := writeTestFile(t, dir, "targets.json", validTargetsReport())
-	diagPath := writeTestFile(t, dir, "x86-runner-blocked.json", `{"code":"TETRA0001","message":"cannot run tests for target linux-x86: host does not support Linux i386 execution; no host fallback is allowed","hint":"","severity":"error"}`)
+	diagPath := writeTestFile(
+		t,
+		dir,
+		"x86-runner-blocked.json",
+		`{"code":"TETRA0001","message":"cannot run tests for target linux-x86: host does not support Linux i386 execution; no host fallback is allowed","hint":"","severity":"error"}`,
+	)
 
 	err := validateLinuxNativeTargets(validateOptions{
 		TargetsReport: targetsPath,
@@ -791,7 +1148,8 @@ func TestValidateLinuxNativeTargetsRejectsGenericBuildOnlyRunnerDiagnosticCode(t
 	if err == nil {
 		t.Fatalf("expected generic runner diagnostic code to fail")
 	}
-	if !strings.Contains(err.Error(), "TETRA3003") || !strings.Contains(err.Error(), "diagnostic code") {
+	if !strings.Contains(err.Error(), "TETRA3003") ||
+		!strings.Contains(err.Error(), "diagnostic code") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -799,7 +1157,12 @@ func TestValidateLinuxNativeTargetsRejectsGenericBuildOnlyRunnerDiagnosticCode(t
 func TestValidateLinuxNativeTargetsRejectsRunnerDiagnosticWithoutProbeCommand(t *testing.T) {
 	dir := t.TempDir()
 	targetsPath := writeTestFile(t, dir, "targets.json", validTargetsReport())
-	diagPath := writeTestFile(t, dir, "x32-runner-blocked.json", `{"code":"TETRA3003","message":"cannot run tests for target linux-x32: host does not support Linux x32 ABI execution; no host fallback is allowed","hint":"","severity":"error"}`)
+	diagPath := writeTestFile(
+		t,
+		dir,
+		"x32-runner-blocked.json",
+		`{"code":"TETRA3003","message":"cannot run tests for target linux-x32: host does not support Linux x32 ABI execution; no host fallback is allowed","hint":"","severity":"error"}`,
+	)
 	abiPath := writeTestFile(t, dir, "x32-abi.json", targetABIReport("linux-x32"))
 	atomicPath := writeTestFile(t, dir, "x32-atomic.json", targetAtomicReport("linux-x32"))
 	fuzzPath := writeTestFile(t, dir, "x32-fuzz.json", targetFuzzReport("linux-x32"))
@@ -824,7 +1187,12 @@ func TestValidateLinuxNativeTargetsRejectsRunnerDiagnosticWithoutProbeCommand(t 
 func TestValidateLinuxNativeTargetsRejectsLinuxX64BlockedRunnerDiagnostic(t *testing.T) {
 	dir := t.TempDir()
 	targetsPath := writeTestFile(t, dir, "targets.json", validTargetsReport())
-	diagPath := writeTestFile(t, dir, "x64-runner-blocked.json", runnerDiagnostic("cannot run tests for target linux-x64: no host fallback is allowed"))
+	diagPath := writeTestFile(
+		t,
+		dir,
+		"x64-runner-blocked.json",
+		runnerDiagnostic("cannot run tests for target linux-x64: no host fallback is allowed"),
+	)
 
 	err := validateLinuxNativeTargets(validateOptions{
 		TargetsReport: targetsPath,
@@ -951,9 +1319,11 @@ func runnerDiagnostic(message string) string {
 	if !strings.Contains(message, "probe command:") {
 		switch {
 		case strings.Contains(message, "linux-x86"):
-			message += "; probe command: tetra test --diagnostics=json --target x86 --format=json <runner-smoke.tetra>"
+			message += ("; probe command: tetra test --diagnostics=json --target x86 --" +
+				"format=json <runner-smoke.tetra>")
 		case strings.Contains(message, "linux-x32"):
-			message += "; probe command: tetra test --diagnostics=json --target x32 --format=json <runner-smoke.tetra>"
+			message += ("; probe command: tetra test --diagnostics=json --target x32 --" +
+				"format=json <runner-smoke.tetra>")
 		}
 	}
 	return `{"code":"TETRA3003","message":"` + message + `","hint":"","severity":"error"}`
@@ -987,7 +1357,9 @@ func suiteReportForTarget(target string, names ...string) string {
 		b.WriteString(name)
 		b.WriteString(`","filename":"suite","index":`)
 		b.WriteString(strconv.Itoa(i))
-		b.WriteString(`,"function_name":"__tetra_test_case","exit_code":0,"passed":true,"duration_ms":1}`)
+		b.WriteString(
+			`,"function_name":"__tetra_test_case","exit_code":0,"passed":true,"duration_ms":1}`,
+		)
 	}
 	b.WriteString(`]}`)
 	return b.String()

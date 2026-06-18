@@ -10,7 +10,11 @@ import (
 func TestRunValidatesSurfaceDevWorkflowReport(t *testing.T) {
 	dir := t.TempDir()
 	reportPath := filepath.Join(dir, "surface-dev-workflow.json")
-	if err := os.WriteFile(reportPath, []byte(validSurfaceDevWorkflowReportJSON()), 0o644); err != nil {
+	if err := os.WriteFile(
+		reportPath,
+		[]byte(validSurfaceDevWorkflowReportJSON()),
+		0o644,
+	); err != nil {
 		t.Fatalf("write report: %v", err)
 	}
 	if err := run([]string{"--report", reportPath}); err != nil {
@@ -21,7 +25,12 @@ func TestRunValidatesSurfaceDevWorkflowReport(t *testing.T) {
 func TestRunRejectsHotReloadClaim(t *testing.T) {
 	dir := t.TempDir()
 	reportPath := filepath.Join(dir, "surface-dev-workflow.json")
-	raw := strings.Replace(validSurfaceDevWorkflowReportJSON(), `"hot_reload_claim":false`, `"hot_reload_claim":true`, 1)
+	raw := strings.Replace(
+		validSurfaceDevWorkflowReportJSON(),
+		`"hot_reload_claim":false`,
+		`"hot_reload_claim":true`,
+		1,
+	)
 	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
 		t.Fatalf("write report: %v", err)
 	}

@@ -1,0 +1,21 @@
+// Memory chained pointer stride microservice smoke.
+//
+// The service derives a pointer from a derived pointer, writes a value through
+// it, and verifies the same cell through the equivalent allocation-base offset.
+module examples.microservices.memory.base_ptrs.helpers.memory_chained_ptr_stride_service
+import lib.core.capability as cap
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let base: ptr = core.alloc_bytes(24)
+        let row: ptr = core.ptr_add(base, 8, memory_cap)
+        let cell: ptr = core.ptr_add(row, 4, memory_cap)
+        let mirror: ptr = core.ptr_add(base, 12, memory_cap)
+        let _write: Int = core.store_i32(cell, 42, memory_cap)
+        let value: Int = core.load_i32(mirror, memory_cap)
+        if value == 42:
+            return 0
+        return value
+    return 97

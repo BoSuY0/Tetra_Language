@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -28,16 +30,31 @@ func TestRunMemoryFuzzShortWritesValidatedArtifacts(t *testing.T) {
 		t.Fatalf("ValidateMemoryFuzzOracleReport: %v\n%s", err, raw)
 	}
 	if len(report.Requirements) != 5 {
-		t.Fatalf("requirements count = %d, want 5: %#v", len(report.Requirements), report.Requirements)
+		t.Fatalf(
+			"requirements count = %d, want 5: %#v",
+			len(report.Requirements),
+			report.Requirements,
+		)
 	}
 	if len(report.SliceCoverage) != 12 {
-		t.Fatalf("slice coverage count = %d, want v0-v11 coverage: %#v", len(report.SliceCoverage), report.SliceCoverage)
+		t.Fatalf(
+			"slice coverage count = %d, want v0-v11 coverage: %#v",
+			len(report.SliceCoverage),
+			report.SliceCoverage,
+		)
 	}
 	summary, err := os.ReadFile(filepath.Join(dir, "summary.md"))
 	if err != nil {
 		t.Fatalf("read summary: %v", err)
 	}
-	for _, want := range []string{"# Memory Fuzz Short Summary", "tetra.memory-fuzz.oracle.v1", "Tier 1", "memory-fuzz-oracle.json", "MEM-FUZZ-001", "v0-v11"} {
+	for _, want := range []string{
+		"# Memory Fuzz Short Summary",
+		"tetra.memory-fuzz.oracle.v1",
+		"Tier 1",
+		"memory-fuzz-oracle.json",
+		"MEM-FUZZ-001",
+		"v0-v11",
+	} {
 		if !strings.Contains(string(summary), want) {
 			t.Fatalf("summary missing %q:\n%s", want, summary)
 		}
@@ -66,14 +83,33 @@ func TestRunMemoryFuzzShortWritesValidatedArtifacts(t *testing.T) {
 	if err := json.Unmarshal(summaryJSONRaw, &summaryJSON); err != nil {
 		t.Fatalf("parse summary json: %v\n%s", err, summaryJSONRaw)
 	}
-	if summaryJSON.SchemaVersion != "tetra.memory-fuzz-short.summary.v1" || summaryJSON.Kind != "tier1_short_ci_smoke" || summaryJSON.Tier != "tier1_short_ci_smoke" || summaryJSON.Status != "pass" {
+	if summaryJSON.SchemaVersion != "tetra.memory-fuzz-short.summary.v1" ||
+		summaryJSON.Kind != "tier1_short_ci_smoke" ||
+		summaryJSON.Tier != "tier1_short_ci_smoke" ||
+		summaryJSON.Status != "pass" {
 		t.Fatalf("summary json identity/status = %#v", summaryJSON)
 	}
-	if summaryJSON.ObservedFailures != 0 || summaryJSON.ClassifiedFailures != 0 || summaryJSON.UnclassifiedFailures != 0 || summaryJSON.ReleaseBlockingFailures != 0 {
-		t.Fatalf("summary json failure classification counts = observed %d classified %d unclassified %d release-blocking %d, want all zero", summaryJSON.ObservedFailures, summaryJSON.ClassifiedFailures, summaryJSON.UnclassifiedFailures, summaryJSON.ReleaseBlockingFailures)
+	if summaryJSON.ObservedFailures != 0 || summaryJSON.ClassifiedFailures != 0 ||
+		summaryJSON.UnclassifiedFailures != 0 ||
+		summaryJSON.ReleaseBlockingFailures != 0 {
+		t.Fatalf(
+			("summary json failure classification counts = observed %d " +
+				"classified %d unclassified %d release-blocking %d, want all zero"),
+			summaryJSON.ObservedFailures,
+			summaryJSON.ClassifiedFailures,
+			summaryJSON.UnclassifiedFailures,
+			summaryJSON.ReleaseBlockingFailures,
+		)
 	}
-	if len(summaryJSON.ReproducibilitySeeds) != 12 || !strings.Contains(strings.Join(summaryJSON.ReproducibilitySeeds, "\n"), "memory-fuzz:v11:seed:1011") {
-		t.Fatalf("summary json reproducibility seeds = %#v, want deterministic v0-v11 seeds", summaryJSON.ReproducibilitySeeds)
+	if len(summaryJSON.ReproducibilitySeeds) != 12 ||
+		!strings.Contains(
+			strings.Join(summaryJSON.ReproducibilitySeeds, "\n"),
+			"memory-fuzz:v11:seed:1011",
+		) {
+		t.Fatalf(
+			"summary json reproducibility seeds = %#v, want deterministic v0-v11 seeds",
+			summaryJSON.ReproducibilitySeeds,
+		)
 	}
 	for _, want := range []string{"oracle_report", "summary_md", "summary_json", "artifact_hashes"} {
 		if summaryJSON.Artifacts[want] == "" {
@@ -85,15 +121,22 @@ func TestRunMemoryFuzzShortWritesValidatedArtifacts(t *testing.T) {
 	}
 	var sawRunner, sawValidator bool
 	for _, command := range summaryJSON.Commands {
-		if command.Name == "memory-fuzz-short" && command.Status == "pass" && strings.Contains(command.Command, "go run ./tools/cmd/memory-fuzz-short") && strings.Contains(command.Command, "--report-dir") {
+		if command.Name == "memory-fuzz-short" && command.Status == "pass" &&
+			strings.Contains(command.Command, "go run ./tools/cmd/memory-fuzz-short") &&
+			strings.Contains(command.Command, "--report-dir") {
 			sawRunner = true
 		}
-		if command.Name == "validate-memory-fuzz-oracle" && command.Status == "pass" && strings.Contains(command.Command, "go run ./tools/cmd/validate-memory-fuzz-oracle") && strings.Contains(command.Command, "--artifact-dir") {
+		if command.Name == "validate-memory-fuzz-oracle" && command.Status == "pass" &&
+			strings.Contains(command.Command, "go run ./tools/cmd/validate-memory-fuzz-oracle") &&
+			strings.Contains(command.Command, "--artifact-dir") {
 			sawValidator = true
 		}
 	}
 	if !sawRunner || !sawValidator {
-		t.Fatalf("summary json commands missing runner/validator provenance: %#v", summaryJSON.Commands)
+		t.Fatalf(
+			"summary json commands missing runner/validator provenance: %#v",
+			summaryJSON.Commands,
+		)
 	}
 	proofSummaryRaw, err := os.ReadFile(filepath.Join(dir, "island-proof-fuzz-summary.json"))
 	if err != nil {
@@ -113,11 +156,18 @@ func TestRunMemoryFuzzShortWritesValidatedArtifacts(t *testing.T) {
 	if err := json.Unmarshal(proofSummaryRaw, &proofSummary); err != nil {
 		t.Fatalf("parse island proof fuzz summary: %v\n%s", err, proofSummaryRaw)
 	}
-	if proofSummary.SchemaVersion != "tetra.island-proof-fuzz-summary.v1" || proofSummary.Status != "pass" {
+	if proofSummary.SchemaVersion != "tetra.island-proof-fuzz-summary.v1" ||
+		proofSummary.Status != "pass" {
 		t.Fatalf("island proof fuzz identity/status = %#v", proofSummary)
 	}
-	if proofSummary.Total < 10 || proofSummary.Rejected != proofSummary.Total || proofSummary.Accepted != 0 {
-		t.Fatalf("island proof fuzz counts = total %d rejected %d accepted %d", proofSummary.Total, proofSummary.Rejected, proofSummary.Accepted)
+	if proofSummary.Total < 10 || proofSummary.Rejected != proofSummary.Total ||
+		proofSummary.Accepted != 0 {
+		t.Fatalf(
+			"island proof fuzz counts = total %d rejected %d accepted %d",
+			proofSummary.Total,
+			proofSummary.Rejected,
+			proofSummary.Accepted,
+		)
 	}
 	seenCases := map[string]bool{}
 	for _, c := range proofSummary.Cases {
@@ -142,11 +192,88 @@ func TestRunMemoryFuzzShortRejectsUnsupportedTier(t *testing.T) {
 
 func TestRunMemoryFuzzShortRejectsStaleReportDir(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "stale-summary.json"), []byte("{}\n"), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(dir, "stale-summary.json"),
+		[]byte("{}\n"),
+		0o644,
+	); err != nil {
 		t.Fatalf("write stale artifact: %v", err)
 	}
 	err := runMemoryFuzzShort(memoryFuzzShortOptions{Tier: "1", ReportDir: dir})
 	if err == nil || !strings.Contains(err.Error(), "fresh --report-dir") {
 		t.Fatalf("runMemoryFuzzShort stale report dir error = %v, want fresh-dir rejection", err)
+	}
+}
+
+func TestWriteMemoryFuzzJSONFileKeepsIndentedJSONFormat(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "artifact.json")
+	value := struct {
+		Schema string   `json:"schema"`
+		Rows   []string `json:"rows"`
+	}{
+		Schema: "tetra.test.schema.v1",
+		Rows:   []string{"one", "two"},
+	}
+	if err := writeMemoryFuzzJSONFile(path, value); err != nil {
+		t.Fatalf("writeMemoryFuzzJSONFile: %v", err)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read written json: %v", err)
+	}
+	want := "{\n  \"schema\": \"tetra.test.schema.v1\",\n  \"rows\": [\n    \"one\",\n    \"two\"\n  ]\n}\n"
+	if string(raw) != want {
+		t.Fatalf("written JSON = %q, want %q", raw, want)
+	}
+}
+
+func TestMemoryFuzzShortArtifactHashingSchemaSniffIsBounded(t *testing.T) {
+	root := t.TempDir()
+	largePrefix := strings.Repeat("x", 64*1024+1024)
+	raw := []byte(`{"padding":"` + largePrefix + `","schema":"too-late"}`)
+	if err := os.WriteFile(filepath.Join(root, "large-report.json"), raw, 0o644); err != nil {
+		t.Fatalf("write large report: %v", err)
+	}
+
+	artifact, err := hashMemoryFuzzArtifact(root, "large-report.json")
+	if err != nil {
+		t.Fatalf("hashMemoryFuzzArtifact: %v", err)
+	}
+	if artifact.Schema != "" {
+		t.Fatalf(
+			"artifact schema = %q, want empty schema when schema appears beyond bounded sniff window",
+			artifact.Schema,
+		)
+	}
+	if artifact.Size != int64(len(raw)) {
+		t.Fatalf("artifact size = %d, want %d", artifact.Size, len(raw))
+	}
+}
+
+func TestMemoryFuzzShortArtifactHashingKeepsEarlySchemaForLargeJSON(t *testing.T) {
+	root := t.TempDir()
+	raw := []byte(`{"schema":"schema-first","payload":"` + strings.Repeat("x", 64*1024+1024) + `"}`)
+	if err := os.WriteFile(filepath.Join(root, "schema-first-large.json"), raw, 0o644); err != nil {
+		t.Fatalf("write large report: %v", err)
+	}
+
+	artifact, err := hashMemoryFuzzArtifact(root, "schema-first-large.json")
+	if err != nil {
+		t.Fatalf("hashMemoryFuzzArtifact: %v", err)
+	}
+	if artifact.Schema != "schema-first" {
+		t.Fatalf("artifact schema = %q, want schema-first", artifact.Schema)
+	}
+	sum := sha256.Sum256(raw)
+	wantSHA := "sha256:" + hex.EncodeToString(sum[:])
+	if artifact.SHA256 != wantSHA {
+		t.Fatalf(
+			"artifact sha256 = %q, want streaming hash of whole artifact %q",
+			artifact.SHA256,
+			wantSHA,
+		)
+	}
+	if artifact.Size != int64(len(raw)) {
+		t.Fatalf("artifact size = %d, want %d", artifact.Size, len(raw))
 	}
 }

@@ -122,8 +122,14 @@ var expectedV9Statuses = map[string]string{
 var requiredV9NegativeTests = map[string][]string{
 	"MEM-STORAGE-001": {"TestVerifyPlanRejectsEscapedActualTrustedLowering"},
 	"MEM-STORAGE-002": {"TestVerifyPlanRejectsTrustedStorageWithoutNoEscapeProof"},
-	"MEM-STORAGE-003": {"TestFromPLIRAndAllocPlanRejectsHeapFallbackWithoutReason", "TestValidateMemoryReportRejectsHeapFallbackWithoutReason"},
-	"MEM-STORAGE-004": {"TestVerifyPlanRejectsEscapedActualTrustedLowering", "TestMiniMemoryModelV9StorageCases"},
+	"MEM-STORAGE-003": {
+		"TestFromPLIRAndAllocPlanRejectsHeapFallbackWithoutReason",
+		"TestValidateMemoryReportRejectsHeapFallbackWithoutReason",
+	},
+	"MEM-STORAGE-004": {
+		"TestVerifyPlanRejectsEscapedActualTrustedLowering",
+		"TestMiniMemoryModelV9StorageCases",
+	},
 }
 
 var expectedV10Statuses = map[string]string{
@@ -205,7 +211,11 @@ func parseCorrelationRows(raw string) ([]map[string]string, error) {
 			continue
 		}
 		if len(cells) != len(headers) {
-			return nil, fmt.Errorf("correlation row has %d fields, want %d", len(cells), len(headers))
+			return nil, fmt.Errorf(
+				"correlation row has %d fields, want %d",
+				len(cells),
+				len(headers),
+			)
 		}
 		row := map[string]string{}
 		for i, header := range headers {
@@ -223,7 +233,14 @@ func validateCorrelationRows(rows []map[string]string) error {
 	var issues []string
 	requiredRequirementIDs := requiredRequirementIDsForRows(rows)
 	if len(rows) != len(requiredRequirementIDs) {
-		issues = append(issues, fmt.Sprintf("correlation table has %d rows, want %d", len(rows), len(requiredRequirementIDs)))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"correlation table has %d rows, want %d",
+				len(rows),
+				len(requiredRequirementIDs),
+			),
+		)
 	}
 	seen := map[string]bool{}
 	for index, row := range rows {
@@ -254,21 +271,42 @@ func validateCorrelationRows(rows []map[string]string) error {
 			issues = append(issues, fmt.Sprintf("%s: unknown status %q", prefix, status))
 		}
 		if want, ok := expectedV8Statuses[id]; ok && status != "" && status != want {
-			issues = append(issues, fmt.Sprintf("%s: widened v8 status %q, want %q", prefix, status, want))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s: widened v8 status %q, want %q", prefix, status, want),
+			)
 		}
 		if want, ok := expectedV9Statuses[id]; ok && status != "" && status != want {
-			issues = append(issues, fmt.Sprintf("%s: widened v9 status %q, want %q", prefix, status, want))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s: widened v9 status %q, want %q", prefix, status, want),
+			)
 		}
 		if want, ok := requiredV9NegativeTests[id]; ok {
-			if missing := missingRequiredNegativeTests(row["negative_test"], want); len(missing) > 0 {
-				issues = append(issues, fmt.Sprintf("%s: negative_test missing required v9 evidence: %s", prefix, strings.Join(missing, ",")))
+			if missing := missingRequiredNegativeTests(row["negative_test"], want); len(
+				missing,
+			) > 0 {
+				issues = append(
+					issues,
+					fmt.Sprintf(
+						"%s: negative_test missing required v9 evidence: %s",
+						prefix,
+						strings.Join(missing, ","),
+					),
+				)
 			}
 		}
 		if want, ok := expectedV10Statuses[id]; ok && status != "" && status != want {
-			issues = append(issues, fmt.Sprintf("%s: widened v10 status %q, want %q", prefix, status, want))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s: widened v10 status %q, want %q", prefix, status, want),
+			)
 		}
 		if want, ok := expectedV11Statuses[id]; ok && status != "" && status != want {
-			issues = append(issues, fmt.Sprintf("%s: widened v11 status %q, want %q", prefix, status, want))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s: widened v11 status %q, want %q", prefix, status, want),
+			)
 		}
 		if issue := validateMemoryClaimDrift(row); issue != "" {
 			issues = append(issues, prefix+": "+issue)

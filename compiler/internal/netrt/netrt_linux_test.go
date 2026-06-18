@@ -56,7 +56,10 @@ func TestListenTCP4AcceptsNonblockingConnections(t *testing.T) {
 		t.Fatalf("listener fd %d was not readable in events %#v", listener.FD, events)
 	}
 
-	connFD, err := Accept(listener.FD, AcceptConfig{Nonblocking: true, CloseOnExec: true, NoDelay: true})
+	connFD, err := Accept(
+		listener.FD,
+		AcceptConfig{Nonblocking: true, CloseOnExec: true, NoDelay: true},
+	)
 	if err != nil {
 		t.Fatalf("Accept: %v", err)
 	}
@@ -97,7 +100,10 @@ func TestPollerSignalsReadableDataAndSyscallReadWriteRoundTrip(t *testing.T) {
 	if _, err := poller.Wait(8, time.Second); err != nil {
 		t.Fatalf("poller.Wait(listener): %v", err)
 	}
-	connFD, err := Accept(listener.FD, AcceptConfig{Nonblocking: true, CloseOnExec: true, NoDelay: true})
+	connFD, err := Accept(
+		listener.FD,
+		AcceptConfig{Nonblocking: true, CloseOnExec: true, NoDelay: true},
+	)
 	if err != nil {
 		t.Fatalf("Accept: %v", err)
 	}
@@ -170,7 +176,10 @@ func TestRecvSendRoundTripOnConnectedTCP(t *testing.T) {
 		t.Fatalf("poller.Wait(listener): %v", err)
 	}
 
-	connFD, err := Accept(listener.FD, AcceptConfig{Nonblocking: true, CloseOnExec: true, NoDelay: true})
+	connFD, err := Accept(
+		listener.FD,
+		AcceptConfig{Nonblocking: true, CloseOnExec: true, NoDelay: true},
+	)
 	if err != nil {
 		t.Fatalf("Accept: %v", err)
 	}
@@ -298,7 +307,11 @@ func TestPollerHandlesManyReadinessWaitsAndTimeouts(t *testing.T) {
 	}
 
 	for i := 0; i < 24; i++ {
-		client, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", listener.Port), time.Second)
+		client, err := net.DialTimeout(
+			"tcp",
+			fmt.Sprintf("127.0.0.1:%d", listener.Port),
+			time.Second,
+		)
 		if err != nil {
 			t.Fatalf("client dial %d: %v", i, err)
 		}
@@ -309,9 +322,17 @@ func TestPollerHandlesManyReadinessWaitsAndTimeouts(t *testing.T) {
 		}
 		if !hasReadable(events, listener.FD) {
 			_ = client.Close()
-			t.Fatalf("listener fd %d was not readable in stress iteration %d events %#v", listener.FD, i, events)
+			t.Fatalf(
+				"listener fd %d was not readable in stress iteration %d events %#v",
+				listener.FD,
+				i,
+				events,
+			)
 		}
-		connFD, err := Accept(listener.FD, AcceptConfig{Nonblocking: true, CloseOnExec: true, NoDelay: true})
+		connFD, err := Accept(
+			listener.FD,
+			AcceptConfig{Nonblocking: true, CloseOnExec: true, NoDelay: true},
+		)
 		if err != nil {
 			_ = client.Close()
 			t.Fatalf("Accept stress %d: %v", i, err)

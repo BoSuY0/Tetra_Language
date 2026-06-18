@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"tetra_language/internal/toon"
 )
 
 func TestValidateEcoMaterializationAcceptsValidReport(t *testing.T) {
@@ -15,8 +17,26 @@ func TestValidateEcoMaterializationAcceptsValidReport(t *testing.T) {
 	}
 }
 
+func TestValidateEcoMaterializationAcceptsTOON(t *testing.T) {
+	toonRaw, err := toon.ConvertJSONToTOON(
+		[]byte(validMaterializationReport()),
+		toon.Options{Strict: true, Deterministic: true},
+	)
+	if err != nil {
+		t.Fatalf("json->toon: %v", err)
+	}
+	if err := validateEcoMaterializationFormat(toonRaw, "toon"); err != nil {
+		t.Fatalf("validateEcoMaterializationFormat TOON: %v\n%s", err, toonRaw)
+	}
+}
+
 func TestValidateEcoMaterializationAcceptsEmptyTarget(t *testing.T) {
-	report := strings.Replace(validMaterializationReport(), `"target": "linux-x64"`, `"target": ""`, 1)
+	report := strings.Replace(
+		validMaterializationReport(),
+		`"target": "linux-x64"`,
+		`"target": ""`,
+		1,
+	)
 	out, err := runEcoMaterializationValidator(t, report)
 	if err != nil {
 		t.Fatalf("validator should accept unscoped materialization target: %v\n%s", err, out)
@@ -34,7 +54,12 @@ func TestValidateEcoMaterializationRejectsMalformedJSON(t *testing.T) {
 }
 
 func TestValidateEcoMaterializationRejectsUnknownField(t *testing.T) {
-	report := strings.Replace(validMaterializationReport(), "\n  \"target\":", "\n  \"strict_extra\": true,\n  \"target\":", 1)
+	report := strings.Replace(
+		validMaterializationReport(),
+		"\n  \"target\":",
+		"\n  \"strict_extra\": true,\n  \"target\":",
+		1,
+	)
 	out, err := runEcoMaterializationValidator(t, report)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
@@ -56,18 +81,31 @@ func TestValidateEcoMaterializationRejectsMissingRequiredField(t *testing.T) {
 }
 
 func TestValidateEcoMaterializationRejectsUnsupportedSchema(t *testing.T) {
-	report := strings.Replace(validMaterializationReport(), `"tetra.eco.materialization.v1"`, `"tetra.eco.materialization.v2"`, 1)
+	report := strings.Replace(
+		validMaterializationReport(),
+		`"tetra.eco.materialization.v1"`,
+		`"tetra.eco.materialization.v2"`,
+		1,
+	)
 	out, err := runEcoMaterializationValidator(t, report)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
 	}
-	if !strings.Contains(string(out), `unsupported materialization schema "tetra.eco.materialization.v2"`) {
+	if !strings.Contains(
+		string(out),
+		`unsupported materialization schema "tetra.eco.materialization.v2"`,
+	) {
 		t.Fatalf("unexpected output:\n%s", out)
 	}
 }
 
 func TestValidateEcoMaterializationRejectsUnsupportedTarget(t *testing.T) {
-	report := strings.Replace(validMaterializationReport(), `"target": "linux-x64"`, `"target": "plan9-riscv64"`, 1)
+	report := strings.Replace(
+		validMaterializationReport(),
+		`"target": "linux-x64"`,
+		`"target": "plan9-riscv64"`,
+		1,
+	)
 	out, err := runEcoMaterializationValidator(t, report)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
@@ -78,7 +116,12 @@ func TestValidateEcoMaterializationRejectsUnsupportedTarget(t *testing.T) {
 }
 
 func TestValidateEcoMaterializationRejectsEmptyPackagePath(t *testing.T) {
-	report := strings.Replace(validMaterializationReport(), `"package_path": "dist/app.todex"`, `"package_path": ""`, 1)
+	report := strings.Replace(
+		validMaterializationReport(),
+		`"package_path": "dist/app.todex"`,
+		`"package_path": ""`,
+		1,
+	)
 	out, err := runEcoMaterializationValidator(t, report)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
@@ -89,7 +132,12 @@ func TestValidateEcoMaterializationRejectsEmptyPackagePath(t *testing.T) {
 }
 
 func TestValidateEcoMaterializationRejectsUnnormalizedMaterializedDir(t *testing.T) {
-	report := strings.Replace(validMaterializationReport(), `"materialized_dir": "out/materialized"`, `"materialized_dir": "out/../materialized"`, 1)
+	report := strings.Replace(
+		validMaterializationReport(),
+		`"materialized_dir": "out/materialized"`,
+		`"materialized_dir": "out/../materialized"`,
+		1,
+	)
 	out, err := runEcoMaterializationValidator(t, report)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
@@ -100,7 +148,12 @@ func TestValidateEcoMaterializationRejectsUnnormalizedMaterializedDir(t *testing
 }
 
 func TestValidateEcoMaterializationRejectsBadLockHash(t *testing.T) {
-	report := strings.Replace(validMaterializationReport(), `"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"`, `"sha256:not-hex"`, 1)
+	report := strings.Replace(
+		validMaterializationReport(),
+		`"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"`,
+		`"sha256:not-hex"`,
+		1,
+	)
 	out, err := runEcoMaterializationValidator(t, report)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
@@ -111,7 +164,12 @@ func TestValidateEcoMaterializationRejectsBadLockHash(t *testing.T) {
 }
 
 func TestValidateEcoMaterializationRejectsEmptyTrustSnapshot(t *testing.T) {
-	report := strings.Replace(validMaterializationReport(), `"trust_snapshot": "reports/tetra.trust-snapshot.json"`, `"trust_snapshot": ""`, 1)
+	report := strings.Replace(
+		validMaterializationReport(),
+		`"trust_snapshot": "reports/tetra.trust-snapshot.json"`,
+		`"trust_snapshot": ""`,
+		1,
+	)
 	out, err := runEcoMaterializationValidator(t, report)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)

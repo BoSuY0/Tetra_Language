@@ -7,7 +7,11 @@ import (
 
 func TestProofStoreRejectsMissingProofID(t *testing.T) {
 	store := NewStore()
-	err := store.ValidateReferences([]Reference{{ID: "proof:missing", Subject: Subject{Kind: "allocation", ID: "alloc:main:1"}}})
+	err := store.ValidateReferences(
+		[]Reference{
+			{ID: "proof:missing", Subject: Subject{Kind: "allocation", ID: "alloc:main:1"}},
+		},
+	)
 	if err == nil || !strings.Contains(err.Error(), "missing proof id") {
 		t.Fatalf("ValidateReferences error = %v, want missing proof id", err)
 	}
@@ -23,7 +27,9 @@ func TestProofStoreRejectsWrongSubject(t *testing.T) {
 		Status:         StatusProven,
 	})
 	store := NewStore(term)
-	err := store.ValidateReferences([]Reference{{ID: term.ID, Subject: Subject{Kind: "allocation", ID: "alloc:other"}}})
+	err := store.ValidateReferences(
+		[]Reference{{ID: term.ID, Subject: Subject{Kind: "allocation", ID: "alloc:other"}}},
+	)
 	if err == nil || !strings.Contains(err.Error(), "subject mismatch") {
 		t.Fatalf("ValidateReferences error = %v, want subject mismatch", err)
 	}
@@ -74,11 +80,20 @@ func TestProofStoreRejectsStaleStableHashForSemanticFields(t *testing.T) {
 		mutate func(*Term)
 	}{
 		{name: "dominance_scope", mutate: func(term *Term) { term.DominanceScope = "dom:changed" }},
-		{name: "lifetime_scope", mutate: func(term *Term) { term.LifetimeScope = "lifetime:changed" }},
+		{
+			name:   "lifetime_scope",
+			mutate: func(term *Term) { term.LifetimeScope = "lifetime:changed" },
+		},
 		{name: "mutation_epoch", mutate: func(term *Term) { term.MutationEpoch = "mutation:1" }},
 		{name: "alias_epoch", mutate: func(term *Term) { term.AliasEpoch = "alias:1" }},
-		{name: "invalidation_policy", mutate: func(term *Term) { term.InvalidationPolicy = "never_invalidate" }},
-		{name: "consumer_passes", mutate: func(term *Term) { term.ConsumerPasses = append(term.ConsumerPasses, "lowering") }},
+		{
+			name:   "invalidation_policy",
+			mutate: func(term *Term) { term.InvalidationPolicy = "never_invalidate" },
+		},
+		{
+			name:   "consumer_passes",
+			mutate: func(term *Term) { term.ConsumerPasses = append(term.ConsumerPasses, "lowering") },
+		},
 	}
 
 	for _, tt := range tests {

@@ -6,7 +6,7 @@ repo_root="$(cd "$script_dir/../../.." && pwd)"
 report_dir="reports/surface/crash-report"
 
 usage() {
-  cat <<'USAGE'
+	cat <<'USAGE'
 Usage: bash scripts/release/surface/surface-crash-report-smoke.sh [--report-dir DIR]
 
 Builds bounded Surface crash recovery and error reporting evidence for
@@ -19,60 +19,62 @@ USAGE
 }
 
 while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --report-dir)
-      if [[ $# -lt 2 ]]; then
-        echo "error: --report-dir requires a value" >&2
-        usage >&2
-        exit 2
-      fi
-      report_dir="$2"
-      shift 2
-      ;;
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    *)
-      echo "error: unknown argument: $1" >&2
-      usage >&2
-      exit 2
-      ;;
-  esac
+	case "$1" in
+	--report-dir)
+		if [[ $# -lt 2 ]]; then
+			echo "error: --report-dir requires a value" >&2
+			usage >&2
+			exit 2
+		fi
+		report_dir="$2"
+		shift 2
+		;;
+	-h | --help)
+		usage
+		exit 0
+		;;
+	*)
+		echo "error: unknown argument: $1" >&2
+		usage >&2
+		exit 2
+		;;
+	esac
 done
 
 cd "$repo_root"
 source "$script_dir/report-dir-guard.sh"
 if [[ -z "${GOCACHE:-}" ]]; then
-  export GOCACHE="$repo_root/.cache/go-build-surface-crash-report"
+	export GOCACHE="$repo_root/.cache/go-build-surface-crash-report"
 fi
 mkdir -p "$GOCACHE"
 
 report_dir_arg="${report_dir%/}"
 report_dir="$report_dir_arg"
 if [[ -z "$report_dir" ]]; then
-  surface_release_guard_reject "surface_crash_report_smoke:" "--report-dir requires a value"
+	surface_release_guard_reject "surface_crash_report_smoke:" "--report-dir requires a value"
 fi
 if [[ "$report_dir" = /* || "$report_dir" == "." || "$report_dir" == "./" || "$report_dir" == -* ]]; then
-  surface_release_guard_reject_unsafe "surface_crash_report_smoke:" "$report_dir"
+	surface_release_guard_reject_unsafe "surface_crash_report_smoke:" "$report_dir"
 fi
 IFS='/' read -r -a report_parts <<<"$report_dir"
 current="$repo_root"
 for part in "${report_parts[@]}"; do
-  if [[ -z "$part" || "$part" == "." ]]; then
-    continue
-  fi
-  if [[ "$part" == ".." ]]; then
-    surface_release_guard_reject_unsafe "surface_crash_report_smoke:" "$report_dir"
-  fi
-  current="$current/$part"
-  if [[ -L "$current" ]]; then
-    surface_release_guard_reject_symlink "surface_crash_report_smoke:" "$report_dir"
-  fi
+	if [[ -z "$part" || "$part" == "." ]]; then
+		continue
+	fi
+	if [[ "$part" == ".." ]]; then
+		surface_release_guard_reject_unsafe "surface_crash_report_smoke:" "$report_dir"
+	fi
+	current="$current/$part"
+	if [[ -L "$current" ]]; then
+		surface_release_guard_reject_symlink "surface_crash_report_smoke:" "$report_dir"
+	fi
 done
 report_dir_abs="$repo_root/$report_dir"
 if [[ -e "$report_dir_abs" && ! -d "$report_dir_abs" ]]; then
-  surface_release_guard_reject "surface_crash_report_smoke:" "refusing to use non-directory report path: $report_dir"
+	surface_release_guard_reject \
+	  "surface_crash_report_smoke:" \
+	  "refusing to use non-directory report path: $report_dir"
 fi
 mkdir -p "$report_dir_abs"
 report_dir="$(realpath --relative-to="$repo_root" "$report_dir_abs")"
@@ -81,41 +83,55 @@ report_path="$report_dir/surface-crash-report.json"
 work_dir="$report_dir/surface-crash-work"
 crash_dir="$report_dir/surface-crash"
 for owned_path in "$report_path" "$work_dir" "$crash_dir"; do
-  if [[ -e "$owned_path" ]]; then
-    echo "surface_crash_report_smoke: refusing to reuse existing crash artifact path: $owned_path" >&2
-    exit 2
-  fi
+	if [[ -e "$owned_path" ]]; then
+		echo "surface_crash_report_smoke: refusing to reuse existing crash artifact path: $owned_path" >&2
+		exit 2
+	fi
 done
 mkdir -p "$work_dir/build" "$crash_dir"
 
 json_string() {
-  local value="$1"
-  value="${value//\\/\\\\}"
-  value="${value//\"/\\\"}"
-  value="${value//$'\n'/\\n}"
-  value="${value//$'\r'/\\r}"
-  value="${value//$'\t'/\\t}"
-  printf '"%s"' "$value"
+	local value="$1"
+	value="${value//\\/\\\\}"
+	value="${value//\"/\\\"}"
+	value="${value//$'\n'/\\n}"
+	value="${value//$'\r'/\\r}"
+	value="${value//$'\t'/\\t}"
+	printf '"%s"' "$value"
 }
 
 sha256_file() {
-  sha256sum "$1" | awk '{print "sha256:" $1}'
+	sha256sum "$1" | awk '{print "sha256:" $1}'
 }
 
 file_size() {
-  wc -c < "$1" | tr -d ' '
+	wc -c <"$1" | tr -d ' '
 }
 
-source_path="examples/surface_reference_command_palette.tetra"
+source_path="examples/surface/reference_core/surface_reference_command_palette.tetra"
 reference_app="command-palette"
 linux_binary="$work_dir/build/surface-command-palette-linux-x64"
 
-if rg -n 'React|Electron|Chromium|DOM app UI|CSS runtime|JavaScript app logic|platform_widget|native_widget|platform widget|native widget|lib\.core\.component|lib\.core\.widgets' "$source_path" > "$work_dir/source-scan.txt"; then
-  echo "surface_crash_report_smoke: reference app source contains forbidden crash/runtime vocabulary: $source_path" >&2
-  cat "$work_dir/source-scan.txt" >&2
-  exit 1
-fi
-: > "$work_dir/source-scan.txt"
+for forbidden_pattern in \
+	'React' \
+	'Electron' \
+	'Chromium' \
+	'DOM app UI' \
+	'CSS runtime' \
+	'JavaScript app logic' \
+	'platform_widget' \
+	'native_widget' \
+	'platform widget' \
+	'native widget' \
+	'lib\.core\.component' \
+	'lib\.core\.widgets'; do
+	if rg -n "$forbidden_pattern" "$source_path" >"$work_dir/source-scan.txt"; then
+		echo "surface_crash_report_smoke: forbidden runtime vocabulary: $source_path" >&2
+		cat "$work_dir/source-scan.txt" >&2
+		exit 1
+	fi
+done
+: >"$work_dir/source-scan.txt"
 
 go run ./cli/cmd/tetra check "$source_path"
 go run ./cli/cmd/tetra build --target linux-x64 -o "$linux_binary" "$source_path"
@@ -124,30 +140,34 @@ go run ./cli/cmd/tetra build --target linux-x64 -o "$linux_binary" "$source_path
 before_exit=0
 
 set +e
-bash -c 'echo "surface command boundary failure: command.palette.missing" >&2; exit 77' >"$work_dir/command-failure.stdout" 2>"$work_dir/command-failure.stderr"
+bash -c 'echo "surface command boundary failure: command.palette.missing" >&2; exit 77' \
+	>"$work_dir/command-failure.stdout" \
+	2>"$work_dir/command-failure.stderr"
 command_failure_exit=$?
-bash -c 'echo "surface host crash harness: sanitized panic frame captured" >&2; exit 70' >"$work_dir/host-crash.stdout" 2>"$work_dir/host-crash.stderr"
+bash -c 'echo "surface host crash harness: sanitized panic frame captured" >&2; exit 70' \
+	>"$work_dir/host-crash.stdout" \
+	2>"$work_dir/host-crash.stderr"
 host_crash_exit=$?
 set -e
 if [[ "$command_failure_exit" -ne 77 ]]; then
-  echo "surface_crash_report_smoke: command failure harness exit = $command_failure_exit, want 77" >&2
-  exit 1
+	echo "surface_crash_report_smoke: command failure exit $command_failure_exit, want 77" >&2
+	exit 1
 fi
 if [[ "$host_crash_exit" -ne 70 ]]; then
-  echo "surface_crash_report_smoke: host crash harness exit = $host_crash_exit, want 70" >&2
-  exit 1
+	echo "surface_crash_report_smoke: host crash harness exit = $host_crash_exit, want 70" >&2
+	exit 1
 fi
 
 "$linux_binary"
 after_exit=0
 
 write_diagnostic() {
-  local path="$1"
-  local kind="$2"
-  local trigger="$3"
-  local exit_code="$4"
-  local boundary="$5"
-  cat > "$path" <<JSON
+	local path="$1"
+	local kind="$2"
+	local trigger="$3"
+	local exit_code="$4"
+	local boundary="$5"
+	cat >"$path" <<JSON
 {
   "schema": "tetra.surface.diagnostic.v1",
   "kind": $(json_string "$kind"),
@@ -178,11 +198,26 @@ restart_diag="$crash_dir/restart-recovery.json"
 trace_path="$crash_dir/surface-app-trace.json"
 log_path="$crash_dir/surface-app.log"
 
-write_diagnostic "$command_diag" "command_failure" "command.palette.missing" "$command_failure_exit" "surface-command-boundary-v1"
-write_diagnostic "$host_diag" "host_crash" "surface-host panic harness" "$host_crash_exit" "surface-host-crash-harness-v1"
-write_diagnostic "$restart_diag" "restart_recovery" "restart after command failure report" "$after_exit" "surface-restart-boundary-v1"
+write_diagnostic \
+	"$command_diag" \
+	"command_failure" \
+	"command.palette.missing" \
+	"$command_failure_exit" \
+	"surface-command-boundary-v1"
+write_diagnostic \
+	"$host_diag" \
+	"host_crash" \
+	"surface-host panic harness" \
+	"$host_crash_exit" \
+	"surface-host-crash-harness-v1"
+write_diagnostic \
+	"$restart_diag" \
+	"restart_recovery" \
+	"restart after command failure report" \
+	"$after_exit" \
+	"surface-restart-boundary-v1"
 
-cat > "$trace_path" <<JSON
+cat >"$trace_path" <<JSON
 {
   "schema": "tetra.surface.diagnostic-trace.v1",
   "ring_buffer": true,
@@ -197,7 +232,7 @@ cat > "$trace_path" <<JSON
 }
 JSON
 
-cat > "$log_path" <<'LOG'
+cat >"$log_path" <<'LOG'
 surface diagnostic log v1
 before_run exit=0
 command_failure report_written=true
@@ -212,7 +247,7 @@ command_diag_size="$(file_size "$command_diag")"
 host_diag_size="$(file_size "$host_diag")"
 restart_diag_size="$(file_size "$restart_diag")"
 
-cat > "$report_path" <<JSON
+cat >"$report_path" <<JSON
 {
   "schema": "tetra.surface.crash-report.v1",
   "model": "surface-crash-report-v1",
@@ -326,12 +361,15 @@ cat > "$report_path" <<JSON
 JSON
 
 if [[ -n "${HOME:-}" ]] && rg -n -F "$HOME" "$report_path" "$crash_dir" >/dev/null; then
-  echo "surface_crash_report_smoke: diagnostic artifacts leaked HOME path" >&2
-  exit 1
+	echo "surface_crash_report_smoke: diagnostic artifacts leaked HOME path" >&2
+	exit 1
 fi
 
 go run ./tools/cmd/validate-surface-crash-report --report "$report_path"
-go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"
+go run ./tools/cmd/validate-artifact-hashes \
+	--write \
+	--root "$report_dir" \
+	--out "$report_dir/artifact-hashes.json"
 go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-hashes.json"
 
 echo "Surface crash report smoke report: $report_path"

@@ -36,7 +36,12 @@ func main() {
 	var target string
 	var reportPath string
 	flag.StringVar(&target, "target", "", "target policy: wasm32-wasi, wasi, wasm32-web, or web")
-	flag.StringVar(&reportPath, "report", "", "optional tetra smoke report whose case out_path artifacts should be validated")
+	flag.StringVar(
+		&reportPath,
+		"report",
+		"",
+		"optional tetra smoke report whose case out_path artifacts should be validated",
+	)
 	flag.Parse()
 
 	if target == "" {
@@ -76,15 +81,26 @@ func validateWASMImportReport(reportPath string, target string) error {
 		return fmt.Errorf("invalid smoke report JSON %s: %w", reportPath, err)
 	}
 	if report.Target != "" && canonicalTarget(report.Target) != canonicalTarget(target) {
-		return fmt.Errorf("report target %q does not match verifier target %q", report.Target, target)
+		return fmt.Errorf(
+			"report target %q does not match verifier target %q",
+			report.Target,
+			target,
+		)
 	}
 	for _, c := range report.Cases {
 		if c.Unsupported {
 			if c.ExpectedDiagnostic == "" {
-				return fmt.Errorf("report case %s is unsupported but missing expected_diagnostic", caseName(c))
+				return fmt.Errorf(
+					"report case %s is unsupported but missing expected_diagnostic",
+					caseName(c),
+				)
 			}
 			if c.OutPath != "" {
-				return fmt.Errorf("report case %s is unsupported but has out_path %s", caseName(c), c.OutPath)
+				return fmt.Errorf(
+					"report case %s is unsupported but has out_path %s",
+					caseName(c),
+					c.OutPath,
+				)
 			}
 			continue
 		}
@@ -123,10 +139,20 @@ func validateWASMImports(raw []byte, target string) error {
 	}
 	for _, imp := range imports {
 		if imp.Kind != importKindFunc {
-			return fmt.Errorf("non-function import %s.%s kind=0x%02x is not allowed", imp.Module, imp.Name, imp.Kind)
+			return fmt.Errorf(
+				"non-function import %s.%s kind=0x%02x is not allowed",
+				imp.Module,
+				imp.Name,
+				imp.Kind,
+			)
 		}
 		if !allowed[imp.Module+"."+imp.Name] {
-			return fmt.Errorf("disallowed import %s.%s for target %s", imp.Module, imp.Name, canonicalTarget(target))
+			return fmt.Errorf(
+				"disallowed import %s.%s for target %s",
+				imp.Module,
+				imp.Name,
+				canonicalTarget(target),
+			)
 		}
 	}
 	return nil
@@ -193,7 +219,12 @@ func parseWASMImports(raw []byte) ([]importEntry, error) {
 			return nil, fmt.Errorf("section %d size: %w", sectionID, err)
 		}
 		if size > uint64(r.Len()) {
-			return nil, fmt.Errorf("section %d size %d exceeds remaining module bytes %d", sectionID, size, r.Len())
+			return nil, fmt.Errorf(
+				"section %d size %d exceeds remaining module bytes %d",
+				sectionID,
+				size,
+				r.Len(),
+			)
 		}
 		payload := make([]byte, int(size))
 		if _, err := r.Read(payload); err != nil {
@@ -222,7 +253,11 @@ func parseImportSection(payload []byte) ([]importEntry, error) {
 		return nil, fmt.Errorf("import count: %w", err)
 	}
 	if count > uint64(len(payload)) {
-		return nil, fmt.Errorf("import count %d exceeds import section bytes %d", count, len(payload))
+		return nil, fmt.Errorf(
+			"import count %d exceeds import section bytes %d",
+			count,
+			len(payload),
+		)
 	}
 	imports := make([]importEntry, 0, count)
 	for i := uint64(0); i < count; i++ {

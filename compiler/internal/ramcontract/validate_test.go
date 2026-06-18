@@ -34,7 +34,8 @@ func TestValidateRAMContractReportRejectsHeapFallbackWithoutBlocker(t *testing.T
 	report.Rows[0].Blockers = nil
 	report.Summary = SummarizeRows(report.Rows)
 	err := ValidateReport(report)
-	if err == nil || !strings.Contains(err.Error(), "heap") || !strings.Contains(err.Error(), "blocker") {
+	if err == nil || !strings.Contains(err.Error(), "heap") ||
+		!strings.Contains(err.Error(), "blocker") {
 		t.Fatalf("ValidateReport error = %v, want heap blocker rejection", err)
 	}
 }
@@ -65,7 +66,10 @@ func TestRAMContractRejectsTrustedPlacementWithoutNoEscapeValidation(t *testing.
 			report.Rows[0].ValidationStatus = test.validation
 			err := ValidateReport(report)
 			if err == nil || !strings.Contains(err.Error(), "trusted placement") {
-				t.Fatalf("ValidateReport error = %v, want trusted placement no-escape proof rejection", err)
+				t.Fatalf(
+					"ValidateReport error = %v, want trusted placement no-escape proof rejection",
+					err,
+				)
 			}
 		})
 	}
@@ -148,7 +152,10 @@ func TestValidatePipelineCoverageRejectsMissingBuildFileEntrypoint(t *testing.T)
 	report.Entries = report.Entries[1:]
 	err := ValidatePipelineCoverage(report)
 	if err == nil || !strings.Contains(err.Error(), "BuildFileWithStatsOpt") {
-		t.Fatalf("ValidatePipelineCoverage error = %v, want missing BuildFileWithStatsOpt rejection", err)
+		t.Fatalf(
+			"ValidatePipelineCoverage error = %v, want missing BuildFileWithStatsOpt rejection",
+			err,
+		)
 	}
 }
 
@@ -159,28 +166,227 @@ func TestRAMContractFromAllocPlanTracksRowsAndBlockers(t *testing.T) {
 			Allocations: []allocplan.Allocation{{
 				SiteID:                "site:main:heap",
 				ValueID:               "heap",
+				Source:                "fixtures/main.tetra:7:13",
 				Escape:                allocplan.EscapeUnknown,
 				Storage:               allocplan.StorageStack,
 				PlannedStorage:        allocplan.StorageStack,
 				ActualLoweringStorage: allocplan.StorageHeap,
+				ReasonCodes:           []string{allocplan.HeapReasonBackendLoweringUnavailable},
+				HeapReasonCodes:       []string{allocplan.HeapReasonBackendLoweringUnavailable},
 				Reason:                "backend conservative heap fallback",
 				ValidationStatus:      "validated_conservative",
 			}},
 		}},
 	}
-	report := BuildReportFromAllocPlan(plan, "linux-x64", "e2c19b8ee276158f8eb2c54cf61e11bd84952893", "test")
+	report := BuildReportFromAllocPlan(
+		plan,
+		"linux-x64",
+		"e2c19b8ee276158f8eb2c54cf61e11bd84952893",
+		"test",
+	)
 	if len(report.Rows) != 1 {
 		t.Fatalf("report rows = %d, want 1", len(report.Rows))
 	}
 	row := report.Rows[0]
-	if row.SiteID != "site:main:heap" || row.Intent != IntentHeapFallback || row.Placement != PlacementHeapUnbounded {
+	if row.SiteID != "site:main:heap" || row.Intent != IntentHeapFallback ||
+		row.Placement != PlacementHeapUnbounded {
 		t.Fatalf("row = %#v, want heap fallback row from alloc plan", row)
 	}
 	if len(row.Blockers) == 0 {
 		t.Fatalf("row blockers = %#v, want heap blocker explanation", row.Blockers)
 	}
-	if report.Summary.HeapRows != 1 || report.Summary.UnboundedRows != 1 || report.Summary.ArtifactGrade != GradeM5 {
+	if len(row.HeapReasonCodes) != 1 ||
+		row.HeapReasonCodes[0] != allocplan.HeapReasonBackendLoweringUnavailable {
+		t.Fatalf("row heap reason codes = %#v, want backend lowering code", row.HeapReasonCodes)
+	}
+	if report.Summary.HeapRows != 1 || report.Summary.UnboundedRows != 1 ||
+		report.Summary.ArtifactGrade != GradeM5 {
 		t.Fatalf("summary = %#v, want heap/unbounded M5 summary", report.Summary)
+	}
+}
+
+func TestRAMContractFromAllocPlanAttachesMemoryDomainMetadata(t *testing.T) {
+	plan := &allocplan.Plan{
+		Functions: []allocplan.FunctionPlan{{
+			Name: "main",
+			Allocations: []allocplan.Allocation{
+				{
+					SiteID:                "site:main:heap",
+					ValueID:               "heap",
+					Builtin:               "core.make_u8",
+					ByteSize:              32,
+					BytesRequested:        32,
+					BytesReserved:         32,
+					Escape:                allocplan.EscapeReturn,
+					Storage:               allocplan.StorageHeap,
+					PlannedStorage:        allocplan.StorageHeap,
+					ActualLoweringStorage: allocplan.StorageHeap,
+					ReasonCodes:           []string{allocplan.HeapReasonEscapeReturn},
+					HeapReasonCodes:       []string{allocplan.HeapReasonEscapeReturn},
+					Reason:                "returned heap allocation",
+					ValidationStatus:      "validated_heap_fallback",
+				},
+				{
+					SiteID:                "site:main:island",
+					ValueID:               "island",
+					Builtin:               "core.island_make_u8",
+					ByteSize:              64,
+					BytesRequested:        64,
+					BytesReserved:         64,
+					Escape:                allocplan.EscapeNoEscape,
+					Storage:               allocplan.StorageExplicitIsland,
+					PlannedStorage:        allocplan.StorageExplicitIsland,
+					ActualLoweringStorage: allocplan.StorageExplicitIsland,
+					ValidationStatus:      "validated_explicit_island_scope",
+					Lifetime:              "island:isl:scope",
+					RegionID:              "island:isl",
+					Reason:                "explicit island scope proof",
+				},
+			},
+		}},
+	}
+	report := BuildReportFromAllocPlan(
+		plan,
+		"linux-x64",
+		"e2c19b8ee276158f8eb2c54cf61e11bd84952893",
+		"test",
+	)
+	if err := ValidateReport(report); err != nil {
+		t.Fatalf("ValidateReport rejected domain report: %v", err)
+	}
+	rows := map[string]Row{}
+	for _, row := range report.Rows {
+		rows[row.ValueID] = row
+	}
+	if rows["heap"].Domain == nil || rows["heap"].Domain.Kind != DomainProcess ||
+		rows["heap"].Domain.DomainID != "domain:process" {
+		t.Fatalf("heap domain = %+v, want process domain", rows["heap"].Domain)
+	}
+	if rows["island"].Domain == nil || rows["island"].Domain.Kind != DomainIsland ||
+		rows["island"].Domain.DomainID != "domain:island:isl" {
+		t.Fatalf("island domain = %+v, want island domain", rows["island"].Domain)
+	}
+	if len(report.Summary.Domains) < 2 {
+		t.Fatalf("summary domains = %+v, want process and island summaries", report.Summary.Domains)
+	}
+	for _, domain := range report.Summary.Domains {
+		if domain.DomainID == "domain:island:isl" && domain.BudgetBytes != 64 {
+			t.Fatalf("island summary budget = %d, want 64", domain.BudgetBytes)
+		}
+	}
+}
+
+func TestRAMContractRejectsInvalidMemoryDomainMetadata(t *testing.T) {
+	report := validReportForTest()
+	report.Rows[0].Domain = &MemoryDomain{
+		Kind: DomainActor,
+	}
+	report.Summary = SummarizeRows(report.Rows)
+	err := ValidateReport(report)
+	if err == nil || !strings.Contains(err.Error(), "domain_id") {
+		t.Fatalf("ValidateReport error = %v, want domain_id rejection", err)
+	}
+}
+
+func TestRAMContractHeapBlockerReportCarriesActionableSourceMetadata(t *testing.T) {
+	plan := &allocplan.Plan{
+		Functions: []allocplan.FunctionPlan{{
+			Name: "main",
+			Allocations: []allocplan.Allocation{{
+				SiteID:                "site:main:heap",
+				ValueID:               "heap",
+				Source:                "fixtures/main.tetra:7:13",
+				Escape:                allocplan.EscapeUnknown,
+				Storage:               allocplan.StorageStack,
+				PlannedStorage:        allocplan.StorageStack,
+				ActualLoweringStorage: allocplan.StorageHeap,
+				ReasonCodes:           []string{allocplan.HeapReasonBackendLoweringUnavailable},
+				HeapReasonCodes:       []string{allocplan.HeapReasonBackendLoweringUnavailable},
+				Reason:                "backend conservative heap fallback",
+				ValidationStatus:      "validated_conservative",
+			}},
+		}},
+	}
+	report := BuildReportFromAllocPlan(
+		plan,
+		"linux-x64",
+		"e2c19b8ee276158f8eb2c54cf61e11bd84952893",
+		"test",
+	)
+	blockers := BuildHeapBlockerReport(report)
+	if err := ValidateBlockerReport(blockers, "heap"); err != nil {
+		t.Fatalf("ValidateBlockerReport: %v", err)
+	}
+	if len(blockers.Rows) != 1 {
+		t.Fatalf("heap blocker rows = %d, want 1", len(blockers.Rows))
+	}
+	row := blockers.Rows[0]
+	if row.File != "fixtures/main.tetra" || row.Line != 7 ||
+		row.SourceLocationStatus != "available" {
+		t.Fatalf(
+			"source metadata = file %q line %d status %q, want fixtures/main.tetra:7 available",
+			row.File,
+			row.Line,
+			row.SourceLocationStatus,
+		)
+	}
+	if row.Symbol != "main" || row.Severity == "" || row.Reason == "" || row.SuggestedFix == "" ||
+		row.EvidenceID == "" {
+		t.Fatalf("row missing actionable metadata: %#v", row)
+	}
+	if len(row.HeapReasonCodes) != 1 ||
+		row.HeapReasonCodes[0] != allocplan.HeapReasonBackendLoweringUnavailable {
+		t.Fatalf("heap blocker reason codes = %#v, want backend lowering code", row.HeapReasonCodes)
+	}
+	if row.SafeToOptimize {
+		t.Fatalf("heap blocker safe_to_optimize = true, want conservative false")
+	}
+}
+
+func TestRAMContractCopyBlockerReportClassifiesCopySafety(t *testing.T) {
+	report := validReportForTest()
+	report.Rows = []Row{{
+		SiteID:           "site:main:copy",
+		ValueID:          "copy",
+		Function:         "main",
+		SourceSpan:       "fixtures/copy.tetra:9:17",
+		Intent:           IntentCopyHeapBounded,
+		RequestedBytes:   64,
+		Bounded:          true,
+		Owner:            "function:main",
+		Lifetime:         "function:main",
+		EscapeStatus:     EscapeNoEscape,
+		Placement:        PlacementHeapBounded,
+		ProofIDs:         nil,
+		Blockers:         []string{"backend_conservative_heap_fallback"},
+		CopyReason:       "copy_requires_bounded_heap_fallback",
+		ContractGrade:    GradeM4,
+		ValidationStatus: ValidationConservative,
+		SourceFactID:     "fact:ram:site:main:copy",
+	}}
+	report.Summary = SummarizeRows(report.Rows)
+	report.Functions = SummarizeFunctions(report.Rows)
+	blockers := BuildCopyBlockerReport(report)
+	if err := ValidateBlockerReport(blockers, "copy"); err != nil {
+		t.Fatalf("ValidateBlockerReport: %v", err)
+	}
+	if len(blockers.Rows) != 1 {
+		t.Fatalf("copy blocker rows = %d, want 1", len(blockers.Rows))
+	}
+	row := blockers.Rows[0]
+	if row.CopyKind != "HOT_PATH_COPY" || row.SourceValue != "copy" ||
+		row.DestinationValue != "heap_bounded" ||
+		row.BytesEstimate != 64 {
+		t.Fatalf("copy classification = %#v, want HOT_PATH_COPY copy -> heap_bounded bytes 64", row)
+	}
+	if row.SafetyReason == "" || row.SuggestedFix == "" || row.SafeToOptimize {
+		t.Fatalf(
+			("copy safety metadata = safety_reason %q suggested_fix %q safe " +
+				"%v, want conservative action guidance"),
+			row.SafetyReason,
+			row.SuggestedFix,
+			row.SafeToOptimize,
+		)
 	}
 }
 
@@ -207,19 +413,35 @@ func TestRAMContractFromAllocPlanDoesNotProveUnknownCallTrustedLowering(t *testi
 			}},
 		}},
 	}
-	report := BuildReportFromAllocPlan(plan, "linux-x64", "e2c19b8ee276158f8eb2c54cf61e11bd84952893", "test")
+	report := BuildReportFromAllocPlan(
+		plan,
+		"linux-x64",
+		"e2c19b8ee276158f8eb2c54cf61e11bd84952893",
+		"test",
+	)
 	if len(report.Rows) != 1 {
 		t.Fatalf("report rows = %d, want 1", len(report.Rows))
 	}
 	row := report.Rows[0]
 	if row.EscapeStatus != EscapeCall || row.Placement != PlacementStack {
-		t.Fatalf("row escape/placement = %q/%q, want escapes_call/stack test fixture", row.EscapeStatus, row.Placement)
+		t.Fatalf(
+			"row escape/placement = %q/%q, want escapes_call/stack test fixture",
+			row.EscapeStatus,
+			row.Placement,
+		)
 	}
 	if row.ValidationStatus == ValidationValidated {
-		t.Fatalf("unknown-call trusted lowering validation_status = %q, want non-validated", row.ValidationStatus)
+		t.Fatalf(
+			"unknown-call trusted lowering validation_status = %q, want non-validated",
+			row.ValidationStatus,
+		)
 	}
 	if len(row.ProofIDs) != 0 || len(report.Proofs) != 0 {
-		t.Fatalf("unknown-call trusted lowering proof_ids/proofs = %v/%v, want no proven trusted proof", row.ProofIDs, report.Proofs)
+		t.Fatalf(
+			"unknown-call trusted lowering proof_ids/proofs = %v/%v, want no proven trusted proof",
+			row.ProofIDs,
+			report.Proofs,
+		)
 	}
 	err := ValidateReport(report)
 	if err == nil || !strings.Contains(err.Error(), "trusted placement") {
@@ -273,7 +495,12 @@ func TestRAMContractFromAllocPlanEmitsScopedRegionIslandProofs(t *testing.T) {
 			},
 		}},
 	}
-	report := BuildReportFromAllocPlan(plan, "linux-x64", "e2c19b8ee276158f8eb2c54cf61e11bd84952893", "test")
+	report := BuildReportFromAllocPlan(
+		plan,
+		"linux-x64",
+		"e2c19b8ee276158f8eb2c54cf61e11bd84952893",
+		"test",
+	)
 	if err := ValidateReport(report); err != nil {
 		t.Fatalf("ValidateReport rejected generated scoped proof report: %v", err)
 	}
@@ -309,7 +536,8 @@ func TestRAMContractRejectsMissingBlockerExplanation(t *testing.T) {
 	report.Rows[0].Blockers = nil
 	report.Summary = SummarizeRows(report.Rows)
 	err := ValidateReport(report)
-	if err == nil || !strings.Contains(err.Error(), "heap") || !strings.Contains(err.Error(), "blocker") {
+	if err == nil || !strings.Contains(err.Error(), "heap") ||
+		!strings.Contains(err.Error(), "blocker") {
 		t.Fatalf("ValidateReport error = %v, want missing blocker explanation rejection", err)
 	}
 }
@@ -322,6 +550,8 @@ func TestRAMContractEnforcementFailsForHeap(t *testing.T) {
 	report.Rows[0].Bounded = false
 	report.Rows[0].ProofIDs = nil
 	report.Rows[0].Blockers = []string{"unknown_size"}
+	report.Rows[0].ReasonCodes = []string{allocplan.HeapReasonDynamicLifetime}
+	report.Rows[0].HeapReasonCodes = []string{allocplan.HeapReasonDynamicLifetime}
 	report.Rows[0].ValidationStatus = ValidationConservative
 	report.Summary = SummarizeRows(report.Rows)
 	err := Enforce(report, EnforcementOptions{FailIfHeap: true})
@@ -372,13 +602,46 @@ func validPipelineCoverageForTest() PipelineCoverageReport {
 		Target:        "linux-x64",
 		GeneratedBy:   "test",
 		Entries: []PipelineEntry{
-			{Entrypoint: "BuildFileWithStatsOpt", ArtifactPath: "app", Status: "validated_by_pipeline", Validators: []string{"ramcontract.ValidateReport"}},
-			{Entrypoint: "buildObjectFileWithStatsOpt", Status: "formal_exemption_with_reason", Exemption: "not exercised by this linux-x64 RAM release fixture; object builds must carry their own RAM coverage evidence"},
-			{Entrypoint: "buildLibraryObjectWithStatsOpt", Status: "formal_exemption_with_reason", Exemption: "not exercised by this linux-x64 RAM release fixture; library builds must carry their own RAM coverage evidence"},
-			{Entrypoint: "InterfaceOnly", Status: "formal_exemption_with_reason", Exemption: "interface-only mode does not produce a RAM artifact in this release fixture"},
-			{Entrypoint: "wasm32-wasi-build", Status: "formal_exemption_with_reason", Exemption: "wasm32-wasi RAM coverage is target-specific and not claimed by this linux-x64 release fixture"},
-			{Entrypoint: "wasm32-web-build", Status: "formal_exemption_with_reason", Exemption: "wasm32-web RAM coverage is target-specific and not claimed by this linux-x64 release fixture"},
-			{Entrypoint: "explain-report-path", Status: "formal_exemption_with_reason", Exemption: "explain report path is not artifact-producing in this release fixture"},
+			{
+				Entrypoint:   "BuildFileWithStatsOpt",
+				ArtifactPath: "app",
+				Status:       "validated_by_pipeline",
+				Validators:   []string{"ramcontract.ValidateReport"},
+			},
+			{
+				Entrypoint: "buildObjectFileWithStatsOpt",
+				Status:     "formal_exemption_with_reason",
+				Exemption: ("not exercised by this linux-x64 RAM release fixture; object " +
+					"builds must carry their own RAM coverage evidence"),
+			},
+			{
+				Entrypoint: "buildLibraryObjectWithStatsOpt",
+				Status:     "formal_exemption_with_reason",
+				Exemption: ("not exercised by this linux-x64 RAM release fixture; library " +
+					"builds must carry their own RAM coverage evidence"),
+			},
+			{
+				Entrypoint: "InterfaceOnly",
+				Status:     "formal_exemption_with_reason",
+				Exemption:  "interface-only mode does not produce a RAM artifact in this release fixture",
+			},
+			{
+				Entrypoint: "wasm32-wasi-build",
+				Status:     "formal_exemption_with_reason",
+				Exemption: ("wasm32-wasi RAM coverage is target-specific and not claimed by " +
+					"this linux-x64 release fixture"),
+			},
+			{
+				Entrypoint: "wasm32-web-build",
+				Status:     "formal_exemption_with_reason",
+				Exemption: ("wasm32-web RAM coverage is target-specific and not claimed by " +
+					"this linux-x64 release fixture"),
+			},
+			{
+				Entrypoint: "explain-report-path",
+				Status:     "formal_exemption_with_reason",
+				Exemption:  "explain report path is not artifact-producing in this release fixture",
+			},
 		},
 		NonClaims: DefaultNonClaims(),
 	}

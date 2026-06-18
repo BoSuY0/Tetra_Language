@@ -45,7 +45,12 @@ func TestRunRejectsMismatchedProofFiles(t *testing.T) {
 	if err := os.WriteFile(proofPath, []byte(validCLIProofReport()), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	memory := strings.Replace(validCLIMemoryReport(), `"island_id": "island:main:0"`, `"island_id": "island:other"`, 1)
+	memory := strings.Replace(
+		validCLIMemoryReport(),
+		`"island_id": "island:main:0"`,
+		`"island_id": "island:other"`,
+		1,
+	)
 	if err := os.WriteFile(memoryPath, []byte(memory), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -79,9 +84,17 @@ func TestRunRejectsManifestMissingVerifierCommand(t *testing.T) {
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	code := run([]string{"--proof", proofPath, "--memory-report", memoryPath, "--manifest", manifestPath}, &stdout, &stderr)
+	code := run(
+		[]string{"--proof", proofPath, "--memory-report", memoryPath, "--manifest", manifestPath},
+		&stdout,
+		&stderr,
+	)
 	if code != 1 || !strings.Contains(stderr.String(), "island-proof-verifier") {
-		t.Fatalf("run code/stderr = %d/%q, want manifest verifier command rejection", code, stderr.String())
+		t.Fatalf(
+			"run code/stderr = %d/%q, want manifest verifier command rejection",
+			code,
+			stderr.String(),
+		)
 	}
 }
 

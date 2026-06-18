@@ -1,1 +1,5 @@
-{"validator":"release-summary","mutation":"missing_producer","expected_error":"producer"}
+{
+  "validator": "release-summary",
+  "mutation": "missing_producer",
+  "expected_error": "producer"
+}

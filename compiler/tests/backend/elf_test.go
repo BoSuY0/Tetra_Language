@@ -209,7 +209,9 @@ func TestELF32LinuxX32ExecutableBuildHeaderContract(t *testing.T) {
 		t.Fatalf("e_machine = %#x, want EM_X86_64", got)
 	}
 	layout := elf.LinuxX32Layout(0, 0)
-	if got := binary.LittleEndian.Uint32(data[24:28]); got != uint32(elf.LinuxX32BaseVaddr+layout.CodeOffset) {
+	if got := binary.LittleEndian.Uint32(data[24:28]); got != uint32(
+		elf.LinuxX32BaseVaddr+layout.CodeOffset,
+	) {
 		t.Fatalf("e_entry = %#x, want %#x", got, elf.LinuxX32BaseVaddr+layout.CodeOffset)
 	}
 	if got := binary.LittleEndian.Uint32(data[28:32]); got != 52 {
@@ -269,7 +271,9 @@ func TestELF32LinuxX86ExecutableBuildHeaderContract(t *testing.T) {
 		t.Fatalf("e_machine = %#x, want EM_386", got)
 	}
 	layout := elf.LinuxX86Layout(0, 0)
-	if got := binary.LittleEndian.Uint32(data[24:28]); got != uint32(elf.LinuxX86BaseVaddr+layout.CodeOffset) {
+	if got := binary.LittleEndian.Uint32(data[24:28]); got != uint32(
+		elf.LinuxX86BaseVaddr+layout.CodeOffset,
+	) {
 		t.Fatalf("e_entry = %#x, want %#x", got, elf.LinuxX86BaseVaddr+layout.CodeOffset)
 	}
 	if !bytes.Contains(data, []byte{0x89, 0xC3, 0xB8, 0x01, 0x00, 0x00, 0x00, 0xCD, 0x80}) {

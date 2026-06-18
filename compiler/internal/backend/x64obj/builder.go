@@ -46,11 +46,22 @@ type EmitFunc func(
 	opt x64.CodegenOptions,
 ) error
 
-func BuildObject(funcs []ir.IRFunc, emit EmitFunc, opt x64.CodegenOptions, options Options) (*tobj.Object, error) {
+func BuildObject(
+	funcs []ir.IRFunc,
+	emit EmitFunc,
+	opt x64.CodegenOptions,
+	options Options,
+) (*tobj.Object, error) {
 	return BuildObjectWithDataPrefix(funcs, nil, emit, opt, options)
 }
 
-func BuildObjectWithDataPrefix(funcs []ir.IRFunc, dataPrefix [][]byte, emit EmitFunc, opt x64.CodegenOptions, options Options) (*tobj.Object, error) {
+func BuildObjectWithDataPrefix(
+	funcs []ir.IRFunc,
+	dataPrefix [][]byte,
+	emit EmitFunc,
+	opt x64.CodegenOptions,
+	options Options,
+) (*tobj.Object, error) {
 	if len(funcs) == 0 {
 		return nil, fmt.Errorf("missing IR functions")
 	}
@@ -62,7 +73,8 @@ func BuildObjectWithDataPrefix(funcs []ir.IRFunc, dataPrefix [][]byte, emit Emit
 		if fn.Name == "" {
 			return nil, fmt.Errorf("function name is empty")
 		}
-		if fn.ParamSlots < 0 || fn.LocalSlots < 0 || fn.LocalSlots < fn.ParamSlots || fn.ReturnSlots < 0 {
+		if fn.ParamSlots < 0 || fn.LocalSlots < 0 || fn.LocalSlots < fn.ParamSlots ||
+			fn.ReturnSlots < 0 {
 			return nil, fmt.Errorf("function '%s' has invalid slots", fn.Name)
 		}
 		if _, exists := functionSigs[fn.Name]; exists {
@@ -89,7 +101,8 @@ func BuildObjectWithDataPrefix(funcs []ir.IRFunc, dataPrefix [][]byte, emit Emit
 		if fn.Name == "" {
 			return nil, fmt.Errorf("function name is empty")
 		}
-		if fn.ParamSlots < 0 || fn.LocalSlots < 0 || fn.LocalSlots < fn.ParamSlots || fn.ReturnSlots < 0 {
+		if fn.ParamSlots < 0 || fn.LocalSlots < 0 || fn.LocalSlots < fn.ParamSlots ||
+			fn.ReturnSlots < 0 {
 			return nil, fmt.Errorf("function '%s' has invalid slots", fn.Name)
 		}
 		if _, exists := funcOffsets[fn.Name]; exists {
@@ -131,7 +144,11 @@ func BuildObjectWithDataPrefix(funcs []ir.IRFunc, dataPrefix [][]byte, emit Emit
 			patchLabel = "function address"
 			relocKind = tobj.RelocFuncAddrDisp32
 		default:
-			return nil, fmt.Errorf("unsupported symbol patch kind %d for %q", patch.Kind, patch.Name)
+			return nil, fmt.Errorf(
+				"unsupported symbol patch kind %d for %q",
+				patch.Kind,
+				patch.Name,
+			)
 		}
 		if err := validatePatchOffset(patchLabel, patch.At); err != nil {
 			return nil, err
@@ -145,7 +162,10 @@ func BuildObjectWithDataPrefix(funcs []ir.IRFunc, dataPrefix [][]byte, emit Emit
 			}
 			continue
 		}
-		relocs = append(relocs, tobj.Reloc{Kind: relocKind, At: uint32(patch.At), Name: patch.Name, Addend: 0})
+		relocs = append(
+			relocs,
+			tobj.Reloc{Kind: relocKind, At: uint32(patch.At), Name: patch.Name, Addend: 0},
+		)
 	}
 	for _, patch := range importPatches {
 		if err := validatePatchOffset("import", patch.At); err != nil {
@@ -154,7 +174,15 @@ func BuildObjectWithDataPrefix(funcs []ir.IRFunc, dataPrefix [][]byte, emit Emit
 		if patch.Name == "" {
 			return nil, fmt.Errorf("import patch name is empty")
 		}
-		relocs = append(relocs, tobj.Reloc{Kind: tobj.RelocIATDisp32, At: uint32(patch.At), Name: patch.Name, Addend: 0})
+		relocs = append(
+			relocs,
+			tobj.Reloc{
+				Kind:   tobj.RelocIATDisp32,
+				At:     uint32(patch.At),
+				Name:   patch.Name,
+				Addend: 0,
+			},
+		)
 	}
 
 	dataOffsets := make([]int, len(dataBlobs))
@@ -214,7 +242,15 @@ func validateObjectLocalCallSignatures(fn ir.IRFunc, functionSigs map[string]ir.
 			continue
 		}
 		if instr.ArgSlots != target.ParamSlots || instr.RetSlots != target.ReturnSlots {
-			return fmt.Errorf("function '%s' call %q ABI mismatch args=%d rets=%d want args=%d rets=%d", fn.Name, instr.Name, instr.ArgSlots, instr.RetSlots, target.ParamSlots, target.ReturnSlots)
+			return fmt.Errorf(
+				"function '%s' call %q ABI mismatch args=%d rets=%d want args=%d rets=%d",
+				fn.Name,
+				instr.Name,
+				instr.ArgSlots,
+				instr.RetSlots,
+				target.ParamSlots,
+				target.ReturnSlots,
+			)
 		}
 	}
 	return nil

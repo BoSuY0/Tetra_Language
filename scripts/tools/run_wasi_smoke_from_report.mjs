@@ -1,70 +1,76 @@
 #!/usr/bin/env node
 
-import { spawnSync } from 'node:child_process';
-import fs from 'node:fs';
-import path from 'node:path';
+import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 
 function usage() {
-  console.error('Usage: node scripts/tools/run_wasi_smoke_from_report.mjs --build-report <path> --out <path> --runner <wasmtime|node-wasi> --work-dir <path>');
+  console.error(
+    "Usage: node scripts/tools/run_wasi_smoke_from_report.mjs " +
+      "--build-report <path> --out <path> --runner <wasmtime|node-wasi> " +
+      "--work-dir <path>",
+  );
 }
 
 function parseArgs(argv) {
   const out = {
-    buildReport: '',
-    outPath: '',
-    runner: '',
-    workDir: '',
+    buildReport: "",
+    outPath: "",
+    runner: "",
+    workDir: "",
   };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     switch (arg) {
-      case '--build-report':
-        out.buildReport = argv[++i] || '';
+      case "--build-report":
+        out.buildReport = argv[++i] || "";
         break;
-      case '--out':
-        out.outPath = argv[++i] || '';
+      case "--out":
+        out.outPath = argv[++i] || "";
         break;
-      case '--runner':
-        out.runner = argv[++i] || '';
+      case "--runner":
+        out.runner = argv[++i] || "";
         break;
-      case '--work-dir':
-        out.workDir = argv[++i] || '';
+      case "--work-dir":
+        out.workDir = argv[++i] || "";
         break;
       default:
         throw new Error(`unknown argument: ${arg}`);
     }
   }
   if (!out.buildReport || !out.outPath || !out.runner || !out.workDir) {
-    throw new Error('--build-report, --out, --runner, and --work-dir are required');
+    throw new Error("--build-report, --out, --runner, and --work-dir are required");
   }
-  if (!['wasmtime', 'node-wasi'].includes(out.runner)) {
+  if (!["wasmtime", "node-wasi"].includes(out.runner)) {
     throw new Error(`unsupported runner ${JSON.stringify(out.runner)}`);
   }
   return out;
 }
 
 function runModule(runner, wasmPath) {
-  if (runner === 'wasmtime') {
-    return spawnSync('wasmtime', [wasmPath], { encoding: 'utf8' });
+  if (runner === "wasmtime") {
+    return spawnSync("wasmtime", [wasmPath], { encoding: "utf8" });
   }
-  const script = path.join(process.cwd(), 'scripts', 'tools', 'wasi_run_module.mjs');
-  return spawnSync('node', [script, wasmPath], { encoding: 'utf8' });
+  const script = path.join(process.cwd(), "scripts", "tools", "wasi_run_module.mjs");
+  return spawnSync("node", [script, wasmPath], { encoding: "utf8" });
 }
 
 function buildModule(srcPath, outPath) {
-  return spawnSync('./tetra', ['build', '--target', 'wasm32-wasi', '-o', outPath, srcPath], { encoding: 'utf8' });
+  return spawnSync("./tetra", ["build", "--target", "wasm32-wasi", "-o", outPath, srcPath], {
+    encoding: "utf8",
+  });
 }
 
 function firstLine(text) {
-  const trimmed = (text || '').trim();
+  const trimmed = (text || "").trim();
   if (!trimmed) {
-    return '';
+    return "";
   }
   return trimmed.split(/\r?\n/)[0];
 }
 
 function toExitCode(result) {
-  if (typeof result.status === 'number') {
+  if (typeof result.status === "number") {
     return Math.max(0, Math.min(255, result.status));
   }
   return 1;
@@ -80,7 +86,7 @@ function main() {
     process.exit(2);
   }
 
-  const buildReport = JSON.parse(fs.readFileSync(args.buildReport, 'utf8'));
+  const buildReport = JSON.parse(fs.readFileSync(args.buildReport, "utf8"));
   const cases = Array.isArray(buildReport.cases) ? buildReport.cases : [];
   fs.mkdirSync(args.workDir, { recursive: true });
 
@@ -93,19 +99,19 @@ function main() {
       name: c.name,
       src_path: c.src_path,
       expected_exit: Number(c.expected_exit || 0),
-      out_path: '',
+      out_path: "",
       ran: false,
       pass: false,
     };
 
     if (!c.pass) {
-      item.error = c.error || 'build-only smoke failed';
+      item.error = c.error || "build-only smoke failed";
       failed++;
       outCases.push(item);
       continue;
     }
     if (!c.src_path) {
-      item.error = 'missing src_path in build report';
+      item.error = "missing src_path in build report";
       failed++;
       outCases.push(item);
       continue;
@@ -114,8 +120,8 @@ function main() {
     const wasmPath = path.join(args.workDir, `${item.name}.wasm`);
     const buildResult = buildModule(c.src_path, wasmPath);
     item.out_path = wasmPath;
-    if (typeof buildResult.status !== 'number' || buildResult.status !== 0) {
-      item.error = firstLine(buildResult.stderr) || firstLine(buildResult.stdout) || 'build failed';
+    if (typeof buildResult.status !== "number" || buildResult.status !== 0) {
+      item.error = firstLine(buildResult.stderr) || firstLine(buildResult.stdout) || "build failed";
       failed++;
       outCases.push(item);
       continue;
@@ -130,7 +136,8 @@ function main() {
     if (item.pass) {
       passed++;
     } else {
-      const errLine = firstLine(result.stderr) || firstLine(result.stdout) || `unexpected exit ${actualExit}`;
+      const errLine =
+        firstLine(result.stderr) || firstLine(result.stdout) || `unexpected exit ${actualExit}`;
       item.error = errLine;
       failed++;
     }
@@ -140,11 +147,11 @@ function main() {
 
   const report = {
     timestamp: new Date().toISOString(),
-    target: buildReport.target || 'wasm32-wasi',
+    target: buildReport.target || "wasm32-wasi",
     build_only: Boolean(buildReport.build_only),
-    host: buildReport.host || '',
-    version: buildReport.version || '',
-    git_head: buildReport.git_head || '',
+    host: buildReport.host || "",
+    version: buildReport.version || "",
+    git_head: buildReport.git_head || "",
     islands_debug: Boolean(buildReport.islands_debug),
     total: outCases.length,
     passed,
@@ -154,7 +161,7 @@ function main() {
   };
 
   fs.mkdirSync(path.dirname(args.outPath), { recursive: true });
-  fs.writeFileSync(args.outPath, JSON.stringify(report, null, 2) + '\n');
+  fs.writeFileSync(args.outPath, JSON.stringify(report, null, 2) + "\n");
 
   if (failed > 0) {
     process.exit(1);

@@ -1,0 +1,31 @@
+// Generic optional-pointer call memory microservice smoke.
+//
+// The service routes an allocation-base pointer through generic optional
+// pointer identity and consume helpers before deriving the checked cell.
+module examples.microservices.memory.optional.pointers.memory_ptr_generic_optional_call_service
+import lib.core.capability as cap
+
+func id<T>(value: T) -> T:
+    return value
+
+func keep_consume<T>(value: consume T) -> T:
+    return value
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let payload: ptr = core.alloc_bytes(8)
+        let cell: ptr = core.ptr_add(payload, 4, memory_cap)
+        let _stored_value: Int = core.store_i32(cell, 42, memory_cap)
+        let maybe_base: ptr? = payload
+        let via_id: ptr? = id(maybe_base)
+        let via_consume: ptr? = keep_consume(via_id)
+        if let base = via_consume:
+            let loaded_cell: ptr = core.ptr_add(base, 4, memory_cap)
+            let value: Int = core.load_i32(loaded_cell, memory_cap)
+            if value == 42:
+                return 0
+            return value
+        return 98
+    return 99

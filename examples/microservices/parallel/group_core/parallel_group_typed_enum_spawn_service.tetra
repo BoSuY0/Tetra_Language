@@ -1,0 +1,36 @@
+// Typed task-group enum spawn microservice smoke.
+//
+// The service carries a task group through an enum payload, spawns a typed
+// grouped worker from the matched handle, joins it, and closes the handle.
+module examples.microservices.parallel.group_core.parallel_group_typed_enum_spawn_service
+enum GroupErr:
+    case stopped
+    case code(Int)
+
+enum GroupSlot:
+    case ready(task.group)
+    case missing
+
+func worker() -> Int throws GroupErr:
+    return 42
+
+func main() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let slot: GroupSlot = GroupSlot.ready(group)
+    match slot:
+    case GroupSlot.ready(handle):
+        let task = core.task_spawn_group_i32_typed<GroupErr>(handle, "worker")
+        let status: Int = catch core.task_join_group_i32_typed<GroupErr>(task):
+        case GroupErr.stopped:
+            7
+        case GroupErr.code(code):
+            code
+        let close_error: Int = core.task_group_close(handle)
+        if close_error != 0:
+            return 20 + close_error
+        if status == 42:
+            return 0
+        return status
+    case GroupSlot.missing:
+        return 99

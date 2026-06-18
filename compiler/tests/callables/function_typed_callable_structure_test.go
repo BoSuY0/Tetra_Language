@@ -2,368 +2,105 @@ package compiler_test
 
 import (
 	"os"
+	"path/filepath"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 )
 
 func TestFunctionTypedCallableTestsAreSplitByDomain(t *testing.T) {
 	expected := map[string][]string{
-		"function_typed_callable_throwing_test.go": {
-			"TestBuildFunctionTypedThrowingLocalDirectTrySmoke",
-			"TestBuildFunctionTypedThrowingCapturedClosureLocalDirectTrySmoke",
-			"TestBuildFunctionTypedThrowingStructFieldDirectTrySmoke",
-			"TestBuildFunctionTypedThrowingEnumPayloadDirectTrySmoke",
-			"TestBuildFunctionTypedThrowingCapturedClosureEnumPayloadReassignmentDirectTrySmoke",
-			"TestBuildFunctionTypedThrowingCapturedClosureReturnCrossModuleDirectTrySmoke",
-			"TestBuildFunctionTypedThrowingCapturedClosureReturnCrossModuleDirectCallbackArgumentSmoke",
-			"TestBuildFunctionTypedThrowingCapturedClosureReturnedStructFieldCrossModuleDirectTrySmoke",
-			"TestBuildFunctionTypedThrowingCapturedClosureReturnedEnumPayloadCrossModuleDirectTrySmoke",
+		".": {
+			"function_typed_callable_structure_test.go",
 		},
-		"function_typed_callable_full_capture_test.go": {
-			"TestBuildFunctionTypedCapturedClosureEightSlotReturnCrossModuleCallbackSmoke",
-			"TestBuildFunctionTypedCapturedClosureEightSlotEnumReturnCrossModuleCallbackSmoke",
-			"TestBuildFullCallableEscapedNineCaptureReturnSmoke",
-			"TestBuildFullCallableLocalNineCaptureSmoke",
-			"TestBuildFullCallableMutableLocalReassignNineCaptureSmoke",
-			"TestBuildFullCallableStructFieldNineCaptureSmoke",
-			"TestBuildFullCallableStructFieldReassignNineCaptureSmoke",
-			"TestBuildFullCallableEnumPayloadNineCaptureSmoke",
-			"TestBuildFullCallableEnumPayloadReassignNineCaptureSmoke",
-			"TestBuildFullCallableEscapedGlobalNineCaptureSmoke",
-			"TestBuildFullCallableCallbackArgumentNineCaptureSmoke",
-			"TestBuildFullCallableLocalCallbackArgumentNineCaptureSmoke",
-			"TestBuildFullCallableReturnAliasTwelveCaptureSmoke",
-			"TestBuildFullCallableGlobalAliasTwelveCaptureSmoke",
-			"TestBuildFullCallableCallbackAliasTwelveCaptureSmoke",
-			"TestBuildFullCallableCrossModuleReturnedNineCaptureMatrixSmoke",
+		"core": {
+			"function_typed_callable_direct_symbol_test.go",
+			"function_typed_callable_local_return_alias_test.go",
+			"function_typed_callable_parameter_field_return_test.go",
+			"function_typed_callable_parameter_return_capture_test.go",
+			"function_typed_callable_parameter_return_reassignment_test.go",
+			"function_typed_callable_test.go",
 		},
-		"function_typed_callable_captured_closure_test.go": {
-			"TestBuildFunctionTypedCapturedClosureLocalDirectCallSmoke",
-			"TestBuildFunctionTypedCapturedClosureLocalDirectCallAllowsArgumentLabelsSmoke",
-			"TestBuildFunctionTypedCapturedPtrClosureFiveSlotDirectAndCallbackSmoke",
-			"TestBuildFunctionTypedCapturedClosureCompositeCaptureMatrixCallbackSmoke",
-			"TestBuildFunctionTypedCapturedClosureEnumCaptureMatrixCallbackSmoke",
-			"TestBuildFunctionTypedCapturedClosureOptionalCaptureMatrixCallbackSmoke",
-			"TestBuildFunctionTypedMutableCaptureSnapshotsAtBindingSmoke",
-			"TestBuildFunctionTypedLocalAliasCapturedPtrClosureSmoke",
-			"TestBuildCapturedPtrClosureLabeledDirectCallSmoke",
-			"TestBuildCapturedPtrClosureDirectCallbackArgumentSmoke",
-			"TestBuildCapturedPtrClosureReturnedFunctionValueSmoke",
-			"TestBuildFunctionTypedMutableLocalReassignCapturedPtrClosureSmoke",
-			"TestBuildFunctionTypedReturnMultiTargetCapturedClosureDirectCallSmoke",
-			"TestBuildFunctionTypedReturnMultiTargetCapturedPtrClosureDirectCallSmoke",
-			"TestBuildFunctionTypedReturnCapturedPtrClosureDirectCallbackArgumentSmoke",
-			"TestBuildFunctionTypedReturnMultiTargetCapturedClosureCallbackSmoke",
-			"TestBuildFunctionTypedCapturedClosureReturnCrossModuleCallbackSmoke",
-			"TestBuildFunctionTypedCapturedClosureReturnCrossModuleDirectCallbackArgumentSmoke",
+		"captures": {
+			"function_typed_callable_captured_closure_test.go",
+			"function_typed_callable_full_capture_test.go",
+			"function_typed_callable_returned_struct_enum_payload_test.go",
 		},
-		"function_typed_callable_mutable_global_test.go": {
-			"TestBuildFunctionTypedCapturedClosureMutableGlobalReassignmentDirectCallSmoke",
-			"TestBuildFunctionTypedCapturedPtrClosureMutableGlobalReassignmentDirectCallSmoke",
-			"TestBuildFunctionTypedCapturedClosureMutableGlobalReassignmentCallbackArgumentSmoke",
-			"TestBuildFunctionTypedCapturedClosureMutableGlobalReassignmentReturnDirectCallSmoke",
-			"TestBuildFunctionTypedCapturedClosureReturnCallMutableGlobalReassignmentDirectCallSmoke",
-			"TestBuildFunctionTypedCapturedClosureReturnLocalMutableGlobalReassignmentDirectCallSmoke",
-			"TestBuildFunctionTypedCapturedClosureReturnMutableLocalReassignmentDirectCallSmoke",
-			"TestBuildFunctionTypedCapturedClosureReturnMutableLocalMutableGlobalReassignmentDirectCallSmoke",
-			"TestBuildFunctionTypedCapturedClosureReturnStructFieldMutableGlobalReassignmentDirectCallSmoke",
-			"TestBuildFunctionTypedCapturedClosureStructFieldMutableGlobalSnapshotSmoke",
-			"TestBuildFunctionTypedCapturedClosureReturnNestedStructFieldMutableGlobalReassignmentDirectCallSmoke",
-			"TestBuildFunctionTypedCapturedClosureReturnWholeStructMutableGlobalReassignmentDirectCallSmoke",
-			"TestBuildFunctionTypedCapturedClosureWholeStructMutableGlobalSnapshotSmoke",
-			"TestBuildFunctionTypedCapturedClosureReturnWholeNestedStructMutableGlobalReassignmentDirectCallSmoke",
-			"TestBuildFunctionTypedCapturedClosureWholeNestedStructMutableGlobalSnapshotSmoke",
-			"TestBuildFunctionTypedCapturedClosureReturnEnumPayloadMutableGlobalReassignmentDirectCallSmoke",
-			"TestBuildFunctionTypedCapturedClosureEnumPayloadMutableGlobalSnapshotSmoke",
-			"TestBuildFunctionTypedCapturedClosureWholeEnumMutableGlobalSnapshotSmoke",
-			"TestBuildFunctionTypedCapturedClosureReturnedStructEnumPayloadMutableGlobalSnapshotSmoke",
-			"TestBuildFunctionTypedCapturedClosureReturnedEnumPayloadMutableGlobalSnapshotSmoke",
+		"globals": {
+			"function_typed_callable_enum_payload_test.go",
+			"function_typed_callable_global_value_test.go",
+			"function_typed_callable_imported_enum_payload_test.go",
+			"function_typed_callable_imported_global_test.go",
+			"function_typed_callable_mutable_global_storage_test.go",
+			"function_typed_callable_mutable_global_test.go",
 		},
-		"function_typed_callable_mutable_global_storage_test.go": {
-			"TestBuildFunctionTypedCapturedClosureImportedReturnedStructEnumPayloadMutableGlobalSnapshotSmoke",
-			"TestBuildFunctionTypedCapturedClosureImportedReturnedEnumPayloadMutableGlobalSnapshotSmoke",
-			"TestBuildFunctionTypedCapturedClosureMutableGlobalReassignmentCrossModuleReturnDirectCallSmoke",
-			"TestBuildFunctionTypedCapturedClosureMutableGlobalCrossModuleReturnDirectCallbackArgumentSmoke",
-			"TestBuildFunctionTypedCapturedClosureMutableGlobalCrossModuleReturnMutableLocalReassignmentSmoke",
-			"TestBuildFunctionTypedCapturedClosureMutableGlobalCrossModuleReturnStructFieldDirectCallSmoke",
-			"TestBuildFunctionTypedCapturedClosureMutableGlobalCrossModuleReturnEnumPayloadDirectCallSmoke",
-			"TestBuildFunctionTypedThrowingCapturedClosureMutableGlobalReassignmentDirectTrySmoke",
-			"TestBuildFunctionTypedThrowingCapturedClosureMutableGlobalCrossModuleReturnDirectTrySmoke",
-			"TestBuildFunctionTypedCapturedClosureMutableGlobalStructFieldInitializerDirectCallSmoke",
-			"TestBuildFunctionTypedCapturedClosureMutableGlobalStructFieldReassignmentDirectCallSmoke",
-			"TestBuildFunctionTypedCapturedClosureMutableGlobalEnumPayloadReassignmentDirectCallSmoke",
-			"TestBuildFunctionTypedCapturedClosureMutableGlobalEnumPayloadInitializerDirectCallSmoke",
+		"reassignment": {
+			"function_typed_callable_parameter_return_enum_reassignment_test.go",
+			"function_typed_callable_reassignment_generic_test.go",
 		},
-		"function_typed_callable_direct_symbol_test.go": {
-			"TestBuildFunctionTypedCallableParamDirectNamedSymbolSmoke",
-			"TestBuildFunctionTypedCallableParamMultiTargetSmoke",
-			"TestBuildFunctionTypedCallableParamMultiTargetStringReturnSmoke",
-			"TestBuildFunctionTypedCallableParamMultiTargetStructReturnSmoke",
-			"TestBuildFunctionTypedCallbackCallAllowsArgumentLabelsSmoke",
-			"TestBuildFunctionTypedStructFieldCallAllowsArgumentLabelsSmoke",
-			"TestBuildFunctionTypedGlobalCallAllowsArgumentLabelsSmoke",
+		"cross_module": {
+			"function_typed_callable_cross_module_callback_test.go",
+			"function_typed_callable_cross_module_direct_storage_test.go",
+			"function_typed_callable_cross_module_multi_target_test.go",
+			"function_typed_callable_cross_module_return_test.go",
 		},
-		"function_typed_callable_cross_module_callback_test.go": {
-			"TestBuildFunctionTypedCallableParamCrossModuleSmoke",
-			"TestBuildFunctionTypedStructFieldCrossModuleCallbackSmoke",
-			"TestBuildFunctionTypedEnumPayloadCrossModuleCallbackSmoke",
-			"TestBuildFunctionTypedCallableParamMultiTargetCrossModuleSmoke",
-			"TestBuildFunctionTypedReturnDirectCallbackArgumentCrossModuleSmoke",
-			"TestBuildFunctionTypedImportedParameterReturnCapturedPtrClosureDirectCallbackArgumentSmoke",
-			"TestBuildFunctionTypedImportedReturnIgnoresCapturedCallbackArgumentSmoke",
+		"throwing": {
+			"function_typed_callable_throwing_test.go",
 		},
-		"function_typed_callable_cross_module_return_test.go": {
-			"TestBuildFunctionTypedCallableParamDirectNamedSymbolCrossModuleSmoke",
-			"TestBuildFunctionTypedReturnDirectNamedSymbolCrossModuleSmoke",
-			"TestBuildFunctionTypedReturnMultiTargetCrossModuleCallbackSmoke",
-			"TestBuildFunctionTypedStructFieldFromMultiTargetCrossModuleReturnSmoke",
-			"TestBuildFunctionTypedStructFieldFromCapturedCrossModuleReturnSmoke",
-			"TestBuildFunctionTypedEnumPayloadFromMultiTargetCrossModuleReturnSmoke",
-			"TestBuildFunctionTypedParameterReturnedEnumPayloadCrossModuleSmoke",
-		},
-		"function_typed_callable_imported_enum_payload_test.go": {
-			"TestBuildFunctionTypedImportedEnumPayloadParamCapturedClosureSmoke",
-			"TestBuildFunctionTypedImportedEnumPayloadParamDirectReturnCapturedClosureSmoke",
-			"TestBuildFunctionTypedImportedEnumPayloadParamDirectConstructorCapturedClosureSmoke",
-			"TestBuildFunctionTypedSelectiveImportedEnumPayloadParamDirectConstructorCapturedClosureSmoke",
-			"TestBuildFunctionTypedImportedEnumPayloadParamDirectConstructorClosureLiteralSmoke",
-		},
-		"function_typed_callable_cross_module_multi_target_test.go": {
-			"TestBuildFunctionTypedReturnMultiTargetCrossModuleDirectCallSmoke",
-			"TestBuildFunctionTypedMutableLocalReassignmentFromMultiTargetCrossModuleReturnSmoke",
-			"TestBuildFunctionTypedStructFieldReassignmentFromMultiTargetCrossModuleReturnSmoke",
-			"TestBuildFunctionTypedMutableEnumPayloadReassignmentFromMultiTargetCrossModuleReturnSmoke",
-		},
-		"function_typed_callable_cross_module_direct_storage_test.go": {
-			"TestBuildFunctionTypedStructFieldDirectNamedSymbolCrossModuleSmoke",
-			"TestBuildFunctionTypedEnumPayloadDirectNamedSymbolCrossModuleSmoke",
-		},
-		"function_typed_callable_local_return_alias_test.go": {
-			"TestBuildFunctionTypedReturnSymbolBackedValueSmoke",
-			"TestBuildFunctionTypedReturnParameterValueSmoke",
-			"TestBuildFunctionTypedReturnParameterDirectCallbackArgumentSmoke",
-			"TestBuildFunctionTypedParameterAliasDirectCallSmoke",
-			"TestBuildFunctionTypedParameterAliasCallbackArgumentSmoke",
-			"TestBuildFunctionTypedReturnDirectNamedSymbolSmoke",
-			"TestBuildFunctionTypedReturnMultiTargetDirectCallSmoke",
-			"TestBuildFunctionTypedReturnMultiTargetCallbackSmoke",
-			"TestBuildFunctionTypedReturnDirectCallbackArgumentSmoke",
-			"TestBuildFunctionTypedReturnMultiTargetLocalAliasSmoke",
-			"TestBuildFunctionTypedMutableLocalReassignmentFromMultiTargetReturnSmoke",
-		},
-		"function_typed_callable_parameter_return_capture_test.go": {
-			"TestBuildFunctionTypedParameterReturnCapturedPtrClosureSmoke",
-			"TestBuildFunctionTypedParameterReturnCapturedPtrClosureCrossModuleSmoke",
-			"TestBuildFunctionTypedReturnCallStructFieldCapturedPtrClosureSmoke",
-			"TestBuildFunctionTypedReturnCallEnumPayloadCapturedPtrClosureSmoke",
-			"TestBuildFunctionTypedImportedParameterReturnStructFieldCapturedPtrClosureSmoke",
-			"TestBuildFunctionTypedImportedParameterReturnEnumPayloadCapturedPtrClosureSmoke",
-		},
-		"function_typed_callable_parameter_return_reassignment_test.go": {
-			"TestBuildFunctionTypedParameterReturnMutableLocalReassignmentCapturedPtrClosureSmoke",
-			"TestBuildFunctionTypedParameterReturnStructFieldReassignmentCapturedPtrClosureSmoke",
-			"TestBuildFunctionTypedImportedParameterReturnMutableLocalReassignmentCapturedPtrClosureSmoke",
-			"TestBuildFunctionTypedImportedParameterReturnStructFieldReassignmentCapturedPtrClosureSmoke",
-			"TestBuildFunctionTypedImportedParameterReturnNestedStructFieldReassignmentCapturedPtrClosureSmoke",
-			"TestBuildFunctionTypedImportedParameterReturnWholeStructReassignmentCapturedPtrClosureSmoke",
-			"TestBuildFunctionTypedImportedParameterReturnStructValuedFieldReassignmentCapturedPtrClosureSmoke",
-			"TestBuildFunctionTypedImportedParameterReturnWholeNestedStructReassignmentCapturedPtrClosureSmoke",
-		},
-		"function_typed_callable_parameter_return_enum_reassignment_test.go": {
-			"TestBuildFunctionTypedParameterReturnEnumPayloadReassignmentCapturedPtrClosureSmoke",
-			"TestBuildFunctionTypedImportedParameterReturnEnumPayloadReassignmentCapturedPtrClosureSmoke",
-			"TestBuildFunctionTypedImportedParameterReturnStructFieldEnumPayloadReassignmentCapturedPtrClosureSmoke",
-		},
-		"function_typed_callable_returned_struct_enum_payload_test.go": {
-			"TestBuildFunctionTypedReturnedStructEnumPayloadCapturedPtrClosureSmoke",
-			"TestBuildFunctionTypedImportedReturnedStructEnumPayloadCapturedPtrClosureSmoke",
-			"TestBuildFunctionTypedReturnedStructEnumPayloadDirectFieldMatchCapturedPtrClosureSmoke",
-			"TestBuildFunctionTypedReturnedStructEnumPayloadWholeStructReassignmentCapturedPtrClosureSmoke",
-			"TestBuildFunctionTypedNestedReturnedStructEnumPayloadCapturedPtrClosureSmoke",
-			"TestBuildFunctionTypedReturnedStructEnumPayloadMultiTargetDirectCallSmoke",
-		},
-		"function_typed_callable_parameter_field_return_test.go": {
-			"TestBuildFunctionTypedStructParameterFieldReturnCapturedClosureDirectCallSmoke",
-			"TestBuildFunctionTypedEnumParameterPayloadReturnCapturedClosureDirectCallSmoke",
-			"TestBuildFunctionTypedStructParameterFieldReturnCapturedClosureCallbackArgumentSmoke",
-			"TestBuildFunctionTypedNestedStructParameterFieldReturnCapturedClosureDirectCallSmoke",
-			"TestBuildFunctionTypedStructParameterWholeReturnCapturedClosureDirectCallSmoke",
-			"TestBuildFunctionTypedEnumParameterWholeReturnCapturedClosureDirectCallSmoke",
-			"TestBuildFunctionTypedEnumParameterPayloadReturnCapturedClosureCallbackArgumentSmoke",
+		"unsupported": {
+			"function_typed_callable_unsupported_diagnostics_test.go",
 		},
 	}
 
-	for path, symbols := range expected {
-		raw, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatalf("read %s: %v", path, err)
-		}
-		text := string(raw)
-		for _, symbol := range symbols {
-			if !strings.Contains(text, "func "+symbol+"(") {
-				t.Fatalf("%s must contain %s", path, symbol)
-			}
+	if _, err := os.Stat("README.md"); err != nil {
+		t.Fatalf("README.md must remain in callables root: %v", err)
+	}
+	for dir, want := range expected {
+		requireGoFiles(t, dir, want)
+		for _, name := range want {
+			requireCompilerTestPackage(t, filepath.Join(dir, name))
 		}
 	}
+	if _, err := os.Stat("runtime_helpers_test.go"); !os.IsNotExist(err) {
+		t.Fatalf("runtime_helpers_test.go must move out of callables root; stat err=%v", err)
+	}
+}
 
-	mainRaw, err := os.ReadFile("function_typed_callable_test.go")
+func requireGoFiles(t *testing.T, dir string, want []string) {
+	t.Helper()
+
+	entries, err := os.ReadDir(dir)
 	if err != nil {
-		t.Fatalf("read function_typed_callable_test.go: %v", err)
+		t.Fatalf("read %s: %v", dir, err)
 	}
-	mainText := string(mainRaw)
-	for _, symbol := range []string{
-		"TestBuildFunctionTypedThrowingLocalDirectTrySmoke",
-		"TestBuildFunctionTypedThrowingCapturedClosureLocalDirectTrySmoke",
-		"TestBuildFunctionTypedThrowingStructFieldDirectTrySmoke",
-		"TestBuildFunctionTypedThrowingEnumPayloadDirectTrySmoke",
-		"TestBuildFunctionTypedThrowingCapturedClosureEnumPayloadReassignmentDirectTrySmoke",
-		"TestBuildFunctionTypedThrowingCapturedClosureReturnCrossModuleDirectTrySmoke",
-		"TestBuildFunctionTypedThrowingCapturedClosureReturnCrossModuleDirectCallbackArgumentSmoke",
-		"TestBuildFunctionTypedThrowingCapturedClosureReturnedStructFieldCrossModuleDirectTrySmoke",
-		"TestBuildFunctionTypedThrowingCapturedClosureReturnedEnumPayloadCrossModuleDirectTrySmoke",
-		"TestBuildFullCallableEscapedNineCaptureReturnSmoke",
-		"TestBuildFullCallableLocalNineCaptureSmoke",
-		"TestBuildFullCallableMutableLocalReassignNineCaptureSmoke",
-		"TestBuildFullCallableStructFieldNineCaptureSmoke",
-		"TestBuildFullCallableStructFieldReassignNineCaptureSmoke",
-		"TestBuildFullCallableEnumPayloadNineCaptureSmoke",
-		"TestBuildFullCallableEnumPayloadReassignNineCaptureSmoke",
-		"TestBuildFullCallableEscapedGlobalNineCaptureSmoke",
-		"TestBuildFullCallableCallbackArgumentNineCaptureSmoke",
-		"TestBuildFullCallableLocalCallbackArgumentNineCaptureSmoke",
-		"TestBuildFullCallableReturnAliasTwelveCaptureSmoke",
-		"TestBuildFullCallableGlobalAliasTwelveCaptureSmoke",
-		"TestBuildFullCallableCallbackAliasTwelveCaptureSmoke",
-		"TestBuildFullCallableCrossModuleReturnedNineCaptureMatrixSmoke",
-		"TestBuildFunctionTypedCapturedClosureEightSlotReturnCrossModuleCallbackSmoke",
-		"TestBuildFunctionTypedCapturedClosureEightSlotEnumReturnCrossModuleCallbackSmoke",
-		"TestBuildFunctionTypedCapturedClosureLocalDirectCallSmoke",
-		"TestBuildFunctionTypedCapturedClosureLocalDirectCallAllowsArgumentLabelsSmoke",
-		"TestBuildFunctionTypedCapturedPtrClosureFiveSlotDirectAndCallbackSmoke",
-		"TestBuildFunctionTypedCapturedClosureCompositeCaptureMatrixCallbackSmoke",
-		"TestBuildFunctionTypedCapturedClosureEnumCaptureMatrixCallbackSmoke",
-		"TestBuildFunctionTypedCapturedClosureOptionalCaptureMatrixCallbackSmoke",
-		"TestBuildFunctionTypedMutableCaptureSnapshotsAtBindingSmoke",
-		"TestBuildFunctionTypedLocalAliasCapturedPtrClosureSmoke",
-		"TestBuildCapturedPtrClosureLabeledDirectCallSmoke",
-		"TestBuildCapturedPtrClosureDirectCallbackArgumentSmoke",
-		"TestBuildCapturedPtrClosureReturnedFunctionValueSmoke",
-		"TestBuildFunctionTypedMutableLocalReassignCapturedPtrClosureSmoke",
-		"TestBuildFunctionTypedReturnMultiTargetCapturedClosureDirectCallSmoke",
-		"TestBuildFunctionTypedReturnMultiTargetCapturedPtrClosureDirectCallSmoke",
-		"TestBuildFunctionTypedReturnCapturedPtrClosureDirectCallbackArgumentSmoke",
-		"TestBuildFunctionTypedReturnMultiTargetCapturedClosureCallbackSmoke",
-		"TestBuildFunctionTypedCapturedClosureReturnCrossModuleCallbackSmoke",
-		"TestBuildFunctionTypedCapturedClosureReturnCrossModuleDirectCallbackArgumentSmoke",
-		"TestBuildFunctionTypedCapturedClosureMutableGlobalReassignmentDirectCallSmoke",
-		"TestBuildFunctionTypedCapturedPtrClosureMutableGlobalReassignmentDirectCallSmoke",
-		"TestBuildFunctionTypedCapturedClosureMutableGlobalReassignmentCallbackArgumentSmoke",
-		"TestBuildFunctionTypedCapturedClosureMutableGlobalReassignmentReturnDirectCallSmoke",
-		"TestBuildFunctionTypedCapturedClosureReturnCallMutableGlobalReassignmentDirectCallSmoke",
-		"TestBuildFunctionTypedCapturedClosureReturnLocalMutableGlobalReassignmentDirectCallSmoke",
-		"TestBuildFunctionTypedCapturedClosureReturnMutableLocalReassignmentDirectCallSmoke",
-		"TestBuildFunctionTypedCapturedClosureReturnMutableLocalMutableGlobalReassignmentDirectCallSmoke",
-		"TestBuildFunctionTypedCapturedClosureReturnStructFieldMutableGlobalReassignmentDirectCallSmoke",
-		"TestBuildFunctionTypedCapturedClosureStructFieldMutableGlobalSnapshotSmoke",
-		"TestBuildFunctionTypedCapturedClosureReturnNestedStructFieldMutableGlobalReassignmentDirectCallSmoke",
-		"TestBuildFunctionTypedCapturedClosureReturnWholeStructMutableGlobalReassignmentDirectCallSmoke",
-		"TestBuildFunctionTypedCapturedClosureWholeStructMutableGlobalSnapshotSmoke",
-		"TestBuildFunctionTypedCapturedClosureReturnWholeNestedStructMutableGlobalReassignmentDirectCallSmoke",
-		"TestBuildFunctionTypedCapturedClosureWholeNestedStructMutableGlobalSnapshotSmoke",
-		"TestBuildFunctionTypedCapturedClosureReturnEnumPayloadMutableGlobalReassignmentDirectCallSmoke",
-		"TestBuildFunctionTypedCapturedClosureEnumPayloadMutableGlobalSnapshotSmoke",
-		"TestBuildFunctionTypedCapturedClosureWholeEnumMutableGlobalSnapshotSmoke",
-		"TestBuildFunctionTypedCapturedClosureReturnedStructEnumPayloadMutableGlobalSnapshotSmoke",
-		"TestBuildFunctionTypedCapturedClosureReturnedEnumPayloadMutableGlobalSnapshotSmoke",
-		"TestBuildFunctionTypedCapturedClosureImportedReturnedStructEnumPayloadMutableGlobalSnapshotSmoke",
-		"TestBuildFunctionTypedCapturedClosureImportedReturnedEnumPayloadMutableGlobalSnapshotSmoke",
-		"TestBuildFunctionTypedCapturedClosureMutableGlobalReassignmentCrossModuleReturnDirectCallSmoke",
-		"TestBuildFunctionTypedCapturedClosureMutableGlobalCrossModuleReturnDirectCallbackArgumentSmoke",
-		"TestBuildFunctionTypedCapturedClosureMutableGlobalCrossModuleReturnMutableLocalReassignmentSmoke",
-		"TestBuildFunctionTypedCapturedClosureMutableGlobalCrossModuleReturnStructFieldDirectCallSmoke",
-		"TestBuildFunctionTypedCapturedClosureMutableGlobalCrossModuleReturnEnumPayloadDirectCallSmoke",
-		"TestBuildFunctionTypedThrowingCapturedClosureMutableGlobalReassignmentDirectTrySmoke",
-		"TestBuildFunctionTypedThrowingCapturedClosureMutableGlobalCrossModuleReturnDirectTrySmoke",
-		"TestBuildFunctionTypedCapturedClosureMutableGlobalStructFieldInitializerDirectCallSmoke",
-		"TestBuildFunctionTypedCapturedClosureMutableGlobalStructFieldReassignmentDirectCallSmoke",
-		"TestBuildFunctionTypedCapturedClosureMutableGlobalEnumPayloadReassignmentDirectCallSmoke",
-		"TestBuildFunctionTypedCapturedClosureMutableGlobalEnumPayloadInitializerDirectCallSmoke",
-		"TestBuildFunctionTypedCallableParamDirectNamedSymbolSmoke",
-		"TestBuildFunctionTypedCallableParamMultiTargetSmoke",
-		"TestBuildFunctionTypedCallableParamMultiTargetStringReturnSmoke",
-		"TestBuildFunctionTypedCallableParamMultiTargetStructReturnSmoke",
-		"TestBuildFunctionTypedCallbackCallAllowsArgumentLabelsSmoke",
-		"TestBuildFunctionTypedStructFieldCallAllowsArgumentLabelsSmoke",
-		"TestBuildFunctionTypedGlobalCallAllowsArgumentLabelsSmoke",
-		"TestBuildFunctionTypedCallableParamCrossModuleSmoke",
-		"TestBuildFunctionTypedStructFieldCrossModuleCallbackSmoke",
-		"TestBuildFunctionTypedEnumPayloadCrossModuleCallbackSmoke",
-		"TestBuildFunctionTypedCallableParamMultiTargetCrossModuleSmoke",
-		"TestBuildFunctionTypedReturnDirectCallbackArgumentCrossModuleSmoke",
-		"TestBuildFunctionTypedImportedParameterReturnCapturedPtrClosureDirectCallbackArgumentSmoke",
-		"TestBuildFunctionTypedImportedReturnIgnoresCapturedCallbackArgumentSmoke",
-		"TestBuildFunctionTypedCallableParamDirectNamedSymbolCrossModuleSmoke",
-		"TestBuildFunctionTypedReturnDirectNamedSymbolCrossModuleSmoke",
-		"TestBuildFunctionTypedReturnMultiTargetCrossModuleCallbackSmoke",
-		"TestBuildFunctionTypedStructFieldFromMultiTargetCrossModuleReturnSmoke",
-		"TestBuildFunctionTypedStructFieldFromCapturedCrossModuleReturnSmoke",
-		"TestBuildFunctionTypedEnumPayloadFromMultiTargetCrossModuleReturnSmoke",
-		"TestBuildFunctionTypedParameterReturnedEnumPayloadCrossModuleSmoke",
-		"TestBuildFunctionTypedImportedEnumPayloadParamCapturedClosureSmoke",
-		"TestBuildFunctionTypedImportedEnumPayloadParamDirectReturnCapturedClosureSmoke",
-		"TestBuildFunctionTypedImportedEnumPayloadParamDirectConstructorCapturedClosureSmoke",
-		"TestBuildFunctionTypedSelectiveImportedEnumPayloadParamDirectConstructorCapturedClosureSmoke",
-		"TestBuildFunctionTypedImportedEnumPayloadParamDirectConstructorClosureLiteralSmoke",
-		"TestBuildFunctionTypedReturnMultiTargetCrossModuleDirectCallSmoke",
-		"TestBuildFunctionTypedMutableLocalReassignmentFromMultiTargetCrossModuleReturnSmoke",
-		"TestBuildFunctionTypedStructFieldReassignmentFromMultiTargetCrossModuleReturnSmoke",
-		"TestBuildFunctionTypedMutableEnumPayloadReassignmentFromMultiTargetCrossModuleReturnSmoke",
-		"TestBuildFunctionTypedStructFieldDirectNamedSymbolCrossModuleSmoke",
-		"TestBuildFunctionTypedEnumPayloadDirectNamedSymbolCrossModuleSmoke",
-		"TestBuildFunctionTypedReturnSymbolBackedValueSmoke",
-		"TestBuildFunctionTypedReturnParameterValueSmoke",
-		"TestBuildFunctionTypedReturnParameterDirectCallbackArgumentSmoke",
-		"TestBuildFunctionTypedParameterAliasDirectCallSmoke",
-		"TestBuildFunctionTypedParameterAliasCallbackArgumentSmoke",
-		"TestBuildFunctionTypedReturnDirectNamedSymbolSmoke",
-		"TestBuildFunctionTypedReturnMultiTargetDirectCallSmoke",
-		"TestBuildFunctionTypedReturnMultiTargetCallbackSmoke",
-		"TestBuildFunctionTypedReturnDirectCallbackArgumentSmoke",
-		"TestBuildFunctionTypedReturnMultiTargetLocalAliasSmoke",
-		"TestBuildFunctionTypedMutableLocalReassignmentFromMultiTargetReturnSmoke",
-		"TestBuildFunctionTypedParameterReturnCapturedPtrClosureSmoke",
-		"TestBuildFunctionTypedParameterReturnCapturedPtrClosureCrossModuleSmoke",
-		"TestBuildFunctionTypedReturnCallStructFieldCapturedPtrClosureSmoke",
-		"TestBuildFunctionTypedReturnCallEnumPayloadCapturedPtrClosureSmoke",
-		"TestBuildFunctionTypedImportedParameterReturnStructFieldCapturedPtrClosureSmoke",
-		"TestBuildFunctionTypedImportedParameterReturnEnumPayloadCapturedPtrClosureSmoke",
-		"TestBuildFunctionTypedParameterReturnMutableLocalReassignmentCapturedPtrClosureSmoke",
-		"TestBuildFunctionTypedParameterReturnStructFieldReassignmentCapturedPtrClosureSmoke",
-		"TestBuildFunctionTypedImportedParameterReturnMutableLocalReassignmentCapturedPtrClosureSmoke",
-		"TestBuildFunctionTypedImportedParameterReturnStructFieldReassignmentCapturedPtrClosureSmoke",
-		"TestBuildFunctionTypedImportedParameterReturnNestedStructFieldReassignmentCapturedPtrClosureSmoke",
-		"TestBuildFunctionTypedImportedParameterReturnWholeStructReassignmentCapturedPtrClosureSmoke",
-		"TestBuildFunctionTypedImportedParameterReturnStructValuedFieldReassignmentCapturedPtrClosureSmoke",
-		"TestBuildFunctionTypedImportedParameterReturnWholeNestedStructReassignmentCapturedPtrClosureSmoke",
-		"TestBuildFunctionTypedParameterReturnEnumPayloadReassignmentCapturedPtrClosureSmoke",
-		"TestBuildFunctionTypedImportedParameterReturnEnumPayloadReassignmentCapturedPtrClosureSmoke",
-		"TestBuildFunctionTypedImportedParameterReturnStructFieldEnumPayloadReassignmentCapturedPtrClosureSmoke",
-		"TestBuildFunctionTypedReturnedStructEnumPayloadCapturedPtrClosureSmoke",
-		"TestBuildFunctionTypedImportedReturnedStructEnumPayloadCapturedPtrClosureSmoke",
-		"TestBuildFunctionTypedReturnedStructEnumPayloadDirectFieldMatchCapturedPtrClosureSmoke",
-		"TestBuildFunctionTypedReturnedStructEnumPayloadWholeStructReassignmentCapturedPtrClosureSmoke",
-		"TestBuildFunctionTypedNestedReturnedStructEnumPayloadCapturedPtrClosureSmoke",
-		"TestBuildFunctionTypedReturnedStructEnumPayloadMultiTargetDirectCallSmoke",
-		"TestBuildFunctionTypedStructParameterFieldReturnCapturedClosureDirectCallSmoke",
-		"TestBuildFunctionTypedEnumParameterPayloadReturnCapturedClosureDirectCallSmoke",
-		"TestBuildFunctionTypedStructParameterFieldReturnCapturedClosureCallbackArgumentSmoke",
-		"TestBuildFunctionTypedNestedStructParameterFieldReturnCapturedClosureDirectCallSmoke",
-		"TestBuildFunctionTypedStructParameterWholeReturnCapturedClosureDirectCallSmoke",
-		"TestBuildFunctionTypedEnumParameterWholeReturnCapturedClosureDirectCallSmoke",
-		"TestBuildFunctionTypedEnumParameterPayloadReturnCapturedClosureCallbackArgumentSmoke",
-	} {
-		if strings.Contains(mainText, "\nfunc "+symbol+"(") {
-			t.Fatalf("function_typed_callable_test.go still contains %s", symbol)
+	var got []string
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".go" {
+			continue
 		}
+		got = append(got, entry.Name())
+	}
+	sort.Strings(got)
+	want = append([]string(nil), want...)
+	sort.Strings(want)
+
+	if len(got) > 6 {
+		t.Fatalf("%s has %d Go files, want <= 6: %v", dir, len(got), got)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("%s Go files mismatch:\n got: %v\nwant: %v", dir, got, want)
+	}
+}
+
+func requireCompilerTestPackage(t *testing.T, path string) {
+	t.Helper()
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	if !strings.HasPrefix(string(raw), "package compiler_test\n") {
+		t.Fatalf("%s must use package compiler_test", path)
 	}
 }

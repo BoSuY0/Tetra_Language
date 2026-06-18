@@ -47,7 +47,12 @@ func TestGenerateSmokeSourceMalformedTestDeclDiagnostic(t *testing.T) {
 		t.Fatalf("diagnostic identity = %#v", diag)
 	}
 	if diag.File != "generated_bad.tetra" || diag.Line != 1 || diag.Column != 6 {
-		t.Fatalf("position = %q:%d:%d, want generated_bad.tetra:1:6", diag.File, diag.Line, diag.Column)
+		t.Fatalf(
+			"position = %q:%d:%d, want generated_bad.tetra:1:6",
+			diag.File,
+			diag.Line,
+			diag.Column,
+		)
 	}
 	if diag.Message != "expected string, got identifier" {
 		t.Fatalf("message = %q", diag.Message)
@@ -64,7 +69,13 @@ func TestGenerateSmokeSourceSpanCRLFTabAndUnicode(t *testing.T) {
 	}
 	diag := compiler.DiagnosticFromError(err)
 	if diag.File != "generated_span.tetra" || diag.Line != expectedLine || diag.Column != 1 {
-		t.Fatalf("position = %q:%d:%d, want generated_span.tetra:%d:1", diag.File, diag.Line, diag.Column, expectedLine)
+		t.Fatalf(
+			"position = %q:%d:%d, want generated_span.tetra:%d:1",
+			diag.File,
+			diag.Line,
+			diag.Column,
+			expectedLine,
+		)
 	}
 	if diag.Message != "tabs are not supported in Flow indentation" {
 		t.Fatalf("message = %q", diag.Message)

@@ -1,14 +1,14 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"tetra_language/tools/internal/reportdecode"
 )
 
 type smokeListReport struct {
@@ -41,8 +41,15 @@ const smokeListArtifact = "tetra.release.v0_2_0.smoke-list.v1"
 func main() {
 	var path string
 	var examplesRoot string
-	flag.StringVar(&path, "report", "", "path to tetra smoke --list --format=json output")
-	flag.StringVar(&examplesRoot, "examples-root", "", "optional examples directory to require smoke coverage or documented exclusion")
+	var format string
+	flag.StringVar(&path, "report", "", "path to tetra smoke --list structured output")
+	flag.StringVar(
+		&examplesRoot,
+		"examples-root",
+		"",
+		"optional examples directory to require smoke coverage or documented exclusion",
+	)
+	flag.StringVar(&format, "format", "auto", "report format: auto, json, or toon")
 	flag.Parse()
 	if path == "" {
 		fmt.Fprintln(os.Stderr, "error: --report is required")
@@ -53,7 +60,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err := validateSmokeListWithExamplesRoot(raw, examplesRoot); err != nil {
+	if err := validateSmokeListWithExamplesRootFormat(raw, examplesRoot, format); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -64,15 +71,17 @@ func isSmokeSourceFile(path string) bool {
 }
 
 func validateSmokeList(raw []byte) error {
-	return validateSmokeListWithExamplesRoot(raw, "")
+	return validateSmokeListWithExamplesRootFormat(raw, "", "auto")
 }
 
 func validateSmokeListWithExamplesRoot(raw []byte, examplesRoot string) error {
+	return validateSmokeListWithExamplesRootFormat(raw, examplesRoot, "auto")
+}
+
+func validateSmokeListWithExamplesRootFormat(raw []byte, examplesRoot string, format string) error {
 	var report smokeListReport
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&report); err != nil {
-		return fmt.Errorf("invalid smoke list JSON: %w", err)
+	if err := reportdecode.DecodeStrictFormat(raw, format, &report); err != nil {
+		return fmt.Errorf("invalid smoke list report: %w", err)
 	}
 	if report.Total != len(report.Cases) {
 		return fmt.Errorf("smoke list total = %d, want %d", report.Total, len(report.Cases))
@@ -106,7 +115,11 @@ func validateSmokeListWithExamplesRoot(raw []byte, examplesRoot string) error {
 		}
 		seenSources[c.SrcPath] = true
 		if c.ExpectedExit < 0 || c.ExpectedExit > 255 {
-			return fmt.Errorf("smoke case %s expected_exit = %d, want 0..255", c.Name, c.ExpectedExit)
+			return fmt.Errorf(
+				"smoke case %s expected_exit = %d, want 0..255",
+				c.Name,
+				c.ExpectedExit,
+			)
 		}
 		if c.Unsupported {
 			if c.ExpectedDiagnostic == "" {
@@ -121,7 +134,11 @@ func validateSmokeListWithExamplesRoot(raw []byte, examplesRoot string) error {
 			case "":
 				return fmt.Errorf("smoke case %s missing target_group", c.Name)
 			default:
-				return fmt.Errorf("smoke case %s target_group = %q, want native or wasm", c.Name, c.TargetGroup)
+				return fmt.Errorf(
+					"smoke case %s target_group = %q, want native or wasm",
+					c.Name,
+					c.TargetGroup,
+				)
 			}
 		}
 		if _, ok := required[c.Name]; ok {
@@ -140,7 +157,10 @@ func validateSmokeListWithExamplesRoot(raw []byte, examplesRoot string) error {
 			return fmt.Errorf("smoke exclusion %s missing reason", exclusion.SrcPath)
 		}
 		if !isSmokeSourceFile(exclusion.SrcPath) {
-			return fmt.Errorf("smoke exclusion %s src_path must be a .t4 or .tetra file", exclusion.SrcPath)
+			return fmt.Errorf(
+				"smoke exclusion %s src_path must be a .t4 or .tetra file",
+				exclusion.SrcPath,
+			)
 		}
 		if seenSources[exclusion.SrcPath] {
 			return fmt.Errorf("smoke exclusion %s is also an active smoke case", exclusion.SrcPath)
@@ -162,7 +182,10 @@ func validateSmokeListWithExamplesRoot(raw []byte, examplesRoot string) error {
 		}
 		for _, example := range examples {
 			if !seenSources[example] && !seenExclusions[example] {
-				return fmt.Errorf("example %s is not assigned to a smoke case or documented exclusion", example)
+				return fmt.Errorf(
+					"example %s is not assigned to a smoke case or documented exclusion",
+					example,
+				)
 			}
 		}
 	}

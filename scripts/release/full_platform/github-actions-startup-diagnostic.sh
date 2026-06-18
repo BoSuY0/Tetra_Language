@@ -13,7 +13,7 @@ canary_branch=""
 billing_owner=""
 
 usage() {
-  cat <<'USAGE'
+  cat << 'USAGE'
 Usage: bash scripts/release/full_platform/github-actions-startup-diagnostic.sh [--repo OWNER/REPO] [--branch BRANCH] [--report FILE] [--canary-branch BRANCH]
 
 Writes a diagnostic-only blocker report when GitHub Actions runs are created
@@ -87,7 +87,7 @@ while [[ $# -gt 0 ]]; do
       limit="$2"
       shift 2
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;
@@ -102,7 +102,7 @@ done
 cd "$repo_root"
 
 if [[ -z "$repo" ]]; then
-  remote_url="$(git remote get-url origin 2>/dev/null || true)"
+  remote_url="$(git remote get-url origin 2> /dev/null || true)"
   repo="$(printf '%s' "$remote_url" | sed -E 's#^git@github.com:##; s#^https://github.com/##; s#\.git$##')"
 fi
 if [[ -z "$branch" ]]; then
@@ -115,11 +115,11 @@ fi
 if [[ -z "$billing_owner" ]]; then
   billing_owner="${repo%%/*}"
 fi
-if ! command -v gh >/dev/null 2>&1; then
+if ! command -v gh > /dev/null 2>&1; then
   echo "error: gh is required for GitHub Actions startup diagnostics" >&2
   exit 2
 fi
-if ! command -v jq >/dev/null 2>&1; then
+if ! command -v jq > /dev/null 2>&1; then
   echo "error: jq is required for GitHub Actions startup diagnostics" >&2
   exit 2
 fi
@@ -140,29 +140,29 @@ gh run list \
   --branch "$branch" \
   --limit "$limit" \
   --json databaseId,event,conclusion,headSha,workflowName \
-  >"$runs_path"
+  > "$runs_path"
 
-jq '[.[] | select(.conclusion == "startup_failure")]' "$runs_path" >"$blocked_runs_path"
+jq '[.[] | select(.conclusion == "startup_failure")]' "$runs_path" > "$blocked_runs_path"
 
 repo_actions_enabled="false"
 repo_allowed_actions="unknown"
-if gh api "repos/$repo/actions/permissions" >"$permissions_path"; then
+if gh api "repos/$repo/actions/permissions" > "$permissions_path"; then
   repo_actions_enabled="$(jq -r '.enabled // false' "$permissions_path")"
   repo_allowed_actions="$(jq -r '.allowed_actions // "unknown"' "$permissions_path")"
 fi
 
 self_hosted_runner_count=0
-if gh api "repos/$repo/actions/runners" >"$runners_path"; then
+if gh api "repos/$repo/actions/runners" > "$runners_path"; then
   self_hosted_runner_count="$(jq -r '.total_count // 0' "$runners_path")"
 fi
 
 billing_actions_status="unavailable"
 billing_actions_detail="billing API unavailable"
-if gh api "users/$billing_owner/settings/billing/actions" >"$billing_path" 2>"$billing_err_path"; then
+if gh api "users/$billing_owner/settings/billing/actions" > "$billing_path" 2> "$billing_err_path"; then
   billing_actions_status="available"
   billing_actions_detail="$(jq -c '{total_minutes_used, included_minutes, minutes_used_breakdown}' "$billing_path")"
 else
-  billing_err="$(tr '\n' ' ' <"$billing_err_path" | sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//' | cut -c 1-240)"
+  billing_err="$(tr '\n' ' ' < "$billing_err_path" | sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//' | cut -c 1-240)"
   if grep -q '"user" scope' "$billing_err_path"; then
     billing_actions_status="unavailable_missing_user_scope"
     billing_actions_detail="requires gh auth refresh -h github.com -s user"
@@ -171,7 +171,7 @@ else
   fi
 fi
 
-printf 'null\n' >"$canary_path"
+printf 'null\n' > "$canary_path"
 if [[ -n "$canary_branch" ]]; then
   canary_runs_path="$tmp_dir/canary-runs.json"
   gh run list \
@@ -179,7 +179,7 @@ if [[ -n "$canary_branch" ]]; then
     --branch "$canary_branch" \
     --limit "$limit" \
     --json databaseId,event,conclusion,headSha,workflowName \
-    >"$canary_runs_path"
+    > "$canary_runs_path"
   jq -e \
     --arg branch "$canary_branch" \
     '[.[] | select(.conclusion == "startup_failure")][0] | {
@@ -192,7 +192,7 @@ if [[ -n "$canary_branch" ]]; then
       jobs: 0,
       logs_available: false
     }' \
-    "$canary_runs_path" >"$canary_path"
+    "$canary_runs_path" > "$canary_path"
 fi
 
 jq -n \
@@ -230,7 +230,7 @@ jq -n \
       logs_available: false
     })),
     next_action: "Use manual or self-hosted target-host Windows/macOS reports; do not count startup_failure as runtime evidence."
-  }' >"$report_path"
+  }' > "$report_path"
 
 go run ./tools/cmd/validate-actions-startup-blocker --report "$report_path"
 echo "GitHub Actions startup blocker report: $report_path"

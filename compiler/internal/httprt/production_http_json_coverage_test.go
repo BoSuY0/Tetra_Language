@@ -16,7 +16,11 @@ func TestProductionHTTPJSONCoverageDefinesP19SourceFirstSlice(t *testing.T) {
 	if report.SchemaVersion != "tetra.stdlib.http_json.production_stack.v1" {
 		t.Fatalf("schema = %q", report.SchemaVersion)
 	}
-	if report.FullProductionWebStackClaimed || report.OfficialTechEmpowerResultClaimed || report.ProductionPostgreSQLStackClaimed || report.P20PerformanceMatrixClaimed || report.CPlusPlusRustParityClaimed || report.RuntimeBehaviorChanged {
+	if report.FullProductionWebStackClaimed || report.OfficialTechEmpowerResultClaimed ||
+		report.ProductionPostgreSQLStackClaimed ||
+		report.P20PerformanceMatrixClaimed ||
+		report.CPlusPlusRustParityClaimed ||
+		report.RuntimeBehaviorChanged {
 		t.Fatalf("coverage report contains forbidden claim flags: %#v", report)
 	}
 
@@ -45,15 +49,72 @@ func TestProductionHTTPJSONCoverageDefinesP19SourceFirstSlice(t *testing.T) {
 		}
 	}
 
-	requireProductionHTTPJSONFacts(t, rows[ProductionHTTPJSONRequestHeadParser], "lib/core/http.tetra", "request_head_len_bytes_at", "ParseRequestView")
-	requireProductionHTTPJSONFacts(t, rows[ProductionHTTPJSONPipelinedRequestHeads], "pipelining", "consumed", "examples/core_http_smoke.tetra")
-	requireProductionHTTPJSONFacts(t, rows[ProductionHTTPJSONHeadersBodyKeepAlive], "Content-Length", "Body", "KeepAlive")
-	requireProductionHTTPJSONFacts(t, rows[ProductionHTTPJSONNoHeapRequestView], "HeapAllocations=0", "HeaderViewsBorrowed", "TestParseRequestViewBorrowsHeadersWithoutAllocating")
-	requireProductionHTTPJSONFacts(t, rows[ProductionHTTPJSONJSONParseStringify], "lib/core/json.tetra", "ParseValueView", "AppendMessageObject")
-	requireProductionHTTPJSONFacts(t, rows[ProductionHTTPJSONResponseBuilder], "write_plaintext_response", "write_json_message_response", "AppendResponseWithReport")
-	requireProductionHTTPJSONFacts(t, rows[ProductionHTTPJSONDateCacheBoundary], "HTTPDateCache", "FormatWithReport", "TestHTTPDateCacheRefreshesOncePerSecond", "source-level lib.core.http cached-date helper remains out of scope")
-	requireProductionHTTPJSONFacts(t, rows[ProductionHTTPJSONWritevSendfileBoundary], "netrt.Writev", "netrt.Sendfile", "TestWritevWritesMultipleBuffersOnConnectedTCP", "TestSendfileCopiesFileBytesToConnectedTCPAndAdvancesOffset", "webrt.flush remains single-buffer")
-	requireProductionHTTPJSONFacts(t, rows[ProductionHTTPJSONSourceFirstBenchmark], "p19.2_http_json_source_first", "HTTP plaintext", "HTTP JSON")
+	requireProductionHTTPJSONFacts(
+		t,
+		rows[ProductionHTTPJSONRequestHeadParser],
+		"lib/core/io/http.tetra",
+		"request_head_len_bytes_at",
+		"ParseRequestView",
+	)
+	requireProductionHTTPJSONFacts(
+		t,
+		rows[ProductionHTTPJSONPipelinedRequestHeads],
+		"pipelining",
+		"consumed",
+		"examples/core/platform/core_http_smoke.tetra",
+	)
+	requireProductionHTTPJSONFacts(
+		t,
+		rows[ProductionHTTPJSONHeadersBodyKeepAlive],
+		"Content-Length",
+		"Body",
+		"KeepAlive",
+	)
+	requireProductionHTTPJSONFacts(
+		t,
+		rows[ProductionHTTPJSONNoHeapRequestView],
+		"HeapAllocations=0",
+		"HeaderViewsBorrowed",
+		"TestParseRequestViewBorrowsHeadersWithoutAllocating",
+	)
+	requireProductionHTTPJSONFacts(
+		t,
+		rows[ProductionHTTPJSONJSONParseStringify],
+		"lib/core/data/json.tetra",
+		"ParseValueView",
+		"AppendMessageObject",
+	)
+	requireProductionHTTPJSONFacts(
+		t,
+		rows[ProductionHTTPJSONResponseBuilder],
+		"write_plaintext_response",
+		"write_json_message_response",
+		"AppendResponseWithReport",
+	)
+	requireProductionHTTPJSONFacts(
+		t,
+		rows[ProductionHTTPJSONDateCacheBoundary],
+		"HTTPDateCache",
+		"FormatWithReport",
+		"TestHTTPDateCacheRefreshesOncePerSecond",
+		"source-level lib.core.http cached-date helper remains out of scope",
+	)
+	requireProductionHTTPJSONFacts(
+		t,
+		rows[ProductionHTTPJSONWritevSendfileBoundary],
+		"netrt.Writev",
+		"netrt.Sendfile",
+		"TestWritevWritesMultipleBuffersOnConnectedTCP",
+		"TestSendfileCopiesFileBytesToConnectedTCPAndAdvancesOffset",
+		"webrt.flush remains single-buffer",
+	)
+	requireProductionHTTPJSONFacts(
+		t,
+		rows[ProductionHTTPJSONSourceFirstBenchmark],
+		"p19.2_http_json_source_first",
+		"HTTP plaintext",
+		"HTTP JSON",
+	)
 }
 
 func TestProductionHTTPJSONCoverageRejectsFakeClaims(t *testing.T) {
@@ -89,7 +150,10 @@ func TestProductionHTTPJSONCoverageRejectsFakeClaims(t *testing.T) {
 	}
 }
 
-func productionHTTPJSONRows(t *testing.T, rows []ProductionHTTPJSONEvidenceRow) map[ProductionHTTPJSONEvidenceID]ProductionHTTPJSONEvidenceRow {
+func productionHTTPJSONRows(
+	t *testing.T,
+	rows []ProductionHTTPJSONEvidenceRow,
+) map[ProductionHTTPJSONEvidenceID]ProductionHTTPJSONEvidenceRow {
 	t.Helper()
 	out := map[ProductionHTTPJSONEvidenceID]ProductionHTTPJSONEvidenceRow{}
 	for _, row := range rows {
@@ -104,9 +168,19 @@ func productionHTTPJSONRows(t *testing.T, rows []ProductionHTTPJSONEvidenceRow) 
 	return out
 }
 
-func requireProductionHTTPJSONFacts(t *testing.T, row ProductionHTTPJSONEvidenceRow, wants ...string) {
+func requireProductionHTTPJSONFacts(
+	t *testing.T,
+	row ProductionHTTPJSONEvidenceRow,
+	wants ...string,
+) {
 	t.Helper()
-	text := strings.Join(row.RequiredFacts, "\n") + "\n" + row.Evidence + "\n" + row.Boundary + "\n" + strings.Join(row.MissingFacts, "\n")
+	text := strings.Join(
+		row.RequiredFacts,
+		"\n",
+	) + "\n" + row.Evidence + "\n" + row.Boundary + "\n" + strings.Join(
+		row.MissingFacts,
+		"\n",
+	)
 	for _, want := range wants {
 		if !strings.Contains(text, want) {
 			t.Fatalf("row %q missing fact %q:\n%s", row.ID, want, text)

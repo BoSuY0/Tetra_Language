@@ -4,8 +4,10 @@ Status: decided (2026-04-26)
 
 This document resolves:
 
-- TODO 237: decide whether `normalizeFlowSyntax` remains compatibility tooling or is replaced by a Flow parser.
-- Open investigation 659: decide whether Flow gets a native parser or keeps normalization during migration.
+- TODO 237: decide whether `normalizeFlowSyntax` remains compatibility tooling or is replaced by a
+  Flow parser.
+- Open investigation 659: decide whether Flow gets a native parser or keeps normalization during
+  migration.
 
 ## Decision
 

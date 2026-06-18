@@ -1,0 +1,32 @@
+// Typed-error base-pointer dynamic memory microservice smoke.
+//
+// The service catches an allocation-base pointer from a typed error and keeps a
+// later dynamic load loop anchored at that recovered base.
+module examples.microservices.memory.typed_errors.core.memory_typed_error_base_dynamic_service
+enum PtrRouteErr:
+    case raw(ptr)
+
+func route_base(raw: ptr) -> ptr throws PtrRouteErr:
+    throw PtrRouteErr.raw(raw)
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let payload: ptr = core.alloc_bytes(4)
+        let payload_one: ptr = core.ptr_add(payload, 1, memory_cap)
+        let _write_zero: UInt8 = core.store_u8(payload, 20, memory_cap)
+        let _write_one: UInt8 = core.store_u8(payload_one, 22, memory_cap)
+        let recovered_base: ptr = catch route_base(payload):
+        case PtrRouteErr.raw(raw_base):
+            raw_base
+        var offset: Int = 0
+        var total: Int = 0
+        while offset < 2:
+            let cell: ptr = core.ptr_add(recovered_base, offset, memory_cap)
+            total = total + core.load_u8(cell, memory_cap)
+            offset = offset + 1
+        if total == 42:
+            return 0
+        return total
+    return 98

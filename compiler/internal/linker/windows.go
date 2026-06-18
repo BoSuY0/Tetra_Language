@@ -17,7 +17,12 @@ func LinkWindowsX64(objects []*tobj.Object, mainName string) (*pe.PEImage, error
 			return nil, fmt.Errorf("nil object")
 		}
 		if obj.Target != expectedTarget {
-			return nil, fmt.Errorf("linker target mismatch: windows-x64 expects '%s' object, got '%s' (module '%s')", expectedTarget, obj.Target, obj.Module)
+			return nil, fmt.Errorf(
+				"linker target mismatch: windows-x64 expects '%s' object, got '%s' (module '%s')",
+				expectedTarget,
+				obj.Target,
+				obj.Module,
+			)
 		}
 	}
 

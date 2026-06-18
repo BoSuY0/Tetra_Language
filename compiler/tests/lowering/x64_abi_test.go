@@ -100,7 +100,12 @@ func TestX64ABIReturnSlotsThreeAndFourRegisterMapping(t *testing.T) {
 				wantSuffix := &x64.Emitter{}
 				emitX64ReturnSlotPushes(wantSuffix, layout.regs)
 				if !bytes.HasSuffix(e.Buf, wantSuffix.Buf) {
-					t.Fatalf("return-slot mapping mismatch for registers %v\n got=% x\nwant suffix=% x", layout.regs, e.Buf, wantSuffix.Buf)
+					t.Fatalf(
+						"return-slot mapping mismatch for registers %v\n got=% x\nwant suffix=% x",
+						layout.regs,
+						e.Buf,
+						wantSuffix.Buf,
+					)
 				}
 			})
 		}
@@ -205,14 +210,16 @@ func TestX64CodegenObjectRelocKindsByPlatformABI(t *testing.T) {
 	if !hasKind(windowsObj, compiler.RelocIATDisp32) {
 		t.Fatalf("Win64 object should carry IAT relocations")
 	}
-	if !hasKind(linuxObj, compiler.RelocDataDisp32) || !hasKind(macosObj, compiler.RelocDataDisp32) || !hasKind(windowsObj, compiler.RelocDataDisp32) {
+	if !hasKind(linuxObj, compiler.RelocDataDisp32) ||
+		!hasKind(macosObj, compiler.RelocDataDisp32) ||
+		!hasKind(windowsObj, compiler.RelocDataDisp32) {
 		t.Fatalf("all native x64 objects should carry data relocations for string literal")
 	}
 }
 
 func TestX64BuildOnlySmokeAcrossNativeTargets(t *testing.T) {
 	tmp := t.TempDir()
-	srcPath := testkit.RepoPath(t, "examples", "hello.tetra")
+	srcPath := testkit.RepoPath(t, "examples", "smoke", "basic", "hello.tetra")
 	targets := []struct {
 		target string
 		suffix string

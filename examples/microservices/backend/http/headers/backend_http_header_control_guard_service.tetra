@@ -1,0 +1,104 @@
+// Backend HTTP response header control-byte guard microservice.
+module examples.microservices.backend.http.headers.backend_http_header_control_guard_service
+import lib.core.http as http
+
+func fill_bytes(dst: inout []u8, count: Int, value: Int) -> Int
+uses mem:
+    var i: Int = 0
+    while i < count:
+        dst[i] = value
+        i = i + 1
+    return count
+
+func all_bytes_equal(src: []u8, count: Int, value: Int) -> Bool
+uses mem:
+    var i: Int = 0
+    while i < count:
+        if src[i] != value:
+            return false
+        i = i + 1
+    return true
+
+func control_value() -> String:
+    return "ok\x1fbad"
+
+func check_htab_value_allowed() -> Int
+uses alloc, mem:
+    let value: String = "ok\tgood"
+    let total: Int = http.header_line_len("X-Test", value)
+    if total <= 0:
+        return 1
+    var header: []u8 = core.make_u8(32)
+    if http.write_header_at(header, 0, "X-Test", value) != total:
+        return 2
+    if header[10] != 9:
+        return 3
+    return 0
+
+func check_header_value_rejects(code: Int) -> Int
+uses alloc, mem:
+    let value: String = control_value()
+    if http.header_line_len("X-Test", value) != -1:
+        return code
+    var header: []u8 = core.make_u8(64)
+    fill_bytes(header, 64, 7)
+    if http.write_header_at(header, 0, "X-Test", value) != -1:
+        return code + 1
+    if !all_bytes_equal(header, 64, 7):
+        return code + 2
+    return 0
+
+func check_response_rejects(reason: String, server: String, content_type: String, code: Int) -> Int
+uses alloc, mem:
+    let date: String = "Fri, 05 Jan 2024 00:00:00 GMT"
+    if http.response_head_len(200, reason, server, date, content_type, 0, true) != -1:
+        return code
+    var head: []u8 = core.make_u8(128)
+    fill_bytes(head, 128, 6)
+    if http.write_response_head(head, 200, reason, server, date, content_type, 0, true) != -1:
+        return code + 1
+    if !all_bytes_equal(head, 128, 6):
+        return code + 2
+    return 0
+
+func check_full_response_rejects() -> Int
+uses alloc, mem:
+    let date: String = "Fri, 05 Jan 2024 00:00:00 GMT"
+    let value: String = control_value()
+    if http.plaintext_response_len(value, date, true) != -1:
+        return 61
+    var plain: []u8 = core.make_u8(192)
+    fill_bytes(plain, 192, 5)
+    if http.write_plaintext_response(plain, value, date, true) != -1:
+        return 62
+    if !all_bytes_equal(plain, 192, 5):
+        return 63
+    if http.json_message_response_len("Tetra", value, "OK", true) != -1:
+        return 64
+    var json: []u8 = core.make_u8(192)
+    fill_bytes(json, 192, 4)
+    if http.write_json_message_response(json, "Tetra", value, "OK", true) != -1:
+        return 65
+    if !all_bytes_equal(json, 192, 4):
+        return 66
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    let valid: Int = check_htab_value_allowed()
+    if valid != 0:
+        return valid
+    let bad_header_value: Int = check_header_value_rejects(11)
+    if bad_header_value != 0:
+        return bad_header_value
+    let value: String = control_value()
+    let bad_reason: Int = check_response_rejects(value, "Tetra", "text/plain", 21)
+    if bad_reason != 0:
+        return bad_reason
+    let bad_server: Int = check_response_rejects("OK", value, "text/plain", 31)
+    if bad_server != 0:
+        return bad_server
+    let bad_content_type: Int = check_response_rejects("OK", "Tetra", value, 41)
+    if bad_content_type != 0:
+        return bad_content_type
+    return check_full_response_rejects()

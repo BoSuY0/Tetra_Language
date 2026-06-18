@@ -1,0 +1,25 @@
+// Memory zero-copy microservice smoke.
+//
+// The service verifies that zero-length memcpy_u8 returns success and leaves
+// the target buffer untouched.
+module examples.microservices.memory.misc.ops.memory_zero_copy_service
+import lib.core.capability as cap
+import lib.core.memory as memory
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let source: ptr = core.alloc_bytes(4)
+        let target: ptr = core.alloc_bytes(4)
+        let _seed_source: Int = memory.memset_u8(source, 99, 4, memory_cap)
+        let _seed_target: Int = memory.memset_u8(target, 7, 4, memory_cap)
+        let copy_status: Int = memory.memcpy_u8(target, source, 0, memory_cap)
+        if copy_status != 0:
+            return 10 + copy_status
+        let target_one: ptr = core.ptr_add(target, 1, memory_cap)
+        let total: Int = core.load_u8(target, memory_cap) + core.load_u8(target_one, memory_cap)
+        if total == 14:
+            return 0
+        return total
+    return 98

@@ -77,6 +77,8 @@ six screens when `chromium` is installed.
   backend snapshot data.
 - `tests/` - backend and UI contract tests.
 - `docs/architecture.md` - component and data-flow notes.
+- `docs/surface-flagship-contract.md` - Surface-native flagship contract for
+  the Tetra Studio Shell product slice.
 - `docs/privileged-helper-threat-model.md` - write boundary and threat model.
 - `docs/hardware-support-matrix.md` - evidence-backed hardware support status.
 - `docs/final-report.md` - implemented features and verification evidence.

@@ -1,0 +1,26 @@
+// Task group current-status microservice smoke.
+//
+// The grouped worker resolves its current group handle and reports the open
+// status back through the task result.
+module examples.microservices.parallel.tasks.group_cancel.task_group_current_status_service
+func worker() -> Int
+uses runtime:
+    let current: task.group = core.task_group_current()
+    let status: Int = core.task_group_status(current)
+    if status == 1:
+        return 42
+    return status
+
+func main() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let task: task.i32 = core.task_spawn_group_i32(group, "worker")
+    let result: task.result_i32 = core.task_join_result_i32(task)
+    let close_error: Int = core.task_group_close(group)
+    if close_error != 0:
+        return 10 + close_error
+    if result.error != 0:
+        return 20 + result.error
+    if result.value == 42:
+        return 0
+    return result.value

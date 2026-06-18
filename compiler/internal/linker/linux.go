@@ -19,10 +19,16 @@ func LinkLinuxX64(objects []*tobj.Object, mainName string) (*elf.Image, error) {
 
 func LinkLinuxX32(objects []*tobj.Object, mainName string) (*elf.Image, error) {
 	const x32SyscallBit = 0x40000000
-	return linkLinuxSysV(objects, mainName, "linux-x32", x32SyscallBit+60, func(codeSize, dataSize int) int {
-		layout := elf.LinuxX32Layout(codeSize, dataSize)
-		return layout.DataOffset - layout.CodeOffset
-	})
+	return linkLinuxSysV(
+		objects,
+		mainName,
+		"linux-x32",
+		x32SyscallBit+60,
+		func(codeSize, dataSize int) int {
+			layout := elf.LinuxX32Layout(codeSize, dataSize)
+			return layout.DataOffset - layout.CodeOffset
+		},
+	)
 }
 
 func LinkLinuxX86(objects []*tobj.Object, mainName string) (*elf.Image, error) {
@@ -31,7 +37,11 @@ func LinkLinuxX86(objects []*tobj.Object, mainName string) (*elf.Image, error) {
 			return nil, fmt.Errorf("nil object")
 		}
 		if obj.Target != "linux-x86" {
-			return nil, fmt.Errorf("linker target mismatch: linux-x86 expects 'linux-x86' object, got '%s' (module '%s')", obj.Target, obj.Module)
+			return nil, fmt.Errorf(
+				"linker target mismatch: linux-x86 expects 'linux-x86' object, got '%s' (module '%s')",
+				obj.Target,
+				obj.Module,
+			)
 		}
 	}
 
@@ -65,7 +75,9 @@ func LinkLinuxX86(objects []*tobj.Object, mainName string) (*elf.Image, error) {
 		}
 		addr := uint64(elf.LinuxX86BaseVaddr + layout.CodeOffset + reloc.TargetOff)
 		if addr > uint64(^uint32(0)) {
-			return nil, fmt.Errorf("absolute function address relocation target exceeds 32-bit address range")
+			return nil, fmt.Errorf(
+				"absolute function address relocation target exceeds 32-bit address range",
+			)
 		}
 		binary.LittleEndian.PutUint32(res.Text[reloc.At:reloc.At+4], uint32(addr))
 	}
@@ -85,13 +97,25 @@ func LinkLinuxX86(objects []*tobj.Object, mainName string) (*elf.Image, error) {
 	return &elf.Image{Code: res.Text, Data: res.Data, EntryOffset: uint64(res.EntryOffset)}, nil
 }
 
-func linkLinuxSysV(objects []*tobj.Object, mainName string, expectedTarget string, sysExit uint32, dataStartRelFor func(codeSize, dataSize int) int) (*elf.Image, error) {
+func linkLinuxSysV(
+	objects []*tobj.Object,
+	mainName string,
+	expectedTarget string,
+	sysExit uint32,
+	dataStartRelFor func(codeSize, dataSize int) int,
+) (*elf.Image, error) {
 	for _, obj := range objects {
 		if obj == nil {
 			return nil, fmt.Errorf("nil object")
 		}
 		if obj.Target != expectedTarget {
-			return nil, fmt.Errorf("linker target mismatch: %s expects '%s' object, got '%s' (module '%s')", expectedTarget, expectedTarget, obj.Target, obj.Module)
+			return nil, fmt.Errorf(
+				"linker target mismatch: %s expects '%s' object, got '%s' (module '%s')",
+				expectedTarget,
+				expectedTarget,
+				obj.Target,
+				obj.Module,
+			)
 		}
 	}
 
@@ -104,7 +128,10 @@ func linkLinuxSysV(objects []*tobj.Object, mainName string, expectedTarget strin
 	dataStartRel := dataStartRelFor(len(res.Text), len(res.Data))
 
 	if len(res.FuncAbsRelocs) != 0 {
-		return nil, fmt.Errorf("absolute function address relocation is not supported for %s", expectedTarget)
+		return nil, fmt.Errorf(
+			"absolute function address relocation is not supported for %s",
+			expectedTarget,
+		)
 	}
 	if len(res.DataAbsRelocs) != 0 {
 		return nil, fmt.Errorf("absolute data relocation is not supported for %s", expectedTarget)

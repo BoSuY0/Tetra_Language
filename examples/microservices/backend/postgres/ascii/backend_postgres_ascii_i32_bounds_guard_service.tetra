@@ -1,0 +1,26 @@
+// Backend PostgreSQL ASCII i32 parser bounds guard microservice.
+module examples.microservices.backend.postgres.ascii.backend_postgres_ascii_i32_bounds_guard_service
+import lib.core.postgres as pg
+
+func main() -> Int
+uses alloc, mem:
+    var bytes: []u8 = core.make_u8(6)
+    bytes[0] = 45
+    bytes[1] = 55
+    bytes[2] = 57
+    bytes[3] = 88
+    bytes[4] = 0
+    bytes[5] = 52
+    if pg.parse_ascii_i32_at(bytes, 0, 3) != -79:
+        return 10
+    if pg.parse_ascii_i32_at(bytes, 1, 2) != 79:
+        return 11
+    if pg.parse_ascii_i32_at(bytes, 3, 1) != 0:
+        return 12
+    if pg.parse_ascii_i32_at(bytes, 5, 0) != 0:
+        return 13
+    if pg.parse_ascii_i32_at(bytes, -1, 2) != 0:
+        return 14
+    if pg.parse_ascii_i32_at(bytes, -1, 0) != 0:
+        return 15
+    return 0

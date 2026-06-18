@@ -16,8 +16,21 @@ func TestValidatePerformanceReportAcceptsEvidence(t *testing.T) {
 		BaselineArtifact:  "docs/performance/v1_0_thresholds.md",
 		ThresholdDecision: "baseline capture approved",
 		Metrics: []performanceMetric{
-			{Name: "BenchmarkBinarySize/foo-8", Iterations: 10, NsPerOp: 1000, ArtifactBytes: 4096, Threshold: "compile <= 15 percent slower", Decision: "accepted"},
-			{Name: "BenchmarkCompile/foo-8", Iterations: 12, NsPerOp: 1200, Threshold: "compile <= 15 percent slower", Decision: "accepted"},
+			{
+				Name:          "BenchmarkBinarySize/foo-8",
+				Iterations:    10,
+				NsPerOp:       1000,
+				ArtifactBytes: 4096,
+				Threshold:     "compile <= 15 percent slower",
+				Decision:      "accepted",
+			},
+			{
+				Name:       "BenchmarkCompile/foo-8",
+				Iterations: 12,
+				NsPerOp:    1200,
+				Threshold:  "compile <= 15 percent slower",
+				Decision:   "accepted",
+			},
 		},
 		ResidualRisk: "single host",
 	})
@@ -57,8 +70,20 @@ func TestValidatePerformanceReportRejectsUnsortedMetrics(t *testing.T) {
 		BaselineArtifact:  "docs/performance/v1_0_thresholds.md",
 		ThresholdDecision: "baseline capture approved",
 		Metrics: []performanceMetric{
-			{Name: "BenchmarkCompile/z", Iterations: 10, NsPerOp: 10, Threshold: "x", Decision: "accepted"},
-			{Name: "BenchmarkCompile/a", Iterations: 10, NsPerOp: 10, Threshold: "x", Decision: "accepted"},
+			{
+				Name:       "BenchmarkCompile/z",
+				Iterations: 10,
+				NsPerOp:    10,
+				Threshold:  "x",
+				Decision:   "accepted",
+			},
+			{
+				Name:       "BenchmarkCompile/a",
+				Iterations: 10,
+				NsPerOp:    10,
+				Threshold:  "x",
+				Decision:   "accepted",
+			},
 		},
 		ResidualRisk: "single host",
 	})
@@ -78,7 +103,13 @@ func TestValidatePerformanceReportRejectsSummaryHashMismatch(t *testing.T) {
 		BaselineArtifact:  "docs/performance/v1_0_thresholds.md",
 		ThresholdDecision: "baseline capture approved",
 		Metrics: []performanceMetric{
-			{Name: "BenchmarkCompile/a", Iterations: 10, NsPerOp: 10, Threshold: "x", Decision: "accepted"},
+			{
+				Name:       "BenchmarkCompile/a",
+				Iterations: 10,
+				NsPerOp:    10,
+				Threshold:  "x",
+				Decision:   "accepted",
+			},
 		},
 		ResidualRisk: "single host",
 		Summary: performanceSummary{
@@ -147,7 +178,13 @@ func TestValidatePerformanceReportRejectsFastestOrOfficialClaims(t *testing.T) {
 				BaselineArtifact:  "docs/performance/v1_0_thresholds.md",
 				ThresholdDecision: "baseline capture approved",
 				Metrics: []performanceMetric{
-					{Name: "BenchmarkCompile/a", Iterations: 10, NsPerOp: 10, Threshold: "local threshold", Decision: "accepted"},
+					{
+						Name:       "BenchmarkCompile/a",
+						Iterations: 10,
+						NsPerOp:    10,
+						Threshold:  "local threshold",
+						Decision:   "accepted",
+					},
 				},
 				ResidualRisk: "single host",
 			}

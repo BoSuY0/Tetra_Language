@@ -32,19 +32,31 @@ func TestAppendStartupMessageDeterministic(t *testing.T) {
 	if protocol := binary.BigEndian.Uint32(got[4:8]); protocol != ProtocolVersion30 {
 		t.Fatalf("protocol = %#x, want %#x", protocol, uint32(ProtocolVersion30))
 	}
-	wantSuffix := "user\x00benchmarkdbuser\x00database\x00hello_world\x00application_name\x00tetra-techempower\x00client_encoding\x00UTF8\x00\x00"
+	wantSuffix := ("user\x00benchmarkdbuser\x00database\x00hello_world\x00application_" +
+		"name\x00tetra-techempower\x00client_encoding\x00UTF8\x00\x00")
 	if string(got[8:]) != wantSuffix {
 		t.Fatalf("startup params = %q, want %q", got[8:], wantSuffix)
 	}
 }
 
 func TestAppendSimpleAndExtendedQueryMessages(t *testing.T) {
-	if got, want := AppendSimpleQuery(nil, "SELECT 1"), []byte{'Q', 0, 0, 0, 13, 'S', 'E', 'L', 'E', 'C', 'T', ' ', '1', 0}; !bytes.Equal(got, want) {
+	if got, want := AppendSimpleQuery(
+		nil,
+		"SELECT 1",
+	), []byte{'Q', 0, 0, 0, 13, 'S', 'E', 'L', 'E', 'C', 'T', ' ', '1', 0}; !bytes.Equal(
+		got,
+		want,
+	) {
 		t.Fatalf("simple query = %#v, want %#v", got, want)
 	}
 
 	var got []byte
-	got = AppendParse(got, "world_by_id", "SELECT id, randomNumber FROM World WHERE id=$1", []uint32{23})
+	got = AppendParse(
+		got,
+		"world_by_id",
+		"SELECT id, randomNumber FROM World WHERE id=$1",
+		[]uint32{23},
+	)
 	got = AppendBind(got, "", "world_by_id", [][]byte{[]byte("42")})
 	got = AppendDescribePortal(got, "")
 	got = AppendExecute(got, "", 0)
@@ -102,7 +114,8 @@ func TestDecodeRowDescriptionAndDataRow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DecodeRowDescription: %v", err)
 	}
-	if len(cols) != 2 || cols[0].Name != "id" || cols[1].Name != "randomNumber" || cols[1].TypeOID != Int4OID {
+	if len(cols) != 2 || cols[0].Name != "id" || cols[1].Name != "randomNumber" ||
+		cols[1].TypeOID != Int4OID {
 		t.Fatalf("columns = %#v", cols)
 	}
 
@@ -112,6 +125,95 @@ func TestDecodeRowDescriptionAndDataRow(t *testing.T) {
 	}
 	if len(values) != 2 || string(values[0]) != "1" || string(values[1]) != "42" {
 		t.Fatalf("values = %#v", values)
+	}
+}
+
+func TestDecodeDataRowBorrowedDoesNotCopyCells(t *testing.T) {
+	payload := appendDataRow(nil, []string{"7", "70"})
+	row, report, err := DecodeDataRowBorrowed(payload, nil)
+	if err != nil {
+		t.Fatalf("DecodeDataRowBorrowed: %v", err)
+	}
+	if len(row) != 2 || string(row[0]) != "7" || string(row[1]) != "70" {
+		t.Fatalf("row = %#v", row)
+	}
+	if report.BorrowedCells != 2 || report.CopiedCells != 0 ||
+		report.Storage != RowStorageBorrowed {
+		t.Fatalf("decode report = %#v", report)
+	}
+	payload[len(payload)-1] = '1'
+	if string(row[1]) != "71" {
+		t.Fatalf("row cell did not borrow payload after mutation: %q", row[1])
+	}
+}
+
+func TestAppendBindBinaryFormatsAndDecodeInt4(t *testing.T) {
+	var payload []byte
+	payload = AppendBindFormat(
+		payload,
+		"",
+		"world_by_id",
+		[]int16{BinaryFormat},
+		[][]byte{AppendInt4Binary(nil, 7)},
+		[]int16{BinaryFormat},
+	)
+	frames := splitClientFrames(t, payload)
+	if len(frames) != 1 || frames[0].Type != 'B' {
+		t.Fatalf("frames = %#v, want one Bind frame", frames)
+	}
+
+	r := payloadReader{data: frames[0].Payload}
+	portal, ok := r.cstring()
+	if !ok || portal != "" {
+		t.Fatalf("portal = %q ok=%v", portal, ok)
+	}
+	statement, ok := r.cstring()
+	if !ok || statement != "world_by_id" {
+		t.Fatalf("statement = %q ok=%v", statement, ok)
+	}
+	formatCount, ok := r.int16()
+	if !ok || formatCount != 1 {
+		t.Fatalf("format count = %d ok=%v", formatCount, ok)
+	}
+	format, ok := r.int16()
+	if !ok || format != BinaryFormat {
+		t.Fatalf("format = %d ok=%v", format, ok)
+	}
+	valueCount, ok := r.int16()
+	if !ok || valueCount != 1 {
+		t.Fatalf("value count = %d ok=%v", valueCount, ok)
+	}
+	valueLen, ok := r.int32()
+	if !ok || valueLen != 4 {
+		t.Fatalf("value length = %d ok=%v", valueLen, ok)
+	}
+	if got := binary.BigEndian.Uint32(r.data[r.off : r.off+4]); got != 7 {
+		t.Fatalf("binary int4 payload = %d, want 7", got)
+	}
+	r.off += 4
+	resultFormatCount, ok := r.int16()
+	if !ok || resultFormatCount != 1 {
+		t.Fatalf("result format count = %d ok=%v", resultFormatCount, ok)
+	}
+	resultFormat, ok := r.int16()
+	if !ok || resultFormat != BinaryFormat {
+		t.Fatalf("result format = %d ok=%v", resultFormat, ok)
+	}
+	if !r.done() {
+		t.Fatalf("trailing bind payload bytes: %#v", r.data[r.off:])
+	}
+
+	encoded := AppendInt4Binary(nil, 70)
+	decoded, err := DecodeInt4(encoded, BinaryFormat)
+	if err != nil || decoded != 70 {
+		t.Fatalf("DecodeInt4 binary = %d,%v want 70,nil", decoded, err)
+	}
+	decoded, err = DecodeInt4([]byte("71"), TextFormat)
+	if err != nil || decoded != 71 {
+		t.Fatalf("DecodeInt4 text = %d,%v want 71,nil", decoded, err)
+	}
+	if !bytes.Equal(AppendInt4Binary(nil, 7), []byte{0, 0, 0, 7}) {
+		t.Fatalf("AppendInt4Binary did not encode big-endian int4")
 	}
 }
 
@@ -127,7 +229,11 @@ func TestClientSimpleQueryAgainstFakePostgresWireServer(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	conn, err := Connect(ctx, client, StartupConfig{User: "benchmarkdbuser", Database: "hello_world"})
+	conn, err := Connect(
+		ctx,
+		client,
+		StartupConfig{User: "benchmarkdbuser", Database: "hello_world"},
+	)
 	if err != nil {
 		t.Fatalf("Connect: %v", err)
 	}
@@ -135,10 +241,12 @@ func TestClientSimpleQueryAgainstFakePostgresWireServer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SimpleQuery: %v", err)
 	}
-	if len(result.Columns) != 2 || result.Columns[0].Name != "id" || result.Columns[1].Name != "randomNumber" {
+	if len(result.Columns) != 2 || result.Columns[0].Name != "id" ||
+		result.Columns[1].Name != "randomNumber" {
 		t.Fatalf("columns = %#v", result.Columns)
 	}
-	if len(result.Rows) != 1 || result.Rows[0].String(0) != "1" || result.Rows[0].String(1) != "42" {
+	if len(result.Rows) != 1 || result.Rows[0].String(0) != "1" ||
+		result.Rows[0].String(1) != "42" {
 		t.Fatalf("rows = %#v", result.Rows)
 	}
 	if result.CommandTag != "SELECT 1" {
@@ -231,6 +339,55 @@ func TestClientCompletesSCRAMSHA256Authentication(t *testing.T) {
 	}
 	if err := <-errc; err != nil {
 		t.Fatalf("fake server: %v", err)
+	}
+}
+
+func TestSCRAMSHA256RFC7677Vector(t *testing.T) {
+	client, err := newSCRAMSHA256Client("user", "pencil", "rOprNGfwEbeRWgbNEkqO")
+	if err != nil {
+		t.Fatalf("newSCRAMSHA256Client: %v", err)
+	}
+	if got, want := client.ClientFirstMessage(), "n,,n=user,r=rOprNGfwEbeRWgbNEkqO"; got != want {
+		t.Fatalf("client first = %q, want %q", got, want)
+	}
+
+	serverFirst := ("r=rOprNGfwEbeRWgbNEkqO%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0," +
+		"s=W22ZaJ0SNY7soEsUEjb6gQ==,i=4096")
+	gotFinal, err := client.ClientFinalMessage(serverFirst)
+	if err != nil {
+		t.Fatalf("ClientFinalMessage: %v", err)
+	}
+	wantFinal := ("c=biws,r=rOprNGfwEbeRWgbNEkqO%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0," +
+		"p=dHzbZapWIk4jUhN+Ute9ytag9zjfMHgsqmmiz7AndVQ=")
+	if gotFinal != wantFinal {
+		t.Fatalf("client final = %q, want %q", gotFinal, wantFinal)
+	}
+	if err := client.VerifyServerFinal("v=6rriTRBi23WpRR/wtup+mMhUZUn/dB5nLTJRsjl95G4="); err != nil {
+		t.Fatalf("VerifyServerFinal: %v", err)
+	}
+}
+
+func TestSCRAMSHA256RejectsBadNonceAndSignature(t *testing.T) {
+	client, err := newSCRAMSHA256Client("user", "pencil", "clientnonce")
+	if err != nil {
+		t.Fatalf("newSCRAMSHA256Client: %v", err)
+	}
+	if _, err := client.ClientFinalMessage("r=server-only,s=c2FsdA==,i=4096"); !errors.Is(
+		err,
+		ErrSCRAMAuthentication,
+	) {
+		t.Fatalf("nonce mismatch error = %v, want ErrSCRAMAuthentication", err)
+	}
+
+	client, err = newSCRAMSHA256Client("user", "pencil", "clientnonce")
+	if err != nil {
+		t.Fatalf("newSCRAMSHA256Client: %v", err)
+	}
+	if _, err := client.ClientFinalMessage("r=clientnonce-server,s=c2FsdA==,i=4096"); err != nil {
+		t.Fatalf("ClientFinalMessage: %v", err)
+	}
+	if err := client.VerifyServerFinal("v=YmFk"); !errors.Is(err, ErrSCRAMAuthentication) {
+		t.Fatalf("bad signature error = %v, want ErrSCRAMAuthentication", err)
 	}
 }
 
@@ -350,15 +507,26 @@ func TestClientPreparedQueryUsesExtendedProtocol(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	conn, err := Connect(ctx, client, StartupConfig{User: "benchmarkdbuser", Database: "hello_world"})
+	conn, err := Connect(
+		ctx,
+		client,
+		StartupConfig{User: "benchmarkdbuser", Database: "hello_world"},
+	)
 	if err != nil {
 		t.Fatalf("Connect: %v", err)
 	}
-	result, err := conn.PreparedQuery(ctx, "world_by_id", "SELECT id, randomNumber FROM World WHERE id=$1", []uint32{Int4OID}, [][]byte{[]byte("7")})
+	result, err := conn.PreparedQuery(
+		ctx,
+		"world_by_id",
+		"SELECT id, randomNumber FROM World WHERE id=$1",
+		[]uint32{Int4OID},
+		[][]byte{[]byte("7")},
+	)
 	if err != nil {
 		t.Fatalf("PreparedQuery: %v", err)
 	}
-	if len(result.Rows) != 1 || result.Rows[0].String(0) != "7" || result.Rows[0].String(1) != "70" {
+	if len(result.Rows) != 1 || result.Rows[0].String(0) != "7" ||
+		result.Rows[0].String(1) != "70" {
 		t.Fatalf("rows = %#v", result.Rows)
 	}
 	if result.CommandTag != "SELECT 1" {
@@ -396,7 +564,8 @@ func serveFakeSimpleQuery(conn net.Conn, t *testing.T) error {
 	if err != nil {
 		return err
 	}
-	if !bytes.Contains(startup, []byte("user\x00benchmarkdbuser\x00")) || !bytes.Contains(startup, []byte("database\x00hello_world\x00")) {
+	if !bytes.Contains(startup, []byte("user\x00benchmarkdbuser\x00")) ||
+		!bytes.Contains(startup, []byte("database\x00hello_world\x00")) {
 		return errors.New("startup message missing expected user/database")
 	}
 	if _, err := conn.Write(serverFrame('R', int32Payload(0))); err != nil {
@@ -416,10 +585,18 @@ func serveFakeSimpleQuery(conn net.Conn, t *testing.T) error {
 	if err != nil {
 		return err
 	}
-	if frame.Type != 'Q' || string(bytes.TrimSuffix(frame.Payload, []byte{0})) != "SELECT id, randomNumber FROM World WHERE id=1" {
+	if frame.Type != 'Q' ||
+		string(
+			bytes.TrimSuffix(frame.Payload, []byte{0}),
+		) != "SELECT id, randomNumber FROM World WHERE id=1" {
 		return errors.New("unexpected query frame")
 	}
-	if _, err := conn.Write(serverFrame('T', appendRowDescription(nil, []fakeColumn{{Name: "id", TypeOID: Int4OID}, {Name: "randomNumber", TypeOID: Int4OID}}))); err != nil {
+	if _, err := conn.Write(
+		serverFrame('T', appendRowDescription(nil, []fakeColumn{
+			{Name: "id", TypeOID: Int4OID},
+			{Name: "randomNumber", TypeOID: Int4OID},
+		})),
+	); err != nil {
 		return err
 	}
 	if _, err := conn.Write(serverFrame('D', appendDataRow(nil, []string{"1", "42"}))); err != nil {
@@ -471,7 +648,9 @@ func serveFakePreparedQuery(conn net.Conn, t *testing.T) error {
 	if err != nil {
 		return err
 	}
-	if stmt != "world_by_id" || query != "SELECT id, randomNumber FROM World WHERE id=$1" || len(paramOIDs) != 1 || paramOIDs[0] != Int4OID {
+	if stmt != "world_by_id" || query != "SELECT id, randomNumber FROM World WHERE id=$1" ||
+		len(paramOIDs) != 1 ||
+		paramOIDs[0] != Int4OID {
 		return errors.New("unexpected Parse payload")
 	}
 	frame, err = ReadFrame(conn, 1<<20)
@@ -523,7 +702,12 @@ func serveFakePreparedQuery(conn net.Conn, t *testing.T) error {
 	if _, err := conn.Write(serverFrame('2', nil)); err != nil {
 		return err
 	}
-	if _, err := conn.Write(serverFrame('T', appendRowDescription(nil, []fakeColumn{{Name: "id", TypeOID: Int4OID}, {Name: "randomNumber", TypeOID: Int4OID}}))); err != nil {
+	if _, err := conn.Write(
+		serverFrame('T', appendRowDescription(nil, []fakeColumn{
+			{Name: "id", TypeOID: Int4OID},
+			{Name: "randomNumber", TypeOID: Int4OID},
+		})),
+	); err != nil {
 		return err
 	}
 	if _, err := conn.Write(serverFrame('D', appendDataRow(nil, []string{"7", "70"}))); err != nil {
@@ -633,7 +817,12 @@ func serveFakeSCRAMSHA256Startup(conn net.Conn, user string, password string) er
 	if !ok {
 		return errors.New("SCRAM client-final missing proof")
 	}
-	serverFinal, err := buildSCRAMServerFinalForTest(password, clientFirstBare, serverFirst, withoutProof)
+	serverFinal, err := buildSCRAMServerFinalForTest(
+		password,
+		clientFirstBare,
+		serverFirst,
+		withoutProof,
+	)
 	if err != nil {
 		return err
 	}
@@ -962,7 +1151,12 @@ func parseSCRAMAttributesForTest(message string) map[string]string {
 	return fields
 }
 
-func buildSCRAMServerFinalForTest(password string, clientFirstBare string, serverFirst string, clientFinalWithoutProof string) (string, error) {
+func buildSCRAMServerFinalForTest(
+	password string,
+	clientFirstBare string,
+	serverFirst string,
+	clientFinalWithoutProof string,
+) (string, error) {
 	fields, err := parseSCRAMAttributes(serverFirst)
 	if err != nil {
 		return "", err

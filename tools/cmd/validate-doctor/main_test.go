@@ -3,10 +3,12 @@ package main
 import (
 	"strings"
 	"testing"
+
+	"tetra_language/internal/toon"
 )
 
-func TestValidateDoctorReportAcceptsExpectedShape(t *testing.T) {
-	raw := []byte(`{
+func validDoctorReportJSON() []byte {
+	return []byte(`{
   "status": "pass",
   "checks": [
     {"name":"version","status":"pass","detail":"v0.6.0"},
@@ -18,7 +20,7 @@ func TestValidateDoctorReportAcceptsExpectedShape(t *testing.T) {
     {"name":"__rt/actors_win64.tetra","status":"pass","detail":"found"},
     {"name":"compiler/selfhostrt/actors_sysv.tetra","status":"pass","detail":"found"},
     {"name":"compiler/selfhostrt/actors_win64.tetra","status":"pass","detail":"found"},
-    {"name":"examples/flow_hello.tetra","status":"pass","detail":"found"},
+    {"name":"examples/flow/flow_hello.tetra","status":"pass","detail":"found"},
     {"name":"docs/generated/manifest.json","status":"pass","detail":"found"},
     {"name":"docs manifest version","status":"pass","detail":"v0.6.0"},
     {"name":"docs manifest surface","status":"pass","detail":"3 targets, 6 runtime symbols"},
@@ -28,8 +30,25 @@ func TestValidateDoctorReportAcceptsExpectedShape(t *testing.T) {
     {"name":"tooling commands","status":"pass","detail":"fmt, test, doc, smoke, lsp, eco"}
   ]
 }`)
+}
+
+func TestValidateDoctorReportAcceptsExpectedShape(t *testing.T) {
+	raw := validDoctorReportJSON()
 	if err := validateDoctorReport(raw); err != nil {
 		t.Fatalf("validate doctor: %v", err)
+	}
+}
+
+func TestValidateDoctorReportAcceptsTOON(t *testing.T) {
+	raw, err := toon.ConvertJSONToTOON(
+		validDoctorReportJSON(),
+		toon.Options{Deterministic: true, Strict: true},
+	)
+	if err != nil {
+		t.Fatalf("json->toon: %v", err)
+	}
+	if err := validateDoctorReport(raw); err != nil {
+		t.Fatalf("validate doctor TOON: %v\n%s", err, raw)
 	}
 }
 
@@ -42,11 +61,13 @@ func TestValidateDoctorReportRejectsFailingStatus(t *testing.T) {
 
 func TestValidateDoctorReportRejectsUnknownFields(t *testing.T) {
 	raw := []byte(`{"status":"pass","checks":[],"extra":true}`)
-	if err := validateDoctorReport(raw); err == nil || !strings.Contains(err.Error(), "unknown field") {
+	if err := validateDoctorReport(raw); err == nil ||
+		!strings.Contains(err.Error(), "unknown field") {
 		t.Fatalf("expected unknown field failure, got %v", err)
 	}
 	raw = []byte(`{"status":"pass","checks":[{"name":"version","status":"pass","extra":true}]}`)
-	if err := validateDoctorReport(raw); err == nil || !strings.Contains(err.Error(), "unknown field") {
+	if err := validateDoctorReport(raw); err == nil ||
+		!strings.Contains(err.Error(), "unknown field") {
 		t.Fatalf("expected nested unknown field failure, got %v", err)
 	}
 }
@@ -71,7 +92,7 @@ func TestValidateDoctorReportRejectsFailingRequiredCheck(t *testing.T) {
     {"name":"__rt/actors_win64.tetra","status":"pass"},
     {"name":"compiler/selfhostrt/actors_sysv.tetra","status":"pass"},
     {"name":"compiler/selfhostrt/actors_win64.tetra","status":"pass"},
-    {"name":"examples/flow_hello.tetra","status":"pass"},
+    {"name":"examples/flow/flow_hello.tetra","status":"pass"},
     {"name":"docs/generated/manifest.json","status":"pass"},
     {"name":"docs manifest version","status":"pass"},
     {"name":"docs manifest surface","status":"pass"},

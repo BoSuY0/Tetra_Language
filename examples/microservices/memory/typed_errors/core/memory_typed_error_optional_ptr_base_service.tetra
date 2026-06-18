@@ -1,0 +1,32 @@
+// Typed-error optional pointer-base memory microservice smoke.
+//
+// The service carries an allocation-base pointer through an optional typed
+// error payload, unwraps it, and derives the checked cell after recovery.
+module examples.microservices.memory.typed_errors.core.memory_typed_error_optional_ptr_base_service
+import lib.core.capability as cap
+
+enum OptionalPtrErr:
+    case maybe(ptr?)
+
+func route_base(raw: ptr) -> ptr? throws OptionalPtrErr:
+    let maybe: ptr? = raw
+    throw OptionalPtrErr.maybe(maybe)
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let base: ptr = core.alloc_bytes(8)
+        let cell: ptr = core.ptr_add(base, 4, memory_cap)
+        let _write: Int = core.store_i32(cell, 42, memory_cap)
+        let recovered_maybe: ptr? = catch route_base(base):
+        case OptionalPtrErr.maybe(payload):
+            payload
+        if let recovered_base = recovered_maybe:
+            let recovered_cell: ptr = core.ptr_add(recovered_base, 4, memory_cap)
+            let value: Int = core.load_i32(recovered_cell, memory_cap)
+            if value == 42:
+                return 0
+            return value
+        return 98
+    return 99

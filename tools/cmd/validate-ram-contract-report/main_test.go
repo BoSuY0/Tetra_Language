@@ -9,7 +9,12 @@ import (
 
 func TestValidateRAMContractReportRejectsMissingBlocker(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "ram-contract.json")
-	raw := strings.Replace(validRAMContractReportForTest(), `"blockers":["unknown_size"]`, `"blockers":[]`, 1)
+	raw := strings.Replace(
+		validRAMContractReportForTest(),
+		`"blockers":["unknown_size"]`,
+		`"blockers":[]`,
+		1,
+	)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -40,16 +45,29 @@ func TestValidateRAMContractReportRejectsTrustedPlacementWithoutNoEscapeValidati
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "ram-contract.json")
-			raw := strings.Replace(validTrustedRAMContractReportForTest(), test.replacement[:strings.Index(test.replacement, ":")+1]+`"no_escape"`, test.replacement, 1)
+			raw := strings.Replace(
+				validTrustedRAMContractReportForTest(),
+				test.replacement[:strings.Index(test.replacement, ":")+1]+`"no_escape"`,
+				test.replacement,
+				1,
+			)
 			if strings.Contains(test.replacement, "validation_status") {
-				raw = strings.Replace(validTrustedRAMContractReportForTest(), `"validation_status":"validated"`, test.replacement, 1)
+				raw = strings.Replace(
+					validTrustedRAMContractReportForTest(),
+					`"validation_status":"validated"`,
+					test.replacement,
+					1,
+				)
 			}
 			if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 				t.Fatal(err)
 			}
 			err := validateRAMContractReport(path)
 			if err == nil || !strings.Contains(err.Error(), "trusted placement") {
-				t.Fatalf("validateRAMContractReport error = %v, want trusted placement no-escape proof rejection", err)
+				t.Fatalf(
+					"validateRAMContractReport error = %v, want trusted placement no-escape proof rejection",
+					err,
+				)
 			}
 		})
 	}
@@ -57,7 +75,11 @@ func TestValidateRAMContractReportRejectsTrustedPlacementWithoutNoEscapeValidati
 
 func TestValidateRAMContractReportRejectsRegionPlacementWithoutScopedProof(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "ram-contract.json")
-	if err := os.WriteFile(path, []byte(validRegionRAMContractReportWithProofKindForTest("allocation_placement")), 0o644); err != nil {
+	if err := os.WriteFile(
+		path,
+		[]byte(validRegionRAMContractReportWithProofKindForTest("allocation_placement")),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 	err := validateRAMContractReport(path)
@@ -68,7 +90,12 @@ func TestValidateRAMContractReportRejectsRegionPlacementWithoutScopedProof(t *te
 
 func TestValidateRAMContractReportRejectsForbiddenNonclaimText(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "ram-contract.json")
-	raw := strings.Replace(validRAMContractReportForTest(), `"non_claims":["not Memory 100%","not full formal proof","not a performance benchmark"]`, `"non_claims":["Memory 100%"]`, 1)
+	raw := strings.Replace(
+		validRAMContractReportForTest(),
+		`"non_claims":["not Memory 100%","not full formal proof","not a performance benchmark"]`,
+		`"non_claims":["Memory 100%"]`,
+		1,
+	)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +107,12 @@ func TestValidateRAMContractReportRejectsForbiddenNonclaimText(t *testing.T) {
 
 func TestValidateRAMContractReportAllowsNegatedNonclaimText(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "ram-contract.json")
-	raw := strings.Replace(validRAMContractReportForTest(), `"non_claims":["not Memory 100%","not full formal proof","not a performance benchmark"]`, `"non_claims":["no Memory 100% claim","not a full formal proof","does not claim zero heap for all programs"]`, 1)
+	raw := strings.Replace(
+		validRAMContractReportForTest(),
+		`"non_claims":["not Memory 100%","not full formal proof","not a performance benchmark"]`,
+		`"non_claims":["no Memory 100% claim","not a full formal proof","does not claim zero heap for all programs"]`,
+		1,
+	)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}

@@ -23,8 +23,8 @@ func TestValidateSurfaceProductSummaryRejectsMissingP29Nonclaim(t *testing.T) {
 	writeSurfaceProductSummaryFixture(t, dir, func(summary map[string]any) {
 		summary["nonclaims"] = []any{
 			"all-platform-surface-parity",
-			"macos-surface-production",
-			"windows-surface-production",
+			"nonclaim-macos-surface-production-support",
+			"nonclaim-windows-surface-production-support",
 			"wasm32-wasi-surface-ui-runtime",
 			"gpu-renderer",
 			"full-rich-text-editor",
@@ -65,16 +65,21 @@ func TestValidateSurfaceProductSummaryRejectsInnerReleaseSummaryAsFinalSignoff(t
 
 func TestValidateSurfaceProductSummaryRejectsMissingHashCoveredArtifact(t *testing.T) {
 	dir := t.TempDir()
-	writeSurfaceProductSummaryFixture(t, dir, nil, func(artifacts []map[string]any) []map[string]any {
-		var kept []map[string]any
-		for _, artifact := range artifacts {
-			if artifact["path"] == "visual/visual-summary.json" {
-				continue
+	writeSurfaceProductSummaryFixture(
+		t,
+		dir,
+		nil,
+		func(artifacts []map[string]any) []map[string]any {
+			var kept []map[string]any
+			for _, artifact := range artifacts {
+				if artifact["path"] == "visual/visual-summary.json" {
+					continue
+				}
+				kept = append(kept, artifact)
 			}
-			kept = append(kept, artifact)
-		}
-		return kept
-	})
+			return kept
+		},
+	)
 
 	err := validateSurfaceProductSummary(surfaceProductSummaryOptions{ReportDir: dir})
 	if err == nil {
@@ -88,13 +93,16 @@ func TestValidateSurfaceProductSummaryRejectsMissingHashCoveredArtifact(t *testi
 func TestValidateSurfaceProductSummaryRejectsUnexpectedTargetMatrixEntry(t *testing.T) {
 	dir := t.TempDir()
 	writeSurfaceProductSummaryFixture(t, dir, func(summary map[string]any) {
-		summary["target_matrix"] = append(surfaceProductSummaryTargetMatrixFixture(), map[string]any{
-			"target":           "electron-desktop",
-			"status":           "current",
-			"tier":             "unsupported-extra",
-			"production_claim": true,
-			"report":           "surface-electron-desktop.json",
-		})
+		summary["target_matrix"] = append(
+			surfaceProductSummaryTargetMatrixFixture(),
+			map[string]any{
+				"target":           "electron-desktop",
+				"status":           "current",
+				"tier":             "unsupported-extra",
+				"production_claim": true,
+				"report":           "surface-electron-desktop.json",
+			},
+		)
 	}, nil)
 
 	err := validateSurfaceProductSummary(surfaceProductSummaryOptions{ReportDir: dir})
@@ -109,13 +117,16 @@ func TestValidateSurfaceProductSummaryRejectsUnexpectedTargetMatrixEntry(t *test
 func TestValidateSurfaceProductSummaryRejectsDuplicateTargetMatrixEntry(t *testing.T) {
 	dir := t.TempDir()
 	writeSurfaceProductSummaryFixture(t, dir, func(summary map[string]any) {
-		summary["target_matrix"] = append(surfaceProductSummaryTargetMatrixFixture(), map[string]any{
-			"target":           "linux-x64",
-			"status":           "current",
-			"tier":             "bounded-linux-web-scope",
-			"production_claim": true,
-			"report":           "surface-linux-x64-release-app-shell.json",
-		})
+		summary["target_matrix"] = append(
+			surfaceProductSummaryTargetMatrixFixture(),
+			map[string]any{
+				"target":           "linux-x64",
+				"status":           "current",
+				"tier":             "bounded-linux-web-scope",
+				"production_claim": true,
+				"report":           "surface-linux-x64-release-app-shell.json",
+			},
+		)
 	}, nil)
 
 	err := validateSurfaceProductSummary(surfaceProductSummaryOptions{ReportDir: dir})
@@ -156,7 +167,12 @@ func TestValidateSurfaceProductSummaryRejectsUnhashedCategorySourceReport(t *tes
 	}
 }
 
-func writeSurfaceProductSummaryFixture(t *testing.T, dir string, mutateSummary func(map[string]any), mutateArtifacts func([]map[string]any) []map[string]any) {
+func writeSurfaceProductSummaryFixture(
+	t *testing.T,
+	dir string,
+	mutateSummary func(map[string]any),
+	mutateArtifacts func([]map[string]any) []map[string]any,
+) {
 	t.Helper()
 
 	requiredArtifacts := map[string]string{
@@ -171,14 +187,15 @@ func writeSurfaceProductSummaryFixture(t *testing.T, dir string, mutateSummary f
 		"claim_governance": "claim-governance/claims-summary.json",
 	}
 	summary := map[string]any{
-		"schema":                            "tetra.surface.product-summary.v1",
-		"release_scope":                     "surface-v1-linux-web",
-		"status":                            "product_gate_passed_clean_same_commit_blocked",
-		"producer":                          "scripts/release/surface/product-gate.sh",
-		"git_head":                          "0123456789abcdef0123456789abcdef01234567",
-		"git_dirty":                         true,
-		"generated_at_utc":                  "2026-06-13T00:00:00Z",
-		"command_line":                      "bash scripts/release/surface/product-gate.sh --report-dir reports/surface-product-v1",
+		"schema":           "tetra.surface.product-summary.v1",
+		"release_scope":    "surface-v1-linux-web",
+		"status":           "product_gate_passed_clean_same_commit_blocked",
+		"producer":         "scripts/release/surface/product-gate.sh",
+		"git_head":         "0123456789abcdef0123456789abcdef01234567",
+		"git_dirty":        true,
+		"generated_at_utc": "2026-06-13T00:00:00Z",
+		"command_line": ("bash scripts/release/surface/product-gate.sh --" +
+			"report-dir reports/surface-product-v1"),
 		"product_gate_summary":              "surface-product-gate-summary.json",
 		"release_gate_report":               "surface-release-summary.json",
 		"artifact_hash_manifest":            "artifact-hashes.json",
@@ -218,7 +235,11 @@ func writeSurfaceProductSummaryFixture(t *testing.T, dir string, mutateSummary f
 		"claim-governance": "surface-product-gate-summary.json",
 	}
 	for _, path := range uniqueStringValues(sourceReportsByCategory) {
-		writeJSON(t, filepath.Join(dir, filepath.FromSlash(path)), map[string]any{"schema": "fixture"})
+		writeJSON(
+			t,
+			filepath.Join(dir, filepath.FromSlash(path)),
+			map[string]any{"schema": "fixture"},
+		)
 	}
 	for category, path := range map[string]string{
 		"visual":           "visual/visual-summary.json",
@@ -281,12 +302,48 @@ func writeSurfaceProductSummaryFixture(t *testing.T, dir string, mutateSummary f
 
 func surfaceProductSummaryTargetMatrixFixture() []any {
 	return []any{
-		map[string]any{"target": "headless", "status": "release-test-evidence", "tier": "evidence-target", "production_claim": false, "report": "surface-headless-release.json"},
-		map[string]any{"target": "linux-x64", "status": "current", "tier": "bounded-linux-web-scope", "production_claim": true, "report": "surface-linux-x64-release-app-shell.json"},
-		map[string]any{"target": "wasm32-web", "status": "current", "tier": "bounded-linux-web-scope", "production_claim": true, "report": "surface-wasm32-web-release-browser.json"},
-		map[string]any{"target": "macos-x64", "status": "unsupported", "tier": "UNSUPPORTED", "production_claim": false, "report": "surface-macos-x64-target-host-status.json"},
-		map[string]any{"target": "windows-x64", "status": "unsupported", "tier": "UNSUPPORTED", "production_claim": false, "report": "surface-windows-x64-target-host-status.json"},
-		map[string]any{"target": "wasm32-wasi", "status": "unsupported", "tier": "UNSUPPORTED", "production_claim": false, "report": "surface-release-summary.json"},
+		map[string]any{
+			"target":           "headless",
+			"status":           "release-test-evidence",
+			"tier":             "evidence-target",
+			"production_claim": false,
+			"report":           "surface-headless-release.json",
+		},
+		map[string]any{
+			"target":           "linux-x64",
+			"status":           "current",
+			"tier":             "bounded-linux-web-scope",
+			"production_claim": true,
+			"report":           "surface-linux-x64-release-app-shell.json",
+		},
+		map[string]any{
+			"target":           "wasm32-web",
+			"status":           "current",
+			"tier":             "bounded-linux-web-scope",
+			"production_claim": true,
+			"report":           "surface-wasm32-web-release-browser.json",
+		},
+		map[string]any{
+			"target":           "macos-x64",
+			"status":           "unsupported",
+			"tier":             "UNSUPPORTED",
+			"production_claim": false,
+			"report":           "surface-macos-x64-target-host-status.json",
+		},
+		map[string]any{
+			"target":           "windows-x64",
+			"status":           "unsupported",
+			"tier":             "UNSUPPORTED",
+			"production_claim": false,
+			"report":           "surface-windows-x64-target-host-status.json",
+		},
+		map[string]any{
+			"target":           "wasm32-wasi",
+			"status":           "unsupported",
+			"tier":             "UNSUPPORTED",
+			"production_claim": false,
+			"report":           "surface-release-summary.json",
+		},
 	}
 }
 
@@ -321,8 +378,8 @@ func uniqueStringValues(values map[string]string) []string {
 func surfaceProductSummaryNonclaimsFixture() []any {
 	return []any{
 		"all-platform-surface-parity",
-		"macos-surface-production",
-		"windows-surface-production",
+		"nonclaim-macos-surface-production-support",
+		"nonclaim-windows-surface-production-support",
 		"wasm32-wasi-surface-ui-runtime",
 		"gpu-renderer",
 		"full-rich-text-editor",

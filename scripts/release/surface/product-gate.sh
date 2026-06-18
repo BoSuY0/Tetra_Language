@@ -7,7 +7,7 @@ report_dir="reports/surface-product-v1"
 original_args=("$@")
 
 usage() {
-  cat <<'USAGE'
+	cat <<'USAGE'
 Usage: bash scripts/release/surface/product-gate.sh [--report-dir DIR]
 
 Runs the scoped Tetra Surface product evidence gate for surface-v1-linux-web.
@@ -19,71 +19,75 @@ USAGE
 }
 
 while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --report-dir)
-      if [[ $# -lt 2 ]]; then
-        echo "error: --report-dir requires a value" >&2
-        usage >&2
-        exit 2
-      fi
-      report_dir="$2"
-      shift 2
-      ;;
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    *)
-      echo "error: unknown argument: $1" >&2
-      usage >&2
-      exit 2
-      ;;
-  esac
+	case "$1" in
+	--report-dir)
+		if [[ $# -lt 2 ]]; then
+			echo "error: --report-dir requires a value" >&2
+			usage >&2
+			exit 2
+		fi
+		report_dir="$2"
+		shift 2
+		;;
+	-h | --help)
+		usage
+		exit 0
+		;;
+	*)
+		echo "error: unknown argument: $1" >&2
+		usage >&2
+		exit 2
+		;;
+	esac
 done
 
 cd "$repo_root"
 source "$script_dir/report-dir-guard.sh"
 if [[ -z "${GOTELEMETRY:-}" ]]; then
-  export GOTELEMETRY=off
+	export GOTELEMETRY=off
 fi
 if [[ -z "${GOCACHE:-}" ]]; then
-  export GOCACHE="$repo_root/.cache/go-build-surface-product-gate"
+	export GOCACHE="$repo_root/.cache/go-build-surface-product-gate"
 fi
 if [[ -z "${GOTMPDIR:-}" ]]; then
-  export GOTMPDIR="$repo_root/.cache/go-tmp-surface-product-gate"
+	export GOTMPDIR="$repo_root/.cache/go-tmp-surface-product-gate"
 fi
 mkdir -p "$GOCACHE" "$GOTMPDIR"
 
 report_dir_arg="${report_dir%/}"
 if [[ -z "$report_dir_arg" ]]; then
-  report_dir_arg="$report_dir"
+	report_dir_arg="$report_dir"
 fi
-surface_release_require_fresh_report_dir "$report_dir_arg" "$repo_root" "surface_product_gate:" >/dev/null
+surface_release_require_fresh_report_dir \
+  "$report_dir_arg" \
+  "$repo_root" \
+  "surface_product_gate:" \
+  >/dev/null
 report_dir="$report_dir_arg"
 
 format_command() {
-  local formatted=""
-  local quoted=""
-  local arg
-  for arg in "$@"; do
-    printf -v quoted "%q" "$arg"
-    if [[ -z "$formatted" ]]; then
-      formatted="$quoted"
-    else
-      formatted+=" $quoted"
-    fi
-  done
-  printf "%s" "$formatted"
+	local formatted=""
+	local quoted=""
+	local arg
+	for arg in "$@"; do
+		printf -v quoted "%q" "$arg"
+		if [[ -z "$formatted" ]]; then
+			formatted="$quoted"
+		else
+			formatted+=" $quoted"
+		fi
+	done
+	printf "%s" "$formatted"
 }
 
 json_string() {
-  local value="$1"
-  value="${value//\\/\\\\}"
-  value="${value//\"/\\\"}"
-  value="${value//$'\n'/\\n}"
-  value="${value//$'\r'/\\r}"
-  value="${value//$'\t'/\\t}"
-  printf '"%s"' "$value"
+	local value="$1"
+	value="${value//\\/\\\\}"
+	value="${value//\"/\\\"}"
+	value="${value//$'\n'/\\n}"
+	value="${value//$'\r'/\\r}"
+	value="${value//$'\t'/\\t}"
+	printf '"%s"' "$value"
 }
 
 bash scripts/release/surface/release-gate.sh --report-dir "$report_dir_arg"
@@ -97,30 +101,32 @@ summary_path="$report_dir/surface-product-gate-summary.json"
 product_summary_path="$report_dir/product-summary.json"
 git_head="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
 git_dirty=false
-if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null || [[ -n "$(git ls-files --others --exclude-standard 2>/dev/null)" ]]; then
-  git_dirty=true
+if ! git diff --quiet 2>/dev/null || \
+  ! git diff --cached --quiet 2>/dev/null || \
+  [[ -n "$(git ls-files --others --exclude-standard 2>/dev/null)" ]]; then
+	git_dirty=true
 fi
 final_verdict="P29_FINAL_AUDIT_REQUIRED"
 product_summary_status="product_gate_passed_p29_final_audit_required"
 if [[ "$git_dirty" == true ]]; then
-  final_verdict="BLOCKED_DIRTY_CHECKOUT"
-  product_summary_status="product_gate_passed_clean_same_commit_blocked"
+	final_verdict="BLOCKED_DIRTY_CHECKOUT"
+	product_summary_status="product_gate_passed_clean_same_commit_blocked"
 fi
 generated_at_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 formatted_args="$(format_command "${original_args[@]}")"
 command_line="bash scripts/release/surface/product-gate.sh"
 if [[ -n "$formatted_args" ]]; then
-  command_line+=" $formatted_args"
+	command_line+=" $formatted_args"
 fi
 
 write_product_category_summary() {
-  local category="$1"
-  local path="$2"
-  local source_report="$3"
-  local status="$4"
-  local evidence="$5"
-  mkdir -p "$(dirname "$path")"
-  cat > "$path" <<JSON
+	local category="$1"
+	local path="$2"
+	local source_report="$3"
+	local status="$4"
+	local evidence="$5"
+	mkdir -p "$(dirname "$path")"
+	cat >"$path" <<JSON
 {
   "schema": "tetra.surface.product-category-summary.v1",
   "release_scope": "surface-v1-linux-web",
@@ -138,7 +144,7 @@ write_product_category_summary() {
 JSON
 }
 
-cat > "$summary_path" <<JSON
+cat >"$summary_path" <<JSON
 {
   "schema": "tetra.surface.product-gate.v1",
   "release_scope": "surface-v1-linux-web",
@@ -166,7 +172,7 @@ cat > "$summary_path" <<JSON
 }
 JSON
 
-cat > "$product_summary_path" <<JSON
+cat >"$product_summary_path" <<JSON
 {
   "schema": "tetra.surface.product-summary.v1",
   "release_scope": "surface-v1-linux-web",
@@ -253,8 +259,8 @@ cat > "$product_summary_path" <<JSON
   },
   "nonclaims": [
     "all-platform-surface-parity",
-    "macos-surface-production",
-    "windows-surface-production",
+    "nonclaim-macos-surface-production-support",
+    "nonclaim-windows-surface-production-support",
     "wasm32-wasi-surface-ui-runtime",
     "gpu-renderer",
     "full-rich-text-editor",
@@ -270,49 +276,52 @@ cat > "$product_summary_path" <<JSON
 JSON
 
 write_product_category_summary \
-  "visual" \
-  "$report_dir/visual/visual-summary.json" \
-  "reference-visual/surface-visual-regression.json" \
-  "validated-evidence-summary" \
-  "visual gate evidence is present through release-gate reference visual reports"
+	"visual" \
+	"$report_dir/visual/visual-summary.json" \
+	"reference-visual/surface-visual-regression.json" \
+	"validated-evidence-summary" \
+	"visual gate evidence is present through release-gate reference visual reports"
+	write_product_category_summary \
+		"accessibility" \
+		"$report_dir/accessibility/accessibility-summary.json" \
+		"surface-linux-x64-release-accessibility.json" \
+		"validated-evidence-summary" \
+		"supported accessibility reports are present; screen-reader support is out of scope"
 write_product_category_summary \
-  "accessibility" \
-  "$report_dir/accessibility/accessibility-summary.json" \
-  "surface-linux-x64-release-accessibility.json" \
-  "validated-evidence-summary" \
-  "supported target accessibility reports are present; full screen-reader support remains outside this summary"
+	"performance" \
+	"$report_dir/performance/performance-budget.json" \
+	"surface-linux-x64-release-app-shell.json" \
+	"validated-evidence-summary" \
+	"surface-performance-budget-v1 is validated as local deterministic budget evidence"
 write_product_category_summary \
-  "performance" \
-  "$report_dir/performance/performance-budget.json" \
-  "surface-linux-x64-release-app-shell.json" \
-  "validated-evidence-summary" \
-  "surface-performance-budget-v1 is validated as local deterministic budget evidence"
+	"app-shell" \
+	"$report_dir/app-shell/app-shell-summary.json" \
+	"surface-linux-x64-release-app-shell.json" \
+	"validated-evidence-summary" \
+	"linux-app-shell-subset-v1 evidence is present for the bounded Linux scope"
 write_product_category_summary \
-  "app-shell" \
-  "$report_dir/app-shell/app-shell-summary.json" \
-  "surface-linux-x64-release-app-shell.json" \
-  "validated-evidence-summary" \
-  "linux-app-shell-subset-v1 evidence is present for the bounded Linux scope"
+	"package" \
+	"$report_dir/package/package-summary.json" \
+	"surface-package.json" \
+	"validated-evidence-summary" \
+	"surface-package-v1 evidence is present for the bounded Linux/web scope"
 write_product_category_summary \
-  "package" \
-  "$report_dir/package/package-summary.json" \
-  "surface-package.json" \
-  "validated-evidence-summary" \
-  "surface-package-v1 evidence is present for the bounded Linux/web scope"
+	"reference-apps" \
+	"$report_dir/reference-apps/reference-apps-summary.json" \
+	"surface-reference-apps.json" \
+	"validated-evidence-summary" \
+	"surface-reference-app-suite-v1 evidence is present for ten reference app shapes"
 write_product_category_summary \
-  "reference-apps" \
-  "$report_dir/reference-apps/reference-apps-summary.json" \
-  "surface-reference-apps.json" \
-  "validated-evidence-summary" \
-  "surface-reference-app-suite-v1 evidence is present for ten reference app shapes"
-write_product_category_summary \
-  "claim-governance" \
-  "$report_dir/claim-governance/claims-summary.json" \
-  "surface-product-gate-summary.json" \
-  "validated-evidence-summary" \
-  "claim scanner, manifest validator, and docs verifier passed for this product gate run"
+	"claim-governance" \
+	"$report_dir/claim-governance/claims-summary.json" \
+	"surface-product-gate-summary.json" \
+	"validated-evidence-summary" \
+	"claim scanner, manifest validator, and docs verifier passed for this product gate run"
 
-go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"
+go run ./tools/cmd/validate-artifact-hashes \
+	--write \
+	--root "$report_dir" \
+	--out "$report_dir/artifact-hashes.json"
 go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-hashes.json"
 go run ./tools/cmd/validate-surface-product-summary --report-dir "$report_dir"
 go run ./tools/cmd/validate-surface-claims --root "$repo_root" --report-dir "$report_dir"

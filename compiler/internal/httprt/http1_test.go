@@ -67,14 +67,19 @@ func TestParseRequestRejectsOversizedBodyAndUnsupportedTransferEncoding(t *testi
 		t.Fatalf("oversized body error = %v, want ErrBodyTooLarge", err)
 	}
 
-	chunked := []byte("POST /echo HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\n")
+	chunked := []byte(
+		"POST /echo HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\n",
+	)
 	if _, _, err := ParseRequest(chunked, limits); !errors.Is(err, ErrUnsupportedTransferEncoding) {
 		t.Fatalf("chunked body error = %v, want ErrUnsupportedTransferEncoding", err)
 	}
 }
 
 func TestParseRequestSeparatesPathAndQuery(t *testing.T) {
-	req, _, err := ParseRequest([]byte("GET /queries?queries=20&unused=yes HTTP/1.1\r\nHost: localhost\r\n\r\n"), Limits{})
+	req, _, err := ParseRequest(
+		[]byte("GET /queries?queries=20&unused=yes HTTP/1.1\r\nHost: localhost\r\n\r\n"),
+		Limits{},
+	)
 	if err != nil {
 		t.Fatalf("ParseRequest: %v", err)
 	}
@@ -102,9 +107,21 @@ func TestParseRequestRejectsMalformedAndOversizedInputs(t *testing.T) {
 		{name: "bad request line", raw: "GET /only-two-parts\r\n\r\n", want: ErrMalformedRequest},
 		{name: "unsupported version", raw: "GET / HTTP/2.0\r\n\r\n", want: ErrUnsupportedVersion},
 		{name: "bad header", raw: "GET / HTTP/1.1\r\nNoColon\r\n\r\n", want: ErrMalformedHeader},
-		{name: "bad content length", raw: "POST / HTTP/1.1\r\nContent-Length: nope\r\n\r\n", want: ErrMalformedHeader},
-		{name: "too many headers", raw: "GET / HTTP/1.1\r\nA: 1\r\nB: 2\r\nC: 3\r\nD: 4\r\nE: 5\r\n\r\n", want: ErrTooManyHeaders},
-		{name: "oversized", raw: "GET / HTTP/1.1\r\nLong: " + strings.Repeat("x", 80) + "\r\n\r\n", want: ErrHeaderTooLarge},
+		{
+			name: "bad content length",
+			raw:  "POST / HTTP/1.1\r\nContent-Length: nope\r\n\r\n",
+			want: ErrMalformedHeader,
+		},
+		{
+			name: "too many headers",
+			raw:  "GET / HTTP/1.1\r\nA: 1\r\nB: 2\r\nC: 3\r\nD: 4\r\nE: 5\r\n\r\n",
+			want: ErrTooManyHeaders,
+		},
+		{
+			name: "oversized",
+			raw:  "GET / HTTP/1.1\r\nLong: " + strings.Repeat("x", 80) + "\r\n\r\n",
+			want: ErrHeaderTooLarge,
+		},
 	}
 
 	for _, tc := range cases {
@@ -172,12 +189,18 @@ func TestRouterMatchesPathParamsAndMiddleware(t *testing.T) {
 	router.Use(func(next Handler) Handler {
 		return func(req Request) Response {
 			resp := next(req)
-			resp.Headers = append(resp.Headers, Header{Name: "X-Route-ID", Value: req.PathValue("id")})
+			resp.Headers = append(
+				resp.Headers,
+				Header{Name: "X-Route-ID", Value: req.PathValue("id")},
+			)
 			return resp
 		}
 	})
 	router.Handle("GET", "/users/:id/books/:book", func(req Request) Response {
-		return Response{StatusCode: 200, Body: []byte(req.PathValue("id") + "/" + req.PathValue("book"))}
+		return Response{
+			StatusCode: 200,
+			Body:       []byte(req.PathValue("id") + "/" + req.PathValue("book")),
+		}
 	})
 	router.Handle("GET", "/users/me/books/current", func(req Request) Response {
 		return Response{StatusCode: 200, Body: []byte("static")}

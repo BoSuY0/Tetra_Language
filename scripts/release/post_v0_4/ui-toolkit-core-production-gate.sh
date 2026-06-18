@@ -7,7 +7,7 @@ report_dir="$repo_root/reports/ui-toolkit-core"
 artifact_id="tetra.release.post_v0_4.ui_toolkit_core.production-gate.v1"
 
 usage() {
-  cat <<'USAGE'
+  cat << 'USAGE'
 Usage: bash scripts/release/post_v0_4/ui-toolkit-core-production-gate.sh [--report-dir DIR]
 
 Runs the ordered post-v0.4 production evidence gate for tetra.ui.toolkit.v1:
@@ -29,7 +29,7 @@ while [[ $# -gt 0 ]]; do
       report_dir="$2"
       shift 2
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;
@@ -80,7 +80,7 @@ go run ./tools/cmd/validate-ui-toolkit-core --report "$report_dir/ui-toolkit-cor
 
 summary_path="$report_dir/ui-toolkit-core-production-gate.json"
 generated_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-cat >"$summary_path" <<JSON
+cat > "$summary_path" << JSON
 {
   "schema": "tetra.release.post_v0_4.ui_toolkit_core.production-gate.summary.v1",
   "artifact": "$artifact_id",

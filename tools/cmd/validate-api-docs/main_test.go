@@ -11,9 +11,9 @@ import (
 func TestValidateAPIDocsAcceptsGeneratedShape(t *testing.T) {
 	docs := `# Tetra API Docs
 
-<!-- tetra-api-metadata: {"schema":"tetra.api.v1alpha1","api_hash":"sha256:a5813045590b999abb9088185f7ee73c1d75b281dbbacfd2ea16fda06106dc36","module_count":1,"entry_count":1} -->
+<!-- tetra-api-metadata: {"schema":"tetra.api.v1alpha1","api_hash":"sha256:6bb4b0eb4a5e074052e52e8f4587d7d611f8e469e98b33c4fcfa78ef965cdf2a","module_count":1,"entry_count":1} -->
 
-## examples/flow_hello.tetra
+## examples/flow/flow_hello.tetra
 
 ### Functions
 
@@ -28,7 +28,7 @@ func TestValidateAPIDocsAcceptsGeneratedShape(t *testing.T) {
 func TestValidateAPIDocsRejectsMissingAPIMetadata(t *testing.T) {
 	docs := `# Tetra API Docs
 
-## examples/flow_hello.tetra
+## examples/flow/flow_hello.tetra
 
 ### Functions
 
@@ -48,7 +48,7 @@ func TestValidateAPIDocsRejectsAPIMetadataHashMismatch(t *testing.T) {
 
 <!-- tetra-api-metadata: {"schema":"tetra.api.v1alpha1","api_hash":"sha256:0000000000000000000000000000000000000000000000000000000000000000","module_count":1,"entry_count":1} -->
 
-## examples/flow_hello.tetra
+## examples/flow/flow_hello.tetra
 
 ### Functions
 
@@ -68,7 +68,7 @@ func TestValidateAPIDocsRejectsUnknownMetadataFields(t *testing.T) {
 
 <!-- tetra-api-metadata: {"schema":"tetra.api.v1alpha1","api_hash":"sha256:a5813045590b999abb9088185f7ee73c1d75b281dbbacfd2ea16fda06106dc36","module_count":1,"entry_count":1,"extra":true} -->
 
-## examples/flow_hello.tetra
+## examples/flow/flow_hello.tetra
 
 ### Functions
 
@@ -188,11 +188,11 @@ func TestValidateAPIDocsRejectsEntryBeforeSection(t *testing.T) {
 func TestValidateAPIDocsRejectsBrokenInternalLink(t *testing.T) {
 	docs := `# Tetra API Docs
 
-<!-- tetra-api-metadata: {"schema":"tetra.api.v1alpha1","api_hash":"sha256:a5813045590b999abb9088185f7ee73c1d75b281dbbacfd2ea16fda06106dc36","module_count":1,"entry_count":1} -->
+<!-- tetra-api-metadata: {"schema":"tetra.api.v1alpha1","api_hash":"sha256:6bb4b0eb4a5e074052e52e8f4587d7d611f8e469e98b33c4fcfa78ef965cdf2a","module_count":1,"entry_count":1} -->
 
 See [missing](#missing-section).
 
-## examples/flow_hello.tetra
+## examples/flow/flow_hello.tetra
 
 ### Functions
 

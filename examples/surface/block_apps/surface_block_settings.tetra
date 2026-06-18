@@ -1,0 +1,258 @@
+// Polished settings scene composed only from Block configuration.
+module examples.surface.block_apps.surface_block_settings
+
+import lib.core.surface as surface
+import lib.core.block as block
+
+func rgba(r: Int, g: Int, b: Int, a: Int) -> surface.Color:
+    return surface.Color(r: r, g: g, b: b, a: a)
+
+func theme_dark() -> surface.Color:
+    return surface.Color(r: 20, g: 24, b: 30, a: 255)
+
+func theme_light() -> surface.Color:
+    return surface.Color(r: 248, g: 250, b: 252, a: 255)
+
+func blue() -> surface.Color:
+    return surface.Color(r: 96, g: 174, b: 244, a: 255)
+
+func rose() -> surface.Color:
+    return surface.Color(r: 244, g: 118, b: 142, a: 255)
+
+func shell_paint() -> block.PaintSpec:
+    let fill = block.paint_layer_fill_radius(rgba(27, 32, 39, 255), 16)
+    let grad_a = rgba(32, 40, 50, 255)
+    let grad_b = rgba(24, 29, 36, 255)
+    let grad = block.paint_layer_linear_gradient(grad_a, grad_b, 16)
+    let border = block.paint_layer_border(rgba(74, 88, 104, 255), 1, 16)
+    let shadow = block.paint_layer_shadow(rgba(0, 0, 0, 96), 18, 0, 8)
+    let outline = block.paint_layer_outline(blue(), 1, 18)
+    return block.paint_stack5(fill, grad, border, shadow, outline)
+
+func field_paint(focused: Bool) -> block.PaintSpec:
+    if focused:
+        let active_fill = block.paint_layer_fill_radius(rgba(14, 18, 22, 255), 10)
+        let active_border = block.paint_layer_border(blue(), 2, 10)
+        let active_shadow = block.paint_layer_shadow(rgba(96, 174, 244, 42), 12, 0, 0)
+        let active_outline = block.paint_layer_outline(blue(), 1, 12)
+        return block.paint_stack4(active_fill, active_border, active_shadow, active_outline)
+    let fill = block.paint_layer_fill_radius(rgba(16, 20, 26, 255), 10)
+    let border = block.paint_layer_border(rgba(68, 80, 94, 255), 1, 10)
+    let shadow = block.paint_layer_shadow(rgba(0, 0, 0, 56), 8, 0, 2)
+    return block.paint_stack3(fill, border, shadow)
+
+func ui_motion(ms: Int, y: Int, scale: Int) -> block.MotionSpec:
+    let ease = block.motion_ease_standard()
+    return block.motion_transition(ms, 0, ease, true, true, true, 0, y, scale)
+
+func field_rect(y: Int) -> surface.Rect:
+    return surface.Rect(x: 182, y: y, w: 254, h: 42)
+
+func action_rect(x: Int) -> surface.Rect:
+    return surface.Rect(x: x, y: 220, w: 108, h: 38)
+
+func field_text(n: Int) -> block.TextSpec:
+    let fg = theme_light()
+    let ui = block.text_family_ui()
+    let align = block.text_align_start()
+    let wrap = block.text_wrap_none()
+    let overflow = block.text_overflow_ellipsis()
+    return block.text_editable_styled(n, 10, fg, ui, 14, 500, 20, align, wrap, overflow, 255)
+
+func button_text(n: Int) -> block.TextSpec:
+    let fg = theme_light()
+    let ui = block.text_family_ui()
+    let align = block.text_align_center()
+    let wrap = block.text_wrap_none()
+    let overflow = block.text_overflow_ellipsis()
+    return block.text_styled(n, fg, ui, 13, 700, 18, align, wrap, overflow, 255)
+
+func nav_text() -> block.TextSpec:
+    let ui = block.text_family_ui()
+    let align = block.text_align_start()
+    let wrap = block.text_wrap_word()
+    let overflow = block.text_overflow_ellipsis()
+    return block.text_styled(8, theme_light(), ui, 15, 700, 20, align, wrap, overflow, 255)
+
+func form_text() -> block.TextSpec:
+    let ui = block.text_family_ui()
+    let align = block.text_align_start()
+    let wrap = block.text_wrap_none()
+    let overflow = block.text_overflow_ellipsis()
+    return block.text_styled(15, theme_light(), ui, 18, 800, 24, align, wrap, overflow, 255)
+
+func label_text(n: Int) -> block.TextSpec:
+    let ui = block.text_family_ui()
+    let align = block.text_align_start()
+    let wrap = block.text_wrap_none()
+    let overflow = block.text_overflow_ellipsis()
+    return block.text_styled(n, theme_light(), ui, 12, 600, 16, align, wrap, overflow, 220)
+
+func make_field(idv: Int, p: Int, lbl: Int, y: Int, n: Int, focused: Bool) -> block.Block:
+    let rect = field_rect(y)
+    let font: block.AssetRef = block.asset_font(2, 6202)
+    let text = field_text(n)
+    var state: block.StateSpec = block.state_interactive()
+    if focused:
+        state = block.state_with_selector(block.state_selector_focused(), 4)
+    let motion = ui_motion(120, 0, 101)
+    let layout = block.layout_row(rect, 8)
+    let image = block.image_none()
+    let input = block.input_text()
+    let event = block.event_text(block.action_primary())
+    let a11y = block.accessibility_textbox_labelled_by(n, block.id(lbl))
+    let paint = field_paint(focused)
+    let props = block.props(layout, paint, text, image, input, event, state, motion, a11y, font)
+    return block.make(block.id(idv), block.id(p), props)
+
+func action_paint(color: surface.Color) -> block.PaintSpec:
+    let fill = block.paint_layer_fill_radius(color, 10)
+    let grad_color = rgba(color.r - 14, color.g - 14, color.b - 14, 255)
+    let grad = block.paint_layer_linear_gradient(color, grad_color, 10)
+    let border = block.paint_layer_border(theme_light(), 1, 10)
+    let shadow = block.paint_layer_shadow(rgba(0, 0, 0, 68), 10, 0, 4)
+    return block.paint_stack4(fill, grad, border, shadow)
+
+func make_action(idv: Int, p: Int, x: Int, n: Int, color: surface.Color, hash: Int) -> block.Block:
+    let rect = action_rect(x)
+    let icon: block.AssetRef = block.asset_icon(idv, 16, 16, hash)
+    let text = button_text(n)
+    let image = block.image_asset_tinted_scaled(icon, 16, 16, theme_light(), 1)
+    let input = block.input_clickable()
+    let event = block.event_click(block.action_primary())
+    let state = block.state_interactive()
+    let motion = ui_motion(110, 1, 98)
+    let a11y = block.accessibility_button(n)
+    let layout = block.layout_row(rect, 8)
+    let paint = action_paint(color)
+    let props = block.props(layout, paint, text, image, input, event, state, motion, a11y, icon)
+    return block.make(block.id(idv), block.id(p), props)
+
+func scene_frame_checksum() -> Int:
+    let hover: block.StateSelector = block.state_selector_hover()
+    let focus: block.StateSelector = block.state_selector_focused()
+    let pressed: block.StateSelector = block.state_selector_pressed()
+    let motion: block.MotionSpec = ui_motion(110, 1, 98)
+    let paint: block.PaintSpec = field_paint(true)
+    let hover_border: Int = block.state_resolve_int(1, 2, hover, hover)
+    let focus_base = block.state_base()
+    let focus_selected = block.state_with_selector(focus, 4)
+    let focus_state: block.StateSpec = block.state_resolve(focus_base, focus_selected, focus)
+    let focus_variant: Int = focus_state.variant
+    let pressed_scale: Int = block.motion_resolve_scale(motion, 55)
+    if block.state_selector_matches(pressed, pressed):
+        return block.paint_feature_flags(paint) + hover_border + focus_variant + pressed_scale
+    return 0
+
+func scene_checksum() -> Int:
+    return scene_frame_checksum()
+
+func make_root_props(rect: surface.Rect) -> block.BlockProps:
+    let layout = block.layout_row(rect, 12)
+    let fill = block.paint_layer_fill_radius(theme_dark(), 0)
+    let overlay = block.paint_layer_overlay(blue(), 22, 0)
+    let paint = block.paint_stack2(fill, overlay)
+    let text = block.text_none()
+    let image = block.image_none()
+    let input = block.input_none()
+    let event = block.event_none()
+    let state = block.state_base()
+    let motion = block.motion_none()
+    let a11y = block.accessibility_text(14)
+    let asset = block.asset_none()
+    return block.props(layout, paint, text, image, input, event, state, motion, a11y, asset)
+
+func make_panel_props(rect: surface.Rect, form: Bool) -> block.BlockProps:
+    var layout: block.LayoutSpec = block.layout_column(rect, 8)
+    var text: block.TextSpec = nav_text()
+    if form:
+        layout = block.layout_column(rect, 12)
+        text = form_text()
+    let image = block.image_none()
+    let input = block.input_none()
+    let event = block.event_none()
+    let state = block.state_base()
+    let motion = block.motion_fast()
+    var a11y: block.AccessibilitySpec = block.accessibility_text(8)
+    if form:
+        a11y = block.accessibility_text(15)
+    let asset = block.asset_none()
+    return block.props(layout, shell_paint(), text, image, input, event, state, motion, a11y, asset)
+
+func make_label_props(rect: surface.Rect, n: Int, target: Int) -> block.BlockProps:
+    let layout = block.layout_fixed(rect)
+    let paint = block.paint_empty()
+    let text = label_text(n)
+    let image = block.image_none()
+    let input = block.input_none()
+    let event = block.event_none()
+    let state = block.state_base()
+    let motion = block.motion_none()
+    let a11y = block.accessibility_label_for(n, block.id(target))
+    let asset = block.asset_none()
+    return block.props(layout, paint, text, image, input, event, state, motion, a11y, asset)
+
+func add_root(tree: inout block.BlockTree, child: block.Block, bounds: surface.Rect) -> Int:
+    return block.tree_add_root(tree, child, bounds)
+
+func add_child(t: inout block.BlockTree, p: Int, child: block.Block, r: surface.Rect) -> Int:
+    return block.tree_add_child(t, block.id(p), child, r)
+
+func shell_ids_ok(root: Int, nav: Int, form: Int, label: Int, field: Int) -> Bool:
+    let shell = root == 1 && nav == 2 && form == 3
+    return shell && label == 4 && field == 5
+
+func form_ids_ok(label: Int, field: Int, save: Int, reset: Int) -> Bool:
+    let fields = label == 6 && field == 7
+    return fields && save == 8 && reset == 9
+
+func state_ok(valid: Int, focus0: Int, focus3: Int) -> Bool:
+    let valid_tree = valid == block.tree_error_ok()
+    return valid_tree && focus0 == 5 && focus3 == 9
+
+func a11y_ok(name_id: block.BlockID) -> Bool:
+    let label = block.accessibility_label_for(4, name_id)
+    let field = block.accessibility_textbox_labelled_by(14, block.id(4))
+    return block.accessibility_relationship_matches(label, field, block.id(4), name_id)
+
+func visual_ok() -> Bool:
+    let paint_ok = block.paint_validate_visual_grammar(shell_paint()) == block.paint_error_ok()
+    return paint_ok && scene_checksum() > 0
+
+func main() -> Int
+uses alloc, mem:
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 480, h: 300)
+    let nav_rect: surface.Rect = surface.Rect(x: 20, y: 20, w: 126, h: 260)
+    let form_rect: surface.Rect = surface.Rect(x: 158, y: 20, w: 302, h: 260)
+    let name_label_rect: surface.Rect = surface.Rect(x: 182, y: 78, w: 120, h: 18)
+    let email_label_rect: surface.Rect = surface.Rect(x: 182, y: 142, w: 120, h: 18)
+    let name_id: block.BlockID = block.id(5)
+    var tree: block.BlockTree = block.tree_init(10)
+    let root_block = block.make(block.id(1), block.id_none(), make_root_props(root_rect))
+    let nav_block = block.make(block.id(2), block.id(1), make_panel_props(nav_rect, false))
+    let form_block = block.make(block.id(3), block.id(1), make_panel_props(form_rect, true))
+    let name_label_props = make_label_props(name_label_rect, 4, 5)
+    let email_label_props = make_label_props(email_label_rect, 5, 7)
+    let name_label_block = block.make(block.id(4), block.id(3), name_label_props)
+    let email_label_block = block.make(block.id(6), block.id(3), email_label_props)
+    let root: Int = add_root(tree, root_block, root_rect)
+    let nav: Int = add_child(tree, 1, nav_block, nav_rect)
+    let form: Int = add_child(tree, 1, form_block, form_rect)
+    let name_label: Int = add_child(tree, 3, name_label_block, name_label_rect)
+    let name_field: Int = add_child(tree, 3, make_field(5, 3, 4, 100, 14, true), field_rect(100))
+    let email_label: Int = add_child(tree, 3, email_label_block, email_label_rect)
+    let email_field: Int = add_child(tree, 3, make_field(7, 3, 6, 164, 17, false), field_rect(164))
+    let save: Int = add_child(tree, 3, make_action(8, 3, 208, 4, blue(), 701), action_rect(208))
+    let reset: Int = add_child(tree, 3, make_action(9, 3, 328, 5, rose(), 702), action_rect(328))
+    let valid: Int = block.tree_validate(tree)
+    let focus0: Int = block.id_value(block.focus_order_at(tree, 0))
+    let focus3: Int = block.id_value(block.focus_order_at(tree, 3))
+    let shell_ids = shell_ids_ok(root, nav, form, name_label, name_field)
+    let form_ids = form_ids_ok(email_label, email_field, save, reset)
+    let ids_ready = shell_ids && form_ids
+    let state_ready = state_ok(valid, focus0, focus3)
+    let a11y_ready = a11y_ok(name_id)
+    let visual_ready = visual_ok()
+    if ids_ready && state_ready && a11y_ready && visual_ready:
+        return 0
+    return 1

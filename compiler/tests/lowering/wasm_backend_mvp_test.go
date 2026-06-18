@@ -232,7 +232,12 @@ func buildWasmTargets(t *testing.T, src string, stem string) {
 	for _, target := range []string{"wasm32-wasi", "wasm32-web"} {
 		t.Run(target, func(t *testing.T) {
 			outPath := filepath.Join(tmp, stem+"-"+target+".wasm")
-			if _, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, target, compiler.BuildOptions{Jobs: 1}); err != nil {
+			if _, err := compiler.BuildFileWithStatsOpt(
+				srcPath,
+				outPath,
+				target,
+				compiler.BuildOptions{Jobs: 1},
+			); err != nil {
 				t.Fatalf("build %s: %v", target, err)
 			}
 			raw, err := os.ReadFile(outPath)
@@ -278,7 +283,12 @@ func runWasmWebMainWithNode(t *testing.T, src string, stem string, want int) {
 	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
 		t.Fatalf("write source: %v", err)
 	}
-	if _, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, "wasm32-web", compiler.BuildOptions{Jobs: 1}); err != nil {
+	if _, err := compiler.BuildFileWithStatsOpt(
+		srcPath,
+		outPath,
+		"wasm32-web",
+		compiler.BuildOptions{Jobs: 1},
+	); err != nil {
 		t.Fatalf("build wasm32-web: %v", err)
 	}
 
@@ -305,7 +315,13 @@ func runWasmWebMainWithNode(t *testing.T, src string, stem string, want int) {
   console.error(err.message);
   process.exit(1);
 });`
-	if out, err := exec.Command(node, "-e", script, outPath, fmt.Sprint(want)).CombinedOutput(); err != nil {
+	if out, err := exec.Command(
+		node,
+		"-e",
+		script,
+		outPath,
+		fmt.Sprint(want),
+	).CombinedOutput(); err != nil {
 		t.Fatalf("wasm32-web tetra_main: %v\n%s", err, out)
 	}
 }

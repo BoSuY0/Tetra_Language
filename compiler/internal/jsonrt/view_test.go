@@ -28,7 +28,8 @@ func TestParseValueViewBorrowsUnescapedStringsWithoutHeap(t *testing.T) {
 	if message.String.Storage != stdlibrt.StorageBorrowed {
 		t.Fatalf("message storage = %q, want borrowed", message.String.Storage)
 	}
-	if report.HeapAllocations != 0 || report.CopiedStrings != 0 || report.BorrowedStrings < 3 || report.UnsafeFacts {
+	if report.HeapAllocations != 0 || report.CopiedStrings != 0 || report.BorrowedStrings < 3 ||
+		report.UnsafeFacts {
 		t.Fatalf("parse report = %#v", report)
 	}
 }
@@ -45,14 +46,16 @@ func TestParseValueViewCopiesEscapedStringsIntoRegionOnlyWhenNeeded(t *testing.T
 	if escaped == nil || string(escaped.String.Bytes) != "hello\nworld" {
 		t.Fatalf("escaped string = %#v", escaped)
 	}
-	if escaped.String.Storage != stdlibrt.StorageRegion || escaped.String.RegionID != "json-request" {
+	if escaped.String.Storage != stdlibrt.StorageRegion ||
+		escaped.String.RegionID != "json-request" {
 		t.Fatalf("escaped string storage = %#v", escaped.String)
 	}
 	plain := value.ObjectMember("plain")
 	if plain == nil || plain.String.Storage != stdlibrt.StorageBorrowed {
 		t.Fatalf("plain string storage = %#v", plain)
 	}
-	if report.CopiedStrings != 1 || report.RegionTemporaries != 1 || report.HeapAllocations != 0 || report.UnsafeFacts {
+	if report.CopiedStrings != 1 || report.RegionTemporaries != 1 || report.HeapAllocations != 0 ||
+		report.UnsafeFacts {
 		t.Fatalf("escaped parse report = %#v", report)
 	}
 }
@@ -83,7 +86,8 @@ func TestParseValueViewDecodesEscapedStringIntoRegionWithoutHeap(t *testing.T) {
 	if value.String.Storage != stdlibrt.StorageRegion || value.String.RegionID != "json-request" {
 		t.Fatalf("escaped string storage = %#v, want request region", value.String)
 	}
-	if report.HeapAllocations != 0 || report.RegionTemporaries != 1 || report.CopiedStrings != 1 || report.UnsafeFacts {
+	if report.HeapAllocations != 0 || report.RegionTemporaries != 1 || report.CopiedStrings != 1 ||
+		report.UnsafeFacts {
 		t.Fatalf("escaped string report = %#v", report)
 	}
 }

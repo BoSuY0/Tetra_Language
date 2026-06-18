@@ -1,0 +1,23 @@
+// Actor yield mailbox microservice smoke.
+//
+// The service starts a worker task that sends to the parent mailbox, checks the
+// mailbox is initially empty, yields, then receives the worker payload.
+module examples.microservices.parallel.actor_send.core.parallel_actor_yield_mailbox_service
+func worker() -> Int
+uses actors:
+    let _sent: Int = core.send(core.sender(), 42)
+    return 0
+
+func main() -> Int
+uses actors, runtime:
+    let _task: task.i32 = core.task_spawn_i32("worker")
+    let before: actor.recv_result_i32 = core.recv_poll()
+    if before.error != 2:
+        return 10 + before.error
+    let _yielded: Int = core.yield()
+    let after: actor.recv_result_i32 = core.recv_poll()
+    if after.error != 0:
+        return 20 + after.error
+    if after.value == 42:
+        return 0
+    return after.value

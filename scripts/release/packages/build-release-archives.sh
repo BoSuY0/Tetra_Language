@@ -9,7 +9,7 @@ version=""
 out_dir=""
 
 usage() {
-  cat <<'USAGE'
+  cat << 'USAGE'
 Usage: bash scripts/release/packages/build-release-archives.sh [--version vX.Y.Z] [--out DIR]
 
 Builds the installable linux-x64 release archive:
@@ -38,7 +38,7 @@ while [[ $# -gt 0 ]]; do
       fi
       out_dir="$1"
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;
@@ -95,7 +95,7 @@ if [[ -f LICENSE ]]; then
   cp LICENSE "$package_root/LICENSE"
 fi
 
-cat > "$package_root/MANIFEST.txt" <<EOF
+cat > "$package_root/MANIFEST.txt" << EOF
 Tetra Language $version
 Target: $target
 Contents:

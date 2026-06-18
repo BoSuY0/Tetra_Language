@@ -1,9 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
+
+	"tetra_language/internal/toon"
 )
 
 func TestReadTargetsReportDefaultsToTargetsCommand(t *testing.T) {
@@ -16,6 +19,20 @@ func TestReadTargetsReportDefaultsToTargetsCommand(t *testing.T) {
 	}
 }
 
+func TestValidateTargetsReportAcceptsTOON(t *testing.T) {
+	rawJSON, err := readTargetsReport("")
+	if err != nil {
+		t.Fatalf("read default targets report: %v", err)
+	}
+	rawTOON, err := toon.ConvertJSONToTOON(rawJSON, toon.Options{Deterministic: true, Strict: true})
+	if err != nil {
+		t.Fatalf("json->toon: %v", err)
+	}
+	if err := validateTargetsReport(rawTOON); err != nil {
+		t.Fatalf("validate targets TOON: %v\n%s", err, rawTOON)
+	}
+}
+
 func TestReadTargetsReportReportsTargetsCommandFailure(t *testing.T) {
 	old := runTargetsCommand
 	runTargetsCommand = func() ([]byte, error) {
@@ -24,77 +41,48 @@ func TestReadTargetsReportReportsTargetsCommandFailure(t *testing.T) {
 	defer func() { runTargetsCommand = old }()
 
 	_, err := readTargetsReport("")
-	if err == nil || !strings.Contains(err.Error(), "runner failed") || !strings.Contains(err.Error(), "exit 127") {
+	if err == nil || !strings.Contains(err.Error(), "runner failed") ||
+		!strings.Contains(err.Error(), "exit 127") {
 		t.Fatalf("unexpected default targets command error: %v", err)
 	}
 }
 
 func TestValidateTargetsReportAcceptsExpectedShape(t *testing.T) {
-	raw := []byte(`{
-  "supported":["linux-x64","windows-x64","macos-x64","wasm32-wasi","wasm32-web"],
-  "build_only":["linux-x86","linux-x32"],
-  "planned":[],
-  "targets":[
-    {"triple":"linux-x64","status":"supported","os":"linux","arch":"x64","abi":"sysv","format":"elf","exe_ext":"","build_only":false,"run_mode":"host_native","run_supported":true,"runtime_status":"production","stdlib_status":"production","ffi_status":"scalar_object_smokes_partial","memory_build":"yes","memory_lower":"yes","memory_run":"yes","memory_raw_diagnostics":"yes","memory_region_lowering":"yes/partial","memory_alignment_semantics":"yes","memory_claim_level":"production/host_runtime","runner_probe_command":"tetra test --target x64 --format=json <runner-smoke.tetra>","release_gate":"scripts/release/post_v0_4/linux-native-targets-smoke.sh","evidence_artifacts":["targets.json","linux-x64-abi.json","linux-x64-atomic-stress.json","linux-x64-fuzz.json","linux-x64-runner.json","linux-native-targets-brutal.json","artifact-hashes.json"],"syscall_instruction":"syscall","syscall_numbering":"x86_64","syscall_arg_registers":["rax","rdi","rsi","rdx","r10","r8","r9"],"syscall_error_range":"-4095..-1","supports_debug_info":true,"supports_release_optimize":true},
-    {"triple":"windows-x64","status":"supported","os":"windows","arch":"x64","abi":"win64","format":"pe","exe_ext":".exe","build_only":false,"run_mode":"host_native","memory_build":"yes","memory_lower":"yes","memory_run":"host-required","memory_raw_diagnostics":"host-required","memory_region_lowering":"host-required","memory_alignment_semantics":"host-required","memory_claim_level":"build_lower_only unless run","run_supported":false,"run_unsupported_reason":"windows-x64 cannot run on host linux/amd64","supports_debug_info":true,"supports_release_optimize":true},
-    {"triple":"macos-x64","status":"supported","os":"macos","arch":"x64","abi":"sysv","format":"macho","exe_ext":"","build_only":false,"run_mode":"host_native","memory_build":"yes","memory_lower":"yes","memory_run":"host-required","memory_raw_diagnostics":"host-required","memory_region_lowering":"host-required","memory_alignment_semantics":"host-required","memory_claim_level":"build_lower_only unless run","run_supported":false,"run_unsupported_reason":"macos-x64 cannot run on host linux/amd64","supports_debug_info":true,"supports_release_optimize":true},
-    {"triple":"wasm32-wasi","status":"supported","os":"wasi","arch":"wasm32","abi":"wasi","format":"wasm","exe_ext":".wasm","build_only":false,"run_mode":"wasi_runner","memory_build":"yes","memory_lower":"yes","memory_run":"runner-smoke if available","memory_raw_diagnostics":"safe-only","memory_region_lowering":"limited","memory_alignment_semantics":"wasm rules","memory_claim_level":"artifact/runtime tiered","run_runner":"wasmtime","run_supported":true,"supports_debug_info":false,"supports_release_optimize":true},
-    {"triple":"wasm32-web","status":"supported","os":"web","arch":"wasm32","abi":"web","format":"wasm","exe_ext":".wasm","build_only":false,"run_mode":"web_runner","memory_build":"yes","memory_lower":"yes","memory_run":"browser-smoke if available","memory_raw_diagnostics":"safe-only","memory_region_lowering":"limited","memory_alignment_semantics":"wasm rules","memory_claim_level":"artifact/runtime tiered","run_supported":false,"run_unsupported_reason":"web runner unavailable: chromium-compatible executable not found","supports_debug_info":false,"supports_release_optimize":true},
-    {"triple":"linux-x86","status":"build_only","os":"linux","arch":"x86","abi":"i386-sysv","format":"elf","exe_ext":"","build_only":true,"run_mode":"host_probed","run_supported":false,"run_unsupported_reason":"host linux/amd64 does not support Linux i386 execution; no host fallback is allowed; probe command: tetra test --diagnostics=json --target x86 --format=json <runner-smoke.tetra>","runtime_status":"partial_build_only","stdlib_status":"partial_build_only","ffi_status":"ilp32_scalar_object_smokes_partial","memory_build":"yes","memory_lower":"yes","memory_run":"no/host-dependent","memory_raw_diagnostics":"partial","memory_region_lowering":"partial","memory_alignment_semantics":"partial","memory_claim_level":"build_lower_only","runner_probe_command":"tetra test --diagnostics=json --target x86 --format=json <runner-smoke.tetra>","release_gate":"scripts/release/post_v0_4/linux-native-targets-smoke.sh","evidence_artifacts":["targets.json","linux-x86-abi.json","linux-x86-atomic-stress.json","linux-x86-fuzz.json","linux-x86-runner.json","linux-native-targets-brutal.json","artifact-hashes.json"],"syscall_instruction":"int 0x80","syscall_numbering":"i386","syscall_arg_registers":["eax","ebx","ecx","edx","esi","edi","ebp"],"syscall_error_range":"-4095..-1","supports_debug_info":false,"supports_release_optimize":false},
-    {"triple":"linux-x32","status":"build_only","os":"linux","arch":"x64","abi":"x32-sysv","format":"elf","exe_ext":"","build_only":true,"run_mode":"host_probed","run_supported":false,"run_unsupported_reason":"host linux/amd64 does not support Linux x32 ABI execution; no host fallback is allowed; probe command: tetra test --diagnostics=json --target x32 --format=json <runner-smoke.tetra>","runtime_status":"partial_build_only","stdlib_status":"partial_build_only","ffi_status":"ilp32_scalar_object_smokes_partial","memory_build":"yes","memory_lower":"yes","memory_run":"no/host-dependent","memory_raw_diagnostics":"partial","memory_region_lowering":"partial","memory_alignment_semantics":"special","memory_claim_level":"build_lower_only","runner_probe_command":"tetra test --diagnostics=json --target x32 --format=json <runner-smoke.tetra>","release_gate":"scripts/release/post_v0_4/linux-native-targets-smoke.sh","evidence_artifacts":["targets.json","linux-x32-abi.json","linux-x32-atomic-stress.json","linux-x32-fuzz.json","linux-x32-runner.json","linux-native-targets-brutal.json","artifact-hashes.json"],"syscall_instruction":"syscall","syscall_numbering":"x32_syscall_bit","syscall_arg_registers":["rax","rdi","rsi","rdx","r10","r8","r9"],"syscall_error_range":"-4095..-1","supports_debug_info":false,"supports_release_optimize":false}
-  ]
-}`)
+	raw := targetsReportJSON(defaultTargetsForTest(true))
 	if err := validateTargetsReport(raw); err != nil {
 		t.Fatalf("validate targets: %v", err)
 	}
 }
 
 func TestValidateTargetsReportAcceptsMissingWASIRunner(t *testing.T) {
-	raw := []byte(`{
-  "supported":["linux-x64","windows-x64","macos-x64","wasm32-wasi","wasm32-web"],
-  "build_only":["linux-x86","linux-x32"],
-  "planned":[],
-  "targets":[
-    {"triple":"linux-x64","status":"supported","os":"linux","arch":"x64","abi":"sysv","format":"elf","exe_ext":"","build_only":false,"run_mode":"host_native","run_supported":true,"runtime_status":"production","stdlib_status":"production","ffi_status":"scalar_object_smokes_partial","memory_build":"yes","memory_lower":"yes","memory_run":"yes","memory_raw_diagnostics":"yes","memory_region_lowering":"yes/partial","memory_alignment_semantics":"yes","memory_claim_level":"production/host_runtime","runner_probe_command":"tetra test --target x64 --format=json <runner-smoke.tetra>","release_gate":"scripts/release/post_v0_4/linux-native-targets-smoke.sh","evidence_artifacts":["targets.json","linux-x64-abi.json","linux-x64-atomic-stress.json","linux-x64-fuzz.json","linux-x64-runner.json","linux-native-targets-brutal.json","artifact-hashes.json"],"syscall_instruction":"syscall","syscall_numbering":"x86_64","syscall_arg_registers":["rax","rdi","rsi","rdx","r10","r8","r9"],"syscall_error_range":"-4095..-1","supports_debug_info":true,"supports_release_optimize":true},
-    {"triple":"windows-x64","status":"supported","os":"windows","arch":"x64","abi":"win64","format":"pe","exe_ext":".exe","build_only":false,"run_mode":"host_native","memory_build":"yes","memory_lower":"yes","memory_run":"host-required","memory_raw_diagnostics":"host-required","memory_region_lowering":"host-required","memory_alignment_semantics":"host-required","memory_claim_level":"build_lower_only unless run","run_supported":false,"run_unsupported_reason":"windows-x64 cannot run on host linux/amd64","supports_debug_info":true,"supports_release_optimize":true},
-    {"triple":"macos-x64","status":"supported","os":"macos","arch":"x64","abi":"sysv","format":"macho","exe_ext":"","build_only":false,"run_mode":"host_native","memory_build":"yes","memory_lower":"yes","memory_run":"host-required","memory_raw_diagnostics":"host-required","memory_region_lowering":"host-required","memory_alignment_semantics":"host-required","memory_claim_level":"build_lower_only unless run","run_supported":false,"run_unsupported_reason":"macos-x64 cannot run on host linux/amd64","supports_debug_info":true,"supports_release_optimize":true},
-    {"triple":"wasm32-wasi","status":"supported","os":"wasi","arch":"wasm32","abi":"wasi","format":"wasm","exe_ext":".wasm","build_only":false,"run_mode":"wasi_runner","memory_build":"yes","memory_lower":"yes","memory_run":"runner-smoke if available","memory_raw_diagnostics":"safe-only","memory_region_lowering":"limited","memory_alignment_semantics":"wasm rules","memory_claim_level":"artifact/runtime tiered","run_supported":false,"run_unsupported_reason":"cannot run target wasm32-wasi: missing WASI runner: need wasmtime or node","supports_debug_info":false,"supports_release_optimize":true},
-    {"triple":"wasm32-web","status":"supported","os":"web","arch":"wasm32","abi":"web","format":"wasm","exe_ext":".wasm","build_only":false,"run_mode":"web_runner","memory_build":"yes","memory_lower":"yes","memory_run":"browser-smoke if available","memory_raw_diagnostics":"safe-only","memory_region_lowering":"limited","memory_alignment_semantics":"wasm rules","memory_claim_level":"artifact/runtime tiered","run_supported":false,"run_unsupported_reason":"web runner unavailable: chromium-compatible executable not found","supports_debug_info":false,"supports_release_optimize":true},
-    {"triple":"linux-x86","status":"build_only","os":"linux","arch":"x86","abi":"i386-sysv","format":"elf","exe_ext":"","build_only":true,"run_mode":"host_probed","run_supported":false,"run_unsupported_reason":"host linux/amd64 does not support Linux i386 execution; no host fallback is allowed; probe command: tetra test --diagnostics=json --target x86 --format=json <runner-smoke.tetra>","runtime_status":"partial_build_only","stdlib_status":"partial_build_only","ffi_status":"ilp32_scalar_object_smokes_partial","memory_build":"yes","memory_lower":"yes","memory_run":"no/host-dependent","memory_raw_diagnostics":"partial","memory_region_lowering":"partial","memory_alignment_semantics":"partial","memory_claim_level":"build_lower_only","runner_probe_command":"tetra test --diagnostics=json --target x86 --format=json <runner-smoke.tetra>","release_gate":"scripts/release/post_v0_4/linux-native-targets-smoke.sh","evidence_artifacts":["targets.json","linux-x86-abi.json","linux-x86-atomic-stress.json","linux-x86-fuzz.json","linux-x86-runner.json","linux-native-targets-brutal.json","artifact-hashes.json"],"syscall_instruction":"int 0x80","syscall_numbering":"i386","syscall_arg_registers":["eax","ebx","ecx","edx","esi","edi","ebp"],"syscall_error_range":"-4095..-1","supports_debug_info":false,"supports_release_optimize":false},
-    {"triple":"linux-x32","status":"build_only","os":"linux","arch":"x64","abi":"x32-sysv","format":"elf","exe_ext":"","build_only":true,"run_mode":"host_probed","run_supported":false,"run_unsupported_reason":"host linux/amd64 does not support Linux x32 ABI execution; no host fallback is allowed; probe command: tetra test --diagnostics=json --target x32 --format=json <runner-smoke.tetra>","runtime_status":"partial_build_only","stdlib_status":"partial_build_only","ffi_status":"ilp32_scalar_object_smokes_partial","memory_build":"yes","memory_lower":"yes","memory_run":"no/host-dependent","memory_raw_diagnostics":"partial","memory_region_lowering":"partial","memory_alignment_semantics":"special","memory_claim_level":"build_lower_only","runner_probe_command":"tetra test --diagnostics=json --target x32 --format=json <runner-smoke.tetra>","release_gate":"scripts/release/post_v0_4/linux-native-targets-smoke.sh","evidence_artifacts":["targets.json","linux-x32-abi.json","linux-x32-atomic-stress.json","linux-x32-fuzz.json","linux-x32-runner.json","linux-native-targets-brutal.json","artifact-hashes.json"],"syscall_instruction":"syscall","syscall_numbering":"x32_syscall_bit","syscall_arg_registers":["rax","rdi","rsi","rdx","r10","r8","r9"],"syscall_error_range":"-4095..-1","supports_debug_info":false,"supports_release_optimize":false}
-  ]
-}`)
+	raw := targetsReportJSON(defaultTargetsForTest(false))
 	if err := validateTargetsReport(raw); err != nil {
 		t.Fatalf("validate targets without WASI runner: %v", err)
 	}
 }
 
 func TestValidateTargetsReportRejectsLinuxHostNativeMarkedUnsupported(t *testing.T) {
-	raw := []byte(`{
-  "supported":["linux-x64","windows-x64","macos-x64","wasm32-wasi","wasm32-web"],
-  "build_only":["linux-x86","linux-x32"],
-  "planned":[],
-  "targets":[
-    {"triple":"linux-x64","status":"supported","os":"linux","arch":"x64","abi":"sysv","format":"elf","exe_ext":"","build_only":false,"run_mode":"host_native","run_supported":false,"run_unsupported_reason":"linux-x64 cannot run on host linux/amd64","supports_debug_info":true,"supports_release_optimize":true},
-    {"triple":"windows-x64","status":"supported","os":"windows","arch":"x64","abi":"win64","format":"pe","exe_ext":".exe","build_only":false,"run_mode":"host_native","memory_build":"yes","memory_lower":"yes","memory_run":"host-required","memory_raw_diagnostics":"host-required","memory_region_lowering":"host-required","memory_alignment_semantics":"host-required","memory_claim_level":"build_lower_only unless run","run_supported":false,"run_unsupported_reason":"windows-x64 cannot run on host linux/amd64","supports_debug_info":true,"supports_release_optimize":true},
-    {"triple":"macos-x64","status":"supported","os":"macos","arch":"x64","abi":"sysv","format":"macho","exe_ext":"","build_only":false,"run_mode":"host_native","memory_build":"yes","memory_lower":"yes","memory_run":"host-required","memory_raw_diagnostics":"host-required","memory_region_lowering":"host-required","memory_alignment_semantics":"host-required","memory_claim_level":"build_lower_only unless run","run_supported":false,"run_unsupported_reason":"macos-x64 cannot run on host linux/amd64","supports_debug_info":true,"supports_release_optimize":true},
-    {"triple":"wasm32-wasi","status":"supported","os":"wasi","arch":"wasm32","abi":"wasi","format":"wasm","exe_ext":".wasm","build_only":false,"run_mode":"wasi_runner","memory_build":"yes","memory_lower":"yes","memory_run":"runner-smoke if available","memory_raw_diagnostics":"safe-only","memory_region_lowering":"limited","memory_alignment_semantics":"wasm rules","memory_claim_level":"artifact/runtime tiered","run_runner":"wasmtime","run_supported":true,"supports_debug_info":false,"supports_release_optimize":true},
-    {"triple":"wasm32-web","status":"supported","os":"web","arch":"wasm32","abi":"web","format":"wasm","exe_ext":".wasm","build_only":false,"run_mode":"web_runner","memory_build":"yes","memory_lower":"yes","memory_run":"browser-smoke if available","memory_raw_diagnostics":"safe-only","memory_region_lowering":"limited","memory_alignment_semantics":"wasm rules","memory_claim_level":"artifact/runtime tiered","run_supported":false,"run_unsupported_reason":"web runner unavailable: chromium-compatible executable not found","supports_debug_info":false,"supports_release_optimize":true},
-    {"triple":"linux-x86","status":"build_only","os":"linux","arch":"x86","abi":"i386-sysv","format":"elf","exe_ext":"","build_only":true,"run_mode":"host_probed","run_supported":false,"run_unsupported_reason":"host does not support Linux i386 execution; no host fallback is allowed","supports_debug_info":false,"supports_release_optimize":false},
-    {"triple":"linux-x32","status":"build_only","os":"linux","arch":"x64","abi":"x32-sysv","format":"elf","exe_ext":"","build_only":true,"run_mode":"host_probed","run_supported":false,"run_unsupported_reason":"host does not support Linux x32 ABI execution; no host fallback is allowed","supports_debug_info":false,"supports_release_optimize":false}
-  ]
-}`)
+	targets := defaultTargetsForTest(true)
+	targets[0].RunSupported = false
+	targets[0].RunUnsupportedReason = "linux-x64 cannot run on host linux/amd64"
+	raw := targetsReportJSON(targets)
 	err := validateTargetsReport(raw)
 	if err == nil {
 		t.Fatalf("expected linux host-native run_supported=false failure")
 	}
-	if !strings.Contains(err.Error(), "linux-x64") || !strings.Contains(err.Error(), "run_supported") {
+	if !strings.Contains(err.Error(), "linux-x64") ||
+		!strings.Contains(err.Error(), "run_supported") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
 func TestValidateTargetsReportRejectsWrongOrder(t *testing.T) {
-	raw := []byte(`{"supported":["windows-x64","linux-x64","macos-x64","wasm32-wasi","wasm32-web"],"build_only":[],"planned":[],"targets":[]}`)
+	raw := targetsReportJSONWithLists(
+		[]string{"windows-x64", "linux-x64", "macos-x64", "wasm32-wasi", "wasm32-web"},
+		[]string{},
+		[]string{},
+		[]targetReportEntry{},
+	)
 	if err := validateTargetsReport(raw); err == nil {
 		t.Fatalf("expected wrong-order failure")
 	}
@@ -102,12 +90,14 @@ func TestValidateTargetsReportRejectsWrongOrder(t *testing.T) {
 
 func TestValidateRunContractAcceptsHostProbedBuildOnly(t *testing.T) {
 	entry := targetReportEntry{
-		Triple:               "linux-x32",
-		Status:               "build_only",
-		BuildOnly:            true,
-		RunMode:              "host_probed",
-		RunSupported:         false,
-		RunUnsupportedReason: "host linux/amd64 does not support Linux x32 ABI execution; no host fallback is allowed; probe command: tetra test --diagnostics=json --target x32 --format=json <runner-smoke.tetra>",
+		Triple:       "linux-x32",
+		Status:       "build_only",
+		BuildOnly:    true,
+		RunMode:      "host_probed",
+		RunSupported: false,
+		RunUnsupportedReason: ("host linux/amd64 does not support Linux x32 ABI execution; no " +
+			"host fallback is allowed; probe command: tetra test --diagnostics=json -" +
+			"-target x32 --format=json <runner-smoke.tetra>"),
 	}
 	if err := validateRunContract(entry); err != nil {
 		t.Fatalf("validate host-probed run contract: %v", err)
@@ -118,19 +108,21 @@ func TestValidateRunContractAcceptsHostProbedBuildOnly(t *testing.T) {
 		t.Fatalf("validate supported host-probed run contract: %v", err)
 	}
 	entry.BuildOnly = false
-	if err := validateRunContract(entry); err == nil || !strings.Contains(err.Error(), "build-only") {
+	if err := validateRunContract(entry); err == nil ||
+		!strings.Contains(err.Error(), "build-only") {
 		t.Fatalf("expected non-build-only host-probed failure, got %v", err)
 	}
 }
 
 func TestValidateRunContractRejectsHostProbedReasonWithoutProbeCommand(t *testing.T) {
 	entry := targetReportEntry{
-		Triple:               "linux-x32",
-		Status:               "build_only",
-		BuildOnly:            true,
-		RunMode:              "host_probed",
-		RunSupported:         false,
-		RunUnsupportedReason: "host does not support Linux x32 ABI execution; no host fallback is allowed",
+		Triple:       "linux-x32",
+		Status:       "build_only",
+		BuildOnly:    true,
+		RunMode:      "host_probed",
+		RunSupported: false,
+		RunUnsupportedReason: ("host does not support Linux x32 ABI execution; no host fallback " +
+			"is allowed"),
 	}
 	err := validateRunContract(entry)
 	if err == nil || !strings.Contains(err.Error(), "probe command") {
@@ -140,13 +132,14 @@ func TestValidateRunContractRejectsHostProbedReasonWithoutProbeCommand(t *testin
 
 func TestValidateLinuxNativePromotionMetadataRejectsMissingEvidenceArtifact(t *testing.T) {
 	entry := targetReportEntry{
-		Triple:             "linux-x86",
-		RuntimeStatus:      "partial_build_only",
-		StdlibStatus:       "partial_build_only",
-		FFIStatus:          "ilp32_scalar_object_smokes_partial",
-		RunnerProbeCommand: "tetra test --diagnostics=json --target x86 --format=json <runner-smoke.tetra>",
-		ReleaseGate:        "scripts/release/post_v0_4/linux-native-targets-smoke.sh",
-		EvidenceArtifacts:  []string{"targets.json"},
+		Triple:        "linux-x86",
+		RuntimeStatus: "partial_build_only",
+		StdlibStatus:  "partial_build_only",
+		FFIStatus:     "ilp32_scalar_object_smokes_partial",
+		RunnerProbeCommand: ("tetra test --diagnostics=json --target x86 --format=json " +
+			"<runner-smoke.tetra>"),
+		ReleaseGate:       "scripts/release/post_v0_4/linux-native-targets-smoke.sh",
+		EvidenceArtifacts: []string{"targets.json"},
 	}
 	err := validateLinuxNativePromotionMetadata(entry)
 	if err == nil || !strings.Contains(err.Error(), "linux-x86-abi.json") {
@@ -188,7 +181,9 @@ func TestValidateMemoryCapabilityClaimsRejectsInflatedRuntimeClaim(t *testing.T)
 	}
 }
 
-func TestValidateMemoryCapabilityClaimsRejectsProductionRuntimeClaimWithoutLinuxX64Evidence(t *testing.T) {
+func TestValidateMemoryCapabilityClaimsRejectsProductionRuntimeClaimWithoutLinuxX64Evidence(
+	t *testing.T,
+) {
 	entry := validMemoryCapabilityTargetForTest("linux-x64")
 	entry.EvidenceArtifacts = []string{"linux-x64-abi.json"}
 
@@ -240,6 +235,145 @@ func TestValidateMemoryCapabilityClaimsRejectsAlignmentWithoutTargetABI(t *testi
 	}
 }
 
+func targetsReportJSON(targets []targetReportEntry) []byte {
+	return targetsReportJSONWithLists(
+		[]string{"linux-x64", "windows-x64", "macos-x64", "wasm32-wasi", "wasm32-web"},
+		[]string{"linux-x86", "linux-x32"},
+		[]string{},
+		targets,
+	)
+}
+
+func targetsReportJSONWithLists(
+	supported []string,
+	buildOnly []string,
+	planned []string,
+	targets []targetReportEntry,
+) []byte {
+	return mustTargetJSON(targetsReport{
+		Supported: supported,
+		BuildOnly: buildOnly,
+		Planned:   planned,
+		Targets:   targets,
+	})
+}
+
+func mustTargetJSON(value any) []byte {
+	raw, err := json.Marshal(value)
+	if err != nil {
+		panic(err)
+	}
+	return raw
+}
+
+func defaultTargetsForTest(wasiRunnerAvailable bool) []targetReportEntry {
+	return []targetReportEntry{
+		linuxX64TargetForTest(),
+		hostRequiredTargetForTest("windows-x64"),
+		hostRequiredTargetForTest("macos-x64"),
+		wasiTargetForTest(wasiRunnerAvailable),
+		webTargetForTest(),
+		linuxBuildOnlyTargetForTest("linux-x86"),
+		linuxBuildOnlyTargetForTest("linux-x32"),
+	}
+}
+
+func linuxX64TargetForTest() targetReportEntry {
+	entry := validMemoryCapabilityTargetForTest("linux-x64")
+	entry.Format = "elf"
+	entry.RunMode = "host_native"
+	entry.RunnerProbeCommand = "tetra test --target x64 --format=json <runner-smoke.tetra>"
+	entry.ReleaseGate = "scripts/release/post_v0_4/linux-native-targets-smoke.sh"
+	entry.EvidenceArtifacts = linuxNativeEvidenceArtifacts("linux-x64")
+	entry.SyscallInstruction = "syscall"
+	entry.SyscallNumbering = "x86_64"
+	entry.SyscallArgRegisters = []string{"rax", "rdi", "rsi", "rdx", "r10", "r8", "r9"}
+	entry.SyscallErrorRange = "-4095..-1"
+	entry.SupportsDebugInfo = true
+	entry.SupportsReleaseOptimize = true
+	return entry
+}
+
+func hostRequiredTargetForTest(triple string) targetReportEntry {
+	entry := validMemoryCapabilityTargetForTest(triple)
+	entry.Format = map[string]string{
+		"windows-x64": "pe",
+		"macos-x64":   "macho",
+	}[triple]
+	entry.ExeExt = map[string]string{"windows-x64": ".exe"}[triple]
+	entry.RunUnsupportedReason = triple + " cannot run on host linux/amd64"
+	entry.SupportsDebugInfo = true
+	entry.SupportsReleaseOptimize = true
+	return entry
+}
+
+func wasiTargetForTest(runnerAvailable bool) targetReportEntry {
+	entry := validMemoryCapabilityTargetForTest("wasm32-wasi")
+	entry.Format = "wasm"
+	entry.ExeExt = ".wasm"
+	entry.SupportsReleaseOptimize = true
+	if runnerAvailable {
+		entry.RunSupported = true
+		entry.RunRunner = "wasmtime"
+		entry.RunUnsupportedReason = ""
+	} else {
+		entry.RunUnsupportedReason = "cannot run target wasm32-wasi: missing WASI runner"
+		entry.RunUnsupportedReason += ": need wasmtime or node"
+	}
+	return entry
+}
+
+func webTargetForTest() targetReportEntry {
+	entry := validMemoryCapabilityTargetForTest("wasm32-web")
+	entry.Format = "wasm"
+	entry.ExeExt = ".wasm"
+	entry.RunUnsupportedReason = "web runner unavailable: chromium-compatible executable not found"
+	entry.SupportsReleaseOptimize = true
+	return entry
+}
+
+func linuxBuildOnlyTargetForTest(triple string) targetReportEntry {
+	entry := validMemoryCapabilityTargetForTest(triple)
+	entry.Format = "elf"
+	entry.RunMode = "host_probed"
+	targetArg := map[string]string{"linux-x86": "x86", "linux-x32": "x32"}[triple]
+	entry.RunnerProbeCommand = "tetra test --diagnostics=json --target " + targetArg
+	entry.RunnerProbeCommand += " --format=json <runner-smoke.tetra>"
+	entry.RunUnsupportedReason = "host linux/amd64 does not support "
+	if triple == "linux-x86" {
+		entry.RunUnsupportedReason += "Linux i386 execution"
+	} else {
+		entry.RunUnsupportedReason += "Linux x32 ABI execution"
+	}
+	entry.RunUnsupportedReason += "; no host fallback is allowed; probe command: "
+	entry.RunUnsupportedReason += entry.RunnerProbeCommand
+	entry.ReleaseGate = "scripts/release/post_v0_4/linux-native-targets-smoke.sh"
+	entry.EvidenceArtifacts = linuxNativeEvidenceArtifacts(triple)
+	if triple == "linux-x86" {
+		entry.SyscallInstruction = "int 0x80"
+		entry.SyscallNumbering = "i386"
+		entry.SyscallArgRegisters = []string{"eax", "ebx", "ecx", "edx", "esi", "edi", "ebp"}
+	} else {
+		entry.SyscallInstruction = "syscall"
+		entry.SyscallNumbering = "x32_syscall_bit"
+		entry.SyscallArgRegisters = []string{"rax", "rdi", "rsi", "rdx", "r10", "r8", "r9"}
+	}
+	entry.SyscallErrorRange = "-4095..-1"
+	return entry
+}
+
+func linuxNativeEvidenceArtifacts(triple string) []string {
+	return []string{
+		"targets.json",
+		triple + "-abi.json",
+		triple + "-atomic-stress.json",
+		triple + "-fuzz.json",
+		triple + "-runner.json",
+		"linux-native-targets-brutal.json",
+		"artifact-hashes.json",
+	}
+}
+
 func validMemoryCapabilityTargetForTest(triple string) targetReportEntry {
 	switch triple {
 	case "linux-x64":
@@ -253,6 +387,8 @@ func validMemoryCapabilityTargetForTest(triple string) targetReportEntry {
 			BuildOnly:                false,
 			RunSupported:             true,
 			RuntimeStatus:            "production",
+			StdlibStatus:             "production",
+			FFIStatus:                "scalar_object_smokes_partial",
 			EvidenceArtifacts:        []string{"linux-x64-abi.json", "linux-x64-runner.json"},
 			MemoryBuild:              "yes",
 			MemoryLower:              "yes",
@@ -273,6 +409,8 @@ func validMemoryCapabilityTargetForTest(triple string) targetReportEntry {
 			BuildOnly:                true,
 			RunSupported:             false,
 			RuntimeStatus:            "partial_build_only",
+			StdlibStatus:             "partial_build_only",
+			FFIStatus:                "ilp32_scalar_object_smokes_partial",
 			EvidenceArtifacts:        []string{"linux-x86-abi.json", "linux-x86-runner.json"},
 			MemoryBuild:              "yes",
 			MemoryLower:              "yes",
@@ -280,6 +418,28 @@ func validMemoryCapabilityTargetForTest(triple string) targetReportEntry {
 			MemoryRawDiagnostics:     "partial",
 			MemoryRegionLowering:     "partial",
 			MemoryAlignmentSemantics: "partial",
+			MemoryClaimLevel:         "build_lower_only",
+		}
+	case "linux-x32":
+		return targetReportEntry{
+			Triple:                   "linux-x32",
+			Status:                   "build_only",
+			OS:                       "linux",
+			Arch:                     "x64",
+			ABI:                      "x32-sysv",
+			DataModel:                "x32",
+			BuildOnly:                true,
+			RunSupported:             false,
+			RuntimeStatus:            "partial_build_only",
+			StdlibStatus:             "partial_build_only",
+			FFIStatus:                "ilp32_scalar_object_smokes_partial",
+			EvidenceArtifacts:        []string{"linux-x32-abi.json", "linux-x32-runner.json"},
+			MemoryBuild:              "yes",
+			MemoryLower:              "yes",
+			MemoryRun:                "no/host-dependent",
+			MemoryRawDiagnostics:     "partial",
+			MemoryRegionLowering:     "partial",
+			MemoryAlignmentSemantics: "special",
 			MemoryClaimLevel:         "build_lower_only",
 		}
 	case "windows-x64":
@@ -364,67 +524,87 @@ func validMemoryCapabilityTargetForTest(triple string) targetReportEntry {
 }
 
 func TestValidateTargetsReportRejectsUnknownFields(t *testing.T) {
-	raw := []byte(`{"supported":["linux-x64","windows-x64","macos-x64","wasm32-wasi","wasm32-web"],"build_only":[],"planned":[],"targets":[],"extra":true}`)
-	if err := validateTargetsReport(raw); err == nil || !strings.Contains(err.Error(), "unknown field") {
+	raw := mustTargetJSON(map[string]any{
+		"supported":  []string{"linux-x64", "windows-x64", "macos-x64", "wasm32-wasi"},
+		"build_only": []string{},
+		"planned":    []string{},
+		"targets":    []targetReportEntry{},
+		"extra":      true,
+	})
+	if err := validateTargetsReport(raw); err == nil ||
+		!strings.Contains(err.Error(), "unknown field") {
 		t.Fatalf("expected unknown top-level field failure, got %v", err)
 	}
-	raw = []byte(`{
-  "supported":["linux-x64","windows-x64","macos-x64","wasm32-wasi","wasm32-web"],
-  "build_only":[],
-  "planned":[],
-  "targets":[
-    {"triple":"linux-x64","status":"supported","os":"linux","arch":"x64","abi":"sysv","format":"elf","exe_ext":"","build_only":false,"run_supported":true,"supports_debug_info":true,"supports_release_optimize":true,"extra":true}
-  ]
-}`)
-	if err := validateTargetsReport(raw); err == nil || !strings.Contains(err.Error(), "unknown field") {
+	raw = mustTargetJSON(map[string]any{
+		"supported":  []string{"linux-x64", "windows-x64", "macos-x64", "wasm32-wasi"},
+		"build_only": []string{},
+		"planned":    []string{},
+		"targets": []map[string]any{{
+			"triple":                    "linux-x64",
+			"status":                    "supported",
+			"os":                        "linux",
+			"arch":                      "x64",
+			"abi":                       "sysv",
+			"format":                    "elf",
+			"build_only":                false,
+			"run_supported":             true,
+			"supports_debug_info":       true,
+			"supports_release_optimize": true,
+			"extra":                     true,
+		}},
+	})
+	if err := validateTargetsReport(raw); err == nil ||
+		!strings.Contains(err.Error(), "unknown field") {
 		t.Fatalf("expected unknown nested field failure, got %v", err)
 	}
 }
 
 func TestValidateTargetsReportRejectsDuplicate(t *testing.T) {
-	if err := validateTargetList("supported", []string{"linux-x64", "linux-x64"}, []string{"linux-x64", "linux-x64"}); err == nil {
+	if err := validateTargetList(
+		"supported",
+		[]string{"linux-x64", "linux-x64"},
+		[]string{"linux-x64", "linux-x64"},
+	); err == nil {
 		t.Fatalf("expected duplicate failure")
 	}
 }
 
 func TestValidateTargetsReportRejectsMissingMetadata(t *testing.T) {
-	raw := []byte(`{"supported":["linux-x64","windows-x64","macos-x64","wasm32-wasi","wasm32-web"],"build_only":[],"planned":[]}`)
+	raw := mustTargetJSON(map[string]any{
+		"supported":  []string{"linux-x64", "windows-x64", "macos-x64", "wasm32-wasi"},
+		"build_only": []string{},
+		"planned":    []string{},
+	})
 	if err := validateTargetsReport(raw); err == nil {
 		t.Fatalf("expected missing metadata failure")
 	}
 }
 
 func TestValidateTargetsReportRejectsWrongABI(t *testing.T) {
-	raw := []byte(`{
-  "supported":["linux-x64","windows-x64","macos-x64","wasm32-wasi","wasm32-web"],
-  "build_only":[],
-  "planned":[],
-  "targets":[
-    {"triple":"linux-x64","status":"supported","os":"linux","arch":"x64","abi":"win64","format":"elf","exe_ext":"","build_only":false,"run_supported":true,"supports_debug_info":true,"supports_release_optimize":true},
-    {"triple":"windows-x64","status":"supported","os":"windows","arch":"x64","abi":"win64","format":"pe","exe_ext":".exe","build_only":false,"run_supported":false,"supports_debug_info":true,"supports_release_optimize":true},
-    {"triple":"macos-x64","status":"supported","os":"macos","arch":"x64","abi":"sysv","format":"macho","exe_ext":"","build_only":false,"run_supported":false,"supports_debug_info":true,"supports_release_optimize":true},
-    {"triple":"wasm32-wasi","status":"supported","os":"wasi","arch":"wasm32","abi":"wasi","format":"wasm","exe_ext":".wasm","build_only":false,"run_supported":false,"run_unsupported_reason":"cannot run target wasm32-wasi: missing WASI runner: need wasmtime or node","supports_debug_info":false,"supports_release_optimize":true},
-    {"triple":"wasm32-web","status":"supported","os":"web","arch":"wasm32","abi":"web","format":"wasm","exe_ext":".wasm","build_only":false,"run_supported":false,"run_unsupported_reason":"web runner unavailable: chromium-compatible executable not found","supports_debug_info":false,"supports_release_optimize":true}
-  ]
-}`)
+	targets := defaultTargetsForTest(false)
+	targets = targets[:5]
+	targets[0].ABI = "win64"
+	raw := targetsReportJSONWithLists(
+		[]string{"linux-x64", "windows-x64", "macos-x64", "wasm32-wasi", "wasm32-web"},
+		[]string{},
+		[]string{},
+		targets,
+	)
 	if err := validateTargetsReport(raw); err == nil {
 		t.Fatalf("expected wrong ABI failure")
 	}
 }
 
 func TestValidateTargetsReportRejectsMissingStatus(t *testing.T) {
-	raw := []byte(`{
-  "supported":["linux-x64","windows-x64","macos-x64","wasm32-wasi","wasm32-web"],
-  "build_only":[],
-  "planned":[],
-  "targets":[
-    {"triple":"linux-x64","os":"linux","arch":"x64","abi":"sysv","format":"elf","exe_ext":"","build_only":false,"run_supported":true,"supports_debug_info":true,"supports_release_optimize":true},
-    {"triple":"windows-x64","status":"supported","os":"windows","arch":"x64","abi":"win64","format":"pe","exe_ext":".exe","build_only":false,"run_supported":false,"supports_debug_info":true,"supports_release_optimize":true},
-    {"triple":"macos-x64","status":"supported","os":"macos","arch":"x64","abi":"sysv","format":"macho","exe_ext":"","build_only":false,"run_supported":false,"supports_debug_info":true,"supports_release_optimize":true},
-    {"triple":"wasm32-wasi","status":"supported","os":"wasi","arch":"wasm32","abi":"wasi","format":"wasm","exe_ext":".wasm","build_only":false,"run_supported":false,"run_unsupported_reason":"cannot run target wasm32-wasi: missing WASI runner: need wasmtime or node","supports_debug_info":false,"supports_release_optimize":true},
-    {"triple":"wasm32-web","status":"supported","os":"web","arch":"wasm32","abi":"web","format":"wasm","exe_ext":".wasm","build_only":false,"run_supported":false,"run_unsupported_reason":"web runner unavailable: chromium-compatible executable not found","supports_debug_info":false,"supports_release_optimize":true}
-  ]
-}`)
+	targets := defaultTargetsForTest(false)
+	targets = targets[:5]
+	targets[0].Status = ""
+	raw := targetsReportJSONWithLists(
+		[]string{"linux-x64", "windows-x64", "macos-x64", "wasm32-wasi", "wasm32-web"},
+		[]string{},
+		[]string{},
+		targets,
+	)
 	if err := validateTargetsReport(raw); err == nil {
 		t.Fatalf("expected missing status failure")
 	}

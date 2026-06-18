@@ -119,22 +119,40 @@ func ValidateReportWithOptions(raw []byte, options ValidateOptions) error {
 		issues = append(issues, fmt.Sprintf("status is %q, want pass", report.Status))
 	}
 	if options.ExpectedVersion != "" && report.Version != options.ExpectedVersion {
-		issues = append(issues, fmt.Sprintf("version is %q, want %q", report.Version, options.ExpectedVersion))
+		issues = append(
+			issues,
+			fmt.Sprintf("version is %q, want %q", report.Version, options.ExpectedVersion),
+		)
 	}
 	if options.ExpectedGitHead != "" && !gitHeadMatches(report.GitHead, options.ExpectedGitHead) {
-		issues = append(issues, fmt.Sprintf("git_head is %q, want %q", report.GitHead, options.ExpectedGitHead))
+		issues = append(
+			issues,
+			fmt.Sprintf("git_head is %q, want %q", report.GitHead, options.ExpectedGitHead),
+		)
 	}
 	if options.ExpectedTarget != "" && report.Target != options.ExpectedTarget {
-		issues = append(issues, fmt.Sprintf("target is %q, want %s", report.Target, options.ExpectedTarget))
+		issues = append(
+			issues,
+			fmt.Sprintf("target is %q, want %s", report.Target, options.ExpectedTarget),
+		)
 	}
 	if report.Host != report.Target {
-		issues = append(issues, fmt.Sprintf("host is %q, want matching target host %q", report.Host, report.Target))
+		issues = append(
+			issues,
+			fmt.Sprintf("host is %q, want matching target host %q", report.Host, report.Target),
+		)
 	}
 	if report.Runtime != "platform-ui-"+report.Target {
-		issues = append(issues, fmt.Sprintf("runtime is %q, want platform-ui-%s", report.Runtime, report.Target))
+		issues = append(
+			issues,
+			fmt.Sprintf("runtime is %q, want platform-ui-%s", report.Runtime, report.Target),
+		)
 	}
 	if !AcceptedUISchemas[report.UISchema] {
-		issues = append(issues, fmt.Sprintf("ui_schema is %q, want tetra.ui.v1 or tetra.ui.v0.4.0", report.UISchema))
+		issues = append(
+			issues,
+			fmt.Sprintf("ui_schema is %q, want tetra.ui.v1 or tetra.ui.v0.4.0", report.UISchema),
+		)
 	}
 	if strings.TrimSpace(report.Source) == "" {
 		issues = append(issues, "source is required")
@@ -142,7 +160,10 @@ func ValidateReportWithOptions(raw []byte, options ValidateOptions) error {
 	if strings.TrimSpace(report.Runner) == "" {
 		issues = append(issues, "runner is required")
 	} else if report.Runner != "target-host-runtime-child" {
-		issues = append(issues, fmt.Sprintf("runner is %q, want target-host-runtime-child", report.Runner))
+		issues = append(
+			issues,
+			fmt.Sprintf("runner is %q, want target-host-runtime-child", report.Runner),
+		)
 	}
 	if report.Blocker != "" {
 		issues = append(issues, "blocker must be empty for production evidence")
@@ -169,7 +190,8 @@ func gitHeadMatches(artifactHead string, currentHead string) bool {
 		return true
 	}
 	if len(artifactHead) >= 7 && len(currentHead) >= 7 {
-		return strings.HasPrefix(artifactHead, currentHead) || strings.HasPrefix(currentHead, artifactHead)
+		return strings.HasPrefix(artifactHead, currentHead) ||
+			strings.HasPrefix(currentHead, artifactHead)
 	}
 	return false
 }
@@ -184,9 +206,28 @@ func rejectPaperEvidence(report Report) []string {
 		lower = strings.ReplaceAll(lower, phrase, "rejects non-production evidence")
 	}
 	var issues []string
-	for _, marker := range []string{"metadata-only", "runtime-less", "build-only", "docs-only", "sidecar-only", " fake", "fake/", "\"fake\"", " mock", "mock/", "\"mock\"", "placeholder"} {
+	for _, marker := range []string{
+		"metadata-only",
+		"runtime-less",
+		"build-only",
+		"docs-only",
+		"sidecar-only",
+		" fake",
+		"fake/",
+		"\"fake\"",
+		" mock",
+		"mock/",
+		"\"mock\"",
+		"placeholder",
+	} {
 		if strings.Contains(lower, marker) {
-			issues = append(issues, fmt.Sprintf("report contains forbidden non-production UI evidence marker %q", strings.Trim(marker, " /\"")))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"report contains forbidden non-production UI evidence marker %q",
+					strings.Trim(marker, " /\""),
+				),
+			)
 		}
 	}
 	return issues
@@ -199,8 +240,18 @@ func validateProcesses(processes []ProcessReport) []string {
 		if _, ok := required[process.Kind]; ok {
 			required[process.Kind] = true
 		}
-		if strings.TrimSpace(process.Name) == "" || strings.TrimSpace(process.Path) == "" || !process.Ran || !process.Pass || process.ExitCode == nil || *process.ExitCode != 0 {
-			issues = append(issues, fmt.Sprintf("process %s must include name/path and pass with exit_code 0", process.Name))
+		if strings.TrimSpace(process.Name) == "" || strings.TrimSpace(process.Path) == "" ||
+			!process.Ran ||
+			!process.Pass ||
+			process.ExitCode == nil ||
+			*process.ExitCode != 0 {
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"process %s must include name/path and pass with exit_code 0",
+					process.Name,
+				),
+			)
 		}
 	}
 	for kind, seen := range required {
@@ -246,14 +297,29 @@ func validateRuntimeTrace(trace string) []string {
 }
 
 func validateWidgets(widgets []WidgetReport) []string {
-	required := map[string]bool{"window": false, "panel": false, "text": false, "button": false, "input": false, "list": false}
+	required := map[string]bool{
+		"window": false,
+		"panel":  false,
+		"text":   false,
+		"button": false,
+		"input":  false,
+		"list":   false,
+	}
 	var issues []string
 	for _, widget := range widgets {
 		if _, ok := required[widget.Kind]; ok {
 			required[widget.Kind] = true
 		}
-		if strings.TrimSpace(widget.ID) == "" || !widget.Enabled || !widget.Visible || widget.Bounds.Width <= 0 || widget.Bounds.Height <= 0 {
-			issues = append(issues, fmt.Sprintf("widget %s must include id, enabled/visible state, and positive bounds", widget.ID))
+		if strings.TrimSpace(widget.ID) == "" || !widget.Enabled || !widget.Visible ||
+			widget.Bounds.Width <= 0 ||
+			widget.Bounds.Height <= 0 {
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"widget %s must include id, enabled/visible state, and positive bounds",
+					widget.ID,
+				),
+			)
 		}
 	}
 	for kind, seen := range required {
@@ -265,15 +331,35 @@ func validateWidgets(widgets []WidgetReport) []string {
 }
 
 func validateEvents(events []EventReport) []string {
-	requiredEvents := map[string]bool{"focus": false, "input": false, "select": false, "click": false, "tick": false}
-	requiredOps := map[string]bool{"state_set": false, "async_command": false, "timer_tick": false, "redraw": false}
+	requiredEvents := map[string]bool{
+		"focus":  false,
+		"input":  false,
+		"select": false,
+		"click":  false,
+		"tick":   false,
+	}
+	requiredOps := map[string]bool{
+		"state_set":     false,
+		"async_command": false,
+		"timer_tick":    false,
+		"redraw":        false,
+	}
 	var issues []string
 	for _, event := range events {
 		if _, ok := requiredEvents[event.Event]; ok {
 			requiredEvents[event.Event] = true
 		}
-		if event.Order <= 0 || strings.TrimSpace(event.WidgetID) == "" || !event.Pass || len(event.BeforeState) == 0 || len(event.AfterState) == 0 || len(event.WidgetUpdates) == 0 {
-			issues = append(issues, fmt.Sprintf("event %s must include order/widget/state/update/pass evidence", event.Event))
+		if event.Order <= 0 || strings.TrimSpace(event.WidgetID) == "" || !event.Pass ||
+			len(event.BeforeState) == 0 ||
+			len(event.AfterState) == 0 ||
+			len(event.WidgetUpdates) == 0 {
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"event %s must include order/widget/state/update/pass evidence",
+					event.Event,
+				),
+			)
 		}
 		for _, op := range event.Operations {
 			if _, ok := requiredOps[op.Kind]; ok {
@@ -329,7 +415,10 @@ func validateCases(cases []CaseReport) []string {
 }
 
 func validateAudit(audit []AuditReport) []string {
-	required := map[string]bool{"real platform runtime evidence": false, "reject runtime-less evidence": false}
+	required := map[string]bool{
+		"real platform runtime evidence": false,
+		"reject runtime-less evidence":   false,
+	}
 	var issues []string
 	for _, entry := range audit {
 		if _, ok := required[entry.Requirement]; ok {

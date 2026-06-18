@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	ctarget "tetra_language/compiler/target"
+	"tetra_language/tools/internal/reportdecode"
 )
 
 const (
@@ -71,7 +72,9 @@ var knownCapsulePermissions = map[string]string{
 
 func main() {
 	var needMapPath string
+	var reportFormat string
 	flag.StringVar(&needMapPath, "needmap", "", "path to tetra.eco.needmap.v1 JSON report")
+	flag.StringVar(&reportFormat, "format", "auto", "report format: auto, json, or toon")
 	flag.Parse()
 
 	if needMapPath == "" {
@@ -83,15 +86,19 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err := validateEcoNeedMap(raw); err != nil {
+	if err := validateEcoNeedMapFormat(raw, reportFormat); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
 func validateEcoNeedMap(raw []byte) error {
+	return validateEcoNeedMapFormat(raw, "auto")
+}
+
+func validateEcoNeedMapFormat(raw []byte, format string) error {
 	var report needMapReport
-	if err := decodeStrictJSON(raw, &report); err != nil {
+	if err := reportdecode.DecodeStrictFormat(raw, format, &report); err != nil {
 		return err
 	}
 	if report.Schema == "" {
@@ -189,7 +196,11 @@ func validateNeedMapNodes(nodes []needMapNode) error {
 		if err := validatePermissions("capsule "+node.ID, node.Permissions); err != nil {
 			return err
 		}
-		if err := validateIDList("capsule "+node.ID+" transitive_need_ids", node.ID, node.TransitiveNeedIDs); err != nil {
+		if err := validateIDList(
+			"capsule "+node.ID+" transitive_need_ids",
+			node.ID,
+			node.TransitiveNeedIDs,
+		); err != nil {
 			return err
 		}
 	}
@@ -221,7 +232,13 @@ func validateNeedMapEdges(nodes []needMapNode, edges []needMapEdge) error {
 			return fmt.Errorf("edge %s -> %s version must use semver x.y.z", edge.FromID, edge.ToID)
 		}
 		if edge.Version != to.Version {
-			return fmt.Errorf("edge %s -> %s version mismatch: edge has %s, capsule has %s", edge.FromID, edge.ToID, edge.Version, to.Version)
+			return fmt.Errorf(
+				"edge %s -> %s version mismatch: edge has %s, capsule has %s",
+				edge.FromID,
+				edge.ToID,
+				edge.Version,
+				to.Version,
+			)
 		}
 		key := from.ID + "\x00" + to.ID + "\x00" + edge.Version
 		if seen[key] {
@@ -241,14 +258,23 @@ func validateNeedMapTransitiveNeeds(nodes []needMapNode, edges []needMapEdge) er
 	for _, node := range nodes {
 		for _, id := range node.TransitiveNeedIDs {
 			if _, ok := byID[id]; !ok {
-				return fmt.Errorf("capsule %s transitive_need_ids references unknown capsule %s", node.ID, id)
+				return fmt.Errorf(
+					"capsule %s transitive_need_ids references unknown capsule %s",
+					node.ID,
+					id,
+				)
 			}
 		}
 		expected := collectTransitiveNeeds(node.ID, adjacent, map[string]bool{})
 		sort.Strings(expected)
 		actual := sortedStringCopy(node.TransitiveNeedIDs)
 		if !sameStringSlice(actual, expected) {
-			return fmt.Errorf("capsule %s transitive_need_ids mismatch: has [%s], expected [%s]", node.ID, strings.Join(actual, ","), strings.Join(expected, ","))
+			return fmt.Errorf(
+				"capsule %s transitive_need_ids mismatch: has [%s], expected [%s]",
+				node.ID,
+				strings.Join(actual, ","),
+				strings.Join(expected, ","),
+			)
 		}
 	}
 	return nil
@@ -271,7 +297,11 @@ func validateNeedMapTargets(nodes []needMapNode, targets []string) error {
 	sort.Strings(expected)
 	actual := sortedStringCopy(targets)
 	if !sameStringSlice(actual, expected) {
-		return fmt.Errorf("targets mismatch: has [%s], expected [%s]", strings.Join(actual, ","), strings.Join(expected, ","))
+		return fmt.Errorf(
+			"targets mismatch: has [%s], expected [%s]",
+			strings.Join(actual, ","),
+			strings.Join(expected, ","),
+		)
 	}
 	return nil
 }
@@ -332,7 +362,11 @@ func validateIDList(label string, selfID string, ids []string) error {
 	return nil
 }
 
-func collectTransitiveNeeds(id string, adjacent map[string][]string, seen map[string]bool) []string {
+func collectTransitiveNeeds(
+	id string,
+	adjacent map[string][]string,
+	seen map[string]bool,
+) []string {
 	var out []string
 	for _, depID := range adjacent[id] {
 		if seen[depID] {

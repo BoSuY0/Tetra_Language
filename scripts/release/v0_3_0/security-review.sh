@@ -6,7 +6,7 @@ repo_root="$(cd "$script_dir/../../.." && pwd)"
 signoff_path=""
 
 usage() {
-  cat <<'USAGE'
+  cat << 'USAGE'
 Usage: bash scripts/release/v0_3_0/security-review.sh --signoff PATH
        bash scripts/release/v0_3_0/security-review.sh --write-template PATH
 
@@ -22,7 +22,7 @@ USAGE
 
 sha256_file() {
   local path="$1"
-  if command -v sha256sum >/dev/null 2>&1; then
+  if command -v sha256sum > /dev/null 2>&1; then
     sha256sum "$path" | awk '{print "sha256:" $1}'
     return
   fi
@@ -115,7 +115,7 @@ verify_listed_artifact_hashes() {
     local artifact="${BASH_REMATCH[1]}"
     local listed_hash="${BASH_REMATCH[2]}"
     case "$artifact" in
-      /*|../*|*/../*|*/..)
+      /* | ../* | */../* | */..)
         echo "release_v0_3_0_security_review: listed artifact path must be relative to Report directory: $artifact" >&2
         exit 1
         ;;
@@ -166,7 +166,7 @@ validate_canonical_gate_artifacts() {
 }
 
 case "${1:-}" in
-  -h|--help)
+  -h | --help)
     usage
     exit 0
     ;;

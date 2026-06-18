@@ -73,6 +73,28 @@ func TestValidateSurfaceMorphStableCandidateRejectsEnabledBeforeP20(t *testing.T
 	}
 }
 
+func TestValidateSurfaceMorphStableCandidateRejectsMissingRendererOwnedStableProofGate(
+	t *testing.T,
+) {
+	fixture := validMorphStableCandidateFixture(t)
+	fixture["promotion_gates"] = []any{
+		"validate-surface-morph-report",
+		"validate-surface-claims",
+		"surface block-system gate",
+		"visual regression gate",
+		"target-host evidence",
+	}
+	path := writeMorphStableCandidateFixture(t, fixture)
+
+	err := validateSurfaceMorphStableCandidate(path)
+	if err == nil {
+		t.Fatalf("expected missing renderer-owned stable proof gate to fail")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "renderer-owned stable proof") {
+		t.Fatalf("error = %v, want renderer-owned stable proof diagnostic", err)
+	}
+}
+
 func validMorphStableCandidateFixture(t *testing.T) map[string]any {
 	t.Helper()
 	raw := []byte(`{
@@ -103,7 +125,7 @@ func validMorphStableCandidateFixture(t *testing.T) map[string]any {
     "requires_no_platform_widgets": true,
     "requires_no_core_primitive_promotion": true
   },
-  "promotion_gates": ["validate-surface-morph-report", "validate-surface-claims", "surface block-system gate", "visual regression gate", "target-host evidence"],
+  "promotion_gates": ["validate-surface-morph-report", "validate-surface-claims", "surface block-system gate", "visual regression gate", "target-host evidence", "renderer-owned stable proof"],
   "nonclaims": ["not production Morph today", "no React runtime", "no Electron runtime", "no CSS cascade runtime", "no platform-native widgets"]
 }`)
 	var out map[string]any

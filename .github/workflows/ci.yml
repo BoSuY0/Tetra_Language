@@ -60,6 +60,11 @@ jobs:
         shell: bash
         run: bash scripts/ci/test.sh
 
+      - name: TOON format focused gate
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash scripts/ci/toon-format-check.sh
+
       - name: Verify docs manifest
         shell: bash
         run: |
@@ -80,9 +85,17 @@ jobs:
           if [[ -f "./tetra.exe" ]]; then tetra_bin="./tetra.exe"; fi
           "${tetra_bin}" version
           "${tetra_bin}" smoke --target "${target}" --run=true --report "smoke_${target}.json"
-          "${tetra_bin}" smoke --target "${target}" --run=true --islands-debug --report "smoke_${target}_islands_debug.json"
-          go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "smoke_${target}.json"
-          go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "smoke_${target}_islands_debug.json"
+          "${tetra_bin}" smoke \
+            --target "${target}" \
+            --run=true \
+            --islands-debug \
+            --report "smoke_${target}_islands_debug.json"
+          go run ./tools/cmd/smoke-report-to-checklist \
+            --validate-only \
+            --report "smoke_${target}.json"
+          go run ./tools/cmd/smoke-report-to-checklist \
+            --validate-only \
+            --report "smoke_${target}_islands_debug.json"
 
       - name: Smoke summary
         shell: bash
@@ -115,10 +128,18 @@ jobs:
                   actual = c.get("actual_exit")
                   expected = c.get("expected_exit")
                   ok = bool(c.get("pass"))
-                  build_ok = "✅" if ok or (c.get("error","").startswith("run:")) else "❌"
+                  build_ok = (
+                      "✅"
+                      if ok or (c.get("error","").startswith("run:"))
+                      else "❌"
+                  )
                   run_cell = "✅" if ran and ok else ("❌" if ran else "—")
                   actual_cell = "—" if actual is None else str(actual)
-                  lines.append(f"| `{name}` | {build_ok} | {run_cell} | {expected} | {actual_cell} | {'✅' if ok else '❌'} |")
+                  pass_cell = "✅" if ok else "❌"
+                  lines.append(
+                      f"| `{name}` | {build_ok} | {run_cell} | "
+                      f"{expected} | {actual_cell} | {pass_cell} |"
+                  )
               lines.append("")
               return "\n".join(lines)
           
@@ -131,10 +152,13 @@ jobs:
           out.append("")
           out.append(render(Path(f"smoke_{target}.json"), "Normal"))
           out.append(render(Path(f"smoke_{target}_islands_debug.json"), "Islands debug"))
-          Path(os.environ["GITHUB_STEP_SUMMARY"]).write_text("\n".join(out), encoding="utf-8")
+          Path(os.environ["GITHUB_STEP_SUMMARY"]).write_text(
+              "\n".join(out),
+              encoding="utf-8",
+          )
           PY
         env:
-          TARGET: ${{ runner.os == 'Linux' && 'linux-x64' || runner.os == 'Windows' && 'windows-x64' || 'macos-x64' }}
+          TARGET: ${{ runner.os == 'Linux' && 'linux-x64' || runner.os == 'Windows' && 'windows-x64' || 'macos-x64' }} # line-length: ignore
 
       - name: Upload smoke report
         uses: actions/upload-artifact@v4
@@ -186,7 +210,11 @@ jobs:
 
       - name: v0.4 stabilization wrapper
         shell: bash
-        run: bash scripts/ci/test-all.sh --stabilization --keep-going --report-dir reports/ci-test-all-stabilization
+        run: |
+          bash scripts/ci/test-all.sh \
+            --stabilization \
+            --keep-going \
+            --report-dir reports/ci-test-all-stabilization
 
       - name: Upload stabilization test report
         if: always()
@@ -222,9 +250,11 @@ jobs:
             --features reports/ci-release-v0.4.0-readiness/features.json \
             --targets reports/ci-release-v0.4.0-readiness/targets.json \
             --manifest docs/generated/manifest.json \
-            --scope-decisions docs/release/v0_4_0_scope_decisions.json
+            --scope-decisions docs/release/v0_4/data/v0_4_0_scope_decisions.json
           go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
-          go run ./tools/cmd/validate-v0-4-completion-audit --audit docs/release/v0_4_0_completion_audit.md --expected-status achieved
+          go run ./tools/cmd/validate-v0-4-completion-audit \
+            --audit docs/release/v0_4/v0_4_0_completion_audit.md \
+            --expected-status achieved
 
       - name: Upload v0.4.0 release readiness report
         if: always()
@@ -232,6 +262,72 @@ jobs:
         with:
           name: tetra-v0.4.0-${{ github.sha }}-release-readiness-linux
           path: reports/ci-release-v0.4.0-readiness
+
+  surface-product-slice-linux:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.20.x"
+
+      - name: Bootstrap
+        shell: bash
+        run: bash scripts/dev/bootstrap.sh
+
+      - name: Surface product-slice gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          export GOTELEMETRY=off
+          export GOCACHE="${PWD}/.cache/go-build-surface-product-slice-ci"
+          export GOTMPDIR="${PWD}/.cache/go-tmp-surface-product-slice-ci"
+          mkdir -p "$GOCACHE" "$GOTMPDIR"
+          if ! command -v weston >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y weston
+          fi
+          export XDG_RUNTIME_DIR="${RUNNER_TEMP:-/tmp}/surface-wayland-runtime"
+          mkdir -p "$XDG_RUNTIME_DIR"
+          chmod 700 "$XDG_RUNTIME_DIR"
+          weston_log="${RUNNER_TEMP:-/tmp}/surface-product-slice-weston.log"
+          weston \
+            --backend=headless-backend.so \
+            --socket=wayland-surface-product-slice-ci \
+            --idle-time=0 \
+            >"$weston_log" 2>&1 &
+          weston_pid=$!
+          cleanup_weston() {
+            kill "$weston_pid" >/dev/null 2>&1
+          }
+          trap cleanup_weston EXIT
+          waited=0
+          while [[ \
+            ! -S "$XDG_RUNTIME_DIR/wayland-surface-product-slice-ci" && \
+            "$waited" -lt 100 \
+          ]]; do
+            sleep 0.1
+            waited=$((waited + 1))
+          done
+          if [[ ! -S "$XDG_RUNTIME_DIR/wayland-surface-product-slice-ci" ]]; then
+            if [[ -f "$weston_log" ]]; then
+              cat "$weston_log" >&2
+            fi
+            exit 1
+          fi
+          export WAYLAND_DISPLAY=wayland-surface-product-slice-ci
+          bash scripts/release/surface/surface-product-slice-gate.sh \
+            --report-dir reports/surface-product-slice-ci
+
+      - name: Upload Surface product-slice reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tetra-surface-product-slice-${{ github.sha }}-linux-x64
+          path: reports/surface-product-slice-ci
 
   surface-release-readiness-linux:
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
@@ -250,7 +346,9 @@ jobs:
 
       - name: Surface Morph gate
         shell: bash
-        run: bash scripts/release/surface/morph-gate.sh --report-dir reports/surface-morph-gate
+        run: |
+          bash scripts/release/surface/morph-gate.sh \
+            --report-dir reports/surface-morph-gate
 
       - name: Surface product gate
         shell: bash
@@ -264,14 +362,21 @@ jobs:
           mkdir -p "$XDG_RUNTIME_DIR"
           chmod 700 "$XDG_RUNTIME_DIR"
           weston_log="${RUNNER_TEMP:-/tmp}/surface-weston.log"
-          weston --backend=headless-backend.so --socket=wayland-surface-ci --idle-time=0 >"$weston_log" 2>&1 &
+          weston \
+            --backend=headless-backend.so \
+            --socket=wayland-surface-ci \
+            --idle-time=0 \
+            >"$weston_log" 2>&1 &
           weston_pid=$!
           cleanup_weston() {
             kill "$weston_pid" >/dev/null 2>&1
           }
           trap cleanup_weston EXIT
           waited=0
-          while [[ ! -S "$XDG_RUNTIME_DIR/wayland-surface-ci" && "$waited" -lt 100 ]]; do
+          while [[ \
+            ! -S "$XDG_RUNTIME_DIR/wayland-surface-ci" && \
+            "$waited" -lt 100 \
+          ]]; do
             sleep 0.1
             waited=$((waited + 1))
           done
@@ -282,19 +387,26 @@ jobs:
             exit 1
           fi
           export WAYLAND_DISPLAY=wayland-surface-ci
-          bash scripts/release/surface/product-gate.sh --report-dir reports/surface-product-v1
+          bash scripts/release/surface/product-gate.sh \
+            --report-dir reports/surface-product-v1
 
       - name: Surface experimental regression gate
         shell: bash
-        run: bash scripts/release/surface/gate.sh --report-dir reports/surface-experimental-regression
+        run: |
+          bash scripts/release/surface/gate.sh \
+            --report-dir reports/surface-experimental-regression
 
       - name: Safe view lifetime gate
         shell: bash
-        run: bash scripts/release/safe-view-lifetime/gate.sh --report-dir reports/safe-view-lifetime
+        run: |
+          bash scripts/release/safe-view-lifetime/gate.sh \
+            --report-dir reports/safe-view-lifetime
 
       - name: Surface API stability gate
         shell: bash
-        run: bash scripts/release/surface/api-stability-gate.sh --report-dir reports/surface-api-stability-v1
+        run: |
+          bash scripts/release/surface/api-stability-gate.sh \
+            --report-dir reports/surface-api-stability-v1
 
       - name: Full tests
         shell: bash
@@ -325,9 +437,17 @@ jobs:
             --product-report-dir reports/surface-product-v1 \
             --expected-scope surface-v1-linux-web \
             --current-git-head "${GITHUB_SHA}"
-          go run ./tools/cmd/validate-artifact-hashes --write --root reports/surface-ui-production-final --out reports/surface-ui-production-final/artifact-hashes.json
-          go run ./tools/cmd/validate-artifact-hashes --manifest reports/surface-ui-production-final/artifact-hashes.json
-          go run ./tools/cmd/validate-surface-final-readiness --report-dir reports/surface-ui-production-final --expected-scope surface-v1-linux-web --require-clean --require-package
+          go run ./tools/cmd/validate-artifact-hashes \
+            --write \
+            --root reports/surface-ui-production-final \
+            --out reports/surface-ui-production-final/artifact-hashes.json
+          go run ./tools/cmd/validate-artifact-hashes \
+            --manifest reports/surface-ui-production-final/artifact-hashes.json
+          go run ./tools/cmd/validate-surface-final-readiness \
+            --report-dir reports/surface-ui-production-final \
+            --expected-scope surface-v1-linux-web \
+            --require-clean \
+            --require-package
 
       - name: Upload release reports
         if: always()
@@ -350,6 +470,8 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - uses: actions/setup-go@v5
         with:
@@ -361,7 +483,9 @@ jobs:
 
       - name: Integrated Memory/Islands/Surface release gate
         shell: bash
-        run: bash scripts/release/post_v0_4/memory-islands-surface-production-gate.sh --report-dir reports/memory-islands-surface-production
+        run: |
+          bash scripts/release/post_v0_4/memory-islands-surface-production-gate.sh \
+            --report-dir reports/memory-islands-surface-production
 
       - name: Upload integrated Memory/Islands/Surface release reports
         if: always()
@@ -376,6 +500,8 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - uses: actions/setup-go@v5
         with:
@@ -393,7 +519,8 @@ jobs:
           export GOCACHE="${PWD}/.cache/go-build-actor-runtime-foundation-ci"
           export GOTMPDIR="${PWD}/.cache/go-tmp-actor-runtime-foundation-ci"
           mkdir -p "$GOCACHE" "$GOTMPDIR"
-          bash scripts/release/post_v0_4/actor-runtime-foundation-linux-x64-gate.sh --report-dir reports/actor-runtime-foundation/final
+          bash scripts/release/post_v0_4/actor-runtime-foundation-linux-x64-gate.sh \
+            --report-dir reports/actor-runtime-foundation/final
 
       - name: Upload actor runtime foundation reports
         if: always()
@@ -403,10 +530,10 @@ jobs:
           path: |
             reports/actor-runtime-foundation/final/actor-runtime-foundation-manifest.json
             reports/actor-runtime-foundation/final/artifact-hashes.json
-            reports/actor-runtime-foundation/final/distributed-actors-linux-x64/distributed-actors-linux-x64.json
-            reports/actor-runtime-foundation/final/distributed-actors-linux-x64/artifact-hashes.json
-            reports/actor-runtime-foundation/final/parallel-production-linux-x64/parallel-production-linux-x64.json
-            reports/actor-runtime-foundation/final/parallel-production-linux-x64/artifact-hashes.json
+            reports/actor-runtime-foundation/final/distributed-actors-linux-x64/distributed-actors-linux-x64.json # line-length: ignore
+            reports/actor-runtime-foundation/final/distributed-actors-linux-x64/artifact-hashes.json # line-length: ignore
+            reports/actor-runtime-foundation/final/parallel-production-linux-x64/parallel-production-linux-x64.json # line-length: ignore
+            reports/actor-runtime-foundation/final/parallel-production-linux-x64/artifact-hashes.json # line-length: ignore
             reports/actor-runtime-foundation/final/logs/*.log
 
   ram-contract-release-readiness-linux:
@@ -432,7 +559,8 @@ jobs:
           export GOCACHE="${PWD}/.cache/go-build-ram-contract-ci"
           export GOTMPDIR="${PWD}/.cache/go-tmp-ram-contract-ci"
           mkdir -p "$GOCACHE" "$GOTMPDIR"
-          bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir reports/ram-contract-release
+          bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh \
+            --report-dir reports/ram-contract-release
 
       - name: Upload RAM contract release reports
         if: always()
@@ -464,7 +592,8 @@ jobs:
           export GOCACHE="${PWD}/.cache/go-build-memory-100-prod-stable-ci"
           export GOTMPDIR="${PWD}/.cache/go-tmp-memory-100-prod-stable-ci"
           mkdir -p "$GOCACHE" "$GOTMPDIR"
-          bash scripts/release/post_v0_4/memory-100-prod-stable-gate.sh --report-dir reports/memory-100/final
+          bash scripts/release/post_v0_4/memory-100-prod-stable-gate.sh \
+            --report-dir reports/memory-100/final
 
       - name: Upload Memory100 prod-stable reports
         if: always()
@@ -487,10 +616,15 @@ jobs:
       - name: Validate TechEmpower report schemas
         shell: bash
         run: |
-          go run ./tools/cmd/validate-techempower-report --report docs/benchmarks/techempower_local_smoke_skip_db_report.json --allow-skip-db
-          go run ./tools/cmd/validate-techempower-report --report docs/benchmarks/techempower_scram_single_query_local_report.json
-          go run ./tools/cmd/validate-techempower-report --report docs/benchmarks/techempower_scram_single_query_matrix_local_report.json
-          go run ./tools/cmd/validate-techempower-report --report docs/benchmarks/techempower_scram_endpoint_matrix_local_report.json
+          go run ./tools/cmd/validate-techempower-report \
+            --report docs/benchmarks/techempower_local_smoke_skip_db_report.json \
+            --allow-skip-db
+          go run ./tools/cmd/validate-techempower-report \
+            --report docs/benchmarks/techempower_scram_single_query_local_report.json
+          go run ./tools/cmd/validate-techempower-report \
+            --report docs/benchmarks/techempower_scram_single_query_matrix_local_report.json
+          go run ./tools/cmd/validate-techempower-report \
+            --report docs/benchmarks/techempower_scram_endpoint_matrix_local_report.json
 
   full-platform-ui-runtime-target-host:
     if: github.event_name != 'schedule'
@@ -525,7 +659,10 @@ jobs:
 
       - name: Target-host UI runtime smoke
         shell: bash
-        run: go run ./tools/cmd/platform-ui-runtime-smoke --target "${{ matrix.target }}" --report "${{ matrix.report }}"
+        run: |
+          go run ./tools/cmd/platform-ui-runtime-smoke \
+            --target "${{ matrix.target }}" \
+            --report "${{ matrix.report }}"
 
       - name: Validate target-host UI runtime report
         shell: bash
@@ -534,10 +671,16 @@ jobs:
           expected_git_head="$(git rev-parse HEAD)"
           case "${{ matrix.target }}" in
             windows-x64)
-              go run ./tools/cmd/validate-windows-ui-runtime --report windows-ui-runtime.json --expected-version "$expected_version" --expected-git-head "$expected_git_head"
+              go run ./tools/cmd/validate-windows-ui-runtime \
+                --report windows-ui-runtime.json \
+                --expected-version "$expected_version" \
+                --expected-git-head "$expected_git_head"
               ;;
             macos-x64)
-              go run ./tools/cmd/validate-macos-ui-runtime --report macos-ui-runtime.json --expected-version "$expected_version" --expected-git-head "$expected_git_head"
+              go run ./tools/cmd/validate-macos-ui-runtime \
+                --report macos-ui-runtime.json \
+                --expected-version "$expected_version" \
+                --expected-git-head "$expected_git_head"
               ;;
             *)
               echo "unexpected target ${{ matrix.target }}" >&2
@@ -558,8 +701,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     env:
-      TETRA_WINDOWS_UI_RUNTIME_REPORT: reports/full-platform-ui-runtime-targets/tetra-full-platform-ui-runtime-${{ github.sha }}-windows-x64/windows-ui-runtime.json
-      TETRA_MACOS_UI_RUNTIME_REPORT: reports/full-platform-ui-runtime-targets/tetra-full-platform-ui-runtime-${{ github.sha }}-macos-x64/macos-ui-runtime.json
+      TETRA_WINDOWS_UI_RUNTIME_REPORT: reports/full-platform-ui-runtime-targets/tetra-full-platform-ui-runtime-${{ github.sha }}-windows-x64/windows-ui-runtime.json # line-length: ignore
+      TETRA_MACOS_UI_RUNTIME_REPORT: reports/full-platform-ui-runtime-targets/tetra-full-platform-ui-runtime-${{ github.sha }}-macos-x64/macos-ui-runtime.json # line-length: ignore
     steps:
       - uses: actions/checkout@v4
 
@@ -575,7 +718,9 @@ jobs:
 
       - name: Full-platform UI runtime gate
         shell: bash
-        run: bash scripts/release/full_platform/ui-runtime-gate.sh --report-dir reports/full-platform-ui-runtime
+        run: |
+          bash scripts/release/full_platform/ui-runtime-gate.sh \
+            --report-dir reports/full-platform-ui-runtime
 
       - name: Upload full-platform UI runtime gate report
         if: always()
@@ -598,7 +743,10 @@ jobs:
       - name: Coverage
         shell: bash
         run: |
-          go test ./compiler/... ./cli/... ./tools/... -covermode=atomic -coverprofile=coverage.out -count=1
+          go test ./compiler/... ./cli/... ./tools/... \
+            -covermode=atomic \
+            -coverprofile=coverage.out \
+            -count=1
           go tool cover -func=coverage.out | tee coverage.txt
 
       - name: Upload coverage report

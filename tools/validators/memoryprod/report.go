@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
+	"reflect"
 	"strings"
 )
 
@@ -42,16 +44,19 @@ type ContractReport struct {
 }
 
 type BenchmarkReport struct {
-	Name             string  `json:"name"`
-	Kind             string  `json:"kind"`
-	Metric           string  `json:"metric"`
-	Unit             string  `json:"unit"`
-	BaselineValue    int     `json:"baseline_value"`
-	MeasuredValue    int     `json:"measured_value"`
-	ImprovementRatio float64 `json:"improvement_ratio"`
-	Evidence         string  `json:"evidence"`
-	Ran              bool    `json:"ran"`
-	Pass             bool    `json:"pass"`
+	Name                string  `json:"name"`
+	Kind                string  `json:"kind"`
+	Metric              string  `json:"metric"`
+	Unit                string  `json:"unit"`
+	EvidenceClass       string  `json:"evidence_class"`
+	Method              string  `json:"method"`
+	MeasurementArtifact string  `json:"measurement_artifact,omitempty"`
+	BaselineValue       int     `json:"baseline_value"`
+	MeasuredValue       int     `json:"measured_value"`
+	ImprovementRatio    float64 `json:"improvement_ratio"`
+	Evidence            string  `json:"evidence"`
+	Ran                 bool    `json:"ran"`
+	Pass                bool    `json:"pass"`
 }
 
 type CaseReport struct {
@@ -78,6 +83,25 @@ func ValidateReport(raw []byte) error {
 
 	var issues []string
 	issues = append(issues, rejectPaperEvidence(raw)...)
+	issues = append(issues, validateReportFields(report)...)
+	if len(issues) > 0 {
+		return errors.New(strings.Join(issues, "; "))
+	}
+	return nil
+}
+
+func ValidateReportObject(report Report) error {
+	var issues []string
+	issues = append(issues, rejectPaperEvidenceStrings(reportStringFields(report))...)
+	issues = append(issues, validateReportFields(report)...)
+	if len(issues) > 0 {
+		return errors.New(strings.Join(issues, "; "))
+	}
+	return nil
+}
+
+func validateReportFields(report Report) []string {
+	var issues []string
 	if report.Schema != SchemaV1 {
 		issues = append(issues, fmt.Sprintf("schema is %q, want %q", report.Schema, SchemaV1))
 	}
@@ -101,14 +125,14 @@ func ValidateReport(raw []byte) error {
 	issues = append(issues, validateContracts(report.Contracts)...)
 	issues = append(issues, validateCases(report.Cases)...)
 	issues = append(issues, validateAudit(report.Audit)...)
-	if len(issues) > 0 {
-		return errors.New(strings.Join(issues, "; "))
-	}
-	return nil
+	return issues
 }
 
 func rejectPaperEvidence(raw []byte) []string {
-	lower := strings.ToLower(string(raw))
+	return rejectPaperEvidenceStrings([]string{string(raw)})
+}
+
+func rejectPaperEvidenceStrings(values []string) []string {
 	forbidden := []string{
 		"metadata-only",
 		"build-only",
@@ -123,12 +147,57 @@ func rejectPaperEvidence(raw []byte) []string {
 		"placeholder",
 	}
 	var issues []string
-	for _, marker := range forbidden {
-		if strings.Contains(lower, marker) {
-			issues = append(issues, fmt.Sprintf("report contains forbidden non-production evidence marker %q", strings.Trim(marker, " /\"")))
+	for _, value := range values {
+		lower := strings.ToLower(value)
+		for _, marker := range forbidden {
+			if strings.Contains(lower, marker) {
+				issues = append(
+					issues,
+					fmt.Sprintf(
+						"report contains forbidden non-production evidence marker %q",
+						strings.Trim(marker, " /\""),
+					),
+				)
+			}
 		}
 	}
 	return issues
+}
+
+func reportStringFields(report Report) []string {
+	var out []string
+	collectStringFields(reflect.ValueOf(report), &out)
+	return out
+}
+
+func collectStringFields(value reflect.Value, out *[]string) {
+	if !value.IsValid() {
+		return
+	}
+	if value.Kind() == reflect.Pointer || value.Kind() == reflect.Interface {
+		if value.IsNil() {
+			return
+		}
+		collectStringFields(value.Elem(), out)
+		return
+	}
+	switch value.Kind() {
+	case reflect.String:
+		*out = append(*out, value.String())
+	case reflect.Struct:
+		for i := 0; i < value.NumField(); i++ {
+			collectStringFields(value.Field(i), out)
+		}
+	case reflect.Slice, reflect.Array:
+		for i := 0; i < value.Len(); i++ {
+			collectStringFields(value.Index(i), out)
+		}
+	case reflect.Map:
+		for _, key := range value.MapKeys() {
+			collectStringFields(key, out)
+			collectStringFields(value.MapIndex(key), out)
+		}
+	}
 }
 
 func validateProcesses(processes []ProcessReport) []string {
@@ -146,7 +215,13 @@ func validateProcesses(processes []ProcessReport) []string {
 	}
 	var issues []string
 	if len(processes) < 3 {
-		issues = append(issues, fmt.Sprintf("process evidence has %d entries, want build, app, and stress processes", len(processes)))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"process evidence has %d entries, want build, app, and stress processes",
+				len(processes),
+			),
+		)
 	}
 	seenBuild := false
 	seenApp := false
@@ -165,7 +240,10 @@ func validateProcesses(processes []ProcessReport) []string {
 			seenRequired[name] = true
 			for _, marker := range requiredMarkers {
 				if !strings.Contains(p.Path, marker) {
-					issues = append(issues, fmt.Sprintf("process %s path must mention %s", name, marker))
+					issues = append(
+						issues,
+						fmt.Sprintf("process %s path must mention %s", name, marker),
+					)
 				}
 			}
 		}
@@ -178,7 +256,14 @@ func validateProcesses(processes []ProcessReport) []string {
 			seenStress = true
 		case "benchmark":
 		default:
-			issues = append(issues, fmt.Sprintf("process %s kind is %q, want build, app, stress, or benchmark", p.Name, p.Kind))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"process %s kind is %q, want build, app, stress, or benchmark",
+					p.Name,
+					p.Kind,
+				),
+			)
 		}
 		if strings.TrimSpace(p.Path) == "" {
 			issues = append(issues, fmt.Sprintf("process %s path is required", p.Name))
@@ -235,9 +320,19 @@ func validateBenchmarks(benchmarks []BenchmarkReport) []string {
 			required[name] = true
 		}
 		if b.Kind != "allocator" {
-			issues = append(issues, fmt.Sprintf("benchmark %s kind is %q, want allocator", name, b.Kind))
+			issues = append(
+				issues,
+				fmt.Sprintf("benchmark %s kind is %q, want allocator", name, b.Kind),
+			)
 		}
-		for _, issue := range forbiddenPerformanceClaimIssues("benchmark "+name, b.Name, b.Kind, b.Metric, b.Unit, b.Evidence) {
+		for _, issue := range forbiddenPerformanceClaimIssues(
+			"benchmark "+name,
+			b.Name,
+			b.Kind,
+			b.Metric,
+			b.Unit,
+			b.Evidence,
+		) {
 			issues = append(issues, issue)
 		}
 		if strings.TrimSpace(b.Metric) == "" {
@@ -246,6 +341,7 @@ func validateBenchmarks(benchmarks []BenchmarkReport) []string {
 		if strings.TrimSpace(b.Unit) == "" {
 			issues = append(issues, fmt.Sprintf("benchmark %s unit is required", name))
 		}
+		issues = append(issues, validateBenchmarkEvidenceClassification(name, b)...)
 		if !b.Ran {
 			issues = append(issues, fmt.Sprintf("benchmark %s did not run", name))
 		}
@@ -253,36 +349,112 @@ func validateBenchmarks(benchmarks []BenchmarkReport) []string {
 			issues = append(issues, fmt.Sprintf("benchmark %s did not pass", name))
 		}
 		if b.BaselineValue <= 0 {
-			issues = append(issues, fmt.Sprintf("benchmark %s baseline_value = %d, want positive", name, b.BaselineValue))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"benchmark %s baseline_value = %d, want positive",
+					name,
+					b.BaselineValue,
+				),
+			)
 		}
 		if b.MeasuredValue <= 0 {
-			issues = append(issues, fmt.Sprintf("benchmark %s measured_value = %d, want positive", name, b.MeasuredValue))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"benchmark %s measured_value = %d, want positive",
+					name,
+					b.MeasuredValue,
+				),
+			)
 		}
 		if b.BaselineValue > 0 && b.MeasuredValue > 0 && b.MeasuredValue >= b.BaselineValue {
-			issues = append(issues, fmt.Sprintf("benchmark %s measured_value = %d, want less than baseline_value %d", name, b.MeasuredValue, b.BaselineValue))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"benchmark %s measured_value = %d, want less than baseline_value %d",
+					name,
+					b.MeasuredValue,
+					b.BaselineValue,
+				),
+			)
 		}
 		if b.ImprovementRatio <= 1 {
-			issues = append(issues, fmt.Sprintf("benchmark %s improvement_ratio = %.3f, want > 1", name, b.ImprovementRatio))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"benchmark %s improvement_ratio = %.3f, want > 1",
+					name,
+					b.ImprovementRatio,
+				),
+			)
 		}
 		evidence := strings.TrimSpace(b.Evidence)
 		if evidence == "" {
 			issues = append(issues, fmt.Sprintf("benchmark %s evidence is required", name))
 		}
 		if name == "small heap allocation syscall reduction" {
+			if b.EvidenceClass != "allocation_report_estimate" {
+				issues = append(
+					issues,
+					fmt.Sprintf(
+						"benchmark %s evidence_class is %q, want allocation_report_estimate",
+						name,
+						b.EvidenceClass,
+					),
+				)
+			}
 			if b.Metric != "estimated_os_syscalls" {
-				issues = append(issues, fmt.Sprintf("benchmark %s metric is %q, want estimated_os_syscalls", name, b.Metric))
+				issues = append(
+					issues,
+					fmt.Sprintf(
+						"benchmark %s metric is %q, want estimated_os_syscalls",
+						name,
+						b.Metric,
+					),
+				)
 			}
 			if b.Unit != "syscalls" {
-				issues = append(issues, fmt.Sprintf("benchmark %s unit is %q, want syscalls", name, b.Unit))
+				issues = append(
+					issues,
+					fmt.Sprintf("benchmark %s unit is %q, want syscalls", name, b.Unit),
+				)
 			}
-			for _, marker := range []string{"per_core_small_heap", "same_core_same_size_class_free_list"} {
+			for _, marker := range []string{"per_core_small_heap"} {
 				if !strings.Contains(evidence, marker) {
-					issues = append(issues, fmt.Sprintf("benchmark %s evidence must mention %s", name, marker))
+					issues = append(
+						issues,
+						fmt.Sprintf("benchmark %s evidence must mention %s", name, marker),
+					)
 				}
 			}
 			for _, marker := range []string{"allocation report schema v2", "64KiB chunk refill"} {
 				if !strings.Contains(evidence, marker) {
-					issues = append(issues, fmt.Sprintf("benchmark %s evidence must mention scoped local artifact marker %s", name, marker))
+					issues = append(
+						issues,
+						fmt.Sprintf(
+							"benchmark %s evidence must mention scoped local artifact marker %s",
+							name,
+							marker,
+						),
+					)
+				}
+			}
+			for _, marker := range []string{
+				"same_core_same_size_class_free_list",
+				"free-list",
+				"free list",
+				"reuse policy",
+			} {
+				if strings.Contains(strings.ToLower(evidence), marker) {
+					issues = append(
+						issues,
+						fmt.Sprintf(
+							"benchmark %s contains runtime free-list wording %q without runtime_measured evidence",
+							name,
+							marker,
+						),
+					)
 				}
 			}
 		}
@@ -293,6 +465,116 @@ func validateBenchmarks(benchmarks []BenchmarkReport) []string {
 		}
 	}
 	return issues
+}
+
+func validateBenchmarkEvidenceClassification(name string, b BenchmarkReport) []string {
+	var issues []string
+	evidenceClass := strings.TrimSpace(b.EvidenceClass)
+	method := strings.TrimSpace(b.Method)
+	measurementArtifact := strings.TrimSpace(b.MeasurementArtifact)
+	if evidenceClass == "" {
+		issues = append(issues, fmt.Sprintf("benchmark %s evidence_class is required", name))
+	}
+	if method == "" {
+		issues = append(issues, fmt.Sprintf("benchmark %s method is required", name))
+	}
+	switch evidenceClass {
+	case "allocation_report_estimate":
+		if method != "allocation_report_summary" {
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"benchmark %s method is %q, want allocation_report_summary for allocation_report_estimate",
+					name,
+					b.Method,
+				),
+			)
+		}
+		if measurementArtifact != "" {
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"benchmark %s measurement_artifact must be empty for allocation_report_estimate",
+					name,
+				),
+			)
+		}
+		if !strings.HasPrefix(b.Metric, "estimated_") {
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"benchmark %s metric %q must be explicitly estimated for allocation_report_estimate",
+					name,
+					b.Metric,
+				),
+			)
+		}
+	case "runtime_measured":
+		if !isRuntimeMeasuredBenchmarkMethod(method) {
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"benchmark %s method is %q, want one of time_v, strace, MemStats, pprof for runtime_measured",
+					name,
+					b.Method,
+				),
+			)
+		}
+		if measurementArtifact == "" {
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"benchmark %s measurement_artifact is required for runtime_measured",
+					name,
+				),
+			)
+		} else if !isSafeRelativeArtifactPath(measurementArtifact) {
+			issues = append(
+				issues,
+				fmt.Sprintf(("benchmark %s measurement_artifact %q is not a safe relative "+
+					"artifact path"), name, b.MeasurementArtifact),
+			)
+		}
+		if strings.HasPrefix(b.Metric, "estimated_") {
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"benchmark %s metric %q must not be estimated for runtime_measured",
+					name,
+					b.Metric,
+				),
+			)
+		}
+	case "":
+	default:
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"benchmark %s evidence_class is %q, want allocation_report_estimate or runtime_measured",
+				name,
+				b.EvidenceClass,
+			),
+		)
+	}
+	return issues
+}
+
+func isRuntimeMeasuredBenchmarkMethod(method string) bool {
+	switch method {
+	case "time_v", "strace", "MemStats", "pprof":
+		return true
+	default:
+		return false
+	}
+}
+
+func isSafeRelativeArtifactPath(path string) bool {
+	path = strings.TrimSpace(path)
+	if path == "" || filepath.IsAbs(path) || strings.Contains(path, "\\") {
+		return false
+	}
+	clean := filepath.Clean(path)
+	return clean == path && clean != "." && clean != ".." && !strings.HasPrefix(clean, "../")
 }
 
 func forbiddenPerformanceClaimIssues(label string, fields ...string) []string {
@@ -309,11 +591,17 @@ func forbiddenPerformanceClaimIssues(label string, fields ...string) []string {
 			{label: "fastest language", markers: []string{"fastest language", "fastest-language"}},
 			{label: "official benchmark", markers: []string{"official benchmark", "official techempower"}},
 			{label: "target parity", markers: []string{"target parity", "target-parity"}},
-			{label: "zero-cost performance", markers: []string{"zero-cost performance", "zero cost performance"}},
+			{
+				label:   "zero-cost performance",
+				markers: []string{"zero-cost performance", "zero cost performance"},
+			},
 		} {
 			for _, marker := range claim.markers {
 				if strings.Contains(lower, marker) {
-					issues = append(issues, fmt.Sprintf("%s contains forbidden %s claim", label, claim.label))
+					issues = append(
+						issues,
+						fmt.Sprintf("%s contains forbidden %s claim", label, claim.label),
+					)
 					break
 				}
 			}
@@ -380,7 +668,10 @@ func validateContracts(contracts []ContractReport) []string {
 			required[name] = true
 		}
 		if c.Status != "pass" {
-			issues = append(issues, fmt.Sprintf("contract %s status is %q, want pass", name, c.Status))
+			issues = append(
+				issues,
+				fmt.Sprintf("contract %s status is %q, want pass", name, c.Status),
+			)
 		}
 		if strings.TrimSpace(c.Evidence) == "" {
 			issues = append(issues, fmt.Sprintf("contract %s evidence is required", name))
@@ -444,12 +735,18 @@ func validateCases(cases []CaseReport) []string {
 		case "negative":
 			seenNegative = true
 			if strings.TrimSpace(c.ExpectedError) == "" {
-				issues = append(issues, fmt.Sprintf("negative case %s expected_error is required", name))
+				issues = append(
+					issues,
+					fmt.Sprintf("negative case %s expected_error is required", name),
+				)
 			}
 		case "stress":
 			seenStress = true
 		default:
-			issues = append(issues, fmt.Sprintf("case %s kind is %q, want positive, negative, or stress", name, c.Kind))
+			issues = append(
+				issues,
+				fmt.Sprintf("case %s kind is %q, want positive, negative, or stress", name, c.Kind),
+			)
 		}
 		if !c.Ran {
 			issues = append(issues, fmt.Sprintf("case %s did not run", name))
@@ -487,7 +784,7 @@ func validateAudit(audit []AuditReport) []string {
 		"runtime bounds checks and diagnostics":                           false,
 		"raw pointer bounds metadata":                                     false,
 		"stress/fuzz evidence":                                            false,
-		"measured memory benchmark improvement":                           false,
+		"allocator benchmark evidence classification":                     false,
 		"use-after-free, double-free, borrow escape, and aliasing safety": false,
 		"actor/task transfer safety":                                      false,
 		"leak/resource finalization evidence":                             false,
@@ -507,25 +804,44 @@ func validateAudit(audit []AuditReport) []string {
 			continue
 		}
 		if seen[requirement] {
-			issues = append(issues, fmt.Sprintf("duplicate completion audit requirement %q", requirement))
+			issues = append(
+				issues,
+				fmt.Sprintf("duplicate completion audit requirement %q", requirement),
+			)
 		}
 		seen[requirement] = true
 		if _, ok := required[requirement]; ok {
 			required[requirement] = true
 		}
 		if strings.TrimSpace(row.Artifact) == "" {
-			issues = append(issues, fmt.Sprintf("completion audit requirement %q artifact is required", requirement))
+			issues = append(
+				issues,
+				fmt.Sprintf("completion audit requirement %q artifact is required", requirement),
+			)
 		}
 		if strings.TrimSpace(row.Evidence) == "" {
-			issues = append(issues, fmt.Sprintf("completion audit requirement %q evidence is required", requirement))
+			issues = append(
+				issues,
+				fmt.Sprintf("completion audit requirement %q evidence is required", requirement),
+			)
 		}
 		if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(row.Result)), "pass") {
-			issues = append(issues, fmt.Sprintf("completion audit requirement %q result is %q, want pass", requirement, row.Result))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"completion audit requirement %q result is %q, want pass",
+					requirement,
+					row.Result,
+				),
+			)
 		}
 	}
 	for requirement, ok := range required {
 		if !ok {
-			issues = append(issues, fmt.Sprintf("completion audit missing required requirement %q", requirement))
+			issues = append(
+				issues,
+				fmt.Sprintf("completion audit missing required requirement %q", requirement),
+			)
 		}
 	}
 	return issues

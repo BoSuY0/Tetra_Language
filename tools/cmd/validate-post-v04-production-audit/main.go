@@ -16,9 +16,19 @@ func main() {
 	var outPath string
 	var write bool
 	flag.StringVar(&reportDir, "report-dir", "", "post-v0.4 production report directory")
-	flag.StringVar(&auditPath, "audit", "", "path to post-v0.4 production audit JSON; defaults inside --report-dir")
+	flag.StringVar(
+		&auditPath,
+		"audit",
+		"",
+		"path to post-v0.4 production audit JSON; defaults inside --report-dir",
+	)
 	flag.BoolVar(&write, "write", false, "write a fresh post-v0.4 production audit")
-	flag.StringVar(&outPath, "out", "", "audit output path for --write; defaults inside --report-dir")
+	flag.StringVar(
+		&outPath,
+		"out",
+		"",
+		"audit output path for --write; defaults inside --report-dir",
+	)
 	flag.Parse()
 
 	if reportDir == "" {

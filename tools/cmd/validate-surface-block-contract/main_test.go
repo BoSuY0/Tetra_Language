@@ -59,7 +59,8 @@ func TestValidateSurfaceBlockContractRejectsGraphWithoutRendererEvidence(t *test
 		t.Fatalf("expected block_graph without paint/layout/a11y evidence to fail")
 	}
 	lower := strings.ToLower(err.Error())
-	if !strings.Contains(lower, "paint") || !strings.Contains(lower, "layout") || !strings.Contains(lower, "accessibility") {
+	if !strings.Contains(lower, "paint") || !strings.Contains(lower, "layout") ||
+		!strings.Contains(lower, "accessibility") {
 		t.Fatalf("error = %v, want paint/layout/accessibility diagnostics", err)
 	}
 }

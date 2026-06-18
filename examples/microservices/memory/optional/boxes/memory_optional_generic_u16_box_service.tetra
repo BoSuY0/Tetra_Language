@@ -1,0 +1,26 @@
+// Optional generic u16 slice box memory microservice smoke.
+//
+// The service carries a heap-backed []u16 through a generic box wrapped in an
+// optional payload and verifies indexed reads after unwrapping.
+module examples.microservices.memory.optional.boxes.memory_optional_generic_u16_box_service
+struct Box<T>:
+    value: T
+
+func wrap<T>(value: T) -> Box<T>:
+    return Box<T>(value: value)
+
+func main() -> Int
+uses alloc, mem:
+    var lane: []u16 = core.make_u16(4)
+    lane[0] = 5
+    lane[1] = 8
+    lane[2] = 13
+    lane[3] = 16
+    let box: Box<[]u16> = wrap(lane)
+    let maybe: Box<[]u16>? = box
+    if let returned = maybe:
+        let total: Int = returned.value[0] + returned.value[1] + returned.value[2] + returned.value[3]
+        if total == 42:
+            return 0
+        return total
+    return 99

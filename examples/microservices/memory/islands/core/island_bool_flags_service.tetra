@@ -1,0 +1,25 @@
+// Island bool flags microservice smoke.
+//
+// The service stores boolean feature flags in an island-backed slice and
+// converts the active flags to a deterministic service score.
+module examples.microservices.memory.islands.core.island_bool_flags_service
+func main() -> Int
+uses alloc, islands, mem:
+    var score: Int = 0
+    island(128) as flag_region:
+        var flags: []bool = core.island_make_bool(flag_region, 4)
+        flags[0] = true
+        flags[1] = false
+        flags[2] = true
+        flags[3] = true
+        if flags[0]:
+            score = score + 10
+        if flags[1]:
+            score = score + 100
+        if flags[2]:
+            score = score + 12
+        if flags[3]:
+            score = score + 20
+    if score == 42:
+        return 0
+    return score

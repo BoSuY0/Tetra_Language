@@ -1,14 +1,13 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"tetra_language/tools/internal/reportdecode"
 )
 
 type featuresReport struct {
@@ -61,19 +60,7 @@ func validateFeaturesReport(raw []byte) error {
 }
 
 func decodeStrictJSON(raw []byte, out any) error {
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(out); err != nil {
-		return err
-	}
-	var extra any
-	if err := dec.Decode(&extra); err != io.EOF {
-		if err == nil {
-			return fmt.Errorf("unexpected trailing JSON value")
-		}
-		return err
-	}
-	return nil
+	return reportdecode.DecodeStrict(raw, out)
 }
 
 func validateFeatures(features []featureEntry) error {
@@ -104,7 +91,12 @@ func validateFeatures(features []featureEntry) error {
 			return fmt.Errorf("feature %s invalid status %q", feature.ID, feature.Status)
 		}
 		if previousStatus, ok := seenID[feature.ID]; ok {
-			return fmt.Errorf("duplicate feature %s (%s and %s)", feature.ID, previousStatus, feature.Status)
+			return fmt.Errorf(
+				"duplicate feature %s (%s and %s)",
+				feature.ID,
+				previousStatus,
+				feature.Status,
+			)
 		}
 		seenID[feature.ID] = feature.Status
 		featureByID[feature.ID] = feature
@@ -139,7 +131,11 @@ func validateSurfaceBlockSystemFeature(features map[string]featureEntry) error {
 		return fmt.Errorf("features missing ui.surface-block-system")
 	}
 	if feature.Status != "experimental" && feature.Status != "planned" {
-		return fmt.Errorf("feature ui.surface-block-system status = %s, want experimental or planned until Block evidence lands", feature.Status)
+		return fmt.Errorf(
+			("feature ui.surface-block-system status = %s, want experimental " +
+				"or planned until Block evidence lands"),
+			feature.Status,
+		)
 	}
 	haystack := feature.Scope + " " + feature.Stability
 	for _, want := range []string{
@@ -150,7 +146,10 @@ func validateSurfaceBlockSystemFeature(features map[string]featureEntry) error {
 		"no production Block claim",
 	} {
 		if !strings.Contains(haystack, want) {
-			return fmt.Errorf("feature ui.surface-block-system missing truth-boundary phrase %q", want)
+			return fmt.Errorf(
+				"feature ui.surface-block-system missing truth-boundary phrase %q",
+				want,
+			)
 		}
 	}
 	return nil
@@ -165,7 +164,11 @@ func validateSurfaceMorphCapsuleFeature(features map[string]featureEntry) error 
 		return fmt.Errorf("features missing ui.surface-morph-capsule")
 	}
 	if feature.Status != "experimental" && feature.Status != "planned" {
-		return fmt.Errorf("feature ui.surface-morph-capsule status = %s, want experimental or planned until Morph evidence lands", feature.Status)
+		return fmt.Errorf(
+			("feature ui.surface-morph-capsule status = %s, want experimental " +
+				"or planned until Morph evidence lands"),
+			feature.Status,
+		)
 	}
 	haystack := feature.Scope + " " + feature.Stability
 	for _, want := range []string{
@@ -176,7 +179,10 @@ func validateSurfaceMorphCapsuleFeature(features map[string]featureEntry) error 
 		"does not add core widget primitives",
 	} {
 		if !strings.Contains(haystack, want) {
-			return fmt.Errorf("feature ui.surface-morph-capsule missing truth-boundary phrase %q", want)
+			return fmt.Errorf(
+				"feature ui.surface-morph-capsule missing truth-boundary phrase %q",
+				want,
+			)
 		}
 	}
 	return nil
@@ -196,14 +202,23 @@ func validateFeatureDocs(feature featureEntry) error {
 			return fmt.Errorf("feature %s has unsafe doc reference %q", feature.ID, doc)
 		}
 		if !strings.HasPrefix(docPath, "docs/") || !strings.HasSuffix(docPath, ".md") {
-			return fmt.Errorf("feature %s doc reference %q must point at docs/*.md", feature.ID, doc)
+			return fmt.Errorf(
+				"feature %s doc reference %q must point at docs/*.md",
+				feature.ID,
+				doc,
+			)
 		}
 		if seenDocs[docPath] {
 			return fmt.Errorf("feature %s doc reference %q is duplicated", feature.ID, doc)
 		}
 		seenDocs[docPath] = true
 		if _, err := statFromRepoRoot(docPath); err != nil {
-			return fmt.Errorf("feature %s doc reference %q is not readable: %v", feature.ID, doc, err)
+			return fmt.Errorf(
+				"feature %s doc reference %q is not readable: %v",
+				feature.ID,
+				doc,
+				err,
+			)
 		}
 	}
 	return nil

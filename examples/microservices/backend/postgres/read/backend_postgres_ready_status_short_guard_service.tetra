@@ -1,0 +1,38 @@
+// Backend PostgreSQL ReadyForQuery status short-buffer guard microservice.
+module examples.microservices.backend.postgres.read.backend_postgres_ready_status_short_guard_service
+import lib.core.postgres as pg
+
+func check_valid_statuses() -> Bool
+uses alloc, mem:
+    var states: []u8 = core.make_u8(3)
+    states[0] = pg.ready_for_query_idle_status()
+    states[1] = pg.ready_for_query_in_transaction_status()
+    states[2] = pg.ready_for_query_failed_transaction_status()
+    if pg.ready_for_query_status(states, 0) != pg.ready_for_query_idle_status():
+        return false
+    if pg.ready_for_query_status(states, 1) != pg.ready_for_query_in_transaction_status():
+        return false
+    if pg.ready_for_query_status(states, 2) != pg.ready_for_query_failed_transaction_status():
+        return false
+    return true
+
+func check_short_status_reads() -> Int
+uses alloc, mem:
+    var empty: []u8 = core.make_u8(0)
+    if pg.ready_for_query_status(empty, 0) != -1:
+        return 11
+    var one: []u8 = core.make_u8(1)
+    one[0] = pg.ready_for_query_idle_status()
+    if pg.ready_for_query_status(one, 1) != -1:
+        return 12
+    if one[0] != pg.ready_for_query_idle_status():
+        return 13
+    if pg.ready_for_query_status(one, -1) != -1:
+        return 14
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    if !check_valid_statuses():
+        return 1
+    return check_short_status_reads()

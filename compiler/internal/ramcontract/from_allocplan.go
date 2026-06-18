@@ -5,12 +5,18 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"tetra_language/compiler/internal/allocplan"
 )
 
-func BuildReportFromAllocPlan(plan *allocplan.Plan, target string, gitHead string, generatedBy string) Report {
+func BuildReportFromAllocPlan(
+	plan *allocplan.Plan,
+	target string,
+	gitHead string,
+	generatedBy string,
+) Report {
 	report := Report{
 		SchemaVersion: ReportSchemaV1,
 		GitHead:       defaultString(gitHead, "unknown"),
@@ -48,7 +54,10 @@ func BuildReportFromAllocPlan(plan *allocplan.Plan, target string, gitHead strin
 	for _, proof := range proofs {
 		report.Proofs = append(report.Proofs, proof)
 	}
-	sort.Slice(report.Proofs, func(i, j int) bool { return report.Proofs[i].ProofID < report.Proofs[j].ProofID })
+	sort.Slice(
+		report.Proofs,
+		func(i, j int) bool { return report.Proofs[i].ProofID < report.Proofs[j].ProofID },
+	)
 	report.Summary = SummarizeRows(report.Rows)
 	report.Functions = SummarizeFunctions(report.Rows)
 	return report
@@ -70,18 +79,106 @@ func rowFromAllocation(function string, alloc allocplan.Allocation) (Row, ProofS
 		EscapeStatus:     escapeStatusFromAllocPlan(alloc.Escape),
 		Placement:        placement,
 		Blockers:         blockersFromAllocation(alloc, placement),
+		ReasonCodes:      append([]string(nil), alloc.ReasonCodes...),
+		HeapReasonCodes:  append([]string(nil), alloc.HeapReasonCodes...),
 		CopyReason:       copyReasonFromAllocation(alloc, intent, placement),
 		FreePoint:        freePointFromAllocation(alloc, function),
 		ContractGrade:    GradeForPlacement(placement),
 		ValidationStatus: validationStatusFromAllocation(alloc, placement),
 		SourceFactID:     "fact:ram:" + sanitizeID(alloc.SiteID),
 	}
+	row.Domain = memoryDomainFromAllocation(function, alloc, row)
 	if trustedPlacement(placement) && row.ValidationStatus == ValidationValidated {
 		proof := proofForAllocation(function, alloc, row)
 		row.ProofIDs = []string{proof.ProofID}
 		return row, proof
 	}
 	return row, ProofSummary{}
+}
+
+func memoryDomainFromAllocation(
+	function string,
+	alloc allocplan.Allocation,
+	row Row,
+) *MemoryDomain {
+	requested := row.RequestedBytes
+	reserved := int64(alloc.BytesReserved)
+	if reserved == 0 {
+		reserved = int64(allocationBytes(alloc))
+		if reserved == 0 {
+			reserved = requested
+		}
+	}
+	domain := &MemoryDomain{
+		DomainID:       "domain:process",
+		Kind:           DomainProcess,
+		OwnerKind:      "process",
+		OwnerID:        "current",
+		Lifetime:       "process",
+		BudgetBytes:    requested,
+		RequestedBytes: requested,
+		ReservedBytes:  reserved,
+		CommittedBytes: int64(alloc.BytesCommitted),
+		ReleasedBytes:  int64(alloc.BytesReleased),
+	}
+	if alloc.MemoryBackend != nil {
+		domain.CurrentBytes = alloc.MemoryBackend.FootprintCurrentBytes
+		domain.PeakBytes = alloc.MemoryBackend.FootprintPeakBytes
+	}
+	switch alloc.ActualLoweringStorage {
+	case allocplan.StorageExplicitIsland:
+		domain.Kind = DomainIsland
+		domain.DomainID = memoryDomainID("island", alloc.RegionID, alloc.SiteID)
+		domain.OwnerKind = "island"
+		domain.OwnerID = ownerIDFromRegion("island", alloc.RegionID, alloc.ValueID)
+		domain.Lifetime = row.Lifetime
+	case allocplan.StorageTaskRegion:
+		domain.Kind = DomainTask
+		domain.DomainID = memoryDomainID("task", alloc.RegionID, alloc.SiteID)
+		domain.OwnerKind = "task"
+		domain.OwnerID = ownerIDFromRegion("task", alloc.RegionID, function)
+		domain.Lifetime = row.Lifetime
+	case allocplan.StorageActorMoveRegion:
+		domain.Kind = DomainActor
+		domain.DomainID = memoryDomainID("actor", alloc.RegionID, alloc.SiteID)
+		domain.OwnerKind = "actor"
+		domain.OwnerID = ownerIDFromRegion("actor", alloc.RegionID, function)
+		domain.Lifetime = row.Lifetime
+	case allocplan.StorageExternal:
+		domain.Kind = DomainExternal
+		domain.DomainID = memoryDomainID("external", alloc.RegionID, alloc.SiteID)
+		domain.OwnerKind = "external"
+		domain.OwnerID = ownerIDFromRegion("external", alloc.RegionID, alloc.ValueID)
+		domain.Lifetime = row.Lifetime
+	}
+	if isCopyIntent(row.Intent) {
+		domain.CopyCount = 1
+		domain.BytesCopied = requested
+	}
+	return domain
+}
+
+func memoryDomainID(kind string, regionID string, fallback string) string {
+	regionID = strings.TrimSpace(regionID)
+	if regionID != "" {
+		return "domain:" + sanitizeID(regionID)
+	}
+	return "domain:" + kind + ":" + sanitizeID(fallback)
+}
+
+func ownerIDFromRegion(kind string, regionID string, fallback string) string {
+	regionID = strings.TrimSpace(regionID)
+	prefix := kind + ":"
+	if strings.HasPrefix(regionID, prefix) {
+		value := strings.TrimSpace(strings.TrimPrefix(regionID, prefix))
+		if value != "" {
+			return sanitizeID(value)
+		}
+	}
+	if regionID != "" {
+		return sanitizeID(regionID)
+	}
+	return sanitizeID(fallback)
 }
 
 func placementFromAllocation(alloc allocplan.Allocation) Placement {
@@ -92,7 +189,10 @@ func placementFromAllocation(alloc allocplan.Allocation) Placement {
 		return PlacementRegister
 	case allocplan.StorageStack:
 		return PlacementStack
-	case allocplan.StorageRegion, allocplan.StorageFunctionTempRegion, allocplan.StorageTaskRegion, allocplan.StorageActorMoveRegion:
+	case allocplan.StorageRegion,
+		allocplan.StorageFunctionTempRegion,
+		allocplan.StorageTaskRegion,
+		allocplan.StorageActorMoveRegion:
 		return PlacementRegion
 	case allocplan.StorageExplicitIsland:
 		return PlacementIsland
@@ -151,7 +251,10 @@ func escapeStatusFromAllocPlan(escape allocplan.EscapeClass) EscapeStatus {
 	}
 }
 
-func validationStatusFromAllocation(alloc allocplan.Allocation, placement Placement) ValidationStatus {
+func validationStatusFromAllocation(
+	alloc allocplan.Allocation,
+	placement Placement,
+) ValidationStatus {
 	if strings.HasPrefix(alloc.ValidationStatus, "invalid") || placement == PlacementRejected {
 		return ValidationRejected
 	}
@@ -200,7 +303,8 @@ func blockersFromAllocation(alloc allocplan.Allocation, placement Placement) []s
 		if allocationBytes(alloc) == 0 && alloc.LengthStatus != allocplan.LengthStatusValidEmpty {
 			add("unknown_size")
 		}
-		if alloc.ActualLoweringStorage == allocplan.StorageHeap && alloc.Storage != allocplan.StorageHeap {
+		if alloc.ActualLoweringStorage == allocplan.StorageHeap &&
+			alloc.Storage != allocplan.StorageHeap {
 			add("backend_conservative_heap_fallback")
 		}
 		if alloc.Reason != "" {
@@ -219,7 +323,16 @@ func proofForAllocation(function string, alloc allocplan.Allocation, row Row) Pr
 	id := "proof:ram:" + sanitizeID(row.SiteID)
 	kind := proofKindForRow(row)
 	subject := proofSubjectForAllocation(function, alloc, row)
-	stable := stableProofHash(id, kind, subject, alloc.ValidationStatus, string(row.Placement), string(row.EscapeStatus), row.Lifetime, row.FreePoint)
+	stable := stableProofHash(
+		id,
+		kind,
+		subject,
+		alloc.ValidationStatus,
+		string(row.Placement),
+		string(row.EscapeStatus),
+		row.Lifetime,
+		row.FreePoint,
+	)
 	return ProofSummary{
 		ProofID:    id,
 		Kind:       kind,
@@ -278,7 +391,14 @@ func BuildProofStoreSummary(report Report) ProofStoreSummary {
 	return out
 }
 
-func BuildPipelineCoverage(target string, gitHead string, generatedBy string, entrypoint string, artifactPath string, validators []string) PipelineCoverageReport {
+func BuildPipelineCoverage(
+	target string,
+	gitHead string,
+	generatedBy string,
+	entrypoint string,
+	artifactPath string,
+	validators []string,
+) PipelineCoverageReport {
 	return PipelineCoverageReport{
 		SchemaVersion: PipelineCoverageSchemaV1,
 		GitHead:       defaultString(gitHead, "unknown"),
@@ -289,7 +409,11 @@ func BuildPipelineCoverage(target string, gitHead string, generatedBy string, en
 	}
 }
 
-func pipelineCoverageEntries(entrypoint string, artifactPath string, validators []string) []PipelineEntry {
+func pipelineCoverageEntries(
+	entrypoint string,
+	artifactPath string,
+	validators []string,
+) []PipelineEntry {
 	entries := make([]PipelineEntry, 0, len(requiredPipelineEntrypoints))
 	covered := map[string]bool{}
 	for _, required := range requiredPipelineEntrypoints {
@@ -324,15 +448,19 @@ func pipelineCoverageEntries(entrypoint string, artifactPath string, validators 
 func pipelineCoverageExemption(entrypoint string) string {
 	switch entrypoint {
 	case "buildObjectFileWithStatsOpt":
-		return "not exercised by this linux-x64 RAM release fixture; object builds must carry their own RAM coverage evidence"
+		return ("not exercised by this linux-x64 RAM release fixture; object " +
+			"builds must carry their own RAM coverage evidence")
 	case "buildLibraryObjectWithStatsOpt":
-		return "not exercised by this linux-x64 RAM release fixture; library builds must carry their own RAM coverage evidence"
+		return ("not exercised by this linux-x64 RAM release fixture; library " +
+			"builds must carry their own RAM coverage evidence")
 	case "InterfaceOnly":
 		return "interface-only mode does not produce a RAM artifact in this release fixture"
 	case "wasm32-wasi-build":
-		return "wasm32-wasi RAM coverage is target-specific and not claimed by this linux-x64 release fixture"
+		return ("wasm32-wasi RAM coverage is target-specific and not claimed by " +
+			"this linux-x64 release fixture")
 	case "wasm32-web-build":
-		return "wasm32-web RAM coverage is target-specific and not claimed by this linux-x64 release fixture"
+		return ("wasm32-web RAM coverage is target-specific and not claimed by " +
+			"this linux-x64 release fixture")
 	case "explain-report-path":
 		return "explain report path is not artifact-producing in this release fixture"
 	default:
@@ -347,6 +475,7 @@ func BuildHeapBlockerReport(report Report) BlockerReport {
 		GitHead:       report.GitHead,
 		Target:        report.Target,
 		GeneratedBy:   report.GeneratedBy,
+		Rows:          make([]BlockerRow, 0, len(report.Rows)),
 		NonClaims:     append([]string(nil), report.NonClaims...),
 	}
 	for _, row := range report.Rows {
@@ -365,6 +494,7 @@ func BuildCopyBlockerReport(report Report) BlockerReport {
 		GitHead:       report.GitHead,
 		Target:        report.Target,
 		GeneratedBy:   report.GeneratedBy,
+		Rows:          make([]BlockerRow, 0, len(report.Rows)),
 		NonClaims:     append([]string(nil), report.NonClaims...),
 	}
 	for _, row := range report.Rows {
@@ -377,15 +507,144 @@ func BuildCopyBlockerReport(report Report) BlockerReport {
 }
 
 func blockerRowFromRAMRow(row Row) BlockerRow {
-	return BlockerRow{
-		SiteID:        row.SiteID,
-		Function:      row.Function,
-		Intent:        row.Intent,
-		Placement:     row.Placement,
-		Blockers:      append([]string(nil), row.Blockers...),
-		CopyReason:    row.CopyReason,
-		ContractGrade: row.ContractGrade,
+	file, line, sourceStatus := sourceLocationFromSpan(row.SourceSpan)
+	blocker := BlockerRow{
+		SiteID:               row.SiteID,
+		Function:             row.Function,
+		Intent:               row.Intent,
+		Placement:            row.Placement,
+		Blockers:             append([]string(nil), row.Blockers...),
+		ReasonCodes:          append([]string(nil), row.ReasonCodes...),
+		HeapReasonCodes:      append([]string(nil), row.HeapReasonCodes...),
+		CopyReason:           row.CopyReason,
+		ContractGrade:        row.ContractGrade,
+		File:                 file,
+		Line:                 line,
+		Symbol:               row.Function,
+		SourceLocationStatus: sourceStatus,
+		Severity:             severityForRAMRow(row),
+		Reason:               blockerReasonForRAMRow(row),
+		SuggestedFix:         suggestedFixForRAMRow(row),
+		ProofID:              firstString(row.ProofIDs),
+		EvidenceID:           evidenceIDForRAMRow(row),
+		SafeToOptimize:       safeToOptimizeRAMRow(row),
 	}
+	if isCopyIntent(row.Intent) {
+		blocker.CopyKind = copyKindForRAMRow(row)
+		blocker.SourceValue = row.ValueID
+		blocker.DestinationValue = string(row.Placement)
+		blocker.BytesEstimate = row.RequestedBytes
+		blocker.SafetyReason = copySafetyReasonForRAMRow(row)
+	}
+	return blocker
+}
+
+func sourceLocationFromSpan(span string) (string, int, string) {
+	span = strings.TrimSpace(span)
+	if span == "" {
+		return "", 0, "unavailable"
+	}
+	parts := strings.Split(span, ":")
+	if len(parts) < 3 {
+		return "", 0, "unavailable"
+	}
+	line, err := strconv.Atoi(parts[len(parts)-2])
+	if err != nil || line <= 0 {
+		return "", 0, "unavailable"
+	}
+	file := strings.Join(parts[:len(parts)-2], ":")
+	if strings.TrimSpace(file) == "" {
+		return "", 0, "unavailable"
+	}
+	return file, line, "available"
+}
+
+func severityForRAMRow(row Row) string {
+	switch row.ContractGrade {
+	case GradeM5, GradeM6:
+		return "P1"
+	case GradeM4:
+		return "P2"
+	default:
+		return "P3"
+	}
+}
+
+func blockerReasonForRAMRow(row Row) string {
+	if isCopyIntent(row.Intent) && strings.TrimSpace(row.CopyReason) != "" {
+		return row.CopyReason
+	}
+	if len(row.Blockers) > 0 {
+		return strings.Join(row.Blockers, ",")
+	}
+	if strings.TrimSpace(string(row.ValidationStatus)) != "" {
+		return "validation_status:" + string(row.ValidationStatus)
+	}
+	return "conservative RAM contract blocker"
+}
+
+func suggestedFixForRAMRow(row Row) string {
+	if isCopyIntent(row.Intent) {
+		if row.Intent == IntentCopyEliminated {
+			return "no code change required; keep the copy-elimination proof covered by RAM contract tests"
+		}
+		return "add ownership/lifetime proof before replacing this copy with a borrowed or zero-copy path"
+	}
+	if isHeapPlacement(row.Placement) {
+		return "add no-escape, lifetime, or bounded allocation proof before changing this heap fallback"
+	}
+	return "preserve conservative RAM contract evidence before changing this placement"
+}
+
+func evidenceIDForRAMRow(row Row) string {
+	if strings.TrimSpace(row.SourceFactID) != "" {
+		return row.SourceFactID
+	}
+	if strings.TrimSpace(row.SiteID) != "" {
+		return "fact:ram:" + sanitizeID(row.SiteID)
+	}
+	return "fact:ram:unknown"
+}
+
+func safeToOptimizeRAMRow(row Row) bool {
+	return isCopyIntent(row.Intent) && row.Intent == IntentCopyEliminated
+}
+
+func copyKindForRAMRow(row Row) string {
+	switch row.Intent {
+	case IntentCopyEliminated:
+		return "ACCEPTABLE_SMALL_COPY"
+	case IntentCopyStackBacked:
+		if row.RequestedBytes > 4096 {
+			return "HOT_PATH_COPY"
+		}
+		return "ACCEPTABLE_SMALL_COPY"
+	case IntentCopyHeapBounded, IntentCopyHeapUnbounded:
+		return "HOT_PATH_COPY"
+	case IntentCopyRequiredBoundary, IntentCopyRequiredMutableAlias:
+		return "NEEDS_ZERO_COPY_OR_BORROWED_VIEW"
+	case IntentCopyIntoNoAllocation:
+		return "ACCEPTABLE_SMALL_COPY"
+	default:
+		return "NEEDS_ZERO_COPY_OR_BORROWED_VIEW"
+	}
+}
+
+func copySafetyReasonForRAMRow(row Row) string {
+	if safeToOptimizeRAMRow(row) {
+		return "copy is already eliminated by supported RAM contract evidence"
+	}
+	if row.ValidationStatus == ValidationValidated && row.EscapeStatus == EscapeNoEscape {
+		return "validated no-escape evidence exists, but ownership semantics still gate zero-copy changes"
+	}
+	return "copy preserves ownership or lifetime boundary until stronger proof is available"
+}
+
+func firstString(values []string) string {
+	if len(values) == 0 {
+		return ""
+	}
+	return values[0]
 }
 
 func allocationBytes(alloc allocplan.Allocation) int {
@@ -405,7 +664,8 @@ func allocationBounded(alloc allocplan.Allocation, placement Placement) bool {
 	if placement == PlacementHeapUnbounded {
 		return false
 	}
-	if alloc.LengthStatus == allocplan.LengthStatusRejectedNegative || alloc.LengthStatus == allocplan.LengthStatusRejectedOverflow {
+	if alloc.LengthStatus == allocplan.LengthStatusRejectedNegative ||
+		alloc.LengthStatus == allocplan.LengthStatusRejectedOverflow {
 		return true
 	}
 	return allocationBytes(alloc) > 0 || alloc.LengthStatus == allocplan.LengthStatusValidEmpty
@@ -423,8 +683,11 @@ func allocationLifetime(alloc allocplan.Allocation, function string) string {
 
 func freePointFromAllocation(alloc allocplan.Allocation, function string) string {
 	switch alloc.ActualLoweringStorage {
-	case allocplan.StorageRegion, allocplan.StorageFunctionTempRegion, allocplan.StorageExplicitIsland,
-		allocplan.StorageTaskRegion, allocplan.StorageActorMoveRegion:
+	case allocplan.StorageRegion,
+		allocplan.StorageFunctionTempRegion,
+		allocplan.StorageExplicitIsland,
+		allocplan.StorageTaskRegion,
+		allocplan.StorageActorMoveRegion:
 		if alloc.Lifetime != "" {
 			return alloc.Lifetime + ":end"
 		}
@@ -436,7 +699,11 @@ func freePointFromAllocation(alloc allocplan.Allocation, function string) string
 	}
 }
 
-func copyReasonFromAllocation(alloc allocplan.Allocation, intent Intent, placement Placement) string {
+func copyReasonFromAllocation(
+	alloc allocplan.Allocation,
+	intent Intent,
+	placement Placement,
+) string {
 	if !isCopyIntent(intent) {
 		return ""
 	}
@@ -458,12 +725,28 @@ func copyReasonFromAllocation(alloc allocplan.Allocation, intent Intent, placeme
 }
 
 func isCopyBuiltin(name string) bool {
-	return name == "core.string_copy" || (strings.HasPrefix(name, "core.slice_copy_") && !strings.HasPrefix(name, "core.slice_copy_into_"))
+	return name == "core.string_copy" ||
+		(strings.HasPrefix(name, "core.slice_copy_") && !strings.HasPrefix(name, "core.slice_copy_into_"))
 }
 
 func normalizeBlocker(reason string) string {
 	reason = strings.ToLower(strings.TrimSpace(reason))
-	replacer := strings.NewReplacer(" ", "_", ";", "", ":", "", ",", "", ".", "", "/", "_", "-", "_")
+	replacer := strings.NewReplacer(
+		" ",
+		"_",
+		";",
+		"",
+		":",
+		"",
+		",",
+		"",
+		".",
+		"",
+		"/",
+		"_",
+		"-",
+		"_",
+	)
 	reason = replacer.Replace(reason)
 	if len(reason) > 96 {
 		reason = reason[:96]
@@ -521,6 +804,13 @@ func EmptyM0Report(target string, gitHead string, generatedBy string) Report {
 }
 
 func DebugString(report Report) string {
-	return fmt.Sprintf("RAM contract %s target=%s grade=%s rows=%d heap=%d copy=%d",
-		report.SchemaVersion, report.Target, report.Summary.ArtifactGrade, report.Summary.RowCount, report.Summary.HeapRows, report.Summary.CopyRows)
+	return fmt.Sprintf(
+		"RAM contract %s target=%s grade=%s rows=%d heap=%d copy=%d",
+		report.SchemaVersion,
+		report.Target,
+		report.Summary.ArtifactGrade,
+		report.Summary.RowCount,
+		report.Summary.HeapRows,
+		report.Summary.CopyRows,
+	)
 }

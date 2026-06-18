@@ -1,0 +1,18 @@
+// Task-group cancel-after-join microservice smoke.
+//
+// The service joins a grouped worker first, then cancels and closes the group
+// to verify the lifecycle remains deterministic after the child has completed.
+module examples.microservices.parallel.group_cancel.parallel_group_cancel_after_join_service
+func worker() -> Int:
+    return 42
+
+func main() -> Int
+uses runtime:
+    var group: task.group = core.task_group_open()
+    let task: task.i32 = core.task_spawn_group_i32(group, "worker")
+    let value: Int = core.task_join_i32(task)
+    group = core.task_group_cancel(group)
+    let close_error: Int = core.task_group_close(group)
+    if value == 42 && close_error == 0:
+        return 0
+    return value + close_error

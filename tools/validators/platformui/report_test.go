@@ -16,9 +16,19 @@ func TestValidateReportAcceptsTargetHostRuntimeEvidence(t *testing.T) {
 }
 
 func TestValidateReportRejectsBlockedRuntimeLessEvidence(t *testing.T) {
-	raw := strings.Replace(validPlatformUIReport("windows-x64"), `"status":"pass"`, `"status":"blocked"`, 1)
+	raw := strings.Replace(
+		validPlatformUIReport("windows-x64"),
+		`"status":"pass"`,
+		`"status":"blocked"`,
+		1,
+	)
 	raw = strings.Replace(raw, `"host":"windows-x64"`, `"host":"linux-x64"`, 1)
-	raw = strings.Replace(raw, `"source":"tools/cmd/platform-ui-runtime-smoke"`, `"source":"docs-only-runtime-less-placeholder.md"`, 1)
+	raw = strings.Replace(
+		raw,
+		`"source":"tools/cmd/platform-ui-runtime-smoke"`,
+		`"source":"docs-only-runtime-less-placeholder.md"`,
+		1,
+	)
 	err := ValidateReport([]byte(raw), "windows-x64")
 	if err == nil {
 		t.Fatalf("expected blocked/runtime-less report to fail")
@@ -39,7 +49,12 @@ func TestValidateReportRejectsBuildOnlyEvidence(t *testing.T) {
 }
 
 func TestValidateReportRejectsNonChildRunner(t *testing.T) {
-	raw := strings.Replace(validPlatformUIReport("windows-x64"), `"runner":"target-host-runtime-child"`, `"runner":"host-native"`, 1)
+	raw := strings.Replace(
+		validPlatformUIReport("windows-x64"),
+		`"runner":"target-host-runtime-child"`,
+		`"runner":"host-native"`,
+		1,
+	)
 	err := ValidateReport([]byte(raw), "windows-x64")
 	if err == nil || !strings.Contains(err.Error(), "target-host-runtime-child") {
 		t.Fatalf("non-child runner error = %v", err)
@@ -47,7 +62,12 @@ func TestValidateReportRejectsNonChildRunner(t *testing.T) {
 }
 
 func TestValidateReportWithOptionsRejectsStaleVersionAndGitHead(t *testing.T) {
-	raw := strings.Replace(validPlatformUIReport("windows-x64"), `"version":"v0.4.0"`, `"version":"v0.3.0"`, 1)
+	raw := strings.Replace(
+		validPlatformUIReport("windows-x64"),
+		`"version":"v0.4.0"`,
+		`"version":"v0.3.0"`,
+		1,
+	)
 	raw = strings.Replace(raw, `"git_head":"abcdef1234567890"`, `"git_head":"stale123"`, 1)
 	err := ValidateReportWithOptions([]byte(raw), ValidateOptions{
 		ExpectedTarget:  "windows-x64",
@@ -65,7 +85,12 @@ func TestValidateReportWithOptionsRejectsStaleVersionAndGitHead(t *testing.T) {
 }
 
 func TestValidateReportRejectsMissingRuntimeTraceMarkers(t *testing.T) {
-	raw := strings.Replace(validPlatformUIReport("windows-x64"), `"runtime_trace":"platform-process-spawn:ok;platform-window-api:ok;platform-widget-tree:ok;platform-event-dispatch:ok;platform-timer:ok;platform-redraw:ok;window-create:ok;window-show:ok;widget-tree-load:ok;layout-measure:ok;layout-place:ok;event-loop-start:ok;focus-dispatch:ok;input-dispatch:ok;select-dispatch:ok;click-dispatch:ok;state-update:ok;async-command:ok;timer-tick:ok;redraw:ok;error-recovery:ok;window-close:ok"`, `"runtime_trace":"platform-process-spawn:ok;widget-tree-load:ok"`, 1)
+	raw := strings.Replace(
+		validPlatformUIReport("windows-x64"),
+		`"runtime_trace":"platform-process-spawn:ok;platform-window-api:ok;platform-widget-tree:ok;platform-event-dispatch:ok;platform-timer:ok;platform-redraw:ok;window-create:ok;window-show:ok;widget-tree-load:ok;layout-measure:ok;layout-place:ok;event-loop-start:ok;focus-dispatch:ok;input-dispatch:ok;select-dispatch:ok;click-dispatch:ok;state-update:ok;async-command:ok;timer-tick:ok;redraw:ok;error-recovery:ok;window-close:ok"`,
+		`"runtime_trace":"platform-process-spawn:ok;widget-tree-load:ok"`,
+		1,
+	)
 	err := ValidateReport([]byte(raw), "windows-x64")
 	if err == nil {
 		t.Fatalf("expected missing runtime_trace markers to fail")
@@ -78,12 +103,22 @@ func TestValidateReportRejectsMissingRuntimeTraceMarkers(t *testing.T) {
 }
 
 func TestValidateReportRejectsWindowOnlyPlatformProbe(t *testing.T) {
-	raw := strings.Replace(validPlatformUIReport("windows-x64"), "platform-widget-tree:ok;platform-event-dispatch:ok;platform-timer:ok;platform-redraw:ok;", "", 1)
+	raw := strings.Replace(
+		validPlatformUIReport("windows-x64"),
+		"platform-widget-tree:ok;platform-event-dispatch:ok;platform-timer:ok;platform-redraw:ok;",
+		"",
+		1,
+	)
 	err := ValidateReport([]byte(raw), "windows-x64")
 	if err == nil {
 		t.Fatalf("expected window-only platform probe to fail")
 	}
-	for _, want := range []string{"platform-widget-tree:ok", "platform-event-dispatch:ok", "platform-timer:ok", "platform-redraw:ok"} {
+	for _, want := range []string{
+		"platform-widget-tree:ok",
+		"platform-event-dispatch:ok",
+		"platform-timer:ok",
+		"platform-redraw:ok",
+	} {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("error missing %q: %v", want, err)
 		}

@@ -31,14 +31,19 @@ func TestValidateProjectInfoReportAcceptsNotFoundProject(t *testing.T) {
 }
 
 func TestValidateProjectInfoReportRejectsUnknownFields(t *testing.T) {
-	raw := []byte(`{"found":true,"root":"/repo/App","capsule_path":"/repo/App/Capsule.t4","entry_path":"src/main.t4","source_roots":["src"],"targets":[],"extra":true}`)
-	if err := validateProjectInfoReport(raw); err == nil || !strings.Contains(err.Error(), "unknown field") {
+	raw := []byte(
+		`{"found":true,"root":"/repo/App","capsule_path":"/repo/App/Capsule.t4","entry_path":"src/main.t4","source_roots":["src"],"targets":[],"extra":true}`,
+	)
+	if err := validateProjectInfoReport(raw); err == nil ||
+		!strings.Contains(err.Error(), "unknown field") {
 		t.Fatalf("expected unknown field failure, got %v", err)
 	}
 }
 
 func TestValidateProjectInfoReportRejectsMissingFoundProjectFields(t *testing.T) {
-	raw := []byte(`{"found":true,"root":"/repo/App","capsule_path":"/repo/App/Capsule.t4","source_roots":["src"],"targets":[]}`)
+	raw := []byte(
+		`{"found":true,"root":"/repo/App","capsule_path":"/repo/App/Capsule.t4","source_roots":["src"],"targets":[]}`,
+	)
 	if err := validateProjectInfoReport(raw); err == nil {
 		t.Fatalf("expected missing entry path failure")
 	}
@@ -52,7 +57,9 @@ func TestValidateProjectInfoReportRejectsNotFoundWithProjectFields(t *testing.T)
 }
 
 func TestValidateProjectInfoReportRejectsNegativeArtifactCount(t *testing.T) {
-	raw := []byte(`{"found":true,"root":"/repo/App","capsule_path":"/repo/App/Capsule.t4","entry_path":"src/main.t4","source_roots":["src"],"targets":[],"artifact_counts":{"object":-1}}`)
+	raw := []byte(
+		`{"found":true,"root":"/repo/App","capsule_path":"/repo/App/Capsule.t4","entry_path":"src/main.t4","source_roots":["src"],"targets":[],"artifact_counts":{"object":-1}}`,
+	)
 	if err := validateProjectInfoReport(raw); err == nil {
 		t.Fatalf("expected negative artifact count failure")
 	}

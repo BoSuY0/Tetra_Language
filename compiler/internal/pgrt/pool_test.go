@@ -131,7 +131,8 @@ func TestPoolStatsTrackOpenIdleInUseAndClosedState(t *testing.T) {
 		t.Fatalf("Checkout second: %v", err)
 	}
 	stats := pool.Stats()
-	if stats.MaxOpen != 2 || stats.Open != 2 || stats.InUse != 2 || stats.Idle != 0 || stats.Closed {
+	if stats.MaxOpen != 2 || stats.Open != 2 || stats.InUse != 2 || stats.Idle != 0 ||
+		stats.Closed {
 		t.Fatalf("checked-out stats = %#v", stats)
 	}
 	if err := first.Release(nil); err != nil {

@@ -6,7 +6,7 @@ repo_root="$(cd "$script_dir/../../.." && pwd)"
 report_dir="$repo_root/reports/post-v0.4"
 
 usage() {
-  cat <<'USAGE'
+  cat << 'USAGE'
 Usage: bash scripts/release/post_v0_4/ui-production-runtime-linux-x64-smoke.sh [--report-dir DIR]
 
 Runs executable Linux-x64 UI Production Runtime smoke and writes tetra.ui.desktop-runtime.v1
@@ -25,7 +25,7 @@ while [[ $# -gt 0 ]]; do
       report_dir="$2"
       shift 2
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;

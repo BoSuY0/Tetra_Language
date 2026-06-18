@@ -10,46 +10,82 @@ func TestMiniMemoryModelV0RequiredOutcomes(t *testing.T) {
 		valid   bool
 	}{
 		{
-			name:    "valid_borrow_local",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperStructField, Escape: EscapeLocalUse, BranchOwners: []string{"xs"}},
+			name: "valid_borrow_local",
+			input: Scenario{
+				Source:       SourceBorrowedView,
+				Wrapper:      WrapperStructField,
+				Escape:       EscapeLocalUse,
+				BranchOwners: []string{"xs"},
+			},
 			outcome: OutcomeValidBorrowLocal,
 			valid:   true,
 		},
 		{
-			name:    "invalid_borrow_return_escape",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperStructField, Escape: EscapeReturn, BranchOwners: []string{"xs"}},
+			name: "invalid_borrow_return_escape",
+			input: Scenario{
+				Source:       SourceBorrowedView,
+				Wrapper:      WrapperStructField,
+				Escape:       EscapeReturn,
+				BranchOwners: []string{"xs"},
+			},
 			outcome: OutcomeInvalidBorrowReturnEscape,
 		},
 		{
-			name:    "valid_copy_escape",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperOptionalPayload, Escape: EscapeStore, Copied: true, BranchOwners: []string{"xs"}},
+			name: "valid_copy_escape",
+			input: Scenario{
+				Source:       SourceBorrowedView,
+				Wrapper:      WrapperOptionalPayload,
+				Escape:       EscapeStore,
+				Copied:       true,
+				BranchOwners: []string{"xs"},
+			},
 			outcome: OutcomeValidCopyEscape,
 			valid:   true,
 		},
 		{
-			name:    "invalid_branch_owner_mix",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperOptionalPayload, Escape: EscapeLocalUse, BranchOwners: []string{"left", "right"}},
+			name: "invalid_branch_owner_mix",
+			input: Scenario{
+				Source:       SourceBorrowedView,
+				Wrapper:      WrapperOptionalPayload,
+				Escape:       EscapeLocalUse,
+				BranchOwners: []string{"left", "right"},
+			},
 			outcome: OutcomeInvalidBranchOwnerMix,
 		},
 		{
-			name:    "invalid_unsafe_unknown_borrow",
-			input:   Scenario{Source: SourceUnsafeUnknown, Wrapper: WrapperStructField, Escape: EscapeLocalUse},
+			name: "invalid_unsafe_unknown_borrow",
+			input: Scenario{
+				Source:  SourceUnsafeUnknown,
+				Wrapper: WrapperStructField,
+				Escape:  EscapeLocalUse,
+			},
 			outcome: OutcomeInvalidUnsafeUnknownBorrow,
 		},
 		{
-			name:    "valid_sequential_inout",
-			input:   Scenario{InoutEvents: []InoutEvent{EventStartInout, EventEndInout, EventStartInout, EventEndInout}},
+			name: "valid_sequential_inout",
+			input: Scenario{
+				InoutEvents: []InoutEvent{
+					EventStartInout,
+					EventEndInout,
+					EventStartInout,
+					EventEndInout,
+				},
+			},
 			outcome: OutcomeValidSequentialInout,
 			valid:   true,
 		},
 		{
-			name:    "invalid_alias_read_during_inout",
-			input:   Scenario{InoutEvents: []InoutEvent{EventStartInout, EventAliasRead, EventEndInout}},
+			name: "invalid_alias_read_during_inout",
+			input: Scenario{
+				InoutEvents: []InoutEvent{EventStartInout, EventAliasRead, EventEndInout},
+			},
 			outcome: OutcomeInvalidAliasReadDuringInout,
 		},
 		{
-			name:    "invalid_alias_write_during_inout",
-			input:   Scenario{InoutEvents: []InoutEvent{EventStartInout, EventAliasWrite, EventEndInout}},
+			name: "invalid_alias_write_during_inout",
+			input: Scenario{
+				InoutEvents: []InoutEvent{EventStartInout, EventAliasWrite, EventEndInout},
+			},
 			outcome: OutcomeInvalidAliasWriteDuringInout,
 		},
 	}
@@ -57,7 +93,12 @@ func TestMiniMemoryModelV0RequiredOutcomes(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			got := Evaluate(test.input)
 			if got.Outcome != test.outcome || got.Valid != test.valid {
-				t.Fatalf("Evaluate() = %+v, want outcome %s valid %v", got, test.outcome, test.valid)
+				t.Fatalf(
+					"Evaluate() = %+v, want outcome %s valid %v",
+					got,
+					test.outcome,
+					test.valid,
+				)
 			}
 			if got.Reason == "" {
 				t.Fatalf("Evaluate() = %+v, want reviewable reason", got)
@@ -100,35 +141,65 @@ func TestMiniMemoryModelV1EnumAndGenericWrapperCases(t *testing.T) {
 		valid   bool
 	}{
 		{
-			name:    "enum_payload_local_use",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperEnumPayload, Escape: EscapeLocalUse, BranchOwners: []string{"xs"}},
+			name: "enum_payload_local_use",
+			input: Scenario{
+				Source:       SourceBorrowedView,
+				Wrapper:      WrapperEnumPayload,
+				Escape:       EscapeLocalUse,
+				BranchOwners: []string{"xs"},
+			},
 			outcome: OutcomeValidBorrowLocal,
 			valid:   true,
 		},
 		{
-			name:    "enum_payload_return_rejected",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperEnumPayload, Escape: EscapeReturn, BranchOwners: []string{"xs"}},
+			name: "enum_payload_return_rejected",
+			input: Scenario{
+				Source:       SourceBorrowedView,
+				Wrapper:      WrapperEnumPayload,
+				Escape:       EscapeReturn,
+				BranchOwners: []string{"xs"},
+			},
 			outcome: OutcomeInvalidBorrowReturnEscape,
 		},
 		{
-			name:    "generic_wrapper_store_rejected",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperGenericWrapper, Escape: EscapeStore, BranchOwners: []string{"xs"}},
+			name: "generic_wrapper_store_rejected",
+			input: Scenario{
+				Source:       SourceBorrowedView,
+				Wrapper:      WrapperGenericWrapper,
+				Escape:       EscapeStore,
+				BranchOwners: []string{"xs"},
+			},
 			outcome: OutcomeInvalidBorrowReturnEscape,
 		},
 		{
-			name:    "generic_wrapper_copy_return_allowed",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperGenericWrapper, Escape: EscapeReturn, Copied: true, BranchOwners: []string{"xs"}},
+			name: "generic_wrapper_copy_return_allowed",
+			input: Scenario{
+				Source:       SourceBorrowedView,
+				Wrapper:      WrapperGenericWrapper,
+				Escape:       EscapeReturn,
+				Copied:       true,
+				BranchOwners: []string{"xs"},
+			},
 			outcome: OutcomeValidCopyEscape,
 			valid:   true,
 		},
 		{
-			name:    "enum_payload_mixed_branch_owners_rejected",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperEnumPayload, Escape: EscapeLocalUse, BranchOwners: []string{"left", "right"}},
+			name: "enum_payload_mixed_branch_owners_rejected",
+			input: Scenario{
+				Source:       SourceBorrowedView,
+				Wrapper:      WrapperEnumPayload,
+				Escape:       EscapeLocalUse,
+				BranchOwners: []string{"left", "right"},
+			},
 			outcome: OutcomeInvalidBranchOwnerMix,
 		},
 		{
-			name:    "generic_wrapper_unsafe_unknown_rejected",
-			input:   Scenario{Source: SourceUnsafeUnknown, Wrapper: WrapperGenericWrapper, Escape: EscapeLocalUse},
+			name: "generic_wrapper_unsafe_unknown_rejected",
+			input: Scenario{
+				Source:  SourceUnsafeUnknown,
+				Wrapper: WrapperGenericWrapper,
+				Escape:  EscapeLocalUse,
+			},
 			outcome: OutcomeInvalidUnsafeUnknownBorrow,
 		},
 	}
@@ -136,7 +207,12 @@ func TestMiniMemoryModelV1EnumAndGenericWrapperCases(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			got := Evaluate(test.input)
 			if got.Outcome != test.outcome || got.Valid != test.valid {
-				t.Fatalf("Evaluate() = %+v, want outcome %s valid %v", got, test.outcome, test.valid)
+				t.Fatalf(
+					"Evaluate() = %+v, want outcome %s valid %v",
+					got,
+					test.outcome,
+					test.valid,
+				)
 			}
 			if got.Reason == "" {
 				t.Fatalf("Evaluate() = %+v, want reviewable reason", got)
@@ -153,36 +229,72 @@ func TestMiniMemoryModelV2FunctionTypedAndCallbackCases(t *testing.T) {
 		valid   bool
 	}{
 		{
-			name:    "function_value_local_use",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperFunctionValue, Escape: EscapeLocalUse, BranchOwners: []string{"xs"}, CallbackTargetKnown: true},
+			name: "function_value_local_use",
+			input: Scenario{
+				Source:              SourceBorrowedView,
+				Wrapper:             WrapperFunctionValue,
+				Escape:              EscapeLocalUse,
+				BranchOwners:        []string{"xs"},
+				CallbackTargetKnown: true,
+			},
 			outcome: OutcomeValidBorrowLocal,
 			valid:   true,
 		},
 		{
-			name:    "known_callback_local_use",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperCallbackArg, Escape: EscapeLocalUse, BranchOwners: []string{"xs"}, CallbackTargetKnown: true},
+			name: "known_callback_local_use",
+			input: Scenario{
+				Source:              SourceBorrowedView,
+				Wrapper:             WrapperCallbackArg,
+				Escape:              EscapeLocalUse,
+				BranchOwners:        []string{"xs"},
+				CallbackTargetKnown: true,
+			},
 			outcome: OutcomeValidBorrowLocal,
 			valid:   true,
 		},
 		{
-			name:    "borrowed_callback_escape_rejected",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperCallbackArg, Escape: EscapeReturn, BranchOwners: []string{"xs"}, CallbackTargetKnown: true},
+			name: "borrowed_callback_escape_rejected",
+			input: Scenario{
+				Source:              SourceBorrowedView,
+				Wrapper:             WrapperCallbackArg,
+				Escape:              EscapeReturn,
+				BranchOwners:        []string{"xs"},
+				CallbackTargetKnown: true,
+			},
 			outcome: OutcomeInvalidBorrowReturnEscape,
 		},
 		{
-			name:    "copied_callback_escape_allowed",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperCallbackArg, Escape: EscapeStore, Copied: true, BranchOwners: []string{"xs"}, CallbackTargetKnown: true},
+			name: "copied_callback_escape_allowed",
+			input: Scenario{
+				Source:              SourceBorrowedView,
+				Wrapper:             WrapperCallbackArg,
+				Escape:              EscapeStore,
+				Copied:              true,
+				BranchOwners:        []string{"xs"},
+				CallbackTargetKnown: true,
+			},
 			outcome: OutcomeValidCopyEscape,
 			valid:   true,
 		},
 		{
-			name:    "unknown_callback_target_conservative",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperCallbackArg, Escape: EscapeLocalUse, BranchOwners: []string{"xs"}},
+			name: "unknown_callback_target_conservative",
+			input: Scenario{
+				Source:       SourceBorrowedView,
+				Wrapper:      WrapperCallbackArg,
+				Escape:       EscapeLocalUse,
+				BranchOwners: []string{"xs"},
+			},
 			outcome: OutcomeConservativeUnknownCallbackTarget,
 		},
 		{
-			name:    "callback_reentrant_inout_conservative",
-			input:   Scenario{InoutEvents: []InoutEvent{EventStartInout, EventCallbackReentrantCall, EventEndInout}},
+			name: "callback_reentrant_inout_conservative",
+			input: Scenario{
+				InoutEvents: []InoutEvent{
+					EventStartInout,
+					EventCallbackReentrantCall,
+					EventEndInout,
+				},
+			},
 			outcome: OutcomeInvalidCallbackInoutAlias,
 		},
 	}
@@ -190,7 +302,12 @@ func TestMiniMemoryModelV2FunctionTypedAndCallbackCases(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			got := Evaluate(test.input)
 			if got.Outcome != test.outcome || got.Valid != test.valid {
-				t.Fatalf("Evaluate() = %+v, want outcome %s valid %v", got, test.outcome, test.valid)
+				t.Fatalf(
+					"Evaluate() = %+v, want outcome %s valid %v",
+					got,
+					test.outcome,
+					test.valid,
+				)
 			}
 			if got.Reason == "" {
 				t.Fatalf("Evaluate() = %+v, want reviewable reason", got)
@@ -207,24 +324,47 @@ func TestMiniMemoryModelV3InterfaceProtocolCases(t *testing.T) {
 		valid   bool
 	}{
 		{
-			name:    "known_static_protocol_target_local_use",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperInterfaceValue, Escape: EscapeLocalUse, BranchOwners: []string{"xs"}, DispatchTargetKnown: true},
+			name: "known_static_protocol_target_local_use",
+			input: Scenario{
+				Source:              SourceBorrowedView,
+				Wrapper:             WrapperInterfaceValue,
+				Escape:              EscapeLocalUse,
+				BranchOwners:        []string{"xs"},
+				DispatchTargetKnown: true,
+			},
 			outcome: OutcomeValidBorrowLocal,
 			valid:   true,
 		},
 		{
-			name:    "borrowed_interface_escape_rejected",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperInterfaceValue, Escape: EscapeReturn, BranchOwners: []string{"xs"}, DispatchTargetKnown: true},
+			name: "borrowed_interface_escape_rejected",
+			input: Scenario{
+				Source:              SourceBorrowedView,
+				Wrapper:             WrapperInterfaceValue,
+				Escape:              EscapeReturn,
+				BranchOwners:        []string{"xs"},
+				DispatchTargetKnown: true,
+			},
 			outcome: OutcomeInvalidBorrowReturnEscape,
 		},
 		{
-			name:    "unknown_protocol_dispatch_conservative",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperProtocolDispatch, Escape: EscapeLocalUse, BranchOwners: []string{"xs"}},
+			name: "unknown_protocol_dispatch_conservative",
+			input: Scenario{
+				Source:       SourceBorrowedView,
+				Wrapper:      WrapperProtocolDispatch,
+				Escape:       EscapeLocalUse,
+				BranchOwners: []string{"xs"},
+			},
 			outcome: OutcomeConservativeUnknownProtocolDispatch,
 		},
 		{
-			name:    "protocol_dispatch_noalias_conservative",
-			input:   Scenario{InoutEvents: []InoutEvent{EventStartInout, EventProtocolDispatchCall, EventEndInout}},
+			name: "protocol_dispatch_noalias_conservative",
+			input: Scenario{
+				InoutEvents: []InoutEvent{
+					EventStartInout,
+					EventProtocolDispatchCall,
+					EventEndInout,
+				},
+			},
 			outcome: OutcomeInvalidProtocolDispatchNoAlias,
 		},
 	}
@@ -232,7 +372,12 @@ func TestMiniMemoryModelV3InterfaceProtocolCases(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			got := Evaluate(test.input)
 			if got.Outcome != test.outcome || got.Valid != test.valid {
-				t.Fatalf("Evaluate() = %+v, want outcome %s valid %v", got, test.outcome, test.valid)
+				t.Fatalf(
+					"Evaluate() = %+v, want outcome %s valid %v",
+					got,
+					test.outcome,
+					test.valid,
+				)
 			}
 			if got.Reason == "" {
 				t.Fatalf("Evaluate() = %+v, want reviewable reason", got)
@@ -249,46 +394,81 @@ func TestMiniMemoryModelV4AsyncTaskActorBoundaryCases(t *testing.T) {
 		valid   bool
 	}{
 		{
-			name:    "local_async_use_before_suspension",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperAsyncBoundary, Escape: EscapeBeforeSuspension, BranchOwners: []string{"xs"}},
+			name: "local_async_use_before_suspension",
+			input: Scenario{
+				Source:       SourceBorrowedView,
+				Wrapper:      WrapperAsyncBoundary,
+				Escape:       EscapeBeforeSuspension,
+				BranchOwners: []string{"xs"},
+			},
 			outcome: OutcomeValidBorrowLocal,
 			valid:   true,
 		},
 		{
-			name:    "borrow_crossing_await_conservative",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperAsyncBoundary, Escape: EscapeAcrossAwait, BranchOwners: []string{"xs"}},
+			name: "borrow_crossing_await_conservative",
+			input: Scenario{
+				Source:       SourceBorrowedView,
+				Wrapper:      WrapperAsyncBoundary,
+				Escape:       EscapeAcrossAwait,
+				BranchOwners: []string{"xs"},
+			},
 			outcome: OutcomeConservativeAsyncBoundaryBorrow,
 		},
 		{
-			name:    "borrow_crossing_task_rejected",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperTaskBoundary, Escape: EscapeTaskBoundary, BranchOwners: []string{"xs"}},
+			name: "borrow_crossing_task_rejected",
+			input: Scenario{
+				Source:       SourceBorrowedView,
+				Wrapper:      WrapperTaskBoundary,
+				Escape:       EscapeTaskBoundary,
+				BranchOwners: []string{"xs"},
+			},
 			outcome: OutcomeInvalidTaskBoundaryBorrow,
 		},
 		{
-			name:    "borrow_crossing_actor_rejected",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperActorBoundary, Escape: EscapeActorBoundary, BranchOwners: []string{"xs"}},
+			name: "borrow_crossing_actor_rejected",
+			input: Scenario{
+				Source:       SourceBorrowedView,
+				Wrapper:      WrapperActorBoundary,
+				Escape:       EscapeActorBoundary,
+				BranchOwners: []string{"xs"},
+			},
 			outcome: OutcomeInvalidActorBoundaryBorrow,
 		},
 		{
-			name:    "copied_value_crossing_task_allowed",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperTaskBoundary, Escape: EscapeTaskBoundary, Copied: true, BranchOwners: []string{"xs"}},
+			name: "copied_value_crossing_task_allowed",
+			input: Scenario{
+				Source:       SourceBorrowedView,
+				Wrapper:      WrapperTaskBoundary,
+				Escape:       EscapeTaskBoundary,
+				Copied:       true,
+				BranchOwners: []string{"xs"},
+			},
 			outcome: OutcomeValidCopyEscape,
 			valid:   true,
 		},
 		{
-			name:    "owned_value_crossing_actor_allowed",
-			input:   Scenario{Source: SourceOwned, Wrapper: WrapperActorBoundary, Escape: EscapeActorBoundary, BranchOwners: []string{"xs"}},
+			name: "owned_value_crossing_actor_allowed",
+			input: Scenario{
+				Source:       SourceOwned,
+				Wrapper:      WrapperActorBoundary,
+				Escape:       EscapeActorBoundary,
+				BranchOwners: []string{"xs"},
+			},
 			outcome: OutcomeValidBorrowLocal,
 			valid:   true,
 		},
 		{
-			name:    "task_boundary_noalias_conservative",
-			input:   Scenario{InoutEvents: []InoutEvent{EventStartInout, EventTaskBoundaryCall, EventEndInout}},
+			name: "task_boundary_noalias_conservative",
+			input: Scenario{
+				InoutEvents: []InoutEvent{EventStartInout, EventTaskBoundaryCall, EventEndInout},
+			},
 			outcome: OutcomeInvalidBoundaryNoAlias,
 		},
 		{
-			name:    "actor_boundary_noalias_conservative",
-			input:   Scenario{InoutEvents: []InoutEvent{EventStartInout, EventActorBoundaryCall, EventEndInout}},
+			name: "actor_boundary_noalias_conservative",
+			input: Scenario{
+				InoutEvents: []InoutEvent{EventStartInout, EventActorBoundaryCall, EventEndInout},
+			},
 			outcome: OutcomeInvalidBoundaryNoAlias,
 		},
 	}
@@ -296,7 +476,12 @@ func TestMiniMemoryModelV4AsyncTaskActorBoundaryCases(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			got := Evaluate(test.input)
 			if got.Outcome != test.outcome || got.Valid != test.valid {
-				t.Fatalf("Evaluate() = %+v, want outcome %s valid %v", got, test.outcome, test.valid)
+				t.Fatalf(
+					"Evaluate() = %+v, want outcome %s valid %v",
+					got,
+					test.outcome,
+					test.valid,
+				)
 			}
 			if got.Reason == "" {
 				t.Fatalf("Evaluate() = %+v, want reviewable reason", got)
@@ -313,20 +498,33 @@ func TestMiniMemoryModelV5RawPointerUnsafeContractCases(t *testing.T) {
 		valid   bool
 	}{
 		{
-			name:    "alloc_bytes_root_ptr_add_in_bounds",
-			input:   Scenario{Source: SourceUnsafeVerifiedRoot, Wrapper: WrapperRawPointer, Escape: EscapeRawPtrAdd, PointerInBounds: true},
+			name: "alloc_bytes_root_ptr_add_in_bounds",
+			input: Scenario{
+				Source:          SourceUnsafeVerifiedRoot,
+				Wrapper:         WrapperRawPointer,
+				Escape:          EscapeRawPtrAdd,
+				PointerInBounds: true,
+			},
 			outcome: OutcomeValidUnsafeVerifiedRootBounds,
 			valid:   true,
 		},
 		{
-			name:    "runtime_checkable_nonnull_alignment_length",
-			input:   Scenario{Source: SourceUnsafeVerifiedRoot, UnsafeContract: ContractNonNullAlignmentLength, RuntimeCheckable: true},
+			name: "runtime_checkable_nonnull_alignment_length",
+			input: Scenario{
+				Source:           SourceUnsafeVerifiedRoot,
+				UnsafeContract:   ContractNonNullAlignmentLength,
+				RuntimeCheckable: true,
+			},
 			outcome: OutcomeValidUnsafeRuntimeContract,
 			valid:   true,
 		},
 		{
-			name:    "unknown_pointer_cannot_become_safe_known",
-			input:   Scenario{Source: SourceUnsafeUnknown, Wrapper: WrapperRawPointer, Escape: EscapeRawPtrAdd},
+			name: "unknown_pointer_cannot_become_safe_known",
+			input: Scenario{
+				Source:  SourceUnsafeUnknown,
+				Wrapper: WrapperRawPointer,
+				Escape:  EscapeRawPtrAdd,
+			},
 			outcome: OutcomeInvalidUnsafeUnknownSafeFacts,
 		},
 		{
@@ -340,18 +538,30 @@ func TestMiniMemoryModelV5RawPointerUnsafeContractCases(t *testing.T) {
 			outcome: OutcomeConservativeUnsafeStaticContract,
 		},
 		{
-			name:    "unsafe_lifetime_region_static_untrusted",
-			input:   Scenario{Source: SourceUnsafeVerifiedRoot, UnsafeContract: ContractLifetimeRegion},
+			name: "unsafe_lifetime_region_static_untrusted",
+			input: Scenario{
+				Source:         SourceUnsafeVerifiedRoot,
+				UnsafeContract: ContractLifetimeRegion,
+			},
 			outcome: OutcomeConservativeUnsafeStaticContract,
 		},
 		{
-			name:    "raw_slice_unknown_pointer_external_unknown",
-			input:   Scenario{Source: SourceUnsafeUnknown, Wrapper: WrapperRawSliceFromParts, Escape: EscapeRawSliceFromParts, RawSliceLengthFits: true},
+			name: "raw_slice_unknown_pointer_external_unknown",
+			input: Scenario{
+				Source:             SourceUnsafeUnknown,
+				Wrapper:            WrapperRawSliceFromParts,
+				Escape:             EscapeRawSliceFromParts,
+				RawSliceLengthFits: true,
+			},
 			outcome: OutcomeConservativeRawSliceExternalUnknown,
 		},
 		{
-			name:    "raw_slice_verified_root_too_large_rejected",
-			input:   Scenario{Source: SourceUnsafeVerifiedRoot, Wrapper: WrapperRawSliceFromParts, Escape: EscapeRawSliceFromParts},
+			name: "raw_slice_verified_root_too_large_rejected",
+			input: Scenario{
+				Source:  SourceUnsafeVerifiedRoot,
+				Wrapper: WrapperRawSliceFromParts,
+				Escape:  EscapeRawSliceFromParts,
+			},
 			outcome: OutcomeInvalidRawSliceTooLarge,
 		},
 	}
@@ -359,7 +569,12 @@ func TestMiniMemoryModelV5RawPointerUnsafeContractCases(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			got := Evaluate(test.input)
 			if got.Outcome != test.outcome || got.Valid != test.valid {
-				t.Fatalf("Evaluate() = %+v, want outcome %s valid %v", got, test.outcome, test.valid)
+				t.Fatalf(
+					"Evaluate() = %+v, want outcome %s valid %v",
+					got,
+					test.outcome,
+					test.valid,
+				)
 			}
 			if got.Reason == "" {
 				t.Fatalf("Evaluate() = %+v, want reviewable reason", got)
@@ -403,8 +618,12 @@ func TestMiniMemoryModelV6BoundsProofCases(t *testing.T) {
 			valid:   true,
 		},
 		{
-			name:    "raw_overflow_keeps_check_or_trap",
-			input:   Scenario{BoundsProof: BoundsProofRawOverflow, BoundsOverflow: true, NormalBuildCheck: true},
+			name: "raw_overflow_keeps_check_or_trap",
+			input: Scenario{
+				BoundsProof:      BoundsProofRawOverflow,
+				BoundsOverflow:   true,
+				NormalBuildCheck: true,
+			},
 			outcome: OutcomeConservativeRawBoundsRuntimeCheck,
 		},
 	}
@@ -412,7 +631,12 @@ func TestMiniMemoryModelV6BoundsProofCases(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			got := Evaluate(test.input)
 			if got.Outcome != test.outcome || got.Valid != test.valid {
-				t.Fatalf("Evaluate() = %+v, want outcome %s valid %v", got, test.outcome, test.valid)
+				t.Fatalf(
+					"Evaluate() = %+v, want outcome %s valid %v",
+					got,
+					test.outcome,
+					test.valid,
+				)
 			}
 			if got.Reason == "" {
 				t.Fatalf("Evaluate() = %+v, want reviewable reason", got)
@@ -434,8 +658,13 @@ func TestMiniMemoryModelV7FFICases(t *testing.T) {
 			outcome: OutcomeConservativeExternalPointerUnknown,
 		},
 		{
-			name:    "ffi_call_may_retain_borrow",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperFFICall, Escape: EscapeFFIBoundary, BranchOwners: []string{"xs"}},
+			name: "ffi_call_may_retain_borrow",
+			input: Scenario{
+				Source:       SourceBorrowedView,
+				Wrapper:      WrapperFFICall,
+				Escape:       EscapeFFIBoundary,
+				BranchOwners: []string{"xs"},
+			},
 			outcome: OutcomeConservativeFFICallMayRetainBorrow,
 		},
 		{
@@ -444,13 +673,21 @@ func TestMiniMemoryModelV7FFICases(t *testing.T) {
 			outcome: OutcomeInvalidSafeWrapperPromotion,
 		},
 		{
-			name:    "external_call_invalidates_noalias",
-			input:   Scenario{InoutEvents: []InoutEvent{EventStartInout, EventExternalCall, EventEndInout}},
+			name: "external_call_invalidates_noalias",
+			input: Scenario{
+				InoutEvents: []InoutEvent{EventStartInout, EventExternalCall, EventEndInout},
+			},
 			outcome: OutcomeInvalidExternalCallNoAlias,
 		},
 		{
-			name:    "owned_copy_crossing_ffi_allowed",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperFFICall, Escape: EscapeFFIBoundary, Copied: true, BranchOwners: []string{"xs"}},
+			name: "owned_copy_crossing_ffi_allowed",
+			input: Scenario{
+				Source:       SourceBorrowedView,
+				Wrapper:      WrapperFFICall,
+				Escape:       EscapeFFIBoundary,
+				Copied:       true,
+				BranchOwners: []string{"xs"},
+			},
 			outcome: OutcomeValidCopyEscape,
 			valid:   true,
 		},
@@ -464,7 +701,12 @@ func TestMiniMemoryModelV7FFICases(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			got := Evaluate(test.input)
 			if got.Outcome != test.outcome || got.Valid != test.valid {
-				t.Fatalf("Evaluate() = %+v, want outcome %s valid %v", got, test.outcome, test.valid)
+				t.Fatalf(
+					"Evaluate() = %+v, want outcome %s valid %v",
+					got,
+					test.outcome,
+					test.valid,
+				)
 			}
 			if got.Reason == "" {
 				t.Fatalf("Evaluate() = %+v, want reviewable reason", got)
@@ -481,29 +723,56 @@ func TestMiniMemoryModelV9StorageCases(t *testing.T) {
 		valid   bool
 	}{
 		{
-			name:    "escaped_return_cannot_use_trusted_stack",
-			input:   Scenario{Source: SourceOwned, Escape: EscapeReturn, StoragePlan: StoragePlanTrustedStack},
+			name: "escaped_return_cannot_use_trusted_stack",
+			input: Scenario{
+				Source:      SourceOwned,
+				Escape:      EscapeReturn,
+				StoragePlan: StoragePlanTrustedStack,
+			},
 			outcome: OutcomeInvalidEscapedTrustedStorage,
 		},
 		{
-			name:    "trusted_stack_requires_no_escape_proof",
-			input:   Scenario{Source: SourceOwned, Escape: EscapeLocalUse, StoragePlan: StoragePlanTrustedStack},
+			name: "trusted_stack_requires_no_escape_proof",
+			input: Scenario{
+				Source:      SourceOwned,
+				Escape:      EscapeLocalUse,
+				StoragePlan: StoragePlanTrustedStack,
+			},
 			outcome: OutcomeInvalidTrustedStorageMissingNoEscapeProof,
 		},
 		{
-			name:    "heap_fallback_preserves_source_fact_and_reason",
-			input:   Scenario{Source: SourceOwned, Escape: EscapeReturn, StoragePlan: StoragePlanHeapFallback, SourceFactIDPresent: true, StorageFallbackReasonPresent: true},
+			name: "heap_fallback_preserves_source_fact_and_reason",
+			input: Scenario{
+				Source:                       SourceOwned,
+				Escape:                       EscapeReturn,
+				StoragePlan:                  StoragePlanHeapFallback,
+				SourceFactIDPresent:          true,
+				StorageFallbackReasonPresent: true,
+			},
 			outcome: OutcomeValidHeapFallbackReasonPreserved,
 			valid:   true,
 		},
 		{
-			name:    "task_boundary_storage_remains_conservative",
-			input:   Scenario{Source: SourceOwned, Escape: EscapeTaskBoundary, StoragePlan: StoragePlanHeapFallback, SourceFactIDPresent: true, StorageFallbackReasonPresent: true},
+			name: "task_boundary_storage_remains_conservative",
+			input: Scenario{
+				Source:                       SourceOwned,
+				Escape:                       EscapeTaskBoundary,
+				StoragePlan:                  StoragePlanHeapFallback,
+				SourceFactIDPresent:          true,
+				StorageFallbackReasonPresent: true,
+			},
 			outcome: OutcomeConservativeBoundaryStorage,
 		},
 		{
-			name:    "ffi_boundary_storage_remains_conservative",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperFFICall, Escape: EscapeFFIBoundary, StoragePlan: StoragePlanHeapFallback, SourceFactIDPresent: true, StorageFallbackReasonPresent: true},
+			name: "ffi_boundary_storage_remains_conservative",
+			input: Scenario{
+				Source:                       SourceBorrowedView,
+				Wrapper:                      WrapperFFICall,
+				Escape:                       EscapeFFIBoundary,
+				StoragePlan:                  StoragePlanHeapFallback,
+				SourceFactIDPresent:          true,
+				StorageFallbackReasonPresent: true,
+			},
 			outcome: OutcomeConservativeBoundaryStorage,
 		},
 	}
@@ -511,7 +780,12 @@ func TestMiniMemoryModelV9StorageCases(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			got := Evaluate(test.input)
 			if got.Outcome != test.outcome || got.Valid != test.valid {
-				t.Fatalf("Evaluate() = %+v, want outcome %s valid %v", got, test.outcome, test.valid)
+				t.Fatalf(
+					"Evaluate() = %+v, want outcome %s valid %v",
+					got,
+					test.outcome,
+					test.valid,
+				)
 			}
 			if got.Reason == "" {
 				t.Fatalf("Evaluate() = %+v, want reviewable reason", got)
@@ -528,34 +802,69 @@ func TestMiniMemoryModelV10AsyncCancellationStructuredBoundaryCases(t *testing.T
 		valid   bool
 	}{
 		{
-			name:    "pre_await_local_non_escaping_borrow_validated",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperAsyncBoundary, Escape: EscapeBeforeSuspension, BranchOwners: []string{"xs"}, NoEscapeProof: true},
+			name: "pre_await_local_non_escaping_borrow_validated",
+			input: Scenario{
+				Source:        SourceBorrowedView,
+				Wrapper:       WrapperAsyncBoundary,
+				Escape:        EscapeBeforeSuspension,
+				BranchOwners:  []string{"xs"},
+				NoEscapeProof: true,
+			},
 			outcome: OutcomeValidPreAwaitLocalBorrow,
 			valid:   true,
 		},
 		{
-			name:    "post_await_borrow_use_conservative",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperAsyncBoundary, Escape: EscapeAfterCancellation, BranchOwners: []string{"xs"}},
+			name: "post_await_borrow_use_conservative",
+			input: Scenario{
+				Source:       SourceBorrowedView,
+				Wrapper:      WrapperAsyncBoundary,
+				Escape:       EscapeAfterCancellation,
+				BranchOwners: []string{"xs"},
+			},
 			outcome: OutcomeConservativePostAwaitBorrow,
 		},
 		{
-			name:    "cancellation_invalidates_task_owned_borrow",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperTaskBoundary, Escape: EscapeCancellation, BranchOwners: []string{"task-owned"}},
+			name: "cancellation_invalidates_task_owned_borrow",
+			input: Scenario{
+				Source:       SourceBorrowedView,
+				Wrapper:      WrapperTaskBoundary,
+				Escape:       EscapeCancellation,
+				BranchOwners: []string{"task-owned"},
+			},
 			outcome: OutcomeInvalidCancellationBorrowLifetime,
 		},
 		{
-			name:    "task_group_boundary_noalias_conservative",
-			input:   Scenario{InoutEvents: []InoutEvent{EventStartInout, EventTaskGroupBoundaryCall, EventEndInout}},
+			name: "task_group_boundary_noalias_conservative",
+			input: Scenario{
+				InoutEvents: []InoutEvent{
+					EventStartInout,
+					EventTaskGroupBoundaryCall,
+					EventEndInout,
+				},
+			},
 			outcome: OutcomeConservativeTaskGroupNoAlias,
 		},
 		{
-			name:    "actor_reentrant_callback_conservative",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperActorReentrantCallback, Escape: EscapeActorBoundary, BranchOwners: []string{"actor-state"}, StoragePlan: StoragePlanHeapFallback, SourceFactIDPresent: true, StorageFallbackReasonPresent: true},
+			name: "actor_reentrant_callback_conservative",
+			input: Scenario{
+				Source:                       SourceBorrowedView,
+				Wrapper:                      WrapperActorReentrantCallback,
+				Escape:                       EscapeActorBoundary,
+				BranchOwners:                 []string{"actor-state"},
+				StoragePlan:                  StoragePlanHeapFallback,
+				SourceFactIDPresent:          true,
+				StorageFallbackReasonPresent: true,
+			},
 			outcome: OutcomeConservativeActorReentrantCallback,
 		},
 		{
-			name:    "async_boundary_trusted_storage_rejected",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperAsyncBoundary, Escape: EscapeAcrossAwait, StoragePlan: StoragePlanTrustedStack},
+			name: "async_boundary_trusted_storage_rejected",
+			input: Scenario{
+				Source:      SourceBorrowedView,
+				Wrapper:     WrapperAsyncBoundary,
+				Escape:      EscapeAcrossAwait,
+				StoragePlan: StoragePlanTrustedStack,
+			},
 			outcome: OutcomeInvalidEscapedTrustedStorage,
 		},
 	}
@@ -563,7 +872,12 @@ func TestMiniMemoryModelV10AsyncCancellationStructuredBoundaryCases(t *testing.T
 		t.Run(test.name, func(t *testing.T) {
 			got := Evaluate(test.input)
 			if got.Outcome != test.outcome || got.Valid != test.valid {
-				t.Fatalf("Evaluate() = %+v, want outcome %s valid %v", got, test.outcome, test.valid)
+				t.Fatalf(
+					"Evaluate() = %+v, want outcome %s valid %v",
+					got,
+					test.outcome,
+					test.valid,
+				)
 			}
 			if got.Reason == "" {
 				t.Fatalf("Evaluate() = %+v, want reviewable reason", got)
@@ -580,24 +894,45 @@ func TestMiniMemoryModelV11DynamicProtocolWitnessCases(t *testing.T) {
 		valid   bool
 	}{
 		{
-			name:    "dynamic_existential_borrow_carrier_conservative",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperDynamicExistential, Escape: EscapeStore, BranchOwners: []string{"xs"}},
+			name: "dynamic_existential_borrow_carrier_conservative",
+			input: Scenario{
+				Source:       SourceBorrowedView,
+				Wrapper:      WrapperDynamicExistential,
+				Escape:       EscapeStore,
+				BranchOwners: []string{"xs"},
+			},
 			outcome: OutcomeConservativeDynamicExistentialBorrow,
 		},
 		{
-			name:    "static_witness_parent_fact_validated",
-			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperStaticWitness, Escape: EscapeLocalUse, BranchOwners: []string{"xs"}, SourceFactIDPresent: true},
+			name: "static_witness_parent_fact_validated",
+			input: Scenario{
+				Source:              SourceBorrowedView,
+				Wrapper:             WrapperStaticWitness,
+				Escape:              EscapeLocalUse,
+				BranchOwners:        []string{"xs"},
+				SourceFactIDPresent: true,
+			},
 			outcome: OutcomeValidStaticWitnessBorrowFact,
 			valid:   true,
 		},
 		{
-			name:    "dynamic_protocol_dispatch_noalias_rejected",
-			input:   Scenario{InoutEvents: []InoutEvent{EventStartInout, EventDynamicProtocolDispatchCall, EventEndInout}},
+			name: "dynamic_protocol_dispatch_noalias_rejected",
+			input: Scenario{
+				InoutEvents: []InoutEvent{
+					EventStartInout,
+					EventDynamicProtocolDispatchCall,
+					EventEndInout,
+				},
+			},
 			outcome: OutcomeInvalidDynamicProtocolNoAlias,
 		},
 		{
-			name:    "witness_lookup_unknown_provenance_promotion_rejected",
-			input:   Scenario{Source: SourceUnsafeUnknown, Wrapper: WrapperWitnessTableLookup, Escape: EscapeLocalUse},
+			name: "witness_lookup_unknown_provenance_promotion_rejected",
+			input: Scenario{
+				Source:  SourceUnsafeUnknown,
+				Wrapper: WrapperWitnessTableLookup,
+				Escape:  EscapeLocalUse,
+			},
 			outcome: OutcomeInvalidWitnessProvenancePromotion,
 		},
 	}
@@ -605,7 +940,12 @@ func TestMiniMemoryModelV11DynamicProtocolWitnessCases(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			got := Evaluate(test.input)
 			if got.Outcome != test.outcome || got.Valid != test.valid {
-				t.Fatalf("Evaluate() = %+v, want outcome %s valid %v", got, test.outcome, test.valid)
+				t.Fatalf(
+					"Evaluate() = %+v, want outcome %s valid %v",
+					got,
+					test.outcome,
+					test.valid,
+				)
 			}
 			if got.Reason == "" {
 				t.Fatalf("Evaluate() = %+v, want reviewable reason", got)

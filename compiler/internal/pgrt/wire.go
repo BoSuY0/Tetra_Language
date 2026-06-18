@@ -147,7 +147,14 @@ func AppendBind(dst []byte, portal string, statement string, values [][]byte) []
 	return AppendBindFormat(dst, portal, statement, nil, values, nil)
 }
 
-func AppendBindFormat(dst []byte, portal string, statement string, paramFormats []int16, values [][]byte, resultFormats []int16) []byte {
+func AppendBindFormat(
+	dst []byte,
+	portal string,
+	statement string,
+	paramFormats []int16,
+	values [][]byte,
+	resultFormats []int16,
+) []byte {
 	return appendTypedPayload(dst, 'B', func(payload []byte) []byte {
 		payload = appendCString(payload, portal)
 		payload = appendCString(payload, statement)
@@ -358,7 +365,12 @@ func Connect(ctx context.Context, rwc io.ReadWriteCloser, cfg StartupConfig) (*C
 	return conn, nil
 }
 
-func (c *Conn) Prepare(ctx context.Context, name string, query string, paramTypeOIDs []uint32) error {
+func (c *Conn) Prepare(
+	ctx context.Context,
+	name string,
+	query string,
+	paramTypeOIDs []uint32,
+) error {
 	if name != "" && c.prepared[name] {
 		return nil
 	}
@@ -398,7 +410,13 @@ func (c *Conn) ExecPrepared(ctx context.Context, name string, values [][]byte) (
 	return c.ExecPreparedFormat(ctx, name, nil, values, nil)
 }
 
-func (c *Conn) ExecPreparedFormat(ctx context.Context, name string, paramFormats []int16, values [][]byte, resultFormats []int16) (Result, error) {
+func (c *Conn) ExecPreparedFormat(
+	ctx context.Context,
+	name string,
+	paramFormats []int16,
+	values [][]byte,
+	resultFormats []int16,
+) (Result, error) {
 	var payload []byte
 	payload = AppendBindFormat(payload, "", name, paramFormats, values, resultFormats)
 	payload = AppendDescribePortal(payload, "")
@@ -410,11 +428,25 @@ func (c *Conn) ExecPreparedFormat(ctx context.Context, name string, paramFormats
 	return c.readQueryResult(ctx, "prepared query")
 }
 
-func (c *Conn) PreparedQuery(ctx context.Context, name string, query string, paramTypeOIDs []uint32, values [][]byte) (Result, error) {
+func (c *Conn) PreparedQuery(
+	ctx context.Context,
+	name string,
+	query string,
+	paramTypeOIDs []uint32,
+	values [][]byte,
+) (Result, error) {
 	return c.PreparedQueryFormat(ctx, name, query, paramTypeOIDs, nil, values, nil)
 }
 
-func (c *Conn) PreparedQueryFormat(ctx context.Context, name string, query string, paramTypeOIDs []uint32, paramFormats []int16, values [][]byte, resultFormats []int16) (Result, error) {
+func (c *Conn) PreparedQueryFormat(
+	ctx context.Context,
+	name string,
+	query string,
+	paramTypeOIDs []uint32,
+	paramFormats []int16,
+	values [][]byte,
+	resultFormats []int16,
+) (Result, error) {
 	if err := c.Prepare(ctx, name, query, paramTypeOIDs); err != nil {
 		return Result{}, err
 	}
@@ -502,32 +534,47 @@ func (c *Conn) readStartupReady(ctx context.Context, cfg StartupConfig) error {
 				}
 			case AuthCleartextPassword:
 				if cfg.Password == "" {
-					return fmt.Errorf("%w: cleartext password requested but no password configured", ErrUnsupportedAuth)
+					return fmt.Errorf(
+						"%w: cleartext password requested but no password configured",
+						ErrUnsupportedAuth,
+					)
 				}
 				if err := c.write(ctx, AppendPasswordMessage(nil, cfg.Password)); err != nil {
 					return err
 				}
 			case AuthSASL:
 				if cfg.Password == "" {
-					return fmt.Errorf("%w: SASL authentication requested but no password configured", ErrUnsupportedAuth)
+					return fmt.Errorf(
+						"%w: SASL authentication requested but no password configured",
+						ErrUnsupportedAuth,
+					)
 				}
 				mechanisms, err := DecodeAuthenticationSASL(frame.Payload[4:])
 				if err != nil {
 					return err
 				}
 				if !containsString(mechanisms, scramSHA256Mechanism) {
-					return fmt.Errorf("%w: server did not advertise SCRAM-SHA-256", ErrUnsupportedAuth)
+					return fmt.Errorf(
+						"%w: server did not advertise SCRAM-SHA-256",
+						ErrUnsupportedAuth,
+					)
 				}
 				scram, err = newSCRAMSHA256ClientWithRandomNonce(cfg.User, cfg.Password)
 				if err != nil {
 					return err
 				}
-				if err := c.write(ctx, AppendSASLInitialResponse(nil, scramSHA256Mechanism, []byte(scram.ClientFirstMessage()))); err != nil {
+				if err := c.write(
+					ctx,
+					AppendSASLInitialResponse(nil, scramSHA256Mechanism, []byte(scram.ClientFirstMessage())),
+				); err != nil {
 					return err
 				}
 			case AuthSASLContinue:
 				if scram == nil {
-					return fmt.Errorf("%w: SASLContinue before AuthenticationSASL", ErrUnexpectedMessage)
+					return fmt.Errorf(
+						"%w: SASLContinue before AuthenticationSASL",
+						ErrUnexpectedMessage,
+					)
 				}
 				final, err := scram.ClientFinalMessage(string(frame.Payload[4:]))
 				if err != nil {
@@ -538,7 +585,10 @@ func (c *Conn) readStartupReady(ctx context.Context, cfg StartupConfig) error {
 				}
 			case AuthSASLFinal:
 				if scram == nil {
-					return fmt.Errorf("%w: SASLFinal before AuthenticationSASL", ErrUnexpectedMessage)
+					return fmt.Errorf(
+						"%w: SASLFinal before AuthenticationSASL",
+						ErrUnexpectedMessage,
+					)
 				}
 				if err := scram.VerifyServerFinal(string(frame.Payload[4:])); err != nil {
 					return err

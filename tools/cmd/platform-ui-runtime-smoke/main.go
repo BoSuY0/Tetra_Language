@@ -23,7 +23,11 @@ type hostRuntime struct {
 func main() {
 	target := flag.String("target", "", "platform UI target")
 	reportPath := flag.String("report", "", "path to write platform UI report")
-	childRuntime := flag.Bool("child-runtime", false, "run hidden platform UI runtime child and write JSON evidence")
+	childRuntime := flag.Bool(
+		"child-runtime",
+		false,
+		"run hidden platform UI runtime child and write JSON evidence",
+	)
 	flag.Parse()
 	if *childRuntime {
 		if *target == "" {
@@ -134,7 +138,11 @@ func (processPlatformRuntimeRunner) Run(target string) (platformRuntimeRun, erro
 		BuildExitCode: exitCodeFromError(err),
 	}
 	if err != nil {
-		return result, fmt.Errorf("build platform UI runtime child: %w: %s", err, strings.TrimSpace(string(buildRaw)))
+		return result, fmt.Errorf(
+			"build platform UI runtime child: %w: %s",
+			err,
+			strings.TrimSpace(string(buildRaw)),
+		)
 	}
 	childArgs := []string{"--child-runtime", "--target", target}
 	childCmd := exec.Command(exePath, childArgs...)
@@ -205,7 +213,11 @@ func exitCodeFromError(err error) int {
 	return 1
 }
 
-func buildPlatformUIRuntimeReportWithRunner(target string, host hostRuntime, runner platformRuntimeRunner) (platformui.Report, int) {
+func buildPlatformUIRuntimeReportWithRunner(
+	target string,
+	host hostRuntime,
+	runner platformRuntimeRunner,
+) (platformui.Report, int) {
 	requiredGOOS, ok := requiredGOOSByTarget(target)
 	if !ok {
 		return platformui.Report{
@@ -220,7 +232,14 @@ func buildPlatformUIRuntimeReportWithRunner(target string, host hostRuntime, run
 		}, 2
 	}
 	if host.GOOS != requiredGOOS || host.GOARCH != "amd64" {
-		blocker := fmt.Sprintf("%s UI runtime production evidence requires a real %s/amd64 host or approved runner; current host is %s/%s", target, requiredGOOS, host.GOOS, host.GOARCH)
+		blocker := fmt.Sprintf(
+			("%s UI runtime production evidence requires a real %s/amd64 host " +
+				"or approved runner; current host is %s/%s"),
+			target,
+			requiredGOOS,
+			host.GOOS,
+			host.GOARCH,
+		)
 		return platformui.Report{
 			Schema:   platformui.SchemaV1,
 			Status:   "blocked",
@@ -255,7 +274,12 @@ func hostTriple(host hostRuntime) string {
 	return host.GOOS + "-" + host.GOARCH
 }
 
-func failedTargetHostRuntimeReport(target string, host string, run platformRuntimeRun, runErr error) platformui.Report {
+func failedTargetHostRuntimeReport(
+	target string,
+	host string,
+	run platformRuntimeRun,
+	runErr error,
+) platformui.Report {
 	return platformui.Report{
 		Schema:       platformui.SchemaV1,
 		Status:       "fail",
@@ -270,8 +294,22 @@ func failedTargetHostRuntimeReport(target string, host string, run platformRunti
 		Runner:       "target-host-runtime-child",
 		Blocker:      runErr.Error(),
 		Processes: []platformui.ProcessReport{
-			{Name: "compiler build", Kind: "build", Path: run.BuildPath, Ran: run.BuildPath != "", Pass: run.BuildExitCode == 0, ExitCode: intPtr(run.BuildExitCode)},
-			{Name: "platform UI app child", Kind: "app", Path: run.AppPath, Ran: run.AppPath != "", Pass: run.AppPath != "" && run.AppExitCode == 0, ExitCode: intPtr(run.AppExitCode)},
+			{
+				Name:     "compiler build",
+				Kind:     "build",
+				Path:     run.BuildPath,
+				Ran:      run.BuildPath != "",
+				Pass:     run.BuildExitCode == 0,
+				ExitCode: intPtr(run.BuildExitCode),
+			},
+			{
+				Name:     "platform UI app child",
+				Kind:     "app",
+				Path:     run.AppPath,
+				Ran:      run.AppPath != "",
+				Pass:     run.AppPath != "" && run.AppExitCode == 0,
+				ExitCode: intPtr(run.AppExitCode),
+			},
 		},
 	}
 }
@@ -290,17 +328,55 @@ func targetHostRuntimeReport(target string, run platformRuntimeRun) platformui.R
 		Source:       "tools/cmd/platform-ui-runtime-smoke",
 		Runner:       "target-host-runtime-child",
 		Processes: []platformui.ProcessReport{
-			{Name: "compiler build", Kind: "build", Path: run.BuildPath, Ran: true, Pass: true, ExitCode: intPtr(run.BuildExitCode)},
-			{Name: "platform UI app child", Kind: "app", Path: run.AppPath, Ran: true, Pass: true, ExitCode: intPtr(run.AppExitCode)},
-			{Name: "platform UI runtime loop", Kind: "runtime", Path: "child-runtime event loop", Ran: true, Pass: true, ExitCode: intPtr(0)},
-			{Name: "platform UI stress sweep", Kind: "stress", Path: "child-runtime stress sweep", Ran: true, Pass: true, ExitCode: intPtr(0)},
+			{
+				Name:     "compiler build",
+				Kind:     "build",
+				Path:     run.BuildPath,
+				Ran:      true,
+				Pass:     true,
+				ExitCode: intPtr(run.BuildExitCode),
+			},
+			{
+				Name:     "platform UI app child",
+				Kind:     "app",
+				Path:     run.AppPath,
+				Ran:      true,
+				Pass:     true,
+				ExitCode: intPtr(run.AppExitCode),
+			},
+			{
+				Name:     "platform UI runtime loop",
+				Kind:     "runtime",
+				Path:     "child-runtime event loop",
+				Ran:      true,
+				Pass:     true,
+				ExitCode: intPtr(0),
+			},
+			{
+				Name:     "platform UI stress sweep",
+				Kind:     "stress",
+				Path:     "child-runtime stress sweep",
+				Ran:      true,
+				Pass:     true,
+				ExitCode: intPtr(0),
+			},
 		},
 		Widgets: run.Evidence.Widgets,
 		Events:  run.Evidence.Events,
 		Cases:   run.Evidence.Cases,
 		Audit: []platformui.AuditReport{
-			{Requirement: "real platform runtime evidence", Artifact: "target-host-runtime child process", Evidence: "target-host child process executed runtime loop, widgets, events, and cases", Result: "pass"},
-			{Requirement: "reject runtime-less evidence", Artifact: "tools/validators/platformui", Evidence: "validator rejects runtime-less evidence", Result: "pass"},
+			{
+				Requirement: "real platform runtime evidence",
+				Artifact:    "target-host-runtime child process",
+				Evidence:    "target-host child process executed runtime loop, widgets, events, and cases",
+				Result:      "pass",
+			},
+			{
+				Requirement: "reject runtime-less evidence",
+				Artifact:    "tools/validators/platformui",
+				Evidence:    "validator rejects runtime-less evidence",
+				Result:      "pass",
+			},
 		},
 	}
 }
@@ -341,19 +417,102 @@ func runPlatformUIRuntimeChild(target string) childRuntimeEvidence {
 		"dirty":    "true",
 	}
 	widgets := []platformui.WidgetReport{
-		{ID: "AppWindow", Kind: "window", Enabled: true, Visible: true, Bounds: platformui.Bounds{Width: 640, Height: 480}},
-		{ID: "RootPanel", Kind: "panel", Enabled: true, Visible: true, Bounds: platformui.Bounds{Width: 624, Height: 464}},
-		{ID: "TitleText", Kind: "text", Enabled: true, Visible: true, Bounds: platformui.Bounds{Width: 608, Height: 32}},
-		{ID: "NameInput", Kind: "input", Enabled: true, Visible: true, Bounds: platformui.Bounds{Width: 608, Height: 32}},
-		{ID: "ItemList", Kind: "list", Enabled: true, Visible: true, Bounds: platformui.Bounds{Width: 608, Height: 240}},
-		{ID: "SaveButton", Kind: "button", Enabled: true, Visible: true, Bounds: platformui.Bounds{Width: 200, Height: 44}},
+		{
+			ID:      "AppWindow",
+			Kind:    "window",
+			Enabled: true,
+			Visible: true,
+			Bounds:  platformui.Bounds{Width: 640, Height: 480},
+		},
+		{
+			ID:      "RootPanel",
+			Kind:    "panel",
+			Enabled: true,
+			Visible: true,
+			Bounds:  platformui.Bounds{Width: 624, Height: 464},
+		},
+		{
+			ID:      "TitleText",
+			Kind:    "text",
+			Enabled: true,
+			Visible: true,
+			Bounds:  platformui.Bounds{Width: 608, Height: 32},
+		},
+		{
+			ID:      "NameInput",
+			Kind:    "input",
+			Enabled: true,
+			Visible: true,
+			Bounds:  platformui.Bounds{Width: 608, Height: 32},
+		},
+		{
+			ID:      "ItemList",
+			Kind:    "list",
+			Enabled: true,
+			Visible: true,
+			Bounds:  platformui.Bounds{Width: 608, Height: 240},
+		},
+		{
+			ID:      "SaveButton",
+			Kind:    "button",
+			Enabled: true,
+			Visible: true,
+			Bounds:  platformui.Bounds{Width: 200, Height: 44},
+		},
 	}
 	events := []platformui.EventReport{
-		dispatchEvent(1, "NameInput", "focus", "focusName", state, map[string]string{"focused": "NameInput"}, []platformui.OperationReport{{Kind: "focus"}}, []platformui.WidgetUpdateReport{{ID: "NameInput", Before: "blurred", After: "focused"}}),
-		dispatchEvent(2, "NameInput", "input", "setName", state, map[string]string{"name": "tetra-ui"}, []platformui.OperationReport{{Kind: "state_set"}}, []platformui.WidgetUpdateReport{{ID: "NameInput", Before: "tetra", After: "tetra-ui"}}),
-		dispatchEvent(3, "ItemList", "select", "selectItem", state, map[string]string{"selected": "item-2"}, []platformui.OperationReport{{Kind: "state_set"}}, []platformui.WidgetUpdateReport{{ID: "ItemList", Before: "item-1", After: "item-2"}}),
-		dispatchEvent(4, "SaveButton", "click", "saveAsync", state, map[string]string{"saved": "true"}, []platformui.OperationReport{{Kind: "async_command"}, {Kind: "redraw"}}, []platformui.WidgetUpdateReport{{ID: "TitleText", Before: "Editing", After: "Saved"}}),
-		dispatchEvent(5, "AppWindow", "tick", "timerTick", state, map[string]string{"dirty": "false"}, []platformui.OperationReport{{Kind: "timer_tick"}, {Kind: "redraw"}}, []platformui.WidgetUpdateReport{{ID: "TitleText", Before: "Saved", After: "Saved after timer"}}),
+		dispatchEvent(
+			1,
+			"NameInput",
+			"focus",
+			"focusName",
+			state,
+			map[string]string{"focused": "NameInput"},
+			[]platformui.OperationReport{{Kind: "focus"}},
+			[]platformui.WidgetUpdateReport{{ID: "NameInput", Before: "blurred", After: "focused"}},
+		),
+		dispatchEvent(
+			2,
+			"NameInput",
+			"input",
+			"setName",
+			state,
+			map[string]string{"name": "tetra-ui"},
+			[]platformui.OperationReport{{Kind: "state_set"}},
+			[]platformui.WidgetUpdateReport{{ID: "NameInput", Before: "tetra", After: "tetra-ui"}},
+		),
+		dispatchEvent(
+			3,
+			"ItemList",
+			"select",
+			"selectItem",
+			state,
+			map[string]string{"selected": "item-2"},
+			[]platformui.OperationReport{{Kind: "state_set"}},
+			[]platformui.WidgetUpdateReport{{ID: "ItemList", Before: "item-1", After: "item-2"}},
+		),
+		dispatchEvent(
+			4,
+			"SaveButton",
+			"click",
+			"saveAsync",
+			state,
+			map[string]string{"saved": "true"},
+			[]platformui.OperationReport{{Kind: "async_command"}, {Kind: "redraw"}},
+			[]platformui.WidgetUpdateReport{{ID: "TitleText", Before: "Editing", After: "Saved"}},
+		),
+		dispatchEvent(
+			5,
+			"AppWindow",
+			"tick",
+			"timerTick",
+			state,
+			map[string]string{"dirty": "false"},
+			[]platformui.OperationReport{{Kind: "timer_tick"}, {Kind: "redraw"}},
+			[]platformui.WidgetUpdateReport{
+				{ID: "TitleText", Before: "Saved", After: "Saved after timer"},
+			},
+		),
 	}
 	trace := []string{"platform-process-spawn:ok"}
 	var probeError string
@@ -395,18 +554,60 @@ func runPlatformUIRuntimeChild(target string) childRuntimeEvidence {
 			{Name: "layout measure and place", Kind: "positive", Ran: true, Pass: true},
 			{Name: "widget tree load", Kind: "positive", Ran: true, Pass: len(widgets) == 6},
 			{Name: "event loop dispatch", Kind: "positive", Ran: true, Pass: len(events) == 5},
-			{Name: "state binding update", Kind: "positive", Ran: true, Pass: state["name"] == "tetra-ui"},
+			{
+				Name: "state binding update",
+				Kind: "positive",
+				Ran:  true,
+				Pass: state["name"] == "tetra-ui",
+			},
 			{Name: "redraw update lifecycle", Kind: "positive", Ran: true, Pass: true},
-			{Name: "async UI command completion", Kind: "positive", Ran: true, Pass: state["saved"] == "true"},
-			{Name: "timer scheduled redraw", Kind: "positive", Ran: true, Pass: state["dirty"] == "false"},
-			{Name: "invalid widget diagnostic", Kind: "negative", Ran: true, Pass: true, ExpectedError: "unknown widget"},
-			{Name: "command failure recovery", Kind: "negative", Ran: true, Pass: true, ExpectedError: "unknown command"},
-			{Name: "crash error handling", Kind: "negative", Ran: true, Pass: true, ExpectedError: "runtime panic recovered"},
+			{
+				Name: "async UI command completion",
+				Kind: "positive",
+				Ran:  true,
+				Pass: state["saved"] == "true",
+			},
+			{
+				Name: "timer scheduled redraw",
+				Kind: "positive",
+				Ran:  true,
+				Pass: state["dirty"] == "false",
+			},
+			{
+				Name:          "invalid widget diagnostic",
+				Kind:          "negative",
+				Ran:           true,
+				Pass:          true,
+				ExpectedError: "unknown widget",
+			},
+			{
+				Name:          "command failure recovery",
+				Kind:          "negative",
+				Ran:           true,
+				Pass:          true,
+				ExpectedError: "unknown command",
+			},
+			{
+				Name:          "crash error handling",
+				Kind:          "negative",
+				Ran:           true,
+				Pass:          true,
+				ExpectedError: "runtime panic recovered",
+			},
 		},
 	}
 }
 
-func dispatchEvent(order int, widgetID string, event string, command string, state map[string]string, updates map[string]string, operations []platformui.OperationReport, widgetUpdates []platformui.WidgetUpdateReport) platformui.EventReport {
+func dispatchEvent(
+	order int,
+	widgetID string,
+	event string,
+	command string,
+	state map[string]string,
+	updates map[string]string,
+	operations []platformui.OperationReport,
+	widgetUpdates []platformui.WidgetUpdateReport,
+) platformui.EventReport {
 	before := map[string]string{}
 	after := map[string]string{}
 	for key, value := range updates {

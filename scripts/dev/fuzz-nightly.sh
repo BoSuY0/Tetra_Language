@@ -10,7 +10,7 @@ max_fuzztime_label="10m"
 fuzz_parallel_args=()
 
 usage() {
-  cat <<'USAGE'
+  cat << 'USAGE'
 Usage: bash scripts/dev/fuzz-nightly.sh [--short] [--fuzztime DURATION] [--out-dir DIR]
 
 Runs the bounded fuzz/property/stress nightly suite one package at a time and
@@ -42,7 +42,7 @@ while [[ $# -gt 0 ]]; do
       out_dir="$2"
       shift 2
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;
@@ -176,7 +176,7 @@ started_s="$(date +%s)"
 step_count=0
 failed_count=0
 mkdir -p -- "$logs_dir"
-: >"$tmp_dir/steps.jsonl"
+: > "$tmp_dir/steps.jsonl"
 
 cleanup() {
   rm -rf "$tmp_dir"
@@ -242,7 +242,7 @@ record_step_json() {
     "$seconds" \
     "$exit_code" \
     "$(json_escape "$command")" \
-    "$(json_escape "$log_rel")" >>"$tmp_dir/steps.jsonl"
+    "$(json_escape "$log_rel")" >> "$tmp_dir/steps.jsonl"
 }
 
 fuzz_inventory_roots=(
@@ -275,7 +275,7 @@ write_crasher_inventory_json() {
   local total_files_count=0
   local root
 
-  : >"$tmp_dir/inventory-roots.jsonl"
+  : > "$tmp_dir/inventory-roots.jsonl"
 
   for root in "${fuzz_inventory_roots[@]}"; do
     roots_count=$((roots_count + 1))
@@ -316,7 +316,7 @@ write_crasher_inventory_json() {
       "$root_targets" \
       "$root_corpus_files" \
       "$root_crasher_files" \
-      "$root_total_files" >>"$tmp_dir/inventory-roots.jsonl"
+      "$root_total_files" >> "$tmp_dir/inventory-roots.jsonl"
   done
 
   {
@@ -335,7 +335,7 @@ write_crasher_inventory_json() {
     printf '    "total_files": %s\n' "$total_files_count"
     echo '  }'
     echo "}"
-  } >"$crasher_inventory"
+  } > "$crasher_inventory"
 }
 
 write_summary_json() {
@@ -369,7 +369,7 @@ write_summary_json() {
     awk 'NR > 1 { printf ",\n" } { printf "    %s", $0 } END { if (NR > 0) printf "\n" }' "$tmp_dir/steps.jsonl"
     echo '  ]'
     echo "}"
-  } >"$summary_json"
+  } > "$summary_json"
 }
 
 {
@@ -383,7 +383,7 @@ write_summary_json() {
   echo "- unstable_seed_log: \`$unstable_seeds\`"
   echo
   echo "## Steps"
-} >"$summary"
+} > "$summary"
 
 {
   echo "# Unstable Fuzz Seeds"
@@ -395,7 +395,7 @@ write_summary_json() {
   echo
   echo "| package | fuzz target | seed/crasher path | status | owner | next command |"
   echo "| --- | --- | --- | --- | --- | --- |"
-} >"$unstable_seeds"
+} > "$unstable_seeds"
 
 failed=0
 run_step() {
@@ -411,17 +411,17 @@ run_step() {
   local start_s
   local end_s
   start_s="$(date +%s)"
-  if "$@" >"$log" 2>&1; then
+  if "$@" > "$log" 2>&1; then
     end_s="$(date +%s)"
     record_step_json "$name" "pass" "$((end_s - start_s))" 0 "$command" "$log_rel"
-    printf -- '- `%s`: pass, command `%s`, log `%s`\n' "$name" "$command" "$log" >>"$summary"
+    printf -- '- `%s`: pass, command `%s`, log `%s`\n' "$name" "$command" "$log" >> "$summary"
   else
     local code="$?"
     end_s="$(date +%s)"
     failed=$((failed + 1))
     failed_count=$((failed_count + 1))
     record_step_json "$name" "fail" "$((end_s - start_s))" "$code" "$command" "$log_rel"
-    printf -- '- `%s`: fail exit `%s`, command `%s`, log `%s`\n' "$name" "$code" "$command" "$log" >>"$summary"
+    printf -- '- `%s`: fail exit `%s`, command `%s`, log `%s`\n' "$name" "$code" "$command" "$log" >> "$summary"
     tail -n 80 "$log" >&2 || true
   fi
 }

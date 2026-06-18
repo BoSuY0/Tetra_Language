@@ -7,7 +7,7 @@ report_dir=""
 check_timeout="${SURFACE_UI_TRUTH_AUDIT_TIMEOUT:-20}"
 
 usage() {
-  cat <<'USAGE'
+  cat << 'USAGE'
 Usage: bash scripts/analysis/surface-ui-truth-audit.sh --report-dir DIR
 
 Collects reproducible Surface/UI production truth-audit evidence. This script is
@@ -34,7 +34,7 @@ while [[ $# -gt 0 ]]; do
       report_dir="$2"
       shift 2
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;
@@ -57,7 +57,7 @@ fi
 if [[ "$report_dir" == "." || "$report_dir" == "./" ]]; then
   reject_report_dir "repo root is not an audit report directory"
 fi
-IFS='/' read -r -a report_parts <<<"$report_dir"
+IFS='/' read -r -a report_parts <<< "$report_dir"
 for part in "${report_parts[@]}"; do
   if [[ "$part" == ".." ]]; then
     reject_report_dir "parent traversal is not accepted ($report_dir)"
@@ -95,37 +95,37 @@ summary="$report_path/truth-summary.md"
 checks_tsv="$report_path/checks.tsv"
 gate_runs_dir="$report_path/gate-runs"
 
-: >"$focused_log"
-: >"$gates_log"
-: >"$validators_log"
-: >"$checks_tsv"
+: > "$focused_log"
+: > "$gates_log"
+: > "$validators_log"
+: > "$checks_tsv"
 mkdir -p "$gate_runs_dir"
 
 {
   echo "# Surface/UI grep index"
   echo
   rg -n --no-heading 'Surface|surface|UI|ui|Draw|draw|Accessibility|TextBox|wasm32-web|linux-x64' \
-    lib compiler tools scripts docs examples .github 2>/dev/null | head -n 800 || true
-} >"$rg_index"
+    lib compiler tools scripts docs examples .github 2> /dev/null | head -n 800 || true
+} > "$rg_index"
 
 {
   echo "# Surface/UI script index"
   echo
   find scripts/release/surface scripts/release/safe-view-lifetime scripts/ci .github/workflows \
-    -maxdepth 3 -type f -print 2>/dev/null | LC_ALL=C sort || true
-} >"$script_index"
+    -maxdepth 3 -type f -print 2> /dev/null | LC_ALL=C sort || true
+} > "$script_index"
 
 {
   echo "# Surface/UI tool index"
   echo
-  rg --files tools/cmd tools/validators 2>/dev/null | rg 'surface|wasm-import|artifact-hashes|api-docs|manifest|docs' || true
-} >"$tool_index"
+  rg --files tools/cmd tools/validators 2> /dev/null | rg 'surface|wasm-import|artifact-hashes|api-docs|manifest|docs' || true
+} > "$tool_index"
 
 {
   echo "# Surface/UI example index"
   echo
-  rg --files examples 2>/dev/null | rg 'surface_.*[.]tetra$' || true
-} >"$example_index"
+  rg --files examples 2> /dev/null | rg 'surface_.*[.]tetra$' || true
+} > "$example_index"
 
 format_command() {
   local formatted=""
@@ -165,17 +165,17 @@ run_check() {
   local command
   command="$(format_command "$@")"
   mkdir -p "$(dirname "$log")" "$report_path"
-  : >>"$log"
+  : >> "$log"
   {
     echo "== $name =="
     echo "command: $command"
-  } >>"$log"
+  } >> "$log"
 
   local code=0
-  if command -v timeout >/dev/null 2>&1; then
-    timeout --kill-after=2s "${check_timeout}s" "$@" >>"$log" 2>&1 || code="$?"
+  if command -v timeout > /dev/null 2>&1; then
+    timeout --kill-after=2s "${check_timeout}s" "$@" >> "$log" 2>&1 || code="$?"
   else
-    "$@" >>"$log" 2>&1 || code="$?"
+    "$@" >> "$log" 2>&1 || code="$?"
   fi
 
   local status="PASS"
@@ -183,11 +183,11 @@ run_check() {
     status="$(status_for_failure "$code" "$log")"
   fi
   mkdir -p "$(dirname "$log")" "$report_path"
-  : >>"$log"
-  : >>"$checks_tsv"
-  printf '%s\t%s\t%s\t%s\n' "$category" "$name" "$status" "$command" >>"$checks_tsv"
-  echo "status: $status (exit $code)" >>"$log"
-  echo >>"$log"
+  : >> "$log"
+  : >> "$checks_tsv"
+  printf '%s\t%s\t%s\t%s\n' "$category" "$name" "$status" "$command" >> "$checks_tsv"
+  echo "status: $status (exit $code)" >> "$log"
+  echo >> "$log"
 }
 
 run_check "focused" "surface validators package" "$focused_log" \
@@ -231,7 +231,7 @@ skipped_count="$(awk -F '\t' '$3 == "SKIPPED" { count++ } END { print count + 0 
   echo
   echo "- production_ready_claim: false"
   echo "- report_dir: \`$report_dir\`"
-  echo "- git_head: \`$(git rev-parse HEAD 2>/dev/null || echo unknown)\`"
+  echo "- git_head: \`$(git rev-parse HEAD 2> /dev/null || echo unknown)\`"
   echo "- git_available: $([[ -d .git || -f .git ]] && echo true || echo false)"
   echo "- generated_at_utc: \`$(date -u +%Y-%m-%dT%H:%M:%SZ)\`"
   echo "- pass_count: \`$pass_count\`"
@@ -262,7 +262,7 @@ skipped_count="$(awk -F '\t' '$3 == "SKIPPED" { count++ } END { print count + 0 
   echo "| category | name | status | command |"
   echo "| --- | --- | --- | --- |"
   awk -F '\t' '{ printf "| `%s` | `%s` | `%s` | `%s` |\n", $1, $2, $3, $4 }' "$checks_tsv"
-} >"$summary"
+} > "$summary"
 
 echo "Surface/UI truth audit summary: $summary"
 echo "production_ready_claim: false"

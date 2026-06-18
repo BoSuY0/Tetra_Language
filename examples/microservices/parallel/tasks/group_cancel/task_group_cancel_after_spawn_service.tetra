@@ -1,0 +1,30 @@
+// Task group cancel-after-spawn microservice smoke.
+//
+// The service starts a sleeping grouped typed task, cancels the group, and
+// verifies the cooperative stopped payload path.
+module examples.microservices.parallel.tasks.group_cancel.task_group_cancel_after_spawn_service
+enum GroupErr:
+    case stopped
+    case code(Int)
+
+func worker() -> Int throws GroupErr
+uses runtime:
+    let _sleep: Int = core.sleep_ms(5)
+    return 99
+
+func main() -> Int
+uses runtime:
+    var group: task.group = core.task_group_open()
+    let task = core.task_spawn_group_i32_typed<GroupErr>(group, "worker")
+    group = core.task_group_cancel(group)
+    let status: Int = catch core.task_join_group_i32_typed<GroupErr>(task):
+    case GroupErr.stopped:
+        42
+    case GroupErr.code(code):
+        code
+    let close_error: Int = core.task_group_close(group)
+    if close_error != 0:
+        return 10 + close_error
+    if status == 42:
+        return 0
+    return status

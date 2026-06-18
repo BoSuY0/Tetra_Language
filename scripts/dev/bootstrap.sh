@@ -8,7 +8,7 @@ cd "$repo_root"
 release_artifact="tetra.release.v0_4_0.bootstrap-binaries.v1"
 
 usage() {
-  cat <<'USAGE'
+  cat << 'USAGE'
 Usage: bash scripts/dev/bootstrap.sh
 
 Builds local CLI binaries:
@@ -19,7 +19,7 @@ USAGE
 
 if [[ $# -gt 0 ]]; then
   case "$1" in
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;

@@ -12,7 +12,7 @@ recorded in the 2026-05-20 closure row under Microservice Bug-Hunt Runs.
 
 - Status: fixed, verified.
 - Area: compiler / generic monomorphization.
-- Found while creating: `examples/microservices/compiler_pipeline_service.tetra`.
+- Found while creating: `examples/microservices/compiler/pipeline/compiler_pipeline_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -48,7 +48,7 @@ return id(v)
 - Status: fixed, verified.
 - Area: compiler / module-aware extension method resolution.
 - Found while creating:
-  `examples/microservices/compiler_artifact_router_service.tetra`.
+  `examples/microservices/compiler/pipeline/compiler_artifact_router_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -90,7 +90,7 @@ go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/out" "$tmp/app/main.tet
 
 - Status: fixed, verified.
 - Area: compiler / callable metadata propagation for enum payload constructors.
-- Found while creating: `examples/microservices/callable_router_service.tetra`.
+- Found while creating: `examples/microservices/compiler/callables/callable_router_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -139,7 +139,7 @@ let route: Route = Route.direct(field_cb)
 
 - Status: fixed, verified.
 - Area: formatter / callable metadata preservation.
-- Found while creating: `examples/microservices/callable_router_service.tetra`.
+- Found while creating: `examples/microservices/compiler/callables/callable_router_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -185,7 +185,7 @@ go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/app" "$tmp/callable_ali
 
 - Status: fixed, verified.
 - Area: compiler / module-aware actor entrypoint resolution.
-- Found while creating: `examples/microservices/actor_deadline_router_service.tetra`.
+- Found while creating: `examples/microservices/actor/core/actor_deadline_router_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -256,7 +256,7 @@ go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/app" "$tmp/global_fn_fo
 - Status: fixed, verified.
 - Area: runtime memory / derived pointer provenance.
 - Found while creating:
-  `examples/microservices/memory_copy_window_service.tetra`.
+  `examples/microservices/memory/misc/state/memory_copy_window_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -298,7 +298,7 @@ let dst_one: ptr = core.ptr_add(base, 9, memory_cap)
 - Status: fixed, verified.
 - Area: formatter / actor state declarations.
 - Found while creating:
-  `examples/microservices/actor_state_counter_service.tetra`.
+  `examples/microservices/actor/state/actor_state_counter_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -338,7 +338,7 @@ go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/formatted" "$tmp/actor_
 - Status: fixed, verified.
 - Area: actor runtime / blocking tagged receive scheduler path.
 - Found while creating:
-  `examples/microservices/actor_dual_mailbox_service.tetra`.
+  `examples/microservices/actor/mailbox/actor_dual_mailbox_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -393,7 +393,7 @@ go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/app" "$tmp/dual_blockin
 - Status: fixed, verified.
 - Area: actor runtime / blocking value receive scheduler path.
 - Found while creating:
-  `examples/microservices/actor_dual_value_mailbox_service.tetra`.
+  `examples/microservices/actor/mailbox/actor_dual_value_mailbox_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -484,7 +484,7 @@ return MaybeBox(value: maybe)
 - Status: fixed, verified.
 - Area: compiler / enum constructor optional coercion.
 - Found while creating:
-  `examples/microservices/optional_enum_router_service.tetra`.
+  `examples/microservices/compiler/optionals/optional_enum_router_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -532,7 +532,7 @@ return Route.ready(maybe)
 - Status: fixed, verified.
 - Area: runtime memory / derived pointer provenance across function calls.
 - Found while creating:
-  `examples/microservices/memory_derived_copy_service.tetra`.
+  `examples/microservices/memory/base_ptrs/derived/memory_derived_copy_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -671,7 +671,7 @@ go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/app-bin" "$tmp/app/main
 - Status: fixed, verified.
 - Area: compiler / match payload binding scope.
 - Found while creating:
-  `examples/microservices/actor_typed_chain_service.tetra`.
+  `examples/microservices/actor/typed/actor_typed_chain_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -716,7 +716,7 @@ go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/app" "$tmp/match_case_d
 - Status: fixed, verified.
 - Area: runtime memory / pointer table provenance.
 - Found while creating:
-  `examples/microservices/memory_derived_ptr_table_service.tetra`.
+  `examples/microservices/memory/base_ptrs/derived/memory_derived_ptr_table_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -754,7 +754,7 @@ go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/app" "$tmp/derived_ptr_
 - Status: fixed, verified.
 - Area: runtime memory / struct pointer-field provenance.
 - Found while creating:
-  `examples/microservices/memory_aggregate_ptr_service.tetra`.
+  `examples/microservices/memory/base_ptrs/core/memory_aggregate_ptr_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -810,7 +810,7 @@ go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/app" "$tmp/struct_base_
 - Status: fixed, verified.
 - Area: runtime memory / enum pointer-payload provenance.
 - Found while creating:
-  `examples/microservices/memory_aggregate_ptr_service.tetra`.
+  `examples/microservices/memory/base_ptrs/core/memory_aggregate_ptr_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -853,7 +853,7 @@ go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/app" "$tmp/enum_derived
 - Status: fixed, verified.
 - Area: compiler / generic monomorphization / function-typed values.
 - Found while creating:
-  `examples/microservices/compiler_callable_generic_route_service.tetra`.
+  `examples/microservices/compiler/callables/compiler_callable_generic_route_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -891,7 +891,7 @@ go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/app" "$tmp/generic_fn_i
 - Status: fixed, verified.
 - Area: runtime memory / optional pointer-payload provenance.
 - Found while creating:
-  `examples/microservices/memory_optional_ptr_service.tetra`.
+  `examples/microservices/memory/optional/pointers/memory_optional_ptr_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -928,7 +928,7 @@ go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/app" "$tmp/optional_der
 - Status: fixed, verified.
 - Area: compiler / generic monomorphization / callback parameters.
 - Found while creating:
-  `examples/microservices/compiler_callable_generic_route_service.tetra`.
+  `examples/microservices/compiler/callables/compiler_callable_generic_route_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -969,7 +969,7 @@ go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/app" "$tmp/generic_call
 - Status: fixed, verified.
 - Area: runtime memory / function return pointer provenance.
 - Found while creating:
-  `examples/microservices/memory_function_ptr_service.tetra`.
+  `examples/microservices/memory/base_ptrs/helpers/memory_function_ptr_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -1014,7 +1014,7 @@ go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/app" "$tmp/function_der
 - Status: fixed, verified.
 - Area: runtime memory / global pointer provenance.
 - Found while creating:
-  `examples/microservices/memory_global_state_service.tetra`.
+  `examples/microservices/memory/misc/state/memory_global_state_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -1053,7 +1053,7 @@ go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/app" "$tmp/global_base_
 - Status: fixed, verified.
 - Area: runtime memory / pointer arithmetic with global scalar operands.
 - Found while creating:
-  `examples/microservices/memory_global_state_service.tetra`.
+  `examples/microservices/memory/misc/state/memory_global_state_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -1089,7 +1089,7 @@ go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/app" "$tmp/global_offse
 - Status: fixed, verified.
 - Area: runtime memory / mutable local pointer provenance.
 - Found while creating:
-  `examples/microservices/memory_mutable_ptr_service.tetra`.
+  `examples/microservices/memory/misc/ops/memory_mutable_ptr_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -1126,7 +1126,7 @@ go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/app" "$tmp/local_var_de
 - Status: fixed, verified.
 - Area: runtime memory / pointer arithmetic with struct-field scalar operands.
 - Found while creating:
-  `examples/microservices/memory_struct_offset_service.tetra`.
+  `examples/microservices/memory/misc/offsets/memory_struct_offset_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -1172,7 +1172,7 @@ go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/app" "$tmp/struct_offse
 - Status: fixed, verified.
 - Area: runtime memory / pointer arithmetic with call-expression operands.
 - Found while creating:
-  `examples/microservices/memory_function_offset_service.tetra`.
+  `examples/microservices/memory/misc/offsets/memory_function_offset_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -1214,7 +1214,7 @@ go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/app" "$tmp/function_ret
 - Status: fixed, verified.
 - Area: runtime memory / pointer arithmetic with computed scalar operands.
 - Found while creating:
-  `examples/microservices/memory_expression_offset_service.tetra`.
+  `examples/microservices/memory/misc/offsets/memory_expression_offset_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -1257,8 +1257,8 @@ go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/app" "$tmp/expression_o
 - Status: fixed, verified.
 - Area: runtime memory / actor-task result field operands.
 - Found while creating:
-  `examples/microservices/memory_task_result_offset_service.tetra` and
-  `examples/microservices/memory_actor_message_offset_service.tetra`.
+  `examples/microservices/memory/tasks/results/memory_task_result_offset_service.tetra` and
+  `examples/microservices/memory/actor_offsets/core/memory_actor_message_offset_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -1386,7 +1386,7 @@ go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/app" "$tmp/generic_stru
 - Area: runtime memory / pointer arithmetic with indexed and metadata scalar
   operands.
 - Found while creating:
-  `examples/microservices/memory_indexed_metadata_offset_service.tetra`.
+  `examples/microservices/memory/misc/offsets/memory_indexed_metadata_offset_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -1427,7 +1427,7 @@ go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/app" "$tmp/slice_offset
 - Status: fixed, verified.
 - Area: compiler / typed task handle type checking / payload error enums.
 - Found while creating:
-  `examples/microservices/parallel_typed_task_payload_handle_service.tetra`.
+  `examples/microservices/parallel/typed_task/parallel_typed_task_payload_handle_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -1479,7 +1479,7 @@ go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/app" "$tmp/typed_payloa
 - Status: fixed, verified.
 - Area: runtime memory / pointer arithmetic with non-local base operands.
 - Found while creating:
-  `examples/microservices/memory_direct_base_offset_service.tetra`.
+  `examples/microservices/memory/base_ptrs/core/memory_direct_base_offset_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -1517,7 +1517,7 @@ go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/app" "$tmp/direct_alloc
 - Status: fixed, verified.
 - Area: actor runtime / typed actor mailbox / enum message type safety.
 - Found while creating:
-  `examples/microservices/actor_typed_envelope_service.tetra`.
+  `examples/microservices/actor/typed/actor_typed_envelope_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -1578,7 +1578,7 @@ go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/app" "$tmp/typed_actor_
 - Status: fixed, verified.
 - Area: typed errors / catch lowering / raw pointer provenance.
 - Found while creating:
-  `examples/microservices/memory_typed_error_ptr_base_service.tetra`.
+  `examples/microservices/memory/typed_errors/core/memory_typed_error_ptr_base_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -1709,7 +1709,7 @@ go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/app" "$tmp/inout_writeb
 - Area: runtime memory / derived pointer provenance with looped dynamic
   offsets.
 - Found while creating:
-  `examples/microservices/memory_dynamic_base_offset_service.tetra`.
+  `examples/microservices/memory/base_ptrs/core/memory_dynamic_base_offset_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -1797,7 +1797,7 @@ go run ./cli/cmd/tetra build --runtime=selfhost --target linux-x64 -o "$tmp/app"
 - Status: fixed, verified.
 - Area: compiler / pattern binding scopes / local-name tracking.
 - Found while creating:
-  `examples/microservices/compiler_pattern_binding_unique_service.tetra`.
+  `examples/microservices/compiler/pipeline/compiler_pattern_binding_unique_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -1838,7 +1838,7 @@ go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/app" "$tmp/iflet_bindin
 - Status: fixed, verified.
 - Area: stdlib memory helpers / runtime memory / derived pointer provenance.
 - Found while creating:
-  `examples/microservices/memory_base_dynamic_copy_service.tetra`.
+  `examples/microservices/memory/base_ptrs/derived/memory_base_dynamic_copy_service.tetra`.
 - Reproduction command, run from the project root:
 
 ```sh
@@ -2247,7 +2247,7 @@ go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/app" "$tmp/island_wrap_
 - Status: fixed, verified.
 - Area: compiler / callable lowering / optional returns.
 - Found while creating:
-  `examples/microservices/memory_callable_optional_ptr_service.tetra`.
+  `examples/microservices/memory/optional/pointers/memory_callable_optional_ptr_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -2342,7 +2342,7 @@ go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/app" "$tmp/generic_fiel
 - Status: fixed, verified.
 - Area: compiler / runtime symbol collection / match expressions / typed tasks.
 - Found while creating:
-  `examples/microservices/parallel_typed_task_match_catch_service.tetra`.
+  `examples/microservices/parallel/typed_task/parallel_typed_task_match_catch_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -2445,7 +2445,7 @@ go run ./cli/cmd/tetra run "$tmp/match_catch_format.tetra"
 - Status: fixed, verified.
 - Area: formatter / nested expressions / match inside catch.
 - Found while creating:
-  `examples/microservices/memory_typed_task_error_nested_enum_offset_service.tetra`.
+  `examples/microservices/memory/typed_errors/tasks/memory_typed_task_error_nested_enum_offset_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -2753,8 +2753,8 @@ uses mem:
 - Area: tooling / Go workspace module configuration.
 - Found while verifying backend web-stack microservice and TechEmpower-adjacent
   bug-hunt tests after adding:
-  `examples/microservices/backend_http_pipeline_gateway_service.tetra` and
-  `examples/microservices/backend_postgres_prepared_pipeline_service.tetra`.
+  `examples/microservices/backend/http/writer/backend_http_pipeline_gateway_service.tetra` and
+  `examples/microservices/backend/postgres/protocol/backend_postgres_prepared_pipeline_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -2792,7 +2792,7 @@ go list -m all
 - Status: fixed, verified.
 - Area: compiler / native backend slice allocation.
 - Found while creating:
-  `examples/microservices/backend_time_collection_window_service.tetra`.
+  `examples/microservices/backend/time/backend_time_collection_window_service.tetra`.
 - Reproduction command:
 
 ```sh
@@ -2873,11 +2873,11 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/projects/dogfood_cli/src/
 - Status: fixed, verified.
 - Area: stdlib / backend HTTP helpers.
 - Found while creating:
-  `examples/microservices/backend_http_status_matrix_service.tetra`.
+  `examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra
 ```
 
 - Expected: `lib.core.http.request_keep_alive(...)` and
@@ -2899,7 +2899,7 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_htt
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 ```
@@ -2909,11 +2909,11 @@ go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend HTTP helpers.
 - Found while creating:
-  `examples/microservices/backend_http_header_whitespace_service.tetra`.
+  `examples/microservices/backend/http/headers/backend_http_header_whitespace_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_whitespace_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/headers/backend_http_header_whitespace_service.tetra
 ```
 
 - Expected: `lib.core.http.request_keep_alive(...)` and
@@ -2933,8 +2933,8 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_htt
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_whitespace_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/headers/backend_http_header_whitespace_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 ```
@@ -2944,11 +2944,11 @@ go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend HTTP helpers.
 - Found while creating:
-  `examples/microservices/backend_http_connection_list_service.tetra`.
+  `examples/microservices/backend/http/connection/backend_http_connection_list_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_list_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_list_service.tetra
 ```
 
 - Expected: `lib.core.http.request_keep_alive(...)` and
@@ -2970,9 +2970,9 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_htt
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_list_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_whitespace_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_list_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/headers/backend_http_header_whitespace_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 ```
@@ -2982,11 +2982,11 @@ go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend HTTP helpers.
 - Found while creating:
-  `examples/microservices/backend_http_connection_scope_service.tetra`.
+  `examples/microservices/backend/http/connection/backend_http_connection_scope_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_scope_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_scope_service.tetra
 ```
 
 - Expected: `lib.core.http.request_keep_alive(...)` and
@@ -3007,10 +3007,10 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_htt
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_scope_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_list_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_whitespace_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_scope_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_list_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/headers/backend_http_header_whitespace_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 ```
@@ -3020,11 +3020,11 @@ go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend HTTP helpers.
 - Found while creating:
-  `examples/microservices/backend_http_connection_token_boundary_service.tetra`.
+  `examples/microservices/backend/http/connection/backend_http_connection_token_boundary_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_token_boundary_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_token_boundary_service.tetra
 ```
 
 - Expected: `lib.core.http.request_keep_alive(...)` and
@@ -3045,11 +3045,11 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_htt
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_token_boundary_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_scope_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_list_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_whitespace_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_token_boundary_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_scope_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_list_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/headers/backend_http_header_whitespace_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 ```
@@ -3059,11 +3059,11 @@ go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend HTTP helpers.
 - Found while creating:
-  `examples/microservices/backend_http_version_scope_service.tetra`.
+  `examples/microservices/backend/http/response/backend_http_version_scope_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_version_scope_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_version_scope_service.tetra
 ```
 
 - Expected: `lib.core.http.route_tech_empower(...)` and
@@ -3085,12 +3085,12 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_htt
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_version_scope_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_token_boundary_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_scope_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_list_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_whitespace_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_version_scope_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_token_boundary_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_scope_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_list_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/headers/backend_http_header_whitespace_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 ```
@@ -3100,11 +3100,11 @@ go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend HTTP helpers.
 - Found while creating:
-  `examples/microservices/backend_http_request_target_guard_service.tetra`.
+  `examples/microservices/backend/http/request/backend_http_request_target_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_target_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_target_guard_service.tetra
 ```
 
 - Expected: `lib.core.http.route_tech_empower(...)` and
@@ -3124,10 +3124,10 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_htt
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_target_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_pipeline_gateway_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_version_scope_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_target_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/writer/backend_http_pipeline_gateway_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_response_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_version_scope_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 ```
@@ -3137,11 +3137,11 @@ go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend HTTP helpers.
 - Found while creating:
-  `examples/microservices/backend_http_request_line_token_guard_service.tetra`.
+  `examples/microservices/backend/http/request/backend_http_request_line_token_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_line_token_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_line_token_guard_service.tetra
 ```
 
 - Expected: `lib.core.http.route_tech_empower(...)`,
@@ -3163,10 +3163,10 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_htt
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_line_token_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_target_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_version_scope_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_pipeline_gateway_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_line_token_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_target_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_version_scope_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/writer/backend_http_pipeline_gateway_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 ```
@@ -3176,11 +3176,11 @@ go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend HTTP helpers.
 - Found while creating:
-  `examples/microservices/backend_http_keep_alive_target_guard_service.tetra`.
+  `examples/microservices/backend/http/connection/backend_http_keep_alive_target_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_keep_alive_target_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_keep_alive_target_guard_service.tetra
 ```
 
 - Expected: `lib.core.http.request_keep_alive(...)` and
@@ -3200,11 +3200,11 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_htt
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_keep_alive_target_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_target_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_line_token_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_version_scope_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_pipeline_gateway_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_keep_alive_target_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_target_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_line_token_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_version_scope_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/writer/backend_http_pipeline_gateway_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 ```
@@ -3214,11 +3214,11 @@ go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend HTTP helpers.
 - Found while creating:
-  `examples/microservices/backend_http_connection_body_scope_service.tetra`.
+  `examples/microservices/backend/http/connection/backend_http_connection_body_scope_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_body_scope_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_body_scope_service.tetra
 ```
 
 - Expected: `lib.core.http.contains_connection_close(...)` and
@@ -3238,12 +3238,12 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_htt
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_body_scope_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_token_boundary_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_scope_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_list_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_whitespace_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_body_scope_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_token_boundary_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_scope_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_list_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/headers/backend_http_header_whitespace_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 ```
@@ -3253,11 +3253,11 @@ go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend HTTP helpers.
 - Found while creating:
-  `examples/microservices/backend_http_keep_alive_method_guard_service.tetra`.
+  `examples/microservices/backend/http/connection/backend_http_keep_alive_method_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_keep_alive_method_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_keep_alive_method_guard_service.tetra
 ```
 
 - Expected: `lib.core.http.request_keep_alive(...)` and
@@ -3276,11 +3276,11 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_htt
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_keep_alive_method_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_keep_alive_target_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_line_token_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_version_scope_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_pipeline_gateway_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_keep_alive_method_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_keep_alive_target_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_line_token_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_version_scope_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/writer/backend_http_pipeline_gateway_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 ```
@@ -3290,11 +3290,11 @@ go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend JSON helpers.
 - Found while creating:
-  `examples/microservices/backend_json_hex_digit_guard_service.tetra`.
+  `examples/microservices/backend/json/backend_json_hex_digit_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_hex_digit_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/json/backend_json_hex_digit_guard_service.tetra
 ```
 
 - Expected: public `lib.core.json.hex_digit_lower(...)` should always return
@@ -3313,9 +3313,9 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_jso
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_hex_digit_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_control_matrix_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_escape_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/json/backend_json_hex_digit_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/json/backend_json_control_matrix_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/json/backend_json_escape_guard_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 go test ./compiler/internal/jsonrt -count=1
 ```
@@ -3325,11 +3325,11 @@ go test ./compiler/internal/jsonrt -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend time helpers.
 - Found while creating:
-  `examples/microservices/backend_time_overflow_guard_service.tetra`.
+  `examples/microservices/backend/time/backend_time_overflow_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_time_overflow_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/time/backend_time_overflow_guard_service.tetra
 ```
 
 - Expected: duration helpers should keep non-negative duration arithmetic
@@ -3351,8 +3351,8 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_tim
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_time_overflow_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_time_collection_window_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/time/backend_time_overflow_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/time/backend_time_collection_window_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -3361,11 +3361,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend PostgreSQL wire helpers.
 - Found while creating:
-  `examples/microservices/backend_postgres_cstring_bounds_guard_service.tetra`.
+  `examples/microservices/backend/postgres/protocol/backend_postgres_cstring_bounds_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_cstring_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_cstring_bounds_guard_service.tetra
 ```
 
 - Expected: `lib.core.postgres.cstring_end_at(...)` should return `-1` for
@@ -3382,9 +3382,9 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_pos
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_cstring_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_session_state_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_cstring_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_session_state_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_result_guard_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -3393,11 +3393,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend PostgreSQL wire helpers.
 - Found while creating:
-  `examples/microservices/backend_postgres_data_row_length_guard_service.tetra`.
+  `examples/microservices/backend/postgres/row/backend_postgres_data_row_length_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_length_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_data_row_length_guard_service.tetra
 ```
 
 - Expected: PostgreSQL signed DataRow length helpers should normalize any
@@ -3417,9 +3417,9 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_pos
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_length_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_cstring_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_data_row_length_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_result_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_cstring_bounds_guard_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -3428,11 +3428,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend PostgreSQL wire helpers.
 - Found while creating:
-  `examples/microservices/backend_postgres_ascii_i32_bounds_guard_service.tetra`.
+  `examples/microservices/backend/postgres/ascii/backend_postgres_ascii_i32_bounds_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/ascii/backend_postgres_ascii_i32_bounds_guard_service.tetra
 ```
 
 - Expected: `lib.core.postgres.parse_ascii_i32_at(...)` should return `0` for
@@ -3450,9 +3450,9 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_pos
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_length_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/ascii/backend_postgres_ascii_i32_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_result_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_data_row_length_guard_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -3461,11 +3461,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend PostgreSQL wire helpers.
 - Found while creating:
-  `examples/microservices/backend_postgres_command_tag_bounds_guard_service.tetra`.
+  `examples/microservices/backend/postgres/command/backend_postgres_command_tag_bounds_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/command/backend_postgres_command_tag_bounds_guard_service.tetra
 ```
 
 - Expected: `lib.core.postgres.command_complete_affected_rows(...)` should
@@ -3485,9 +3485,9 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_pos
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/command/backend_postgres_command_tag_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_result_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/ascii/backend_postgres_ascii_i32_bounds_guard_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -3496,11 +3496,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend PostgreSQL wire helpers.
 - Found while creating:
-  `examples/microservices/backend_postgres_row_description_bounds_guard_service.tetra`.
+  `examples/microservices/backend/postgres/row/backend_postgres_row_description_bounds_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_row_description_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_row_description_bounds_guard_service.tetra
 ```
 
 - Expected: `lib.core.postgres.row_description_type_oid_at(...)` should return
@@ -3520,9 +3520,9 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_pos
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_row_description_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_row_description_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_result_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/command/backend_postgres_command_tag_bounds_guard_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -3531,11 +3531,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend PostgreSQL wire helpers.
 - Found while creating:
-  `examples/microservices/backend_postgres_data_row_bounds_guard_service.tetra`.
+  `examples/microservices/backend/postgres/row/backend_postgres_data_row_bounds_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_data_row_bounds_guard_service.tetra
 ```
 
 - Expected: `lib.core.postgres.data_row_value_len_at(...)` and
@@ -3555,10 +3555,10 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_pos
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_length_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_row_description_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_data_row_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_result_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_data_row_length_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_row_description_bounds_guard_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -3567,11 +3567,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend PostgreSQL wire helpers.
 - Found while creating:
-  `examples/microservices/backend_postgres_frame_header_bounds_guard_service.tetra`.
+  `examples/microservices/backend/postgres/frame/backend_postgres_frame_header_bounds_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_header_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_header_bounds_guard_service.tetra
 ```
 
 - Expected: `lib.core.postgres.frame_type_at(...)` and
@@ -3594,10 +3594,10 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_pos
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_header_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_header_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_result_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_data_row_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/command/backend_postgres_command_tag_bounds_guard_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -3606,11 +3606,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend PostgreSQL wire helpers.
 - Found while creating:
-  `examples/microservices/backend_postgres_ready_status_bounds_guard_service.tetra`.
+  `examples/microservices/backend/postgres/read/backend_postgres_ready_status_bounds_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ready_status_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_ready_status_bounds_guard_service.tetra
 ```
 
 - Expected: `lib.core.postgres.ready_for_query_status(...)` should return
@@ -3629,10 +3629,10 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_pos
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ready_status_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_session_state_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_prepared_pipeline_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_header_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_ready_status_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_session_state_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_prepared_pipeline_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_header_bounds_guard_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -3641,11 +3641,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend PostgreSQL wire helpers.
 - Found while creating:
-  `examples/microservices/backend_postgres_column_count_bounds_guard_service.tetra`.
+  `examples/microservices/backend/postgres/row/backend_postgres_column_count_bounds_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_column_count_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_column_count_bounds_guard_service.tetra
 ```
 
 - Expected: `lib.core.postgres.row_description_column_count(...)` and
@@ -3665,10 +3665,10 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_pos
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_column_count_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_row_description_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_column_count_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_row_description_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_data_row_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_result_guard_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -3677,11 +3677,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend PostgreSQL wire helpers.
 - Found while creating:
-  `examples/microservices/backend_postgres_read_bounds_guard_service.tetra`.
+  `examples/microservices/backend/postgres/read/backend_postgres_read_bounds_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_read_bounds_guard_service.tetra
 ```
 
 - Expected: exported `lib.core.postgres.read_i32_be(...)`,
@@ -3703,10 +3703,10 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_pos
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_column_count_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_header_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_prepared_pipeline_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_read_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_column_count_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_header_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_prepared_pipeline_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -3715,11 +3715,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend PostgreSQL wire helpers.
 - Found while creating:
-  `examples/microservices/backend_postgres_write_bounds_guard_service.tetra`.
+  `examples/microservices/backend/postgres/write/backend_postgres_write_bounds_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_write_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_write_bounds_guard_service.tetra
 ```
 
 - Expected: exported `lib.core.postgres.write_i32_be_at(...)` and
@@ -3739,10 +3739,10 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_pos
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_write_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_column_count_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_prepared_pipeline_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_write_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_read_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_column_count_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_prepared_pipeline_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -3751,11 +3751,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend PostgreSQL wire helpers.
 - Found while creating:
-  `examples/microservices/backend_postgres_text_write_bounds_guard_service.tetra`.
+  `examples/microservices/backend/postgres/write/backend_postgres_text_write_bounds_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_text_write_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_text_write_bounds_guard_service.tetra
 ```
 
 - Expected: exported `lib.core.postgres.write_ascii_at(...)`,
@@ -3776,10 +3776,10 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_pos
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_text_write_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_write_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_prepared_pipeline_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_text_write_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_write_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_prepared_pipeline_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_result_guard_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -3788,11 +3788,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend HTTP wire helpers.
 - Found while creating:
-  `examples/microservices/backend_http_writer_bounds_guard_service.tetra`.
+  `examples/microservices/backend/http/writer/backend_http_writer_bounds_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_writer_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/writer/backend_http_writer_bounds_guard_service.tetra
 ```
 
 - Expected: exported `lib.core.http.write_ascii_at(...)`,
@@ -3813,10 +3813,10 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_htt
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_writer_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_pipeline_gateway_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/writer/backend_http_writer_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_response_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/writer/backend_http_pipeline_gateway_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -3825,11 +3825,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend JSON wire helpers.
 - Found while creating:
-  `examples/microservices/backend_json_writer_bounds_guard_service.tetra`.
+  `examples/microservices/backend/json/backend_json_writer_bounds_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_writer_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/json/backend_json_writer_bounds_guard_service.tetra
 ```
 
 - Expected: exported `lib.core.json.write_json_string_at(...)` and
@@ -3851,10 +3851,10 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_jso
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_writer_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_control_matrix_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_escape_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_hex_digit_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/json/backend_json_writer_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/json/backend_json_control_matrix_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/json/backend_json_escape_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/json/backend_json_hex_digit_guard_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -3863,11 +3863,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend HTTP and JSON decimal helpers.
 - Found while creating:
-  `examples/microservices/backend_http_json_i32_min_guard_service.tetra`.
+  `examples/microservices/backend/json/backend_http_json_i32_min_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_json_i32_min_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/json/backend_http_json_i32_min_guard_service.tetra
 ```
 
 - Expected: `http.digits_i32(-2147483648)` and
@@ -3889,11 +3889,11 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_htt
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_json_i32_min_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_writer_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_control_matrix_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_writer_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/json/backend_http_json_i32_min_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/writer/backend_http_writer_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/json/backend_json_control_matrix_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/json/backend_json_writer_bounds_guard_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -3902,11 +3902,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend crypto interface helpers.
 - Found while creating:
-  `examples/microservices/backend_crypto_mix_min_guard_service.tetra`.
+  `examples/microservices/backend/crypto_fs/backend_crypto_mix_min_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_crypto_mix_min_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/crypto_fs/backend_crypto_mix_min_guard_service.tetra
 ```
 
 - Expected: `crypto.mix_seed(...)` should keep the negative-normalization branch
@@ -3924,9 +3924,9 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_cry
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_crypto_mix_min_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_crypto_serialization_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_experimental_buffer_mirror_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/crypto_fs/backend_crypto_mix_min_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/crypto_fs/backend_crypto_serialization_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/misc/backend_experimental_buffer_mirror_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -3935,11 +3935,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend networking policy helpers.
 - Found while creating:
-  `examples/microservices/backend_network_backoff_overflow_guard_service.tetra`.
+  `examples/microservices/backend/net/backend_network_backoff_overflow_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_network_backoff_overflow_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/net/backend_network_backoff_overflow_guard_service.tetra
 ```
 
 - Expected: `retry_backoff_ms(...)` should honor a non-negative `max_ms` cap
@@ -3958,9 +3958,9 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_net
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_network_backoff_overflow_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_network_policy_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_experimental_route_policy_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/net/backend_network_backoff_overflow_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/net/backend_network_policy_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/misc/backend_experimental_route_policy_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -3969,11 +3969,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend net epoll helpers.
 - Found while creating:
-  `examples/microservices/backend_net_epoll_event_bounds_guard_service.tetra`.
+  `examples/microservices/backend/net/backend_net_epoll_event_bounds_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_net_epoll_event_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/net/backend_net_epoll_event_bounds_guard_service.tetra
 ```
 
 - Expected: `net.epoll_event_fd(...)` should return `-1` for an empty event
@@ -3993,8 +3993,8 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_net
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_net_epoll_event_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_net_epoll_lifecycle_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/net/backend_net_epoll_event_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/net/backend_net_epoll_lifecycle_service.tetra
 go test ./compiler -run 'TestBuildCoreNetSmoke|TestMicroserviceExamplesAndBugLedger' -count=1
 ```
 
@@ -4003,11 +4003,11 @@ go test ./compiler -run 'TestBuildCoreNetSmoke|TestMicroserviceExamplesAndBugLed
 - Status: fixed, verified.
 - Area: stdlib / backend PostgreSQL frame helpers.
 - Found while creating:
-  `examples/microservices/backend_postgres_frame_short_guard_service.tetra`.
+  `examples/microservices/backend/postgres/frame/backend_postgres_frame_short_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_short_guard_service.tetra
 ```
 
 - Expected: `frame_type_at(...)` should return `-1` when the tag slot is
@@ -4028,9 +4028,9 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_pos
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_short_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_header_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_header_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_read_bounds_guard_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -4039,11 +4039,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend PostgreSQL byte readers.
 - Found while creating:
-  `examples/microservices/backend_postgres_read_short_guard_service.tetra`.
+  `examples/microservices/backend/postgres/read/backend_postgres_read_short_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_read_short_guard_service.tetra
 ```
 
 - Expected: `read_i32_be(...)`, `read_i32_be_signed(...)`, and
@@ -4063,9 +4063,9 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_pos
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_short_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_read_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_read_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_short_guard_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -4074,11 +4074,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend PostgreSQL byte writers.
 - Found while creating:
-  `examples/microservices/backend_postgres_write_short_guard_service.tetra`.
+  `examples/microservices/backend/postgres/write/backend_postgres_write_short_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_write_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_write_short_guard_service.tetra
 ```
 
 - Expected: `write_i32_be_at(...)` and `write_i16_be_at(...)` should return
@@ -4100,9 +4100,9 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_pos
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_write_short_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_write_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_write_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_write_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_read_short_guard_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -4111,11 +4111,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend PostgreSQL text writers.
 - Found while creating:
-  `examples/microservices/backend_postgres_text_write_short_guard_service.tetra`.
+  `examples/microservices/backend/postgres/write/backend_postgres_text_write_short_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_text_write_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_text_write_short_guard_service.tetra
 ```
 
 - Expected: `write_ascii_at(...)`, `write_cstring_at(...)`, and
@@ -4137,9 +4137,9 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_pos
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_text_write_short_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_text_write_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_write_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_text_write_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_text_write_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_write_short_guard_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -4148,11 +4148,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend HTTP writers.
 - Found while creating:
-  `examples/microservices/backend_http_writer_short_guard_service.tetra`.
+  `examples/microservices/backend/http/writer/backend_http_writer_short_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_writer_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/writer/backend_http_writer_short_guard_service.tetra
 ```
 
 - Expected: `write_ascii_at(...)`, `write_crlf_at(...)`,
@@ -4174,9 +4174,9 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_htt
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_writer_short_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_writer_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/writer/backend_http_writer_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/writer/backend_http_writer_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -4185,11 +4185,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend JSON writers.
 - Found while creating:
-  `examples/microservices/backend_json_writer_short_guard_service.tetra`.
+  `examples/microservices/backend/json/backend_json_writer_short_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_writer_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/json/backend_json_writer_short_guard_service.tetra
 ```
 
 - Expected: `write_json_string_at(...)` and `write_message_object_at(...)`
@@ -4211,9 +4211,9 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_jso
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_writer_short_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_writer_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_control_matrix_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/json/backend_json_writer_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/json/backend_json_writer_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/json/backend_json_control_matrix_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -4222,11 +4222,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend PostgreSQL frame writers.
 - Found while creating:
-  `examples/microservices/backend_postgres_frame_writer_short_guard_service.tetra`.
+  `examples/microservices/backend/postgres/frame/backend_postgres_frame_writer_short_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_writer_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_writer_short_guard_service.tetra
 ```
 
 - Expected: high-level PostgreSQL frontend writers such as
@@ -4251,9 +4251,9 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_pos
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_writer_short_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_prepared_pipeline_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_session_state_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_writer_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_prepared_pipeline_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_session_state_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -4262,11 +4262,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend PostgreSQL bounded parsers.
 - Found while creating:
-  `examples/microservices/backend_postgres_parser_short_guard_service.tetra`.
+  `examples/microservices/backend/postgres/read/backend_postgres_parser_short_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_parser_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_parser_short_guard_service.tetra
 ```
 
 - Expected: `cstring_end_at(...)`, `parse_ascii_i32_at(...)`, and
@@ -4289,10 +4289,10 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_pos
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_parser_short_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_cstring_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_parser_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_cstring_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/ascii/backend_postgres_ascii_i32_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/command/backend_postgres_command_tag_bounds_guard_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -4301,11 +4301,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend PostgreSQL ReadyForQuery parser.
 - Found while creating:
-  `examples/microservices/backend_postgres_ready_status_short_guard_service.tetra`.
+  `examples/microservices/backend/postgres/read/backend_postgres_ready_status_short_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ready_status_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_ready_status_short_guard_service.tetra
 ```
 
 - Expected: `ready_for_query_status(...)` should return `-1` for empty payloads
@@ -4326,10 +4326,10 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_pos
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ready_status_short_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ready_status_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_session_state_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_prepared_pipeline_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_ready_status_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_ready_status_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_session_state_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_prepared_pipeline_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -4338,11 +4338,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend HTTP request scanners.
 - Found while creating:
-  `examples/microservices/backend_http_request_short_guard_service.tetra`.
+  `examples/microservices/backend/http/request/backend_http_request_short_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_short_guard_service.tetra
 ```
 
 - Expected: byte-buffer HTTP request scanners should return their existing
@@ -4366,10 +4366,10 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_htt
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_short_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_body_scope_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_line_token_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_body_scope_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_line_token_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -4378,11 +4378,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend HTTP response writers.
 - Found while creating:
-  `examples/microservices/backend_http_response_writer_short_guard_service.tetra`.
+  `examples/microservices/backend/http/writer/backend_http_response_writer_short_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_writer_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/writer/backend_http_response_writer_short_guard_service.tetra
 ```
 
 - Expected: `write_response_head(...)`, `write_plaintext_response(...)`, and
@@ -4406,10 +4406,10 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_htt
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_writer_short_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_writer_short_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/writer/backend_http_response_writer_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_response_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/writer/backend_http_writer_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -4418,11 +4418,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend PostgreSQL big-endian writers.
 - Found while creating:
-  `examples/microservices/backend_postgres_signed_write_guard_service.tetra`.
+  `examples/microservices/backend/postgres/write/backend_postgres_signed_write_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_signed_write_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_signed_write_guard_service.tetra
 ```
 
 - Expected: `write_i32_be_at(...)` and `write_i16_be_at(...)` should encode
@@ -4444,10 +4444,10 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_pos
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_signed_write_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_write_short_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_short_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_writer_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_signed_write_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_write_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_read_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_writer_short_guard_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -4456,11 +4456,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend PostgreSQL frame helpers.
 - Found while creating:
-  `examples/microservices/backend_postgres_frame_signed_length_guard_service.tetra`.
+  `examples/microservices/backend/postgres/frame/backend_postgres_frame_signed_length_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_signed_length_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_signed_length_guard_service.tetra
 ```
 
 - Expected: `frame_length_at(...)` should normalize malformed negative signed
@@ -4480,10 +4480,10 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_pos
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_signed_length_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_short_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_header_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_signed_write_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_signed_length_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_header_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_signed_write_guard_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -4492,11 +4492,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend PostgreSQL big-endian readers.
 - Found while creating:
-  `examples/microservices/backend_postgres_high_bit_read_guard_service.tetra`.
+  `examples/microservices/backend/postgres/read/backend_postgres_high_bit_read_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_high_bit_read_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_high_bit_read_guard_service.tetra
 ```
 
 - Expected: `read_i32_be(...)` should preserve max positive `0x7fffffff`
@@ -4515,10 +4515,10 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_pos
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_high_bit_read_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_short_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_signed_length_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_signed_write_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_high_bit_read_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_read_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_signed_length_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_signed_write_guard_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -4527,11 +4527,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend time helpers.
 - Found while creating:
-  `examples/microservices/backend_time_negative_base_delta_guard_service.tetra`.
+  `examples/microservices/backend/time/backend_time_negative_base_delta_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_time_negative_base_delta_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/time/backend_time_negative_base_delta_guard_service.tetra
 ```
 
 - Expected: `add_duration_ms(base, delta)` should add `delta` to `base` first,
@@ -4552,9 +4552,9 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_tim
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_time_negative_base_delta_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_time_overflow_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_time_collection_window_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/time/backend_time_negative_base_delta_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/time/backend_time_overflow_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/time/backend_time_collection_window_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -4563,11 +4563,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend HTTP request-line scanners.
 - Found while creating:
-  `examples/microservices/backend_http_request_crlf_guard_service.tetra`.
+  `examples/microservices/backend/http/request/backend_http_request_crlf_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_crlf_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_crlf_guard_service.tetra
 ```
 
 - Expected: route and keep-alive helpers should accept the `HTTP/1.1`
@@ -4590,10 +4590,10 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_htt
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_crlf_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_line_token_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_version_scope_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_crlf_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_line_token_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_version_scope_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_short_guard_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -4602,11 +4602,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend filesystem runtime ABI.
 - Found while creating:
-  `examples/microservices/backend_filesystem_nul_exists_guard_service.tetra`.
+  `examples/microservices/backend/crypto_fs/backend_filesystem_nul_exists_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_filesystem_nul_exists_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/crypto_fs/backend_filesystem_nul_exists_guard_service.tetra
 ```
 
 - Expected: `filesystem.exists(path, cap)` should return `false` when the
@@ -4626,9 +4626,9 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_fil
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_filesystem_nul_exists_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_filesystem_path_policy_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_experimental_route_policy_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/crypto_fs/backend_filesystem_nul_exists_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/crypto_fs/backend_filesystem_path_policy_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/misc/backend_experimental_route_policy_service.tetra
 go test ./compiler -run 'TestFilesystemRuntimeExistsBuildAndRunLinuxX64|TestMicroserviceExamplesAndBugLedger' -count=1
 ```
 
@@ -4637,11 +4637,11 @@ go test ./compiler -run 'TestFilesystemRuntimeExistsBuildAndRunLinuxX64|TestMicr
 - Status: fixed, verified.
 - Area: stdlib / backend HTTP request-line scanners.
 - Found while creating:
-  `examples/microservices/backend_http_request_target_char_guard_service.tetra`.
+  `examples/microservices/backend/http/request/backend_http_request_target_char_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_target_char_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_target_char_guard_service.tetra
 ```
 
 - Expected: route and keep-alive helpers should reject request targets
@@ -4664,13 +4664,13 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_htt
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra check examples/microservices/backend_http_request_target_char_guard_service.tetra
-go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-http-request-target-char-guard examples/microservices/backend_http_request_target_char_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_target_char_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_target_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_line_token_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_keep_alive_method_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_crlf_guard_service.tetra
+go run ./cli/cmd/tetra check examples/microservices/backend/http/request/backend_http_request_target_char_guard_service.tetra
+go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-http-request-target-char-guard examples/microservices/backend/http/request/backend_http_request_target_char_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_target_char_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_target_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_line_token_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_keep_alive_method_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_crlf_guard_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 ```
@@ -4680,11 +4680,11 @@ go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend PostgreSQL ASCII integer parser.
 - Found while creating:
-  `examples/microservices/backend_postgres_ascii_i32_overflow_guard_service.tetra`.
+  `examples/microservices/backend/postgres/ascii/backend_postgres_ascii_i32_overflow_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_overflow_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/ascii/backend_postgres_ascii_i32_overflow_guard_service.tetra
 ```
 
 - Expected: `lib.core.postgres.parse_ascii_i32_at(...)` and DataRow integer
@@ -4704,13 +4704,13 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_pos
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra check examples/microservices/backend_postgres_ascii_i32_overflow_guard_service.tetra
-go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-ascii-i32-overflow-guard examples/microservices/backend_postgres_ascii_i32_overflow_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_overflow_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_min_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_parser_short_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_length_guard_service.tetra
+go run ./cli/cmd/tetra check examples/microservices/backend/postgres/ascii/backend_postgres_ascii_i32_overflow_guard_service.tetra
+go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-ascii-i32-overflow-guard examples/microservices/backend/postgres/ascii/backend_postgres_ascii_i32_overflow_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/ascii/backend_postgres_ascii_i32_overflow_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/ascii/backend_postgres_ascii_i32_min_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/ascii/backend_postgres_ascii_i32_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_parser_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_data_row_length_guard_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 ```
 
@@ -4719,11 +4719,11 @@ go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend PostgreSQL CommandComplete parser.
 - Found while creating:
-  `examples/microservices/backend_postgres_command_tag_overflow_guard_service.tetra`.
+  `examples/microservices/backend/postgres/command/backend_postgres_command_tag_overflow_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_overflow_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/command/backend_postgres_command_tag_overflow_guard_service.tetra
 ```
 
 - Expected: `lib.core.postgres.command_complete_affected_rows(...)` should
@@ -4744,12 +4744,12 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_pos
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra check examples/microservices/backend_postgres_command_tag_overflow_guard_service.tetra
-go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-command-tag-overflow-guard examples/microservices/backend_postgres_command_tag_overflow_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_overflow_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_parser_short_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_overflow_guard_service.tetra
+go run ./cli/cmd/tetra check examples/microservices/backend/postgres/command/backend_postgres_command_tag_overflow_guard_service.tetra
+go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-command-tag-overflow-guard examples/microservices/backend/postgres/command/backend_postgres_command_tag_overflow_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/command/backend_postgres_command_tag_overflow_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/command/backend_postgres_command_tag_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_parser_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/ascii/backend_postgres_ascii_i32_overflow_guard_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 go test ./compiler/internal/pgrt -count=1
 ```
@@ -4759,11 +4759,11 @@ go test ./compiler/internal/pgrt -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend PostgreSQL CommandComplete parser.
 - Found while creating:
-  `examples/microservices/backend_postgres_command_tag_trailing_guard_service.tetra`.
+  `examples/microservices/backend/postgres/command/backend_postgres_command_tag_trailing_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_trailing_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/command/backend_postgres_command_tag_trailing_guard_service.tetra
 ```
 
 - Expected: `lib.core.postgres.command_complete_affected_rows(...)` should
@@ -4784,12 +4784,12 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_pos
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra check examples/microservices/backend_postgres_command_tag_trailing_guard_service.tetra
-go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-command-tag-trailing-guard examples/microservices/backend_postgres_command_tag_trailing_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_trailing_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_overflow_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_parser_short_guard_service.tetra
+go run ./cli/cmd/tetra check examples/microservices/backend/postgres/command/backend_postgres_command_tag_trailing_guard_service.tetra
+go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-command-tag-trailing-guard examples/microservices/backend/postgres/command/backend_postgres_command_tag_trailing_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/command/backend_postgres_command_tag_trailing_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/command/backend_postgres_command_tag_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/command/backend_postgres_command_tag_overflow_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_parser_short_guard_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 go test ./compiler/internal/pgrt -count=1
 ```
@@ -4799,11 +4799,11 @@ go test ./compiler/internal/pgrt -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend PostgreSQL DataRow parser.
 - Found while creating:
-  `examples/microservices/backend_postgres_data_row_truncated_value_guard_service.tetra`.
+  `examples/microservices/backend/postgres/row/backend_postgres_data_row_truncated_value_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_truncated_value_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_data_row_truncated_value_guard_service.tetra
 ```
 
 - Expected: `lib.core.postgres.data_row_value_len_at(...)` and
@@ -4826,12 +4826,12 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_pos
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra check examples/microservices/backend_postgres_data_row_truncated_value_guard_service.tetra
-go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-data-row-truncated-value-guard examples/microservices/backend_postgres_data_row_truncated_value_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_truncated_value_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_length_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra
+go run ./cli/cmd/tetra check examples/microservices/backend/postgres/row/backend_postgres_data_row_truncated_value_guard_service.tetra
+go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-data-row-truncated-value-guard examples/microservices/backend/postgres/row/backend_postgres_data_row_truncated_value_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_data_row_truncated_value_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_data_row_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_data_row_length_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_result_guard_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 go test ./compiler/internal/pgrt -count=1
 ```
@@ -4841,11 +4841,11 @@ go test ./compiler/internal/pgrt -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend PostgreSQL frame header parser.
 - Found while creating:
-  `examples/microservices/backend_postgres_frame_total_overflow_guard_service.tetra`.
+  `examples/microservices/backend/postgres/frame/backend_postgres_frame_total_overflow_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_total_overflow_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_total_overflow_guard_service.tetra
 ```
 
 - Expected: `lib.core.postgres.frame_total_len_at(...)` should return `-1`
@@ -4866,12 +4866,12 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_pos
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra check examples/microservices/backend_postgres_frame_total_overflow_guard_service.tetra
-go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-frame-total-overflow-guard examples/microservices/backend_postgres_frame_total_overflow_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_total_overflow_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_header_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_signed_length_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_short_guard_service.tetra
+go run ./cli/cmd/tetra check examples/microservices/backend/postgres/frame/backend_postgres_frame_total_overflow_guard_service.tetra
+go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-frame-total-overflow-guard examples/microservices/backend/postgres/frame/backend_postgres_frame_total_overflow_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_total_overflow_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_header_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_signed_length_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_short_guard_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 go test ./compiler/internal/pgrt -count=1
 ```
@@ -4881,11 +4881,11 @@ go test ./compiler/internal/pgrt -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend HTTP response writer.
 - Found while creating:
-  `examples/microservices/backend_http_negative_content_length_guard_service.tetra`.
+  `examples/microservices/backend/http/request/backend_http_negative_content_length_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_negative_content_length_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_negative_content_length_guard_service.tetra
 ```
 
 - Expected: `lib.core.http.response_head_len(...)` and
@@ -4909,12 +4909,12 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_htt
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra check examples/microservices/backend_http_negative_content_length_guard_service.tetra
-go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-http-negative-content-length-guard examples/microservices/backend_http_negative_content_length_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_negative_content_length_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_writer_short_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_json_i32_min_guard_service.tetra
+go run ./cli/cmd/tetra check examples/microservices/backend/http/request/backend_http_negative_content_length_guard_service.tetra
+go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-http-negative-content-length-guard examples/microservices/backend/http/request/backend_http_negative_content_length_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_negative_content_length_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/writer/backend_http_response_writer_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/json/backend_http_json_i32_min_guard_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 ```
@@ -4924,11 +4924,11 @@ go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend HTTP response writer.
 - Found while creating:
-  `examples/microservices/backend_http_status_code_guard_service.tetra`.
+  `examples/microservices/backend/http/response/backend_http_status_code_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_code_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_code_guard_service.tetra
 ```
 
 - Expected: `lib.core.http.response_head_len(...)` and
@@ -4951,12 +4951,12 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_htt
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra check examples/microservices/backend_http_status_code_guard_service.tetra
-go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-http-status-code-guard examples/microservices/backend_http_status_code_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_code_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_negative_content_length_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_writer_short_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
+go run ./cli/cmd/tetra check examples/microservices/backend/http/response/backend_http_status_code_guard_service.tetra
+go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-http-status-code-guard examples/microservices/backend/http/response/backend_http_status_code_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_code_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_negative_content_length_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/writer/backend_http_response_writer_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 ```
@@ -4966,11 +4966,11 @@ go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend HTTP response writer.
 - Found while creating:
-  `examples/microservices/backend_http_header_injection_guard_service.tetra`.
+  `examples/microservices/backend/http/headers/backend_http_header_injection_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_injection_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/headers/backend_http_header_injection_guard_service.tetra
 ```
 
 - Expected: `lib.core.http.header_line_len(...)`, `write_header_at(...)`,
@@ -4995,13 +4995,13 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_htt
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra check examples/microservices/backend_http_header_injection_guard_service.tetra
-go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-http-header-injection-guard examples/microservices/backend_http_header_injection_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_injection_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_code_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_negative_content_length_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_writer_short_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
+go run ./cli/cmd/tetra check examples/microservices/backend/http/headers/backend_http_header_injection_guard_service.tetra
+go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-http-header-injection-guard examples/microservices/backend/http/headers/backend_http_header_injection_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/headers/backend_http_header_injection_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_code_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_negative_content_length_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/writer/backend_http_response_writer_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 ```
@@ -5011,11 +5011,11 @@ go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend HTTP response writer.
 - Found while creating:
-  `examples/microservices/backend_http_header_control_guard_service.tetra`.
+  `examples/microservices/backend/http/headers/backend_http_header_control_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_control_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/headers/backend_http_header_control_guard_service.tetra
 ```
 
 - Expected: `lib.core.http.header_line_len(...)`, `write_header_at(...)`,
@@ -5038,14 +5038,14 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_htt
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra check examples/microservices/backend_http_header_control_guard_service.tetra
-go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-http-header-control-guard examples/microservices/backend_http_header_control_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_control_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_injection_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_code_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_negative_content_length_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_writer_short_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
+go run ./cli/cmd/tetra check examples/microservices/backend/http/headers/backend_http_header_control_guard_service.tetra
+go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-http-header-control-guard examples/microservices/backend/http/headers/backend_http_header_control_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/headers/backend_http_header_control_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/headers/backend_http_header_injection_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_code_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_negative_content_length_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/writer/backend_http_response_writer_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 ```
@@ -5055,11 +5055,11 @@ go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend PostgreSQL wire-frame writers.
 - Found while creating:
-  `examples/microservices/backend_postgres_parse_count_guard_service.tetra`.
+  `examples/microservices/backend/postgres/command/backend_postgres_parse_count_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_parse_count_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/command/backend_postgres_parse_count_guard_service.tetra
 ```
 
 - Expected: `lib.core.postgres.parse_payload_len(...)`,
@@ -5082,13 +5082,13 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_pos
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra check examples/microservices/backend_postgres_parse_count_guard_service.tetra
-go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-parse-count-guard examples/microservices/backend_postgres_parse_count_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_parse_count_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_prepared_pipeline_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_parser_short_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_writer_short_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_signed_write_guard_service.tetra
+go run ./cli/cmd/tetra check examples/microservices/backend/postgres/command/backend_postgres_parse_count_guard_service.tetra
+go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-parse-count-guard examples/microservices/backend/postgres/command/backend_postgres_parse_count_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/command/backend_postgres_parse_count_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_prepared_pipeline_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_parser_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_writer_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_signed_write_guard_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 go test ./compiler/internal/pgrt -count=1
 ```
@@ -5098,11 +5098,11 @@ go test ./compiler/internal/pgrt -count=1
 - Status: fixed, verified.
 - Area: runtime / backend net TCP helpers.
 - Found while creating:
-  `examples/microservices/backend_net_port_bounds_guard_service.tetra`.
+  `examples/microservices/backend/net/backend_net_port_bounds_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_net_port_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/net/backend_net_port_bounds_guard_service.tetra
 ```
 
 - Expected: `lib.core.net.bind_tcp4_loopback(...)` should return a negative
@@ -5123,11 +5123,11 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_net
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra check examples/microservices/backend_net_port_bounds_guard_service.tetra
-go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-net-port-bounds-guard examples/microservices/backend_net_port_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_net_port_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_net_epoll_lifecycle_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_net_epoll_event_bounds_guard_service.tetra
+go run ./cli/cmd/tetra check examples/microservices/backend/net/backend_net_port_bounds_guard_service.tetra
+go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-net-port-bounds-guard examples/microservices/backend/net/backend_net_port_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/net/backend_net_port_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/net/backend_net_epoll_lifecycle_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/net/backend_net_epoll_event_bounds_guard_service.tetra
 go test ./compiler -run 'TestBuildCoreNetSmoke|TestMicroserviceExamplesAndBugLedger|TestNetRuntimeSocketLifecycleBuildAndRunLinuxX64|TestNetRuntimeEpollWaitOneIntoBuildAndRunLinuxX64' -count=1
 go test ./compiler/internal/actorsrt -count=1
 ```
@@ -5137,11 +5137,11 @@ go test ./compiler/internal/actorsrt -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend PostgreSQL payload readers.
 - Found while creating:
-  `examples/microservices/backend_postgres_column_count_signed_guard_service.tetra`.
+  `examples/microservices/backend/postgres/row/backend_postgres_column_count_signed_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_column_count_signed_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_column_count_signed_guard_service.tetra
 ```
 
 - Expected: `lib.core.postgres.row_description_column_count(...)` and
@@ -5164,12 +5164,12 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_pos
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra check examples/microservices/backend_postgres_column_count_signed_guard_service.tetra
-go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-column-count-signed-guard examples/microservices/backend_postgres_column_count_signed_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_column_count_signed_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_column_count_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_row_description_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_bounds_guard_service.tetra
+go run ./cli/cmd/tetra check examples/microservices/backend/postgres/row/backend_postgres_column_count_signed_guard_service.tetra
+go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-column-count-signed-guard examples/microservices/backend/postgres/row/backend_postgres_column_count_signed_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_column_count_signed_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_column_count_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_row_description_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_data_row_bounds_guard_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 go test ./compiler/internal/pgrt -count=1
 ```
@@ -5179,11 +5179,11 @@ go test ./compiler/internal/pgrt -count=1
 - Status: fixed, verified.
 - Area: stdlib / backend PostgreSQL wire-frame writers.
 - Found while creating:
-  `examples/microservices/backend_postgres_cstring_nul_guard_service.tetra`.
+  `examples/microservices/backend/postgres/protocol/backend_postgres_cstring_nul_guard_service.tetra`.
 - Reproduction command:
 
 ```sh
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_cstring_nul_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_cstring_nul_guard_service.tetra
 ```
 
 - Expected: PostgreSQL C-string length and writer helpers should return `-1`
@@ -5210,13 +5210,13 @@ go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_pos
 - Verification:
 
 ```sh
-go run ./cli/cmd/tetra check examples/microservices/backend_postgres_cstring_nul_guard_service.tetra
-go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-cstring-nul-guard examples/microservices/backend_postgres_cstring_nul_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_cstring_nul_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_text_write_bounds_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_writer_short_guard_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_session_state_service.tetra
-go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_prepared_pipeline_service.tetra
+go run ./cli/cmd/tetra check examples/microservices/backend/postgres/protocol/backend_postgres_cstring_nul_guard_service.tetra
+go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-cstring-nul-guard examples/microservices/backend/postgres/protocol/backend_postgres_cstring_nul_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_cstring_nul_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_text_write_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_writer_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_session_state_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_prepared_pipeline_service.tetra
 go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
 go test ./compiler/internal/pgrt -count=1
 ```
@@ -5326,70 +5326,70 @@ go test ./compiler/internal/pgrt -count=1
 | 2026-05-22 | Added backend modular web-stack pack microservice example; probed local-module imports over HTTP routing/JSON response helpers and PostgreSQL prepared-frame/data-row helpers under direct execution and `--jobs 4 --interface-only`. | `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | none |
 | 2026-05-23 | Added backend capsule source-root microservice project; probed `Capsule.t4` entry discovery, `src`/`tests` source roots, cross-source local imports, `tetra check`, `tetra build`, `tetra run`, `tetra test`, and explicit dogfood source-file CLI handling near capsule projects. | `go test ./cli/cmd/tetra -run 'TestTestCommandRunsMicroserviceCapsuleSourceRootExample|TestBuildCheckRunCommandsAcceptExplicitProjectSourceFile' -count=1`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0058` |
 | 2026-05-23 | Added backend PostgreSQL session-state wire microservice example; probed startup-message layout, simple-query frames, describe portal/statement frames, execute max-row encoding, sync/terminate frames, and ready-for-query state bytes. | `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | none |
-| 2026-05-23 | Added backend HTTP status/header matrix microservice example; probed response status serialization, decimal writes, route path chars, string keep-alive detection, and byte-buffer mixed-case `Connection: close` handling. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0059` |
-| 2026-05-23 | Added backend JSON control-character matrix microservice example; probed tab, carriage-return, newline, empty-message object, signed integer digit, negative world-object length, and lowercase hex digit helper paths. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_control_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | none |
-| 2026-05-23 | Added backend HTTP header-whitespace microservice example; probed string and byte-buffer keep-alive handling for exact, multi-space, and tabbed `Connection: close` headers plus request-head length controls. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_whitespace_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0060` |
-| 2026-05-23 | Added backend HTTP Connection token-list microservice example; probed string and byte-buffer keep-alive handling for exact close, keep-alive-only, comma-separated `keep-alive, close`, and `upgrade, Close` header values. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_list_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_whitespace_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0061` |
-| 2026-05-23 | Added backend HTTP Connection header-scope microservice example; probed `X-Connection`, `Proxy-Connection`, `Connection-Mode`, and exact `Connection` semantics through string and byte-buffer keep-alive helpers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_list_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_whitespace_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0062` |
-| 2026-05-23 | Added backend HTTP Connection token-boundary microservice example; probed `closex`, `close-upgrade`, `enclose`, `close, keep-alive`, and trailing-whitespace `close` values through string and byte-buffer keep-alive helpers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_token_boundary_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_list_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_whitespace_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0063` |
-| 2026-05-23 | Added backend HTTP request-version scope microservice example; probed HTTP/1.0 requests with header-only `HTTP/1.1` markers, `HTTP/1.10` request-line prefixes, query routes, and byte-buffer keep-alive routing. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_version_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_token_boundary_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_list_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_whitespace_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0064` |
-| 2026-05-23 | Added backend HTTP request-target guard microservice example; probed double-space empty targets, query-only targets, root and root-query not-found controls, and byte-buffer plaintext/missing query routing. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_target_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_pipeline_gateway_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_version_scope_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0065` |
-| 2026-05-23 | Added backend HTTP request-line token guard microservice example; probed extra middle tokens before `HTTP/1.1`, HTTP/1.0 followed by a later `HTTP/1.1`, and valid string/byte-buffer route controls. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_line_token_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_target_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_version_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_pipeline_gateway_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0066` |
-| 2026-05-23 | Added backend HTTP keep-alive request-target guard microservice example; probed malformed `noslash` and query-only targets in string/byte helpers plus `/`, `/?query`, `/json`, and `Connection: close` controls. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_keep_alive_target_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_target_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_line_token_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_version_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_pipeline_gateway_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0067` |
-| 2026-05-23 | Added backend HTTP Connection header/body scope microservice example; probed body-only `Connection: close`, real header `Connection: close`, CRLF header terminators, and byte-buffer offset keep-alive helpers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_body_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_token_boundary_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_list_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_whitespace_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0068` |
-| 2026-05-23 | Added backend HTTP keep-alive method-token guard microservice example; probed malformed `GE:T`, tabbed method, and `GET@` method tokens in string/byte helpers plus valid `GET`, `POST`, and `Connection: close` controls. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_keep_alive_method_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_keep_alive_target_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_line_token_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_version_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_pipeline_gateway_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0069` |
-| 2026-05-23 | Added backend JSON hex-digit guard microservice example; probed lowercase hex helper bounds for `-1`, `16`, and `99` plus normal nibble inputs and message-object serialization controls. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_hex_digit_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_control_matrix_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_escape_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/jsonrt -count=1` | `TETRA-BUG-0070` |
-| 2026-05-23 | Added backend time overflow guard microservice example; probed `millis_from_seconds(2147483)`, `millis_from_seconds(2147484)`, positive `add_duration_ms` near `Int` max, and negative duration underflow controls. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_time_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_time_collection_window_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0071` |
-| 2026-05-23 | Added backend PostgreSQL C-string bounds guard microservice example; probed bounded NUL scans for valid subranges, empty/reversed ranges, and negative start indexes. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_cstring_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_session_state_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0072` |
-| 2026-05-23 | Added backend PostgreSQL DataRow signed-length guard microservice example; probed valid DataRow columns, NULL-style negative sentinel handling, malformed `0xfffffffe` length normalization, and following-column recovery. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_length_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_cstring_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0073` |
-| 2026-05-23 | Added backend PostgreSQL ASCII i32 bounds guard microservice example; probed signed and unsigned ASCII integer parsing, non-digit stops, zero-count ranges, and negative-start parser bounds. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_length_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0074` |
-| 2026-05-23 | Added backend PostgreSQL CommandComplete bounds guard microservice example; probed `INSERT 0 3`, `UPDATE 12`, no-digit tags, digit-only subranges, empty ranges, negative payload lengths, and negative-start parser bounds. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0075` |
-| 2026-05-23 | Added backend PostgreSQL RowDescription bounds guard microservice example; probed valid type OID scans, negative/out-of-range column indexes, truncated metadata, empty payload lengths, negative payload lengths, and negative-start parser bounds. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_row_description_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0076` |
-| 2026-05-23 | Added backend PostgreSQL DataRow bounds guard microservice example; probed valid DataRow integer columns, negative/out-of-range column indexes, negative-start length/start helpers, and `data_row_i32_at` missing-value controls. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_length_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0077` |
-| 2026-05-23 | Added backend PostgreSQL frame-header bounds guard microservice example; probed valid Sync frame header reads, negative-start header reads, and malformed length fields below the PostgreSQL four-byte frame-length minimum. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_header_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0078` |
-| 2026-05-23 | Added backend PostgreSQL ReadyForQuery status bounds guard microservice example; probed valid idle, in-transaction, and failed-transaction status bytes plus negative-start status reads. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ready_status_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_session_state_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_prepared_pipeline_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0079` |
-| 2026-05-23 | Added backend PostgreSQL column-count bounds guard microservice example; probed valid RowDescription and DataRow count fields plus negative-start count readers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_column_count_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_row_description_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0080` |
-| 2026-05-23 | Added backend PostgreSQL big-endian reader bounds guard microservice example; probed valid i32/i16 big-endian reads, signed i32 normalization, and negative-start reader sentinels. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_column_count_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_header_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0081` |
-| 2026-05-23 | Added backend PostgreSQL big-endian writer bounds guard microservice example; probed valid i32/i16 big-endian writes, negative-start writer sentinels, and preserved buffer contents after rejected writes. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_write_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_column_count_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0082` |
-| 2026-05-23 | Added backend PostgreSQL text writer bounds guard microservice example; probed valid ASCII/C-string writes, negative-start text writer sentinels, and preserved buffer contents after rejected writes. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_text_write_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_write_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_prepared_pipeline_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0083` |
-| 2026-05-23 | Added backend HTTP writer bounds guard microservice example; probed valid ASCII, CRLF, header, and decimal writes plus negative-start writer sentinels and preserved buffer contents after rejected writes. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_writer_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0084` |
-| 2026-05-23 | Added backend JSON writer bounds guard microservice example; probed valid escaped JSON string and message-object writes plus negative-start writer sentinels and preserved buffer contents after rejected writes. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_writer_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_control_matrix_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_escape_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0085` |
-| 2026-05-23 | Added backend HTTP/JSON i32 minimum guard microservice example; probed HTTP and JSON decimal digit helpers, JSON world-object sizing, HTTP decimal byte writes, and rejected negative-start writes for `-2147483648`. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_json_i32_min_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_control_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0086` |
-| 2026-05-23 | Added backend crypto mix i32 minimum guard microservice example; probed stable crypto seed mixing when `seed * 33 + value` reaches `-2147483648` plus existing positive/negative controls and the experimental mirror. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_crypto_mix_min_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_crypto_serialization_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_experimental_buffer_mirror_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0087` |
-| 2026-05-23 | Added backend networking backoff overflow guard microservice example; probed capped retry backoff before i32 doubling overflow, ordinary capped backoff, uncapped below-overflow behavior, negative base clamping, and the experimental networking mirror. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_network_backoff_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_network_policy_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_experimental_route_policy_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0088` |
-| 2026-05-23 | Added backend net epoll event bounds guard microservice example; probed valid fd/flag extraction plus empty and one-slot event buffers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_net_epoll_event_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_net_epoll_lifecycle_service.tetra`; `go test ./compiler -run 'TestBuildCoreNetSmoke|TestMicroserviceExamplesAndBugLedger' -count=1` | `TETRA-BUG-0089` |
-| 2026-05-23 | Added backend PostgreSQL short frame-header guard microservice example; probed valid Sync frames plus empty, tag-only, and truncated typed-frame buffers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_header_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0090` |
-| 2026-05-23 | Added backend PostgreSQL big-endian reader short-buffer guard microservice example; probed valid i32/i16 reads plus empty, truncated, and offset-truncated buffers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_short_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0091` |
-| 2026-05-23 | Added backend PostgreSQL big-endian writer short-buffer guard microservice example; probed valid i32/i16 writes plus empty, truncated, and offset-truncated destination buffers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_write_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_write_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_short_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0092` |
-| 2026-05-23 | Added backend PostgreSQL text writer short-buffer guard microservice example; probed valid ASCII/C-string writes plus empty and truncated destination buffers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_text_write_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_text_write_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_write_short_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0093` |
-| 2026-05-23 | Added backend HTTP writer short-buffer guard microservice example; probed valid ASCII, CRLF, header, and decimal writes plus empty and truncated destination buffers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_writer_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0094` |
-| 2026-05-23 | Added backend JSON writer short-buffer guard microservice example; probed valid escaped strings and message objects plus empty and truncated destination buffers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_writer_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_control_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0095` |
-| 2026-05-23 | Added backend PostgreSQL frame writer short-buffer guard microservice example; probed valid startup, Simple Query, Parse, Bind, Describe, Execute, Sync, and Terminate frames plus empty and truncated destination buffers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_prepared_pipeline_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_session_state_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0096` |
-| 2026-05-23 | Added backend PostgreSQL bounded parser short-buffer guard microservice example; probed valid bounded C-string, ASCII integer, and CommandComplete parsing plus overstated limits/counts for short physical buffers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_parser_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_cstring_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0097` |
-| 2026-05-23 | Added backend PostgreSQL ReadyForQuery status short-buffer guard microservice example; probed valid idle/in-transaction/failed-transaction status bytes plus empty and offset-short payloads. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ready_status_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ready_status_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_session_state_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_prepared_pipeline_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0098` |
-| 2026-05-23 | Added backend HTTP request short-buffer guard microservice example; probed valid pipelined requests plus empty, offset-short, and overstated request windows. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_body_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_line_token_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0099` |
-| 2026-05-23 | Added backend HTTP response writer short-buffer guard microservice example; probed valid response heads, plaintext responses, and JSON responses plus empty, prefix-short, and body-short destination buffers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0100` |
-| 2026-05-23 | Added backend PostgreSQL signed big-endian writer guard microservice example; probed negative i32/i16 two's-complement bytes for `-1`, `-2`, `-32768`, and `-2147483648` while preserving positive controls. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_signed_write_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_write_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_writer_short_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0101` |
-| 2026-05-23 | Added backend PostgreSQL signed frame-length guard microservice example; probed malformed negative signed frame lengths for `-2` and `-2147483648` while preserving valid Sync and positive short-length controls. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_signed_length_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_header_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_signed_write_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0102` |
-| 2026-05-23 | Added backend PostgreSQL high-bit big-endian reader guard microservice example; probed `0x7fffffff` positive control plus `0x80000000` and `0xfffffffe` high-bit sentinels. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_high_bit_read_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_signed_length_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_signed_write_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0103` |
-| 2026-05-23 | Added backend PostgreSQL ASCII i32 minimum guard microservice example; probed direct bounded parser and DataRow integer parsing for `-2147483648` plus `2147483647` positive max control. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_min_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | none |
-| 2026-05-23 | Added backend time negative-base duration guard microservice example; probed negative-base positive-delta recovery, still-negative sums, zero-delta negative bases, negative-delta subtraction, and positive overflow saturation. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_time_negative_base_delta_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_time_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_time_collection_window_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0104` |
-| 2026-05-23 | Added backend HTTP request-line CRLF guard microservice example; probed valid CRLF request routing plus LF-only and bare-CR `HTTP/1.1` terminator rejection for string and byte-buffer helpers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_crlf_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_line_token_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_version_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_short_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0105` |
-| 2026-05-23 | Added backend filesystem embedded-NUL exists guard microservice example; probed normal existing/missing paths plus `/<NUL>_suffix` prefix-truncation rejection. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_filesystem_nul_exists_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_filesystem_path_policy_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_experimental_route_policy_service.tetra`; `go test ./compiler -run 'TestFilesystemRuntimeExistsBuildAndRunLinuxX64|TestMicroserviceExamplesAndBugLedger' -count=1` | `TETRA-BUG-0106` |
-| 2026-05-23 | Added backend HTTP request-target character guard microservice example; probed tab and raw control-byte target rejection in string/byte helpers plus valid query-string target controls. | `go run ./cli/cmd/tetra check examples/microservices/backend_http_request_target_char_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-http-request-target-char-guard examples/microservices/backend_http_request_target_char_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_target_char_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_target_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_line_token_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_keep_alive_method_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_crlf_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0107` |
-| 2026-05-23 | Added backend PostgreSQL ASCII i32 overflow guard microservice example; probed out-of-range positive/negative ASCII integers in direct and DataRow parsing while preserving max/min i32 boundary controls. | `go run ./cli/cmd/tetra check examples/microservices/backend_postgres_ascii_i32_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-ascii-i32-overflow-guard examples/microservices/backend_postgres_ascii_i32_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_min_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_parser_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_length_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0108` |
-| 2026-05-23 | Added backend PostgreSQL CommandComplete affected-row overflow guard microservice example; probed out-of-range `UPDATE` and `INSERT` affected-row counts while preserving `2147483647` and valid subrange controls. | `go run ./cli/cmd/tetra check examples/microservices/backend_postgres_command_tag_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-command-tag-overflow-guard examples/microservices/backend_postgres_command_tag_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_parser_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_overflow_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/pgrt -count=1` | `TETRA-BUG-0109` |
-| 2026-05-23 | Added backend PostgreSQL CommandComplete trailing-count guard microservice example; probed malformed non-trailing digit runs such as `UPDATE 12 rows` while preserving valid trailing `UPDATE`, `INSERT`, and subrange controls. | `go run ./cli/cmd/tetra check examples/microservices/backend_postgres_command_tag_trailing_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-command-tag-trailing-guard examples/microservices/backend_postgres_command_tag_trailing_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_trailing_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_parser_short_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/pgrt -count=1` | `TETRA-BUG-0110` |
-| 2026-05-23 | Added backend PostgreSQL DataRow truncated-value guard microservice example; probed advertised positive value lengths whose physical bytes are missing while preserving valid and empty DataRow value controls. | `go run ./cli/cmd/tetra check examples/microservices/backend_postgres_data_row_truncated_value_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-data-row-truncated-value-guard examples/microservices/backend_postgres_data_row_truncated_value_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_truncated_value_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_length_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/pgrt -count=1` | `TETRA-BUG-0111` |
-| 2026-05-23 | Added backend PostgreSQL frame total-length overflow guard microservice example; probed maximum valid typed-frame total length plus signed maximum length whose tag-inclusive total would overflow. | `go run ./cli/cmd/tetra check examples/microservices/backend_postgres_frame_total_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-frame-total-overflow-guard examples/microservices/backend_postgres_frame_total_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_total_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_header_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_signed_length_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_short_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/pgrt -count=1` | `TETRA-BUG-0112` |
-| 2026-05-23 | Added backend HTTP negative Content-Length guard microservice example; probed response-head sizing and writing for negative Content-Length rejection while preserving zero and positive length controls. | `go run ./cli/cmd/tetra check examples/microservices/backend_http_negative_content_length_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-http-negative-content-length-guard examples/microservices/backend_http_negative_content_length_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_negative_content_length_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_json_i32_min_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0113` |
-| 2026-05-23 | Added backend HTTP status-code guard microservice example; probed response-head sizing and writing for non-three-digit status-code rejection while preserving `100`, `200`, and `999` controls. | `go run ./cli/cmd/tetra check examples/microservices/backend_http_status_code_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-http-status-code-guard examples/microservices/backend_http_status_code_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_code_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_negative_content_length_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0114` |
-| 2026-05-23 | Added backend HTTP header injection guard microservice example; probed CR/LF injection rejection for header names, header values, response reason text, and response header fields while preserving valid header/response controls. | `go run ./cli/cmd/tetra check examples/microservices/backend_http_header_injection_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-http-header-injection-guard examples/microservices/backend_http_header_injection_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_injection_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_code_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_negative_content_length_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0115` |
-| 2026-05-23 | Added backend HTTP header control-byte guard microservice example; probed non-HTAB control-byte rejection for header values, response reason text, and response header fields while preserving valid HTAB values. | `go run ./cli/cmd/tetra check examples/microservices/backend_http_header_control_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-http-header-control-guard examples/microservices/backend_http_header_control_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_control_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_injection_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_code_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_negative_content_length_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0116` |
-| 2026-05-23 | Added backend PostgreSQL Parse parameter-count guard microservice example; probed signed i16 OID-count overflow rejection for Parse frame sizing and writing while preserving small valid Parse frames. | `go run ./cli/cmd/tetra check examples/microservices/backend_postgres_parse_count_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-parse-count-guard examples/microservices/backend_postgres_parse_count_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_parse_count_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_prepared_pipeline_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_parser_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_signed_write_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/pgrt -count=1` | `TETRA-BUG-0117` |
-| 2026-05-23 | Added backend net TCP port bounds guard microservice example; probed rejection of negative and above-range loopback bind ports while preserving ephemeral port `0`. | `go run ./cli/cmd/tetra check examples/microservices/backend_net_port_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-net-port-bounds-guard examples/microservices/backend_net_port_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_net_port_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_net_epoll_lifecycle_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_net_epoll_event_bounds_guard_service.tetra`; `go test ./compiler -run 'TestBuildCoreNetSmoke|TestMicroserviceExamplesAndBugLedger|TestNetRuntimeSocketLifecycleBuildAndRunLinuxX64|TestNetRuntimeEpollWaitOneIntoBuildAndRunLinuxX64' -count=1`; `go test ./compiler/internal/actorsrt -count=1` | `TETRA-BUG-0118` |
-| 2026-05-23 | Added backend PostgreSQL signed column-count guard microservice example; probed high-bit RowDescription/DataRow count rejection while preserving one-column payload controls. | `go run ./cli/cmd/tetra check examples/microservices/backend_postgres_column_count_signed_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-column-count-signed-guard examples/microservices/backend_postgres_column_count_signed_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_column_count_signed_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_column_count_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_row_description_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/pgrt -count=1` | `TETRA-BUG-0119` |
-| 2026-05-23 | Added backend PostgreSQL embedded-NUL C-string guard microservice example; probed C-string length/writer rejection for startup, query, statement, and portal fields while preserving valid frame controls. | `go run ./cli/cmd/tetra check examples/microservices/backend_postgres_cstring_nul_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-cstring-nul-guard examples/microservices/backend_postgres_cstring_nul_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_cstring_nul_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_text_write_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_session_state_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_prepared_pipeline_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/pgrt -count=1` | `TETRA-BUG-0120` |
+| 2026-05-23 | Added backend HTTP status/header matrix microservice example; probed response status serialization, decimal writes, route path chars, string keep-alive detection, and byte-buffer mixed-case `Connection: close` handling. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0059` |
+| 2026-05-23 | Added backend JSON control-character matrix microservice example; probed tab, carriage-return, newline, empty-message object, signed integer digit, negative world-object length, and lowercase hex digit helper paths. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/json/backend_json_control_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | none |
+| 2026-05-23 | Added backend HTTP header-whitespace microservice example; probed string and byte-buffer keep-alive handling for exact, multi-space, and tabbed `Connection: close` headers plus request-head length controls. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/headers/backend_http_header_whitespace_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0060` |
+| 2026-05-23 | Added backend HTTP Connection token-list microservice example; probed string and byte-buffer keep-alive handling for exact close, keep-alive-only, comma-separated `keep-alive, close`, and `upgrade, Close` header values. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_list_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/headers/backend_http_header_whitespace_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0061` |
+| 2026-05-23 | Added backend HTTP Connection header-scope microservice example; probed `X-Connection`, `Proxy-Connection`, `Connection-Mode`, and exact `Connection` semantics through string and byte-buffer keep-alive helpers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_list_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/headers/backend_http_header_whitespace_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0062` |
+| 2026-05-23 | Added backend HTTP Connection token-boundary microservice example; probed `closex`, `close-upgrade`, `enclose`, `close, keep-alive`, and trailing-whitespace `close` values through string and byte-buffer keep-alive helpers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_token_boundary_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_list_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/headers/backend_http_header_whitespace_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0063` |
+| 2026-05-23 | Added backend HTTP request-version scope microservice example; probed HTTP/1.0 requests with header-only `HTTP/1.1` markers, `HTTP/1.10` request-line prefixes, query routes, and byte-buffer keep-alive routing. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_version_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_token_boundary_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_list_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/headers/backend_http_header_whitespace_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0064` |
+| 2026-05-23 | Added backend HTTP request-target guard microservice example; probed double-space empty targets, query-only targets, root and root-query not-found controls, and byte-buffer plaintext/missing query routing. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_target_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/writer/backend_http_pipeline_gateway_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_response_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_version_scope_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0065` |
+| 2026-05-23 | Added backend HTTP request-line token guard microservice example; probed extra middle tokens before `HTTP/1.1`, HTTP/1.0 followed by a later `HTTP/1.1`, and valid string/byte-buffer route controls. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_line_token_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_target_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_version_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/writer/backend_http_pipeline_gateway_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0066` |
+| 2026-05-23 | Added backend HTTP keep-alive request-target guard microservice example; probed malformed `noslash` and query-only targets in string/byte helpers plus `/`, `/?query`, `/json`, and `Connection: close` controls. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_keep_alive_target_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_target_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_line_token_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_version_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/writer/backend_http_pipeline_gateway_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0067` |
+| 2026-05-23 | Added backend HTTP Connection header/body scope microservice example; probed body-only `Connection: close`, real header `Connection: close`, CRLF header terminators, and byte-buffer offset keep-alive helpers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_body_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_token_boundary_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_list_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/headers/backend_http_header_whitespace_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0068` |
+| 2026-05-23 | Added backend HTTP keep-alive method-token guard microservice example; probed malformed `GE:T`, tabbed method, and `GET@` method tokens in string/byte helpers plus valid `GET`, `POST`, and `Connection: close` controls. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_keep_alive_method_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_keep_alive_target_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_line_token_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_version_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/writer/backend_http_pipeline_gateway_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0069` |
+| 2026-05-23 | Added backend JSON hex-digit guard microservice example; probed lowercase hex helper bounds for `-1`, `16`, and `99` plus normal nibble inputs and message-object serialization controls. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/json/backend_json_hex_digit_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/json/backend_json_control_matrix_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/json/backend_json_escape_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/jsonrt -count=1` | `TETRA-BUG-0070` |
+| 2026-05-23 | Added backend time overflow guard microservice example; probed `millis_from_seconds(2147483)`, `millis_from_seconds(2147484)`, positive `add_duration_ms` near `Int` max, and negative duration underflow controls. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/time/backend_time_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/time/backend_time_collection_window_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0071` |
+| 2026-05-23 | Added backend PostgreSQL C-string bounds guard microservice example; probed bounded NUL scans for valid subranges, empty/reversed ranges, and negative start indexes. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_cstring_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_session_state_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_result_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0072` |
+| 2026-05-23 | Added backend PostgreSQL DataRow signed-length guard microservice example; probed valid DataRow columns, NULL-style negative sentinel handling, malformed `0xfffffffe` length normalization, and following-column recovery. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_data_row_length_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_result_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_cstring_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0073` |
+| 2026-05-23 | Added backend PostgreSQL ASCII i32 bounds guard microservice example; probed signed and unsigned ASCII integer parsing, non-digit stops, zero-count ranges, and negative-start parser bounds. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/ascii/backend_postgres_ascii_i32_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_result_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_data_row_length_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0074` |
+| 2026-05-23 | Added backend PostgreSQL CommandComplete bounds guard microservice example; probed `INSERT 0 3`, `UPDATE 12`, no-digit tags, digit-only subranges, empty ranges, negative payload lengths, and negative-start parser bounds. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/command/backend_postgres_command_tag_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_result_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/ascii/backend_postgres_ascii_i32_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0075` |
+| 2026-05-23 | Added backend PostgreSQL RowDescription bounds guard microservice example; probed valid type OID scans, negative/out-of-range column indexes, truncated metadata, empty payload lengths, negative payload lengths, and negative-start parser bounds. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_row_description_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_result_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/command/backend_postgres_command_tag_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0076` |
+| 2026-05-23 | Added backend PostgreSQL DataRow bounds guard microservice example; probed valid DataRow integer columns, negative/out-of-range column indexes, negative-start length/start helpers, and `data_row_i32_at` missing-value controls. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_data_row_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_result_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_data_row_length_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0077` |
+| 2026-05-23 | Added backend PostgreSQL frame-header bounds guard microservice example; probed valid Sync frame header reads, negative-start header reads, and malformed length fields below the PostgreSQL four-byte frame-length minimum. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_header_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_result_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_data_row_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0078` |
+| 2026-05-23 | Added backend PostgreSQL ReadyForQuery status bounds guard microservice example; probed valid idle, in-transaction, and failed-transaction status bytes plus negative-start status reads. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_ready_status_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_session_state_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_prepared_pipeline_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0079` |
+| 2026-05-23 | Added backend PostgreSQL column-count bounds guard microservice example; probed valid RowDescription and DataRow count fields plus negative-start count readers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_column_count_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_row_description_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_data_row_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0080` |
+| 2026-05-23 | Added backend PostgreSQL big-endian reader bounds guard microservice example; probed valid i32/i16 big-endian reads, signed i32 normalization, and negative-start reader sentinels. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_read_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_column_count_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_header_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0081` |
+| 2026-05-23 | Added backend PostgreSQL big-endian writer bounds guard microservice example; probed valid i32/i16 big-endian writes, negative-start writer sentinels, and preserved buffer contents after rejected writes. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_write_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_read_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_column_count_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0082` |
+| 2026-05-23 | Added backend PostgreSQL text writer bounds guard microservice example; probed valid ASCII/C-string writes, negative-start text writer sentinels, and preserved buffer contents after rejected writes. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_text_write_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_write_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_prepared_pipeline_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0083` |
+| 2026-05-23 | Added backend HTTP writer bounds guard microservice example; probed valid ASCII, CRLF, header, and decimal writes plus negative-start writer sentinels and preserved buffer contents after rejected writes. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/writer/backend_http_writer_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_response_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0084` |
+| 2026-05-23 | Added backend JSON writer bounds guard microservice example; probed valid escaped JSON string and message-object writes plus negative-start writer sentinels and preserved buffer contents after rejected writes. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/json/backend_json_writer_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/json/backend_json_control_matrix_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/json/backend_json_escape_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0085` |
+| 2026-05-23 | Added backend HTTP/JSON i32 minimum guard microservice example; probed HTTP and JSON decimal digit helpers, JSON world-object sizing, HTTP decimal byte writes, and rejected negative-start writes for `-2147483648`. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/json/backend_http_json_i32_min_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/json/backend_json_control_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0086` |
+| 2026-05-23 | Added backend crypto mix i32 minimum guard microservice example; probed stable crypto seed mixing when `seed * 33 + value` reaches `-2147483648` plus existing positive/negative controls and the experimental mirror. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/crypto_fs/backend_crypto_mix_min_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/crypto_fs/backend_crypto_serialization_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/misc/backend_experimental_buffer_mirror_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0087` |
+| 2026-05-23 | Added backend networking backoff overflow guard microservice example; probed capped retry backoff before i32 doubling overflow, ordinary capped backoff, uncapped below-overflow behavior, negative base clamping, and the experimental networking mirror. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/net/backend_network_backoff_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/net/backend_network_policy_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/misc/backend_experimental_route_policy_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0088` |
+| 2026-05-23 | Added backend net epoll event bounds guard microservice example; probed valid fd/flag extraction plus empty and one-slot event buffers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/net/backend_net_epoll_event_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/net/backend_net_epoll_lifecycle_service.tetra`; `go test ./compiler -run 'TestBuildCoreNetSmoke|TestMicroserviceExamplesAndBugLedger' -count=1` | `TETRA-BUG-0089` |
+| 2026-05-23 | Added backend PostgreSQL short frame-header guard microservice example; probed valid Sync frames plus empty, tag-only, and truncated typed-frame buffers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_header_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_read_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0090` |
+| 2026-05-23 | Added backend PostgreSQL big-endian reader short-buffer guard microservice example; probed valid i32/i16 reads plus empty, truncated, and offset-truncated buffers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_read_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_read_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_short_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0091` |
+| 2026-05-23 | Added backend PostgreSQL big-endian writer short-buffer guard microservice example; probed valid i32/i16 writes plus empty, truncated, and offset-truncated destination buffers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_write_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_write_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_read_short_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0092` |
+| 2026-05-23 | Added backend PostgreSQL text writer short-buffer guard microservice example; probed valid ASCII/C-string writes plus empty and truncated destination buffers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_text_write_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_text_write_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_write_short_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0093` |
+| 2026-05-23 | Added backend HTTP writer short-buffer guard microservice example; probed valid ASCII, CRLF, header, and decimal writes plus empty and truncated destination buffers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/writer/backend_http_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/writer/backend_http_writer_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0094` |
+| 2026-05-23 | Added backend JSON writer short-buffer guard microservice example; probed valid escaped strings and message objects plus empty and truncated destination buffers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/json/backend_json_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/json/backend_json_writer_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/json/backend_json_control_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0095` |
+| 2026-05-23 | Added backend PostgreSQL frame writer short-buffer guard microservice example; probed valid startup, Simple Query, Parse, Bind, Describe, Execute, Sync, and Terminate frames plus empty and truncated destination buffers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_prepared_pipeline_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_session_state_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0096` |
+| 2026-05-23 | Added backend PostgreSQL bounded parser short-buffer guard microservice example; probed valid bounded C-string, ASCII integer, and CommandComplete parsing plus overstated limits/counts for short physical buffers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_parser_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_cstring_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/ascii/backend_postgres_ascii_i32_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/command/backend_postgres_command_tag_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0097` |
+| 2026-05-23 | Added backend PostgreSQL ReadyForQuery status short-buffer guard microservice example; probed valid idle/in-transaction/failed-transaction status bytes plus empty and offset-short payloads. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_ready_status_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_ready_status_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_session_state_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_prepared_pipeline_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0098` |
+| 2026-05-23 | Added backend HTTP request short-buffer guard microservice example; probed valid pipelined requests plus empty, offset-short, and overstated request windows. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_connection_body_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_line_token_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0099` |
+| 2026-05-23 | Added backend HTTP response writer short-buffer guard microservice example; probed valid response heads, plaintext responses, and JSON responses plus empty, prefix-short, and body-short destination buffers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/writer/backend_http_response_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_response_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/writer/backend_http_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0100` |
+| 2026-05-23 | Added backend PostgreSQL signed big-endian writer guard microservice example; probed negative i32/i16 two's-complement bytes for `-1`, `-2`, `-32768`, and `-2147483648` while preserving positive controls. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_signed_write_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_write_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_read_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_writer_short_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0101` |
+| 2026-05-23 | Added backend PostgreSQL signed frame-length guard microservice example; probed malformed negative signed frame lengths for `-2` and `-2147483648` while preserving valid Sync and positive short-length controls. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_signed_length_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_header_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_signed_write_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0102` |
+| 2026-05-23 | Added backend PostgreSQL high-bit big-endian reader guard microservice example; probed `0x7fffffff` positive control plus `0x80000000` and `0xfffffffe` high-bit sentinels. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_high_bit_read_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_read_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_signed_length_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_signed_write_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0103` |
+| 2026-05-23 | Added backend PostgreSQL ASCII i32 minimum guard microservice example; probed direct bounded parser and DataRow integer parsing for `-2147483648` plus `2147483647` positive max control. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/ascii/backend_postgres_ascii_i32_min_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/ascii/backend_postgres_ascii_i32_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | none |
+| 2026-05-23 | Added backend time negative-base duration guard microservice example; probed negative-base positive-delta recovery, still-negative sums, zero-delta negative bases, negative-delta subtraction, and positive overflow saturation. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/time/backend_time_negative_base_delta_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/time/backend_time_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/time/backend_time_collection_window_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0104` |
+| 2026-05-23 | Added backend HTTP request-line CRLF guard microservice example; probed valid CRLF request routing plus LF-only and bare-CR `HTTP/1.1` terminator rejection for string and byte-buffer helpers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_crlf_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_line_token_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_version_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_short_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0105` |
+| 2026-05-23 | Added backend filesystem embedded-NUL exists guard microservice example; probed normal existing/missing paths plus `/<NUL>_suffix` prefix-truncation rejection. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/crypto_fs/backend_filesystem_nul_exists_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/crypto_fs/backend_filesystem_path_policy_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/misc/backend_experimental_route_policy_service.tetra`; `go test ./compiler -run 'TestFilesystemRuntimeExistsBuildAndRunLinuxX64|TestMicroserviceExamplesAndBugLedger' -count=1` | `TETRA-BUG-0106` |
+| 2026-05-23 | Added backend HTTP request-target character guard microservice example; probed tab and raw control-byte target rejection in string/byte helpers plus valid query-string target controls. | `go run ./cli/cmd/tetra check examples/microservices/backend/http/request/backend_http_request_target_char_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-http-request-target-char-guard examples/microservices/backend/http/request/backend_http_request_target_char_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_target_char_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_target_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_line_token_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/connection/backend_http_keep_alive_method_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_request_crlf_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0107` |
+| 2026-05-23 | Added backend PostgreSQL ASCII i32 overflow guard microservice example; probed out-of-range positive/negative ASCII integers in direct and DataRow parsing while preserving max/min i32 boundary controls. | `go run ./cli/cmd/tetra check examples/microservices/backend/postgres/ascii/backend_postgres_ascii_i32_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-ascii-i32-overflow-guard examples/microservices/backend/postgres/ascii/backend_postgres_ascii_i32_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/ascii/backend_postgres_ascii_i32_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/ascii/backend_postgres_ascii_i32_min_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/ascii/backend_postgres_ascii_i32_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_parser_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_data_row_length_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0108` |
+| 2026-05-23 | Added backend PostgreSQL CommandComplete affected-row overflow guard microservice example; probed out-of-range `UPDATE` and `INSERT` affected-row counts while preserving `2147483647` and valid subrange controls. | `go run ./cli/cmd/tetra check examples/microservices/backend/postgres/command/backend_postgres_command_tag_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-command-tag-overflow-guard examples/microservices/backend/postgres/command/backend_postgres_command_tag_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/command/backend_postgres_command_tag_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/command/backend_postgres_command_tag_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_parser_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/ascii/backend_postgres_ascii_i32_overflow_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/pgrt -count=1` | `TETRA-BUG-0109` |
+| 2026-05-23 | Added backend PostgreSQL CommandComplete trailing-count guard microservice example; probed malformed non-trailing digit runs such as `UPDATE 12 rows` while preserving valid trailing `UPDATE`, `INSERT`, and subrange controls. | `go run ./cli/cmd/tetra check examples/microservices/backend/postgres/command/backend_postgres_command_tag_trailing_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-command-tag-trailing-guard examples/microservices/backend/postgres/command/backend_postgres_command_tag_trailing_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/command/backend_postgres_command_tag_trailing_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/command/backend_postgres_command_tag_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/command/backend_postgres_command_tag_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_parser_short_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/pgrt -count=1` | `TETRA-BUG-0110` |
+| 2026-05-23 | Added backend PostgreSQL DataRow truncated-value guard microservice example; probed advertised positive value lengths whose physical bytes are missing while preserving valid and empty DataRow value controls. | `go run ./cli/cmd/tetra check examples/microservices/backend/postgres/row/backend_postgres_data_row_truncated_value_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-data-row-truncated-value-guard examples/microservices/backend/postgres/row/backend_postgres_data_row_truncated_value_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_data_row_truncated_value_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_data_row_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_data_row_length_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_result_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/pgrt -count=1` | `TETRA-BUG-0111` |
+| 2026-05-23 | Added backend PostgreSQL frame total-length overflow guard microservice example; probed maximum valid typed-frame total length plus signed maximum length whose tag-inclusive total would overflow. | `go run ./cli/cmd/tetra check examples/microservices/backend/postgres/frame/backend_postgres_frame_total_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-frame-total-overflow-guard examples/microservices/backend/postgres/frame/backend_postgres_frame_total_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_total_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_header_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_signed_length_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_short_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/pgrt -count=1` | `TETRA-BUG-0112` |
+| 2026-05-23 | Added backend HTTP negative Content-Length guard microservice example; probed response-head sizing and writing for negative Content-Length rejection while preserving zero and positive length controls. | `go run ./cli/cmd/tetra check examples/microservices/backend/http/request/backend_http_negative_content_length_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-http-negative-content-length-guard examples/microservices/backend/http/request/backend_http_negative_content_length_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_negative_content_length_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/writer/backend_http_response_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/json/backend_http_json_i32_min_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0113` |
+| 2026-05-23 | Added backend HTTP status-code guard microservice example; probed response-head sizing and writing for non-three-digit status-code rejection while preserving `100`, `200`, and `999` controls. | `go run ./cli/cmd/tetra check examples/microservices/backend/http/response/backend_http_status_code_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-http-status-code-guard examples/microservices/backend/http/response/backend_http_status_code_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_code_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_negative_content_length_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/writer/backend_http_response_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0114` |
+| 2026-05-23 | Added backend HTTP header injection guard microservice example; probed CR/LF injection rejection for header names, header values, response reason text, and response header fields while preserving valid header/response controls. | `go run ./cli/cmd/tetra check examples/microservices/backend/http/headers/backend_http_header_injection_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-http-header-injection-guard examples/microservices/backend/http/headers/backend_http_header_injection_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/headers/backend_http_header_injection_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_code_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_negative_content_length_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/writer/backend_http_response_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0115` |
+| 2026-05-23 | Added backend HTTP header control-byte guard microservice example; probed non-HTAB control-byte rejection for header values, response reason text, and response header fields while preserving valid HTAB values. | `go run ./cli/cmd/tetra check examples/microservices/backend/http/headers/backend_http_header_control_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-http-header-control-guard examples/microservices/backend/http/headers/backend_http_header_control_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/headers/backend_http_header_control_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/headers/backend_http_header_injection_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_code_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/request/backend_http_negative_content_length_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/writer/backend_http_response_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/http/response/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0116` |
+| 2026-05-23 | Added backend PostgreSQL Parse parameter-count guard microservice example; probed signed i16 OID-count overflow rejection for Parse frame sizing and writing while preserving small valid Parse frames. | `go run ./cli/cmd/tetra check examples/microservices/backend/postgres/command/backend_postgres_parse_count_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-parse-count-guard examples/microservices/backend/postgres/command/backend_postgres_parse_count_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/command/backend_postgres_parse_count_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_prepared_pipeline_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/read/backend_postgres_parser_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_signed_write_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/pgrt -count=1` | `TETRA-BUG-0117` |
+| 2026-05-23 | Added backend net TCP port bounds guard microservice example; probed rejection of negative and above-range loopback bind ports while preserving ephemeral port `0`. | `go run ./cli/cmd/tetra check examples/microservices/backend/net/backend_net_port_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-net-port-bounds-guard examples/microservices/backend/net/backend_net_port_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/net/backend_net_port_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/net/backend_net_epoll_lifecycle_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/net/backend_net_epoll_event_bounds_guard_service.tetra`; `go test ./compiler -run 'TestBuildCoreNetSmoke|TestMicroserviceExamplesAndBugLedger|TestNetRuntimeSocketLifecycleBuildAndRunLinuxX64|TestNetRuntimeEpollWaitOneIntoBuildAndRunLinuxX64' -count=1`; `go test ./compiler/internal/actorsrt -count=1` | `TETRA-BUG-0118` |
+| 2026-05-23 | Added backend PostgreSQL signed column-count guard microservice example; probed high-bit RowDescription/DataRow count rejection while preserving one-column payload controls. | `go run ./cli/cmd/tetra check examples/microservices/backend/postgres/row/backend_postgres_column_count_signed_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-column-count-signed-guard examples/microservices/backend/postgres/row/backend_postgres_column_count_signed_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_column_count_signed_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_column_count_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_row_description_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/row/backend_postgres_data_row_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/pgrt -count=1` | `TETRA-BUG-0119` |
+| 2026-05-23 | Added backend PostgreSQL embedded-NUL C-string guard microservice example; probed C-string length/writer rejection for startup, query, statement, and portal fields while preserving valid frame controls. | `go run ./cli/cmd/tetra check examples/microservices/backend/postgres/protocol/backend_postgres_cstring_nul_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-cstring-nul-guard examples/microservices/backend/postgres/protocol/backend_postgres_cstring_nul_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_cstring_nul_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/write/backend_postgres_text_write_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/frame/backend_postgres_frame_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_session_state_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend/postgres/protocol/backend_postgres_prepared_pipeline_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/pgrt -count=1` | `TETRA-BUG-0120` |
 
 ## Notes
 

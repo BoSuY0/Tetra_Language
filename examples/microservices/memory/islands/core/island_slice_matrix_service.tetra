@@ -1,0 +1,27 @@
+// Island slice matrix microservice smoke.
+//
+// The service allocates multiple typed slices inside one scoped island and
+// verifies integer, byte, and boolean lanes before the region expires.
+module examples.microservices.memory.islands.core.island_slice_matrix_service
+import lib.core.slices as slices
+
+func main() -> Int
+uses alloc, islands, mem:
+    var total: Int = 0
+    island(256) as isl:
+        var ints: []i32 = core.island_make_i32(isl, 3)
+        ints[0] = 10
+        ints[1] = 20
+        ints[2] = 12
+        var bytes: []u8 = core.island_make_u8(isl, 3)
+        bytes[0] = 5
+        bytes[1] = 7
+        bytes[2] = 30
+        var flags: []bool = core.island_make_bool(isl, 2)
+        flags[0] = true
+        flags[1] = false
+        if flags[0] && !flags[1]:
+            total = slices.sum_i32(ints) + slices.sum_u8(bytes)
+    if total == 84:
+        return 0
+    return total

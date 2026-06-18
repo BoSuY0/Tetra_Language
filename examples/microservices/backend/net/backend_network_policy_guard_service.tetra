@@ -1,0 +1,32 @@
+// Backend networking policy guard microservice smoke.
+module examples.microservices.backend.net.backend_network_policy_guard_service
+import lib.core.networking as networking
+
+func main() -> Int:
+    if networking.default_port_http() != 80:
+        return 1
+    if networking.default_port_https() != 443:
+        return 2
+    if networking.clamp_port(-7) != 0:
+        return 3
+    if networking.clamp_port(70000) != 65535:
+        return 4
+    if !networking.is_valid_port(0) || !networking.is_valid_port(65535):
+        return 5
+    if networking.is_valid_port(-1) || networking.is_valid_port(65536):
+        return 6
+    if networking.choose_port(8080, 443) != 8080:
+        return 7
+    if networking.choose_port(0, 8443) != 8443:
+        return 8
+    if networking.choose_port(-1, 70000) != 65535:
+        return 9
+    if networking.retry_backoff_ms(0, 7, 42) != 7:
+        return 10
+    if networking.retry_backoff_ms(3, 7, 42) != 42:
+        return 11
+    if networking.retry_backoff_ms(2, -5, 100) != 0:
+        return 12
+    if networking.retry_backoff_ms(2, 3, -1) != 12:
+        return 13
+    return 0

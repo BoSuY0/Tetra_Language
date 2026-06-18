@@ -1,1 +1,5 @@
-{"validator":"toolkit","mutation":"missing_checkbox","expected_error":"Checkbox"}
+{
+  "validator": "toolkit",
+  "mutation": "missing_checkbox",
+  "expected_error": "Checkbox"
+}

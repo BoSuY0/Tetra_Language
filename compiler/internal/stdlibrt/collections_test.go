@@ -118,10 +118,12 @@ func TestRegionAwareStdlibHelpersUseRegionReportsAndBorrowedViews(t *testing.T) 
 	if err != nil {
 		t.Fatalf("StringBuilder.View: %v", err)
 	}
-	if string(builderView.Bytes) != "hello world" || builderView.Storage != StorageRegion || builderView.RegionID != "stdlib-region" {
+	if string(builderView.Bytes) != "hello world" || builderView.Storage != StorageRegion ||
+		builderView.RegionID != "stdlib-region" {
 		t.Fatalf("builder view = %#v", builderView)
 	}
-	if report := builder.Report(); report.Component != "StringBuilder" || report.HiddenHeap || report.BytesUsed != len("hello world") {
+	if report := builder.Report(); report.Component != "StringBuilder" || report.HiddenHeap ||
+		report.BytesUsed != len("hello world") {
 		t.Fatalf("builder report = %#v", report)
 	}
 
@@ -139,10 +141,13 @@ func TestRegionAwareStdlibHelpersUseRegionReportsAndBorrowedViews(t *testing.T) 
 	if err != nil {
 		t.Fatalf("VecBytes.View: %v", err)
 	}
-	if string(vecView.Bytes) != "abc" || vecView.Storage != StorageRegion || vecView.RegionID != "stdlib-region" {
+	if string(vecView.Bytes) != "abc" || vecView.Storage != StorageRegion ||
+		vecView.RegionID != "stdlib-region" {
 		t.Fatalf("vec view = %#v", vecView)
 	}
-	if report := vec.Report(); report.Component != "Vec" || report.HiddenHeap || report.CopyOperations != 1 || report.BytesCopied != 2 {
+	if report := vec.Report(); report.Component != "Vec" || report.HiddenHeap ||
+		report.CopyOperations != 1 ||
+		report.BytesCopied != 2 {
 		t.Fatalf("vec report = %#v", report)
 	}
 
@@ -157,10 +162,14 @@ func TestRegionAwareStdlibHelpersUseRegionReportsAndBorrowedViews(t *testing.T) 
 	if !ok {
 		t.Fatalf("HashMapBytes.Get missing key")
 	}
-	if string(hashView.Bytes) != "ok" || hashView.Storage != StorageRegion || hashView.RegionID != "stdlib-region" || hashView.Copied {
+	if string(hashView.Bytes) != "ok" || hashView.Storage != StorageRegion ||
+		hashView.RegionID != "stdlib-region" ||
+		hashView.Copied {
 		t.Fatalf("hash map value view = %#v", hashView)
 	}
-	if report := hash.Report(); report.Component != "HashMap" || report.HiddenHeap || report.CopyOperations != 2 || report.BytesCopied != len("message")+len("ok") {
+	if report := hash.Report(); report.Component != "HashMap" || report.HiddenHeap ||
+		report.CopyOperations != 2 ||
+		report.BytesCopied != len("message")+len("ok") {
 		t.Fatalf("hash map report = %#v", report)
 	}
 
@@ -188,10 +197,13 @@ func TestRegionAwareStdlibHelpersUseRegionReportsAndBorrowedViews(t *testing.T) 
 	if err != nil {
 		t.Fatalf("RingBuffer.PeekView wrapped: %v", err)
 	}
-	if string(copied.Bytes) != "fXYZ" || !copied.Copied || copied.Storage != StorageRegion || copied.RegionID != "stdlib-region" {
+	if string(copied.Bytes) != "fXYZ" || !copied.Copied || copied.Storage != StorageRegion ||
+		copied.RegionID != "stdlib-region" {
 		t.Fatalf("wrapped ring view = %#v", copied)
 	}
-	if report := ring.Report(); report.Component != "RingBuffer" || report.HiddenHeap || report.CopyOperations != 1 || report.BytesCopied != 4 {
+	if report := ring.Report(); report.Component != "RingBuffer" || report.HiddenHeap ||
+		report.CopyOperations != 1 ||
+		report.BytesCopied != 4 {
 		t.Fatalf("ring report = %#v", report)
 	}
 }
@@ -207,7 +219,8 @@ func TestRegionAwareStdlibCoverageCoversP19PlanList(t *testing.T) {
 	if report.SchemaVersion != "tetra.stdlib.region_aware.v1" {
 		t.Fatalf("schema = %q", report.SchemaVersion)
 	}
-	if report.FullProductionWebStackClaimed || report.OfficialTechEmpowerResultClaimed || report.ProductionPostgreSQLStackClaimed {
+	if report.FullProductionWebStackClaimed || report.OfficialTechEmpowerResultClaimed ||
+		report.ProductionPostgreSQLStackClaimed {
 		t.Fatalf("P19.0 must not promote production web/db claims: %#v", report)
 	}
 	for _, want := range []string{
@@ -251,18 +264,84 @@ func TestRegionAwareStdlibCoverageCoversP19PlanList(t *testing.T) {
 		}
 	}
 
-	requireStdlibCoverageFacts(t, byID[RegionStdlibStringBuilder], "NewStringBuilder", "StorageRegion", "borrowed BytesView")
-	requireStdlibCoverageFacts(t, byID[RegionStdlibVecArray], "NewVecBytes", "Vec/Array equivalent", "CopyOperations")
-	requireStdlibCoverageFacts(t, byID[RegionStdlibHashMap], "NewHashMapBytes", "open addressing", "BytesCopied")
-	requireStdlibCoverageFacts(t, byID[RegionStdlibJSONParserBuilder], "ParseValueView", "AppendValue", "BorrowedStrings", "CopiedStrings")
-	requireStdlibCoverageFacts(t, byID[RegionStdlibHTTPParserBuilder], "ParseRequestViewInRegion", "AppendResponseWithReport", "HeaderViewsBorrowed")
-	requireStdlibCoverageFacts(t, byID[RegionStdlibPostgreSQLProtocol], "AppendBindFormat", "DecodeDataRowBorrowed", "RowDecodeReport")
+	requireStdlibCoverageFacts(
+		t,
+		byID[RegionStdlibStringBuilder],
+		"NewStringBuilder",
+		"StorageRegion",
+		"borrowed BytesView",
+	)
+	requireStdlibCoverageFacts(
+		t,
+		byID[RegionStdlibVecArray],
+		"NewVecBytes",
+		"Vec/Array equivalent",
+		"CopyOperations",
+	)
+	requireStdlibCoverageFacts(
+		t,
+		byID[RegionStdlibHashMap],
+		"NewHashMapBytes",
+		"open addressing",
+		"BytesCopied",
+	)
+	requireStdlibCoverageFacts(
+		t,
+		byID[RegionStdlibJSONParserBuilder],
+		"ParseValueView",
+		"AppendValue",
+		"BorrowedStrings",
+		"CopiedStrings",
+	)
+	requireStdlibCoverageFacts(
+		t,
+		byID[RegionStdlibHTTPParserBuilder],
+		"ParseRequestViewInRegion",
+		"AppendResponseWithReport",
+		"HeaderViewsBorrowed",
+	)
+	requireStdlibCoverageFacts(
+		t,
+		byID[RegionStdlibPostgreSQLProtocol],
+		"AppendBindFormat",
+		"DecodeDataRowBorrowed",
+		"RowDecodeReport",
+	)
 	requireStdlibCoverageFacts(t, byID[RegionStdlibBuffers], "NewByteBuffer", "StorageReport")
-	requireStdlibCoverageFacts(t, byID[RegionStdlibRingBuffers], "NewRingBuffer", "wrapped readable window", "Copied")
-	requireStdlibCoverageFacts(t, byID[RegionStdlibBorrowedViews], "BytesView", "StorageBorrowed", "StorageRegion")
-	requireStdlibCoverageFacts(t, byID[RegionStdlibCopyReports], "copy only when needed", "CopyOperations", "BytesCopied")
-	requireStdlibCoverageFacts(t, byID[RegionStdlibNoHiddenHeapReports], "HiddenHeap=false", "HeapAllocations=0")
-	requireStdlibCoverageFacts(t, byID[RegionStdlibProductionBoundaries], "no full production web stack", "no official TechEmpower", "no production PostgreSQL")
+	requireStdlibCoverageFacts(
+		t,
+		byID[RegionStdlibRingBuffers],
+		"NewRingBuffer",
+		"wrapped readable window",
+		"Copied",
+	)
+	requireStdlibCoverageFacts(
+		t,
+		byID[RegionStdlibBorrowedViews],
+		"BytesView",
+		"StorageBorrowed",
+		"StorageRegion",
+	)
+	requireStdlibCoverageFacts(
+		t,
+		byID[RegionStdlibCopyReports],
+		"copy only when needed",
+		"CopyOperations",
+		"BytesCopied",
+	)
+	requireStdlibCoverageFacts(
+		t,
+		byID[RegionStdlibNoHiddenHeapReports],
+		"HiddenHeap=false",
+		"HeapAllocations=0",
+	)
+	requireStdlibCoverageFacts(
+		t,
+		byID[RegionStdlibProductionBoundaries],
+		"no full production web stack",
+		"no official TechEmpower",
+		"no production PostgreSQL",
+	)
 }
 
 func TestRegionAwareStdlibCoverageRejectsFakeClaims(t *testing.T) {
@@ -276,19 +355,22 @@ func TestRegionAwareStdlibCoverageRejectsFakeClaims(t *testing.T) {
 
 	fakeWeb := cloneStdlibCoverage(report)
 	fakeWeb.FullProductionWebStackClaimed = true
-	if err := ValidateRegionAwareStdlibCoverage(fakeWeb); err == nil || !strings.Contains(err.Error(), "full production web stack") {
+	if err := ValidateRegionAwareStdlibCoverage(fakeWeb); err == nil ||
+		!strings.Contains(err.Error(), "full production web stack") {
 		t.Fatalf("fake web-stack claim error = %v", err)
 	}
 
 	fakeTechEmpower := cloneStdlibCoverage(report)
 	fakeTechEmpower.OfficialTechEmpowerResultClaimed = true
-	if err := ValidateRegionAwareStdlibCoverage(fakeTechEmpower); err == nil || !strings.Contains(err.Error(), "TechEmpower") {
+	if err := ValidateRegionAwareStdlibCoverage(fakeTechEmpower); err == nil ||
+		!strings.Contains(err.Error(), "TechEmpower") {
 		t.Fatalf("fake TechEmpower claim error = %v", err)
 	}
 
 	fakePostgres := cloneStdlibCoverage(report)
 	fakePostgres.ProductionPostgreSQLStackClaimed = true
-	if err := ValidateRegionAwareStdlibCoverage(fakePostgres); err == nil || !strings.Contains(err.Error(), "PostgreSQL") {
+	if err := ValidateRegionAwareStdlibCoverage(fakePostgres); err == nil ||
+		!strings.Contains(err.Error(), "PostgreSQL") {
 		t.Fatalf("fake PostgreSQL claim error = %v", err)
 	}
 
@@ -298,7 +380,8 @@ func TestRegionAwareStdlibCoverageRejectsFakeClaims(t *testing.T) {
 			hiddenHeap.Rows[i].HiddenHeapInHotPath = true
 		}
 	}
-	if err := ValidateRegionAwareStdlibCoverage(hiddenHeap); err == nil || !strings.Contains(err.Error(), "hidden heap") {
+	if err := ValidateRegionAwareStdlibCoverage(hiddenHeap); err == nil ||
+		!strings.Contains(err.Error(), "hidden heap") {
 		t.Fatalf("hidden heap claim error = %v", err)
 	}
 
@@ -308,13 +391,15 @@ func TestRegionAwareStdlibCoverageRejectsFakeClaims(t *testing.T) {
 			missingBorrowedViews.Rows[i].RequiredFacts = []string{"BytesView only"}
 		}
 	}
-	if err := ValidateRegionAwareStdlibCoverage(missingBorrowedViews); err == nil || !strings.Contains(err.Error(), "borrowed") {
+	if err := ValidateRegionAwareStdlibCoverage(missingBorrowedViews); err == nil ||
+		!strings.Contains(err.Error(), "borrowed") {
 		t.Fatalf("missing borrowed-view facts error = %v", err)
 	}
 
 	noNonClaims := cloneStdlibCoverage(report)
 	noNonClaims.NonClaims = nil
-	if err := ValidateRegionAwareStdlibCoverage(noNonClaims); err == nil || !strings.Contains(err.Error(), "non-claim") {
+	if err := ValidateRegionAwareStdlibCoverage(noNonClaims); err == nil ||
+		!strings.Contains(err.Error(), "non-claim") {
 		t.Fatalf("missing non-claim error = %v", err)
 	}
 }
@@ -330,7 +415,8 @@ func TestStableGenericCollectionsCoverageCoversP19PlanList(t *testing.T) {
 	if report.SchemaVersion != "tetra.stdlib.generic_collections.v1" {
 		t.Fatalf("schema = %q", report.SchemaVersion)
 	}
-	if report.CPlusPlusRustParityClaimed || report.BroadProductionStdlibClaimed || report.HiddenRuntimeAllocatorClaimed {
+	if report.CPlusPlusRustParityClaimed || report.BroadProductionStdlibClaimed ||
+		report.HiddenRuntimeAllocatorClaimed {
 		t.Fatalf("P19.1 foundation must not promote broad/parity/allocator claims: %#v", report)
 	}
 	for _, want := range []string{
@@ -365,19 +451,53 @@ func TestStableGenericCollectionsCoverageCoversP19PlanList(t *testing.T) {
 		}
 	}
 
-	requireStableGenericCollectionsFacts(t, byID[StableGenericCollectionsTetraSourceAPI], "lib.core.collections.Vec<T>", "HashMap<K,V>", "caller-owned slices")
-	requireStableGenericCollectionsFacts(t, byID[StableGenericCollectionsValueRepresentation], "genericTypeName", "mangleGenericName", "[]T")
-	requireStableGenericCollectionsFacts(t, byID[StableGenericCollectionsMonomorphizedOperations], "vec_from_slice<T>", "hash_map_from_slices<K,V>", "concrete before lowering")
-	requireStableGenericCollectionsFacts(t, byID[StableGenericCollectionsCommonSpecializations], "hash_map_get_i32_i32_or", "hash_map_get_u8_i32_or")
-	requireStableGenericCollectionsFacts(t, byID[StableGenericCollectionsAllocationReports], "core.make_*", "allocation-plan reports", "no internal allocation")
+	requireStableGenericCollectionsFacts(
+		t,
+		byID[StableGenericCollectionsTetraSourceAPI],
+		"lib.core.collections.Vec<T>",
+		"HashMap<K,V>",
+		"caller-owned slices",
+	)
+	requireStableGenericCollectionsFacts(
+		t,
+		byID[StableGenericCollectionsValueRepresentation],
+		"genericTypeName",
+		"mangleGenericName",
+		"[]T",
+	)
+	requireStableGenericCollectionsFacts(
+		t,
+		byID[StableGenericCollectionsMonomorphizedOperations],
+		"vec_from_slice<T>",
+		"hash_map_from_slices<K,V>",
+		"concrete before lowering",
+	)
+	requireStableGenericCollectionsFacts(
+		t,
+		byID[StableGenericCollectionsCommonSpecializations],
+		"hash_map_get_i32_i32_or",
+		"hash_map_get_u8_i32_or",
+	)
+	requireStableGenericCollectionsFacts(
+		t,
+		byID[StableGenericCollectionsAllocationReports],
+		"core.make_*",
+		"allocation-plan reports",
+		"no internal allocation",
+	)
 	benchmarkGate := byID[StableGenericCollectionsBenchmarkGate]
 	if benchmarkGate.Status != StableGenericCollectionsEvidenceOnly {
-		t.Fatalf("benchmark gate status = %q, want checked evidence-only artifact", benchmarkGate.Status)
+		t.Fatalf(
+			"benchmark gate status = %q, want checked evidence-only artifact",
+			benchmarkGate.Status,
+		)
 	}
 	if len(benchmarkGate.MissingFacts) != 0 {
 		t.Fatalf("benchmark gate still has missing facts: %#v", benchmarkGate.MissingFacts)
 	}
-	requireStableGenericCollectionsFacts(t, benchmarkGate,
+	requireStableGenericCollectionsFacts(
+		t,
+		benchmarkGate,
 		"truth-bench-harness",
 		"p19.1_generic_collections",
 		"reports/stable-generic-collections-v1/benchmarks/generic-collections-hash-table-manifest.json",
@@ -402,19 +522,22 @@ func TestStableGenericCollectionsCoverageRejectsFakeClaims(t *testing.T) {
 
 	fakeParity := cloneStableGenericCollectionsCoverage(report)
 	fakeParity.CPlusPlusRustParityClaimed = true
-	if err := ValidateStableGenericCollectionsCoverage(fakeParity); err == nil || !strings.Contains(err.Error(), "C++/Rust parity") {
+	if err := ValidateStableGenericCollectionsCoverage(fakeParity); err == nil ||
+		!strings.Contains(err.Error(), "C++/Rust parity") {
 		t.Fatalf("fake parity claim error = %v", err)
 	}
 
 	fakeProduction := cloneStableGenericCollectionsCoverage(report)
 	fakeProduction.BroadProductionStdlibClaimed = true
-	if err := ValidateStableGenericCollectionsCoverage(fakeProduction); err == nil || !strings.Contains(err.Error(), "broad production stdlib") {
+	if err := ValidateStableGenericCollectionsCoverage(fakeProduction); err == nil ||
+		!strings.Contains(err.Error(), "broad production stdlib") {
 		t.Fatalf("fake production claim error = %v", err)
 	}
 
 	hiddenAllocator := cloneStableGenericCollectionsCoverage(report)
 	hiddenAllocator.HiddenRuntimeAllocatorClaimed = true
-	if err := ValidateStableGenericCollectionsCoverage(hiddenAllocator); err == nil || !strings.Contains(err.Error(), "hidden runtime allocator") {
+	if err := ValidateStableGenericCollectionsCoverage(hiddenAllocator); err == nil ||
+		!strings.Contains(err.Error(), "hidden runtime allocator") {
 		t.Fatalf("hidden allocator claim error = %v", err)
 	}
 
@@ -424,7 +547,8 @@ func TestStableGenericCollectionsCoverageRejectsFakeClaims(t *testing.T) {
 			missingAllocationReports.Rows[i].RequiredFacts = []string{"core.make_* only"}
 		}
 	}
-	if err := ValidateStableGenericCollectionsCoverage(missingAllocationReports); err == nil || !strings.Contains(err.Error(), "allocation-plan reports") {
+	if err := ValidateStableGenericCollectionsCoverage(missingAllocationReports); err == nil ||
+		!strings.Contains(err.Error(), "allocation-plan reports") {
 		t.Fatalf("missing allocation report facts error = %v", err)
 	}
 
@@ -434,7 +558,8 @@ func TestStableGenericCollectionsCoverageRejectsFakeClaims(t *testing.T) {
 			fakeBenchmark.Rows[i].Status = "implemented_benchmark_parity"
 		}
 	}
-	if err := ValidateStableGenericCollectionsCoverage(fakeBenchmark); err == nil || !strings.Contains(err.Error(), "benchmark parity") {
+	if err := ValidateStableGenericCollectionsCoverage(fakeBenchmark); err == nil ||
+		!strings.Contains(err.Error(), "benchmark parity") {
 		t.Fatalf("fake benchmark parity error = %v", err)
 	}
 }
@@ -464,7 +589,11 @@ func cloneStdlibCoverage(report RegionAwareStdlibCoverageReport) RegionAwareStdl
 	return clone
 }
 
-func requireStableGenericCollectionsFacts(t *testing.T, row StableGenericCollectionsEvidenceRow, wants ...string) {
+func requireStableGenericCollectionsFacts(
+	t *testing.T,
+	row StableGenericCollectionsEvidenceRow,
+	wants ...string,
+) {
 	t.Helper()
 	for _, want := range wants {
 		if !hasStdlibCoverageText(row.RequiredFacts, want) {
@@ -473,7 +602,9 @@ func requireStableGenericCollectionsFacts(t *testing.T, row StableGenericCollect
 	}
 }
 
-func cloneStableGenericCollectionsCoverage(report StableGenericCollectionsCoverageReport) StableGenericCollectionsCoverageReport {
+func cloneStableGenericCollectionsCoverage(
+	report StableGenericCollectionsCoverageReport,
+) StableGenericCollectionsCoverageReport {
 	clone := report
 	clone.Rows = append([]StableGenericCollectionsEvidenceRow(nil), report.Rows...)
 	clone.NonClaims = append([]string(nil), report.NonClaims...)

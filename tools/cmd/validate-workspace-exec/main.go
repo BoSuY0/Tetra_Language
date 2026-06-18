@@ -32,7 +32,12 @@ type workspaceExecMember struct {
 
 func main() {
 	var reportPath string
-	flag.StringVar(&reportPath, "report", "", "path to tetra workspace build/test --format=json output")
+	flag.StringVar(
+		&reportPath,
+		"report",
+		"",
+		"path to tetra workspace build/test --format=json output",
+	)
 	flag.Parse()
 	if reportPath == "" {
 		fmt.Fprintln(os.Stderr, "error: --report is required")
@@ -93,10 +98,20 @@ func validateWorkspaceExecReport(raw []byte) error {
 			skipped++
 		}
 	}
-	if report.Total != len(report.Members) || report.Passed != passed || report.Failed != failed || report.Skipped != skipped {
-		return fmt.Errorf("count mismatch: got total=%d passed=%d failed=%d skipped=%d, computed total=%d passed=%d failed=%d skipped=%d",
-			report.Total, report.Passed, report.Failed, report.Skipped,
-			len(report.Members), passed, failed, skipped)
+	if report.Total != len(report.Members) || report.Passed != passed || report.Failed != failed ||
+		report.Skipped != skipped {
+		return fmt.Errorf(
+			("count mismatch: got total=%d passed=%d failed=%d skipped=%d, " +
+				"computed total=%d passed=%d failed=%d skipped=%d"),
+			report.Total,
+			report.Passed,
+			report.Failed,
+			report.Skipped,
+			len(report.Members),
+			passed,
+			failed,
+			skipped,
+		)
 	}
 	return nil
 }
@@ -122,7 +137,9 @@ func validateWorkspaceExecMember(member workspaceExecMember) error {
 	if strings.TrimSpace(member.Path) == "" {
 		return fmt.Errorf("member missing path")
 	}
-	if isWorkspaceExecWindowsAbsPath(member.Path) || filepath.IsAbs(member.Path) || filepath.Clean(member.Path) == "." || strings.HasPrefix(filepath.ToSlash(filepath.Clean(member.Path)), "../") {
+	if isWorkspaceExecWindowsAbsPath(member.Path) || filepath.IsAbs(member.Path) ||
+		filepath.Clean(member.Path) == "." ||
+		strings.HasPrefix(filepath.ToSlash(filepath.Clean(member.Path)), "../") {
 		return fmt.Errorf("member %s path must be workspace-relative", member.Path)
 	}
 	if strings.Contains(member.Path, `\`) {
@@ -137,7 +154,11 @@ func validateWorkspaceExecMember(member workspaceExecMember) error {
 			return fmt.Errorf("pass member %s missing exit_code", member.Path)
 		}
 		if *member.ExitCode != 0 {
-			return fmt.Errorf("pass member %s has non-zero exit_code %d", member.Path, *member.ExitCode)
+			return fmt.Errorf(
+				"pass member %s has non-zero exit_code %d",
+				member.Path,
+				*member.ExitCode,
+			)
 		}
 	case "fail":
 		if member.ExitCode == nil {
@@ -151,13 +172,18 @@ func validateWorkspaceExecMember(member workspaceExecMember) error {
 			return fmt.Errorf("skipped member %s must not include exit_code", member.Path)
 		}
 	default:
-		return fmt.Errorf("member %s status = %q, want pass, fail, or skipped", member.Path, member.Status)
+		return fmt.Errorf(
+			"member %s status = %q, want pass, fail, or skipped",
+			member.Path,
+			member.Status,
+		)
 	}
 	return nil
 }
 
 func isWorkspaceExecWindowsAbsPath(memberPath string) bool {
-	if len(memberPath) >= 3 && isASCIIAlpha(memberPath[0]) && memberPath[1] == ':' && (memberPath[2] == '\\' || memberPath[2] == '/') {
+	if len(memberPath) >= 3 && isASCIIAlpha(memberPath[0]) && memberPath[1] == ':' &&
+		(memberPath[2] == '\\' || memberPath[2] == '/') {
 		return true
 	}
 	return strings.HasPrefix(memberPath, `\\`)

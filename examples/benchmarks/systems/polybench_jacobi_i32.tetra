@@ -1,0 +1,38 @@
+// PolyBench-inspired 1D Jacobi stencil with Int values.
+module examples.benchmarks.systems.polybench_jacobi_i32
+
+func main() -> Int
+uses alloc, mem:
+    var a: []i32 = core.make_i32(8)
+    var b: []i32 = core.make_i32(8)
+    a[0] = 0
+    a[1] = 10
+    a[2] = 0
+    a[3] = 30
+    a[4] = 5
+    a[5] = 20
+    a[6] = 0
+    a[7] = 40
+    var i: Int = 0
+    while i < 8:
+        b[i] = a[i]
+        i = i + 1
+    var step: Int = 0
+    while step < 4:
+        i = 1
+        while i < 7:
+            b[i] = (a[i - 1] + a[i] + a[i + 1]) / 3
+            i = i + 1
+        i = 1
+        while i < 7:
+            a[i] = b[i]
+            i = i + 1
+        step = step + 1
+    var checksum: Int = 0
+    i = 0
+    while i < 8:
+        checksum = checksum + a[i] * (i + 1)
+        i = i + 1
+    if checksum == 758:
+        return 0
+    return checksum

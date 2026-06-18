@@ -46,7 +46,11 @@ type requestCommand struct {
 }
 
 func main() {
-	reportPath := flag.String("report", "", "path to tetra.ui.target-host-evidence-request.v1 JSON report")
+	reportPath := flag.String(
+		"report",
+		"",
+		"path to tetra.ui.target-host-evidence-request.v1 JSON report",
+	)
 	expectedRepo := flag.String("expected-repo", "", "expected OWNER/REPO repository")
 	expectedBranch := flag.String("expected-branch", "", "expected Git branch")
 	expectedVersion := flag.String("expected-version", "", "expected Tetra version")
@@ -80,13 +84,19 @@ func validateTargetHostEvidenceRequest(raw []byte, opts requestValidationOptions
 	}
 	var issues []string
 	if report.Schema != targetHostEvidenceRequestSchema {
-		issues = append(issues, fmt.Sprintf("schema is %q, want %q", report.Schema, targetHostEvidenceRequestSchema))
+		issues = append(
+			issues,
+			fmt.Sprintf("schema is %q, want %q", report.Schema, targetHostEvidenceRequestSchema),
+		)
 	}
 	if report.Status != "request" {
 		issues = append(issues, fmt.Sprintf("status is %q, want request", report.Status))
 	}
 	if report.ProductionEvidence {
-		issues = append(issues, "production_evidence must be false; target-host requests are not runtime evidence")
+		issues = append(
+			issues,
+			"production_evidence must be false; target-host requests are not runtime evidence",
+		)
 	}
 	for name, value := range map[string]string{
 		"repo":              report.Repo,
@@ -99,13 +109,28 @@ func validateTargetHostEvidenceRequest(raw []byte, opts requestValidationOptions
 			issues = append(issues, name+" is required")
 		}
 	}
-	if strings.Contains(report.Repo, "://") || strings.HasSuffix(report.Repo, ".git") || strings.Contains(report.Repo, " ") || !strings.Contains(report.Repo, "/") {
-		issues = append(issues, fmt.Sprintf("repo is %q, want OWNER/REPO without URL or .git suffix", report.Repo))
+	if strings.Contains(report.Repo, "://") || strings.HasSuffix(report.Repo, ".git") ||
+		strings.Contains(report.Repo, " ") ||
+		!strings.Contains(report.Repo, "/") {
+		issues = append(
+			issues,
+			fmt.Sprintf("repo is %q, want OWNER/REPO without URL or .git suffix", report.Repo),
+		)
 	}
 	issues = appendExpectedIssue(issues, "repo", report.Repo, opts.ExpectedRepo)
 	issues = appendExpectedIssue(issues, "branch", report.Branch, opts.ExpectedBranch)
-	issues = appendExpectedIssue(issues, "expected_version", report.ExpectedVersion, opts.ExpectedVersion)
-	issues = appendExpectedIssue(issues, "expected_git_head", report.ExpectedGitHead, opts.ExpectedGitHead)
+	issues = appendExpectedIssue(
+		issues,
+		"expected_version",
+		report.ExpectedVersion,
+		opts.ExpectedVersion,
+	)
+	issues = appendExpectedIssue(
+		issues,
+		"expected_git_head",
+		report.ExpectedGitHead,
+		opts.ExpectedGitHead,
+	)
 
 	claimText := strings.ToLower(report.Warning + " " + report.Aggregation.Command)
 	if strings.Contains(claimText, "ready") {
@@ -183,13 +208,23 @@ func validateTargetCommand(target requestTarget, report targetHostEvidenceReques
 	}
 	switch target.Target {
 	case "windows-x64":
-		for _, want := range []string{"windows-ui-runtime-smoke.ps1", "-ExpectedVersion " + report.ExpectedVersion, "-ExpectedGitHead " + report.ExpectedGitHead, "windows-ui-runtime.json"} {
+		for _, want := range []string{
+			"windows-ui-runtime-smoke.ps1",
+			"-ExpectedVersion " + report.ExpectedVersion,
+			"-ExpectedGitHead " + report.ExpectedGitHead,
+			"windows-ui-runtime.json",
+		} {
 			if !strings.Contains(command, want) {
 				issues = append(issues, fmt.Sprintf("%s missing %q", prefix, want))
 			}
 		}
 	case "macos-x64":
-		for _, want := range []string{"target-host-ui-runtime-smoke.sh --target macos-x64", "--expected-version " + report.ExpectedVersion, "--expected-git-head " + report.ExpectedGitHead, "macos-ui-runtime.json"} {
+		for _, want := range []string{
+			"target-host-ui-runtime-smoke.sh --target macos-x64",
+			"--expected-version " + report.ExpectedVersion,
+			"--expected-git-head " + report.ExpectedGitHead,
+			"macos-ui-runtime.json",
+		} {
 			if !strings.Contains(command, want) {
 				issues = append(issues, fmt.Sprintf("%s missing %q", prefix, want))
 			}
@@ -208,7 +243,11 @@ func validateAggregation(aggregation requestCommand) []string {
 	if strings.TrimSpace(aggregation.Command) == "" {
 		issues = append(issues, "aggregation.command is required")
 	}
-	for _, want := range []string{"TETRA_WINDOWS_UI_RUNTIME_REPORT", "TETRA_MACOS_UI_RUNTIME_REPORT", "ui-runtime-gate.sh"} {
+	for _, want := range []string{
+		"TETRA_WINDOWS_UI_RUNTIME_REPORT",
+		"TETRA_MACOS_UI_RUNTIME_REPORT",
+		"ui-runtime-gate.sh",
+	} {
 		if !strings.Contains(aggregation.Command, want) {
 			issues = append(issues, fmt.Sprintf("aggregation.command missing %q", want))
 		}

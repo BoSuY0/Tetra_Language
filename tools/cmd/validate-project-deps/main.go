@@ -31,7 +31,12 @@ var semverPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
 
 func main() {
 	var path string
-	flag.StringVar(&path, "report", "", "path to tetra project deps list/check --format=json output")
+	flag.StringVar(
+		&path,
+		"report",
+		"",
+		"path to tetra project deps list/check --format=json output",
+	)
 	flag.Parse()
 	if path == "" {
 		fmt.Fprintln(os.Stderr, "error: --report is required")
@@ -83,7 +88,12 @@ func validateProjectDepsReport(raw []byte) error {
 		hasIssue = hasIssue || issue
 		key := dep.ID + "\x00" + dep.Version + "\x00" + dep.Path
 		if dep.ID != "" && seen[key] {
-			return fmt.Errorf("project deps dependency %s %s %s is duplicated", dep.ID, dep.Version, dep.Path)
+			return fmt.Errorf(
+				"project deps dependency %s %s %s is duplicated",
+				dep.ID,
+				dep.Version,
+				dep.Path,
+			)
 		}
 		if dep.ID != "" {
 			seen[key] = true
@@ -113,28 +123,46 @@ func validateDependency(index int, dep projectDependencyReport) (bool, error) {
 		return false, fmt.Errorf("project deps dependency[%d] missing id", index)
 	}
 	if dep.ID != "" && !strings.HasPrefix(dep.ID, "tetra://") {
-		return false, fmt.Errorf("project deps dependency[%d] id %q must start with tetra://", index, dep.ID)
+		return false, fmt.Errorf(
+			"project deps dependency[%d] id %q must start with tetra://",
+			index,
+			dep.ID,
+		)
 	}
 	if dep.Version == "" && dep.Status != "fail" {
 		return false, fmt.Errorf("project deps dependency[%d] missing version", index)
 	}
 	if dep.Version != "" && !semverPattern.MatchString(dep.Version) {
-		return false, fmt.Errorf("project deps dependency[%d] version %q must use semver x.y.z", index, dep.Version)
+		return false, fmt.Errorf(
+			"project deps dependency[%d] version %q must use semver x.y.z",
+			index,
+			dep.Version,
+		)
 	}
 	if dep.Status == "ok" {
 		if strings.TrimSpace(dep.Path) == "" {
 			return false, fmt.Errorf("project deps dependency[%d] ok status requires path", index)
 		}
 		if strings.TrimSpace(dep.ResolvedPath) == "" {
-			return false, fmt.Errorf("project deps dependency[%d] ok status requires resolved_path", index)
+			return false, fmt.Errorf(
+				"project deps dependency[%d] ok status requires resolved_path",
+				index,
+			)
 		}
 		if dep.Detail != "" {
-			return false, fmt.Errorf("project deps dependency[%d] ok status must not include detail", index)
+			return false, fmt.Errorf(
+				"project deps dependency[%d] ok status must not include detail",
+				index,
+			)
 		}
 		return false, nil
 	}
 	if strings.TrimSpace(dep.Detail) == "" {
-		return false, fmt.Errorf("project deps dependency[%d] %s status requires detail", index, dep.Status)
+		return false, fmt.Errorf(
+			"project deps dependency[%d] %s status requires detail",
+			index,
+			dep.Status,
+		)
 	}
 	return true, nil
 }

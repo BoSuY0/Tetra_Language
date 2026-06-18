@@ -19,14 +19,25 @@ type morphReportValidationOptions struct {
 }
 
 func main() {
-	reportPath := flag.String("report", "", "path to tetra.surface.runtime.v1 report with morph evidence")
-	sameCommit := flag.String("same-commit", "", "require the report to validate at this git commit")
+	reportPath := flag.String(
+		"report",
+		"",
+		"path to tetra.surface.runtime.v1 report with morph evidence",
+	)
+	sameCommit := flag.String(
+		"same-commit",
+		"",
+		"require the report to validate at this git commit",
+	)
 	flag.Parse()
 	if *reportPath == "" {
 		fmt.Fprintln(os.Stderr, "error: --report is required")
 		os.Exit(2)
 	}
-	if err := validateSurfaceMorphReportWithOptions(*reportPath, morphReportValidationOptions{SameCommit: *sameCommit}); err != nil {
+	if err := validateSurfaceMorphReportWithOptions(
+		*reportPath,
+		morphReportValidationOptions{SameCommit: *sameCommit},
+	); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -36,7 +47,10 @@ func validateSurfaceMorphReport(path string) error {
 	return validateSurfaceMorphReportWithOptions(path, morphReportValidationOptions{})
 }
 
-func validateSurfaceMorphReportWithOptions(path string, options morphReportValidationOptions) error {
+func validateSurfaceMorphReportWithOptions(
+	path string,
+	options morphReportValidationOptions,
+) error {
 	if err := validateMorphReportPathSafety(path); err != nil {
 		return err
 	}
@@ -59,10 +73,14 @@ func validateSurfaceMorphReportWithOptions(path string, options morphReportValid
 	if report.Morph.Schema != "tetra.surface.morph.v1" {
 		return fmt.Errorf("morph schema is %q, want tetra.surface.morph.v1", report.Morph.Schema)
 	}
-	if report.BlockSystem == nil {
+	if report.BlockSystem == nil && !isTargetMorphRuntimeReport(report) {
 		return fmt.Errorf("surface Morph report requires block_system evidence")
 	}
-	if err := validateMorphReportArtifactLocality(path, report.ArtifactScan, report.Artifacts); err != nil {
+	if err := validateMorphReportArtifactLocality(
+		path,
+		report.ArtifactScan,
+		report.Artifacts,
+	); err != nil {
 		return err
 	}
 	if err := validateMorphReportArtifactFiles(filepath.Dir(path), report.Artifacts); err != nil {
@@ -78,6 +96,68 @@ func validateSurfaceMorphReportWithOptions(path string, options morphReportValid
 		}
 	}
 	return nil
+}
+
+func isBrowserCanvasMorphRuntimeReport(report surface.Report) bool {
+	if report.Target != "wasm32-web" ||
+		report.Runtime != "surface-wasm32-web" ||
+		report.HostEvidence.Level != "wasm32-web-browser-canvas-input" ||
+		!report.HostEvidence.BrowserCanvas ||
+		!report.HostEvidence.BrowserInput ||
+		report.RenderCommandStream == nil ||
+		report.RenderCommandStream.Renderer != "browser-canvas-rgba" {
+		return false
+	}
+	for _, frame := range report.Frames {
+		if strings.EqualFold(strings.TrimSpace(frame.Producer), "app") &&
+			strings.EqualFold(strings.TrimSpace(frame.EvidenceRole), "product_visual") &&
+			strings.TrimSpace(frame.ArtifactPath) != "" &&
+			strings.TrimSpace(
+				frame.RenderCommandStreamHash,
+			) == strings.TrimSpace(
+				report.RenderCommandStream.CommandStreamHash,
+			) {
+			return true
+		}
+	}
+	return false
+}
+
+func isLinuxRealWindowMorphRuntimeReport(report surface.Report) bool {
+	if report.Target != "linux-x64" ||
+		report.Runtime != "surface-linux-x64" ||
+		report.HostEvidence.Level != "linux-x64-real-window" ||
+		report.HostEvidence.Backend != "wayland-shm-rgba" ||
+		!report.HostEvidence.RealWindow ||
+		!report.HostEvidence.NativeInput ||
+		report.RenderCommandStream == nil ||
+		report.RenderCommandStream.Renderer != "wayland-shm-rgba" {
+		return false
+	}
+	return hasSourceLinkedProductVisualFrame(report)
+}
+
+func isTargetMorphRuntimeReport(report surface.Report) bool {
+	return isBrowserCanvasMorphRuntimeReport(report) || isLinuxRealWindowMorphRuntimeReport(report)
+}
+
+func hasSourceLinkedProductVisualFrame(report surface.Report) bool {
+	if report.RenderCommandStream == nil {
+		return false
+	}
+	for _, frame := range report.Frames {
+		if strings.EqualFold(strings.TrimSpace(frame.Producer), "app") &&
+			strings.EqualFold(strings.TrimSpace(frame.EvidenceRole), "product_visual") &&
+			strings.TrimSpace(frame.ArtifactPath) != "" &&
+			strings.TrimSpace(
+				frame.RenderCommandStreamHash,
+			) == strings.TrimSpace(
+				report.RenderCommandStream.CommandStreamHash,
+			) {
+			return true
+		}
+	}
+	return false
 }
 
 func validateMorphReportPathSafety(reportPath string) error {
@@ -109,7 +189,11 @@ func rejectSymlinkPath(path string) error {
 	}
 }
 
-func validateMorphReportArtifactLocality(reportPath string, scan surface.ArtifactScanReport, artifacts []surface.ArtifactReport) error {
+func validateMorphReportArtifactLocality(
+	reportPath string,
+	scan surface.ArtifactScanReport,
+	artifacts []surface.ArtifactReport,
+) error {
 	reportDir, err := filepath.Abs(filepath.Dir(reportPath))
 	if err != nil {
 		return err
@@ -120,7 +204,11 @@ func validateMorphReportArtifactLocality(reportPath string, scan surface.Artifac
 			return err
 		}
 		if !pathWithin(root, reportDir) {
-			return fmt.Errorf("artifact_scan.root %s is outside report dir %s", scan.Root, reportDir)
+			return fmt.Errorf(
+				"artifact_scan.root %s is outside report dir %s",
+				scan.Root,
+				reportDir,
+			)
 		}
 	}
 	for _, artifact := range artifacts {
@@ -129,7 +217,12 @@ func validateMorphReportArtifactLocality(reportPath string, scan surface.Artifac
 			return err
 		}
 		if !pathWithin(path, reportDir) {
-			return fmt.Errorf("artifact %s path %s is outside report dir %s", artifact.Kind, artifact.Path, reportDir)
+			return fmt.Errorf(
+				"artifact %s path %s is outside report dir %s",
+				artifact.Kind,
+				artifact.Path,
+				reportDir,
+			)
 		}
 	}
 	return nil
@@ -147,17 +240,32 @@ func validateMorphReportArtifactFiles(reportDir string, artifacts []surface.Arti
 		}
 		info, err := os.Lstat(path)
 		if err != nil {
-			return fmt.Errorf("artifact %s path %s cannot be read: %w", artifact.Kind, artifact.Path, err)
+			return fmt.Errorf(
+				"artifact %s path %s cannot be read: %w",
+				artifact.Kind,
+				artifact.Path,
+				err,
+			)
 		}
 		if info.Mode()&os.ModeSymlink != 0 {
 			return fmt.Errorf("artifact %s path %s is a symlink", artifact.Kind, artifact.Path)
 		}
 		raw, err := os.ReadFile(path)
 		if err != nil {
-			return fmt.Errorf("artifact %s path %s cannot be read: %w", artifact.Kind, artifact.Path, err)
+			return fmt.Errorf(
+				"artifact %s path %s cannot be read: %w",
+				artifact.Kind,
+				artifact.Path,
+				err,
+			)
 		}
 		if int64(len(raw)) != artifact.Size {
-			return fmt.Errorf("artifact %s size = %d, want %d", artifact.Kind, len(raw), artifact.Size)
+			return fmt.Errorf(
+				"artifact %s size = %d, want %d",
+				artifact.Kind,
+				len(raw),
+				artifact.Size,
+			)
 		}
 		sum := sha256.Sum256(raw)
 		want := strings.TrimSpace(artifact.SHA256)
@@ -187,7 +295,8 @@ func pathWithin(path string, root string) bool {
 	if err != nil {
 		return false
 	}
-	return rel == "." || (rel != "" && !strings.HasPrefix(rel, ".."+string(os.PathSeparator)) && rel != "..")
+	return rel == "." ||
+		(rel != "" && !strings.HasPrefix(rel, ".."+string(os.PathSeparator)) && rel != "..")
 }
 
 func validateSameCommit(expected string, actual string) error {
@@ -199,7 +308,8 @@ func validateSameCommit(expected string, actual string) error {
 	if actual == "" {
 		return fmt.Errorf("same-commit validation requires current git commit evidence")
 	}
-	if expected == actual || strings.HasPrefix(actual, expected) || strings.HasPrefix(expected, actual) {
+	if expected == actual || strings.HasPrefix(actual, expected) ||
+		strings.HasPrefix(expected, actual) {
 		return nil
 	}
 	return fmt.Errorf("same-commit mismatch: expected %s, got %s", expected, actual)

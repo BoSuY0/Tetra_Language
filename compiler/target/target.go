@@ -471,9 +471,11 @@ func UIRuntimeEvidence(triple string) string {
 	case "linux-x64":
 		return "scripts/release/post_v0_4/ui-production-runtime-linux-x64-smoke.sh"
 	case "windows-x64":
-		return "scripts/release/full_platform/windows-ui-runtime-smoke.sh --evidence <windows-target-host-report>"
+		return ("scripts/release/full_platform/windows-ui-runtime-smoke.sh --" +
+			"evidence <windows-target-host-report>")
 	case "macos-x64":
-		return "scripts/release/full_platform/macos-ui-runtime-smoke.sh --evidence <macos-target-host-report>"
+		return ("scripts/release/full_platform/macos-ui-runtime-smoke.sh --" +
+			"evidence <macos-target-host-report>")
 	case "wasm32-web":
 		return "scripts/release/v1_0/web-smoke.sh"
 	case "wasm32-wasi":
@@ -489,23 +491,42 @@ func Parse(triple string) (Target, error) {
 	switch canonical {
 	case "linux-x86":
 		return Target{
-			Triple:                   "linux-x86",
-			Status:                   StatusBuildOnly,
-			OS:                       OSLinux,
-			Arch:                     ArchX86,
-			ABI:                      ABI386SysV,
-			DataModel:                DataModelILP32,
-			Format:                   FormatELF,
-			ExeExt:                   "",
-			CollectImports:           false,
-			RunMode:                  RunModeHostProbed,
-			PointerWidthBits:         32,
-			RegisterWidthBits:        32,
-			NativeIntWidthBits:       32,
-			Endian:                   EndianLittle,
-			StackAlignmentBytes:      16,
-			MaxAtomicWidthBits:       32,
-			UnsupportedReason:        "full linux-x86 runtime/stdlib/FFI support is not implemented yet; no-runtime executable build/link, i386-compatible Linux run/test execution, stdout write/string literal data, stack-argument, scalar global, symbol-backed callback, heap-backed slice allocation/indexing, raw ptr_add/load/store, raw pointer-slot base/offset load/store executable smokes, MMIO read/write, scoped island bump allocation/free plus debug double-free guard/page-protect object codegen, ELF/linker primitives, i386 SysV ABI classifier, self-host logical time runtime smoke, fs_exists filesystem runtime plus filesystem/scheduler composition smoke, bounded two-spawn self-host actors/task/task-group runtime smokes, single-spawn typed-task/staged typed-task/typed task-group plus actor-state runtime smoke, i386 ctx_switch object smoke, current core.net networking runtime smokes, Surface, distributed actors, and actor fanout above 2 runtime boundary diagnostics, x86 canonical ptr/rawptr/nullable_ptr/ref, c_int/c_uint, and complete ILP32 native/libc scalar @export object smokes, x86 function-pointer @export diagnostics, remaining source target-layout scalar diagnostics, pointer-only atomic ABI-width object check, source-level atomic diagnostics, and full 8/16/32-bit atomic/fuzz object checks are available",
+			Triple:              "linux-x86",
+			Status:              StatusBuildOnly,
+			OS:                  OSLinux,
+			Arch:                ArchX86,
+			ABI:                 ABI386SysV,
+			DataModel:           DataModelILP32,
+			Format:              FormatELF,
+			ExeExt:              "",
+			CollectImports:      false,
+			RunMode:             RunModeHostProbed,
+			PointerWidthBits:    32,
+			RegisterWidthBits:   32,
+			NativeIntWidthBits:  32,
+			Endian:              EndianLittle,
+			StackAlignmentBytes: 16,
+			MaxAtomicWidthBits:  32,
+			UnsupportedReason: ("full linux-x86 runtime/stdlib/FFI support is not " +
+				"implemented yet; no-runtime executable build/link, i386-compatible " +
+				"Linux run/test execution, stdout write/string literal data, stack-" +
+				"argument, scalar global, symbol-backed callback, heap-backed slice " +
+				"allocation/indexing, raw ptr_add/load/store, raw pointer-slot base/" +
+				"offset load/store executable smokes, MMIO read/write, scoped island " +
+				"bump allocation/free plus debug double-free guard/page-protect object " +
+				"codegen, ELF/linker primitives, i386 SysV ABI classifier, self-host " +
+				"logical time runtime smoke, fs_exists filesystem runtime plus " +
+				"filesystem/scheduler composition smoke, bounded two-spawn self-host " +
+				"actors/task/task-group runtime smokes, single-spawn typed-task/staged " +
+				"typed-task/typed task-group plus actor-state runtime smoke, i386 ctx_" +
+				"switch object smoke, current core.net networking runtime smokes, " +
+				"Surface, distributed actors, and actor fanout above 2 runtime boundary " +
+				"diagnostics, x86 canonical ptr/rawptr/nullable_ptr/ref, c_int/c_uint, " +
+				"and complete ILP32 native/libc scalar @export object smokes, x86 " +
+				"function-pointer @export diagnostics, remaining source target-layout " +
+				"scalar diagnostics, pointer-only atomic ABI-width object check, source-" +
+				"level atomic diagnostics, and full 8/16/32-bit atomic/fuzz object " +
+				"checks are available"),
 			RuntimeStatus:            "partial_build_only",
 			StdlibStatus:             "partial_build_only",
 			FFIStatus:                "ilp32_scalar_object_smokes_partial",
@@ -516,15 +537,16 @@ func Parse(triple string) (Target, error) {
 			MemoryRegionLowering:     "partial",
 			MemoryAlignmentSemantics: "partial",
 			MemoryClaimLevel:         "build_lower_only",
-			RunnerProbeCommand:       "tetra test --diagnostics=json --target x86 --format=json <runner-smoke.tetra>",
-			ReleaseGate:              linuxNativeReleaseGate,
-			EvidenceArtifacts:        linuxNativeEvidenceArtifacts("linux-x86"),
-			SyscallInstruction:       "int 0x80",
-			SyscallNumbering:         "i386",
-			SyscallArgRegisters:      []string{"eax", "ebx", "ecx", "edx", "esi", "edi", "ebp"},
-			SyscallErrorRange:        "-4095..-1",
-			SupportsDebugInfo:        false,
-			SupportsReleaseOptimize:  false,
+			RunnerProbeCommand: ("tetra test --diagnostics=json --target x86 --format=json " +
+				"<runner-smoke.tetra>"),
+			ReleaseGate:             linuxNativeReleaseGate,
+			EvidenceArtifacts:       linuxNativeEvidenceArtifacts("linux-x86"),
+			SyscallInstruction:      "int 0x80",
+			SyscallNumbering:        "i386",
+			SyscallArgRegisters:     []string{"eax", "ebx", "ecx", "edx", "esi", "edi", "ebp"},
+			SyscallErrorRange:       "-4095..-1",
+			SupportsDebugInfo:       false,
+			SupportsReleaseOptimize: false,
 		}, nil
 	case "linux-x64":
 		return Target{
@@ -566,23 +588,40 @@ func Parse(triple string) (Target, error) {
 		}, nil
 	case "linux-x32":
 		return Target{
-			Triple:                   "linux-x32",
-			Status:                   StatusBuildOnly,
-			OS:                       OSLinux,
-			Arch:                     ArchX64,
-			ABI:                      ABIX32SysV,
-			DataModel:                DataModelX32,
-			Format:                   FormatELF,
-			ExeExt:                   "",
-			CollectImports:           false,
-			RunMode:                  RunModeHostProbed,
-			PointerWidthBits:         32,
-			RegisterWidthBits:        64,
-			NativeIntWidthBits:       32,
-			Endian:                   EndianLittle,
-			StackAlignmentBytes:      16,
-			MaxAtomicWidthBits:       64,
-			UnsupportedReason:        "full linux-x32 runtime/stdlib/FFI support is not implemented yet; executable build/link, object codegen, ELF/linker primitives, no-runtime programs with stdout write/string literal data, raw ptr_add/load/store, pointer load/store, raw pointer-slot base/offset executable smokes, MMIO read/write, scoped island bump allocation/free, self-host runtime builds for time, bounded two-spawn actors/task/task-group, single-spawn typed-task/staged typed-task/typed task-group, actor-state, and filesystem/scheduler composition smokes, x32 ctx_switch object smoke, compiler-owned target suites, x32 SysV ABI classifier, fs_exists-only filesystem runtime smoke, current x32 core.net networking runtime smokes, Surface, distributed actors, and x32 actor fanout above 2 runtime boundary diagnostics, scalar i32 plus canonical ptr/rawptr/nullable_ptr/ref, c_int/c_uint, and complete ILP32 native/libc scalar @export object smokes, x32 function-pointer @export diagnostics, remaining source target-layout scalar diagnostics, x32 syscall numbers, pointer-only atomic ABI-width object check, dword pointer atomics, and host-probed source run/test execution are available when the Linux kernel supports the x32 ABI",
+			Triple:              "linux-x32",
+			Status:              StatusBuildOnly,
+			OS:                  OSLinux,
+			Arch:                ArchX64,
+			ABI:                 ABIX32SysV,
+			DataModel:           DataModelX32,
+			Format:              FormatELF,
+			ExeExt:              "",
+			CollectImports:      false,
+			RunMode:             RunModeHostProbed,
+			PointerWidthBits:    32,
+			RegisterWidthBits:   64,
+			NativeIntWidthBits:  32,
+			Endian:              EndianLittle,
+			StackAlignmentBytes: 16,
+			MaxAtomicWidthBits:  64,
+			UnsupportedReason: ("full linux-x32 runtime/stdlib/FFI support is not " +
+				"implemented yet; executable build/link, object codegen, ELF/linker " +
+				"primitives, no-runtime programs with stdout write/string literal data, " +
+				"raw ptr_add/load/store, pointer load/store, raw pointer-slot base/" +
+				"offset executable smokes, MMIO read/write, scoped island bump " +
+				"allocation/free, self-host runtime builds for time, bounded two-spawn " +
+				"actors/task/task-group, single-spawn typed-task/staged typed-task/typed " +
+				"task-group, actor-state, and filesystem/scheduler composition smokes, " +
+				"x32 ctx_switch object smoke, compiler-owned target suites, x32 SysV ABI " +
+				"classifier, fs_exists-only filesystem runtime smoke, current x32 " +
+				"core.net networking runtime smokes, Surface, distributed actors, and " +
+				"x32 actor fanout above 2 runtime boundary diagnostics, scalar i32 plus " +
+				"canonical ptr/rawptr/nullable_ptr/ref, c_int/c_uint, and complete ILP32 " +
+				"native/libc scalar @export object smokes, x32 function-pointer @export " +
+				"diagnostics, remaining source target-layout scalar diagnostics, x32 " +
+				"syscall numbers, pointer-only atomic ABI-width object check, dword " +
+				"pointer atomics, and host-probed source run/test execution are " +
+				"available when the Linux kernel supports the x32 ABI"),
 			RuntimeStatus:            "partial_build_only",
 			StdlibStatus:             "partial_build_only",
 			FFIStatus:                "ilp32_scalar_object_smokes_partial",
@@ -593,15 +632,16 @@ func Parse(triple string) (Target, error) {
 			MemoryRegionLowering:     "partial",
 			MemoryAlignmentSemantics: "special",
 			MemoryClaimLevel:         "build_lower_only",
-			RunnerProbeCommand:       "tetra test --diagnostics=json --target x32 --format=json <runner-smoke.tetra>",
-			ReleaseGate:              linuxNativeReleaseGate,
-			EvidenceArtifacts:        linuxNativeEvidenceArtifacts("linux-x32"),
-			SyscallInstruction:       "syscall",
-			SyscallNumbering:         "x32_syscall_bit",
-			SyscallArgRegisters:      []string{"rax", "rdi", "rsi", "rdx", "r10", "r8", "r9"},
-			SyscallErrorRange:        "-4095..-1",
-			SupportsDebugInfo:        false,
-			SupportsReleaseOptimize:  false,
+			RunnerProbeCommand: ("tetra test --diagnostics=json --target x32 --format=json " +
+				"<runner-smoke.tetra>"),
+			ReleaseGate:             linuxNativeReleaseGate,
+			EvidenceArtifacts:       linuxNativeEvidenceArtifacts("linux-x32"),
+			SyscallInstruction:      "syscall",
+			SyscallNumbering:        "x32_syscall_bit",
+			SyscallArgRegisters:     []string{"rax", "rdi", "rsi", "rdx", "r10", "r8", "r9"},
+			SyscallErrorRange:       "-4095..-1",
+			SupportsDebugInfo:       false,
+			SupportsReleaseOptimize: false,
 		}, nil
 	case "windows-x64":
 		return Target{
@@ -775,11 +815,20 @@ func (t Target) PackedStructLayout(fields []LayoutField) (AggregateLayout, error
 
 func (t Target) ArrayLayout(elemType string, count int) (TypeLayout, error) {
 	if count < 0 {
-		return TypeLayout{}, fmt.Errorf("%s array %s has negative length %d", t.Triple, elemType, count)
+		return TypeLayout{}, fmt.Errorf(
+			"%s array %s has negative length %d",
+			t.Triple,
+			elemType,
+			count,
+		)
 	}
 	elem, ok := t.namedTypeLayout(elemType)
 	if !ok {
-		return TypeLayout{}, fmt.Errorf("unknown array element layout type %q for target %s", elemType, t.Triple)
+		return TypeLayout{}, fmt.Errorf(
+			"unknown array element layout type %q for target %s",
+			elemType,
+			t.Triple,
+		)
 	}
 	stride := alignUp(elem.SizeBytes, elem.AlignBytes)
 	size64, err := checkedLayoutProduct(stride, count)
@@ -787,10 +836,25 @@ func (t Target) ArrayLayout(elemType string, count int) (TypeLayout, error) {
 		return TypeLayout{}, fmt.Errorf("%s array [%d]%s: %w", t.Triple, count, elemType, err)
 	}
 	if limit, ok := t.maxNativeSizeBytes(); ok && size64 > limit {
-		return TypeLayout{}, fmt.Errorf("%s array [%d]%s size %d exceeds %d-bit native size limit %d", t.Triple, count, elemType, size64, t.NativeIntWidthBits, limit)
+		return TypeLayout{}, fmt.Errorf(
+			"%s array [%d]%s size %d exceeds %d-bit native size limit %d",
+			t.Triple,
+			count,
+			elemType,
+			size64,
+			t.NativeIntWidthBits,
+			limit,
+		)
 	}
 	if size64 > maxHostInt() {
-		return TypeLayout{}, fmt.Errorf("%s array [%d]%s size %d exceeds host layout size limit %d", t.Triple, count, elemType, size64, maxHostInt())
+		return TypeLayout{}, fmt.Errorf(
+			"%s array [%d]%s size %d exceeds host layout size limit %d",
+			t.Triple,
+			count,
+			elemType,
+			size64,
+			maxHostInt(),
+		)
 	}
 	size := int(size64)
 	return TypeLayout{
@@ -805,7 +869,11 @@ func (t Target) ArrayLayout(elemType string, count int) (TypeLayout, error) {
 
 func (t Target) SliceLayout(elemType string) (AggregateLayout, error) {
 	if _, ok := t.namedTypeLayout(elemType); !ok {
-		return AggregateLayout{}, fmt.Errorf("unknown slice element layout type %q for target %s", elemType, t.Triple)
+		return AggregateLayout{}, fmt.Errorf(
+			"unknown slice element layout type %q for target %s",
+			elemType,
+			t.Triple,
+		)
 	}
 	return t.StructLayout([]LayoutField{
 		{Name: "ptr", Type: "ptr"},
@@ -829,7 +897,12 @@ func (t Target) EnumLayout(cases []EnumCaseLayout) (AggregateLayout, error) {
 		}
 		payload, err := t.StructLayout(enumCase.Payload)
 		if err != nil {
-			return AggregateLayout{}, fmt.Errorf("%s enum case %s payload: %w", t.Triple, enumCase.Name, err)
+			return AggregateLayout{}, fmt.Errorf(
+				"%s enum case %s payload: %w",
+				t.Triple,
+				enumCase.Name,
+				err,
+			)
 		}
 		if payload.SizeBytes > maxPayloadSize {
 			maxPayloadSize = payload.SizeBytes
@@ -848,7 +921,14 @@ func (t Target) EnumLayout(cases []EnumCaseLayout) (AggregateLayout, error) {
 		PayloadSizeBytes:   maxPayloadSize,
 		Fields: []FieldLayout{
 			{Name: "tag", Type: "i32", OffsetBytes: 0, SizeBytes: 4, AlignBytes: 4, ABIBytes: 4},
-			{Name: "payload", Type: "union", OffsetBytes: payloadOffset, SizeBytes: maxPayloadSize, AlignBytes: maxPayloadAlign, ABIBytes: maxPayloadSize},
+			{
+				Name:        "payload",
+				Type:        "union",
+				OffsetBytes: payloadOffset,
+				SizeBytes:   maxPayloadSize,
+				AlignBytes:  maxPayloadAlign,
+				ABIBytes:    maxPayloadSize,
+			},
 		},
 	}, nil
 }
@@ -900,7 +980,11 @@ func (t Target) fieldTypeLayout(field LayoutField, packed bool) (TypeLayout, err
 	}
 	layout, ok := t.namedTypeLayout(field.Type)
 	if !ok {
-		return TypeLayout{}, fmt.Errorf("unknown layout type %q for target %s", field.Type, t.Triple)
+		return TypeLayout{}, fmt.Errorf(
+			"unknown layout type %q for target %s",
+			field.Type,
+			t.Triple,
+		)
 	}
 	return layout, nil
 }
@@ -944,10 +1028,19 @@ func (t Target) AtomicWidthBits() []int {
 
 func (t Target) AtomicLayout(widthBits int) (AtomicLayout, error) {
 	if widthBits != 8 && widthBits != 16 && widthBits != 32 && widthBits != 64 {
-		return AtomicLayout{}, fmt.Errorf("%s unsupported atomic width %d bits", t.Triple, widthBits)
+		return AtomicLayout{}, fmt.Errorf(
+			"%s unsupported atomic width %d bits",
+			t.Triple,
+			widthBits,
+		)
 	}
 	if widthBits > t.MaxAtomicWidthBits {
-		return AtomicLayout{}, fmt.Errorf("%s unsupported atomic width %d bits (max=%d)", t.Triple, widthBits, t.MaxAtomicWidthBits)
+		return AtomicLayout{}, fmt.Errorf(
+			"%s unsupported atomic width %d bits (max=%d)",
+			t.Triple,
+			widthBits,
+			t.MaxAtomicWidthBits,
+		)
 	}
 	size := widthBits / 8
 	return AtomicLayout{
@@ -972,7 +1065,12 @@ func (t Target) AtomicPointerLayout() (AtomicLayout, error) {
 	return layout, nil
 }
 
-func (t Target) ValidateAtomic(op AtomicOp, widthBits int, alignmentBytes int, order MemoryOrder) error {
+func (t Target) ValidateAtomic(
+	op AtomicOp,
+	widthBits int,
+	alignmentBytes int,
+	order MemoryOrder,
+) error {
 	if op == AtomicFence {
 		if !validMemoryOrder(order) {
 			return fmt.Errorf("%s atomic fence has unsupported memory order %s", t.Triple, order)
@@ -983,8 +1081,15 @@ func (t Target) ValidateAtomic(op AtomicOp, widthBits int, alignmentBytes int, o
 	if err != nil {
 		return err
 	}
-	if alignmentBytes <= 0 || alignmentBytes < layout.AlignBytes || alignmentBytes%layout.AlignBytes != 0 {
-		return fmt.Errorf("%s misaligned %d-bit atomic: alignment=%d required=%d", t.Triple, widthBits, alignmentBytes, layout.AlignBytes)
+	if alignmentBytes <= 0 || alignmentBytes < layout.AlignBytes ||
+		alignmentBytes%layout.AlignBytes != 0 {
+		return fmt.Errorf(
+			"%s misaligned %d-bit atomic: alignment=%d required=%d",
+			t.Triple,
+			widthBits,
+			alignmentBytes,
+			layout.AlignBytes,
+		)
 	}
 	if !atomicOrderAllowed(op, order) {
 		return fmt.Errorf("%s atomic %s does not support memory order %s", t.Triple, op, order)
@@ -998,7 +1103,11 @@ func scalarLayout(name string, size int, align int) ScalarLayout {
 
 func validMemoryOrder(order MemoryOrder) bool {
 	switch order {
-	case MemoryOrderRelaxed, MemoryOrderAcquire, MemoryOrderRelease, MemoryOrderAcqRel, MemoryOrderSeqCst:
+	case MemoryOrderRelaxed,
+		MemoryOrderAcquire,
+		MemoryOrderRelease,
+		MemoryOrderAcqRel,
+		MemoryOrderSeqCst:
 		return true
 	default:
 		return false
@@ -1011,9 +1120,11 @@ func atomicOrderAllowed(op AtomicOp, order MemoryOrder) bool {
 	}
 	switch op {
 	case AtomicLoad:
-		return order == MemoryOrderRelaxed || order == MemoryOrderAcquire || order == MemoryOrderSeqCst
+		return order == MemoryOrderRelaxed || order == MemoryOrderAcquire ||
+			order == MemoryOrderSeqCst
 	case AtomicStore:
-		return order == MemoryOrderRelaxed || order == MemoryOrderRelease || order == MemoryOrderSeqCst
+		return order == MemoryOrderRelaxed || order == MemoryOrderRelease ||
+			order == MemoryOrderSeqCst
 	case AtomicExchange, AtomicCompareExchange, AtomicCompareExchangeWeak,
 		AtomicFetchAdd, AtomicFetchSub, AtomicFetchAnd, AtomicFetchOr, AtomicFetchXor:
 		return true

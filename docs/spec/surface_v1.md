@@ -276,11 +276,13 @@ boundaries, assign them through `inout` outputs, or capture them in function-typ
 closure values. `Surface` handles plus `Frame`, `Event`,
 and `DrawContext` values also cannot cross task or actor transfer boundaries:
 typed task error payloads and typed actor message payloads that contain them
-are rejected before slot-count promotion checks. The only starter exceptions are the core constructors
+are rejected before slot-count promotion checks. The only starter exceptions are the core
+constructors
 `lib.core.surface.begin_frame` and
 `lib.core.surface.poll_event`, which are allowed to return the fresh per-turn
 values they create, plus the `lib.core.draw.DrawContext` wrapper that carries
-a live `Frame` only as an active draw call argument. `Frame.pixels` is also treated as a borrowed per-frame
+a live `Frame` only as an active draw call argument. `Frame.pixels` is also treated as a borrowed
+per-frame
 buffer: user code cannot return it, throw it, return or throw a local alias of
 it, assign it through an `inout` output, or keep using a local `[]u8` alias
 after the owning `Frame` has been consumed by `surface.present`, including when

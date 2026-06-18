@@ -80,7 +80,10 @@ func buildReleaseState(expectedVersion, reportDir string) releaseStateReport {
 	}
 	report.Version = currentVersion()
 	if report.Version != expectedVersion {
-		report.Issues = append(report.Issues, fmt.Sprintf("version is %q, want %q", report.Version, expectedVersion))
+		report.Issues = append(
+			report.Issues,
+			fmt.Sprintf("version is %q, want %q", report.Version, expectedVersion),
+		)
 	}
 
 	entries, err := gitStatusEntries()
@@ -89,7 +92,10 @@ func buildReleaseState(expectedVersion, reportDir string) releaseStateReport {
 	}
 	report.Git = gitState{Clean: len(entries) == 0 && err == nil, Entries: entries}
 	if len(entries) > 0 {
-		report.Issues = append(report.Issues, fmt.Sprintf("git status has %d entries", len(entries)))
+		report.Issues = append(
+			report.Issues,
+			fmt.Sprintf("git status has %d entries", len(entries)),
+		)
 	}
 
 	for _, path := range requiredRepoArtifacts() {
@@ -159,10 +165,10 @@ func gitStatusEntries() ([]gitStatusEntry, error) {
 func requiredRepoArtifacts() []string {
 	return []string{
 		"docs/generated/manifest.json",
-		"docs/release/v0_4_0_scope_decisions.json",
-		"docs/release/v0_4_0_completion_audit.md",
-		"docs/release/v0_4_0_final_handoff.md",
-		"docs/spec/v0_4_scope.md",
+		"docs/release/v0_4/data/v0_4_0_scope_decisions.json",
+		"docs/release/v0_4/v0_4_0_completion_audit.md",
+		"docs/release/v0_4/v0_4_0_final_handoff.md",
+		"docs/spec/flow/v0_4_scope.md",
 		"reports/v0.4.0/features.json",
 		"reports/v0.4.0/targets.json",
 		"reports/v0.4.0/linux-host-smoke.json",

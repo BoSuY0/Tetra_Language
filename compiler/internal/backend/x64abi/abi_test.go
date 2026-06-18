@@ -178,7 +178,12 @@ func TestEmitCallReturnSlotLayout(t *testing.T) {
 				wantSuffix := &x64.Emitter{}
 				emitReturnSlotPushes(wantSuffix, ret.regs)
 				if !bytes.HasSuffix(e.Buf, wantSuffix.Buf) {
-					t.Fatalf("return-slot push suffix mismatch for registers %v\n got=% x\nwant suffix=% x", ret.regs, e.Buf, wantSuffix.Buf)
+					t.Fatalf(
+						"return-slot push suffix mismatch for registers %v\n got=% x\nwant suffix=% x",
+						ret.regs,
+						e.Buf,
+						wantSuffix.Buf,
+					)
 				}
 			})
 		}
@@ -199,27 +204,57 @@ func TestEmitCallRejectsInvalidABIInputs(t *testing.T) {
 			e := &x64.Emitter{}
 			var callPatches []x64obj.CallPatch
 			stackDepth := 0
-			err := tc.abi.EmitCall(e, ir.IRInstr{Kind: ir.IRCall, Name: "bad", ArgSlots: -1}, &stackDepth, &callPatches)
+			err := tc.abi.EmitCall(
+				e,
+				ir.IRInstr{Kind: ir.IRCall, Name: "bad", ArgSlots: -1},
+				&stackDepth,
+				&callPatches,
+			)
 			if err == nil {
 				t.Fatalf("expected invalid argument count error")
 			}
 
-			err = tc.abi.EmitCall(e, ir.IRInstr{Kind: ir.IRCall, ArgSlots: 0}, &stackDepth, &callPatches)
+			err = tc.abi.EmitCall(
+				e,
+				ir.IRInstr{Kind: ir.IRCall, ArgSlots: 0},
+				&stackDepth,
+				&callPatches,
+			)
 			if err == nil || !strings.Contains(err.Error(), "call is missing target name") {
 				t.Fatalf("expected missing target error, got %v", err)
 			}
 
-			err = tc.abi.EmitCall(e, ir.IRInstr{Kind: ir.IRCall, Name: "bad_return", RetSlots: -1}, &stackDepth, &callPatches)
-			if err == nil || !strings.Contains(err.Error(), `call "bad_return" has negative ABI slots`) {
+			err = tc.abi.EmitCall(
+				e,
+				ir.IRInstr{Kind: ir.IRCall, Name: "bad_return", RetSlots: -1},
+				&stackDepth,
+				&callPatches,
+			)
+			if err == nil ||
+				!strings.Contains(err.Error(), `call "bad_return" has negative ABI slots`) {
 				t.Fatalf("expected negative return slots error, got %v", err)
 			}
 
-			err = tc.abi.EmitCall(e, ir.IRInstr{Kind: ir.IRCall, Name: "too_many_returns", RetSlots: 11}, &stackDepth, &callPatches)
-			if err == nil || !strings.Contains(err.Error(), `call "too_many_returns" has unsupported return slots`) {
+			err = tc.abi.EmitCall(
+				e,
+				ir.IRInstr{Kind: ir.IRCall, Name: "too_many_returns", RetSlots: 11},
+				&stackDepth,
+				&callPatches,
+			)
+			if err == nil ||
+				!strings.Contains(
+					err.Error(),
+					`call "too_many_returns" has unsupported return slots`,
+				) {
 				t.Fatalf("expected unsupported return slots error, got %v", err)
 			}
 
-			err = tc.abi.EmitCall(e, ir.IRInstr{Kind: ir.IRCall, Name: "underflow", ArgSlots: 1}, &stackDepth, &callPatches)
+			err = tc.abi.EmitCall(
+				e,
+				ir.IRInstr{Kind: ir.IRCall, Name: "underflow", ArgSlots: 1},
+				&stackDepth,
+				&callPatches,
+			)
 			if err == nil {
 				t.Fatalf("expected stack underflow error")
 			}
@@ -242,7 +277,12 @@ func TestEmitIslandNewDebugInitializesDebugHeader(t *testing.T) {
 			e := &x64.Emitter{}
 			stackDepth := 1
 			var importPatches []x64obj.ImportPatch
-			if err := tc.abi.EmitIslandNew(e, &stackDepth, x64.CodegenOptions{IslandsDebug: true}, &importPatches); err != nil {
+			if err := tc.abi.EmitIslandNew(
+				e,
+				&stackDepth,
+				x64.CodegenOptions{IslandsDebug: true},
+				&importPatches,
+			); err != nil {
 				t.Fatalf("EmitIslandNew: %v", err)
 			}
 			if stackDepth != 1 {
@@ -252,12 +292,20 @@ func TestEmitIslandNewDebugInitializesDebugHeader(t *testing.T) {
 			header := &x64.Emitter{}
 			header.MovMem32RaxPtrImm32(0, x64.IslandsDebugPageSize)
 			if !bytes.Contains(e.Buf, header.Buf) {
-				t.Fatalf("debug island header size not emitted\n got=% x\nwant contains=% x", e.Buf, header.Buf)
+				t.Fatalf(
+					"debug island header size not emitted\n got=% x\nwant contains=% x",
+					e.Buf,
+					header.Buf,
+				)
 			}
 			freedMarkerClear := &x64.Emitter{}
 			freedMarkerClear.MovMem32RaxPtrImm32(12, 0)
 			if !bytes.Contains(e.Buf, freedMarkerClear.Buf) {
-				t.Fatalf("debug island freed marker clear not emitted\n got=% x\nwant contains=% x", e.Buf, freedMarkerClear.Buf)
+				t.Fatalf(
+					"debug island freed marker clear not emitted\n got=% x\nwant contains=% x",
+					e.Buf,
+					freedMarkerClear.Buf,
+				)
 			}
 			if tc.wantAllocImport != "" && !hasImportPatch(importPatches, tc.wantAllocImport) {
 				t.Fatalf("import patches = %#v, want %s", importPatches, tc.wantAllocImport)
@@ -299,7 +347,12 @@ func TestEmitIslandFreeDebugEmitsDoubleFreeGuard(t *testing.T) {
 			e := &x64.Emitter{}
 			stackDepth := 1
 			var importPatches []x64obj.ImportPatch
-			if err := tc.abi.EmitIslandFree(e, &stackDepth, x64.CodegenOptions{IslandsDebug: true}, &importPatches); err != nil {
+			if err := tc.abi.EmitIslandFree(
+				e,
+				&stackDepth,
+				x64.CodegenOptions{IslandsDebug: true},
+				&importPatches,
+			); err != nil {
 				t.Fatalf("EmitIslandFree: %v", err)
 			}
 			if stackDepth != 0 {
@@ -310,7 +363,11 @@ func TestEmitIslandFreeDebugEmitsDoubleFreeGuard(t *testing.T) {
 			freedCheck.MovEaxFromRdiDisp(12)
 			freedCheck.TestEaxEax()
 			if !bytes.Contains(e.Buf, freedCheck.Buf) {
-				t.Fatalf("debug island freed check not emitted\n got=% x\nwant contains=% x", e.Buf, freedCheck.Buf)
+				t.Fatalf(
+					"debug island freed check not emitted\n got=% x\nwant contains=% x",
+					e.Buf,
+					freedCheck.Buf,
+				)
 			}
 			if !bytes.Contains(e.Buf, tc.wantExitCodeBytes()) {
 				t.Fatalf("debug island exit code 2 not emitted\n got=% x", e.Buf)
@@ -319,12 +376,20 @@ func TestEmitIslandFreeDebugEmitsDoubleFreeGuard(t *testing.T) {
 			freedMarkerSet.MovRaxRdi()
 			freedMarkerSet.MovMem32RaxPtrImm32(12, 1)
 			if !bytes.Contains(e.Buf, freedMarkerSet.Buf) {
-				t.Fatalf("debug island freed marker set not emitted\n got=% x\nwant contains=% x", e.Buf, freedMarkerSet.Buf)
+				t.Fatalf(
+					"debug island freed marker set not emitted\n got=% x\nwant contains=% x",
+					e.Buf,
+					freedMarkerSet.Buf,
+				)
 			}
 			protectLen := &x64.Emitter{}
 			protectLen.SubEaxImm32(x64.IslandsDebugPageSize)
 			if !bytes.Contains(e.Buf, protectLen.Buf) {
-				t.Fatalf("debug island protected length adjustment not emitted\n got=% x\nwant contains=% x", e.Buf, protectLen.Buf)
+				t.Fatalf(
+					"debug island protected length adjustment not emitted\n got=% x\nwant contains=% x",
+					e.Buf,
+					protectLen.Buf,
+				)
 			}
 			if tc.wantProtectImport != "" && !hasImportPatch(importPatches, tc.wantProtectImport) {
 				t.Fatalf("import patches = %#v, want %s", importPatches, tc.wantProtectImport)
@@ -364,7 +429,12 @@ func TestEmitIslandResetDebugChecksFreedMarkerAndReturnsHandle(t *testing.T) {
 			e := &x64.Emitter{}
 			stackDepth := 1
 			var importPatches []x64obj.ImportPatch
-			if err := tc.abi.EmitIslandReset(e, &stackDepth, x64.CodegenOptions{IslandsDebug: true}, &importPatches); err != nil {
+			if err := tc.abi.EmitIslandReset(
+				e,
+				&stackDepth,
+				x64.CodegenOptions{IslandsDebug: true},
+				&importPatches,
+			); err != nil {
 				t.Fatalf("EmitIslandReset: %v", err)
 			}
 			if stackDepth != 1 {
@@ -375,7 +445,11 @@ func TestEmitIslandResetDebugChecksFreedMarkerAndReturnsHandle(t *testing.T) {
 			freedCheck.MovEaxFromRdiDisp(12)
 			freedCheck.TestEaxEax()
 			if !bytes.Contains(e.Buf, freedCheck.Buf) {
-				t.Fatalf("debug island reset freed check not emitted\n got=% x\nwant contains=% x", e.Buf, freedCheck.Buf)
+				t.Fatalf(
+					"debug island reset freed check not emitted\n got=% x\nwant contains=% x",
+					e.Buf,
+					freedCheck.Buf,
+				)
 			}
 			if !bytes.Contains(e.Buf, tc.wantExitCodeBytes()) {
 				t.Fatalf("debug island reset exit code 2 not emitted\n got=% x", e.Buf)
@@ -383,7 +457,11 @@ func TestEmitIslandResetDebugChecksFreedMarkerAndReturnsHandle(t *testing.T) {
 			headerReset := &x64.Emitter{}
 			headerReset.MovMem32RdiDispImm32(0, x64.IslandsDebugPageSize)
 			if !bytes.Contains(e.Buf, headerReset.Buf) {
-				t.Fatalf("debug island reset header cursor not emitted\n got=% x\nwant contains=% x", e.Buf, headerReset.Buf)
+				t.Fatalf(
+					"debug island reset header cursor not emitted\n got=% x\nwant contains=% x",
+					e.Buf,
+					headerReset.Buf,
+				)
 			}
 		})
 	}
@@ -397,7 +475,12 @@ func TestEmitIslandNewRejectsInvalidSizeBeforeAllocator(t *testing.T) {
 		allocatorCode []byte
 	}{
 		{name: "sysv", abi: LinuxSysV(), allocatorCode: []byte{0x0F, 0x05}},
-		{name: "win64", abi: NewWin64(), importPatches: &[]x64obj.ImportPatch{}, allocatorCode: []byte{0xFF, 0x15}},
+		{
+			name:          "win64",
+			abi:           NewWin64(),
+			importPatches: &[]x64obj.ImportPatch{},
+			allocatorCode: []byte{0xFF, 0x15},
+		},
 	}
 
 	for _, tc := range cases {
@@ -405,7 +488,12 @@ func TestEmitIslandNewRejectsInvalidSizeBeforeAllocator(t *testing.T) {
 			e := &x64.Emitter{}
 			stackDepth := 1
 			e.PushRax()
-			if err := tc.abi.EmitIslandNew(e, &stackDepth, x64.CodegenOptions{}, tc.importPatches); err != nil {
+			if err := tc.abi.EmitIslandNew(
+				e,
+				&stackDepth,
+				x64.CodegenOptions{},
+				tc.importPatches,
+			); err != nil {
 				t.Fatalf("EmitIslandNew: %v", err)
 			}
 			if stackDepth != 1 {
@@ -426,7 +514,13 @@ func TestEmitIslandNewRejectsInvalidSizeBeforeAllocator(t *testing.T) {
 				t.Fatalf("island_new missing allocator marker % x:\n% x", tc.allocatorCode, e.Buf)
 			}
 			if negativeAt > allocatorAt || overflowAt > allocatorAt {
-				t.Fatalf("island_new guards must precede allocator: neg=%d overflow=%d allocator=%d\n% x", negativeAt, overflowAt, allocatorAt, e.Buf)
+				t.Fatalf(
+					"island_new guards must precede allocator: neg=%d overflow=%d allocator=%d\n% x",
+					negativeAt,
+					overflowAt,
+					allocatorAt,
+					e.Buf,
+				)
 			}
 		})
 	}
@@ -437,7 +531,13 @@ func TestEmitIslandMakeSliceAlignsBumpToContract(t *testing.T) {
 	stackDepth := 2
 	e.PushRax()
 	e.PushRax()
-	if err := LinuxSysV().EmitIslandMakeSlice(e, ir.IRIslandMakeSliceU8, &stackDepth, x64.CodegenOptions{}, nil); err != nil {
+	if err := LinuxSysV().EmitIslandMakeSlice(
+		e,
+		ir.IRIslandMakeSliceU8,
+		&stackDepth,
+		x64.CodegenOptions{},
+		nil,
+	); err != nil {
 		t.Fatalf("EmitIslandMakeSlice: %v", err)
 	}
 	if stackDepth != 2 {
@@ -458,7 +558,14 @@ func TestEmitIslandMakeSliceAlignsBumpToContract(t *testing.T) {
 		t.Fatalf("island_make_slice missing capacity check/commit:\n% x", e.Buf)
 	}
 	if !(addAt < maskAt && maskAt < cmpAt && cmpAt < commitAt) {
-		t.Fatalf("island_make_slice alignment must happen before capacity check and bump commit: add=%d mask=%d cmp=%d commit=%d\n% x", addAt, maskAt, cmpAt, commitAt, e.Buf)
+		t.Fatalf(
+			"island_make_slice alignment must happen before capacity check and bump commit: add=%d mask=%d cmp=%d commit=%d\n% x",
+			addAt,
+			maskAt,
+			cmpAt,
+			commitAt,
+			e.Buf,
+		)
 	}
 }
 
@@ -471,16 +578,42 @@ func TestSysVAllocBytesEmitsDeterministicMmapFailureGuard(t *testing.T) {
 		forbidCode [][]byte
 	}{
 		{
-			name:      "linux-x64",
-			abi:       LinuxSysV(),
-			wantMmap:  []byte{0xB8, 0x09, 0x00, 0x00, 0x00, 0x0F, 0x05},
-			wantExit2: []byte{0xBF, 0x02, 0x00, 0x00, 0x00, 0xB8, 0x3C, 0x00, 0x00, 0x00, 0x0F, 0x05},
+			name:     "linux-x64",
+			abi:      LinuxSysV(),
+			wantMmap: []byte{0xB8, 0x09, 0x00, 0x00, 0x00, 0x0F, 0x05},
+			wantExit2: []byte{
+				0xBF,
+				0x02,
+				0x00,
+				0x00,
+				0x00,
+				0xB8,
+				0x3C,
+				0x00,
+				0x00,
+				0x00,
+				0x0F,
+				0x05,
+			},
 		},
 		{
-			name:      "linux-x32",
-			abi:       LinuxX32SysV(),
-			wantMmap:  []byte{0xB8, 0x09, 0x00, 0x00, 0x40, 0x0F, 0x05},
-			wantExit2: []byte{0xBF, 0x02, 0x00, 0x00, 0x00, 0xB8, 0x3C, 0x00, 0x00, 0x40, 0x0F, 0x05},
+			name:     "linux-x32",
+			abi:      LinuxX32SysV(),
+			wantMmap: []byte{0xB8, 0x09, 0x00, 0x00, 0x40, 0x0F, 0x05},
+			wantExit2: []byte{
+				0xBF,
+				0x02,
+				0x00,
+				0x00,
+				0x00,
+				0xB8,
+				0x3C,
+				0x00,
+				0x00,
+				0x40,
+				0x0F,
+				0x05,
+			},
 			forbidCode: [][]byte{
 				{0xB8, 0x09, 0x00, 0x00, 0x00, 0x0F, 0x05},
 				{0xB8, 0x3C, 0x00, 0x00, 0x00, 0x0F, 0x05},
@@ -504,12 +637,20 @@ func TestSysVAllocBytesEmitsDeterministicMmapFailureGuard(t *testing.T) {
 				tc.wantExit2,
 			} {
 				if !bytes.Contains(e.Buf, want) {
-					t.Fatalf("alloc_bytes missing mmap failure guard bytes\n got=% x\nwant contains=% x", e.Buf, want)
+					t.Fatalf(
+						"alloc_bytes missing mmap failure guard bytes\n got=% x\nwant contains=% x",
+						e.Buf,
+						want,
+					)
 				}
 			}
 			for _, forbid := range tc.forbidCode {
 				if bytes.Contains(e.Buf, forbid) {
-					t.Fatalf("alloc_bytes contains forbidden syscall bytes\n got=% x\nforbid=% x", e.Buf, forbid)
+					t.Fatalf(
+						"alloc_bytes contains forbidden syscall bytes\n got=% x\nforbid=% x",
+						e.Buf,
+						forbid,
+					)
 				}
 			}
 		})
@@ -642,7 +783,13 @@ func TestEmitMakeSliceZeroLengthBypassesAllocator(t *testing.T) {
 			e := &x64.Emitter{}
 			stackDepth := 1
 			e.PushRax()
-			if err := tc.abi.EmitMakeSlice(e, ir.IRMakeSliceI32, &stackDepth, x64.CodegenOptions{}, tc.importPatches); err != nil {
+			if err := tc.abi.EmitMakeSlice(
+				e,
+				ir.IRMakeSliceI32,
+				&stackDepth,
+				x64.CodegenOptions{},
+				tc.importPatches,
+			); err != nil {
 				t.Fatalf("EmitMakeSlice: %v", err)
 			}
 			if stackDepth != 2 {
@@ -658,7 +805,12 @@ func TestEmitMakeSliceZeroLengthBypassesAllocator(t *testing.T) {
 				t.Fatalf("make_slice missing zero-length test/jz bypass:\n% x", e.Buf)
 			}
 			if allocatorAt >= 0 && zeroAt > allocatorAt {
-				t.Fatalf("make_slice zero-length branch must precede allocator: zero=%d allocator=%d\n% x", zeroAt, allocatorAt, e.Buf)
+				t.Fatalf(
+					"make_slice zero-length branch must precede allocator: zero=%d allocator=%d\n% x",
+					zeroAt,
+					allocatorAt,
+					e.Buf,
+				)
 			}
 			if !bytes.Contains(e.Buf, []byte{0x50, 0x50}) {
 				t.Fatalf("make_slice empty branch does not push ptr/len zeros:\n% x", e.Buf)
@@ -671,7 +823,13 @@ func TestEmitMakeSliceLengthContractGuardsBeforeAllocator(t *testing.T) {
 	e := &x64.Emitter{}
 	stackDepth := 1
 	e.PushRax()
-	if err := LinuxSysV().EmitMakeSlice(e, ir.IRMakeSliceI32, &stackDepth, x64.CodegenOptions{}, nil); err != nil {
+	if err := LinuxSysV().EmitMakeSlice(
+		e,
+		ir.IRMakeSliceI32,
+		&stackDepth,
+		x64.CodegenOptions{},
+		nil,
+	); err != nil {
 		t.Fatalf("EmitMakeSlice: %v", err)
 	}
 	negativeGuard := []byte{0x48, 0x85, 0xC0, 0x0F, 0x8C}
@@ -690,7 +848,13 @@ func TestEmitMakeSliceLengthContractGuardsBeforeAllocator(t *testing.T) {
 		t.Fatalf("make_slice missing allocator syscall:\n% x", e.Buf)
 	}
 	if negativeAt > syscallAt || overflowAt > syscallAt {
-		t.Fatalf("make_slice guards must precede allocator syscall: neg=%d overflow=%d syscall=%d\n% x", negativeAt, overflowAt, syscallAt, e.Buf)
+		t.Fatalf(
+			"make_slice guards must precede allocator syscall: neg=%d overflow=%d syscall=%d\n% x",
+			negativeAt,
+			overflowAt,
+			syscallAt,
+			e.Buf,
+		)
 	}
 }
 
@@ -699,7 +863,13 @@ func TestEmitIslandMakeSliceLengthContractGuardsBeforeMetadataAccess(t *testing.
 	stackDepth := 2
 	e.PushRax()
 	e.PushRax()
-	if err := LinuxSysV().EmitIslandMakeSlice(e, ir.IRIslandMakeSliceI32, &stackDepth, x64.CodegenOptions{}, nil); err != nil {
+	if err := LinuxSysV().EmitIslandMakeSlice(
+		e,
+		ir.IRIslandMakeSliceI32,
+		&stackDepth,
+		x64.CodegenOptions{},
+		nil,
+	); err != nil {
 		t.Fatalf("EmitIslandMakeSlice: %v", err)
 	}
 	negativeGuard := []byte{0x48, 0x85, 0xC9, 0x0F, 0x8C}
@@ -709,16 +879,28 @@ func TestEmitIslandMakeSliceLengthContractGuardsBeforeMetadataAccess(t *testing.
 	overflowAt := bytes.Index(e.Buf, overflowGuard)
 	metadataAt := bytes.Index(e.Buf, metadataRead)
 	if negativeAt < 0 {
-		t.Fatalf("island_make_slice missing negative-length guard before metadata access:\n% x", e.Buf)
+		t.Fatalf(
+			"island_make_slice missing negative-length guard before metadata access:\n% x",
+			e.Buf,
+		)
 	}
 	if overflowAt < 0 {
-		t.Fatalf("island_make_slice missing byte-size overflow guard before metadata access:\n% x", e.Buf)
+		t.Fatalf(
+			"island_make_slice missing byte-size overflow guard before metadata access:\n% x",
+			e.Buf,
+		)
 	}
 	if metadataAt < 0 {
 		t.Fatalf("island_make_slice missing island metadata read:\n% x", e.Buf)
 	}
 	if negativeAt > metadataAt || overflowAt > metadataAt {
-		t.Fatalf("island_make_slice guards must precede metadata read: neg=%d overflow=%d metadata=%d\n% x", negativeAt, overflowAt, metadataAt, e.Buf)
+		t.Fatalf(
+			"island_make_slice guards must precede metadata read: neg=%d overflow=%d metadata=%d\n% x",
+			negativeAt,
+			overflowAt,
+			metadataAt,
+			e.Buf,
+		)
 	}
 }
 

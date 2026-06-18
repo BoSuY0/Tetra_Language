@@ -9,7 +9,7 @@ expected_version=""
 expected_git_head=""
 
 usage() {
-  cat <<'USAGE'
+  cat << 'USAGE'
 Usage: bash scripts/release/full_platform/target-host-ui-runtime-smoke.sh [--target TARGET] [--report FILE] [--expected-version VERSION] [--expected-git-head SHA]
 
 Runs the platform UI runtime smoke on a real target host and validates the
@@ -57,7 +57,7 @@ while [[ $# -gt 0 ]]; do
       expected_git_head="$2"
       shift 2
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;
@@ -71,12 +71,12 @@ done
 
 detect_target() {
   local os_name
-  os_name="$(uname -s 2>/dev/null || printf unknown)"
+  os_name="$(uname -s 2> /dev/null || printf unknown)"
   case "$os_name" in
     Darwin)
       printf 'macos-x64'
       ;;
-    MINGW*|MSYS*|CYGWIN*)
+    MINGW* | MSYS* | CYGWIN*)
       printf 'windows-x64'
       ;;
     *)
@@ -100,7 +100,7 @@ if [[ -z "$target" ]]; then
 fi
 
 case "$target" in
-  windows-x64|macos-x64)
+  windows-x64 | macos-x64)
     ;;
   *)
     echo "error: unsupported target-host UI runtime target: $target" >&2
@@ -120,7 +120,7 @@ cd "$repo_root"
 mkdir -p "$(dirname "$report_path")"
 
 if [[ -z "$expected_version" ]]; then
-  expected_version="$("./tetra" version 2>/dev/null || go run ./cli/cmd/tetra version)"
+  expected_version="$("./tetra" version 2> /dev/null || go run ./cli/cmd/tetra version)"
 fi
 if [[ -z "$expected_git_head" ]]; then
   expected_git_head="$(git rev-parse HEAD)"

@@ -100,13 +100,36 @@ func main() {
 	var runtimeReports runtimeReportFlags
 	expectedVersion := flag.String("expected-version", "v0.4.0", "expected release version")
 	manifestPath := flag.String("manifest", "docs/generated/manifest.json", "manifest JSON")
-	featuresPath := flag.String("features", "", "features JSON produced by ./tetra features --format=json")
-	targetsPath := flag.String("targets", "", "targets JSON produced by ./tetra targets --format=json")
-	scopePath := flag.String("scope-decisions", "docs/release/v0_4_0_scope_decisions.json", "v0.4.0 scope decisions JSON")
-	flag.Var(&runtimeReports, "runtime-report", "external runtime smoke report as target=path; repeat for cross-host targets")
+	featuresPath := flag.String(
+		"features",
+		"",
+		"features JSON produced by ./tetra features --format=json",
+	)
+	targetsPath := flag.String(
+		"targets",
+		"",
+		"targets JSON produced by ./tetra targets --format=json",
+	)
+	scopePath := flag.String(
+		"scope-decisions",
+		"docs/release/v0_4/data/v0_4_0_scope_decisions.json",
+		"v0.4.0 scope decisions JSON",
+	)
+	flag.Var(
+		&runtimeReports,
+		"runtime-report",
+		"external runtime smoke report as target=path; repeat for cross-host targets",
+	)
 	flag.Parse()
 
-	inputs, err := readInputs(*expectedVersion, *manifestPath, *featuresPath, *targetsPath, *scopePath, runtimeReports)
+	inputs, err := readInputs(
+		*expectedVersion,
+		*manifestPath,
+		*featuresPath,
+		*targetsPath,
+		*scopePath,
+		runtimeReports,
+	)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "validate-v0-4-readiness: %v\n", err)
 		os.Exit(2)
@@ -132,7 +155,10 @@ func (r *runtimeReportFlags) Set(value string) error {
 	return nil
 }
 
-func readInputs(expectedVersion, manifestPath, featuresPath, targetsPath, scopePath string, runtimeReportSpecs []string) (readinessInputs, error) {
+func readInputs(
+	expectedVersion, manifestPath, featuresPath, targetsPath, scopePath string,
+	runtimeReportSpecs []string,
+) (readinessInputs, error) {
 	read := func(path, label string) ([]byte, error) {
 		if path == "" {
 			return nil, fmt.Errorf("%s path is required", label)
@@ -212,16 +238,39 @@ func validateReadiness(inputs readinessInputs) error {
 
 	var issues []string
 	if manifest.CompilerVersion != expectedVersion {
-		issues = append(issues, fmt.Sprintf("manifest compiler_version = %s, want %s", manifest.CompilerVersion, expectedVersion))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"manifest compiler_version = %s, want %s",
+				manifest.CompilerVersion,
+				expectedVersion,
+			),
+		)
 	}
 	if features.Version != expectedVersion {
-		issues = append(issues, fmt.Sprintf("features version = %s, want %s", features.Version, expectedVersion))
+		issues = append(
+			issues,
+			fmt.Sprintf("features version = %s, want %s", features.Version, expectedVersion),
+		)
 	}
 	if scope.ReleaseVersion != expectedVersion {
-		issues = append(issues, fmt.Sprintf("scope release_version = %s, want %s", scope.ReleaseVersion, expectedVersion))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"scope release_version = %s, want %s",
+				scope.ReleaseVersion,
+				expectedVersion,
+			),
+		)
 	}
 	if !isAllowedScopeStatus(scope.Status) {
-		issues = append(issues, fmt.Sprintf("scope status = %s, want full-production-scope-selected or linux-x64-production-scope-selected", scope.Status))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"scope status = %s, want full-production-scope-selected or linux-x64-production-scope-selected",
+				scope.Status,
+			),
+		)
 	}
 
 	featureStatus := map[string]string{}
@@ -256,11 +305,17 @@ func validateReadiness(inputs readinessInputs) error {
 			issues = append(issues, validateDecisionEvidence(decision.ID, decision.Evidence)...)
 			status, ok := featureStatus[decision.ID]
 			if !ok {
-				issues = append(issues, fmt.Sprintf("feature %s missing from features report", decision.ID))
+				issues = append(
+					issues,
+					fmt.Sprintf("feature %s missing from features report", decision.ID),
+				)
 				continue
 			}
 			if status != "current" {
-				issues = append(issues, fmt.Sprintf("feature %s status = %s, want current", decision.ID, status))
+				issues = append(
+					issues,
+					fmt.Sprintf("feature %s status = %s, want current", decision.ID, status),
+				)
 			}
 			if featureSince[decision.ID] == "" {
 				issues = append(issues, fmt.Sprintf("feature %s missing since", decision.ID))
@@ -269,18 +324,30 @@ func validateReadiness(inputs readinessInputs) error {
 			issues = append(issues, validateDecisionEvidence(decision.ID, decision.Evidence)...)
 			target, ok := targetByTriple[decision.ID]
 			if !ok {
-				issues = append(issues, fmt.Sprintf("target %s missing from targets report", decision.ID))
+				issues = append(
+					issues,
+					fmt.Sprintf("target %s missing from targets report", decision.ID),
+				)
 				continue
 			}
 			if target.Status != "supported" {
-				issues = append(issues, fmt.Sprintf("target %s status = %s, want supported", decision.ID, target.Status))
+				issues = append(
+					issues,
+					fmt.Sprintf(
+						"target %s status = %s, want supported",
+						decision.ID,
+						target.Status,
+					),
+				)
 			}
 			if target.BuildOnly {
 				issues = append(issues, fmt.Sprintf("target %s build_only = true", decision.ID))
 			}
 			if !target.RunSupported {
 				if rawReport, ok := inputs.RuntimeReports[decision.ID]; ok {
-					issues = append(issues, validateRuntimeSmokeReport(decision.ID, rawReport, expectedVersion)...)
+					issues = append(
+						issues,
+						validateRuntimeSmokeReport(decision.ID, rawReport, expectedVersion)...)
 				} else {
 					issue := fmt.Sprintf("target %s run_supported = false", decision.ID)
 					if target.RunUnsupportedReason != "" {
@@ -320,17 +387,30 @@ func validateRuntimeSmokeReport(target string, raw []byte, expectedVersion strin
 		issues = append(issues, fmt.Sprintf("%s timestamp is not RFC3339: %v", label, err))
 	}
 	if report.Target != target {
-		issues = append(issues, fmt.Sprintf("%s target is %q, want %q", label, report.Target, target))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s target is %q, want %q", label, report.Target, target),
+		)
 	}
 	if report.Host == "" {
 		issues = append(issues, fmt.Sprintf("%s host is empty", label))
 	}
 	if isNativeRuntimeTarget(target) {
 		if report.Host != target {
-			issues = append(issues, fmt.Sprintf("%s host is %q, want %q", label, report.Host, target))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s host is %q, want %q", label, report.Host, target),
+			)
 		}
 		if report.Runner != "" {
-			issues = append(issues, fmt.Sprintf("%s runner is %q, want empty host-native runtime", label, report.Runner))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"%s runner is %q, want empty host-native runtime",
+					label,
+					report.Runner,
+				),
+			)
 		}
 	}
 	if report.BuildOnly {
@@ -340,7 +420,10 @@ func validateRuntimeSmokeReport(target string, raw []byte, expectedVersion strin
 		issues = append(issues, fmt.Sprintf("%s unsupported is true, want false", label))
 	}
 	if report.Version != expectedVersion {
-		issues = append(issues, fmt.Sprintf("%s version is %q, want %q", label, report.Version, expectedVersion))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s version is %q, want %q", label, report.Version, expectedVersion),
+		)
 	}
 	if strings.TrimSpace(report.GitHead) == "" {
 		issues = append(issues, fmt.Sprintf("%s git_head is empty", label))
@@ -358,7 +441,19 @@ func validateRuntimeSmokeReport(target string, raw []byte, expectedVersion strin
 	total := len(report.Cases)
 	failed := total - passed
 	if report.Total != total || report.Passed != passed || report.Failed != failed {
-		issues = append(issues, fmt.Sprintf("%s counts mismatch: got total=%d passed=%d failed=%d, computed total=%d passed=%d failed=%d", label, report.Total, report.Passed, report.Failed, total, passed, failed))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s counts mismatch: got total=%d passed=%d failed=%d, computed total=%d passed=%d failed=%d",
+				label,
+				report.Total,
+				report.Passed,
+				report.Failed,
+				total,
+				passed,
+				failed,
+			),
+		)
 	}
 
 	byName := map[string]struct{}{}
@@ -384,7 +479,10 @@ func validateRuntimeSmokeReport(target string, raw []byte, expectedVersion strin
 		if c.ActualExit == nil {
 			issues = append(issues, fmt.Sprintf("%s case %s missing actual_exit", label, c.Name))
 		} else if *c.ActualExit != c.ExpectedExit {
-			issues = append(issues, fmt.Sprintf("%s case %s actual_exit is %d, want %d", label, c.Name, *c.ActualExit, c.ExpectedExit))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s case %s actual_exit is %d, want %d", label, c.Name, *c.ActualExit, c.ExpectedExit),
+			)
 		}
 		if strings.TrimSpace(c.Error) != "" {
 			issues = append(issues, fmt.Sprintf("%s case %s has error text", label, c.Name))
@@ -393,7 +491,10 @@ func validateRuntimeSmokeReport(target string, raw []byte, expectedVersion strin
 	if isNativeRuntimeTarget(target) {
 		for _, name := range requiredNativeRuntimeSmokeCases() {
 			if _, ok := byName[name]; !ok {
-				issues = append(issues, fmt.Sprintf("%s missing required runtime case %s", label, name))
+				issues = append(
+					issues,
+					fmt.Sprintf("%s missing required runtime case %s", label, name),
+				)
 			}
 		}
 	}
@@ -438,13 +539,24 @@ func validateDecisionEvidence(id string, evidence decisionEvidence) []string {
 			issues = append(issues, fmt.Sprintf("decision %s missing evidence.%s", id, item.name))
 		}
 	}
-	issues = append(issues, validateEvidencePaths(id, "implementation", evidence.Implementation, "")...)
+	issues = append(
+		issues,
+		validateEvidencePaths(id, "implementation", evidence.Implementation, "")...)
 	issues = append(issues, validateTestEvidence(id, evidence.Tests)...)
 	issues = append(issues, validateEvidencePaths(id, "docs", evidence.Docs, "docs/")...)
-	releaseIssues, hasReportArtifact := validateReleaseGateEvidence(id, evidence.ReleaseGateEvidence)
+	releaseIssues, hasReportArtifact := validateReleaseGateEvidence(
+		id,
+		evidence.ReleaseGateEvidence,
+	)
 	issues = append(issues, releaseIssues...)
 	if len(nonEmptyStrings(evidence.ReleaseGateEvidence)) > 0 && !hasReportArtifact {
-		issues = append(issues, fmt.Sprintf("decision %s missing evidence.release_gate_evidence report artifact under reports/", id))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"decision %s missing evidence.release_gate_evidence report artifact under reports/",
+				id,
+			),
+		)
 	}
 	if id == actorDistributedRuntimeDecision {
 		issues = append(issues, validateActorDistributedRuntimeEvidence(evidence)...)
@@ -462,20 +574,62 @@ func validateNativeUIRuntimeEvidence(evidence decisionEvidence) []string {
 	hasSidecarEvidence := hasNativeUISidecarOrMetadataEvidence(evidence)
 
 	var issues []string
-	if hasSidecarEvidence && !hasRuntimeImplementation && !hasRuntimeTests && !hasRuntimeGateArtifact {
-		issues = append(issues, fmt.Sprintf("decision %s has only metadata/web/native-shell sidecar evidence; requires real Linux-x64 native UI runtime evidence, not %s or %s artifacts", nativeUIRuntimeDecision, nativeUISidecarSchemaV1, uiBundleSchemaV1))
+	if hasSidecarEvidence && !hasRuntimeImplementation && !hasRuntimeTests &&
+		!hasRuntimeGateArtifact {
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				("decision %s has only metadata/web/native-shell sidecar "+
+					"evidence; requires real Linux-x64 native UI runtime evidence, not %s or "+
+					"%s artifacts"),
+				nativeUIRuntimeDecision,
+				nativeUISidecarSchemaV1,
+				uiBundleSchemaV1,
+			),
+		)
 	}
 	if !hasRuntimeImplementation {
-		issues = append(issues, fmt.Sprintf("decision %s requires real Linux-x64 native UI runtime implementation evidence under tools/cmd/native-ui-runtime-smoke or tools/validators/nativeui", nativeUIRuntimeDecision))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				("decision %s requires real Linux-x64 native UI runtime "+
+					"implementation evidence under tools/cmd/native-ui-runtime-smoke or "+
+					"tools/validators/nativeui"),
+				nativeUIRuntimeDecision,
+			),
+		)
 	}
 	if !hasRuntimeTests {
-		issues = append(issues, fmt.Sprintf("decision %s requires native UI runtime tests or smoke script evidence covering widget load, click dispatch, state propagation, negative dispatch paths, and close", nativeUIRuntimeDecision))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				("decision %s requires native UI runtime tests or smoke script "+
+					"evidence covering widget load, click dispatch, state propagation, "+
+					"negative dispatch paths, and close"),
+				nativeUIRuntimeDecision,
+			),
+		)
 	}
 	if !hasNativeUIRuntimeDocsEvidence(evidence.Docs) {
-		issues = append(issues, fmt.Sprintf("decision %s docs evidence must include docs/spec/current_supported_surface.md plus UI runtime docs/spec content", nativeUIRuntimeDecision))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				("decision %s docs evidence must include docs/spec/core/current_"+
+					"supported_surface.md plus UI runtime docs/spec content"),
+				nativeUIRuntimeDecision,
+			),
+		)
 	}
 	if !hasRuntimeGateArtifact {
-		issues = append(issues, fmt.Sprintf("decision %s requires a %s release-gate artifact under reports/, not ui.metadata-v1, web, or native-shell sidecar evidence", nativeUIRuntimeDecision, nativeui.SchemaV1))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				("decision %s requires a %s release-gate artifact under reports/, "+
+					"not ui.metadata-v1, web, or native-shell sidecar evidence"),
+				nativeUIRuntimeDecision,
+				nativeui.SchemaV1,
+			),
+		)
 	}
 	issues = append(issues, validateNativeUIRuntimeGateArtifacts(evidence.ReleaseGateEvidence)...)
 	return issues
@@ -556,10 +710,12 @@ func hasNativeUIRuntimeDocsEvidence(values []string) bool {
 	hasUIDocs := false
 	for _, value := range nonEmptyStrings(values) {
 		normalized := normalizeEvidenceValue(value)
-		if normalized == "docs/spec/current_supported_surface.md" {
+		if normalized == "docs/spec/core/current_supported_surface.md" {
 			hasSurface = true
 		}
-		if normalized == "docs/spec/ui_v0.4.0.md" || normalized == "docs/user/wasm_ui_guide.md" || strings.Contains(normalized, "ui") {
+		if normalized == "docs/spec/ui/ui_v0.4.0.md" ||
+			normalized == "docs/user/surface/wasm_ui_guide.md" ||
+			strings.Contains(normalized, "ui") {
 			hasUIDocs = true
 		}
 	}
@@ -577,7 +733,8 @@ func hasNativeUIRuntimeGateArtifact(values []string) bool {
 			continue
 		}
 		lower := strings.ToLower(string(raw))
-		if strings.Contains(lower, nativeUISidecarSchemaV1) || strings.Contains(lower, "tetra.ui.web") {
+		if strings.Contains(lower, nativeUISidecarSchemaV1) ||
+			strings.Contains(lower, "tetra.ui.web") {
 			continue
 		}
 		if strings.Contains(lower, nativeui.SchemaV1) && nativeui.ValidateReport(raw) == nil {
@@ -600,26 +757,60 @@ func validateNativeUIRuntimeGateArtifacts(values []string) []string {
 		}
 		lower := strings.ToLower(string(raw))
 		if strings.Contains(lower, nativeUISidecarSchemaV1) {
-			issues = append(issues, fmt.Sprintf("decision %s evidence.release_gate_evidence path %s is native-shell sidecar-only %s evidence, not native runtime evidence", nativeUIRuntimeDecision, value, nativeUISidecarSchemaV1))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					("decision %s evidence.release_gate_evidence path %s is native-"+
+						"shell sidecar-only %s evidence, not native runtime evidence"),
+					nativeUIRuntimeDecision,
+					value,
+					nativeUISidecarSchemaV1,
+				),
+			)
 			continue
 		}
 		if strings.Contains(lower, "tetra.ui.web") || strings.Contains(lower, "wasm32-web") {
-			issues = append(issues, fmt.Sprintf("decision %s evidence.release_gate_evidence path %s is web runtime evidence, not Linux-x64 native UI runtime evidence", nativeUIRuntimeDecision, value))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					("decision %s evidence.release_gate_evidence path %s is web "+
+						"runtime evidence, not Linux-x64 native UI runtime evidence"),
+					nativeUIRuntimeDecision,
+					value,
+				),
+			)
 			continue
 		}
 		if strings.Contains(lower, nativeui.SchemaV1) {
 			if err := nativeui.ValidateReport(raw); err != nil {
-				issues = append(issues, fmt.Sprintf("decision %s evidence.release_gate_evidence path %s invalid native UI runtime report: %v", nativeUIRuntimeDecision, value, err))
+				issues = append(
+					issues,
+					fmt.Sprintf(
+						"decision %s evidence.release_gate_evidence path %s invalid native UI runtime report: %v",
+						nativeUIRuntimeDecision,
+						value,
+						err,
+					),
+				)
 			}
 		} else if strings.Contains(normalized, "native-ui") || strings.Contains(normalized, "ui") {
-			issues = append(issues, fmt.Sprintf("decision %s evidence.release_gate_evidence path %s must use %s executable runtime report schema", nativeUIRuntimeDecision, value, nativeui.SchemaV1))
+			issues = append(
+				issues,
+				fmt.Sprintf(("decision %s evidence.release_gate_evidence path %s must use %s "+
+					"executable runtime report schema"), nativeUIRuntimeDecision, value, nativeui.SchemaV1),
+			)
 		}
 	}
 	return issues
 }
 
 func hasNativeUISidecarOrMetadataEvidence(evidence decisionEvidence) bool {
-	for _, values := range [][]string{evidence.Implementation, evidence.Tests, evidence.Docs, evidence.ReleaseGateEvidence} {
+	for _, values := range [][]string{
+		evidence.Implementation,
+		evidence.Tests,
+		evidence.Docs,
+		evidence.ReleaseGateEvidence,
+	} {
 		for _, value := range nonEmptyStrings(values) {
 			normalized := normalizeEvidenceValue(value)
 			if isNativeUISidecarOrMetadataEvidenceValue(normalized) {
@@ -629,7 +820,10 @@ func hasNativeUISidecarOrMetadataEvidence(evidence decisionEvidence) bool {
 				raw, err := readFileFromRepoRoot(normalized)
 				if err == nil {
 					lower := strings.ToLower(string(raw))
-					if strings.Contains(lower, nativeUISidecarSchemaV1) || strings.Contains(lower, `"schema":"tetra.ui.v0.4.0"`) || strings.Contains(lower, `"schema": "tetra.ui.v0.4.0"`) || strings.Contains(lower, "wasm32-web") {
+					if strings.Contains(lower, nativeUISidecarSchemaV1) ||
+						strings.Contains(lower, `"schema":"tetra.ui.v0.4.0"`) ||
+						strings.Contains(lower, `"schema": "tetra.ui.v0.4.0"`) ||
+						strings.Contains(lower, "wasm32-web") {
 						return true
 					}
 				}
@@ -660,28 +854,71 @@ func isNativeUISidecarOrMetadataEvidenceValue(value string) bool {
 }
 
 func validateActorDistributedRuntimeEvidence(evidence decisionEvidence) []string {
-	hasRuntimeImplementation := hasActorDistributedRuntimeImplementationEvidence(evidence.Implementation)
+	hasRuntimeImplementation := hasActorDistributedRuntimeImplementationEvidence(
+		evidence.Implementation,
+	)
 	hasRuntimeTests := hasActorDistributedRuntimeTestEvidence(evidence.Tests)
 	hasRuntimeGateArtifact := hasActorDistributedRuntimeGateArtifact(evidence.ReleaseGateEvidence)
 	hasTransportEvidence := hasActorTransportEvidence(evidence)
 
 	var issues []string
-	if hasTransportEvidence && !hasRuntimeImplementation && !hasRuntimeTests && !hasRuntimeGateArtifact {
-		issues = append(issues, fmt.Sprintf("decision %s has only actor transport evidence; requires real distributed actor runtime/lowering evidence, not %s envelope/trace/hash validation", actorDistributedRuntimeDecision, actorTransportSchemaV1))
+	if hasTransportEvidence && !hasRuntimeImplementation && !hasRuntimeTests &&
+		!hasRuntimeGateArtifact {
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				("decision %s has only actor transport evidence; requires real "+
+					"distributed actor runtime/lowering evidence, not %s envelope/trace/hash "+
+					"validation"),
+				actorDistributedRuntimeDecision,
+				actorTransportSchemaV1,
+			),
+		)
 	}
 	if !hasRuntimeImplementation {
-		issues = append(issues, fmt.Sprintf("decision %s requires real distributed actor runtime/lowering evidence under compiler runtime, lowering, IR, or backend paths", actorDistributedRuntimeDecision))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				("decision %s requires real distributed actor runtime/lowering "+
+					"evidence under compiler runtime, lowering, IR, or backend paths"),
+				actorDistributedRuntimeDecision,
+			),
+		)
 	}
 	if !hasRuntimeTests {
-		issues = append(issues, fmt.Sprintf("decision %s requires distributed actor runtime tests covering cross-node send/receive plus failure, cancel, join, and diagnostics behavior", actorDistributedRuntimeDecision))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				("decision %s requires distributed actor runtime tests covering "+
+					"cross-node send/receive plus failure, cancel, join, and diagnostics "+
+					"behavior"),
+				actorDistributedRuntimeDecision,
+			),
+		)
 	}
 	if !hasActorDistributedRuntimeDocsEvidence(evidence.Docs) {
-		issues = append(issues, fmt.Sprintf("decision %s docs evidence must include docs/spec/current_supported_surface.md and actor docs", actorDistributedRuntimeDecision))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				("decision %s docs evidence must include docs/spec/core/current_"+
+					"supported_surface.md and actor docs"),
+				actorDistributedRuntimeDecision,
+			),
+		)
 	}
 	if !hasRuntimeGateArtifact {
-		issues = append(issues, fmt.Sprintf("decision %s requires a distributed actor runtime release-gate artifact under reports/, not actor transport-only evidence", actorDistributedRuntimeDecision))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				("decision %s requires a distributed actor runtime release-gate "+
+					"artifact under reports/, not actor transport-only evidence"),
+				actorDistributedRuntimeDecision,
+			),
+		)
 	}
-	issues = append(issues, validateActorDistributedRuntimeGateArtifacts(evidence.ReleaseGateEvidence)...)
+	issues = append(
+		issues,
+		validateActorDistributedRuntimeGateArtifacts(evidence.ReleaseGateEvidence)...)
 	return issues
 }
 
@@ -694,7 +931,8 @@ func hasActorDistributedRuntimeImplementationEvidence(values []string) bool {
 		if !hasRuntimeImplementationPrefix(normalized) {
 			continue
 		}
-		if hasDistributedRuntimeMarker(normalized) || hasDistributedRuntimeImplementationContent(normalized) {
+		if hasDistributedRuntimeMarker(normalized) ||
+			hasDistributedRuntimeImplementationContent(normalized) {
 			return true
 		}
 	}
@@ -774,10 +1012,10 @@ func hasActorDistributedRuntimeDocsEvidence(values []string) bool {
 	hasActorDocs := false
 	for _, value := range nonEmptyStrings(values) {
 		normalized := normalizeEvidenceValue(value)
-		if normalized == "docs/spec/current_supported_surface.md" {
+		if normalized == "docs/spec/core/current_supported_surface.md" {
 			hasSurface = true
 		}
-		if normalized == "docs/spec/actors.md" || strings.Contains(normalized, "actor") {
+		if normalized == "docs/spec/runtime/actors.md" || strings.Contains(normalized, "actor") {
 			hasActorDocs = true
 		}
 	}
@@ -819,23 +1057,51 @@ func validateActorDistributedRuntimeGateArtifacts(values []string) []string {
 		if err != nil {
 			continue
 		}
-		if isActorTransportEvidenceValue(normalized) || strings.Contains(strings.ToLower(string(raw)), actorTransportSchemaV1) {
-			issues = append(issues, fmt.Sprintf("decision %s evidence.release_gate_evidence path %s is transport-only %s evidence, not distributed actor runtime evidence", actorDistributedRuntimeDecision, value, actorTransportSchemaV1))
+		if isActorTransportEvidenceValue(normalized) ||
+			strings.Contains(strings.ToLower(string(raw)), actorTransportSchemaV1) {
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					("decision %s evidence.release_gate_evidence path %s is transport-"+
+						"only %s evidence, not distributed actor runtime evidence"),
+					actorDistributedRuntimeDecision,
+					value,
+					actorTransportSchemaV1,
+				),
+			)
 			continue
 		}
 		if strings.Contains(strings.ToLower(string(raw)), actordist.SchemaV1) {
 			if err := actordist.ValidateReport(raw); err != nil {
-				issues = append(issues, fmt.Sprintf("decision %s evidence.release_gate_evidence path %s invalid distributed actor runtime report: %v", actorDistributedRuntimeDecision, value, err))
+				issues = append(
+					issues,
+					fmt.Sprintf(
+						("decision %s evidence.release_gate_evidence path %s invalid "+
+							"distributed actor runtime report: %v"),
+						actorDistributedRuntimeDecision,
+						value,
+						err,
+					),
+				)
 			}
 		} else if hasDistributedRuntimeMarker(normalized) {
-			issues = append(issues, fmt.Sprintf("decision %s evidence.release_gate_evidence path %s must use %s executable runtime report schema", actorDistributedRuntimeDecision, value, actordist.SchemaV1))
+			issues = append(
+				issues,
+				fmt.Sprintf(("decision %s evidence.release_gate_evidence path %s must use %s "+
+					"executable runtime report schema"), actorDistributedRuntimeDecision, value, actordist.SchemaV1),
+			)
 		}
 	}
 	return issues
 }
 
 func hasActorTransportEvidence(evidence decisionEvidence) bool {
-	for _, values := range [][]string{evidence.Implementation, evidence.Tests, evidence.Docs, evidence.ReleaseGateEvidence} {
+	for _, values := range [][]string{
+		evidence.Implementation,
+		evidence.Tests,
+		evidence.Docs,
+		evidence.ReleaseGateEvidence,
+	} {
 		for _, value := range nonEmptyStrings(values) {
 			normalized := normalizeEvidenceValue(value)
 			if isActorTransportEvidenceValue(normalized) {
@@ -843,7 +1109,8 @@ func hasActorTransportEvidence(evidence decisionEvidence) bool {
 			}
 			if strings.HasPrefix(normalized, "reports/") {
 				raw, err := readFileFromRepoRoot(normalized)
-				if err == nil && strings.Contains(strings.ToLower(string(raw)), actorTransportSchemaV1) {
+				if err == nil &&
+					strings.Contains(strings.ToLower(string(raw)), actorTransportSchemaV1) {
 					return true
 				}
 			}
@@ -923,20 +1190,42 @@ func validateReleaseGateEvidence(id string, paths []string) ([]string, bool) {
 	hasReportArtifact := false
 	for _, rawPath := range nonEmptyStrings(paths) {
 		path := filepath.ToSlash(strings.TrimSpace(rawPath))
-		if filepath.IsAbs(rawPath) || path == ".." || strings.HasPrefix(path, "../") || strings.Contains(path, "/../") {
-			issues = append(issues, fmt.Sprintf("decision %s evidence.release_gate_evidence path %s is unsafe", id, rawPath))
+		if filepath.IsAbs(rawPath) || path == ".." || strings.HasPrefix(path, "../") ||
+			strings.Contains(path, "/../") {
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"decision %s evidence.release_gate_evidence path %s is unsafe",
+					id,
+					rawPath,
+				),
+			)
 			continue
 		}
 		info, err := statFromRepoRoot(path)
 		if err != nil {
-			issues = append(issues, fmt.Sprintf("decision %s evidence.release_gate_evidence path %s is not readable", id, rawPath))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"decision %s evidence.release_gate_evidence path %s is not readable",
+					id,
+					rawPath,
+				),
+			)
 			if strings.HasPrefix(path, "reports/") {
 				hasReportArtifact = true
 			}
 			continue
 		}
 		if info.IsDir() {
-			issues = append(issues, fmt.Sprintf("decision %s evidence.release_gate_evidence path %s is a directory, want report file", id, rawPath))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"decision %s evidence.release_gate_evidence path %s is a directory, want report file",
+					id,
+					rawPath,
+				),
+			)
 			continue
 		}
 		if !strings.HasPrefix(path, "reports/") {
@@ -945,7 +1234,14 @@ func validateReleaseGateEvidence(id string, paths []string) ([]string, bool) {
 		hasReportArtifact = true
 		raw, err := readFileFromRepoRoot(path)
 		if err != nil {
-			issues = append(issues, fmt.Sprintf("decision %s evidence.release_gate_evidence path %s is not readable", id, rawPath))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"decision %s evidence.release_gate_evidence path %s is not readable",
+					id,
+					rawPath,
+				),
+			)
 			continue
 		}
 		issues = append(issues, validateReleaseGateReportContent(id, rawPath, raw)...)
@@ -956,16 +1252,34 @@ func validateReleaseGateEvidence(id string, paths []string) ([]string, bool) {
 func validateReleaseGateReportContent(id string, path string, raw []byte) []string {
 	text := strings.TrimSpace(string(raw))
 	if text == "" {
-		return []string{fmt.Sprintf("decision %s evidence.release_gate_evidence path %s is incomplete", id, path)}
+		return []string{
+			fmt.Sprintf(
+				"decision %s evidence.release_gate_evidence path %s is incomplete",
+				id,
+				path,
+			),
+		}
 	}
 	if json.Valid(raw) {
 		var decoded any
 		if err := json.Unmarshal(raw, &decoded); err == nil {
 			if isIncompleteJSONEvidence(decoded) {
-				return []string{fmt.Sprintf("decision %s evidence.release_gate_evidence path %s is incomplete", id, path)}
+				return []string{
+					fmt.Sprintf(
+						"decision %s evidence.release_gate_evidence path %s is incomplete",
+						id,
+						path,
+					),
+				}
 			}
 			if containsForbiddenStructuredEvidence(decoded) {
-				return []string{fmt.Sprintf("decision %s evidence.release_gate_evidence path %s contains forbidden filler wording", id, path)}
+				return []string{
+					fmt.Sprintf(
+						"decision %s evidence.release_gate_evidence path %s contains forbidden filler wording",
+						id,
+						path,
+					),
+				}
 			}
 			return nil
 		}
@@ -973,7 +1287,13 @@ func validateReleaseGateReportContent(id string, path string, raw []byte) []stri
 	lower := strings.ToLower(text)
 	for _, phrase := range []string{"fake", "mock", "placeholder"} {
 		if strings.Contains(lower, phrase) {
-			return []string{fmt.Sprintf("decision %s evidence.release_gate_evidence path %s contains forbidden filler wording", id, path)}
+			return []string{
+				fmt.Sprintf(
+					"decision %s evidence.release_gate_evidence path %s contains forbidden filler wording",
+					id,
+					path,
+				),
+			}
 		}
 	}
 	return nil
@@ -1040,16 +1360,32 @@ func validateEvidencePaths(id, bucket string, paths []string, requiredPrefix str
 	var issues []string
 	for _, rawPath := range nonEmptyStrings(paths) {
 		path := filepath.ToSlash(strings.TrimSpace(rawPath))
-		if filepath.IsAbs(rawPath) || path == ".." || strings.HasPrefix(path, "../") || strings.Contains(path, "/../") {
-			issues = append(issues, fmt.Sprintf("decision %s evidence.%s path %s is unsafe", id, bucket, rawPath))
+		if filepath.IsAbs(rawPath) || path == ".." || strings.HasPrefix(path, "../") ||
+			strings.Contains(path, "/../") {
+			issues = append(
+				issues,
+				fmt.Sprintf("decision %s evidence.%s path %s is unsafe", id, bucket, rawPath),
+			)
 			continue
 		}
 		if requiredPrefix != "" && !strings.HasPrefix(path, requiredPrefix) {
-			issues = append(issues, fmt.Sprintf("decision %s evidence.%s path %s must be under %s", id, bucket, rawPath, strings.TrimSuffix(requiredPrefix, "/")+"/"))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"decision %s evidence.%s path %s must be under %s",
+					id,
+					bucket,
+					rawPath,
+					strings.TrimSuffix(requiredPrefix, "/")+"/",
+				),
+			)
 			continue
 		}
 		if _, err := statFromRepoRoot(path); err != nil {
-			issues = append(issues, fmt.Sprintf("decision %s evidence.%s path %s is not readable", id, bucket, rawPath))
+			issues = append(
+				issues,
+				fmt.Sprintf("decision %s evidence.%s path %s is not readable", id, bucket, rawPath),
+			)
 		}
 	}
 	return issues

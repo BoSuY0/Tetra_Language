@@ -32,15 +32,24 @@ func TestExerciseEndpointCountsEachFailedRequestOnce(t *testing.T) {
 		context.Background(),
 		http.DefaultClient,
 		"http://127.0.0.1:1/unreachable",
-		endpointSpec{Name: "fail", Path: "/fail", Kind: "negative", Validate: func(int, http.Header, []byte) error {
-			return errors.New("not reached")
-		}},
+		endpointSpec{
+			Name: "fail",
+			Path: "/fail",
+			Kind: "negative",
+			Validate: func(int, http.Header, []byte) error {
+				return errors.New("not reached")
+			},
+		},
 		3,
 		2,
 		0,
 	)
 	if result.successes != 0 || result.failures != 3 {
-		t.Fatalf("result successes=%d failures=%d, want 0 successes and 3 failures", result.successes, result.failures)
+		t.Fatalf(
+			"result successes=%d failures=%d, want 0 successes and 3 failures",
+			result.successes,
+			result.failures,
+		)
 	}
 }
 
@@ -75,14 +84,18 @@ func TestRunBenchmarkRecordsLatencyPercentilesAndIntegrityMetadata(t *testing.T)
 	if report.GeneratedAt == "" || report.GeneratedLocalAt == "" {
 		t.Fatalf("report missing generated timestamps: %#v", report)
 	}
-	if report.Environment.OS == "" || report.Environment.Arch == "" || report.Environment.GoVersion == "" {
+	if report.Environment.OS == "" || report.Environment.Arch == "" ||
+		report.Environment.GoVersion == "" {
 		t.Fatalf("report missing environment: %#v", report.Environment)
 	}
 	if report.Git.WorktreeStatus == "" {
 		t.Fatalf("report missing git state: %#v", report.Git)
 	}
 	for _, endpoint := range report.Endpoints {
-		if endpoint.P50LatencyMS < 0 || endpoint.P90LatencyMS < 0 || endpoint.P95LatencyMS < 0 || endpoint.P99LatencyMS < 0 || endpoint.P999LatencyMS < 0 || endpoint.MaxLatencyMS < 0 {
+		if endpoint.P50LatencyMS < 0 || endpoint.P90LatencyMS < 0 || endpoint.P95LatencyMS < 0 ||
+			endpoint.P99LatencyMS < 0 ||
+			endpoint.P999LatencyMS < 0 ||
+			endpoint.MaxLatencyMS < 0 {
 			t.Fatalf("endpoint missing latency percentiles: %#v", endpoint)
 		}
 		if endpoint.ObservedContentType == "" || len(endpoint.SemanticChecks) == 0 {
@@ -119,7 +132,9 @@ func TestValidateReportAllowsFailedEndpointWithZeroRPS(t *testing.T) {
 
 func TestValidateFortunesRejectsUnsortedRows(t *testing.T) {
 	header := http.Header{"Content-Type": []string{"text/html; charset=utf-8"}}
-	body := []byte(`<!DOCTYPE html><html><body><table><tr><td>0</td><td>Additional fortune added at request time.</td></tr><tr><td>11</td><td>&lt;script&gt;alert(&quot;This should not be displayed in a browser alert box.&quot;);&lt;/script&gt;</td></tr></table></body></html>`)
+	body := []byte(
+		`<!DOCTYPE html><html><body><table><tr><td>0</td><td>Additional fortune added at request time.</td></tr><tr><td>11</td><td>&lt;script&gt;alert(&quot;This should not be displayed in a browser alert box.&quot;);&lt;/script&gt;</td></tr></table></body></html>`,
+	)
 
 	err := validateFortunes(http.StatusOK, header, body)
 	if err == nil {
@@ -157,7 +172,11 @@ func TestRunBenchmarkChecksEndpointsAndWritesReport(t *testing.T) {
 			_, _ = w.Write([]byte(`[{"id":1,"randomNumber":5},{"id":3,"randomNumber":6}]`))
 		case "/fortunes":
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			_, _ = w.Write([]byte(`<!DOCTYPE html><html><body><table><tr><td>11</td><td>&lt;script&gt;alert(&quot;This should not be displayed in a browser alert box.&quot;);&lt;/script&gt;</td></tr><tr><td>0</td><td>Additional fortune added at request time.</td></tr></table></body></html>`))
+			_, _ = w.Write(
+				[]byte(
+					`<!DOCTYPE html><html><body><table><tr><td>11</td><td>&lt;script&gt;alert(&quot;This should not be displayed in a browser alert box.&quot;);&lt;/script&gt;</td></tr><tr><td>0</td><td>Additional fortune added at request time.</td></tr></table></body></html>`,
+				),
+			)
 		default:
 			http.NotFound(w, r)
 		}
@@ -180,7 +199,8 @@ func TestRunBenchmarkChecksEndpointsAndWritesReport(t *testing.T) {
 		raw, _ := json.MarshalIndent(report, "", "  ")
 		t.Fatalf("validateReport: %v\n%s", err, raw)
 	}
-	if report.Status != "pass" || report.Summary.EndpointCount != 6 || report.Summary.TotalRequests != 48 {
+	if report.Status != "pass" || report.Summary.EndpointCount != 6 ||
+		report.Summary.TotalRequests != 48 {
 		t.Fatalf("summary = %#v status=%s", report.Summary, report.Status)
 	}
 	for _, endpoint := range report.Endpoints {

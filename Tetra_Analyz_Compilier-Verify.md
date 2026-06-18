@@ -55,13 +55,13 @@ flowchart LR
     Alloc --> Reports
 ```
 
-Публічні API це підтверджують: `compiler/api.go:48-120` дає `Parse`, `ParseFile`, `Check`, `CheckWorldOpt`, `Lower`, `BuildPLIR`, `LowerModule`, `VerifyIRProgram`, `VerifyIRFunc`. Уже на API-рівні видно, що verification є не одним етапом, а набором окремих entrypoints.
+Публічні API це підтверджують: `compiler/compiler_facade.go:48-120` дає `Parse`, `ParseFile`, `Check`, `CheckWorldOpt`, `Lower`, `BuildPLIR`, `LowerModule`, `VerifyIRProgram`, `VerifyIRFunc`. Уже на API-рівні видно, що verification є не одним етапом, а набором окремих entrypoints.
 
-`BuildFileWithStatsOpt` у `compiler/compiler.go:138-184` завантажує checked world, перевіряє exported FFI ABI, runtime до codegen, будує native module plan, компілює, лінкує і емітить explain reports. Важливо: це production compile entrypoint, тому саме тут має бути найсильніший validation contract.
+`BuildFileWithStatsOpt` у `compiler/compiler_facade.go:138-184` завантажує checked world, перевіряє exported FFI ABI, runtime до codegen, будує native module plan, компілює, лінкує і емітить explain reports. Важливо: це production compile entrypoint, тому саме тут має бути найсильніший validation contract.
 
-`compileNativeModulePlan` у `compiler/compiler.go:490-610` для target-supported stack allocation будує PLIR, allocation plan, lowering, перевіряє target atomics, викликає `validation.ValidateAllocationLowering` і лише тоді йде в backend codegen. Це хороший gate.
+`compileNativeModulePlan` у `compiler/compiler_facade.go:490-610` для target-supported stack allocation будує PLIR, allocation plan, lowering, перевіряє target atomics, викликає `validation.ValidateAllocationLowering` і лише тоді йде в backend codegen. Це хороший gate.
 
-Проблема: інший object path у `compiler/compiler.go:1355-1435` робить `CheckWorldOpt`, FFI ABI validation, `LowerModule`, target atomic IR validation і object codegen, але в оглянутому фрагменті не видно симетричного `ValidateAllocationLowering`. Для ідеальної архітектури всі compile/output entrypoints мають проходити однаковий proof/validation contract або явно декларувати, чому він не застосовується.
+Проблема: інший object path у `compiler/compiler_facade.go:1355-1435` робить `CheckWorldOpt`, FFI ABI validation, `LowerModule`, target atomic IR validation і object codegen, але в оглянутому фрагменті не видно симетричного `ValidateAllocationLowering`. Для ідеальної архітектури всі compile/output entrypoints мають проходити однаковий proof/validation contract або явно декларувати, чому він не застосовується.
 
 ## 4. Semantic layer: що вже добре
 
@@ -88,7 +88,7 @@ PLIR verifier також не декоративний:
 - `VerifyProgram` у `compiler/internal/plir/verify.go:8-26` ловить duplicate funcs.
 - `VerifyFunction` у `compiler/internal/plir/verify.go:28-173` перевіряє value metadata, alloc intent guards, CFG, proof wiring, range facts, consistency.
 - `verifyProofWiring` у `compiler/internal/plir/verify.go:225-268` вимагає, щоб proof guards мали відомі blocks/ops, proof uses посилалися на відомі blocks/ops, а guard block домінував use block.
-- `compiler/internal/plir/cfg.go:19-25` визначає `Dominates`, а `compiler/internal/plir/cfg.go:27-78` рахує dominators.
+- `compiler/internal/plir/verify.go:736` визначає `Dominates`, а `compiler/internal/plir/verify.go:744` рахує dominators.
 
 Це сильний дизайн: proof не просто string tag, він має CFG-домінування. Але proof still shallow щодо семантичного змісту guard-а. Dominance каже "guard стоїть раніше на всіх шляхах", а не "guard справді доводить саме цей index in range після всіх alias/mutation effects".
 
@@ -186,7 +186,7 @@ Optimization manager має сильну contract discipline:
 - `validateDifferentialSamples` у `compiler/internal/validation/validation.go:1185-1205` працює для одного return slot і максимум двох params;
 - sample args у `compiler/internal/validation/validation.go:1208-1229` - це маленький deterministic набір `-2,-1,0,1,2,7`.
 
-Тобто translation validation тут чесно bounded. Це добре, якщо система це не перебільшує. І проект частково це робить правильно: `compiler/translation_validation_v2.go:330-339` прямо декларує non-claims: немає broad memory model, broad loop theorem prover і performance proof.
+Тобто translation validation тут чесно bounded. Це добре, якщо система це не перебільшує. І проект частково це робить правильно: `compiler/compiler_evidence_gates.go:330-339` прямо декларує non-claims: немає broad memory model, broad loop theorem prover і performance proof.
 
 Ідеально треба рухатись до layered translation validation:
 
@@ -199,11 +199,11 @@ Optimization manager має сильну contract discipline:
 
 ## 11. Formal core reports: корисна чесність, але ще не kernel
 
-`compiler/formal_core_v1.go` і `compiler/translation_validation_v2.go` - важливі, бо вони не тільки створюють claims, а й мають validation/non-claim boundaries.
+`compiler/compiler_evidence_gates.go` і `compiler/compiler_evidence_gates.go` - важливі, бо вони не тільки створюють claims, а й мають validation/non-claim boundaries.
 
-`compiler/formal_core_v1.go:300-355` відхиляє claims про full formal proof, broad theorem prover, unsafe/runtime semantics, safe semantics і performance. Це правильна культура: система знає, чого вона не доводить.
+`compiler/compiler_evidence_gates.go:300-355` відхиляє claims про full formal proof, broad theorem prover, unsafe/runtime semantics, safe semantics і performance. Це правильна культура: система знає, чого вона не доводить.
 
-`compiler/formal_core_v1.go:401-457` будує PLIR witness і дивиться на facts; `compiler/formal_core_v1.go:460-470` переходить до proof witness. `compiler/translation_validation_v2.go:343-371` перевіряє registered passes witness, `compiler/translation_validation_v2.go:374-399` scalar witness, `compiler/translation_validation_v2.go:402-416` memory witness, `compiler/translation_validation_v2.go:419-445` loop witness, `compiler/translation_validation_v2.go:480-495` proof witness, `compiler/translation_validation_v2.go:498-511` allocation witness, `compiler/translation_validation_v2.go:514-550` hash witness.
+`compiler/compiler_evidence_gates.go:401-457` будує PLIR witness і дивиться на facts; `compiler/compiler_evidence_gates.go:460-470` переходить до proof witness. `compiler/compiler_evidence_gates.go:343-371` перевіряє registered passes witness, `compiler/compiler_evidence_gates.go:374-399` scalar witness, `compiler/compiler_evidence_gates.go:402-416` memory witness, `compiler/compiler_evidence_gates.go:419-445` loop witness, `compiler/compiler_evidence_gates.go:480-495` proof witness, `compiler/compiler_evidence_gates.go:498-511` allocation witness, `compiler/compiler_evidence_gates.go:514-550` hash witness.
 
 Критика: ці reports важливі як evidence docs, але вони не мають стати заміною runtime-enforced compiler contract. Ідеально reports мають бути output-ом одного validation kernel, а не паралельною системою, яка сама себе перевіряє.
 
@@ -223,7 +223,7 @@ Backend differential у `compiler/internal/differential/differential.go:230-355`
 
 ## 13. Reports path: корисний, але умовний
 
-`emitExplainReports` у `compiler/reports.go:302-380` при відповідних flags будує PLIR, перевіряє його, створює allocation plan, lower IR, запускає `ValidateAllocationLowering`, `CheckBoundsProofsWithPLIR`, і пише `.plir`, `.proof`, `.bounds`, `.alloc`, `.backend`, `.layout`, `.perf`, `.explain`.
+`emitExplainReports` у `compiler/compiler_reports.go:302-380` при відповідних flags будує PLIR, перевіряє його, створює allocation plan, lower IR, запускає `ValidateAllocationLowering`, `CheckBoundsProofsWithPLIR`, і пише `.plir`, `.proof`, `.bounds`, `.alloc`, `.backend`, `.layout`, `.perf`, `.explain`.
 
 Це цінний introspection path. Але він conditional: залежить від `Explain`, `EmitPLIR`, `EmitProof`, `EmitBoundsReport`, `EmitAllocReport`. Ідеально proof validation не має бути тільки explain/report feature. Reports мають бути видимою проекцією обов'язкової validation evidence, яка існує для кожної build-команди.
 
@@ -503,7 +503,7 @@ Acceptance:
 
 ## 19. Примирення висновків sub-agentів
 
-Kuhn правильно підсвітив головний compiler-internal ризик: proof/validation distributed across compile/reports/optimizer; потрібен centralized `ValidationPipeline`. Це підтверджено `compiler/compiler.go:138-184`, `compiler/compiler.go:490-610`, `compiler/reports.go:302-380`, `compiler/internal/opt/manager.go:159-230`.
+Kuhn правильно підсвітив головний compiler-internal ризик: proof/validation distributed across compile/reports/optimizer; потрібен centralized `ValidationPipeline`. Це підтверджено `compiler/compiler_facade.go:138-184`, `compiler/compiler_facade.go:490-610`, `compiler/compiler_reports.go:302-380`, `compiler/internal/opt/manager.go:159-230`.
 
 Pascal правильно підсвітив release-validator ризик: artifacts добре перевіряються локально, але provenance/attestation неповні. Це підтверджено `tools/cmd/validate-artifact-hashes/main.go:1-220`, `scripts/release/v1_0/gate.sh:1-444`, `scripts/release/surface/release-gate.sh:1-139`.
 

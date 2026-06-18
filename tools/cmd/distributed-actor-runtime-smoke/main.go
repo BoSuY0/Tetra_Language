@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -30,15 +31,16 @@ type smokeOptions struct {
 }
 
 type smokeRunner struct {
-	opt        smokeOptions
-	workDir    string
-	tetraPath  string
-	broker     *brokerProcess
-	counts     actordist.FrameCounts
-	processes  []actordist.ProcessReport
-	cases      []actordist.CaseReport
-	frameOrder []string
-	nextPeer   uint16
+	opt                  smokeOptions
+	workDir              string
+	tetraPath            string
+	broker               *brokerProcess
+	counts               actordist.FrameCounts
+	processes            []actordist.ProcessReport
+	cases                []actordist.CaseReport
+	frameOrder           []string
+	nextPeer             uint16
+	expectedDecodeErrors int64
 }
 
 type brokerProcess struct {
@@ -57,8 +59,18 @@ type processResult struct {
 
 func main() {
 	var opt smokeOptions
-	flag.StringVar(&opt.ReportPath, "report", "", "path to write tetra.actors.distributed-runtime.v1 report")
-	flag.StringVar(&opt.TetraPath, "tetra", "", "tetra CLI path; defaults to a fresh temp build from ./cli/cmd/tetra")
+	flag.StringVar(
+		&opt.ReportPath,
+		"report",
+		"",
+		"path to write tetra.actors.distributed-runtime.v1 report",
+	)
+	flag.StringVar(
+		&opt.TetraPath,
+		"tetra",
+		"",
+		"tetra CLI path; defaults to a fresh temp build from ./cli/cmd/tetra",
+	)
 	flag.BoolVar(&opt.KeepWork, "keep-work", false, "keep temporary build directory")
 	flag.Parse()
 	if opt.ReportPath == "" {
@@ -73,7 +85,11 @@ func main() {
 
 func runSmoke(ctx context.Context, opt smokeOptions) error {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
-		return fmt.Errorf("distributed actor runtime smoke requires linux/amd64 host, got %s/%s", runtime.GOOS, runtime.GOARCH)
+		return fmt.Errorf(
+			"distributed actor runtime smoke requires linux/amd64 host, got %s/%s",
+			runtime.GOOS,
+			runtime.GOARCH,
+		)
 	}
 	workDir, err := os.MkdirTemp("", "tetra-distributed-actors-*")
 	if err != nil {
@@ -144,7 +160,26 @@ func runSmoke(ctx context.Context, opt smokeOptions) error {
 	if err := r.forceBrokerDroppedFrame(); err != nil {
 		return err
 	}
+	if err := r.runMalformedFrameLengthCase(); err != nil {
+		return err
+	}
+	if err := r.runUnknownFrameTypeCase(); err != nil {
+		return err
+	}
+	if err := r.runBadTypedSlotCountCase(); err != nil {
+		return err
+	}
+	if err := r.runDuplicateNodeCase(); err != nil {
+		return err
+	}
+	if err := r.runForgedSourceNodeCase(); err != nil {
+		return err
+	}
+	brokerAddr := r.broker.addr
 	if err := r.stopBroker(); err != nil {
+		return err
+	}
+	if err := r.runMissingNodeAfterBrokerCloseCase(brokerAddr); err != nil {
 		return err
 	}
 	return r.writeReport(ctx)
@@ -153,7 +188,15 @@ func runSmoke(ctx context.Context, opt smokeOptions) error {
 func (r *smokeRunner) startBroker(ctx context.Context) error {
 	reportPath := filepath.Join(r.workDir, "actornet-broker.json")
 	bctx, cancel := context.WithCancel(ctx)
-	cmd := exec.CommandContext(bctx, r.tetraPath, "actor-net", "--addr", "127.0.0.1:0", "--report", reportPath)
+	cmd := exec.CommandContext(
+		bctx,
+		r.tetraPath,
+		"actor-net",
+		"--addr",
+		"127.0.0.1:0",
+		"--report",
+		reportPath,
+	)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		cancel()
@@ -271,7 +314,12 @@ func (r *smokeRunner) runSenderCase(ctx context.Context) error {
 		if err != nil {
 			select {
 			case res := <-done:
-				return fmt.Errorf("read sender frame after node exit code %d: %w output=%q", res.exitCode, err, res.output)
+				return fmt.Errorf(
+					"read sender frame after node exit code %d: %w output=%q",
+					res.exitCode,
+					err,
+					res.output,
+				)
 			default:
 			}
 			return fmt.Errorf("read sender frame: %w", err)
@@ -293,7 +341,12 @@ func (r *smokeRunner) runSenderCase(ctx context.Context) error {
 			r.countFrame(ack.Type)
 		}
 	}
-	for _, typ := range []actorwire.FrameType{actorwire.FrameSpawnReq, actorwire.FrameSendI32, actorwire.FrameSendMsg, actorwire.FrameSendTyped} {
+	for _, typ := range []actorwire.FrameType{
+		actorwire.FrameSpawnReq,
+		actorwire.FrameSendI32,
+		actorwire.FrameSendMsg,
+		actorwire.FrameSendTyped,
+	} {
 		if !seen[typ] {
 			return fmt.Errorf("sender case missing %s frame", frameTypeName(typ))
 		}
@@ -306,7 +359,12 @@ func (r *smokeRunner) runSenderCase(ctx context.Context) error {
 	return nil
 }
 
-func (r *smokeRunner) runInboundCase(ctx context.Context, caseName, nodeName string, source func(int) string, frame actorwire.Frame) error {
+func (r *smokeRunner) runInboundCase(
+	ctx context.Context,
+	caseName, nodeName string,
+	source func(int) string,
+	frame actorwire.Frame,
+) error {
 	peerID := r.allocPeerNodeID()
 	frame.SourceNodeID = peerID
 	peer, err := r.connectPeer(peerID)
@@ -398,7 +456,11 @@ func (r *smokeRunner) runTaskCancelJoinCase(ctx context.Context) error {
 		return err
 	}
 	if res.err != nil {
-		return fmt.Errorf("task cancel/join compatibility failed: %w output=%q", res.err, res.output)
+		return fmt.Errorf(
+			"task cancel/join compatibility failed: %w output=%q",
+			res.err,
+			res.output,
+		)
 	}
 	r.recordCase("task cancel/join compatibility", res.exitCode, 1)
 	r.recordProcess("task-cancel-join", outPath, res)
@@ -427,9 +489,197 @@ func (r *smokeRunner) forceBrokerDroppedFrame() error {
 		return err
 	}
 	if got.Type != actorwire.FrameNodeDown {
-		return fmt.Errorf("missing-destination broker response = %s, want node_down", frameTypeName(got.Type))
+		return fmt.Errorf(
+			"missing-destination broker response = %s, want node_down",
+			frameTypeName(got.Type),
+		)
 	}
 	r.countFrame(got.Type)
+	return nil
+}
+
+func (r *smokeRunner) runMalformedFrameLengthCase() error {
+	frame := actorwire.Frame{
+		Type:         actorwire.FrameSendI32,
+		SourceNodeID: r.allocPeerNodeID(),
+		DestNodeID:   1,
+		SequenceID:   401,
+		Payload:      []int32{1},
+	}
+	return r.runMalformedRawFrameCase(
+		"malformed frame length rejected",
+		frame,
+		func(raw []byte) []byte {
+			return raw[:actorwire.FrameSize-1]
+		},
+	)
+}
+
+func (r *smokeRunner) runUnknownFrameTypeCase() error {
+	frame := actorwire.Frame{
+		Type:         actorwire.FrameSendI32,
+		SourceNodeID: r.allocPeerNodeID(),
+		DestNodeID:   1,
+		SequenceID:   402,
+		Payload:      []int32{1},
+	}
+	return r.runMalformedRawFrameCase(
+		"unknown frame type rejected",
+		frame,
+		func(raw []byte) []byte {
+			binary.LittleEndian.PutUint16(raw[actorwire.FrameTypeOffset:], 0xffff)
+			return raw
+		},
+	)
+}
+
+func (r *smokeRunner) runBadTypedSlotCountCase() error {
+	frame := actorwire.Frame{
+		Type:         actorwire.FrameSendI32,
+		SourceNodeID: r.allocPeerNodeID(),
+		DestNodeID:   1,
+		SequenceID:   403,
+		Payload:      []int32{1},
+	}
+	return r.runMalformedRawFrameCase(
+		"bad typed slot count rejected",
+		frame,
+		func(raw []byte) []byte {
+			binary.LittleEndian.PutUint16(
+				raw[actorwire.FrameTypeOffset:],
+				uint16(actorwire.FrameSendTyped),
+			)
+			binary.LittleEndian.PutUint16(
+				raw[actorwire.FrameSlotCountOffset:],
+				actorwire.MaxPayloadSlots+1,
+			)
+			return raw
+		},
+	)
+}
+
+func (r *smokeRunner) runMalformedRawFrameCase(
+	name string,
+	frame actorwire.Frame,
+	mutate func([]byte) []byte,
+) error {
+	raw, err := actorwire.EncodeFrame(frame)
+	if err != nil {
+		return err
+	}
+	if err := r.writeRawBrokerFrame(mutate(raw)); err != nil {
+		return fmt.Errorf("%s: %w", name, err)
+	}
+	r.expectedDecodeErrors++
+	r.recordNetworkNegativeCase(name)
+	return nil
+}
+
+func (r *smokeRunner) runDuplicateNodeCase() error {
+	peerID := r.allocPeerNodeID()
+	primary, err := r.connectPeer(peerID)
+	if err != nil {
+		return err
+	}
+	defer primary.Close()
+
+	duplicate, err := net.DialTimeout("tcp", r.broker.addr, 2*time.Second)
+	if err != nil {
+		return err
+	}
+	defer duplicate.Close()
+
+	hello := actorwire.Frame{Type: actorwire.FrameHello, SourceNodeID: peerID, DestNodeID: peerID}
+	if err := writeFrame(duplicate, hello); err != nil {
+		return err
+	}
+	r.countFrame(hello.Type)
+	got, err := readFrame(duplicate)
+	if err != nil {
+		return err
+	}
+	r.countFrame(got.Type)
+	if got.Type != actorwire.FrameError || got.Status != actorwire.StatusDuplicateNode {
+		return fmt.Errorf(
+			"duplicate node response = %s status %d, want error duplicate_node",
+			frameTypeName(got.Type),
+			got.Status,
+		)
+	}
+	r.recordNetworkNegativeCase("duplicate node rejected")
+	return nil
+}
+
+func (r *smokeRunner) runForgedSourceNodeCase() error {
+	sourceID := r.allocPeerNodeID()
+	destID := r.allocPeerNodeID()
+	source, err := r.connectPeer(sourceID)
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+	dest, err := r.connectPeer(destID)
+	if err != nil {
+		return err
+	}
+	defer dest.Close()
+
+	frame := actorwire.Frame{
+		Type:         actorwire.FrameSendI32,
+		SourceNodeID: destID,
+		DestNodeID:   destID,
+		SequenceID:   404,
+		Payload:      []int32{99},
+	}
+	if err := writeFrame(source, frame); err != nil {
+		return err
+	}
+	r.countFrame(frame.Type)
+	got, err := readFrame(source)
+	if err != nil {
+		return err
+	}
+	r.countFrame(got.Type)
+	if got.Type != actorwire.FrameError || got.Status != actorwire.StatusDecodeError {
+		return fmt.Errorf(
+			"forged source response = %s status %d, want error decode_error",
+			frameTypeName(got.Type),
+			got.Status,
+		)
+	}
+	if err := expectNoFrame(dest, 50*time.Millisecond); err != nil {
+		return err
+	}
+	r.recordNetworkNegativeCase("forged source node rejected")
+	return nil
+}
+
+func (r *smokeRunner) runMissingNodeAfterBrokerCloseCase(addr string) error {
+	conn, err := net.DialTimeout("tcp", addr, 200*time.Millisecond)
+	if err == nil {
+		_ = conn.Close()
+		return errors.New("broker accepted connection after broker close")
+	}
+	r.recordNetworkNegativeCase("missing-node send after broker close")
+	return nil
+}
+
+func (r *smokeRunner) writeRawBrokerFrame(data []byte) error {
+	conn, err := net.DialTimeout("tcp", r.broker.addr, 2*time.Second)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	if err := conn.SetWriteDeadline(time.Now().Add(2 * time.Second)); err != nil {
+		return err
+	}
+	for len(data) > 0 {
+		n, err := conn.Write(data)
+		if err != nil {
+			return err
+		}
+		data = data[n:]
+	}
 	return nil
 }
 
@@ -442,7 +692,11 @@ func (r *smokeRunner) allocPeerNodeID() uint16 {
 	return id
 }
 
-func (r *smokeRunner) sendUntilNodeExits(conn net.Conn, done <-chan processResult, frame actorwire.Frame) (processResult, error) {
+func (r *smokeRunner) sendUntilNodeExits(
+	conn net.Conn,
+	done <-chan processResult,
+	frame actorwire.Frame,
+) (processResult, error) {
 	deadline := time.Now().Add(3 * time.Second)
 	for {
 		_ = writeFrame(conn, frame)
@@ -479,7 +733,11 @@ func (r *smokeRunner) connectPeer(nodeID uint16) (net.Conn, error) {
 	r.countFrame(ack.Type)
 	if ack.Type != actorwire.FrameHelloAck || ack.Status != actorwire.StatusOK {
 		_ = conn.Close()
-		return nil, fmt.Errorf("peer hello ack = %s status %d, want hello_ack ok", frameTypeName(ack.Type), ack.Status)
+		return nil, fmt.Errorf(
+			"peer hello ack = %s status %d, want hello_ack ok",
+			frameTypeName(ack.Type),
+			ack.Status,
+		)
 	}
 	return conn, nil
 }
@@ -490,7 +748,16 @@ func (r *smokeRunner) buildNode(ctx context.Context, name string, source string)
 	if err := os.WriteFile(srcPath, []byte(source), 0o644); err != nil {
 		return "", err
 	}
-	if err := runCommand(ctx, r.tetraPath, "build", "--target", "linux-x64", "-o", outPath, srcPath); err != nil {
+	if err := runCommand(
+		ctx,
+		r.tetraPath,
+		"build",
+		"--target",
+		"linux-x64",
+		"-o",
+		outPath,
+		srcPath,
+	); err != nil {
 		return "", fmt.Errorf("build %s: %w", name, err)
 	}
 	return outPath, nil
@@ -524,6 +791,18 @@ func (r *smokeRunner) recordCase(name string, exitCode int, nodeProcesses int) {
 	})
 }
 
+func (r *smokeRunner) recordNetworkNegativeCase(name string) {
+	r.cases = append(r.cases, actordist.CaseReport{
+		Name:          name,
+		Kind:          "network_negative",
+		Ran:           true,
+		Pass:          true,
+		ExpectedExit:  0,
+		ActualExit:    intPtr(0),
+		NodeProcesses: 0,
+	})
+}
+
 func (r *smokeRunner) countFrame(typ actorwire.FrameType) {
 	switch typ {
 	case actorwire.FrameHello:
@@ -542,6 +821,8 @@ func (r *smokeRunner) countFrame(typ actorwire.FrameType) {
 		r.counts.SendTyped++
 	case actorwire.FrameNodeDown:
 		r.counts.NodeDown++
+	case actorwire.FrameError:
+		r.counts.Error++
 	}
 	r.frameOrder = append(r.frameOrder, frameTypeName(typ))
 }
@@ -555,6 +836,7 @@ func (r *smokeRunner) writeReport(ctx context.Context) error {
 	if err := json.Unmarshal(rawBroker, &broker); err != nil {
 		return err
 	}
+	broker.ExpectedDecodeErrors = r.expectedDecodeErrors
 	head, err := currentGitHead(ctx)
 	if err != nil {
 		return err
@@ -674,6 +956,19 @@ func readFrame(conn net.Conn) (actorwire.Frame, error) {
 		return actorwire.Frame{}, err
 	}
 	return actorwire.DecodeFrame(data)
+}
+
+func expectNoFrame(conn net.Conn, timeout time.Duration) error {
+	if err := conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+		return err
+	}
+	data := make([]byte, actorwire.FrameSize)
+	if _, err := io.ReadFull(conn, data); err == nil {
+		return errors.New("unexpected frame received")
+	} else if netErr, ok := err.(net.Error); !ok || !netErr.Timeout() {
+		return err
+	}
+	return nil
 }
 
 func processExitCode(err error) int {

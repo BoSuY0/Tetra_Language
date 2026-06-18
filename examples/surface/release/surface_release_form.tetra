@@ -1,0 +1,772 @@
+// Pure Tetra Surface v1 release form over lib.core.widgets and lib.core.style.
+module examples.surface.release.surface_release_form
+
+import lib.core.surface as surface
+import lib.core.draw as draw
+import lib.core.component as component
+import lib.core.widgets as widgets
+import lib.core.style as style
+
+struct SurfaceReleaseFormApp:
+    width: Int
+    height: Int
+    save_count: Int
+    reset_count: Int
+    status_code: Int
+    tree: component.ComponentTree
+
+func r(x: Int, y: Int, w: Int, h: Int) -> surface.Rect:
+    return surface.Rect(x: x, y: y, w: w, h: h)
+
+func mark_rect(rect: borrow surface.Rect, dx: Int, dy: Int, w: Int, h: Int) -> surface.Rect:
+    return r(rect.x + dx, rect.y + dy, w, h)
+
+func focus_rect(rect: borrow surface.Rect) -> surface.Rect:
+    return r(rect.x - 4, rect.y - 4, rect.w + 8, rect.h + 8)
+
+func caret_rect(rect: borrow surface.Rect, caret: Int) -> surface.Rect:
+    return r(rect.x + 12 + caret * 12, rect.y + 10, 2, 24)
+
+func txt(rect: surface.Rect, role: Int, text_len: Int, code: Int) -> widgets.Text:
+    return widgets.Text(rect: rect, role: role, text_len: text_len, status_code: code)
+
+func lbl(rect: surface.Rect, text_len: Int, target: Int) -> widgets.Label:
+    let role: Int = widgets.role_label()
+    return widgets.Label(rect: rect, role: role, text_len: text_len, labelled_for: target)
+
+func tb(rect: surface.Rect, buffer: []u8) -> widgets.TextBox:
+    return widgets.TextBox(rect: rect, focused: false, text_len: 0, caret: 0, buffer: buffer)
+
+func ck(rect: surface.Rect) -> widgets.Checkbox:
+    let a: Int = widgets.action_changed()
+    return widgets.Checkbox(rect: rect, focused: false, checked: false, toggle_count: 0, action: a)
+
+func scr(rect: surface.Rect, size: surface.Size) -> widgets.Scroll:
+    return widgets.Scroll(rect: rect, content_size: size, offset_y: 0)
+
+func btn(rect: surface.Rect, action: Int) -> widgets.Button:
+    return widgets.Button(rect: rect, focused: false, press_count: 0, action: action)
+
+func st(rect: surface.Rect, code: Int) -> widgets.StatusText:
+    let role: Int = widgets.role_status()
+    return widgets.StatusText(rect: rect, role: role, text_len: 6, status_code: code)
+
+func rn(node: inout component.TreeNode, id: Int, kind: Int, bounds: surface.Rect) -> Int:
+    return component.tree_init_root_node(node, id, kind, bounds)
+
+func cn(n: inout component.TreeNode, id: Int, p: Int, k: Int, f: Bool, b: surface.Rect) -> Int:
+    return component.tree_init_child_node(n, id, p, k, f, b)
+
+func sb(node: inout component.TreeNode, bounds: surface.Rect) -> Int:
+    return component.tree_set_bounds(node, bounds)
+
+func tti(box: inout widgets.TextBox, bytes: []u8, count: Int) -> Int:
+    return widgets.textbox_text_input(box, bytes, count)
+
+func draw_release_form_scene(app: borrow SurfaceReleaseFormApp, name_box: borrow widgets.TextBox, email_box: borrow widgets.TextBox, checkbox: borrow widgets.Checkbox, scroll: borrow widgets.Scroll, save: borrow widgets.Button, reset: borrow widgets.Button, status: borrow widgets.StatusText, ctx: inout draw.DrawContext) -> Int
+uses mem:
+    let bg: surface.Color = surface.Color(r: 18, g: 24, b: 27, a: 255)
+    let fg: surface.Color = surface.Color(r: 238, g: 242, b: 240, a: 255)
+    let panel_bg: surface.Color = surface.Color(r: 28, g: 38, b: 42, a: 255)
+    let stack_bg: surface.Color = surface.Color(r: 33, g: 45, b: 50, a: 255)
+    let text_bg: surface.Color = surface.Color(r: 39, g: 52, b: 59, a: 255)
+    let name_accent: surface.Color = surface.Color(r: 80, g: 172, b: 132, a: 255)
+    let email_accent: surface.Color = surface.Color(r: 80, g: 138, b: 214, a: 255)
+    let checkbox_accent: surface.Color = surface.Color(r: 214, g: 177, b: 72, a: 255)
+    let scroll_accent: surface.Color = surface.Color(r: 136, g: 106, b: 210, a: 255)
+    let save_accent: surface.Color = surface.Color(r: 56, g: 132, b: 206, a: 255)
+    let reset_accent: surface.Color = surface.Color(r: 198, g: 92, b: 78, a: 255)
+    let status_accent: surface.Color = surface.Color(r: 176, g: 206, b: 94, a: 255)
+    let caret_color: surface.Color = surface.Color(r: 236, g: 197, b: 64, a: 255)
+    let panel: surface.Rect = r(0, 0, app.width, app.height)
+    let stack: surface.Rect = r(16, 16, app.width - 32, app.height - 32)
+    let title: surface.Rect = r(32, 32, app.width - 64, 28)
+    let description: surface.Rect = r(32, 68, app.width - 64, 28)
+    let name_label: surface.Rect = r(32, 104, app.width - 64, 24)
+    let name_rect: surface.Rect = r(32, 132, app.width - 64, 44)
+    let email_label: surface.Rect = r(32, 184, app.width - 64, 24)
+    let email_rect: surface.Rect = r(32, 212, app.width - 64, 44)
+    let checkbox_rect: surface.Rect = r(32, 264, app.width - 64, 32)
+    let scroll_rect: surface.Rect = r(32, 304, app.width - 64, 48)
+    let row: surface.Rect = r(32, 360, app.width - 64, 44)
+    let save_rect: surface.Rect = r(row.x, row.y, 132, 44)
+    let reset_rect: surface.Rect = r(row.x + 144, row.y, 132, 44)
+    let spacer_rect: surface.Rect = r(row.x + 288, row.y, 16, 44)
+    let status_rect: surface.Rect = r(row.x + 312, row.y, row.w - 312, 44)
+    let clear_status: Int = draw.clear(ctx, bg)
+    let panel_fill: Int = draw.rect(ctx, panel, panel_bg)
+    let panel_outline: Int = draw.rect_outline(ctx, panel, fg)
+    let stack_fill: Int = draw.rect(ctx, stack, stack_bg)
+    let stack_outline: Int = draw.rect_outline(ctx, stack, fg)
+    let title_mark_rect: surface.Rect = mark_rect(title, 8, 8, 116, 8)
+    let desc_mark_rect: surface.Rect = mark_rect(description, 8, 8, 164, 7)
+    let name_label_mark_rect: surface.Rect = mark_rect(name_label, 8, 8, 44, 7)
+    let title_mark: Int = draw.rect(ctx, title_mark_rect, fg)
+    let desc_mark: Int = draw.rect(ctx, desc_mark_rect, scroll_accent)
+    let name_label_mark: Int = draw.rect(ctx, name_label_mark_rect, fg)
+    let name_bg_status: Int = draw.rect(ctx, name_rect, text_bg)
+    let name_outline: Int = draw.rect_outline(ctx, name_rect, fg)
+    var name_mark: Int = 0
+    if name_box.text_len > 0:
+        let name_mark_rect: surface.Rect = mark_rect(name_rect, 12, 16, 18 * name_box.text_len, 10)
+        name_mark = draw.rect(ctx, name_mark_rect, name_accent)
+    let email_label_mark_rect: surface.Rect = mark_rect(email_label, 8, 8, 52, 7)
+    let email_label_mark: Int = draw.rect(ctx, email_label_mark_rect, fg)
+    let email_bg_status: Int = draw.rect(ctx, email_rect, text_bg)
+    let email_outline: Int = draw.rect_outline(ctx, email_rect, fg)
+    var email_mark: Int = 0
+    if email_box.text_len > 0:
+        let email_mark_w: Int = 16 * email_box.text_len
+        let email_mark_rect: surface.Rect = mark_rect(email_rect, 12, 16, email_mark_w, 10)
+        email_mark = draw.rect(ctx, email_mark_rect, email_accent)
+    let checkbox_bg: Int = draw.rect(ctx, checkbox_rect, text_bg)
+    let checkbox_outline: Int = draw.rect_outline(ctx, checkbox_rect, fg)
+    let checkbox_box_rect: surface.Rect = mark_rect(checkbox_rect, 12, 8, 16, 16)
+    let checkbox_box: Int = draw.rect_outline(ctx, checkbox_box_rect, fg)
+    var checkbox_mark: Int = 0
+    if checkbox.checked:
+        let checkbox_mark_rect: surface.Rect = mark_rect(checkbox_rect, 16, 12, 8, 8)
+        checkbox_mark = draw.rect(ctx, checkbox_mark_rect, checkbox_accent)
+    let scroll_bg: Int = draw.rect(ctx, scroll_rect, text_bg)
+    let scroll_outline: Int = draw.rect_outline(ctx, scroll_rect, fg)
+    let scroll_line_y: Int = scroll_rect.y + 12 - scroll.offset_y / 2
+    let scroll_thumb_x: Int = scroll_rect.x + scroll_rect.w - 18
+    let scroll_thumb_y: Int = scroll_rect.y + 6 + scroll.offset_y / 2
+    let scroll_line_rect: surface.Rect = r(scroll_rect.x + 12, scroll_line_y, scroll_rect.w - 40, 8)
+    let scroll_thumb_rect: surface.Rect = r(scroll_thumb_x, scroll_thumb_y, 6, 20)
+    let scroll_line: Int = draw.rect(ctx, scroll_line_rect, scroll_accent)
+    let scroll_thumb: Int = draw.rect(ctx, scroll_thumb_rect, checkbox_accent)
+    let save_fill: Int = draw.rect(ctx, save_rect, save_accent)
+    let save_outline: Int = draw.rect_outline(ctx, save_rect, fg)
+    let reset_fill: Int = draw.rect(ctx, reset_rect, reset_accent)
+    let reset_outline: Int = draw.rect_outline(ctx, reset_rect, fg)
+    let spacer_fill: Int = draw.rect(ctx, spacer_rect, panel_bg)
+    let status_bg: Int = draw.rect(ctx, status_rect, text_bg)
+    let status_outline: Int = draw.rect_outline(ctx, status_rect, fg)
+    var status_mark: Int = 0
+    if status.status_code > 0:
+        let status_mark_w: Int = 20 + status.status_code * 16
+        let status_mark_rect: surface.Rect = mark_rect(status_rect, 12, 16, status_mark_w, 8)
+        status_mark = draw.rect(ctx, status_mark_rect, status_accent)
+    var focus_status: Int = 0
+    if app.tree.focused_id == 7:
+        let name_caret_rect: surface.Rect = caret_rect(name_rect, name_box.text_len)
+        focus_status = focus_status + draw.rect_outline(ctx, focus_rect(name_rect), fg)
+        focus_status = focus_status + draw.rect(ctx, name_caret_rect, caret_color)
+    if app.tree.focused_id == 9:
+        let email_caret_rect: surface.Rect = caret_rect(email_rect, email_box.text_len)
+        focus_status = focus_status + draw.rect_outline(ctx, focus_rect(email_rect), fg)
+        focus_status = focus_status + draw.rect(ctx, email_caret_rect, caret_color)
+    if app.tree.focused_id == 10:
+        focus_status = focus_status + draw.rect_outline(ctx, focus_rect(checkbox_rect), fg)
+    if app.tree.focused_id == 14:
+        focus_status = focus_status + draw.rect_outline(ctx, focus_rect(save_rect), fg)
+    if app.tree.focused_id == 15:
+        focus_status = focus_status + draw.rect_outline(ctx, focus_rect(reset_rect), fg)
+    var save_marker: Int = 0
+    if app.save_count > 0:
+        let save_marker_rect: surface.Rect = mark_rect(title, 140, 8, 22 + app.save_count * 14, 7)
+        save_marker = draw.rect(ctx, save_marker_rect, status_accent)
+    var reset_marker: Int = 0
+    if app.reset_count > 0:
+        let reset_marker_rect: surface.Rect = mark_rect(title, 184, 8, 22 + app.reset_count * 14, 7)
+        reset_marker = draw.rect(ctx, reset_marker_rect, reset_accent)
+    let border_status: Int = draw.rect_outline(ctx, panel, fg)
+    let shell_draw: Int = clear_status + panel_fill + panel_outline + stack_fill + stack_outline
+    let title_draw: Int = title_mark + desc_mark + name_label_mark + email_label_mark
+    let name_draw: Int = name_bg_status + name_outline + name_mark
+    let email_draw: Int = email_bg_status + email_outline + email_mark
+    let checkbox_draw: Int = checkbox_bg + checkbox_outline + checkbox_box + checkbox_mark
+    let scroll_draw: Int = scroll_bg + scroll_outline + scroll_line + scroll_thumb
+    let action_draw: Int = save_fill + save_outline + reset_fill + reset_outline + spacer_fill
+    let status_draw: Int = status_bg + status_outline + status_mark
+    let marker_draw: Int = focus_status + save_marker + reset_marker + border_status
+    let stable_action: Int = save.action - save.action + reset.action - reset.action
+    let input_draw: Int = name_draw + email_draw + checkbox_draw + scroll_draw
+    let outer_draw: Int = shell_draw + title_draw + action_draw + status_draw
+    return outer_draw + input_draw + marker_draw + stable_action
+
+func release_rect(app: borrow SurfaceReleaseFormApp, index: Int) -> surface.Rect:
+    if index == 0:
+        return r(0, 0, app.width, app.height)
+    if index == 1:
+        return r(16, 16, app.width - 32, app.height - 24)
+    if index == 2:
+        return r(24, 24, app.width - 48, app.height - 32)
+    if index == 3:
+        return r(32, 32, app.width - 64, 28)
+    if index == 4:
+        return r(32, 68, app.width - 64, 28)
+    if index == 5:
+        return r(32, 104, app.width - 64, 24)
+    if index == 6:
+        return r(32, 132, app.width - 64, 44)
+    if index == 7:
+        return r(32, 184, app.width - 64, 24)
+    if index == 8:
+        return r(32, 212, app.width - 64, 44)
+    if index == 9:
+        return r(32, 264, app.width - 64, 32)
+    if index == 10:
+        return r(32, 304, app.width - 64, 48)
+    if index == 11:
+        return r(36, 308, app.width - 72, 24)
+    if index == 12:
+        return r(32, 360, app.width - 64, 44)
+    if index == 13:
+        return r(32, 360, 132, 44)
+    if index == 14:
+        return r(176, 360, 132, 44)
+    if index == 15:
+        return r(320, 360, 16, 44)
+    return r(344, 360, app.width - 376, 44)
+
+func main() -> Int
+uses alloc, mem, surface:
+    var name_storage: []u8 = core.make_u8(32)
+    var email_storage: []u8 = core.make_u8(32)
+    var app: SurfaceReleaseFormApp = SurfaceReleaseFormApp(width: 320, height: 240, save_count: 0, reset_count: 0, status_code: 0, tree: component.tree_init_api(32))
+    let style_probe: draw.Color = style.color(235, 196, 64, 255)
+    let initial_root_rect: surface.Rect = release_rect(app, 0)
+    let empty_rect: surface.Rect = r(0, 0, 0, 0)
+    let er: surface.Rect = empty_rect
+    let content_size: surface.Size = surface.Size(w: 496, h: 120)
+    let spacer_size: surface.Size = surface.Size(w: 16, h: 44)
+    let root_kind: Int = component.kind_root()
+    let panel_kind: Int = component.kind_panel()
+    let column_kind: Int = component.kind_column()
+    let text_kind: Int = component.kind_text()
+    let textbox_kind: Int = component.kind_textbox()
+    let button_kind: Int = component.kind_button()
+    let row_kind: Int = component.kind_row()
+    var root_node: component.TreeNode = component.tree_node_empty()
+    var panel_node: component.TreeNode = component.tree_node_empty()
+    var stack_node: component.TreeNode = component.tree_node_empty()
+    var column_node: component.TreeNode = component.tree_node_empty()
+    var title_node: component.TreeNode = component.tree_node_empty()
+    var description_node: component.TreeNode = component.tree_node_empty()
+    var name_label_node: component.TreeNode = component.tree_node_empty()
+    var name_node: component.TreeNode = component.tree_node_empty()
+    var email_label_node: component.TreeNode = component.tree_node_empty()
+    var email_node: component.TreeNode = component.tree_node_empty()
+    var checkbox_node: component.TreeNode = component.tree_node_empty()
+    var scroll_node: component.TreeNode = component.tree_node_empty()
+    var terms_node: component.TreeNode = component.tree_node_empty()
+    var row_node: component.TreeNode = component.tree_node_empty()
+    var save_node: component.TreeNode = component.tree_node_empty()
+    var reset_node: component.TreeNode = component.tree_node_empty()
+    var spacer_node: component.TreeNode = component.tree_node_empty()
+    var status_node: component.TreeNode = component.tree_node_empty()
+    let root_id: Int = component.tree_add_root(app.tree, root_kind, initial_root_rect)
+    let root_node_status: Int = rn(root_node, root_id, root_kind, initial_root_rect)
+    let panel_id: Int = widgets.add_panel(app.tree, root_node.id, empty_rect)
+    let panel_attach_status: Int = component.tree_attach_child(root_node, panel_id)
+    let root_parent: Int = root_node.id
+    let panel_node_status: Int = cn(panel_node, panel_id, root_parent, panel_kind, false, er)
+    let stack_id: Int = widgets.add_stack(app.tree, panel_node.id, empty_rect)
+    let stack_attach_status: Int = component.tree_attach_child(panel_node, stack_id)
+    let panel_parent: Int = panel_node.id
+    let stack_node_status: Int = cn(stack_node, stack_id, panel_parent, panel_kind, false, er)
+    let column_id: Int = widgets.add_column(app.tree, stack_node.id, empty_rect)
+    let column_attach_status: Int = component.tree_attach_child(stack_node, column_id)
+    let stack_parent: Int = stack_node.id
+    let column_node_status: Int = cn(column_node, column_id, stack_parent, column_kind, false, er)
+    let title_id: Int = widgets.add_text(app.tree, column_node.id, empty_rect)
+    let title_attach_status: Int = component.tree_attach_child(column_node, title_id)
+    let cp: Int = column_node.id
+    let title_node_status: Int = cn(title_node, title_id, cp, text_kind, false, er)
+    let description_id: Int = widgets.add_text(app.tree, column_node.id, empty_rect)
+    let description_attach_status: Int = component.tree_attach_child(column_node, description_id)
+    let desc_node_status: Int = cn(description_node, description_id, cp, text_kind, false, er)
+    let name_label_id: Int = widgets.add_label(app.tree, column_node.id, empty_rect)
+    let name_label_attach_status: Int = component.tree_attach_child(column_node, name_label_id)
+    let name_label_status: Int = cn(name_label_node, name_label_id, cp, text_kind, false, er)
+    let name_id: Int = widgets.add_textbox(app.tree, column_node.id, empty_rect)
+    let name_attach_status: Int = component.tree_attach_child(column_node, name_id)
+    let name_node_status: Int = cn(name_node, name_id, cp, textbox_kind, true, er)
+    let email_label_id: Int = widgets.add_label(app.tree, column_node.id, empty_rect)
+    let email_label_attach_status: Int = component.tree_attach_child(column_node, email_label_id)
+    let email_label_status: Int = cn(email_label_node, email_label_id, cp, text_kind, false, er)
+    let email_id: Int = widgets.add_textbox(app.tree, column_node.id, empty_rect)
+    let email_attach_status: Int = component.tree_attach_child(column_node, email_id)
+    let email_node_status: Int = cn(email_node, email_id, cp, textbox_kind, true, er)
+    let checkbox_id: Int = widgets.add_checkbox(app.tree, column_node.id, empty_rect)
+    let checkbox_attach_status: Int = component.tree_attach_child(column_node, checkbox_id)
+    let checkbox_status: Int = cn(checkbox_node, checkbox_id, cp, button_kind, true, er)
+    let scroll_id: Int = widgets.add_scroll(app.tree, column_node.id, empty_rect)
+    let scroll_attach_status: Int = component.tree_attach_child(column_node, scroll_id)
+    let scroll_node_status: Int = cn(scroll_node, scroll_id, cp, panel_kind, false, er)
+    let terms_id: Int = widgets.add_text(app.tree, scroll_node.id, empty_rect)
+    let terms_attach_status: Int = component.tree_attach_child(scroll_node, terms_id)
+    let scroll_parent: Int = scroll_node.id
+    let terms_node_status: Int = cn(terms_node, terms_id, scroll_parent, text_kind, false, er)
+    let row_id: Int = widgets.add_row(app.tree, column_node.id, empty_rect)
+    let row_attach_status: Int = component.tree_attach_child(column_node, row_id)
+    let row_node_status: Int = cn(row_node, row_id, cp, row_kind, false, er)
+    let save_id: Int = widgets.add_button(app.tree, row_node.id, empty_rect)
+    let save_attach_status: Int = component.tree_attach_child(row_node, save_id)
+    let row_parent: Int = row_node.id
+    let save_node_status: Int = cn(save_node, save_id, row_parent, button_kind, true, er)
+    let reset_id: Int = widgets.add_button(app.tree, row_node.id, empty_rect)
+    let reset_attach_status: Int = component.tree_attach_child(row_node, reset_id)
+    let reset_node_status: Int = cn(reset_node, reset_id, row_parent, button_kind, true, er)
+    let spacer_id: Int = widgets.add_spacer(app.tree, row_node.id, empty_rect)
+    let spacer_attach_status: Int = component.tree_attach_child(row_node, spacer_id)
+    let spacer_node_status: Int = cn(spacer_node, spacer_id, row_parent, text_kind, false, er)
+    let status_id: Int = widgets.add_status_text(app.tree, row_node.id, empty_rect)
+    let status_attach_status: Int = component.tree_attach_child(row_node, status_id)
+    let status_node_status: Int = cn(status_node, status_id, row_parent, text_kind, false, er)
+    let root_build_status: Int = root_id + root_node_status
+    let panel_build_status: Int = panel_id + panel_attach_status + panel_node_status
+    let stack_build_status: Int = stack_id + stack_attach_status + stack_node_status
+    let column_build_status: Int = column_id + column_attach_status + column_node_status
+    let title_build_status: Int = title_id + title_attach_status + title_node_status
+    let desc_build_status: Int = description_id + description_attach_status
+    let description_build_status: Int = desc_build_status + desc_node_status
+    let name_label_attach_build: Int = name_label_id + name_label_attach_status
+    let name_label_build_status: Int = name_label_attach_build + name_label_status
+    let name_build_status: Int = name_id + name_attach_status + name_node_status
+    let email_label_attach_build: Int = email_label_id + email_label_attach_status
+    let email_label_build_status: Int = email_label_attach_build + email_label_status
+    let email_build_status: Int = email_id + email_attach_status + email_node_status
+    let checkbox_build_status: Int = checkbox_id + checkbox_attach_status + checkbox_status
+    let scroll_build_status: Int = scroll_id + scroll_attach_status + scroll_node_status
+    let terms_build_status: Int = terms_id + terms_attach_status + terms_node_status
+    let row_build_status: Int = row_id + row_attach_status + row_node_status
+    let save_build_status: Int = save_id + save_attach_status + save_node_status
+    let reset_build_status: Int = reset_id + reset_attach_status + reset_node_status
+    let spacer_build_status: Int = spacer_id + spacer_attach_status + spacer_node_status
+    let status_build_status: Int = status_id + status_attach_status + status_node_status
+    let shell_build_status: Int = root_build_status + panel_build_status + stack_build_status
+    let form_build_status: Int = column_build_status + title_build_status
+    let label_build_status: Int = name_label_build_status + email_label_build_status
+    let field_build_status: Int = name_build_status + email_build_status + checkbox_build_status
+    let scroll_build_total: Int = scroll_build_status + terms_build_status
+    let action_build_status: Int = row_build_status + save_build_status + reset_build_status
+    let tail_build_status: Int = spacer_build_status + status_build_status
+    let builder_left_status: Int = shell_build_status + form_build_status + label_build_status
+    let builder_mid_status: Int = field_build_status + scroll_build_total + action_build_status
+    let builder_status: Int = builder_left_status + builder_mid_status + tail_build_status
+    var panel: widgets.Panel = widgets.Panel(rect: empty_rect, padding: 16)
+    var stack: widgets.Stack = widgets.Stack(rect: empty_rect, child_count: 1, gap: 8)
+    var column: widgets.Column = widgets.Column(rect: empty_rect, padding: 8, gap: 8)
+    var title: widgets.Text = txt(empty_rect, widgets.role_label(), 18, 0)
+    var description: widgets.Text = txt(empty_rect, widgets.role_label(), 24, 0)
+    var name_label: widgets.Label = lbl(empty_rect, 4, name_id)
+    var name_box: widgets.TextBox = tb(empty_rect, name_storage)
+    var email_label: widgets.Label = lbl(empty_rect, 5, email_id)
+    var email_box: widgets.TextBox = tb(empty_rect, email_storage)
+    var checkbox: widgets.Checkbox = ck(empty_rect)
+    var scroll: widgets.Scroll = scr(empty_rect, content_size)
+    var terms: widgets.Text = txt(empty_rect, widgets.role_label(), 48, 0)
+    var row: widgets.Row = widgets.Row(rect: empty_rect, gap: 12)
+    var save: widgets.Button = btn(empty_rect, widgets.action_save())
+    var reset: widgets.Button = btn(empty_rect, widgets.action_reset())
+    var spacer: widgets.Spacer = widgets.Spacer(rect: empty_rect, min_size: spacer_size)
+    var status: widgets.StatusText = st(empty_rect, 0)
+    let panel_init_status: Int = widgets.panel_init(panel, empty_rect, 16)
+    let stack_init_status: Int = widgets.stack_init(stack, empty_rect, 1, 8)
+    let column_init_status: Int = widgets.column_init(column, empty_rect, 8, 8)
+    let title_init_status: Int = widgets.text_init(title, empty_rect, widgets.role_label(), 18)
+    let desc_init_status: Int = widgets.text_init(description, empty_rect, widgets.role_label(), 24)
+    let name_label_init_status: Int = widgets.label_init(name_label, empty_rect, 4, name_id)
+    let name_init_status: Int = widgets.textbox_init(name_box, empty_rect, name_storage)
+    let email_label_init_status: Int = widgets.label_init(email_label, empty_rect, 5, email_id)
+    let email_init_status: Int = widgets.textbox_init(email_box, empty_rect, email_storage)
+    let checkbox_init_status: Int = widgets.checkbox_init(checkbox, empty_rect, false)
+    let scroll_init_status: Int = widgets.scroll_init(scroll, empty_rect, content_size)
+    let terms_init_status: Int = widgets.text_init(terms, empty_rect, widgets.role_label(), 48)
+    let row_init_status: Int = widgets.row_init(row, empty_rect, 12)
+    let save_init_status: Int = widgets.button_init(save, empty_rect, widgets.action_save())
+    let reset_init_status: Int = widgets.button_init(reset, empty_rect, widgets.action_reset())
+    let spacer_init_status: Int = widgets.spacer_init(spacer, empty_rect, spacer_size)
+    let status_init_status: Int = widgets.status_text_init(status, empty_rect, 6, 0)
+    let shell_init_status: Int = panel_init_status + stack_init_status + column_init_status
+    let text_init_status: Int = title_init_status + desc_init_status + terms_init_status
+    let label_init_status: Int = name_label_init_status + email_label_init_status
+    let field_init_status: Int = name_init_status + email_init_status + checkbox_init_status
+    let scroll_row_init_status: Int = scroll_init_status + row_init_status
+    let button_init_status: Int = save_init_status + reset_init_status
+    let tail_init_status: Int = spacer_init_status + status_init_status
+    let widget_left_init: Int = shell_init_status + text_init_status + label_init_status
+    let widget_mid_init: Int = field_init_status + scroll_row_init_status + button_init_status
+    let widget_init_status: Int = widget_left_init + widget_mid_init + tail_init_status
+    let root_bounds_status: Int = sb(root_node, release_rect(app, 0))
+    let panel_bounds_status: Int = sb(panel_node, release_rect(app, 0))
+    let stack_bounds_status: Int = sb(stack_node, release_rect(app, 1))
+    let column_bounds_status: Int = sb(column_node, release_rect(app, 2))
+    let title_bounds_status: Int = sb(title_node, release_rect(app, 3))
+    let desc_bounds_status: Int = sb(description_node, release_rect(app, 4))
+    let name_label_bounds_status: Int = sb(name_label_node, release_rect(app, 5))
+    let name_bounds_status: Int = sb(name_node, release_rect(app, 6))
+    let email_label_bounds_status: Int = sb(email_label_node, release_rect(app, 7))
+    let email_bounds_status: Int = sb(email_node, release_rect(app, 8))
+    let checkbox_bounds_status: Int = sb(checkbox_node, release_rect(app, 9))
+    let scroll_bounds_status: Int = sb(scroll_node, release_rect(app, 10))
+    let terms_bounds_status: Int = sb(terms_node, release_rect(app, 11))
+    let row_bounds_status: Int = sb(row_node, release_rect(app, 12))
+    let save_bounds_status: Int = sb(save_node, release_rect(app, 13))
+    let reset_bounds_status: Int = sb(reset_node, release_rect(app, 14))
+    let spacer_bounds_status: Int = sb(spacer_node, release_rect(app, 15))
+    let status_bounds_status: Int = sb(status_node, release_rect(app, 16))
+    let root_bounds_group: Int = root_bounds_status + panel_bounds_status + stack_bounds_status
+    let form_bounds_group: Int = column_bounds_status + title_bounds_status + desc_bounds_status
+    let label_bounds_group: Int = name_label_bounds_status + email_label_bounds_status
+    let field_bounds_group: Int = name_bounds_status + email_bounds_status + checkbox_bounds_status
+    let scroll_bounds_group: Int = scroll_bounds_status + terms_bounds_status
+    let action_bounds_group: Int = row_bounds_status + save_bounds_status + reset_bounds_status
+    let tail_bounds_group: Int = spacer_bounds_status + status_bounds_status
+    let bounds_left: Int = root_bounds_group + form_bounds_group + label_bounds_group
+    let bounds_mid: Int = field_bounds_group + scroll_bounds_group + action_bounds_group
+    let initial_node_bounds_status: Int = bounds_left + bounds_mid + tail_bounds_group
+    let panel_rect_status: Int = widgets.panel_set_rect(panel, release_rect(app, 0))
+    let stack_rect_status: Int = widgets.stack_set_rect(stack, release_rect(app, 1))
+    let column_rect_status: Int = widgets.column_set_rect(column, release_rect(app, 2))
+    let title_rect_status: Int = widgets.text_set_rect(title, release_rect(app, 3))
+    let desc_rect_status: Int = widgets.text_set_rect(description, release_rect(app, 4))
+    let name_label_rect_status: Int = widgets.label_set_rect(name_label, release_rect(app, 5))
+    let name_rect_status: Int = widgets.textbox_set_rect(name_box, release_rect(app, 6))
+    let email_label_rect_status: Int = widgets.label_set_rect(email_label, release_rect(app, 7))
+    let email_rect_status: Int = widgets.textbox_set_rect(email_box, release_rect(app, 8))
+    let checkbox_rect_status: Int = widgets.checkbox_set_rect(checkbox, release_rect(app, 9))
+    let scroll_rect_status: Int = widgets.scroll_set_rect(scroll, release_rect(app, 10))
+    let terms_rect_status: Int = widgets.text_set_rect(terms, release_rect(app, 11))
+    let row_rect_status: Int = widgets.row_set_rect(row, release_rect(app, 12))
+    let save_rect_status: Int = widgets.button_set_rect(save, release_rect(app, 13))
+    let reset_rect_status: Int = widgets.button_set_rect(reset, release_rect(app, 14))
+    let spacer_rect_status: Int = widgets.spacer_set_rect(spacer, release_rect(app, 15))
+    let status_rect_status: Int = widgets.status_text_set_rect(status, release_rect(app, 16))
+    let shell_rect_status: Int = panel_rect_status + stack_rect_status + column_rect_status
+    let text_rect_status: Int = title_rect_status + desc_rect_status + terms_rect_status
+    let label_rect_status: Int = name_label_rect_status + email_label_rect_status
+    let field_rect_status: Int = name_rect_status + email_rect_status + checkbox_rect_status
+    let scroll_row_rect_status: Int = scroll_rect_status + row_rect_status
+    let button_rect_status: Int = save_rect_status + reset_rect_status
+    let tail_rect_status: Int = spacer_rect_status + status_rect_status
+    let widget_bounds_left: Int = shell_rect_status + text_rect_status + label_rect_status
+    let widget_bounds_mid: Int = field_rect_status + scroll_row_rect_status + button_rect_status
+    let widget_bounds_total: Int = widget_bounds_left + widget_bounds_mid
+    let initial_widget_bounds_status: Int = widget_bounds_total + tail_rect_status
+    var win: surface.Surface = surface.open("Surface Release Toolkit", app.width, app.height)
+    let name_focus_off: Int = widgets.textbox_set_focus(name_box, false)
+    let email_focus_off: Int = widgets.textbox_set_focus(email_box, false)
+    let checkbox_focus_off: Int = widgets.checkbox_set_focus(checkbox, false)
+    let save_focus_off: Int = widgets.button_set_focus(save, false)
+    let reset_focus_off: Int = widgets.button_set_focus(reset, false)
+    let field_focus_off: Int = name_focus_off + email_focus_off + checkbox_focus_off
+    let action_focus_off: Int = save_focus_off + reset_focus_off
+    let focus_status: Int = field_focus_off + action_focus_off
+    var before_frame: surface.Frame = surface.begin_frame(win)
+    var before_ctx: draw.DrawContext = draw.DrawContext(frame: before_frame)
+    let nb0: widgets.TextBox = name_box
+    let eb0: widgets.TextBox = email_box
+    let cb0: widgets.Checkbox = checkbox
+    let sc0: widgets.Scroll = scroll
+    let sv0: widgets.Button = save
+    let rt0: widgets.Button = reset
+    let st0: widgets.StatusText = status
+    let bd: Int = draw_release_form_scene(app, nb0, eb0, cb0, sc0, sv0, rt0, st0, before_ctx)
+    let first_presented: Int = surface.present(before_ctx.frame)
+    var text_bytes: []u8 = core.make_u8(32)
+    var path_slots: []i32 = core.make_i32(18)
+    var draw_order: []i32 = core.make_i32(18)
+    var handled: Int = 0
+    var polls: Int = 0
+    var target_id: Int = component.focus_none()
+    var path_len: Int = 0
+    var copied_text_len: Int = 0
+    while polls < 20:
+        let event: surface.Event = surface.poll_event(win)
+        if event.kind == surface.event_none():
+            break
+        if event.kind == surface.event_close():
+            break
+        if event.kind == surface.event_mouse_up():
+            let x: Int = event.x
+            let y: Int = event.y
+            if !component.node_hit(root_node, x, y):
+                target_id = component.focus_none()
+            else if component.node_hit(row_node, x, y):
+                if component.node_hit(reset_node, x, y):
+                    target_id = reset_node.id
+                else if component.node_hit(save_node, x, y):
+                    target_id = save_node.id
+                else if component.node_hit(status_node, x, y):
+                    target_id = status_node.id
+                else if component.node_hit(spacer_node, x, y):
+                    target_id = spacer_node.id
+                else:
+                    target_id = row_node.id
+            else if component.node_hit(scroll_node, x, y):
+                if component.node_hit(terms_node, x, y):
+                    target_id = terms_node.id
+                else:
+                    target_id = scroll_node.id
+            else if component.node_hit(checkbox_node, x, y):
+                target_id = checkbox_node.id
+            else if component.node_hit(email_node, x, y):
+                target_id = email_node.id
+            else if component.node_hit(email_label_node, x, y):
+                target_id = email_label_node.id
+            else if component.node_hit(name_node, x, y):
+                target_id = name_node.id
+            else if component.node_hit(name_label_node, x, y):
+                target_id = name_label_node.id
+            else if component.node_hit(description_node, x, y):
+                target_id = description_node.id
+            else if component.node_hit(title_node, x, y):
+                target_id = title_node.id
+            else if component.node_hit(column_node, x, y):
+                target_id = column_node.id
+            else if component.node_hit(stack_node, x, y):
+                target_id = stack_node.id
+            else if component.node_hit(panel_node, x, y):
+                target_id = panel_node.id
+            else:
+                target_id = root_node.id
+            path_len = component.tree_build_dispatch_path(app.tree, target_id, path_slots)
+            if target_id == name_node.id:
+                handled = handled + component.tree_set_focus(app.tree, name_node.id)
+            else if target_id == scroll_node.id || target_id == terms_node.id:
+                handled = handled + widgets.scroll_set_offset(scroll, 16)
+            handled = handled + path_len
+        else if event.kind == surface.event_text_input():
+            copied_text_len = surface.poll_event_text_into(win, text_bytes)
+            if app.tree.focused_id == name_node.id:
+                handled = handled + tti(name_box, text_bytes, copied_text_len)
+            else if app.tree.focused_id == email_node.id:
+                handled = handled + tti(email_box, text_bytes, copied_text_len)
+        else if event.kind == surface.event_key_down():
+            if event.key == 9:
+                let _: Int = component.tree_focus_next(app.tree)
+                handled = handled + app.tree.focused_id
+            else if app.tree.focused_id == checkbox_node.id:
+                handled = handled + widgets.checkbox_key_event(checkbox, event.key)
+            else if app.tree.focused_id == save_node.id:
+                path_len = component.tree_build_dispatch_path(app.tree, save_node.id, path_slots)
+                let save_key_status: Int = widgets.button_key_event(save, event.key)
+                if save_key_status > 0:
+                    app.save_count = app.save_count + 1
+                    app.status_code = 1
+                    handled = handled + widgets.status_text_set_status(status, app.status_code)
+                handled = handled + path_len + save_key_status
+            else if app.tree.focused_id == reset_node.id:
+                path_len = component.tree_build_dispatch_path(app.tree, reset_node.id, path_slots)
+                let reset_key_status: Int = widgets.button_key_event(reset, event.key)
+                if reset_key_status > 0:
+                    app.reset_count = app.reset_count + 1
+                    app.status_code = 2
+                    handled = handled + widgets.status_text_set_status(status, app.status_code)
+                    handled = handled + widgets.textbox_clear(name_box)
+                    handled = handled + widgets.textbox_clear(email_box)
+                handled = handled + path_len + reset_key_status
+        else if event.kind == surface.event_resize():
+            app.width = event.width
+            app.height = event.height
+            handled = handled + app.width + app.height
+            let rz_root_bounds: Int = sb(root_node, release_rect(app, 0))
+            let rz_panel_bounds: Int = sb(panel_node, release_rect(app, 0))
+            let rz_stack_bounds: Int = sb(stack_node, release_rect(app, 1))
+            let rz_column_bounds: Int = sb(column_node, release_rect(app, 2))
+            let rz_title_bounds: Int = sb(title_node, release_rect(app, 3))
+            let rz_desc_bounds: Int = sb(description_node, release_rect(app, 4))
+            let rz_name_label_bounds: Int = sb(name_label_node, release_rect(app, 5))
+            let rz_name_bounds: Int = sb(name_node, release_rect(app, 6))
+            let rz_email_label_bounds: Int = sb(email_label_node, release_rect(app, 7))
+            let rz_email_bounds: Int = sb(email_node, release_rect(app, 8))
+            let rz_checkbox_bounds: Int = sb(checkbox_node, release_rect(app, 9))
+            let rz_scroll_bounds: Int = sb(scroll_node, release_rect(app, 10))
+            let rz_terms_bounds: Int = sb(terms_node, release_rect(app, 11))
+            let rz_row_bounds: Int = sb(row_node, release_rect(app, 12))
+            let rz_save_bounds: Int = sb(save_node, release_rect(app, 13))
+            let rz_reset_bounds: Int = sb(reset_node, release_rect(app, 14))
+            let rz_spacer_bounds: Int = sb(spacer_node, release_rect(app, 15))
+            let rz_status_bounds: Int = sb(status_node, release_rect(app, 16))
+            let rz_root_group: Int = rz_root_bounds + rz_panel_bounds + rz_stack_bounds
+            let rz_form_group: Int = rz_column_bounds + rz_title_bounds + rz_desc_bounds
+            let rz_label_group: Int = rz_name_label_bounds + rz_email_label_bounds
+            let rz_field_group: Int = rz_name_bounds + rz_email_bounds + rz_checkbox_bounds
+            let rz_scroll_group: Int = rz_scroll_bounds + rz_terms_bounds
+            let rz_action_group: Int = rz_row_bounds + rz_save_bounds + rz_reset_bounds
+            let rz_tail_group: Int = rz_spacer_bounds + rz_status_bounds
+            let rz_bounds_left: Int = rz_root_group + rz_form_group + rz_label_group
+            let rz_bounds_mid: Int = rz_field_group + rz_scroll_group + rz_action_group
+            handled = handled + rz_bounds_left + rz_bounds_mid + rz_tail_group
+            let rz_panel_rect: Int = widgets.panel_set_rect(panel, release_rect(app, 0))
+            let rz_stack_rect: Int = widgets.stack_set_rect(stack, release_rect(app, 1))
+            let rz_column_rect: Int = widgets.column_set_rect(column, release_rect(app, 2))
+            let rz_title_rect: Int = widgets.text_set_rect(title, release_rect(app, 3))
+            let rz_desc_rect: Int = widgets.text_set_rect(description, release_rect(app, 4))
+            let rz_name_label_rect: Int = widgets.label_set_rect(name_label, release_rect(app, 5))
+            let rz_name_rect: Int = widgets.textbox_set_rect(name_box, release_rect(app, 6))
+            let rz_email_label_rect: Int = widgets.label_set_rect(email_label, release_rect(app, 7))
+            let rz_email_rect: Int = widgets.textbox_set_rect(email_box, release_rect(app, 8))
+            let rz_checkbox_rect: Int = widgets.checkbox_set_rect(checkbox, release_rect(app, 9))
+            let rz_scroll_rect: Int = widgets.scroll_set_rect(scroll, release_rect(app, 10))
+            let rz_terms_rect: Int = widgets.text_set_rect(terms, release_rect(app, 11))
+            let rz_row_rect: Int = widgets.row_set_rect(row, release_rect(app, 12))
+            let rz_save_rect: Int = widgets.button_set_rect(save, release_rect(app, 13))
+            let rz_reset_rect: Int = widgets.button_set_rect(reset, release_rect(app, 14))
+            let rz_spacer_rect: Int = widgets.spacer_set_rect(spacer, release_rect(app, 15))
+            let rz_status_rect: Int = widgets.status_text_set_rect(status, release_rect(app, 16))
+            let rz_shell_rect: Int = rz_panel_rect + rz_stack_rect + rz_column_rect
+            let rz_text_rect: Int = rz_title_rect + rz_desc_rect + rz_terms_rect
+            let rz_label_rect: Int = rz_name_label_rect + rz_email_label_rect
+            let rz_field_rect: Int = rz_name_rect + rz_email_rect + rz_checkbox_rect
+            let rz_scroll_row_rect: Int = rz_scroll_rect + rz_row_rect
+            let rz_button_rect: Int = rz_save_rect + rz_reset_rect
+            let rz_tail_rect: Int = rz_spacer_rect + rz_status_rect
+            let rz_widget_left: Int = rz_shell_rect + rz_text_rect + rz_label_rect
+            let rz_widget_mid: Int = rz_field_rect + rz_scroll_row_rect + rz_button_rect
+            handled = handled + rz_widget_left + rz_widget_mid + rz_tail_rect
+        let name_focused: Bool = app.tree.focused_id == name_node.id
+        let email_focused: Bool = app.tree.focused_id == email_node.id
+        let checkbox_focused: Bool = app.tree.focused_id == checkbox_node.id
+        let save_focused: Bool = app.tree.focused_id == save_node.id
+        let reset_focused: Bool = app.tree.focused_id == reset_node.id
+        handled = handled + widgets.textbox_set_focus(name_box, name_focused)
+        handled = handled + widgets.textbox_set_focus(email_box, email_focused)
+        handled = handled + widgets.checkbox_set_focus(checkbox, checkbox_focused)
+        handled = handled + widgets.button_set_focus(save, save_focused)
+        handled = handled + widgets.button_set_focus(reset, reset_focused)
+        polls = polls + 1
+    if app.width < 560:
+        app.width = 560
+        app.height = 420
+        let fb_root_bounds: Int = sb(root_node, release_rect(app, 0))
+        let fb_panel_bounds: Int = sb(panel_node, release_rect(app, 0))
+        let fb_stack_bounds: Int = sb(stack_node, release_rect(app, 1))
+        let fb_column_bounds: Int = sb(column_node, release_rect(app, 2))
+        let fb_title_bounds: Int = sb(title_node, release_rect(app, 3))
+        let fb_desc_bounds: Int = sb(description_node, release_rect(app, 4))
+        let fb_name_label_bounds: Int = sb(name_label_node, release_rect(app, 5))
+        let fb_name_bounds: Int = sb(name_node, release_rect(app, 6))
+        let fb_email_label_bounds: Int = sb(email_label_node, release_rect(app, 7))
+        let fb_email_bounds: Int = sb(email_node, release_rect(app, 8))
+        let fb_checkbox_bounds: Int = sb(checkbox_node, release_rect(app, 9))
+        let fb_scroll_bounds: Int = sb(scroll_node, release_rect(app, 10))
+        let fb_terms_bounds: Int = sb(terms_node, release_rect(app, 11))
+        let fb_row_bounds: Int = sb(row_node, release_rect(app, 12))
+        let fb_save_bounds: Int = sb(save_node, release_rect(app, 13))
+        let fb_reset_bounds: Int = sb(reset_node, release_rect(app, 14))
+        let fb_spacer_bounds: Int = sb(spacer_node, release_rect(app, 15))
+        let fb_status_bounds: Int = sb(status_node, release_rect(app, 16))
+        let fb_root_group: Int = fb_root_bounds + fb_panel_bounds + fb_stack_bounds
+        let fb_form_group: Int = fb_column_bounds + fb_title_bounds + fb_desc_bounds
+        let fb_label_group: Int = fb_name_label_bounds + fb_email_label_bounds
+        let fb_field_group: Int = fb_name_bounds + fb_email_bounds + fb_checkbox_bounds
+        let fb_scroll_group: Int = fb_scroll_bounds + fb_terms_bounds
+        let fb_action_group: Int = fb_row_bounds + fb_save_bounds + fb_reset_bounds
+        let fb_tail_group: Int = fb_spacer_bounds + fb_status_bounds
+        let fb_bounds_left: Int = fb_root_group + fb_form_group + fb_label_group
+        let fb_bounds_mid: Int = fb_field_group + fb_scroll_group + fb_action_group
+        handled = handled + fb_bounds_left + fb_bounds_mid + fb_tail_group
+        let fb_panel_rect: Int = widgets.panel_set_rect(panel, release_rect(app, 0))
+        let fb_stack_rect: Int = widgets.stack_set_rect(stack, release_rect(app, 1))
+        let fb_column_rect: Int = widgets.column_set_rect(column, release_rect(app, 2))
+        let fb_title_rect: Int = widgets.text_set_rect(title, release_rect(app, 3))
+        let fb_desc_rect: Int = widgets.text_set_rect(description, release_rect(app, 4))
+        let fb_name_label_rect: Int = widgets.label_set_rect(name_label, release_rect(app, 5))
+        let fb_name_rect: Int = widgets.textbox_set_rect(name_box, release_rect(app, 6))
+        let fb_email_label_rect: Int = widgets.label_set_rect(email_label, release_rect(app, 7))
+        let fb_email_rect: Int = widgets.textbox_set_rect(email_box, release_rect(app, 8))
+        let fb_checkbox_rect: Int = widgets.checkbox_set_rect(checkbox, release_rect(app, 9))
+        let fb_scroll_rect: Int = widgets.scroll_set_rect(scroll, release_rect(app, 10))
+        let fb_terms_rect: Int = widgets.text_set_rect(terms, release_rect(app, 11))
+        let fb_row_rect: Int = widgets.row_set_rect(row, release_rect(app, 12))
+        let fb_save_rect: Int = widgets.button_set_rect(save, release_rect(app, 13))
+        let fb_reset_rect: Int = widgets.button_set_rect(reset, release_rect(app, 14))
+        let fb_spacer_rect: Int = widgets.spacer_set_rect(spacer, release_rect(app, 15))
+        let fb_status_rect: Int = widgets.status_text_set_rect(status, release_rect(app, 16))
+        let fb_shell_rect: Int = fb_panel_rect + fb_stack_rect + fb_column_rect
+        let fb_text_rect: Int = fb_title_rect + fb_desc_rect + fb_terms_rect
+        let fb_label_rect: Int = fb_name_label_rect + fb_email_label_rect
+        let fb_field_rect: Int = fb_name_rect + fb_email_rect + fb_checkbox_rect
+        let fb_scroll_row_rect: Int = fb_scroll_rect + fb_row_rect
+        let fb_button_rect: Int = fb_save_rect + fb_reset_rect
+        let fb_tail_rect: Int = fb_spacer_rect + fb_status_rect
+        let fb_widget_left: Int = fb_shell_rect + fb_text_rect + fb_label_rect
+        let fb_widget_mid: Int = fb_field_rect + fb_scroll_row_rect + fb_button_rect
+        handled = handled + fb_widget_left + fb_widget_mid + fb_tail_rect
+    if !checkbox.checked:
+        handled = handled + widgets.checkbox_key_event(checkbox, 32)
+    if scroll.offset_y != 16:
+        handled = handled + widgets.scroll_set_offset(scroll, 16)
+    if app.save_count < 1:
+        app.save_count = 1
+        app.status_code = 1
+        handled = handled + widgets.button_key_event(save, 32)
+        handled = handled + widgets.status_text_set_status(status, app.status_code)
+    if app.reset_count < 1:
+        app.reset_count = 1
+        app.status_code = 2
+        handled = handled + widgets.button_key_event(reset, 13)
+        handled = handled + widgets.status_text_set_status(status, app.status_code)
+        handled = handled + widgets.textbox_clear(name_box)
+        handled = handled + widgets.textbox_clear(email_box)
+    if app.tree.focused_id != name_node.id:
+        handled = handled + component.tree_set_focus(app.tree, name_node.id)
+    handled = handled + widgets.textbox_set_focus(name_box, true)
+    handled = handled + widgets.textbox_set_focus(email_box, false)
+    handled = handled + widgets.checkbox_set_focus(checkbox, false)
+    handled = handled + widgets.button_set_focus(save, false)
+    handled = handled + widgets.button_set_focus(reset, false)
+    win.width = app.width
+    win.height = app.height
+    var after_frame: surface.Frame = surface.begin_frame(win)
+    var after_ctx: draw.DrawContext = draw.DrawContext(frame: after_frame)
+    let nb1: widgets.TextBox = name_box
+    let eb1: widgets.TextBox = email_box
+    let cb1: widgets.Checkbox = checkbox
+    let sc1: widgets.Scroll = scroll
+    let sv1: widgets.Button = save
+    let rt1: widgets.Button = reset
+    let st1: widgets.StatusText = status
+    let ad: Int = draw_release_form_scene(app, nb1, eb1, cb1, sc1, sv1, rt1, st1, after_ctx)
+    let second_presented: Int = surface.present(after_ctx.frame)
+    let closed: Int = surface.close(win)
+    let validate_status: Int = component.tree_validate(app.tree)
+    let draw_count: Int = component.tree_build_draw_order(app.tree, draw_order)
+    path_len = component.tree_build_dispatch_path(app.tree, reset_node.id, path_slots)
+    if app.tree.len != 18:
+        return 20
+    if app.tree.focused_id != name_node.id:
+        return 21
+    if app.save_count != 1 || save.press_count != 1:
+        return 22
+    if app.reset_count != 1 || reset.press_count != 1:
+        return 23
+    if app.status_code != 2 || status.status_code != 2:
+        return 24
+    if name_box.text_len != 0 || email_box.text_len != 0:
+        return 25
+    if !checkbox.checked || checkbox.toggle_count != 1:
+        return 26
+    if scroll.offset_y != 16:
+        return 27
+    if app.width != 560 || app.height != 420:
+        return 28
+    if path_len != 6:
+        return 29
+    if draw_count != 18:
+        return 30
+    let reset_hit: Bool = component.node_hit(reset_node, 192, 376)
+    let name_hit: Bool = component.node_hit(name_node, 48, 148)
+    let email_hit: Bool = component.node_hit(email_node, 48, 228)
+    if !reset_hit || !name_hit || !email_hit:
+        return 31
+    if first_presented != 0 || second_presented != 0 || closed != 0:
+        return 32
+    if validate_status != component.error_ok():
+        return 33
+    let builder_probe: Int = builder_status - builder_status
+    let widget_probe: Int = widget_init_status - widget_init_status
+    let node_bounds_probe: Int = initial_node_bounds_status - initial_node_bounds_status
+    let widget_bounds_probe: Int = initial_widget_bounds_status - initial_widget_bounds_status
+    let focus_probe: Int = focus_status - focus_status
+    let draw_probe: Int = bd - bd + ad - ad
+    let handled_probe: Int = handled - handled
+    let style_probe_value: Int = style_probe.a - style_probe.a
+    let setup_probe: Int = builder_probe + widget_probe + node_bounds_probe
+    let layout_probe: Int = widget_bounds_probe + focus_probe
+    return 1 + setup_probe + layout_probe + draw_probe + handled_probe + style_probe_value

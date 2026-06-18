@@ -1,349 +1,779 @@
-# Actor Foundation RC100 Goal
+<active_goal_pointer>
+Current active goal for this session lives in
+`.workflow/line-length-limit/GOAL.md`.
+
+The completed six-file directory structure goal lives in
+`.workflow/six-file-directory-structure/GOAL.md`.
+
+The older Morph Rendered Beauty goal text below is preserved as historical
+context and is not the active line-length limit goal.
+</active_goal_pointer>
 
 <goal>
-Implement the full plan in
-`/home/tetra/Downloads/2026-06-10-actor-foundation-prod-ready-scoped-rc-100-implementation-plan.md`.
+Execute the full plan in
+`docs/plans/2026-06/structure-and-morph/2026-06-16-surface-morph-rendered-beauty-implementation-plan.md`.
 
-Mission: drive the scoped Actor Foundation from the previous
-`PROD_STABLE_SCOPED_DIRTY_OR_STALE` baseline to the strongest honest
-`ACTOR_FOUNDATION_PROD_READY_SCOPED_RC_100_PERC` state.
+Mission: make Morph the actual Tetra Surface beauty layer end to end:
+
+`Morph Capsule -> resolved visual scene -> Block scene -> render commands -> real pixels -> pixel golden evidence -> product claim`.
+
+This goal is complete only when Morph-authored Surface UI renders through the
+real pipeline, the flagship UI proves it, true pixel golden evidence exists,
+unsupported shortcuts are rejected by validators, and release/product claims
+are gated by same-commit evidence.
 </goal>
 
 <context>
-Active `/goal` objective:
+Canonical execution plan:
 
-`$todium-superpower Реалізуй повністю весь цей план - /home/tetra/Downloads/2026-06-10-actor-foundation-prod-ready-scoped-rc-100-implementation-plan.md`
+- `docs/plans/2026-06/structure-and-morph/2026-06-16-surface-morph-rendered-beauty-implementation-plan.md`
 
-Primary source of scope:
+Read this plan at the start of every continuation and before each phase change.
+The plan is intentionally the source of truth for detailed task text. This
+`GOAL.md` mirrors the task order and acceptance contract so the long-running
+`/goal` can survive compaction.
 
-- `/home/tetra/Downloads/2026-06-10-actor-foundation-prod-ready-scoped-rc-100-implementation-plan.md`
+Primary files and systems to inspect first:
 
-Working evidence root:
+- `AGENTS.md`
+- `README.md`
+- `docs/spec/surface/surface_v1.md`
+- `docs/spec/surface/morph/surface_morph.md`
+- `docs/spec/surface/surface_block_contract.md`
+- `docs/spec/core/current_supported_surface.md`
+- `docs/plans/2026-06/product-memory-toon/2026-06-13-surface-electron-competitor-product-slice.md`
+- `docs/plan/2026-06-13-surface-electron-competitor-platform-plan.md`
+- `docs/plans/2026-06/prompts/2026-06-10-gpt-55-pro-tetra-surface-beauty-analysis-prompt.md`
+- `lib/core/morph/morph.tetra`
+- `lib/core/block/block.tetra`
+- `lib/core/block.parts/text_state.tetra`
+- `lib/core/surface/draw.tetra`
+- `tools/cmd/surface-runtime-smoke/`
+- `tools/cmd/surface-visual-diff/`
+- `tools/validators/surface/`
+- `scripts/release/surface/surface-product-slice-gate.sh`
+- `examples/surface/migration/surface_migration_tetra_control_center.tetra`
+- `examples/projects/tetra_control_center/docs/surface-flagship-contract.md`
+- `graphify-out/GRAPH_REPORT.md`
 
-- `reports/actor-foundation-prod-ready-scoped-rc-100/`
+Baseline discovery commands:
 
-Baseline:
-
-- Previous final-production evidence under `reports/actor-final-production/P15/`
-  reached `PROD_STABLE_SCOPED_DIRTY_OR_STALE`.
-- Previous P15 local gate proof is supporting evidence only; it does not prove
-  clean checkout, remote CI, or package workflow proof for RC100.
+```bash
+git status --short --branch
+git rev-parse HEAD
+rg -n "product_claim|final_signoff|visual-regression|renderBlockSystemFrameSizedRGBA|draw\\.text|recipe_expands_to_block" docs lib tools scripts examples
+```
 </context>
 
 <constraints>
 - Always communicate with the user in Ukrainian.
 - Preserve unrelated dirty worktree changes.
-- Never use destructive cleanup (`git reset --hard`, `git clean -fdx`,
-  deleting user files) to obtain clean proof.
-- Use persistent Go caches under `.cache/`, `.gocache`, or
-  `${XDG_CACHE_HOME:-$HOME/.cache}/tetra-language/...`; never set `GOCACHE` to
-  `/tmp`.
-- Use `GOTELEMETRY=off` for Go evidence commands.
-- Do not accept stale reports, docs-only evidence, build-only evidence, or
-  historical actor evidence as current same-commit RC100 proof.
-- Do not weaken tests, validators, release gates, nonclaims, CI workflows, or
-  package workflow guards to obtain a stronger claim.
-- Do not claim full actor runtime production, Erlang/OTP parity, cluster
-  membership, reconnect/retry/TLS/auth production, non-Linux distributed actor
-  runtime support, distributed zero-copy pointer/region transfer, formal
-  race/liveness proof, official benchmark status, or performance superiority.
-- Remote CI/package proof may be recorded only if actually run, inspected, and
-  evidenced, or if an approved dry-run proof is explicitly allowed by the plan
-  and user permissions.
-- After modifying code, run `graphify update .` before closing the packet.
+- Do not use destructive cleanup such as `git reset --hard`,
+  `git checkout --`, broad `git clean`, or any command that overwrites
+  unrelated user work.
+- Use `rg` / `rg --files` for search when available.
+- Use `apply_patch` for manual edits.
+- Before architecture/codebase answers, read `graphify-out/GRAPH_REPORT.md`.
+- After modifying implementation code, run `graphify update .`.
+- Never set `GOCACHE` to `/tmp`; use persistent caches under this repo's
+  `.cache/` or `${XDG_CACHE_HOME:-$HOME/.cache}/tetra-language/...`.
+- Prefer `GOTELEMETRY=off` for Go evidence commands.
+- Do not create a second design system beside Morph.
+- Morph is the beauty layer: visual language, tokens, materials, recipes,
+  density, states, motion, and scene-level composition live there.
+- Block remains the only core UI primitive.
+- Do not add `Button`, `Card`, `TextField`, `TextBox`, `Sidebar`, `Modal`, or
+  similar as new core primitives. They may exist only as Morph recipes, helper
+  APIs, examples, or compatibility facades that expand to Block.
+- Do not claim Electron/React/CSS/DOM/GPU/native parity unless the relevant
+  implementation and validators prove it.
+- Do not claim macOS or Windows product support while Surface v1 marks those
+  targets unsupported.
+- Do not promote Morph to stable because recipes exist. Promote only when
+  Morph-authored UI renders through the real pipeline and passes visual
+  evidence gates.
+- Product visual evidence must be app-produced and source-linked. Metadata-only
+  checksums, self-goldens, and precomputed fixture frames cannot satisfy product
+  visual proof.
+
+Subagent policy required by the user:
+
+- Use subagents where they materially help, especially for read-heavy
+  reconnaissance and review between phases.
+- Read-only investigation/review subagents may use only:
+  - `agent_type=explorer`, which is `gpt-5.4-mini`;
+  - `agent_type=explorer_fast`, which is `gpt-5.3-codex-spark`.
+- Do not use read-only subagents with other models or unknown model mappings.
+- Delegated editing subagents may use only:
+  - `agent_type=worker`;
+  - model `gpt-5.5`;
+  - reasoning effort `xhigh`;
+  - `fork_context=true` in the spawn tool field.
+- If a write-enabled subagent cannot be spawned with that exact policy, do not
+  substitute another write model. Either continue with the parent controller
+  where appropriate or mark delegated editing as blocked and ask the user.
+- Write-enabled subagents must have disjoint write scopes.
+- Do not start the next implementation task while review issues remain open on
+  the current task.
 </constraints>
 
 <scorecard>
-Target claim:
+Primary score: `MORPH_RENDERED_BEAUTY_TASKS_PASSED`.
 
-- `ACTOR_FOUNDATION_PROD_READY_SCOPED_RC_100_PERC`
+Passing threshold:
 
-Allowed lower verdicts:
+- `14 / 14` plan tasks completed with evidence, or an explicit `PARTIAL` /
+  `BLOCKED` verdict names the exact remaining target/tool/dependency gap.
+- All acceptance criteria in the canonical plan are satisfied.
+- The final integrated Morph rendered beauty gate passes on supported targets,
+  or unavailable targets are explicitly reported as `BLOCKED` with no product
+  claim.
 
-- `ACTOR_FOUNDATION_RC_LOCAL_CLEAN`
-- `ACTOR_FOUNDATION_RC_LOCAL_CLEAN_REMOTE_BLOCKED`
-- `ACTOR_FOUNDATION_RC_BLOCKED_CLEAN_CHECKOUT`
-- `ACTOR_FOUNDATION_RC_BLOCKED_PACKAGE_PROOF`
-- `BLOCKED`
+Task checklist:
 
-The target is achieved only when clean local proof, remote CI proof, package
-workflow proof or approved dry-run proof, artifact hashes, docs/manifest, final
-handoff, and residual nonclaims all satisfy the implementation plan.
+- Alias: `MORPH-T00` through `MORPH-T13` are equivalent to `MRB-00` through
+  `MRB-13` below.
+- `MRB-00` baseline truth freeze and current gap audit.
+- `MRB-01` Morph rendered beauty contract and validator.
+- `MRB-02` real Block scene snapshot preserving visual specs.
+- `MRB-03` render command stream v1.
+- `MRB-04` non-placeholder text/icon raster evidence for beauty path.
+- `MRB-05` true pixel golden visual gate.
+- `MRB-06` precomputed frames removed from product visual evidence.
+- `MRB-07` `tetra.surface.morph-rendered-beauty.v1` report.
+- `MRB-08` flagship Surface migrated to Morph-authored rendering.
+- `MRB-09` developer loop and inspector show Morph-to-pixels chain.
+- `MRB-10` templates and reference apps use Morph-rendered path.
+- `MRB-11` claims and documentation hardened.
+- `MRB-12` integrated Morph rendered beauty gate wired.
+- `MRB-13` stable promotion audit and final signoff discipline.
+
+Regression checks:
+
+- Block remains the only core primitive.
+- Morph remains the beauty layer, not a duplicated design system.
+- Existing Surface nonclaims are not weakened.
+- Release gates do not pass from synthetic-only, metadata-only, or self-golden
+  evidence.
+- Existing validators and smoke scripts remain at least as strict as before.
+- Dirty unrelated files are preserved.
+
+Stop conditions:
+
+- If the same fix fails twice without new evidence, stop that line, record the
+  blocker in `GOAL.md` progress and `ATTEMPTS.md`, and choose a new evidence-led
+  approach or ask the user.
+- If a required display/browser/runtime dependency is unavailable, report the
+  exact blocked target instead of weakening acceptance.
+- If subagent model constraints cannot be satisfied for delegated editing, do
+  not use a substitute write subagent.
 </scorecard>
 
 <done_when>
-The goal is complete only when every scoped RC packet is completed or an
-explicit blocker/nonclaim prevents the target:
+The goal is complete only when all items below are proven with current evidence:
 
-- `ACTOR-RC100-P00` records current HEAD, dirty state, implementation plan hash,
-  and stale evidence classification.
-- `ACTOR-RC100-P01` obtains a clean isolated checkout or records the exact safe
-  blocker.
-- `ACTOR-RC100-P02` proves the clean local actor foundation gate and validators.
-- `ACTOR-RC100-P03` creates and validates the RC artifact hash/stale-evidence
-  bundle.
-- `ACTOR-RC100-P04` records remote CI actor foundation proof or a precise
-  remote blocker.
-- `ACTOR-RC100-P05` records package workflow proof or an approved dry-run proof,
-  or a precise permission blocker.
-- `ACTOR-RC100-P06` proves CI/workflow hardening against bypass and stale/docs
-  evidence.
-- `ACTOR-RC100-P07` updates final audit/docs/manifest/handoff only after
-  executable evidence passes.
-- `ACTOR-RC100-P08` performs final acceptance and locks the exact verdict.
-- Optional `ACTOR-RC100-FULL-*` packets remain separate full actor runtime
-  follow-on work and must not be mixed into the scoped RC100 claim.
+- The canonical plan file exists and remains the detailed execution source.
+- `MRB-00` through `MRB-13` are complete or explicitly marked `BLOCKED` /
+  `PARTIAL` with exact residual gaps.
+- `ACCEPTANCE-FULL`: every item in the canonical plan's `Acceptance Criteria`
+  section is satisfied with current evidence or has an exact `BLOCKED` /
+  `PARTIAL` explanation.
+- `docs/spec/surface/morph/surface_morph_rendered_beauty.md` and the corresponding contract
+  schema/report definition exist.
+- A validator for `tetra.surface.morph-rendered-beauty.v1` exists with positive
+  and negative fixtures.
+- Morph recipe expansion can emit or produce evidence for a rich renderable
+  scene snapshot.
+- The renderer emits deterministic command streams from app/Morph source.
+- Runtime smoke produces actual RGBA or PNG frame artifacts for the relevant
+  supported targets.
+- Visual diff compares real artifacts to separate golden artifacts.
+- Release/product gates reject self-goldens, metadata-only checksums,
+  precomputed product frames, and missing frame artifacts.
+- The flagship Surface UI is primarily Morph-authored and produces scene,
+  command, pixel, and golden evidence.
+- `tetra surface dev` and the Surface inspector expose Morph tokens, recipe
+  expansion, Block scene, render commands, frame artifacts, and golden result.
+- New Surface templates and reference apps demonstrate the Morph-rendered path.
+- Claim scanner blocks unsupported Morph beauty/product language unless
+  same-commit evidence exists.
+- `scripts/release/surface/morph-rendered-beauty-gate.sh` exists and passes,
+  or reports exact target blockers without unsupported claims.
+- `scripts/release/surface/surface-product-slice-gate.sh` consumes the new gate
+  before any `product_claim: true` / `final_signoff: true` result.
+- `graphify update .` has been run after implementation code changes.
+- `GOAL.md` `## Progress`, `PLAN.md`, `ATTEMPTS.md`, and `NOTES.md` are current.
+- Final handoff reports `DONE`, `PARTIAL`, or `BLOCKED` according to repo
+  completion rules, with concrete evidence and residual risks.
 </done_when>
 
 <feedback_loop>
-Packet loop: run packet-specific commands with `GOTELEMETRY=off`,
-repo-local `GOCACHE`, and repo-local `GOTMPDIR`; record evidence under
-`reports/actor-foundation-prod-ready-scoped-rc-100/PXX/`; update tracker files
-after each packet.
+Fast loop for each implementation slice:
 
-Final loop: run the full validation ladder from the implementation plan,
-inspect current evidence, and choose the exact truthful verdict.
+1. Re-read `GOAL.md`, `CONTROL.md`, and the canonical plan.
+2. Inspect current files before editing.
+3. Use read-only subagents (`explorer` / `explorer_fast`) for independent
+   reconnaissance or review when useful.
+4. Use a write-enabled `worker` subagent only for one bounded task with a
+   disjoint write scope and `fork_context=true`.
+5. Prefer TDD for feature or bugfix slices when practical.
+6. Run the focused verification command named in the canonical plan for that
+   task.
+7. Update `ATTEMPTS.md` after each meaningful attempt.
+8. Update `NOTES.md` with durable discoveries or blockers.
+9. Update `GOAL.md` `## Progress` with one concise evidence line per state
+   change.
+10. Run broader verification only at phase boundaries and final acceptance.
+
+Expected cadence:
+
+- Use focused Go/Tetra tests during implementation.
+- Use script smoke gates after wiring or integration changes.
+- Use full integrated gates only after the relevant slices are green.
 </feedback_loop>
 
-<working_memory>
-Maintain:
+<workflow>
+Execute the canonical plan in order. Do not silently skip ahead because one
+local validator passes.
 
-- `GOAL.md`: canonical objective, acceptance, and progress.
-- `PLAN.md`: packet matrix and current strategy.
-- `ATTEMPTS.md`: completed attempts and evidence links.
-- `NOTES.md`: durable discoveries and blockers.
-- `CONTROL.md`: active packet, next actions, stop conditions, cache rules.
+Phase 0 - Baseline and safety:
+
+- Complete `MRB-00`.
+- Record current HEAD, dirty tree summary, existing nonclaims, and current gaps.
+- Confirm old unrelated working-memory state has been superseded by this goal.
+
+Phase 1 - Contract and proof shape:
+
+- Complete `MRB-01`.
+- Define `tetra.surface.morph-rendered-beauty.v1`.
+- Add positive and negative validator fixtures.
+
+Phase 2 - Scene and rendering core:
+
+- Complete `MRB-02`, `MRB-03`, and `MRB-04`.
+- Preserve rich visual specs for renderer/validator use without replacing Block
+  as the primitive.
+- Produce deterministic render commands and non-marker text/icon evidence.
+
+Phase 3 - Pixel evidence:
+
+- Complete `MRB-05`, `MRB-06`, and `MRB-07`.
+- Replace self-equal visual checks with real artifact-to-golden comparison.
+- Prevent precomputed fixture frames from satisfying product visual evidence.
+
+Phase 4 - Product surface:
+
+- Complete `MRB-08`, `MRB-09`, and `MRB-10`.
+- Migrate or add the flagship Morph-rendered source.
+- Update dev loop, inspector, templates, and reference apps.
+
+Phase 5 - Claims and release gates:
+
+- Complete `MRB-11` and `MRB-12`.
+- Harden docs/claim scanner and wire the integrated Morph rendered beauty gate
+  into product-slice signoff.
+
+Phase 6 - Stable candidate audit:
+
+- Complete `MRB-13`.
+- Re-run from a clean checkout or report the exact dirty tree.
+- Run `graphify update .` after implementation changes.
+- Produce final evidence and status.
+
+Subagent execution pattern:
+
+- For read-heavy phase reconnaissance, spawn one or more `explorer` /
+  `explorer_fast` agents with narrow prompts and no edit permission.
+- For implementation, spawn at most one `worker` per disjoint write scope with
+  `fork_context=true`.
+- After each write task, run read-only review with allowed read-only agents.
+- The parent controller integrates, verifies, and owns final status.
+</workflow>
+
+<working_memory>
+Maintain these root files for the long-running goal:
+
+- `GOAL.md`: canonical `/goal` contract and `## Progress`.
+- `PLAN.md`: current strategy, phases, active task, open decisions.
+- `ATTEMPTS.md`: every meaningful attempt, evidence, result, and next
+  adjustment.
+- `NOTES.md`: chronological durable discoveries, blockers, and context.
+- `CONTROL.md`: human operator panel and subagent/resource policy.
+
+Update cadence:
+
+- Update `PLAN.md` when the active phase or strategy changes.
+- Update `ATTEMPTS.md` after each meaningful implementation attempt or failed
+  experiment.
+- Update `NOTES.md` whenever durable context should survive compaction.
+- Update `GOAL.md` progress after each completed task, blocker, or phase
+  transition.
+- Re-read `CONTROL.md` before phase changes, strategic pivots, expensive
+  verification, or sidecar/subagent integration.
 </working_memory>
+
+<human_control_surface>
+Create and maintain `CONTROL.md` as the compact human operator panel for this
+goal.
+
+Before each phase change, strategic pivot, expensive step, or subagent result
+integration, reread `CONTROL.md`. If it changed, summarize the relevant change
+in `PLAN.md` and adapt before proceeding.
+
+`CONTROL.md` can narrow priorities, pause work, or require approval, but it
+cannot silently weaken `GOAL.md`, the canonical plan, done_when, scorecard, or
+repo completion rules.
+</human_control_surface>
+
+<verification_loop>
+Use focused checks first, then broad gates.
+
+Representative focused checks from the canonical plan:
+
+```bash
+GOCACHE=$(pwd)/.cache/go-build-surface-morph-beauty \
+  go test -buildvcs=false ./tools/cmd/validate-surface-morph-rendered-beauty ./tools/validators/surface \
+  -run 'MorphRenderedBeauty|Visual' -count=1
+
+GOCACHE=$(pwd)/.cache/go-build-surface-scene \
+  go test -buildvcs=false ./tools/validators/surface -run 'Block|Morph|Scene' -count=1
+
+GOCACHE=$(pwd)/.cache/go-build-surface-render \
+  go test -buildvcs=false ./tools/internal/surfacerender ./tools/cmd/surface-runtime-smoke ./tools/validators/surface \
+  -run 'RenderCommand|BlockPaint|Morph' -count=1
+
+GOCACHE=$(pwd)/.cache/go-build-surface-visual \
+  go test -buildvcs=false ./tools/cmd/surface-visual-diff ./tools/validators/surface \
+  -run 'Visual|Golden|Checksum' -count=1
+
+./tetra check examples/surface/morph_flagship/surface_morph_rendered_studio_shell.tetra
+```
+
+Representative final checks:
+
+```bash
+graphify update .
+bash scripts/release/surface/morph-rendered-beauty-gate.sh
+bash scripts/release/surface/surface-product-slice-gate.sh
+git status --short
+```
+
+For Go checks, prefer:
+
+```bash
+GOTELEMETRY=off
+GOCACHE="$(pwd)/.cache/go-build-<slug>"
+GOTMPDIR="$(pwd)/.cache/go-tmp-<slug>"
+```
+
+After evidence runs, clean the concrete cache path when appropriate:
+
+```bash
+GOCACHE="$(pwd)/.cache/go-build-<slug>" go clean -cache
+```
+
+If a check cannot run, record the exact command, reason, and impact in
+`ATTEMPTS.md`, `NOTES.md`, and final status.
+</verification_loop>
+
+<execution_rules>
+- Follow system/developer/user instructions, nearest `AGENTS.md`, then invoked
+  skills.
+- Treat `повністю`, `до кінця`, `100%`, `final`, `complete`, and `end-to-end`
+  as requests for the whole requested outcome.
+- Never claim `DONE`, `готово`, `complete`, `final`, or `100%` from one local
+  success signal.
+- Final status must be exactly `DONE`, `PARTIAL`, or `BLOCKED`.
+- Before substantive implementation, inspect affected surfaces: files/modules,
+  APIs/CLI/jobs, storage/config, UI flows, tests/validators, docs, and gates.
+- Preserve unrelated dirty worktree changes.
+- Prefer existing repo patterns and helpers over new abstractions.
+- Add abstractions only when they remove real complexity or match local
+  patterns.
+- Use structured parsers/APIs instead of ad hoc string manipulation when
+  available.
+- Keep edits scoped.
+- Add focused tests proportional to risk and blast radius.
+- Do not paper over failures or weaken validators/gates to pass.
+- Do not widen scope beyond the Morph rendered beauty plan.
+- Keep final reports concise but include required repo completion fields.
+</execution_rules>
+
+<output_contract>
+Final handoff must include:
+
+- `Status`: exactly `DONE`, `PARTIAL`, or `BLOCKED`.
+- `Completed`: highest-signal summary of implemented work.
+- `Scope covered`: affected specs, runtime, validators, examples, gates, docs.
+- `Validation`: commands run and results.
+- `Evidence`: artifact/report paths and relevant file references.
+- `Not verified / risks`: exact residual gaps, if any.
+
+Do not call `update_goal { "status": "complete" }` until every `done_when`
+item is satisfied with evidence. Budget exhaustion, local success, or plausible
+progress is not completion.
+</output_contract>
 
 ## Progress
 
-- 2026-06-10: User approval unblocked the P16 gate for committing, pushing,
-  and running remote evidence. Bridge: `ACTOR-RC100-P17` is in progress from
-  clean candidate worktree
-  `/home/tetra/.codex/worktrees/Tetra_Language/actor-rc100-p12-expanded-clean`.
-  Preflight found `git diff --check` clean, valid repository access as
-  `BoSuY0/Tetra_Language`, and active `ci.yml` / `release-packages.yml`
-  workflows. Next evidence: same-change candidate commit SHA, pushed branch,
-  remote `ci` actor runtime foundation artifact, and release package proof.
-- 2026-06-10: `ACTOR-RC100-P17` completed with blocker
-  `REMOTE_CI_BILLING_LOCKED`. Candidate commit
-  `3480870c7ff52d211aaa63c16238e62d6165cfbd` was pushed to
-  `origin/actor-rc100-p12-expanded-clean`, and `ci.yml` run `27284988190`
-  targeted the same SHA. GitHub Actions did not start jobs because the account
-  is locked due to a billing issue; `actor-runtime-foundation-linux` has
-  `steps=0`, no runner, no artifact, and check-run annotations record the
-  billing lock. Evidence:
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P17-remote-execution-billing-blocked/summary.md`,
-  `status.tsv`, `ci-run.json`, `ci-jobs.json`, `ci-check-annotations.jsonl`,
-  and `ci-artifacts.json`. Target
-  `ACTOR_FOUNDATION_PROD_READY_SCOPED_RC_100_PERC` remains `NOT_CLAIMED`.
-- 2026-06-10: `ACTOR-RC100-P18` started after the user installed `act` and
-  asked the agent to run the local emulation. Scope: run the
-  `actor-runtime-foundation-linux` GitHub Actions job locally on a fresh
-  worktree at commit `3480870c7ff52d211aaa63c16238e62d6165cfbd`, capture
-  artifact/report evidence under
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P18-act-local/`, and keep
-  the target unclaimed unless remote GitHub Actions/package proof also exists.
-- 2026-06-10: Goal realigned from the completed final-production plan to the
-  active RC100 implementation plan. Bridge: `ACTOR-RC100-P00` is completed and
-  `ACTOR-RC100-P01` is next. Evidence:
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P00/summary.md`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P00/summary.json`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P00/command-status.tsv`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P00/git-status-short.log`,
-  and
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P00/stale-evidence-classification.tsv`.
-- 2026-06-10: `ACTOR-RC100-P01` completed. Evidence:
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P01/summary.md`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P01/summary.json`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P01/command-status.tsv`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P01/clean-worktree-path.txt`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P01/clean-git-status-short.log`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P01/git-diff-check.log`,
-  and
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P01/manifest-diff-exit-code.log`.
-  Clean detached worktree:
-  `/home/tetra/.codex/worktrees/Tetra_Language/actor-rc100-clean-c0258`.
-  Bridge: next packet is `ACTOR-RC100-P02` clean local actor foundation gate
-  rerun in the isolated worktree.
-- 2026-06-10: `ACTOR-RC100-P02` completed. Clean RC worktree branch
-  `actor-rc100-clean-proof` reached
-  `f47d0dcc0b42784f318844621d6a2ba8ce3e31fb`; final local gate and validators
-  passed from a clean committed checkout. Evidence:
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P02/summary.md`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P02/summary.json`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P02/command-status.tsv`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P02/foundation-gate-final-status.tsv`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P02/final-validate-actor-runtime-foundation-status.tsv`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P02/final-validate-distributed-actor-runtime-status.tsv`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P02/final-validate-parallel-production-status.tsv`,
-  and final artifact hash validator status files. Bridge: next packet is
-  `ACTOR-RC100-P03` final artifact hash and stale-evidence bundle.
-- 2026-06-10: `ACTOR-RC100-P03` completed. The canonical RC evidence root
-  has a validated artifact hash manifest and `final-artifact-sha256.txt`;
-  historical `reports/actor-runtime-foundation/final` evidence is rejected as
-  current proof for clean HEAD
-  `f47d0dcc0b42784f318844621d6a2ba8ce3e31fb`. Evidence:
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P03/summary.md`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P03/summary.json`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P03/command-status.tsv`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P03/stale-evidence-bundle.tsv`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/artifact-hashes.json`,
-  and `reports/actor-foundation-prod-ready-scoped-rc-100/final-artifact-sha256.txt`.
-  Bridge: next packet is `ACTOR-RC100-P04` remote CI actor foundation proof or
-  precise remote blocker.
-- 2026-06-10: `ACTOR-RC100-P04` completed with blocker `REMOTE_CI_BLOCKED`.
-  Static CI workflow proof passed, but exact clean commit
-  `f47d0dcc0b42784f318844621d6a2ba8ce3e31fb` is not present on `origin` and
-  `gh auth status` reports invalid tokens, so no remote run/artifact proof can
-  be honestly recorded in this session. Evidence:
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P04/summary.md`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P04/summary.json`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P04/command-status.tsv`,
-  and
-  `reports/actor-foundation-prod-ready-scoped-rc-100/remote-ci/actor-runtime-foundation-run.json`.
-  Bridge: next packet is `ACTOR-RC100-P05` release package workflow proof or
-  approved dry-run / permission blocker.
-- 2026-06-10: `ACTOR-RC100-P05` completed with blocker
-  `PACKAGE_WORKFLOW_PROOF_BLOCKED`. Static release-package workflow proof
-  passed and actor gate ordering/artifact inclusion are covered, but no real
-  package workflow run or approved dry-run was executed. Evidence:
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P05/summary.md`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P05/summary.json`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P05/command-status.tsv`,
-  and
-  `reports/actor-foundation-prod-ready-scoped-rc-100/package-workflow/release-packages-run.json`.
-  Bridge: next packet is `ACTOR-RC100-P06` CI/workflow hardening.
-- 2026-06-10: `ACTOR-RC100-P06` completed. Workflow hardening tests passed;
-  raw bypass-marker findings were classified as legacy/other scripts or
-  cleanup/diagnostic fallbacks, and targeted actor RC workflows/gate scan found
-  no bypass markers affecting actor RC gates. Evidence:
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P06/summary.md`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P06/summary.json`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P06/command-status.tsv`,
-  and
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P06/workflow-hardening.log`.
-  Bridge: next packet is `ACTOR-RC100-P07` final audit/docs/handoff update.
-- 2026-06-10: `ACTOR-RC100-P07` completed. Clean RC branch
-  `actor-rc100-clean-proof` reached
-  `f417202a7fd611b4da0059b57c54a63a9e86f81e`; final audit/docs/manifest were
-  updated without claiming the target, and `verify-docs` now requires the
-  post-scope actor blocker ledger in the distributed actor feature manifest.
+- 2026-06-16: New `/goal` contract created for Surface Morph Rendered Beauty.
+  Canonical plan:
+  `docs/plans/2026-06/structure-and-morph/2026-06-16-surface-morph-rendered-beauty-implementation-plan.md`.
+  This supersedes the prior release-validation / Actor RC100 root working
+  memory for the active tool-level goal.
+- 2026-06-16: Tool-level goal created with objective to execute this `GOAL.md`
+  end to end. Read-only subagents `explorer_fast` and `explorer` reviewed the
+  goal shape and memory reset policy; their accepted recommendations were
+  incorporated as `MORPH-T00` aliases and `ACCEPTANCE-FULL`.
+- 2026-06-16: `MRB-00` completed locally as a baseline audit. Evidence:
+  `reports/stabilization/surface_morph_rendered_beauty_mrb_00_baseline.md`,
+  `git rev-parse HEAD` -> `95bfd4a887bab5032437cb22494d034e82ae6d35`,
+  `git status --short --branch` -> `main...origin/main [behind 12]` with a
+  large dirty tree, targeted `rg` scans, line inspections, and read-only
+  `explorer_fast` / `explorer` audits. Bridge: next task is `MRB-01`
+  Morph rendered beauty contract/schema/validator/negative fixtures.
+- 2026-06-16: `MRB-01` completed locally. Added
+  `docs/spec/surface/morph/surface_morph_rendered_beauty.md`,
+  `docs/spec/surface/morph/surface_morph_rendered_beauty_contract.json`, and
+  `tools/cmd/validate-surface-morph-rendered-beauty/`; updated
+  `docs/spec/surface/morph/surface_morph.md` and `docs/spec/surface/surface_v1.md` to reference the
+  experimental rendered beauty proof contract. TDD evidence: RED test first
+  failed on undefined validator types/functions; GREEN command
+  `GOTELEMETRY=off GOCACHE="$PWD/.cache/go-build-surface-morph-beauty-mrb01" GOTMPDIR="$PWD/.cache/go-tmp-surface-morph-beauty-mrb01" go test -buildvcs=false ./tools/cmd/validate-surface-morph-rendered-beauty ./tools/validators/surface -run 'MorphRenderedBeauty|Visual' -count=1`
+  passed, and
+  `go run ./tools/cmd/validate-surface-morph-rendered-beauty --contract docs/spec/surface/morph/surface_morph_rendered_beauty_contract.json`
+  passed. Ran `graphify update .` after code changes. Bridge: next task is
+  `MRB-02` rich Block scene snapshot evidence.
+- 2026-06-16: `MRB-02` completed locally/integration. Added typed
+  `block_scene_snapshot` evidence to `surface.Report`, validator tests and
+  rules, `surface-runtime-smoke` emission, and MRB rendered-beauty report
+  coupling; updated `docs/spec/surface_morph_rendered_beauty*`. Folded the
+  existing `lib/core/block.parts/tree.tetra` and
+  `lib/core/block.parts/text_state.tetra` helper APIs into
+  `lib/core/block/block.tetra` exports so Morph examples can check through
+  `lib.core.block` without changing the compact `BlockProps` ABI. Evidence:
+  `./tetra check examples/surface/morph_core/surface_morph_studio_shell.tetra`,
+  `./tetra check examples/surface/block_core/surface_block_system.tetra`,
+  `./tetra check examples/surface/morph_core/surface_morph_command_palette.tetra`,
+  `GOTELEMETRY=off GOCACHE="$PWD/.cache/go-build-surface-scene" GOTMPDIR="$PWD/.cache/go-tmp-surface-scene" go test -buildvcs=false ./tools/validators/surface -run 'Block|Morph|Scene' -count=1`,
+  `GOTELEMETRY=off GOCACHE="$PWD/.cache/go-build-surface-scene" GOTMPDIR="$PWD/.cache/go-tmp-surface-scene" go test -buildvcs=false ./tools/cmd/surface-runtime-smoke ./tools/cmd/validate-surface-morph-rendered-beauty -run 'BlockSceneSnapshot|MorphRenderedBeauty|MorphScenarioProducesBlockSceneSnapshot' -count=1`,
+  `go run -buildvcs=false ./tools/cmd/validate-surface-morph-rendered-beauty --contract docs/spec/surface/morph/surface_morph_rendered_beauty_contract.json`,
+  `jq empty docs/spec/surface/morph/surface_morph_rendered_beauty_contract.json`, and
+  `graphify update .`. Cleaned repo-local Go caches after evidence. Bridge:
+  next task is `MRB-03` deterministic render command stream v1.
+- 2026-06-16: `MRB-03` completed locally/integration. Added typed
+  `render_command_stream` evidence to `surface.Report`, runtime-smoke reports
+  and traces, `tools/internal/surfacerender` deterministic stream generation
+  from `BlockSceneSnapshotReport`, validator tests/rules rejecting
+  non-source-linked or handcrafted streams, and MRB rendered-beauty report
+  coupling plus docs/spec contract update. Evidence:
+  `GOTELEMETRY=off GOCACHE="$PWD/.cache/go-build-surface-render" GOTMPDIR="$PWD/.cache/go-tmp-surface-render" go test -buildvcs=false ./tools/internal/surfacerender ./tools/cmd/surface-runtime-smoke ./tools/validators/surface -run 'RenderCommand|BlockPaint|Morph' -count=1`,
+  `GOTELEMETRY=off GOCACHE="$PWD/.cache/go-build-surface-render" GOTMPDIR="$PWD/.cache/go-tmp-surface-render" go test -buildvcs=false ./tools/internal/surfacerender ./tools/cmd/surface-runtime-smoke ./tools/validators/surface ./tools/cmd/validate-surface-morph-rendered-beauty -count=1`,
+  `go run -buildvcs=false ./tools/cmd/validate-surface-morph-rendered-beauty --contract docs/spec/surface/morph/surface_morph_rendered_beauty_contract.json`,
+  `jq empty docs/spec/surface/morph/surface_morph_rendered_beauty_contract.json`,
+  `git diff --check`, and `graphify update .`. Bridge: next task is
+  `MRB-04` non-placeholder text/icon raster evidence for the beauty path.
+- 2026-06-16: `MRB-04` completed locally/integration. Added deterministic
+  non-marker text/icon raster evidence across `lib/core/surface/draw.tetra`,
+  `tools/internal/surfacerender`, `tools/validators/surface`,
+  `tools/cmd/surface-runtime-smoke`, `tools/cmd/validate-surface-morph-rendered-beauty`,
+  and `docs/spec/surface_morph_rendered_beauty*`; synchronized runtime smoke
+  expected frames with the new 5x7 glyph mask; restored the public
+  `lib.core.block` facade helpers needed by Morph examples without adding new
+  core UI primitives. Evidence:
+  `GOTELEMETRY=off GOCACHE="$PWD/.cache/go-build-surface-text" GOTMPDIR="$PWD/.cache/go-tmp-surface-text" go test -buildvcs=false ./tools/internal/surfacerender ./tools/validators/surface ./tools/cmd/validate-surface-morph-rendered-beauty -run 'Text|Glyph|Icon|Asset|MorphRenderedBeautyReport' -count=1`,
+  `GOTELEMETRY=off GOCACHE="$PWD/.cache/go-build-surface-text" GOTMPDIR="$PWD/.cache/go-tmp-surface-text" go test -buildvcs=false ./tools/internal/surfacerender ./tools/cmd/surface-runtime-smoke ./tools/validators/surface ./tools/cmd/validate-surface-morph-rendered-beauty -count=1`,
+  `./tetra check examples/surface/morph_core/surface_morph_studio_shell.tetra`,
+  `./tetra check examples/surface/block_core/surface_block_system.tetra`,
+  `./tetra check examples/surface/morph_core/surface_morph_command_palette.tetra`,
+  `./tetra check examples/surface/block_render/surface_block_text.tetra`,
+  `./tetra check examples/surface/runtime/surface_counter.tetra`,
+  `./tetra check examples/surface/runtime/surface_window_counter.tetra`,
+  `./tetra check examples/surface/runtime/surface_browser_counter.tetra`,
+  `./tetra check examples/surface/release/surface_release_counter.tetra`,
+  `./tetra check examples/surface/runtime/surface_textbox_app.tetra`,
+  `go run -buildvcs=false ./tools/cmd/validate-surface-morph-rendered-beauty --contract docs/spec/surface/morph/surface_morph_rendered_beauty_contract.json`,
+  `jq empty docs/spec/surface/morph/surface_morph_rendered_beauty_contract.json`,
+  `git diff --check`, and `graphify update .`. Bridge: next task is
+  `MRB-05` true pixel golden visual gate.
+- 2026-06-16: `MRB-05` completed locally/integration. Added true
+  artifact-to-golden visual diff evidence in `tools/cmd/surface-visual-diff`
+  with `--frame-artifact`, `--golden-artifact`, explicit `--write-golden`,
+  SHA256-from-bytes, RGBA/PNG pixel diff metrics, runtime `artifact_path`
+  current-frame discovery, and validator rejection for self-golden,
+  metadata-only, fixture-frame-only, and missing PNG/RGBA artifact evidence.
+  `surface-runtime-smoke` now writes Block-system RGBA frame artifacts for
+  runtime checksum evidence, and `scripts/release/surface/visual-gate.sh`
+  rejects `--write-golden`. Evidence:
+  `GOTELEMETRY=off GOCACHE="$PWD/.cache/go-build-surface-visual" GOTMPDIR="$PWD/.cache/go-tmp-surface-visual" go test -buildvcs=false ./tools/cmd/surface-visual-diff ./tools/validators/surface -run 'Visual|Golden|Checksum' -count=1`,
+  `GOTELEMETRY=off GOCACHE="$PWD/.cache/go-build-surface-visual" GOTMPDIR="$PWD/.cache/go-tmp-surface-visual" go test -buildvcs=false ./tools/cmd/surface-visual-diff ./tools/validators/surface ./tools/cmd/surface-runtime-smoke ./tools/cmd/validate-surface-visual-report ./tools/scriptstest -count=1`,
+  `git diff --check`, `graphify update .`, and
+  `GOCACHE="$PWD/.cache/go-build-surface-visual" go clean -cache`. Bridge:
+  next task is `MRB-06` remove precomputed frames from product visual
+  evidence.
+- 2026-06-16: `MRB-06` completed locally/integration. Added runtime frame
+  provenance fields (`producer`, `evidence_role`, `app_source`,
+  `morph_recipe_hash`, `block_scene_hash`, `render_command_stream_hash`,
+  `precomputed`) and validator rules so `product_visual` frames must be
+  app-produced and source/hash-linked while precomputed frames are allowed only
+  as `host_probe_only` infrastructure evidence. Linux real-window probe frames
+  are now explicitly marked host-probe-only/precomputed, Block-system frame
+  evidence preserves that provenance, and MRB pixel evidence now rejects
+  fixture/synthetic product frames plus missing/mismatched app/source/hash
+  links. Evidence:
+  `GOTELEMETRY=off GOCACHE="$PWD/.cache/go-build-surface-runtime" GOTMPDIR="$PWD/.cache/go-tmp-surface-runtime" go test -buildvcs=false ./tools/cmd/surface-runtime-smoke ./tools/validators/surface -run 'Runtime|BlockSystem|Precomputed|ProductEvidence' -count=1`,
+  `GOTELEMETRY=off GOCACHE="$PWD/.cache/go-build-surface-runtime" GOTMPDIR="$PWD/.cache/go-tmp-surface-runtime" go test -buildvcs=false ./tools/cmd/validate-surface-morph-rendered-beauty -count=1`,
+  `GOTELEMETRY=off GOCACHE="$PWD/.cache/go-build-surface-runtime" GOTMPDIR="$PWD/.cache/go-tmp-surface-runtime" go test -buildvcs=false ./tools/cmd/surface-runtime-smoke ./tools/validators/surface ./tools/cmd/validate-surface-morph-rendered-beauty -count=1`,
+  `git diff --check`, `graphify update .`, and
+  `GOCACHE="$PWD/.cache/go-build-surface-runtime" go clean -cache`. Bridge:
+  next task is `MRB-07` first-class Morph rendered beauty reports.
+- 2026-06-16: `MRB-07` completed locally/integration, with a local
+  end-to-end report-path smoke. Added shared
+  `tools/validators/surface` Morph rendered beauty report APIs, converted
+  `tools/cmd/validate-surface-morph-rendered-beauty` into a thin wrapper,
+  added runtime-smoke `--visual-report` and
+  `--morph-rendered-beauty-report` emission, attached app-produced Morph frame
+  artifacts for `headless-morph`, and updated
+  `docs/spec/surface_morph_rendered_beauty*` to require scenario, token
+  coverage, recipe coverage, scene, command stream, pixel/golden, and negative
+  guard evidence. Real CLI smoke produced
+  `.cache/mrb07-e2e/surface-headless-morph.json`,
+  `.cache/mrb07-e2e/surface-visual-regression.json`, and
+  `.cache/mrb07-e2e/surface-morph-rendered-beauty.json`; the first two smoke
+  attempts usefully failed on missing per-frame goldens and over-tolerance
+  drift, then the adjusted run validated
+  `tetra.surface.morph-rendered-beauty.v1 headless headless-morph:examples/surface/morph_core/surface_morph_command_palette.tetra`.
   Evidence:
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P07/summary.md`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P07/summary.json`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P07/post-commit-command-status.tsv`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P07/final-handoff.md`,
+  `GOTELEMETRY=off GOCACHE="$PWD/.cache/go-build-surface-morph-report" GOTMPDIR="$PWD/.cache/go-tmp-surface-morph-report" go test -buildvcs=false ./tools/cmd/validate-surface-morph-rendered-beauty ./tools/validators/surface -run 'MorphRenderedBeauty|Report' -count=1`,
+  `GOTELEMETRY=off GOCACHE="$PWD/.cache/go-build-surface-morph-report" GOTMPDIR="$PWD/.cache/go-tmp-surface-morph-report" go test -buildvcs=false ./tools/cmd/surface-runtime-smoke ./tools/cmd/validate-surface-morph-rendered-beauty ./tools/validators/surface -count=1`,
+  `GOTELEMETRY=off GOCACHE="$PWD/.cache/go-build-surface-morph-report" GOTMPDIR="$PWD/.cache/go-tmp-surface-morph-report" go run -buildvcs=false ./tools/cmd/validate-surface-morph-rendered-beauty --contract docs/spec/surface/morph/surface_morph_rendered_beauty_contract.json`,
+  `jq empty docs/spec/surface/morph/surface_morph_rendered_beauty_contract.json`,
+  `git diff --check`, `graphify update .`, and
+  `GOCACHE="$PWD/.cache/go-build-surface-morph-report" go clean -cache`.
+  Bridge: next task is `MRB-08` flagship Surface migration to Morph-authored
+  rendering.
+- 2026-06-16: `MRB-08` completed locally/integration with a headless
+  end-to-end MRB report for the new clean Morph-authored flagship source
+  `examples/surface/morph_flagship/surface_morph_rendered_studio_shell.tetra`. Added source-aware
+  Morph scenario selection, flagship Block scene/accessibility evidence,
+  source-specific app artifact naming/exit policy, Morph recipe-app validator
+  requirements, and runtime/visual/MRB evidence under `reports/surface/`:
+  `mrb08-flagship-runtime.json`, `mrb08-flagship-visual.json`, and
+  `mrb08-flagship-morph-rendered-beauty.json`. The MRB report validates
+  `headless-morph:examples/surface/morph_flagship/surface_morph_rendered_studio_shell.tetra` with 19
+  recipes, 18 Block-scene nodes, 27 render commands, app-produced pixel
+  evidence, and separate one-pixel-drift golden artifacts. Evidence:
+  `GOTELEMETRY=off GOCACHE="$PWD/.cache/go-build-surface-flagship" GOTMPDIR="$PWD/.cache/go-tmp-surface-flagship" go test -buildvcs=false ./tools/cmd/surface-runtime-smoke ./tools/validators/surface ./tools/cmd/surface-visual-diff ./tools/cmd/validate-surface-morph-rendered-beauty -run 'Morph|Flagship|RenderedBeauty|Runtime|Visual' -count=1`,
+  `GOTELEMETRY=off GOCACHE="$PWD/.cache/go-build-surface-flagship" GOTMPDIR="$PWD/.cache/go-tmp-surface-flagship" go run -buildvcs=false ./tools/cmd/surface-runtime-smoke --mode headless-morph --source examples/surface/morph_flagship/surface_morph_rendered_studio_shell.tetra --report reports/surface/mrb08-flagship-runtime.json`,
+  `GOTELEMETRY=off GOCACHE="$PWD/.cache/go-build-surface-flagship" GOTMPDIR="$PWD/.cache/go-tmp-surface-flagship" go run -buildvcs=false ./tools/cmd/surface-visual-diff --runtime-report reports/surface/mrb08-flagship-runtime.json --required-target headless --golden-set surface-morph-rendered-beauty-mrb08 --golden-artifact examples/surface/morph_flagship/surface_morph_rendered_studio_shell.tetra,headless,1,reports/surface/mrb08-flagship-goldens/headless/order-1-initial.rgba --golden-artifact examples/surface/morph_flagship/surface_morph_rendered_studio_shell.tetra,headless,2,reports/surface/mrb08-flagship-goldens/headless/order-2-focused.rgba --golden-artifact examples/surface/morph_flagship/surface_morph_rendered_studio_shell.tetra,headless,3,reports/surface/mrb08-flagship-goldens/headless/order-3-motion.rgba --out reports/surface/mrb08-flagship-visual.json`,
+  `GOTELEMETRY=off GOCACHE="$PWD/.cache/go-build-surface-flagship" GOTMPDIR="$PWD/.cache/go-tmp-surface-flagship" go run -buildvcs=false ./tools/cmd/surface-runtime-smoke --mode headless-morph --source examples/surface/morph_flagship/surface_morph_rendered_studio_shell.tetra --report reports/surface/mrb08-flagship-runtime.json --visual-report reports/surface/mrb08-flagship-visual.json --morph-rendered-beauty-report reports/surface/mrb08-flagship-morph-rendered-beauty.json`,
+  `GOTELEMETRY=off GOCACHE="$PWD/.cache/go-build-surface-flagship" GOTMPDIR="$PWD/.cache/go-tmp-surface-flagship" go run -buildvcs=false ./tools/cmd/validate-surface-morph-rendered-beauty --report reports/surface/mrb08-flagship-morph-rendered-beauty.json`,
+  `git diff --check -- tools/cmd/surface-runtime-smoke tools/validators/surface examples/surface/morph_flagship/surface_morph_rendered_studio_shell.tetra lib/core/block/block.tetra`,
+  and `graphify update .`. MRB-12 later resolved the single-file checker risk:
+  `go run -buildvcs=false ./cli/cmd/tetra check examples/surface/morph_flagship/surface_morph_rendered_studio_shell.tetra`
+  now passes after the flagship source moved runtime frame rendering behind a
+  Morph-owned helper. Bridge: next task is `MRB-09` developer loop and
+  inspector.
+- 2026-06-16: `MRB-09` completed locally/integration with real dev-loop and
+  inspector smoke evidence. Added `morph_to_pixels` chain summaries sourced
+  from validated `tetra.surface.morph-rendered-beauty.v1` reports, wired
+  `tetra surface dev --morph-rendered-beauty-report`, added
+  `surface-inspector` `morph-rendered-beauty:<path>` input sections for recipe
+  expansions, Block scene nodes, render commands, frame artifacts, and golden
+  diff, and updated docs/smoke scripts. Evidence reports:
+  `reports/surface/mrb09-dev-workflow-smoke/surface-dev-workflow.json` and
+  `reports/surface/mrb09-inspector-smoke/surface-inspector.json`; validation:
+  focused Go tests, smoke scripts, validator commands, script wiring tests,
+  `git diff --check`, `graphify update .`, and repo-local Go cache clean.
+  Bridge: next task is `MRB-10` templates and reference apps.
+- 2026-06-16: `MRB-10` completed locally/integration. Template smoke reports
+  now require a `morph_to_pixels` chain from generated Surface template source;
+  `surface-template-smoke.sh` produces validated MRB evidence for generated
+  `studio-shell`. Reference app reports now require every product app to carry
+  Morph-to-pixels evidence or be marked infrastructure-only; the suite produced
+  nine product reference-app MRB chains and marked only `migration` as
+  `infrastructure_only`. Evidence reports:
+  `reports/surface/mrb10-template-smoke/surface-template-smoke.json` and
+  `reports/surface/mrb10-reference-apps-smoke/surface-reference-apps.json`.
+  Validation: focused MRB-10 Go tests, broader touched-package Go tests,
+  template/reference smoke scripts, validator re-runs, JSON evidence
+  inspection, `git diff --check`, and `graphify update .`. Bridge: next task
+  is `MRB-11` claims and documentation hardening.
+- 2026-06-16: `MRB-11` completed locally/integration. Claim scanning now
+  rejects unsupported Morph production beauty, Electron-quality UI,
+  React-quality UI, production-ready Morph, and pixel-perfect Surface wording;
+  beauty/quality claims require a valid same-commit
+  `tetra.surface.morph-rendered-beauty.v1` report, while production-ready
+  Morph wording requires product MRB signoff. Added
+  `scripts/release/surface/surface-docs-claims-gate.sh` and narrowed docs in
+  `docs/spec/surface/morph/surface_morph_rendered_beauty.md`,
+  `docs/spec/surface/morph/surface_morph.md`, `docs/user/surface/surface_electron_comparison.md`,
+  and `docs/user/surface/surface_cookbook.md`. Evidence: focused and full claim
+  validator tests, docs gate with and without MRB-10 report dirs, script
+  wiring tests, `git diff --check`, and `graphify update .`. Bridge: next
+  task is `MRB-12` integrated Morph rendered beauty gate.
+- 2026-06-16: `MRB-12` completed locally/integration. Added the integrated
+  `scripts/release/surface/morph-rendered-beauty-gate.sh`, wired it into
+  `scripts/release/surface/surface-product-slice-gate.sh`, required MRB
+  category/artifact evidence in product-slice validation, and moved the
+  flagship source's presented pixels behind Morph-owned
+  `morph.render_studio_shell_frame` instead of `lib.core.draw` authoring.
+  Evidence:
+  `reports/surface/mrb12-morph-rendered-beauty-gate-verify-20260616195220/morph-rendered-beauty-gate-summary.json`
+  -> schema `tetra.surface.morph-rendered-beauty.gate.v1`, status
+  `validated_with_target_blockers`, `pass=true`, `product_claim=false`,
+  `final_signoff=false`;
+  `reports/surface/mrb12-product-slice-gate-verify-20260616195413/surface-product-slice-summary.json`
+  -> flagship source `examples/surface/morph_flagship/surface_morph_rendered_studio_shell.tetra`,
+  `morph_rendered_beauty=validated`, `pass=true`, `product_claim=false`,
+  `final_signoff=false`;
+  `reports/surface/mrb12-morph-source-wasm-20260616194952/wasm32-web-browser-canvas-block-system.json`
+  -> `wasm32-web-browser-canvas-input` evidence for the Morph flagship source.
+  Verification included focused flagship tests, `tetra check`, browser-canvas
+  runtime smoke, broad touched-package Go tests, `verify-docs`, standalone MRB
+  gate, product-slice gate, and scoped `git diff --check`. Read-only
+  `explorer_fast` final audit found no hard MRB-12 blocker, but flagged
+  `morph.render_studio_shell_frame` as an architectural risk if promoted as a
+  second renderer path; it is documented as an MRB-12 evidence bridge only.
+  Bridge: next task is `MRB-13` stable promotion audit and final signoff
+  discipline, including replacement or explicit nonclaim constraint for that
+  helper.
+- 2026-06-16: `MRB-13` completed as a stable-promotion denial, not a stable
+  promotion. Added
+  `reports/stabilization/surface_morph_rendered_beauty_mrb_13_stable_promotion_audit.md`
+  and updated `docs/spec/surface/morph/surface_morph_stable_candidate.md`. Fresh gate
+  evidence:
+  `reports/surface/mrb13-morph-rendered-beauty-gate-audit-20260616200009/morph-rendered-beauty-gate-summary.json`
+  -> `validated_with_target_blockers`, `pass=true`, `product_claim=false`,
+  `final_signoff=false`, `linux-x64-real-window=BLOCKED`,
+  `wasm32-web-browser-canvas=BLOCKED`;
+  `reports/surface/mrb13-product-slice-gate-audit-20260616200041/surface-product-slice-summary.json`
+  -> `morph_rendered_beauty=validated`, `pass=true`, `product_claim=false`,
+  `final_signoff=false`. Stable-candidate validator passed, but promotion is
+  denied because the worktree is dirty, target blockers remain, reports lack
+  machine-visible `git_commit` fields, and the MRB-12 Morph frame-render helper
+  is not renderer-owned stable proof. Final goal verdict is `PARTIAL` until
+  those gaps are resolved.
+- 2026-06-16: Post-MRB-13 same-commit identity follow-up completed for newly
+  generated MRB/product-slice evidence. Added required `git_commit` alias
+  checks beside `git_head` in the Morph rendered beauty report, Morph-to-pixels
+  chain, MRB gate summary, product-slice summary, claim scanner evidence, and
+  product-slice validator. Fresh evidence:
+  `reports/surface/mrb-git-identity-morph-rendered-beauty-gate-20260616171311/morph-rendered-beauty-gate-summary.json`
   and
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P07/final-artifact-sha256.txt`.
-  Bridge: next packet is `ACTOR-RC100-P08` final acceptance gate and verdict
-  lock for clean HEAD `f417202a7fd611b4da0059b57c54a63a9e86f81e`.
-- 2026-06-10: `ACTOR-RC100-P08` completed with lower truthful verdict
-  `BLOCKED`; strongest actor-specific state reached is
-  `ACTOR_FOUNDATION_RC_LOCAL_CLEAN_REMOTE_BLOCKED`, and target
-  `ACTOR_FOUNDATION_PROD_READY_SCOPED_RC_100_PERC` remains `NOT_CLAIMED`.
-  Same-head actor foundation gate, current-head validator, copied report
-  validation, docs/manifest, graphify update, and final artifact hash manifest
-  passed for clean HEAD `f417202a7fd611b4da0059b57c54a63a9e86f81e`.
-- 2026-06-10: P09 continuation fixed the local broad validation blocker in the
-  current worktree. Original P08 focused failures now pass, `TestWorkspaceModules`
-  has repo-local `GOTMPDIR` isolation, and the required broad command
-  `go test -buildvcs=false ./compiler/... ./cli/... ./tools/... -count=1`
-  passed with `GOTELEMETRY=off`, repo-local `GOCACHE`, and repo-local
-  `GOTMPDIR`. Evidence:
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P09-broad-fix/repro-status.tsv`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P09-broad-fix/post-patch-targeted-status.tsv`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P09-broad-fix/scriptstest-repeat-status.tsv`,
-  and
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P09-broad-fix/broad-rerun2-status.tsv`.
-  Remote CI/package proof remains blocked with
-  `BLOCKED_REMOTE_CI_USER_ACTION_REQUIRED` because `gh auth status` reports
-  invalid tokens and the broad-green worktree is dirty/unpushed. Evidence:
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P09-broad-fix/remote-ci-instruction-bundle.md`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P09-broad-fix/remote-ci-blocker.json`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P09-broad-fix/gh-auth-status.log`,
-  and
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P09-broad-fix/remote-ci-preflight-status.tsv`.
-  Closeout checks passed: `graphify update .`, `git diff --check`, and Go cache
-  cleanup; see `P09-broad-fix/graphify-update-status.tsv`,
-  `P09-broad-fix/git-diff-check-status.tsv`, and
-  `P09-broad-fix/cache-clean-status.tsv`.
-  Bridge: next action is user GitHub re-auth plus a pushed same-change commit,
-  then real `ci`/`actor-runtime-foundation-linux` and `release-packages` proof.
-  Remaining target blockers are `REMOTE_CI_BLOCKED` and
-  `PACKAGE_WORKFLOW_PROOF_BLOCKED`; `BROAD_VALIDATION_FAILED` is cleared by P09
-  local evidence.
-- 2026-06-10: P10 remote blocker recheck repeated the current external blocker:
-  P09 broad status remains `PASS`, but `gh auth status` still fails with invalid
-  GitHub tokens, no same-change remote branch/commit is available, and the
-  broad-green worktree is still dirty. The remote CI bundle now explicitly marks
-  `c0258b63a636775b114d69d31cb7832fc3991b05` as the local dirty base HEAD, not
-  a remote proof SHA. Evidence:
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P10-remote-blocker-recheck/summary.md`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P10-remote-blocker-recheck/summary.json`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P10-remote-blocker-recheck/remote-blocker-recheck-status.tsv`,
-  and
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P09-broad-fix/remote-ci-instruction-bundle.md`.
-  Hygiene checks passed: `P10-remote-blocker-recheck/git-diff-check-status.tsv`
-  and `P10-remote-blocker-recheck/json-validity-status.tsv`.
-  Bridge: a fresh continuation should recheck `gh auth status`; if the same
-  blocker repeats for the third consecutive resumed goal turn, the strict
-  blocked-audit threshold is satisfied.
-- 2026-06-10: P11 remote blocked final rechecked the same external blocker for
-  the third consecutive resumed goal turn after the prior blocked state. P09
-  broad validation remains `PASS`, but `gh auth status` still fails with invalid
-  tokens, no same-change remote branch/commit exists, and the worktree remains
-  dirty. Strict blocked-audit threshold is satisfied. Evidence:
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P11-remote-blocked-final/summary.md`,
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P11-remote-blocked-final/summary.json`,
-  and
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P11-remote-blocked-final/remote-blocked-final-status.tsv`.
-  Hygiene checks passed: `P11-remote-blocked-final/git-diff-check-status.tsv`,
-  `P11-remote-blocked-final/json-validity-status.tsv`, and
-  `P11-remote-blocked-final/graphify-update-status.tsv`.
-  Current target blockers are `REMOTE_CI_BLOCKED` and
-  `PACKAGE_WORKFLOW_PROOF_BLOCKED`; the historical P08 root final verdict still
-  records the old P08 broad failure, while P09/P11 evidence is the current
-  broad-green remote-blocked continuation state.
-- 2026-06-10: P13 resumed after user GitHub login. `gh auth status` now passes
-  for `BoSuY0` with `repo` and `workflow` scopes, the scoped candidate was
-  integrated in clean worktree
-  `/home/tetra/.codex/worktrees/Tetra_Language/actor-rc100-p12-expanded-clean`,
-  and the required broad command passed with evidence logged to
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P13-broad-green/broad-status.tsv`
-  and
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P13-broad-green/broad-compiler-cli-tools.log`.
-  Additional fixes since P11 cover PLIR borrowed region summary ownership,
-  explicit island return-summary validation across module cache boundaries, and
-  generic-collections cache invalidation for monomorphized module-local
-  functions/types. Candidate artifacts:
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P13-broad-green/candidate-selected-tracked.patch`
-  and
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P13-broad-green/candidate-newfiles.patch`.
-  Remote CI instruction bundle is prepared at
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P13-broad-green/remote-ci-instruction-bundle.md`.
-  Bridge: `BROAD_VALIDATION_FAILED` and `gh auth invalid` are cleared; remaining
-  proof gap is a user-approved commit/push plus real `ci` job
-  `actor-runtime-foundation-linux` and release package workflow evidence.
-- 2026-06-10: P15 repeated the post-P13 remote proof audit without approval.
-  P13 broad remains `PASS`, `gh auth status` remains valid for `BoSuY0`, but
-  `git ls-remote --heads origin actor-rc100-p12-expanded-clean` returns no
-  remote branch, the clean candidate worktree still has uncommitted scoped diff,
-  and neither `ci` job `actor-runtime-foundation-linux` nor `release-packages`
-  has been run by the agent. Evidence:
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P15-remote-proof-still-pending/status.tsv`
-  and
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P15-remote-proof-still-pending/summary.md`.
-  Bridge: waiting for explicit approval to commit/push and run remote CI; RC100
-  remains `NOT_CLAIMED`.
-- 2026-06-10: P16 repeated the same post-P13 approval gate for the third
-  consecutive resumed turn (`P14`/`P15`/`P16`). P13 broad remains `PASS`, `gh`
-  auth remains valid, but no remote branch/commit exists for
-  `actor-rc100-p12-expanded-clean`, the candidate diff remains uncommitted, and
-  remote `ci`/`release-packages` proof cannot be created without explicit
-  approval for external writes/execution. Evidence:
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P16-approval-blocked-final/status.tsv`
-  and
-  `reports/actor-foundation-prod-ready-scoped-rc-100/P16-approval-blocked-final/summary.md`.
-  Strict blocked-audit threshold is reached. Goal status should be `blocked`;
-  RC100 remains `NOT_CLAIMED`.
+  `reports/surface/mrb-git-identity-product-slice-gate-20260616171359/surface-product-slice-summary.json`
+  both expose matching `git_head`/`git_commit`, keep `product_claim=false` and
+  `final_signoff=false`, and retain target blockers. Verification: focused and
+  full touched-package Go tests, contract validation, standalone MRB gate, and
+  product-slice gate. At that point the goal remained `PARTIAL`: dirty
+  worktree, blocked `linux-x64-real-window`/`wasm32-web-browser-canvas` Morph
+  rendered beauty modes, and renderer-owned stable proof were still unresolved.
+- 2026-06-16: Post-MRB-13 wasm browser-canvas Morph target evidence completed
+  for newly generated reports. Added `wasm32-web-browser-canvas-morph` runtime
+  mode, browser-canvas `product_visual` frame evidence, `browser-canvas-rgba`
+  command streams, visual-diff support without synthetic `block_system`, and
+  MRB gate/product-slice wiring. Fresh evidence:
+  `reports/surface/mrb-wasm-browser-canvas-morph-gate-final-20260616-verify/morph-rendered-beauty-gate-summary.json`
+  -> `wasm32-web-browser-canvas=validated`, `linux-x64-real-window=BLOCKED`;
+  `reports/surface/mrb-wasm-browser-canvas-product-slice-final-20260616-verify/surface-product-slice-summary.json`
+  -> `morph_rendered_beauty=validated`, `product_claim=false`,
+  `final_signoff=false`. Goal remains `PARTIAL`: dirty worktree, blocked
+  `linux-x64-real-window`, product/final signoff, and renderer-owned stable
+  proof are still unresolved.
+- 2026-06-16: Post-MRB-13 linux real-window Morph target evidence completed for
+  newly generated reports. Added `linux-x64-real-window-morph` runtime mode,
+  app-produced source-linked real-window Morph frame evidence,
+  `wayland-shm-rgba` render streams, target visual/MRB validation, and MRB gate
+  wiring. Fresh evidence:
+  `reports/surface/mrb-linux-real-window-morph-gate-final-20260616-verify/morph-rendered-beauty-gate-summary.json`
+  -> `status=validated`, `target_blockers=[]`, `headless=validated`,
+  `linux-x64-real-window=validated`, `wasm32-web-browser-canvas=validated`;
+  `reports/surface/mrb-linux-real-window-product-slice-final-20260616-verify/surface-product-slice-summary.json`
+  -> `morph-rendered-beauty=validated`, `product_claim=false`,
+  `final_signoff=false`. Goal remains `PARTIAL`: dirty worktree, product/final
+  signoff, and renderer-owned stable proof are still unresolved.
+- 2026-06-16: Post-MRB-13 renderer-owned stable proof guard completed for the
+  current bridge-vs-stable boundary. Added `renderer_stable_proof` to MRB
+  reports/validators, product/final claim rejection without renderer-owned
+  proof, MRB gate `stable_promotion_blockers`, and a stable-candidate
+  `renderer-owned stable proof` promotion gate. Fresh evidence:
+  `reports/surface/mrb-renderer-proof-guard-gate-20260616-verify/morph-rendered-beauty-gate-summary.json`
+  -> `target_blockers=[]`, `stable_promotion_blockers=["renderer-owned stable proof missing", "dirty worktree audit required", "product_claim=false", "final_signoff=false"]`;
+  `reports/surface/mrb-renderer-proof-guard-product-slice-20260616-verify/surface-product-slice-summary.json`
+  -> `morph-rendered-beauty=validated`, `product_claim=false`,
+  `final_signoff=false`. At that point reports explicitly remained bridge-owned:
+  `pixel_owner=morph-evidence-bridge`, `renderer_owned=false`,
+  `stable_promotion_eligible=false`. Goal remains `PARTIAL`: dirty worktree,
+  product/final signoff, and actual renderer-owned stable proof are still
+  unresolved.
+- 2026-06-16: Post-MRB-13 headless renderer-owned stable proof completed.
+  Added deterministic `RenderCommandStreamReport` -> RGBA rendering in
+  `tools/internal/surfacerender`, headless Morph artifact generation from that
+  renderer, and MRB report rerender/checksum verification before setting
+  `renderer_stable_proof.pixel_owner=surface-renderer`. Fresh evidence:
+  `reports/surface/mrb-renderer-owned-headless-gate-final-20260616-verify/morph-rendered-beauty-gate-summary.json`
+  -> at that point `renderer_owned_stable_targets=["headless"]`,
+  `bridge_owned_stable_targets=["linux-x64-real-window","wasm32-web-browser-canvas"]`;
+  `reports/surface/mrb-renderer-owned-headless-product-slice-final-20260616-verify/surface-product-slice-summary.json`
+  -> `morph-rendered-beauty=validated`, `product_claim=false`,
+  `final_signoff=false`. Headless MRB proof became
+  `pixel_owner=surface-renderer`, `renderer_owned=true`,
+  `derived_from_render_command_stream=true`, and
+  `stable_promotion_eligible=true`. At that point goal remained `PARTIAL`:
+  all-target renderer-owned stable proof, dirty worktree, product claim, and
+  final signoff were still unresolved.
+- 2026-06-16: Post-MRB-13 all-supported-target renderer-owned stable proof
+  completed locally/integration. Added RED target assertions for
+  `wasm32-web-browser-canvas-morph` and `linux-x64-real-window-morph`, then
+  made the flagship Morph command stream reproduce the target initial frame
+  bytes and allowed `renderer_stable_proof.pixel_owner=surface-renderer` for
+  any supported renderer only after `RenderCommandStreamRGBA` matches the
+  visual frame checksum. Focused/touched-package Go tests and fresh integrated
+  gates passed. Evidence:
+  `reports/surface/mrb-target-renderer-owned-gate-final-20260616-verify/morph-rendered-beauty-gate-summary.json`
+  -> `renderer_owned_stable_targets=["headless","linux-x64-real-window","wasm32-web-browser-canvas"]`,
+  `bridge_owned_stable_targets=[]`;
+  `reports/surface/mrb-target-renderer-owned-product-slice-final-20260616-verify/surface-product-slice-summary.json`
+  -> `git_dirty=true`, `product_claim=false`, `final_signoff=false`.
+  `graphify update .` passed after implementation changes. Goal remains
+  `PARTIAL` until dirty checkout audit, `product_claim=true`, and
+  `final_signoff=true` are intentionally completed.
+- 2026-06-16: Post-MRB-13 promotion-mode signoff guard completed
+  locally/integration. Added explicit MRB report signoff flags, MRB/product
+  gate `--product-claim --final-signoff` promotion mode, dirty-checkout
+  preflight rejection, and product-slice validation that accepts either the
+  safe nonclaim state or a clean fully promoted state. Evidence:
+  `reports/stabilization/surface_morph_rendered_beauty_promotion_mode_audit.md`;
+  `reports/surface/mrb-promotion-aware-gate-default-20260616-verify/morph-rendered-beauty-gate-summary.json`
+  -> `pass=true`, all supported renderer-owned targets, `git_dirty=true`,
+  `product_claim=false`, `final_signoff=false`;
+  `reports/surface/mrb-promotion-aware-product-default-20260616-verify/surface-product-slice-summary.json`
+  -> `pass=true`, nested MRB validated, `git_dirty=true`,
+  `product_claim=false`, `final_signoff=false`. Promotion-mode dirty preflight
+  for both gates failed with `git_dirty=true`, as intended. Goal remains
+  `PARTIAL`: the remaining real step is a clean checkout or clean isolated
+  worktree promotion run that produces `git_dirty=false`, `product_claim=true`,
+  and `final_signoff=true`.
+- 2026-06-16: Clean isolated promotion audit completed the remaining MRB
+  product/final signoff step. Read-only `explorer` audit approved the isolated
+  worktree strategy before the run. Worktree:
+  `/home/tetra/.codex/worktrees/Tetra_Language/mrb-promotion-clean-20260616`,
+  branch `codex/mrb-promotion-clean-20260616`. Snapshot commit
+  `e7e4c9653f0fd4d3f6c92fe32525024f04d111b9` captured the current non-ignored
+  Surface Morph Rendered Beauty state; follow-up commit
+  `1dff559a06f27313759abc2ba4d89c4c8c88d3e5` refreshed isolated RAM readiness
+  metadata after `verify-docs` correctly rejected the changed audit commit
+  chain. Standalone MRB promotion gate evidence:
+  `reports/surface/mrb-promotion-clean-gate-final-20260616-verify/morph-rendered-beauty-gate-summary.json`
+  -> `pass=true`, `git_dirty=false`, `product_claim=true`,
+  `final_signoff=true`, `stable_promotion_blockers=[]`,
+  all supported targets renderer-owned. Integrated product-slice promotion gate
+  evidence:
+  `reports/surface/mrb-promotion-clean-product-final3-20260616-final/surface-product-slice-summary.json`
+  -> `pass=true`, `git_dirty=false`, `product_claim=true`,
+  `final_signoff=true`, nested `morph-rendered-beauty=validated`. Additional
+  verification passed for product-slice validation, MRB target revalidation,
+  touched Go packages, contracts, `verify-docs`, `git diff --check`, and
+  isolated clean status. Surface Morph Rendered Beauty product-claim acceptance
+  is proven in the clean audit branch; remaining risk is packaging/merging the
+  broad snapshot, not this goal's evidence chain.

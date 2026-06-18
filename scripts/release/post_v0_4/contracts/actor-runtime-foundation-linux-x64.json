@@ -1,0 +1,381 @@
+{
+  "schema": "tetra.gate-contract.v1",
+  "id": "actor-runtime-foundation-linux-x64-v1",
+  "title": "Actor Runtime Foundation Linux-x64 release gate",
+  "scope": "actor-runtime-foundation-linux-x64",
+  "producer": "scripts/release/post_v0_4/actor-runtime-foundation-linux-x64-gate.sh",
+  "entrypoint": "scripts/release/post_v0_4/actor-runtime-foundation-linux-x64-gate.sh",
+  "fresh_report_dir_policy": "require-empty-or-new",
+  "host_preconditions": [
+    "linux",
+    "go",
+    "fresh-report-dir"
+  ],
+  "steps": [
+    {
+      "id": "distributed-actors-smoke",
+      "kind": "bash",
+      "command": "bash scripts/release/v0_4_0/distributed-actors-linux-x64-smoke.sh --report-dir \"$REPORT_DIR/distributed-actors-linux-x64\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "distributed-actors-linux-x64/distributed-actors-linux-x64.json",
+        "distributed-actors-linux-x64/artifact-hashes.json"
+      ],
+      "validator_refs": [
+        "validate-distributed-actor-runtime",
+        "validate-artifact-hashes"
+      ],
+      "host_preconditions": [
+        "linux",
+        "go"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "parallel-production-smoke",
+      "kind": "bash",
+      "command": "bash scripts/release/post_v0_4/parallel-production-linux-x64-smoke.sh --report-dir \"$REPORT_DIR/parallel-production-linux-x64\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "parallel-production-linux-x64/parallel-production-linux-x64.json",
+        "parallel-production-linux-x64/artifact-hashes.json"
+      ],
+      "validator_refs": [
+        "validate-parallel-production",
+        "validate-artifact-hashes"
+      ],
+      "host_preconditions": [
+        "linux",
+        "go"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "focused-actor-tests",
+      "kind": "go-test",
+      "command": "go test -buildvcs=false ./cli/cmd/tetra ./compiler/tests/ownership ./compiler/tests/ownership/actor_task ./compiler -run 'Diagnostic|Actor|Backpressure|Invalid|Closed|Transfer' -count=1",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "focused-actor-tests"
+      ],
+      "host_preconditions": [
+        "linux",
+        "go"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "race-actor-slice",
+      "kind": "go-test",
+      "command": "go test -race -buildvcs=false ./compiler ./cli/internal/actornet -run 'Actor|Broker' -count=1",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "race-actor-slice"
+      ],
+      "host_preconditions": [
+        "linux",
+        "go"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "validate-manifest",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-manifest --manifest docs/generated/manifest.json",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-manifest"
+      ],
+      "host_preconditions": [
+        "linux",
+        "go"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "verify-docs",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "verify-docs"
+      ],
+      "host_preconditions": [
+        "linux",
+        "go"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "write-actor-runtime-foundation-manifest",
+      "kind": "internal-write",
+      "command": "scripts/release/post_v0_4/actor-runtime-foundation-linux-x64-gate.sh writes \"$REPORT_DIR/actor-runtime-foundation-manifest.json\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "actor-runtime-foundation-manifest.json"
+      ],
+      "validator_refs": [
+        "validate-actor-runtime-foundation"
+      ],
+      "host_preconditions": [
+        "linux",
+        "go"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "artifact-hashes-write",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-artifact-hashes --write --root \"$REPORT_DIR\" --out \"$REPORT_DIR/artifact-hashes.json\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "artifact-hashes.json"
+      ],
+      "validator_refs": [
+        "validate-artifact-hashes"
+      ],
+      "host_preconditions": [
+        "linux",
+        "go"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "artifact-hashes-validate",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-artifact-hashes --manifest \"$REPORT_DIR/artifact-hashes.json\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-artifact-hashes"
+      ],
+      "host_preconditions": [
+        "linux",
+        "go"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "actor-foundation-validator",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-actor-runtime-foundation --report-dir \"$REPORT_DIR\" --current-git-head \"$GIT_HEAD\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-actor-runtime-foundation"
+      ],
+      "host_preconditions": [
+        "linux",
+        "go"
+      ],
+      "blocked_status_policy": "block-release"
+    }
+  ],
+  "required_reports": [
+    {
+      "path": "actor-runtime-foundation-manifest.json",
+      "schema": "tetra.actor.production_foundation.v1",
+      "validator": "validate-actor-runtime-foundation",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "linux_x64_foundation_evidence",
+        "docs_manifest_checks",
+        "artifact_hash_integrity",
+        "foundation_validator"
+      ]
+    },
+    {
+      "path": "parallel-production-linux-x64/parallel-production-linux-x64.json",
+      "schema": "tetra.parallel.production.v1",
+      "validator": "validate-parallel-production",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "nested_parallel_production_report"
+      ]
+    },
+    {
+      "path": "parallel-production-linux-x64/artifact-hashes.json",
+      "schema": "tetra.release-artifact-hashes.v1alpha1",
+      "validator": "validate-artifact-hashes",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "nested_parallel_production_report",
+        "artifact_hash_integrity"
+      ]
+    },
+    {
+      "path": "distributed-actors-linux-x64/distributed-actors-linux-x64.json",
+      "schema": "tetra.actors.distributed-runtime.v1",
+      "validator": "validate-distributed-actor-runtime",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "nested_distributed_actor_runtime_report"
+      ]
+    },
+    {
+      "path": "distributed-actors-linux-x64/artifact-hashes.json",
+      "schema": "tetra.release-artifact-hashes.v1alpha1",
+      "validator": "validate-artifact-hashes",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "nested_distributed_actor_runtime_report",
+        "artifact_hash_integrity"
+      ]
+    },
+    {
+      "path": "artifact-hashes.json",
+      "schema": "tetra.release-artifact-hashes.v1alpha1",
+      "validator": "validate-artifact-hashes",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "artifact_hash_integrity",
+        "foundation_validator"
+      ]
+    }
+  ],
+  "validators": [
+    {
+      "id": "validate-distributed-actor-runtime",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-distributed-actor-runtime --report \"$REPORT_DIR/distributed-actors-linux-x64/distributed-actors-linux-x64.json\" --current-git-head \"$GIT_HEAD\""
+    },
+    {
+      "id": "validate-parallel-production",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-parallel-production --report \"$REPORT_DIR/parallel-production-linux-x64/parallel-production-linux-x64.json\""
+    },
+    {
+      "id": "focused-actor-tests",
+      "kind": "go-test",
+      "command": "go test -buildvcs=false ./cli/cmd/tetra ./compiler/tests/ownership ./compiler/tests/ownership/actor_task ./compiler -run 'Diagnostic|Actor|Backpressure|Invalid|Closed|Transfer' -count=1"
+    },
+    {
+      "id": "race-actor-slice",
+      "kind": "go-test",
+      "command": "go test -race -buildvcs=false ./compiler ./cli/internal/actornet -run 'Actor|Broker' -count=1"
+    },
+    {
+      "id": "validate-manifest",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-manifest --manifest docs/generated/manifest.json"
+    },
+    {
+      "id": "verify-docs",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json"
+    },
+    {
+      "id": "validate-artifact-hashes",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-artifact-hashes --manifest \"$REPORT_DIR/artifact-hashes.json\""
+    },
+    {
+      "id": "validate-actor-runtime-foundation",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-actor-runtime-foundation --report-dir \"$REPORT_DIR\" --current-git-head \"$GIT_HEAD\""
+    }
+  ],
+  "artifact_hashes": {
+    "enabled": true,
+    "required": true,
+    "algorithm": "sha256"
+  },
+  "claims": [
+    {
+      "id": "linux_x64_foundation_evidence",
+      "statement": "Linux-x64 scoped actor/task runtime foundation evidence is produced by this gate."
+    },
+    {
+      "id": "nested_distributed_actor_runtime_report",
+      "statement": "The gate requires the nested Linux-x64 distributed actor runtime smoke report."
+    },
+    {
+      "id": "nested_parallel_production_report",
+      "statement": "The gate requires the nested Linux-x64 parallel production report."
+    },
+    {
+      "id": "docs_manifest_checks",
+      "statement": "The gate runs generated manifest validation and docs verification before writing the foundation manifest."
+    },
+    {
+      "id": "artifact_hash_integrity",
+      "statement": "The gate requires SHA-256 artifact hash integrity for nested and foundation reports."
+    },
+    {
+      "id": "foundation_validator",
+      "statement": "The final actor runtime foundation validator checks the scoped report directory."
+    }
+  ],
+  "nonclaims": [
+    {
+      "id": "no_full_erlang_otp_actor_runtime",
+      "statement": "This gate does not claim a full Erlang/OTP actor runtime."
+    },
+    {
+      "id": "no_cluster_membership_reconnect_retry_production",
+      "statement": "This gate does not claim production cluster membership, reconnect, or retry behavior."
+    },
+    {
+      "id": "no_non_linux_distributed_actor_runtime_support",
+      "statement": "This gate does not claim non-Linux distributed actor runtime support."
+    },
+    {
+      "id": "no_distributed_zero_copy_pointer_region_transfer",
+      "statement": "This gate does not claim distributed zero-copy pointer or region transfer."
+    },
+    {
+      "id": "no_formal_race_proof",
+      "statement": "This gate does not provide a formal race proof."
+    }
+  ],
+  "ci_artifacts": [
+    {
+      "path": "actor-runtime-foundation-manifest.json",
+      "required": true
+    },
+    {
+      "path": "parallel-production-linux-x64/parallel-production-linux-x64.json",
+      "required": true
+    },
+    {
+      "path": "parallel-production-linux-x64/artifact-hashes.json",
+      "required": true
+    },
+    {
+      "path": "distributed-actors-linux-x64/distributed-actors-linux-x64.json",
+      "required": true
+    },
+    {
+      "path": "distributed-actors-linux-x64/artifact-hashes.json",
+      "required": true
+    },
+    {
+      "path": "artifact-hashes.json",
+      "required": true
+    },
+    {
+      "path": "logs/*.log",
+      "required": true
+    }
+  ]
+}

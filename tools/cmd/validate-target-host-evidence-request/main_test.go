@@ -77,7 +77,14 @@ func TestValidateTargetHostEvidenceRequestRejectsRuntimeEvidenceClaims(t *testin
 	if err == nil {
 		t.Fatalf("expected fake target-host request to fail")
 	}
-	for _, want := range []string{"status", "production_evidence", "repo", ".git.git", "READY", "macos-x64"} {
+	for _, want := range []string{
+		"status",
+		"production_evidence",
+		"repo",
+		".git.git",
+		"READY",
+		"macos-x64",
+	} {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("error missing %q: %v", want, err)
 		}

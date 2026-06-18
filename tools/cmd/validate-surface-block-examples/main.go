@@ -14,11 +14,11 @@ import (
 )
 
 var defaultExamplePaths = []string{
-	"examples/surface_block_command_palette.tetra",
-	"examples/surface_block_project_dashboard.tetra",
-	"examples/surface_block_settings.tetra",
-	"examples/surface_block_editor_shell.tetra",
-	"examples/surface_block_glass_panel.tetra",
+	"examples/surface/block_apps/surface_block_command_palette.tetra",
+	"examples/surface/block_apps/surface_block_project_dashboard.tetra",
+	"examples/surface/block_apps/surface_block_settings.tetra",
+	"examples/surface/block_apps/surface_block_editor_shell.tetra",
+	"examples/surface/block_apps/surface_block_glass_panel.tetra",
 }
 
 type examplesReport struct {
@@ -143,13 +143,24 @@ func validateExampleFile(path string, artifactDir string) (exampleReport, error)
 	exitCode := 0
 	if artifactDir != "" {
 		artifact = filepath.Join(artifactDir, strings.TrimSuffix(filepath.Base(path), ".tetra"))
-		if _, err := compiler.BuildFileWithStatsOpt(path, artifact, "linux-x64", compiler.BuildOptions{Jobs: 1}); err != nil {
+		if _, err := compiler.BuildFileWithStatsOpt(
+			path,
+			artifact,
+			"linux-x64",
+			compiler.BuildOptions{Jobs: 1},
+		); err != nil {
 			return exampleReport{}, fmt.Errorf("%s: BuildFileWithStatsOpt: %w", path, err)
 		}
 		cmd := exec.Command(artifact)
 		if output, err := cmd.CombinedOutput(); err != nil {
 			exitCode = commandExitCode(err)
-			return exampleReport{}, fmt.Errorf("%s: run exit %d: %w\n%s", path, exitCode, err, output)
+			return exampleReport{}, fmt.Errorf(
+				"%s: run exit %d: %w\n%s",
+				path,
+				exitCode,
+				err,
+				output,
+			)
 		}
 	}
 
@@ -193,7 +204,16 @@ func validateExampleSource(path string, source string) error {
 	}
 
 	lower := strings.ToLower(source)
-	for _, forbidden := range []string{"react", "electron", "dom ui", "user js", "user javascript", ".ui.html", ".ui.json", ".ui.web.mjs"} {
+	for _, forbidden := range []string{
+		"react",
+		"electron",
+		"dom ui",
+		"user js",
+		"user javascript",
+		".ui.html",
+		".ui.json",
+		".ui.web.mjs",
+	} {
 		if strings.Contains(lower, forbidden) {
 			return fmt.Errorf("%s: forbidden platform/sidecar marker %q", path, forbidden)
 		}
@@ -203,7 +223,10 @@ func validateExampleSource(path string, source string) error {
 		name string
 		ok   bool
 	}{
-		{name: "surface import", ok: strings.Contains(source, "import lib.core.surface as surface")},
+		{
+			name: "surface import",
+			ok:   strings.Contains(source, "import lib.core.surface as surface"),
+		},
 		{name: "block import", ok: strings.Contains(source, "import lib.core.block as block")},
 		{name: "dark/light theme tokens", ok: hasThemeTokens(source)},
 		{name: "layout evidence", ok: strings.Contains(source, "block.layout_")},
@@ -211,9 +234,18 @@ func validateExampleSource(path string, source string) error {
 		{name: "text evidence", ok: strings.Contains(source, "block.text_")},
 		{name: "asset evidence", ok: strings.Contains(source, "block.asset_")},
 		{name: "accessibility role evidence", ok: hasAccessibilityRole(source)},
-		{name: "hover state evidence", ok: strings.Contains(source, "block.state_selector_hover()")},
-		{name: "focus state evidence", ok: strings.Contains(source, "block.state_selector_focused()")},
-		{name: "pressed state evidence", ok: strings.Contains(source, "block.state_selector_pressed()")},
+		{
+			name: "hover state evidence",
+			ok:   strings.Contains(source, "block.state_selector_hover()"),
+		},
+		{
+			name: "focus state evidence",
+			ok:   strings.Contains(source, "block.state_selector_focused()"),
+		},
+		{
+			name: "pressed state evidence",
+			ok:   strings.Contains(source, "block.state_selector_pressed()"),
+		},
 		{name: "motion evidence", ok: strings.Contains(source, "block.motion_")},
 		{name: "scene checksum evidence", ok: strings.Contains(source, "scene_checksum")},
 	}

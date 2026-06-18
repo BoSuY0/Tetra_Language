@@ -14,9 +14,23 @@ import (
 
 func TestWASIDogfoodTargetBuildOnlyAndNoUIRuntimeArtifacts(t *testing.T) {
 	tmp := t.TempDir()
-	srcPath := filepath.Join("..", "..", "..", "examples", "projects", "dogfood_wasi", "src", "main.tetra")
+	srcPath := filepath.Join(
+		"..",
+		"..",
+		"..",
+		"examples",
+		"projects",
+		"dogfood_wasi",
+		"src",
+		"main.tetra",
+	)
 	outPath := filepath.Join(tmp, "dogfood-wasi.wasm")
-	if _, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, "wasm32-wasi", compiler.BuildOptions{Jobs: 1}); err != nil {
+	if _, err := compiler.BuildFileWithStatsOpt(
+		srcPath,
+		outPath,
+		"wasm32-wasi",
+		compiler.BuildOptions{Jobs: 1},
+	); err != nil {
 		t.Fatalf("build wasm32-wasi dogfood: %v", err)
 	}
 	raw, err := os.ReadFile(outPath)
@@ -46,7 +60,9 @@ func TestWASIDogfoodTargetBuildOnlyAndNoUIRuntimeArtifacts(t *testing.T) {
 		}
 	}
 
-	capsuleRaw, err := os.ReadFile(filepath.Join("..", "..", "..", "examples", "projects", "dogfood_wasi", "Tetra.capsule"))
+	capsuleRaw, err := os.ReadFile(
+		filepath.Join("..", "..", "..", "examples", "projects", "dogfood_wasi", "Tetra.capsule"),
+	)
 	if err != nil {
 		t.Fatalf("read dogfood_wasi capsule: %v", err)
 	}
@@ -57,9 +73,23 @@ func TestWASIDogfoodTargetBuildOnlyAndNoUIRuntimeArtifacts(t *testing.T) {
 
 func TestWebUIDogfoodBuildWritesSchemaCheckedArtifacts(t *testing.T) {
 	tmp := t.TempDir()
-	srcPath := filepath.Join("..", "..", "..", "examples", "projects", "dogfood_web_ui", "src", "main.tetra")
+	srcPath := filepath.Join(
+		"..",
+		"..",
+		"..",
+		"examples",
+		"projects",
+		"dogfood_web_ui",
+		"src",
+		"main.tetra",
+	)
 	outPath := filepath.Join(tmp, "dogfood-web-ui.wasm")
-	if _, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, "wasm32-web", compiler.BuildOptions{Jobs: 1}); err != nil {
+	if _, err := compiler.BuildFileWithStatsOpt(
+		srcPath,
+		outPath,
+		"wasm32-web",
+		compiler.BuildOptions{Jobs: 1},
+	); err != nil {
 		t.Fatalf("build wasm32-web dogfood: %v", err)
 	}
 	raw, err := os.ReadFile(outPath)
@@ -111,7 +141,9 @@ func TestWebUIDogfoodBuildWritesSchemaCheckedArtifacts(t *testing.T) {
 		}
 	}
 
-	capsuleRaw, err := os.ReadFile(filepath.Join("..", "..", "..", "examples", "projects", "dogfood_web_ui", "Tetra.capsule"))
+	capsuleRaw, err := os.ReadFile(
+		filepath.Join("..", "..", "..", "examples", "projects", "dogfood_web_ui", "Tetra.capsule"),
+	)
 	if err != nil {
 		t.Fatalf("read dogfood_web_ui capsule: %v", err)
 	}
@@ -130,7 +162,7 @@ func TestWASMUIExamplesBuildWithDeterministicMetadataSidecars(t *testing.T) {
 	}{
 		{
 			name:     "ui_web_smoke",
-			srcPath:  filepath.Join("..", "..", "..", "examples", "ui_web_smoke.tetra"),
+			srcPath:  filepath.Join("..", "..", "..", "examples", "ui", "ui_web_smoke.tetra"),
 			viewName: "CounterView",
 			accessibility: []string{
 				`"name": "role"`,
@@ -139,8 +171,15 @@ func TestWASMUIExamplesBuildWithDeterministicMetadataSidecars(t *testing.T) {
 			},
 		},
 		{
-			name:     "ui_native_shell_smoke",
-			srcPath:  filepath.Join("..", "..", "..", "examples", "ui_native_shell_smoke.tetra"),
+			name: "ui_native_shell_smoke",
+			srcPath: filepath.Join(
+				"..",
+				"..",
+				"..",
+				"examples",
+				"ui",
+				"ui_native_shell_smoke.tetra",
+			),
 			viewName: "ShellView",
 			accessibility: []string{
 				`"name": "role"`,
@@ -152,7 +191,12 @@ func TestWASMUIExamplesBuildWithDeterministicMetadataSidecars(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			outPath := filepath.Join(tmp, tc.name+".wasm")
-			if _, err := compiler.BuildFileWithStatsOpt(tc.srcPath, outPath, "wasm32-web", compiler.BuildOptions{Jobs: 1}); err != nil {
+			if _, err := compiler.BuildFileWithStatsOpt(
+				tc.srcPath,
+				outPath,
+				"wasm32-web",
+				compiler.BuildOptions{Jobs: 1},
+			); err != nil {
 				t.Fatalf("build wasm32-web %s: %v", tc.srcPath, err)
 			}
 			base := strings.TrimSuffix(outPath, ".wasm")
@@ -160,12 +204,18 @@ func TestWASMUIExamplesBuildWithDeterministicMetadataSidecars(t *testing.T) {
 			if err != nil {
 				t.Fatalf("read ui bundle: %v", err)
 			}
-			if !strings.Contains(string(uiJSON), `"schema": "tetra.ui.v0.4.0"`) || !strings.Contains(string(uiJSON), tc.viewName) {
+			if !strings.Contains(string(uiJSON), `"schema": "tetra.ui.v0.4.0"`) ||
+				!strings.Contains(string(uiJSON), tc.viewName) {
 				t.Fatalf("unexpected ui bundle for %s:\n%s", tc.name, uiJSON)
 			}
 			for _, want := range tc.accessibility {
 				if !strings.Contains(string(uiJSON), want) {
-					t.Fatalf("ui bundle for %s missing accessibility marker %q:\n%s", tc.name, want, uiJSON)
+					t.Fatalf(
+						"ui bundle for %s missing accessibility marker %q:\n%s",
+						tc.name,
+						want,
+						uiJSON,
+					)
 				}
 			}
 		})
@@ -174,7 +224,7 @@ func TestWASMUIExamplesBuildWithDeterministicMetadataSidecars(t *testing.T) {
 
 func TestWASMUISidecarsAreDeterministicAcrossBuilds(t *testing.T) {
 	tmp := t.TempDir()
-	srcPath := filepath.Join("..", "..", "..", "examples", "ui_web_smoke.tetra")
+	srcPath := filepath.Join("..", "..", "..", "examples", "ui", "ui_web_smoke.tetra")
 	firstBase := buildWASMUIFixture(t, srcPath, filepath.Join(tmp, "first", "app.wasm"))
 	secondBase := buildWASMUIFixture(t, srcPath, filepath.Join(tmp, "second", "app.wasm"))
 	for _, ext := range []string{".ui.json", ".ui.web.mjs", ".ui.html"} {
@@ -187,7 +237,12 @@ func TestWASMUISidecarsAreDeterministicAcrossBuilds(t *testing.T) {
 			t.Fatalf("read second%s: %v", ext, err)
 		}
 		if !bytes.Equal(first, second) {
-			t.Fatalf("sidecar %s is not deterministic across builds\nfirst:\n%s\nsecond:\n%s", ext, first, second)
+			t.Fatalf(
+				"sidecar %s is not deterministic across builds\nfirst:\n%s\nsecond:\n%s",
+				ext,
+				first,
+				second,
+			)
 		}
 	}
 }
@@ -197,7 +252,12 @@ func buildWASMUIFixture(t *testing.T, srcPath, outPath string) string {
 	if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
 		t.Fatalf("create wasm ui output dir: %v", err)
 	}
-	if _, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, "wasm32-web", compiler.BuildOptions{Jobs: 1}); err != nil {
+	if _, err := compiler.BuildFileWithStatsOpt(
+		srcPath,
+		outPath,
+		"wasm32-web",
+		compiler.BuildOptions{Jobs: 1},
+	); err != nil {
 		t.Fatalf("build wasm32-web %s: %v", srcPath, err)
 	}
 	return strings.TrimSuffix(outPath, ".wasm")
@@ -208,9 +268,14 @@ func TestNativeShellUIExampleWritesMetadataPreviewSidecar(t *testing.T) {
 		t.Skip("linux/amd64 only")
 	}
 	tmp := t.TempDir()
-	srcPath := filepath.Join("..", "..", "..", "examples", "ui_native_shell_smoke.tetra")
+	srcPath := filepath.Join("..", "..", "..", "examples", "ui", "ui_native_shell_smoke.tetra")
 	outPath := filepath.Join(tmp, "ui-native")
-	if _, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, "linux-x64", compiler.BuildOptions{Jobs: 1}); err != nil {
+	if _, err := compiler.BuildFileWithStatsOpt(
+		srcPath,
+		outPath,
+		"linux-x64",
+		compiler.BuildOptions{Jobs: 1},
+	); err != nil {
 		t.Fatalf("build linux-x64 native ui example: %v", err)
 	}
 	sidecar, err := os.ReadFile(outPath + ".ui.shell.txt")
@@ -270,7 +335,13 @@ func TestNativeShellUIExampleWritesMetadataPreviewSidecar(t *testing.T) {
 			t.Fatalf("native shell trace missing %q:\n%s", want, trace)
 		}
 	}
-	cmd := exec.Command("go", "run", "../../../tools/cmd/validate-native-ui-smoke", "--report", outPath+".ui.shell.json")
+	cmd := exec.Command(
+		"go",
+		"run",
+		"../../../tools/cmd/validate-native-ui-smoke",
+		"--report",
+		outPath+".ui.shell.json",
+	)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("validate native ui smoke failed: %v\n%s", err, out)
 	}

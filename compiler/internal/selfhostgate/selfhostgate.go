@@ -53,7 +53,10 @@ func Evaluate(e Evidence) Decision {
 		return Decision{
 			Allowed:         false,
 			MissingEvidence: missing,
-			Reason:          "blocked: self-hosting remains gated until " + strings.Join(missing, ", "),
+			Reason: "blocked: self-hosting remains gated until " + strings.Join(
+				missing,
+				", ",
+			),
 		}
 	}
 	return Decision{Allowed: true, Reason: "allowed: verified core evidence is present"}

@@ -36,7 +36,12 @@ func main() {
 	var expectedVersion string
 	flag.StringVar(&artifactPath, "artifact", "", "path to readiness-blockers.json")
 	flag.StringVar(&reportDir, "report-dir", "", "release gate report directory")
-	flag.StringVar(&expectedVersion, "expected-version", defaultExpectedVersion, "expected release version")
+	flag.StringVar(
+		&expectedVersion,
+		"expected-version",
+		defaultExpectedVersion,
+		"expected release version",
+	)
 	flag.Parse()
 
 	if artifactPath == "" {
@@ -109,7 +114,8 @@ func validateSourceLog(sourceLog string, reportDir string) error {
 	if strings.TrimSpace(sourceLog) == "" {
 		return fmt.Errorf("source_log is required")
 	}
-	if filepath.IsAbs(sourceLog) || strings.Contains(sourceLog, "..") || !strings.HasPrefix(filepath.ToSlash(sourceLog), "logs/") {
+	if filepath.IsAbs(sourceLog) || strings.Contains(sourceLog, "..") ||
+		!strings.HasPrefix(filepath.ToSlash(sourceLog), "logs/") {
 		return fmt.Errorf("unsafe source_log %q", sourceLog)
 	}
 	logPath := filepath.Join(reportDir, filepath.FromSlash(sourceLog))

@@ -53,8 +53,18 @@ func main() {
 	flag.StringVar(&inputs.Windows, "windows", "", "Windows UI runtime report")
 	flag.StringVar(&inputs.MacOS, "macos", "", "macOS UI runtime report")
 	flag.StringVar(&inputs.Web, "web", "", "Web UI smoke report")
-	flag.StringVar(&options.ExpectedVersion, "expected-version", compiler.Version(), "expected compiler/runtime version for target-host reports")
-	flag.StringVar(&options.ExpectedGitHead, "expected-git-head", "", "expected git HEAD for target-host reports; defaults to current repository HEAD")
+	flag.StringVar(
+		&options.ExpectedVersion,
+		"expected-version",
+		compiler.Version(),
+		"expected compiler/runtime version for target-host reports",
+	)
+	flag.StringVar(
+		&options.ExpectedGitHead,
+		"expected-git-head",
+		"",
+		"expected git HEAD for target-host reports; defaults to current repository HEAD",
+	)
 	flag.Parse()
 	if strings.TrimSpace(options.ExpectedGitHead) == "" {
 		head, err := currentGitHead()
@@ -74,7 +84,10 @@ func validateCrossPlatformUIRuntime(inputs crossPlatformInputs) error {
 	return validateCrossPlatformUIRuntimeWithOptions(inputs, validationOptions{})
 }
 
-func validateCrossPlatformUIRuntimeWithOptions(inputs crossPlatformInputs, options validationOptions) error {
+func validateCrossPlatformUIRuntimeWithOptions(
+	inputs crossPlatformInputs,
+	options validationOptions,
+) error {
 	var issues []string
 	if err := validateLinux(inputs.Linux); err != nil {
 		issues = append(issues, "linux: "+err.Error())
@@ -159,7 +172,8 @@ func validateWeb(path string) error {
 		return err
 	}
 	var issues []string
-	if report.Schema != "tetra.web-ui-smoke.v1alpha1" || report.Status != "pass" || report.Target != "wasm32-web" {
+	if report.Schema != "tetra.web-ui-smoke.v1alpha1" || report.Status != "pass" ||
+		report.Target != "wasm32-web" {
 		issues = append(issues, "web report header mismatch")
 	}
 	if !platformui.AcceptedUISchemas[report.UISchema] {
@@ -168,7 +182,26 @@ func validateWeb(path string) error {
 	if report.UIBundlePath == "" || report.UIModulePath == "" || report.DOMSnapshot == "" {
 		issues = append(issues, "ui bundle paths and dom_snapshot are required")
 	}
-	for _, marker := range []string{"window-mount:ok", "root-mount:ok", "layout:ok", "text:ok", "button:ok", "input:ok", "list:ok", "panel:ok", "focus:ok", "input-event:ok", "change:ok", "select:ok", "click:ok", "timer:ok", "async-command:ok", "redraw-update:ok", "error-recovery:ok", "ui-event-dispatch:web-command-dispatch"} {
+	for _, marker := range []string{
+		"window-mount:ok",
+		"root-mount:ok",
+		"layout:ok",
+		"text:ok",
+		"button:ok",
+		"input:ok",
+		"list:ok",
+		"panel:ok",
+		"focus:ok",
+		"input-event:ok",
+		"change:ok",
+		"select:ok",
+		"click:ok",
+		"timer:ok",
+		"async-command:ok",
+		"redraw-update:ok",
+		"error-recovery:ok",
+		"ui-event-dispatch:web-command-dispatch",
+	} {
 		if !strings.Contains(report.RuntimeTrace, marker) {
 			issues = append(issues, "runtime_trace missing "+marker)
 		}

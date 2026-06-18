@@ -26,15 +26,22 @@ type waylandClient struct {
 	reader *bufio.Reader
 	nextID uint32
 
-	registryID   uint32
-	compositor   waylandGlobal
-	shm          waylandGlobal
-	xdgWMBase    waylandGlobal
-	configured   bool
-	configSerial uint32
+	registryID    uint32
+	compositor    waylandGlobal
+	shm           waylandGlobal
+	xdgWMBase     waylandGlobal
+	xdgToplevelID uint32
+	configured    bool
+	configSerial  uint32
+	closed        bool
 }
 
-func presentRealWindowSurface(title string, frame rgbaFrame, dwell time.Duration) error {
+func presentRealWindowSurface(
+	title string,
+	frame rgbaFrame,
+	dwell time.Duration,
+	holdUntilClose bool,
+) error {
 	socketPath, err := waylandSocketPath()
 	if err != nil {
 		return err
@@ -51,25 +58,46 @@ func presentRealWindowSurface(title string, frame rgbaFrame, dwell time.Duration
 		return err
 	}
 	if client.compositor.Name == 0 || client.shm.Name == 0 || client.xdgWMBase.Name == 0 {
-		return fmt.Errorf("Wayland compositor missing required globals: wl_compositor=%d wl_shm=%d xdg_wm_base=%d", client.compositor.Name, client.shm.Name, client.xdgWMBase.Name)
+		return fmt.Errorf(
+			"Wayland compositor missing required globals: wl_compositor=%d wl_shm=%d xdg_wm_base=%d",
+			client.compositor.Name,
+			client.shm.Name,
+			client.xdgWMBase.Name,
+		)
 	}
 
 	compositorID := client.newID()
 	shmID := client.newID()
 	wmBaseID := client.newID()
-	if err := client.bind(client.compositor.Name, "wl_compositor", minVersion(client.compositor.Version, 4), compositorID); err != nil {
+	if err := client.bind(
+		client.compositor.Name,
+		"wl_compositor",
+		minVersion(client.compositor.Version, 4),
+		compositorID,
+	); err != nil {
 		return err
 	}
-	if err := client.bind(client.shm.Name, "wl_shm", minVersion(client.shm.Version, 1), shmID); err != nil {
+	if err := client.bind(
+		client.shm.Name,
+		"wl_shm",
+		minVersion(client.shm.Version, 1),
+		shmID,
+	); err != nil {
 		return err
 	}
-	if err := client.bind(client.xdgWMBase.Name, "xdg_wm_base", minVersion(client.xdgWMBase.Version, 1), wmBaseID); err != nil {
+	if err := client.bind(
+		client.xdgWMBase.Name,
+		"xdg_wm_base",
+		minVersion(client.xdgWMBase.Version, 1),
+		wmBaseID,
+	); err != nil {
 		return err
 	}
 
 	surfaceID := client.newID()
 	xdgSurfaceID := client.newID()
 	toplevelID := client.newID()
+	client.xdgToplevelID = toplevelID
 	if err := client.send(compositorID, 0, u32(surfaceID), nil); err != nil {
 		return fmt.Errorf("create wl_surface: %w", err)
 	}
@@ -104,16 +132,31 @@ func presentRealWindowSurface(title string, frame rgbaFrame, dwell time.Duration
 
 	poolID := client.newID()
 	bufferID := client.newID()
-	if err := client.send(shmID, 0, concat(u32(poolID), i32(int32(size))), []int{int(shmFile.Fd())}); err != nil {
+	if err := client.send(
+		shmID,
+		0,
+		concat(u32(poolID), i32(int32(size))),
+		[]int{int(shmFile.Fd())},
+	); err != nil {
 		return fmt.Errorf("create wl_shm_pool: %w", err)
 	}
-	if err := client.send(poolID, 0, concat(u32(bufferID), i32(0), i32(int32(frame.Width)), i32(int32(frame.Height)), i32(int32(frame.Stride)), u32(0)), nil); err != nil {
+	if err := client.send(
+		poolID,
+		0,
+		concat(u32(bufferID), i32(0), i32(int32(frame.Width)), i32(int32(frame.Height)), i32(int32(frame.Stride)), u32(0)),
+		nil,
+	); err != nil {
 		return fmt.Errorf("create wl_buffer: %w", err)
 	}
 	if err := client.send(surfaceID, 1, concat(u32(bufferID), i32(0), i32(0)), nil); err != nil {
 		return fmt.Errorf("attach wl_buffer: %w", err)
 	}
-	if err := client.send(surfaceID, 2, concat(i32(0), i32(0), i32(int32(frame.Width)), i32(int32(frame.Height))), nil); err != nil {
+	if err := client.send(
+		surfaceID,
+		2,
+		concat(i32(0), i32(0), i32(int32(frame.Width)), i32(int32(frame.Height))),
+		nil,
+	); err != nil {
 		return fmt.Errorf("damage wl_surface: %w", err)
 	}
 	if err := client.send(surfaceID, 6, nil, nil); err != nil {
@@ -121,7 +164,10 @@ func presentRealWindowSurface(title string, frame rgbaFrame, dwell time.Duration
 	}
 
 	deadline := time.Now().Add(dwell)
-	for time.Now().Before(deadline) {
+	for holdUntilClose || time.Now().Before(deadline) {
+		if client.closed {
+			return nil
+		}
 		_ = client.conn.SetReadDeadline(time.Now().Add(25 * time.Millisecond))
 		if err := client.readOne(wmBaseID, xdgSurfaceID); err != nil {
 			if isTimeout(err) {
@@ -136,14 +182,19 @@ func presentRealWindowSurface(title string, frame rgbaFrame, dwell time.Duration
 func waylandSocketPath() (string, error) {
 	display := os.Getenv("WAYLAND_DISPLAY")
 	if strings.TrimSpace(display) == "" {
-		return "", fmt.Errorf("WAYLAND_DISPLAY is not set; cannot collect linux-x64 real-window Surface evidence")
+		return "", fmt.Errorf(
+			"WAYLAND_DISPLAY is not set; cannot collect linux-x64 real-window Surface evidence",
+		)
 	}
 	if filepath.IsAbs(display) {
 		return display, nil
 	}
 	runtimeDir := os.Getenv("XDG_RUNTIME_DIR")
 	if strings.TrimSpace(runtimeDir) == "" {
-		return "", fmt.Errorf("XDG_RUNTIME_DIR is not set; cannot resolve Wayland socket %s", display)
+		return "", fmt.Errorf(
+			"XDG_RUNTIME_DIR is not set; cannot resolve Wayland socket %s",
+			display,
+		)
 	}
 	return filepath.Join(runtimeDir, display), nil
 }
@@ -185,7 +236,11 @@ func (c *waylandClient) bind(name uint32, iface string, version uint32, id uint3
 	return c.send(c.registryID, 0, payload, nil)
 }
 
-func (c *waylandClient) waitForConfigure(xdgSurfaceID uint32, wmBaseID uint32, timeout time.Duration) error {
+func (c *waylandClient) waitForConfigure(
+	xdgSurfaceID uint32,
+	wmBaseID uint32,
+	timeout time.Duration,
+) error {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
 		_ = c.conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
@@ -235,7 +290,13 @@ func (c *waylandClient) readOne(wmBaseID uint32, xdgSurfaceID uint32) error {
 	return c.handleCommonEvent(object, opcode, payload, wmBaseID, xdgSurfaceID)
 }
 
-func (c *waylandClient) handleCommonEvent(object uint32, opcode uint16, payload []byte, wmBaseID uint32, xdgSurfaceID uint32) error {
+func (c *waylandClient) handleCommonEvent(
+	object uint32,
+	opcode uint16,
+	payload []byte,
+	wmBaseID uint32,
+	xdgSurfaceID uint32,
+) error {
 	if object == 1 && opcode == 0 {
 		_, code, message, err := parseDisplayError(payload)
 		if err != nil {
@@ -256,6 +317,9 @@ func (c *waylandClient) handleCommonEvent(object uint32, opcode uint16, payload 
 		}
 		c.configSerial = binary.LittleEndian.Uint32(payload[:4])
 		c.configured = true
+	}
+	if c.xdgToplevelID != 0 && object == c.xdgToplevelID && opcode == 1 {
+		c.closed = true
 	}
 	return nil
 }

@@ -26,7 +26,12 @@ func TestCollectRelPathsFiltersGitignoredTrackedAndUntrackedFiles(t *testing.T) 
 func TestFileListCannotBypassGitignoreFiltering(t *testing.T) {
 	root := testGitignoreFixture(t)
 	fileListPath := filepath.Join(root, "file-list.txt")
-	writeTestFile(t, root, "file-list.txt", "compiler/kept.tetra\nignored/tracked-cache.json\nreports/untracked-report.json\n")
+	writeTestFile(
+		t,
+		root,
+		"file-list.txt",
+		"compiler/kept.tetra\nignored/tracked-cache.json\nreports/untracked-report.json\n",
+	)
 	outputPath := filepath.Join(root, "dumps", "project_dump.md")
 	opts := dumpOptions{
 		root:         root,
@@ -206,7 +211,10 @@ func assertGitignoredFixtureFiltered(t *testing.T, relPaths []string) {
 		t.Fatalf("tracked file matched by .gitignore should not be collected; paths = %v", relPaths)
 	}
 	if _, ok := relSet["reports/untracked-report.json"]; ok {
-		t.Fatalf("untracked file matched by .gitignore should not be collected; paths = %v", relPaths)
+		t.Fatalf(
+			"untracked file matched by .gitignore should not be collected; paths = %v",
+			relPaths,
+		)
 	}
 }
 

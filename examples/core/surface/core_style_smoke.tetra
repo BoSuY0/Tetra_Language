@@ -1,0 +1,12 @@
+// Stable core style stdlib smoke.
+module examples.core.surface.core_style_smoke
+
+import lib.core.style as style
+
+func main() -> Int:
+    let theme: style.Theme = style.default_theme()
+    let normal: style.WidgetColors = style.style_for_state(theme.button, style.state_normal())
+    let focused: style.WidgetColors = style.style_for_state(theme.textbox, style.state_focused())
+    if normal.bg == 255 && focused.border.a == 255:
+        return 42
+    return 0

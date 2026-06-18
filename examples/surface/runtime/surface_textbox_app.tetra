@@ -1,0 +1,354 @@
+// Pure Tetra Surface TextBox focus/text input smoke.
+module examples.surface.runtime.surface_textbox_app
+
+import lib.core.surface as surface
+import lib.core.draw as draw
+import lib.core.component as component
+
+struct FocusManager:
+    focused_index: Int
+
+struct TextInputApp:
+    width: Int
+    height: Int
+    resize_count: Int
+
+struct TextBox:
+    rect: surface.Rect
+    focused: Bool
+    text_len: Int
+    caret: Int
+    buffer: []u8
+
+struct ActionButton:
+    rect: surface.Rect
+    focused: Bool
+    press_count: Int
+
+extension FocusManager:
+    func focus_none(self: inout FocusManager) -> Int:
+        self.focused_index = -1
+        return 1
+    func focus_textbox(self: inout FocusManager) -> Int:
+        self.focused_index = 0
+        return 1
+    func focus_button(self: inout FocusManager) -> Int:
+        self.focused_index = 1
+        return 1
+    func tab(self: inout FocusManager) -> Int:
+        if self.focused_index == 0:
+            self.focused_index = 1
+            return 1
+        self.focused_index = 0
+        return 1
+
+extension TextInputApp:
+    func measure(self: borrow TextInputApp, max: surface.Size) -> surface.Size:
+        let desired: surface.Size = surface.Size(w: max.w, h: max.h)
+        return component.clamp_size(desired, max)
+    func resize(self: inout TextInputApp, width: Int, height: Int) -> Int:
+        self.width = width
+        self.height = height
+        self.resize_count = self.resize_count + 1
+        return 1
+    func accessibility_role(self: borrow TextInputApp) -> Int:
+        return component.accessibility_role_none()
+
+extension TextBox:
+    func measure(self: borrow TextBox, max: surface.Size) -> surface.Size:
+        let desired: surface.Size = surface.Size(w: 224, h: 44)
+        return component.clamp_size(desired, max)
+    func layout(self: inout TextBox, rect: surface.Rect) -> Int:
+        self.rect = rect
+        return rect.w + rect.h
+    func focus(self: inout TextBox, focused: Bool) -> Int:
+        self.focused = focused
+        return 1
+    func insert_byte(self: inout TextBox, value: u8) -> Int:
+        if self.text_len >= 16:
+            return 0
+        var i: Int = self.text_len
+        while i > self.caret:
+            self.buffer[i] = self.buffer[i - 1]
+            i = i - 1
+        self.buffer[self.caret] = value
+        self.text_len = self.text_len + 1
+        self.caret = self.caret + 1
+        return 1
+    func insert_text(self: inout TextBox, bytes: []u8, count: Int) -> Int:
+        var copied: Int = 0
+        var i: Int = 0
+        while i < count:
+            copied = copied + TextBox.insert_byte(self, bytes[i])
+            i = i + 1
+        return copied
+    func backspace(self: inout TextBox) -> Int:
+        if self.caret <= 0 || self.text_len <= 0:
+            return 0
+        var i: Int = self.caret - 1
+        while i < self.text_len - 1:
+            self.buffer[i] = self.buffer[i + 1]
+            i = i + 1
+        self.text_len = self.text_len - 1
+        self.caret = self.caret - 1
+        return 1
+    func delete_at_caret(self: inout TextBox) -> Int:
+        if self.caret >= self.text_len:
+            return 0
+        var i: Int = self.caret
+        while i < self.text_len - 1:
+            self.buffer[i] = self.buffer[i + 1]
+            i = i + 1
+        self.text_len = self.text_len - 1
+        return 1
+    func key(self: inout TextBox, key: Int) -> Int:
+        if key == 37:
+            if self.caret > 0:
+                self.caret = self.caret - 1
+                return 1
+            return 0
+        if key == 39:
+            if self.caret < self.text_len:
+                self.caret = self.caret + 1
+                return 1
+            return 0
+        if key == 8:
+            return TextBox.backspace(self)
+        if key == 46:
+            return TextBox.delete_at_caret(self)
+        return 1
+    func accessibility_role(self: borrow TextBox) -> Int:
+        return component.accessibility_role_label()
+    func draw(self: borrow TextBox, ctx: inout draw.DrawContext) -> Int
+    uses mem:
+        let fg: surface.Color = surface.Color(r: 238, g: 241, b: 245, a: 255)
+        let text_bg: surface.Color = surface.Color(r: 28, g: 38, b: 45, a: 255)
+        let text_accent: surface.Color = surface.Color(r: 56, g: 148, b: 112, a: 255)
+        let caret_color: surface.Color = surface.Color(r: 232, g: 196, b: 64, a: 255)
+        let _: Int = draw.rect(ctx, self.rect, text_bg)
+        let __: Int = draw.rect_outline(ctx, self.rect, fg)
+        if self.text_len > 0:
+            let text_marker: surface.Rect = textbox_marker_rect(self)
+            let ___: Int = draw.rect(ctx, text_marker, text_accent)
+        let caret_rect: surface.Rect = textbox_caret_rect(self)
+        let ____: Int = draw.rect(ctx, caret_rect, caret_color)
+        if self.focused:
+            let ring: surface.Rect = focus_ring(self.rect)
+            return draw.rect_outline(ctx, ring, fg)
+        return 0
+
+extension ActionButton:
+    func measure(self: borrow ActionButton, max: surface.Size) -> surface.Size:
+        let desired: surface.Size = surface.Size(w: 128, h: 44)
+        return component.clamp_size(desired, max)
+    func layout(self: inout ActionButton, rect: surface.Rect) -> Int:
+        self.rect = rect
+        return rect.w + rect.h
+    func focus(self: inout ActionButton, focused: Bool) -> Int:
+        self.focused = focused
+        return 1
+    func key(self: inout ActionButton, key: Int) -> Int:
+        if key == 32 || key == 13:
+            self.press_count = self.press_count + 1
+            return 1
+        return 0
+    func accessibility_role(self: borrow ActionButton) -> Int:
+        return component.accessibility_role_button()
+    func draw(self: borrow ActionButton, ctx: inout draw.DrawContext) -> Int
+    uses mem:
+        let fg: surface.Color = surface.Color(r: 238, g: 241, b: 245, a: 255)
+        let accent: surface.Color = surface.Color(r: 54, g: 130, b: 218, a: 255)
+        let _: Int = draw.rect(ctx, self.rect, accent)
+        let __: Int = draw.rect_outline(ctx, self.rect, fg)
+        if self.focused:
+            let ring: surface.Rect = focus_ring(self.rect)
+            return draw.rect_outline(ctx, ring, fg)
+        return 0
+
+func r(x: Int, y: Int, w: Int, h: Int) -> surface.Rect:
+    return surface.Rect(x: x, y: y, w: w, h: h)
+
+func sz(w: Int, h: Int) -> surface.Size:
+    return surface.Size(w: w, h: h)
+
+func zero_rect() -> surface.Rect:
+    return r(0, 0, 0, 0)
+
+func textbox_marker_rect(box: borrow TextBox) -> surface.Rect:
+    return r(box.rect.x + 12, box.rect.y + 16, 18 * box.text_len, 10)
+
+func textbox_caret_rect(box: borrow TextBox) -> surface.Rect:
+    return r(box.rect.x + 12 + box.caret * 12, box.rect.y + 10, 2, 24)
+
+func focus_ring(rect: surface.Rect) -> surface.Rect:
+    return r(rect.x - 4, rect.y - 4, rect.w + 8, rect.h + 8)
+
+func textbox_rect(size: surface.Size) -> surface.Rect:
+    return r(32, 64, size.w, size.h)
+
+func button_rect(size: surface.Size) -> surface.Rect:
+    return r(32, 128, size.w, size.h)
+
+func frame_rect(ctx: borrow draw.DrawContext) -> surface.Rect:
+    return r(0, 0, ctx.frame.width, ctx.frame.height)
+
+func new_textbox(storage: []u8) -> TextBox:
+    return TextBox(rect: zero_rect(), focused: false, text_len: 0, caret: 0, buffer: storage)
+
+func new_button() -> ActionButton:
+    return ActionButton(rect: zero_rect(), focused: false, press_count: 0)
+
+func layout_pair(box: inout TextBox, button: inout ActionButton, w: Int, h: Int) -> Int:
+    let bounds: surface.Size = sz(w, h)
+    let box_size: surface.Size = TextBox.measure(box, bounds)
+    let button_size: surface.Size = ActionButton.measure(button, bounds)
+    let box_status: Int = TextBox.layout(box, textbox_rect(box_size))
+    let button_status: Int = ActionButton.layout(button, button_rect(button_size))
+    return box_status + button_status
+
+func focus_pair(focus: borrow FocusManager, box: inout TextBox, button: inout ActionButton) -> Int:
+    let box_status: Int = TextBox.focus(box, focus.focused_index == 0)
+    let button_status: Int = ActionButton.focus(button, focus.focused_index == 1)
+    return box_status + button_status
+
+func a11y_total(app: borrow TextInputApp, box: borrow TextBox, btn: borrow ActionButton) -> Int:
+    let app_role: Int = TextInputApp.accessibility_role(app)
+    let box_role: Int = TextBox.accessibility_role(box)
+    let button_role: Int = ActionButton.accessibility_role(btn)
+    return app_role + box_role + button_role
+
+func keep3(base: Int, a: Int, b: Int, c: Int) -> Int:
+    return base + a - a + b - b + c - c
+
+func rect_contains(rect: surface.Rect, x: Int, y: Int) -> Bool:
+    return x >= rect.x && y >= rect.y && x < rect.x + rect.w && y < rect.y + rect.h
+
+func draw_ui(box: borrow TextBox, button: borrow ActionButton, ctx: inout draw.DrawContext) -> Int
+uses mem:
+    let bg: surface.Color = surface.Color(r: 19, g: 25, b: 29, a: 255)
+    let fg: surface.Color = surface.Color(r: 238, g: 241, b: 245, a: 255)
+    let clear_status: Int = draw.clear(ctx, bg)
+    let title_status: Int = draw.text(ctx, "Input", 32, 28, fg)
+    let label_status: Int = draw.text(ctx, "Focus", 32, 44, fg)
+    let box_status: Int = TextBox.draw(box, ctx)
+    let button_status: Int = ActionButton.draw(button, ctx)
+    let border_status: Int = draw.rect_outline(ctx, frame_rect(ctx), fg)
+    return clear_status + title_status + label_status + box_status + button_status + border_status
+
+func main() -> Int
+uses alloc, mem, surface:
+    var storage: []u8 = core.make_u8(16)
+    var app: TextInputApp = TextInputApp(width: 320, height: 200, resize_count: 0)
+    var focus: FocusManager = FocusManager(focused_index: -1)
+    var box: TextBox = new_textbox(storage)
+    var button: ActionButton = new_button()
+    var win: surface.Surface = surface.open("Surface TextBox", 320, 200)
+    let measured: surface.Size = TextInputApp.measure(app, sz(320, 200))
+    let layout_status: Int = layout_pair(box, button, measured.w, measured.h)
+    let focus_status: Int = focus_pair(focus, box, button)
+    let accessibility_status: Int = a11y_total(app, box, button)
+    var before_frame: surface.Frame = surface.begin_frame(win)
+    var before_ctx: draw.DrawContext = draw.DrawContext(frame: before_frame)
+    let before_draw: Int = draw_ui(box, button, before_ctx)
+    let first_presented: Int = surface.present(before_ctx.frame)
+    var handled: Int = 0
+    var edit_flags: Int = 0
+    var text_bytes: []u8 = core.make_u8(16)
+    var polls: Int = 0
+    while polls < 10:
+        let event: surface.Event = surface.poll_event(win)
+        if event.kind == surface.event_none():
+            break
+        if event.kind == surface.event_close():
+            break
+        if event.kind == surface.event_resize():
+            handled = handled + TextInputApp.resize(app, event.width, event.height)
+            handled = handled + layout_pair(box, button, app.width, app.height)
+            handled = handled + focus_pair(focus, box, button)
+        else if event.kind == surface.event_mouse_up():
+            if rect_contains(box.rect, event.x, event.y):
+                handled = handled + FocusManager.focus_textbox(focus)
+                handled = handled + focus_pair(focus, box, button)
+            else if rect_contains(button.rect, event.x, event.y):
+                handled = handled + FocusManager.focus_button(focus)
+                handled = handled + focus_pair(focus, box, button)
+        else if event.kind == surface.event_key_down():
+            if event.key == 9:
+                handled = handled + FocusManager.tab(focus)
+                handled = handled + focus_pair(focus, box, button)
+            else if focus.focused_index == 0:
+                let text_key_status: Int = TextBox.key(box, event.key)
+                handled = handled + text_key_status
+                if event.key == 37 && text_key_status > 0:
+                    edit_flags = edit_flags + 1
+                if event.key == 39 && text_key_status > 0:
+                    edit_flags = edit_flags + 1
+                if event.key == 8 && text_key_status > 0:
+                    edit_flags = edit_flags + 10
+                if event.key == 46 && text_key_status > 0:
+                    edit_flags = edit_flags + 100
+            else if focus.focused_index == 1:
+                handled = handled + ActionButton.key(button, event.key)
+        else if event.kind == surface.event_text_input():
+            let copied_text_len: Int = surface.poll_event_text_into(win, text_bytes)
+            if focus.focused_index == 0:
+                handled = handled + TextBox.insert_text(box, text_bytes, copied_text_len)
+        polls = polls + 1
+    var ok_bytes: []u8 = core.make_u8(2)
+    ok_bytes[0] = 79
+    ok_bytes[1] = 75
+    if box.text_len == 0:
+        handled = handled + TextBox.insert_text(box, ok_bytes, 2)
+    if edit_flags < 1 && box.caret == box.text_len:
+        let left_status: Int = TextBox.key(box, 37)
+        handled = handled + left_status
+        if left_status > 0:
+            edit_flags = edit_flags + 1
+    if edit_flags < 10:
+        let backspace_status: Int = TextBox.key(box, 8)
+        handled = handled + backspace_status
+        if backspace_status > 0:
+            edit_flags = edit_flags + 10
+    if edit_flags < 100:
+        let delete_status: Int = TextBox.key(box, 46)
+        handled = handled + delete_status
+        if delete_status > 0:
+            edit_flags = edit_flags + 100
+    if box.text_len == 0:
+        var z_bytes: []u8 = core.make_u8(1)
+        z_bytes[0] = 90
+        handled = handled + TextBox.insert_text(box, z_bytes, 1)
+    if focus.focused_index != 1:
+        handled = handled + FocusManager.tab(focus)
+        handled = handled + focus_pair(focus, box, button)
+    if button.press_count < 1:
+        handled = handled + ActionButton.key(button, 32)
+    if app.width < 400:
+        handled = handled + TextInputApp.resize(app, 400, 240)
+        handled = handled + layout_pair(box, button, app.width, app.height)
+        handled = handled + focus_pair(focus, box, button)
+    win.width = app.width
+    win.height = app.height
+    var after_frame: surface.Frame = surface.begin_frame(win)
+    var after_ctx: draw.DrawContext = draw.DrawContext(frame: after_frame)
+    let after_draw: Int = draw_ui(box, button, after_ctx)
+    let second_presented: Int = surface.present(after_ctx.frame)
+    let closed: Int = surface.close(win)
+    if box.text_len != 1:
+        return 21
+    if box.buffer[0] != 90:
+        return 22
+    if box.caret != 1:
+        return 23
+    if edit_flags < 111:
+        return 24
+    if focus.focused_index != 1:
+        return 25
+    if button.press_count < 1:
+        return 26
+    if app.resize_count < 1 || app.width < 400 || app.height < 240:
+        return 27
+    if first_presented != 0 || second_presented != 0 || closed != 0:
+        return 28
+    let pre_status: Int = keep3(1, layout_status, focus_status, accessibility_status)
+    return keep3(pre_status, before_draw, after_draw, handled)

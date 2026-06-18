@@ -31,7 +31,11 @@ func TestParse(t *testing.T) {
 }
 
 func TestTargetListsAreStable(t *testing.T) {
-	if got := SupportedTriples(); len(got) != 5 || got[0] != "linux-x64" || got[1] != "windows-x64" || got[2] != "macos-x64" || got[3] != "wasm32-wasi" || got[4] != "wasm32-web" {
+	if got := SupportedTriples(); len(got) != 5 || got[0] != "linux-x64" ||
+		got[1] != "windows-x64" ||
+		got[2] != "macos-x64" ||
+		got[3] != "wasm32-wasi" ||
+		got[4] != "wasm32-web" {
 		t.Fatalf("supported triples = %#v", got)
 	}
 	if got := BuildOnlyTriples(); len(got) != 2 || got[0] != "linux-x86" || got[1] != "linux-x32" {
@@ -40,7 +44,9 @@ func TestTargetListsAreStable(t *testing.T) {
 	if got := PlannedTriples(); len(got) != 0 {
 		t.Fatalf("planned triples = %#v", got)
 	}
-	if got := ActorRuntimeTriples(); len(got) != 3 || got[0] != "linux-x64" || got[1] != "macos-x64" || got[2] != "windows-x64" {
+	if got := ActorRuntimeTriples(); len(got) != 3 || got[0] != "linux-x64" ||
+		got[1] != "macos-x64" ||
+		got[2] != "windows-x64" {
 		t.Fatalf("actor runtime triples = %#v", got)
 	}
 }
@@ -92,11 +98,25 @@ func TestTargetStatusValues(t *testing.T) {
 			t.Fatalf("Parse(%q).Status = %q, want %q", tc.triple, tgt.Status, tc.status)
 		}
 	}
-	if StatusSupported.String() != "supported" || StatusBuildOnly.String() != "build_only" || StatusPlanned.String() != "planned" {
-		t.Fatalf("unexpected status strings: %q %q %q", StatusSupported, StatusBuildOnly, StatusPlanned)
+	if StatusSupported.String() != "supported" || StatusBuildOnly.String() != "build_only" ||
+		StatusPlanned.String() != "planned" {
+		t.Fatalf(
+			"unexpected status strings: %q %q %q",
+			StatusSupported,
+			StatusBuildOnly,
+			StatusPlanned,
+		)
 	}
-	if RunModeHostNative.String() != "host_native" || RunModeHostProbed.String() != "host_probed" || RunModeWASIRunner.String() != "wasi_runner" || RunModeWebRunner.String() != "web_runner" {
-		t.Fatalf("unexpected run mode strings: %q %q %q %q", RunModeHostNative, RunModeHostProbed, RunModeWASIRunner, RunModeWebRunner)
+	if RunModeHostNative.String() != "host_native" || RunModeHostProbed.String() != "host_probed" ||
+		RunModeWASIRunner.String() != "wasi_runner" ||
+		RunModeWebRunner.String() != "web_runner" {
+		t.Fatalf(
+			"unexpected run mode strings: %q %q %q %q",
+			RunModeHostNative,
+			RunModeHostProbed,
+			RunModeWASIRunner,
+			RunModeWebRunner,
+		)
 	}
 }
 
@@ -115,40 +135,260 @@ func TestParseNormalizesX86X64X32Aliases(t *testing.T) {
 		{"x86", "linux-x86", ArchX86, ABI386SysV, DataModelILP32, 32, 32, 32, StatusBuildOnly},
 		{"i386", "linux-x86", ArchX86, ABI386SysV, DataModelILP32, 32, 32, 32, StatusBuildOnly},
 		{"i686", "linux-x86", ArchX86, ABI386SysV, DataModelILP32, 32, 32, 32, StatusBuildOnly},
-		{"linux-i386", "linux-x86", ArchX86, ABI386SysV, DataModelILP32, 32, 32, 32, StatusBuildOnly},
-		{"linux-i686", "linux-x86", ArchX86, ABI386SysV, DataModelILP32, 32, 32, 32, StatusBuildOnly},
-		{"i386-linux-gnu", "linux-x86", ArchX86, ABI386SysV, DataModelILP32, 32, 32, 32, StatusBuildOnly},
-		{"i686-linux-gnu", "linux-x86", ArchX86, ABI386SysV, DataModelILP32, 32, 32, 32, StatusBuildOnly},
-		{"i686-unknown-linux-gnu", "linux-x86", ArchX86, ABI386SysV, DataModelILP32, 32, 32, 32, StatusBuildOnly},
-		{"i686-pc-linux-gnu", "linux-x86", ArchX86, ABI386SysV, DataModelILP32, 32, 32, 32, StatusBuildOnly},
+		{
+			"linux-i386",
+			"linux-x86",
+			ArchX86,
+			ABI386SysV,
+			DataModelILP32,
+			32,
+			32,
+			32,
+			StatusBuildOnly,
+		},
+		{
+			"linux-i686",
+			"linux-x86",
+			ArchX86,
+			ABI386SysV,
+			DataModelILP32,
+			32,
+			32,
+			32,
+			StatusBuildOnly,
+		},
+		{
+			"i386-linux-gnu",
+			"linux-x86",
+			ArchX86,
+			ABI386SysV,
+			DataModelILP32,
+			32,
+			32,
+			32,
+			StatusBuildOnly,
+		},
+		{
+			"i686-linux-gnu",
+			"linux-x86",
+			ArchX86,
+			ABI386SysV,
+			DataModelILP32,
+			32,
+			32,
+			32,
+			StatusBuildOnly,
+		},
+		{
+			"i686-unknown-linux-gnu",
+			"linux-x86",
+			ArchX86,
+			ABI386SysV,
+			DataModelILP32,
+			32,
+			32,
+			32,
+			StatusBuildOnly,
+		},
+		{
+			"i686-pc-linux-gnu",
+			"linux-x86",
+			ArchX86,
+			ABI386SysV,
+			DataModelILP32,
+			32,
+			32,
+			32,
+			StatusBuildOnly,
+		},
 		{"x64", "linux-x64", ArchX64, ABISysV, DataModelLP64, 64, 64, 64, StatusSupported},
 		{"amd64", "linux-x64", ArchX64, ABISysV, DataModelLP64, 64, 64, 64, StatusSupported},
 		{"x86_64", "linux-x64", ArchX64, ABISysV, DataModelLP64, 64, 64, 64, StatusSupported},
 		{"linux-amd64", "linux-x64", ArchX64, ABISysV, DataModelLP64, 64, 64, 64, StatusSupported},
 		{"linux-x86_64", "linux-x64", ArchX64, ABISysV, DataModelLP64, 64, 64, 64, StatusSupported},
-		{"x86_64-linux-gnu", "linux-x64", ArchX64, ABISysV, DataModelLP64, 64, 64, 64, StatusSupported},
-		{"x86_64-unknown-linux-gnu", "linux-x64", ArchX64, ABISysV, DataModelLP64, 64, 64, 64, StatusSupported},
-		{"x86_64-pc-linux-gnu", "linux-x64", ArchX64, ABISysV, DataModelLP64, 64, 64, 64, StatusSupported},
-		{"amd64-linux-gnu", "linux-x64", ArchX64, ABISysV, DataModelLP64, 64, 64, 64, StatusSupported},
+		{
+			"x86_64-linux-gnu",
+			"linux-x64",
+			ArchX64,
+			ABISysV,
+			DataModelLP64,
+			64,
+			64,
+			64,
+			StatusSupported,
+		},
+		{
+			"x86_64-unknown-linux-gnu",
+			"linux-x64",
+			ArchX64,
+			ABISysV,
+			DataModelLP64,
+			64,
+			64,
+			64,
+			StatusSupported,
+		},
+		{
+			"x86_64-pc-linux-gnu",
+			"linux-x64",
+			ArchX64,
+			ABISysV,
+			DataModelLP64,
+			64,
+			64,
+			64,
+			StatusSupported,
+		},
+		{
+			"amd64-linux-gnu",
+			"linux-x64",
+			ArchX64,
+			ABISysV,
+			DataModelLP64,
+			64,
+			64,
+			64,
+			StatusSupported,
+		},
 		{"win-x64", "windows-x64", ArchX64, ABIWin64, DataModelLLP64, 64, 64, 64, StatusSupported},
-		{"windows-amd64", "windows-x64", ArchX64, ABIWin64, DataModelLLP64, 64, 64, 64, StatusSupported},
-		{"windows-x86_64", "windows-x64", ArchX64, ABIWin64, DataModelLLP64, 64, 64, 64, StatusSupported},
-		{"x86_64-pc-windows-msvc", "windows-x64", ArchX64, ABIWin64, DataModelLLP64, 64, 64, 64, StatusSupported},
-		{"x86_64-pc-windows-gnu", "windows-x64", ArchX64, ABIWin64, DataModelLLP64, 64, 64, 64, StatusSupported},
-		{"amd64-windows-msvc", "windows-x64", ArchX64, ABIWin64, DataModelLLP64, 64, 64, 64, StatusSupported},
+		{
+			"windows-amd64",
+			"windows-x64",
+			ArchX64,
+			ABIWin64,
+			DataModelLLP64,
+			64,
+			64,
+			64,
+			StatusSupported,
+		},
+		{
+			"windows-x86_64",
+			"windows-x64",
+			ArchX64,
+			ABIWin64,
+			DataModelLLP64,
+			64,
+			64,
+			64,
+			StatusSupported,
+		},
+		{
+			"x86_64-pc-windows-msvc",
+			"windows-x64",
+			ArchX64,
+			ABIWin64,
+			DataModelLLP64,
+			64,
+			64,
+			64,
+			StatusSupported,
+		},
+		{
+			"x86_64-pc-windows-gnu",
+			"windows-x64",
+			ArchX64,
+			ABIWin64,
+			DataModelLLP64,
+			64,
+			64,
+			64,
+			StatusSupported,
+		},
+		{
+			"amd64-windows-msvc",
+			"windows-x64",
+			ArchX64,
+			ABIWin64,
+			DataModelLLP64,
+			64,
+			64,
+			64,
+			StatusSupported,
+		},
 		{"darwin-x64", "macos-x64", ArchX64, ABISysV, DataModelLP64, 64, 64, 64, StatusSupported},
 		{"macos-amd64", "macos-x64", ArchX64, ABISysV, DataModelLP64, 64, 64, 64, StatusSupported},
 		{"macos-x86_64", "macos-x64", ArchX64, ABISysV, DataModelLP64, 64, 64, 64, StatusSupported},
-		{"x86_64-apple-darwin", "macos-x64", ArchX64, ABISysV, DataModelLP64, 64, 64, 64, StatusSupported},
-		{"amd64-apple-darwin", "macos-x64", ArchX64, ABISysV, DataModelLP64, 64, 64, 64, StatusSupported},
+		{
+			"x86_64-apple-darwin",
+			"macos-x64",
+			ArchX64,
+			ABISysV,
+			DataModelLP64,
+			64,
+			64,
+			64,
+			StatusSupported,
+		},
+		{
+			"amd64-apple-darwin",
+			"macos-x64",
+			ArchX64,
+			ABISysV,
+			DataModelLP64,
+			64,
+			64,
+			64,
+			StatusSupported,
+		},
 		{"x32", "linux-x32", ArchX64, ABIX32SysV, DataModelX32, 32, 64, 32, StatusBuildOnly},
 		{"x86_64-x32", "linux-x32", ArchX64, ABIX32SysV, DataModelX32, 32, 64, 32, StatusBuildOnly},
 		{"linux-x32", "linux-x32", ArchX64, ABIX32SysV, DataModelX32, 32, 64, 32, StatusBuildOnly},
-		{"linux-x86_64-x32", "linux-x32", ArchX64, ABIX32SysV, DataModelX32, 32, 64, 32, StatusBuildOnly},
-		{"x86_64-linux-gnux32", "linux-x32", ArchX64, ABIX32SysV, DataModelX32, 32, 64, 32, StatusBuildOnly},
-		{"x86_64-unknown-linux-gnux32", "linux-x32", ArchX64, ABIX32SysV, DataModelX32, 32, 64, 32, StatusBuildOnly},
-		{"x86_64-pc-linux-gnux32", "linux-x32", ArchX64, ABIX32SysV, DataModelX32, 32, 64, 32, StatusBuildOnly},
-		{"linux-x86_64-gnux32", "linux-x32", ArchX64, ABIX32SysV, DataModelX32, 32, 64, 32, StatusBuildOnly},
+		{
+			"linux-x86_64-x32",
+			"linux-x32",
+			ArchX64,
+			ABIX32SysV,
+			DataModelX32,
+			32,
+			64,
+			32,
+			StatusBuildOnly,
+		},
+		{
+			"x86_64-linux-gnux32",
+			"linux-x32",
+			ArchX64,
+			ABIX32SysV,
+			DataModelX32,
+			32,
+			64,
+			32,
+			StatusBuildOnly,
+		},
+		{
+			"x86_64-unknown-linux-gnux32",
+			"linux-x32",
+			ArchX64,
+			ABIX32SysV,
+			DataModelX32,
+			32,
+			64,
+			32,
+			StatusBuildOnly,
+		},
+		{
+			"x86_64-pc-linux-gnux32",
+			"linux-x32",
+			ArchX64,
+			ABIX32SysV,
+			DataModelX32,
+			32,
+			64,
+			32,
+			StatusBuildOnly,
+		},
+		{
+			"linux-x86_64-gnux32",
+			"linux-x32",
+			ArchX64,
+			ABIX32SysV,
+			DataModelX32,
+			32,
+			64,
+			32,
+			StatusBuildOnly,
+		},
 	}
 
 	for _, tc := range cases {
@@ -156,12 +396,23 @@ func TestParseNormalizesX86X64X32Aliases(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Parse(%q): %v", tc.raw, err)
 		}
-		if tgt.Triple != tc.canonical || tgt.Arch != tc.arch || tgt.ABI != tc.abi || tgt.DataModel != tc.dataModel || tgt.Status != tc.status {
+		if tgt.Triple != tc.canonical || tgt.Arch != tc.arch || tgt.ABI != tc.abi ||
+			tgt.DataModel != tc.dataModel ||
+			tgt.Status != tc.status {
 			t.Fatalf("Parse(%q) = %#v", tc.raw, tgt)
 		}
-		if tgt.PointerWidthBits != tc.ptrBits || tgt.RegisterWidthBits != tc.regBits || tgt.NativeIntWidthBits != tc.nativeInt {
-			t.Fatalf("Parse(%q) widths ptr=%d reg=%d native=%d, want ptr=%d reg=%d native=%d",
-				tc.raw, tgt.PointerWidthBits, tgt.RegisterWidthBits, tgt.NativeIntWidthBits, tc.ptrBits, tc.regBits, tc.nativeInt)
+		if tgt.PointerWidthBits != tc.ptrBits || tgt.RegisterWidthBits != tc.regBits ||
+			tgt.NativeIntWidthBits != tc.nativeInt {
+			t.Fatalf(
+				"Parse(%q) widths ptr=%d reg=%d native=%d, want ptr=%d reg=%d native=%d",
+				tc.raw,
+				tgt.PointerWidthBits,
+				tgt.RegisterWidthBits,
+				tgt.NativeIntWidthBits,
+				tc.ptrBits,
+				tc.regBits,
+				tc.nativeInt,
+			)
 		}
 		if tgt.Endian != EndianLittle {
 			t.Fatalf("Parse(%q).Endian = %s, want little", tc.raw, tgt.Endian)
@@ -175,13 +426,26 @@ func TestX32IsNeitherX86NorX64Layout(t *testing.T) {
 	x32 := mustParse(t, "x32")
 
 	if x32.Arch != ArchX64 || x32.RegisterWidthBits != 64 {
-		t.Fatalf("x32 ISA/register model = arch %s reg %d, want x64 ISA with 64-bit registers", x32.Arch, x32.RegisterWidthBits)
+		t.Fatalf(
+			"x32 ISA/register model = arch %s reg %d, want x64 ISA with 64-bit registers",
+			x32.Arch,
+			x32.RegisterWidthBits,
+		)
 	}
 	if x32.PointerWidthBits != 32 || x32.NativeIntWidthBits != 32 {
-		t.Fatalf("x32 pointer/native int widths = %d/%d, want 32/32", x32.PointerWidthBits, x32.NativeIntWidthBits)
+		t.Fatalf(
+			"x32 pointer/native int widths = %d/%d, want 32/32",
+			x32.PointerWidthBits,
+			x32.NativeIntWidthBits,
+		)
 	}
 	if x32.ABI == x86.ABI || x32.ABI == x64.ABI {
-		t.Fatalf("x32 ABI must be distinct from x86 and x64: x86=%s x64=%s x32=%s", x86.ABI, x64.ABI, x32.ABI)
+		t.Fatalf(
+			"x32 ABI must be distinct from x86 and x64: x86=%s x64=%s x32=%s",
+			x86.ABI,
+			x64.ABI,
+			x32.ABI,
+		)
 	}
 	if x32.PointerWidthBits != x86.PointerWidthBits {
 		t.Fatalf("x32 and x86 pointer width should both be 32 bits")
@@ -226,8 +490,17 @@ func TestScalarLayoutsForNativeIntegerPointerAndCABIWidths(t *testing.T) {
 			t.Fatalf("%s scalar %s not found", tc.target, tc.scalar)
 		}
 		if got.SizeBytes != tc.size || got.AlignBytes != tc.align || got.ABIBytes != tc.abiSize {
-			t.Fatalf("%s scalar %s layout = size %d align %d abi %d, want size %d align %d abi %d",
-				tc.target, tc.scalar, got.SizeBytes, got.AlignBytes, got.ABIBytes, tc.size, tc.align, tc.abiSize)
+			t.Fatalf(
+				"%s scalar %s layout = size %d align %d abi %d, want size %d align %d abi %d",
+				tc.target,
+				tc.scalar,
+				got.SizeBytes,
+				got.AlignBytes,
+				got.ABIBytes,
+				tc.size,
+				tc.align,
+				tc.abiSize,
+			)
 		}
 	}
 }
@@ -282,15 +555,30 @@ func TestCompoundLayoutsUseTargetPointerWidth(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s ArrayLayout: %v", tc.target, err)
 		}
-		if array.SizeBytes != tc.arraySize || array.AlignBytes != tc.arrayAlign || array.ElemType != "ptr" || array.Len != 3 {
-			t.Fatalf("%s ptr[3] layout = %#v, want size=%d align=%d elem=ptr len=3", tc.target, array, tc.arraySize, tc.arrayAlign)
+		if array.SizeBytes != tc.arraySize || array.AlignBytes != tc.arrayAlign ||
+			array.ElemType != "ptr" ||
+			array.Len != 3 {
+			t.Fatalf(
+				"%s ptr[3] layout = %#v, want size=%d align=%d elem=ptr len=3",
+				tc.target,
+				array,
+				tc.arraySize,
+				tc.arrayAlign,
+			)
 		}
 
 		slice, err := tgt.SliceLayout("u8")
 		if err != nil {
 			t.Fatalf("%s SliceLayout: %v", tc.target, err)
 		}
-		assertStructLayout(t, tc.target+" []u8", slice, tc.sliceSize, tc.sliceAlign, tc.sliceOffsets)
+		assertStructLayout(
+			t,
+			tc.target+" []u8",
+			slice,
+			tc.sliceSize,
+			tc.sliceAlign,
+			tc.sliceOffsets,
+		)
 		if slice.Fields[0].Type != "ptr" || slice.Fields[1].Type != "i32" {
 			t.Fatalf("%s slice fields = %#v, want ptr+i32", tc.target, slice.Fields)
 		}
@@ -308,9 +596,18 @@ func TestCompoundLayoutsUseTargetPointerWidth(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s EnumLayout: %v", tc.target, err)
 		}
-		if enumLayout.SizeBytes != tc.enumSize || enumLayout.AlignBytes != tc.enumAlign || enumLayout.PayloadOffsetBytes != tc.enumPayloadOff || enumLayout.PayloadSizeBytes != tc.enumPayloadSize {
-			t.Fatalf("%s enum layout = %#v, want size=%d align=%d payloadOff=%d payloadSize=%d",
-				tc.target, enumLayout, tc.enumSize, tc.enumAlign, tc.enumPayloadOff, tc.enumPayloadSize)
+		if enumLayout.SizeBytes != tc.enumSize || enumLayout.AlignBytes != tc.enumAlign ||
+			enumLayout.PayloadOffsetBytes != tc.enumPayloadOff ||
+			enumLayout.PayloadSizeBytes != tc.enumPayloadSize {
+			t.Fatalf(
+				"%s enum layout = %#v, want size=%d align=%d payloadOff=%d payloadSize=%d",
+				tc.target,
+				enumLayout,
+				tc.enumSize,
+				tc.enumAlign,
+				tc.enumPayloadOff,
+				tc.enumPayloadSize,
+			)
 		}
 	}
 }
@@ -386,10 +683,17 @@ func TestArrayLayoutRejectsTargetNativeSizeOverflow(t *testing.T) {
 
 		_, err = tgt.ArrayLayout("ptr", over32BitByteLimit)
 		if err == nil {
-			t.Fatalf("%s ArrayLayout accepted 4GiB pointer array, want target usize overflow diagnostic", raw)
+			t.Fatalf(
+				"%s ArrayLayout accepted 4GiB pointer array, want target usize overflow diagnostic",
+				raw,
+			)
 		}
 		if !strings.Contains(err.Error(), "exceeds 32-bit native size limit") {
-			t.Fatalf("%s overflow error = %q, want explicit 32-bit native size diagnostic", raw, err)
+			t.Fatalf(
+				"%s overflow error = %q, want explicit 32-bit native size diagnostic",
+				raw,
+				err,
+			)
 		}
 	}
 
@@ -421,8 +725,17 @@ func TestAtomicPolicyCoversPointerSizedAndFixedWidths(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s AtomicPointerLayout: %v", tc.target, err)
 		}
-		if ptr.WidthBits != tc.pointerWidth || ptr.AlignBytes != tc.pointerAlign || ptr.RegisterWidthBits != tc.registerWidth || !ptr.PointerSized {
-			t.Fatalf("%s pointer atomic = %#v, want width=%d align=%d reg=%d pointer-sized", tc.target, ptr, tc.pointerWidth, tc.pointerAlign, tc.registerWidth)
+		if ptr.WidthBits != tc.pointerWidth || ptr.AlignBytes != tc.pointerAlign ||
+			ptr.RegisterWidthBits != tc.registerWidth ||
+			!ptr.PointerSized {
+			t.Fatalf(
+				"%s pointer atomic = %#v, want width=%d align=%d reg=%d pointer-sized",
+				tc.target,
+				ptr,
+				tc.pointerWidth,
+				tc.pointerAlign,
+				tc.registerWidth,
+			)
 		}
 		for _, width := range tc.supportedWidth {
 			got, err := tgt.AtomicLayout(width)
@@ -439,10 +752,15 @@ func TestAtomicPolicyCoversPointerSizedAndFixedWidths(t *testing.T) {
 	}
 	x86 := mustParse(t, "x86")
 	if _, err := x86.AtomicLayout(64); err == nil {
-		t.Fatalf("x86 AtomicLayout(64) succeeded, want explicit unsupported-width error without CPU-feature model")
+		t.Fatalf(
+			("x86 AtomicLayout(64) succeeded, want explicit unsupported-width " +
+				"error without CPU-feature model"),
+		)
 	}
 	if err := x86.ValidateAtomic(AtomicCompareExchange, 64, 8, MemoryOrderSeqCst); err == nil {
-		t.Fatalf("x86 64-bit atomic compare_exchange succeeded, want explicit unsupported-width error")
+		t.Fatalf(
+			"x86 64-bit atomic compare_exchange succeeded, want explicit unsupported-width error",
+		)
 	}
 }
 
@@ -482,8 +800,11 @@ func TestBuildOnlyArchitecturesHaveHonestRuntimeMetadata(t *testing.T) {
 			"single-spawn typed-task/staged typed-task/typed task-group plus actor-state runtime smoke",
 			"raw pointer-slot base/offset load/store executable smokes",
 			"i386 ctx_switch object smoke",
-			"current core.net networking runtime smokes, Surface, distributed actors, and actor fanout above 2 runtime boundary diagnostics",
-			"x86 canonical ptr/rawptr/nullable_ptr/ref, c_int/c_uint, and complete ILP32 native/libc scalar @export object smokes",
+			("current core.net networking runtime smokes, Surface, " +
+				"distributed actors, and actor fanout above 2 runtime boundary " +
+				"diagnostics"),
+			("x86 canonical ptr/rawptr/nullable_ptr/ref, c_int/c_uint, and " +
+				"complete ILP32 native/libc scalar @export object smokes"),
 			"x86 function-pointer @export diagnostics",
 			"remaining source target-layout scalar diagnostics",
 			"pointer-only atomic ABI-width object check",
@@ -497,11 +818,16 @@ func TestBuildOnlyArchitecturesHaveHonestRuntimeMetadata(t *testing.T) {
 			"raw pointer-slot base/offset executable smokes",
 			"MMIO read/write",
 			"scoped island bump allocation/free",
-			"self-host runtime builds for time, bounded two-spawn actors/task/task-group, single-spawn typed-task/staged typed-task/typed task-group, actor-state, and filesystem/scheduler composition smokes",
+			("self-host runtime builds for time, bounded two-spawn actors/" +
+				"task/task-group, single-spawn typed-task/staged typed-task/typed task-" +
+				"group, actor-state, and filesystem/scheduler composition smokes"),
 			"x32 ctx_switch object smoke",
 			"fs_exists-only filesystem runtime smoke",
-			"current x32 core.net networking runtime smokes, Surface, distributed actors, and x32 actor fanout above 2 runtime boundary diagnostics",
-			"scalar i32 plus canonical ptr/rawptr/nullable_ptr/ref, c_int/c_uint, and complete ILP32 native/libc scalar @export object smokes",
+			("current x32 core.net networking runtime smokes, Surface, " +
+				"distributed actors, and x32 actor fanout above 2 runtime boundary " +
+				"diagnostics"),
+			("scalar i32 plus canonical ptr/rawptr/nullable_ptr/ref, c_int/c_" +
+				"uint, and complete ILP32 native/libc scalar @export object smokes"),
 			"x32 function-pointer @export diagnostics",
 			"remaining source target-layout scalar diagnostics",
 			"pointer-only atomic ABI-width object check",
@@ -512,7 +838,12 @@ func TestBuildOnlyArchitecturesHaveHonestRuntimeMetadata(t *testing.T) {
 	for _, raw := range []string{"x86", "x32"} {
 		tgt := mustParse(t, raw)
 		if tgt.Status != StatusBuildOnly || !IsBuildOnlyTarget(tgt.Triple) {
-			t.Fatalf("%s status/build-only = %s/%v, want build_only/true", raw, tgt.Status, IsBuildOnlyTarget(tgt.Triple))
+			t.Fatalf(
+				"%s status/build-only = %s/%v, want build_only/true",
+				raw,
+				tgt.Status,
+				IsBuildOnlyTarget(tgt.Triple),
+			)
 		}
 		if tgt.RunMode != RunModeHostProbed {
 			t.Fatalf("%s run mode = %s, want host-probed", raw, tgt.RunMode)
@@ -545,25 +876,51 @@ func TestLinuxNativeTargetsExposePromotionGateMetadata(t *testing.T) {
 			ffiStatus:          "scalar_object_smokes_partial",
 			runnerProbeCommand: "tetra test --target x64 --format=json <runner-smoke.tetra>",
 			releaseGate:        "scripts/release/post_v0_4/linux-native-targets-smoke.sh",
-			evidenceArtifacts:  []string{"targets.json", "linux-x64-abi.json", "linux-x64-atomic-stress.json", "linux-x64-fuzz.json", "linux-x64-runner.json", "linux-native-targets-brutal.json", "artifact-hashes.json"},
+			evidenceArtifacts: []string{
+				"targets.json",
+				"linux-x64-abi.json",
+				"linux-x64-atomic-stress.json",
+				"linux-x64-fuzz.json",
+				"linux-x64-runner.json",
+				"linux-native-targets-brutal.json",
+				"artifact-hashes.json",
+			},
 		},
 		{
-			raw:                "x86",
-			runtimeStatus:      "partial_build_only",
-			stdlibStatus:       "partial_build_only",
-			ffiStatus:          "ilp32_scalar_object_smokes_partial",
-			runnerProbeCommand: "tetra test --diagnostics=json --target x86 --format=json <runner-smoke.tetra>",
-			releaseGate:        "scripts/release/post_v0_4/linux-native-targets-smoke.sh",
-			evidenceArtifacts:  []string{"targets.json", "linux-x86-abi.json", "linux-x86-atomic-stress.json", "linux-x86-fuzz.json", "linux-x86-runner.json", "linux-native-targets-brutal.json", "artifact-hashes.json"},
+			raw:           "x86",
+			runtimeStatus: "partial_build_only",
+			stdlibStatus:  "partial_build_only",
+			ffiStatus:     "ilp32_scalar_object_smokes_partial",
+			runnerProbeCommand: ("tetra test --diagnostics=json --target x86 --format=json " +
+				"<runner-smoke.tetra>"),
+			releaseGate: "scripts/release/post_v0_4/linux-native-targets-smoke.sh",
+			evidenceArtifacts: []string{
+				"targets.json",
+				"linux-x86-abi.json",
+				"linux-x86-atomic-stress.json",
+				"linux-x86-fuzz.json",
+				"linux-x86-runner.json",
+				"linux-native-targets-brutal.json",
+				"artifact-hashes.json",
+			},
 		},
 		{
-			raw:                "x32",
-			runtimeStatus:      "partial_build_only",
-			stdlibStatus:       "partial_build_only",
-			ffiStatus:          "ilp32_scalar_object_smokes_partial",
-			runnerProbeCommand: "tetra test --diagnostics=json --target x32 --format=json <runner-smoke.tetra>",
-			releaseGate:        "scripts/release/post_v0_4/linux-native-targets-smoke.sh",
-			evidenceArtifacts:  []string{"targets.json", "linux-x32-abi.json", "linux-x32-atomic-stress.json", "linux-x32-fuzz.json", "linux-x32-runner.json", "linux-native-targets-brutal.json", "artifact-hashes.json"},
+			raw:           "x32",
+			runtimeStatus: "partial_build_only",
+			stdlibStatus:  "partial_build_only",
+			ffiStatus:     "ilp32_scalar_object_smokes_partial",
+			runnerProbeCommand: ("tetra test --diagnostics=json --target x32 --format=json " +
+				"<runner-smoke.tetra>"),
+			releaseGate: "scripts/release/post_v0_4/linux-native-targets-smoke.sh",
+			evidenceArtifacts: []string{
+				"targets.json",
+				"linux-x32-abi.json",
+				"linux-x32-atomic-stress.json",
+				"linux-x32-fuzz.json",
+				"linux-x32-runner.json",
+				"linux-native-targets-brutal.json",
+				"artifact-hashes.json",
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -578,13 +935,23 @@ func TestLinuxNativeTargetsExposePromotionGateMetadata(t *testing.T) {
 			t.Fatalf("%s ffi_status = %q, want %q", tt.raw, tgt.FFIStatus, tt.ffiStatus)
 		}
 		if tgt.RunnerProbeCommand != tt.runnerProbeCommand {
-			t.Fatalf("%s runner_probe_command = %q, want %q", tt.raw, tgt.RunnerProbeCommand, tt.runnerProbeCommand)
+			t.Fatalf(
+				"%s runner_probe_command = %q, want %q",
+				tt.raw,
+				tgt.RunnerProbeCommand,
+				tt.runnerProbeCommand,
+			)
 		}
 		if tgt.ReleaseGate != tt.releaseGate {
 			t.Fatalf("%s release_gate = %q, want %q", tt.raw, tgt.ReleaseGate, tt.releaseGate)
 		}
 		if !reflect.DeepEqual(tgt.EvidenceArtifacts, tt.evidenceArtifacts) {
-			t.Fatalf("%s evidence_artifacts = %#v, want %#v", tt.raw, tgt.EvidenceArtifacts, tt.evidenceArtifacts)
+			t.Fatalf(
+				"%s evidence_artifacts = %#v, want %#v",
+				tt.raw,
+				tgt.EvidenceArtifacts,
+				tt.evidenceArtifacts,
+			)
 		}
 	}
 }
@@ -601,21 +968,84 @@ func TestTargetsExposeMemoryCapabilityMatrixMetadata(t *testing.T) {
 		claimLevel         string
 	}{
 		{"linux-x64", "yes", "yes", "yes", "yes", "yes/partial", "yes", "production/host_runtime"},
-		{"linux-x86", "yes", "yes", "no/host-dependent", "partial", "partial", "partial", "build_lower_only"},
-		{"linux-x32", "yes", "yes", "no/host-dependent", "partial", "partial", "special", "build_lower_only"},
-		{"macos-x64", "yes", "yes", "host-required", "host-required", "host-required", "host-required", "build_lower_only unless run"},
-		{"windows-x64", "yes", "yes", "host-required", "host-required", "host-required", "host-required", "build_lower_only unless run"},
-		{"wasm32-wasi", "yes", "yes", "runner-smoke if available", "safe-only", "limited", "wasm rules", "artifact/runtime tiered"},
-		{"wasm32-web", "yes", "yes", "browser-smoke if available", "safe-only", "limited", "wasm rules", "artifact/runtime tiered"},
+		{
+			"linux-x86",
+			"yes",
+			"yes",
+			"no/host-dependent",
+			"partial",
+			"partial",
+			"partial",
+			"build_lower_only",
+		},
+		{
+			"linux-x32",
+			"yes",
+			"yes",
+			"no/host-dependent",
+			"partial",
+			"partial",
+			"special",
+			"build_lower_only",
+		},
+		{
+			"macos-x64",
+			"yes",
+			"yes",
+			"host-required",
+			"host-required",
+			"host-required",
+			"host-required",
+			"build_lower_only unless run",
+		},
+		{
+			"windows-x64",
+			"yes",
+			"yes",
+			"host-required",
+			"host-required",
+			"host-required",
+			"host-required",
+			"build_lower_only unless run",
+		},
+		{
+			"wasm32-wasi",
+			"yes",
+			"yes",
+			"runner-smoke if available",
+			"safe-only",
+			"limited",
+			"wasm rules",
+			"artifact/runtime tiered",
+		},
+		{
+			"wasm32-web",
+			"yes",
+			"yes",
+			"browser-smoke if available",
+			"safe-only",
+			"limited",
+			"wasm rules",
+			"artifact/runtime tiered",
+		},
 	}
 	for _, tt := range tests {
 		tgt := mustParse(t, tt.raw)
 		if tgt.MemoryBuild != tt.build || tgt.MemoryLower != tt.lower || tgt.MemoryRun != tt.run ||
 			tgt.MemoryRawDiagnostics != tt.rawDiagnostics || tgt.MemoryRegionLowering != tt.regionLowering ||
 			tgt.MemoryAlignmentSemantics != tt.alignmentSemantics || tgt.MemoryClaimLevel != tt.claimLevel {
-			t.Fatalf("%s memory capability metadata = build:%q lower:%q run:%q raw:%q region:%q alignment:%q claim:%q",
-				tt.raw, tgt.MemoryBuild, tgt.MemoryLower, tgt.MemoryRun, tgt.MemoryRawDiagnostics,
-				tgt.MemoryRegionLowering, tgt.MemoryAlignmentSemantics, tgt.MemoryClaimLevel)
+			t.Fatalf(
+				("%s memory capability metadata = build:%q lower:%q run:%q raw:%q " +
+					"region:%q alignment:%q claim:%q"),
+				tt.raw,
+				tgt.MemoryBuild,
+				tgt.MemoryLower,
+				tgt.MemoryRun,
+				tgt.MemoryRawDiagnostics,
+				tgt.MemoryRegionLowering,
+				tgt.MemoryAlignmentSemantics,
+				tgt.MemoryClaimLevel,
+			)
 		}
 	}
 }
@@ -653,16 +1083,36 @@ func TestLinuxNativeTargetsExposeSyscallPackMetadata(t *testing.T) {
 	for _, tt := range tests {
 		tgt := mustParse(t, tt.raw)
 		if tgt.SyscallInstruction != tt.instruction {
-			t.Fatalf("%s syscall_instruction = %q, want %q", tt.raw, tgt.SyscallInstruction, tt.instruction)
+			t.Fatalf(
+				"%s syscall_instruction = %q, want %q",
+				tt.raw,
+				tgt.SyscallInstruction,
+				tt.instruction,
+			)
 		}
 		if tgt.SyscallNumbering != tt.numbering {
-			t.Fatalf("%s syscall_numbering = %q, want %q", tt.raw, tgt.SyscallNumbering, tt.numbering)
+			t.Fatalf(
+				"%s syscall_numbering = %q, want %q",
+				tt.raw,
+				tgt.SyscallNumbering,
+				tt.numbering,
+			)
 		}
 		if !reflect.DeepEqual(tgt.SyscallArgRegisters, tt.registers) {
-			t.Fatalf("%s syscall_arg_registers = %#v, want %#v", tt.raw, tgt.SyscallArgRegisters, tt.registers)
+			t.Fatalf(
+				"%s syscall_arg_registers = %#v, want %#v",
+				tt.raw,
+				tgt.SyscallArgRegisters,
+				tt.registers,
+			)
 		}
 		if tgt.SyscallErrorRange != tt.errorRange {
-			t.Fatalf("%s syscall_error_range = %q, want %q", tt.raw, tgt.SyscallErrorRange, tt.errorRange)
+			t.Fatalf(
+				"%s syscall_error_range = %q, want %q",
+				tt.raw,
+				tgt.SyscallErrorRange,
+				tt.errorRange,
+			)
 		}
 	}
 }
@@ -676,17 +1126,37 @@ func mustParse(t *testing.T, raw string) Target {
 	return tgt
 }
 
-func assertStructLayout(t *testing.T, name string, got AggregateLayout, size int, align int, offsets []int) {
+func assertStructLayout(
+	t *testing.T,
+	name string,
+	got AggregateLayout,
+	size int,
+	align int,
+	offsets []int,
+) {
 	t.Helper()
 	if got.SizeBytes != size || got.AlignBytes != align {
-		t.Fatalf("%s struct layout = size %d align %d, want size %d align %d", name, got.SizeBytes, got.AlignBytes, size, align)
+		t.Fatalf(
+			"%s struct layout = size %d align %d, want size %d align %d",
+			name,
+			got.SizeBytes,
+			got.AlignBytes,
+			size,
+			align,
+		)
 	}
 	if len(got.Fields) != len(offsets) {
 		t.Fatalf("%s field count = %d, want %d", name, len(got.Fields), len(offsets))
 	}
 	for i, want := range offsets {
 		if got.Fields[i].OffsetBytes != want {
-			t.Fatalf("%s field %s offset = %d, want %d", name, got.Fields[i].Name, got.Fields[i].OffsetBytes, want)
+			t.Fatalf(
+				"%s field %s offset = %d, want %d",
+				name,
+				got.Fields[i].Name,
+				got.Fields[i].OffsetBytes,
+				want,
+			)
 		}
 	}
 }
@@ -781,7 +1251,8 @@ func TestCurrentTargetContractIncludesRunnableWASMTargets(t *testing.T) {
 		t.Fatalf("All() = %#v, want supported triples %#v", all, SupportedTriples())
 	}
 	for _, tgt := range all {
-		if tgt.Status != StatusSupported || IsBuildOnlyTarget(tgt.Triple) || IsPlannedTarget(tgt.Triple) {
+		if tgt.Status != StatusSupported || IsBuildOnlyTarget(tgt.Triple) ||
+			IsPlannedTarget(tgt.Triple) {
 			t.Fatalf("All() included non-supported target: %#v", tgt)
 		}
 	}
@@ -793,10 +1264,12 @@ func TestCurrentTargetContractIncludesRunnableWASMTargets(t *testing.T) {
 		if tgt.Status != StatusSupported || IsBuildOnlyTarget(triple) || IsPlannedTarget(triple) {
 			t.Fatalf("WASM target %s contract drifted: %#v", triple, tgt)
 		}
-		if tgt.Arch != ArchWASM32 || tgt.Format != FormatWASM || tgt.ExeExt != ".wasm" || tgt.SupportsDebugInfo {
+		if tgt.Arch != ArchWASM32 || tgt.Format != FormatWASM || tgt.ExeExt != ".wasm" ||
+			tgt.SupportsDebugInfo {
 			t.Fatalf("WASM target %s metadata drifted: %#v", triple, tgt)
 		}
-		if triple == "wasm32-wasi" && (tgt.RunMode != RunModeWASIRunner || tgt.RunRunner != "wasmtime") {
+		if triple == "wasm32-wasi" &&
+			(tgt.RunMode != RunModeWASIRunner || tgt.RunRunner != "wasmtime") {
 			t.Fatalf("WASM target %s runner metadata drifted: %#v", triple, tgt)
 		}
 		if triple == "wasm32-web" && (tgt.RunMode != RunModeWebRunner || tgt.RunRunner != "") {

@@ -57,11 +57,16 @@ func FuzzLinkX64ObjectsDoesNotPanic(f *testing.F) {
 					Code:    []byte{0x48, 0x8D, 0x05, 0, 0, 0, 0, 0xC3},
 					Data:    data,
 					Symbols: []tobj.Symbol{{Name: fmt.Sprintf("sym_%s", mod), Offset: 0}},
-					Relocs:  []tobj.Reloc{{Kind: tobj.RelocDataDisp32, At: 3, Addend: uint32(rng.Intn(len(data)))}},
+					Relocs: []tobj.Reloc{
+						{Kind: tobj.RelocDataDisp32, At: 3, Addend: uint32(rng.Intn(len(data)))},
+					},
 				})
 			}
 		}
-		rng.Shuffle(len(objects), func(i, j int) { objects[i], objects[j] = objects[j], objects[i] })
+		rng.Shuffle(
+			len(objects),
+			func(i, j int) { objects[i], objects[j] = objects[j], objects[i] },
+		)
 
 		res, err := LinkX64Objects(objects, "main", stub, stubCallAt, 0)
 		if err != nil {
@@ -81,7 +86,11 @@ func FuzzLinkX64ObjectsDoesNotPanic(f *testing.F) {
 				t.Fatalf("data reloc out of range: at=%d text=%d", r.At, len(res.Text))
 			}
 			if r.TargetOff < 0 || r.TargetOff >= len(res.Data) {
-				t.Fatalf("data reloc target out of range: off=%d data=%d", r.TargetOff, len(res.Data))
+				t.Fatalf(
+					"data reloc target out of range: off=%d data=%d",
+					r.TargetOff,
+					len(res.Data),
+				)
 			}
 		}
 		for _, r := range res.IATRelocs {

@@ -95,7 +95,10 @@ func validateActionsAvailability(raw []byte) error {
 	}
 	var issues []string
 	if report.Schema != actionsAvailabilitySchema {
-		issues = append(issues, fmt.Sprintf("schema is %q, want %q", report.Schema, actionsAvailabilitySchema))
+		issues = append(
+			issues,
+			fmt.Sprintf("schema is %q, want %q", report.Schema, actionsAvailabilitySchema),
+		)
 	}
 	if report.Status != "pass" {
 		issues = append(issues, fmt.Sprintf("status is %q, want pass", report.Status))
@@ -117,7 +120,10 @@ func validateActionsAvailability(raw []byte) error {
 		}
 	}
 	if report.ProductionEvidence {
-		issues = append(issues, "production_evidence must be false; Actions availability is not runtime evidence")
+		issues = append(
+			issues,
+			"production_evidence must be false; Actions availability is not runtime evidence",
+		)
 	}
 	claimText := strings.ToLower(report.Summary + " " + report.NextAction)
 	if strings.Contains(claimText, "ready") {
@@ -130,21 +136,58 @@ func validateActionsAvailability(raw []byte) error {
 		issues = append(issues, "self_hosted_runner_count must be non-negative")
 	}
 	if report.BillingActionsStatus == "unavailable_missing_user_scope" {
-		issues = append(issues, "billing_actions_status is unavailable_missing_user_scope; refresh gh auth with user scope before availability can pass")
+		issues = append(
+			issues,
+			("billing_actions_status is unavailable_missing_user_scope; " +
+				"refresh gh auth with user scope before availability can pass"),
+		)
 	}
 	switch report.RunSelection {
-	case "workflow_name", "empty_workflow_fallback", "workflow_name_stale", "empty_workflow_fallback_stale", "none":
+	case "workflow_name",
+		"empty_workflow_fallback",
+		"workflow_name_stale",
+		"empty_workflow_fallback_stale",
+		"none":
 	default:
-		issues = append(issues, fmt.Sprintf("run_selection is %q, want workflow_name, empty_workflow_fallback, workflow_name_stale, empty_workflow_fallback_stale, or none", report.RunSelection))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				("run_selection is %q, want workflow_name, empty_workflow_"+
+					"fallback, workflow_name_stale, empty_workflow_fallback_stale, or none"),
+				report.RunSelection,
+			),
+		)
 	}
 	if report.Status == "pass" && report.RunSelection != "workflow_name" {
-		issues = append(issues, fmt.Sprintf("passing Actions availability requires run_selection workflow_name, got %q", report.RunSelection))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"passing Actions availability requires run_selection workflow_name, got %q",
+				report.RunSelection,
+			),
+		)
 	}
-	if report.Run.HeadSHA != "" && report.ExpectedGitHead != "" && report.Run.HeadSHA != report.ExpectedGitHead {
-		issues = append(issues, fmt.Sprintf("run.head_sha is %q, want expected_git_head %q", report.Run.HeadSHA, report.ExpectedGitHead))
+	if report.Run.HeadSHA != "" && report.ExpectedGitHead != "" &&
+		report.Run.HeadSHA != report.ExpectedGitHead {
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"run.head_sha is %q, want expected_git_head %q",
+				report.Run.HeadSHA,
+				report.ExpectedGitHead,
+			),
+		)
 	}
-	if report.Run.CheckSuite.HeadSHA != "" && report.ExpectedGitHead != "" && report.Run.CheckSuite.HeadSHA != report.ExpectedGitHead {
-		issues = append(issues, fmt.Sprintf("run.check_suite.head_sha is %q, want expected_git_head %q", report.Run.CheckSuite.HeadSHA, report.ExpectedGitHead))
+	if report.Run.CheckSuite.HeadSHA != "" && report.ExpectedGitHead != "" &&
+		report.Run.CheckSuite.HeadSHA != report.ExpectedGitHead {
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"run.check_suite.head_sha is %q, want expected_git_head %q",
+				report.Run.CheckSuite.HeadSHA,
+				report.ExpectedGitHead,
+			),
+		)
 	}
 	issues = append(issues, validateActionsWorkflows(report.Workflows, report.Workflow)...)
 	issues = append(issues, validateAvailabilityRun(report.Run)...)
@@ -180,16 +223,28 @@ func validateActionsWorkflows(workflows actionsWorkflows, expectedWorkflow strin
 		}
 		if entry.State == "active" {
 			actualActive++
-			if entry.Name == expectedWorkflow || strings.HasSuffix(entry.Path, "/"+expectedWorkflow+".yml") || strings.HasSuffix(entry.Path, "/"+expectedWorkflow+".yaml") {
+			if entry.Name == expectedWorkflow ||
+				strings.HasSuffix(entry.Path, "/"+expectedWorkflow+".yml") ||
+				strings.HasSuffix(entry.Path, "/"+expectedWorkflow+".yaml") {
 				hasExpectedActive = true
 			}
 		}
 	}
 	if workflows.ActiveCount != actualActive {
-		issues = append(issues, fmt.Sprintf("workflows.active_count is %d, computed %d", workflows.ActiveCount, actualActive))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"workflows.active_count is %d, computed %d",
+				workflows.ActiveCount,
+				actualActive,
+			),
+		)
 	}
 	if expectedWorkflow != "" && !hasExpectedActive {
-		issues = append(issues, fmt.Sprintf("workflows missing active workflow %q", expectedWorkflow))
+		issues = append(
+			issues,
+			fmt.Sprintf("workflows missing active workflow %q", expectedWorkflow),
+		)
 	}
 	return issues
 }
@@ -239,16 +294,31 @@ func validateAvailabilityCheckSuite(suite actionsAvailabilityCheckSuite) []strin
 		issues = append(issues, "run.check_suite.id must be positive")
 	}
 	if suite.App != "github-actions" {
-		issues = append(issues, fmt.Sprintf("run.check_suite.app is %q, want github-actions", suite.App))
+		issues = append(
+			issues,
+			fmt.Sprintf("run.check_suite.app is %q, want github-actions", suite.App),
+		)
 	}
 	if suite.Status != "completed" {
-		issues = append(issues, fmt.Sprintf("run.check_suite.status is %q, want completed", suite.Status))
+		issues = append(
+			issues,
+			fmt.Sprintf("run.check_suite.status is %q, want completed", suite.Status),
+		)
 	}
 	if suite.Conclusion != "success" {
-		issues = append(issues, fmt.Sprintf("run.check_suite.conclusion is %q, want success", suite.Conclusion))
+		issues = append(
+			issues,
+			fmt.Sprintf("run.check_suite.conclusion is %q, want success", suite.Conclusion),
+		)
 	}
 	if suite.LatestCheckRunsCount <= 0 {
-		issues = append(issues, fmt.Sprintf("run.check_suite.latest_check_runs_count is %d, want at least 1", suite.LatestCheckRunsCount))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"run.check_suite.latest_check_runs_count is %d, want at least 1",
+				suite.LatestCheckRunsCount,
+			),
+		)
 	}
 	if strings.TrimSpace(suite.HeadSHA) == "" {
 		issues = append(issues, "run.check_suite.head_sha is required")

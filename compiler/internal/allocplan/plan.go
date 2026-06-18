@@ -10,24 +10,39 @@ import (
 	"tetra_language/compiler/internal/runtimeabi"
 )
 
+type allocationRuntimePath = runtimeabi.AllocationRuntimePath
+type memoryBackendEvidence = runtimeabi.MemoryBackendAllocationEvidence
+type memoryDomain = runtimeabi.MemoryDomain
+type memoryDomainSummary = runtimeabi.MemoryDomainSummary
+
 type Plan struct {
 	Functions []FunctionPlan `json:"functions,omitempty"`
 	Totals    Totals         `json:"totals"`
 }
 
 type ReportSummary struct {
-	AllocationCount              int                   `json:"allocation_count"`
-	StorageClasses               map[string]int        `json:"storage_classes"`
-	ActualLoweringStorageClasses map[string]int        `json:"actual_lowering_storage_classes"`
-	RuntimePaths                 map[string]int        `json:"runtime_paths"`
-	AllocatorClasses             map[string]int        `json:"allocator_classes,omitempty"`
-	AllocatorScopes              map[string]int        `json:"allocator_scopes,omitempty"`
-	AllocatorReusePolicies       map[string]int        `json:"allocator_reuse_policies,omitempty"`
-	RawPointerBoundsStatuses     map[string]int        `json:"raw_pointer_bounds_statuses,omitempty"`
-	RawSlicePolicies             map[string]int        `json:"raw_slice_policies,omitempty"`
-	BytesRequested               int                   `json:"bytes_requested"`
-	BytesReserved                int                   `json:"bytes_reserved"`
-	Regions                      []RegionReportSummary `json:"regions,omitempty"`
+	AllocationCount              int            `json:"allocation_count"`
+	StorageClasses               map[string]int `json:"storage_classes"`
+	ActualLoweringStorageClasses map[string]int `json:"actual_lowering_storage_classes"`
+	RuntimePaths                 map[string]int `json:"runtime_paths"`
+	AllocatorClasses             map[string]int `json:"allocator_classes,omitempty"`
+	AllocatorScopes              map[string]int `json:"allocator_scopes,omitempty"`
+	AllocatorReusePolicies       map[string]int `json:"allocator_reuse_policies,omitempty"`
+
+	MemoryBackendClasses         map[string]int `json:"memory_backend_classes,omitempty"`
+	MemoryBackendOperations      map[string]int `json:"memory_backend_operations,omitempty"`
+	MemoryBackendEvidenceClasses map[string]int `json:"memory_backend_evidence_classes,omitempty"`
+	HeapReasonCodes              map[string]int `json:"heap_reason_codes,omitempty"`
+
+	RawPointerBoundsStatuses map[string]int `json:"raw_pointer_bounds_statuses,omitempty"`
+	RawSlicePolicies         map[string]int `json:"raw_slice_policies,omitempty"`
+	BytesRequested           int            `json:"bytes_requested"`
+	BytesReserved            int            `json:"bytes_reserved"`
+	BytesCommitted           int            `json:"bytes_committed,omitempty"`
+	BytesReleased            int            `json:"bytes_released,omitempty"`
+
+	Regions []RegionReportSummary `json:"regions,omitempty"`
+	Domains []memoryDomainSummary `json:"domains,omitempty"`
 }
 
 type RegionReportSummary struct {
@@ -53,45 +68,54 @@ type FunctionPlan struct {
 }
 
 type Allocation struct {
-	ID                                 string                           `json:"id"`
-	SiteID                             string                           `json:"site_id"`
-	ValueID                            string                           `json:"value_id"`
-	Source                             string                           `json:"source,omitempty"`
-	Builtin                            string                           `json:"builtin,omitempty"`
-	ElementType                        string                           `json:"element_type,omitempty"`
-	ElementSize                        int                              `json:"element_size,omitempty"`
-	LengthExpr                         string                           `json:"length_expr,omitempty"`
-	LengthStatus                       LengthStatus                     `json:"length_status,omitempty"`
-	ZeroGuardStatus                    string                           `json:"zero_guard_status,omitempty"`
-	NegativeGuardStatus                string                           `json:"negative_guard_status,omitempty"`
-	OverflowGuardStatus                string                           `json:"overflow_guard_status,omitempty"`
-	ByteSize                           int                              `json:"byte_size,omitempty"`
-	Escape                             EscapeClass                      `json:"escape"`
-	Storage                            StorageClass                     `json:"storage"`
-	PlannedStorage                     StorageClass                     `json:"planned_storage"`
-	ActualLoweringStorage              StorageClass                     `json:"actual_lowering_storage"`
-	Reason                             string                           `json:"reason"`
-	ValidationStatus                   string                           `json:"validation_status,omitempty"`
-	LoweringStatus                     string                           `json:"lowering_status,omitempty"`
-	BackendStorage                     StorageClass                     `json:"backend_storage,omitempty"`
-	BackendReason                      string                           `json:"backend_reason,omitempty"`
-	RuntimePath                        runtimeabi.AllocationRuntimePath `json:"runtime_path,omitempty"`
-	AllocatorClass                     string                           `json:"allocator_class,omitempty"`
-	AllocatorScope                     string                           `json:"allocator_scope,omitempty"`
-	AllocatorReusePolicy               string                           `json:"allocator_reuse_policy,omitempty"`
-	AllocatorChunkBytes                int                              `json:"allocator_chunk_bytes,omitempty"`
-	RawPointerBoundsStatus             string                           `json:"raw_pointer_bounds_status,omitempty"`
-	RawPointerBaseID                   string                           `json:"raw_pointer_base_id,omitempty"`
-	RawPointerBaseBytes                int64                            `json:"raw_pointer_base_bytes,omitempty"`
-	RawPointerOffsetBytes              int64                            `json:"raw_pointer_offset_bytes,omitempty"`
-	RawSlicePolicy                     string                           `json:"raw_slice_policy,omitempty"`
-	BytesRequested                     int                              `json:"bytes_requested"`
-	BytesReserved                      int                              `json:"bytes_reserved"`
-	RegionID                           string                           `json:"region_id,omitempty"`
-	Lifetime                           string                           `json:"lifetime,omitempty"`
-	DebugMode                          string                           `json:"debug_mode,omitempty"`
-	ExplicitIslandHandleParamSlotKnown bool                             `json:"-"`
-	ExplicitIslandHandleParamSlot      int                              `json:"-"`
+	ID                    string                 `json:"id"`
+	SiteID                string                 `json:"site_id"`
+	ValueID               string                 `json:"value_id"`
+	Source                string                 `json:"source,omitempty"`
+	Builtin               string                 `json:"builtin,omitempty"`
+	ElementType           string                 `json:"element_type,omitempty"`
+	ElementSize           int                    `json:"element_size,omitempty"`
+	LengthExpr            string                 `json:"length_expr,omitempty"`
+	LengthStatus          LengthStatus           `json:"length_status,omitempty"`
+	ZeroGuardStatus       string                 `json:"zero_guard_status,omitempty"`
+	NegativeGuardStatus   string                 `json:"negative_guard_status,omitempty"`
+	OverflowGuardStatus   string                 `json:"overflow_guard_status,omitempty"`
+	ByteSize              int                    `json:"byte_size,omitempty"`
+	Escape                EscapeClass            `json:"escape"`
+	Storage               StorageClass           `json:"storage"`
+	PlannedStorage        StorageClass           `json:"planned_storage"`
+	ActualLoweringStorage StorageClass           `json:"actual_lowering_storage"`
+	Reason                string                 `json:"reason"`
+	ValidationStatus      string                 `json:"validation_status,omitempty"`
+	LoweringStatus        string                 `json:"lowering_status,omitempty"`
+	BackendStorage        StorageClass           `json:"backend_storage,omitempty"`
+	BackendReason         string                 `json:"backend_reason,omitempty"`
+	ReasonCodes           []string               `json:"reason_codes,omitempty"`
+	HeapReasonCodes       []string               `json:"heap_reason_codes,omitempty"`
+	RuntimePath           allocationRuntimePath  `json:"runtime_path,omitempty"`
+	AllocatorClass        string                 `json:"allocator_class,omitempty"`
+	AllocatorScope        string                 `json:"allocator_scope,omitempty"`
+	AllocatorReusePolicy  string                 `json:"allocator_reuse_policy,omitempty"`
+	AllocatorChunkBytes   int                    `json:"allocator_chunk_bytes,omitempty"`
+	MemoryBackend         *memoryBackendEvidence `json:"memory_backend,omitempty"`
+
+	RawPointerBoundsStatus string `json:"raw_pointer_bounds_status,omitempty"`
+	RawPointerBaseID       string `json:"raw_pointer_base_id,omitempty"`
+	RawPointerBaseBytes    int64  `json:"raw_pointer_base_bytes,omitempty"`
+	RawPointerOffsetBytes  int64  `json:"raw_pointer_offset_bytes,omitempty"`
+	RawSlicePolicy         string `json:"raw_slice_policy,omitempty"`
+
+	BytesRequested int           `json:"bytes_requested"`
+	BytesReserved  int           `json:"bytes_reserved"`
+	BytesCommitted int           `json:"bytes_committed,omitempty"`
+	BytesReleased  int           `json:"bytes_released,omitempty"`
+	RegionID       string        `json:"region_id,omitempty"`
+	Lifetime       string        `json:"lifetime,omitempty"`
+	DebugMode      string        `json:"debug_mode,omitempty"`
+	Domain         *memoryDomain `json:"domain,omitempty"`
+
+	ExplicitIslandHandleParamSlotKnown bool `json:"-"`
+	ExplicitIslandHandleParamSlot      int  `json:"-"`
 }
 
 type Totals struct {
@@ -154,7 +178,20 @@ const (
 	LengthStatusInvalidContract  LengthStatus = "invalid_length_contract"
 )
 
+const (
+	HeapReasonEscapeReturn               = "heap.required_escape_return"
+	HeapReasonUnknownCall                = "heap.required_unknown_call"
+	HeapReasonActorBoundary              = "heap.required_actor_boundary"
+	HeapReasonTaskBoundary               = "heap.required_task_boundary"
+	HeapReasonDynamicLifetime            = "heap.required_dynamic_lifetime"
+	HeapReasonLargeObject                = "heap.required_large_object"
+	HeapReasonFFIExternal                = "heap.required_ffi_external"
+	HeapReasonBackendLoweringUnavailable = "heap.required_backend_lowering_unavailable"
+	HeapReasonRegionLoweringUnavailable  = "heap.required_region_lowering_unavailable"
+)
+
 const smallStackAllocationBytes = 4096
+const largeI32StackAllocationBytes = 16 * 1024
 const scalarReplacementMaxElements int64 = 2
 const maxAllocationByteSize int64 = 1<<31 - 1
 
@@ -167,6 +204,7 @@ func FromPLIRWithOptions(prog *plir.Program, opt Options) (*Plan, error) {
 		return nil, fmt.Errorf("allocplan: missing PLIR program")
 	}
 	plan := &Plan{}
+	callSummaries := buildReadOnlyCallSummaries(prog)
 	for _, fn := range prog.Funcs {
 		row := FunctionPlan{Name: fn.Name}
 		values := append([]plir.Value(nil), fn.Values...)
@@ -181,7 +219,7 @@ func FromPLIRWithOptions(prog *plir.Program, opt Options) (*Plan, error) {
 				valueOpt.EnableRegionPlanning = false
 				valueOpt.EnableRegionLowering = false
 			}
-			alloc := planAllocation(fn, value, valueOpt)
+			alloc := planAllocation(fn, value, valueOpt, callSummaries)
 			if alloc.Storage == StorageFunctionTempRegion {
 				functionTempRegionUsed = true
 			}
@@ -198,10 +236,15 @@ func FromPLIRWithOptions(prog *plir.Program, opt Options) (*Plan, error) {
 	return plan, nil
 }
 
-func planAllocation(fn plir.Function, value plir.Value, opt Options) Allocation {
+func planAllocation(
+	fn plir.Function,
+	value plir.Value,
+	opt Options,
+	callSummaries map[string]readOnlyCallSummary,
+) Allocation {
 	id := allocationName(value.ID)
-	escape, reason := classifyEscape(fn, id, value)
-	storage, storageReason := chooseStorage(value, escape, opt)
+	escape, reason := classifyEscape(fn, id, value, callSummaries)
+	storage, storageReason := chooseStorage(value, escape, reason, opt)
 	lengthStatus := classifyLengthStatus(value.Alloc)
 	scalarReplacement := false
 	unusedCopy := false
@@ -217,13 +260,15 @@ func planAllocation(fn plir.Function, value plir.Value, opt Options) Allocation 
 		unusedCopy = true
 		escape = EscapeNoEscape
 		storage = StorageEliminated
-		storageReason = "copy result is unused in the supported v0 intra-function scan; allocation intent can be elided"
+		storageReason = ("copy result is unused in the supported v0 intra-function " +
+			"scan; allocation intent can be elided")
 	}
 	if reason != "" {
 		storageReason = storageReason + "; " + reason
 	}
 	if lengthStatus == LengthStatusValidEmpty {
-		storageReason = storageReason + "; valid empty allocation has no allocator access where the backend implements the contract"
+		storageReason = storageReason + ("; valid empty allocation has no allocator access where the " +
+			"backend implements the contract")
 	}
 	if lengthStatus == LengthStatusRejectedNegative {
 		storageReason = storageReason + "; negative length is rejected before allocation"
@@ -232,7 +277,14 @@ func planAllocation(fn plir.Function, value plir.Value, opt Options) Allocation 
 		storageReason = storageReason + "; byte-size overflow is rejected before allocation"
 	}
 	byteSize := constantByteSize(value.Alloc)
-	actualStorage, loweringStatus, backendReason := actualLoweringStorage(value, storage, lengthStatus, opt, scalarReplacement, unusedCopy)
+	actualStorage, loweringStatus, backendReason := actualLoweringStorage(
+		value,
+		storage,
+		lengthStatus,
+		opt,
+		scalarReplacement,
+		unusedCopy,
+	)
 	alloc := Allocation{
 		ID:                     id,
 		SiteID:                 allocationSiteID(fn.Name, id, value.Source),
@@ -274,11 +326,96 @@ func planAllocation(fn plir.Function, value plir.Value, opt Options) Allocation 
 	if storage == StorageFunctionTempRegion {
 		applyPlannedRegionAllocatorEvidence(&alloc, fn, byteSize)
 	}
-	if opt.EnableSmallHeapRuntime && actualStorage == StorageHeap && storage != StorageFunctionTempRegion && lengthStatus == LengthStatusNormal {
+	if opt.EnableSmallHeapRuntime && actualStorage == StorageHeap &&
+		storage != StorageFunctionTempRegion &&
+		lengthStatus == LengthStatusNormal {
 		applyRuntimeAllocatorEvidence(&alloc, byteSize)
 	}
 	applyDefaultAllocationReportHooks(&alloc)
+	applyMemoryBackendEvidence(&alloc)
+	applyHeapReasonCodeEvidence(&alloc)
 	return alloc
+}
+
+func applyHeapReasonCodeEvidence(alloc *Allocation) {
+	if alloc == nil || !allocationUsesHeap(*alloc) {
+		return
+	}
+	codes := heapReasonCodesForAllocation(*alloc)
+	alloc.HeapReasonCodes = appendReasonCodes(nil, codes...)
+	alloc.ReasonCodes = appendReasonCodes(alloc.ReasonCodes, codes...)
+}
+
+func allocationUsesHeap(alloc Allocation) bool {
+	if alloc.Storage == StorageHeap || alloc.PlannedStorage == StorageHeap ||
+		alloc.ActualLoweringStorage == StorageHeap {
+		return true
+	}
+	switch RuntimePathForAllocation(alloc) {
+	case runtimeabi.AllocationPathHeap,
+		runtimeabi.AllocationPathPerCoreSmallHeap,
+		runtimeabi.AllocationPathLargeMmap:
+		return true
+	default:
+		return false
+	}
+}
+
+func heapReasonCodesForAllocation(alloc Allocation) []string {
+	var codes []string
+	switch alloc.Escape {
+	case EscapeReturn:
+		codes = append(codes, HeapReasonEscapeReturn)
+	case EscapeCallUnknown:
+		codes = append(codes, HeapReasonUnknownCall)
+	case EscapeActor:
+		codes = append(codes, HeapReasonActorBoundary)
+	case EscapeTask:
+		codes = append(codes, HeapReasonTaskBoundary)
+	case EscapeUnsafe:
+		codes = append(codes, HeapReasonFFIExternal)
+	case EscapeGlobal, EscapeClosure, EscapeAggregate, EscapeUnknown:
+		codes = append(codes, HeapReasonDynamicLifetime)
+	}
+	if alloc.PlannedStorage != StorageHeap && alloc.ActualLoweringStorage == StorageHeap {
+		switch alloc.LoweringStatus {
+		case "region_planned_heap_fallback":
+			codes = append(codes, HeapReasonRegionLoweringUnavailable)
+		case "conservative_heap_fallback":
+			codes = append(codes, HeapReasonBackendLoweringUnavailable)
+		}
+	}
+	if alloc.RuntimePath == runtimeabi.AllocationPathLargeMmap ||
+		alloc.ByteSize > smallStackAllocationBytes {
+		codes = append(codes, HeapReasonLargeObject)
+	}
+	if len(codes) == 0 {
+		codes = append(codes, HeapReasonDynamicLifetime)
+	}
+	return appendReasonCodes(nil, codes...)
+}
+
+func appendReasonCodes(existing []string, codes ...string) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(existing)+len(codes))
+	for _, code := range existing {
+		code = strings.TrimSpace(code)
+		if code == "" || seen[code] {
+			continue
+		}
+		seen[code] = true
+		out = append(out, code)
+	}
+	for _, code := range codes {
+		code = strings.TrimSpace(code)
+		if code == "" || seen[code] {
+			continue
+		}
+		seen[code] = true
+		out = append(out, code)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func applyDefaultAllocationReportHooks(alloc *Allocation) {
@@ -303,6 +440,123 @@ func applyDefaultAllocationReportHooks(alloc *Allocation) {
 			alloc.BytesReserved = alloc.ByteSize
 		}
 	}
+	if alloc.Domain == nil {
+		alloc.Domain = allocationMemoryDomain(*alloc)
+	}
+}
+
+func applyMemoryBackendEvidence(alloc *Allocation) {
+	if alloc == nil {
+		return
+	}
+	runtimePath := RuntimePathForAllocation(*alloc)
+	alloc.RuntimePath = runtimePath
+	reserved := int64(allocationReportBytesReserved(*alloc))
+	evidence := runtimeabi.MemoryBackendAllocationEvidence{
+		Schema:      runtimeabi.MemoryBackendAllocationEvidenceSchemaV1,
+		RuntimePath: runtimePath,
+	}
+	switch runtimePath {
+	case runtimeabi.AllocationPathPerCoreSmallHeap:
+		evidence.BackendClass = runtimeabi.MemoryBackendClassSmallHeap
+		evidence.Adapter = "runtime.small_heap.per_core_v1"
+		evidence.EvidenceClass = runtimeabi.MemoryFootprintEstimated
+		evidence.Method = "allocation_report_memory_backend_v1"
+		evidence.Operations = estimatedMemoryBackendOperations()
+		evidence.ReserveBytes = reserved
+		evidence.CommitBytes = reserved
+		evidence.ReleaseBytes = reserved
+		evidence.FootprintCurrentBytes = reserved
+		evidence.FootprintPeakBytes = reserved
+	case runtimeabi.AllocationPathLargeMmap:
+		evidence.BackendClass = runtimeabi.MemoryBackendClassLargeBackend
+		evidence.Adapter = "target.large_mmap_v1"
+		evidence.EvidenceClass = runtimeabi.MemoryFootprintEstimated
+		evidence.Method = "allocation_report_memory_backend_v1"
+		evidence.Operations = estimatedMemoryBackendOperations()
+		evidence.ReserveBytes = reserved
+		evidence.CommitBytes = reserved
+		evidence.ReleaseBytes = reserved
+		evidence.FootprintCurrentBytes = reserved
+		evidence.FootprintPeakBytes = reserved
+	case runtimeabi.AllocationPathExplicitIsland, runtimeabi.AllocationPathRegion:
+		evidence.BackendClass = runtimeabi.MemoryBackendClassRegion
+		evidence.Adapter = "runtime.region_bump_v1"
+		evidence.EvidenceClass = runtimeabi.MemoryFootprintEstimated
+		evidence.Method = "allocation_report_memory_backend_v1"
+		evidence.Operations = estimatedMemoryBackendOperations()
+		evidence.ReserveBytes = reserved
+		evidence.CommitBytes = reserved
+		evidence.ReleaseBytes = reserved
+		evidence.FootprintCurrentBytes = reserved
+		evidence.FootprintPeakBytes = reserved
+	case runtimeabi.AllocationPathStackFrame, runtimeabi.AllocationPathEliminated:
+		evidence.BackendClass = runtimeabi.MemoryBackendClassNone
+		evidence.Adapter = "no_runtime_memory_backend"
+		evidence.EvidenceClass = runtimeabi.MemoryFootprintUnsupported
+		evidence.Method = "no_runtime_memory_backend"
+		evidence.UnsupportedReason = ("stack/register/eliminated storage does not use the runtime " +
+			"MemoryBackend")
+	case runtimeabi.AllocationPathExternal:
+		evidence.BackendClass = runtimeabi.MemoryBackendClassExternal
+		evidence.Adapter = "external_owner_memory"
+		evidence.EvidenceClass = runtimeabi.MemoryFootprintUnsupported
+		evidence.Method = "external_owner_memory"
+		evidence.UnsupportedReason = "external storage is owned outside the Tetra runtime MemoryBackend"
+	case runtimeabi.AllocationPathHeap:
+		evidence.BackendClass = runtimeabi.MemoryBackendClassConservativeHeap
+		evidence.Adapter = "runtime.heap_conservative"
+		evidence.EvidenceClass = runtimeabi.MemoryFootprintBlocked
+		evidence.Method = "allocator_backend_not_enabled"
+		evidence.BlockedReason = "heap path has no MemoryBackend adapter evidence in this build"
+	default:
+		evidence.BackendClass = runtimeabi.MemoryBackendClassUnknown
+		evidence.Adapter = "unknown_memory_backend"
+		evidence.EvidenceClass = runtimeabi.MemoryFootprintBlocked
+		evidence.Method = "unknown_memory_backend"
+		evidence.BlockedReason = "runtime path does not map to a MemoryBackend evidence producer"
+	}
+	alloc.MemoryBackend = &evidence
+	if evidence.EvidenceClass == runtimeabi.MemoryFootprintEstimated ||
+		evidence.EvidenceClass == runtimeabi.MemoryFootprintMeasured {
+		alloc.BytesCommitted = int(evidence.CommitBytes)
+		alloc.BytesReleased = int(evidence.ReleaseBytes)
+	}
+	if alloc.Domain != nil {
+		alloc.Domain.CommittedBytes = int64(alloc.BytesCommitted)
+		alloc.Domain.ReleasedBytes = int64(alloc.BytesReleased)
+		alloc.Domain.CurrentBytes = evidence.FootprintCurrentBytes
+		alloc.Domain.PeakBytes = evidence.FootprintPeakBytes
+	}
+}
+
+func estimatedMemoryBackendOperations() []runtimeabi.MemoryBackendOperation {
+	return []runtimeabi.MemoryBackendOperation{
+		runtimeabi.MemoryBackendReserve,
+		runtimeabi.MemoryBackendCommit,
+		runtimeabi.MemoryBackendRelease,
+		runtimeabi.MemoryBackendFootprint,
+	}
+}
+
+func allocationMemoryDomain(alloc Allocation) *runtimeabi.MemoryDomain {
+	requested := int64(allocationReportBytesRequested(alloc))
+	reserved := int64(allocationReportBytesReserved(alloc))
+	var domain runtimeabi.MemoryDomain
+	switch alloc.ActualLoweringStorage {
+	case StorageExplicitIsland:
+		domain = runtimeabi.IslandMemoryDomain(alloc.RegionID, alloc.Lifetime, requested, reserved)
+	case StorageExternal:
+		domain = runtimeabi.ExternalMemoryDomain(
+			alloc.RegionID,
+			alloc.Lifetime,
+			requested,
+			reserved,
+		)
+	default:
+		domain = runtimeabi.DefaultProcessMemoryDomain(requested, reserved)
+	}
+	return &domain
 }
 
 func RuntimePathForAllocation(alloc Allocation) runtimeabi.AllocationRuntimePath {
@@ -347,9 +601,12 @@ func applyPlannedRegionAllocatorEvidence(alloc *Allocation, fn plir.Function, by
 		}
 	}
 	if alloc.ActualLoweringStorage == StorageFunctionTempRegion {
-		alloc.Reason = alloc.Reason + "; P15.0 function-local temporary region lowers through region enter/reset IR"
+		alloc.Reason = alloc.Reason + ("; P15.0 function-local temporary region lowers through " +
+			"region enter/reset IR")
 	} else {
-		alloc.Reason = alloc.Reason + "; P5.3 planned function-local temporary region; current backend still reports heap fallback until implicit region lowering lands"
+		alloc.Reason = alloc.Reason + ("; P5.3 planned function-local temporary region; current " +
+			"backend still reports heap fallback until implicit region " +
+			"lowering lands")
 	}
 }
 
@@ -369,7 +626,8 @@ func applyRegionAllocatorEvidence(alloc *Allocation, value plir.Value, byteSize 
 			alloc.BytesReserved = int(reserved)
 		}
 	}
-	alloc.Reason = alloc.Reason + "; P5.2 region allocator uses aligned bump allocation with bulk free at island scope exit"
+	alloc.Reason = alloc.Reason + ("; P5.2 region allocator uses aligned bump allocation with " +
+		"bulk free at island scope exit")
 }
 
 func allocationLifetime(value plir.Value) string {
@@ -445,50 +703,82 @@ func applyRuntimeAllocatorEvidence(alloc *Allocation, byteSize int) {
 		alloc.AllocatorChunkBytes = abi.ChunkBytes
 		alloc.BytesReserved = cls.MaxBytes
 		alloc.LoweringStatus = "per_core_small_heap_runtime"
-		alloc.Reason = alloc.Reason + "; P15.2 runtime allocator uses per-core small-heap metadata, 16-byte size classes, chunk refills, and same-core same-class free-list reuse for this byte class"
+		alloc.Reason = alloc.Reason + ("; P15.2 runtime allocator uses per-core small-heap metadata," +
+			" 16-byte size classes, chunk refills, and same-core " +
+			"same-class free-list reuse for this byte class")
 		return
 	}
 	alloc.RuntimePath = runtimeabi.AllocationPathLargeMmap
 	alloc.AllocatorClass = "large_mmap"
 	alloc.BytesReserved = byteSize
 	alloc.LoweringStatus = "large_mmap_runtime"
-	alloc.Reason = alloc.Reason + "; P5.1 runtime allocator routes this large allocation to mmap fallback"
+	alloc.Reason = alloc.Reason + ("; P5.1 runtime allocator routes this large allocation to " +
+		"mmap fallback")
 }
 
-func actualLoweringStorage(value plir.Value, planned StorageClass, lengthStatus LengthStatus, opt Options, scalarReplacement bool, unusedCopy bool) (StorageClass, string, string) {
+func actualLoweringStorage(
+	value plir.Value,
+	planned StorageClass,
+	lengthStatus LengthStatus,
+	opt Options,
+	scalarReplacement bool,
+	unusedCopy bool,
+) (StorageClass, string, string) {
 	if value.Provenance.Kind == plir.ProvenanceIsland || planned == StorageExplicitIsland {
-		return StorageExplicitIsland, "explicit_island_lowering", "explicit island allocation remains region-backed in the current backend"
+		return StorageExplicitIsland, "explicit_island_lowering", (("explicit island allocation " +
+			"remains region-backed in the ") +
+			"current backend")
 	}
 	switch planned {
 	case StorageEliminated:
 		if opt.EnableStackLowering && unusedCopy {
-			return StorageEliminated, "eliminated_unused_copy", "unused copy lowers to source evaluation plus an empty local header with no fresh storage"
+			return StorageEliminated, "eliminated_unused_copy", (("unused copy lowers to source " +
+				"evaluation plus an empty local ") +
+				"header with no fresh storage")
 		}
 		if opt.EnableStackLowering && scalarReplacement {
-			return StorageEliminated, "scalar_replacement", "fixed tiny no-escape allocation lowers to scalar locals with no slice backing storage"
+			return StorageEliminated, "scalar_replacement", (("fixed tiny no-escape allocation " +
+				"lowers to scalar locals ") +
+				"with no slice backing storage")
 		}
 		if opt.EnableStackLowering && lengthStatus == LengthStatusValidEmpty {
-			return StorageEliminated, "eliminated_no_backing_storage", "valid empty allocation intent lowers without backing storage"
+			return StorageEliminated, "eliminated_no_backing_storage", ("valid empty allocation " +
+				"intent lowers without backing storage")
 		}
 	case StorageStack:
 		if opt.EnableStackLowering {
-			return StorageStack, "stack_lowering", "fixed small no-escape allocation lowers to stack frame storage"
+			return StorageStack, "stack_lowering", (("fixed small no-escape allocation lowers to " +
+				"stack frame ") +
+				"storage")
 		}
 	case StorageHeap:
-		return StorageHeap, "heap_runtime", "planned heap allocation lowers through the conservative heap/runtime path"
+		return StorageHeap, "heap_runtime", ("planned heap allocation lowers through the conservative " +
+			"heap/runtime path")
 	case StorageFunctionTempRegion:
 		if opt.EnableRegionLowering {
-			return StorageFunctionTempRegion, "function_temp_region_lowering", "function-local temporary copy lowers through function-temp region enter/reset IR"
+			return StorageFunctionTempRegion, "function_temp_region_lowering", (("function-local " +
+				"temporary copy lowers through function-temp ") +
+				"region enter/reset IR")
 		}
-		return StorageHeap, "region_planned_heap_fallback", "P5.3 models a bounded function-local region, but implicit region runtime lowering is not enabled in the current backend"
+		return StorageHeap, "region_planned_heap_fallback", (("P5.3 models a bounded function-" +
+			"local region, but implicit ") +
+			"region runtime lowering is not enabled in the current " +
+			"backend")
 	case StorageExternal:
-		return StorageExternal, "external_no_lowering", "external storage is supplied outside the allocator"
+		return StorageExternal, "external_no_lowering", ("external storage is supplied outside " +
+			"the allocator")
 	case StorageUnknownConservative:
 		return StorageUnknownConservative, "unknown_conservative", "unknown storage remains conservative"
 	default:
-		return StorageHeap, "conservative_heap_fallback", "planner v0 records the narrower storage class; current stack backend still lowers make through the conservative heap/runtime path"
+		return StorageHeap, "conservative_heap_fallback", (("planner v0 records the narrower " +
+			"storage class; current ") +
+			"stack backend still lowers make through the conservative " +
+			"heap/runtime path")
 	}
-	return StorageHeap, "conservative_heap_fallback", "planner v0 records the narrower storage class; current stack backend still lowers make through the conservative heap/runtime path"
+	return StorageHeap, "conservative_heap_fallback", (("planner v0 records the narrower " +
+		"storage class; current ") +
+		"stack backend still lowers make through the conservative " +
+		"heap/runtime path")
 }
 
 func validationStatus(escape EscapeClass, storage StorageClass, lengthStatus LengthStatus) string {
@@ -529,7 +819,8 @@ func validationStatus(escape EscapeClass, storage StorageClass, lengthStatus Len
 }
 
 func isUnusedCopyAllocation(fn plir.Function, value plir.Value, allocName string) bool {
-	if value.Alloc == nil || !isCopyBuiltin(value.Alloc.Builtin) || allocName == "" || allocName == "$return" {
+	if value.Alloc == nil || !isCopyBuiltin(value.Alloc.Builtin) || allocName == "" ||
+		allocName == "$return" {
 		return false
 	}
 	for _, op := range fn.Ops {
@@ -543,10 +834,15 @@ func isUnusedCopyAllocation(fn plir.Function, value plir.Value, allocName string
 }
 
 func isCopyBuiltin(name string) bool {
-	return name == "core.string_copy" || (strings.HasPrefix(name, "core.slice_copy_") && !strings.HasPrefix(name, "core.slice_copy_into_"))
+	return name == "core.string_copy" ||
+		(strings.HasPrefix(name, "core.slice_copy_") && !strings.HasPrefix(name, "core.slice_copy_into_"))
 }
 
-func isScalarReplacementCandidate(fn plir.Function, value plir.Value, allocName string) (bool, string) {
+func isScalarReplacementCandidate(
+	fn plir.Function,
+	value plir.Value,
+	allocName string,
+) (bool, string) {
 	if value.Alloc == nil || allocName == "" {
 		return false, ""
 	}
@@ -587,9 +883,19 @@ func isScalarReplacementCandidate(fn plir.Function, value plir.Value, allocName 
 		return false, ""
 	}
 	if copyCandidate {
-		return true, fmt.Sprintf("scalar_replacement_copy_fixed_constant_indices: fixed tiny no-escape copy has %d elements and every indexed use is constant in range", length)
+		return true, fmt.Sprintf(
+			("scalar_replacement_copy_fixed_constant_indices: fixed tiny " +
+				"no-escape copy has %d elements and every indexed use is " +
+				"constant in range"),
+			length,
+		)
 	}
-	return true, fmt.Sprintf("scalar_replacement_fixed_constant_indices: fixed tiny no-escape allocation has %d elements and every indexed use is constant in range", length)
+	return true, fmt.Sprintf(
+		("scalar_replacement_fixed_constant_indices: fixed tiny " +
+			"no-escape allocation has %d elements and every indexed use " +
+			"is constant in range"),
+		length,
+	)
 }
 
 func isMakeSliceBuiltin(name string) bool {
@@ -640,7 +946,137 @@ func allocationInputUses(input string, allocName string) bool {
 	return input == allocName || strings.HasPrefix(input, allocName+".")
 }
 
-func classifyEscape(fn plir.Function, allocName string, value plir.Value) (EscapeClass, string) {
+type readOnlyCallSummary struct {
+	Params            map[int]bool
+	InoutWriterParams map[int]bool
+}
+
+func buildReadOnlyCallSummaries(prog *plir.Program) map[string]readOnlyCallSummary {
+	if prog == nil {
+		return nil
+	}
+	out := map[string]readOnlyCallSummary{}
+	for _, fn := range prog.Funcs {
+		summary := readOnlyCallSummary{Params: map[int]bool{}, InoutWriterParams: map[int]bool{}}
+		if fn.Summary == nil || fn.Summary.Async || fn.Summary.TouchesMutableGlobals {
+			continue
+		}
+		for i, name := range fn.Summary.ParamNames {
+			if !isMemoryBearingParamType(fn.Summary, i) {
+				continue
+			}
+			if parameterHasReadOnlyNoEscapeUse(fn, name) {
+				summary.Params[i] = true
+			}
+			if parameterHasInoutWriterNoEscapeUse(fn, i, name) {
+				summary.InoutWriterParams[i] = true
+			}
+		}
+		if len(summary.Params) > 0 || len(summary.InoutWriterParams) > 0 {
+			out[fn.Name] = summary
+		}
+	}
+	return out
+}
+
+func isMemoryBearingParamType(summary *plir.FunctionSummary, index int) bool {
+	if summary == nil || index < 0 || index >= len(summary.ParamTypes) {
+		return false
+	}
+	typeName := strings.TrimSpace(summary.ParamTypes[index])
+	return strings.HasPrefix(typeName, "[]") || typeName == "str" || typeName == "String"
+}
+
+func parameterHasReadOnlyNoEscapeUse(fn plir.Function, paramName string) bool {
+	if strings.TrimSpace(paramName) == "" {
+		return false
+	}
+	carriers := allocationCarriers(fn, paramName, string(plir.ValueParam)+":"+paramName)
+	for _, op := range fn.Ops {
+		if op.Kind == plir.OpUnsafe {
+			return false
+		}
+		if !opUsesCarrier(op, carriers) {
+			continue
+		}
+		switch op.Kind {
+		case plir.OpAssign, plir.OpGuard, plir.OpIndexLoad, plir.OpSliceWindow:
+			continue
+		case plir.OpCall:
+			if isNonEscapingBuiltinCall(op.Note) {
+				continue
+			}
+			return false
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+func parameterHasInoutWriterNoEscapeUse(fn plir.Function, index int, paramName string) bool {
+	if fn.Summary == nil || !isMemoryBearingParamType(fn.Summary, index) ||
+		!summaryParamOwnershipIs(fn.Summary, index, "inout") {
+		return false
+	}
+	if strings.TrimSpace(paramName) == "" {
+		return false
+	}
+	carriers := allocationCarriers(fn, paramName, string(plir.ValueParam)+":"+paramName)
+	sawCarrierUse := false
+	for _, op := range fn.Ops {
+		if op.Kind == plir.OpUnsafe {
+			return false
+		}
+		if !opUsesCarrier(op, carriers) {
+			continue
+		}
+		sawCarrierUse = true
+		switch op.Kind {
+		case plir.OpAssign, plir.OpGuard, plir.OpIndexLoad, plir.OpSliceWindow:
+			continue
+		case plir.OpIndexStore:
+			if indexStoreUsesCarrierOnlyAsBase(op, carriers) {
+				continue
+			}
+			return false
+		case plir.OpCall:
+			if isNonEscapingBuiltinCall(op.Note) {
+				continue
+			}
+			return false
+		default:
+			return false
+		}
+	}
+	return sawCarrierUse
+}
+
+func summaryParamOwnershipIs(summary *plir.FunctionSummary, index int, want string) bool {
+	if summary == nil || index < 0 || index >= len(summary.ParamOwnership) {
+		return false
+	}
+	return strings.TrimSpace(summary.ParamOwnership[index]) == want
+}
+
+func indexStoreUsesCarrierOnlyAsBase(op plir.Operation, carriers map[string]bool) bool {
+	if len(op.Inputs) == 0 || !inputCarriesAny(op.Inputs[0], carriers) {
+		return false
+	}
+	for _, input := range op.Inputs[1:] {
+		if inputCarriesAny(input, carriers) {
+			return false
+		}
+	}
+	return true
+}
+
+func classifyEscape(
+	fn plir.Function,
+	allocName string,
+	value plir.Value,
+	callSummaries map[string]readOnlyCallSummary,
+) (EscapeClass, string) {
 	if value.Provenance.Kind == plir.ProvenanceIsland {
 		return EscapeNoEscape, "explicit island allocation is bounded by the island scope"
 	}
@@ -651,6 +1087,8 @@ func classifyEscape(fn plir.Function, allocName string, value plir.Value) (Escap
 	unsafeBoundary := false
 	aggregateBoundary := false
 	closureBoundary := false
+	readOnlyCallSummaryProof := false
+	inoutWriterCallSummaryProof := false
 	for _, op := range fn.Ops {
 		if opUsesCarrier(op, carriers) {
 			switch op.Kind {
@@ -677,6 +1115,11 @@ func classifyEscape(fn plir.Function, allocName string, value plir.Value) (Escap
 				if looksTaskBoundary(op.Note) {
 					return EscapeTask, "allocation crosses a task boundary"
 				}
+				if proof, ok := callInputsCoveredByLocalNoEscapeSummary(op, carriers, callSummaries); ok {
+					readOnlyCallSummaryProof = readOnlyCallSummaryProof || proof.ReadOnly
+					inoutWriterCallSummaryProof = inoutWriterCallSummaryProof || proof.InoutWriter
+					continue
+				}
 				return EscapeCallUnknown, "allocation is passed to a call without interprocedural escape facts"
 			}
 		}
@@ -692,9 +1135,94 @@ func classifyEscape(fn plir.Function, allocName string, value plir.Value) (Escap
 		return EscapeAggregate, "allocation is stored inside an aggregate value"
 	}
 	if unsafeBoundary {
-		return EscapeUnsafe, "function contains an unsafe boundary; v0 conservatively assumes possible raw exposure"
+		return EscapeUnsafe, ("function contains an unsafe boundary; v0 conservatively " +
+			"assumes possible raw exposure")
+	}
+	if readOnlyCallSummaryProof && inoutWriterCallSummaryProof {
+		return EscapeNoEscape, ("allocation is passed only to proven read-only local call " +
+			"summary parameters and proven local inout writer noescape " +
+			"summary parameters and does not escape in the supported v0 " +
+			"scan")
+	}
+	if inoutWriterCallSummaryProof {
+		return EscapeNoEscape, ("allocation is passed only to proven local inout writer " +
+			"noescape summary parameters and does not escape in the " +
+			"supported v0 scan")
+	}
+	if readOnlyCallSummaryProof {
+		return EscapeNoEscape, ("allocation is passed only to proven read-only local call " +
+			"summary parameters and does not escape in the supported v0 " +
+			"scan")
 	}
 	return EscapeNoEscape, "allocation does not escape in the supported v0 intra-function scan"
+}
+
+type localCallSummaryProof struct {
+	ReadOnly    bool
+	InoutWriter bool
+}
+
+func callInputsCoveredByLocalNoEscapeSummary(
+	op plir.Operation,
+	carriers map[string]bool,
+	summaries map[string]readOnlyCallSummary,
+) (localCallSummaryProof, bool) {
+	callee := localCallSummaryName(op.Note)
+	if callee == "" {
+		return localCallSummaryProof{}, false
+	}
+	summary, ok := summaries[callee]
+	if !ok || (len(summary.Params) == 0 && len(summary.InoutWriterParams) == 0) {
+		return localCallSummaryProof{}, false
+	}
+	proof := localCallSummaryProof{}
+	matched := false
+	for i, input := range op.Inputs {
+		if !inputCarriesAny(input, carriers) {
+			continue
+		}
+		matched = true
+		if summary.Params[i] {
+			proof.ReadOnly = true
+			continue
+		}
+		if summary.InoutWriterParams[i] {
+			proof.InoutWriter = true
+			continue
+		}
+		return localCallSummaryProof{}, false
+	}
+	return proof, matched
+}
+
+func inputCarriesAny(input string, carriers map[string]bool) bool {
+	for carrier := range carriers {
+		if allocationInputCarriesValue(input, carrier) {
+			return true
+		}
+	}
+	return false
+}
+
+func localCallSummaryName(note string) string {
+	note = strings.TrimSpace(note)
+	if note == "" {
+		return ""
+	}
+	lower := strings.ToLower(note)
+	if strings.Contains(lower, "unknown external") || strings.Contains(lower, "external call") ||
+		strings.Contains(lower, "alias_boundary:") {
+		return ""
+	}
+	fields := strings.Fields(note)
+	if len(fields) == 0 {
+		return ""
+	}
+	name := fields[0]
+	if strings.HasPrefix(name, "core.") || strings.HasPrefix(name, "ffi.") {
+		return ""
+	}
+	return name
 }
 
 func allocationCarriers(fn plir.Function, allocName string, valueID string) map[string]bool {
@@ -774,14 +1302,20 @@ func allocationInputCarriesValue(input string, carrier string) bool {
 }
 
 func isNonEscapingBuiltinCall(note string) bool {
-	return isBorrowViewOperation(note) || strings.Contains(note, "copies into caller-owned destination without allocation")
+	return isBorrowViewOperation(note) ||
+		strings.Contains(note, "copies into caller-owned destination without allocation")
 }
 
 func isBorrowViewOperation(note string) bool {
 	return strings.Contains(note, "creates borrowed view without allocation")
 }
 
-func chooseStorage(value plir.Value, escape EscapeClass, opt Options) (StorageClass, string) {
+func chooseStorage(
+	value plir.Value,
+	escape EscapeClass,
+	escapeReason string,
+	opt Options,
+) (StorageClass, string) {
 	if classifyLengthStatus(value.Alloc) == LengthStatusValidEmpty {
 		return StorageEliminated, "zero-length allocation intent needs no backing storage"
 	}
@@ -790,16 +1324,45 @@ func chooseStorage(value plir.Value, escape EscapeClass, opt Options) (StorageCl
 	}
 	switch escape {
 	case EscapeNoEscape:
+		if strings.Contains(escapeReason, "read-only local call summary") {
+			bytes := constantByteSize(value.Alloc)
+			if bytes > 0 && bytes <= smallStackAllocationBytes {
+				return StorageStack, fmt.Sprintf(
+					("fixed_small_read_only_local_call_no_escape: fixed-size " +
+						"no-escape allocation crosses only proven read-only local " +
+						"call summaries and is %d bytes, within stack threshold"),
+					bytes,
+				)
+			}
+			return StorageHeap, ("no-escape allocation crosses a local call boundary but is " +
+				"not fixed-small; planner keeps heap fallback until broader " +
+				"call-aware region lowering is proven")
+		}
 		if opt.EnableRegionPlanning && isFunctionTempRegionCandidate(value) {
-			return StorageFunctionTempRegion, "function-local temporary copy has bounded lifetime and can be planned for a temp region"
+			return StorageFunctionTempRegion, (("function-local temporary copy has bounded " +
+				"lifetime and can ") +
+				"be planned for a temp region")
 		}
 		bytes := constantByteSize(value.Alloc)
-		if bytes > 0 && bytes <= smallStackAllocationBytes {
-			return StorageStack, fmt.Sprintf("fixed_small_no_escape: fixed-size no-escape allocation is %d bytes, within stack threshold", bytes)
+		stackLimit := stackAllocationLimitBytes(value.Alloc)
+		if bytes > 0 && bytes <= stackLimit {
+			if stackLimit > smallStackAllocationBytes {
+				return StorageStack, fmt.Sprintf(
+					("fixed_i32_no_escape: fixed-size no-escape i32 allocation is " +
+						"%d bytes, within i32 stack threshold"),
+					bytes,
+				)
+			}
+			return StorageStack, fmt.Sprintf(
+				"fixed_small_no_escape: fixed-size no-escape allocation is %d bytes, within stack threshold",
+				bytes,
+			)
 		}
-		return StorageHeap, "no-escape allocation has non-constant or large size; planner v0 keeps heap fallback"
+		return StorageHeap, ("no-escape allocation has non-constant or large size; " +
+			"planner v0 keeps heap fallback")
 	case EscapeReturn:
-		return StorageHeap, "returned allocation needs caller-owned region support before it can avoid heap fallback"
+		return StorageHeap, ("returned allocation needs caller-owned region support " +
+			"before it can avoid heap fallback")
 	case EscapeCallUnknown:
 		return StorageHeap, "unknown call escape requires conservative heap fallback"
 	case EscapeActor:
@@ -807,11 +1370,13 @@ func chooseStorage(value plir.Value, escape EscapeClass, opt Options) (StorageCl
 	case EscapeTask:
 		return StorageHeap, "task transfer region planning is not enabled for this allocation"
 	case EscapeUnsafe:
-		return StorageHeap, "unsafe exposure requires conservative heap fallback unless explicit proof exists"
+		return StorageHeap, ("unsafe exposure requires conservative heap fallback unless " +
+			"explicit proof exists")
 	case EscapeClosure:
 		return StorageHeap, "closure environment escape requires conservative heap fallback"
 	case EscapeAggregate:
-		return StorageHeap, "aggregate escape requires conservative heap fallback until field-sensitive storage planning"
+		return StorageHeap, ("aggregate escape requires conservative heap fallback until " +
+			"field-sensitive storage planning")
 	default:
 		return StorageHeap, "unknown escape state requires conservative heap fallback"
 	}
@@ -828,364 +1393,14 @@ func isFunctionTempRegionCandidate(value plir.Value) bool {
 	return bytes == 0 || bytes > smallStackAllocationBytes
 }
 
-func VerifyPlan(plan *Plan) error {
-	if plan == nil {
-		return fmt.Errorf("allocplan verifier: missing plan")
+func stackAllocationLimitBytes(intent *plir.AllocIntent) int {
+	if intent == nil {
+		return smallStackAllocationBytes
 	}
-	seen := map[string]bool{}
-	for _, fn := range plan.Functions {
-		if fn.Name == "" {
-			return fmt.Errorf("allocplan verifier: function with empty name")
-		}
-		for _, alloc := range fn.Allocations {
-			if alloc.ValueID == "" {
-				return fmt.Errorf("allocplan verifier: %s allocation with empty value id", fn.Name)
-			}
-			if alloc.ID == "" {
-				return fmt.Errorf("allocplan verifier: %s allocation with empty allocation id", fn.Name)
-			}
-			if alloc.SiteID == "" {
-				return fmt.Errorf("allocplan verifier: %s allocation %q missing stable site id", fn.Name, alloc.ValueID)
-			}
-			if alloc.Builtin == "" {
-				return fmt.Errorf("allocplan verifier: %s allocation %q missing builtin", fn.Name, alloc.ValueID)
-			}
-			key := fn.Name + "\x00" + alloc.ValueID
-			if seen[key] {
-				return fmt.Errorf("allocplan verifier: %s duplicate allocation %q", fn.Name, alloc.ValueID)
-			}
-			seen[key] = true
-			if alloc.Storage == "" {
-				return fmt.Errorf("allocplan verifier: %s allocation %q has empty storage", fn.Name, alloc.ValueID)
-			}
-			if alloc.PlannedStorage == "" {
-				return fmt.Errorf("allocplan verifier: %s allocation %q has empty planned storage", fn.Name, alloc.ValueID)
-			}
-			if alloc.PlannedStorage != alloc.Storage {
-				return fmt.Errorf("allocplan verifier: %s allocation %q planned storage %s does not match storage %s", fn.Name, alloc.ValueID, alloc.PlannedStorage, alloc.Storage)
-			}
-			if alloc.ActualLoweringStorage == "" {
-				return fmt.Errorf("allocplan verifier: %s allocation %q has empty actual lowering storage", fn.Name, alloc.ValueID)
-			}
-			if alloc.ValidationStatus == "" {
-				return fmt.Errorf("allocplan verifier: %s allocation %q missing validation status", fn.Name, alloc.ValueID)
-			}
-			if alloc.LoweringStatus == "" {
-				return fmt.Errorf("allocplan verifier: %s allocation %q missing lowering status", fn.Name, alloc.ValueID)
-			}
-			if alloc.LengthStatus == "" {
-				return fmt.Errorf("allocplan verifier: %s allocation %q has empty length status", fn.Name, alloc.ValueID)
-			}
-			if strings.TrimSpace(alloc.Reason) == "" {
-				return fmt.Errorf("allocplan verifier: %s allocation %q missing storage reason", fn.Name, alloc.ValueID)
-			}
-			for _, observed := range []struct {
-				name    string
-				storage StorageClass
-			}{
-				{name: "storage", storage: alloc.Storage},
-				{name: "planned storage", storage: alloc.PlannedStorage},
-				{name: "actual lowering storage", storage: alloc.ActualLoweringStorage},
-			} {
-				if alloc.Escape != EscapeNoEscape && trustedStorageRequiresNoEscape(observed.storage, alloc.LengthStatus) {
-					return fmt.Errorf("allocplan verifier: %s escaping allocation %q cannot use %s %s", fn.Name, alloc.ValueID, observed.storage, observed.name)
-				}
-				if alloc.Escape == EscapeNoEscape && trustedStorageRequiresNoEscape(observed.storage, alloc.LengthStatus) && !storageHasCompilerOwnedNoEscapeProof(observed.storage, alloc.ValidationStatus, alloc.LengthStatus) {
-					return fmt.Errorf("allocplan verifier: %s allocation %q uses %s %s without compiler-owned no-escape proof", fn.Name, alloc.ValueID, observed.storage, observed.name)
-				}
-			}
-			if alloc.Storage == StorageExplicitIsland && alloc.Escape != EscapeNoEscape {
-				return fmt.Errorf("allocplan verifier: %s island allocation %q cannot escape its island scope", fn.Name, alloc.ValueID)
-			}
-		}
+	if intent.Builtin == "core.make_i32" && intent.ElementType == "i32" && intent.ElementSize == 4 {
+		return largeI32StackAllocationBytes
 	}
-	return nil
-}
-
-func trustedStorageRequiresNoEscape(storage StorageClass, lengthStatus LengthStatus) bool {
-	switch storage {
-	case StorageEliminated:
-		return lengthStatus != LengthStatusValidEmpty
-	case StorageRegister, StorageStack, StorageRegion, StorageFunctionTempRegion,
-		StorageExplicitIsland, StorageTaskRegion, StorageActorMoveRegion:
-		return true
-	default:
-		return false
-	}
-}
-
-func storageHasCompilerOwnedNoEscapeProof(storage StorageClass, status string, lengthStatus LengthStatus) bool {
-	status = strings.TrimSpace(status)
-	switch storage {
-	case StorageEliminated:
-		return lengthStatus == LengthStatusValidEmpty || status == "validated_no_escape"
-	case StorageRegister, StorageStack:
-		return status == "validated_no_escape"
-	case StorageRegion:
-		return status == "validated_region_scope"
-	case StorageFunctionTempRegion:
-		return status == "validated_function_temp_region_scope"
-	case StorageExplicitIsland:
-		if lengthStatus == LengthStatusValidEmpty && status == "validated_empty_no_backing" {
-			return true
-		}
-		return status == "validated_explicit_island_scope"
-	case StorageTaskRegion:
-		return status == "validated_task_region_scope"
-	case StorageActorMoveRegion:
-		return status == "validated_actor_move_region_scope"
-	default:
-		return true
-	}
-}
-
-func Summarize(plan *Plan) ReportSummary {
-	summary := ReportSummary{
-		StorageClasses:               map[string]int{},
-		ActualLoweringStorageClasses: map[string]int{},
-		RuntimePaths:                 map[string]int{},
-		AllocatorClasses:             map[string]int{},
-		AllocatorScopes:              map[string]int{},
-		AllocatorReusePolicies:       map[string]int{},
-		RawPointerBoundsStatuses:     map[string]int{},
-		RawSlicePolicies:             map[string]int{},
-	}
-	if plan == nil {
-		return summary
-	}
-	regions := map[string]RegionReportSummary{}
-	for _, fn := range plan.Functions {
-		for _, alloc := range fn.Allocations {
-			summary.AllocationCount++
-			summary.StorageClasses[string(alloc.PlannedStorage)]++
-			summary.ActualLoweringStorageClasses[string(alloc.ActualLoweringStorage)]++
-			runtimePath := string(RuntimePathForAllocation(alloc))
-			summary.RuntimePaths[runtimePath]++
-			if alloc.AllocatorClass != "" {
-				summary.AllocatorClasses[alloc.AllocatorClass]++
-			}
-			if alloc.AllocatorScope != "" {
-				summary.AllocatorScopes[alloc.AllocatorScope]++
-			}
-			if alloc.AllocatorReusePolicy != "" {
-				summary.AllocatorReusePolicies[alloc.AllocatorReusePolicy]++
-			}
-			if alloc.RawPointerBoundsStatus != "" {
-				summary.RawPointerBoundsStatuses[alloc.RawPointerBoundsStatus]++
-			}
-			if alloc.RawSlicePolicy != "" {
-				summary.RawSlicePolicies[alloc.RawSlicePolicy]++
-			}
-			requested := allocationReportBytesRequested(alloc)
-			reserved := allocationReportBytesReserved(alloc)
-			summary.BytesRequested += requested
-			summary.BytesReserved += reserved
-			if alloc.RegionID == "" {
-				continue
-			}
-			switch alloc.ActualLoweringStorage {
-			case StorageRegion, StorageFunctionTempRegion, StorageExplicitIsland, StorageTaskRegion, StorageActorMoveRegion:
-			default:
-				continue
-			}
-			key := alloc.RegionID + "\x00" + alloc.Lifetime + "\x00" + string(alloc.PlannedStorage) + "\x00" + runtimePath
-			region := regions[key]
-			if region.RegionID == "" {
-				region.RegionID = alloc.RegionID
-				region.Lifetime = alloc.Lifetime
-				region.StorageClass = string(alloc.PlannedStorage)
-				region.RuntimePath = runtimePath
-			}
-			region.AllocationCount++
-			region.BytesRequested += requested
-			region.BytesReserved += reserved
-			regions[key] = region
-		}
-	}
-	if len(regions) > 0 {
-		keys := make([]string, 0, len(regions))
-		for key := range regions {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
-		for _, key := range keys {
-			summary.Regions = append(summary.Regions, regions[key])
-		}
-	}
-	return summary
-}
-
-func allocationReportBytesRequested(alloc Allocation) int {
-	if alloc.BytesRequested > 0 {
-		return alloc.BytesRequested
-	}
-	if alloc.ByteSize > 0 {
-		return alloc.ByteSize
-	}
-	return 0
-}
-
-func allocationReportBytesReserved(alloc Allocation) int {
-	if alloc.BytesReserved > 0 {
-		return alloc.BytesReserved
-	}
-	if alloc.ActualLoweringStorage == StorageEliminated {
-		return 0
-	}
-	if alloc.ByteSize > 0 {
-		return alloc.ByteSize
-	}
-	return 0
-}
-
-func FormatText(plan *Plan) string {
-	if plan == nil {
-		return ""
-	}
-	summary := Summarize(plan)
-	var b strings.Builder
-	for _, fn := range plan.Functions {
-		fmt.Fprintf(&b, "func %s\n", fn.Name)
-		for _, alloc := range fn.Allocations {
-			fmt.Fprintf(&b, "  %s: site_id: %s builtin: %s planned_storage: %s actual_lowering_storage: %s escape: %s", alloc.ID, alloc.SiteID, alloc.Builtin, alloc.PlannedStorage, alloc.ActualLoweringStorage, alloc.Escape)
-			if alloc.LengthStatus != "" {
-				fmt.Fprintf(&b, " length_status: %s", alloc.LengthStatus)
-			}
-			if alloc.ValidationStatus != "" {
-				fmt.Fprintf(&b, " validation_status: %s", alloc.ValidationStatus)
-			}
-			if alloc.LoweringStatus != "" {
-				fmt.Fprintf(&b, " lowering_status: %s", alloc.LoweringStatus)
-			}
-			if alloc.ZeroGuardStatus != "" {
-				fmt.Fprintf(&b, " zero_guard: %s", alloc.ZeroGuardStatus)
-			}
-			if alloc.NegativeGuardStatus != "" {
-				fmt.Fprintf(&b, " negative_guard: %s", alloc.NegativeGuardStatus)
-			}
-			if alloc.OverflowGuardStatus != "" {
-				fmt.Fprintf(&b, " overflow_guard: %s", alloc.OverflowGuardStatus)
-			}
-			if alloc.ByteSize > 0 {
-				fmt.Fprintf(&b, " bytes: %d", alloc.ByteSize)
-			}
-			if alloc.RuntimePath != "" {
-				fmt.Fprintf(&b, " runtime_path: %s", alloc.RuntimePath)
-			}
-			if alloc.AllocatorClass != "" {
-				fmt.Fprintf(&b, " allocator_class: %s", alloc.AllocatorClass)
-			}
-			if alloc.AllocatorScope != "" {
-				fmt.Fprintf(&b, " allocator_scope: %s", alloc.AllocatorScope)
-			}
-			if alloc.AllocatorReusePolicy != "" {
-				fmt.Fprintf(&b, " allocator_reuse_policy: %s", alloc.AllocatorReusePolicy)
-			}
-			if alloc.AllocatorChunkBytes > 0 {
-				fmt.Fprintf(&b, " allocator_chunk_bytes: %d", alloc.AllocatorChunkBytes)
-			}
-			if alloc.RawPointerBoundsStatus != "" {
-				fmt.Fprintf(&b, " raw_pointer_bounds: %s", alloc.RawPointerBoundsStatus)
-			}
-			if alloc.RawPointerBaseID != "" {
-				fmt.Fprintf(&b, " raw_pointer_base: %s", alloc.RawPointerBaseID)
-			}
-			if alloc.RawPointerBaseBytes > 0 {
-				fmt.Fprintf(&b, " raw_pointer_base_bytes: %d", alloc.RawPointerBaseBytes)
-			}
-			if alloc.RawPointerOffsetBytes != 0 {
-				fmt.Fprintf(&b, " raw_pointer_offset_bytes: %d", alloc.RawPointerOffsetBytes)
-			}
-			if alloc.RawSlicePolicy != "" {
-				fmt.Fprintf(&b, " raw_slice_policy: %s", alloc.RawSlicePolicy)
-			}
-			if alloc.BytesRequested > 0 {
-				fmt.Fprintf(&b, " bytes_requested: %d", alloc.BytesRequested)
-			}
-			if alloc.BytesReserved > 0 {
-				fmt.Fprintf(&b, " bytes_reserved: %d", alloc.BytesReserved)
-			}
-			if alloc.RegionID != "" {
-				fmt.Fprintf(&b, " region_id: %s", alloc.RegionID)
-			}
-			if alloc.Lifetime != "" {
-				fmt.Fprintf(&b, " lifetime: %s", alloc.Lifetime)
-			}
-			if alloc.DebugMode != "" {
-				fmt.Fprintf(&b, " debug_mode: %s", alloc.DebugMode)
-			}
-			if alloc.Reason != "" {
-				fmt.Fprintf(&b, " reason: %s", alloc.Reason)
-			}
-			if alloc.BackendStorage != "" {
-				fmt.Fprintf(&b, " backend_storage: %s", alloc.BackendStorage)
-			}
-			fmt.Fprintln(&b)
-		}
-	}
-	fmt.Fprintf(&b, "totals allocation_count:%d bytes_requested:%d bytes_reserved:%d heap:%d stack:%d region:%d function_temp_region:%d explicit_island:%d eliminated:%d runtime_paths:%s allocator_classes:%s allocator_scopes:%s allocator_reuse_policies:%s raw_pointer_bounds:%s raw_slice_policies:%s\n",
-		summary.AllocationCount,
-		summary.BytesRequested,
-		summary.BytesReserved,
-		plan.Totals.Heap,
-		plan.Totals.Stack,
-		plan.Totals.Region,
-		plan.Totals.FunctionTempRegion,
-		plan.Totals.ExplicitIsland,
-		plan.Totals.Eliminated,
-		formatSummaryCounts(summary.RuntimePaths),
-		formatSummaryCounts(summary.AllocatorClasses),
-		formatSummaryCounts(summary.AllocatorScopes),
-		formatSummaryCounts(summary.AllocatorReusePolicies),
-		formatSummaryCounts(summary.RawPointerBoundsStatuses),
-		formatSummaryCounts(summary.RawSlicePolicies),
-	)
-	return b.String()
-}
-
-func formatSummaryCounts(counts map[string]int) string {
-	if len(counts) == 0 {
-		return "none"
-	}
-	keys := make([]string, 0, len(counts))
-	for key := range counts {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	parts := make([]string, 0, len(keys))
-	for _, key := range keys {
-		parts = append(parts, fmt.Sprintf("%s=%d", key, counts[key]))
-	}
-	return strings.Join(parts, ",")
-}
-
-func (t *Totals) add(storage StorageClass) {
-	switch storage {
-	case StorageEliminated:
-		t.Eliminated++
-	case StorageRegister:
-		t.Register++
-	case StorageStack:
-		t.Stack++
-	case StorageRegion:
-		t.Region++
-	case StorageFunctionTempRegion:
-		t.FunctionTempRegion++
-	case StorageExplicitIsland:
-		t.ExplicitIsland++
-	case StorageTaskRegion:
-		t.TaskRegion++
-	case StorageActorMoveRegion:
-		t.ActorMoveRegion++
-	case StorageHeap:
-		t.Heap++
-	case StorageMmapLarge:
-		t.MmapLarge++
-	case StorageExternal:
-		t.External++
-	default:
-		t.Unknown++
-	}
+	return smallStackAllocationBytes
 }
 
 func allocationName(valueID string) string {

@@ -107,17 +107,57 @@ func WriteMachO64MacOSX64(path string, img *MachOImage) error {
 		return err
 	}
 
-	if err := writeSegment64(&buf, "__TEXT", textCmdSize, textVMAddr, uint64(textFileSize), uint64(textFileOff), uint64(textFileSize), 0x5, 0x5, 1); err != nil {
+	if err := writeSegment64(
+		&buf,
+		"__TEXT",
+		textCmdSize,
+		textVMAddr,
+		uint64(textFileSize),
+		uint64(textFileOff),
+		uint64(textFileSize),
+		0x5,
+		0x5,
+		1,
+	); err != nil {
 		return err
 	}
-	if err := writeSection64(&buf, "__text", "__TEXT", textVMAddr, uint64(len(textData)), uint32(textFileOff), 4, 0x80000400); err != nil {
+	if err := writeSection64(
+		&buf,
+		"__text",
+		"__TEXT",
+		textVMAddr,
+		uint64(len(textData)),
+		uint32(textFileOff),
+		4,
+		0x80000400,
+	); err != nil {
 		return err
 	}
 
-	if err := writeSegment64(&buf, "__DATA", dataCmdSize, cstringVMAddr, uint64(cstringFileSize), uint64(cstringFileOff), uint64(cstringFileSize), 0x1, 0x1, 1); err != nil {
+	if err := writeSegment64(
+		&buf,
+		"__DATA",
+		dataCmdSize,
+		cstringVMAddr,
+		uint64(cstringFileSize),
+		uint64(cstringFileOff),
+		uint64(cstringFileSize),
+		0x1,
+		0x1,
+		1,
+	); err != nil {
 		return err
 	}
-	if err := writeSection64(&buf, "__cstring", "__DATA", cstringVMAddr, uint64(len(cstringData)), uint32(cstringFileOff), 0, 0x2); err != nil {
+	if err := writeSection64(
+		&buf,
+		"__cstring",
+		"__DATA",
+		cstringVMAddr,
+		uint64(len(cstringData)),
+		uint32(cstringFileOff),
+		0,
+		0x2,
+	); err != nil {
 		return err
 	}
 
@@ -159,7 +199,14 @@ func WriteMachO64MacOSX64(path string, img *MachOImage) error {
 	return nil
 }
 
-func writeSegment64(w *bytes.Buffer, name string, cmdsize int, vmaddr, vmsize, fileoff, filesize uint64, maxprot, initprot uint32, nsects uint32) error {
+func writeSegment64(
+	w *bytes.Buffer,
+	name string,
+	cmdsize int,
+	vmaddr, vmsize, fileoff, filesize uint64,
+	maxprot, initprot uint32,
+	nsects uint32,
+) error {
 	if err := writeMachOU32(w, machoCmdSegment64); err != nil {
 		return err
 	}
@@ -196,7 +243,14 @@ func writeSegment64(w *bytes.Buffer, name string, cmdsize int, vmaddr, vmsize, f
 	return nil
 }
 
-func writeSection64(w *bytes.Buffer, sectName, segName string, addr, size uint64, offset uint32, align uint32, flags uint32) error {
+func writeSection64(
+	w *bytes.Buffer,
+	sectName, segName string,
+	addr, size uint64,
+	offset uint32,
+	align uint32,
+	flags uint32,
+) error {
 	if err := writeMachOName(w, sectName); err != nil {
 		return err
 	}

@@ -1,0 +1,44 @@
+// Backend HTTP/JSON i32 minimum decimal guard microservice.
+module examples.microservices.backend.json.backend_http_json_i32_min_guard_service
+import lib.core.http as http
+import lib.core.json as json
+
+func main() -> Int
+uses alloc, mem:
+    let min_i32: Int = -2147483648
+    if http.digits_i32(min_i32) != 11:
+        return 21
+    if json.digits_i32(min_i32) != 11:
+        return 22
+    if json.world_object_len(min_i32, -1) != 36:
+        return 23
+    var buf: []u8 = core.make_u8(16)
+    if http.write_decimal_i32_at(buf, 0, min_i32) != 11:
+        return 24
+    if buf[0] != 45:
+        return 25
+    if buf[1] != 50:
+        return 26
+    if buf[2] != 49:
+        return 27
+    if buf[3] != 52:
+        return 28
+    if buf[4] != 55:
+        return 29
+    if buf[5] != 52:
+        return 30
+    if buf[6] != 56:
+        return 31
+    if buf[7] != 51:
+        return 32
+    if buf[8] != 54:
+        return 33
+    if buf[9] != 52:
+        return 34
+    if buf[10] != 56:
+        return 35
+    if http.write_decimal_i32_at(buf, -1, min_i32) != -1:
+        return 36
+    if buf[0] != 45:
+        return 37
+    return 0

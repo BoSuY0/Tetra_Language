@@ -107,9 +107,23 @@ func TestIslandKernelRequiredDecisionQuestions(t *testing.T) {
 		{
 			name: "noalias across distinct proven islands accepts narrowly",
 			got: CanClaimNoAlias(NoAliasRequest{
-				Left:  liveRef,
-				Right: MemoryRef{BaseID: "other", IslandID: "island:b", Epoch: 3, Provenance: ProvenanceOwned, AliasState: AliasUniqueLocal},
-				Proof: Proof{ID: "proof:noalias", Kind: ProofNoAlias, SubjectBaseID: "buf", IslandID: "island:a", Epoch: 7, Operation: OperationNoAlias, Verified: true},
+				Left: liveRef,
+				Right: MemoryRef{
+					BaseID:     "other",
+					IslandID:   "island:b",
+					Epoch:      3,
+					Provenance: ProvenanceOwned,
+					AliasState: AliasUniqueLocal,
+				},
+				Proof: Proof{
+					ID:            "proof:noalias",
+					Kind:          ProofNoAlias,
+					SubjectBaseID: "buf",
+					IslandID:      "island:a",
+					Epoch:         7,
+					Operation:     OperationNoAlias,
+					Verified:      true,
+				},
 			}),
 			want: Accept,
 			code: "noalias.distinct_proven_islands",
@@ -117,21 +131,31 @@ func TestIslandKernelRequiredDecisionQuestions(t *testing.T) {
 		{
 			name: "noalias with external unsafe rejects",
 			got: CanClaimNoAlias(NoAliasRequest{
-				Left:  liveRef,
-				Right: MemoryRef{BaseID: "raw", IslandID: ExternalUnsafeIsland, Epoch: 1, Provenance: ProvenanceUnsafeUnknown, UnsafeClass: UnsafeUnknown},
+				Left: liveRef,
+				Right: MemoryRef{
+					BaseID:      "raw",
+					IslandID:    ExternalUnsafeIsland,
+					Epoch:       1,
+					Provenance:  ProvenanceUnsafeUnknown,
+					UnsafeClass: UnsafeUnknown,
+				},
 			}),
 			want: Reject,
 			code: "noalias.unsafe_external",
 		},
 		{
 			name: "bounds elimination requires verified proof",
-			got:  CanEliminateBoundsCheck(ProofRequest{Ref: liveRef, Proof: boundsProof, Operation: OperationIndexLoad}),
+			got: CanEliminateBoundsCheck(
+				ProofRequest{Ref: liveRef, Proof: boundsProof, Operation: OperationIndexLoad},
+			),
 			want: Accept,
 			code: "bounds.proof_verified",
 		},
 		{
 			name: "bounds elimination missing proof rejects",
-			got:  CanEliminateBoundsCheck(ProofRequest{Ref: liveRef, Operation: OperationIndexLoad}),
+			got: CanEliminateBoundsCheck(
+				ProofRequest{Ref: liveRef, Operation: OperationIndexLoad},
+			),
 			want: Reject,
 			code: "bounds.missing_proof",
 		},
@@ -161,7 +185,17 @@ func TestIslandKernelRequiredDecisionQuestions(t *testing.T) {
 		},
 		{
 			name: "unsafe unknown promotion rejects",
-			got:  CanPromoteUnsafeRoot(UnsafeRequest{Ref: MemoryRef{BaseID: "raw", IslandID: ExternalUnsafeIsland, Epoch: 1, Provenance: ProvenanceUnsafeUnknown, UnsafeClass: UnsafeUnknown}}),
+			got: CanPromoteUnsafeRoot(
+				UnsafeRequest{
+					Ref: MemoryRef{
+						BaseID:      "raw",
+						IslandID:    ExternalUnsafeIsland,
+						Epoch:       1,
+						Provenance:  ProvenanceUnsafeUnknown,
+						UnsafeClass: UnsafeUnknown,
+					},
+				},
+			),
 			want: Reject,
 			code: "unsafe.unknown_promotion",
 		},
@@ -256,7 +290,11 @@ func TestIslandKernelRejectsExternalUnsafeTrustedStoragePromotion(t *testing.T) 
 
 func TestIslandKernelDangerousDecisionRouteCoverage(t *testing.T) {
 	routes := DangerousDecisionRoutes()
-	if err := ValidateDangerousDecisionRoutes(routes, fileExistsFromRepoRoot(t), fileContainsTokenFromRepoRoot(t)); err != nil {
+	if err := ValidateDangerousDecisionRoutes(
+		routes,
+		fileExistsFromRepoRoot(t),
+		fileContainsTokenFromRepoRoot(t),
+	); err != nil {
 		t.Fatalf("ValidateDangerousDecisionRoutes: %v", err)
 	}
 	t.Logf("validated %d IslandKernel dangerous decision routes", len(routes))

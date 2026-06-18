@@ -1,12 +1,12 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"strings"
+
+	"tetra_language/tools/internal/reportdecode"
 )
 
 type formatsReport struct {
@@ -51,9 +51,7 @@ func validateFormatsReport(raw []byte) error {
 }
 
 func decodeStrictJSON(raw []byte, out any) error {
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.DisallowUnknownFields()
-	return dec.Decode(out)
+	return reportdecode.DecodeStrict(raw, out)
 }
 
 func validateFormats(formats []formatEntry) error {
@@ -72,7 +70,18 @@ func validateFormats(formats []formatEntry) error {
 		".tneed":     "needmap",
 		"Tetra.lock": "semantic-lock",
 	}
-	officialOrder := []string{".t4", ".tetra", ".tdx", ".t4s", ".t4i", ".t4p", ".t4r", ".t4q", ".tneed", "Tetra.lock"}
+	officialOrder := []string{
+		".t4",
+		".tetra",
+		".tdx",
+		".t4s",
+		".t4i",
+		".t4p",
+		".t4r",
+		".t4q",
+		".tneed",
+		"Tetra.lock",
+	}
 	seen := map[string]bool{}
 	var order []string
 	for _, format := range formats {
@@ -108,8 +117,13 @@ func validateFormats(formats []formatEntry) error {
 			return fmt.Errorf("formats missing %s", key)
 		}
 	}
-	if len(order) >= len(officialOrder) && !sameStringSequence(order[:len(officialOrder)], officialOrder) {
-		return fmt.Errorf("formats must start with official T4 order: got %s want %s", strings.Join(order[:len(officialOrder)], ", "), strings.Join(officialOrder, ", "))
+	if len(order) >= len(officialOrder) &&
+		!sameStringSequence(order[:len(officialOrder)], officialOrder) {
+		return fmt.Errorf(
+			"formats must start with official T4 order: got %s want %s",
+			strings.Join(order[:len(officialOrder)], ", "),
+			strings.Join(officialOrder, ", "),
+		)
 	}
 	return nil
 }

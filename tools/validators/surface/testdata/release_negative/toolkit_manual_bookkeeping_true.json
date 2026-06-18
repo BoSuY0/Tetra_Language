@@ -1,1 +1,5 @@
-{"validator":"toolkit","mutation":"manual_bookkeeping_true","expected_error":"manual_bookkeeping"}
+{
+  "validator": "toolkit",
+  "mutation": "manual_bookkeeping_true",
+  "expected_error": "manual_bookkeeping"
+}

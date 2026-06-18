@@ -1,0 +1,26 @@
+// Task-to-actor deadline microservice smoke.
+//
+// The service starts a task that replies through the actor mailbox, checks an
+// immediate receive timeout, then joins and receives through deadline waits.
+module examples.microservices.parallel.task_core.parallel_task_actor_deadline_service
+func worker() -> Int
+uses actors, runtime:
+    let _sleep: Int = core.sleep_ms(1)
+    let _sent: Int = core.send_msg(core.sender(), 42, 6)
+    return 0
+
+func main() -> Int
+uses actors, runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let early: actor.recv_msg_result = core.recv_msg_until(core.deadline_ms(0))
+    if early.error != 2:
+        return 10 + early.error
+    let joined: task.result_i32 = core.task_join_until_i32(task, core.deadline_ms(4))
+    if joined.error != 0:
+        return 30 + joined.error
+    let late: actor.recv_msg_result = core.recv_msg_until(core.deadline_ms(4))
+    if late.error != 0:
+        return 20 + late.error
+    if late.value == 42 && late.tag == 6:
+        return 0
+    return late.value

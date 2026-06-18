@@ -6,7 +6,10 @@ import (
 )
 
 func TestValidateActorRuntimeFoundationRequiresManifestInReportDir(t *testing.T) {
-	err := validateActorRuntimeFoundationReportDir(t.TempDir(), "e2c19b8ee276158f8eb2c54cf61e11bd84952893")
+	err := validateActorRuntimeFoundationReportDir(
+		t.TempDir(),
+		"e2c19b8ee276158f8eb2c54cf61e11bd84952893",
+	)
 	if err == nil {
 		t.Fatalf("expected missing actor foundation manifest to fail")
 	}

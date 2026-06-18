@@ -1,0 +1,17 @@
+// Memory u16 lane microservice smoke.
+//
+// The service allocates a scoped u16 slice and verifies arithmetic through the
+// island-backed typed lane.
+module examples.microservices.memory.scalars.loops.memory_u16_lane_service
+func main() -> Int
+uses alloc, islands, mem:
+    var total: Int = 0
+    island(128) as isl:
+        var lane: []u16 = core.island_make_u16(isl, 3)
+        lane[0] = 10
+        lane[1] = 20
+        lane[2] = 12
+        total = lane[0] + lane[1] + lane[2]
+    if total == 42:
+        return 0
+    return total

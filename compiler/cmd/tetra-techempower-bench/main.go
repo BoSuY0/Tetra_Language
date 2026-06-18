@@ -116,13 +116,38 @@ type endpointResult struct {
 
 func main() {
 	var opt benchOptions
-	flag.StringVar(&opt.BaseURL, "base-url", "http://127.0.0.1:8080", "base URL of a running tetra-techempower server")
-	flag.StringVar(&opt.ReportPath, "report", "", "path to write tetra.techempower.benchmark.v1 JSON report")
-	flag.DurationVar(&opt.Duration, "duration", 0, "duration per endpoint; if zero, --requests controls the run")
-	flag.IntVar(&opt.RequestsPerEndpoint, "requests", 256, "fixed requests per endpoint when --duration is zero")
+	flag.StringVar(
+		&opt.BaseURL,
+		"base-url",
+		"http://127.0.0.1:8080",
+		"base URL of a running tetra-techempower server",
+	)
+	flag.StringVar(
+		&opt.ReportPath,
+		"report",
+		"",
+		"path to write tetra.techempower.benchmark.v1 JSON report",
+	)
+	flag.DurationVar(
+		&opt.Duration,
+		"duration",
+		0,
+		"duration per endpoint; if zero, --requests controls the run",
+	)
+	flag.IntVar(
+		&opt.RequestsPerEndpoint,
+		"requests",
+		256,
+		"fixed requests per endpoint when --duration is zero",
+	)
 	flag.IntVar(&opt.Concurrency, "concurrency", 32, "concurrent clients per endpoint")
 	flag.Float64Var(&opt.MinRPS, "min-rps", 1, "minimum requests/second required for each endpoint")
-	flag.BoolVar(&opt.SkipDB, "skip-db", false, "run only /plaintext and /json for local no-database smoke")
+	flag.BoolVar(
+		&opt.SkipDB,
+		"skip-db",
+		false,
+		"run only /plaintext and /json for local no-database smoke",
+	)
 	flag.Parse()
 	if opt.ReportPath == "" {
 		fmt.Fprintln(os.Stderr, "error: --report is required")
@@ -175,7 +200,10 @@ func runBenchmark(ctx context.Context, opt benchOptions) (Report, error) {
 		},
 	}
 	if opt.SkipDB {
-		report.Limitations = append(report.Limitations, "skip-db enabled: report covers only /plaintext and /json")
+		report.Limitations = append(
+			report.Limitations,
+			"skip-db enabled: report covers only /plaintext and /json",
+		)
 	}
 	for _, endpoint := range defaultEndpoints(opt.SkipDB) {
 		endpointReport := runEndpoint(ctx, opt, base, endpoint)
@@ -197,8 +225,21 @@ func runBenchmark(ctx context.Context, opt benchOptions) (Report, error) {
 	return report, nil
 }
 
-func runEndpoint(ctx context.Context, opt benchOptions, base string, endpoint endpointSpec) EndpointReport {
-	result := exerciseEndpoint(ctx, opt.Client, base+endpoint.Path, endpoint, opt.RequestsPerEndpoint, opt.Concurrency, opt.Duration)
+func runEndpoint(
+	ctx context.Context,
+	opt benchOptions,
+	base string,
+	endpoint endpointSpec,
+) EndpointReport {
+	result := exerciseEndpoint(
+		ctx,
+		opt.Client,
+		base+endpoint.Path,
+		endpoint,
+		opt.RequestsPerEndpoint,
+		opt.Concurrency,
+		opt.Duration,
+	)
 	requests := result.successes + result.failures
 	elapsed := result.elapsed.Seconds()
 	if elapsed <= 0 {
@@ -239,7 +280,15 @@ func runEndpoint(ctx context.Context, opt benchOptions, base string, endpoint en
 	return report
 }
 
-func exerciseEndpoint(ctx context.Context, client *http.Client, target string, endpoint endpointSpec, requests int, concurrency int, duration time.Duration) endpointResult {
+func exerciseEndpoint(
+	ctx context.Context,
+	client *http.Client,
+	target string,
+	endpoint endpointSpec,
+	requests int,
+	concurrency int,
+	duration time.Duration,
+) endpointResult {
 	start := time.Now()
 	jobs := make(chan struct{})
 	results := make(chan singleResult, concurrency)
@@ -318,7 +367,12 @@ type singleResult struct {
 	err         error
 }
 
-func oneRequest(ctx context.Context, client *http.Client, target string, endpoint endpointSpec) singleResult {
+func oneRequest(
+	ctx context.Context,
+	client *http.Client,
+	target string,
+	endpoint endpointSpec,
+) singleResult {
 	start := time.Now()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
 	if err != nil {
@@ -334,24 +388,72 @@ func oneRequest(ctx context.Context, client *http.Client, target string, endpoin
 		return singleResult{httpStatus: resp.StatusCode, latency: time.Since(start), err: err}
 	}
 	if err := endpoint.Validate(resp.StatusCode, resp.Header, body); err != nil {
-		return singleResult{httpStatus: resp.StatusCode, bytes: len(body), contentType: resp.Header.Get("Content-Type"), latency: time.Since(start), err: err}
+		return singleResult{
+			httpStatus:  resp.StatusCode,
+			bytes:       len(body),
+			contentType: resp.Header.Get("Content-Type"),
+			latency:     time.Since(start),
+			err:         err,
+		}
 	}
-	return singleResult{httpStatus: resp.StatusCode, bytes: len(body), contentType: resp.Header.Get("Content-Type"), latency: time.Since(start)}
+	return singleResult{
+		httpStatus:  resp.StatusCode,
+		bytes:       len(body),
+		contentType: resp.Header.Get("Content-Type"),
+		latency:     time.Since(start),
+	}
 }
 
 func defaultEndpoints(skipDB bool) []endpointSpec {
 	endpoints := []endpointSpec{
-		{Name: "plaintext", Path: "/plaintext", Kind: "plaintext", SemanticChecks: semanticChecksForPath("/plaintext"), Validate: validatePlaintext},
-		{Name: "json", Path: "/json", Kind: "json", SemanticChecks: semanticChecksForPath("/json"), Validate: validateJSON},
+		{
+			Name:           "plaintext",
+			Path:           "/plaintext",
+			Kind:           "plaintext",
+			SemanticChecks: semanticChecksForPath("/plaintext"),
+			Validate:       validatePlaintext,
+		},
+		{
+			Name:           "json",
+			Path:           "/json",
+			Kind:           "json",
+			SemanticChecks: semanticChecksForPath("/json"),
+			Validate:       validateJSON,
+		},
 	}
 	if skipDB {
 		return endpoints
 	}
-	return append(endpoints,
-		endpointSpec{Name: "db", Path: "/db", Kind: "single-query", SemanticChecks: semanticChecksForPath("/db"), Validate: validateWorldObject},
-		endpointSpec{Name: "queries", Path: "/queries?queries=2", Kind: "multiple-queries", SemanticChecks: semanticChecksForPath("/queries?queries=2"), Validate: validateWorldArray},
-		endpointSpec{Name: "updates", Path: "/updates?queries=2", Kind: "updates", SemanticChecks: semanticChecksForPath("/updates?queries=2"), Validate: validateWorldArray},
-		endpointSpec{Name: "fortunes", Path: "/fortunes", Kind: "fortunes", SemanticChecks: semanticChecksForPath("/fortunes"), Validate: validateFortunes},
+	return append(
+		endpoints,
+		endpointSpec{
+			Name:           "db",
+			Path:           "/db",
+			Kind:           "single-query",
+			SemanticChecks: semanticChecksForPath("/db"),
+			Validate:       validateWorldObject,
+		},
+		endpointSpec{
+			Name:           "queries",
+			Path:           "/queries?queries=2",
+			Kind:           "multiple-queries",
+			SemanticChecks: semanticChecksForPath("/queries?queries=2"),
+			Validate:       validateWorldArray,
+		},
+		endpointSpec{
+			Name:           "updates",
+			Path:           "/updates?queries=2",
+			Kind:           "updates",
+			SemanticChecks: semanticChecksForPath("/updates?queries=2"),
+			Validate:       validateWorldArray,
+		},
+		endpointSpec{
+			Name:           "fortunes",
+			Path:           "/fortunes",
+			Kind:           "fortunes",
+			SemanticChecks: semanticChecksForPath("/fortunes"),
+			Validate:       validateFortunes,
+		},
 	)
 }
 
@@ -360,15 +462,29 @@ func semanticChecksForPath(path string) []string {
 	case "/plaintext":
 		return []string{"status 200", "content-type text/plain", "body equals Hello, World!"}
 	case "/json":
-		return []string{"status 200", "content-type application/json", "JSON message equals Hello, World!"}
+		return []string{
+			"status 200",
+			"content-type application/json",
+			"JSON message equals Hello, World!",
+		}
 	case "/db":
-		return []string{"status 200", "content-type application/json", "World object id/randomNumber range"}
+		return []string{
+			"status 200",
+			"content-type application/json",
+			"World object id/randomNumber range",
+		}
 	case "/queries?queries=2":
 		return []string{"status 200", "content-type application/json", "World array shape"}
 	case "/updates?queries=2":
 		return []string{"status 200", "content-type application/json", "World update array shape"}
 	case "/fortunes":
-		return []string{"status 200", "content-type text/html", "request-time fortune present", "HTML escaping sentinel", "sorted Fortune rows"}
+		return []string{
+			"status 200",
+			"content-type text/html",
+			"request-time fortune present",
+			"HTML escaping sentinel",
+			"sorted Fortune rows",
+		}
 	default:
 		return []string{"status 200"}
 	}
@@ -466,7 +582,8 @@ func validateFortunes(status int, header http.Header, body []byte) error {
 		return fmt.Errorf("content-type = %q, want text/html", header.Get("Content-Type"))
 	}
 	text := string(body)
-	if !strings.Contains(text, "<table>") || !strings.Contains(text, "Additional fortune added at request time.") {
+	if !strings.Contains(text, "<table>") ||
+		!strings.Contains(text, "Additional fortune added at request time.") {
 		return errors.New("fortunes HTML missing table or request-time fortune")
 	}
 	rawScript := `<script>alert("This should not be displayed in a browser alert box.");</script>`
@@ -476,7 +593,10 @@ func validateFortunes(status int, header http.Header, body []byte) error {
 	if !strings.Contains(text, "&lt;script&gt;") {
 		return errors.New("fortunes HTML missing escaped XSS sentinel")
 	}
-	if !orderedMarkers(text, []string{"&lt;script&gt;", "Additional fortune added at request time."}) {
+	if !orderedMarkers(
+		text,
+		[]string{"&lt;script&gt;", "Additional fortune added at request time."},
+	) {
 		return errors.New("fortunes HTML rows are not sorted by message")
 	}
 	return nil
@@ -512,7 +632,9 @@ func validateReport(report Report) error {
 			issues = append(issues, label+" is required")
 		}
 	}
-	if report.Environment.OS == "" || report.Environment.Arch == "" || report.Environment.GoVersion == "" || report.Environment.Hostname == "" {
+	if report.Environment.OS == "" || report.Environment.Arch == "" ||
+		report.Environment.GoVersion == "" ||
+		report.Environment.Hostname == "" {
 		issues = append(issues, "environment os/arch/go_version/hostname are required")
 	}
 	if report.Git.WorktreeStatus == "" {
@@ -547,19 +669,50 @@ func validateReport(report Report) error {
 		}
 	}
 	if report.Summary.EndpointCount != len(report.Endpoints) {
-		issues = append(issues, fmt.Sprintf("summary.endpoint_count = %d, want %d", report.Summary.EndpointCount, len(report.Endpoints)))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"summary.endpoint_count = %d, want %d",
+				report.Summary.EndpointCount,
+				len(report.Endpoints),
+			),
+		)
 	}
 	if report.Summary.TotalRequests != totalRequests {
-		issues = append(issues, fmt.Sprintf("summary.total_requests = %d, want %d", report.Summary.TotalRequests, totalRequests))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"summary.total_requests = %d, want %d",
+				report.Summary.TotalRequests,
+				totalRequests,
+			),
+		)
 	}
 	if report.Summary.TotalSuccesses != totalSuccesses {
-		issues = append(issues, fmt.Sprintf("summary.total_successes = %d, want %d", report.Summary.TotalSuccesses, totalSuccesses))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"summary.total_successes = %d, want %d",
+				report.Summary.TotalSuccesses,
+				totalSuccesses,
+			),
+		)
 	}
 	if report.Summary.TotalFailures != totalFailures {
-		issues = append(issues, fmt.Sprintf("summary.total_failures = %d, want %d", report.Summary.TotalFailures, totalFailures))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"summary.total_failures = %d, want %d",
+				report.Summary.TotalFailures,
+				totalFailures,
+			),
+		)
 	}
 	if report.Summary.Decision != "pass" && report.Summary.Decision != "fail" {
-		issues = append(issues, fmt.Sprintf("summary.decision = %q, want pass or fail", report.Summary.Decision))
+		issues = append(
+			issues,
+			fmt.Sprintf("summary.decision = %q, want pass or fail", report.Summary.Decision),
+		)
 	}
 	if len(report.Limitations) == 0 {
 		issues = append(issues, "limitations are required")
@@ -572,38 +725,72 @@ func validateReport(report Report) error {
 
 func validateEndpointReport(endpoint EndpointReport) []string {
 	var issues []string
-	if strings.TrimSpace(endpoint.Name) == "" || strings.TrimSpace(endpoint.Path) == "" || strings.TrimSpace(endpoint.Kind) == "" {
+	if strings.TrimSpace(endpoint.Name) == "" || strings.TrimSpace(endpoint.Path) == "" ||
+		strings.TrimSpace(endpoint.Kind) == "" {
 		issues = append(issues, "endpoint identity is required")
 	}
 	if endpoint.Status != "pass" && endpoint.Status != "fail" {
-		issues = append(issues, fmt.Sprintf("endpoint %s status = %q, want pass or fail", endpoint.Path, endpoint.Status))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"endpoint %s status = %q, want pass or fail",
+				endpoint.Path,
+				endpoint.Status,
+			),
+		)
 	}
-	if endpoint.Requests <= 0 || endpoint.Successes < 0 || endpoint.Failures < 0 || endpoint.Successes+endpoint.Failures != endpoint.Requests {
-		issues = append(issues, fmt.Sprintf("endpoint %s request counters are inconsistent", endpoint.Path))
+	if endpoint.Requests <= 0 || endpoint.Successes < 0 || endpoint.Failures < 0 ||
+		endpoint.Successes+endpoint.Failures != endpoint.Requests {
+		issues = append(
+			issues,
+			fmt.Sprintf("endpoint %s request counters are inconsistent", endpoint.Path),
+		)
 	}
 	if endpoint.HTTPStatus <= 0 {
 		issues = append(issues, fmt.Sprintf("endpoint %s missing HTTP status", endpoint.Path))
 	}
-	if endpoint.RPS < 0 || endpoint.AvgLatencyMS < 0 || endpoint.P50LatencyMS < 0 || endpoint.P90LatencyMS < 0 || endpoint.P95LatencyMS < 0 || endpoint.P99LatencyMS < 0 || endpoint.P999LatencyMS < 0 || endpoint.MaxLatencyMS < 0 {
-		issues = append(issues, fmt.Sprintf("endpoint %s has invalid timing metrics", endpoint.Path))
+	if endpoint.RPS < 0 || endpoint.AvgLatencyMS < 0 || endpoint.P50LatencyMS < 0 ||
+		endpoint.P90LatencyMS < 0 ||
+		endpoint.P95LatencyMS < 0 ||
+		endpoint.P99LatencyMS < 0 ||
+		endpoint.P999LatencyMS < 0 ||
+		endpoint.MaxLatencyMS < 0 {
+		issues = append(
+			issues,
+			fmt.Sprintf("endpoint %s has invalid timing metrics", endpoint.Path),
+		)
 	}
 	if endpoint.Status == "pass" && strings.TrimSpace(endpoint.ObservedContentType) == "" {
-		issues = append(issues, fmt.Sprintf("endpoint %s missing observed content type", endpoint.Path))
+		issues = append(
+			issues,
+			fmt.Sprintf("endpoint %s missing observed content type", endpoint.Path),
+		)
 	}
 	if endpoint.Status == "pass" && len(endpoint.SemanticChecks) == 0 {
 		issues = append(issues, fmt.Sprintf("endpoint %s missing semantic checks", endpoint.Path))
 	}
-	if strings.TrimSpace(endpoint.Threshold) == "" || strings.TrimSpace(endpoint.Validation) == "" || strings.TrimSpace(endpoint.Evidence) == "" {
-		issues = append(issues, fmt.Sprintf("endpoint %s missing threshold/validation/evidence", endpoint.Path))
+	if strings.TrimSpace(endpoint.Threshold) == "" ||
+		strings.TrimSpace(endpoint.Validation) == "" ||
+		strings.TrimSpace(endpoint.Evidence) == "" {
+		issues = append(
+			issues,
+			fmt.Sprintf("endpoint %s missing threshold/validation/evidence", endpoint.Path),
+		)
 	}
 	lower := strings.ToLower(endpoint.Evidence + " " + endpoint.Validation)
 	for _, marker := range []string{"placeholder", "todo", "metadata-only", "fake benchmark"} {
 		if strings.Contains(lower, marker) {
-			issues = append(issues, fmt.Sprintf("endpoint %s contains weak evidence marker %q", endpoint.Path, marker))
+			issues = append(
+				issues,
+				fmt.Sprintf("endpoint %s contains weak evidence marker %q", endpoint.Path, marker),
+			)
 		}
 	}
 	if endpoint.Status == "pass" && (!endpoint.ThresholdPass || endpoint.Failures != 0) {
-		issues = append(issues, fmt.Sprintf("endpoint %s pass status contradicts counters/threshold", endpoint.Path))
+		issues = append(
+			issues,
+			fmt.Sprintf("endpoint %s pass status contradicts counters/threshold", endpoint.Path),
+		)
 	}
 	return issues
 }

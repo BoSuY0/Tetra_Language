@@ -1,11 +1,11 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
+
+	"tetra_language/tools/internal/reportdecode"
 )
 
 type doctorReport struct {
@@ -60,7 +60,7 @@ func validateDoctorReport(raw []byte) error {
 		"__rt/actors_win64.tetra":                false,
 		"compiler/selfhostrt/actors_sysv.tetra":  false,
 		"compiler/selfhostrt/actors_win64.tetra": false,
-		"examples/flow_hello.tetra":              false,
+		"examples/flow/flow_hello.tetra":         false,
 		"docs/generated/manifest.json":           false,
 		"docs manifest version":                  false,
 		"docs manifest surface":                  false,
@@ -93,7 +93,5 @@ func validateDoctorReport(raw []byte) error {
 }
 
 func decodeStrictJSON(raw []byte, out any) error {
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.DisallowUnknownFields()
-	return dec.Decode(out)
+	return reportdecode.DecodeStrict(raw, out)
 }

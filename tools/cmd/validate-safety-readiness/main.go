@@ -75,14 +75,35 @@ var forbiddenSafetyEvidencePhrases = []string{
 }
 
 func main() {
-	featuresPath := flag.String("features", "", "features JSON produced by ./tetra features --format=json")
-	currentSurfacePath := flag.String("current-surface", "docs/spec/current_supported_surface.md", "current supported surface docs")
-	ownershipSpecPath := flag.String("ownership-spec", "docs/spec/ownership_v1.md", "ownership/lifetime safety docs")
-	effectsSpecPath := flag.String("effects-spec", "docs/spec/effects_capabilities_privacy_v1.md", "effects/capabilities/privacy/budget docs")
+	featuresPath := flag.String(
+		"features",
+		"",
+		"features JSON produced by ./tetra features --format=json",
+	)
+	currentSurfacePath := flag.String(
+		"current-surface",
+		"docs/spec/core/current_supported_surface.md",
+		"current supported surface docs",
+	)
+	ownershipSpecPath := flag.String(
+		"ownership-spec",
+		"docs/spec/runtime/ownership_v1.md",
+		"ownership/lifetime safety docs",
+	)
+	effectsSpecPath := flag.String(
+		"effects-spec",
+		"docs/spec/runtime/effects_capabilities_privacy_v1.md",
+		"effects/capabilities/privacy/budget docs",
+	)
 	outPath := flag.String("out", "", "optional JSON report path")
 	flag.Parse()
 
-	evidence, err := readSafetyEvidence(*featuresPath, *currentSurfacePath, *ownershipSpecPath, *effectsSpecPath)
+	evidence, err := readSafetyEvidence(
+		*featuresPath,
+		*currentSurfacePath,
+		*ownershipSpecPath,
+		*effectsSpecPath,
+	)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "validate-safety-readiness: %v\n", err)
 		os.Exit(2)
@@ -106,7 +127,9 @@ func main() {
 	}
 }
 
-func readSafetyEvidence(featuresPath, currentSurfacePath, ownershipSpecPath, effectsSpecPath string) (safetyEvidence, error) {
+func readSafetyEvidence(
+	featuresPath, currentSurfacePath, ownershipSpecPath, effectsSpecPath string,
+) (safetyEvidence, error) {
 	readRequired := func(path, label string) ([]byte, error) {
 		if strings.TrimSpace(path) == "" {
 			return nil, fmt.Errorf("%s path is required", label)
@@ -164,7 +187,10 @@ func validateSafetyReadinessReport(evidence safetyEvidence) (safetyReport, error
 			continue
 		}
 		if feature.Status != "current" {
-			issues = append(issues, fmt.Sprintf("feature %s status = %s, want current", id, feature.Status))
+			issues = append(
+				issues,
+				fmt.Sprintf("feature %s status = %s, want current", id, feature.Status),
+			)
 		}
 		if strings.TrimSpace(feature.Since) == "" {
 			issues = append(issues, fmt.Sprintf("current feature %s missing since", id))
@@ -174,49 +200,79 @@ func validateSafetyReadinessReport(evidence safetyEvidence) (safetyReport, error
 		haystack := feature.Scope + " " + feature.Stability
 		for _, phrase := range productionCoreRequiredPhrases {
 			if !strings.Contains(haystack, phrase) {
-				issues = append(issues, fmt.Sprintf("feature safety.production-core missing phrase %q", phrase))
+				issues = append(
+					issues,
+					fmt.Sprintf("feature safety.production-core missing phrase %q", phrase),
+				)
 			}
 		}
 		for _, phrase := range []string{"MVP", "placeholder", "mock", "fake"} {
 			if strings.Contains(strings.ToLower(haystack), strings.ToLower(phrase)) {
-				issues = append(issues, fmt.Sprintf("feature safety.production-core contains production-blocking phrase %q", phrase))
+				issues = append(
+					issues,
+					fmt.Sprintf(
+						"feature safety.production-core contains production-blocking phrase %q",
+						phrase,
+					),
+				)
 			}
 		}
 	}
 
 	docs := map[string][]byte{
-		"docs/spec/current_supported_surface.md":       evidence.CurrentSurface,
-		"docs/spec/ownership_v1.md":                    evidence.OwnershipSpec,
-		"docs/spec/effects_capabilities_privacy_v1.md": evidence.EffectsSpec,
+		"docs/spec/core/current_supported_surface.md":          evidence.CurrentSurface,
+		"docs/spec/runtime/ownership_v1.md":                    evidence.OwnershipSpec,
+		"docs/spec/runtime/effects_capabilities_privacy_v1.md": evidence.EffectsSpec,
 	}
 	for path, raw := range docs {
 		text := string(raw)
 		for _, phrase := range forbiddenSafetyEvidencePhrases {
 			if containsForbiddenSafetyClaim(text, phrase) {
-				issues = append(issues, fmt.Sprintf("%s contains production-blocking phrase %q", path, phrase))
+				issues = append(
+					issues,
+					fmt.Sprintf("%s contains production-blocking phrase %q", path, phrase),
+				)
 			}
 		}
 	}
-	issues = append(issues, requireDocPhrases("docs/spec/current_supported_surface.md", string(evidence.CurrentSurface), []string{
-		"Safety production core is current",
-		"Lifetime SSA local join solver is current since `v0.4.0`",
-		"Mutable by-reference captures, including callable mutable-capture",
-		"stable JSON diagnostics",
-	})...)
-	issues = append(issues, requireDocPhrases("docs/spec/ownership_v1.md", string(evidence.OwnershipSpec), []string{
-		"current production surface",
-		"SSA-like for branch, match, and loop joins",
-		"borrow escape diagnostics",
-		"use-after-transfer diagnostics",
-		"worker effect boundary",
-	})...)
-	issues = append(issues, requireDocPhrases("docs/spec/effects_capabilities_privacy_v1.md", string(evidence.EffectsSpec), []string{
-		"Canonical `uses` effect names",
-		"Unsafe Policy Public API Boundary",
-		"Privacy And Consent",
-		"Budget exhaustion uses the stable local policy-failure ABI",
-		"Pointer/MMIO/memory operations require matching `uses` effects",
-	})...)
+	issues = append(
+		issues,
+		requireDocPhrases(
+			"docs/spec/core/current_supported_surface.md",
+			string(evidence.CurrentSurface),
+			[]string{
+				"Safety production core is current",
+				"Lifetime SSA local join solver is current since `v0.4.0`",
+				"Mutable by-reference captures, including callable mutable-capture",
+				"stable JSON diagnostics",
+			},
+		)...)
+	issues = append(
+		issues,
+		requireDocPhrases(
+			"docs/spec/runtime/ownership_v1.md",
+			string(evidence.OwnershipSpec),
+			[]string{
+				"current production surface",
+				"SSA-like for branch, match, and loop joins",
+				"borrow escape diagnostics",
+				"use-after-transfer diagnostics",
+				"worker effect boundary",
+			},
+		)...)
+	issues = append(
+		issues,
+		requireDocPhrases(
+			"docs/spec/runtime/effects_capabilities_privacy_v1.md",
+			string(evidence.EffectsSpec),
+			[]string{
+				"Canonical `uses` effect names",
+				"Unsafe Policy Public API Boundary",
+				"Privacy And Consent",
+				"Budget exhaustion uses the stable local policy-failure ABI",
+				"Pointer/MMIO/memory operations require matching `uses` effects",
+			},
+		)...)
 
 	if len(issues) > 0 {
 		return safetyReport{}, errors.New(strings.Join(issues, "; "))
@@ -245,7 +301,13 @@ func containsForbiddenSafetyClaim(text string, phrase string) bool {
 }
 
 func isValidatorRejectionParagraph(paragraph string) bool {
-	for _, marker := range []string{"rejects", "reject ", "rejected", "must reject", "validator rejects"} {
+	for _, marker := range []string{
+		"rejects",
+		"reject ",
+		"rejected",
+		"must reject",
+		"validator rejects",
+	} {
 		if strings.Contains(paragraph, marker) {
 			return true
 		}
@@ -263,12 +325,17 @@ func decodeFeaturesReport(raw []byte) (featuresReport, error) {
 	var extra any
 	if err := dec.Decode(&extra); err != io.EOF {
 		if err == nil {
-			return featuresReport{}, fmt.Errorf("invalid features JSON: unexpected trailing JSON value")
+			return featuresReport{}, fmt.Errorf(
+				"invalid features JSON: unexpected trailing JSON value",
+			)
 		}
 		return featuresReport{}, fmt.Errorf("invalid features JSON: %w", err)
 	}
 	if report.Schema != "tetra.features.v1" {
-		return featuresReport{}, fmt.Errorf("features schema = %q, want tetra.features.v1", report.Schema)
+		return featuresReport{}, fmt.Errorf(
+			"features schema = %q, want tetra.features.v1",
+			report.Schema,
+		)
 	}
 	if strings.TrimSpace(report.Version) == "" {
 		return featuresReport{}, fmt.Errorf("features version is required")

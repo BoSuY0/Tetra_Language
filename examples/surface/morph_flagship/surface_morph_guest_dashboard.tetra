@@ -1,0 +1,191 @@
+// Guest dashboard slice authored as Tetra Surface Blocks with Morph recipe evidence.
+module examples.surface.morph_flagship.surface_morph_guest_dashboard
+
+import lib.core.surface as surface
+import lib.core.block as block
+import lib.core.morph as morph
+
+struct App:
+    pc: Int
+    ec: Int
+    bc: Int
+    a: Bool
+
+func page_bg() -> surface.Color:
+    return surface.Color(r: 255, g: 255, b: 255, a: 255)
+
+func panel_line() -> surface.Color:
+    return surface.Color(r: 212, g: 216, b: 221, a: 255)
+
+func heading_text() -> surface.Color:
+    return surface.Color(r: 17, g: 24, b: 39, a: 255)
+
+func body_text() -> surface.Color:
+    return surface.Color(r: 62, g: 74, b: 88, a: 255)
+
+func icon_soft() -> surface.Color:
+    return surface.Color(r: 236, g: 238, b: 241, a: 255)
+
+func page_props(r: surface.Rect, paint: block.PaintSpec) -> block.BlockProps:
+    let layout: block.LayoutSpec = block.layout_overlay(r, 0)
+    let access: block.AccessibilitySpec = block.accessibility_region(25)
+    var props: block.BlockProps = block.props_default(r)
+    props.layout_mode = layout.mode
+    props.paint_layers = paint.layer_count
+    props.accessibility_role = access.role
+    return props
+
+func panel_props(r: surface.Rect, paint: block.PaintSpec, l: Int) -> block.BlockProps:
+    let layout: block.LayoutSpec = block.layout_column(r, 0)
+    let access: block.AccessibilitySpec = block.accessibility_region(l)
+    var props: block.BlockProps = block.props_default(r)
+    props.layout_mode = layout.mode
+    props.paint_layers = paint.layer_count
+    props.motion_ms = 120
+    props.accessibility_role = access.role
+    return props
+
+func divider_props(r: surface.Rect, paint: block.PaintSpec) -> block.BlockProps:
+    let access: block.AccessibilitySpec = block.accessibility_region(1)
+    var props: block.BlockProps = block.props_default(r)
+    props.paint_layers = paint.layer_count
+    props.accessibility_role = access.role
+    return props
+
+func text_props(r: surface.Rect, text: block.TextSpec, l: Int) -> block.BlockProps:
+    let access: block.AccessibilitySpec = block.accessibility_text(l)
+    var props: block.BlockProps = block.props_default(r)
+    props.text_len = text.text_len
+    props.accessibility_role = access.role
+    return props
+
+func txt(l: Int, c: surface.Color, fs: Int, w: Int) -> block.TextSpec:
+    let family: Int = block.text_family_ui()
+    let align: Int = block.text_align_start()
+    let wrap: Int = block.text_wrap_none()
+    let overflow: Int = block.text_overflow_ellipsis()
+    let line_height: Int = fs + 6
+    return block.text_styled(l, c, family, fs, w, line_height, align, wrap, overflow, 255)
+
+func guest_app(tree: borrow block.BlockTree) -> App:
+    let a11y: Bool = morph.accessibility_projection_ok(4, 6, 21)
+    return App(pc: 2, ec: 2, bc: block.tree_len(tree), a: a11y)
+
+func page_block(rect: surface.Rect) -> block.Block:
+    let paint: block.PaintSpec = block.paint_from_layer(block.paint_layer_fill(page_bg()))
+    let props: block.BlockProps = page_props(rect, paint)
+    return block.make(block.id(1), block.id_none(), props)
+
+func panel_block(i: Int, p: Int, rect: surface.Rect, label_len: Int) -> block.Block:
+    let fill: block.PaintLayer = block.paint_layer_fill_radius(page_bg(), 6)
+    let outline: block.PaintLayer = block.paint_layer_outline(panel_line(), 1, 6)
+    let paint: block.PaintSpec = block.paint_stack2(fill, outline)
+    let props: block.BlockProps = panel_props(rect, paint, label_len)
+    return block.make(block.id(i), block.id(p), props)
+
+func divider_block(i: Int, p: Int, rect: surface.Rect) -> block.Block:
+    let paint: block.PaintSpec = block.paint_from_layer(block.paint_layer_fill(panel_line()))
+    let props: block.BlockProps = divider_props(rect, paint)
+    return block.make(block.id(i), block.id(p), props)
+
+func tb(i: Int, p: Int, r: surface.Rect, l: Int, fs: Int, w: Int, c: surface.Color) -> block.Block:
+    let text: block.TextSpec = txt(l, c, fs, w)
+    let props: block.BlockProps = text_props(r, text, l)
+    return block.make(block.id(i), block.id(p), props)
+
+func ib(i: Int, p: Int, rect: surface.Rect, label_len: Int, icon_hash: Int) -> block.Block:
+    let icon: block.AssetRef = block.asset_icon(i, 32, 32, icon_hash)
+    let image: block.ImageSpec = block.image_asset_tinted_scaled(icon, 32, 32, panel_line(), 1)
+    let fill: block.PaintLayer = block.paint_layer_fill_radius(icon_soft(), 2)
+    let outline: block.PaintLayer = block.paint_layer_outline(panel_line(), 1, 2)
+    let paint: block.PaintSpec = block.paint_stack2(fill, outline)
+    let access: block.AccessibilitySpec = block.accessibility_text(label_len)
+    var props: block.BlockProps = block.props_default(rect)
+    props.paint_layers = paint.layer_count
+    props.visual_asset = image.asset_index
+    props.accessibility_role = access.role
+    return block.make(block.id(i), block.id(p), props)
+
+func ap(t: inout block.BlockTree, p: Int, i: Int, r: surface.Rect, l: Int) -> Int:
+    return block.tree_add_child(t, block.id(p), panel_block(i, p, r, l), r)
+
+func ath(t: inout block.BlockTree, p: Int, i: Int, r: surface.Rect, l: Int, fs: Int, w: Int) -> Int:
+    return block.tree_add_child(t, block.id(p), tb(i, p, r, l, fs, w, heading_text()), r)
+
+func atb(t: inout block.BlockTree, p: Int, i: Int, r: surface.Rect, l: Int, fs: Int, w: Int) -> Int:
+    return block.tree_add_child(t, block.id(p), tb(i, p, r, l, fs, w, body_text()), r)
+
+func ai(t: inout block.BlockTree, p: Int, i: Int, r: surface.Rect, l: Int, h: Int) -> Int:
+    return block.tree_add_child(t, block.id(p), ib(i, p, r, l, h), r)
+
+func ad(t: inout block.BlockTree, p: Int, i: Int, r: surface.Rect) -> Int:
+    return block.tree_add_child(t, block.id(p), divider_block(i, p, r), r)
+
+func ex3(a: morph.RecipeExpansion, b: morph.RecipeExpansion, c: morph.RecipeExpansion) -> Bool:
+    let av: Bool = morph.expansion_valid(a)
+    let bv: Bool = morph.expansion_valid(b)
+    let cv: Bool = morph.expansion_valid(c)
+    return av && bv && cv
+
+func main() -> Int
+uses alloc, mem, surface:
+    let page_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 1760, h: 700)
+    let title_rect: surface.Rect = surface.Rect(x: 50, y: 32, w: 520, h: 36)
+    let recent_panel_rect: surface.Rect = surface.Rect(x: 50, y: 75, w: 1692, h: 212)
+    let recent_title_rect: surface.Rect = surface.Rect(x: 68, y: 96, w: 320, h: 22)
+    let recent_icon_rect: surface.Rect = surface.Rect(x: 866, y: 136, w: 60, h: 72)
+    let recent_empty_rect: surface.Rect = surface.Rect(x: 820, y: 238, w: 260, h: 20)
+    let overview_panel_rect: surface.Rect = surface.Rect(x: 50, y: 305, w: 1692, h: 382)
+    let overview_title_rect: surface.Rect = surface.Rect(x: 68, y: 326, w: 260, h: 22)
+    let divider_rect: surface.Rect = surface.Rect(x: 68, y: 360, w: 1656, h: 1)
+    let overview_icon_rect: surface.Rect = surface.Rect(x: 866, y: 382, w: 60, h: 72)
+    let overview_headline_rect: surface.Rect = surface.Rect(x: 755, y: 484, w: 370, h: 24)
+    let overview_body_rect: surface.Rect = surface.Rect(x: 725, y: 522, w: 430, h: 20)
+    var tree: block.BlockTree = block.tree_init(12)
+    let root: Int = block.tree_add_root(tree, page_block(page_rect), page_rect)
+    let title: Int = ath(tree, 1, 2, title_rect, 25, 28, 700)
+    let recent_panel: Int = ap(tree, 1, 3, recent_panel_rect, 27)
+    let recent_title: Int = ath(tree, 3, 4, recent_title_rect, 27, 18, 500)
+    let recent_icon: Int = ai(tree, 3, 5, recent_icon_rect, 21, 1501)
+    let recent_empty: Int = atb(tree, 3, 6, recent_empty_rect, 21, 14, 400)
+    let overview_panel: Int = ap(tree, 1, 7, overview_panel_rect, 11)
+    let overview_title: Int = ath(tree, 7, 8, overview_title_rect, 11, 18, 500)
+    let divider: Int = ad(tree, 7, 9, divider_rect)
+    let overview_icon: Int = ai(tree, 7, 10, overview_icon_rect, 34, 1502)
+    let overview_headline: Int = ath(tree, 7, 11, overview_headline_rect, 34, 18, 600)
+    let overview_body: Int = atb(tree, 7, 12, overview_body_rect, 54, 14, 400)
+    let app_shell_recipe: morph.Recipe = morph.recipe_app_shell()
+    let panel_recipe: morph.Recipe = morph.recipe_region_panel()
+    let empty_recipe: morph.Recipe = morph.recipe_empty_state()
+    let status_recipe: morph.Recipe = morph.recipe_status_bar()
+    let app_shell_expansion = morph.recipe_expansion(app_shell_recipe, block.id(1))
+    let recent_panel_expansion = morph.recipe_expansion(panel_recipe, block.id(3))
+    let overview_panel_expansion = morph.recipe_expansion(panel_recipe, block.id(7))
+    let recent_empty_expansion = morph.recipe_expansion(empty_recipe, block.id(5))
+    let overview_empty_expansion = morph.recipe_expansion(empty_recipe, block.id(10))
+    let status_expansion = morph.recipe_expansion(status_recipe, block.id(2))
+    let app: App = guest_app(tree)
+    let valid: Int = block.tree_validate(tree)
+    let ids_a: Bool = root == 1 && title == 2 && recent_panel == 3 && recent_title == 4
+    let ids_b: Bool = recent_icon == 5 && recent_empty == 6 && overview_panel == 7
+    let ids_c: Bool = overview_title == 8 && divider == 9 && overview_icon == 10
+    let ids_d: Bool = overview_headline == 11 && overview_body == 12
+    let app_ok: Bool = app.pc == 2 && app.ec == 2 && app.bc == 12 && app.a
+    let exp_a: Bool = ex3(app_shell_expansion, recent_panel_expansion, overview_panel_expansion)
+    let exp_b: Bool = ex3(recent_empty_expansion, overview_empty_expansion, status_expansion)
+    let ready: Bool = ids_a && ids_b && ids_c && ids_d && valid == block.tree_error_ok()
+    if !(ready && app_ok && morph.capsule_self_check() && exp_a && exp_b):
+        return 1
+    var win: surface.Surface = surface.open("Tetra Surface Guest Dashboard", 1760, 700)
+    var before_frame: surface.Frame = surface.begin_frame(win)
+    let before_render: Int = morph.render_guest_dashboard_frame(false, before_frame)
+    let first_presented: Int = surface.present(before_frame)
+    var after_frame: surface.Frame = surface.begin_frame(win)
+    let after_render: Int = morph.render_guest_dashboard_frame(true, after_frame)
+    let second_presented: Int = surface.present(after_frame)
+    let closed: Int = surface.close(win)
+    let frames_ok: Bool = before_render == 0 && first_presented == 0 && after_render == 0
+    let close_ok: Bool = second_presented == 0 && closed == 0
+    if frames_ok && close_ok:
+        return 0
+    return 1

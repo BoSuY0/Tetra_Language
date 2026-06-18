@@ -15,13 +15,16 @@ under `reports/memory-islands-ideal/final-completion/` and is hashed by
 
 ## Actor Handoff
 
-Actor handoff readiness: actor phase may start as a separate Actor Runtime Production Foundation plan.
+Actor handoff readiness: actor phase may start as a separate Actor Runtime Production Foundation
+plan.
 
 Actor runtime production status: not started in this plan.
 
 Actor phase preconditions:
 
-- production actor gate must prove scheduler, mailbox backpressure, message exhaustion/reclamation, race-safety, cross-target distributed runtime gates, structured concurrency, and fake-evidence rejection.
+- production actor gate must prove scheduler, mailbox backpressure, message exhaustion/reclamation,
+  race-safety, cross-target distributed runtime gates, structured concurrency, and fake-evidence
+  rejection.
 - `docs/audits/actor-runtime-production-boundary-v1.md` remains the actor
   production boundary.
 - `MEMISL-P10` memory-boundary handoff evidence is an input, not actor runtime
@@ -29,7 +32,8 @@ Actor phase preconditions:
 
 ## Benchmark Preconditions:
 
-- Benchmark preconditions: benchmark phase may start only as Tier 0/Tier 1 preparation until measured evidence exists.
+- Benchmark preconditions: benchmark phase may start only as Tier 0/Tier 1 preparation until
+  measured evidence exists.
 - no official benchmark result
 - no performance superiority
 - no C++/Rust parity

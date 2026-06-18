@@ -25,12 +25,16 @@ func TestRenderIncludesStateAndViewMetadata(t *testing.T) {
 			{
 				Name:      "ShellView",
 				StateType: "ShellState",
-				Bindings:  []lower.UILoweredBinding{{Name: "toggles", Type: "i32", Source: "state.toggles"}},
-				Events:    []lower.UILoweredEvent{{Name: "submit", Command: "toggle"}},
+				Bindings: []lower.UILoweredBinding{
+					{Name: "toggles", Type: "i32", Source: "state.toggles"},
+				},
+				Events: []lower.UILoweredEvent{{Name: "submit", Command: "toggle"}},
 				Commands: []lower.UILoweredCommand{{
 					Name:           "toggle",
 					StatementCount: 1,
-					Operations:     []lower.UILoweredCommandOperation{{Kind: "state_add", Target: "state.toggles", Value: "1"}},
+					Operations: []lower.UILoweredCommandOperation{
+						{Kind: "state_add", Target: "state.toggles", Value: "1"},
+					},
 				}},
 			},
 		},
@@ -73,12 +77,16 @@ func TestRenderDispatchesStateSubtractOperations(t *testing.T) {
 			{
 				Name:      "ShellView",
 				StateType: "ShellState",
-				Bindings:  []lower.UILoweredBinding{{Name: "count", Type: "i32", Source: "state.count"}},
-				Events:    []lower.UILoweredEvent{{Name: "submit", Command: "decrement"}},
+				Bindings: []lower.UILoweredBinding{
+					{Name: "count", Type: "i32", Source: "state.count"},
+				},
+				Events: []lower.UILoweredEvent{{Name: "submit", Command: "decrement"}},
 				Commands: []lower.UILoweredCommand{{
 					Name:           "decrement",
 					StatementCount: 1,
-					Operations:     []lower.UILoweredCommandOperation{{Kind: "state_sub", Target: "state.count", Value: "2"}},
+					Operations: []lower.UILoweredCommandOperation{
+						{Kind: "state_sub", Target: "state.count", Value: "2"},
+					},
 				}},
 			},
 		},
@@ -113,12 +121,16 @@ func TestRenderDispatchesStringStateSetWithoutLiteralQuotes(t *testing.T) {
 			{
 				Name:      "ShellView",
 				StateType: "ShellState",
-				Bindings:  []lower.UILoweredBinding{{Name: "labelText", Type: "str", Source: "state.label"}},
-				Events:    []lower.UILoweredEvent{{Name: "submit", Command: "rename"}},
+				Bindings: []lower.UILoweredBinding{
+					{Name: "labelText", Type: "str", Source: "state.label"},
+				},
+				Events: []lower.UILoweredEvent{{Name: "submit", Command: "rename"}},
 				Commands: []lower.UILoweredCommand{{
 					Name:           "rename",
 					StatementCount: 1,
-					Operations:     []lower.UILoweredCommandOperation{{Kind: "state_set", Target: "state.label", Value: `"Done"`}},
+					Operations: []lower.UILoweredCommandOperation{
+						{Kind: "state_set", Target: "state.label", Value: `"Done"`},
+					},
 				}},
 			},
 		},
@@ -154,12 +166,16 @@ func TestRenderDispatchesStateSetFromSameStateField(t *testing.T) {
 			{
 				Name:      "ShellView",
 				StateType: "ShellState",
-				Bindings:  []lower.UILoweredBinding{{Name: "labelText", Type: "str", Source: "state.label"}},
-				Events:    []lower.UILoweredEvent{{Name: "submit", Command: "copy"}},
+				Bindings: []lower.UILoweredBinding{
+					{Name: "labelText", Type: "str", Source: "state.label"},
+				},
+				Events: []lower.UILoweredEvent{{Name: "submit", Command: "copy"}},
 				Commands: []lower.UILoweredCommand{{
 					Name:           "copy",
 					StatementCount: 1,
-					Operations:     []lower.UILoweredCommandOperation{{Kind: "state_set", Target: "state.label", Value: "state.source"}},
+					Operations: []lower.UILoweredCommandOperation{
+						{Kind: "state_set", Target: "state.label", Value: "state.source"},
+					},
 				}},
 			},
 		},
@@ -195,8 +211,10 @@ func TestRenderDispatchesCommandOperationsInOrder(t *testing.T) {
 			{
 				Name:      "ShellView",
 				StateType: "ShellState",
-				Bindings:  []lower.UILoweredBinding{{Name: "targetValue", Type: "i32", Source: "state.target"}},
-				Events:    []lower.UILoweredEvent{{Name: "submit", Command: "copyAfterIncrement"}},
+				Bindings: []lower.UILoweredBinding{
+					{Name: "targetValue", Type: "i32", Source: "state.target"},
+				},
+				Events: []lower.UILoweredEvent{{Name: "submit", Command: "copyAfterIncrement"}},
 				Commands: []lower.UILoweredCommand{{
 					Name:           "copyAfterIncrement",
 					StatementCount: 2,
@@ -241,12 +259,16 @@ func TestRenderJSONIncludesDispatchTrace(t *testing.T) {
 			{
 				Name:      "ShellView",
 				StateType: "ShellState",
-				Bindings:  []lower.UILoweredBinding{{Name: "countValue", Type: "i32", Source: "state.count"}},
-				Events:    []lower.UILoweredEvent{{Name: "submit", Command: "increment"}},
+				Bindings: []lower.UILoweredBinding{
+					{Name: "countValue", Type: "i32", Source: "state.count"},
+				},
+				Events: []lower.UILoweredEvent{{Name: "submit", Command: "increment"}},
 				Commands: []lower.UILoweredCommand{{
 					Name:           "increment",
 					StatementCount: 1,
-					Operations:     []lower.UILoweredCommandOperation{{Kind: "state_add", Target: "state.count", Value: "2"}},
+					Operations: []lower.UILoweredCommandOperation{
+						{Kind: "state_add", Target: "state.count", Value: "2"},
+					},
 				}},
 			},
 		},
@@ -278,7 +300,8 @@ func TestRenderJSONIncludesDispatchTrace(t *testing.T) {
 	if err := json.Unmarshal(RenderJSON(bundle), &report); err != nil {
 		t.Fatalf("RenderJSON produced invalid JSON: %v\n%s", err, RenderJSON(bundle))
 	}
-	if report.Schema != "tetra.ui.native-shell.v1" || report.UISchema != "tetra.ui.v0.4.0" || report.Runtime != "native shell command dispatch" {
+	if report.Schema != "tetra.ui.native-shell.v1" || report.UISchema != "tetra.ui.v0.4.0" ||
+		report.Runtime != "native shell command dispatch" {
 		t.Fatalf("report header = %#v", report)
 	}
 	if len(report.Views) != 1 || len(report.Views[0].Events) != 1 {
@@ -289,10 +312,13 @@ func TestRenderJSONIncludesDispatchTrace(t *testing.T) {
 		t.Fatalf("event trace = %#v", event)
 	}
 	op := event.Operations[0]
-	if op.Kind != "state_add" || op.Target != "state.count" || op.Value != "2" || op.StateField != "count" || op.StateValue != "3" {
+	if op.Kind != "state_add" || op.Target != "state.count" || op.Value != "2" ||
+		op.StateField != "count" ||
+		op.StateValue != "3" {
 		t.Fatalf("operation trace = %#v", op)
 	}
-	if len(event.Bindings) != 1 || event.Bindings[0].Name != "countValue" || event.Bindings[0].Value != "3" {
+	if len(event.Bindings) != 1 || event.Bindings[0].Name != "countValue" ||
+		event.Bindings[0].Value != "3" {
 		t.Fatalf("event bindings = %#v", event.Bindings)
 	}
 }
@@ -313,15 +339,23 @@ func TestRenderJSONIncludesNativeWidgetTree(t *testing.T) {
 			{
 				Name:      "ShellView",
 				StateType: "ShellState",
-				Bindings:  []lower.UILoweredBinding{{Name: "labelText", Type: "str", Source: "state.label"}},
-				Events:    []lower.UILoweredEvent{{Name: "submit", Command: "rename"}},
+				Bindings: []lower.UILoweredBinding{
+					{Name: "labelText", Type: "str", Source: "state.label"},
+				},
+				Events: []lower.UILoweredEvent{{Name: "submit", Command: "rename"}},
 				Commands: []lower.UILoweredCommand{{
 					Name:           "rename",
 					StatementCount: 1,
-					Operations:     []lower.UILoweredCommandOperation{{Kind: "state_set", Target: "state.label", Value: `"Done"`}},
+					Operations: []lower.UILoweredCommandOperation{
+						{Kind: "state_set", Target: "state.label", Value: `"Done"`},
+					},
 				}},
-				Styles:        []lower.UILoweredStyle{{Name: "accent", Type: "str", Value: `"amber"`}},
-				Accessibility: []lower.UILoweredAccessibility{{Name: "role", Type: "str", Value: `"status"`}},
+				Styles: []lower.UILoweredStyle{
+					{Name: "accent", Type: "str", Value: `"amber"`},
+				},
+				Accessibility: []lower.UILoweredAccessibility{
+					{Name: "role", Type: "str", Value: `"status"`},
+				},
 			},
 		},
 	}
@@ -348,14 +382,19 @@ func TestRenderJSONIncludesNativeWidgetTree(t *testing.T) {
 		t.Fatalf("widgets = %#v", report.Views)
 	}
 	label := report.Views[0].Widgets[0]
-	if label.ID != "ShellView.labelText" || label.Kind != "text" || label.Binding != "labelText" || label.Type != "str" || label.Value != "Ready" {
+	if label.ID != "ShellView.labelText" || label.Kind != "text" || label.Binding != "labelText" ||
+		label.Type != "str" ||
+		label.Value != "Ready" {
 		t.Fatalf("binding widget = %#v", label)
 	}
-	if len(label.Styles) != 1 || label.Styles[0].Name != "accent" || len(label.Accessibility) != 1 || label.Accessibility[0].Name != "role" {
+	if len(label.Styles) != 1 || label.Styles[0].Name != "accent" ||
+		len(label.Accessibility) != 1 ||
+		label.Accessibility[0].Name != "role" {
 		t.Fatalf("binding widget metadata = %#v", label)
 	}
 	action := report.Views[0].Widgets[1]
-	if action.ID != "ShellView.submit" || action.Kind != "action" || action.Event != "submit" || action.Command != "rename" {
+	if action.ID != "ShellView.submit" || action.Kind != "action" || action.Event != "submit" ||
+		action.Command != "rename" {
 		t.Fatalf("action widget = %#v", action)
 	}
 }

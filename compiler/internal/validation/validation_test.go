@@ -61,7 +61,13 @@ func TestCheckBoundsProofsWithPLIRAcceptsLiveDominatingProof(t *testing.T) {
 		}},
 		Blocks: []plir.BasicBlock{
 			{ID: "entry", Kind: "entry", Entry: true, Succs: []string{"body"}},
-			{ID: "body", Kind: "while_body", Preds: []string{"entry"}, Ops: []string{"op0"}, Exit: true},
+			{
+				ID:    "body",
+				Kind:  "while_body",
+				Preds: []string{"entry"},
+				Ops:   []string{"op0"},
+				Exit:  true,
+			},
 		},
 		Ops: []plir.Operation{
 			{ID: "op0", Kind: plir.OpIndexLoad, Block: "body"},
@@ -133,8 +139,10 @@ func TestCheckBoundsProofsWithPLIRRejectsGuardWithoutTypedProofTerm(t *testing.T
 			Type:       "i32",
 			Provenance: plir.Provenance{Kind: plir.ProvenanceStack, Root: "i"},
 		}},
-		Blocks: []plir.BasicBlock{{ID: "body", Kind: "while_body", Entry: true, Exit: true, Ops: []string{"op0"}}},
-		Ops:    []plir.Operation{{ID: "op0", Kind: plir.OpIndexLoad, Block: "body"}},
+		Blocks: []plir.BasicBlock{
+			{ID: "body", Kind: "while_body", Entry: true, Exit: true, Ops: []string{"op0"}},
+		},
+		Ops: []plir.Operation{{ID: "op0", Kind: plir.OpIndexLoad, Block: "body"}},
 		Facts: []plir.Fact{{
 			ID:      "f0",
 			Kind:    plir.FactIndexInRange,
@@ -159,7 +167,10 @@ func TestCheckBoundsProofsWithPLIRRejectsGuardWithoutTypedProofTerm(t *testing.T
 	}}}
 	_, err := CheckBoundsProofsWithPLIR(irProg, plirProg)
 	if err == nil || !strings.Contains(err.Error(), "typed proof term") {
-		t.Fatalf("CheckBoundsProofsWithPLIR error = %v, want missing typed proof term rejection", err)
+		t.Fatalf(
+			"CheckBoundsProofsWithPLIR error = %v, want missing typed proof term rejection",
+			err,
+		)
 	}
 }
 
@@ -177,8 +188,10 @@ func TestCheckBoundsProofsWithPLIRRejectsTypedProofBaseMismatch(t *testing.T) {
 			Type:       "i32",
 			Provenance: plir.Provenance{Kind: plir.ProvenanceStack, Root: "i"},
 		}},
-		Blocks: []plir.BasicBlock{{ID: "body", Kind: "while_body", Entry: true, Exit: true, Ops: []string{"op0"}}},
-		Ops:    []plir.Operation{{ID: "op0", Kind: plir.OpIndexLoad, Block: "body"}},
+		Blocks: []plir.BasicBlock{
+			{ID: "body", Kind: "while_body", Entry: true, Exit: true, Ops: []string{"op0"}},
+		},
+		Ops: []plir.Operation{{ID: "op0", Kind: plir.OpIndexLoad, Block: "body"}},
 		Facts: []plir.Fact{{
 			ID:      "f0",
 			Kind:    plir.FactIndexInRange,
@@ -229,8 +242,10 @@ func TestCheckBoundsProofsWithPLIRRejectsProofWithoutUse(t *testing.T) {
 			Type:       "i32",
 			Provenance: plir.Provenance{Kind: plir.ProvenanceStack, Root: "i"},
 		}},
-		Blocks: []plir.BasicBlock{{ID: "body", Kind: "while_body", Entry: true, Exit: true, Ops: []string{"op0"}}},
-		Ops:    []plir.Operation{{ID: "op0", Kind: plir.OpIndexLoad, Block: "body"}},
+		Blocks: []plir.BasicBlock{
+			{ID: "body", Kind: "while_body", Entry: true, Exit: true, Ops: []string{"op0"}},
+		},
+		Ops: []plir.Operation{{ID: "op0", Kind: plir.OpIndexLoad, Block: "body"}},
 		Facts: []plir.Fact{{
 			ID:      "f0",
 			Kind:    plir.FactIndexInRange,
@@ -275,8 +290,10 @@ func TestCheckBoundsProofsWithPLIRRejectsTypedProofOperationMismatch(t *testing.
 			Type:       "i32",
 			Provenance: plir.Provenance{Kind: plir.ProvenanceStack, Root: "i"},
 		}},
-		Blocks: []plir.BasicBlock{{ID: "body", Kind: "while_body", Entry: true, Exit: true, Ops: []string{"op0"}}},
-		Ops:    []plir.Operation{{ID: "op0", Kind: plir.OpIndexLoad, Block: "body"}},
+		Blocks: []plir.BasicBlock{
+			{ID: "body", Kind: "while_body", Entry: true, Exit: true, Ops: []string{"op0"}},
+		},
+		Ops: []plir.Operation{{ID: "op0", Kind: plir.OpIndexLoad, Block: "body"}},
 		Facts: []plir.Fact{{
 			ID:      "f0",
 			Kind:    plir.FactIndexInRange,
@@ -327,8 +344,10 @@ func TestCheckBoundsProofsWithPLIRRejectsProofUseOperationMismatch(t *testing.T)
 			Type:       "i32",
 			Provenance: plir.Provenance{Kind: plir.ProvenanceStack, Root: "i"},
 		}},
-		Blocks: []plir.BasicBlock{{ID: "body", Kind: "while_body", Entry: true, Exit: true, Ops: []string{"op0"}}},
-		Ops:    []plir.Operation{{ID: "op0", Kind: plir.OpIndexStore, Block: "body"}},
+		Blocks: []plir.BasicBlock{
+			{ID: "body", Kind: "while_body", Entry: true, Exit: true, Ops: []string{"op0"}},
+		},
+		Ops: []plir.Operation{{ID: "op0", Kind: plir.OpIndexStore, Block: "body"}},
 		Facts: []plir.Fact{{
 			ID:      "f0",
 			Kind:    plir.FactIndexInRange,
@@ -361,7 +380,10 @@ func TestCheckBoundsProofsWithPLIRRejectsProofUseOperationMismatch(t *testing.T)
 	}}}
 	_, err := CheckBoundsProofsWithPLIR(irProg, plirProg)
 	if err == nil || !strings.Contains(err.Error(), "proof use operation") {
-		t.Fatalf("CheckBoundsProofsWithPLIR error = %v, want proof use operation mismatch rejection", err)
+		t.Fatalf(
+			"CheckBoundsProofsWithPLIR error = %v, want proof use operation mismatch rejection",
+			err,
+		)
 	}
 }
 
@@ -538,7 +560,10 @@ func TestValidateAllocationLoweringRejectsReturnedStackAllocation(t *testing.T) 
 	}}}
 	err := ValidateAllocationLowering(plan, prog)
 	if err == nil || !strings.Contains(err.Error(), "escapes via return") {
-		t.Fatalf("ValidateAllocationLowering error = %v, want returned stack allocation rejection", err)
+		t.Fatalf(
+			"ValidateAllocationLowering error = %v, want returned stack allocation rejection",
+			err,
+		)
 	}
 }
 
@@ -556,7 +581,75 @@ func TestValidateAllocationLoweringRejectsCalledStackAllocation(t *testing.T) {
 	}}}
 	err := ValidateAllocationLowering(plan, prog)
 	if err == nil || !strings.Contains(err.Error(), "escapes via call") {
-		t.Fatalf("ValidateAllocationLowering error = %v, want called stack allocation rejection", err)
+		t.Fatalf(
+			"ValidateAllocationLowering error = %v, want called stack allocation rejection",
+			err,
+		)
+	}
+}
+
+func TestValidateAllocationLoweringAcceptsStackAllocationPassedToKnownNoEscapeCall(t *testing.T) {
+	plan := stackU8ValidationPlan("main")
+	prog := &ir.IRProgram{Funcs: []ir.IRFunc{
+		{
+			Name:        "len_slice",
+			ParamSlots:  2,
+			LocalSlots:  2,
+			ReturnSlots: 1,
+			Instrs: []ir.IRInstr{
+				{Kind: ir.IRLoadLocal, Local: 1},
+				{Kind: ir.IRReturn},
+			},
+		},
+		{
+			Name:        "main",
+			LocalSlots:  4,
+			ReturnSlots: 1,
+			Instrs: []ir.IRInstr{
+				{Kind: ir.IRConstI32, Imm: 4},
+				{Kind: ir.IRStackSliceU8, Local: 0, ArgSlots: 4, Imm: 4, Name: "xs"},
+				{Kind: ir.IRCall, Name: "len_slice", ArgSlots: 2, RetSlots: 1},
+				{Kind: ir.IRReturn},
+			},
+		},
+	}}
+	if err := ValidateAllocationLowering(plan, prog); err != nil {
+		t.Fatalf("ValidateAllocationLowering: %v", err)
+	}
+}
+
+func TestValidateAllocationLoweringRejectsReturnedStackAllocationThroughCallSummary(t *testing.T) {
+	plan := stackU8ValidationPlan("bad")
+	prog := &ir.IRProgram{Funcs: []ir.IRFunc{
+		{
+			Name:        "identity_slice",
+			ParamSlots:  2,
+			LocalSlots:  2,
+			ReturnSlots: 2,
+			Instrs: []ir.IRInstr{
+				{Kind: ir.IRLoadLocal, Local: 0},
+				{Kind: ir.IRLoadLocal, Local: 1},
+				{Kind: ir.IRReturn},
+			},
+		},
+		{
+			Name:        "bad",
+			LocalSlots:  4,
+			ReturnSlots: 2,
+			Instrs: []ir.IRInstr{
+				{Kind: ir.IRConstI32, Imm: 4},
+				{Kind: ir.IRStackSliceU8, Local: 0, ArgSlots: 4, Imm: 4, Name: "xs"},
+				{Kind: ir.IRCall, Name: "identity_slice", ArgSlots: 2, RetSlots: 2},
+				{Kind: ir.IRReturn},
+			},
+		},
+	}}
+	err := ValidateAllocationLowering(plan, prog)
+	if err == nil || !strings.Contains(err.Error(), "escapes via return") {
+		t.Fatalf(
+			"ValidateAllocationLowering error = %v, want call-summary return escape rejection",
+			err,
+		)
 	}
 }
 
@@ -575,7 +668,10 @@ func TestValidateAllocationLoweringRejectsGlobalStoredStackAllocation(t *testing
 	}}}
 	err := ValidateAllocationLowering(plan, prog)
 	if err == nil || !strings.Contains(err.Error(), "escapes via global store") {
-		t.Fatalf("ValidateAllocationLowering error = %v, want global-stored stack allocation rejection", err)
+		t.Fatalf(
+			"ValidateAllocationLowering error = %v, want global-stored stack allocation rejection",
+			err,
+		)
 	}
 }
 
@@ -668,7 +764,10 @@ func TestValidateAllocationLoweringRejectsMissingExplicitIslandIR(t *testing.T) 
 	}}}
 	err := ValidateAllocationLowering(plan, prog)
 	if err == nil || !strings.Contains(err.Error(), "no matching IR island slice") {
-		t.Fatalf("ValidateAllocationLowering error = %v, want missing explicit island IR rejection", err)
+		t.Fatalf(
+			"ValidateAllocationLowering error = %v, want missing explicit island IR rejection",
+			err,
+		)
 	}
 }
 
@@ -791,7 +890,9 @@ func TestValidateAllocationLoweringAcceptsExplicitIslandHandleReturnedFromCall(t
 	}
 }
 
-func TestValidateAllocationLoweringAcceptsExplicitIslandHandleReturnedFromSummaryProgram(t *testing.T) {
+func TestValidateAllocationLoweringAcceptsExplicitIslandHandleReturnedFromSummaryProgram(
+	t *testing.T,
+) {
 	plan := explicitIslandValidationPlan("main")
 	prog := &ir.IRProgram{Funcs: []ir.IRFunc{{
 		Name:       "main",
@@ -848,6 +949,33 @@ func TestValidateAllocationLoweringAcceptsExplicitIslandSliceMovedByCall(t *test
 	}
 }
 
+func TestValidateAllocationLoweringAcceptsExplicitIslandRecreatedAtLoopSite(t *testing.T) {
+	plan := explicitIslandValidationPlan("main")
+	prog := &ir.IRProgram{Funcs: []ir.IRFunc{{
+		Name:       "main",
+		LocalSlots: 3,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRLabel, Label: 1},
+			{Kind: ir.IRConstI32, Imm: 64},
+			{Kind: ir.IRIslandNew},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 4},
+			{Kind: ir.IRIslandMakeSliceI32, Name: "xs"},
+			{Kind: ir.IRStoreLocal, Local: 2},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRIslandFree},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRJmpIfZero, Label: 1},
+			{Kind: ir.IRReturn},
+		},
+	}}}
+	if err := ValidateAllocationLowering(plan, prog); err != nil {
+		t.Fatalf("ValidateAllocationLowering: %v", err)
+	}
+}
+
 func TestValidateAllocationLoweringAllowsFreeOfUntrackedIslandHandle(t *testing.T) {
 	plan := explicitIslandValidationPlan("main")
 	prog := &ir.IRProgram{Funcs: []ir.IRFunc{{
@@ -889,7 +1017,10 @@ func TestValidateAllocationLoweringRejectsUnnamedExplicitIslandIR(t *testing.T) 
 	}}}
 	err := ValidateAllocationLowering(plan, prog)
 	if err == nil || !strings.Contains(err.Error(), "no matching IR island slice") {
-		t.Fatalf("ValidateAllocationLowering error = %v, want unnamed explicit island rejection", err)
+		t.Fatalf(
+			"ValidateAllocationLowering error = %v, want unnamed explicit island rejection",
+			err,
+		)
 	}
 }
 
@@ -909,7 +1040,10 @@ func TestValidateAllocationLoweringRejectsReturnedExplicitIslandAllocation(t *te
 	}}}
 	err := ValidateAllocationLowering(plan, prog)
 	if err == nil || !strings.Contains(err.Error(), "escapes via return") {
-		t.Fatalf("ValidateAllocationLowering error = %v, want returned explicit island allocation rejection", err)
+		t.Fatalf(
+			"ValidateAllocationLowering error = %v, want returned explicit island allocation rejection",
+			err,
+		)
 	}
 }
 
@@ -934,11 +1068,16 @@ func TestValidateAllocationLoweringRejectsUseAfterExplicitIslandFree(t *testing.
 	}}}
 	err := ValidateAllocationLowering(plan, prog)
 	if err == nil || !strings.Contains(err.Error(), "use after free") {
-		t.Fatalf("ValidateAllocationLowering error = %v, want explicit island use-after-free rejection", err)
+		t.Fatalf(
+			"ValidateAllocationLowering error = %v, want explicit island use-after-free rejection",
+			err,
+		)
 	}
 }
 
-func TestValidateAllocationLoweringRejectsExplicitIslandMakeWithHandleInLengthOperand(t *testing.T) {
+func TestValidateAllocationLoweringRejectsExplicitIslandMakeWithHandleInLengthOperand(
+	t *testing.T,
+) {
 	plan := explicitIslandValidationPlan("bad")
 	prog := &ir.IRProgram{Funcs: []ir.IRFunc{{
 		Name:       "bad",
@@ -982,7 +1121,10 @@ func TestValidateAllocationLoweringRejectsExplicitIslandDoubleFree(t *testing.T)
 	}}}
 	err := ValidateAllocationLowering(plan, prog)
 	if err == nil || !strings.Contains(err.Error(), "double free") {
-		t.Fatalf("ValidateAllocationLowering error = %v, want explicit island double-free rejection", err)
+		t.Fatalf(
+			"ValidateAllocationLowering error = %v, want explicit island double-free rejection",
+			err,
+		)
 	}
 }
 
@@ -1012,7 +1154,10 @@ func TestValidateAllocationLoweringRejectsExplicitIslandDoubleFreeOnBranchMerge(
 	}}}
 	err := ValidateAllocationLowering(plan, prog)
 	if err == nil || !strings.Contains(err.Error(), "double free") {
-		t.Fatalf("ValidateAllocationLowering error = %v, want branch-merge explicit island double-free rejection", err)
+		t.Fatalf(
+			"ValidateAllocationLowering error = %v, want branch-merge explicit island double-free rejection",
+			err,
+		)
 	}
 }
 
@@ -1121,7 +1266,10 @@ func TestValidateAllocationLoweringRejectsExplicitIslandResetWhileSliceLive(t *t
 	}}}
 	err := ValidateAllocationLowering(plan, prog)
 	if err == nil || !strings.Contains(err.Error(), "reset while live slice") {
-		t.Fatalf("ValidateAllocationLowering error = %v, want reset while live slice rejection", err)
+		t.Fatalf(
+			"ValidateAllocationLowering error = %v, want reset while live slice rejection",
+			err,
+		)
 	}
 }
 
@@ -1172,11 +1320,16 @@ func TestValidateAllocationLoweringRejectsExplicitIslandUnknownCallReturnedHandl
 	}}}
 	err := ValidateAllocationLowering(plan, prog)
 	if err == nil || !strings.Contains(err.Error(), "no active island handle operand") {
-		t.Fatalf("ValidateAllocationLowering error = %v, want unknown-call conservative handle rejection", err)
+		t.Fatalf(
+			"ValidateAllocationLowering error = %v, want unknown-call conservative handle rejection",
+			err,
+		)
 	}
 }
 
-func TestValidateAllocationLoweringRejectsReturnedExplicitIslandAllocationThroughCallSummary(t *testing.T) {
+func TestValidateAllocationLoweringRejectsReturnedExplicitIslandAllocationThroughCallSummary(
+	t *testing.T,
+) {
 	plan := explicitIslandValidationPlan("bad")
 	prog := &ir.IRProgram{Funcs: []ir.IRFunc{
 		{
@@ -1212,7 +1365,10 @@ func TestValidateAllocationLoweringRejectsReturnedExplicitIslandAllocationThroug
 	}}
 	err := ValidateAllocationLowering(plan, prog)
 	if err == nil || !strings.Contains(err.Error(), "escapes via return") {
-		t.Fatalf("ValidateAllocationLowering error = %v, want call-summary return escape rejection", err)
+		t.Fatalf(
+			"ValidateAllocationLowering error = %v, want call-summary return escape rejection",
+			err,
+		)
 	}
 }
 
@@ -1260,7 +1416,10 @@ func TestValidateAllocationLoweringRejectsMissingFunctionTempRegionIR(t *testing
 	}}}
 	err := ValidateAllocationLowering(plan, prog)
 	if err == nil || !strings.Contains(err.Error(), "no matching IR function-temp region slice") {
-		t.Fatalf("ValidateAllocationLowering error = %v, want missing function-temp region IR rejection", err)
+		t.Fatalf(
+			"ValidateAllocationLowering error = %v, want missing function-temp region IR rejection",
+			err,
+		)
 	}
 }
 
@@ -1279,11 +1438,16 @@ func TestValidateAllocationLoweringRejectsReturnedFunctionTempRegionAllocation(t
 	}}}
 	err := ValidateAllocationLowering(plan, prog)
 	if err == nil || !strings.Contains(err.Error(), "escapes via return") {
-		t.Fatalf("ValidateAllocationLowering error = %v, want returned region allocation rejection", err)
+		t.Fatalf(
+			"ValidateAllocationLowering error = %v, want returned region allocation rejection",
+			err,
+		)
 	}
 }
 
-func TestValidateAllocationLoweringRejectsFunctionTempRegionResetThatDoesNotDominateBranchReturn(t *testing.T) {
+func TestValidateAllocationLoweringRejectsFunctionTempRegionResetThatDoesNotDominateBranchReturn(
+	t *testing.T,
+) {
 	plan := functionTempRegionValidationPlan("branchy")
 	prog := &ir.IRProgram{Funcs: []ir.IRFunc{{
 		Name:        "branchy",
@@ -1304,8 +1468,12 @@ func TestValidateAllocationLoweringRejectsFunctionTempRegionResetThatDoesNotDomi
 		},
 	}}}
 	err := ValidateAllocationLowering(plan, prog)
-	if err == nil || !strings.Contains(err.Error(), "function-temp region reset does not dominate return") {
-		t.Fatalf("ValidateAllocationLowering error = %v, want branch reset-dominance rejection", err)
+	if err == nil ||
+		!strings.Contains(err.Error(), "function-temp region reset does not dominate return") {
+		t.Fatalf(
+			"ValidateAllocationLowering error = %v, want branch reset-dominance rejection",
+			err,
+		)
 	}
 }
 
@@ -1326,7 +1494,8 @@ func TestValidateAllocationLoweringRejectsFunctionTempRegionMakeWithoutEnter(t *
 		},
 	}}}
 	err := ValidateAllocationLowering(plan, prog)
-	if err == nil || !strings.Contains(err.Error(), "function-temp region enter does not dominate make") {
+	if err == nil ||
+		!strings.Contains(err.Error(), "function-temp region enter does not dominate make") {
 		t.Fatalf("ValidateAllocationLowering error = %v, want missing region-enter rejection", err)
 	}
 }
@@ -1353,8 +1522,12 @@ func TestValidateAllocationLoweringRejectsFunctionTempRegionLoopExitWithoutReset
 		},
 	}}}
 	err := ValidateAllocationLowering(plan, prog)
-	if err == nil || !strings.Contains(err.Error(), "function-temp region reset does not dominate return") {
-		t.Fatalf("ValidateAllocationLowering error = %v, want loop-exit reset-dominance rejection", err)
+	if err == nil ||
+		!strings.Contains(err.Error(), "function-temp region reset does not dominate return") {
+		t.Fatalf(
+			"ValidateAllocationLowering error = %v, want loop-exit reset-dominance rejection",
+			err,
+		)
 	}
 }
 
@@ -1383,358 +1556,4 @@ func TestValidateAllocationLoweringAcceptsFunctionTempRegionResetAfterLoopExit(t
 	if err := ValidateAllocationLowering(plan, prog); err != nil {
 		t.Fatalf("ValidateAllocationLowering: %v", err)
 	}
-}
-
-func TestValidateAllocationLoweringAcceptsFunctionTempRegionIR(t *testing.T) {
-	plan := functionTempRegionValidationPlan("main")
-	prog := &ir.IRProgram{Funcs: []ir.IRFunc{{
-		Name:        "main",
-		LocalSlots:  4,
-		ReturnSlots: 1,
-		Instrs: []ir.IRInstr{
-			{Kind: ir.IRRegionEnter},
-			{Kind: ir.IRConstI32, Imm: 4},
-			{Kind: ir.IRRegionMakeSliceU8, Name: "copied"},
-			{Kind: ir.IRStoreLocal, Local: 1},
-			{Kind: ir.IRStoreLocal, Local: 0},
-			{Kind: ir.IRLoadLocal, Local: 1},
-			{Kind: ir.IRRegionReset},
-			{Kind: ir.IRReturn},
-		},
-	}}}
-	if err := ValidateAllocationLowering(plan, prog); err != nil {
-		t.Fatalf("ValidateAllocationLowering: %v", err)
-	}
-}
-
-func functionTempRegionValidationPlan(functionName string) *allocplan.Plan {
-	return &allocplan.Plan{Functions: []allocplan.FunctionPlan{{
-		Name: functionName,
-		Allocations: []allocplan.Allocation{{
-			ID:                    "copied",
-			SiteID:                "allocsite:" + functionName + ":copied:line_1_1",
-			ValueID:               "alloc_intent:copied",
-			Builtin:               "core.slice_copy_u8",
-			ElementType:           "u8",
-			ElementSize:           1,
-			LengthExpr:            "4",
-			LengthStatus:          allocplan.LengthStatusNormal,
-			ZeroGuardStatus:       "valid_empty_no_allocator",
-			NegativeGuardStatus:   "reject_before_allocation",
-			OverflowGuardStatus:   "reject_before_allocation",
-			ByteSize:              4,
-			Escape:                allocplan.EscapeNoEscape,
-			Storage:               allocplan.StorageFunctionTempRegion,
-			PlannedStorage:        allocplan.StorageFunctionTempRegion,
-			ActualLoweringStorage: allocplan.StorageFunctionTempRegion,
-			ValidationStatus:      "validated_function_temp_region_scope",
-			LoweringStatus:        "function_temp_region_lowering",
-			Reason:                "test",
-			RuntimePath:           "region",
-			AllocatorClass:        "function_temp_region",
-			RegionID:              "region:" + functionName + ":temp",
-			Lifetime:              "function:" + functionName,
-		}},
-	}}}
-}
-
-func TestValidateAllocationLoweringAcceptsScalarReplacementWithoutStackIR(t *testing.T) {
-	plan := &allocplan.Plan{Functions: []allocplan.FunctionPlan{{
-		Name: "main",
-		Allocations: []allocplan.Allocation{{
-			ID:                    "xs",
-			SiteID:                "allocsite:main:xs:line_1_1",
-			ValueID:               "alloc_intent:xs",
-			Builtin:               "core.make_i32",
-			ElementType:           "i32",
-			ElementSize:           4,
-			LengthExpr:            "2",
-			LengthStatus:          allocplan.LengthStatusNormal,
-			ZeroGuardStatus:       "valid_empty_no_allocator",
-			NegativeGuardStatus:   "reject_before_allocation",
-			OverflowGuardStatus:   "reject_before_allocation",
-			ByteSize:              8,
-			Escape:                allocplan.EscapeNoEscape,
-			Storage:               allocplan.StorageEliminated,
-			PlannedStorage:        allocplan.StorageEliminated,
-			ActualLoweringStorage: allocplan.StorageEliminated,
-			ValidationStatus:      "validated_no_escape",
-			LoweringStatus:        "scalar_replacement",
-			Reason:                "scalar_replacement_fixed_constant_indices",
-		}},
-	}}}
-	prog := &ir.IRProgram{Funcs: []ir.IRFunc{{
-		Name:        "main",
-		LocalSlots:  4,
-		ReturnSlots: 1,
-		Instrs: []ir.IRInstr{
-			{Kind: ir.IRConstI32, Imm: 20},
-			{Kind: ir.IRStoreLocal, Local: 2},
-			{Kind: ir.IRLoadLocal, Local: 2},
-			{Kind: ir.IRReturn},
-		},
-	}}}
-	if err := ValidateAllocationLowering(plan, prog); err != nil {
-		t.Fatalf("ValidateAllocationLowering: %v", err)
-	}
-}
-
-func TestValidateTranslationRequiresSameVerifiedFunctionSet(t *testing.T) {
-	before := validEmptyIR("main")
-	after := validEmptyIR("main")
-	report, err := ValidateTranslation(before, after)
-	if err != nil {
-		t.Fatalf("ValidateTranslation: %v", err)
-	}
-	if report.FunctionsCompared != 1 || report.Functions[0] != "main" {
-		t.Fatalf("translation report = %+v", report)
-	}
-	badAfter := validEmptyIR("other")
-	_, err = ValidateTranslation(before, badAfter)
-	if err == nil || !strings.Contains(err.Error(), "function set changed") {
-		t.Fatalf("ValidateTranslation mismatch error = %v, want function set changed", err)
-	}
-}
-
-func TestValidateTranslationAcceptsLocalAlgebraEquivalentRewrite(t *testing.T) {
-	before := singleReturnIR("main", 1,
-		ir.IRInstr{Kind: ir.IRLoadLocal, Local: 0},
-		ir.IRInstr{Kind: ir.IRConstI32, Imm: 0},
-		ir.IRInstr{Kind: ir.IRAddI32},
-	)
-	after := singleReturnIR("main", 1,
-		ir.IRInstr{Kind: ir.IRLoadLocal, Local: 0},
-	)
-	report, err := ValidateTranslation(before, after)
-	if err != nil {
-		t.Fatalf("ValidateTranslation equivalent algebra: %v", err)
-	}
-	if report.SemanticLocalChecks == 0 || report.DifferentialSamples == 0 {
-		t.Fatalf("translation report missing semantic/differential evidence: %+v", report)
-	}
-}
-
-func TestValidateTranslationAcceptsCommutativeLocalAlgebraRewrite(t *testing.T) {
-	before := singleReturnIR("main", 2,
-		ir.IRInstr{Kind: ir.IRLoadLocal, Local: 0},
-		ir.IRInstr{Kind: ir.IRLoadLocal, Local: 1},
-		ir.IRInstr{Kind: ir.IRAddI32},
-	)
-	after := singleReturnIR("main", 2,
-		ir.IRInstr{Kind: ir.IRLoadLocal, Local: 1},
-		ir.IRInstr{Kind: ir.IRLoadLocal, Local: 0},
-		ir.IRInstr{Kind: ir.IRAddI32},
-	)
-	report, err := ValidateTranslation(before, after)
-	if err != nil {
-		t.Fatalf("ValidateTranslation commutative algebra: %v", err)
-	}
-	if report.SemanticLocalChecks == 0 || report.DifferentialSamples == 0 {
-		t.Fatalf("translation report missing semantic/differential evidence: %+v", report)
-	}
-}
-
-func TestValidateTranslationAcceptsMirroredComparisonAlgebraRewrite(t *testing.T) {
-	tests := []struct {
-		name   string
-		before ir.IRInstrKind
-		after  ir.IRInstrKind
-	}{
-		{name: "lt-to-gt", before: ir.IRCmpLtI32, after: ir.IRCmpGtI32},
-		{name: "gt-to-lt", before: ir.IRCmpGtI32, after: ir.IRCmpLtI32},
-		{name: "le-to-ge", before: ir.IRCmpLeI32, after: ir.IRCmpGeI32},
-		{name: "ge-to-le", before: ir.IRCmpGeI32, after: ir.IRCmpLeI32},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			before := singleReturnIR("main", 2,
-				ir.IRInstr{Kind: ir.IRLoadLocal, Local: 0},
-				ir.IRInstr{Kind: ir.IRLoadLocal, Local: 1},
-				ir.IRInstr{Kind: tc.before},
-			)
-			after := singleReturnIR("main", 2,
-				ir.IRInstr{Kind: ir.IRLoadLocal, Local: 1},
-				ir.IRInstr{Kind: ir.IRLoadLocal, Local: 0},
-				ir.IRInstr{Kind: tc.after},
-			)
-			report, err := ValidateTranslation(before, after)
-			if err != nil {
-				t.Fatalf("ValidateTranslation mirrored comparison algebra: %v", err)
-			}
-			if report.SemanticLocalChecks == 0 || report.DifferentialSamples == 0 {
-				t.Fatalf("translation report missing semantic/differential evidence: %+v", report)
-			}
-		})
-	}
-}
-
-func TestValidateTranslationAcceptsSameLocalComparisonAlgebraRewrite(t *testing.T) {
-	tests := []struct {
-		name  string
-		kind  ir.IRInstrKind
-		value int32
-	}{
-		{name: "eq", kind: ir.IRCmpEqI32, value: 1},
-		{name: "le", kind: ir.IRCmpLeI32, value: 1},
-		{name: "ge", kind: ir.IRCmpGeI32, value: 1},
-		{name: "ne", kind: ir.IRCmpNeI32, value: 0},
-		{name: "lt", kind: ir.IRCmpLtI32, value: 0},
-		{name: "gt", kind: ir.IRCmpGtI32, value: 0},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			before := singleReturnIR("main", 1,
-				ir.IRInstr{Kind: ir.IRLoadLocal, Local: 0},
-				ir.IRInstr{Kind: ir.IRLoadLocal, Local: 0},
-				ir.IRInstr{Kind: tc.kind},
-			)
-			after := singleReturnIR("main", 1,
-				ir.IRInstr{Kind: ir.IRConstI32, Imm: tc.value},
-			)
-			report, err := ValidateTranslation(before, after)
-			if err != nil {
-				t.Fatalf("ValidateTranslation same-local comparison algebra: %v", err)
-			}
-			if report.SemanticLocalChecks == 0 || report.DifferentialSamples == 0 {
-				t.Fatalf("translation report missing semantic/differential evidence: %+v", report)
-			}
-		})
-	}
-}
-
-func TestValidateTranslationRejectsNonCommutativeLocalAlgebraRewrite(t *testing.T) {
-	before := singleReturnIR("main", 2,
-		ir.IRInstr{Kind: ir.IRLoadLocal, Local: 0},
-		ir.IRInstr{Kind: ir.IRLoadLocal, Local: 1},
-		ir.IRInstr{Kind: ir.IRSubI32},
-	)
-	after := singleReturnIR("main", 2,
-		ir.IRInstr{Kind: ir.IRLoadLocal, Local: 1},
-		ir.IRInstr{Kind: ir.IRLoadLocal, Local: 0},
-		ir.IRInstr{Kind: ir.IRSubI32},
-	)
-	_, err := ValidateTranslation(before, after)
-	if err == nil || !strings.Contains(err.Error(), "semantic local equivalence") {
-		t.Fatalf("ValidateTranslation non-commutative algebra error = %v, want semantic mismatch", err)
-	}
-}
-
-func TestValidateTranslationRejectsOppositeComparisonRewrite(t *testing.T) {
-	before := singleReturnIR("main", 2,
-		ir.IRInstr{Kind: ir.IRLoadLocal, Local: 0},
-		ir.IRInstr{Kind: ir.IRLoadLocal, Local: 1},
-		ir.IRInstr{Kind: ir.IRCmpLtI32},
-	)
-	after := singleReturnIR("main", 2,
-		ir.IRInstr{Kind: ir.IRLoadLocal, Local: 0},
-		ir.IRInstr{Kind: ir.IRLoadLocal, Local: 1},
-		ir.IRInstr{Kind: ir.IRCmpGeI32},
-	)
-	_, err := ValidateTranslation(before, after)
-	if err == nil || !strings.Contains(err.Error(), "semantic local equivalence") {
-		t.Fatalf("ValidateTranslation opposite comparison error = %v, want semantic mismatch", err)
-	}
-}
-
-func TestValidateTranslationRejectsBadLocalAlgebraRewrite(t *testing.T) {
-	before := singleReturnIR("main", 1,
-		ir.IRInstr{Kind: ir.IRLoadLocal, Local: 0},
-		ir.IRInstr{Kind: ir.IRConstI32, Imm: 0},
-		ir.IRInstr{Kind: ir.IRAddI32},
-	)
-	after := singleReturnIR("main", 1,
-		ir.IRInstr{Kind: ir.IRLoadLocal, Local: 0},
-		ir.IRInstr{Kind: ir.IRConstI32, Imm: 1},
-		ir.IRInstr{Kind: ir.IRAddI32},
-	)
-	_, err := ValidateTranslation(before, after)
-	if err == nil || !strings.Contains(err.Error(), "semantic local equivalence") {
-		t.Fatalf("ValidateTranslation bad algebra error = %v, want semantic mismatch", err)
-	}
-}
-
-func TestValidateTranslationRejectsProofFactDrift(t *testing.T) {
-	before := proofLoadIR("main", "proof:while:i:xs:1:1", ir.IRIndexLoadI32Unchecked)
-	after := proofLoadIR("main", "proof:while:i:ys:1:1", ir.IRIndexLoadI32Unchecked)
-	_, err := ValidateTranslation(before, after)
-	if err == nil || !strings.Contains(err.Error(), "proof facts changed") {
-		t.Fatalf("ValidateTranslation proof drift error = %v, want proof facts changed", err)
-	}
-}
-
-func TestValidateTranslationRejectsMissingProofIDAfterTransform(t *testing.T) {
-	before := proofLoadIR("main", "proof:while:i:xs:1:1", ir.IRIndexLoadI32Unchecked)
-	after := proofLoadIR("main", "", ir.IRIndexLoadI32Unchecked)
-	_, err := ValidateTranslation(before, after)
-	if err == nil || !strings.Contains(err.Error(), "missing proof id") {
-		t.Fatalf("ValidateTranslation missing proof error = %v, want missing proof id", err)
-	}
-}
-
-func TestValidateTranslationRejectsDifferentialMismatch(t *testing.T) {
-	before := singleReturnIR("main", 2,
-		ir.IRInstr{Kind: ir.IRLoadLocal, Local: 0},
-		ir.IRInstr{Kind: ir.IRLoadLocal, Local: 1},
-		ir.IRInstr{Kind: ir.IRDivI32},
-	)
-	after := singleReturnIR("main", 2,
-		ir.IRInstr{Kind: ir.IRLoadLocal, Local: 0},
-		ir.IRInstr{Kind: ir.IRLoadLocal, Local: 1},
-		ir.IRInstr{Kind: ir.IRAddI32},
-	)
-	_, err := ValidateTranslation(before, after)
-	if err == nil || !strings.Contains(err.Error(), "differential mismatch") {
-		t.Fatalf("ValidateTranslation differential error = %v, want differential mismatch", err)
-	}
-}
-
-func TestVerifierMapNamesRequiredStages(t *testing.T) {
-	stages := map[Stage]bool{}
-	for _, item := range VerifierMap() {
-		stages[item.Stage] = item.Implemented
-	}
-	for _, stage := range []Stage{StageTypedAST, StagePLIR, StageProofFacts, StageOptimizedIR, StageAllocationPlan, StageMachineIR, StageABI, StageObjectSmoke} {
-		if !stages[stage] {
-			t.Fatalf("VerifierMap missing implemented stage %s: %+v", stage, VerifierMap())
-		}
-	}
-}
-
-func validEmptyIR(name string) *ir.IRProgram {
-	return &ir.IRProgram{
-		MainIndex: 0,
-		MainName:  name,
-		Funcs: []ir.IRFunc{{
-			Name:       name,
-			LocalSlots: 0,
-			Instrs: []ir.IRInstr{
-				{Kind: ir.IRReturn},
-			},
-		}},
-	}
-}
-
-func singleReturnIR(name string, params int, body ...ir.IRInstr) *ir.IRProgram {
-	instrs := append([]ir.IRInstr(nil), body...)
-	instrs = append(instrs, ir.IRInstr{Kind: ir.IRReturn})
-	return &ir.IRProgram{
-		MainIndex: 0,
-		MainName:  name,
-		Funcs: []ir.IRFunc{{
-			Name:        name,
-			ParamSlots:  params,
-			LocalSlots:  params,
-			ReturnSlots: 1,
-			Instrs:      instrs,
-		}},
-	}
-}
-
-func proofLoadIR(name string, proofID string, kind ir.IRInstrKind) *ir.IRProgram {
-	return singleReturnIR(name, 3,
-		ir.IRInstr{Kind: ir.IRLoadLocal, Local: 0},
-		ir.IRInstr{Kind: ir.IRLoadLocal, Local: 1},
-		ir.IRInstr{Kind: ir.IRLoadLocal, Local: 2},
-		ir.IRInstr{Kind: kind, ProofID: proofID},
-	)
 }

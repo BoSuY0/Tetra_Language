@@ -58,7 +58,10 @@ func (c *scramSHA256Client) ClientFinalMessage(serverFirst string) (string, erro
 		return "", fmt.Errorf("%w: missing server nonce", ErrMalformedFrame)
 	}
 	if !strings.HasPrefix(serverNonce, c.nonce) {
-		return "", fmt.Errorf("%w: server nonce does not extend client nonce", ErrSCRAMAuthentication)
+		return "", fmt.Errorf(
+			"%w: server nonce does not extend client nonce",
+			ErrSCRAMAuthentication,
+		)
 	}
 	salt64 := fields["s"]
 	if salt64 == "" {
@@ -79,7 +82,12 @@ func (c *scramSHA256Client) ClientFinalMessage(serverFirst string) (string, erro
 
 	clientFinalWithoutProof := "c=biws,r=" + serverNonce
 	authMessage := c.clientFirstBare + "," + serverFirst + "," + clientFinalWithoutProof
-	clientProof, serverSignature := scramSHA256ProofAndServerSignature(c.password, salt, iterations, authMessage)
+	clientProof, serverSignature := scramSHA256ProofAndServerSignature(
+		c.password,
+		salt,
+		iterations,
+		authMessage,
+	)
 	c.serverFirst = serverFirst
 	c.clientFinalBare = clientFinalWithoutProof
 	c.serverSignature = serverSignature
@@ -137,7 +145,12 @@ func scramEscapeName(value string) string {
 	return value
 }
 
-func scramSHA256ProofAndServerSignature(password string, salt []byte, iterations int, authMessage string) ([]byte, []byte) {
+func scramSHA256ProofAndServerSignature(
+	password string,
+	salt []byte,
+	iterations int,
+	authMessage string,
+) ([]byte, []byte) {
 	saltedPassword := pbkdf2HMACSHA256([]byte(password), salt, iterations, sha256.Size)
 	clientKey := hmacSHA256(saltedPassword, []byte("Client Key"))
 	storedKeyHash := sha256.Sum256(clientKey)
@@ -148,8 +161,18 @@ func scramSHA256ProofAndServerSignature(password string, salt []byte, iterations
 	return clientProof, serverSignature
 }
 
-func scramSHA256ServerSignature(password string, salt []byte, iterations int, authMessage string) []byte {
-	_, serverSignature := scramSHA256ProofAndServerSignature(password, salt, iterations, authMessage)
+func scramSHA256ServerSignature(
+	password string,
+	salt []byte,
+	iterations int,
+	authMessage string,
+) []byte {
+	_, serverSignature := scramSHA256ProofAndServerSignature(
+		password,
+		salt,
+		iterations,
+		authMessage,
+	)
 	return serverSignature
 }
 

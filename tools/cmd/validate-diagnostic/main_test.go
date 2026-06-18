@@ -1,11 +1,38 @@
 package main
 
-import "testing"
+import (
+	"testing"
+
+	"tetra_language/internal/toon"
+)
 
 func TestValidateDiagnosticAcceptsStableShape(t *testing.T) {
-	diag, err := parseDiagnostic([]byte(`{"code":"TETRA2001","message":"unknown function","file":"bad.tetra","line":2,"column":5,"severity":"error","hint":"check spelling"}`))
+	diag, err := parseDiagnostic(
+		[]byte(
+			`{"code":"TETRA2001","message":"unknown function","file":"bad.tetra","line":2,"column":5,"severity":"error","hint":"check spelling"}`,
+		),
+	)
 	if err != nil {
 		t.Fatalf("parse diagnostic: %v", err)
+	}
+	if err := validateDiagnostic(diag, "TETRA2001", "error", "unknown function", true); err != nil {
+		t.Fatalf("validate diagnostic: %v", err)
+	}
+}
+
+func TestValidateDiagnosticAcceptsTOONStableShape(t *testing.T) {
+	raw, err := toon.ConvertJSONToTOON(
+		[]byte(
+			`{"code":"TETRA2001","message":"unknown function","file":"bad.tetra","line":2,"column":5,"severity":"error","hint":"check spelling"}`,
+		),
+		toon.Options{Deterministic: true, Strict: true},
+	)
+	if err != nil {
+		t.Fatalf("json->toon: %v", err)
+	}
+	diag, err := parseDiagnostic(raw)
+	if err != nil {
+		t.Fatalf("parse diagnostic: %v\n%s", err, raw)
 	}
 	if err := validateDiagnostic(diag, "TETRA2001", "error", "unknown function", true); err != nil {
 		t.Fatalf("validate diagnostic: %v", err)
@@ -23,13 +50,17 @@ func TestValidateDiagnosticRejectsMissingRequiredFields(t *testing.T) {
 }
 
 func TestValidateDiagnosticRejectsUnknownFields(t *testing.T) {
-	if _, err := parseDiagnostic([]byte(`{"code":"TETRA2001","message":"bad","severity":"error","extra":true}`)); err == nil {
+	if _, err := parseDiagnostic(
+		[]byte(`{"code":"TETRA2001","message":"bad","severity":"error","extra":true}`),
+	); err == nil {
 		t.Fatalf("expected unknown field failure")
 	}
 }
 
 func TestValidateDiagnosticRejectsWrongCodeSeverityAndMessage(t *testing.T) {
-	diag, err := parseDiagnostic([]byte(`{"code":"TETRA0001","message":"parse failed","severity":"warning"}`))
+	diag, err := parseDiagnostic(
+		[]byte(`{"code":"TETRA0001","message":"parse failed","severity":"warning"}`),
+	)
 	if err != nil {
 		t.Fatalf("parse diagnostic: %v", err)
 	}
@@ -69,7 +100,9 @@ func TestValidateDiagnosticRejectsWhitespaceDrift(t *testing.T) {
 }
 
 func TestValidateDiagnosticRejectsPartialPositionWithoutFile(t *testing.T) {
-	diag, err := parseDiagnostic([]byte(`{"code":"TETRA2001","message":"bad","severity":"error","line":1,"column":1}`))
+	diag, err := parseDiagnostic(
+		[]byte(`{"code":"TETRA2001","message":"bad","severity":"error","line":1,"column":1}`),
+	)
 	if err != nil {
 		t.Fatalf("parse diagnostic: %v", err)
 	}

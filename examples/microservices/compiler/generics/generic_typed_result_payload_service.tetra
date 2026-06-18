@@ -1,0 +1,23 @@
+// Typed-result payload microservice smoke.
+//
+// The service catches a typed error carrying a payload and maps it back to a
+// successful service result.
+module examples.microservices.compiler.generics.generic_typed_result_payload_service
+enum ServiceErr:
+    case missing(Int)
+    case stopped
+
+func fetch(ok: Bool) -> Int throws ServiceErr:
+    if ok:
+        return 42
+    throw ServiceErr.missing(7)
+
+func main() -> Int:
+    let value: Int = catch fetch(false):
+    case ServiceErr.missing(code):
+        code + 35
+    case ServiceErr.stopped:
+        99
+    if value == 42:
+        return 0
+    return value

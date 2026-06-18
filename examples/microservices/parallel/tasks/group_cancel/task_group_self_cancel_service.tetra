@@ -1,0 +1,27 @@
+// Task group self-cancel microservice smoke.
+//
+// The worker resolves its current group, cancels it, checkpoints the canceled
+// state, and returns a deterministic service payload to the parent.
+module examples.microservices.parallel.tasks.group_cancel.task_group_self_cancel_service
+func worker() -> Int
+uses runtime:
+    let current: task.group = core.task_group_current()
+    let _canceled: task.group = core.task_group_cancel(current)
+    let checkpoint: task.error = core.task_checkpoint()
+    if checkpoint == 1:
+        return 42
+    return checkpoint
+
+func main() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let task: task.i32 = core.task_spawn_group_i32(group, "worker")
+    let result: task.result_i32 = core.task_join_result_i32(task)
+    let close_error: Int = core.task_group_close(group)
+    if close_error != 0:
+        return 10 + close_error
+    if result.error != 0:
+        return 20 + result.error
+    if result.value == 42:
+        return 0
+    return result.value

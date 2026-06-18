@@ -1,0 +1,28 @@
+// CLBG-inspired Mandelbrot escape kernel using fixed-point Int math.
+module examples.benchmarks.classic.clbg_integer_mandelbrot
+
+func escape_iters(cx: Int, cy: Int) -> Int:
+    var zx: Int = 0
+    var zy: Int = 0
+    var iter: Int = 0
+    while iter < 20 && zx * zx + zy * zy <= 40000:
+        let next_zx: Int = (zx * zx - zy * zy) / 100 + cx
+        zy = 2 * zx * zy / 100 + cy
+        zx = next_zx
+        iter = iter + 1
+    return iter
+
+func main() -> Int:
+    var y: Int = 0
+    var checksum: Int = 0
+    while y < 8:
+        var x: Int = 0
+        let cy: Int = y * 45 - 160
+        while x < 8:
+            let cx: Int = x * 45 - 220
+            checksum = checksum + escape_iters(cx, cy)
+            x = x + 1
+        y = y + 1
+    if checksum == 315:
+        return 0
+    return checksum

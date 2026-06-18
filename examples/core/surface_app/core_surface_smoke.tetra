@@ -1,0 +1,11 @@
+// Stable core surface stdlib smoke.
+module examples.core.surface_app.core_surface_smoke
+
+import lib.core.surface as surface
+
+func main() -> Int:
+    let size: surface.Size = surface.Size(w: 40, h: 2)
+    let rect: surface.Rect = surface.Rect(x: 0, y: 0, w: size.w, h: size.h)
+    if rect.w + rect.h == 42:
+        return 42
+    return 1

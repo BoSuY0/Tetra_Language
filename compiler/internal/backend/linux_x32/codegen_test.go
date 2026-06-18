@@ -78,8 +78,18 @@ func TestCodegenObjectLinuxX32RawSliceFromPartsBuildsScopedView(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CodegenObjectLinuxX32 raw_slice_from_parts: %v", err)
 	}
-	assertContainsBytes(t, "x32 raw slice signed length guard", obj.Code, []byte{0x85, 0xC9, 0x0F, 0x8C})
-	assertContainsBytes(t, "x32 raw slice i32 byte-overflow guard", obj.Code, []byte{0x48, 0x81, 0xF9, 0xFF, 0xFF, 0xFF, 0x1F, 0x0F, 0x8F})
+	assertContainsBytes(
+		t,
+		"x32 raw slice signed length guard",
+		obj.Code,
+		[]byte{0x85, 0xC9, 0x0F, 0x8C},
+	)
+	assertContainsBytes(
+		t,
+		"x32 raw slice i32 byte-overflow guard",
+		obj.Code,
+		[]byte{0x48, 0x81, 0xF9, 0xFF, 0xFF, 0xFF, 0x1F, 0x0F, 0x8F},
+	)
 }
 
 func TestCodegenObjectLinuxX32EmitsCtxSwitchSysVStub(t *testing.T) {
@@ -157,7 +167,8 @@ func hasRelocKind(relocs []tobj.Reloc, kind tobj.RelocKind) bool {
 
 func hasSymbol(symbols []tobj.Symbol, name string, params, returns int) bool {
 	for _, sym := range symbols {
-		if sym.Name == name && sym.HasSignature && sym.ParamSlots == params && sym.ReturnSlots == returns {
+		if sym.Name == name && sym.HasSignature && sym.ParamSlots == params &&
+			sym.ReturnSlots == returns {
 			return true
 		}
 	}

@@ -12,14 +12,26 @@ import (
 
 func main() {
 	reportPath := flag.String("report", "", "path to tetra.ram-contract-fuzz-oracle.v1 JSON report")
-	artifactDir := flag.String("artifact-dir", "", "optional RAM contract fuzz artifact directory to validate alongside the oracle report")
-	currentGitHead := flag.String("current-git-head", "", "optional current git HEAD to require in the oracle report")
+	artifactDir := flag.String(
+		"artifact-dir",
+		"",
+		"optional RAM contract fuzz artifact directory to validate alongside the oracle report",
+	)
+	currentGitHead := flag.String(
+		"current-git-head",
+		"",
+		"optional current git HEAD to require in the oracle report",
+	)
 	flag.Parse()
 	if *reportPath == "" {
 		fmt.Fprintln(os.Stderr, "error: --report is required")
 		os.Exit(2)
 	}
-	if err := validateRAMContractFuzzOracleWithHead(*reportPath, *currentGitHead, *artifactDir); err != nil {
+	if err := validateRAMContractFuzzOracleWithHead(
+		*reportPath,
+		*currentGitHead,
+		*artifactDir,
+	); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -29,7 +41,11 @@ func validateRAMContractFuzzOracle(path string, artifactDirs ...string) error {
 	return validateRAMContractFuzzOracleWithHead(path, "", artifactDirs...)
 }
 
-func validateRAMContractFuzzOracleWithHead(path string, currentGitHead string, artifactDirs ...string) error {
+func validateRAMContractFuzzOracleWithHead(
+	path string,
+	currentGitHead string,
+	artifactDirs ...string,
+) error {
 	var report struct {
 		SchemaVersion string `json:"schema_version"`
 		Observations  []struct {
@@ -54,11 +70,18 @@ func validateRAMContractFuzzOracleWithHead(path string, currentGitHead string, a
 		return err
 	}
 	if report.SchemaVersion != "tetra.ram-contract-fuzz-oracle.v1" {
-		return fmt.Errorf("schema_version is %q, want tetra.ram-contract-fuzz-oracle.v1", report.SchemaVersion)
+		return fmt.Errorf(
+			"schema_version is %q, want tetra.ram-contract-fuzz-oracle.v1",
+			report.SchemaVersion,
+		)
 	}
 	currentGitHead = strings.TrimSpace(currentGitHead)
 	if currentGitHead != "" && report.GitHead != currentGitHead {
-		return fmt.Errorf("git_head %s does not match current git head %s", report.GitHead, currentGitHead)
+		return fmt.Errorf(
+			"git_head %s does not match current git head %s",
+			report.GitHead,
+			currentGitHead,
+		)
 	}
 	if err := validateOracleClaimText(report.NonClaims, "non_claims"); err != nil {
 		return err
@@ -76,11 +99,18 @@ func validateRAMContractFuzzOracleWithHead(path string, currentGitHead string, a
 		if _, ok := required[obs.Mutation]; ok {
 			required[obs.Mutation] = true
 		}
-		if !obs.Rejected || strings.TrimSpace(obs.Validator) == "" || strings.TrimSpace(obs.Reason) == "" {
+		if !obs.Rejected || strings.TrimSpace(obs.Validator) == "" ||
+			strings.TrimSpace(obs.Reason) == "" {
 			return fmt.Errorf("mutation %s is not rejected with validator evidence", obs.Mutation)
 		}
-		if obs.ExitCode == nil || *obs.ExitCode == 0 || strings.TrimSpace(obs.ValidatorCommand) == "" || strings.TrimSpace(obs.OutputExcerpt) == "" || strings.TrimSpace(obs.MutatedFile) == "" {
-			return fmt.Errorf("mutation %s is not rejected with validator exit evidence", obs.Mutation)
+		if obs.ExitCode == nil || *obs.ExitCode == 0 ||
+			strings.TrimSpace(obs.ValidatorCommand) == "" ||
+			strings.TrimSpace(obs.OutputExcerpt) == "" ||
+			strings.TrimSpace(obs.MutatedFile) == "" {
+			return fmt.Errorf(
+				"mutation %s is not rejected with validator exit evidence",
+				obs.Mutation,
+			)
 		}
 		if err := validateOracleClaimText([]string{obs.Reason}, "observation "+obs.Mutation); err != nil {
 			return err
@@ -116,7 +146,11 @@ func validateRAMContractFuzzOracleArtifactDir(reportPath string, artifactDir str
 	if same, err := sameCleanPath(reportPath, expectedReport); err != nil {
 		return err
 	} else if !same {
-		return fmt.Errorf("--report must point at %s when --artifact-dir is used, got %s", expectedReport, reportPath)
+		return fmt.Errorf(
+			"--report must point at %s when --artifact-dir is used, got %s",
+			expectedReport,
+			reportPath,
+		)
 	}
 	for _, rel := range []string{
 		"ram-contract-fuzz-oracle.json",
@@ -132,22 +166,36 @@ func validateRAMContractFuzzOracleArtifactDir(reportPath string, artifactDir str
 			return err
 		}
 	}
-	if err := ramvalidate.ValidateReportFile(filepath.Join(artifactDir, "ram-contract-report.json")); err != nil {
+	if err := ramvalidate.ValidateReportFile(
+		filepath.Join(artifactDir, "ram-contract-report.json"),
+	); err != nil {
 		return fmt.Errorf("ram-contract-report.json: %w", err)
 	}
-	if err := ramvalidate.ValidateGradeReportFile(filepath.Join(artifactDir, "memory-grade-report.json")); err != nil {
+	if err := ramvalidate.ValidateGradeReportFile(
+		filepath.Join(artifactDir, "memory-grade-report.json"),
+	); err != nil {
 		return fmt.Errorf("memory-grade-report.json: %w", err)
 	}
-	if err := ramvalidate.ValidateProofStoreSummaryFile(filepath.Join(artifactDir, "proof-store-summary.json")); err != nil {
+	if err := ramvalidate.ValidateProofStoreSummaryFile(
+		filepath.Join(artifactDir, "proof-store-summary.json"),
+	); err != nil {
 		return fmt.Errorf("proof-store-summary.json: %w", err)
 	}
-	if err := ramvalidate.ValidatePipelineCoverageFile(filepath.Join(artifactDir, "validation-pipeline-coverage.json")); err != nil {
+	if err := ramvalidate.ValidatePipelineCoverageFile(
+		filepath.Join(artifactDir, "validation-pipeline-coverage.json"),
+	); err != nil {
 		return fmt.Errorf("validation-pipeline-coverage.json: %w", err)
 	}
-	if err := ramvalidate.ValidateBlockerReportFile(filepath.Join(artifactDir, "heap-blockers.json"), "heap"); err != nil {
+	if err := ramvalidate.ValidateBlockerReportFile(
+		filepath.Join(artifactDir, "heap-blockers.json"),
+		"heap",
+	); err != nil {
 		return fmt.Errorf("heap-blockers.json: %w", err)
 	}
-	if err := ramvalidate.ValidateBlockerReportFile(filepath.Join(artifactDir, "copy-blockers.json"), "copy"); err != nil {
+	if err := ramvalidate.ValidateBlockerReportFile(
+		filepath.Join(artifactDir, "copy-blockers.json"),
+		"copy",
+	); err != nil {
 		return fmt.Errorf("copy-blockers.json: %w", err)
 	}
 	summary, err := os.ReadFile(filepath.Join(artifactDir, "ram-contract-fuzz-summary.md"))

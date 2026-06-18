@@ -53,8 +53,22 @@ v1 gate summary cites the same command as a passing gate step.
 - [ ] `./t version`
 - [ ] `go test ./compiler/internal/frontend/... -count=1`
 - [ ] `go test ./compiler/... -run 'Closure|FunctionType|Callable|Capsule|Property' -count=1`
-- [ ] `go test ./compiler/... -run 'Type|Inference|Enum|Optional|Protocol|Extension|Module' -count=1`
-- [ ] `go test ./compiler/... -run 'Ownership|Borrow|Consume|Inout|Lifetime|Resource|Island|Actor|Task|Unsafe|Capability|Effect|Privacy|Consent|Budget|MMIO|Mem' -count=1`
+- [ ] Compiler type/module sweep:
+
+      ```sh
+      go test ./compiler/... \
+        -run 'Type|Inference|Enum|Optional|Protocol|Extension|Module' \
+        -count=1
+      ```
+- [ ] Compiler safety sweep:
+
+      ```sh
+      pattern='Ownership|Borrow|Consume|Inout|Lifetime|Resource|Island|Actor|Task'
+      pattern="${pattern}|Unsafe|Capability|Effect|Privacy|Consent|Budget|MMIO|Mem"
+      go test ./compiler/... \
+        -run "$pattern" \
+        -count=1
+      ```
 - [ ] `go test ./compiler/... -run 'Privacy|Consent|Budget|Effect' -count=1`
 - [ ] `go test ./compiler/... -run 'Async|Await|Task|TypedError' -count=1`
 - [ ] `go test ./compiler/... -run 'Task|Runtime|Async|Stress' -count=1`
@@ -71,19 +85,81 @@ v1 gate summary cites the same command as a passing gate step.
 - [ ] `go test ./tools/cmd/validate-diagnostic/... -count=1`
 - [ ] `go test ./tools/cmd/validate-lsp-stdio/... ./tools/cmd/validate-lsp-smoke/... -count=1`
 - [ ] `./tetra smoke --target linux-x64 --run=true --report <report-dir>/artifacts/host-smoke.json`
-- [ ] `./tetra smoke --target macos-x64 --run=false --report <report-dir>/artifacts/macos-smoke.json`
-- [ ] `./tetra smoke --target windows-x64 --run=false --report <report-dir>/artifacts/windows-smoke.json`
-- [ ] `./tetra smoke --target wasm32-wasi --run=false --report <report-dir>/artifacts/wasm32-wasi-artifact-smoke.json`
-- [ ] `./tetra smoke --target wasm32-web --run=false --report <report-dir>/artifacts/wasm32-web-artifact-smoke.json`
+- [ ] macOS build-only smoke:
+
+      ```sh
+      ./tetra smoke \
+        --target macos-x64 \
+        --run=false \
+        --report <report-dir>/artifacts/macos-smoke.json
+      ```
+- [ ] Windows build-only smoke:
+
+      ```sh
+      ./tetra smoke \
+        --target windows-x64 \
+        --run=false \
+        --report <report-dir>/artifacts/windows-smoke.json
+      ```
+- [ ] WASI artifact smoke:
+
+      ```sh
+      ./tetra smoke \
+        --target wasm32-wasi \
+        --run=false \
+        --report <report-dir>/artifacts/wasm32-wasi-artifact-smoke.json
+      ```
+- [ ] Web artifact smoke:
+
+      ```sh
+      ./tetra smoke \
+        --target wasm32-web \
+        --run=false \
+        --report <report-dir>/artifacts/wasm32-web-artifact-smoke.json
+      ```
 - [ ] `bash scripts/release/v1_0/wasi-smoke.sh --report <report-dir>/artifacts/wasi-smoke.json`
 - [ ] `bash scripts/release/v1_0/web-smoke.sh --report <report-dir>/artifacts/web-ui-smoke.json`
-- [ ] `bash scripts/release/v1_0/security-review.sh --signoff <report-dir>/artifacts/security-review.md`
-- [ ] `bash scripts/release/v1_0/binary-size.sh --report <report-dir>/artifacts/binary-size-thresholds.json`
-- [ ] `bash scripts/release/v1_0/reproducible-build.sh --report <report-dir>/artifacts/reproducible-build.json`
-- [ ] `go run ./tools/cmd/validate-release-state --expected-version v1.0.0 --format=text --report-dir <report-dir>`
-- [ ] `go run ./tools/cmd/validate-artifact-hashes --manifest <report-dir>/artifacts/artifact-hashes.json`
-- [ ] `! rg -n 'TODO|TBD|<[A-Za-z0-9_ ./:-]+>' docs/release/v1_0_final_handoff.md <report-dir>/artifacts/security-review.md`
-- [ ] Cross-reference audit: `docs/spec/v1_scope.md`, `docs/checklists/v1_0_release_gate.md`, and `docs/release/v1_0_final_handoff.md` all cite each other and the same final `<report-dir>`.
+- [ ] Security review signoff:
+
+      ```sh
+      bash scripts/release/v1_0/security-review.sh \
+        --signoff <report-dir>/artifacts/security-review.md
+      ```
+- [ ] Binary-size thresholds:
+
+      ```sh
+      bash scripts/release/v1_0/binary-size.sh \
+        --report <report-dir>/artifacts/binary-size-thresholds.json
+      ```
+- [ ] Reproducible build report:
+
+      ```sh
+      bash scripts/release/v1_0/reproducible-build.sh \
+        --report <report-dir>/artifacts/reproducible-build.json
+      ```
+- [ ] Release-state validation:
+
+      ```sh
+      go run ./tools/cmd/validate-release-state \
+        --expected-version v1.0.0 \
+        --format=text \
+        --report-dir <report-dir>
+      ```
+- [ ] Artifact-hash validation:
+
+      ```sh
+      go run ./tools/cmd/validate-artifact-hashes \
+        --manifest <report-dir>/artifacts/artifact-hashes.json
+      ```
+- [ ] Handoff/signoff placeholder scan:
+
+      ```sh
+      ! rg -n 'TODO|TBD|<[A-Za-z0-9_ ./:-]+>' \
+        docs/release/v1_0_final_handoff.md \
+        <report-dir>/artifacts/security-review.md
+      ```
+- [ ] Cross-reference audit: `docs/spec/v1_scope.md`, `docs/checklists/v1_0_release_gate.md`, and
+      `docs/release/v1_0_final_handoff.md` all cite each other and the same final `<report-dir>`.
 - [ ] `git diff --check`
 
 ## Required Artifacts
@@ -124,22 +200,105 @@ The final handoff must cite concrete paths under one fresh `<report-dir>`.
 
 ## Scope Evidence Matrix
 
-| Scope area | Required evidence | Artifact or log to cite | Status |
-| --- | --- | --- | --- |
-| Flow syntax and formatter | Flow-only scan plus formatter check over `examples`, `lib`, `__rt`, and `compiler/selfhostrt` | `<report-dir>/logs/*flow-only*`; `<report-dir>/logs/*formatter*` | blocked until fresh v1 evidence |
-| Frontend parser and diagnostics | Frontend package tests and diagnostic validators | `<report-dir>/logs/*frontend*`; diagnostic validator logs | blocked until fresh v1 evidence |
-| Function-type/callable MVP boundaries | Compiler tests prove supported direct-local callable subset and stable diagnostics for unsupported callable forms | compiler callable/closure test log | blocked until fresh v1 evidence |
-| Capsule metadata declaration MVP | Frontend + compiler tests prove metadata-only capsule acceptance and validation without runtime coupling | frontend/compiler capsule test logs | blocked until fresh v1 evidence |
-| Stable type and module contracts | Compiler tests for type, inference, enum, optional, protocol, extension, and module behavior | compiler test log | blocked until fresh v1 evidence |
-| Safety closure: ownership, lifetimes, resources, islands, actors/tasks, unsafe, capabilities, effects, privacy, consent, budgets, MMIO, and memory | Aggregate compiler safety command plus docs verification and diagnostic shape tests from the same branch state | `<report-dir>/logs/*safety*`; `<report-dir>/logs/*docs*`; diagnostic log | blocked until fresh v1 evidence |
-| Async, task runtime, and actor runtime MVP | Async/task/actor/runtime tests plus target smoke evidence | runtime test logs; smoke artifacts | blocked until fresh v1 evidence |
-| Runtime ABI and TOBJ linking | Runtime ABI, object, link, override, and mismatch tests | runtime ABI test log | blocked until fresh v1 evidence |
-| UI metadata surface | UI compiler tests, `docs/spec/ui_v1.md`, native shell smoke, and web smoke | UI test log; web smoke artifact; target smoke artifact | blocked until fresh v1 evidence |
-| CLI and tooling | CLI package tests, tools package tests, JSON validators, release-state audit | CLI/tools logs; release-state artifacts | blocked until fresh v1 evidence |
-| Docs and API docs | Manifest validation, docs verification, generated API docs validation | docs logs; `api-docs.md`; API diff artifacts | blocked until fresh v1 evidence |
-| LSP baseline | LSP stdio and smoke validators | LSP test or transcript logs | blocked until fresh v1 evidence |
-| Local Eco lifecycle | Eco verify/pack/unpack/lock/vault/publish metadata fixtures | Eco validator logs and artifacts | blocked until fresh v1 evidence |
-| Target matrix | Linux host run, macOS/Windows build-only, WASI runner, web browser smoke | target smoke JSON and smoke script artifacts | blocked until fresh v1 evidence |
+### Flow syntax and formatter
+
+- Required evidence: Flow-only scan plus formatter check over `examples`,
+  `lib`, `__rt`, and `compiler/selfhostrt`.
+- Artifact or log to cite: `<report-dir>/logs/*flow-only*` and
+  `<report-dir>/logs/*formatter*`.
+- Status: blocked until fresh v1 evidence.
+
+### Frontend parser and diagnostics
+
+- Required evidence: frontend package tests and diagnostic validators.
+- Artifact or log to cite: `<report-dir>/logs/*frontend*` plus diagnostic
+  validator logs.
+- Status: blocked until fresh v1 evidence.
+
+### Function-type/callable MVP boundaries
+
+- Required evidence: compiler tests prove supported direct-local callable
+  subset and stable diagnostics for unsupported callable forms.
+- Artifact or log to cite: compiler callable/closure test log.
+- Status: blocked until fresh v1 evidence.
+
+### Capsule metadata declaration MVP
+
+- Required evidence: frontend and compiler tests prove metadata-only capsule
+  acceptance and validation without runtime coupling.
+- Artifact or log to cite: frontend/compiler capsule test logs.
+- Status: blocked until fresh v1 evidence.
+
+### Stable type and module contracts
+
+- Required evidence: compiler tests for type, inference, enum, optional,
+  protocol, extension, and module behavior.
+- Artifact or log to cite: compiler test log.
+- Status: blocked until fresh v1 evidence.
+
+### Safety closure
+
+- Required evidence: ownership, lifetimes, resources, islands, actors/tasks,
+  unsafe, capabilities, effects, privacy, consent, budgets, MMIO, and memory.
+- Required command scope: aggregate compiler safety command plus docs
+  verification and diagnostic shape tests from the same branch state.
+- Artifact or log to cite: `<report-dir>/logs/*safety*`,
+  `<report-dir>/logs/*docs*`, and diagnostic log.
+- Status: blocked until fresh v1 evidence.
+
+### Async, task runtime, and actor runtime MVP
+
+- Required evidence: async/task/actor/runtime tests plus target smoke evidence.
+- Artifact or log to cite: runtime test logs and smoke artifacts.
+- Status: blocked until fresh v1 evidence.
+
+### Runtime ABI and TOBJ linking
+
+- Required evidence: runtime ABI, object, link, override, and mismatch tests.
+- Artifact or log to cite: runtime ABI test log.
+- Status: blocked until fresh v1 evidence.
+
+### UI metadata surface
+
+- Required evidence: UI compiler tests, `docs/spec/ui_v1.md`, native shell
+  smoke, and web smoke.
+- Artifact or log to cite: UI test log, web smoke artifact, and target smoke
+  artifact.
+- Status: blocked until fresh v1 evidence.
+
+### CLI and tooling
+
+- Required evidence: CLI package tests, tools package tests, JSON validators,
+  and release-state audit.
+- Artifact or log to cite: CLI/tools logs and release-state artifacts.
+- Status: blocked until fresh v1 evidence.
+
+### Docs and API docs
+
+- Required evidence: manifest validation, docs verification, and generated API
+  docs validation.
+- Artifact or log to cite: docs logs, `api-docs.md`, and API diff artifacts.
+- Status: blocked until fresh v1 evidence.
+
+### LSP baseline
+
+- Required evidence: LSP stdio and smoke validators.
+- Artifact or log to cite: LSP test or transcript logs.
+- Status: blocked until fresh v1 evidence.
+
+### Local Eco lifecycle
+
+- Required evidence: Eco verify/pack/unpack/lock/vault/publish metadata
+  fixtures.
+- Artifact or log to cite: Eco validator logs and artifacts.
+- Status: blocked until fresh v1 evidence.
+
+### Target matrix
+
+- Required evidence: Linux host run, macOS/Windows build-only, WASI runner,
+  and web browser smoke.
+- Artifact or log to cite: target smoke JSON and smoke script artifacts.
+- Status: blocked until fresh v1 evidence.
 
 ## Source Of Truth Guardrails
 

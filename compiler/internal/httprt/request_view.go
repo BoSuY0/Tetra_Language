@@ -1,6 +1,10 @@
 package httprt
 
-import "tetra_language/compiler/internal/stdlibrt"
+import (
+	"errors"
+
+	"tetra_language/compiler/internal/stdlibrt"
+)
 
 type HeaderView struct {
 	Name  []byte
@@ -49,7 +53,129 @@ type ResponseBufferReport struct {
 	HeapAllocations       int
 }
 
-func AppendResponseWithReport(dst []byte, resp Response, opts ResponseBufferOptions) ([]byte, ResponseBufferReport) {
+var ErrInvalidRequestRegionScope = errors.New("invalid request region scope")
+
+type RequestRegionOptions struct {
+	RegionID         string
+	RegionCapacity   int
+	HeaderCapacity   int
+	ResponseCapacity int
+}
+
+type RequestRegionReport struct {
+	RegionID             string
+	Lifetime             string
+	Request              RequestParseReport
+	Response             ResponseBufferReport
+	HeapAllocations      int
+	BytesUsedBeforeReset int
+	Reset                bool
+}
+
+type RequestRegionHandler func(RequestView, *stdlibrt.Region) (Response, error)
+type RequestRegionWriter func([]byte) error
+
+type RequestRegionScope struct {
+	region           *stdlibrt.Region
+	headers          []HeaderView
+	responseCapacity int
+}
+
+func NewRequestRegionScope(opt RequestRegionOptions) *RequestRegionScope {
+	regionID := opt.RegionID
+	if regionID == "" {
+		regionID = "request"
+	}
+	regionCapacity := opt.RegionCapacity
+	if regionCapacity <= 0 {
+		regionCapacity = 8192
+	}
+	headerCapacity := opt.HeaderCapacity
+	if headerCapacity <= 0 {
+		headerCapacity = 64
+	}
+	responseCapacity := opt.ResponseCapacity
+	if responseCapacity <= 0 {
+		responseCapacity = regionCapacity
+	}
+	return &RequestRegionScope{
+		region:           stdlibrt.NewRegion(regionID, regionCapacity),
+		headers:          make([]HeaderView, 0, headerCapacity),
+		responseCapacity: responseCapacity,
+	}
+}
+
+func (s *RequestRegionScope) RegionUsed() int {
+	if s == nil || s.region == nil {
+		return 0
+	}
+	return s.region.Used()
+}
+
+func (s *RequestRegionScope) Run(
+	input []byte,
+	limits Limits,
+	handler RequestRegionHandler,
+	write RequestRegionWriter,
+) (consumed int, report RequestRegionReport, err error) {
+	if s == nil || s.region == nil || handler == nil {
+		return 0, RequestRegionReport{}, ErrInvalidRequestRegionScope
+	}
+	report.RegionID = s.region.ID()
+	report.Lifetime = "request"
+	defer func() {
+		report.BytesUsedBeforeReset = s.region.Used()
+		if resetErr := s.region.Reset(); resetErr != nil && err == nil {
+			err = resetErr
+		}
+		report.Reset = true
+		s.headers = s.headers[:0]
+	}()
+
+	req, parsed, requestReport, parseErr := ParseRequestViewInRegion(
+		input,
+		limits,
+		s.headers[:0],
+		s.region,
+	)
+	consumed = parsed
+	report.Request = requestReport
+	if parseErr != nil {
+		err = parseErr
+		return
+	}
+	s.headers = req.Headers
+	resp, handlerErr := handler(req, s.region)
+	if handlerErr != nil {
+		err = handlerErr
+		return
+	}
+	buf, allocErr := s.region.Alloc(s.responseCapacity)
+	if allocErr != nil {
+		err = allocErr
+		return
+	}
+	out, responseReport := AppendResponseWithReport(buf[:0], resp, ResponseBufferOptions{
+		Storage:  stdlibrt.StorageRegion,
+		RegionID: s.region.ID(),
+	})
+	report.Response = responseReport
+	report.HeapAllocations = report.Request.HeapAllocations + report.Response.HeapAllocations
+	if responseReport.HeapAllocations != 0 {
+		err = stdlibrt.ErrRegionCapacity
+		return
+	}
+	if write != nil {
+		err = write(out)
+	}
+	return
+}
+
+func AppendResponseWithReport(
+	dst []byte,
+	resp Response,
+	opts ResponseBufferOptions,
+) ([]byte, ResponseBufferReport) {
 	before := len(dst)
 	out := AppendResponse(dst, resp)
 	storage := opts.Storage
@@ -70,15 +196,29 @@ func AppendResponseWithReport(dst []byte, resp Response, opts ResponseBufferOpti
 	return out, report
 }
 
-func ParseRequestView(input []byte, limits Limits, headers []HeaderView) (RequestView, int, RequestParseReport, error) {
+func ParseRequestView(
+	input []byte,
+	limits Limits,
+	headers []HeaderView,
+) (RequestView, int, RequestParseReport, error) {
 	return parseRequestView(input, limits, headers, nil)
 }
 
-func ParseRequestViewInRegion(input []byte, limits Limits, headers []HeaderView, region *stdlibrt.Region) (RequestView, int, RequestParseReport, error) {
+func ParseRequestViewInRegion(
+	input []byte,
+	limits Limits,
+	headers []HeaderView,
+	region *stdlibrt.Region,
+) (RequestView, int, RequestParseReport, error) {
 	return parseRequestView(input, limits, headers, region)
 }
 
-func parseRequestView(input []byte, limits Limits, headers []HeaderView, region *stdlibrt.Region) (RequestView, int, RequestParseReport, error) {
+func parseRequestView(
+	input []byte,
+	limits Limits,
+	headers []HeaderView,
+	region *stdlibrt.Region,
+) (RequestView, int, RequestParseReport, error) {
 	limits = normalizeLimits(limits)
 	report := RequestParseReport{RequestStorage: stdlibrt.StorageBorrowed}
 	if region != nil {
@@ -171,7 +311,13 @@ func parseRequestLineView(line []byte) (RequestView, error) {
 	if len(path) == 0 {
 		return RequestView{}, ErrMalformedRequest
 	}
-	return RequestView{Method: method, RequestTarget: target, Path: path, Query: query, Version: version}, nil
+	return RequestView{
+		Method:        method,
+		RequestTarget: target,
+		Path:          path,
+		Query:         query,
+		Version:       version,
+	}, nil
 }
 
 func parseHeaderLineView(line []byte) (HeaderView, error) {
@@ -188,7 +334,8 @@ func parseHeaderLineView(line []byte) (HeaderView, error) {
 }
 
 func applyHeaderMetadataView(req *RequestView, limits Limits) error {
-	if value := req.Header("Transfer-Encoding"); len(value) > 0 && !asciiEqualFoldBytesString(value, "identity") {
+	if value := req.Header("Transfer-Encoding"); len(value) > 0 &&
+		!asciiEqualFoldBytesString(value, "identity") {
 		return ErrUnsupportedTransferEncoding
 	}
 	req.ContentLength = 0
@@ -265,7 +412,25 @@ func validTokenBytes(value []byte) bool {
 
 func isHTTPSeparator(c byte) bool {
 	switch c {
-	case '(', ')', '<', '>', '@', ',', ';', ':', '\\', '"', '/', '[', ']', '?', '=', '{', '}', ' ', '\t':
+	case '(',
+		')',
+		'<',
+		'>',
+		'@',
+		',',
+		';',
+		':',
+		'\\',
+		'"',
+		'/',
+		'[',
+		']',
+		'?',
+		'=',
+		'{',
+		'}',
+		' ',
+		'\t':
 		return true
 	default:
 		return false

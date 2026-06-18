@@ -1,0 +1,170 @@
+{
+  "schema": "tetra.surface.morph.stable-candidate.v1",
+  "status": "design-freeze",
+  "current_tier": "EXPERIMENTAL",
+  "target_tier": "PROD_STABLE_SCOPED",
+  "surface_scope": "surface-v1-linux-web",
+  "production_claim": false,
+  "validator_enabled": false,
+  "disabled_until": "P20+",
+  "required_target_evidence": [
+    "headless",
+    "linux-x64-real-window",
+    "wasm32-web-browser-canvas"
+  ],
+  "stable_schemas": {
+    "token_graph": {
+      "schema": "tetra.surface.morph.token-graph.v1",
+      "required_fields": [
+        "schema",
+        "namespace",
+        "version",
+        "hash",
+        "source_of_truth",
+        "explicit_imports",
+        "no_global_cascade",
+        "fixed_override_order",
+        "categories",
+        "tokens",
+        "density_dpi",
+        "diagnostics"
+      ],
+      "backward_compatibility": [
+        "versioned_schema",
+        "additive_fields_only"
+      ]
+    },
+    "material": {
+      "schema": "tetra.surface.morph.material.v1",
+      "required_fields": [
+        "name",
+        "paint_stack",
+        "fill",
+        "border",
+        "radius",
+        "shadow",
+        "overlay"
+      ],
+      "backward_compatibility": [
+        "versioned_schema",
+        "additive_fields_only"
+      ]
+    },
+    "affordance": {
+      "schema": "tetra.surface.morph.affordance.v1",
+      "required_fields": [
+        "name",
+        "role",
+        "focusable",
+        "action",
+        "input",
+        "projects_accessibility"
+      ],
+      "backward_compatibility": [
+        "versioned_schema",
+        "additive_fields_only"
+      ]
+    },
+    "recipe": {
+      "schema": "tetra.surface.morph.recipe.v1",
+      "required_fields": [
+        "name",
+        "output",
+        "slots",
+        "inputs",
+        "expands_to_block_graph"
+      ],
+      "backward_compatibility": [
+        "versioned_schema",
+        "additive_fields_only"
+      ]
+    },
+    "variant": {
+      "schema": "tetra.surface.morph.variant.v1",
+      "required_fields": [
+        "name",
+        "state_lenses",
+        "materials",
+        "motion"
+      ],
+      "backward_compatibility": [
+        "versioned_schema",
+        "additive_fields_only"
+      ]
+    },
+    "state_lens": {
+      "schema": "tetra.surface.morph.state-lens.v1",
+      "required_fields": [
+        "selector",
+        "property",
+        "deterministic"
+      ],
+      "backward_compatibility": [
+        "versioned_schema",
+        "additive_fields_only"
+      ]
+    },
+    "motion_preset": {
+      "schema": "tetra.surface.morph.motion-preset.v1",
+      "required_fields": [
+        "name",
+        "duration_ms",
+        "curve",
+        "properties",
+        "reduced_motion",
+        "deterministic_time"
+      ],
+      "backward_compatibility": [
+        "versioned_schema",
+        "additive_fields_only"
+      ]
+    },
+    "accessibility_projection": {
+      "schema": "tetra.surface.morph.accessibility-projection.v1",
+      "required_fields": [
+        "schema",
+        "derived_from_block_graph",
+        "safety_overrides_win",
+        "snapshot_evidence",
+        "required_fields",
+        "roles"
+      ],
+      "backward_compatibility": [
+        "versioned_schema",
+        "additive_fields_only"
+      ]
+    }
+  },
+  "recipe_contract": {
+    "allowed_outputs": [
+      "Block"
+    ],
+    "forbidden_outputs": [
+      "Button",
+      "Card",
+      "TextField",
+      "TextBox",
+      "Sidebar",
+      "Modal"
+    ],
+    "requires_expands_to_block_graph": true,
+    "requires_no_hidden_app_state": true,
+    "requires_no_platform_widgets": true,
+    "requires_no_core_primitive_promotion": true
+  },
+  "promotion_gates": [
+    "validate-surface-morph-report",
+    "validate-surface-claims",
+    "surface block-system gate",
+    "visual regression gate",
+    "target-host evidence",
+    "renderer-owned stable proof"
+  ],
+  "nonclaims": [
+    "not production Morph today",
+    "no React runtime",
+    "no Electron runtime",
+    "no CSS cascade runtime",
+    "no platform-native widgets"
+  ]
+}

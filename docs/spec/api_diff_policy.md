@@ -2,7 +2,8 @@
 
 Status: Accepted on 2026-04-26 (TODO 662).
 
-Policy decision: release gating uses a committed JSON baseline artifact and a machine-readable diff report derived from generated API docs metadata plus canonical API symbol records.
+Policy decision: release gating uses a committed JSON baseline artifact and a machine-readable diff
+report derived from generated API docs metadata plus canonical API symbol records.
 
 ## Baseline Artifact
 

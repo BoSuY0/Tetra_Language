@@ -56,10 +56,28 @@ func requiredPassingCases() []compilerprod.CaseReport {
 		{Name: "wasm32-wasi module emission", Kind: "positive", Ran: true, Pass: true},
 		{Name: "wasm32-web module and loader emission", Kind: "positive", Ran: true, Pass: true},
 		{Name: "frontend parser fixture corpus", Kind: "positive", Ran: true, Pass: true},
-		{Name: "semantic diagnostics stability", Kind: "negative", Ran: true, Pass: true, ExpectedError: "semantic diagnostic"},
-		{Name: "IR verifier diagnostics", Kind: "negative", Ran: true, Pass: true, ExpectedError: "IR verifier"},
+		{
+			Name:          "semantic diagnostics stability",
+			Kind:          "negative",
+			Ran:           true,
+			Pass:          true,
+			ExpectedError: "semantic diagnostic",
+		},
+		{
+			Name:          "IR verifier diagnostics",
+			Kind:          "negative",
+			Ran:           true,
+			Pass:          true,
+			ExpectedError: "IR verifier",
+		},
 		{Name: "backend format emission", Kind: "positive", Ran: true, Pass: true},
-		{Name: "CLI build option diagnostics", Kind: "negative", Ran: true, Pass: true, ExpectedError: "unsupported --runtime"},
+		{
+			Name:          "CLI build option diagnostics",
+			Kind:          "negative",
+			Ran:           true,
+			Pass:          true,
+			ExpectedError: "unsupported --runtime",
+		},
 		{Name: "compiler cache separates modes", Kind: "positive", Ran: true, Pass: true},
 		{Name: "smoke profile compilation matrix", Kind: "stress", Ran: true, Pass: true},
 	}
@@ -67,7 +85,14 @@ func requiredPassingCases() []compilerprod.CaseReport {
 
 func process(name, kind string) compilerprod.ProcessReport {
 	exitZero := 0
-	return compilerprod.ProcessReport{Name: name, Kind: kind, Path: name, Ran: true, Pass: true, ExitCode: &exitZero}
+	return compilerprod.ProcessReport{
+		Name:     name,
+		Kind:     kind,
+		Path:     name,
+		Ran:      true,
+		Pass:     true,
+		ExitCode: &exitZero,
+	}
 }
 
 func hasCase(cases []compilerprod.CaseReport, name string) bool {

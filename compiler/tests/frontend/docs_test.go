@@ -85,7 +85,11 @@ capsule Demo:
 	if err := os.MkdirAll(filepath.Join(dir, "src"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "src", "main.t4"), []byte("func answer() -> Int:\n    return 42\n"), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(dir, "src", "main.t4"),
+		[]byte("func answer() -> Int:\n    return 42\n"),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 	docs, err := compiler.GenerateAPIDocs([]string{dir})
@@ -101,10 +105,18 @@ func TestGenerateAPIDocsDisambiguatesDuplicateDirectoryModuleHeadings(t *testing
 	dir := t.TempDir()
 	first := filepath.Join(dir, "first.tetra")
 	second := filepath.Join(dir, "second.tetra")
-	if err := os.WriteFile(first, []byte("module app.main\n\nfunc first() -> Int:\n    return 1\n"), 0o644); err != nil {
+	if err := os.WriteFile(
+		first,
+		[]byte("module app.main\n\nfunc first() -> Int:\n    return 1\n"),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(second, []byte("module app.main\n\nfunc second() -> Int:\n    return 2\n"), 0o644); err != nil {
+	if err := os.WriteFile(
+		second,
+		[]byte("module app.main\n\nfunc second() -> Int:\n    return 2\n"),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 	docs, err := compiler.GenerateAPIDocs([]string{first, second})
@@ -130,7 +142,7 @@ func TestGenerateAPIDocsLabelsExperimentalModules(t *testing.T) {
 func unstable_add(a: Int, b: Int) -> Int:
     return a + b
 `)
-	docs, err := compiler.GenerateAPIDocsFromSource(src, "lib/experimental/math.tetra")
+	docs, err := compiler.GenerateAPIDocsFromSource(src, "lib/experimental/base/math.tetra")
 	if err != nil {
 		t.Fatalf("GenerateAPIDocsFromSource: %v", err)
 	}
@@ -156,10 +168,18 @@ func TestGenerateAPIDocsDisambiguatesDuplicateModuleHeadings(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(second), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(first, []byte("module app.main\nfunc alpha() -> Int:\n    return 1\n"), 0o644); err != nil {
+	if err := os.WriteFile(
+		first,
+		[]byte("module app.main\nfunc alpha() -> Int:\n    return 1\n"),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(second, []byte("module app.main\nfunc beta() -> Int:\n    return 2\n"), 0o644); err != nil {
+	if err := os.WriteFile(
+		second,
+		[]byte("module app.main\nfunc beta() -> Int:\n    return 2\n"),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 

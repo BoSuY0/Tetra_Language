@@ -16,16 +16,37 @@ blocked by `vector.alias_unknown` until a validator-backed pass exists.
 
 ## Implemented Rules
 
-| Rule | Evidence |
-|---|---|
-| `inout []T` is represented as a mutable borrow in PLIR. | `compiler/internal/plir/plir.go`, `TestFromCheckedProgramRecordsNoAliasForExclusiveInoutSliceParam` |
-| `no_alias` is emitted only for memory-backed `inout` params with parameter provenance, bounded function lifetime, `borrowed_mut`, and `region_alive`. | `compiler/internal/plir/plir.go`, `compiler/internal/plir/verify.go` |
-| Overlapping mutable borrows are rejected by existing active call-argument ownership tracking. | `TestOwnershipRejectsOverlappingMutableInoutSliceBorrow`, `compiler/internal/semantics/exprs.go` |
-| Immutable borrow plus mutable borrow aliases are rejected; distinct roots remain allowed. | `TestOwnershipRejectsBorrowInoutAlias`, `TestOwnershipAllowsBorrowInoutWithDistinctLocals` |
-| Raw unsafe pointer exposure kills `no_alias` for the exposed root. | `TestFromCheckedProgramDoesNotClaimNoAliasAfterRawInoutExposure` |
-| Forged `no_alias` facts are rejected by the PLIR verifier. | `TestVerifierRejectsNoAliasWithoutExclusiveMutableBorrow`, `TestVerifierRejectsNoAliasForExternalProvenance` |
-| Reports expose `no_alias` as evidence without changing semantics. | `TestBuildReportsShowInoutNoAliasProofFact` |
-| Optimizer use remains validation-gated. | `compiler/internal/opt` and `compiler/internal/validation` package gates passed; no optimizer pass consumes PLIR `no_alias` in this slice |
+- Rule: `inout []T` is represented as a mutable borrow in PLIR.
+  - Evidence:
+    - `compiler/internal/plir/plir.go`
+    - `TestFromCheckedProgramRecordsNoAliasForExclusiveInoutSliceParam`
+- Rule: `no_alias` is emitted only for memory-backed `inout` params.
+  - Constraints: parameter provenance, bounded function lifetime, `borrowed_mut`.
+  - Extra constraint: `region_alive`.
+  - Evidence:
+    - `compiler/internal/plir/plir.go`
+    - `compiler/internal/plir/verify.go`
+- Rule: overlapping mutable borrows are rejected.
+  - Evidence:
+    - `TestOwnershipRejectsOverlappingMutableInoutSliceBorrow`
+    - `compiler/internal/semantics/exprs.go`
+- Rule: immutable borrow plus mutable borrow aliases are rejected.
+  - Evidence:
+    - `TestOwnershipRejectsBorrowInoutAlias`
+    - `TestOwnershipAllowsBorrowInoutWithDistinctLocals`
+- Rule: raw unsafe pointer exposure kills `no_alias` for the exposed root.
+  - Evidence: `TestFromCheckedProgramDoesNotClaimNoAliasAfterRawInoutExposure`
+- Rule: forged `no_alias` facts are rejected by the PLIR verifier.
+  - Evidence:
+    - `TestVerifierRejectsNoAliasWithoutExclusiveMutableBorrow`
+    - `TestVerifierRejectsNoAliasForExternalProvenance`
+- Rule: reports expose `no_alias` as evidence without changing semantics.
+  - Evidence: `TestBuildReportsShowInoutNoAliasProofFact`
+- Rule: optimizer use remains validation-gated.
+  - Evidence:
+    - `compiler/internal/opt`
+    - `compiler/internal/validation` package gates passed
+    - no optimizer pass consumes PLIR `no_alias` in this slice
 
 ## Code Changes
 
@@ -43,8 +64,12 @@ blocked by `vector.alias_unknown` until a validator-backed pass exists.
 RED evidence:
 
 ```bash
-GOCACHE=$(pwd)/.cache/go-build-ideal-plan go test ./compiler/internal/plir -run 'NoAlias|RawInout' -count=1
-GOCACHE=$(pwd)/.cache/go-build-ideal-plan go test ./compiler -run 'BuildReportsShowInoutNoAliasProofFact' -count=1
+GOCACHE=$(pwd)/.cache/go-build-ideal-plan \
+  go test ./compiler/internal/plir \
+  -run 'NoAlias|RawInout' -count=1
+GOCACHE=$(pwd)/.cache/go-build-ideal-plan \
+  go test ./compiler \
+  -run 'BuildReportsShowInoutNoAliasProofFact' -count=1
 ```
 
 Initial result: failed because PLIR emitted `borrowed_mut` but no `no_alias`,
@@ -53,9 +78,15 @@ and the verifier accepted a forged `no_alias` fact.
 Focused GREEN evidence:
 
 ```bash
-GOCACHE=$(pwd)/.cache/go-build-ideal-plan go test ./compiler/internal/plir -run 'NoAlias|RawInout' -count=1
-GOCACHE=$(pwd)/.cache/go-build-ideal-plan go test ./compiler/tests/ownership -run 'OverlappingMutableInoutSliceBorrow' -count=1
-GOCACHE=$(pwd)/.cache/go-build-ideal-plan go test ./compiler -run 'BuildReportsShowInoutNoAliasProofFact' -count=1
+GOCACHE=$(pwd)/.cache/go-build-ideal-plan \
+  go test ./compiler/internal/plir \
+  -run 'NoAlias|RawInout' -count=1
+GOCACHE=$(pwd)/.cache/go-build-ideal-plan \
+  go test ./compiler/tests/ownership \
+  -run 'OverlappingMutableInoutSliceBorrow' -count=1
+GOCACHE=$(pwd)/.cache/go-build-ideal-plan \
+  go test ./compiler \
+  -run 'BuildReportsShowInoutNoAliasProofFact' -count=1
 ```
 
 Result: pass.
@@ -63,11 +94,29 @@ Result: pass.
 Relevant package evidence:
 
 ```bash
-GOCACHE=$(pwd)/.cache/go-build-ideal-plan go test ./compiler/internal/plir -run 'Borrow|RawSlice|RawDerived|NoAlias|VerifierRejects.*Provenance|VerifierRejectsNoAlias' -count=1
-GOCACHE=$(pwd)/.cache/go-build-ideal-plan go test ./compiler/tests/ownership -run 'Inout|BorrowInout|OverlappingMutable|BorrowedProjectionAsInout|BorrowDerivedValueAsInout' -count=1
-GOCACHE=$(pwd)/.cache/go-build-ideal-plan go test ./compiler/tests/semantics -run 'Borrowed|RawSliceFromParts|SliceRaw|BorrowCopy' -count=1
-GOCACHE=$(pwd)/.cache/go-build-ideal-plan go test ./compiler -run 'BuildReportsShowInoutNoAliasProofFact|BuildReportsShowBorrowedReturnNoAllocationAndCopyOwnership|ReportFlagsDoNotChangeBorrowedReturnFailure|BuildReportsShowBorrowCopyProvenanceAndAllocationIntent' -count=1
-GOCACHE=$(pwd)/.cache/go-build-ideal-plan go test ./compiler/internal/opt ./compiler/internal/validation -count=1
+PLIR_RUN='Borrow|RawSlice|RawDerived|NoAlias'
+PLIR_RUN="$PLIR_RUN|VerifierRejects.*Provenance|VerifierRejectsNoAlias"
+OWNERSHIP_RUN='Inout|BorrowInout|OverlappingMutable'
+OWNERSHIP_RUN="$OWNERSHIP_RUN|BorrowedProjectionAsInout|BorrowDerivedValueAsInout"
+COMPILER_RUN='BuildReportsShowInoutNoAliasProofFact'
+COMPILER_RUN="$COMPILER_RUN|BuildReportsShowBorrowedReturnNoAllocationAndCopyOwnership"
+COMPILER_RUN="$COMPILER_RUN|ReportFlagsDoNotChangeBorrowedReturnFailure"
+COMPILER_RUN="$COMPILER_RUN|BuildReportsShowBorrowCopyProvenanceAndAllocationIntent"
+
+GOCACHE=$(pwd)/.cache/go-build-ideal-plan \
+  go test ./compiler/internal/plir \
+  -run "$PLIR_RUN" -count=1
+GOCACHE=$(pwd)/.cache/go-build-ideal-plan \
+  go test ./compiler/tests/ownership \
+  -run "$OWNERSHIP_RUN" -count=1
+GOCACHE=$(pwd)/.cache/go-build-ideal-plan \
+  go test ./compiler/tests/semantics \
+  -run 'Borrowed|RawSliceFromParts|SliceRaw|BorrowCopy' -count=1
+GOCACHE=$(pwd)/.cache/go-build-ideal-plan \
+  go test ./compiler \
+  -run "$COMPILER_RUN" -count=1
+GOCACHE=$(pwd)/.cache/go-build-ideal-plan \
+  go test ./compiler/internal/opt ./compiler/internal/validation -count=1
 ```
 
 Result: pass.
@@ -75,9 +124,18 @@ Result: pass.
 Final hygiene evidence:
 
 ```bash
-GOCACHE=$(pwd)/.cache/go-build-ideal-plan go test ./compiler/internal/plir ./compiler/tests/ownership ./compiler/tests/semantics ./compiler/internal/opt ./compiler/internal/validation ./compiler -count=1
-GOCACHE=$(pwd)/.cache/go-build-ideal-plan go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
-GOCACHE=$(pwd)/.cache/go-build-ideal-plan go run ./tools/cmd/validate-manifest --manifest docs/generated/manifest.json
+GOCACHE=$(pwd)/.cache/go-build-ideal-plan go test \
+  ./compiler/internal/plir \
+  ./compiler/tests/ownership \
+  ./compiler/tests/semantics \
+  ./compiler/internal/opt \
+  ./compiler/internal/validation \
+  ./compiler \
+  -count=1
+GOCACHE=$(pwd)/.cache/go-build-ideal-plan \
+  go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
+GOCACHE=$(pwd)/.cache/go-build-ideal-plan \
+  go run ./tools/cmd/validate-manifest --manifest docs/generated/manifest.json
 git diff --check
 graphify update .
 ```

@@ -1,0 +1,22 @@
+// Memory mixed-width microservice smoke.
+//
+// The service writes byte and i32 cells into one allocation without overlap and
+// verifies both typed lanes through capability-bound loads.
+module examples.microservices.memory.scalars.loops.memory_mixed_width_service
+import lib.core.capability as cap
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let base: ptr = core.alloc_bytes(12)
+        let byte_one: ptr = core.ptr_add(base, 1, memory_cap)
+        let word: ptr = core.ptr_add(base, 4, memory_cap)
+        let _write_zero: u8 = core.store_u8(base, 10, memory_cap)
+        let _write_one: u8 = core.store_u8(byte_one, 11, memory_cap)
+        let _write_word: Int = core.store_i32(word, 21, memory_cap)
+        let total: Int = core.load_u8(base, memory_cap) + core.load_u8(byte_one, memory_cap) + core.load_i32(word, memory_cap)
+        if total == 42:
+            return 0
+        return total
+    return 98

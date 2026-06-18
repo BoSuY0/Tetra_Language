@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	ctarget "tetra_language/compiler/target"
+	"tetra_language/tools/internal/reportdecode"
 )
 
 const (
@@ -146,7 +147,9 @@ var knownCapsulePermissions = map[string]string{
 
 func main() {
 	var seedPath string
+	var reportFormat string
 	flag.StringVar(&seedPath, "seed", "", "path to tetra.eco.seed.v1 JSON report")
+	flag.StringVar(&reportFormat, "format", "auto", "report format: auto, json, or toon")
 	flag.Parse()
 
 	if seedPath == "" {
@@ -158,15 +161,19 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err := validateEcoSeed(raw); err != nil {
+	if err := validateEcoSeedFormat(raw, reportFormat); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
 func validateEcoSeed(raw []byte) error {
+	return validateEcoSeedFormat(raw, "auto")
+}
+
+func validateEcoSeedFormat(raw []byte, format string) error {
 	var report seedReport
-	if err := decodeStrictJSON(raw, &report); err != nil {
+	if err := reportdecode.DecodeStrictFormat(raw, format, &report); err != nil {
 		return err
 	}
 	if report.Schema == "" {
@@ -181,7 +188,8 @@ func validateEcoSeed(raw []byte) error {
 	if *report.GeneratedUnix < 0 {
 		return fmt.Errorf("generated_at_unix must not be negative")
 	}
-	if len(bytes.TrimSpace(report.LockRaw)) == 0 || bytes.Equal(bytes.TrimSpace(report.LockRaw), []byte("null")) {
+	if len(bytes.TrimSpace(report.LockRaw)) == 0 ||
+		bytes.Equal(bytes.TrimSpace(report.LockRaw), []byte("null")) {
 		return fmt.Errorf("lock is required")
 	}
 	if err := decodeEcoLock(report.LockRaw, &report.Lock); err != nil {
@@ -245,7 +253,11 @@ func decodeEcoLock(raw json.RawMessage, lock *ecoLock) error {
 		sum := sha256.Sum256([]byte(lockGraphFingerprint(lock.Capsules)))
 		expected := sha256Prefix + hex.EncodeToString(sum[:])
 		if lock.GraphSHA256 != expected {
-			return fmt.Errorf("lock graph_sha256 mismatch: metadata has %s, computed %s", lock.GraphSHA256, expected)
+			return fmt.Errorf(
+				"lock graph_sha256 mismatch: metadata has %s, computed %s",
+				lock.GraphSHA256,
+				expected,
+			)
 		}
 	}
 	return nil
@@ -295,13 +307,22 @@ func validateSeedCapsules(capsules []ecoSeedItem) error {
 }
 
 func validateSeedCapsule(capsule ecoSeedItem) error {
-	if err := validateCapsuleIdentity("seed capsule", capsule.ID, capsule.Name, capsule.Version); err != nil {
+	if err := validateCapsuleIdentity(
+		"seed capsule",
+		capsule.ID,
+		capsule.Name,
+		capsule.Version,
+	); err != nil {
 		return err
 	}
 	if err := validateTargets("seed capsule "+capsule.ID, capsule.Targets); err != nil {
 		return err
 	}
-	if err := validateEffectsAndPermissions("seed capsule "+capsule.ID, capsule.Effects, capsule.Permissions); err != nil {
+	if err := validateEffectsAndPermissions(
+		"seed capsule "+capsule.ID,
+		capsule.Effects,
+		capsule.Permissions,
+	); err != nil {
 		return err
 	}
 	return validateDependencies("seed capsule "+capsule.ID, capsule.ID, capsule.DependsOn)
@@ -322,19 +343,39 @@ func validateLockCapsules(capsules []ecoLockCapsule) error {
 		for _, dep := range capsule.Dependencies {
 			found, ok := seen[dep.ID]
 			if !ok {
-				return fmt.Errorf("lock capsule %s references unknown dependency %s", capsule.ID, dep.ID)
+				return fmt.Errorf(
+					"lock capsule %s references unknown dependency %s",
+					capsule.ID,
+					dep.ID,
+				)
 			}
 			if found.Version != dep.Version {
-				return fmt.Errorf("lock capsule %s dependency %s version mismatch: wants %s, lock has %s", capsule.ID, dep.ID, dep.Version, found.Version)
+				return fmt.Errorf(
+					"lock capsule %s dependency %s version mismatch: wants %s, lock has %s",
+					capsule.ID,
+					dep.ID,
+					dep.Version,
+					found.Version,
+				)
 			}
 			for _, effect := range found.Effects {
 				if !containsString(capsule.Effects, effect) {
-					return fmt.Errorf("lock capsule %s missing required effect %s for dependency %s", capsule.ID, effect, dep.ID)
+					return fmt.Errorf(
+						"lock capsule %s missing required effect %s for dependency %s",
+						capsule.ID,
+						effect,
+						dep.ID,
+					)
 				}
 			}
 			for _, permission := range found.Permissions {
 				if !containsString(capsule.Permissions, permission) {
-					return fmt.Errorf("lock capsule %s missing required permission %s for dependency %s", capsule.ID, permission, dep.ID)
+					return fmt.Errorf(
+						"lock capsule %s missing required permission %s for dependency %s",
+						capsule.ID,
+						permission,
+						dep.ID,
+					)
 				}
 			}
 		}
@@ -343,7 +384,12 @@ func validateLockCapsules(capsules []ecoLockCapsule) error {
 }
 
 func validateLockCapsule(capsule ecoLockCapsule) error {
-	if err := validateCapsuleIdentity("lock capsule", capsule.ID, capsule.Name, capsule.Version); err != nil {
+	if err := validateCapsuleIdentity(
+		"lock capsule",
+		capsule.ID,
+		capsule.Name,
+		capsule.Version,
+	); err != nil {
 		return err
 	}
 	if _, err := validatePortableRelativePath(capsule.Path, "lock capsule "+capsule.ID); err != nil {
@@ -352,10 +398,18 @@ func validateLockCapsule(capsule ecoLockCapsule) error {
 	if err := validateTargets("lock capsule "+capsule.ID, capsule.Targets); err != nil {
 		return err
 	}
-	if err := validateEffectsAndPermissions("lock capsule "+capsule.ID, capsule.Effects, capsule.Permissions); err != nil {
+	if err := validateEffectsAndPermissions(
+		"lock capsule "+capsule.ID,
+		capsule.Effects,
+		capsule.Permissions,
+	); err != nil {
 		return err
 	}
-	if err := validateDependencies("lock capsule "+capsule.ID, capsule.ID, capsule.Dependencies); err != nil {
+	if err := validateDependencies(
+		"lock capsule "+capsule.ID,
+		capsule.ID,
+		capsule.Dependencies,
+	); err != nil {
 		return err
 	}
 	if err := validateCapsulePolicy(capsule.ID, capsule.Policy); err != nil {
@@ -370,7 +424,11 @@ func validateSeedMatchesLock(seedCapsules []ecoSeedItem, lockCapsules []ecoLockC
 		lockByID[capsule.ID] = capsule
 	}
 	if len(seedCapsules) != len(lockCapsules) {
-		return fmt.Errorf("seed capsule count %d does not match lock capsule count %d", len(seedCapsules), len(lockCapsules))
+		return fmt.Errorf(
+			"seed capsule count %d does not match lock capsule count %d",
+			len(seedCapsules),
+			len(lockCapsules),
+		)
 	}
 	for _, seed := range seedCapsules {
 		lock, ok := lockByID[seed.ID]
@@ -378,10 +436,20 @@ func validateSeedMatchesLock(seedCapsules []ecoSeedItem, lockCapsules []ecoLockC
 			return fmt.Errorf("seed capsule %s missing from lock", seed.ID)
 		}
 		if seed.Name != lock.Name {
-			return fmt.Errorf("seed capsule %s name mismatch: seed has %s, lock has %s", seed.ID, seed.Name, lock.Name)
+			return fmt.Errorf(
+				"seed capsule %s name mismatch: seed has %s, lock has %s",
+				seed.ID,
+				seed.Name,
+				lock.Name,
+			)
 		}
 		if seed.Version != lock.Version {
-			return fmt.Errorf("seed capsule %s version mismatch: seed has %s, lock has %s", seed.ID, seed.Version, lock.Version)
+			return fmt.Errorf(
+				"seed capsule %s version mismatch: seed has %s, lock has %s",
+				seed.ID,
+				seed.Version,
+				lock.Version,
+			)
 		}
 		if !sameStringSet(seed.Targets, lock.Targets) {
 			return fmt.Errorf("seed capsule %s targets mismatch", seed.ID)
@@ -472,7 +540,12 @@ func validateDependencies(label string, capsuleID string, deps []seedDependency)
 			return fmt.Errorf("%s dependency %s must use tetra:// prefix", label, dep.ID)
 		}
 		if dep.Version == "" || !isCapsuleSemver(dep.Version) {
-			return fmt.Errorf("%s dependency %s has invalid semver version %s", label, dep.ID, dep.Version)
+			return fmt.Errorf(
+				"%s dependency %s has invalid semver version %s",
+				label,
+				dep.ID,
+				dep.Version,
+			)
 		}
 		if dep.ID == capsuleID {
 			return fmt.Errorf("%s cannot depend on itself", label)
@@ -535,7 +608,10 @@ func validateCapsulePolicy(capsuleID string, policy map[string]string) error {
 			}
 		case "reproducible":
 			if value != "required" && value != "preferred" && value != "off" {
-				return fmt.Errorf("lock capsule %s reproducible policy must be required, preferred, or off", capsuleID)
+				return fmt.Errorf(
+					"lock capsule %s reproducible policy must be required, preferred, or off",
+					capsuleID,
+				)
 			}
 		default:
 			return fmt.Errorf("lock capsule %s unknown policy %s", capsuleID, key)
@@ -553,10 +629,18 @@ func validateArtifacts(capsuleID string, artifacts []ecoLockArtifact) error {
 		}
 		if artifact.Target != "" {
 			if !supportedTargets()[artifact.Target] {
-				return fmt.Errorf("lock capsule %s artifact %s has unsupported target %s", capsuleID, artifact.Path, artifact.Target)
+				return fmt.Errorf(
+					"lock capsule %s artifact %s has unsupported target %s",
+					capsuleID,
+					artifact.Path,
+					artifact.Target,
+				)
 			}
 			if kind != "object" {
-				return fmt.Errorf("lock capsule %s only object artifacts accept a target", capsuleID)
+				return fmt.Errorf(
+					"lock capsule %s only object artifacts accept a target",
+					capsuleID,
+				)
 			}
 		}
 		cleanPath, err := cleanArtifactPath(artifact.Path)
@@ -568,17 +652,32 @@ func validateArtifacts(capsuleID string, artifacts []ecoLockArtifact) error {
 		}
 		if artifact.SHA256 != "" {
 			if _, err := parseSHA256Hash(artifact.SHA256); err != nil {
-				return fmt.Errorf("lock capsule %s artifact %s has invalid sha256: %w", capsuleID, cleanPath, err)
+				return fmt.Errorf(
+					"lock capsule %s artifact %s has invalid sha256: %w",
+					capsuleID,
+					cleanPath,
+					err,
+				)
 			}
 		}
 		if artifact.PublicAPIHash != "" {
 			if _, err := parseSHA256Hash(artifact.PublicAPIHash); err != nil {
-				return fmt.Errorf("lock capsule %s artifact %s has invalid public_api_hash: %w", capsuleID, cleanPath, err)
+				return fmt.Errorf(
+					"lock capsule %s artifact %s has invalid public_api_hash: %w",
+					capsuleID,
+					cleanPath,
+					err,
+				)
 			}
 		}
 		key := kind + "\x00" + artifact.Target + "\x00" + cleanPath
 		if seen[key] {
-			return fmt.Errorf("lock capsule %s has duplicate artifact %s %s", capsuleID, kind, cleanPath)
+			return fmt.Errorf(
+				"lock capsule %s has duplicate artifact %s %s",
+				capsuleID,
+				kind,
+				cleanPath,
+			)
 		}
 		seen[key] = true
 	}

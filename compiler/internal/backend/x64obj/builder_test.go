@@ -24,7 +24,10 @@ func TestObjectBuildCollectsRelocsAndSymbols(t *testing.T) {
 		*leaPatches = append(*leaPatches, LeaPatch{At: 0, DataIndex: 0})
 		*callPatches = append(*callPatches, CallPatch{At: 0, Name: "ext.call"})
 		if importPatches != nil {
-			*importPatches = append(*importPatches, ImportPatch{At: 0, Name: "kernel32.ExitProcess"})
+			*importPatches = append(
+				*importPatches,
+				ImportPatch{At: 0, Name: "kernel32.ExitProcess"},
+			)
 		}
 		return nil
 	}
@@ -54,7 +57,8 @@ func TestObjectBuildCollectsRelocsAndSymbols(t *testing.T) {
 		}
 		return false
 	}
-	if !hasKind(tobj.RelocCallRel32) || !hasKind(tobj.RelocIATDisp32) || !hasKind(tobj.RelocDataDisp32) {
+	if !hasKind(tobj.RelocCallRel32) || !hasKind(tobj.RelocIATDisp32) ||
+		!hasKind(tobj.RelocDataDisp32) {
 		t.Fatalf("missing expected reloc kinds: %#v", obj.Relocs)
 	}
 	if len(obj.Symbols) != 2 || obj.Symbols[0].Name != "entry" || obj.Symbols[1].Name != "main" {
@@ -73,7 +77,10 @@ func TestObjectBuildEmitsFunctionAddressRelocDistinctFromCall(t *testing.T) {
 		opt x64.CodegenOptions,
 	) error {
 		e.Emit(0x48, 0x8D, 0x05, 0, 0, 0, 0, 0xC3)
-		*callPatches = append(*callPatches, CallPatch{At: 3, Name: "ext.callback", Kind: PatchFuncAddrRel32})
+		*callPatches = append(
+			*callPatches,
+			CallPatch{At: 3, Name: "ext.callback", Kind: PatchFuncAddrRel32},
+		)
 		return nil
 	}
 
@@ -290,7 +297,12 @@ func TestObjectBuildRejectsEmptyImportPatchName(t *testing.T) {
 		return nil
 	}
 
-	_, err := BuildObject([]ir.IRFunc{{Name: "main"}}, emit, x64.CodegenOptions{}, Options{CollectImports: true})
+	_, err := BuildObject(
+		[]ir.IRFunc{{Name: "main"}},
+		emit,
+		x64.CodegenOptions{},
+		Options{CollectImports: true},
+	)
 	if err == nil {
 		t.Fatalf("expected empty import patch name error")
 	}
@@ -324,7 +336,10 @@ func TestObjectBuildRejectsInvalidPatchOffsets(t *testing.T) {
 			options: Options{CollectImports: true},
 			emit: func(e *x64.Emitter, dataBlobs *[][]byte, leaPatches *[]LeaPatch, callPatches *[]CallPatch, importPatches *[]ImportPatch) {
 				e.Emit(0x90, 0x90, 0x90, 0x90)
-				*importPatches = append(*importPatches, ImportPatch{At: -1, Name: "kernel32.ExitProcess"})
+				*importPatches = append(
+					*importPatches,
+					ImportPatch{At: -1, Name: "kernel32.ExitProcess"},
+				)
 			},
 		},
 		{
@@ -360,7 +375,12 @@ func TestObjectBuildRejectsInvalidPatchOffsets(t *testing.T) {
 				return nil
 			}
 
-			_, err := BuildObject([]ir.IRFunc{{Name: "main"}}, emit, x64.CodegenOptions{}, tc.options)
+			_, err := BuildObject(
+				[]ir.IRFunc{{Name: "main"}},
+				emit,
+				x64.CodegenOptions{},
+				tc.options,
+			)
 			if err == nil {
 				t.Fatalf("expected invalid patch offset error")
 			}

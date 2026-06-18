@@ -19,7 +19,7 @@ body:
     attributes:
       label: Location
       description: Link or path to the doc, README section, release page, or example text.
-      placeholder: docs/user/install.md, README.md, release page, etc.
+      placeholder: docs/user/start/install.md, README.md, release page, etc.
     validations:
       required: true
   - type: textarea

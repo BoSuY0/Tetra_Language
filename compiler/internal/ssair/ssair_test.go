@@ -16,10 +16,12 @@ func TestVerifyFunctionRejectsMalformedSSA(t *testing.T) {
 			{ID: "x", Type: TypeI32},
 		},
 		Blocks: []Block{{
-			ID:     "entry",
-			Entry:  true,
-			Instrs: []Instr{{ID: "add0", Kind: OpAddI32, Result: "sum", Args: []ValueID{"x", "missing"}}},
-			Term:   Terminator{Kind: TermReturn, Value: "sum"},
+			ID:    "entry",
+			Entry: true,
+			Instrs: []Instr{
+				{ID: "add0", Kind: OpAddI32, Result: "sum", Args: []ValueID{"x", "missing"}},
+			},
+			Term: Terminator{Kind: TermReturn, Value: "sum"},
 		}},
 	}
 	err := VerifyFunction(fn)
@@ -37,10 +39,12 @@ func TestVerifyFunctionRequiresCallEffectTokens(t *testing.T) {
 			{ID: "ret", Type: TypeI32},
 		},
 		Blocks: []Block{{
-			ID:     "entry",
-			Entry:  true,
-			Instrs: []Instr{{ID: "call0", Kind: OpCall, Result: "ret", Args: []ValueID{"arg"}, Call: "callee"}},
-			Term:   Terminator{Kind: TermReturn, Value: "ret"},
+			ID:    "entry",
+			Entry: true,
+			Instrs: []Instr{
+				{ID: "call0", Kind: OpCall, Result: "ret", Args: []ValueID{"arg"}, Call: "callee"},
+			},
+			Term: Terminator{Kind: TermReturn, Value: "ret"},
 		}},
 	}
 	err := VerifyFunction(fn)
@@ -125,7 +129,12 @@ func TestFromStackIRScalarConstantStrideLoopUsesBlockParamsAndStep(t *testing.T)
 func TestFromStackIRScalarConstantStrideLoopRejectsInvalidStep(t *testing.T) {
 	for _, step := range []int32{0, -1, 128} {
 		if _, ok, err := FromStackIRFunction(sumStrideStackIRFunc(step)); err != nil || ok {
-			t.Fatalf("FromStackIRFunction step %d ok=%v err=%v, want fallback without error", step, ok, err)
+			t.Fatalf(
+				"FromStackIRFunction step %d ok=%v err=%v, want fallback without error",
+				step,
+				ok,
+				err,
+			)
 		}
 	}
 }
@@ -192,7 +201,8 @@ func TestFromStackIRScalarMaxLoopUsesBranchyBlockParams(t *testing.T) {
 		t.Fatalf("loop params = %+v, want index/max phi-style params", loop.Params)
 	}
 	body := blockByID(fn, "body")
-	if len(body.Params) < 2 || body.Term.Kind != TermCondBr || body.Term.IfTrue != "update" || body.Term.IfFalse != "keep" {
+	if len(body.Params) < 2 || body.Term.Kind != TermCondBr || body.Term.IfTrue != "update" ||
+		body.Term.IfFalse != "keep" {
 		t.Fatalf("body block = %+v, want conditional update/keep branch with params", body)
 	}
 	if !hasInstrKind(fn, OpCmpGtI32) {
@@ -242,8 +252,15 @@ func TestFromStackIRScalarAffineLoopRejectsInvalidConstants(t *testing.T) {
 		{128, 1},
 		{2, 128},
 	} {
-		if _, ok, err := FromStackIRFunction(sumAffineStackIRFunc(tc.scale, tc.bias)); err != nil || ok {
-			t.Fatalf("FromStackIRFunction scale=%d bias=%d ok=%v err=%v, want fallback without error", tc.scale, tc.bias, ok, err)
+		if _, ok, err := FromStackIRFunction(sumAffineStackIRFunc(tc.scale, tc.bias)); err != nil ||
+			ok {
+			t.Fatalf(
+				"FromStackIRFunction scale=%d bias=%d ok=%v err=%v, want fallback without error",
+				tc.scale,
+				tc.bias,
+				ok,
+				err,
+			)
 		}
 	}
 }
@@ -310,8 +327,14 @@ func TestFromStackIRSliceSumConstantStrideCarriesMemoryEffectProofAndStep(t *tes
 
 func TestFromStackIRSliceSumConstantStrideRejectsInvalidStep(t *testing.T) {
 	for _, step := range []int32{0, -1, 128} {
-		if _, ok, err := FromStackIRFunction(sliceSumStrideStackIRFunc(true, step)); err != nil || ok {
-			t.Fatalf("FromStackIRFunction step %d ok=%v err=%v, want fallback without error", step, ok, err)
+		if _, ok, err := FromStackIRFunction(sliceSumStrideStackIRFunc(true, step)); err != nil ||
+			ok {
+			t.Fatalf(
+				"FromStackIRFunction step %d ok=%v err=%v, want fallback without error",
+				step,
+				ok,
+				err,
+			)
 		}
 	}
 	if _, ok, err := FromStackIRFunction(sliceSumStrideStackIRFunc(false, 2)); err != nil || ok {
@@ -327,7 +350,13 @@ func TestFromPLIRProgramChainsCallEffects(t *testing.T) {
 			{ID: "ret", Type: "Int"},
 		},
 		Ops: []plir.Operation{
-			{ID: "op0", Kind: plir.OpCall, Inputs: []string{"arg"}, Outputs: []string{"ret"}, Note: "callee"},
+			{
+				ID:      "op0",
+				Kind:    plir.OpCall,
+				Inputs:  []string{"arg"},
+				Outputs: []string{"ret"},
+				Note:    "callee",
+			},
 			{ID: "op1", Kind: plir.OpReturn, Inputs: []string{"ret"}},
 		},
 	}}})
@@ -357,7 +386,13 @@ func TestFromPLIRProgramLowersSliceIndexLoadWithMemoryEffect(t *testing.T) {
 			{ID: "elem", Type: "Int"},
 		},
 		Ops: []plir.Operation{
-			{ID: "op0", Kind: plir.OpIndexLoad, Inputs: []string{"xs", "len", "i"}, Outputs: []string{"elem"}, Note: "proof:while:test"},
+			{
+				ID:      "op0",
+				Kind:    plir.OpIndexLoad,
+				Inputs:  []string{"xs", "len", "i"},
+				Outputs: []string{"elem"},
+				Note:    "proof:while:test",
+			},
 			{ID: "op1", Kind: plir.OpReturn, Inputs: []string{"elem"}},
 		},
 	}}})
@@ -400,7 +435,8 @@ func blockByID(fn Function, id string) Block {
 
 func hasTermTarget(fn Function, target string) bool {
 	for _, block := range fn.Blocks {
-		if block.Term.Target == target || block.Term.IfTrue == target || block.Term.IfFalse == target {
+		if block.Term.Target == target || block.Term.IfTrue == target ||
+			block.Term.IfFalse == target {
 			return true
 		}
 	}

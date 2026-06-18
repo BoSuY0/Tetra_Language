@@ -137,7 +137,12 @@ type runtimeWidget struct {
 func main() {
 	var opt smokeOptions
 	flag.StringVar(&opt.ReportPath, "report", "", "path to write tetra.ui.native-runtime.v1 report")
-	flag.StringVar(&opt.TetraPath, "tetra", "", "tetra CLI path; defaults to a fresh temp build from ./cli/cmd/tetra")
+	flag.StringVar(
+		&opt.TetraPath,
+		"tetra",
+		"",
+		"tetra CLI path; defaults to a fresh temp build from ./cli/cmd/tetra",
+	)
 	flag.BoolVar(&opt.KeepWork, "keep-work", false, "keep temporary build directory")
 	flag.Parse()
 	if opt.ReportPath == "" {
@@ -152,7 +157,11 @@ func main() {
 
 func runSmoke(ctx context.Context, opt smokeOptions) error {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
-		return fmt.Errorf("native UI runtime smoke requires linux/amd64 host, got %s/%s", runtime.GOOS, runtime.GOARCH)
+		return fmt.Errorf(
+			"native UI runtime smoke requires linux/amd64 host, got %s/%s",
+			runtime.GOOS,
+			runtime.GOARCH,
+		)
 	}
 	workDir, err := os.MkdirTemp("", "tetra-native-ui-*")
 	if err != nil {
@@ -167,7 +176,15 @@ func runSmoke(ctx context.Context, opt smokeOptions) error {
 	}
 	if opt.TetraPath == "" {
 		r.tetraPath = filepath.Join(workDir, "tetra")
-		res, err := runCommand(ctx, 30*time.Second, "go", "build", "-o", r.tetraPath, "./cli/cmd/tetra")
+		res, err := runCommand(
+			ctx,
+			30*time.Second,
+			"go",
+			"build",
+			"-o",
+			r.tetraPath,
+			"./cli/cmd/tetra",
+		)
 		r.recordProcess("go build tetra cli", "build", "go build ./cli/cmd/tetra", res)
 		if err != nil {
 			return fmt.Errorf("build smoke tetra CLI: %w", err)
@@ -177,8 +194,18 @@ func runSmoke(ctx context.Context, opt smokeOptions) error {
 	}
 
 	outPath := filepath.Join(workDir, "ui-native")
-	sourcePath := filepath.Join("examples", "ui_native_shell_smoke.tetra")
-	res, err := runCommand(ctx, 30*time.Second, r.tetraPath, "build", "--target", "linux-x64", "-o", outPath, sourcePath)
+	sourcePath := filepath.Join("examples", "ui", "ui_native_shell_smoke.tetra")
+	res, err := runCommand(
+		ctx,
+		30*time.Second,
+		r.tetraPath,
+		"build",
+		"--target",
+		"linux-x64",
+		"-o",
+		outPath,
+		sourcePath,
+	)
 	r.recordProcess("tetra build native UI", "build", r.tetraPath+" build --target linux-x64", res)
 	if err != nil {
 		return fmt.Errorf("build native UI smoke app: %w", err)
@@ -215,7 +242,9 @@ func runSmoke(ctx context.Context, opt smokeOptions) error {
 	return r.writeReport(sourcePath, widgets, events, cases)
 }
 
-func runRuntimeScenario(rawSidecar []byte) ([]nativeui.WidgetReport, []nativeui.EventReport, []nativeui.CaseReport, error) {
+func runRuntimeScenario(
+	rawSidecar []byte,
+) ([]nativeui.WidgetReport, []nativeui.EventReport, []nativeui.CaseReport, error) {
 	rt, err := loadNativeRuntime(rawSidecar)
 	if err != nil {
 		return nil, nil, nil, err
@@ -240,14 +269,51 @@ func runRuntimeScenario(rawSidecar []byte) ([]nativeui.WidgetReport, []nativeui.
 
 	cases := []nativeui.CaseReport{
 		{Name: "load widget tree", Ran: true, Pass: len(rt.widgets) >= 3},
-		{Name: "dispatch click command", Ran: true, Pass: len(events) >= 1 && events[0].Pass && events[0].Event == "click"},
-		{Name: "propagate state update", Ran: true, Pass: len(events) >= 1 && stateChanged(events[0].BeforeState, events[0].AfterState)},
-		{Name: "dispatch multiple ordered events", Ran: true, Pass: len(events) >= 2 && events[0].Order == 1 && events[1].Order == 2},
-		{Name: "reject invalid widget id", Ran: true, Pass: invalidWidgetErr != nil, ExpectedError: errorString(invalidWidgetErr)},
-		{Name: "reject malformed metadata", Ran: true, Pass: malformedErr != nil, ExpectedError: errorString(malformedErr)},
-		{Name: "reject unsupported event kind", Ran: true, Pass: unsupportedEventErr != nil, ExpectedError: errorString(unsupportedEventErr)},
-		{Name: "reject command failure", Ran: true, Pass: commandFailureErr != nil, ExpectedError: errorString(commandFailureErr)},
-		{Name: "close runtime", Ran: true, Pass: closeErr == nil, ExpectedError: errorString(closeErr)},
+		{
+			Name: "dispatch click command",
+			Ran:  true,
+			Pass: len(events) >= 1 && events[0].Pass && events[0].Event == "click",
+		},
+		{
+			Name: "propagate state update",
+			Ran:  true,
+			Pass: len(events) >= 1 && stateChanged(events[0].BeforeState, events[0].AfterState),
+		},
+		{
+			Name: "dispatch multiple ordered events",
+			Ran:  true,
+			Pass: len(events) >= 2 && events[0].Order == 1 && events[1].Order == 2,
+		},
+		{
+			Name:          "reject invalid widget id",
+			Ran:           true,
+			Pass:          invalidWidgetErr != nil,
+			ExpectedError: errorString(invalidWidgetErr),
+		},
+		{
+			Name:          "reject malformed metadata",
+			Ran:           true,
+			Pass:          malformedErr != nil,
+			ExpectedError: errorString(malformedErr),
+		},
+		{
+			Name:          "reject unsupported event kind",
+			Ran:           true,
+			Pass:          unsupportedEventErr != nil,
+			ExpectedError: errorString(unsupportedEventErr),
+		},
+		{
+			Name:          "reject command failure",
+			Ran:           true,
+			Pass:          commandFailureErr != nil,
+			ExpectedError: errorString(commandFailureErr),
+		},
+		{
+			Name:          "close runtime",
+			Ran:           true,
+			Pass:          closeErr == nil,
+			ExpectedError: errorString(closeErr),
+		},
 	}
 	return rt.widgetReports(), events, cases, nil
 }
@@ -258,13 +324,25 @@ func loadNativeRuntime(raw []byte) (*nativeRuntime, error) {
 		return nil, fmt.Errorf("malformed metadata: %w", err)
 	}
 	if shell.Schema != nativeShellSchemaV1 {
-		return nil, fmt.Errorf("malformed metadata: schema is %q, want %q", shell.Schema, nativeShellSchemaV1)
+		return nil, fmt.Errorf(
+			"malformed metadata: schema is %q, want %q",
+			shell.Schema,
+			nativeShellSchemaV1,
+		)
 	}
 	if shell.UISchema != uiBundleSchemaV1 {
-		return nil, fmt.Errorf("malformed metadata: ui_schema is %q, want %q", shell.UISchema, uiBundleSchemaV1)
+		return nil, fmt.Errorf(
+			"malformed metadata: ui_schema is %q, want %q",
+			shell.UISchema,
+			uiBundleSchemaV1,
+		)
 	}
 	if shell.Runtime != nativeShellRuntimeDispatch {
-		return nil, fmt.Errorf("malformed metadata: runtime is %q, want %q", shell.Runtime, nativeShellRuntimeDispatch)
+		return nil, fmt.Errorf(
+			"malformed metadata: runtime is %q, want %q",
+			shell.Runtime,
+			nativeShellRuntimeDispatch,
+		)
 	}
 	if len(shell.States) == 0 {
 		return nil, errors.New("malformed metadata: states are required")
@@ -284,7 +362,10 @@ func loadNativeRuntime(raw []byte) (*nativeRuntime, error) {
 		fields := map[string]string{}
 		for _, field := range state.Fields {
 			if strings.TrimSpace(field.Name) == "" || strings.TrimSpace(field.Type) == "" {
-				return nil, fmt.Errorf("malformed metadata: state %s has field missing name or type", state.Name)
+				return nil, fmt.Errorf(
+					"malformed metadata: state %s has field missing name or type",
+					state.Name,
+				)
 			}
 			fields[field.Name] = field.Value
 		}
@@ -306,7 +387,11 @@ func (rt *nativeRuntime) buildWidgets() error {
 			return errors.New("malformed metadata: view name and state_type are required")
 		}
 		if _, ok := rt.states[view.StateType]; !ok {
-			return fmt.Errorf("malformed metadata: view %s references unknown state %s", view.Name, view.StateType)
+			return fmt.Errorf(
+				"malformed metadata: view %s references unknown state %s",
+				view.Name,
+				view.StateType,
+			)
 		}
 		view.bindingFields = rt.inferBindingFields(view)
 		view.widgetValues = map[string]string{}
@@ -324,13 +409,21 @@ func (rt *nativeRuntime) buildWidgets() error {
 		}
 		for eventIndex, event := range view.Events {
 			if strings.TrimSpace(event.Name) == "" || strings.TrimSpace(event.Command) == "" {
-				return fmt.Errorf("malformed metadata: view %s event %d missing name or command", view.Name, eventIndex+1)
+				return fmt.Errorf(
+					"malformed metadata: view %s event %d missing name or command",
+					view.Name,
+					eventIndex+1,
+				)
 			}
 			view.eventCommands[event.Command] = event
 		}
 		for widgetIndex, widget := range view.Widgets {
 			if strings.TrimSpace(widget.ID) == "" || strings.TrimSpace(widget.Kind) == "" {
-				return fmt.Errorf("malformed metadata: view %s widget %d missing id or kind", view.Name, widgetIndex+1)
+				return fmt.Errorf(
+					"malformed metadata: view %s widget %d missing id or kind",
+					view.Name,
+					widgetIndex+1,
+				)
 			}
 			report := nativeui.WidgetReport{
 				ID:      widget.ID,
@@ -354,11 +447,19 @@ func (rt *nativeRuntime) buildWidgets() error {
 				view.widgetValues[widget.ID] = report.Value
 			}
 			if widget.Kind == "action" {
-				if strings.TrimSpace(widget.Event) == "" || strings.TrimSpace(widget.Command) == "" {
-					return fmt.Errorf("malformed metadata: action widget %s missing event or command", widget.ID)
+				if strings.TrimSpace(widget.Event) == "" ||
+					strings.TrimSpace(widget.Command) == "" {
+					return fmt.Errorf(
+						"malformed metadata: action widget %s missing event or command",
+						widget.ID,
+					)
 				}
 				if _, ok := view.eventCommands[widget.Command]; !ok {
-					return fmt.Errorf("malformed metadata: action widget %s references unknown command %s", widget.ID, widget.Command)
+					return fmt.Errorf(
+						"malformed metadata: action widget %s references unknown command %s",
+						widget.ID,
+						widget.Command,
+					)
 				}
 			}
 			if err := rt.addWidget(report, view); err != nil {
@@ -412,7 +513,10 @@ func (rt *nativeRuntime) firstActionWidget() (string, error) {
 	return "", errors.New("runtime has no action widget")
 }
 
-func (rt *nativeRuntime) dispatch(widgetID, eventKind, commandOverride string, order int) (nativeui.EventReport, error) {
+func (rt *nativeRuntime) dispatch(
+	widgetID, eventKind, commandOverride string,
+	order int,
+) (nativeui.EventReport, error) {
 	if rt.closed {
 		return nativeui.EventReport{}, errors.New("runtime is closed")
 	}
@@ -424,7 +528,11 @@ func (rt *nativeRuntime) dispatch(widgetID, eventKind, commandOverride string, o
 		return nativeui.EventReport{}, fmt.Errorf("widget %s is not an action widget", widgetID)
 	}
 	if eventKind != "click" && eventKind != "activate" {
-		return nativeui.EventReport{}, fmt.Errorf("unsupported event %s for widget %s", eventKind, widgetID)
+		return nativeui.EventReport{}, fmt.Errorf(
+			"unsupported event %s for widget %s",
+			eventKind,
+			widgetID,
+		)
 	}
 	command := widget.report.Command
 	if commandOverride != "" {
@@ -432,7 +540,11 @@ func (rt *nativeRuntime) dispatch(widgetID, eventKind, commandOverride string, o
 	}
 	shellEvent, ok := widget.view.eventCommands[command]
 	if !ok {
-		return nativeui.EventReport{}, fmt.Errorf("unknown command %s for widget %s", command, widgetID)
+		return nativeui.EventReport{}, fmt.Errorf(
+			"unknown command %s for widget %s",
+			command,
+			widgetID,
+		)
 	}
 	beforeState := rt.stateSnapshot(widget.view)
 	beforeWidgets := rt.boundWidgetValues(widget.view)
@@ -464,7 +576,10 @@ func (rt *nativeRuntime) dispatch(widgetID, eventKind, commandOverride string, o
 	}, nil
 }
 
-func (rt *nativeRuntime) applyOperation(view *shellViewTrace, op shellOperationTrace) (string, string, error) {
+func (rt *nativeRuntime) applyOperation(
+	view *shellViewTrace,
+	op shellOperationTrace,
+) (string, string, error) {
 	field, ok := stateFieldName(op.Target)
 	if !ok {
 		return "", "", fmt.Errorf("operation target %s is not a state field", op.Target)
@@ -512,7 +627,10 @@ func (rt *nativeRuntime) resolveOperationValue(view *shellViewTrace, value strin
 	return value
 }
 
-func (rt *nativeRuntime) refreshWidgets(view *shellViewTrace, before map[string]string) []nativeui.WidgetUpdateReport {
+func (rt *nativeRuntime) refreshWidgets(
+	view *shellViewTrace,
+	before map[string]string,
+) []nativeui.WidgetUpdateReport {
 	var updates []nativeui.WidgetUpdateReport
 	for _, id := range rt.widgetOrder {
 		widget := rt.widgets[id]
@@ -521,7 +639,10 @@ func (rt *nativeRuntime) refreshWidgets(view *shellViewTrace, before map[string]
 		}
 		after := rt.bindingValue(view, widget.report.Binding)
 		if before[id] != after {
-			updates = append(updates, nativeui.WidgetUpdateReport{ID: id, Before: before[id], After: after})
+			updates = append(
+				updates,
+				nativeui.WidgetUpdateReport{ID: id, Before: before[id], After: after},
+			)
 		}
 		widget.report.Value = after
 		view.widgetValues[id] = after
@@ -583,7 +704,12 @@ func (r *smokeRunner) recordProcess(name, kind, path string, res processResult) 
 	})
 }
 
-func (r *smokeRunner) writeReport(sourcePath string, widgets []nativeui.WidgetReport, events []nativeui.EventReport, cases []nativeui.CaseReport) error {
+func (r *smokeRunner) writeReport(
+	sourcePath string,
+	widgets []nativeui.WidgetReport,
+	events []nativeui.EventReport,
+	cases []nativeui.CaseReport,
+) error {
 	report := nativeui.Report{
 		Schema:    nativeui.SchemaV1,
 		Status:    "pass",
@@ -607,7 +733,12 @@ func (r *smokeRunner) writeReport(sourcePath string, widgets []nativeui.WidgetRe
 	return os.WriteFile(r.opt.ReportPath, append(raw, '\n'), 0o644)
 }
 
-func runCommand(ctx context.Context, timeout time.Duration, name string, args ...string) (processResult, error) {
+func runCommand(
+	ctx context.Context,
+	timeout time.Duration,
+	name string,
+	args ...string,
+) (processResult, error) {
 	cctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	cmd := exec.CommandContext(cctx, name, args...)
@@ -621,7 +752,13 @@ func runCommand(ctx context.Context, timeout time.Duration, name string, args ..
 		return res, fmt.Errorf("%s timed out", name)
 	}
 	if err != nil {
-		return res, fmt.Errorf("%s %s: %w output=%q", name, strings.Join(args, " "), err, res.output)
+		return res, fmt.Errorf(
+			"%s %s: %w output=%q",
+			name,
+			strings.Join(args, " "),
+			err,
+			res.output,
+		)
 	}
 	return res, nil
 }

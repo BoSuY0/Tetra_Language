@@ -1,0 +1,63 @@
+// Command palette scene built through the experimental Morph Capsule recipe layer.
+module examples.surface.morph_core.surface_morph_command_palette
+
+import lib.core.surface as surface
+import lib.core.block as block
+import lib.core.morph as morph
+
+struct MorphCommandPaletteApp:
+    capsule_hash: Int
+    token_graph_hash: Int
+    expanded_recipe_count: Int
+    block_count: Int
+    a11y_projection: Bool
+
+func root_block(rect: surface.Rect) -> block.Block:
+    let paint: block.PaintSpec = block.paint_stack2(block.paint_layer_fill_radius(morph.theme_dark(), 0), block.paint_layer_overlay(morph.accent(), 44, 0))
+    let props: block.BlockProps = block.props(block.layout_overlay(rect, 0), paint, block.text_none(), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_text(16), block.asset_none())
+    return block.make(block.id(1), block.id_none(), props)
+
+func scene_recipe_checksum() -> Int:
+    let capsule: morph.Capsule = morph.capsule_default()
+    let action: morph.Recipe = morph.recipe_control_action()
+    let field: morph.Recipe = morph.recipe_field_text()
+    let panel: morph.Recipe = morph.recipe_region_panel()
+    let action_expansion: morph.RecipeExpansion = morph.recipe_expansion(action, block.id(5))
+    if morph.capsule_valid(capsule) && morph.recipe_expands_to_block(action) && morph.recipe_expands_to_block(field) && morph.recipe_expands_to_block(panel) && morph.expansion_valid(action_expansion):
+        return capsule.token_graph_hash + action.name_hash + field.name_hash + panel.name_hash
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 400, h: 260)
+    let panel_rect: surface.Rect = surface.Rect(x: 20, y: 20, w: 360, h: 220)
+    let label_rect: surface.Rect = surface.Rect(x: 32, y: 24, w: 120, h: 18)
+    let field_rect: surface.Rect = surface.Rect(x: 28, y: 32, w: 344, h: 42)
+    let first_rect: surface.Rect = surface.Rect(x: 28, y: 88, w: 344, h: 44)
+    let second_rect: surface.Rect = surface.Rect(x: 28, y: 138, w: 344, h: 44)
+    let third_rect: surface.Rect = surface.Rect(x: 28, y: 188, w: 344, h: 28)
+    let capsule: morph.Capsule = morph.capsule_default()
+    let panel_recipe: morph.Recipe = morph.recipe_region_panel()
+    let field_recipe: morph.Recipe = morph.recipe_field_text()
+    let item_recipe: morph.Recipe = morph.recipe_command_item()
+    let action_recipe: morph.Recipe = morph.recipe_control_action()
+    var tree: block.BlockTree = block.tree_init(8)
+    let root: Int = block.tree_add_root(tree, root_block(root_rect), root_rect)
+    let panel: Int = block.tree_add_child(tree, block.id(1), morph.expand_region_panel(2, 1, panel_rect, 15), panel_rect)
+    let label: Int = block.tree_add_child(tree, block.id(2), morph.expand_label(3, 2, 4, label_rect, 6), label_rect)
+    let field: Int = block.tree_add_child(tree, block.id(2), morph.expand_field_text(4, 2, 3, field_rect, 18, 8), field_rect)
+    let first: Int = block.tree_add_child(tree, block.id(2), morph.expand_control_action(5, 2, first_rect, 13, 301, true), first_rect)
+    let second: Int = block.tree_add_child(tree, block.id(2), morph.expand_control_action(6, 2, second_rect, 17, 302, false), second_rect)
+    let third: Int = block.tree_add_child(tree, block.id(2), morph.expand_control_action(7, 2, third_rect, 12, 303, false), third_rect)
+    let panel_expansion: morph.RecipeExpansion = morph.recipe_expansion(panel_recipe, block.id(2))
+    let field_expansion: morph.RecipeExpansion = morph.recipe_expansion(field_recipe, block.id(4))
+    let item_expansion: morph.RecipeExpansion = morph.recipe_expansion(item_recipe, block.id(5))
+    let action_expansion: morph.RecipeExpansion = morph.recipe_expansion(action_recipe, block.id(6))
+    let app: MorphCommandPaletteApp = MorphCommandPaletteApp(capsule_hash: morph.schema_v1(), token_graph_hash: capsule.token_graph_hash, expanded_recipe_count: 4, block_count: block.tree_len(tree), a11y_projection: morph.accessibility_projection_ok(3, 4, 6))
+    let valid: Int = block.tree_validate(tree)
+    let focus0: Int = block.id_value(block.focus_order_at(tree, 0))
+    let focus1: Int = block.id_value(block.focus_order_at(tree, 1))
+    let a11y0: Int = block.id_value(block.tree_accessibility_order_at(tree, 0))
+    if root == 1 && panel == 2 && label == 3 && field == 4 && first == 5 && second == 6 && third == 7 && valid == block.tree_error_ok() && focus0 == 4 && focus1 == 5 && a11y0 == 1 && app.capsule_hash == morph.schema_v1() && app.token_graph_hash > 0 && app.expanded_recipe_count == 4 && app.block_count == 7 && app.a11y_projection && morph.capsule_self_check() && morph.capsule_valid(capsule) && morph.expansion_valid(panel_expansion) && morph.expansion_valid(field_expansion) && morph.expansion_valid(item_expansion) && morph.expansion_valid(action_expansion) && morph.memory_budget_ok(app.block_count, 3, 400 * 260 * 4) && scene_recipe_checksum() > 0:
+        return 0
+    return 1

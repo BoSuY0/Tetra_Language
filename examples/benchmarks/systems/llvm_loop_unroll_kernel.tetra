@@ -1,0 +1,15 @@
+// LLVM test-suite-inspired loop arithmetic kernel.
+module examples.benchmarks.systems.llvm_loop_unroll_kernel
+
+func main() -> Int:
+    var i: Int = 0
+    var total: Int = 0
+    while i < 64:
+        total = total + i * 3 + 7
+        total = total + (i + 1) * 3 + 7
+        total = total + (i + 2) * 3 + 7
+        total = total + (i + 3) * 3 + 7
+        i = i + 4
+    if total == 6496:
+        return 0
+    return total % 251

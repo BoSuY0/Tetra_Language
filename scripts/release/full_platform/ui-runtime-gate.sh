@@ -8,7 +8,7 @@ failures=0
 failed_steps=()
 
 usage() {
-  cat <<'USAGE'
+  cat << 'USAGE'
 Usage: bash scripts/release/full_platform/ui-runtime-gate.sh [--report-dir DIR]
 
 Runs the full-platform UI runtime production gate for Linux, Windows, macOS,
@@ -41,7 +41,7 @@ while [[ $# -gt 0 ]]; do
       report_dir="$2"
       shift 2
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;
@@ -127,7 +127,7 @@ write_gate_report() {
     done
     printf ']\n'
     printf '}\n'
-  } >"$report_dir/full-platform-ui-runtime-gate.json"
+  } > "$report_dir/full-platform-ui-runtime-gate.json"
 }
 
 prepare_report_dir

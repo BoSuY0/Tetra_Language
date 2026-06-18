@@ -19,8 +19,18 @@ func TestValidateCrossPlatformUIRuntimeAcceptsAllPlatforms(t *testing.T) {
 func TestValidateCrossPlatformUIRuntimeRejectsBlockedTargetReport(t *testing.T) {
 	dir := t.TempDir()
 	inputs := writeCrossPlatformReports(t, dir)
-	blockedWindows := strings.Replace(validPlatformUIReport("windows-x64"), `"status":"pass"`, `"status":"blocked"`, 1)
-	blockedWindows = strings.Replace(blockedWindows, `"host":"windows-x64"`, `"host":"linux-x64"`, 1)
+	blockedWindows := strings.Replace(
+		validPlatformUIReport("windows-x64"),
+		`"status":"pass"`,
+		`"status":"blocked"`,
+		1,
+	)
+	blockedWindows = strings.Replace(
+		blockedWindows,
+		`"host":"windows-x64"`,
+		`"host":"linux-x64"`,
+		1,
+	)
 	writeFile(t, inputs.Windows, blockedWindows)
 
 	err := validateCrossPlatformUIRuntime(inputs)
@@ -37,7 +47,12 @@ func TestValidateCrossPlatformUIRuntimeRejectsBlockedTargetReport(t *testing.T) 
 func TestValidateCrossPlatformUIRuntimeRejectsStaleTargetHostReport(t *testing.T) {
 	dir := t.TempDir()
 	inputs := writeCrossPlatformReports(t, dir)
-	staleWindows := strings.Replace(validPlatformUIReport("windows-x64"), `"git_head":"abcdef1234567890"`, `"git_head":"stale123"`, 1)
+	staleWindows := strings.Replace(
+		validPlatformUIReport("windows-x64"),
+		`"git_head":"abcdef1234567890"`,
+		`"git_head":"stale123"`,
+		1,
+	)
 	writeFile(t, inputs.Windows, staleWindows)
 
 	err := validateCrossPlatformUIRuntimeWithOptions(inputs, validationOptions{
@@ -62,10 +77,18 @@ func writeCrossPlatformReports(t *testing.T, dir string) crossPlatformInputs {
 		MacOS:   filepath.Join(dir, "macos.json"),
 		Web:     filepath.Join(dir, "web.json"),
 	}
-	writeFile(t, inputs.Linux, `{"schema":"tetra.ui.desktop-runtime.v1","status":"pass","target":"linux-x64","runtime":"desktop-ui-linux-x64","ui_schema":"tetra.ui.v1"}`)
+	writeFile(
+		t,
+		inputs.Linux,
+		`{"schema":"tetra.ui.desktop-runtime.v1","status":"pass","target":"linux-x64","runtime":"desktop-ui-linux-x64","ui_schema":"tetra.ui.v1"}`,
+	)
 	writeFile(t, inputs.Windows, validPlatformUIReport("windows-x64"))
 	writeFile(t, inputs.MacOS, validPlatformUIReport("macos-x64"))
-	writeFile(t, inputs.Web, `{"schema":"tetra.web-ui-smoke.v1alpha1","status":"pass","target":"wasm32-web","ui_schema":"tetra.ui.v1","ui_bundle_path":"web-smoke.ui.json","ui_module_path":"web-smoke.ui.web.mjs","dom_snapshot":"web-smoke.dom.html","runtime_trace":"window-mount:ok;root-mount:ok;layout:ok;text:ok;button:ok;input:ok;list:ok;panel:ok;focus:ok;input-event:ok;change:ok;select:ok;click:ok;timer:ok;async-command:ok;redraw-update:ok;error-recovery:ok;ui-event-dispatch:web-command-dispatch"}`)
+	writeFile(
+		t,
+		inputs.Web,
+		`{"schema":"tetra.web-ui-smoke.v1alpha1","status":"pass","target":"wasm32-web","ui_schema":"tetra.ui.v1","ui_bundle_path":"web-smoke.ui.json","ui_module_path":"web-smoke.ui.web.mjs","dom_snapshot":"web-smoke.dom.html","runtime_trace":"window-mount:ok;root-mount:ok;layout:ok;text:ok;button:ok;input:ok;list:ok;panel:ok;focus:ok;input-event:ok;change:ok;select:ok;click:ok;timer:ok;async-command:ok;redraw-update:ok;error-recovery:ok;ui-event-dispatch:web-command-dispatch"}`,
+	)
 	return inputs
 }
 

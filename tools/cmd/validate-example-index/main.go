@@ -48,8 +48,16 @@ func main() {
 func runValidateExampleIndex(args []string, stdout, stderr io.Writer) int {
 	flags := flag.NewFlagSet("validate-example-index", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	smokeListPath := flags.String("smoke-list", "", "path to tetra smoke --list --format=json output")
-	indexPath := flags.String("index", "docs/user/examples_index.md", "path to examples index markdown")
+	smokeListPath := flags.String(
+		"smoke-list",
+		"",
+		"path to tetra smoke --list --format=json output",
+	)
+	indexPath := flags.String(
+		"index",
+		"docs/user/reference/examples_index.md",
+		"path to examples index markdown",
+	)
 	docsPath := flags.String("docs", "", "path to examples index markdown for docs-only validation")
 	if err := flags.Parse(args); err != nil {
 		return 2
@@ -121,7 +129,11 @@ func validateExampleIndex(rawSmoke []byte, markdown string) error {
 			return fmt.Errorf("smoke case %s has invalid target_group %q", c.Name, c.TargetGroup)
 		}
 		if c.ExpectedExit < 0 || c.ExpectedExit > 255 {
-			return fmt.Errorf("smoke case %s expected_exit = %d, want 0..255", c.Name, c.ExpectedExit)
+			return fmt.Errorf(
+				"smoke case %s expected_exit = %d, want 0..255",
+				c.Name,
+				c.ExpectedExit,
+			)
 		}
 		entry, ok := entries[c.SrcPath]
 		if !ok {
@@ -132,13 +144,23 @@ func validateExampleIndex(rawSmoke []byte, markdown string) error {
 			return fmt.Errorf("example index %s missing purpose", c.SrcPath)
 		}
 		if entry.Target == "" || !strings.Contains(entry.Target, c.TargetGroup) {
-			return fmt.Errorf("example index %s target group %q does not mention %q", c.SrcPath, entry.Target, c.TargetGroup)
+			return fmt.Errorf(
+				"example index %s target group %q does not mention %q",
+				c.SrcPath,
+				entry.Target,
+				c.TargetGroup,
+			)
 		}
 		wantExit := fmt.Sprintf("exit %d", c.ExpectedExit)
 		wantExits := fmt.Sprintf("exits %d", c.ExpectedExit)
 		expected := strings.ToLower(entry.Expected)
-		if !strings.Contains(expected, wantExit) && !strings.Contains(expected, wantExits) && !strings.Contains(expected, "build-only") {
-			return fmt.Errorf("example index %s expected behavior must mention %s or build-only", c.SrcPath, wantExit)
+		if !strings.Contains(expected, wantExit) && !strings.Contains(expected, wantExits) &&
+			!strings.Contains(expected, "build-only") {
+			return fmt.Errorf(
+				"example index %s expected behavior must mention %s or build-only",
+				c.SrcPath,
+				wantExit,
+			)
 		}
 	}
 	for _, exclusion := range list.ExcludedExamples {
@@ -152,7 +174,10 @@ func validateExampleIndex(rawSmoke []byte, markdown string) error {
 	}
 	for path := range entries {
 		if !coveredPaths[path] {
-			return fmt.Errorf("example index includes %s but smoke list does not cover or exclude it", path)
+			return fmt.Errorf(
+				"example index includes %s but smoke list does not cover or exclude it",
+				path,
+			)
 		}
 	}
 	return nil
@@ -171,7 +196,11 @@ func validateExampleDocs(markdown string) error {
 			return fmt.Errorf("example index %s missing target group", path)
 		}
 		if !strings.Contains(entry.Target, "native") && !strings.Contains(entry.Target, "wasm") {
-			return fmt.Errorf("example index %s target group %q must mention native or wasm", path, entry.Target)
+			return fmt.Errorf(
+				"example index %s target group %q must mention native or wasm",
+				path,
+				entry.Target,
+			)
 		}
 		if entry.Expected == "" {
 			return fmt.Errorf("example index %s missing expected behavior", path)

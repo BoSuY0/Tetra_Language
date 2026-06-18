@@ -66,7 +66,10 @@ func WritePE64WindowsX64(path string, img *PEImage) error {
 	idataRVA := rdataRVA + rdataVirtAligned
 	idataRawOffset := rdataRawOffset + rdataRawSize
 
-	idataData, iatRVAs, importDirSize, iatRVA, iatSize, err := BuildImportSection(uint32(idataRVA), img.Imports)
+	idataData, iatRVAs, importDirSize, iatRVA, iatSize, err := BuildImportSection(
+		uint32(idataRVA),
+		img.Imports,
+	)
 	if err != nil {
 		return err
 	}
@@ -262,16 +265,48 @@ func WritePE64WindowsX64(path string, img *PEImage) error {
 		}
 	}
 
-	if err := writeSectionHeader(&buf, ".text", uint32(textVirtSize), uint32(textRVA), uint32(textRawSize), uint32(textRawOffset), 0x60000020); err != nil {
+	if err := writeSectionHeader(
+		&buf,
+		".text",
+		uint32(textVirtSize),
+		uint32(textRVA),
+		uint32(textRawSize),
+		uint32(textRawOffset),
+		0x60000020,
+	); err != nil {
 		return err
 	}
-	if err := writeSectionHeader(&buf, ".rdata", uint32(rdataVirtSize), uint32(rdataRVA), uint32(rdataRawSize), uint32(rdataRawOffset), 0x40000040); err != nil {
+	if err := writeSectionHeader(
+		&buf,
+		".rdata",
+		uint32(rdataVirtSize),
+		uint32(rdataRVA),
+		uint32(rdataRawSize),
+		uint32(rdataRawOffset),
+		0x40000040,
+	); err != nil {
 		return err
 	}
-	if err := writeSectionHeader(&buf, ".idata", uint32(idataVirtSize), uint32(idataRVA), uint32(idataRawSize), uint32(idataRawOffset), 0xC0000040); err != nil {
+	if err := writeSectionHeader(
+		&buf,
+		".idata",
+		uint32(idataVirtSize),
+		uint32(idataRVA),
+		uint32(idataRawSize),
+		uint32(idataRawOffset),
+		0xC0000040,
+	); err != nil {
 		return err
 	}
-	if err := writeSectionHeader(&buf, ".reloc", uint32(relocVirtSize), uint32(relocRVA), uint32(relocRawSize), uint32(relocRawOffset), 0x42000040); err != nil {
+	if err := writeSectionHeader(
+		&buf,
+		".reloc",
+		uint32(relocVirtSize),
+		uint32(relocRVA),
+		uint32(relocRawSize),
+		uint32(relocRawOffset),
+		0x42000040,
+	); err != nil {
 		return err
 	}
 
@@ -312,7 +347,10 @@ func WritePE64WindowsX64(path string, img *PEImage) error {
 	return nil
 }
 
-func BuildImportSection(idataRVA uint32, imports []string) ([]byte, map[string]uint32, uint32, uint32, uint32, error) {
+func BuildImportSection(
+	idataRVA uint32,
+	imports []string,
+) ([]byte, map[string]uint32, uint32, uint32, uint32, error) {
 	type dllGroup struct {
 		name    string
 		syms    []string
@@ -416,7 +454,13 @@ func BuildImportSection(idataRVA uint32, imports []string) ([]byte, map[string]u
 	iatStart := groups[0].iatOff
 	iatEnd := groups[len(groups)-1].iatOff + (len(groups[len(groups)-1].syms)+1)*8
 
-	return data, iatRVAs, uint32(descSize), idataRVA + uint32(iatStart), uint32(iatEnd - iatStart), nil
+	return data, iatRVAs, uint32(
+			descSize,
+		), idataRVA + uint32(
+			iatStart,
+		), uint32(
+			iatEnd - iatStart,
+		), nil
 }
 
 func parseImportName(full string) (string, string, error) {
@@ -500,7 +544,11 @@ func writeU64At(buf []byte, off int, v uint64) {
 	binary.LittleEndian.PutUint64(buf[off:off+8], v)
 }
 
-func writeSectionHeader(w *bytes.Buffer, name string, virtSize, virtAddr, rawSize, rawOffset, chars uint32) error {
+func writeSectionHeader(
+	w *bytes.Buffer,
+	name string,
+	virtSize, virtAddr, rawSize, rawOffset, chars uint32,
+) error {
 	var nameBuf [8]byte
 	copy(nameBuf[:], name)
 	if _, err := w.Write(nameBuf[:]); err != nil {

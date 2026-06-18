@@ -36,39 +36,169 @@ generated docs run.
 
 ## Stable Module Choices
 
-| Need | Import | Example | Effects |
-| --- | --- | --- | --- |
-| Integer helpers and small arithmetic choices | `import lib.core.math as math` | `examples/core_math_smoke.tetra` | none |
-| Explicit memory capability wrappers | `import lib.core.memory as memory` | `examples/core_memory_smoke.tetra` | `mem` |
-| Capability tokens for host-like surfaces | `import lib.core.capability as cap` | `examples/core_memory_smoke.tetra` | `capability`, `io`, `mem` |
-| Capability-gated IO helpers | `import lib.core.io as io` | `examples/core_io_smoke.tetra` | `capability`, `io`, `mmio` |
-| Test status helpers | `import lib.core.testing as testing` | `examples/core_testing_smoke.tetra` | none |
-| Slice summation helpers (`sum_i32`, `weighted_sum_i32`, `sum_u8`) | `import lib.core.slices as slices` | `examples/core_slices_smoke.tetra` | `mem` |
-| ASCII length, ASCII sum, and empty checks (`ascii_len`, `ascii_sum`, `is_empty`) | `import lib.core.strings as strings` | `examples/core_strings_smoke.tetra` | none |
-| Caller-owned UTF-8 text buffer helpers | `import lib.core.text as text` | `examples/core_text_smoke.tetra` | none |
-| Bounded Surface string tables, locale fallback, formatting hooks, and RTL placeholder nonclaims | `import lib.core.i18n as i18n` | `examples/core_i18n_smoke.tetra`, `examples/surface_reference_localized_form.tetra` | none |
-| Caller-owned Surface app command/reducer helpers | `import lib.core.surface_app as appmodel` | `examples/core_surface_app_smoke.tetra`, `examples/surface_app_model.tetra` | none |
-| Scoped Linux Surface app-shell state helpers with `electron-feature-ledger-v1`, `surface-security-permission-v1`, and `surface-performance-budget-v1` release evidence | `import lib.core.surface_app_shell as shell` | `examples/core_surface_app_shell_smoke.tetra`, `examples/surface_linux_app_shell_notes.tetra` | none |
-| Generic collection views and `[]i32` scans | `import lib.core.collections as collections` | `examples/core_collections_smoke.tetra` | `mem` |
-| Tiny serialization combinators | `import lib.core.serialization as serialization` | `examples/core_serialization_smoke.tetra` | `mem` |
-| Filesystem path helpers and host-backed `exists` | `import lib.core.filesystem as filesystem` | `examples/core_filesystem_smoke.tetra` | `io` |
-| Linux TCP socket client/server I/O helpers | `import lib.core.net as net` | `examples/core_net_smoke.tetra` | `io, mem` |
-| Networking endpoint policy helpers | `import lib.core.networking as networking` | `examples/core_networking_smoke.tetra` | none |
-| HTTP/1.1 String/byte-buffer request routing, request-head framing, and response byte-buffer helpers | `import lib.core.http as http` | `examples/core_http_smoke.tetra` | `mem` |
-| JSON byte-buffer response helpers | `import lib.core.json as json` | `examples/core_json_smoke.tetra` | `mem` |
-| PostgreSQL wire-frame byte-buffer helpers | `import lib.core.postgres as pg` | `examples/core_postgres_smoke.tetra`, `examples/core_postgres_prepared_smoke.tetra`, `examples/core_postgres_result_smoke.tetra` | `mem` |
-| Async helper functions | `import lib.core.async as async` | `examples/core_async_smoke.tetra` | none |
-| Synchronization status helpers | `import lib.core.sync as sync` | `examples/core_sync_smoke.tetra` | none |
-| Time duration/status helpers | `import lib.core.time as time` | `examples/core_time_smoke.tetra` | none |
-| Crypto interface helpers | `import lib.core.crypto as crypto` | `examples/core_crypto_smoke.tetra` | `mem` |
-| Planned Tetra Surface host/frame/event wrappers | `import lib.core.surface as surface` | `examples/core_surface_smoke.tetra` | `surface`, `alloc`, `mem` |
-| Planned Tetra Surface software draw helpers | `import lib.core.draw as draw` | `examples/core_draw_smoke.tetra` | `mem` |
-| Stable Surface v1 widget style and theme helpers | `import lib.core.style as style` | `examples/core_style_smoke.tetra` | none |
-| Planned Tetra Surface static component helpers | `import lib.core.component as component` | `examples/core_component_smoke.tetra` | none |
-| Experimental Surface Block System data model | `import lib.core.block as block` | `examples/core_block_smoke.tetra` | alloc, mem |
-| Experimental Surface Morph Capsule recipe layer | `import lib.core.morph as morph` | `examples/core_morph_smoke.tetra`, `examples/surface_morph_command_palette.tetra`, `examples/surface_morph_project_dashboard.tetra`, `examples/surface_morph_settings.tetra`, `examples/surface_morph_editor_shell.tetra`, `examples/surface_morph_glass_panel.tetra` | none |
-| Experimental Tetra Surface accessibility metadata helpers | `import lib.core.accessibility as accessibility` | `examples/core_accessibility_smoke.tetra` | none |
-| Experimental Tetra Surface minimal widget helpers | `import lib.core.widgets as widgets` | `examples/core_widgets_smoke.tetra` | none |
+Entries:
+
+- Need: Integer helpers and small arithmetic choices
+  - Import: `import lib.core.math as math`
+  - Example: `examples/core_math_smoke.tetra`
+  - Effects: none
+
+- Need: Explicit memory capability wrappers
+  - Import: `import lib.core.memory as memory`
+  - Example: `examples/core_memory_smoke.tetra`
+  - Effects: `mem`
+
+- Need: Capability tokens for host-like surfaces
+  - Import: `import lib.core.capability as cap`
+  - Example: `examples/core_memory_smoke.tetra`
+  - Effects: `capability`, `io`, `mem`
+
+- Need: Capability-gated IO helpers
+  - Import: `import lib.core.io as io`
+  - Example: `examples/core_io_smoke.tetra`
+  - Effects: `capability`, `io`, `mmio`
+
+- Need: Test status helpers
+  - Import: `import lib.core.testing as testing`
+  - Example: `examples/core_testing_smoke.tetra`
+  - Effects: none
+
+- Need: Slice summation helpers (`sum_i32`, `weighted_sum_i32`, `sum_u8`)
+  - Import: `import lib.core.slices as slices`
+  - Example: `examples/core_slices_smoke.tetra`
+  - Effects: `mem`
+
+- Need: ASCII length, ASCII sum, and empty checks (`ascii_len`, `ascii_sum`, `is_empty`)
+  - Import: `import lib.core.strings as strings`
+  - Example: `examples/core_strings_smoke.tetra`
+  - Effects: none
+
+- Need: Caller-owned UTF-8 text buffer helpers
+  - Import: `import lib.core.text as text`
+  - Example: `examples/core_text_smoke.tetra`
+  - Effects: none
+
+- Need: Bounded Surface string tables, locale fallback, formatting hooks, and RTL placeholder
+  nonclaims
+  - Import: `import lib.core.i18n as i18n`
+  - Example: `examples/core_i18n_smoke.tetra`, `examples/surface_reference_localized_form.tetra`
+  - Effects: none
+
+- Need: Caller-owned Surface app command/reducer helpers
+  - Import: `import lib.core.surface_app as appmodel`
+  - Example: `examples/core_surface_app_smoke.tetra`, `examples/surface_app_model.tetra`
+  - Effects: none
+
+- Need: Scoped Linux Surface app-shell state helpers with `electron-feature-ledger-v1`,
+  `surface-security-permission-v1`, and `surface-performance-budget-v1` release evidence
+  - Import: `import lib.core.surface_app_shell as shell`
+  - Example: `examples/core_surface_app_shell_smoke.tetra`,
+    `examples/surface_linux_app_shell_notes.tetra`
+  - Effects: none
+
+- Need: Generic collection views and `[]i32` scans
+  - Import: `import lib.core.collections as collections`
+  - Example: `examples/core_collections_smoke.tetra`
+  - Effects: `mem`
+
+- Need: Tiny serialization combinators
+  - Import: `import lib.core.serialization as serialization`
+  - Example: `examples/core_serialization_smoke.tetra`
+  - Effects: `mem`
+
+- Need: Filesystem path helpers and host-backed `exists`
+  - Import: `import lib.core.filesystem as filesystem`
+  - Example: `examples/core_filesystem_smoke.tetra`
+  - Effects: `io`
+
+- Need: Linux TCP socket client/server I/O helpers
+  - Import: `import lib.core.net as net`
+  - Example: `examples/core_net_smoke.tetra`
+  - Effects: `io, mem`
+
+- Need: Networking endpoint policy helpers
+  - Import: `import lib.core.networking as networking`
+  - Example: `examples/core_networking_smoke.tetra`
+  - Effects: none
+
+- Need: HTTP/1.1 String/byte-buffer request routing, request-head framing, and response byte-buffer
+  helpers
+  - Import: `import lib.core.http as http`
+  - Example: `examples/core_http_smoke.tetra`
+  - Effects: `mem`
+
+- Need: JSON byte-buffer response helpers
+  - Import: `import lib.core.json as json`
+  - Example: `examples/core_json_smoke.tetra`
+  - Effects: `mem`
+
+- Need: PostgreSQL wire-frame byte-buffer helpers
+  - Import: `import lib.core.postgres as pg`
+  - Example: `examples/core_postgres_smoke.tetra`, `examples/core_postgres_prepared_smoke.tetra`,
+    `examples/core_postgres_result_smoke.tetra`
+  - Effects: `mem`
+
+- Need: Async helper functions
+  - Import: `import lib.core.async as async`
+  - Example: `examples/core_async_smoke.tetra`
+  - Effects: none
+
+- Need: Synchronization status helpers
+  - Import: `import lib.core.sync as sync`
+  - Example: `examples/core_sync_smoke.tetra`
+  - Effects: none
+
+- Need: Time duration/status helpers
+  - Import: `import lib.core.time as time`
+  - Example: `examples/core_time_smoke.tetra`
+  - Effects: none
+
+- Need: Crypto interface helpers
+  - Import: `import lib.core.crypto as crypto`
+  - Example: `examples/core_crypto_smoke.tetra`
+  - Effects: `mem`
+
+- Need: Planned Tetra Surface host/frame/event wrappers
+  - Import: `import lib.core.surface as surface`
+  - Example: `examples/core_surface_smoke.tetra`
+  - Effects: `surface`, `alloc`, `mem`
+
+- Need: Planned Tetra Surface software draw helpers
+  - Import: `import lib.core.draw as draw`
+  - Example: `examples/core_draw_smoke.tetra`
+  - Effects: `mem`
+
+- Need: Stable Surface v1 widget style and theme helpers
+  - Import: `import lib.core.style as style`
+  - Example: `examples/core_style_smoke.tetra`
+  - Effects: none
+
+- Need: Planned Tetra Surface static component helpers
+  - Import: `import lib.core.component as component`
+  - Example: `examples/core_component_smoke.tetra`
+  - Effects: none
+
+- Need: Experimental Surface Block System data model
+  - Import: `import lib.core.block as block`
+  - Example: `examples/core_block_smoke.tetra`
+  - Effects: alloc, mem
+
+- Need: Experimental Surface Morph Capsule recipe layer
+  - Import: `import lib.core.morph as morph`
+  - Example: `examples/core_morph_smoke.tetra`, `examples/surface_morph_command_palette.tetra`,
+    `examples/surface_morph_project_dashboard.tetra`, `examples/surface_morph_settings.tetra`,
+    `examples/surface_morph_editor_shell.tetra`, `examples/surface_morph_glass_panel.tetra`
+  - Effects: none
+
+- Need: Experimental Tetra Surface accessibility metadata helpers
+  - Import: `import lib.core.accessibility as accessibility`
+  - Example: `examples/core_accessibility_smoke.tetra`
+  - Effects: none
+
+- Need: Experimental Tetra Surface minimal widget helpers
+  - Import: `import lib.core.widgets as widgets`
+  - Example: `examples/core_widgets_smoke.tetra`
+  - Effects: none
 
 Call-shape reminders used by generated docs and smoke examples:
 `slices.sum_i32(values)`, `slices.weighted_sum_i32(values)`,
@@ -243,11 +373,22 @@ These helpers are capability-gated and describe MMIO-shaped operations. In the
 current backend, MMIO reads and writes lower to normal memory loads and stores,
 so this is not a production device-driver or host-IO abstraction.
 
-| Function | Required effects | Behavior |
-| --- | --- | --- |
-| `io.capability_io()` | `capability`, `io` | Returns a `cap.io` token from the reviewed unsafe boundary. It does not perform MMIO by itself. |
-| `io.mmio_read_i32(addr, io_cap)` | `io`, `mmio` | Reads the current `i32` value at `addr` through the supplied `cap.io` token and returns it as `Int`. |
-| `io.mmio_write_i32(addr, value, io_cap)` | `io`, `mmio` | Writes `value` as an `i32` at `addr` through the supplied `cap.io` token and returns the written value. |
+Entries:
+
+- Function: `io.capability_io()`
+  - Required effects: `capability`, `io`
+  - Behavior: Returns a `cap.io` token from the reviewed unsafe boundary. It does not perform MMIO
+    by itself.
+
+- Function: `io.mmio_read_i32(addr, io_cap)`
+  - Required effects: `io`, `mmio`
+  - Behavior: Reads the current `i32` value at `addr` through the supplied `cap.io` token and
+    returns it as `Int`.
+
+- Function: `io.mmio_write_i32(addr, value, io_cap)`
+  - Required effects: `io`, `mmio`
+  - Behavior: Writes `value` as an `i32` at `addr` through the supplied `cap.io` token and returns
+    the written value.
 
 Minimal MMIO example:
 
@@ -418,13 +559,42 @@ configuration defaults:
   surfaces, and other unsupported native targets, report a filesystem runtime
   diagnostic; WASM targets reject the filesystem runtime builtin.
 
-| Path | `has_leading_slash` | `ends_with_slash` | `is_root` | `slash_count` | `directory_depth` |
-| --- | --- | --- | --- | --- | --- |
-| `""` | false | false | false | `0` | `0` |
-| `"/"` | true | true | true | `1` | `0` |
-| `"/tmp/cache"` | true | false | false | `2` | `2` |
-| `"tmp/cache"` | false | false | false | `1` | `2` |
-| `"/tmp/"` | true | true | false | `2` | `1` |
+Entries:
+
+- Path: `""`
+  - `has_leading_slash`: false
+  - `ends_with_slash`: false
+  - `is_root`: false
+  - `slash_count`: `0`
+  - `directory_depth`: `0`
+
+- Path: `"/"`
+  - `has_leading_slash`: true
+  - `ends_with_slash`: true
+  - `is_root`: true
+  - `slash_count`: `1`
+  - `directory_depth`: `0`
+
+- Path: `"/tmp/cache"`
+  - `has_leading_slash`: true
+  - `ends_with_slash`: false
+  - `is_root`: false
+  - `slash_count`: `2`
+  - `directory_depth`: `2`
+
+- Path: `"tmp/cache"`
+  - `has_leading_slash`: false
+  - `ends_with_slash`: false
+  - `is_root`: false
+  - `slash_count`: `1`
+  - `directory_depth`: `2`
+
+- Path: `"/tmp/"`
+  - `has_leading_slash`: true
+  - `ends_with_slash`: true
+  - `is_root`: false
+  - `slash_count`: `2`
+  - `directory_depth`: `1`
 
 Warning: `filesystem.exists` is an existence probe only. It does not open files,
 return metadata, distinguish permission errors from missing paths, or imply
@@ -513,14 +683,16 @@ from the Tetra-source transport/database surface for the TechEmpower-compatible 
 the current `lib.core.net` slice provides real linux-x64 TCP socket
 open/bind/connect/listen/accept/read/recv/write/send/nonblocking/close helpers,
 `SO_REUSEPORT`/`TCP_NODELAY`, plus epoll add/mod/delete and wait-one readiness,
-including `epoll_wait_one_into` fd/flags capture and event flag predicates, while full event-loop abstractions, broader socket-option APIs, and
+including `epoll_wait_one_into` fd/flags capture and event flag predicates, while full event-loop
+abstractions, broader socket-option APIs, and
 full PostgreSQL access and pooling belong behind future `lib.core.net`
 expansion and higher-level `lib.core.postgres` driver layers above the current
 startup/simple-query/prepared-frame byte-buffer helpers. Importing
 `lib.core.networking` is therefore safe for configuration defaults, but it must
 not be used as evidence that the current stdlib can run a production TCP
 server, parse full HTTP header maps or request bodies, or talk to a database.
-HTTP String and byte-buffer request-line routing, request-head framing, and response byte-buffer helpers are available separately through
+HTTP String and byte-buffer request-line routing, request-head framing, and response byte-buffer
+helpers are available separately through
 `lib.core.http`; JSON response byte-buffer helpers are available separately
 through `lib.core.json`.
 
@@ -561,11 +733,19 @@ Use `import lib.core.testing as testing` for small status-returning checks in
 examples, smoke tests, and documentation tests. These helpers use process-style
 status conventions: `0` means pass and `1` means fail.
 
-| Helper | Pass status | Fail status |
-| --- | --- | --- |
-| `testing.assert_true(value)` | `0` when `value` is true | `1` when `value` is false |
-| `testing.assert_false(value)` | `0` when `value` is false | `1` when `value` is true |
-| `testing.assert_eq_i32(actual, expected)` | `0` when both `i32` values are equal | `1` when they differ |
+Entries:
+
+- Helper: `testing.assert_true(value)`
+  - Pass status: `0` when `value` is true
+  - Fail status: `1` when `value` is false
+
+- Helper: `testing.assert_false(value)`
+  - Pass status: `0` when `value` is false
+  - Fail status: `1` when `value` is true
+
+- Helper: `testing.assert_eq_i32(actual, expected)`
+  - Pass status: `0` when both `i32` values are equal
+  - Fail status: `1` when they differ
 
 Use `testing.combine(lhs, rhs)` to merge status values. It returns `lhs` when
 `lhs` is non-zero, otherwise it returns `rhs`, so the first failing status is
@@ -599,22 +779,63 @@ surface: each mirror forwards to the matching `lib.core.*` module so legacy
 imports keep compiling. The mirror namespace still has no stability guarantees
 for new API growth, so prefer the stable replacement in new code.
 
-| Experimental import | Stable replacement | Status |
-| --- | --- | --- |
-| `import lib.experimental.async as async` | `import lib.core.async as async` | Experimental mirror; no stability guarantees. |
-| `import lib.experimental.collections as collections` | `import lib.core.collections as collections` | Experimental mirror; no stability guarantees. |
-| `import lib.experimental.crypto as crypto` | `import lib.core.crypto as crypto` | Experimental mirror; no stability guarantees. |
-| `import lib.experimental.filesystem as filesystem` | `import lib.core.filesystem as filesystem` | Experimental mirror; no stability guarantees. |
-| `import lib.experimental.io as io` | `import lib.core.io as io` | Experimental mirror; no stability guarantees. |
-| `import lib.experimental.math as math` | `import lib.core.math as math` | Experimental mirror; no stability guarantees. |
-| `import lib.experimental.memory as memory` | `import lib.core.memory as memory` | Experimental mirror; no stability guarantees. |
-| `import lib.experimental.networking as networking` | `import lib.core.networking as networking` | Experimental mirror; no stability guarantees. |
-| `import lib.experimental.serialization as serialization` | `import lib.core.serialization as serialization` | Experimental mirror; no stability guarantees. |
-| `import lib.experimental.slices as slices` | `import lib.core.slices as slices` | Experimental mirror; no stability guarantees. |
-| `import lib.experimental.strings as strings` | `import lib.core.strings as strings` | Experimental mirror; no stability guarantees. |
-| `import lib.experimental.sync as sync` | `import lib.core.sync as sync` | Experimental mirror; no stability guarantees. |
-| `import lib.experimental.testing as testing` | `import lib.core.testing as testing` | Experimental mirror; no stability guarantees. |
-| `import lib.experimental.time as time` | `import lib.core.time as time` | Experimental mirror; no stability guarantees. |
+Entries:
+
+- Experimental import: `import lib.experimental.async as async`
+  - Stable replacement: `import lib.core.async as async`
+  - Status: Experimental mirror; no stability guarantees.
+
+- Experimental import: `import lib.experimental.collections as collections`
+  - Stable replacement: `import lib.core.collections as collections`
+  - Status: Experimental mirror; no stability guarantees.
+
+- Experimental import: `import lib.experimental.crypto as crypto`
+  - Stable replacement: `import lib.core.crypto as crypto`
+  - Status: Experimental mirror; no stability guarantees.
+
+- Experimental import: `import lib.experimental.filesystem as filesystem`
+  - Stable replacement: `import lib.core.filesystem as filesystem`
+  - Status: Experimental mirror; no stability guarantees.
+
+- Experimental import: `import lib.experimental.io as io`
+  - Stable replacement: `import lib.core.io as io`
+  - Status: Experimental mirror; no stability guarantees.
+
+- Experimental import: `import lib.experimental.math as math`
+  - Stable replacement: `import lib.core.math as math`
+  - Status: Experimental mirror; no stability guarantees.
+
+- Experimental import: `import lib.experimental.memory as memory`
+  - Stable replacement: `import lib.core.memory as memory`
+  - Status: Experimental mirror; no stability guarantees.
+
+- Experimental import: `import lib.experimental.networking as networking`
+  - Stable replacement: `import lib.core.networking as networking`
+  - Status: Experimental mirror; no stability guarantees.
+
+- Experimental import: `import lib.experimental.serialization as serialization`
+  - Stable replacement: `import lib.core.serialization as serialization`
+  - Status: Experimental mirror; no stability guarantees.
+
+- Experimental import: `import lib.experimental.slices as slices`
+  - Stable replacement: `import lib.core.slices as slices`
+  - Status: Experimental mirror; no stability guarantees.
+
+- Experimental import: `import lib.experimental.strings as strings`
+  - Stable replacement: `import lib.core.strings as strings`
+  - Status: Experimental mirror; no stability guarantees.
+
+- Experimental import: `import lib.experimental.sync as sync`
+  - Stable replacement: `import lib.core.sync as sync`
+  - Status: Experimental mirror; no stability guarantees.
+
+- Experimental import: `import lib.experimental.testing as testing`
+  - Stable replacement: `import lib.core.testing as testing`
+  - Status: Experimental mirror; no stability guarantees.
+
+- Experimental import: `import lib.experimental.time as time`
+  - Stable replacement: `import lib.core.time as time`
+  - Status: Experimental mirror; no stability guarantees.
 
 ## Runnable Examples
 
@@ -705,8 +926,12 @@ mkdir -p reports
 ./tetra doc examples > reports/examples-docs.md
 go run ./tools/cmd/validate-api-docs --docs reports/examples-docs.md
 ./tetra smoke --list --format=json > reports/smoke-list-linux-x64.json
-go run ./tools/cmd/validate-smoke-list --report reports/smoke-list-linux-x64.json --examples-root examples
-go run ./tools/cmd/validate-example-index --smoke-list reports/smoke-list-linux-x64.json --index docs/user/examples_index.md
+go run ./tools/cmd/validate-smoke-list \
+  --report reports/smoke-list-linux-x64.json \
+  --examples-root examples
+go run ./tools/cmd/validate-example-index \
+  --smoke-list reports/smoke-list-linux-x64.json \
+  --index docs/user/examples_index.md
 ```
 
 The examples workflow validates example-only generated docs, catches missing

@@ -1,0 +1,26 @@
+// Indexed and metadata offset memory microservice smoke.
+//
+// The service reads pointer offsets from a slice element and string metadata,
+// then aliases both into local Int bindings before raw pointer arithmetic.
+module examples.microservices.memory.misc.offsets.memory_indexed_metadata_offset_service
+func main() -> Int
+uses alloc, capability, islands, mem:
+    let label: String = "abcdefgh"
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let payload: ptr = core.alloc_bytes(16)
+        island(128) as isl:
+            var offsets: []i32 = core.island_make_i32(isl, 2)
+            offsets[0] = 1
+            offsets[1] = 4
+            let slice_offset: Int = offsets[1]
+            let len_offset: Int = label.len
+            let first: ptr = core.ptr_add(payload, slice_offset, memory_cap)
+            let second: ptr = core.ptr_add(payload, len_offset, memory_cap)
+            let _write_first: Int = core.store_i32(first, 20, memory_cap)
+            let _write_second: Int = core.store_i32(second, 22, memory_cap)
+            let total: Int = core.load_i32(first, memory_cap) + core.load_i32(second, memory_cap)
+            if total == 42:
+                return 0
+            return total
+    return 99

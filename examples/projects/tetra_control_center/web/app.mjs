@@ -1,5 +1,12 @@
 const app = document.getElementById("app");
-const defaultScreens = ["Dashboard", "Profiles", "Fans/Backends", "Diagnostics", "Logs", "Settings"];
+const defaultScreens = [
+  "Dashboard",
+  "Profiles",
+  "Fans/Backends",
+  "Diagnostics",
+  "Logs",
+  "Settings",
+];
 const defaultProfiles = ["quiet", "balanced", "performance", "custom"];
 const requestedScreen = new URLSearchParams(window.location.search).get("screen");
 
@@ -21,7 +28,7 @@ function text(value, fallback = "unavailable") {
 
 function parseTetraInit(value) {
   const raw = String(value || "");
-  if (raw.length >= 2 && raw.startsWith("\"") && raw.endsWith("\"")) return raw.slice(1, -1);
+  if (raw.length >= 2 && raw.startsWith('"') && raw.endsWith('"')) return raw.slice(1, -1);
   return raw;
 }
 
@@ -63,8 +70,10 @@ function el(tag, attrs = {}, children = []) {
   for (const [key, value] of Object.entries(attrs)) {
     if (key === "class") node.className = value;
     else if (key === "text") node.textContent = value;
-    else if (key.startsWith("on") && typeof value === "function") node.addEventListener(key.slice(2), value);
-    else if (value !== false && value !== null && value !== undefined) node.setAttribute(key, String(value));
+    else if (key.startsWith("on") && typeof value === "function")
+      node.addEventListener(key.slice(2), value);
+    else if (value !== false && value !== null && value !== undefined)
+      node.setAttribute(key, String(value));
   }
   for (const child of Array.isArray(children) ? children : [children]) {
     if (child === null || child === undefined) continue;
@@ -91,10 +100,13 @@ function metric(title, value, detail = "", level = null) {
 }
 
 function table(rows) {
-  const body = el("tbody", {}, rows.map(([key, value]) => el("tr", {}, [
-    el("th", { text: key }),
-    el("td", { text: text(value) }),
-  ])));
+  const body = el(
+    "tbody",
+    {},
+    rows.map(([key, value]) =>
+      el("tr", {}, [el("th", { text: key }), el("td", { text: text(value) })]),
+    ),
+  );
   return el("table", { class: "kv" }, body);
 }
 
@@ -158,23 +170,36 @@ function header(snapshot) {
     el("div", { class: "top-actions" }, [
       pill(`profile ${current}`, snapshot?.power?.profile?.status),
       pill(mode, mode === "read-only" ? "dry-run" : "supported"),
-      el("button", { class: "icon-button", title: "Refresh", "aria-label": "Refresh", onclick: refreshSnapshot }, [
-        el("span", { text: "R" }),
-      ]),
+      el(
+        "button",
+        {
+          class: "icon-button",
+          title: "Refresh",
+          "aria-label": "Refresh",
+          onclick: refreshSnapshot,
+        },
+        [el("span", { text: "R" })],
+      ),
     ]),
   ]);
 }
 
 function nav() {
   const { screens } = tetraContract();
-  return el("nav", { class: "side-nav" }, screens.map((screen) => el("button", {
-    class: state.activeScreen === screen ? "active" : "",
-    text: screen,
-    onclick: () => {
-      state.activeScreen = screen;
-      render();
-    },
-  })));
+  return el(
+    "nav",
+    { class: "side-nav" },
+    screens.map((screen) =>
+      el("button", {
+        class: state.activeScreen === screen ? "active" : "",
+        text: screen,
+        onclick: () => {
+          state.activeScreen = screen;
+          render();
+        },
+      }),
+    ),
+  );
 }
 
 function dashboard(snapshot) {
@@ -189,17 +214,37 @@ function dashboard(snapshot) {
   const support = snapshot?.dashboard?.driver_support || [];
   return section("Dashboard", [
     el("div", { class: "metrics-grid" }, [
-      metric("CPU", cpu.governors?.join(", ") || cpu.model, `EPP: ${(cpu.epp || []).join(", ") || "unavailable"}`),
+      metric(
+        "CPU",
+        cpu.governors?.join(", ") || cpu.model,
+        `EPP: ${(cpu.epp || []).join(", ") || "unavailable"}`,
+      ),
       metric("GPU", gpu.name || nvidia.status, `driver ${text(gpu.driver_version)}`),
-      metric("RAM", memory.used_percent !== null ? `${memory.used_percent}% used` : "unavailable", `${text(memory.available_kb)} kB available`, memory.used_percent),
-      metric("Battery", battery.capacity ? `${battery.capacity}%` : "unavailable", text(battery.status), battery.capacity),
+      metric(
+        "RAM",
+        memory.used_percent !== null ? `${memory.used_percent}% used` : "unavailable",
+        `${text(memory.available_kb)} kB available`,
+        memory.used_percent,
+      ),
+      metric(
+        "Battery",
+        battery.capacity ? `${battery.capacity}%` : "unavailable",
+        text(battery.status),
+        battery.capacity,
+      ),
       metric("Power", snapshot?.power?.profile?.current, snapshot?.power?.profile?.reason),
       metric("Sensors", `${tempCount} temp / ${fanCount} fan`, "read-only hwmon discovery"),
     ]),
-    el("div", { class: "support-strip" }, support.map((item) => el("div", { class: "support-item" }, [
-      pill(item.name, item.status),
-      el("span", { text: item.reason }),
-    ]))),
+    el(
+      "div",
+      { class: "support-strip" },
+      support.map((item) =>
+        el("div", { class: "support-item" }, [
+          pill(item.name, item.status),
+          el("span", { text: item.reason }),
+        ]),
+      ),
+    ),
   ]);
 }
 
@@ -207,13 +252,23 @@ function profilesScreen(snapshot) {
   const current = snapshot?.profiles?.current || "unavailable";
   const { profiles } = tetraContract();
   return section("Profiles", [
-    el("div", { class: "profile-grid" }, profiles.map((profile) => el("button", {
-      class: `profile-tile ${state.selectedProfile === profile ? "selected" : ""}`,
-      onclick: () => applyProfile(profile),
-    }, [
-      el("strong", { text: profile[0].toUpperCase() + profile.slice(1) }),
-      el("span", { text: profileDescription(profile) }),
-    ]))),
+    el(
+      "div",
+      { class: "profile-grid" },
+      profiles.map((profile) =>
+        el(
+          "button",
+          {
+            class: `profile-tile ${state.selectedProfile === profile ? "selected" : ""}`,
+            onclick: () => applyProfile(profile),
+          },
+          [
+            el("strong", { text: profile[0].toUpperCase() + profile.slice(1) }),
+            el("span", { text: profileDescription(profile) }),
+          ],
+        ),
+      ),
+    ),
     el("label", { class: "toggle" }, [
       el("input", {
         type: "checkbox",
@@ -227,7 +282,9 @@ function profilesScreen(snapshot) {
     ]),
     el("div", { class: "result-line" }, [
       pill(`current ${current}`, snapshot?.power?.profile?.status),
-      state.lastProfileResult ? pill(state.lastProfileResult.status, state.lastProfileResult.status) : null,
+      state.lastProfileResult
+        ? pill(state.lastProfileResult.status, state.lastProfileResult.status)
+        : null,
       state.lastProfileResult ? el("span", { text: state.lastProfileResult.reason }) : null,
     ]),
   ]);
@@ -257,7 +314,11 @@ function fansScreen(snapshot) {
       metric("NBFC-Linux", nbfc.status, nbfc.reason),
       metric("TUXEDO/DKMS/TCC", tuxedo.status, tuxedo.reason),
     ]),
-    table(rpm.length ? rpm.map((item) => [item.device, `${text(item.rpm)} RPM`]) : [["fan control", "unsupported until a validated backend exists"]]),
+    table(
+      rpm.length
+        ? rpm.map((item) => [item.device, `${text(item.rpm)} RPM`])
+        : [["fan control", "unsupported until a validated backend exists"]],
+    ),
   ]);
 }
 
@@ -269,7 +330,12 @@ function diagnosticsScreen(snapshot) {
   return section("Diagnostics", [
     el("div", { class: "split" }, [
       el("div", {}, [el("h3", { text: "DMI" }), table(Object.entries(dmi))]),
-      el("div", {}, [el("h3", { text: "Kernel modules" }), table(Object.entries(modules).map(([key, value]) => [key, value ? "loaded" : "not loaded"]))]),
+      el("div", {}, [
+        el("h3", { text: "Kernel modules" }),
+        table(
+          Object.entries(modules).map(([key, value]) => [key, value ? "loaded" : "not loaded"]),
+        ),
+      ]),
     ]),
     el("h3", { text: "Sysfs capabilities" }),
     table([
@@ -277,10 +343,16 @@ function diagnosticsScreen(snapshot) {
       ["hwmon devices", (sysfs.hwmon_devices || []).length],
     ]),
     el("h3", { text: "Support matrix" }),
-    el("div", { class: "support-strip" }, (diag.support || []).map((item) => el("div", { class: "support-item" }, [
-      pill(item.name, item.status),
-      el("span", { text: item.reason }),
-    ]))),
+    el(
+      "div",
+      { class: "support-strip" },
+      (diag.support || []).map((item) =>
+        el("div", { class: "support-item" }, [
+          pill(item.name, item.status),
+          el("span", { text: item.reason }),
+        ]),
+      ),
+    ),
   ]);
 }
 
@@ -291,9 +363,16 @@ function logsScreen(snapshot) {
       el("button", { text: "Refresh logs", onclick: refreshSnapshot }),
       el("span", { text: `${logs.length} audit entries loaded` }),
     ]),
-    el("div", { class: "log-list" }, logs.length ? logs.slice().reverse().map((entry) => el("pre", { text: JSON.stringify(entry, null, 2) })) : [
-      el("p", { class: "muted", text: "No audit entries yet." }),
-    ]),
+    el(
+      "div",
+      { class: "log-list" },
+      logs.length
+        ? logs
+            .slice()
+            .reverse()
+            .map((entry) => el("pre", { text: JSON.stringify(entry, null, 2) }))
+        : [el("p", { class: "muted", text: "No audit entries yet." })],
+    ),
   ]);
 }
 
@@ -306,7 +385,10 @@ function settingsScreen(snapshot) {
       ["dry-run default", text(settings.dry_run_default)],
       ["audit log", settings.audit_log],
       ["Tetra UI schema", bundle.schema || "missing"],
-      ["Tetra views", bundle.views ? bundle.views.map((view) => view.name).join(", ") : text(bundle.error)],
+      [
+        "Tetra views",
+        bundle.views ? bundle.views.map((view) => view.name).join(", ") : text(bundle.error),
+      ],
     ]),
   ]);
 }
@@ -323,7 +405,8 @@ function section(title, children) {
 
 function mainContent(snapshot) {
   if (state.loading) return section("Loading", [el("p", { text: "Loading snapshot." })]);
-  if (state.error) return section("Backend unavailable", [el("p", { class: "error", text: state.error })]);
+  if (state.error)
+    return section("Backend unavailable", [el("p", { class: "error", text: state.error })]);
   const renderers = {
     Dashboard: dashboard,
     Profiles: profilesScreen,
@@ -338,10 +421,7 @@ function mainContent(snapshot) {
 function render() {
   app.replaceChildren(
     header(state.snapshot),
-    el("div", { class: "workspace" }, [
-      nav(),
-      mainContent(state.snapshot),
-    ]),
+    el("div", { class: "workspace" }, [nav(), mainContent(state.snapshot)]),
   );
 }
 

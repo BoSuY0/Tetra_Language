@@ -45,7 +45,10 @@ func (f *targetReportFlags) String() string {
 	}
 	parts := make([]string, 0, len(*f))
 	for _, item := range *f {
-		parts = append(parts, item.Triple+":"+item.ABIReport+":"+item.AtomicReport+":"+item.FuzzReport)
+		parts = append(
+			parts,
+			item.Triple+":"+item.ABIReport+":"+item.AtomicReport+":"+item.FuzzReport,
+		)
 	}
 	return strings.Join(parts, ",")
 }
@@ -197,11 +200,38 @@ func main() {
 	var options validateOptions
 	var targets targetReportFlags
 	var runners targetRunnerFlags
-	flag.StringVar(&options.TargetsReport, "targets", "", "path to tetra targets --format=json report")
-	flag.StringVar(&options.BrutalReport, "brutal", "", "tetra test --all-targets --brutal --format=json or --report=json report; required when all Linux native family targets are provided")
-	flag.StringVar(&options.ArtifactHashesManifest, "artifact-hashes", "", "path to artifact-hashes.json manifest for this Linux native evidence directory")
-	flag.Var(&targets, "target", "target evidence as TRIPLE:ABI_REPORT:ATOMIC_REPORT:FUZZ_REPORT; repeatable")
-	flag.Var(&runners, "runner", "runner evidence as TRIPLE:REPORT; repeatable; REPORT may be a passing test report or no-host-fallback diagnostic for build-only targets")
+	flag.StringVar(
+		&options.TargetsReport,
+		"targets",
+		"",
+		"path to tetra targets --format=json report",
+	)
+	flag.StringVar(
+		&options.BrutalReport,
+		"brutal",
+		"",
+		("tetra test --all-targets --brutal --format=json or --" +
+			"report=json report; required when all Linux native family targets are " +
+			"provided"),
+	)
+	flag.StringVar(
+		&options.ArtifactHashesManifest,
+		"artifact-hashes",
+		"",
+		"path to artifact-hashes.json manifest for this Linux native evidence directory",
+	)
+	flag.Var(
+		&targets,
+		"target",
+		"target evidence as TRIPLE:ABI_REPORT:ATOMIC_REPORT:FUZZ_REPORT; repeatable",
+	)
+	flag.Var(
+		&runners,
+		"runner",
+		("runner evidence as TRIPLE:REPORT; repeatable; REPORT may be a " +
+			"passing test report or no-host-fallback diagnostic for build-only " +
+			"targets"),
+	)
 	flag.Parse()
 	options.TargetReports = append(options.TargetReports, targets...)
 	options.RunnerReports = append(options.RunnerReports, runners...)
@@ -243,7 +273,13 @@ func validateLinuxNativeTargets(options validateOptions) error {
 	for _, input := range options.TargetReports {
 		triple := canonicalLinuxTarget(input.Triple)
 		if !isLinuxNativeFamilyTarget(triple) {
-			issues = append(issues, fmt.Sprintf("target %q is not in linux-x64/linux-x86/linux-x32 family", input.Triple))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"target %q is not in linux-x64/linux-x86/linux-x32 family",
+					input.Triple,
+				),
+			)
 			continue
 		}
 		if seenInputs[triple] {
@@ -257,15 +293,42 @@ func validateLinuxNativeTargets(options validateOptions) error {
 			continue
 		}
 		issues = append(issues, validateLinuxTargetMetadata(entry)...)
-		issues = append(issues, validateSuiteReportForTarget(input.ABIReport, triple+" ABI report", requiredABINames(triple), triple)...)
-		issues = append(issues, validateSuiteReportForTarget(input.AtomicReport, triple+" atomic report", requiredAtomicNames(triple), triple)...)
-		issues = append(issues, validateSuiteReportForTarget(input.FuzzReport, triple+" fuzz report", requiredFuzzNames(triple), triple)...)
+		issues = append(
+			issues,
+			validateSuiteReportForTarget(
+				input.ABIReport,
+				triple+" ABI report",
+				requiredABINames(triple),
+				triple,
+			)...)
+		issues = append(
+			issues,
+			validateSuiteReportForTarget(
+				input.AtomicReport,
+				triple+" atomic report",
+				requiredAtomicNames(triple),
+				triple,
+			)...)
+		issues = append(
+			issues,
+			validateSuiteReportForTarget(
+				input.FuzzReport,
+				triple+" fuzz report",
+				requiredFuzzNames(triple),
+				triple,
+			)...)
 	}
 	seenRunnerInputs := map[string]bool{}
 	for _, input := range options.RunnerReports {
 		triple := canonicalLinuxTarget(input.Triple)
 		if !isLinuxNativeFamilyTarget(triple) {
-			issues = append(issues, fmt.Sprintf("runner target %q is not in linux-x64/linux-x86/linux-x32 family", input.Triple))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"runner target %q is not in linux-x64/linux-x86/linux-x32 family",
+					input.Triple,
+				),
+			)
 			continue
 		}
 		if seenRunnerInputs[triple] {
@@ -277,7 +340,10 @@ func validateLinuxNativeTargets(options validateOptions) error {
 	}
 	for triple := range seenInputs {
 		if !seenRunnerInputs[triple] {
-			issues = append(issues, fmt.Sprintf("%s runner report is required for target evidence", triple))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s runner report is required for target evidence", triple),
+			)
 		}
 	}
 	for _, triple := range []string{"linux-x64", "linux-x86", "linux-x32"} {
@@ -291,12 +357,29 @@ func validateLinuxNativeTargets(options validateOptions) error {
 		issues = append(issues, "linux native brutal report is required for full-family evidence")
 	}
 	if strings.TrimSpace(options.BrutalReport) != "" {
-		issues = append(issues, validateSuiteReport(options.BrutalReport, "linux native brutal report", requiredBrutalNames())...)
-		issues = append(issues, validateForbiddenSuiteResults(options.BrutalReport, "linux native brutal report", forbiddenSuiteResultNames("linux-x64"))...)
+		issues = append(
+			issues,
+			validateSuiteReport(
+				options.BrutalReport,
+				"linux native brutal report",
+				requiredBrutalNames(),
+			)...)
+		issues = append(
+			issues,
+			validateForbiddenSuiteResults(
+				options.BrutalReport,
+				"linux native brutal report",
+				forbiddenSuiteResultNames("linux-x64"),
+			)...)
 	}
 	if strings.TrimSpace(options.ArtifactHashesManifest) != "" {
 		issues = append(issues, validateArtifactHashManifest(options.ArtifactHashesManifest)...)
-		issues = append(issues, validateArtifactHashManifestCoversEvidence(options.ArtifactHashesManifest, evidenceArtifactPaths(options))...)
+		issues = append(
+			issues,
+			validateArtifactHashManifestCoversEvidence(
+				options.ArtifactHashesManifest,
+				evidenceArtifactPaths(options),
+			)...)
 	}
 	if len(issues) > 0 {
 		return errors.New(strings.Join(issues, "; "))
@@ -320,14 +403,30 @@ func validateRunnerReport(path string, triple string, entry targetReportEntry) [
 			return append(issues, fmt.Sprintf("%s: %v", label, err))
 		}
 		if entry.Triple != "" && entry.RunSupported {
-			issues = append(issues, fmt.Sprintf("%s is a no-host diagnostic but %s metadata has run_supported=true", label, triple))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"%s is a no-host diagnostic but %s metadata has run_supported=true",
+					label,
+					triple,
+				),
+			)
 		}
 		return append(issues, validateRunnerDiagnostic(diag, triple, label)...)
 	}
 	if entry.Triple != "" && entry.RunMode == "host_probed" && !entry.RunSupported {
-		issues = append(issues, fmt.Sprintf("%s is a passing runner report but %s metadata has run_supported=false", label, triple))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s is a passing runner report but %s metadata has run_supported=false",
+				label,
+				triple,
+			),
+		)
 	}
-	return append(issues, validateSuiteReportForTarget(path, label, requiredRunnerNames(triple), triple)...)
+	return append(
+		issues,
+		validateSuiteReportForTarget(path, label, requiredRunnerNames(triple), triple)...)
 }
 
 func isDiagnosticJSON(raw []byte) bool {
@@ -344,18 +443,28 @@ func isDiagnosticJSON(raw []byte) bool {
 func validateRunnerDiagnostic(diag diagnosticReport, triple string, label string) []string {
 	var issues []string
 	if triple == "linux-x64" {
-		return []string{label + " cannot be a blocked diagnostic; linux-x64 must run as the baseline"}
+		return []string{
+			label + " cannot be a blocked diagnostic; linux-x64 must run as the baseline",
+		}
 	}
 	if triple != "linux-x86" && triple != "linux-x32" {
-		return []string{label + " diagnostic is only valid for linux-x86/linux-x32 host-probed targets"}
+		return []string{
+			label + " diagnostic is only valid for linux-x86/linux-x32 host-probed targets",
+		}
 	}
 	if diag.Code == "" {
 		issues = append(issues, label+" diagnostic code is required")
 	} else if diag.Code != targetRuntimeDiagnosticCode {
-		issues = append(issues, fmt.Sprintf("%s diagnostic code = %q, want %s", label, diag.Code, targetRuntimeDiagnosticCode))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s diagnostic code = %q, want %s", label, diag.Code, targetRuntimeDiagnosticCode),
+		)
 	}
 	if diag.Severity != "error" {
-		issues = append(issues, fmt.Sprintf("%s diagnostic severity = %q, want error", label, diag.Severity))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s diagnostic severity = %q, want error", label, diag.Severity),
+		)
 	}
 	if !strings.Contains(diag.Message, triple) {
 		issues = append(issues, fmt.Sprintf("%s diagnostic message must mention %s", label, triple))
@@ -369,8 +478,12 @@ func validateRunnerDiagnostic(diag diagnosticReport, triple string, label string
 	if !strings.Contains(diag.Message, "probe command:") {
 		issues = append(issues, label+" diagnostic message must include probe command")
 	}
-	if wantFlag := runnerProbeTargetFlag(triple); wantFlag != "" && !strings.Contains(diag.Message, wantFlag) {
-		issues = append(issues, fmt.Sprintf("%s diagnostic message must include %s probe command", label, wantFlag))
+	if wantFlag := runnerProbeTargetFlag(triple); wantFlag != "" &&
+		!strings.Contains(diag.Message, wantFlag) {
+		issues = append(
+			issues,
+			fmt.Sprintf("%s diagnostic message must include %s probe command", label, wantFlag),
+		)
 	}
 	return issues
 }
@@ -405,10 +518,24 @@ func validateLinuxFamilyTopLevel(report targetsReport) []string {
 	}
 	for _, triple := range []string{"linux-x86", "linux-x32"} {
 		if !containsString(report.BuildOnly, triple) {
-			issues = append(issues, fmt.Sprintf("build_only targets must include %s until promotion evidence is real", triple))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"build_only targets must include %s until promotion evidence is real",
+					triple,
+				),
+			)
 		}
 		if containsString(report.Supported, triple) {
-			issues = append(issues, fmt.Sprintf("%s appears in supported targets without linux native promotion validator support; keep it build_only until runtime/stdlib/FFI/smoke evidence passes", triple))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					("%s appears in supported targets without linux native promotion "+
+						"validator support; keep it build_only until runtime/stdlib/FFI/smoke "+
+						"evidence passes"),
+					triple,
+				),
+			)
 		}
 	}
 	return issues
@@ -466,40 +593,122 @@ type linuxNativeMemoryCapabilityExpectation struct {
 func validateLinuxNativeMemoryCapabilityMetadata(entry targetReportEntry) []string {
 	want := map[string]linuxNativeMemoryCapabilityExpectation{
 		"linux-x64": {"yes", "yes", "yes", "yes", "yes/partial", "yes", "production/host_runtime"},
-		"linux-x86": {"yes", "yes", "no/host-dependent", "partial", "partial", "partial", "build_lower_only"},
-		"linux-x32": {"yes", "yes", "no/host-dependent", "partial", "partial", "special", "build_lower_only"},
+		"linux-x86": {
+			"yes",
+			"yes",
+			"no/host-dependent",
+			"partial",
+			"partial",
+			"partial",
+			"build_lower_only",
+		},
+		"linux-x32": {
+			"yes",
+			"yes",
+			"no/host-dependent",
+			"partial",
+			"partial",
+			"special",
+			"build_lower_only",
+		},
 	}[entry.Triple]
 	var issues []string
-	if entry.BuildOnly && (entry.MemoryRun == "yes" || entry.MemoryClaimLevel == "production/host_runtime") {
-		issues = append(issues, fmt.Sprintf("%s runtime memory claim requires target runtime evidence, but target is build-only", entry.Triple))
+	if entry.BuildOnly &&
+		(entry.MemoryRun == "yes" || entry.MemoryClaimLevel == "production/host_runtime") {
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s runtime memory claim requires target runtime evidence, but target is build-only",
+				entry.Triple,
+			),
+		)
 	}
-	if entry.Triple == "linux-x64" && (entry.MemoryRun == "yes" || entry.MemoryClaimLevel == "production/host_runtime") {
+	if entry.Triple == "linux-x64" &&
+		(entry.MemoryRun == "yes" || entry.MemoryClaimLevel == "production/host_runtime") {
 		for _, artifact := range []string{"linux-x64-abi.json", "linux-x64-runner.json"} {
 			if !containsString(entry.EvidenceArtifacts, artifact) {
-				issues = append(issues, fmt.Sprintf("%s production runtime memory claim requires %s evidence", entry.Triple, artifact))
+				issues = append(
+					issues,
+					fmt.Sprintf(
+						"%s production runtime memory claim requires %s evidence",
+						entry.Triple,
+						artifact,
+					),
+				)
 			}
 		}
 	}
 	if entry.MemoryBuild != want.build {
-		issues = append(issues, fmt.Sprintf("%s memory_build = %q, want %q", entry.Triple, entry.MemoryBuild, want.build))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s memory_build = %q, want %q",
+				entry.Triple,
+				entry.MemoryBuild,
+				want.build,
+			),
+		)
 	}
 	if entry.MemoryLower != want.lower {
-		issues = append(issues, fmt.Sprintf("%s memory_lower = %q, want %q", entry.Triple, entry.MemoryLower, want.lower))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s memory_lower = %q, want %q",
+				entry.Triple,
+				entry.MemoryLower,
+				want.lower,
+			),
+		)
 	}
 	if entry.MemoryRun != want.run {
-		issues = append(issues, fmt.Sprintf("%s memory_run = %q, want %q", entry.Triple, entry.MemoryRun, want.run))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s memory_run = %q, want %q", entry.Triple, entry.MemoryRun, want.run),
+		)
 	}
 	if entry.MemoryRawDiagnostics != want.rawDiagnostics {
-		issues = append(issues, fmt.Sprintf("%s memory_raw_diagnostics = %q, want %q", entry.Triple, entry.MemoryRawDiagnostics, want.rawDiagnostics))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s memory_raw_diagnostics = %q, want %q",
+				entry.Triple,
+				entry.MemoryRawDiagnostics,
+				want.rawDiagnostics,
+			),
+		)
 	}
 	if entry.MemoryRegionLowering != want.regionLowering {
-		issues = append(issues, fmt.Sprintf("%s memory_region_lowering = %q, want %q", entry.Triple, entry.MemoryRegionLowering, want.regionLowering))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s memory_region_lowering = %q, want %q",
+				entry.Triple,
+				entry.MemoryRegionLowering,
+				want.regionLowering,
+			),
+		)
 	}
 	if entry.MemoryAlignmentSemantics != want.alignmentSemantics {
-		issues = append(issues, fmt.Sprintf("%s memory_alignment_semantics = %q, want %q", entry.Triple, entry.MemoryAlignmentSemantics, want.alignmentSemantics))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s memory_alignment_semantics = %q, want %q",
+				entry.Triple,
+				entry.MemoryAlignmentSemantics,
+				want.alignmentSemantics,
+			),
+		)
 	}
 	if entry.MemoryClaimLevel != want.claimLevel {
-		issues = append(issues, fmt.Sprintf("%s memory_claim_level = %q, want %q", entry.Triple, entry.MemoryClaimLevel, want.claimLevel))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s memory_claim_level = %q, want %q",
+				entry.Triple,
+				entry.MemoryClaimLevel,
+				want.claimLevel,
+			),
+		)
 	}
 	return issues
 }
@@ -522,25 +731,70 @@ func validateLinuxNativePromotionMetadata(entry targetReportEntry) []string {
 	}
 	var issues []string
 	if entry.RuntimeStatus != wantRuntimeStatus[entry.Triple] {
-		issues = append(issues, fmt.Sprintf("%s runtime_status = %q, want %q", entry.Triple, entry.RuntimeStatus, wantRuntimeStatus[entry.Triple]))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s runtime_status = %q, want %q",
+				entry.Triple,
+				entry.RuntimeStatus,
+				wantRuntimeStatus[entry.Triple],
+			),
+		)
 	}
 	if entry.StdlibStatus != wantStdlibStatus[entry.Triple] {
-		issues = append(issues, fmt.Sprintf("%s stdlib_status = %q, want %q", entry.Triple, entry.StdlibStatus, wantStdlibStatus[entry.Triple]))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s stdlib_status = %q, want %q",
+				entry.Triple,
+				entry.StdlibStatus,
+				wantStdlibStatus[entry.Triple],
+			),
+		)
 	}
 	if entry.FFIStatus != wantFFIStatus[entry.Triple] {
-		issues = append(issues, fmt.Sprintf("%s ffi_status = %q, want %q", entry.Triple, entry.FFIStatus, wantFFIStatus[entry.Triple]))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s ffi_status = %q, want %q",
+				entry.Triple,
+				entry.FFIStatus,
+				wantFFIStatus[entry.Triple],
+			),
+		)
 	}
 	if entry.ReleaseGate != "scripts/release/post_v0_4/linux-native-targets-smoke.sh" {
-		issues = append(issues, fmt.Sprintf("%s release_gate = %q, want linux native smoke script", entry.Triple, entry.ReleaseGate))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s release_gate = %q, want linux native smoke script",
+				entry.Triple,
+				entry.ReleaseGate,
+			),
+		)
 	}
 	if strings.TrimSpace(entry.RunnerProbeCommand) == "" {
 		issues = append(issues, fmt.Sprintf("%s runner_probe_command is required", entry.Triple))
 	}
 	if entry.Triple == "linux-x86" && !strings.Contains(entry.RunnerProbeCommand, "--target x86") {
-		issues = append(issues, fmt.Sprintf("%s runner_probe_command = %q, want x86 target probe", entry.Triple, entry.RunnerProbeCommand))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s runner_probe_command = %q, want x86 target probe",
+				entry.Triple,
+				entry.RunnerProbeCommand,
+			),
+		)
 	}
 	if entry.Triple == "linux-x32" && !strings.Contains(entry.RunnerProbeCommand, "--target x32") {
-		issues = append(issues, fmt.Sprintf("%s runner_probe_command = %q, want x32 target probe", entry.Triple, entry.RunnerProbeCommand))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s runner_probe_command = %q, want x32 target probe",
+				entry.Triple,
+				entry.RunnerProbeCommand,
+			),
+		)
 	}
 	for _, artifact := range []string{
 		"targets.json",
@@ -552,7 +806,10 @@ func validateLinuxNativePromotionMetadata(entry targetReportEntry) []string {
 		"artifact-hashes.json",
 	} {
 		if !containsString(entry.EvidenceArtifacts, artifact) {
-			issues = append(issues, fmt.Sprintf("%s evidence_artifacts missing %s", entry.Triple, artifact))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s evidence_artifacts missing %s", entry.Triple, artifact),
+			)
 		}
 	}
 	return issues
@@ -565,22 +822,65 @@ func validateLinuxNativeSyscallMetadata(entry targetReportEntry) []string {
 		registers   []string
 	}
 	want := map[string]wantSyscall{
-		"linux-x64": {instruction: "syscall", numbering: "x86_64", registers: []string{"rax", "rdi", "rsi", "rdx", "r10", "r8", "r9"}},
-		"linux-x86": {instruction: "int 0x80", numbering: "i386", registers: []string{"eax", "ebx", "ecx", "edx", "esi", "edi", "ebp"}},
-		"linux-x32": {instruction: "syscall", numbering: "x32_syscall_bit", registers: []string{"rax", "rdi", "rsi", "rdx", "r10", "r8", "r9"}},
+		"linux-x64": {
+			instruction: "syscall",
+			numbering:   "x86_64",
+			registers:   []string{"rax", "rdi", "rsi", "rdx", "r10", "r8", "r9"},
+		},
+		"linux-x86": {
+			instruction: "int 0x80",
+			numbering:   "i386",
+			registers:   []string{"eax", "ebx", "ecx", "edx", "esi", "edi", "ebp"},
+		},
+		"linux-x32": {
+			instruction: "syscall",
+			numbering:   "x32_syscall_bit",
+			registers:   []string{"rax", "rdi", "rsi", "rdx", "r10", "r8", "r9"},
+		},
 	}[entry.Triple]
 	var issues []string
 	if entry.SyscallInstruction != want.instruction {
-		issues = append(issues, fmt.Sprintf("%s syscall_instruction = %q, want %q", entry.Triple, entry.SyscallInstruction, want.instruction))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s syscall_instruction = %q, want %q",
+				entry.Triple,
+				entry.SyscallInstruction,
+				want.instruction,
+			),
+		)
 	}
 	if entry.SyscallNumbering != want.numbering {
-		issues = append(issues, fmt.Sprintf("%s syscall_numbering = %q, want %q", entry.Triple, entry.SyscallNumbering, want.numbering))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s syscall_numbering = %q, want %q",
+				entry.Triple,
+				entry.SyscallNumbering,
+				want.numbering,
+			),
+		)
 	}
 	if !sameStringSequence(entry.SyscallArgRegisters, want.registers) {
-		issues = append(issues, fmt.Sprintf("%s syscall_arg_registers = %v, want %v", entry.Triple, entry.SyscallArgRegisters, want.registers))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s syscall_arg_registers = %v, want %v",
+				entry.Triple,
+				entry.SyscallArgRegisters,
+				want.registers,
+			),
+		)
 	}
 	if entry.SyscallErrorRange != "-4095..-1" {
-		issues = append(issues, fmt.Sprintf("%s syscall_error_range = %q, want -4095..-1", entry.Triple, entry.SyscallErrorRange))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s syscall_error_range = %q, want -4095..-1",
+				entry.Triple,
+				entry.SyscallErrorRange,
+			),
+		)
 	}
 	return issues
 }
@@ -607,65 +907,188 @@ type expectedTarget struct {
 func validateExpectedTarget(entry targetReportEntry, want expectedTarget) []string {
 	var issues []string
 	if entry.Status != want.status {
-		issues = append(issues, fmt.Sprintf("%s status = %q, want %q", entry.Triple, entry.Status, want.status))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s status = %q, want %q", entry.Triple, entry.Status, want.status),
+		)
 	}
-	if entry.OS != want.os || entry.Arch != want.arch || entry.ABI != want.abi || entry.DataModel != want.dataModel || entry.Format != want.format {
-		issues = append(issues, fmt.Sprintf("%s platform = os:%s arch:%s abi:%s data_model:%s format:%s, want os:%s arch:%s abi:%s data_model:%s format:%s",
-			entry.Triple, entry.OS, entry.Arch, entry.ABI, entry.DataModel, entry.Format, want.os, want.arch, want.abi, want.dataModel, want.format))
+	if entry.OS != want.os || entry.Arch != want.arch || entry.ABI != want.abi ||
+		entry.DataModel != want.dataModel ||
+		entry.Format != want.format {
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				("%s platform = os:%s arch:%s abi:%s data_model:%s format:%s, "+
+					"want os:%s arch:%s abi:%s data_model:%s format:%s"),
+				entry.Triple,
+				entry.OS,
+				entry.Arch,
+				entry.ABI,
+				entry.DataModel,
+				entry.Format,
+				want.os,
+				want.arch,
+				want.abi,
+				want.dataModel,
+				want.format,
+			),
+		)
 	}
 	if entry.BuildOnly != want.buildOnly {
-		issues = append(issues, fmt.Sprintf("%s build_only = %v, want %v", entry.Triple, entry.BuildOnly, want.buildOnly))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s build_only = %v, want %v",
+				entry.Triple,
+				entry.BuildOnly,
+				want.buildOnly,
+			),
+		)
 	}
 	if entry.RunMode != want.runMode {
-		issues = append(issues, fmt.Sprintf("%s run_mode = %q, want %q", entry.Triple, entry.RunMode, want.runMode))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s run_mode = %q, want %q", entry.Triple, entry.RunMode, want.runMode),
+		)
 	}
-	if entry.PointerWidthBits != want.pointerBits || entry.RegisterWidthBits != want.registerBits || entry.NativeIntWidthBits != want.nativeIntBits {
-		issues = append(issues, fmt.Sprintf("%s widths = pointer:%d register:%d native_int:%d, want pointer:%d register:%d native_int:%d",
-			entry.Triple, entry.PointerWidthBits, entry.RegisterWidthBits, entry.NativeIntWidthBits, want.pointerBits, want.registerBits, want.nativeIntBits))
+	if entry.PointerWidthBits != want.pointerBits || entry.RegisterWidthBits != want.registerBits ||
+		entry.NativeIntWidthBits != want.nativeIntBits {
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s widths = pointer:%d register:%d native_int:%d, want pointer:%d register:%d native_int:%d",
+				entry.Triple,
+				entry.PointerWidthBits,
+				entry.RegisterWidthBits,
+				entry.NativeIntWidthBits,
+				want.pointerBits,
+				want.registerBits,
+				want.nativeIntBits,
+			),
+		)
 	}
 	if entry.Endian != "little" {
-		issues = append(issues, fmt.Sprintf("%s endian = %q, want little", entry.Triple, entry.Endian))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s endian = %q, want little", entry.Triple, entry.Endian),
+		)
 	}
 	if entry.StackAlignmentBytes != 16 {
-		issues = append(issues, fmt.Sprintf("%s stack_alignment_bytes = %d, want 16", entry.Triple, entry.StackAlignmentBytes))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s stack_alignment_bytes = %d, want 16",
+				entry.Triple,
+				entry.StackAlignmentBytes,
+			),
+		)
 	}
 	if entry.MaxAtomicWidthBits != want.maxAtomicBits {
-		issues = append(issues, fmt.Sprintf("%s max_atomic_width_bits = %d, want %d", entry.Triple, entry.MaxAtomicWidthBits, want.maxAtomicBits))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s max_atomic_width_bits = %d, want %d",
+				entry.Triple,
+				entry.MaxAtomicWidthBits,
+				want.maxAtomicBits,
+			),
+		)
 	}
 	if !sameInts(entry.AtomicWidthBits, want.atomicBits) {
-		issues = append(issues, fmt.Sprintf("%s atomic_width_bits = %v, want %v", entry.Triple, entry.AtomicWidthBits, want.atomicBits))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s atomic_width_bits = %v, want %v",
+				entry.Triple,
+				entry.AtomicWidthBits,
+				want.atomicBits,
+			),
+		)
 	}
 	if entry.AtomicPointerWidthBits != want.atomicPointerBits {
-		issues = append(issues, fmt.Sprintf("%s atomic_pointer_width_bits = %d, want %d", entry.Triple, entry.AtomicPointerWidthBits, want.atomicPointerBits))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s atomic_pointer_width_bits = %d, want %d",
+				entry.Triple,
+				entry.AtomicPointerWidthBits,
+				want.atomicPointerBits,
+			),
+		)
 	}
 	if entry.SupportsDebugInfo != want.debugInfo {
-		issues = append(issues, fmt.Sprintf("%s supports_debug_info = %v, want %v", entry.Triple, entry.SupportsDebugInfo, want.debugInfo))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s supports_debug_info = %v, want %v",
+				entry.Triple,
+				entry.SupportsDebugInfo,
+				want.debugInfo,
+			),
+		)
 	}
 	if entry.SupportsReleaseOptimize != want.releaseOptimize {
-		issues = append(issues, fmt.Sprintf("%s supports_release_optimize = %v, want %v", entry.Triple, entry.SupportsReleaseOptimize, want.releaseOptimize))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s supports_release_optimize = %v, want %v",
+				entry.Triple,
+				entry.SupportsReleaseOptimize,
+				want.releaseOptimize,
+			),
+		)
 	}
 	if entry.RunSupported && entry.RunUnsupportedReason != "" {
-		issues = append(issues, fmt.Sprintf("%s run_unsupported_reason must be empty when run_supported is true", entry.Triple))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s run_unsupported_reason must be empty when run_supported is true",
+				entry.Triple,
+			),
+		)
 	}
 	if !entry.RunSupported && entry.RunMode == "host_probed" {
 		if !strings.Contains(entry.RunUnsupportedReason, "no host fallback") {
-			issues = append(issues, fmt.Sprintf("%s run_unsupported_reason must mention no host fallback", entry.Triple))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"%s run_unsupported_reason must mention no host fallback",
+					entry.Triple,
+				),
+			)
 		}
 		if !strings.Contains(entry.RunUnsupportedReason, "host ") {
-			issues = append(issues, fmt.Sprintf("%s run_unsupported_reason must include host identity", entry.Triple))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s run_unsupported_reason must include host identity", entry.Triple),
+			)
 		}
 		if !strings.Contains(entry.RunUnsupportedReason, "probe command:") {
-			issues = append(issues, fmt.Sprintf("%s run_unsupported_reason must include probe command", entry.Triple))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s run_unsupported_reason must include probe command", entry.Triple),
+			)
 		}
-		if entry.RunnerProbeCommand != "" && !strings.Contains(entry.RunUnsupportedReason, entry.RunnerProbeCommand) {
-			issues = append(issues, fmt.Sprintf("%s run_unsupported_reason must include runner_probe_command %q", entry.Triple, entry.RunnerProbeCommand))
+		if entry.RunnerProbeCommand != "" &&
+			!strings.Contains(entry.RunUnsupportedReason, entry.RunnerProbeCommand) {
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"%s run_unsupported_reason must include runner_probe_command %q",
+					entry.Triple,
+					entry.RunnerProbeCommand,
+				),
+			)
 		}
 	}
 	if entry.Triple == "linux-x64" && !entry.RunSupported {
 		issues = append(issues, "linux-x64 must be runnable for the linux native baseline smoke")
 	}
 	if entry.Triple == "linux-x64" && entry.RunUnsupportedReason != "" {
-		issues = append(issues, "linux-x64 run_unsupported_reason must be empty for the linux native baseline smoke")
+		issues = append(
+			issues,
+			"linux-x64 run_unsupported_reason must be empty for the linux native baseline smoke",
+		)
 	}
 	return issues
 }
@@ -673,12 +1096,22 @@ func validateExpectedTarget(entry targetReportEntry, want expectedTarget) []stri
 func validateBuildOnlyLinuxReason(entry targetReportEntry, triple string) []string {
 	var issues []string
 	if entry.Status != "build_only" || !entry.BuildOnly || entry.RunMode != "host_probed" {
-		issues = append(issues, fmt.Sprintf("%s must stay build_only with host_probed run mode until full runtime/stdlib/FFI promotion evidence exists", triple))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				("%s must stay build_only with host_probed run mode until full "+
+					"runtime/stdlib/FFI promotion evidence exists"),
+				triple,
+			),
+		)
 	}
 	reason := strings.ToLower(entry.UnsupportedReason)
 	for _, want := range []string{"not implemented yet", "runtime", "stdlib", "ffi"} {
 		if !strings.Contains(reason, want) {
-			issues = append(issues, fmt.Sprintf("%s unsupported_reason must mention %s", triple, want))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s unsupported_reason must mention %s", triple, want),
+			)
 		}
 	}
 	return issues
@@ -702,13 +1135,30 @@ func validateSuiteReport(path string, label string, requiredNames []string) []st
 		issues = append(issues, fmt.Sprintf("%s total = %d, want positive", label, report.Total))
 	}
 	if report.Passed != report.Total || report.Failed != 0 {
-		issues = append(issues, fmt.Sprintf("%s pass/fail = %d/%d of %d, want all pass", label, report.Passed, report.Failed, report.Total))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s pass/fail = %d/%d of %d, want all pass",
+				label,
+				report.Passed,
+				report.Failed,
+				report.Total,
+			),
+		)
 	}
 	if len(report.Files) == 0 {
 		issues = append(issues, fmt.Sprintf("%s files must not be empty", label))
 	}
 	if len(report.Results) != report.Total {
-		issues = append(issues, fmt.Sprintf("%s results count = %d, want total %d", label, len(report.Results), report.Total))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s results count = %d, want total %d",
+				label,
+				len(report.Results),
+				report.Total,
+			),
+		)
 	}
 	seenNames := map[string]bool{}
 	for i, result := range report.Results {
@@ -722,13 +1172,24 @@ func validateSuiteReport(path string, label string, requiredNames []string) []st
 			issues = append(issues, fmt.Sprintf("%s result %s filename is required", label, name))
 		}
 		if !strings.HasPrefix(result.FunctionName, "__tetra_test_") {
-			issues = append(issues, fmt.Sprintf("%s result %s function_name = %q, want __tetra_test_ prefix", label, name, result.FunctionName))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"%s result %s function_name = %q, want __tetra_test_ prefix",
+					label,
+					name,
+					result.FunctionName,
+				),
+			)
 		}
 		if !result.Passed {
 			issues = append(issues, fmt.Sprintf("%s result %s did not pass", label, name))
 		}
 		if result.ExitCode != 0 {
-			issues = append(issues, fmt.Sprintf("%s result %s exit_code = %d, want 0", label, name, result.ExitCode))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s result %s exit_code = %d, want 0", label, name, result.ExitCode),
+			)
 		}
 		if strings.TrimSpace(result.Error) != "" {
 			issues = append(issues, fmt.Sprintf("%s result %s error must be empty", label, name))
@@ -742,7 +1203,12 @@ func validateSuiteReport(path string, label string, requiredNames []string) []st
 	return issues
 }
 
-func validateSuiteReportForTarget(path string, label string, requiredNames []string, expectedTarget string) []string {
+func validateSuiteReportForTarget(
+	path string,
+	label string,
+	requiredNames []string,
+	expectedTarget string,
+) []string {
 	issues := validateSuiteReport(path, label, requiredNames)
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -753,9 +1219,14 @@ func validateSuiteReportForTarget(path string, label string, requiredNames []str
 		return issues
 	}
 	if strings.TrimSpace(expectedTarget) != "" && report.Target != expectedTarget {
-		issues = append(issues, fmt.Sprintf("%s target = %q, want %s", label, report.Target, expectedTarget))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s target = %q, want %s", label, report.Target, expectedTarget),
+		)
 	}
-	issues = append(issues, validateForbiddenResultNames(report, label, forbiddenSuiteResultNames(expectedTarget))...)
+	issues = append(
+		issues,
+		validateForbiddenResultNames(report, label, forbiddenSuiteResultNames(expectedTarget))...)
 	return issues
 }
 
@@ -774,7 +1245,11 @@ func validateForbiddenSuiteResults(path string, label string, forbiddenNames []s
 	return validateForbiddenResultNames(report, label, forbiddenNames)
 }
 
-func validateForbiddenResultNames(report testRunnerReport, label string, forbiddenNames []string) []string {
+func validateForbiddenResultNames(
+	report testRunnerReport,
+	label string,
+	forbiddenNames []string,
+) []string {
 	if len(forbiddenNames) == 0 {
 		return nil
 	}
@@ -786,7 +1261,10 @@ func validateForbiddenResultNames(report testRunnerReport, label string, forbidd
 	for _, result := range report.Results {
 		name := strings.TrimSpace(result.Name)
 		if forbidden[name] {
-			issues = append(issues, fmt.Sprintf("%s contains build-only boundary result %q", label, name))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s contains build-only boundary result %q", label, name),
+			)
 		}
 	}
 	return issues
@@ -821,11 +1299,24 @@ func validateArtifactHashManifest(path string) []string {
 	}
 	var issues []string
 	if manifest.Schema != artifactHashManifestSchema {
-		issues = append(issues, fmt.Sprintf("%s schema = %q, want %s", label, manifest.Schema, artifactHashManifestSchema))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s schema = %q, want %s",
+				label,
+				manifest.Schema,
+				artifactHashManifestSchema,
+			),
+		)
 	}
 	if strings.TrimSpace(manifest.Root) == "" {
 		issues = append(issues, label+" root must not be empty")
-	} else if filepath.IsAbs(manifest.Root) || strings.Contains(filepath.ToSlash(manifest.Root), "..") {
+	} else if filepath.IsAbs(
+		manifest.Root,
+	) || strings.Contains(
+		filepath.ToSlash(manifest.Root),
+		"..",
+	) {
 		issues = append(issues, fmt.Sprintf("%s root = %q is unsafe", label, manifest.Root))
 	}
 	if len(manifest.Artifacts) == 0 {
@@ -850,20 +1341,37 @@ func validateArtifactHashManifest(path string) []string {
 			continue
 		}
 		if filepath.IsAbs(artifactPath) || strings.Contains(filepath.ToSlash(artifactPath), "..") {
-			issues = append(issues, fmt.Sprintf("%s artifact path %q is unsafe", label, artifactPath))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s artifact path %q is unsafe", label, artifactPath),
+			)
 			continue
 		}
 		if lastPath != "" && artifactPath < lastPath {
-			issues = append(issues, fmt.Sprintf("%s artifacts must be sorted by path: %s appears before %s", label, artifactPath, lastPath))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"%s artifacts must be sorted by path: %s appears before %s",
+					label,
+					artifactPath,
+					lastPath,
+				),
+			)
 		}
 		lastPath = artifactPath
 		if seen[artifactPath] {
-			issues = append(issues, fmt.Sprintf("%s duplicate artifact path %s", label, artifactPath))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s duplicate artifact path %s", label, artifactPath),
+			)
 			continue
 		}
 		seen[artifactPath] = true
 		if artifact.Size < 0 {
-			issues = append(issues, fmt.Sprintf("%s artifact %s has negative size", label, artifactPath))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s artifact %s has negative size", label, artifactPath),
+			)
 		}
 		if err := validateArtifactSHA256(artifact.SHA256, artifactPath); err != nil {
 			issues = append(issues, fmt.Sprintf("%s: %v", label, err))
@@ -875,13 +1383,40 @@ func validateArtifactHashManifest(path string) []string {
 			continue
 		}
 		if actual.Size != artifact.Size {
-			issues = append(issues, fmt.Sprintf("%s size mismatch for %s: got %d want %d", label, artifactPath, actual.Size, artifact.Size))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"%s size mismatch for %s: got %d want %d",
+					label,
+					artifactPath,
+					actual.Size,
+					artifact.Size,
+				),
+			)
 		}
 		if actual.SHA256 != artifact.SHA256 {
-			issues = append(issues, fmt.Sprintf("%s sha256 mismatch for %s: got %s want %s", label, artifactPath, actual.SHA256, artifact.SHA256))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"%s sha256 mismatch for %s: got %s want %s",
+					label,
+					artifactPath,
+					actual.SHA256,
+					artifact.SHA256,
+				),
+			)
 		}
 		if actual.Schema != artifact.Schema {
-			issues = append(issues, fmt.Sprintf("%s schema mismatch for %s: got %q want %q", label, artifactPath, actual.Schema, artifact.Schema))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"%s schema mismatch for %s: got %q want %q",
+					label,
+					artifactPath,
+					actual.Schema,
+					artifact.Schema,
+				),
+			)
 		}
 	}
 	actualPaths, err := listArtifactPaths(root, manifestRel)
@@ -891,7 +1426,10 @@ func validateArtifactHashManifest(path string) []string {
 	}
 	for _, actualPath := range actualPaths {
 		if !seen[actualPath] {
-			issues = append(issues, fmt.Sprintf("%s missing listed hash for artifact %s", label, actualPath))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s missing listed hash for artifact %s", label, actualPath),
+			)
 		}
 	}
 	return issues
@@ -911,7 +1449,10 @@ func evidenceArtifactPaths(options validateOptions) []string {
 	return paths
 }
 
-func validateArtifactHashManifestCoversEvidence(manifestPath string, evidencePaths []string) []string {
+func validateArtifactHashManifestCoversEvidence(
+	manifestPath string,
+	evidencePaths []string,
+) []string {
 	label := "artifact hash manifest"
 	raw, err := os.ReadFile(manifestPath)
 	if err != nil {
@@ -921,10 +1462,13 @@ func validateArtifactHashManifestCoversEvidence(manifestPath string, evidencePat
 	if err := decodeStrictJSON(raw, &manifest); err != nil {
 		return nil
 	}
-	if strings.TrimSpace(manifest.Root) == "" || filepath.IsAbs(manifest.Root) || strings.Contains(filepath.ToSlash(manifest.Root), "..") {
+	if strings.TrimSpace(manifest.Root) == "" || filepath.IsAbs(manifest.Root) ||
+		strings.Contains(filepath.ToSlash(manifest.Root), "..") {
 		return nil
 	}
-	root := filepath.Clean(filepath.Join(filepath.Dir(manifestPath), filepath.FromSlash(manifest.Root)))
+	root := filepath.Clean(
+		filepath.Join(filepath.Dir(manifestPath), filepath.FromSlash(manifest.Root)),
+	)
 	root, err = filepath.Abs(root)
 	if err != nil {
 		return []string{fmt.Sprintf("%s: %v", label, err)}
@@ -942,17 +1486,28 @@ func validateArtifactHashManifestCoversEvidence(manifestPath string, evidencePat
 		}
 		absPath, err := filepath.Abs(path)
 		if err != nil {
-			issues = append(issues, fmt.Sprintf("%s does not cover required evidence file %s: %v", label, path, err))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s does not cover required evidence file %s: %v", label, path, err),
+			)
 			continue
 		}
 		rel, err := filepath.Rel(root, absPath)
-		if err != nil || rel == "." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || rel == ".." || filepath.IsAbs(rel) {
-			issues = append(issues, fmt.Sprintf("%s does not cover required evidence file %s", label, path))
+		if err != nil || rel == "." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) ||
+			rel == ".." ||
+			filepath.IsAbs(rel) {
+			issues = append(
+				issues,
+				fmt.Sprintf("%s does not cover required evidence file %s", label, path),
+			)
 			continue
 		}
 		rel = filepath.ToSlash(rel)
 		if !seen[rel] {
-			issues = append(issues, fmt.Sprintf("%s does not cover required evidence file %s", label, path))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s does not cover required evidence file %s", label, path),
+			)
 		}
 	}
 	return issues
@@ -1040,11 +1595,24 @@ func artifactJSONSchema(path string) string {
 
 func rejectPaperEvidence(raw []byte, label string) []string {
 	lower := strings.ToLower(string(raw))
-	forbidden := []string{"metadata-only", "docs-only", "report-only", "sidecar-only", "fake", "mock", "placeholder", "skipped", "skip-only"}
+	forbidden := []string{
+		"metadata-only",
+		"docs-only",
+		"report-only",
+		"sidecar-only",
+		"fake",
+		"mock",
+		"placeholder",
+		"skipped",
+		"skip-only",
+	}
 	var issues []string
 	for _, marker := range forbidden {
 		if strings.Contains(lower, marker) {
-			issues = append(issues, fmt.Sprintf("%s contains paper evidence marker %q", label, marker))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s contains paper evidence marker %q", label, marker),
+			)
 		}
 	}
 	return issues
@@ -1161,7 +1729,11 @@ func requiredAtomicNames(triple string) []string {
 	if prefix == "" {
 		return nil
 	}
-	return []string{prefix + " atomic object matrix", prefix + " pointer atomic object width", prefix + " atomic concurrency stress oracle"}
+	return []string{
+		prefix + " atomic object matrix",
+		prefix + " pointer atomic object width",
+		prefix + " atomic concurrency stress oracle",
+	}
 }
 
 func requiredFuzzNames(triple string) []string {

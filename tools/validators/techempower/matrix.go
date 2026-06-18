@@ -185,12 +185,20 @@ func ValidateMatrixReport(raw []byte) error {
 	if len(report.Limitations) == 0 {
 		issues = append(issues, "limitations are required")
 	}
-	if report.Environment.OS == "" || report.Environment.Arch == "" || report.Environment.GoVersion == "" || report.Environment.Hostname == "" {
+	if report.Environment.OS == "" || report.Environment.Arch == "" ||
+		report.Environment.GoVersion == "" ||
+		report.Environment.Hostname == "" {
 		issues = append(issues, "environment os/arch/go_version/hostname are required")
 	}
 	issues = append(issues, validateGitHead(report.Git.Head)...)
 	if report.Git.WorktreeStatus != "clean" && report.Git.WorktreeStatus != "dirty" {
-		issues = append(issues, fmt.Sprintf("git worktree_status is %q, want clean or dirty", report.Git.WorktreeStatus))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"git worktree_status is %q, want clean or dirty",
+				report.Git.WorktreeStatus,
+			),
+		)
 	}
 	if err := validateBaseURL(report.Server.BaseURL); err != nil {
 		issues = append(issues, "server "+err.Error())
@@ -229,7 +237,17 @@ func ValidateMatrixReport(raw []byte) error {
 			worstP999 = run.P999LatencyMS
 		}
 	}
-	issues = append(issues, validateMatrixSummary(report.Summary, len(report.Runs), totalRequests, totalFailures, bestRPS, worstP99, worstP999)...)
+	issues = append(
+		issues,
+		validateMatrixSummary(
+			report.Summary,
+			len(report.Runs),
+			totalRequests,
+			totalFailures,
+			bestRPS,
+			worstP99,
+			worstP999,
+		)...)
 	issues = append(issues, validateMatrixArtifacts(report.Artifacts)...)
 	issues = append(issues, validateMatrixCommandArtifacts(report.Command, report.Artifacts)...)
 	issues = append(issues, validateMatrixCommandDuration(report.Command, report.Runs)...)
@@ -238,7 +256,9 @@ func ValidateMatrixReport(raw []byte) error {
 	issues = append(issues, validateMatrixCommandSoak(report.Command, report.Soak)...)
 	issues = append(issues, validateMatrixCommandPool(report.Command, report.Server)...)
 	issues = append(issues, validateMatrixCoverage(report.Artifacts, report.Server, report.Runs)...)
-	issues = append(issues, validateMatrixResourceWindow(report.Resource, report.Warmup, report.Soak, report.Runs)...)
+	issues = append(
+		issues,
+		validateMatrixResourceWindow(report.Resource, report.Warmup, report.Soak, report.Runs)...)
 
 	if len(issues) > 0 {
 		return errors.New(strings.Join(issues, "; "))
@@ -276,15 +296,24 @@ func validateMatrixCommandExecutable(command string) []string {
 
 	executable := fields[executableIndex]
 	if executable == "go" {
-		if executableIndex+2 < len(fields) && fields[executableIndex+1] == "run" && isMatrixHarnessGoRunTarget(fields[executableIndex+2]) {
+		if executableIndex+2 < len(fields) && fields[executableIndex+1] == "run" &&
+			isMatrixHarnessGoRunTarget(fields[executableIndex+2]) {
 			return nil
 		}
-		return []string{fmt.Sprintf("matrix command executable is %q, want go run %s", executable, matrixHarnessGoRunTarget)}
+		return []string{
+			fmt.Sprintf(
+				"matrix command executable is %q, want go run %s",
+				executable,
+				matrixHarnessGoRunTarget,
+			),
+		}
 	}
 	if isMatrixHarnessScript(executable) {
 		return nil
 	}
-	return []string{fmt.Sprintf("matrix command executable is %q, want scram-local-bench harness", executable)}
+	return []string{
+		fmt.Sprintf("matrix command executable is %q, want scram-local-bench harness", executable),
+	}
 }
 
 func isCommandEnvAssignment(field string) bool {
@@ -323,11 +352,26 @@ func validateMatrixCommandArtifacts(command string, artifacts map[string]string)
 		}
 		flagValue, ok := flags[check.flagName]
 		if !ok || strings.TrimSpace(flagValue) == "" {
-			issues = append(issues, fmt.Sprintf("matrix command artifact %s flag --%s is required", check.artifactKey, check.flagName))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"matrix command artifact %s flag --%s is required",
+					check.artifactKey,
+					check.flagName,
+				),
+			)
 			continue
 		}
 		if flagValue != artifactValue {
-			issues = append(issues, fmt.Sprintf("matrix command artifact %s = %q, want %q", check.artifactKey, flagValue, artifactValue))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"matrix command artifact %s = %q, want %q",
+					check.artifactKey,
+					flagValue,
+					artifactValue,
+				),
+			)
 		}
 	}
 	return issues
@@ -374,7 +418,20 @@ func validateMatrixCommandDuration(command string, runs []MatrixRun) []string {
 	var issues []string
 	for _, run := range runs {
 		if math.Abs(run.DurationSeconds-expected) > 0.001 {
-			issues = append(issues, fmt.Sprintf("matrix command duration for run %s workers=%d c%d/k%d repeat=%d = %g, want %g from --duration", run.Endpoint, run.Workers, run.Level.Concurrency, run.Level.Connections, run.Repeat, run.DurationSeconds, expected))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					("matrix command duration for run %s workers=%d c%d/k%d repeat=%d "+
+						"= %g, want %g from --duration"),
+					run.Endpoint,
+					run.Workers,
+					run.Level.Concurrency,
+					run.Level.Connections,
+					run.Repeat,
+					run.DurationSeconds,
+					expected,
+				),
+			)
 		}
 	}
 	return issues
@@ -400,7 +457,13 @@ func validateMatrixCommandRepeats(command string, runs []MatrixRun) []string {
 		}
 	}
 	if actual != expected {
-		return []string{fmt.Sprintf("matrix command repeats = %d, want %d from run repeat evidence", expected, actual)}
+		return []string{
+			fmt.Sprintf(
+				"matrix command repeats = %d, want %d from run repeat evidence",
+				expected,
+				actual,
+			),
+		}
 	}
 	return nil
 }
@@ -424,12 +487,23 @@ func validateMatrixCommandWarmup(command string, warmup *MatrixRun) []string {
 	expected := duration.Seconds()
 	if warmup == nil {
 		if expected > 0.001 {
-			return []string{fmt.Sprintf("matrix command warmup = %g, want 0 because warmup evidence is absent", expected)}
+			return []string{
+				fmt.Sprintf(
+					"matrix command warmup = %g, want 0 because warmup evidence is absent",
+					expected,
+				),
+			}
 		}
 		return nil
 	}
 	if math.Abs(warmup.DurationSeconds-expected) > 0.001 {
-		return []string{fmt.Sprintf("matrix command warmup = %g, want %g from warmup duration_seconds", expected, warmup.DurationSeconds)}
+		return []string{
+			fmt.Sprintf(
+				"matrix command warmup = %g, want %g from warmup duration_seconds",
+				expected,
+				warmup.DurationSeconds,
+			),
+		}
 	}
 	return nil
 }
@@ -453,12 +527,23 @@ func validateMatrixCommandSoak(command string, soak *MatrixSoak) []string {
 	expected := duration.Seconds()
 	if soak == nil {
 		if expected > 0.001 {
-			return []string{fmt.Sprintf("matrix command soak = %g, want 0 because soak evidence is absent", expected)}
+			return []string{
+				fmt.Sprintf(
+					"matrix command soak = %g, want 0 because soak evidence is absent",
+					expected,
+				),
+			}
 		}
 		return nil
 	}
 	if math.Abs(soak.DurationSeconds-expected) > 0.001 {
-		return []string{fmt.Sprintf("matrix command soak = %g, want %g from soak duration_seconds", expected, soak.DurationSeconds)}
+		return []string{
+			fmt.Sprintf(
+				"matrix command soak = %g, want %g from soak duration_seconds",
+				expected,
+				soak.DurationSeconds,
+			),
+		}
 	}
 	return nil
 }
@@ -477,13 +562,25 @@ func validateMatrixCommandPool(command string, server MatrixServer) []string {
 		return []string{fmt.Sprintf("matrix command pool %q is invalid", rawPool)}
 	}
 	if server.PoolSize > 0 && expected != server.PoolSize {
-		return []string{fmt.Sprintf("matrix command pool = %d, want %d from server.pool_size", expected, server.PoolSize)}
+		return []string{
+			fmt.Sprintf(
+				"matrix command pool = %d, want %d from server.pool_size",
+				expected,
+				server.PoolSize,
+			),
+		}
 	}
 	return nil
 }
 
-func validateMatrixCoverage(artifacts map[string]string, server MatrixServer, runs []MatrixRun) []string {
-	if strings.TrimSpace(artifacts["endpoints"]) == "" || strings.TrimSpace(artifacts["levels"]) == "" || strings.TrimSpace(artifacts["worker_levels"]) == "" {
+func validateMatrixCoverage(
+	artifacts map[string]string,
+	server MatrixServer,
+	runs []MatrixRun,
+) []string {
+	if strings.TrimSpace(artifacts["endpoints"]) == "" ||
+		strings.TrimSpace(artifacts["levels"]) == "" ||
+		strings.TrimSpace(artifacts["worker_levels"]) == "" {
 		return nil
 	}
 
@@ -499,7 +596,10 @@ func validateMatrixCoverage(artifacts map[string]string, server MatrixServer, ru
 	}
 
 	if !sameIntSet(server.WorkerLevels, workers) {
-		issues = append(issues, "matrix coverage worker_levels artifact does not match server.worker_levels")
+		issues = append(
+			issues,
+			"matrix coverage worker_levels artifact does not match server.worker_levels",
+		)
 	}
 
 	declaredEndpoints := make(map[string]bool, len(endpoints))
@@ -519,13 +619,33 @@ func validateMatrixCoverage(artifacts map[string]string, server MatrixServer, ru
 	seenRuns := make(map[string]bool, len(runs))
 	repeatsByCell := make(map[string]map[int]bool, len(runs))
 	for _, run := range runs {
-		if !declaredEndpoints[run.Endpoint] || !declaredWorkers[run.Workers] || !declaredLevels[matrixLevelKey(run.Level)] {
-			issues = append(issues, fmt.Sprintf("matrix coverage includes undeclared endpoint %s workers=%d c%d/k%d", run.Endpoint, run.Workers, run.Level.Concurrency, run.Level.Connections))
+		if !declaredEndpoints[run.Endpoint] || !declaredWorkers[run.Workers] ||
+			!declaredLevels[matrixLevelKey(run.Level)] {
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"matrix coverage includes undeclared endpoint %s workers=%d c%d/k%d",
+					run.Endpoint,
+					run.Workers,
+					run.Level.Concurrency,
+					run.Level.Connections,
+				),
+			)
 			continue
 		}
 		runKey := matrixRunIdentityKey(run)
 		if seenRuns[runKey] {
-			issues = append(issues, fmt.Sprintf("duplicate matrix run endpoint %s workers=%d c%d/k%d repeat=%d", run.Endpoint, run.Workers, run.Level.Concurrency, run.Level.Connections, run.Repeat))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"duplicate matrix run endpoint %s workers=%d c%d/k%d repeat=%d",
+					run.Endpoint,
+					run.Workers,
+					run.Level.Concurrency,
+					run.Level.Connections,
+					run.Repeat,
+				),
+			)
 			continue
 		}
 		seenRuns[runKey] = true
@@ -545,13 +665,25 @@ func validateMatrixCoverage(artifacts map[string]string, server MatrixServer, ru
 			for _, level := range levels {
 				key := matrixCoverageKey(endpoint, workerCount, level)
 				if !seen[key] {
-					issues = append(issues, fmt.Sprintf("matrix coverage missing endpoint %s workers=%d c%d/k%d", endpoint, workerCount, level.Concurrency, level.Connections))
+					issues = append(
+						issues,
+						fmt.Sprintf(
+							"matrix coverage missing endpoint %s workers=%d c%d/k%d",
+							endpoint,
+							workerCount,
+							level.Concurrency,
+							level.Connections,
+						),
+					)
 					continue
 				}
 				label := matrixCoverageLabel(endpoint, workerCount, level)
 				repeats := sortedRepeatSet(repeatsByCell[key])
 				if len(repeats) == 0 {
-					issues = append(issues, "matrix repeat coverage "+label+" is missing positive repeat evidence")
+					issues = append(
+						issues,
+						"matrix repeat coverage "+label+" is missing positive repeat evidence",
+					)
 					continue
 				}
 				issues = append(issues, validateMatrixRepeatSequence(label, repeats)...)
@@ -560,7 +692,15 @@ func validateMatrixCoverage(artifacts map[string]string, server MatrixServer, ru
 					continue
 				}
 				if !sameIntSequence(repeats, expectedRepeats) {
-					issues = append(issues, fmt.Sprintf("matrix repeat coverage %s repeats %s, want %s", label, formatIntSequence(repeats), formatIntSequence(expectedRepeats)))
+					issues = append(
+						issues,
+						fmt.Sprintf(
+							"matrix repeat coverage %s repeats %s, want %s",
+							label,
+							formatIntSequence(repeats),
+							formatIntSequence(expectedRepeats),
+						),
+					)
 				}
 			}
 		}
@@ -604,7 +744,10 @@ func parseMatrixArtifactLevels(raw string) ([]MatrixLevel, []string) {
 		}
 		concurrencyRaw, connectionsRaw, ok := strings.Cut(entry, ":")
 		if !ok {
-			issues = append(issues, "matrix coverage level "+entry+" must be concurrency:connections")
+			issues = append(
+				issues,
+				"matrix coverage level "+entry+" must be concurrency:connections",
+			)
 			continue
 		}
 		concurrency, err1 := strconv.Atoi(strings.TrimSpace(concurrencyRaw))
@@ -637,11 +780,17 @@ func parseMatrixArtifactWorkers(raw string) ([]int, []string) {
 		}
 		value, err := strconv.Atoi(entry)
 		if err != nil || value <= 0 {
-			issues = append(issues, "matrix coverage worker level "+entry+" must be a positive integer")
+			issues = append(
+				issues,
+				"matrix coverage worker level "+entry+" must be a positive integer",
+			)
 			continue
 		}
 		if seen[value] {
-			issues = append(issues, fmt.Sprintf("matrix coverage worker level %d is duplicated", value))
+			issues = append(
+				issues,
+				fmt.Sprintf("matrix coverage worker level %d is duplicated", value),
+			)
 			continue
 		}
 		seen[value] = true
@@ -671,11 +820,24 @@ func matrixCoverageKey(endpoint string, workers int, level MatrixLevel) string {
 }
 
 func matrixCoverageLabel(endpoint string, workers int, level MatrixLevel) string {
-	return fmt.Sprintf("endpoint %s workers=%d c%d/k%d", endpoint, workers, level.Concurrency, level.Connections)
+	return fmt.Sprintf(
+		"endpoint %s workers=%d c%d/k%d",
+		endpoint,
+		workers,
+		level.Concurrency,
+		level.Connections,
+	)
 }
 
 func matrixRunIdentityKey(run MatrixRun) string {
-	return fmt.Sprintf("%s|%d|%d|%d|%d", run.Endpoint, run.Workers, run.Level.Concurrency, run.Level.Connections, run.Repeat)
+	return fmt.Sprintf(
+		"%s|%d|%d|%d|%d",
+		run.Endpoint,
+		run.Workers,
+		run.Level.Concurrency,
+		run.Level.Connections,
+		run.Repeat,
+	)
 }
 
 func matrixLevelKey(level MatrixLevel) string {
@@ -696,7 +858,15 @@ func validateMatrixRepeatSequence(label string, repeats []int) []string {
 	for index, repeat := range repeats {
 		want := index + 1
 		if repeat != want {
-			issues = append(issues, fmt.Sprintf("matrix repeat coverage %s missing repeat %d before repeat %d", label, want, repeat))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"matrix repeat coverage %s missing repeat %d before repeat %d",
+					label,
+					want,
+					repeat,
+				),
+			)
 			return issues
 		}
 	}
@@ -725,7 +895,9 @@ func formatIntSequence(values []int) string {
 
 func validateMatrixBuild(build MatrixBuild) []string {
 	var issues []string
-	if strings.TrimSpace(build.AppBinary) == "" || strings.TrimSpace(build.BenchBinary) == "" || strings.TrimSpace(build.Mode) == "" || strings.TrimSpace(build.BuildCommand) == "" {
+	if strings.TrimSpace(build.AppBinary) == "" || strings.TrimSpace(build.BenchBinary) == "" ||
+		strings.TrimSpace(build.Mode) == "" ||
+		strings.TrimSpace(build.BuildCommand) == "" {
 		issues = append(issues, "build app_binary/bench_binary/mode/build_command are required")
 	}
 	return issues
@@ -733,16 +905,22 @@ func validateMatrixBuild(build MatrixBuild) []string {
 
 func validateMatrixPostgres(pg MatrixPostgres) []string {
 	var issues []string
-	if pg.AuthMethod != "scram-sha-256" || pg.PasswordEncryption != "scram-sha-256" || pg.VerifierPrefix != "SCRAM-SHA-256" {
+	if pg.AuthMethod != "scram-sha-256" || pg.PasswordEncryption != "scram-sha-256" ||
+		pg.VerifierPrefix != "SCRAM-SHA-256" {
 		issues = append(issues, "PostgreSQL SCRAM evidence is incomplete")
 	}
 	if pg.WorldRows != 10000 {
 		issues = append(issues, fmt.Sprintf("postgres world_rows = %d, want 10000", pg.WorldRows))
 	}
 	if pg.FortuneRows < 12 {
-		issues = append(issues, fmt.Sprintf("postgres fortune_rows = %d, want at least 12", pg.FortuneRows))
+		issues = append(
+			issues,
+			fmt.Sprintf("postgres fortune_rows = %d, want at least 12", pg.FortuneRows),
+		)
 	}
-	if strings.TrimSpace(pg.Version) == "" || strings.TrimSpace(pg.Host) == "" || pg.Port <= 0 || strings.TrimSpace(pg.Database) == "" || strings.TrimSpace(pg.User) == "" {
+	if strings.TrimSpace(pg.Version) == "" || strings.TrimSpace(pg.Host) == "" || pg.Port <= 0 ||
+		strings.TrimSpace(pg.Database) == "" ||
+		strings.TrimSpace(pg.User) == "" {
 		issues = append(issues, "postgres version/host/port/database/user are required")
 	}
 	return issues
@@ -784,7 +962,9 @@ func validateMatrixResourceSnapshot(name string, snapshot MatrixResourceSnapshot
 	if snapshot.PID <= 0 || !snapshot.ProcessAlive {
 		issues = append(issues, fmt.Sprintf("%s process evidence is required", name))
 	}
-	if snapshot.TCPConnections < 0 || snapshot.CPUUserSeconds < 0 || snapshot.CPUSystemSeconds < 0 || snapshot.Goroutines < 0 {
+	if snapshot.TCPConnections < 0 || snapshot.CPUUserSeconds < 0 ||
+		snapshot.CPUSystemSeconds < 0 ||
+		snapshot.Goroutines < 0 {
 		issues = append(issues, fmt.Sprintf("%s resource counters must be non-negative", name))
 	}
 	if strings.TrimSpace(snapshot.Timestamp) == "" {
@@ -806,13 +986,22 @@ func validateMatrixSemanticProbe(checks []MatrixSemantic) []string {
 			issues = append(issues, "semantic probe name is required")
 		}
 		if check.Status != "pass" {
-			issues = append(issues, fmt.Sprintf("semantic probe %s status is %q, want pass", check.Name, check.Status))
+			issues = append(
+				issues,
+				fmt.Sprintf("semantic probe %s status is %q, want pass", check.Name, check.Status),
+			)
 		}
 		if strings.TrimSpace(check.Evidence) == "" {
-			issues = append(issues, fmt.Sprintf("semantic probe %s evidence is required", check.Name))
+			issues = append(
+				issues,
+				fmt.Sprintf("semantic probe %s evidence is required", check.Name),
+			)
 		}
 		if strings.TrimSpace(check.Error) != "" {
-			issues = append(issues, fmt.Sprintf("semantic probe %s has error: %s", check.Name, check.Error))
+			issues = append(
+				issues,
+				fmt.Sprintf("semantic probe %s has error: %s", check.Name, check.Error),
+			)
 		}
 		seen[check.Name] = true
 	}
@@ -837,7 +1026,8 @@ func requiredMatrixSemanticProbeNames() []string {
 
 func validateMatrixSoak(soak MatrixSoak) []string {
 	var issues []string
-	if strings.TrimSpace(soak.Endpoint) == "" || strings.TrimSpace(soak.Path) == "" || soak.Workers <= 0 {
+	if strings.TrimSpace(soak.Endpoint) == "" || strings.TrimSpace(soak.Path) == "" ||
+		soak.Workers <= 0 {
 		issues = append(issues, "soak endpoint/path/workers are required")
 	}
 	issues = append(issues, validateMatrixEndpointIdentity("soak", soak.Endpoint, soak.Path, "")...)
@@ -847,22 +1037,36 @@ func validateMatrixSoak(soak MatrixSoak) []string {
 	if soak.DurationSeconds <= 0 {
 		issues = append(issues, "soak duration evidence is required")
 	}
-	if soak.Requests <= 0 || soak.Successes < 0 || soak.Failures < 0 || soak.Successes+soak.Failures != soak.Requests {
+	if soak.Requests <= 0 || soak.Successes < 0 || soak.Failures < 0 ||
+		soak.Successes+soak.Failures != soak.Requests {
 		issues = append(issues, "soak request counters are inconsistent")
 	}
 	if soak.Successes <= 0 || soak.Failures != 0 || soak.RPS <= 0 {
 		issues = append(issues, "soak evidence did not pass")
 	}
 	issues = append(issues, validateMatrixSoakRPS(soak)...)
-	if soak.AvgLatencyMS < 0 || soak.P99LatencyMS < 0 || soak.P999LatencyMS < 0 || soak.MaxLatencyMS < 0 || soak.FirstHalfAvgMS < 0 || soak.SecondHalfAvgMS < 0 {
+	if soak.AvgLatencyMS < 0 || soak.P99LatencyMS < 0 || soak.P999LatencyMS < 0 ||
+		soak.MaxLatencyMS < 0 ||
+		soak.FirstHalfAvgMS < 0 ||
+		soak.SecondHalfAvgMS < 0 {
 		issues = append(issues, "soak has invalid timing metrics")
 	}
-	issues = append(issues, validateTailLatencyPercentiles("soak "+soak.Path, soak.P99LatencyMS, soak.P999LatencyMS, soak.MaxLatencyMS)...)
+	issues = append(
+		issues,
+		validateTailLatencyPercentiles(
+			"soak "+soak.Path,
+			soak.P99LatencyMS,
+			soak.P999LatencyMS,
+			soak.MaxLatencyMS,
+		)...)
 	if !soak.ShutdownClean {
 		issues = append(issues, "soak shutdown_clean is false")
 	}
 	if soak.OpenSocketsAfter != 0 {
-		issues = append(issues, fmt.Sprintf("soak open_sockets_after_shutdown = %d, want 0", soak.OpenSocketsAfter))
+		issues = append(
+			issues,
+			fmt.Sprintf("soak open_sockets_after_shutdown = %d, want 0", soak.OpenSocketsAfter),
+		)
 	}
 	if strings.TrimSpace(soak.Validation) == "" {
 		issues = append(issues, "soak validation is required")
@@ -876,7 +1080,9 @@ func validateMatrixSoak(soak MatrixSoak) []string {
 	if err := validateMatrixResourceSnapshot("soak.resource_end", soak.ResourceEnd); err != nil {
 		issues = append(issues, err.Error())
 	}
-	issues = append(issues, validateMatrixResourceSpan("soak.resource", soak.ResourceStart, soak.ResourceEnd)...)
+	issues = append(
+		issues,
+		validateMatrixResourceSpan("soak.resource", soak.ResourceStart, soak.ResourceEnd)...)
 	return issues
 }
 
@@ -887,12 +1093,22 @@ func validateMatrixSoakRPS(soak MatrixSoak) []string {
 	expected := float64(soak.Successes) / soak.DurationSeconds
 	tolerance := math.Max(0.001, expected*0.0001)
 	if math.Abs(soak.RPS-expected) > tolerance {
-		return []string{fmt.Sprintf("soak rps evidence = %g, want %g from successes/duration_seconds", soak.RPS, expected)}
+		return []string{
+			fmt.Sprintf(
+				"soak rps evidence = %g, want %g from successes/duration_seconds",
+				soak.RPS,
+				expected,
+			),
+		}
 	}
 	return nil
 }
 
-func validateMatrixResourceSpan(name string, start MatrixResourceSnapshot, end MatrixResourceSnapshot) []string {
+func validateMatrixResourceSpan(
+	name string,
+	start MatrixResourceSnapshot,
+	end MatrixResourceSnapshot,
+) []string {
 	var issues []string
 	startTime, startOK := parseMatrixResourceTimestamp(start)
 	endTime, endOK := parseMatrixResourceTimestamp(end)
@@ -913,7 +1129,12 @@ func parseMatrixResourceTimestamp(snapshot MatrixResourceSnapshot) (time.Time, b
 	return parsed, err == nil
 }
 
-func validateMatrixResourceWindow(resource MatrixResource, warmup *MatrixRun, soak *MatrixSoak, runs []MatrixRun) []string {
+func validateMatrixResourceWindow(
+	resource MatrixResource,
+	warmup *MatrixRun,
+	soak *MatrixSoak,
+	runs []MatrixRun,
+) []string {
 	start, startOK := parseMatrixResourceTimestamp(resource.Start)
 	end, endOK := parseMatrixResourceTimestamp(resource.End)
 	if !startOK || !endOK || !end.After(start) {
@@ -922,26 +1143,67 @@ func validateMatrixResourceWindow(resource MatrixResource, warmup *MatrixRun, so
 
 	var issues []string
 	if warmup != nil {
-		issues = append(issues, validateMatrixResourceTimestampInWindow("warmup resource", warmup.Resource, start, end)...)
+		issues = append(
+			issues,
+			validateMatrixResourceTimestampInWindow(
+				"warmup resource",
+				warmup.Resource,
+				start,
+				end,
+			)...)
 	}
 	for _, run := range runs {
-		label := fmt.Sprintf("run %s workers=%d c%d/k%d repeat=%d resource", run.Endpoint, run.Workers, run.Level.Concurrency, run.Level.Connections, run.Repeat)
-		issues = append(issues, validateMatrixResourceTimestampInWindow(label, run.Resource, start, end)...)
+		label := fmt.Sprintf(
+			"run %s workers=%d c%d/k%d repeat=%d resource",
+			run.Endpoint,
+			run.Workers,
+			run.Level.Concurrency,
+			run.Level.Connections,
+			run.Repeat,
+		)
+		issues = append(
+			issues,
+			validateMatrixResourceTimestampInWindow(label, run.Resource, start, end)...)
 	}
 	if soak != nil {
-		issues = append(issues, validateMatrixResourceTimestampInWindow("soak.resource_start", soak.ResourceStart, start, end)...)
-		issues = append(issues, validateMatrixResourceTimestampInWindow("soak.resource_end", soak.ResourceEnd, start, end)...)
+		issues = append(
+			issues,
+			validateMatrixResourceTimestampInWindow(
+				"soak.resource_start",
+				soak.ResourceStart,
+				start,
+				end,
+			)...)
+		issues = append(
+			issues,
+			validateMatrixResourceTimestampInWindow(
+				"soak.resource_end",
+				soak.ResourceEnd,
+				start,
+				end,
+			)...)
 	}
 	return issues
 }
 
-func validateMatrixResourceTimestampInWindow(label string, snapshot MatrixResourceSnapshot, start time.Time, end time.Time) []string {
+func validateMatrixResourceTimestampInWindow(
+	label string,
+	snapshot MatrixResourceSnapshot,
+	start time.Time,
+	end time.Time,
+) []string {
 	timestamp, ok := parseMatrixResourceTimestamp(snapshot)
 	if !ok {
 		return nil
 	}
 	if timestamp.Before(start) || timestamp.After(end) {
-		return []string{fmt.Sprintf("%s timestamp %s outside report resource window", label, snapshot.Timestamp)}
+		return []string{
+			fmt.Sprintf(
+				"%s timestamp %s outside report resource window",
+				label,
+				snapshot.Timestamp,
+			),
+		}
 	}
 	return nil
 }
@@ -958,7 +1220,17 @@ func validateTailLatencyPercentiles(label string, p99, p999, max float64) []stri
 	var issues []string
 	for i := 1; i < len(ordered); i++ {
 		if ordered[i].value < ordered[i-1].value {
-			issues = append(issues, fmt.Sprintf("%s latency percentiles are not monotonic: %s=%g < %s=%g", label, ordered[i].name, ordered[i].value, ordered[i-1].name, ordered[i-1].value))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"%s latency percentiles are not monotonic: %s=%g < %s=%g",
+					label,
+					ordered[i].name,
+					ordered[i].value,
+					ordered[i-1].name,
+					ordered[i-1].value,
+				),
+			)
 			break
 		}
 	}
@@ -967,11 +1239,20 @@ func validateTailLatencyPercentiles(label string, p99, p999, max float64) []stri
 
 func validateMatrixRun(run MatrixRun, warmup bool) []string {
 	var issues []string
-	label := fmt.Sprintf("run %s workers=%d c%d/k%d repeat=%d", run.Endpoint, run.Workers, run.Level.Concurrency, run.Level.Connections, run.Repeat)
+	label := fmt.Sprintf(
+		"run %s workers=%d c%d/k%d repeat=%d",
+		run.Endpoint,
+		run.Workers,
+		run.Level.Concurrency,
+		run.Level.Connections,
+		run.Repeat,
+	)
 	if warmup {
 		label = "warmup " + label
 	}
-	if strings.TrimSpace(run.Endpoint) == "" || strings.TrimSpace(run.Path) == "" || strings.TrimSpace(run.Kind) == "" || run.Workers <= 0 {
+	if strings.TrimSpace(run.Endpoint) == "" || strings.TrimSpace(run.Path) == "" ||
+		strings.TrimSpace(run.Kind) == "" ||
+		run.Workers <= 0 {
 		issues = append(issues, label+" endpoint/path/kind/workers metadata is incomplete")
 	}
 	if warmup && run.Repeat != 0 {
@@ -980,7 +1261,9 @@ func validateMatrixRun(run MatrixRun, warmup bool) []string {
 	if !warmup && run.Repeat <= 0 {
 		issues = append(issues, label+" repeat must be positive")
 	}
-	issues = append(issues, validateMatrixEndpointIdentity(label, run.Endpoint, run.Path, run.Kind)...)
+	issues = append(
+		issues,
+		validateMatrixEndpointIdentity(label, run.Endpoint, run.Path, run.Kind)...)
 	if run.Level.Concurrency <= 0 || run.Level.Connections <= 0 {
 		issues = append(issues, label+" level concurrency/connections must be positive")
 	}
@@ -988,17 +1271,32 @@ func validateMatrixRun(run MatrixRun, warmup bool) []string {
 		issues = append(issues, label+" duration evidence is required")
 	}
 	issues = append(issues, validateMatrixRunElapsed(label, run)...)
-	if run.Requests <= 0 || run.Successes <= 0 || run.Failures != 0 || run.Successes+run.Failures != run.Requests {
+	if run.Requests <= 0 || run.Successes <= 0 || run.Failures != 0 ||
+		run.Successes+run.Failures != run.Requests {
 		issues = append(issues, label+" request counters are inconsistent")
 	}
 	if run.Bytes <= 0 {
 		issues = append(issues, label+" bytes must be positive")
 	}
-	if run.RPS <= 0 || run.AvgLatencyMS < 0 || run.P50LatencyMS < 0 || run.P90LatencyMS < 0 || run.P95LatencyMS < 0 || run.P99LatencyMS < 0 || run.P999LatencyMS < 0 || run.MaxLatencyMS < 0 {
+	if run.RPS <= 0 || run.AvgLatencyMS < 0 || run.P50LatencyMS < 0 || run.P90LatencyMS < 0 ||
+		run.P95LatencyMS < 0 ||
+		run.P99LatencyMS < 0 ||
+		run.P999LatencyMS < 0 ||
+		run.MaxLatencyMS < 0 {
 		issues = append(issues, label+" has invalid timing metrics")
 	}
 	issues = append(issues, validateMatrixRunRPS(label, run)...)
-	issues = append(issues, validateLatencyPercentiles(label, run.P50LatencyMS, run.P90LatencyMS, run.P95LatencyMS, run.P99LatencyMS, run.P999LatencyMS, run.MaxLatencyMS)...)
+	issues = append(
+		issues,
+		validateLatencyPercentiles(
+			label,
+			run.P50LatencyMS,
+			run.P90LatencyMS,
+			run.P95LatencyMS,
+			run.P99LatencyMS,
+			run.P999LatencyMS,
+			run.MaxLatencyMS,
+		)...)
 	if run.MaxLatencyMS > 0 && run.P99LatencyMS > run.MaxLatencyMS {
 		issues = append(issues, label+" p99 exceeds max")
 	}
@@ -1023,7 +1321,14 @@ func validateMatrixRunElapsed(label string, run MatrixRun) []string {
 	}
 	tolerance := 0.001
 	if run.ElapsedSeconds+tolerance < run.DurationSeconds {
-		return []string{fmt.Sprintf("%s elapsed evidence = %g, want at least duration_seconds %g", label, run.ElapsedSeconds, run.DurationSeconds)}
+		return []string{
+			fmt.Sprintf(
+				"%s elapsed evidence = %g, want at least duration_seconds %g",
+				label,
+				run.ElapsedSeconds,
+				run.DurationSeconds,
+			),
+		}
 	}
 	return nil
 }
@@ -1035,22 +1340,40 @@ func validateMatrixRunRPS(label string, run MatrixRun) []string {
 	expected := float64(run.Successes) / run.ElapsedSeconds
 	tolerance := math.Max(0.001, expected*0.0001)
 	if math.Abs(run.RPS-expected) > tolerance {
-		return []string{fmt.Sprintf("%s rps evidence = %g, want %g from successes/elapsed_seconds", label, run.RPS, expected)}
+		return []string{
+			fmt.Sprintf(
+				"%s rps evidence = %g, want %g from successes/elapsed_seconds",
+				label,
+				run.RPS,
+				expected,
+			),
+		}
 	}
 	return nil
 }
 
-func validateMatrixEndpointIdentity(label string, endpoint string, path string, kind string) []string {
+func validateMatrixEndpointIdentity(
+	label string,
+	endpoint string,
+	path string,
+	kind string,
+) []string {
 	spec, ok := matrixEndpointSpecs()[strings.TrimSpace(endpoint)]
 	if !ok {
 		return []string{label + " matrix endpoint identity is unsupported"}
 	}
 	var issues []string
 	if path != spec.path {
-		issues = append(issues, fmt.Sprintf("%s matrix endpoint identity path = %q, want %q", label, path, spec.path))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s matrix endpoint identity path = %q, want %q", label, path, spec.path),
+		)
 	}
 	if strings.TrimSpace(kind) != "" && kind != spec.kind {
-		issues = append(issues, fmt.Sprintf("%s matrix endpoint identity kind = %q, want %q", label, kind, spec.kind))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s matrix endpoint identity kind = %q, want %q", label, kind, spec.kind),
+		)
 	}
 	return issues
 }
@@ -1070,31 +1393,68 @@ func matrixEndpointSpecs() map[string]struct {
 	}
 }
 
-func validateMatrixSummary(summary MatrixSummary, runCount int, totalRequests int, totalFailures int, bestRPS float64, worstP99 float64, worstP999 float64) []string {
+func validateMatrixSummary(
+	summary MatrixSummary,
+	runCount int,
+	totalRequests int,
+	totalFailures int,
+	bestRPS float64,
+	worstP99 float64,
+	worstP999 float64,
+) []string {
 	var issues []string
 	if summary.RunCount != runCount {
-		issues = append(issues, fmt.Sprintf("summary.run_count = %d, want %d", summary.RunCount, runCount))
+		issues = append(
+			issues,
+			fmt.Sprintf("summary.run_count = %d, want %d", summary.RunCount, runCount),
+		)
 	}
 	if summary.TotalRequests != totalRequests {
-		issues = append(issues, fmt.Sprintf("summary.total_requests = %d, want %d", summary.TotalRequests, totalRequests))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"summary.total_requests = %d, want %d",
+				summary.TotalRequests,
+				totalRequests,
+			),
+		)
 	}
 	if summary.TotalFailures != totalFailures {
-		issues = append(issues, fmt.Sprintf("summary.total_failures = %d, want %d", summary.TotalFailures, totalFailures))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"summary.total_failures = %d, want %d",
+				summary.TotalFailures,
+				totalFailures,
+			),
+		)
 	}
 	if summary.TotalFailures != 0 {
-		issues = append(issues, fmt.Sprintf("summary.total_failures = %d, want 0", summary.TotalFailures))
+		issues = append(
+			issues,
+			fmt.Sprintf("summary.total_failures = %d, want 0", summary.TotalFailures),
+		)
 	}
 	if summary.BestRPS <= 0 || summary.WorstP99MS < 0 || summary.WorstP999MS < 0 {
 		issues = append(issues, "summary latency/RPS metrics are invalid")
 	}
 	if summary.BestRPS != bestRPS {
-		issues = append(issues, fmt.Sprintf("summary.best_rps = %g, want %g", summary.BestRPS, bestRPS))
+		issues = append(
+			issues,
+			fmt.Sprintf("summary.best_rps = %g, want %g", summary.BestRPS, bestRPS),
+		)
 	}
 	if summary.WorstP99MS != worstP99 {
-		issues = append(issues, fmt.Sprintf("summary.worst_p99_ms = %g, want %g", summary.WorstP99MS, worstP99))
+		issues = append(
+			issues,
+			fmt.Sprintf("summary.worst_p99_ms = %g, want %g", summary.WorstP99MS, worstP99),
+		)
 	}
 	if summary.WorstP999MS != worstP999 {
-		issues = append(issues, fmt.Sprintf("summary.worst_p999_ms = %g, want %g", summary.WorstP999MS, worstP999))
+		issues = append(
+			issues,
+			fmt.Sprintf("summary.worst_p999_ms = %g, want %g", summary.WorstP999MS, worstP999),
+		)
 	}
 	if summary.Decision != "pass" {
 		issues = append(issues, fmt.Sprintf("summary.decision is %q, want pass", summary.Decision))

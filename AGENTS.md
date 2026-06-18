@@ -34,6 +34,23 @@ Before substantive implementation or before claiming completion, inspect the sur
 
 Do not silently reduce a feature request to a narrower local patch. If only the local patch is possible, say so and keep status `PARTIAL`.
 
+## Task integrity / no bypassing
+
+- Solve the requested problem directly. Do not replace it with an easier, adjacent, simulated, visual, partial, mocked, stubbed, wrapped, or demo-only version unless the user explicitly approves that change first.
+- Treat the user's stated outcome, constraints, platform, runtime, data source, architecture boundary, and `must`/`should` wording as acceptance criteria.
+- Do not silently redefine success. Passing a narrower check, producing a similar-looking artifact, or making a local workaround is not completion unless it satisfies the original request.
+- Before using a workaround, fallback, mock, generated artifact, compatibility layer, manual step, or substitute implementation, disclose it and get explicit approval.
+- Workarounds are allowed for diagnosis only. They must be clearly labeled as diagnostic/provisional and must not be presented as the requested solution.
+- If the direct solution is blocked, stop and report `BLOCKED` or `PARTIAL` with the exact missing capability, failing dependency, unknown, or architectural gap. Do not hide the blocker behind a substitute.
+- When implementation risk is nontrivial, identify the direct path before coding: requested outcome, hard constraints, real execution path, and evidence that would prove the original task is solved.
+- Final reports must state whether the delivered result solves the original task directly. If any substitute, mock, wrapper, generated artifact, or unapproved shortcut remains in the delivery path, status must be `PARTIAL` or `BLOCKED`, never `DONE`.
+
+## No task substitution
+
+The agent must not transform the user's task into a different task in order to make progress, produce a demo, satisfy a validator, or appear successful.
+
+If the original task cannot be solved directly with the current codebase/tools, the agent must say so, name the blocker, and keep the status `PARTIAL` or `BLOCKED`. Any substitute path requires explicit user approval before implementation.
+
 ## Host temp/cache discipline
 
 - Never set `GOCACHE` to `/tmp/...` in this repo; `/tmp` is tmpfs and repeated validators/TDD slices can exhaust RAM-backed temp space.

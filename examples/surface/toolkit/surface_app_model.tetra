@@ -1,0 +1,59 @@
+// Surface app-model command/reducer smoke.
+module examples.surface.toolkit.surface_app_model
+
+import lib.core.surface_app as appmodel
+
+struct AppModelApp:
+    state: appmodel.AppState
+    route_after_push: Int
+    route_after_back: Int
+    underflow_rejected: Bool
+
+struct NameField:
+    focused: Bool
+    buffer_len: Int
+    caret: Int
+
+struct SaveButton:
+    focused: Bool
+    press_count: Int
+    action: Int
+
+func main() -> Int:
+    var state: appmodel.AppState = appmodel.init_state()
+    let focus_binding: appmodel.EventBinding = appmodel.bind_event(appmodel.event_mouse_up(), appmodel.target_name(), appmodel.cmd_focus_name())
+    let text_binding: appmodel.EventBinding = appmodel.bind_event(appmodel.event_text_input(), appmodel.target_name(), appmodel.cmd_text_insert())
+    let save_binding: appmodel.EventBinding = appmodel.bind_event(appmodel.event_key_down(), appmodel.target_save(), appmodel.cmd_async_save_start())
+    let focus_status: Int = appmodel.apply_focus_name(state)
+    let edit_status: Int = appmodel.apply_text_insert(state, 3)
+    let route_before_push: Int = state.route
+    let nav_push_status: Int = appmodel.apply_nav_push_settings(state)
+    let route_after_push: Int = state.route
+    let task_id: Int = appmodel.apply_async_save_start(state, 1)
+    let completed: Bool = appmodel.apply_async_save_complete(state, task_id)
+    let undo: Bool = appmodel.apply_history_undo(state)
+    let redo: Bool = appmodel.apply_history_redo(state)
+    let route_before_back: Int = state.route
+    let nav_back_underflow: Bool = appmodel.apply_nav_back(state)
+    let route_after_back: Int = state.route
+    let nav_underflow: Bool = appmodel.apply_nav_back(state)
+    var dialog_scope: appmodel.FocusScope = appmodel.focus_scope_dialog()
+    let dialog_next: Int = appmodel.focus_scope_next(dialog_scope)
+    let dialog_escape_rejected: Bool = appmodel.focus_scope_reject_escape(dialog_scope)
+    var guard_state: appmodel.AppState = appmodel.init_state()
+    guard_state.save_count = 7
+    let guard_task_id: Int = appmodel.apply_async_save_start(guard_state, 2)
+    let canceled: Bool = appmodel.apply_async_save_cancel(guard_state, guard_task_id)
+    let missing_binding_rejected: Bool = appmodel.command_without_binding_rejected(focus_binding, appmodel.cmd_history_undo())
+    let name_field: NameField = NameField(focused: state.focused == appmodel.focus_name(), buffer_len: state.name_len, caret: state.name_len)
+    let save_button: SaveButton = SaveButton(focused: false, press_count: state.save_count, action: appmodel.cmd_async_save_start())
+    let app: AppModelApp = AppModelApp(state: state, route_after_push: route_after_push, route_after_back: route_after_back, underflow_rejected: nav_underflow)
+    let nav_push: appmodel.NavigationTransition = appmodel.NavigationTransition(operation: 1, before_route: route_before_push, after_route: route_after_push, underflow_rejected: false)
+    let nav_back: appmodel.NavigationTransition = appmodel.NavigationTransition(operation: 3, before_route: route_before_back, after_route: route_after_back, underflow_rejected: nav_back_underflow)
+    let completed_task: appmodel.AsyncTask = appmodel.AsyncTask(id: task_id, pending: false, canceled: false, completed: completed, mutated_business_state: completed)
+    let canceled_task: appmodel.AsyncTask = appmodel.AsyncTask(id: guard_task_id, pending: false, canceled: canceled, completed: false, mutated_business_state: false)
+    let undo_history: appmodel.HistoryState = appmodel.HistoryState(depth: 0, redo_depth: 1, matched_entry: undo, applied: undo)
+    let redo_history: appmodel.HistoryState = appmodel.HistoryState(depth: state.history_depth, redo_depth: state.redo_depth, matched_entry: redo, applied: redo)
+    if focus_status == 1 && edit_status == 1 && appmodel.command_registry_count() == 9 && appmodel.binding_valid(focus_binding, appmodel.event_mouse_up(), appmodel.target_name(), appmodel.cmd_focus_name()) && appmodel.binding_valid(text_binding, appmodel.event_text_input(), appmodel.target_name(), appmodel.cmd_text_insert()) && appmodel.binding_valid(save_binding, appmodel.event_key_down(), appmodel.target_save(), appmodel.cmd_async_save_start()) && nav_push_status == 1 && nav_push.before_route == appmodel.route_home() && nav_push.after_route == appmodel.route_settings() && app.route_after_push == appmodel.route_settings() && completed_task.completed && completed_task.mutated_business_state && app.state.save_count == 1 && app.state.pending_task == 0 && undo_history.matched_entry && undo_history.applied && redo_history.matched_entry && redo_history.applied && app.state.history_depth == 1 && app.state.redo_depth == 0 && app.state.name_len == 3 && !nav_back.underflow_rejected && nav_back.before_route == appmodel.route_settings() && nav_back.after_route == appmodel.route_home() && app.route_after_back == appmodel.route_home() && app.underflow_rejected && dialog_next == appmodel.focus_save() && dialog_escape_rejected && !dialog_scope.escaped && canceled_task.canceled && !canceled_task.mutated_business_state && guard_state.save_count == 7 && guard_state.pending_task == 0 && missing_binding_rejected && name_field.focused && name_field.buffer_len == 3 && name_field.caret == 3 && !save_button.focused && save_button.press_count == 1 && save_button.action == appmodel.cmd_async_save_start():
+        return 1
+    return 0

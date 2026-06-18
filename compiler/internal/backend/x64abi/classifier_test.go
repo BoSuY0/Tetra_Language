@@ -10,7 +10,11 @@ import (
 func TestX32SysVClassifierKeepsX64RegistersButILP32PointerSlots(t *testing.T) {
 	classifier := mustClassifier(t, "x32")
 	if classifier.Name() != "x32-sysv" || !classifier.UsesX64Registers() {
-		t.Fatalf("x32 classifier identity = %s x64regs=%v", classifier.Name(), classifier.UsesX64Registers())
+		t.Fatalf(
+			"x32 classifier identity = %s x64regs=%v",
+			classifier.Name(),
+			classifier.UsesX64Registers(),
+		)
 	}
 
 	plan, err := classifier.ClassifySignature(ABISignature{
@@ -50,10 +54,15 @@ func TestX32ClassifierDiffersFromX64AndRejectsX86(t *testing.T) {
 		t.Fatalf("pointer param sizes x64=%#v x32=%#v", x64Plan.Params[0], x32Plan.Params[0])
 	}
 	if x64Plan.Params[0].Register != x32Plan.Params[0].Register {
-		t.Fatalf("x32 should keep AMD64 integer arg registers: x64=%s x32=%s", x64Plan.Params[0].Register, x32Plan.Params[0].Register)
+		t.Fatalf(
+			"x32 should keep AMD64 integer arg registers: x64=%s x32=%s",
+			x64Plan.Params[0].Register,
+			x32Plan.Params[0].Register,
+		)
 	}
 
-	if _, err := NewClassifier(mustTarget(t, "x86")); err == nil || !strings.Contains(err.Error(), "x64abi classifier requires x64 ISA") {
+	if _, err := NewClassifier(mustTarget(t, "x86")); err == nil ||
+		!strings.Contains(err.Error(), "x64abi classifier requires x64 ISA") {
 		t.Fatalf("NewClassifier(x86) = %v, want x64 ISA rejection", err)
 	}
 }
@@ -68,8 +77,13 @@ func TestX32SysVClassifierUsesEightByteStackSlotsBeyondRegisters(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ClassifySignature: %v", err)
 	}
-	if got := plan.Params[6]; got.Register != "" || got.StackOffsetBytes != 0 || got.StackSlotBytes != 8 || got.SizeBytes != 4 {
-		t.Fatalf("x32 seventh integer arg = %#v, want first 8-byte stack slot carrying 4-byte pointer", got)
+	if got := plan.Params[6]; got.Register != "" || got.StackOffsetBytes != 0 ||
+		got.StackSlotBytes != 8 ||
+		got.SizeBytes != 4 {
+		t.Fatalf(
+			"x32 seventh integer arg = %#v, want first 8-byte stack slot carrying 4-byte pointer",
+			got,
+		)
 	}
 }
 
@@ -85,10 +99,19 @@ func TestX32SysVClassifierUsesX32AggregateLayout(t *testing.T) {
 	if err != nil {
 		t.Fatalf("x32 ClassifySignature: %v", err)
 	}
-	if got := x32Plan.Params[0]; got.SizeBytes != 8 || got.AlignBytes != 4 || got.Class != ABIClassInteger || got.Register != "rdi" || !sameStrings(got.Registers, []string{"rdi"}) {
-		t.Fatalf("x32 aggregate param = %#v, want one integer register carrying 8-byte ILP32 aggregate", got)
+	if got := x32Plan.Params[0]; got.SizeBytes != 8 || got.AlignBytes != 4 ||
+		got.Class != ABIClassInteger ||
+		got.Register != "rdi" ||
+		!sameStrings(got.Registers, []string{"rdi"}) {
+		t.Fatalf(
+			"x32 aggregate param = %#v, want one integer register carrying 8-byte ILP32 aggregate",
+			got,
+		)
 	}
-	if got := x32Plan.Return; got.SizeBytes != 8 || got.AlignBytes != 4 || got.Class != ABIClassInteger || got.Register != "rax" || !sameStrings(got.Registers, []string{"rax"}) {
+	if got := x32Plan.Return; got.SizeBytes != 8 || got.AlignBytes != 4 ||
+		got.Class != ABIClassInteger ||
+		got.Register != "rax" ||
+		!sameStrings(got.Registers, []string{"rax"}) {
 		t.Fatalf("x32 aggregate return = %#v, want rax", got)
 	}
 
@@ -98,7 +121,8 @@ func TestX32SysVClassifierUsesX32AggregateLayout(t *testing.T) {
 	if err != nil {
 		t.Fatalf("x64 ClassifySignature: %v", err)
 	}
-	if got := x64Plan.Params[0]; got.SizeBytes != 16 || got.AlignBytes != 8 || !sameStrings(got.Registers, []string{"rdi", "rsi"}) {
+	if got := x64Plan.Params[0]; got.SizeBytes != 16 || got.AlignBytes != 8 ||
+		!sameStrings(got.Registers, []string{"rdi", "rsi"}) {
 		t.Fatalf("x64 aggregate param = %#v, want two integer registers from LP64 layout", got)
 	}
 }
@@ -118,7 +142,9 @@ func TestX32SysVClassifierClassifiesMixedAggregateEightbytes(t *testing.T) {
 		t.Fatalf("ClassifySignature: %v", err)
 	}
 	got := plan.Params[0]
-	if got.SizeBytes != 16 || got.AlignBytes != 8 || !sameClasses(got.Classes, []ABIClass{ABIClassSSE, ABIClassInteger}) || !sameStrings(got.Registers, []string{"xmm0", "rdi"}) {
+	if got.SizeBytes != 16 || got.AlignBytes != 8 ||
+		!sameClasses(got.Classes, []ABIClass{ABIClassSSE, ABIClassInteger}) ||
+		!sameStrings(got.Registers, []string{"xmm0", "rdi"}) {
 		t.Fatalf("mixed aggregate = %#v, want SSE then integer eightbytes in x32 layout", got)
 	}
 }
@@ -138,10 +164,16 @@ func TestX32SysVClassifierUsesMemoryForLargeAggregates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ClassifySignature: %v", err)
 	}
-	if got := plan.Params[0]; got.Class != ABIClassMemory || got.Register != "" || len(got.Registers) != 0 || got.StackOffsetBytes != 0 || got.StackSlotBytes != 24 || got.SizeBytes != 20 {
+	if got := plan.Params[0]; got.Class != ABIClassMemory || got.Register != "" ||
+		len(got.Registers) != 0 ||
+		got.StackOffsetBytes != 0 ||
+		got.StackSlotBytes != 24 ||
+		got.SizeBytes != 20 {
 		t.Fatalf("large aggregate param = %#v, want stack memory slot rounded to 24 bytes", got)
 	}
-	if got := plan.Return; got.Class != ABIClassMemory || !got.Indirect || got.Register != "rdi" || got.StackSlotBytes != 0 || got.SizeBytes != 20 {
+	if got := plan.Return; got.Class != ABIClassMemory || !got.Indirect || got.Register != "rdi" ||
+		got.StackSlotBytes != 0 ||
+		got.SizeBytes != 20 {
 		t.Fatalf("large aggregate return = %#v, want hidden sret pointer in rdi", got)
 	}
 }
@@ -178,11 +210,31 @@ func TestSysVClassifierUsesMemoryForPackedUnalignedAggregates(t *testing.T) {
 				wantSize = 5
 				wantSlot = 8
 			}
-			if got := plan.Params[0]; got.Class != ABIClassMemory || got.Register != "" || len(got.Registers) != 0 || got.StackOffsetBytes != 0 || got.StackSlotBytes != wantSlot || got.SizeBytes != wantSize || got.AlignBytes != 1 {
-				t.Fatalf("%s packed param = %#v, want MEMORY stack slot=%d size=%d align=1", raw, got, wantSlot, wantSize)
+			if got := plan.Params[0]; got.Class != ABIClassMemory || got.Register != "" ||
+				len(got.Registers) != 0 ||
+				got.StackOffsetBytes != 0 ||
+				got.StackSlotBytes != wantSlot ||
+				got.SizeBytes != wantSize ||
+				got.AlignBytes != 1 {
+				t.Fatalf(
+					"%s packed param = %#v, want MEMORY stack slot=%d size=%d align=1",
+					raw,
+					got,
+					wantSlot,
+					wantSize,
+				)
 			}
-			if got := plan.Return; got.Class != ABIClassMemory || !got.Indirect || got.Register != "rdi" || got.StackSlotBytes != 0 || got.SizeBytes != wantSize || got.AlignBytes != 1 {
-				t.Fatalf("%s packed return = %#v, want hidden sret pointer in rdi size=%d align=1", raw, got, wantSize)
+			if got := plan.Return; got.Class != ABIClassMemory || !got.Indirect ||
+				got.Register != "rdi" ||
+				got.StackSlotBytes != 0 ||
+				got.SizeBytes != wantSize ||
+				got.AlignBytes != 1 {
+				t.Fatalf(
+					"%s packed return = %#v, want hidden sret pointer in rdi size=%d align=1",
+					raw,
+					got,
+					wantSize,
+				)
 			}
 		})
 	}
@@ -208,7 +260,12 @@ func TestSysVVarargsReportALUpperBound(t *testing.T) {
 				t.Fatalf("%s variadic metadata = %#v", raw, plan)
 			}
 			if !plan.SysVRequiresAL || plan.SysV_ALSSERegisterCount != 2 {
-				t.Fatalf("%s SysV AL metadata = requires=%v count=%d, want requires=true count=2", raw, plan.SysVRequiresAL, plan.SysV_ALSSERegisterCount)
+				t.Fatalf(
+					"%s SysV AL metadata = requires=%v count=%d, want requires=true count=2",
+					raw,
+					plan.SysVRequiresAL,
+					plan.SysV_ALSSERegisterCount,
+				)
 			}
 			if plan.Win64ShadowSpaceBytes != 0 || len(plan.Win64VarargFloatMirrors) != 0 {
 				t.Fatalf("%s unexpected Win64 vararg metadata: %#v", raw, plan)
@@ -261,10 +318,20 @@ func TestWin64ClassifierPassesSmallAggregatesAsIntegerScalars(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ClassifySignature: %v", err)
 	}
-	if got := plan.Params[0]; got.Class != ABIClassInteger || got.Register != "rcx" || !sameStrings(got.Registers, []string{"rcx"}) || len(got.Classes) != 0 || got.SizeBytes != 8 || got.ABIBytes != 8 || got.Indirect {
+	if got := plan.Params[0]; got.Class != ABIClassInteger || got.Register != "rcx" ||
+		!sameStrings(got.Registers, []string{"rcx"}) ||
+		len(got.Classes) != 0 ||
+		got.SizeBytes != 8 ||
+		got.ABIBytes != 8 ||
+		got.Indirect {
 		t.Fatalf("Win64 small aggregate param = %#v, want single integer rcx slot", got)
 	}
-	if got := plan.Return; got.Class != ABIClassInteger || got.Register != "rax" || !sameStrings(got.Registers, []string{"rax"}) || len(got.Classes) != 0 || got.SizeBytes != 8 || got.ABIBytes != 8 || got.Indirect {
+	if got := plan.Return; got.Class != ABIClassInteger || got.Register != "rax" ||
+		!sameStrings(got.Registers, []string{"rax"}) ||
+		len(got.Classes) != 0 ||
+		got.SizeBytes != 8 ||
+		got.ABIBytes != 8 ||
+		got.Indirect {
 		t.Fatalf("Win64 small aggregate return = %#v, want rax", got)
 	}
 }
@@ -281,10 +348,21 @@ func TestWin64ClassifierPassesLargeAggregatesByReference(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ClassifySignature: %v", err)
 	}
-	if got := plan.Params[0]; got.Class != ABIClassMemory || !got.Indirect || got.Register != "rcx" || !sameStrings(got.Registers, []string{"rcx"}) || len(got.Classes) != 0 || got.StackSlotBytes != 0 || got.SizeBytes != 16 || got.ABIBytes != 8 {
+	if got := plan.Params[0]; got.Class != ABIClassMemory || !got.Indirect ||
+		got.Register != "rcx" ||
+		!sameStrings(got.Registers, []string{"rcx"}) ||
+		len(got.Classes) != 0 ||
+		got.StackSlotBytes != 0 ||
+		got.SizeBytes != 16 ||
+		got.ABIBytes != 8 {
 		t.Fatalf("Win64 large aggregate param = %#v, want by-reference pointer in rcx", got)
 	}
-	if got := plan.Return; got.Class != ABIClassMemory || !got.Indirect || got.Register != "rcx" || !sameStrings(got.Registers, []string{"rcx"}) || len(got.Classes) != 0 || got.StackSlotBytes != 0 || got.SizeBytes != 16 || got.ABIBytes != 8 {
+	if got := plan.Return; got.Class != ABIClassMemory || !got.Indirect || got.Register != "rcx" ||
+		!sameStrings(got.Registers, []string{"rcx"}) ||
+		len(got.Classes) != 0 ||
+		got.StackSlotBytes != 0 ||
+		got.SizeBytes != 16 ||
+		got.ABIBytes != 8 {
 		t.Fatalf("Win64 large aggregate return = %#v, want hidden sret pointer in rcx", got)
 	}
 }
@@ -320,11 +398,34 @@ func mustTarget(t *testing.T, raw string) ctarget.Target {
 	return tgt
 }
 
-func assertArg(t *testing.T, got ABILocation, name string, class ABIClass, register string, size int, align int, regWidth int, extend ABIExtension) {
+func assertArg(
+	t *testing.T,
+	got ABILocation,
+	name string,
+	class ABIClass,
+	register string,
+	size int,
+	align int,
+	regWidth int,
+	extend ABIExtension,
+) {
 	t.Helper()
-	if got.Name != name || got.Class != class || got.Register != register || got.SizeBytes != size || got.AlignBytes != align || got.RegisterWidthBits != regWidth || got.Extension != extend {
-		t.Fatalf("%s location = %#v, want class=%s register=%s size=%d align=%d regWidth=%d extend=%s",
-			name, got, class, register, size, align, regWidth, extend)
+	if got.Name != name || got.Class != class || got.Register != register ||
+		got.SizeBytes != size ||
+		got.AlignBytes != align ||
+		got.RegisterWidthBits != regWidth ||
+		got.Extension != extend {
+		t.Fatalf(
+			"%s location = %#v, want class=%s register=%s size=%d align=%d regWidth=%d extend=%s",
+			name,
+			got,
+			class,
+			register,
+			size,
+			align,
+			regWidth,
+			extend,
+		)
 	}
 }
 

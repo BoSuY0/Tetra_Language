@@ -219,7 +219,12 @@ func readObject(r io.Reader) (*Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := ensureObjectRecordTableAvailable(r, "symbol table", symCount, minSymbolRecordBytes(version)); err != nil {
+	if err := ensureObjectRecordTableAvailable(
+		r,
+		"symbol table",
+		symCount,
+		minSymbolRecordBytes(version),
+	); err != nil {
 		return nil, err
 	}
 	symCap, err := checkedObjectCountCapacity("symbol table", symCount)
@@ -263,7 +268,12 @@ func readObject(r io.Reader) (*Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := ensureObjectRecordTableAvailable(r, "relocation table", relocCount, minRelocRecordBytes); err != nil {
+	if err := ensureObjectRecordTableAvailable(
+		r,
+		"relocation table",
+		relocCount,
+		minRelocRecordBytes,
+	); err != nil {
 		return nil, err
 	}
 	relocCap, err := checkedObjectCountCapacity("relocation table", relocCount)
@@ -318,7 +328,12 @@ func validateSymbolRecord(sym Symbol, codeLen int) error {
 	if sym.HasSignature && (sym.ParamSlots < 0 || sym.ReturnSlots < 0) {
 		return fmt.Errorf("negative symbol signature slots for %q", sym.Name)
 	}
-	if sym.HasSignature && (int64(sym.ParamSlots) > maxSignatureSlotValue || int64(sym.ReturnSlots) > maxSignatureSlotValue) {
+	if sym.HasSignature &&
+		(int64(
+			sym.ParamSlots,
+		) > maxSignatureSlotValue || int64(
+			sym.ReturnSlots,
+		) > maxSignatureSlotValue) {
 		return fmt.Errorf("symbol signature slots out of range for %q", sym.Name)
 	}
 	return nil
@@ -389,14 +404,24 @@ func ensureObjectBytesAvailable(r io.Reader, section string, n uint32) error {
 	return nil
 }
 
-func ensureObjectRecordTableAvailable(r io.Reader, table string, count uint32, minRecordBytes int) error {
+func ensureObjectRecordTableAvailable(
+	r io.Reader,
+	table string,
+	count uint32,
+	minRecordBytes int,
+) error {
 	if count == 0 {
 		return nil
 	}
 	if rem, ok := objectRemainingBytes(r); ok {
 		minBytes := uint64(count) * uint64(minRecordBytes)
 		if minBytes > uint64(rem) {
-			return fmt.Errorf("truncated object %s: declared %d records, remaining %d bytes", table, count, rem)
+			return fmt.Errorf(
+				"truncated object %s: declared %d records, remaining %d bytes",
+				table,
+				count,
+				rem,
+			)
 		}
 	}
 	return nil

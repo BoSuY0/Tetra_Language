@@ -12,7 +12,7 @@ remote_url=""
 billing_owner=""
 
 usage() {
-  cat <<'USAGE'
+  cat << 'USAGE'
 Usage: bash scripts/release/full_platform/actions-availability-preflight.sh [--repo OWNER/REPO] [--branch BRANCH] [--report FILE]
 
 Writes and validates a GitHub Actions availability preflight report. This proves
@@ -77,7 +77,7 @@ while [[ $# -gt 0 ]]; do
       limit="$2"
       shift 2
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;
@@ -92,7 +92,7 @@ done
 cd "$repo_root"
 
 if [[ -z "$repo" ]]; then
-  remote_url="$(git remote get-url origin 2>/dev/null || true)"
+  remote_url="$(git remote get-url origin 2> /dev/null || true)"
   repo="$(printf '%s' "$remote_url" | sed -E 's#^git@github.com:##; s#^https://github.com/##; s#\.git$##')"
 fi
 if [[ -z "$branch" ]]; then
@@ -106,11 +106,11 @@ fi
 if [[ -z "$billing_owner" ]]; then
   billing_owner="${repo%%/*}"
 fi
-if ! command -v gh >/dev/null 2>&1; then
+if ! command -v gh > /dev/null 2>&1; then
   echo "error: gh is required for GitHub Actions availability preflight" >&2
   exit 2
 fi
-if ! command -v jq >/dev/null 2>&1; then
+if ! command -v jq > /dev/null 2>&1; then
   echo "error: jq is required for GitHub Actions availability preflight" >&2
   exit 2
 fi
@@ -140,12 +140,12 @@ gh run list \
   --branch "$branch" \
   --limit "$limit" \
   --json databaseId,event,status,conclusion,headSha,workflowName \
-  >"$runs_path"
+  > "$runs_path"
 
-jq -e --arg workflow "$workflow" '[.[] | select(.workflowName == $workflow)][0] // empty' "$runs_path" >"$exact_workflow_run_path" || true
-jq -e '[.[] | select(.workflowName == "" or .workflowName == null)][0] // empty' "$runs_path" >"$fallback_workflow_run_path" || true
-jq -e --arg workflow "$workflow" --arg head "$expected_git_head" '[.[] | select(.workflowName == $workflow and .headSha == $head)][0] // empty' "$runs_path" >"$exact_workflow_current_head_run_path" || true
-jq -e --arg head "$expected_git_head" '[.[] | select((.workflowName == "" or .workflowName == null) and .headSha == $head)][0] // empty' "$runs_path" >"$fallback_workflow_current_head_run_path" || true
+jq -e --arg workflow "$workflow" '[.[] | select(.workflowName == $workflow)][0] // empty' "$runs_path" > "$exact_workflow_run_path" || true
+jq -e '[.[] | select(.workflowName == "" or .workflowName == null)][0] // empty' "$runs_path" > "$fallback_workflow_run_path" || true
+jq -e --arg workflow "$workflow" --arg head "$expected_git_head" '[.[] | select(.workflowName == $workflow and .headSha == $head)][0] // empty' "$runs_path" > "$exact_workflow_current_head_run_path" || true
+jq -e --arg head "$expected_git_head" '[.[] | select((.workflowName == "" or .workflowName == null) and .headSha == $head)][0] // empty' "$runs_path" > "$fallback_workflow_current_head_run_path" || true
 
 run_selection="none"
 if [[ -s "$exact_workflow_current_head_run_path" ]]; then
@@ -169,7 +169,7 @@ else
     conclusion: "",
     headSha: "",
     workflowName: ""
-  }' >"$run_path"
+  }' > "$run_path"
 fi
 
 run_id="$(jq -r '.databaseId // 0' "$run_path")"
@@ -190,44 +190,44 @@ run_jobs=0
 logs_available="false"
 
 if [[ "$run_id" =~ ^[0-9]+$ && "$run_id" -gt 0 ]]; then
-  if gh api "repos/$repo/actions/runs/$run_id" >"$run_details_path"; then
+  if gh api "repos/$repo/actions/runs/$run_id" > "$run_details_path"; then
     run_workflow_name="$(jq -r '.name // ""' "$run_details_path")"
     run_workflow_path="$(jq -r '.path // ""' "$run_details_path")"
     run_workflow_id="$(jq -r '.workflow_id // 0' "$run_details_path")"
     run_check_suite_id="$(jq -r '.check_suite_id // 0' "$run_details_path")"
   fi
   if [[ "$run_check_suite_id" =~ ^[0-9]+$ && "$run_check_suite_id" -gt 0 ]] &&
-     gh api "repos/$repo/check-suites/$run_check_suite_id" >"$check_suite_path"; then
+    gh api "repos/$repo/check-suites/$run_check_suite_id" > "$check_suite_path"; then
     run_check_suite_app="$(jq -r '.app.slug // ""' "$check_suite_path")"
     run_check_suite_status="$(jq -r '.status // ""' "$check_suite_path")"
     run_check_suite_conclusion="$(jq -r '.conclusion // ""' "$check_suite_path")"
     run_check_suite_latest_check_runs_count="$(jq -r '.latest_check_runs_count // 0' "$check_suite_path")"
     run_check_suite_head_sha="$(jq -r '.head_sha // ""' "$check_suite_path")"
   fi
-  if gh api "repos/$repo/actions/runs/$run_id/jobs" >"$jobs_path"; then
+  if gh api "repos/$repo/actions/runs/$run_id/jobs" > "$jobs_path"; then
     run_jobs="$(jq -r '.total_count // 0' "$jobs_path")"
   fi
-  if gh api "repos/$repo/actions/runs/$run_id/logs" >"$logs_path" 2>/dev/null; then
+  if gh api "repos/$repo/actions/runs/$run_id/logs" > "$logs_path" 2> /dev/null; then
     logs_available="true"
   fi
 fi
 
 repo_actions_enabled="false"
 repo_allowed_actions="unknown"
-if gh api "repos/$repo/actions/permissions" >"$permissions_path"; then
+if gh api "repos/$repo/actions/permissions" > "$permissions_path"; then
   repo_actions_enabled="$(jq -r '.enabled // false' "$permissions_path")"
   repo_allowed_actions="$(jq -r '.allowed_actions // "unknown"' "$permissions_path")"
 fi
 
 self_hosted_runner_count=0
-if gh api "repos/$repo/actions/runners" >"$runners_path"; then
+if gh api "repos/$repo/actions/runners" > "$runners_path"; then
   self_hosted_runner_count="$(jq -r '.total_count // 0' "$runners_path")"
 fi
 
 workflows_total_count=0
 workflows_active_count=0
 workflows_entries='[]'
-if gh api "repos/$repo/actions/workflows" >"$workflows_path"; then
+if gh api "repos/$repo/actions/workflows" > "$workflows_path"; then
   workflows_total_count="$(jq -r '.total_count // 0' "$workflows_path")"
   workflows_active_count="$(jq -r '[.workflows[]? | select(.state == "active")] | length' "$workflows_path")"
   workflows_entries="$(jq -c '[.workflows[]? | {id, name, path, state}]' "$workflows_path")"
@@ -235,11 +235,11 @@ fi
 
 billing_actions_status="unavailable"
 billing_actions_detail="billing API unavailable"
-if gh api "users/$billing_owner/settings/billing/actions" >"$billing_path" 2>"$billing_err_path"; then
+if gh api "users/$billing_owner/settings/billing/actions" > "$billing_path" 2> "$billing_err_path"; then
   billing_actions_status="available"
   billing_actions_detail="$(jq -c '{total_minutes_used, included_minutes, minutes_used_breakdown}' "$billing_path")"
 else
-  billing_err="$(tr '\n' ' ' <"$billing_err_path" | sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//' | cut -c 1-240)"
+  billing_err="$(tr '\n' ' ' < "$billing_err_path" | sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//' | cut -c 1-240)"
   if grep -q '"user" scope' "$billing_err_path"; then
     billing_actions_status="unavailable_missing_user_scope"
     billing_actions_detail="requires gh auth refresh -h github.com -s user"
@@ -251,21 +251,21 @@ fi
 availability_status="blocked"
 summary="GitHub Actions did not prove job-backed availability."
 if [[ "$repo_actions_enabled" == "true" &&
-      "$run_selection" == "workflow_name" &&
-      "$run_head_sha" == "$expected_git_head" &&
-      "$run_status" == "completed" &&
-      "$run_conclusion" == "success" &&
-      "$run_jobs" -gt 0 &&
-      "$logs_available" == "true" &&
-      "$run_workflow_path" != "BuildFailed" &&
-      "$run_workflow_id" -gt 0 &&
-      "$run_check_suite_id" -gt 0 &&
-      "$run_check_suite_app" == "github-actions" &&
-      "$run_check_suite_status" == "completed" &&
-      "$run_check_suite_conclusion" == "success" &&
-      "$run_check_suite_latest_check_runs_count" -gt 0 &&
-      "$run_check_suite_head_sha" == "$expected_git_head" &&
-      "$billing_actions_status" != "unavailable_missing_user_scope" ]]; then
+  "$run_selection" == "workflow_name" &&
+  "$run_head_sha" == "$expected_git_head" &&
+  "$run_status" == "completed" &&
+  "$run_conclusion" == "success" &&
+  "$run_jobs" -gt 0 &&
+  "$logs_available" == "true" &&
+  "$run_workflow_path" != "BuildFailed" &&
+  "$run_workflow_id" -gt 0 &&
+  "$run_check_suite_id" -gt 0 &&
+  "$run_check_suite_app" == "github-actions" &&
+  "$run_check_suite_status" == "completed" &&
+  "$run_check_suite_conclusion" == "success" &&
+  "$run_check_suite_latest_check_runs_count" -gt 0 &&
+  "$run_check_suite_head_sha" == "$expected_git_head" &&
+  "$billing_actions_status" != "unavailable_missing_user_scope" ]]; then
   availability_status="pass"
   summary="GitHub Actions can start jobs and expose logs."
 fi
@@ -344,7 +344,7 @@ jq -n \
       logs_available: $logsAvailable
     },
     next_action: "Collect target-host Windows/macOS UI runtime reports after Actions availability passes; this is not runtime evidence."
-  }' >"$report_path"
+  }' > "$report_path"
 
 go run ./tools/cmd/validate-actions-availability --report "$report_path"
 echo "GitHub Actions availability preflight report: $report_path"

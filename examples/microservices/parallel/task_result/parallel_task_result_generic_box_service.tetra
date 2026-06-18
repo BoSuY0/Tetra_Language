@@ -1,0 +1,29 @@
+// Generic task-result box microservice smoke.
+//
+// The service carries a joined task result through a monomorphized generic box
+// and aliases the selected field before generic identity routing.
+module examples.microservices.parallel.task_result.parallel_task_result_generic_box_service
+struct Box<T>:
+    value: T
+
+func worker() -> Int:
+    return 42
+
+func id<T>(value: T) -> T:
+    return value
+
+func pass_result(box: Box<task.result_i32>) -> Box<task.result_i32>:
+    return box
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let joined: task.result_i32 = core.task_join_result_i32(task)
+    let boxed: Box<task.result_i32> = pass_result(Box<task.result_i32>(value: joined))
+    let selected: task.result_i32 = boxed.value
+    let same: task.result_i32 = id(selected)
+    if same.error != 0:
+        return 10 + same.error
+    if same.value == 42:
+        return 0
+    return same.value

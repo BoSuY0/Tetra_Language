@@ -64,6 +64,34 @@ func TestModuleLoadWorldPrefersT4OverLegacyTetraImport(t *testing.T) {
 	}
 }
 
+func TestModuleLoadWorldMergesSameModuleFragments(t *testing.T) {
+	tmp := t.TempDir()
+	writeModuleFiles(t, tmp, map[string]string{
+		"engine/math.t4":             "module engine.math\nfunc base() -> Int:\n    return 40\n",
+		"engine/math.parts/extra.t4": "module engine.math\nfunc add_two(x: Int) -> Int:\n    return x + 2\n",
+		"app/main.t4":                "module app.main\nimport engine.math as math\nfunc main() -> Int:\n    return math.add_two(math.base())\n",
+	})
+
+	world, err := LoadWorld(filepath.Join(tmp, filepath.FromSlash("app/main.t4")))
+	if err != nil {
+		t.Fatalf("LoadWorld: %v", err)
+	}
+	file := world.ByModule["engine.math"]
+	if file == nil {
+		t.Fatalf("engine.math module missing")
+	}
+	if got := len(file.Funcs); got != 2 {
+		t.Fatalf("engine.math funcs = %d, want 2", got)
+	}
+	if got := filepath.Base(file.Path); got != "math.t4" {
+		t.Fatalf("engine.math primary path = %q, want math.t4", got)
+	}
+	if src := string(file.Src); !strings.Contains(src, "func base") ||
+		!strings.Contains(src, "func add_two") {
+		t.Fatalf("merged source missing primary or fragment function:\n%s", src)
+	}
+}
+
 func TestModuleLoadWorldWithSourceRootsResolvesImportsAcrossProjectRoots(t *testing.T) {
 	tmp := t.TempDir()
 	writeModuleFiles(t, tmp, map[string]string{
@@ -71,10 +99,13 @@ func TestModuleLoadWorldWithSourceRootsResolvesImportsAcrossProjectRoots(t *test
 		"ui/components/counter.t4": "module components.counter\nfunc value() -> Int:\n    return 42\n",
 	})
 
-	world, err := LoadWorldOpt(filepath.Join(tmp, filepath.FromSlash("src/app/main.t4")), LoadOptions{
-		Root:        tmp,
-		SourceRoots: []string{"src", "ui"},
-	})
+	world, err := LoadWorldOpt(
+		filepath.Join(tmp, filepath.FromSlash("src/app/main.t4")),
+		LoadOptions{
+			Root:        tmp,
+			SourceRoots: []string{"src", "ui"},
+		},
+	)
 	if err != nil {
 		t.Fatalf("LoadWorldOpt: %v", err)
 	}
@@ -119,14 +150,17 @@ func TestModuleLoadWorldWithDependencyRootsResolvesCrossCapsuleImport(t *testing
 		"src/math/core.t4": "module math.core\nfunc add(a: Int, b: Int) -> Int:\n    return a + b\n",
 	})
 
-	world, err := LoadWorldOpt(filepath.Join(appRoot, filepath.FromSlash("src/app/main.t4")), LoadOptions{
-		Root:        appRoot,
-		SourceRoots: []string{"src"},
-		DependencyRoots: []ModuleRoot{{
-			Root:        mathRoot,
+	world, err := LoadWorldOpt(
+		filepath.Join(appRoot, filepath.FromSlash("src/app/main.t4")),
+		LoadOptions{
+			Root:        appRoot,
 			SourceRoots: []string{"src"},
-		}},
-	})
+			DependencyRoots: []ModuleRoot{{
+				Root:        mathRoot,
+				SourceRoots: []string{"src"},
+			}},
+		},
+	)
 	if err != nil {
 		t.Fatalf("LoadWorldOpt: %v", err)
 	}
@@ -147,17 +181,22 @@ func TestModuleLoadWorldFallsBackToT4InterfaceForDependencyImport(t *testing.T) 
 		"src/app/main.t4": "module app.main\nimport math.core as math\nfunc main() -> Int:\n    return math.add(40, 2)\n",
 	})
 	writeModuleFiles(t, mathRoot, map[string]string{
-		"interfaces/math/core.t4i": hashedT4I("module math.core\nfunc add(a: Int, b: Int) -> Int:\n    return 0\n"),
+		"interfaces/math/core.t4i": hashedT4I(
+			"module math.core\nfunc add(a: Int, b: Int) -> Int:\n    return 0\n",
+		),
 	})
 
-	world, err := LoadWorldOpt(filepath.Join(appRoot, filepath.FromSlash("src/app/main.t4")), LoadOptions{
-		Root:        appRoot,
-		SourceRoots: []string{"src"},
-		DependencyRoots: []ModuleRoot{{
-			Root:        mathRoot,
-			SourceRoots: []string{"src", "interfaces"},
-		}},
-	})
+	world, err := LoadWorldOpt(
+		filepath.Join(appRoot, filepath.FromSlash("src/app/main.t4")),
+		LoadOptions{
+			Root:        appRoot,
+			SourceRoots: []string{"src"},
+			DependencyRoots: []ModuleRoot{{
+				Root:        mathRoot,
+				SourceRoots: []string{"src", "interfaces"},
+			}},
+		},
+	)
 	if err != nil {
 		t.Fatalf("LoadWorldOpt: %v", err)
 	}
@@ -196,7 +235,10 @@ func TestModuleLoadWorldDiagnosticForModuleDeclarationMismatch(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected module declaration mismatch error")
 	}
-	if !strings.Contains(err.Error(), "module declaration 'engine.wrong' does not match import 'engine.math'") {
+	if !strings.Contains(
+		err.Error(),
+		"module declaration 'engine.wrong' does not match import 'engine.math'",
+	) {
 		t.Fatalf("error = %v", err)
 	}
 }

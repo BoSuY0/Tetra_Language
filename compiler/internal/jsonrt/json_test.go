@@ -7,7 +7,9 @@ import (
 )
 
 func TestAppendStringEscapesJSONControlCharacters(t *testing.T) {
-	input := "quote \" slash \\ backspace \b tab \t newline \n formfeed \f carriage \r nul " + string([]byte{0x00, 0x1f})
+	input := "quote \" slash \\ backspace \b tab \t newline \n formfeed \f carriage \r nul " + string(
+		[]byte{0x00, 0x1f},
+	)
 	got := string(AppendString(nil, input))
 	want := `"quote \" slash \\ backspace \b tab \t newline \n formfeed \f carriage \r nul \u0000\u001f"`
 	if got != want {
@@ -48,7 +50,9 @@ func TestAppendMessageObjectWritesTechEmpowerPayload(t *testing.T) {
 }
 
 func TestAppendWorldObjectAndArray(t *testing.T) {
-	if got, want := string(AppendWorldObject(nil, 3217, 2149)), `{"id":3217,"randomNumber":2149}`; got != want {
+	if got, want := string(
+		AppendWorldObject(nil, 3217, 2149),
+	), `{"id":3217,"randomNumber":2149}`; got != want {
 		t.Fatalf("AppendWorldObject = %q, want %q", got, want)
 	}
 	worlds := []World{

@@ -1,12 +1,12 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"strings"
+
+	"tetra_language/tools/internal/reportdecode"
 )
 
 type diagnostic struct {
@@ -31,7 +31,12 @@ func main() {
 	flag.StringVar(&wantCode, "code", "", "expected diagnostic code")
 	flag.StringVar(&wantSeverity, "severity", "error", "expected severity")
 	flag.StringVar(&wantContains, "contains", "", "substring expected in message")
-	flag.BoolVar(&requirePosition, "require-position", false, "require file, line, and column fields")
+	flag.BoolVar(
+		&requirePosition,
+		"require-position",
+		false,
+		"require file, line, and column fields",
+	)
 	flag.Parse()
 
 	if path == "" {
@@ -48,7 +53,13 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err := validateDiagnostic(diag, wantCode, wantSeverity, wantContains, requirePosition); err != nil {
+	if err := validateDiagnostic(
+		diag,
+		wantCode,
+		wantSeverity,
+		wantContains,
+		requirePosition,
+	); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -56,15 +67,19 @@ func main() {
 
 func parseDiagnostic(raw []byte) (diagnostic, error) {
 	var diag diagnostic
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&diag); err != nil {
-		return diagnostic{}, fmt.Errorf("invalid diagnostic JSON: %w", err)
+	if err := reportdecode.DecodeStrict(raw, &diag); err != nil {
+		return diagnostic{}, fmt.Errorf("invalid diagnostic report: %w", err)
 	}
 	return diag, nil
 }
 
-func validateDiagnostic(diag diagnostic, wantCode string, wantSeverity string, wantContains string, requirePosition bool) error {
+func validateDiagnostic(
+	diag diagnostic,
+	wantCode string,
+	wantSeverity string,
+	wantContains string,
+	requirePosition bool,
+) error {
 	if strings.TrimSpace(diag.Code) == "" {
 		return fmt.Errorf("diagnostic code is required")
 	}

@@ -86,9 +86,21 @@ var forbiddenCLIProductionPhrases = []string{
 }
 
 func main() {
-	featuresPath := flag.String("features", "", "features JSON produced by ./tetra features --format=json")
-	stdlibDocsPath := flag.String("stdlib-docs", "docs/spec/stdlib.md", "stdlib production/readiness docs")
-	cliContractsPath := flag.String("cli-contracts", "docs/spec/cli_contracts.md", "CLI contracts docs")
+	featuresPath := flag.String(
+		"features",
+		"",
+		"features JSON produced by ./tetra features --format=json",
+	)
+	stdlibDocsPath := flag.String(
+		"stdlib-docs",
+		"docs/spec/standard_library/stdlib.md",
+		"stdlib production/readiness docs",
+	)
+	cliContractsPath := flag.String(
+		"cli-contracts",
+		"docs/spec/policy/cli_contracts.md",
+		"CLI contracts docs",
+	)
 	flag.Parse()
 
 	evidence, err := readReadinessEvidence(*featuresPath, *stdlibDocsPath, *cliContractsPath)
@@ -102,7 +114,9 @@ func main() {
 	}
 }
 
-func readReadinessEvidence(featuresPath, stdlibDocsPath, cliContractsPath string) (readinessEvidence, error) {
+func readReadinessEvidence(
+	featuresPath, stdlibDocsPath, cliContractsPath string,
+) (readinessEvidence, error) {
 	readRequired := func(path, label string) ([]byte, error) {
 		if strings.TrimSpace(path) == "" {
 			return nil, fmt.Errorf("%s path is required", label)
@@ -140,7 +154,10 @@ func validateToolingStdlibReadiness(evidence readinessEvidence) error {
 		return err
 	}
 	if report.Schema != "tetra.features.v1" {
-		issues = append(issues, fmt.Sprintf("features schema = %q, want tetra.features.v1", report.Schema))
+		issues = append(
+			issues,
+			fmt.Sprintf("features schema = %q, want tetra.features.v1", report.Schema),
+		)
 	}
 	if strings.TrimSpace(report.Version) == "" {
 		issues = append(issues, "features version is required")
@@ -194,7 +211,10 @@ func validateCurrentFeature(featuresByID map[string]featureEntry, id string) []s
 	}
 	var issues []string
 	if feature.Status != "current" {
-		issues = append(issues, fmt.Sprintf("feature %s status = %s, want current", id, feature.Status))
+		issues = append(
+			issues,
+			fmt.Sprintf("feature %s status = %s, want current", id, feature.Status),
+		)
 	}
 	if strings.TrimSpace(feature.Since) == "" {
 		issues = append(issues, fmt.Sprintf("feature %s missing since", id))
@@ -216,11 +236,18 @@ func validateStdlibFeature(feature featureEntry) []string {
 	text := strings.ToLower(feature.Scope + "\n" + feature.Stability)
 	for _, phrase := range forbiddenStdlibProductionPhrases {
 		if strings.Contains(text, phrase) {
-			issues = append(issues, fmt.Sprintf("feature stdlib.core-current contains production-blocking phrase %q", phrase))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"feature stdlib.core-current contains production-blocking phrase %q",
+					phrase,
+				),
+			)
 		}
 	}
 	for _, module := range requiredStdlibModules {
-		if !strings.Contains(feature.Scope, module) && !strings.Contains(feature.Stability, module) {
+		if !strings.Contains(feature.Scope, module) &&
+			!strings.Contains(feature.Stability, module) {
 			// The full module list may live in docs rather than the short feature row, so this
 			// remains a docs-level check below.
 			continue
@@ -235,12 +262,24 @@ func validateStdlibDocs(raw []byte) []string {
 	var issues []string
 	for _, module := range requiredStdlibModules {
 		if !strings.Contains(text, module) {
-			issues = append(issues, fmt.Sprintf("docs/spec/stdlib.md missing required module %s", module))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"docs/spec/standard_library/stdlib.md missing required module %s",
+					module,
+				),
+			)
 		}
 	}
 	for _, phrase := range forbiddenStdlibProductionPhrases {
 		if strings.Contains(lower, phrase) {
-			issues = append(issues, fmt.Sprintf("docs/spec/stdlib.md contains production-blocking phrase %q", phrase))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"docs/spec/standard_library/stdlib.md contains production-blocking phrase %q",
+					phrase,
+				),
+			)
 		}
 	}
 	return issues
@@ -252,7 +291,10 @@ func validateCLIContracts(raw []byte) []string {
 	var issues []string
 	for _, command := range requiredCLICommands {
 		if !strings.Contains(text, command) {
-			issues = append(issues, fmt.Sprintf("docs/spec/cli_contracts.md missing CLI command %s", command))
+			issues = append(
+				issues,
+				fmt.Sprintf("docs/spec/policy/cli_contracts.md missing CLI command %s", command),
+			)
 		}
 	}
 	for _, phrase := range []string{
@@ -262,12 +304,24 @@ func validateCLIContracts(raw []byte) []string {
 		"not current release readiness",
 	} {
 		if strings.Contains(lower, phrase) {
-			issues = append(issues, fmt.Sprintf("docs/spec/cli_contracts.md contains stale tooling-readiness phrase %q", phrase))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"docs/spec/policy/cli_contracts.md contains stale tooling-readiness phrase %q",
+					phrase,
+				),
+			)
 		}
 	}
 	for _, phrase := range forbiddenCLIProductionPhrases {
 		if strings.Contains(lower, strings.ToLower(phrase)) {
-			issues = append(issues, fmt.Sprintf("docs/spec/cli_contracts.md contains production-blocking phrase %q", phrase))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"docs/spec/policy/cli_contracts.md contains production-blocking phrase %q",
+					phrase,
+				),
+			)
 		}
 	}
 	return issues

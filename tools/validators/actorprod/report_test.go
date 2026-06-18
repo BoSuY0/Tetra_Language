@@ -22,7 +22,11 @@ func TestValidateReportAcceptsActorFoundationEvidence(t *testing.T) {
 func TestValidateReportRejectsMissingParallelAndDistributedEvidence(t *testing.T) {
 	raw := validActorFoundationReportFrom(t, func(report *Report) {
 		report.Artifacts = []ArtifactReport{
-			{Path: "actor-runtime-foundation-manifest.json", Kind: "foundation_manifest", Schema: SchemaV1},
+			{
+				Path:   "actor-runtime-foundation-manifest.json",
+				Kind:   "foundation_manifest",
+				Schema: SchemaV1,
+			},
 			{Path: "artifact-hashes.json", Kind: "hash_manifest", Schema: ArtifactHashSchema},
 		}
 	})
@@ -30,7 +34,10 @@ func TestValidateReportRejectsMissingParallelAndDistributedEvidence(t *testing.T
 	if err == nil {
 		t.Fatalf("expected missing subreports to fail")
 	}
-	for _, want := range []string{"parallel-production-linux-x64.json", "distributed-actors-linux-x64.json"} {
+	for _, want := range []string{
+		"parallel-production-linux-x64.json",
+		"distributed-actors-linux-x64.json",
+	} {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("error missing %q:\n%v", want, err)
 		}
@@ -67,6 +74,26 @@ func TestValidateReportRejectsCrossTargetDistributedActorClaimWithoutSmoke(t *te
 			}
 			if !strings.Contains(err.Error(), "cross-target distributed actor claim") {
 				t.Fatalf("error = %v, want cross-target distributed actor claim rejection", err)
+			}
+		})
+	}
+}
+
+func TestValidateReportRejectsDistributedZeroCopySpellingVariants(t *testing.T) {
+	for _, claim := range []string{
+		"linux-x64 actor foundation proves distributed zero copy actor transfer",
+		"linux-x64 actor foundation proves cross-node zero-copy actor transfer",
+	} {
+		t.Run(claim, func(t *testing.T) {
+			raw := validActorFoundationReportFrom(t, func(report *Report) {
+				report.Claims = []string{claim}
+			})
+			err := ValidateReport(raw)
+			if err == nil {
+				t.Fatalf("expected distributed zero-copy spelling variant to fail")
+			}
+			if !strings.Contains(strings.ToLower(err.Error()), "zero") {
+				t.Fatalf("error = %v, want zero-copy rejection", err)
 			}
 		})
 	}
@@ -159,18 +186,33 @@ func TestValidateReportDirRejectsMissingSubreportsAndHashManifests(t *testing.T)
 func TestValidateReportDirRejectsDistributedSubreportStaleGitHead(t *testing.T) {
 	dir := t.TempDir()
 	writeActorFoundationFixtureDir(t, dir)
-	stale := strings.Replace(validDistributedActorSubreport, testGitHead, strings.Repeat("a", 40), 1)
-	writeFile(t, filepath.Join(dir, "distributed-actors-linux-x64", "distributed-actors-linux-x64.json"), stale)
+	stale := strings.Replace(
+		validDistributedActorSubreport,
+		testGitHead,
+		strings.Repeat("a", 40),
+		1,
+	)
+	writeFile(
+		t,
+		filepath.Join(dir, "distributed-actors-linux-x64", "distributed-actors-linux-x64.json"),
+		stale,
+	)
 	writeArtifactHashManifest(t, filepath.Join(dir, "distributed-actors-linux-x64"), []testArtifact{
 		{Path: "distributed-actors-linux-x64.json", Schema: "tetra.actors.distributed-runtime.v1"},
 	})
 	writeArtifactHashManifest(t, dir, []testArtifact{
 		{Path: "actor-runtime-foundation-manifest.json", Schema: SchemaV1},
 		{Path: "distributed-actors-linux-x64/artifact-hashes.json", Schema: ArtifactHashSchema},
-		{Path: "distributed-actors-linux-x64/distributed-actors-linux-x64.json", Schema: "tetra.actors.distributed-runtime.v1"},
+		{
+			Path:   "distributed-actors-linux-x64/distributed-actors-linux-x64.json",
+			Schema: "tetra.actors.distributed-runtime.v1",
+		},
 		{Path: "logs/focused-actor-tests.log"},
 		{Path: "parallel-production-linux-x64/artifact-hashes.json", Schema: ArtifactHashSchema},
-		{Path: "parallel-production-linux-x64/parallel-production-linux-x64.json", Schema: "tetra.parallel.production.v1"},
+		{
+			Path:   "parallel-production-linux-x64/parallel-production-linux-x64.json",
+			Schema: "tetra.parallel.production.v1",
+		},
 	})
 	err := ValidateReportDir(dir, Options{CurrentGitHead: testGitHead})
 	if err == nil {
@@ -207,23 +249,110 @@ func validActorFoundationReportFrom(t *testing.T, mutate func(*Report)) []byte {
 			"no formal race proof claim",
 		},
 		Commands: []CommandReport{
-			{Name: "distributed-actors-smoke", Command: "bash scripts/release/v0_4_0/distributed-actors-linux-x64-smoke.sh --report-dir reports/actor-runtime-foundation/final/distributed-actors-linux-x64", Status: "pass", Log: "logs/distributed-actors-smoke.log"},
-			{Name: "parallel-production-smoke", Command: "bash scripts/release/post_v0_4/parallel-production-linux-x64-smoke.sh --report-dir reports/actor-runtime-foundation/final/parallel-production-linux-x64", Status: "pass", Log: "logs/parallel-production-smoke.log"},
-			{Name: "focused-actor-tests", Command: "go test -buildvcs=false ./cli/cmd/tetra ./compiler/tests/ownership ./compiler -run 'Diagnostic|Actor|Backpressure|Invalid|Closed|Transfer' -count=1", Status: "pass", Log: "logs/focused-actor-tests.log"},
-			{Name: "race-actor-slice", Command: "go test -race -buildvcs=false ./compiler ./cli/internal/actornet -run 'Actor|Broker' -count=1", Status: "pass", Log: "logs/race-actor-slice.log"},
-			{Name: "validate-manifest", Command: "go run ./tools/cmd/validate-manifest --manifest docs/generated/manifest.json", Status: "pass", Log: "logs/validate-manifest.log"},
-			{Name: "verify-docs", Command: "go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json", Status: "pass", Log: "logs/verify-docs.log"},
-			{Name: "artifact-hashes-write", Command: "go run ./tools/cmd/validate-artifact-hashes --write --root reports/actor-runtime-foundation/final --out reports/actor-runtime-foundation/final/artifact-hashes.json", Status: "pass", Log: "logs/artifact-hashes-write.log"},
-			{Name: "artifact-hashes-validate", Command: "go run ./tools/cmd/validate-artifact-hashes --manifest reports/actor-runtime-foundation/final/artifact-hashes.json", Status: "pass", Log: "logs/artifact-hashes-validate.log"},
-			{Name: "actor-foundation-validator", Command: "go run ./tools/cmd/validate-actor-runtime-foundation --report-dir reports/actor-runtime-foundation/final --current-git-head " + testGitHead, Status: "pass", Log: "logs/actor-foundation-validator.log"},
+			{
+				Name: "distributed-actors-smoke",
+				Command: ("bash " +
+					"scripts/release/v0_4_0/distributed-actors-linux-x64-smoke.sh" +
+					" --report-dir " +
+					"reports/actor-runtime-foundation/final/distributed-actors-li" +
+					"nux-x64"),
+				Status: "pass",
+				Log:    "logs/distributed-actors-smoke.log",
+			},
+			{
+				Name: "parallel-production-smoke",
+				Command: ("bash " +
+					"scripts/release/post_v0_4/parallel-production-linux-x64-smok" +
+					"e.sh --report-dir " +
+					"reports/actor-runtime-foundation/final/parallel-production-l" +
+					"inux-x64"),
+				Status: "pass",
+				Log:    "logs/parallel-production-smoke.log",
+			},
+			{
+				Name: "focused-actor-tests",
+				Command: ("go test -buildvcs=false ./cli/cmd/tetra " +
+					"./compiler/tests/ownership " +
+					"./compiler/tests/ownership/actor_task ./compiler -run " +
+					"'Diagnostic|Actor|Backpressure|Invalid|Closed|Transfer' " +
+					"-count=1"),
+				Status: "pass",
+				Log:    "logs/focused-actor-tests.log",
+			},
+			{
+				Name: "race-actor-slice",
+				Command: ("go test -race -buildvcs=false ./compiler " +
+					"./cli/internal/actornet -run 'Actor|Broker' -count=1"),
+				Status: "pass",
+				Log:    "logs/race-actor-slice.log",
+			},
+			{
+				Name:    "validate-manifest",
+				Command: "go run ./tools/cmd/validate-manifest --manifest docs/generated/manifest.json",
+				Status:  "pass",
+				Log:     "logs/validate-manifest.log",
+			},
+			{
+				Name:    "verify-docs",
+				Command: "go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json",
+				Status:  "pass",
+				Log:     "logs/verify-docs.log",
+			},
+			{
+				Name: "artifact-hashes-write",
+				Command: ("go run ./tools/cmd/validate-artifact-hashes --write --root " +
+					"reports/actor-runtime-foundation/final --out " +
+					"reports/actor-runtime-foundation/final/artifact-hashes.json"),
+				Status: "pass",
+				Log:    "logs/artifact-hashes-write.log",
+			},
+			{
+				Name: "artifact-hashes-validate",
+				Command: ("go run ./tools/cmd/validate-artifact-hashes --manifest " +
+					"reports/actor-runtime-foundation/final/artifact-hashes.json"),
+				Status: "pass",
+				Log:    "logs/artifact-hashes-validate.log",
+			},
+			{
+				Name: "actor-foundation-validator",
+				Command: ("go run ./tools/cmd/validate-actor-runtime-foundation " +
+					"--report-dir reports/actor-runtime-foundation/final " +
+					"--current-git-head ") + testGitHead,
+				Status: "pass",
+				Log:    "logs/actor-foundation-validator.log",
+			},
 		},
 		Artifacts: []ArtifactReport{
-			{Path: "actor-runtime-foundation-manifest.json", Kind: "foundation_manifest", Schema: SchemaV1},
-			{Path: "parallel-production-linux-x64/parallel-production-linux-x64.json", Kind: "parallel_production_report", Schema: "tetra.parallel.production.v1"},
-			{Path: "parallel-production-linux-x64/artifact-hashes.json", Kind: "parallel_hash_manifest", Schema: ArtifactHashSchema},
-			{Path: "distributed-actors-linux-x64/distributed-actors-linux-x64.json", Kind: "distributed_actor_runtime_report", Schema: "tetra.actors.distributed-runtime.v1"},
-			{Path: "distributed-actors-linux-x64/artifact-hashes.json", Kind: "distributed_hash_manifest", Schema: ArtifactHashSchema},
-			{Path: "artifact-hashes.json", Kind: "foundation_hash_manifest", Schema: ArtifactHashSchema},
+			{
+				Path:   "actor-runtime-foundation-manifest.json",
+				Kind:   "foundation_manifest",
+				Schema: SchemaV1,
+			},
+			{
+				Path:   "parallel-production-linux-x64/parallel-production-linux-x64.json",
+				Kind:   "parallel_production_report",
+				Schema: "tetra.parallel.production.v1",
+			},
+			{
+				Path:   "parallel-production-linux-x64/artifact-hashes.json",
+				Kind:   "parallel_hash_manifest",
+				Schema: ArtifactHashSchema,
+			},
+			{
+				Path:   "distributed-actors-linux-x64/distributed-actors-linux-x64.json",
+				Kind:   "distributed_actor_runtime_report",
+				Schema: "tetra.actors.distributed-runtime.v1",
+			},
+			{
+				Path:   "distributed-actors-linux-x64/artifact-hashes.json",
+				Kind:   "distributed_hash_manifest",
+				Schema: ArtifactHashSchema,
+			},
+			{
+				Path:   "artifact-hashes.json",
+				Kind:   "foundation_hash_manifest",
+				Schema: ArtifactHashSchema,
+			},
 		},
 	}
 	mutate(&report)
@@ -246,12 +375,28 @@ func removeActorFoundationArtifact(artifacts []ArtifactReport, path string) []Ar
 
 func writeActorFoundationFixtureDir(t *testing.T, dir string) {
 	t.Helper()
-	writeFile(t, filepath.Join(dir, "actor-runtime-foundation-manifest.json"), string(validActorFoundationReport(t)))
-	writeFile(t, filepath.Join(dir, "parallel-production-linux-x64", "parallel-production-linux-x64.json"), validParallelProductionSubreport)
-	writeArtifactHashManifest(t, filepath.Join(dir, "parallel-production-linux-x64"), []testArtifact{
-		{Path: "parallel-production-linux-x64.json", Schema: "tetra.parallel.production.v1"},
-	})
-	writeFile(t, filepath.Join(dir, "distributed-actors-linux-x64", "distributed-actors-linux-x64.json"), validDistributedActorSubreport)
+	writeFile(
+		t,
+		filepath.Join(dir, "actor-runtime-foundation-manifest.json"),
+		string(validActorFoundationReport(t)),
+	)
+	writeFile(
+		t,
+		filepath.Join(dir, "parallel-production-linux-x64", "parallel-production-linux-x64.json"),
+		validParallelProductionSubreport,
+	)
+	writeArtifactHashManifest(
+		t,
+		filepath.Join(dir, "parallel-production-linux-x64"),
+		[]testArtifact{
+			{Path: "parallel-production-linux-x64.json", Schema: "tetra.parallel.production.v1"},
+		},
+	)
+	writeFile(
+		t,
+		filepath.Join(dir, "distributed-actors-linux-x64", "distributed-actors-linux-x64.json"),
+		validDistributedActorSubreport,
+	)
 	writeArtifactHashManifest(t, filepath.Join(dir, "distributed-actors-linux-x64"), []testArtifact{
 		{Path: "distributed-actors-linux-x64.json", Schema: "tetra.actors.distributed-runtime.v1"},
 	})
@@ -259,10 +404,16 @@ func writeActorFoundationFixtureDir(t *testing.T, dir string) {
 	writeArtifactHashManifest(t, dir, []testArtifact{
 		{Path: "actor-runtime-foundation-manifest.json", Schema: SchemaV1},
 		{Path: "distributed-actors-linux-x64/artifact-hashes.json", Schema: ArtifactHashSchema},
-		{Path: "distributed-actors-linux-x64/distributed-actors-linux-x64.json", Schema: "tetra.actors.distributed-runtime.v1"},
+		{
+			Path:   "distributed-actors-linux-x64/distributed-actors-linux-x64.json",
+			Schema: "tetra.actors.distributed-runtime.v1",
+		},
 		{Path: "logs/focused-actor-tests.log"},
 		{Path: "parallel-production-linux-x64/artifact-hashes.json", Schema: ArtifactHashSchema},
-		{Path: "parallel-production-linux-x64/parallel-production-linux-x64.json", Schema: "tetra.parallel.production.v1"},
+		{
+			Path:   "parallel-production-linux-x64/parallel-production-linux-x64.json",
+			Schema: "tetra.parallel.production.v1",
+		},
 	})
 }
 
@@ -280,6 +431,50 @@ type testArtifact struct {
 	Path   string
 	Schema string
 }
+
+var validParallelProductionActorMemoryDomains = strings.Join([]string{
+	("[{\"schema_version\":\"tetra.actors.memory-domain.v1\",\"actor_id\":\"acto" +
+		"r-mailbox-copy\",\"evidence_class\":\"local_parallelrt_model\",\"evidence_" +
+		"method\":\"parallelrt_typed_mailbox_memory_domain_v1\",\"runtime_measure" +
+		"d\":false,\"runtime_blocked_reason\":\"production actor runtime per-acto" +
+		"r byte sampler is not implemented; this is local parallelrt model ev" +
+		"idence\",\"domain\":{\"domain_id\":\"domain:actor:actor-mailbox-copy\",\"k" +
+		"ind\":\"actor\",\"owner_kind\":\"actor\",\"owner_id\":\"actor-mailbox-copy" +
+		"\",\"lifetime\":\"actor:actor-mailbox-copy\",\"budget_bytes\":256,\"reques" +
+		"ted_bytes\":48,\"reserved_bytes\":256,\"committed_bytes\":256,\"current_by" +
+		"tes\":48,\"peak_bytes\":48,\"copy_count\":1,\"bytes_copied\":32},\"mailbox" +
+		"\":{\"capacity_messages\":4,\"queued_messages\":1,\"capacity_bytes\":256," +
+		"\"queued_bytes\":48,\"peak_queued_bytes\":48,\"message_bytes\":16,\"backpr" +
+		"essure_mode\":\"blocking_recv_yield\"},\"message_pool\":{\"slab_bytes\":64" +
+		",\"live_bytes\":48,\"capacity_bytes\":256,\"message_slots_live\":1,\"messa" +
+		"ge_slots_limit\":4},\"backpressure\":{\"mode\":\"blocking_recv_yield\",\"s" +
+		"tatus\":\"available\"},\"non_claims\":[\"full production actor runtime is " +
+		"not claimed\",\"distributed actor zero-copy is not claimed\",\"actor mem" +
+		"ory domain bytes are model/report evidence unless paired with runtim" +
+		"e measurement\"],\"production_runtime_claimed\":false,\"distributed_zero" +
+		"_copy_claimed\":false},{\"schema_version\":\"tetra.actors.memory-domain." +
+		"v1\",\"actor_id\":\"actor-frame\",\"evidence_class\":\"local_parallelrt_mo" +
+		"del\",\"evidence_method\":\"parallelrt_typed_mailbox_memory_domain_v1\",\"" +
+		"runtime_measured\":false,\"runtime_blocked_reason\":\"production actor r" +
+		"untime per-actor byte sampler is not implemented; this is local para" +
+		"llelrt model evidence\",\"domain\":{\"domain_id\":\"domain:actor:actor-fra" +
+		"me\",\"kind\":\"actor\",\"owner_kind\":\"actor\",\"owner_id\":\"actor-fram" +
+		"e\",\"lifetime\":\"actor:actor-frame\",\"budget_bytes\":512,\"requested_by" +
+		"tes\":272,\"reserved_bytes\":512,\"committed_bytes\":512,\"current_bytes\"" +
+		":272,\"peak_bytes\":272},\"mailbox\":{\"capacity_messages\":2,\"queued_mes" +
+		"sages\":1,\"capacity_bytes\":512,\"queued_bytes\":272,\"peak_queued_bytes" +
+		"\":272,\"message_bytes\":16,\"backpressure_mode\":\"blocking_recv_yield\"}" +
+		",\"message_pool\":{\"slab_bytes\":32,\"live_bytes\":272,\"capacity_bytes\"" +
+		":512,\"message_slots_live\":1,\"message_slots_limit\":2},\"owned_regions\"" +
+		":[{\"region_name\":\"frame\",\"domain_id\":\"domain:actor:actor-frame\",\"" +
+		"owner_id\":\"actor-frame\",\"bytes\":256}],\"backpressure\":{\"mode\":\"bl" +
+		"ocking_recv_yield\",\"status\":\"byte_limit_reached\",\"reason\":\"mailbox" +
+		" byte capacity reached\"},\"non_claims\":[\"full production actor runtim" +
+		"e is not claimed\",\"distributed actor zero-copy is not claimed\",\"acto" +
+		"r memory domain bytes are model/report evidence unless paired with r" +
+		"untime measurement\"],\"production_runtime_claimed\":false,\"distributed" +
+		"_zero_copy_claimed\":false}]"),
+}, "\n")
 
 func writeArtifactHashManifest(t *testing.T, root string, artifacts []testArtifact) {
 	t.Helper()
@@ -309,120 +504,469 @@ func writeArtifactHashManifest(t *testing.T, root string, artifacts []testArtifa
 	writeFile(t, filepath.Join(root, "artifact-hashes.json"), string(raw)+"\n")
 }
 
-const validParallelProductionSubreport = `{
-  "schema": "tetra.parallel.production.v1",
-  "status": "pass",
-  "target": "linux-x64",
-  "host": "linux-x64",
-  "runtime": "parallel-linux-x64",
-  "source": "tools/cmd/parallel-production-smoke",
-  "processes": [
-    {"name":"tetra build","kind":"build","path":"go build ./cli/cmd/tetra","ran":true,"pass":true,"exit_code":0},
-    {"name":"parallel smoke app","kind":"app","path":"parallel-smoke","ran":true,"pass":true,"exit_code":0},
-    {"name":"parallel stress","kind":"stress","path":"parallel-stress","ran":true,"pass":true,"exit_code":0},
-    {"name":"parallel scheduler prototype","kind":"benchmark","path":"compiler/internal/parallelrt","ran":true,"pass":true,"exit_code":0}
-  ],
-  "benchmarks": [
-    {"name":"actor ping-pong benchmark prep","kind":"actor_benchmark_prep","metric":"messages_round_trip","unit":"prep_only","baseline_value":0,"measured_value":0,"improvement_ratio":0.0,"evidence":"compiler/actors_test.go::TestActorsPingPongBuildAndRun and examples/actors_pingpong.tetra define the local Linux-x64 actor ping-pong workload candidate","claim_tier":"tier0_local_smoke_only","claim":"Actor ping-pong benchmark prep row exists as Tier 0 local smoke only; no measured result is published and cross-runtime comparison is out of scope.","raw_output_artifacts":["reports/actor-runtime-foundation/P15/parallelrt-evidence.raw.json"],"ran":false,"pass":true},
-    {"name":"actor fanout/fanin benchmark prep","kind":"actor_benchmark_prep","metric":"fanout_fanin_messages","unit":"prep_only","baseline_value":0,"measured_value":0,"improvement_ratio":0.0,"evidence":"compiler/internal/parallelrt two-core work stealing model checks actor fanout/fanin scheduling shape without publishing throughput","claim_tier":"tier0_local_smoke_only","claim":"Actor fanout/fanin benchmark prep row exists as Tier 0 local smoke only; it records local workload shape and leaves public benchmark publication out of scope.","raw_output_artifacts":["reports/actor-runtime-foundation/P15/parallelrt-evidence.raw.json"],"ran":false,"pass":true},
-    {"name":"actor mailbox throughput benchmark prep","kind":"actor_benchmark_prep","metric":"mailbox_messages","unit":"prep_only","baseline_value":0,"measured_value":0,"improvement_ratio":0.0,"evidence":"compiler/internal/parallelrt TypedMailbox and parallel production actor mailbox cases define the local mailbox throughput workload candidate","claim_tier":"tier0_local_smoke_only","claim":"Actor mailbox throughput benchmark prep row exists as Tier 0 local smoke only; it publishes no measured result and no throughput guarantee.","raw_output_artifacts":["reports/actor-runtime-foundation/P15/parallelrt-evidence.raw.json"],"ran":false,"pass":true},
-    {"name":"actor backpressure latency benchmark prep","kind":"actor_benchmark_prep","metric":"backpressure_wait","unit":"prep_only","baseline_value":0,"measured_value":0,"improvement_ratio":0.0,"evidence":"compiler/internal/parallelrt ErrMailboxFull and blocking_recv_yield metadata define the local backpressure latency diagnostic candidate","claim_tier":"tier0_local_smoke_only","claim":"Actor backpressure latency benchmark prep row exists as Tier 0 local smoke only; no real-world SLA or latency advantage is claimed.","raw_output_artifacts":["reports/actor-runtime-foundation/P15/parallelrt-evidence.raw.json"],"ran":false,"pass":true},
-    {"name":"zero_copy_move local typed mailbox benchmark prep","kind":"actor_transfer_prep","metric":"owned_region_transfer","unit":"prep_only","baseline_value":0,"measured_value":0,"improvement_ratio":0.0,"evidence":"compiler/internal/parallelrt owned-region transfer report emits zero_copy_move for local typed mailbox metadata only","claim_tier":"tier0_local_smoke_only","claim":"zero_copy_move local typed mailbox benchmark prep row exists as Tier 0 local smoke only; it records local owned-region metadata and leaves distributed or network transfer behavior out of scope.","raw_output_artifacts":["reports/actor-runtime-foundation/P15/parallelrt-evidence.raw.json"],"ran":false,"pass":true}
-  ],
-  "contracts": [
-    {"name":"production task scheduler","status":"pass","evidence":"scheduler fairness and lifecycle cases ran on linux-x64"},
-    {"name":"join cancel deadline select group lifecycle","status":"pass","evidence":"join, cancel, deadline, select, and group lifecycle diagnostics are stable"},
-    {"name":"actor mailbox backpressure and failure handling","status":"pass","evidence":"mailbox capacity, message pool exhaustion, and actor failure cases are covered"},
-    {"name":"task actor thread boundary transfer rules","status":"pass","evidence":"ownership transfer diagnostics and actor/island boundary proof protect task, actor, and thread boundaries"},
-    {"name":"race safety model","status":"pass","evidence":"shared mutable state crossing parallel boundaries is rejected conservatively with matrix evidence"},
-    {"name":"safe unsafe forbidden parallelism boundary","status":"pass","evidence":"docs and diagnostics define safe, unsafe, and forbidden parallel behavior"}
-  ],
-  "cases": [
-    {"name":"scheduler fairness","kind":"positive","ran":true,"pass":true},
-    {"name":"task join lifecycle","kind":"positive","ran":true,"pass":true},
-    {"name":"task cancellation","kind":"negative","ran":true,"pass":true,"expected_error":"cancelled"},
-    {"name":"deadline timeout","kind":"negative","ran":true,"pass":true,"expected_error":"deadline"},
-    {"name":"select readiness","kind":"positive","ran":true,"pass":true},
-    {"name":"task group lifecycle","kind":"positive","ran":true,"pass":true},
-    {"name":"task group cancel wakes deadline join","kind":"negative","ran":true,"pass":true,"expected_error":"cancelled before deadline"},
-    {"name":"actor recv cancel wake","kind":"negative","ran":true,"pass":true,"expected_error":"actor recv cancel wake"},
-    {"name":"nested cancellation propagation","kind":"positive","ran":true,"pass":true},
-    {"name":"task actor mailbox handoff","kind":"positive","ran":true,"pass":true},
-    {"name":"actor mailbox backpressure","kind":"negative","ran":true,"pass":true,"expected_error":"backpressure"},
-    {"name":"message pool exhaustion","kind":"negative","ran":true,"pass":true,"expected_error":"message pool exhausted"},
-    {"name":"invalid actor handle send","kind":"negative","ran":true,"pass":true,"expected_error":"invalid actor handle"},
-    {"name":"done actor send","kind":"negative","ran":true,"pass":true,"expected_error":"done actor"},
-    {"name":"actor failure handling","kind":"negative","ran":true,"pass":true,"expected_error":"actor failed"},
-    {"name":"invalid handle diagnostics","kind":"negative","ran":true,"pass":true,"expected_error":"invalid handle"},
-    {"name":"resource double join diagnostic","kind":"negative","ran":true,"pass":true,"expected_error":"joined"},
-    {"name":"task group use-after-close diagnostic","kind":"negative","ran":true,"pass":true,"expected_error":"closed"},
-    {"name":"ownership transfer across task boundary","kind":"negative","ran":true,"pass":true,"expected_error":"transfer"},
-    {"name":"ownership transfer across actor boundary","kind":"negative","ran":true,"pass":true,"expected_error":"transfer"},
-    {"name":"race-safety shared mutable rejection","kind":"negative","ran":true,"pass":true,"expected_error":"shared mutable"},
-    {"name":"race-safety rejection matrix","kind":"positive","ran":true,"pass":true},
-    {"name":"actor island boundary proof","kind":"positive","ran":true,"pass":true},
-    {"name":"actor broker leak cleanup","kind":"positive","ran":true,"pass":true},
-    {"name":"safe unsafe forbidden boundary coverage","kind":"positive","ran":true,"pass":true},
-    {"name":"many tasks stress","kind":"stress","ran":true,"pass":true},
-    {"name":"many actor messages stress","kind":"stress","ran":true,"pass":true},
-    {"name":"cancellation storm","kind":"stress","ran":true,"pass":true},
-    {"name":"timeouts stress","kind":"stress","ran":true,"pass":true}
-  ],
-  "diagnostics": [
-    {"case":"task cancellation","code":"TASK_CANCELLED","severity":"error","category":"task","position":"runtime","expected_error":"cancelled"},
-    {"case":"deadline timeout","code":"TASK_DEADLINE_TIMEOUT","severity":"error","category":"task","position":"runtime","expected_error":"deadline"},
-    {"case":"task group cancel wakes deadline join","code":"TASK_GROUP_CANCEL_WAKE_JOIN","severity":"error","category":"task","position":"runtime","expected_error":"cancelled before deadline"},
-    {"case":"actor recv cancel wake","code":"ACTOR_RECV_CANCEL_WAKE","severity":"error","category":"actor","position":"runtime","expected_error":"actor recv cancel wake"},
-    {"case":"actor mailbox backpressure","code":"ACTOR_MAILBOX_BACKPRESSURE","severity":"error","category":"actor","position":"runtime","expected_error":"backpressure"},
-    {"case":"message pool exhaustion","code":"ACTOR_MESSAGE_POOL_EXHAUSTED","severity":"error","category":"actor","position":"runtime","expected_error":"message pool exhausted"},
-    {"case":"invalid actor handle send","code":"ACTOR_INVALID_HANDLE_SEND","severity":"error","category":"actor","position":"runtime","expected_error":"invalid actor handle"},
-    {"case":"done actor send","code":"ACTOR_DONE_SEND","severity":"error","category":"actor","position":"runtime","expected_error":"done actor"},
-    {"case":"actor failure handling","code":"ACTOR_MISSING_NODE_FAILURE","severity":"error","category":"actor","position":"runtime","expected_error":"actor failed"},
-    {"case":"invalid handle diagnostics","code":"ACTOR_INVALID_HANDLE_DIAGNOSTIC","severity":"error","category":"actor","position":"cli-json","expected_error":"invalid handle"},
-    {"case":"resource double join diagnostic","code":"RESOURCE_DOUBLE_JOIN","severity":"error","category":"resource","position":"cli-json","expected_error":"joined"},
-    {"case":"task group use-after-close diagnostic","code":"TASK_GROUP_CLOSED","severity":"error","category":"task","position":"cli-json","expected_error":"closed"},
-    {"case":"ownership transfer across task boundary","code":"OWNERSHIP_TASK_TRANSFER","severity":"error","category":"ownership","position":"compiler","expected_error":"transfer"},
-    {"case":"ownership transfer across actor boundary","code":"OWNERSHIP_ACTOR_TRANSFER","severity":"error","category":"ownership","position":"compiler","expected_error":"transfer"},
-    {"case":"race-safety shared mutable rejection","code":"RACE_SHARED_MUTABLE_REJECTED","severity":"error","category":"race-safety","position":"compiler","expected_error":"shared mutable"}
-  ],
-  "audit": [
-    {"requirement":"production task scheduler","artifact":"compiler/task_runtime_test.go; compiler/internal/actorsrt/linux_x64.go","evidence":"scheduler fairness, many tasks stress, join, cancel, deadline, select, and task group lifecycle cases ran","result":"pass"},
-    {"requirement":"join/cancel/deadline/select/group lifecycle","artifact":"compiler/task_runtime_test.go; examples/task_bounded_stress.tetra","evidence":"required lifecycle cases cover join, cancellation, deadline timeout, cancel-wakes-deadline-join, actor recv cancel wake, select readiness, task group lifecycle, and nested cancellation propagation","result":"pass"},
-    {"requirement":"actor mailbox backpressure and failure handling","artifact":"compiler/actors_test.go; compiler/distributed_actor_runtime_test.go","evidence":"actor mailbox backpressure, checked message pool exhaustion, invalid actor handle send, done actor send, task actor mailbox handoff, and actor failure handling cases are required","result":"pass"},
-    {"requirement":"task/actor/thread-boundary transfer rules","artifact":"compiler/tests/ownership; cli/cmd/tetra/check_diagnostics_resource_actor_test.go","evidence":"task and actor ownership transfer, actor/island boundary proof, resource double join, and task group use-after-close diagnostics are required cases","result":"pass"},
-    {"requirement":"race-safety model or conservative rejections","artifact":"compiler/tests/ownership; docs/spec/actors.md","evidence":"shared mutable race-safety rejection and race-safety rejection matrix evidence are required until a broader race-safe model is implemented","result":"pass"},
-    {"requirement":"stress evidence for tasks, actor messages, cancellation storms, and timeouts","artifact":"tools/cmd/parallel-production-smoke","evidence":"many tasks stress, many actor messages stress, cancellation storm, timeouts stress, and actor broker leak cleanup cases are required","result":"pass"},
-    {"requirement":"safe/unsafe/forbidden parallelism documentation","artifact":"docs/spec/actors.md; docs/user/async_actors_guide.md; docs/spec/runtime_abi.md; compiler/tests/semantics/async_test.go; compiler/tests/safety/effects_test.go","evidence":"documentation defines supported actor/task runtime, transfer boundaries, and unsupported guarantees; safe unsafe forbidden boundary coverage runs compiler tests for allowed immutable task targets, missing runtime/actors effects, unsafe-only operations, and forbidden mutable actor/task targets","result":"pass"},
-    {"requirement":"stable parallel diagnostics","artifact":"compiler/task_runtime_test.go; compiler/actors_test.go; compiler/tests/ownership/actor_task_ownership_test.go; cli/cmd/tetra/check_diagnostics_resource_actor_test.go","evidence":"negative parallel cases require stable expected_error evidence for cancellation, deadline, backpressure, invalid handle, double join, use-after-close, transfer, and shared mutable rejection diagnostics","result":"pass"},
-    {"requirement":"actor benchmark Tier 0/Tier 1 preparation","artifact":"compiler/internal/parallelrt; tools/cmd/parallel-production-smoke","evidence":"parallelrt evidence emits Tier 0 actor ping-pong, fanout/fanin, mailbox throughput, backpressure latency, and zero_copy_move local typed mailbox prep rows with raw artifact references and no performance claim","result":"pass"},
-    {"requirement":"release-gate entrypoint","artifact":"scripts/release/post_v0_4/parallel-production-linux-x64-smoke.sh","evidence":"parallel production gate must run producer, validator, and artifact hash validation","result":"pass"}
-  ]
-}`
+var validParallelProductionSubreport = mustMarshalJSON(map[string]any{
+	"schema":               "tetra.parallel.production.v1",
+	"status":               "pass",
+	"target":               "linux-x64",
+	"host":                 "linux-x64",
+	"runtime":              "parallel-linux-x64",
+	"source":               "tools/cmd/parallel-production-smoke",
+	"processes":            parallelProductionProcesses(),
+	"benchmarks":           parallelProductionBenchmarks(),
+	"actor_memory_domains": json.RawMessage(validParallelProductionActorMemoryDomains),
+	"contracts":            parallelProductionContracts(),
+	"cases":                parallelProductionCases(),
+	"diagnostics":          parallelProductionDiagnostics(),
+	"audit":                parallelProductionAudit(),
+})
 
-const validDistributedActorSubreport = `{
-  "schema": "tetra.actors.distributed-runtime.v1",
-  "status": "pass",
-  "target": "linux-x64",
-  "host": "linux-x64",
-  "runtime": "actornet",
-  "transport": "loopback-tcp",
-  "git_head": "e2c19b8ee276158f8eb2c54cf61e11bd84952893",
-  "artifact_hashes": "artifact-hashes.json",
-  "claims": ["linux-x64 loopback tcp distributed actor runtime evidence"],
-  "nonclaims": ["no cluster membership", "no reconnect/retry production", "no non-linux distributed actor runtime support"],
-  "broker": {"runtime":"actornet","transport":"loopback-tcp","listen_addr":"127.0.0.1:47777","accepted_connections":3,"routed_frames":5,"dropped_frames":1},
-  "processes": [
-    {"name":"broker","kind":"broker","path":"./tetra actor-net","ran":true,"pass":true,"exit_code":0},
-    {"name":"node-a","kind":"node","path":"node-a","ran":true,"pass":true,"exit_code":0},
-    {"name":"node-b","kind":"node","path":"node-b","ran":true,"pass":true,"exit_code":0}
-  ],
-  "frame_counts": {"hello":2,"hello_ack":2,"spawn_req":1,"spawn_ack":1,"send_i32":1,"send_msg":1,"send_typed":1,"node_down":1},
-  "frame_order": ["hello","hello_ack","spawn_req","spawn_ack","send_i32","send_msg","send_typed","node_down"],
-  "cases": [
-    {"name":"cross-node i32 send/receive","ran":true,"pass":true,"expected_exit":0,"actual_exit":0,"node_processes":2},
-    {"name":"cross-node tagged send/receive","ran":true,"pass":true,"expected_exit":0,"actual_exit":0,"node_processes":2},
-    {"name":"cross-node typed send/receive","ran":true,"pass":true,"expected_exit":0,"actual_exit":0,"node_processes":2},
-    {"name":"missing-node failure/status","ran":true,"pass":true,"expected_exit":0,"actual_exit":0,"node_processes":1},
-    {"name":"task cancel/join compatibility","ran":true,"pass":true,"expected_exit":0,"actual_exit":0,"node_processes":1}
-  ]
-}`
+func mustMarshalJSON(value any) string {
+	raw, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		panic(err)
+	}
+	return string(raw) + "\n"
+}
+
+func parallelProductionProcesses() []map[string]any {
+	return []map[string]any{
+		processRow("tetra build", "build", "go build ./cli/cmd/tetra"),
+		processRow("parallel smoke app", "app", "parallel-smoke"),
+		processRow("parallel stress", "stress", "parallel-stress"),
+		processRow("parallel scheduler prototype", "benchmark", "compiler/internal/parallelrt"),
+	}
+}
+
+func processRow(name, kind, path string) map[string]any {
+	return map[string]any{
+		"name":      name,
+		"kind":      kind,
+		"path":      path,
+		"ran":       true,
+		"pass":      true,
+		"exit_code": 0,
+	}
+}
+
+func parallelProductionBenchmarks() []map[string]any {
+	return []map[string]any{
+		benchmarkPrep(
+			"actor ping-pong benchmark prep",
+			"actor_benchmark_prep",
+			"messages_round_trip",
+			"compiler/compiler_suite_test.go::TestActorsPingPongBuildAndRun and "+
+				"examples/actors/actors_pingpong.tetra define the local Linux-x64 "+
+				"actor ping-pong workload candidate",
+			"Actor ping-pong benchmark prep row exists as Tier 0 local smoke only; "+
+				"no measured result is published and cross-runtime comparison is out of scope.",
+		),
+		benchmarkPrep(
+			"actor fanout/fanin benchmark prep",
+			"actor_benchmark_prep",
+			"fanout_fanin_messages",
+			"compiler/internal/parallelrt two-core work stealing model checks "+
+				"actor fanout/fanin scheduling shape without publishing throughput",
+			"Actor fanout/fanin benchmark prep row exists as Tier 0 local smoke only; "+
+				"it records local workload shape and leaves public benchmark publication "+
+				"out of scope.",
+		),
+		benchmarkPrep(
+			"actor mailbox throughput benchmark prep",
+			"actor_benchmark_prep",
+			"mailbox_messages",
+			"compiler/internal/parallelrt TypedMailbox and parallel production "+
+				"actor mailbox cases define the local mailbox throughput workload candidate",
+			"Actor mailbox throughput benchmark prep row exists as Tier 0 local smoke only; "+
+				"it publishes no measured result and no throughput guarantee.",
+		),
+		benchmarkPrep(
+			"actor backpressure latency benchmark prep",
+			"actor_benchmark_prep",
+			"backpressure_wait",
+			"compiler/internal/parallelrt ErrMailboxFull and blocking_recv_yield "+
+				"metadata define the local backpressure latency diagnostic candidate",
+			"Actor backpressure latency benchmark prep row exists as Tier 0 local smoke only; "+
+				"no real-world SLA is claimed.",
+		),
+		benchmarkPrep(
+			"zero_copy_move local typed mailbox benchmark prep",
+			"actor_transfer_prep",
+			"owned_region_transfer",
+			"compiler/internal/parallelrt owned-region transfer report emits "+
+				"zero_copy_move for local typed mailbox metadata only",
+			"zero_copy_move local typed mailbox benchmark prep row exists as Tier 0 "+
+				"local smoke only; it records local owned-region metadata and leaves "+
+				"distributed or network transfer behavior out of scope.",
+		),
+	}
+}
+
+func benchmarkPrep(name, kind, metric, evidence, claim string) map[string]any {
+	return map[string]any{
+		"name":                 name,
+		"kind":                 kind,
+		"metric":               metric,
+		"unit":                 "prep_only",
+		"baseline_value":       0,
+		"measured_value":       0,
+		"improvement_ratio":    0.0,
+		"evidence":             evidence,
+		"claim_tier":           "tier0_local_smoke_only",
+		"claim":                claim,
+		"raw_output_artifacts": []string{parallelRTEvidenceArtifact},
+		"ran":                  false,
+		"pass":                 true,
+	}
+}
+
+var parallelRTEvidenceArtifact = "reports/actor-runtime-foundation/P15/" +
+	"parallelrt-evidence.raw.json"
+
+func parallelProductionContracts() []map[string]any {
+	return []map[string]any{
+		contractRow(
+			"production task scheduler",
+			"scheduler fairness and lifecycle cases ran on linux-x64",
+		),
+		contractRow(
+			"join cancel deadline select group lifecycle",
+			"join, cancel, deadline, select, and group lifecycle diagnostics are stable",
+		),
+		contractRow(
+			"actor mailbox backpressure and failure handling",
+			"mailbox capacity, message pool exhaustion, and actor failure cases are covered",
+		),
+		contractRow(
+			"task actor thread boundary transfer rules",
+			"ownership transfer diagnostics and actor/island boundary proof protect "+
+				"task, actor, and thread boundaries",
+		),
+		contractRow(
+			"race safety model",
+			"shared mutable state crossing parallel boundaries is rejected "+
+				"conservatively with matrix evidence",
+		),
+		contractRow(
+			"safe unsafe forbidden parallelism boundary",
+			"docs and diagnostics define safe, unsafe, and forbidden parallel behavior",
+		),
+	}
+}
+
+func contractRow(name, evidence string) map[string]any {
+	return map[string]any{
+		"name":     name,
+		"status":   "pass",
+		"evidence": evidence,
+	}
+}
+
+func parallelProductionCases() []map[string]any {
+	return []map[string]any{
+		caseRow("scheduler fairness", "positive"),
+		caseRow("task join lifecycle", "positive"),
+		caseError("task cancellation", "negative", "cancelled"),
+		caseError("deadline timeout", "negative", "deadline"),
+		caseRow("select readiness", "positive"),
+		caseRow("task group lifecycle", "positive"),
+		caseError("task group cancel wakes deadline join", "negative", "cancelled before deadline"),
+		caseError("actor recv cancel wake", "negative", "actor recv cancel wake"),
+		caseRow("nested cancellation propagation", "positive"),
+		caseRow("task actor mailbox handoff", "positive"),
+		caseError("actor mailbox backpressure", "negative", "backpressure"),
+		caseError("message pool exhaustion", "negative", "message pool exhausted"),
+		caseError("invalid actor handle send", "negative", "invalid actor handle"),
+		caseError("done actor send", "negative", "done actor"),
+		caseError("actor failure handling", "negative", "actor failed"),
+		caseError("invalid handle diagnostics", "negative", "invalid handle"),
+		caseError("resource double join diagnostic", "negative", "joined"),
+		caseError("task group use-after-close diagnostic", "negative", "closed"),
+		caseError("ownership transfer across task boundary", "negative", "transfer"),
+		caseError("ownership transfer across actor boundary", "negative", "transfer"),
+		caseError("race-safety shared mutable rejection", "negative", "shared mutable"),
+		caseRow("race-safety rejection matrix", "positive"),
+		caseRow("actor island boundary proof", "positive"),
+		caseRow("actor broker leak cleanup", "positive"),
+		caseRow("safe unsafe forbidden boundary coverage", "positive"),
+		stressCase("actor fanout mailbox drain soak", 512, "actor-fanout-mailbox-drain-v1", 90000),
+		stressCase("many tasks stress", 64, "task-bounded-stress-seed-17", 10000),
+		stressCase("many actor messages stress", 256, "actors-tagged-stress-v1", 10000),
+		stressCase("cancellation storm", 16, "parallel-cancellation-storm-v1", 10000),
+		stressCase("timeouts stress", 1, "deadline-aware-waits-v1", 10000),
+	}
+}
+
+func caseRow(name, kind string) map[string]any {
+	return map[string]any{"name": name, "kind": kind, "ran": true, "pass": true}
+}
+
+func caseError(name, kind, expected string) map[string]any {
+	row := caseRow(name, kind)
+	row["expected_error"] = expected
+	return row
+}
+
+func stressCase(name string, iterations int, seed string, maxDurationMS int) map[string]any {
+	row := caseRow(name, "stress")
+	row["iterations"] = iterations
+	row["deterministic_seed"] = seed
+	row["max_duration_ms"] = maxDurationMS
+	return row
+}
+
+func parallelProductionDiagnostics() []map[string]any {
+	return []map[string]any{
+		diagnosticRow("task cancellation", "TASK_CANCELLED", "task", "runtime", "cancelled"),
+		diagnosticRow("deadline timeout", "TASK_DEADLINE_TIMEOUT", "task", "runtime", "deadline"),
+		diagnosticRow(
+			"task group cancel wakes deadline join",
+			"TASK_GROUP_CANCEL_WAKE_JOIN",
+			"task",
+			"runtime",
+			"cancelled before deadline",
+		),
+		diagnosticRow(
+			"actor recv cancel wake",
+			"ACTOR_RECV_CANCEL_WAKE",
+			"actor",
+			"runtime",
+			"actor recv cancel wake",
+		),
+		diagnosticRow(
+			"actor mailbox backpressure",
+			"ACTOR_MAILBOX_BACKPRESSURE",
+			"actor",
+			"runtime",
+			"backpressure",
+		),
+		diagnosticRow(
+			"message pool exhaustion",
+			"ACTOR_MESSAGE_POOL_EXHAUSTED",
+			"actor",
+			"runtime",
+			"message pool exhausted",
+		),
+		diagnosticRow(
+			"invalid actor handle send",
+			"ACTOR_INVALID_HANDLE_SEND",
+			"actor",
+			"runtime",
+			"invalid actor handle",
+		),
+		diagnosticRow("done actor send", "ACTOR_DONE_SEND", "actor", "runtime", "done actor"),
+		diagnosticRow(
+			"actor failure handling",
+			"ACTOR_MISSING_NODE_FAILURE",
+			"actor",
+			"runtime",
+			"actor failed",
+		),
+		diagnosticRow(
+			"invalid handle diagnostics",
+			"ACTOR_INVALID_HANDLE_DIAGNOSTIC",
+			"actor",
+			"cli-json",
+			"invalid handle",
+		),
+		diagnosticRow(
+			"resource double join diagnostic",
+			"RESOURCE_DOUBLE_JOIN",
+			"resource",
+			"cli-json",
+			"joined",
+		),
+		diagnosticRow(
+			"task group use-after-close diagnostic",
+			"TASK_GROUP_CLOSED",
+			"task",
+			"cli-json",
+			"closed",
+		),
+		diagnosticRow(
+			"ownership transfer across task boundary",
+			"OWNERSHIP_TASK_TRANSFER",
+			"ownership",
+			"compiler",
+			"transfer",
+		),
+		diagnosticRow(
+			"ownership transfer across actor boundary",
+			"OWNERSHIP_ACTOR_TRANSFER",
+			"ownership",
+			"compiler",
+			"transfer",
+		),
+		diagnosticRow(
+			"race-safety shared mutable rejection",
+			"RACE_SHARED_MUTABLE_REJECTED",
+			"race-safety",
+			"compiler",
+			"shared mutable",
+		),
+	}
+}
+
+func diagnosticRow(name, code, category, position, expected string) map[string]any {
+	return map[string]any{
+		"case":           name,
+		"code":           code,
+		"severity":       "error",
+		"category":       category,
+		"position":       position,
+		"expected_error": expected,
+	}
+}
+
+func parallelProductionAudit() []map[string]any {
+	return []map[string]any{
+		auditRow(
+			"production task scheduler",
+			"compiler/compiler_suite_test.go; compiler/internal/actorsrt/actorsrt_core.go",
+			"scheduler fairness, many tasks stress, join, cancel, deadline, select, "+
+				"and task group lifecycle cases ran",
+		),
+		auditRow(
+			"join/cancel/deadline/select/group lifecycle",
+			"compiler/compiler_suite_test.go; examples/tasks/task_bounded_stress.tetra",
+			"required lifecycle cases cover join, cancellation, deadline timeout, "+
+				"cancel-wakes-deadline-join, actor recv cancel wake, select readiness, "+
+				"task group lifecycle, and nested cancellation propagation",
+		),
+		auditRow(
+			"actor mailbox backpressure and failure handling",
+			"compiler/compiler_suite_test.go; compiler/compiler_suite_test.go",
+			"actor mailbox backpressure, checked message pool exhaustion, invalid actor "+
+				"handle send, done actor send, task actor mailbox handoff, and actor "+
+				"failure handling cases are required",
+		),
+		auditRow(
+			"task/actor/thread-boundary transfer rules",
+			"compiler/tests/ownership; cli/cmd/tetra/tetra_suite_test.go",
+			"task and actor ownership transfer, actor/island boundary proof, resource "+
+				"double join, and task group use-after-close diagnostics are required cases",
+		),
+		auditRow(
+			"race-safety model or conservative rejections",
+			"compiler/tests/ownership; docs/spec/runtime/actors.md",
+			"shared mutable race-safety rejection and race-safety rejection matrix "+
+				"evidence are required until a broader race-safe model is implemented",
+		),
+		auditRow(
+			"stress evidence for tasks, actor messages, cancellation storms, and timeouts",
+			"tools/cmd/parallel-production-smoke",
+			"many tasks stress, many actor messages stress, actor fanout mailbox drain "+
+				"soak, cancellation storm, timeouts stress, and actor broker leak cleanup "+
+				"cases are required with bounded metadata",
+		),
+		auditRow(
+			"safe/unsafe/forbidden parallelism documentation",
+			"docs/spec/runtime/actors.md; docs/user/platform/async_actors_guide.md; "+
+				"docs/spec/runtime/runtime_abi.md; "+
+				"compiler/tests/semantics/semantics_async_ownership_test.go; "+
+				"compiler/tests/safety/effects/effects_test.go",
+			"documentation defines supported actor/task runtime, transfer boundaries, "+
+				"and unsupported guarantees; safe unsafe forbidden boundary coverage runs "+
+				"compiler tests for allowed immutable task targets, missing runtime/actors "+
+				"effects, unsafe-only operations, and forbidden mutable actor/task targets",
+		),
+		auditRow(
+			"stable parallel diagnostics",
+			"compiler/compiler_suite_test.go; compiler/compiler_suite_test.go; "+
+				"compiler/tests/ownership/actor_task/actor_task_ownership_test.go; "+
+				"cli/cmd/tetra/tetra_suite_test.go",
+			"negative parallel cases require stable expected_error evidence for "+
+				"cancellation, deadline, backpressure, invalid handle, double join, "+
+				"use-after-close, transfer, and shared mutable rejection diagnostics",
+		),
+		auditRow(
+			"actor benchmark Tier 0/Tier 1 preparation",
+			"compiler/internal/parallelrt; tools/cmd/parallel-production-smoke",
+			"parallelrt evidence emits Tier 0 actor ping-pong, fanout/fanin, mailbox "+
+				"throughput, backpressure latency, and zero_copy_move local typed mailbox "+
+				"prep rows with raw artifact references; Tier 1 remains preparation-only "+
+				"here, with no benchmark superiority, no C++/Rust parity, and no official "+
+				"benchmark claim",
+		),
+		auditRow(
+			"release-gate entrypoint",
+			"scripts/release/post_v0_4/parallel-production-linux-x64-smoke.sh",
+			"parallel production gate must run producer, validator, and artifact hash "+
+				"validation",
+		),
+	}
+}
+
+func auditRow(requirement, artifact, evidence string) map[string]any {
+	return map[string]any{
+		"requirement": requirement,
+		"artifact":    artifact,
+		"evidence":    evidence,
+		"result":      "pass",
+	}
+}
+
+var validDistributedActorSubreport = strings.Join([]string{
+	"",
+	"{",
+	"  \"schema\": \"tetra.actors.distributed-runtime.v1\",",
+	"  \"status\": \"pass\",",
+	"  \"target\": \"linux-x64\",",
+	"  \"host\": \"linux-x64\",",
+	"  \"runtime\": \"actornet\",",
+	"  \"transport\": \"loopback-tcp\",",
+	"  \"git_head\": \"e2c19b8ee276158f8eb2c54cf61e11bd84952893\",",
+	"  \"artifact_hashes\": \"artifact-hashes.json\",",
+	("  \"claims\": [\"linux-x64 loopback tcp distributed actor runtime evide" +
+		"nce\"],"),
+	("  \"nonclaims\": [\"no cluster membership\",\"no reconnect/retry producti" +
+		"on\",\"no non-linux distributed actor runtime support\"],"),
+	("  \"broker\": {\"runtime\":\"actornet\",\"transport\":\"loopback-tcp\",\"l" +
+		"isten_addr\":\"127.0.0.1:47777\",\"accepted_connections\":8,\"routed_frame" +
+		"s\":5,\"dropped_frames\":3,\"decode_errors\":3,\"expected_decode_errors\":" +
+		"3,\"last_error\":\"actor wire: invalid slot count: 9\"},"),
+	"  \"processes\": [",
+	("    {\"name\":\"broker\",\"kind\":\"broker\",\"path\":\"./tetra actor-net" +
+		"\",\"ran\":true,\"pass\":true,\"exit_code\":0},"),
+	("    {\"name\":\"node-a\",\"kind\":\"node\",\"path\":\"node-a\",\"ran\":tru" +
+		"e,\"pass\":true,\"exit_code\":0},"),
+	("    {\"name\":\"node-b\",\"kind\":\"node\",\"path\":\"node-b\",\"ran\":tru" +
+		"e,\"pass\":true,\"exit_code\":0}"),
+	"  ],",
+	("  \"frame_counts\": {\"hello\":2,\"hello_ack\":2,\"spawn_req\":1,\"spawn_a" +
+		"ck\":1,\"send_i32\":1,\"send_msg\":1,\"send_typed\":1,\"node_down\":1,\"er" +
+		"ror\":2},"),
+	("  \"frame_order\": [\"hello\",\"hello_ack\",\"spawn_req\",\"spawn_ack\",\"" +
+		"send_i32\",\"send_msg\",\"send_typed\",\"node_down\",\"error\",\"error\"],"),
+	"  \"cases\": [",
+	("    {\"name\":\"cross-node i32 send/receive\",\"ran\":true,\"pass\":true," +
+		"\"expected_exit\":0,\"actual_exit\":0,\"node_processes\":2},"),
+	("    {\"name\":\"cross-node tagged send/receive\",\"ran\":true,\"pass\":tru" +
+		"e,\"expected_exit\":0,\"actual_exit\":0,\"node_processes\":2},"),
+	("    {\"name\":\"cross-node typed send/receive\",\"ran\":true,\"pass\":true" +
+		",\"expected_exit\":0,\"actual_exit\":0,\"node_processes\":2},"),
+	("    {\"name\":\"missing-node failure/status\",\"ran\":true,\"pass\":true," +
+		"\"expected_exit\":0,\"actual_exit\":0,\"node_processes\":1},"),
+	("    {\"name\":\"task cancel/join compatibility\",\"ran\":true,\"pass\":tru" +
+		"e,\"expected_exit\":0,\"actual_exit\":0,\"node_processes\":1},"),
+	("    {\"name\":\"malformed frame length rejected\",\"kind\":\"network_negat" +
+		"ive\",\"ran\":true,\"pass\":true,\"expected_exit\":0,\"actual_exit\":0,\"n" +
+		"ode_processes\":0},"),
+	("    {\"name\":\"duplicate node rejected\",\"kind\":\"network_negative\",\"" +
+		"ran\":true,\"pass\":true,\"expected_exit\":0,\"actual_exit\":0,\"node_proc" +
+		"esses\":0},"),
+	("    {\"name\":\"unknown frame type rejected\",\"kind\":\"network_negative" +
+		"\",\"ran\":true,\"pass\":true,\"expected_exit\":0,\"actual_exit\":0,\"node" +
+		"_processes\":0},"),
+	("    {\"name\":\"bad typed slot count rejected\",\"kind\":\"network_negativ" +
+		"e\",\"ran\":true,\"pass\":true,\"expected_exit\":0,\"actual_exit\":0,\"nod" +
+		"e_processes\":0},"),
+	("    {\"name\":\"missing-node send after broker close\",\"kind\":\"network_" +
+		"negative\",\"ran\":true,\"pass\":true,\"expected_exit\":0,\"actual_exit\":" +
+		"0,\"node_processes\":0},"),
+	("    {\"name\":\"forged source node rejected\",\"kind\":\"network_negative" +
+		"\",\"ran\":true,\"pass\":true,\"expected_exit\":0,\"actual_exit\":0,\"node" +
+		"_processes\":0}"),
+	"  ]",
+	"}",
+	"",
+}, "\n")

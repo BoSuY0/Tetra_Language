@@ -17,17 +17,32 @@ type flowIssue struct {
 	Message string
 }
 
-// Keep these boundaries aligned with docs/spec/flow_syntax_v1.md.
+// Keep these boundaries aligned with docs/spec/flow/flow_syntax_v1.md.
 var legacyPatterns = []struct {
 	re      *regexp.Regexp
 	message string
 }{
-	{regexp.MustCompile(`^\s*(fun|fn)\b.*\{\s*$`), "legacy function syntax; use Flow 'func name(...) -> Type:'"},
-	{regexp.MustCompile(`^\s*if\s*\(.*\)\s*\{\s*$`), "legacy braced if syntax; use Flow 'if condition:'"},
-	{regexp.MustCompile(`^\s*while\s*\(.*\)\s*\{\s*$`), "legacy braced while syntax; use Flow 'while condition:'"},
+	{
+		regexp.MustCompile(`^\s*(fun|fn)\b.*\{\s*$`),
+		"legacy function syntax; use Flow 'func name(...) -> Type:'",
+	},
+	{
+		regexp.MustCompile(`^\s*if\s*\(.*\)\s*\{\s*$`),
+		"legacy braced if syntax; use Flow 'if condition:'",
+	},
+	{
+		regexp.MustCompile(`^\s*while\s*\(.*\)\s*\{\s*$`),
+		"legacy braced while syntax; use Flow 'while condition:'",
+	},
 	{regexp.MustCompile(`^\s*unsafe\s*\{\s*$`), "legacy braced unsafe syntax; use Flow 'unsafe:'"},
-	{regexp.MustCompile(`^\s*island\s*\(.*\)\s+as\s+\w+\s*\{\s*$`), "legacy braced island syntax; use Flow 'island(size) as name:'"},
-	{regexp.MustCompile(`^\s*test\b.*\{\s*$`), "legacy braced test syntax; use Flow 'test \"name\":'"},
+	{
+		regexp.MustCompile(`^\s*island\s*\(.*\)\s+as\s+\w+\s*\{\s*$`),
+		"legacy braced island syntax; use Flow 'island(size) as name:'",
+	},
+	{
+		regexp.MustCompile(`^\s*test\b.*\{\s*$`),
+		"legacy braced test syntax; use Flow 'test \"name\":'",
+	},
 }
 
 var inlineStructLiteralPattern = regexp.MustCompile(`\b[A-Za-z_][A-Za-z0-9_.]*\s*\{[^{}]*\}`)
@@ -44,7 +59,14 @@ func main() {
 	}
 	if len(issues) > 0 {
 		for _, issue := range issues {
-			fmt.Fprintf(os.Stderr, "%s:%d:%d: %s\n", issue.Path, issue.Line, issue.Column, issue.Message)
+			fmt.Fprintf(
+				os.Stderr,
+				"%s:%d:%d: %s\n",
+				issue.Path,
+				issue.Line,
+				issue.Column,
+				issue.Message,
+			)
 		}
 		os.Exit(1)
 	}
@@ -129,20 +151,60 @@ func validateFile(path string) ([]flowIssue, error) {
 		}
 		for _, pattern := range legacyPatterns {
 			if pattern.re.MatchString(trimmed) || pattern.re.MatchString(code) {
-				issues = append(issues, flowIssue{Path: path, Line: lineNo, Column: firstCodeColumn(line), Message: pattern.message})
+				issues = append(
+					issues,
+					flowIssue{
+						Path:    path,
+						Line:    lineNo,
+						Column:  firstCodeColumn(line),
+						Message: pattern.message,
+					},
+				)
 			}
 		}
 		if strings.HasSuffix(trimmed, ";") {
-			issues = append(issues, flowIssue{Path: path, Line: lineNo, Column: strings.LastIndex(code, ";") + 1, Message: "trailing semicolon; Flow syntax is semicolon-free"})
+			issues = append(
+				issues,
+				flowIssue{
+					Path:    path,
+					Line:    lineNo,
+					Column:  strings.LastIndex(code, ";") + 1,
+					Message: "trailing semicolon; Flow syntax is semicolon-free",
+				},
+			)
 		}
 		if col := strings.Index(code, "\t"); col >= 0 {
-			issues = append(issues, flowIssue{Path: path, Line: lineNo, Column: col + 1, Message: "tabs are not supported in Flow indentation"})
+			issues = append(
+				issues,
+				flowIssue{
+					Path:    path,
+					Line:    lineNo,
+					Column:  col + 1,
+					Message: "tabs are not supported in Flow indentation",
+				},
+			)
 		}
 		if col := strings.Index(braceScan, "{"); col >= 0 {
-			issues = append(issues, flowIssue{Path: path, Line: lineNo, Column: col + 1, Message: "legacy brace token; Flow syntax uses indentation blocks"})
+			issues = append(
+				issues,
+				flowIssue{
+					Path:    path,
+					Line:    lineNo,
+					Column:  col + 1,
+					Message: "legacy brace token; Flow syntax uses indentation blocks",
+				},
+			)
 		}
 		if col := strings.Index(braceScan, "}"); col >= 0 {
-			issues = append(issues, flowIssue{Path: path, Line: lineNo, Column: col + 1, Message: "legacy brace token; Flow syntax uses indentation blocks"})
+			issues = append(
+				issues,
+				flowIssue{
+					Path:    path,
+					Line:    lineNo,
+					Column:  col + 1,
+					Message: "legacy brace token; Flow syntax uses indentation blocks",
+				},
+			)
 		}
 	}
 	if err := scanner.Err(); err != nil {

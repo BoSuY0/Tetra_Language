@@ -101,9 +101,9 @@ go run ./cli/cmd/tetra run /tmp/tetra-bug-hunt/session-001/bughunt/net_backoff_c
   cap and creating a denial-of-service style busy retry edge.
 - Supporting evidence:
   - `go run ./cli/cmd/tetra check .../net_backoff_cap_bypass.tetra` succeeded.
-  - `docs/user/standard_library_guide.md` documents capping at non-negative
+  - `docs/user/platform/standard_library_guide.md` documents capping at non-negative
     `max_ms`.
-  - `lib/core/networking.tetra` multiplies `value = value * 2` in a loop before
+  - `lib/core/io/networking.tetra` multiplies `value = value * 2` in a loop before
     comparing with `max_ms`, so overflow can occur before the cap check.
 
 ### BUG-002 - Repository `./tetra` binary is stale relative to current source/runtime checks
@@ -190,7 +190,7 @@ go run ./cli/cmd/tetra run /tmp/tetra-bug-hunt/session-001/bughunt/fs_nul_trunca
   should reject embedded NUL bytes or return false for such paths. It should not
   silently ask Linux `access(2)` about the prefix before the NUL.
 - Evidence path:
-  - `compiler/internal/actorsrt/linux_x64_emit.go` `emitFilesystemExists`
+  - `compiler/internal/actorsrt/actorsrt_core.go` `emitFilesystemExists`
     copies `path_len` bytes to a stack buffer and then appends a NUL terminator
     before calling Linux `access`.
   - The copy loop does not reject NUL bytes already present in the input.
@@ -218,7 +218,7 @@ go run ./cli/cmd/tetra run /tmp/tetra-bug-hunt/session-001/bughunt/crypto_mix_se
   modulo in a way that preserves a non-negative result, or document that signed
   overflow can escape as a negative seed.
 - Evidence path:
-  - `lib/core/crypto.tetra` computes `mixed = seed * 33 + value`.
+  - `lib/core/data/crypto.tetra` computes `mixed = seed * 33 + value`.
   - For the repro input this overflows to the minimum signed `Int` value.
   - The branch `return 0 - mixed` overflows again and remains negative.
 - Why it matters: even though this module is explicitly not cryptographic,
@@ -284,7 +284,7 @@ find /tmp/tetra-bug-hunt/session-002/escape-t4 -maxdepth 3 -printf '%y %p -> %l\
   tree, remove/replace them only under an explicit safe policy, or open files
   with no-follow/inside-root guarantees.
 - Evidence path:
-  - `cli/cmd/tetra/eco_package.go` normalizes archive entry names in
+  - `cli/cmd/tetra/tetra_eco.go` normalizes archive entry names in
     `unpackCapsule`, then writes `filepath.Join(outDir, name)`.
   - The write path uses `os.MkdirAll(filepath.Dir(outPath), 0o755)` followed by
     `os.OpenFile(outPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)`, which
@@ -357,14 +357,14 @@ go run ./cli/cmd/tetra run /tmp/tetra-bug-hunt/session-003/bughunt/time_add_posi
   non-negative duration boundary. These helpers should saturate, reject
   overflowing inputs, or document overflow behavior explicitly.
 - Evidence path:
-  - `docs/spec/stdlib.md` labels `lib.core.time` as stable duration arithmetic
+  - `docs/spec/standard_library/stdlib.md` labels `lib.core.time` as stable duration arithmetic
     and documents negative-input/result clamping.
-  - `docs/user/standard_library_guide.md` says `millis_from_seconds` converts
+  - `docs/user/platform/standard_library_guide.md` says `millis_from_seconds` converts
     seconds by multiplying by `1000` and negative seconds clamp to `0`; it says
     `add_duration_ms` returns `0` if the result would be negative.
-  - `lib/core/time.tetra` returns `seconds * 1000` directly after checking only
+  - `lib/core/base/time.tetra` returns `seconds * 1000` directly after checking only
     the input sign.
-  - `lib/core/time.tetra` computes `let next: Int = base + delta` and treats an
+  - `lib/core/base/time.tetra` computes `let next: Int = base + delta` and treats an
     overflowed negative `next` as a real negative result.
 - Why it matters: microservices commonly compute retry, timeout, lease, and
   deadline durations from configuration. A large but positive value can become
@@ -404,9 +404,9 @@ go run ./cli/cmd/tetra run /tmp/tetra-bug-hunt/session-010/bughunt/slice_bool_em
   docs should state that heap slice length must be positive and provide another
   way to construct empty slices.
 - Evidence path:
-  - `docs/spec/stdlib.md` says `collections.first_or_i32` returns the fallback
+  - `docs/spec/standard_library/stdlib.md` says `collections.first_or_i32` returns the fallback
     for an empty slice.
-  - `docs/user/standard_library_guide.md` says `collections.first_or_i32`
+  - `docs/user/platform/standard_library_guide.md` says `collections.first_or_i32`
     returns the fallback when the slice is empty and says a byte checksum over
     an empty slice returns `0`.
   - `compiler/internal/backend/x64abi/sysv_unix.go` `EmitMakeSlice` forwards
@@ -483,9 +483,9 @@ go run ./cli/cmd/tetra run -runtime selfhost /tmp/tetra-bug-hunt/session-005/bug
   negative absolute deadline. It should saturate, reject overflow, or document a
   bounded deadline range and return an error/status for out-of-range values.
 - Evidence path:
-  - `docs/spec/runtime_abi.md` says `deadline_ms` returns
+  - `docs/spec/runtime/runtime_abi.md` says `deadline_ms` returns
     `now + max(delta, 0)` and `timer_ready` checks an absolute deadline.
-  - `compiler/internal/actorsrt/linux_x64_emit.go` `emitDeadlineMs` clamps the
+  - `compiler/internal/actorsrt/actorsrt_core.go` `emitDeadlineMs` clamps the
     delta to non-negative and then performs `schedTimeMs + delta` with a plain
     32-bit add.
   - The same repro triggers under `-runtime builtin` and `-runtime selfhost`.
@@ -517,7 +517,7 @@ go run ./cli/cmd/tetra run -runtime selfhost /tmp/tetra-bug-hunt/session-005/bug
 - Evidence path:
   - The repro first calls `core.sleep_ms(10)`, then
     `core.sleep_ms(2147483640)`, then `return 42`.
-  - `compiler/internal/actorsrt/linux_x64_emit.go` `emitSleepMs` clamps only
+  - `compiler/internal/actorsrt/actorsrt_core.go` `emitSleepMs` clamps only
     negative `ms`, computes `schedTimeMs + ms` with a plain 32-bit add, stores
     that as the actor wake deadline, marks the actor sleeping, and yields.
   - The builtin scheduler does not resume the only task after that overflowed
@@ -562,9 +562,9 @@ go run ./cli/cmd/tetra run -runtime selfhost /tmp/tetra-bug-hunt/session-006/bug
   every task poll/join runtime entry should validate the actor handle range and
   lifecycle before reading actor state.
 - Evidence path:
-  - `compiler/internal/semantics/types.go` defines `task.i32` as a public struct
+  - `compiler/internal/semantics/semantics_core.go` defines `task.i32` as a public struct
     with public `value: i32` and `error: task.error` fields.
-  - `compiler/internal/actorsrt/linux_x64_emit.go` `emitTaskPollI32`,
+  - `compiler/internal/actorsrt/actorsrt_core.go` `emitTaskPollI32`,
     `emitTaskJoinI32`, and `emitTaskJoinUntilI32` trust the first slot as an
     actor index after checking only the error slot.
   - `compiler/selfhostrt/actors_sysv.tetra` maps any nonzero actor index through
@@ -608,7 +608,7 @@ go run ./cli/cmd/tetra run -runtime builtin /tmp/tetra-bug-hunt/session-006/bugh
   honor the checker's constructor resolution and not require a function
   signature for the struct type name.
 - Evidence path:
-  - `compiler/internal/semantics/exprs.go`
+  - `compiler/internal/semantics/semantics_expressions.go`
     `checkStructConstructorCallWithEffects` accepts labeled calls whose name
     resolves to a struct type and rewrites the call to the resolved type.
   - The build/cache path still reports `task.i32` as a missing call signature,
@@ -643,7 +643,7 @@ go run ./cli/cmd/tetra run -runtime selfhost /tmp/tetra-bug-hunt/session-006/bug
   `core.task_group_*` ABI surface or reject/diagnose task-group use before
   trying to link a runtime object missing required symbols.
 - Evidence path:
-  - `compiler/internal/semantics/builtins.go` exposes `core.task_group_open`,
+  - `compiler/internal/semantics/semantics_core.go` exposes `core.task_group_open`,
     `core.task_group_close`, `core.task_group_cancel`,
     `core.task_group_current`, and `core.task_group_status`.
   - `compiler/selfhostrt/actors_sysv.tetra` implements task spawn/join/time
@@ -696,10 +696,10 @@ go run ./cli/cmd/tetra run -runtime selfhost /tmp/tetra-bug-hunt/session-007/bug
   it should return/throw a typed-message decode error instead of manufacturing
   an enum value from raw `send_msg` frames.
 - Evidence path:
-  - `compiler/internal/lower/lower.go` lowers `core.recv_typed` by calling
+  - `compiler/internal/lower/lower_core.go` lowers `core.recv_typed` by calling
     `__tetra_actor_recv_begin` for the tag and then blindly reading
     `Enum.SlotCount-1` payload slots via `__tetra_actor_recv_slot`.
-  - `compiler/internal/actorsrt/linux_x64_emit.go` `emitRecvBegin` stores the
+  - `compiler/internal/actorsrt/actorsrt_core.go` `emitRecvBegin` stores the
     message as `schedPendingMsg` and returns `msgTag`; `emitRecvSlot` reads
     payload slots without checking `msgCount`.
   - `core.send_msg` creates the same mailbox message shape with caller-chosen
@@ -733,12 +733,12 @@ go run ./cli/cmd/tetra run -runtime builtin /tmp/tetra-bug-hunt/session-007/bugh
   type definition/lowering should agree on how a 1-slot secret wrapper with no
   public fields is constructed.
 - Evidence path:
-  - `compiler/internal/semantics/types.go` defines `secret.i32` as a public
+  - `compiler/internal/semantics/semantics_core.go` defines `secret.i32` as a public
     `TypeStruct` with `SlotCount: 1` but no fields.
-  - `compiler/internal/semantics/exprs.go` accepts a brace struct literal when
+  - `compiler/internal/semantics/semantics_expressions.go` accepts a brace struct literal when
     all declared fields are present; for `secret.i32`, there are zero declared
     fields.
-  - `compiler/internal/lower/lower.go` then lowers the literal to zero slots and
+  - `compiler/internal/lower/lower_core.go` then lowers the literal to zero slots and
     rejects the `let fake: secret.i32 = secret.i32{}` assignment as a slot
     mismatch.
 - Why it matters: privacy/secret wrappers are part of the safety surface, and
@@ -780,9 +780,9 @@ timeout 5s /tmp/tetra-bug-hunt/session-008/bughunt/runtime_div_zero.bin
   unchecked arithmetic is intentional, this process-abort behavior needs to be
   explicitly documented as part of the language/runtime contract.
 - Evidence path:
-  - `compiler/internal/semantics/checker.go` only diagnoses division/modulo by
+  - `compiler/internal/semantics/semantics_checker.go` only diagnoses division/modulo by
     zero inside global constant expressions.
-  - `compiler/internal/backend/x64core/emit.go` lowers both `IRDivI32` and
+  - `compiler/internal/backend/x64core/x64core_core.go` lowers both `IRDivI32` and
     `IRModI32` to `cdq; idiv ecx` without checking whether `ecx == 0` or
     whether the operands are `-2147483648 / -1`.
   - The WASI/web backends similarly emit raw `i32.div_s` / `i32.rem_s` opcodes,
@@ -830,14 +830,14 @@ go run ./cli/cmd/tetra run /tmp/tetra-bug-hunt/session-059/bughunt/budget_uint32
   literals outside `0..2147483647` should be rejected before lowering, or the
   language should specify a wider literal type and require explicit narrowing.
 - Evidence path:
-  - `compiler/internal/frontend/lexer.go` parses number tokens with
+  - `compiler/internal/frontend/frontend_core.go` parses number tokens with
     `strconv.ParseInt(..., 64)`.
-  - `compiler/internal/frontend/parser.go` stores both normal expression and
+  - `compiler/internal/frontend/frontend_core.go` stores both normal expression and
     match-pattern numbers as `NumberExpr{Value: int32(tok.num)}`.
   - That unchecked `int64` to `int32` cast is enough to turn `2147483648` into
     `-2147483648` and `4294967295` into `-1` before semantic checking sees the
     expression.
-  - `compiler/internal/semantics/checker.go` validates `budget(...)` through
+  - `compiler/internal/semantics/semantics_checker.go` validates `budget(...)` through
     the already-wrapped `NumberExpr` value, so `4294967296` arrives as `0` and
     satisfies the non-negative check.
 - Why it matters: config-like constants, quota limits, retry thresholds, and
@@ -873,7 +873,7 @@ go run ./cli/cmd/tetra run /tmp/tetra-bug-hunt/session-009/bughunt/defer_try_err
   by typed-error propagation, just as they run before explicit `throw` and
   `return`.
 - Evidence path:
-  - `compiler/internal/lower/lower.go` return/throw statement lowering calls
+  - `compiler/internal/lower/lower_core.go` return/throw statement lowering calls
     `emitDeferredFramesSince(0, ...)` before cleanup and `IRReturn`.
   - `TryExpr` error-path lowering emits the converted error status and then
     calls `emitCleanup(...)` plus `IRReturn`, but does not emit active defer
@@ -908,10 +908,10 @@ go run ./cli/cmd/tetra run /tmp/tetra-bug-hunt/session-009/bughunt/defer_body_tr
   semantic checking, or lowering should model them in a way that preserves
   cleanup/control-flow invariants and passes IR verification.
 - Evidence path:
-  - `compiler/internal/semantics/checker.go` `validateDeferBodyControl`
+  - `compiler/internal/semantics/semantics_checker.go` `validateDeferBodyControl`
     rejects `ReturnStmt`, `ThrowStmt`, nested `DeferStmt`, and nonlocal
     `break`/`continue`, but it does not inspect expressions for `TryExpr`.
-  - `compiler/internal/lower/lower.go` lowers `TryExpr` error paths by emitting
+  - `compiler/internal/lower/lower_core.go` lowers `TryExpr` error paths by emitting
     an `IRReturn`; when that expression appears inside a replayed defer body,
     the generated stack shape is inconsistent and the verifier rejects it.
 - Why it matters: cleanup blocks should have constrained, predictable control
@@ -1024,29 +1024,29 @@ go run ./cli/cmd/tetra run /tmp/tetra-bug-hunt/session-020/bughunt/throw_u16_out
   outside `0..65535`, unless the language explicitly requires a checked or
   explicit wrapping conversion.
 - Evidence path:
-  - `compiler/internal/semantics/checker.go` has `validateGlobalIntLikeRange`
+  - `compiler/internal/semantics/semantics_checker.go` has `validateGlobalIntLikeRange`
     for global `u8`/`u16` initializers, but the local declaration path checks
     only `typesCompatibleWithNullPtr`.
-  - `compiler/internal/semantics/types.go` treats any `isInt32Like` expected
+  - `compiler/internal/semantics/semantics_core.go` treats any `isInt32Like` expected
     and actual type as compatible, so `i32` literals are accepted for `u8` and
     `u16` without range validation.
-  - `compiler/internal/semantics/exprs.go` validates enum case constructor
+  - `compiler/internal/semantics/semantics_expressions.go` validates enum case constructor
     payloads with the same `typesCompatibleWithNullPtr` compatibility check,
     so enum/message payload constructors inherit the missing `u8`/`u16` range
     validation.
-  - `compiler/internal/semantics/checker.go` validates `ReturnStmt` values with
+  - `compiler/internal/semantics/semantics_checker.go` validates `ReturnStmt` values with
     `typesCompatibleWithNullPtr(returnType, tname, s.Value)`, so `i32`
     expressions are accepted for `u8`/`u16` returns without range validation.
-  - `compiler/internal/semantics/exprs.go` validates both brace-style struct
+  - `compiler/internal/semantics/semantics_expressions.go` validates both brace-style struct
     literals and call-style labeled struct constructors with
     `typesCompatibleWithNullPtr(field.TypeName, valType, value)`.
-  - `compiler/internal/semantics/checker.go` validates struct field assignment
+  - `compiler/internal/semantics/semantics_checker.go` validates struct field assignment
     through `resolveAssignTarget` followed by
     `typesCompatibleWithNullPtr(targetType, valType, s.Value)`.
-  - `compiler/internal/semantics/checker.go` validates `ThrowStmt` values with
+  - `compiler/internal/semantics/semantics_checker.go` validates `ThrowStmt` values with
     `typesCompatibleWithNullPtr(state.throwType, tname, s.Value)`, so typed
     error codes declared as `u8`/`u16` inherit the same range hole.
-  - `compiler/internal/lower/lower.go` lowers `core.store_u8` directly to
+  - `compiler/internal/lower/lower_core.go` lowers `core.store_u8` directly to
     `IRMemWriteU8`, and x64 emission stores only the low byte.
   - `[]u8` index assignment similarly lowers to `IRIndexStoreU8`; the x64
     emitter writes `r8b`, silently truncating the out-of-range value.
@@ -1088,12 +1088,12 @@ go run ./cli/cmd/tetra run /tmp/tetra-bug-hunt/session-012/bughunt/array_int_loc
   after zero initialization, so index `0` should be valid and should initially
   read the element default value.
 - Evidence path:
-  - `compiler/tests/semantics/array_mvp_test.go` has a build smoke test named
+  - `compiler/tests/semantics/semantics_core_language_test.go` has a build smoke test named
     `TestArrayMVPBuildSupportsZeroedFixedArrayFieldGlobal`, so this surface is
     intentionally accepted.
-  - `compiler/internal/semantics/types.go` models `TypeArray` with slice-like
+  - `compiler/internal/semantics/semantics_core.go` models `TypeArray` with slice-like
     `ptr` and `len` fields and `SlotCount: 2`.
-  - `compiler/internal/lower/lower.go` lowers both fixed arrays and slices
+  - `compiler/internal/lower/lower_core.go` lowers both fixed arrays and slices
     through the same `IRIndexLoad*` / `IRIndexStore*` path, which expects a
     runtime pointer and length on the stack.
   - Zeroed global struct fields do not initialize those runtime `ptr`/`len`
@@ -1148,7 +1148,7 @@ go run ./cli/cmd/tetra run /tmp/tetra-bug-hunt/session-013/bughunt/global_struct
   to the resolved global data slot, just as whole-global assignment already
   does.
 - Evidence path:
-  - `compiler/internal/lower/lower.go` `resolveLValue` returns `Global: true`
+  - `compiler/internal/lower/lower_core.go` `resolveLValue` returns `Global: true`
     for global field targets and computes the base from `g.DataIndex`.
   - The general `AssignStmt` field-assignment path then ignores `target.Global`
     and always emits `IRStoreLocal` for `target.Base + i`.
@@ -1199,11 +1199,11 @@ go run ./cli/cmd/tetra run /tmp/tetra-bug-hunt/session-014/bughunt/compound_inde
   the checker should reject side-effecting compound targets until lowering can
   preserve single-evaluation semantics.
 - Evidence path:
-  - `compiler/internal/frontend/parser.go` parses `a += b` by constructing a
+  - `compiler/internal/frontend/frontend_core.go` parses `a += b` by constructing a
     `BinaryExpr` whose left side is `cloneCompoundTarget(expr)`.
   - `cloneCompoundTarget` recursively clones `IndexExpr`, including its index
     expression, rather than staging the target result in a temporary.
-  - `compiler/internal/lower/lower.go` lowers index assignment by evaluating the
+  - `compiler/internal/lower/lower_core.go` lowers index assignment by evaluating the
     store target base/index first, then evaluating `s.Value`; for compound
     assignments `s.Value` contains the cloned target and therefore evaluates the
     index expression again.
@@ -1252,7 +1252,7 @@ go run ./cli/cmd/tetra run /tmp/tetra-bug-hunt/session-017/bughunt/global_i32_wr
   evaluate in a wider/exact integer domain and only narrow after validating the
   declared target type.
 - Evidence path:
-  - `compiler/internal/semantics/checker.go` `evalGlobalConstI32` evaluates
+  - `compiler/internal/semantics/semantics_checker.go` `evalGlobalConstI32` evaluates
     `+`, `-`, `*`, `/`, and `%` directly in `int32`.
   - `validateGlobalIntLikeRange` receives the already-wrapped value, so a
     mathematically out-of-range expression like `65536 * 65536` becomes `0`
@@ -1317,10 +1317,10 @@ go run ./cli/cmd/tetra check /tmp/tetra-bug-hunt/session-021/bughunt/optional_bo
   tag slots consistently. In-range `255` for `UInt8?` should not pass `check`
   and then fail lowering.
 - Evidence path:
-  - `compiler/internal/semantics/types.go` accepts optional payloads when
+  - `compiler/internal/semantics/semantics_core.go` accepts optional payloads when
     `typesCompatible(elem, actual)` is true, and `typesCompatible("u8", "i32")`
     / `typesCompatible("u16", "i32")` are true through `isInt32Like`.
-  - `compiler/internal/lower/lower.go` `lowerExprAs` wraps an optional payload
+  - `compiler/internal/lower/lower_core.go` `lowerExprAs` wraps an optional payload
     only when `actualType == expectedInfo.ElemType`; numeric literals infer as
     `i32`, so `UInt8?`/`UInt16?` literals fall through to plain one-slot
     lowering.
@@ -1375,10 +1375,10 @@ go run ./cli/cmd/tetra run /tmp/tetra-bug-hunt/session-022/bughunt/nested_option
   required payload/tag slots consistently, or the checker should reject direct
   `Int` payloads for `Int??` and require an explicitly typed `Int?` payload.
 - Evidence path:
-  - `compiler/internal/semantics/types.go` `typesCompatible` accepts optional
+  - `compiler/internal/semantics/semantics_core.go` `typesCompatible` accepts optional
     payloads recursively via `typesCompatible(elem, actual)`, so
     `typesCompatible("i32??", "i32")` succeeds through the inner `i32?`.
-  - `compiler/internal/lower/lower.go` `lowerExprAs` only wraps one optional
+  - `compiler/internal/lower/lower_core.go` `lowerExprAs` only wraps one optional
     layer when `actualType == expectedInfo.ElemType`; direct `42` infers as
     `i32`, not `i32?`, so it falls through to one-slot lowering.
   - Local initialization, assignment, and return lowering still expect the
@@ -1439,9 +1439,9 @@ go run ./cli/cmd/tetra check /tmp/tetra-bug-hunt/session-023/bughunt/fixed_array
   metadata mutation should be confined to an audited unsafe boundary that
   preserves allocation provenance and length invariants.
 - Evidence path:
-  - `compiler/internal/semantics/types.go` models `TypeSlice` with public
+  - `compiler/internal/semantics/semantics_core.go` models `TypeSlice` with public
     `ptr` and `len` fields.
-  - `compiler/internal/semantics/resolution.go` `resolveAssignTarget` permits
+  - `compiler/internal/semantics/semantics_core.go` `resolveAssignTarget` permits
     field assignment after `resolveFieldChain`.
   - `rejectFixedArrayInternalAssignment` rejects `ptr`/`len` only when the
     current type is `TypeArray`; it does not reject `TypeSlice` internals.
@@ -1506,14 +1506,14 @@ go run ./cli/cmd/tetra check /tmp/tetra-bug-hunt/session-024/bughunt/string_len_
   pointer/length pair should require an audited unsafe operation that preserves
   provenance and bounds.
 - Evidence path:
-  - `compiler/internal/semantics/types.go` builds `str` by calling
+  - `compiler/internal/semantics/semantics_core.go` builds `str` by calling
     `makeSliceTypeInfo("str", "u8")`, then changing the kind to `TypeStr`,
     so `String` exposes the same `ptr` and `len` fields as slices.
-  - `compiler/internal/semantics/resolution.go` `resolveAssignTarget` permits
+  - `compiler/internal/semantics/semantics_core.go` `resolveAssignTarget` permits
     field assignment after `resolveFieldChain`, and
     `rejectFixedArrayInternalAssignment` only rejects `ptr`/`len` for
     `TypeArray`, not `TypeStr`.
-  - `compiler/internal/lower/lower.go` treats `TypeStr` as indexable with
+  - `compiler/internal/lower/lower_core.go` treats `TypeStr` as indexable with
     element type `u8`, and native `IRIndexLoadU8` compares against the string
     length slot and addresses through the string pointer slot.
 - Why it matters: strings carry request paths, hostnames, headers, and protocol
@@ -1579,18 +1579,18 @@ go run ./cli/cmd/tetra check /tmp/tetra-bug-hunt/session-028/bughunt/typed_task_
   `String`, `ptr`, capabilities, slices, arrays, actors, or other non-sendable
   handles/views.
 - Evidence path:
-  - `docs/spec/v1_scope.md` describes Actor/task transfer safety as covering
+  - `docs/spec/flow/v1_scope.md` describes Actor/task transfer safety as covering
     worker entrypoints, sendable results, handle transfer, and local
     actor/task safety.
-  - `docs/spec/current_supported_surface.md` advertises an Actor/task transfer
+  - `docs/spec/core/current_supported_surface.md` advertises an Actor/task transfer
     safety MVP for local worker entrypoints, sendable scalar and supported
     structural results, handle transfer, and related diagnostics.
-  - `compiler/internal/semantics/types.go`
+  - `compiler/internal/semantics/semantics_core.go`
     `funcSigActorTaskTransferUnsafeReason` validates only parameter and return
     types with `typeActorTaskSendable`; it does not inspect `sig.ThrowsType`.
-  - `compiler/internal/semantics/exprs.go` `validateTypedTaskErrorType` only
+  - `compiler/internal/semantics/semantics_expressions.go` `validateTypedTaskErrorType` only
     checks that the typed task error argument is an enum.
-  - `compiler/internal/semantics/exprs.go` `checkTypedTaskBuiltin` calls
+  - `compiler/internal/semantics/semantics_expressions.go` `checkTypedTaskBuiltin` calls
     `validateTypedTaskErrorType` and then `funcSigActorTaskTransferSafe`, so
     non-sendable error payloads bypass the task-boundary sendability check.
   - `validateTypedActorMessageType` already rejects `TypeStr`, `TypePtr`,
@@ -1661,11 +1661,11 @@ go run ./cli/cmd/tetra run /tmp/tetra-bug-hunt/session-032/bughunt/typed_group_s
   - `compiler/tests/runtime/resource_finalization_test.go`
     `TestTaskGroupFinalizationRejectsSpawnAfterClose` expects the untyped group
     spawn to reject a closed `task.group`.
-  - `compiler/internal/semantics/exprs.go` generic builtin checking calls
+  - `compiler/internal/semantics/semantics_expressions.go` generic builtin checking calls
     `checkResourceCallArg` for each argument and then
     `markCallFinalizedResources`, which is the path that catches ordinary
     task-group use-after-close.
-  - `compiler/internal/semantics/exprs.go` `checkTypedTaskBuiltin` handles
+  - `compiler/internal/semantics/semantics_expressions.go` `checkTypedTaskBuiltin` handles
     `core.task_spawn_group_i32_typed` in a specialized branch; for the first
     argument it only calls `checkExprWithEffects` and checks that the type is
     `task.group`.
@@ -1708,9 +1708,9 @@ go run ./cli/cmd/tetra run /tmp/tetra-bug-hunt/session-036/bughunt/export_secret
   `exprSecretTainted` policy to the thrown expression, at least for exported
   functions and for non-privacy throw sites.
 - Evidence path:
-  - `compiler/tests/safety/effects_test.go` covers the return-side policy:
+  - `compiler/tests/safety/effects/effects_test.go` covers the return-side policy:
     exported functions cannot return unsealed secret-tainted locals.
-  - `compiler/internal/semantics/checker.go` checks `exprSecretTainted` for
+  - `compiler/internal/semantics/semantics_checker.go` checks `exprSecretTainted` for
     `ReturnStmt` and emits the `@export` diagnostic when needed.
   - The adjacent `ThrowStmt` checker validates throw type compatibility,
     borrowed escapes, region scope, and resource payload summaries, but does
@@ -1757,7 +1757,7 @@ go run ./cli/cmd/tetra run /tmp/tetra-bug-hunt/session-040/bughunt/secret_print_
   expression as other externally observable sinks, or require an explicit
   declassification primitive/policy before emitting tainted bytes.
 - Evidence path:
-  - `compiler/internal/semantics/checker.go` `PrintStmt` checking only requires
+  - `compiler/internal/semantics/semantics_checker.go` `PrintStmt` checking only requires
     the `io` effect, checks the expression type, and validates
     `isPrintableType`; it does not call `exprSecretTainted`.
   - `ReturnStmt` in the same checker path calls `exprSecretTainted` and emits
@@ -1817,7 +1817,7 @@ go run ./cli/cmd/tetra run /tmp/tetra-bug-hunt/session-041/bughunt/global_secret
   privacy model should explicitly reject/require declassification for branches
   whose condition is secret-tainted.
 - Evidence path:
-  - `compiler/internal/semantics/checker.go` `ReturnStmt` calls
+  - `compiler/internal/semantics/semantics_checker.go` `ReturnStmt` calls
     `exprSecretTainted` on the returned expression, which catches direct raw
     secret returns.
   - `IfStmt` checking calls `checkExprWithEffects` for the condition and only
@@ -1883,10 +1883,10 @@ go run ./cli/cmd/tetra run /tmp/tetra-bug-hunt/session-043/bughunt/export_secret
   be rejected, require an explicit declassification policy, or taint the
   receive side so exported returns of mailbox data remain blocked.
 - Evidence path:
-  - `docs/spec/actors.md` documents `core.send(to: actor, v: i32) -> i32` as
+  - `docs/spec/runtime/actors.md` documents `core.send(to: actor, v: i32) -> i32` as
     sending a message to another actor and `core.recv() -> i32` as receiving
     from the current mailbox.
-  - `compiler/internal/semantics/checker.go` `ExprStmt` calls
+  - `compiler/internal/semantics/semantics_checker.go` `ExprStmt` calls
     `exprSecretTainted` on call statements but discards the returned `true`
     value unless an error is produced.
   - `exprSecretTainted(CallExpr)` treats calls with tainted arguments to
@@ -1947,13 +1947,13 @@ go run ./cli/cmd/tetra run /tmp/tetra-bug-hunt/session-045/bughunt/export_secret
   through raw memory should be rejected/require declassification, or loads from
   memory that may contain tainted data should preserve taint.
 - Evidence path:
-  - `docs/spec/effects_capabilities_privacy_v1.md` states the v1 privacy MVP is
+  - `docs/spec/runtime/effects_capabilities_privacy_v1.md` states the v1 privacy MVP is
     static auditing and call-shape enforcement, while `cap.mem` belongs to a
     separate unsafe capability boundary.
-  - `docs/spec/unsafe.md` documents `core.load_i32`/`core.store_i32` as unsafe
+  - `docs/spec/runtime/unsafe.md` documents `core.load_i32`/`core.store_i32` as unsafe
     raw-memory operations requiring `mem` and a `cap.mem` argument; it does not
     state that raw memory declassifies privacy-tainted values.
-  - `compiler/internal/semantics/checker.go` `ReturnStmt` checks
+  - `compiler/internal/semantics/semantics_checker.go` `ReturnStmt` checks
     `exprSecretTainted`, which blocks the direct raw secret return control.
   - `exprSecretTainted(CallExpr)` treats a `core.*` call with tainted arguments
     as a tainted result, so `core.store_i32(p, raw, mem)` can mark only the
@@ -2010,10 +2010,10 @@ go run ./cli/cmd/tetra run /tmp/tetra-bug-hunt/session-046/bughunt/export_secret
   runtime clock value derived from that sleep should be considered tainted for
   outward sinks such as exported returns.
 - Evidence path:
-  - `docs/spec/runtime_abi.md` documents that the runtime clock is
+  - `docs/spec/runtime/runtime_abi.md` documents that the runtime clock is
     deterministic/logical, starts at `0`, and that `sleep_ms` parks until
     `time_now_ms() + ms`.
-  - `compiler/internal/semantics/checker.go` `ReturnStmt` calls
+  - `compiler/internal/semantics/semantics_checker.go` `ReturnStmt` calls
     `exprSecretTainted`, which catches direct `core.deadline_ms(raw)` returns.
   - `exprSecretTainted(CallExpr)` treats a `core.*` call with tainted arguments
     as a tainted result, so the local `_slept` binding becomes tainted, but the
@@ -2069,13 +2069,13 @@ go run ./cli/cmd/tetra run /tmp/tetra-bug-hunt/session-047/bughunt/export_secret
   secret-tainted MMIO write should be rejected, require explicit
   declassification, or taint subsequent reads from the affected location.
 - Evidence path:
-  - `docs/spec/capabilities.md` states that MMIO read/write currently lower to
+  - `docs/spec/runtime/capabilities.md` states that MMIO read/write currently lower to
     normal memory operations, but the language contract treats MMIO operations
     as observable and orders them as MMIO.
-  - `compiler/internal/semantics/builtins.go` defines `core.mmio_write_i32` as
+  - `compiler/internal/semantics/semantics_core.go` defines `core.mmio_write_i32` as
     `(ptr, i32, cap.io) -> i32` and `core.mmio_read_i32` as
     `(ptr, cap.io) -> i32`.
-  - `compiler/internal/semantics/checker.go` `ReturnStmt` calls
+  - `compiler/internal/semantics/semantics_checker.go` `ReturnStmt` calls
     `exprSecretTainted`, which blocks the direct raw secret return control.
   - `exprSecretTainted(CallExpr)` treats a `core.*` call with tainted arguments
     as a tainted result, so `core.mmio_write_i32(p, raw, io_cap)` can taint
@@ -2131,7 +2131,7 @@ go run ./cli/cmd/tetra run /tmp/tetra-bug-hunt/session-049/bughunt/export_secret
   exported boundary, require explicit declassification, or mark calls through
   that function-typed value as secret-tainted.
 - Evidence path:
-  - `compiler/internal/semantics/checker.go` `ReturnStmt` calls
+  - `compiler/internal/semantics/semantics_checker.go` `ReturnStmt` calls
     `exprSecretTainted`, which blocks the direct raw secret return control.
   - `exprSecretTainted(CallExpr)` propagates taint from tainted call arguments
     and from known `funcReturnSecretTaint`, but a zero-argument function-typed
@@ -2201,14 +2201,14 @@ go run ./cli/cmd/tetra run /tmp/tetra-bug-hunt/session-058/bughunt/budget_functi
   rejected the same way as the direct call, or the function type should carry
   and enforce a required budget contract rather than only the `budget` effect.
 - Evidence path:
-  - `docs/spec/current_supported_surface.md` states direct calls into
+  - `docs/spec/core/current_supported_surface.md` states direct calls into
     `budget(N)` functions require a caller budget context of at least `N`.
-  - `compiler/internal/semantics/checker.go` `validateBudgetContextsInExpr`
+  - `compiler/internal/semantics/semantics_checker.go` `validateBudgetContextsInExpr`
     checks named `CallExpr` targets found directly in `funcs` and string-based
     actor/task spawn targets.
   - That budget-context pass does not resolve function-typed local/global
     targets, struct or enum callable metadata, or callback argument target sets.
-  - `compiler/internal/semantics/exprs.go`
+  - `compiler/internal/semantics/semantics_expressions.go`
     `validateCallAgainstSemanticClauseTarget` enforces `realtime`, `noalloc`,
     and `noblock`, but has no budget clause case.
   - `hasStrictSemanticCallClauses` similarly excludes `HasBudget`, so existing
@@ -2279,12 +2279,12 @@ go run ./cli/cmd/tetra run /tmp/tetra-bug-hunt/session-060/bughunt/enum_function
   Enclosing functions and aggregates that expose such function types should
   require the same privacy/consent policy as direct secret signatures.
 - Evidence path:
-  - `docs/spec/current_supported_surface.md` says secret-bearing signatures
+  - `docs/spec/core/current_supported_surface.md` says secret-bearing signatures
     require `consent(<token>)`.
-  - `compiler/internal/semantics/resolution.go` resolves `TypeRefFunction` to
+  - `compiler/internal/semantics/semantics_core.go` resolves `TypeRefFunction` to
     the opaque type name `fnptr` after resolving its nested parameter/return
     refs.
-  - `compiler/internal/semantics/checker.go` `validateFunctionPolicyClauses`
+  - `compiler/internal/semantics/semantics_checker.go` `validateFunctionPolicyClauses`
     decides whether a function signature has secrets by calling
     `typeUsesSecret` on the resolved return, throws, and parameter type names.
   - `typeUsesSecret` recursively examines struct/enum/optional/slice/array
@@ -2353,17 +2353,17 @@ go run ./cli/cmd/tetra check /tmp/tetra-bug-hunt/session-061/bughunt/cap_io_lite
   should not be able to manufacture a capability merely by placing an integer
   in the ABI slot.
 - Evidence path:
-  - `docs/spec/effects_capabilities_privacy_v1.md` says `cap.io` and
+  - `docs/spec/runtime/effects_capabilities_privacy_v1.md` says `cap.io` and
     `cap.mem` are opaque tokens that can only be obtained inside `unsafe`
     through `core.cap_io()` / `core.cap_mem()`.
-  - `compiler/internal/semantics/checker.go` validates reserved export names
+  - `compiler/internal/semantics/semantics_checker.go` validates reserved export names
     and duplicate export aliases, but there is no exported-signature filter for
     `TypeCap` parameters or returns.
-  - `compiler/internal/lower/lower.go` lowers `core.fs_exists` as a call with
+  - `compiler/internal/lower/lower_core.go` lowers `core.fs_exists` as a call with
     three argument slots and lowers raw memory operations to `IRMemRead*` /
     `IRMemWrite*`; capability token values are consumed for call shape, not
     validated.
-  - `compiler/internal/actorsrt/linux_x64_emit.go` documents
+  - `compiler/internal/actorsrt/actorsrt_core.go` documents
     `rdi=path_ptr, rsi=path_len, rdx=cap.io token` for `__tetra_fs_exists`,
     but the emitted helper never tests or compares `rdx`.
 - Why it matters: the typechecker protects capability tokens inside Tetra
@@ -2426,17 +2426,17 @@ rg -a -n "ffi_close_group|close_group" /tmp/tetra-bug-hunt/session-062/bughunt/e
   A native caller should not be able to manufacture an `actor`, `task.group`,
   or task handle by placing an integer in the ABI slot.
 - Evidence path:
-  - `docs/spec/actors.md` defines `actor` as an opaque handle and states that
+  - `docs/spec/runtime/actors.md` defines `actor` as an opaque handle and states that
     sending to an invalid handle is outside the current guarantee.
-  - `docs/spec/current_supported_surface.md` and ownership tests treat
+  - `docs/spec/core/current_supported_surface.md` and ownership tests treat
     task-group handles as resource-lifetime handles rather than plain integers.
-  - `compiler/internal/semantics/checker.go` validates reserved export names
+  - `compiler/internal/semantics/semantics_checker.go` validates reserved export names
     and duplicate export aliases, but does not filter exported signatures by
     `TypeActor`, `task.group`, or task-handle resource types.
-  - `compiler/internal/lower/lower.go` lowers `core.task_group_close` with
+  - `compiler/internal/lower/lower_core.go` lowers `core.task_group_close` with
     `ArgSlots: 1`, `core.task_join_i32` with `ArgSlots: 2`, and `core.send`
     with `ArgSlots: 2`, preserving raw handle slots at the runtime ABI.
-  - `compiler/internal/actorsrt/linux_x64_emit.go` computes actor and
+  - `compiler/internal/actorsrt/actorsrt_core.go` computes actor and
     task-group pointers by shifting incoming handle values into scheduler table
     offsets. The local `emitSend` path does not bounds-check the actor handle
     before appending to the target mailbox.
@@ -2495,18 +2495,18 @@ rg -a -n "ffi_free_island|free_island" /tmp/tetra-bug-hunt/session-063/bughunt/e
   symbols should not be able to manufacture an island by passing an integer or
   arbitrary pointer.
 - Evidence path:
-  - `docs/spec/islands.md` says `island` is an opaque handle pointing to the
+  - `docs/spec/memory/islands.md` says `island` is an opaque handle pointing to the
     island base address, with a header containing `bump`, `end`, `total`, and
     `flags`.
-  - `docs/spec/stdlib.md` says opaque handles such as `ptr`, `island`,
+  - `docs/spec/standard_library/stdlib.md` says opaque handles such as `ptr`, `island`,
     `actor`, `cap.io`, `cap.mem`, and `task.*` are not interchangeable even
     when they occupy one slot.
-  - `compiler/internal/semantics/region.go` classifies `island` as a resource
+  - `compiler/internal/semantics/semantics_memory_resources.go` classifies `island` as a resource
     handle type alongside `actor`, `task.group`, and `task.i32`.
-  - `compiler/internal/semantics/checker.go` validates reserved export names
+  - `compiler/internal/semantics/semantics_checker.go` validates reserved export names
     and duplicate export aliases, but does not reject exported signatures that
     contain `island`.
-  - `compiler/internal/lower/lower.go` lowers `core.island_make_u8` to
+  - `compiler/internal/lower/lower_core.go` lowers `core.island_make_u8` to
     `IRIslandMakeSliceU8` with the incoming island slot preserved.
   - `compiler/internal/backend/x64abi/sysv_unix.go` emits `island_make_slice`
     by reading `bump` and `end` directly from the handle pointer, and emits
@@ -2587,16 +2587,16 @@ rg -a -n "ffi_spawn_peer|spawn_peer" /tmp/tetra-bug-hunt/session-064/bughunt/exp
   A host-callable function should not be able to mint `cap.*`, `island`,
   `actor`, `task.group`, or `task.i32` as untyped ABI machine values.
 - Evidence path:
-  - `docs/spec/stdlib.md` states opaque handles such as `ptr`, `island`,
+  - `docs/spec/standard_library/stdlib.md` states opaque handles such as `ptr`, `island`,
     `actor`, `cap.io`, `cap.mem`, and `task.*` are not interchangeable even
     when they occupy one slot.
-  - `docs/spec/islands.md` defines `island` as an opaque arena base handle, and
-    `docs/spec/effects_capabilities_privacy_v1.md` defines `cap.io`/`cap.mem`
+  - `docs/spec/memory/islands.md` defines `island` as an opaque arena base handle, and
+    `docs/spec/runtime/effects_capabilities_privacy_v1.md` defines `cap.io`/`cap.mem`
     as opaque tokens obtained only inside `unsafe`.
-  - `compiler/internal/semantics/checker.go` validates `@export` names and
+  - `compiler/internal/semantics/semantics_checker.go` validates `@export` names and
     duplicate aliases, but does not filter exported return types by `TypeCap`,
     `TypeActor`, `TypeIsland`, or task resource handles.
-  - `compiler/internal/lower/lower.go` copies `fn.ReturnSlots` directly into
+  - `compiler/internal/lower/lower_core.go` copies `fn.ReturnSlots` directly into
     `ir.IRFunc.ReturnSlots` while preserving `ExportName`.
   - `compiler/internal/backend/x64obj/builder.go` assigns the same compiled
     function body and signature to both the internal symbol and export alias.
@@ -2674,13 +2674,13 @@ rg -a -n "ffi_mint_io_box|mint_io_box" /tmp/tetra-bug-hunt/session-065/bughunt/e
   explicit FFI-safe representation that cannot smuggle scheduler, allocator,
   task, or capability authority through native call slots.
 - Evidence path:
-  - `docs/spec/stdlib.md` states opaque handles such as `ptr`, `island`,
+  - `docs/spec/standard_library/stdlib.md` states opaque handles such as `ptr`, `island`,
     `actor`, `cap.io`, `cap.mem`, and `task.*` are not interchangeable even
     when they occupy one slot.
-  - `compiler/internal/semantics/region.go` already has recursive
+  - `compiler/internal/semantics/semantics_memory_resources.go` already has recursive
     `typeContainsResourceHandle` logic for structs, enum payloads, arrays, and
     optionals containing `actor`, `island`, and `task.*` handles.
-  - `compiler/internal/semantics/checker.go` validates export namespace,
+  - `compiler/internal/semantics/semantics_checker.go` validates export namespace,
     reserved `__tetra_` aliases, and duplicate aliases, but does not apply
     recursive handle filtering to exported parameter or return signatures and
     does not cover `TypeCap` inside aggregates.
@@ -2748,16 +2748,16 @@ rg -a -n "ffi_make_captured_callback|make_captured_callback" /tmp/tetra-bug-hunt
   At minimum, captured callback parameters need a boundary check that incoming
   environment slots correspond to a compiler-created closure payload.
 - Evidence path:
-  - `compiler/internal/semantics/checker.go` validates only export namespace,
+  - `compiler/internal/semantics/semantics_checker.go` validates only export namespace,
     reserved aliases, and duplicate aliases; it does not reject `TypeRefFunction`
     in exported parameters or return types.
-  - `compiler/internal/semantics/types.go` defines `fnptr` as a public pointer
+  - `compiler/internal/semantics/semantics_core.go` defines `fnptr` as a public pointer
     kind with `FnPtrSlotCount` slots.
-  - `docs/spec/runtime_abi.md` documents 9-slot direct returns for the current
+  - `docs/spec/runtime/runtime_abi.md` documents 9-slot direct returns for the current
     `fnptr` callable payload slice, and
-    `docs/spec/current_supported_surface.md` describes captured closure
+    `docs/spec/core/current_supported_surface.md` describes captured closure
     lifetime/ABI evidence through the `fnptr` fast path.
-  - `compiler/internal/lower/callables.go` lowers function-typed parameter
+  - `compiler/internal/lower/lower_callables.go` lowers function-typed parameter
     calls by loading hidden capture slots from `local.Base + 1 + slot`; when
     there is a single known target it calls that target directly, but the
     captured environment slots still come from the incoming parameter.
@@ -2833,13 +2833,13 @@ rg -a -n "ffi_make_callback_box|make_callback_box" /tmp/tetra-bug-hunt/session-0
   rule needs to inspect struct fields, enum payloads, and aggregate returns,
   not only direct `fn(...)` parameter and return positions.
 - Evidence path:
-  - `compiler/internal/semantics/checker.go` validates only export namespace,
+  - `compiler/internal/semantics/semantics_checker.go` validates only export namespace,
     reserved aliases, and duplicate aliases; it does not reject
     aggregate-contained `TypeRefFunction` values in exported signatures.
-  - `compiler/internal/semantics/function_types.go` has dedicated metadata
+  - `compiler/internal/semantics/semantics_expressions.go` has dedicated metadata
     paths for function-typed struct fields and enum payloads, proving those
     fields are semantically special even though they lower into `fnptr` slots.
-  - `compiler/internal/lower/callables.go` lowers stored function calls by
+  - `compiler/internal/lower/lower_callables.go` lowers stored function calls by
     reading hidden capture slots from `fnptrBase + 1 + slot`, so a native
     caller that supplies the aggregate supplies the callback environment slots.
   - TOBJ metadata confirms the exported aggregate aliases carry the flattened
@@ -2922,16 +2922,16 @@ rg -a -n "ffi_make_slice|make_slice" /tmp/tetra-bug-hunt/session-068/bughunt/exp
   boundary. Return paths should similarly require an explicit borrowed/owned
   buffer contract rather than publishing internal `ptr,len` views.
 - Evidence path:
-  - `compiler/internal/semantics/checker.go` validates only export namespace,
+  - `compiler/internal/semantics/semantics_checker.go` validates only export namespace,
     reserved aliases, and duplicate aliases; it does not reject `TypeStr`,
     `TypeSlice`, or aggregate two-slot view types in exported signatures.
-  - `compiler/internal/semantics/types.go` builds slices with public `ptr` and
+  - `compiler/internal/semantics/semantics_core.go` builds slices with public `ptr` and
     `len` fields and `SlotCount: 2`; `String`/`str` reuses the same slice shape
     over `u8`.
-  - `docs/spec/stdlib.md` documents `String`/`str` as a two-slot UTF-8
+  - `docs/spec/standard_library/stdlib.md` documents `String`/`str` as a two-slot UTF-8
     string/slice shape and says `str`, `[]u8`, `[]u16`, `[]i32`, and `[]bool`
     are two-slot values (`ptr`, `len`).
-  - `docs/spec/runtime_abi.md` already distinguishes explicit host `ptr,len`
+  - `docs/spec/runtime/runtime_abi.md` already distinguishes explicit host `ptr,len`
     filesystem paths from language-level string handling, which shows this
     boundary needs a deliberate ABI contract rather than accidental flattening.
   - TOBJ metadata confirms the exported aliases carry raw two-slot shapes:
@@ -3030,15 +3030,15 @@ rg -a -n "ffi_make_slice_box|make_slice_box" /tmp/tetra-bug-hunt/session-069/bug
   payloads, optionals, and aggregate returns, not only direct parameter and
   return positions.
 - Evidence path:
-  - `compiler/internal/semantics/checker.go` validates only export namespace,
+  - `compiler/internal/semantics/semantics_checker.go` validates only export namespace,
     reserved aliases, and duplicate aliases; it does not recursively inspect
     exported signatures for `TypeStr`, `TypeSlice`, or optional/aggregate view
     payloads.
-  - `compiler/internal/semantics/types.go` builds slices with public `ptr` and
+  - `compiler/internal/semantics/semantics_core.go` builds slices with public `ptr` and
     `len` fields and `SlotCount: 2`, then computes struct slot offsets by
     summing field `SlotCount`, so a `String`/slice field contributes two raw
     slots to the aggregate ABI.
-  - `docs/spec/stdlib.md` documents `String`/`str` and slices as two-slot
+  - `docs/spec/standard_library/stdlib.md` documents `String`/`str` and slices as two-slot
     values (`ptr`, `len`) and says `T?` adds one presence tag slot to the
     payload slots.
   - TOBJ metadata confirms the flattened raw slot shapes for struct fields,
@@ -3114,15 +3114,15 @@ rg -a -n "ffi_echo_fixed_array|echo_fixed_array" /tmp/tetra-bug-hunt/session-070
   In particular, a fixed-size `[1]Int` boundary should not trust a host-provided
   length slot that can disagree with the static array length.
 - Evidence path:
-  - `compiler/internal/semantics/types.go` models `TypeArray` with public `ptr`
+  - `compiler/internal/semantics/semantics_core.go` models `TypeArray` with public `ptr`
     and `len` fields and `SlotCount: 2`.
-  - `compiler/internal/semantics/resolution.go` has a targeted
+  - `compiler/internal/semantics/semantics_core.go` has a targeted
     `rejectFixedArrayInternalAssignment` guard for `ptr`/`len`, showing those
     metadata slots are sensitive enough to protect from Tetra assignment.
-  - `compiler/internal/semantics/checker.go` validates only export namespace,
+  - `compiler/internal/semantics/semantics_checker.go` validates only export namespace,
     reserved aliases, and duplicate aliases; it does not reject `TypeArray` in
     exported signatures.
-  - `compiler/internal/semantics/exprs.go` and `compiler/internal/lower/lower.go`
+  - `compiler/internal/semantics/semantics_expressions.go` and `compiler/internal/lower/lower_core.go`
     both route `TypeArray` through the ordinary index element path, so an
     exported function that indexes a fixed array consumes the incoming view
     metadata.
@@ -3221,13 +3221,13 @@ rg -a -n "ffi_wrap_fixed_array_envelope|wrap_fixed_array_envelope" /tmp/tetra-bu
   expose mutable `ptr,len` metadata. The rule needs to inspect struct fields,
   enum payloads, optionals, and aggregate returns.
 - Evidence path:
-  - `compiler/internal/semantics/types.go` models `TypeArray` with public `ptr`
+  - `compiler/internal/semantics/semantics_core.go` models `TypeArray` with public `ptr`
     and `len` fields and `SlotCount: 2`, then computes struct slot offsets by
     summing field slot counts.
-  - `compiler/tests/semantics/array_mvp_test.go` has build smoke coverage for
+  - `compiler/tests/semantics/semantics_core_language_test.go` has build smoke coverage for
     fixed arrays inside structs and optionals, so these aggregate surfaces are
     intentionally accepted by the compiler.
-  - `compiler/internal/semantics/checker.go` validates only export namespace,
+  - `compiler/internal/semantics/semantics_checker.go` validates only export namespace,
     reserved aliases, and duplicate aliases; it does not recursively inspect
     exported signatures for nested `TypeArray`.
   - TOBJ metadata confirms the flattened raw slot shapes for struct fields,
@@ -3312,14 +3312,14 @@ rg -a -n "ffi_optional_bool_gate|optional_bool_gate" /tmp/tetra-bug-hunt/session
   not be indistinguishable from an arbitrary one-slot integer in the exported
   object record, especially for gate/authorization-style service APIs.
 - Evidence path:
-  - `compiler/internal/semantics/types.go` defines `bool` as `TypeBool` with
+  - `compiler/internal/semantics/semantics_core.go` defines `bool` as `TypeBool` with
     `SlotCount: 1`, while `typesCompatible` and the controls reject integer
     literals in `Bool` positions.
-  - `compiler/internal/semantics/checker.go` validates only export namespace,
+  - `compiler/internal/semantics/semantics_checker.go` validates only export namespace,
     reserved aliases, and duplicate aliases; it does not validate or annotate
     exported `Bool` signatures.
-  - `compiler/internal/lower/lower.go` lowers `if flag` to a one-slot condition,
-    and `compiler/internal/backend/x64core/emit.go` implements conditional jumps
+  - `compiler/internal/lower/lower_core.go` lowers `if flag` to a one-slot condition,
+    and `compiler/internal/backend/x64core/x64core_core.go` implements conditional jumps
     with `test eax,eax`, so any nonzero incoming slot behaves as true.
   - `compiler/internal/format/tobj/object.go` stores exported symbol signatures
     as only `ParamSlots` and `ReturnSlots`, not scalar types, ranges, or boolean
@@ -3390,17 +3390,17 @@ go run ./cli/cmd/tetra build -o /tmp/tetra-bug-hunt/session-073/bughunt/catch_gu
   lowering must define a checked failure path instead of exposing an unstored
   result local.
 - Evidence path:
-  - `compiler/internal/semantics/exprs.go` checks `match` expression
+  - `compiler/internal/semantics/semantics_expressions.go` checks `match` expression
     exhaustiveness by calling the complete optional/enum helpers, then falls
     back to a `hasDefault` loop that treats any default arm as exhaustive without
     checking `c.Guard == nil`.
   - The same file's `checkCatchExpr` uses the same fallback shape for `catch`
     expression exhaustiveness.
   - The dedicated complete-pattern helpers skip guarded cases, and
-    `compiler/internal/semantics/checker.go` uses a stricter `matchHasDefault`
+    `compiler/internal/semantics/semantics_checker.go` uses a stricter `matchHasDefault`
     helper for match statements, so the hole is specific to expression fallback
     default detection.
-  - `compiler/internal/lower/lower.go` lowers guarded expression arms by storing
+  - `compiler/internal/lower/lower_core.go` lowers guarded expression arms by storing
     into the result local only after the guard passes; when a guarded default
     guard fails, control reaches the shared end label and reloads the result
     local without any arm assignment.
@@ -3464,16 +3464,16 @@ rg -a -n "ffi_request_decision|request_decision" /tmp/tetra-bug-hunt/session-074
   entry validation guard that rejects tags outside the declared enum cases before
   Tetra control flow sees them.
 - Evidence path:
-  - `compiler/internal/semantics/checker.go` validates `@export` names for
+  - `compiler/internal/semantics/semantics_checker.go` validates `@export` names for
     namespace/reserved/duplicate rules only; it does not reject enum parameter
     or return types and does not attach discriminant validation metadata.
   - `compiler/internal/format/tobj/object.go` stores exported symbol signatures
     as `ParamSlots` and `ReturnSlots` only, so `Route` is indistinguishable from
     an arbitrary one-slot integer to a native caller.
-  - `compiler/internal/semantics/checker.go` and `exprs.go` treat enum matches
+  - `compiler/internal/semantics/semantics_checker.go` and `exprs.go` treat enum matches
     as exhaustive when every declared case appears, so no source-level default
     is required for invalid runtime tags.
-  - `compiler/internal/lower/lower.go` lowers enum `match` by comparing the raw
+  - `compiler/internal/lower/lower_core.go` lowers enum `match` by comparing the raw
     tag slot to each case ordinal. If no case matches and there is no default,
     lowering emits a jump to the end label.
 - Why it matters: exported functions are service/FFI boundaries. Route,
@@ -3535,13 +3535,13 @@ rg -a -n "ffi_optional_iflet|optional_iflet" /tmp/tetra-bug-hunt/session-075/bug
   type/tag metadata for host bindings, or validate the presence tag at the entry
   boundary so only `0` and `1` are accepted.
 - Evidence path:
-  - `docs/spec/flow_syntax_v1.md` defines optional layout as a presence tag
+  - `docs/spec/flow/flow_syntax_v1.md` defines optional layout as a presence tag
     followed by payload slots.
-  - `compiler/internal/lower/lower.go` `lowerExprAs` emits `0` for `none` and
+  - `compiler/internal/lower/lower_core.go` `lowerExprAs` emits `0` for `none` and
     `1` for implicit optional payload packing.
   - The same file lowers optional `match` and `if let some(...)` checks with
     `IRJmpIfZero`, so any nonzero presence tag is treated as `some`.
-  - `compiler/internal/semantics/checker.go` validates `@export` names but does
+  - `compiler/internal/semantics/semantics_checker.go` validates `@export` names but does
     not reject optional parameter types or add presence-tag validation metadata.
   - `compiler/internal/format/tobj/object.go` records only parameter and return
     slot counts, making `Int?` indistinguishable from two arbitrary integer
@@ -3627,17 +3627,17 @@ go run ./cli/cmd/tetra check /tmp/tetra-bug-hunt/session-076/bughunt/export_secr
   embedded constant. Secret-bearing exported signatures should not rely on a
   host-supplied one-slot consent value as their only policy entry guard.
 - Evidence path:
-  - `docs/spec/effects_capabilities_privacy_v1.md` says `core.consent_token()`
+  - `docs/spec/runtime/effects_capabilities_privacy_v1.md` says `core.consent_token()`
     lowers to an opaque runtime sentinel and consent clauses validate exact
     sentinel equality; it also states the surface is static auditing and
     call-shape/lowering-shape enforcement, not cryptographic isolation.
-  - `compiler/internal/semantics/types.go` models `consent.token` as a public
+  - `compiler/internal/semantics/semantics_core.go` models `consent.token` as a public
     one-slot `TypeCap`, while `secret.i32` is a public one-slot struct.
-  - `compiler/internal/semantics/checker.go` requires `privacy` and
+  - `compiler/internal/semantics/semantics_checker.go` requires `privacy` and
     `consent(<token>)` for secret-bearing signatures, but `@export` validation
     only checks reserved/duplicate names and does not reject `consent.token`
     parameters at the native boundary.
-  - `compiler/internal/lower/lower.go` emits `IRLoadLocal`, sentinel
+  - `compiler/internal/lower/lower_core.go` emits `IRLoadLocal`, sentinel
     `IRConstI32`, `IRCmpEqI32`, and `IRJmpIfZero` for consent clauses; the
     sentinel is the compile-time constant `-0x43544f4b`.
   - `compiler/internal/format/tobj/object.go` stores symbol signatures as
@@ -3699,11 +3699,11 @@ go run ./cli/cmd/tetra build -emit object -o /tmp/tetra-bug-hunt/session-077/bug
   Accepting an export declaration and silently omitting the requested symbol is
   not a safe build artifact.
 - Evidence path:
-  - `compiler/internal/semantics/checker.go` validates `@export` names before
+  - `compiler/internal/semantics/semantics_checker.go` validates `@export` names before
     the generic-function branch records a `Generic` signature with zero slots,
     but the later body-checking/lowering path skips functions whose
     `TypeParams` are still present.
-  - `compiler/internal/semantics/generics.go` `cloneGenericFunc()` sets
+  - `compiler/internal/semantics/semantics_expressions.go` `cloneGenericFunc()` sets
     `out.ExportName = ""`, so monomorphized specializations are never emitted
     under the requested export alias.
   - `compiler/internal/backend/x64obj/builder.go` emits export aliases from
@@ -3772,13 +3772,13 @@ go run ./cli/cmd/tetra build -emit object -o /tmp/tetra-bug-hunt/session-078/bug
   payload layout so native bindings cannot silently treat typed-error control
   flow as an untyped tuple.
 - Evidence path:
-  - `docs/spec/flow_syntax_v1.md` says typed errors return success tag plus
+  - `docs/spec/flow/flow_syntax_v1.md` says typed errors return success tag plus
     success/error payload slots and source bare calls to throwing functions are
     rejected in favor of `try`/`catch`.
-  - `compiler/internal/semantics/checker.go` computes throwing return slot
+  - `compiler/internal/semantics/semantics_checker.go` computes throwing return slot
     counts but `@export` validation only checks names/duplicates, not whether
     a function has `HasThrows`.
-  - `compiler/internal/lower/lower.go` lowers throwing returns into compact
+  - `compiler/internal/lower/lower_core.go` lowers throwing returns into compact
     two-slot or expanded success/error/status layouts and then copies only
     `ReturnSlots` into `IRFunc`.
   - `compiler/internal/format/tobj/object.go` writes `HasSignature`,
@@ -3854,11 +3854,11 @@ go run ./cli/cmd/tetra build -emit object -o /tmp/tetra-bug-hunt/session-079/bug
   callers cannot silently treat `borrow`, `consume`, and `inout` as ordinary
   owned slots.
 - Evidence path:
-  - `docs/spec/current_supported_surface.md` defines `borrow`, `inout`, and
+  - `docs/spec/core/current_supported_surface.md` defines `borrow`, `inout`, and
     `consume` as call-site contracts.
-  - `compiler/internal/semantics/types.go`,
-    `compiler/internal/semantics/exprs.go`, and
-    `compiler/internal/semantics/checker.go` use `ParamOwnership` to reject
+  - `compiler/internal/semantics/semantics_core.go`,
+    `compiler/internal/semantics/semantics_expressions.go`, and
+    `compiler/internal/semantics/semantics_checker.go` use `ParamOwnership` to reject
     unsafe local calls and actor/task transfers.
   - `compiler/internal/backend/x64obj/builder.go` copies only lowered slot
     counts into `tobj.Symbol`.
@@ -3958,12 +3958,12 @@ go run ./cli/cmd/tetra run /tmp/tetra-bug-hunt/session-081/bughunt/defer_capture
   is consumed before cleanup runs, while still allowing cleanup that captures
   only unaffected sibling paths such as `pair.right` or the second enum payload.
 - Evidence path:
-  - `docs/spec/current_supported_surface.md` and `docs/spec/ownership_v1.md`
+  - `docs/spec/core/current_supported_surface.md` and `docs/spec/runtime/ownership_v1.md`
     state that partial struct-field, enum-payload, and optional-payload consumes
     reject whole-value use while allowing sibling-path reuse.
-  - `compiler/internal/semantics/closure_captures.go` records a field access by
+  - `compiler/internal/semantics/semantics_memory_resources.go` records a field access by
     collecting only the base identifier, so `pair.left` becomes capture `pair`.
-  - `compiler/internal/semantics/region.go` `checkPendingDeferCaptures()`
+  - `compiler/internal/semantics/semantics_memory_resources.go` `checkPendingDeferCaptures()`
     checks only `consumedAt(name)` for each captured base; it does not call the
     descendant-aware `checkNoConsumedDescendants()` path used by ordinary
     whole-value checks.
@@ -4019,14 +4019,14 @@ GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra build -o /tmp/tetra-bug-hunt/
   locals as taint dependencies and reject later secret-tainting assignments that
   would make the cleanup body write secret-derived data to public/global sinks.
 - Evidence path:
-  - `compiler/internal/semantics/checker.go` `checkDeferBody()` snapshots
+  - `compiler/internal/semantics/semantics_checker.go` `checkDeferBody()` snapshots
     `analysis.secretTaint`, checks the cleanup body immediately, then restores
     the saved taint map.
   - `LetStmt` and `AssignStmt` update local secret taint after
     `core.secret_unseal_i32(...)`.
   - Global assignment rejects `secretTainted` only when the checker sees the
     tainted expression during statement checking.
-  - `compiler/internal/lower/lower.go` stores deferred bodies and lowers them at
+  - `compiler/internal/lower/lower_core.go` stores deferred bodies and lowers them at
     scope exit, so the cleanup reads the later local value rather than the value
     from registration time.
 - Why it matters: cleanup code in request handlers and microservices often
@@ -4084,9 +4084,9 @@ GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra run /tmp/tetra-bug-hunt/sessi
   Task and actor spawn checks should reject such workers before they cross the
   concurrency boundary.
 - Evidence path:
-  - `compiler/internal/semantics/exprs.go` rejects task and actor spawn targets
+  - `compiler/internal/semantics/semantics_expressions.go` rejects task and actor spawn targets
     when `targetSig.TouchesMutableGlobals` is true.
-  - `compiler/internal/semantics/checker.go` copies
+  - `compiler/internal/semantics/semantics_checker.go` copies
     `analysis.touchesMutableGlobals` into each function signature.
   - `checkExprWithEffects()` marks mutable global reads by setting
     `analysis.touchesMutableGlobals = true`.
@@ -4146,12 +4146,12 @@ rg -a -n "ffi_async_answer|async_answer|ffi_sync_answer|sync_answer" /tmp/tetra-
   successful exported object should not erase the source-level async call
   requirement into a plain synchronous slot signature.
 - Evidence path:
-  - `compiler/internal/frontend/parser.go` permits `@export` attributes before
+  - `compiler/internal/frontend/frontend_core.go` permits `@export` attributes before
     `async func`.
-  - `compiler/internal/semantics/checker.go` stores `FuncSig.Async` and uses it
+  - `compiler/internal/semantics/semantics_checker.go` stores `FuncSig.Async` and uses it
     to reject bare async calls, async `main`, and async task/actor targets, but
     `validateExportedOpaqueABISignature()` does not reject `fn.Async`.
-  - `compiler/internal/lower/lower.go` copies `fn.Decl.ExportName` into
+  - `compiler/internal/lower/lower_core.go` copies `fn.Decl.ExportName` into
     `ir.IRFunc` while not carrying async metadata into the exported symbol.
   - `compiler/internal/format/tobj/object.go` `Symbol` stores only `Name`,
     `Offset`, `HasSignature`, `ParamSlots`, and `ReturnSlots`; there is no async
@@ -4212,7 +4212,7 @@ rg -a -n "ffi_budgeted_answer|budgeted_answer|ffi_plain_answer|plain_answer" /tm
   erase a source-level `budget(N)` call precondition into a plain slot
   signature.
 - Evidence path:
-  - `compiler/internal/semantics/checker.go` `validateBudgetContextEdge()`
+  - `compiler/internal/semantics/semantics_checker.go` `validateBudgetContextEdge()`
     enforces caller budget for direct calls into budgeted functions.
   - `compiler/internal/ir/ir.go` `IRPolicy` carries `HasBudget` and `Budget`
     internally for lowered function policy.
@@ -4273,12 +4273,12 @@ rg -a -n "ffi_log_answer|log_answer|ffi_plain_answer|plain_answer" /tmp/tetra-bu
   exported object should not erase a source-level `uses io` call requirement
   into a plain slot signature.
 - Evidence path:
-  - `docs/spec/effects_capabilities_privacy_v1.md` states that function calls
+  - `docs/spec/runtime/effects_capabilities_privacy_v1.md` states that function calls
     propagate callee effects transitively and missing `uses` declarations are
     diagnostics.
-  - `compiler/internal/semantics/effects.go` `effectContext.require()` emits the
+  - `compiler/internal/semantics/semantics_memory_resources.go` `effectContext.require()` emits the
     missing-effect diagnostic for ordinary source callers.
-  - `compiler/internal/semantics/checker.go` stores normalized effects in
+  - `compiler/internal/semantics/semantics_checker.go` stores normalized effects in
     `FuncSig.Effects`, but `validateExportedOpaqueABISignature()` only rejects
     selected opaque ABI value shapes and does not reject or preserve
     `fn.Uses`.
@@ -4341,7 +4341,7 @@ python -c '<TOBJ symbol parser>' /tmp/tetra-bug-hunt/session-087/export_name_col
   order. The object builder should also treat function-name symbol collisions as
   hard errors instead of overwriting existing symbol table entries.
 - Evidence path:
-  - `compiler/internal/semantics/checker.go` tracks duplicate `@export` names
+  - `compiler/internal/semantics/semantics_checker.go` tracks duplicate `@export` names
     only in `exportedSymbols`; it does not compare export aliases against all
     function names in the module/world.
   - `compiler/internal/backend/x64obj/builder.go` writes
@@ -4402,9 +4402,9 @@ python -c '<TOBJ symbol parser with repr(name)>' /tmp/tetra-bug-hunt/session-088
   whitespace, control characters, and other binding-hostile bytes before object
   emission.
 - Evidence path:
-  - `compiler/internal/frontend/parser.go` rejects only an empty export string
+  - `compiler/internal/frontend/frontend_core.go` rejects only an empty export string
     during attribute parsing.
-  - `compiler/internal/semantics/checker.go` checks `core.*`, reserved
+  - `compiler/internal/semantics/semantics_checker.go` checks `core.*`, reserved
     `__tetra_*`, and duplicate export names, but does not validate a general
     symbol-name grammar.
   - `compiler/internal/format/tobj/object.go` `validateSymbolRecord()` rejects
@@ -4461,13 +4461,13 @@ python -c '<TOBJ relocation parser with repr(name)>' /tmp/tetra-bug-hunt/session
   symbol grammar as exported symbols and reject whitespace, control characters,
   and other binding-hostile bytes before lowering or object emission.
 - Evidence path:
-  - `docs/spec/unsafe.md:33` classifies `core.sym_addr` as always unsafe with
+  - `docs/spec/runtime/unsafe.md:33` classifies `core.sym_addr` as always unsafe with
     the `link` effect.
-  - `compiler/internal/semantics/exprs.go:2012` to `:2022` validates only arity,
+  - `compiler/internal/semantics/semantics_expressions.go:2012` to `:2022` validates only arity,
     string-literal form, and non-empty bytes.
-  - `compiler/internal/lower/lower.go:3291` to `:3303` repeats the same
+  - `compiler/internal/lower/lower_core.go:3291` to `:3303` repeats the same
     non-empty check and emits `IRSymAddr` with the raw string.
-  - `compiler/internal/backend/x64core/emit.go:724` to `:729` turns `IRSymAddr`
+  - `compiler/internal/backend/x64core/x64core_core.go:724` to `:729` turns `IRSymAddr`
     into a `CallPatch` name.
   - `compiler/internal/backend/x64obj/builder.go:124` to `:130` serializes
     unresolved call patches as `RelocCallRel32` without symbol grammar checks.
@@ -4520,15 +4520,15 @@ python -c '<TOBJ parser printing repr(name) and raw hex>' /tmp/tetra-bug-hunt/se
   A NUL-containing string may be a valid byte string in some languages, but it
   must not become a native ABI symbol name.
 - Evidence path:
-  - `compiler/internal/frontend/lexer.go:337` to `:343` treats a source file as
+  - `compiler/internal/frontend/frontend_core.go:337` to `:343` treats a source file as
     acceptable when it is valid UTF-8; `0x00` satisfies that check.
-  - `compiler/internal/frontend/lexer.go:355` to `:391` appends any
+  - `compiler/internal/frontend/frontend_core.go:355` to `:391` appends any
     non-quote/non-escape byte directly to `TokenString.str`.
-  - `compiler/internal/frontend/parser.go:1127` to `:1139` copies
+  - `compiler/internal/frontend/frontend_core.go:1127` to `:1139` copies
     `TokenString.str` into `ExportName` and rejects only the empty string.
-  - `compiler/internal/semantics/exprs.go:2012` to `:2022` validates
+  - `compiler/internal/semantics/semantics_expressions.go:2012` to `:2022` validates
     `core.sym_addr` only as a non-empty string literal.
-  - `compiler/internal/lower/lower.go:3291` to `:3303` emits `IRSymAddr` with
+  - `compiler/internal/lower/lower_core.go:3291` to `:3303` emits `IRSymAddr` with
     the raw string bytes.
   - `compiler/internal/format/tobj/object.go:308` to `:331` rejects only empty
     symbol/relocation names.
@@ -4770,10 +4770,10 @@ uses link:
     compile error.
   - `docs/backend/wasm_architecture.md:60` to `:63` lists
     `core.sym_addr` token lowering as currently allowed WASM IR.
-  - `docs/spec/unsafe.md:33` marks `core.sym_addr` as always unsafe with the
+  - `docs/spec/runtime/unsafe.md:33` marks `core.sym_addr` as always unsafe with the
     `link` effect.
-  - `compiler/internal/semantics/exprs.go:2012` to `:2023` and
-    `compiler/internal/lower/lower.go:3291` to `:3304` validate only arity,
+  - `compiler/internal/semantics/semantics_expressions.go:2012` to `:2023` and
+    `compiler/internal/lower/lower_core.go:3291` to `:3304` validate only arity,
     string-literal shape, and non-empty names before emitting `IRSymAddr`.
   - `compiler/internal/backend/wasm32_wasi/codegen.go:514` to `:516` and
     `compiler/internal/backend/wasm32_web/codegen.go:581` to `:583` lower
@@ -4781,7 +4781,7 @@ uses link:
   - `compiler/internal/backend/wasm32_wasi/codegen.go:1548` to `:1585` and
     `compiler/internal/backend/wasm32_web/codegen.go:1570` to `:1607` check
     only for empty names and in-module FNV token collisions.
-  - `compiler/internal/backend/x64core/emit.go:724` to `:730` shows the native
+  - `compiler/internal/backend/x64core/x64core_core.go:724` to `:730` shows the native
     path preserves `IRSymAddr` as a named relocation instead of erasing it.
 - Why it matters: `core.sym_addr` is explicitly a `link` boundary. Erasing the
   original symbol into an unaudited 32-bit token means service manifests,
@@ -4931,7 +4931,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S007-001 | Graphify/source navigation for actor/privacy surfaces | `mcp__graphify__.query_graph ... actor handle consent.token secret.i32 ...`; `rg -n "secret\\.i32|consent\\.token|send_typed|recv_typed|send_msg"`; source reads in `compiler/internal/lower/lower.go`, `compiler/internal/actorsrt/linux_x64_emit.go`, and `compiler/selfhostrt/actors_sysv.tetra` | Found typed actor receive lowering reads tag and payload slots from shared mailbox without count validation; found `secret.i32` public struct with slot count 1 and no fields | Create raw-to-typed and secret literal probes |
+| S007-001 | Graphify/source navigation for actor/privacy surfaces | `mcp__graphify__.query_graph ... actor handle consent.token secret.i32 ...`; `rg -n "secret\\.i32|consent\\.token|send_typed|recv_typed|send_msg"`; source reads in `compiler/internal/lower/lower_core.go`, `compiler/internal/actorsrt/actorsrt_core.go`, and `compiler/selfhostrt/actors_sysv.tetra` | Found typed actor receive lowering reads tag and payload slots from shared mailbox without count validation; found `secret.i32` public struct with slot count 1 and no fields | Create raw-to-typed and secret literal probes |
 | S007-002 | Typed actor baseline | `go run ./cli/cmd/tetra check .../actor_typed_send_inc_baseline.tetra`; `go run ./cli/cmd/tetra run -runtime builtin .../actor_typed_send_inc_baseline.tetra`; `go run ./cli/cmd/tetra run -runtime selfhost .../actor_typed_send_inc_baseline.tetra` | `check` succeeded; both runtimes printed `exit status 42` for `CounterMsg.inc(20, 22)` | Baseline valid |
 | S007-003 | Raw `send_msg` spoof of typed payload case | `go run ./cli/cmd/tetra check .../actor_raw_send_msg_spoofs_typed_inc.tetra`; `go run ./cli/cmd/tetra run -runtime builtin .../actor_raw_send_msg_spoofs_typed_inc.tetra`; `go run ./cli/cmd/tetra run -runtime selfhost .../actor_raw_send_msg_spoofs_typed_inc.tetra` | `check` succeeded; both runtimes printed `exit status 42`, proving raw tag 0 decoded as `CounterMsg.inc(7, 0)` | Confirmed BUG-017 |
 | S007-004 | Raw `send_msg` spoof of typed zero-payload case | `go run ./cli/cmd/tetra check .../actor_raw_send_msg_spoofs_typed_reset.tetra`; `go run ./cli/cmd/tetra run -runtime builtin ...`; `go run ./cli/cmd/tetra run -runtime selfhost ...` | `check` succeeded; both runtimes printed `exit status 42`, proving raw tag 1 decoded as `CounterMsg.reset` | Confirms BUG-017 |
@@ -4953,7 +4953,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S008-001 | Graphify/source navigation for stdlib and arithmetic surfaces | `mcp__graphify__.query_graph ... serialization json strings payload helpers ...`; `rg -n "division|divide|mod|zero|IRDivI32|IRModI32"`; source reads in `lib/core/*`, `compiler/internal/semantics/checker.go`, and backend emitters | Found const-only division/modulo diagnostics and direct backend `idiv`/`i32.div_s` emission without arithmetic guards | Probe runtime expressions directly |
+| S008-001 | Graphify/source navigation for stdlib and arithmetic surfaces | `mcp__graphify__.query_graph ... serialization json strings payload helpers ...`; `rg -n "division|divide|mod|zero|IRDivI32|IRModI32"`; source reads in `lib/core/*`, `compiler/internal/semantics/semantics_checker.go`, and backend emitters | Found const-only division/modulo diagnostics and direct backend `idiv`/`i32.div_s` emission without arithmetic guards | Probe runtime expressions directly |
 | S008-002 | Compile-time divide-by-zero control | `go run ./cli/cmd/tetra check .../const_div_zero_control.tetra` | Rejected with `division by zero in global const expression` | No bug; confirms existing const guard |
 | S008-003 | Runtime divide by zero | `go run ./cli/cmd/tetra check .../runtime_div_zero.tetra`; `go run ./cli/cmd/tetra run .../runtime_div_zero.tetra`; `go run ./cli/cmd/tetra build -o .../runtime_div_zero.bin ...`; `timeout 5s .../runtime_div_zero.bin` | `check`/`build` succeeded; `run` printed `exit status 255`; direct binary exited `136` and dumped core; confirmed BUG-019 | Add runtime guard or documented trap policy |
 | S008-004 | Runtime modulo by zero | `go run ./cli/cmd/tetra check .../runtime_mod_zero.tetra`; `go run ./cli/cmd/tetra run .../runtime_mod_zero.tetra`; `go run ./cli/cmd/tetra build -o .../runtime_mod_zero.bin ...`; `timeout 5s .../runtime_mod_zero.bin` | `check`/`build` succeeded; `run` printed `exit status 255`; direct binary exited `136` and dumped core; confirmed BUG-019 | Same guard as division |
@@ -4975,7 +4975,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S009-001 | Graphify/source navigation for defer/throws cleanup | `mcp__graphify__.query_graph ... defer throws cleanup semantics ...`; `mcp__graphify__.get_neighbors("TestDeferRunsOnNestedReturnBeforeOuterCleanup()")`; source reads in `compiler/tests/semantics/defer_test.go`, `compiler/internal/lower/lower.go`, and `compiler/internal/semantics/checker.go` | Found tests for explicit return/throw cleanup, and found `TryExpr` error-path lowering emits `IRReturn` without `emitDeferredFramesSince` | Probe `try` propagation |
+| S009-001 | Graphify/source navigation for defer/throws cleanup | `mcp__graphify__.query_graph ... defer throws cleanup semantics ...`; `mcp__graphify__.get_neighbors("TestDeferRunsOnNestedReturnBeforeOuterCleanup()")`; source reads in `compiler/tests/semantics/semantics_core_language_test.go`, `compiler/internal/lower/lower_core.go`, and `compiler/internal/semantics/semantics_checker.go` | Found tests for explicit return/throw cleanup, and found `TryExpr` error-path lowering emits `IRReturn` without `emitDeferredFramesSince` | Probe `try` propagation |
 | S009-002 | Explicit throw cleanup control | `go run ./cli/cmd/tetra check .../defer_throw_statement_control.tetra`; `go run ./cli/cmd/tetra run .../defer_throw_statement_control.tetra` | `check` succeeded; `run` printed `exit status 42` from branch proving `defer` set `cleaned = 1` before explicit `throw` propagated | Baseline valid |
 | S009-003 | Successful try cleanup control | `go run ./cli/cmd/tetra check .../defer_try_success_control.tetra`; `go run ./cli/cmd/tetra run .../defer_try_success_control.tetra` | `check` succeeded; `run` printed `exit status 42` from branch proving `try ok()` returned value and `defer` set `cleaned = 1` on normal return | Baseline valid |
 | S009-004 | Propagated try skips active defer | `go run ./cli/cmd/tetra check .../defer_try_error_skips_cleanup.tetra`; `go run ./cli/cmd/tetra build -o .../defer_try_error_skips_cleanup.bin ...`; `go run ./cli/cmd/tetra run .../defer_try_error_skips_cleanup.tetra` | `check`/`build` succeeded; `run` printed `exit status 42` from branch proving `cleaned == 0` after `try fail()` propagated; confirmed BUG-021 | `TryExpr` error path must emit active defer frames |
@@ -4994,7 +4994,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S010-001 | Graphify/source navigation for u16/bool slice constructors | `mcp__graphify__.query_graph ... make_u16 make_bool slice constructor ...`; `rg -n "make_u16|make_bool|IRMakeSliceU16|\\[\\]bool"`; source reads in `compiler/internal/lower/lower.go`, `compiler/internal/backend/x64abi/sysv_unix.go`, and `compiler/tests/semantics/slice_bool_test.go` | Found `make_u16` lowers to `IRMakeSliceU16`, `make_bool` lowers through `IRMakeSliceI32`, and both reach the same heap `mmap` path with no length guard | Probe zero/negative heap lengths |
+| S010-001 | Graphify/source navigation for u16/bool slice constructors | `mcp__graphify__.query_graph ... make_u16 make_bool slice constructor ...`; `rg -n "make_u16|make_bool|IRMakeSliceU16|\\[\\]bool"`; source reads in `compiler/internal/lower/lower_core.go`, `compiler/internal/backend/x64abi/sysv_unix.go`, and `compiler/tests/semantics/semantics_memory_surface_test.go` | Found `make_u16` lowers to `IRMakeSliceU16`, `make_bool` lowers through `IRMakeSliceI32`, and both reach the same heap `mmap` path with no length guard | Probe zero/negative heap lengths |
 | S010-002 | Positive `[]u16` and `[]bool` heap baselines | `go run ./cli/cmd/tetra check .../slice_u16_positive_baseline.tetra`; `go run ./cli/cmd/tetra run .../slice_u16_positive_baseline.tetra`; repeated for `.../slice_bool_positive_baseline.tetra` | Both passed `check`; both `run` commands printed `exit status 42` from success sentinels | Baseline valid |
 | S010-003 | Empty heap `[]u16` and `[]bool` constructors | `go run ./cli/cmd/tetra check .../slice_u16_empty_heap.tetra`; `go run ./cli/cmd/tetra run .../slice_u16_empty_heap.tetra`; repeated for `.../slice_bool_empty_heap.tetra` | Both passed `check`; both `run` commands printed `exit status 2`; extends BUG-010 to `make_u16(0)` and `make_bool(0)` | Heap make needs empty-slice path for all supported element types |
 | S010-004 | Negative heap `[]u16` and `[]bool` lengths | `go run ./cli/cmd/tetra check .../slice_u16_negative_heap_store.tetra`; `go run ./cli/cmd/tetra run .../slice_u16_negative_heap_store.tetra`; repeated for `.../slice_bool_negative_heap_store.tetra` | Both passed `check`; both `run` commands printed `exit status 42` after writing and reading element `0`; extends BUG-011 to `make_u16(-1)` and `make_bool(-1)` | Reject negative heap lengths for all supported element types |
@@ -5012,7 +5012,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S011-001 | Graphify/source navigation for small integer range validation | `mcp__graphify__.query_graph ... u8 u16 local literal range validation ...`; `rg -n "validate.*Range|within 0..255|typesCompatibleWithNullPtr"`; source reads in `compiler/internal/semantics/types.go`, `compiler/internal/semantics/checker.go`, `compiler/internal/lower/lower.go`, and `compiler/internal/backend/x64core/emit.go` | Found global-only `u8`/`u16` range validation, broad `isInt32Like` compatibility for locals/args, and byte store lowering that writes low-byte registers | Probe local and store behavior |
+| S011-001 | Graphify/source navigation for small integer range validation | `mcp__graphify__.query_graph ... u8 u16 local literal range validation ...`; `rg -n "validate.*Range|within 0..255|typesCompatibleWithNullPtr"`; source reads in `compiler/internal/semantics/semantics_core.go`, `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/lower/lower_core.go`, and `compiler/internal/backend/x64core/x64core_core.go` | Found global-only `u8`/`u16` range validation, broad `isInt32Like` compatibility for locals/args, and byte store lowering that writes low-byte registers | Probe local and store behavior |
 | S011-002 | Valid local max controls | `go run ./cli/cmd/tetra check .../local_u8_max_control.tetra`; `go run ./cli/cmd/tetra run .../local_u8_max_control.tetra`; repeated for `.../local_u16_max_control.tetra` | Both passed `check`; both `run` commands printed `exit status 42` from max-value success sentinels | Baseline valid |
 | S011-003 | Out-of-range local `u8` values | `go run ./cli/cmd/tetra check .../local_u8_out_of_range_256.tetra`; `go run ./cli/cmd/tetra run .../local_u8_out_of_range_256.tetra`; repeated for `.../local_u8_negative_literal.tetra` | Both passed `check`; `run` printed `exit status 42` proving `u8` local held `256` and `-1`; confirmed BUG-023 | Add local/assignment range validation |
 | S011-004 | Out-of-range local `u16` value | `go run ./cli/cmd/tetra check .../local_u16_out_of_range_70000.tetra`; `go run ./cli/cmd/tetra run .../local_u16_out_of_range_70000.tetra` | Passed `check`; `run` printed `exit status 42` proving `u16` local held `70000`; confirmed BUG-023 | Add `u16` local/assignment range validation |
@@ -5034,7 +5034,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S012-001 | Graphify/source navigation for fixed arrays and index store lowering | `mcp__graphify__.query_graph ... fixed arrays u8 u16 index store lowering ...`; `rg -n "TypeArray|IRIndexLoad|IRIndexStore|lowerIndexStoreKind"`; source reads in `compiler/tests/semantics/array_mvp_test.go`, `compiler/internal/semantics/types.go`, `compiler/internal/lower/lower.go`, and `compiler/internal/backend/x64core/emit.go` | Found fixed-array build smoke tests, `TypeArray` modeled as `ptr`/`len` with `SlotCount: 2`, and common slice/fixed-array index lowering | Probe accepted runtime paths |
+| S012-001 | Graphify/source navigation for fixed arrays and index store lowering | `mcp__graphify__.query_graph ... fixed arrays u8 u16 index store lowering ...`; `rg -n "TypeArray|IRIndexLoad|IRIndexStore|lowerIndexStoreKind"`; source reads in `compiler/tests/semantics/semantics_core_language_test.go`, `compiler/internal/semantics/semantics_core.go`, `compiler/internal/lower/lower_core.go`, and `compiler/internal/backend/x64core/x64core_core.go` | Found fixed-array build smoke tests, `TypeArray` modeled as `ptr`/`len` with `SlotCount: 2`, and common slice/fixed-array index lowering | Probe accepted runtime paths |
 | S012-002 | Out-of-range `u8` and `u16` function arguments | `go run ./cli/cmd/tetra check .../arg_u8_out_of_range.tetra`; `go run ./cli/cmd/tetra run .../arg_u8_out_of_range.tetra`; repeated for `.../arg_u16_out_of_range.tetra` | Both passed `check`; both `run` commands printed `exit status 42`, proving the callee received `256` as `u8` and `70000` as `u16`; extends BUG-023 | Validate parameter binding/conversion ranges |
 | S012-003 | `[]u16` index store out-of-range assignment | `go run ./cli/cmd/tetra check .../slice_u16_store_out_of_range.tetra`; `go run ./cli/cmd/tetra run .../slice_u16_store_out_of_range.tetra` | Passed `check`; `run` printed `exit status 42` after assigning `70000` and reading back `4464`; extends BUG-023 | Enforce `u16` element range at assignment/checker boundary |
 | S012-004 | Fixed-array direct local zero init attempt | `go run ./cli/cmd/tetra check .../array_u8_max_control.tetra` before rewriting through a global field | Rejected `var xs: [1]u8 = 0` with `type mismatch: expected '[1]u8', got 'i32'` | Use accepted global-field construction from existing tests |
@@ -5056,7 +5056,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S013-001 | Graphify/source navigation for global field assignment lowering | `mcp__graphify__.query_graph ... global struct field assignment lowering IRStoreLocal IRStoreGlobal ...`; `rg -n "AssignStmt|resolveLValue|IRStoreLocal|IRStoreGlobal"`; source reads in `compiler/internal/lower/lower.go` and nearby tests | Found `resolveLValue` marks global targets, whole-global assignment emits `IRStoreGlobal`, but general field assignment always emits `IRStoreLocal` | Probe runtime behavior |
+| S013-001 | Graphify/source navigation for global field assignment lowering | `mcp__graphify__.query_graph ... global struct field assignment lowering IRStoreLocal IRStoreGlobal ...`; `rg -n "AssignStmt|resolveLValue|IRStoreLocal|IRStoreGlobal"`; source reads in `compiler/internal/lower/lower_core.go` and nearby tests | Found `resolveLValue` marks global targets, whole-global assignment emits `IRStoreGlobal`, but general field assignment always emits `IRStoreLocal` | Probe runtime behavior |
 | S013-002 | Local field assignment and whole-global controls | `go run ./cli/cmd/tetra check .../local_struct_field_assignment_control.tetra`; `go run ./cli/cmd/tetra run .../local_struct_field_assignment_control.tetra`; repeated for `.../global_struct_whole_assignment_control.tetra` | Both controls passed `check`; both `run` commands printed `exit status 42` | Confirms struct fields and whole-global assignment work outside the suspect path |
 | S013-003 | Global field assignment with no locals | `go run ./cli/cmd/tetra check .../global_struct_field_assignment_ignored.tetra`; `go run ./cli/cmd/tetra run .../global_struct_field_assignment_ignored.tetra`; repeated for nested `.../global_nested_struct_field_assignment_ignored.tetra` | Both passed `check`; both `run` commands failed IR verification with `local slot 0 out of bounds (locals=0)` | Confirmed BUG-025 verifier-failure mode |
 | S013-004 | Global first-field assignment corrupts local slot 0 | `go run ./cli/cmd/tetra check .../global_struct_field_assignment_corrupts_local.tetra`; `go run ./cli/cmd/tetra run .../global_struct_field_assignment_corrupts_local.tetra` | Passed `check`; `run` printed `exit status 42` from branch proving `marker == 42` and `box.value == 0` after `box.value = 42` | Confirmed BUG-025 silent-corruption mode |
@@ -5075,7 +5075,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S014-001 | Graphify/source navigation for compound assignment desugaring | `mcp__graphify__.query_graph ... compound assignment += lowering AssignStmt ...`; `rg -n "CompoundValue|cloneCompoundTarget|IRIndexStore"`; source reads in `compiler/internal/frontend/parser.go`, `compiler/internal/lower/lower.go`, and `compiler/tests/semantics/compound_assignment_test.go` | Found parser desugars `+=` into an assignment whose RHS contains a cloned target; tests cover field/index smoke without side-effecting targets | Probe target evaluation count |
+| S014-001 | Graphify/source navigation for compound assignment desugaring | `mcp__graphify__.query_graph ... compound assignment += lowering AssignStmt ...`; `rg -n "CompoundValue|cloneCompoundTarget|IRIndexStore"`; source reads in `compiler/internal/frontend/frontend_core.go`, `compiler/internal/lower/lower_core.go`, and `compiler/tests/semantics/semantics_core_language_test.go` | Found parser desugars `+=` into an assignment whose RHS contains a cloned target; tests cover field/index smoke without side-effecting targets | Probe target evaluation count |
 | S014-002 | Non-side-effecting and explicit-temp controls | `go run ./cli/cmd/tetra check .../compound_index_no_side_effect_control.tetra`; `go run ./cli/cmd/tetra run .../compound_index_no_side_effect_control.tetra`; repeated for `.../compound_index_explicit_temp_control.tetra` | Both passed `check`; both `run` commands printed `exit status 42` | Baseline valid |
 | S014-003 | Side-effecting index compound assignment | `go run ./cli/cmd/tetra check .../compound_index_side_effect_double_eval.tetra`; `go run ./cli/cmd/tetra run .../compound_index_side_effect_double_eval.tetra` | Passed `check`; `run` printed `exit status 42` from branch proving `next()` executed twice and wrote `xs[1] + 2` into `xs[0]`; confirmed BUG-026 | Stage compound assignment targets once |
 | S014-004 | Side-effecting index compound assignment to length-one slice | `go run ./cli/cmd/tetra check .../compound_index_side_effect_oob.tetra`; `go run ./cli/cmd/tetra run .../compound_index_side_effect_oob.tetra` | Passed `check`; `run` printed `exit status 1` because the cloned RHS target evaluated `next()` again and loaded index `1` from a length-one slice; confirmed BUG-026 bounds-trap mode | Add semantic or lowering guard for side-effecting compound targets |
@@ -5093,7 +5093,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S015-001 | Graphify/source navigation for `Bool` compatibility | `mcp__graphify__.query_graph ... Bool type range validation ...`; `rg -n "isInt32Like|Bool|make_bool|type mismatch: expected 'bool'"`; source reads in `compiler/internal/semantics/types.go` and `compiler/tests/semantics/slice_bool_test.go` | Found `isInt32Like` excludes `bool`, and existing tests reject `Bool = 1` / `[]bool = 1` | Use as control, not a bug |
+| S015-001 | Graphify/source navigation for `Bool` compatibility | `mcp__graphify__.query_graph ... Bool type range validation ...`; `rg -n "isInt32Like|Bool|make_bool|type mismatch: expected 'bool'"`; source reads in `compiler/internal/semantics/semantics_core.go` and `compiler/tests/semantics/semantics_memory_surface_test.go` | Found `isInt32Like` excludes `bool`, and existing tests reject `Bool = 1` / `[]bool = 1` | Use as control, not a bug |
 | S015-002 | Local/argument/slice `Bool` integer rejection | `go run ./cli/cmd/tetra check .../bool_local_int_rejected.tetra`; repeated for `.../bool_arg_int_rejected.tetra` and `.../bool_slice_int_rejected.tetra` | All rejected with type mismatch diagnostics; no BUG entry | Bool payload boundary does not share BUG-023 |
 | S015-003 | Integer condition control | `go run ./cli/cmd/tetra check .../int_condition_control.tetra`; `go run ./cli/cmd/tetra run .../int_condition_control.tetra` | Passed `check`; `run` printed `exit status 42`; this matches `isConditionType` allowing `i32` conditions | No bug logged |
 
@@ -5110,7 +5110,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S016-001 | Graphify/source navigation for enum payload checking/lowering | `mcp__graphify__.query_graph ... enum value construction ...`; `rg -n "resolveEnumCaseConstructorCall|PayloadTypes|typesCompatibleWithNullPtr"`; source reads in `compiler/internal/semantics/exprs.go`, `compiler/internal/semantics/resolution.go`, and `compiler/internal/lower/lower.go` | Found enum case constructor payload validation uses `typesCompatibleWithNullPtr`, and lowering stores payload slots as-is | Probe payload range boundaries |
+| S016-001 | Graphify/source navigation for enum payload checking/lowering | `mcp__graphify__.query_graph ... enum value construction ...`; `rg -n "resolveEnumCaseConstructorCall|PayloadTypes|typesCompatibleWithNullPtr"`; source reads in `compiler/internal/semantics/semantics_expressions.go`, `compiler/internal/semantics/semantics_core.go`, and `compiler/internal/lower/lower_core.go` | Found enum case constructor payload validation uses `typesCompatibleWithNullPtr`, and lowering stores payload slots as-is | Probe payload range boundaries |
 | S016-002 | Enum `u8` max control | `go run ./cli/cmd/tetra check .../enum_u8_payload_max_control.tetra`; `go run ./cli/cmd/tetra run .../enum_u8_payload_max_control.tetra` | Passed `check`; `run` printed `exit status 42` for `Packet.byte(255)` | Baseline valid |
 | S016-003 | Enum `u8` out-of-range payload | `go run ./cli/cmd/tetra check .../enum_u8_payload_out_of_range.tetra`; `go run ./cli/cmd/tetra run .../enum_u8_payload_out_of_range.tetra` | Passed `check`; `run` printed `exit status 42`, proving match binding saw `b == 300`; extends BUG-023 | Validate enum payload ranges |
 | S016-004 | Enum `u16` out-of-range payload | `go run ./cli/cmd/tetra check .../enum_u16_payload_out_of_range.tetra`; `go run ./cli/cmd/tetra run .../enum_u16_payload_out_of_range.tetra` | Passed `check`; `run` printed `exit status 42`, proving match binding saw `w == 70000`; extends BUG-023 | Validate enum payload ranges |
@@ -5131,7 +5131,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S017-001 | Graphify/source navigation for global const/range validation | `mcp__graphify__.query_graph ... validateGlobalIntLikeRange u8 u16 global const initializer ...`; `rg -n "validateGlobalIntLikeRange|evalGlobalConstI32|constI32"`; source reads in `compiler/internal/semantics/checker.go`, `compiler/internal/semantics/types.go`, and `compiler/tests/semantics/const_test.go` | Found global `u8`/`u16` validation exists, but `evalGlobalConstI32` computes binary arithmetic directly in `int32` before `validateGlobalIntLikeRange` sees the value | Probe overflow-wrapped expressions |
+| S017-001 | Graphify/source navigation for global const/range validation | `mcp__graphify__.query_graph ... validateGlobalIntLikeRange u8 u16 global const initializer ...`; `rg -n "validateGlobalIntLikeRange|evalGlobalConstI32|constI32"`; source reads in `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/semantics/semantics_core.go`, and `compiler/tests/semantics/semantics_core_language_test.go` | Found global `u8`/`u16` validation exists, but `evalGlobalConstI32` computes binary arithmetic directly in `int32` before `validateGlobalIntLikeRange` sees the value | Probe overflow-wrapped expressions |
 | S017-002 | Direct and simple-expression out-of-range controls | `go run ./cli/cmd/tetra check .../global_u8_direct_out_of_range_control.tetra`; `go run ./cli/cmd/tetra check .../global_u8_simple_expr_out_of_range_control.tetra` | Both rejected with `global var 'b' initializer must be within 0..255 for type u8` | Confirms ordinary global range checks are active |
 | S017-003 | Global `UInt8` overflow-wrapped expression | `go run ./cli/cmd/tetra check .../global_u8_wrapped_const_expr.tetra`; `go run ./cli/cmd/tetra run .../global_u8_wrapped_const_expr.tetra` | Passed `check`; `run` printed `exit status 42`, proving `65536 * 65536` was folded/stored as `0`; confirmed BUG-027 | Detect const-expression overflow before narrowing |
 | S017-004 | Global `UInt16` overflow-wrapped expression | `go run ./cli/cmd/tetra check .../global_u16_wrapped_const_expr.tetra`; `go run ./cli/cmd/tetra run .../global_u16_wrapped_const_expr.tetra` | Passed `check`; `run` printed `exit status 42`, proving the same wrapped-zero path for `UInt16`; confirmed BUG-027 | Add small-int global regression coverage |
@@ -5151,7 +5151,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S018-001 | Graphify/source navigation for return type checking | `mcp__graphify__.query_graph ... function return type checking u8 u16 ...`; `rg -n "ReturnStmt|typesCompatibleWithNullPtr"`; source reads in `compiler/internal/semantics/checker.go`, `compiler/internal/semantics/exprs.go`, and `compiler/internal/semantics/types.go` | Found `ReturnStmt` validation eventually uses `typesCompatibleWithNullPtr(returnType, tname, s.Value)` and `isInt32Like` compatibility covers `i32`, `u8`, and `u16` without range checks | Probe runtime return values |
+| S018-001 | Graphify/source navigation for return type checking | `mcp__graphify__.query_graph ... function return type checking u8 u16 ...`; `rg -n "ReturnStmt|typesCompatibleWithNullPtr"`; source reads in `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/semantics/semantics_expressions.go`, and `compiler/internal/semantics/semantics_core.go` | Found `ReturnStmt` validation eventually uses `typesCompatibleWithNullPtr(returnType, tname, s.Value)` and `isInt32Like` compatibility covers `i32`, `u8`, and `u16` without range checks | Probe runtime return values |
 | S018-002 | `UInt8` max return control | `go run ./cli/cmd/tetra check .../return_u8_max_control.tetra`; `go run ./cli/cmd/tetra run .../return_u8_max_control.tetra` | Passed `check`; `run` printed `exit status 42` for `return 255` from `-> UInt8` | Baseline valid |
 | S018-003 | Out-of-range `UInt8` return | `go run ./cli/cmd/tetra check .../return_u8_out_of_range.tetra`; `go run ./cli/cmd/tetra run .../return_u8_out_of_range.tetra` | Passed `check`; `run` printed `exit status 42`, proving the caller saw returned `UInt8` value `300`; extends BUG-023 | Validate return expression ranges |
 | S018-004 | Out-of-range `UInt16` return | `go run ./cli/cmd/tetra check .../return_u16_out_of_range.tetra`; `go run ./cli/cmd/tetra run .../return_u16_out_of_range.tetra` | Passed `check`; `run` printed `exit status 42`, proving the caller saw returned `UInt16` value `70000`; extends BUG-023 | Validate return expression ranges |
@@ -5172,7 +5172,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S019-001 | Graphify/source navigation for struct field validation | `mcp__graphify__.query_graph ... struct constructor field payload type checking ...`; source reads in `compiler/internal/semantics/exprs.go` and `compiler/internal/semantics/checker.go` | Found brace-style struct literals, call-style struct constructors, and field assignments all rely on `typesCompatibleWithNullPtr` for field/target type compatibility | Probe runtime field values |
+| S019-001 | Graphify/source navigation for struct field validation | `mcp__graphify__.query_graph ... struct constructor field payload type checking ...`; source reads in `compiler/internal/semantics/semantics_expressions.go` and `compiler/internal/semantics/semantics_checker.go` | Found brace-style struct literals, call-style struct constructors, and field assignments all rely on `typesCompatibleWithNullPtr` for field/target type compatibility | Probe runtime field values |
 | S019-002 | `UInt8` struct constructor max control | `go run ./cli/cmd/tetra check .../struct_u8_constructor_max_control.tetra`; `go run ./cli/cmd/tetra run .../struct_u8_constructor_max_control.tetra` | Passed `check`; `run` printed `exit status 42` for `Header{byte: 255}` | Baseline valid |
 | S019-003 | Brace-style `UInt8`/`UInt16` out-of-range field initializers | `go run ./cli/cmd/tetra check .../struct_u8_constructor_out_of_range.tetra`; `go run ./cli/cmd/tetra run .../struct_u8_constructor_out_of_range.tetra`; repeated for `.../struct_u16_constructor_out_of_range.tetra` | Both passed `check`; both `run` commands printed `exit status 42`, proving struct fields held `300` and `70000` unchanged; extends BUG-023 | Validate struct field initializer ranges |
 | S019-004 | Call-style `UInt8` out-of-range field initializer | `go run ./cli/cmd/tetra check .../struct_u8_call_constructor_out_of_range.tetra`; `go run ./cli/cmd/tetra run .../struct_u8_call_constructor_out_of_range.tetra` | Passed `check`; `run` printed `exit status 42`, proving `Header(byte: 300)` follows the same path | Validate call-style constructor field ranges |
@@ -5193,7 +5193,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S020-001 | Graphify/source navigation for typed-error throw validation | `mcp__graphify__.query_graph ... typed errors throw statement UInt8 UInt16 ...`; source reads in `compiler/tests/semantics/typed_errors_test.go`, `compiler/internal/semantics/checker.go`, and `compiler/internal/semantics/exprs.go` | Found `ThrowStmt` checks values with `typesCompatibleWithNullPtr(state.throwType, tname, s.Value)`, and scalar catch patterns can match integer literals with a default fallback | Probe runtime error-code delivery |
+| S020-001 | Graphify/source navigation for typed-error throw validation | `mcp__graphify__.query_graph ... typed errors throw statement UInt8 UInt16 ...`; source reads in `compiler/tests/semantics/semantics_types_protocols_test.go`, `compiler/internal/semantics/semantics_checker.go`, and `compiler/internal/semantics/semantics_expressions.go` | Found `ThrowStmt` checks values with `typesCompatibleWithNullPtr(state.throwType, tname, s.Value)`, and scalar catch patterns can match integer literals with a default fallback | Probe runtime error-code delivery |
 | S020-002 | `UInt8` throw max control | `go run ./cli/cmd/tetra check .../throw_u8_max_control.tetra`; `go run ./cli/cmd/tetra run .../throw_u8_max_control.tetra` | Passed `check`; `run` printed `exit status 42` for `throw 255` matched by `case 255` | Baseline valid |
 | S020-003 | Out-of-range `UInt8` typed-error throw | `go run ./cli/cmd/tetra check .../throw_u8_out_of_range.tetra`; `go run ./cli/cmd/tetra run .../throw_u8_out_of_range.tetra` | Passed `check`; `run` printed `exit status 42`, proving `throw 300` from `throws UInt8` matched `case 300`; extends BUG-023 | Validate throw expression ranges |
 | S020-004 | Out-of-range `UInt16` typed-error throw | `go run ./cli/cmd/tetra check .../throw_u16_out_of_range.tetra`; `go run ./cli/cmd/tetra run .../throw_u16_out_of_range.tetra` | Passed `check`; `run` printed `exit status 42`, proving `throw 70000` from `throws UInt16` matched `case 70000`; extends BUG-023 | Validate throw expression ranges |
@@ -5214,7 +5214,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S021-001 | Graphify/source navigation for optional payload validation/lowering | `mcp__graphify__.query_graph ... optional some payload UInt8 UInt16 ...`; source reads in `compiler/tests/semantics/optional_match_test.go`, `compiler/internal/semantics/types.go`, `compiler/internal/semantics/checker.go`, and `compiler/internal/lower/lower.go` | Found optional checker compatibility accepts `UInt8?`/`UInt16?` from `i32` via `typesCompatible(elem, actual)`, while `lowerExprAs` only wraps optional payloads when the inferred actual type exactly equals the optional element type | Probe check/run behavior |
+| S021-001 | Graphify/source navigation for optional payload validation/lowering | `mcp__graphify__.query_graph ... optional some payload UInt8 UInt16 ...`; source reads in `compiler/tests/semantics/semantics_types_protocols_test.go`, `compiler/internal/semantics/semantics_core.go`, `compiler/internal/semantics/semantics_checker.go`, and `compiler/internal/lower/lower_core.go` | Found optional checker compatibility accepts `UInt8?`/`UInt16?` from `i32` via `typesCompatible(elem, actual)`, while `lowerExprAs` only wraps optional payloads when the inferred actual type exactly equals the optional element type | Probe check/run behavior |
 | S021-002 | Direct `UInt8?` in-range literal payload | `go run ./cli/cmd/tetra check .../optional_u8_max_control.tetra`; `go run ./cli/cmd/tetra run .../optional_u8_max_control.tetra` | Passed `check`; `run` failed with `slot mismatch for 'maybe'`; confirmed BUG-028 even for valid `255` | Align checker/lowering or reject literal payload |
 | S021-003 | Direct `UInt8?`/`UInt16?` out-of-range literal payloads | `go run ./cli/cmd/tetra check .../optional_u8_out_of_range.tetra`; `go run ./cli/cmd/tetra run .../optional_u8_out_of_range.tetra`; repeated for `.../optional_u16_out_of_range.tetra` | Both passed `check`; both `run` commands failed with `slot mismatch for 'maybe'` before payload could be matched | Reject out-of-range optional payloads during check |
 | S021-004 | `UInt8?` assignment from out-of-range literal | `go run ./cli/cmd/tetra check .../optional_u8_assignment_out_of_range.tetra`; `go run ./cli/cmd/tetra run .../optional_u8_assignment_out_of_range.tetra` | Passed `check`; `run` failed with `slot mismatch for assignment` | Align assignment lowering with checker or reject |
@@ -5239,7 +5239,7 @@ Evidence to add as probes run:
 | S022-002 | Collection-loop controls | `go run ./cli/cmd/tetra check .../string_for_control.tetra`; `go run ./cli/cmd/tetra check .../u8_slice_for_control.tetra` | Both passed `check`, confirming standard string and `[]u8` collection loops are accepted | Baselines only |
 | S022-003 | Fixed array `String` collection loop hypothesis | `go run ./cli/cmd/tetra check .../array_string_for_field.tetra` | Rejected during `check` with `array element type 'str' is not supported`; no checker/lowering bug | Do not log as new |
 | S022-004 | Fixed array `Int` collection loop duplicate check | `go run ./cli/cmd/tetra check .../array_i32_for_field_control.tetra` | Passed `check`, but this path depends on the already-known zeroed fixed-array storage bug if executed | Treat as BUG-024 territory |
-| S022-005 | Nested optional source navigation | `mcp__graphify__.query_graph ... typesCompatible lowerExprAs ...`; source reads in `compiler/internal/semantics/types.go` and `compiler/internal/lower/lower.go` | Found `typesCompatible` recursively accepts optional payload lifting, but `lowerExprAs` only emits one wrapper layer when the actual type exactly matches the optional element type | Probe `Int??` direct literals |
+| S022-005 | Nested optional source navigation | `mcp__graphify__.query_graph ... typesCompatible lowerExprAs ...`; source reads in `compiler/internal/semantics/semantics_core.go` and `compiler/internal/lower/lower_core.go` | Found `typesCompatible` recursively accepts optional payload lifting, but `lowerExprAs` only emits one wrapper layer when the actual type exactly matches the optional element type | Probe `Int??` direct literals |
 | S022-006 | Nested optional controls | `go run ./cli/cmd/tetra check .../nested_optional_none_control.tetra`; `go run ./cli/cmd/tetra run .../nested_optional_none_control.tetra`; repeated for `.../nested_optional_inner_control.tetra` | Both passed `check`; both `run` commands printed `exit status 42`, proving `none` and already-typed `Int?` payloads lower correctly | Working nearby behavior |
 | S022-007 | Direct nested optional literal payload | `go run ./cli/cmd/tetra check .../nested_optional_literal_payload.tetra`; `go run ./cli/cmd/tetra run .../nested_optional_literal_payload.tetra` | Passed `check`; `run` failed with `slot mismatch for 'nested'`; confirmed BUG-029 | Align recursive optional lifting or reject direct payload |
 | S022-008 | Nested optional assignment and return payloads | `go run ./cli/cmd/tetra check .../nested_optional_assignment_literal_payload.tetra`; `go run ./cli/cmd/tetra run .../nested_optional_assignment_literal_payload.tetra`; repeated for `.../nested_optional_return_literal_payload.tetra` | Both passed `check`; assignment failed with `slot mismatch for assignment`; return failed with `return slot mismatch`; extends BUG-029 across assignment/return surfaces | Add regression coverage for all three contexts |
@@ -5258,7 +5258,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S023-001 | Graphify/source navigation for slice metadata assignment | `mcp__graphify__.query_graph ... slice ptr len field assignment ...`; `mcp__graphify__.get_neighbors rejectFixedArrayInternalAssignment()`; source reads in `compiler/internal/semantics/types.go`, `compiler/internal/semantics/resolution.go`, and `compiler/internal/backend/x64core/emit.go` | Found `TypeSlice` exposes `ptr`/`len`; `resolveAssignTarget` rejects `ptr`/`len` only for `TypeArray`; x64 index checks compare against the slice length slot and address via the pointer slot | Probe safe metadata mutation |
+| S023-001 | Graphify/source navigation for slice metadata assignment | `mcp__graphify__.query_graph ... slice ptr len field assignment ...`; `mcp__graphify__.get_neighbors rejectFixedArrayInternalAssignment()`; source reads in `compiler/internal/semantics/semantics_core.go`, `compiler/internal/semantics/semantics_core.go`, and `compiler/internal/backend/x64core/x64core_core.go` | Found `TypeSlice` exposes `ptr`/`len`; `resolveAssignTarget` rejects `ptr`/`len` only for `TypeArray`; x64 index checks compare against the slice length slot and address via the pointer slot | Probe safe metadata mutation |
 | S023-002 | Enlarge slice length and write out of allocation | `go run ./cli/cmd/tetra check .../slice_len_mutation_oob_write.tetra`; `go run ./cli/cmd/tetra run .../slice_len_mutation_oob_write.tetra` | Passed `check`; `run` printed `exit status 42`, proving `bytes.len = 64` lets `bytes[50]` pass on a one-byte slice | Confirmed BUG-030 |
 | S023-003 | Pointer/length mismatch across slices | `go run ./cli/cmd/tetra check .../slice_ptr_len_mismatch_oob_write.tetra`; `go run ./cli/cmd/tetra run .../slice_ptr_len_mismatch_oob_write.tetra` | Passed `check`; `run` printed `exit status 42`, proving `wide.ptr = tiny.ptr` keeps the wide length and writes through the tiny allocation pointer | Include `ptr` in BUG-030 |
 | S023-004 | Shrink length and block valid allocation index | `go run ./cli/cmd/tetra check .../slice_len_mutation_blocks_valid_index.tetra`; `go run ./cli/cmd/tetra run .../slice_len_mutation_blocks_valid_index.tetra` | Passed `check`; `run` printed `exit status 1` after `bytes.len = 0; bytes[0] = 42`, proving bounds checks trust mutated metadata | Supports root cause |
@@ -5281,7 +5281,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S024-001 | Graphify/source navigation for string metadata assignment | `mcp__graphify__.query_graph ... String TypeStr ptr len ...`; source reads in `compiler/internal/semantics/types.go`, `compiler/internal/semantics/resolution.go`, `compiler/internal/lower/lower.go`, and `compiler/internal/backend/x64core/emit.go` | Found `str` is `makeSliceTypeInfo("str", "u8")` with `Kind = TypeStr`; field assignment rejection only protects `TypeArray`; string index lowering uses `IRIndexLoadU8` with the view's pointer/length slots | Probe safe string metadata mutation |
+| S024-001 | Graphify/source navigation for string metadata assignment | `mcp__graphify__.query_graph ... String TypeStr ptr len ...`; source reads in `compiler/internal/semantics/semantics_core.go`, `compiler/internal/semantics/semantics_core.go`, `compiler/internal/lower/lower_core.go`, and `compiler/internal/backend/x64core/x64core_core.go` | Found `str` is `makeSliceTypeInfo("str", "u8")` with `Kind = TypeStr`; field assignment rejection only protects `TypeArray`; string index lowering uses `IRIndexLoadU8` with the view's pointer/length slots | Probe safe string metadata mutation |
 | S024-002 | Enlarge string length and read past literal | `go run ./cli/cmd/tetra check .../string_len_mutation_oob_read.tetra`; `go run ./cli/cmd/tetra run .../string_len_mutation_oob_read.tetra` | Passed `check`; `run` printed `exit status 42`, proving `text.len = 2` lets `text[1]` pass on `"*"` | Confirmed BUG-031 |
 | S024-003 | Pointer/length mismatch across strings | `go run ./cli/cmd/tetra check .../string_ptr_len_mismatch_oob_read.tetra`; `go run ./cli/cmd/tetra run .../string_ptr_len_mismatch_oob_read.tetra` | Passed `check`; `run` printed `exit status 42`, proving `wide.ptr = tiny.ptr` keeps the wide length and reads through the tiny string pointer | Include `ptr` in BUG-031 |
 | S024-004 | String collection iteration trusts forged length | `go run ./cli/cmd/tetra check .../string_for_len_mutation_count.tetra`; `go run ./cli/cmd/tetra run .../string_for_len_mutation_count.tetra` | Passed `check`; `run` printed `exit status 42` after counting two `for ch in text` iterations over a one-byte literal | Cover collection loop path |
@@ -5302,7 +5302,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S027-001 | Graphify/source navigation for call-style struct constructors | `mcp__graphify__.query_graph ... call-style constructors for dotted builtin structs ...`; `mcp__graphify__.get_neighbors checkCallExprWithEffects()`; `mcp__graphify__.shortest_path call-style constructor lowerExpr`; source reads in `compiler/internal/semantics/exprs.go` and `compiler/internal/lower/lower.go` | Found `checkStructConstructorCallWithEffects` accepts labeled calls that resolve to struct types, while lowering/build still has paths that can demand function signatures for dotted type names | Probe concrete built-in structs |
+| S027-001 | Graphify/source navigation for call-style struct constructors | `mcp__graphify__.query_graph ... call-style constructors for dotted builtin structs ...`; `mcp__graphify__.get_neighbors checkCallExprWithEffects()`; `mcp__graphify__.shortest_path call-style constructor lowerExpr`; source reads in `compiler/internal/semantics/semantics_expressions.go` and `compiler/internal/lower/lower_core.go` | Found `checkStructConstructorCallWithEffects` accepts labeled calls that resolve to struct types, while lowering/build still has paths that can demand function signatures for dotted type names | Probe concrete built-in structs |
 | S027-002 | Call-style `actor.msg(...)` constructor | `go run ./cli/cmd/tetra check .../actor_msg_call_constructor.tetra`; `go run ./cli/cmd/tetra run .../actor_msg_call_constructor.tetra` | Passed `check`; `run` failed with `missing signature for 'actor.msg'`; extends BUG-015 | Align call-style constructor lowering/dependency handling |
 | S027-003 | Call-style `actor.recv_result_i32(...)` constructor | `go run ./cli/cmd/tetra check .../actor_recv_result_call_constructor.tetra`; `go run ./cli/cmd/tetra run .../actor_recv_result_call_constructor.tetra` | Passed `check`; `run` failed with `missing signature for 'actor.recv_result_i32'`; extends BUG-015 | Align call-style constructor lowering/dependency handling |
 | S027-004 | Call-style `task.result_i32(...)` constructor | `go run ./cli/cmd/tetra check .../task_result_call_constructor.tetra`; `go run ./cli/cmd/tetra run .../task_result_call_constructor.tetra` | Passed `check`; `run` failed with `missing signature for 'task.result_i32'`; extends BUG-015 | Align call-style constructor lowering/dependency handling |
@@ -5323,7 +5323,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S028-001 | Graphify/source navigation for typed task error payload validation | `mcp__graphify__.query_graph ... typed task error enum payload sendable validation ...`; `mcp__graphify__.get_neighbors validateTypedActorMessageType()`; `mcp__graphify__.get_neighbors funcSigActorTaskTransferSafe()`; source reads in `compiler/internal/semantics/types.go`, `compiler/internal/semantics/exprs.go`, `docs/spec/v1_scope.md`, and `docs/spec/current_supported_surface.md` | Found task worker sendability checks inspect params/return but not `ThrowsType`; typed task error validation only requires enum; typed actor payload validation rejects string/pointer/capability handles | Probe task error payloads |
+| S028-001 | Graphify/source navigation for typed task error payload validation | `mcp__graphify__.query_graph ... typed task error enum payload sendable validation ...`; `mcp__graphify__.get_neighbors validateTypedActorMessageType()`; `mcp__graphify__.get_neighbors funcSigActorTaskTransferSafe()`; source reads in `compiler/internal/semantics/semantics_core.go`, `compiler/internal/semantics/semantics_expressions.go`, `docs/spec/flow/v1_scope.md`, and `docs/spec/core/current_supported_surface.md` | Found task worker sendability checks inspect params/return but not `ThrowsType`; typed task error validation only requires enum; typed actor payload validation rejects string/pointer/capability handles | Probe task error payloads |
 | S028-002 | Typed task error carries `String` payload across join | `go run ./cli/cmd/tetra check .../typed_task_string_error_payload.tetra`; `go run ./cli/cmd/tetra run .../typed_task_string_error_payload.tetra` | Passed `check`; `run` printed `exit status 42` after catch arm read `text[0]` from the task-thrown `String` payload; confirmed BUG-032 | Validate typed task error payload sendability |
 | S028-003 | Typed task error carries `ptr` payload across join | `go run ./cli/cmd/tetra check .../typed_task_ptr_error_payload_null.tetra`; `go run ./cli/cmd/tetra run .../typed_task_ptr_error_payload_null.tetra` | Passed `check`; `run` printed `exit status 42` through the `TaskErr.bad(ptr)` catch arm; extends BUG-032 | Reject pointer payloads in typed task errors |
 | S028-004 | Typed actor `String` payload control | `go run ./cli/cmd/tetra check .../typed_actor_string_payload_rejected_control.tetra` | Rejected with `typed actor message payload must be value-only, got string view 'str'` | Use analogous value-only policy for typed task errors |
@@ -5343,7 +5343,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S029-001 | Graphify/source navigation for resource payloads in typed task errors | `mcp__graphify__.query_graph ... typed task error enum payload resource handles ...`; `mcp__graphify__.get_neighbors typeContainsResourceHandle()`; `mcp__graphify__.get_neighbors funcSigActorTaskTransferUnsafeReason()`; source reads in `compiler/internal/semantics/types.go`, `compiler/internal/semantics/region.go`, and `compiler/internal/semantics/exprs.go` | Found resource tracking knows `actor`/`island`/`task.i32`, but typed-task spawn still validates only params/return and the error type's enum-ness | Probe handles and non-sendable error cases |
+| S029-001 | Graphify/source navigation for resource payloads in typed task errors | `mcp__graphify__.query_graph ... typed task error enum payload resource handles ...`; `mcp__graphify__.get_neighbors typeContainsResourceHandle()`; `mcp__graphify__.get_neighbors funcSigActorTaskTransferUnsafeReason()`; source reads in `compiler/internal/semantics/semantics_core.go`, `compiler/internal/semantics/semantics_memory_resources.go`, and `compiler/internal/semantics/semantics_expressions.go` | Found resource tracking knows `actor`/`island`/`task.i32`, but typed-task spawn still validates only params/return and the error type's enum-ness | Probe handles and non-sendable error cases |
 | S029-002 | `task.i32` payload matched through typed task error | `go run ./cli/cmd/tetra check .../typed_task_error_task_handle_payload_match_only.tetra`; `go run ./cli/cmd/tetra run .../typed_task_error_task_handle_payload_match_only.tetra` | Passed `check`; `run` printed `exit status 42`, proving `TaskErr.moved(task.i32)` can be matched after join; using it as a join handle in the stronger variant was rejected with `ambiguous resource provenance` | Keep as handle-transfer/provenance probe under BUG-032 root |
 | S029-003 | `actor` payload matched through typed task error | `go run ./cli/cmd/tetra check .../typed_task_error_actor_payload.tetra`; `go run ./cli/cmd/tetra run .../typed_task_error_actor_payload.tetra` | Passed `check`; `run` printed `exit status 42`, proving `TaskErr.who(actor)` crosses the typed task error channel | Clarify whether actor handles are intended sendable error payloads |
 | S029-004 | `island` payload accepted in typed task error type | `go run ./cli/cmd/tetra check .../typed_task_error_island_payload_type_only.tetra`; `go run ./cli/cmd/tetra run .../typed_task_error_island_payload_type_only.tetra` | Passed `check`; `run` printed `exit status 42` on the success path, proving `task_spawn_i32_typed<TaskErr>` accepts `E` with an island payload case | Extend BUG-032 validation gap |
@@ -5363,7 +5363,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S031-001 | Graphify/source navigation for typed task group resource checks | `mcp__graphify__.query_graph ... task_join_until_i32 task_select2_i32 typed task join ...`; `mcp__graphify__.get_neighbors checkTypedTaskBuiltin()`; source reads in `compiler/internal/semantics/exprs.go`, `compiler/internal/semantics/builtins.go`, and `compiler/tests/runtime/resource_finalization_test.go` | Found the generic call path invokes `checkResourceCallArg`, while `checkTypedTaskBuiltin` validates the group argument with only `checkExprWithEffects` plus a `task.group` type check | Probe direct closed-group spawn |
+| S031-001 | Graphify/source navigation for typed task group resource checks | `mcp__graphify__.query_graph ... task_join_until_i32 task_select2_i32 typed task join ...`; `mcp__graphify__.get_neighbors checkTypedTaskBuiltin()`; source reads in `compiler/internal/semantics/semantics_expressions.go`, `compiler/internal/semantics/semantics_core.go`, and `compiler/tests/runtime/resource_finalization_test.go` | Found the generic call path invokes `checkResourceCallArg`, while `checkTypedTaskBuiltin` validates the group argument with only `checkExprWithEffects` plus a `task.group` type check | Probe direct closed-group spawn |
 | S031-002 | Untyped closed-group spawn control | `go run ./cli/cmd/tetra check .../untyped_group_spawn_after_close_control.tetra` | Rejected with `cannot use closed resource 'group'` at `core.task_spawn_group_i32(group, "worker")` | Confirms baseline resource finalization rule |
 | S031-003 | Typed closed-group spawn repro | `go run ./cli/cmd/tetra check .../typed_group_spawn_after_close_repro.tetra`; `go run ./cli/cmd/tetra run .../typed_group_spawn_after_close_repro.tetra` | Passed `check`; `run` printed `exit status 5` via `GroupErr.stopped`, proving the closed group reaches the typed task group runtime path | Confirmed BUG-033 |
 
@@ -5398,7 +5398,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S036-001 | Graphify/source navigation for secret-tainted throw policy | `mcp__graphify__.query_graph ... secret tainted value throw enum payload ...`; source reads in `compiler/internal/semantics/checker.go` and `compiler/tests/safety/effects_test.go` | Found `ReturnStmt` calls `exprSecretTainted`, while `ThrowStmt` does not; existing tests cover exported secret-tainted returns but not throw payloads | Build export return/throw pair |
+| S036-001 | Graphify/source navigation for secret-tainted throw policy | `mcp__graphify__.query_graph ... secret tainted value throw enum payload ...`; source reads in `compiler/internal/semantics/semantics_checker.go` and `compiler/tests/safety/effects/effects_test.go` | Found `ReturnStmt` calls `exprSecretTainted`, while `ThrowStmt` does not; existing tests cover exported secret-tainted returns but not throw payloads | Build export return/throw pair |
 | S036-002 | Exported return control | `go run ./cli/cmd/tetra check .../export_secret_return_rejected_control.tetra` | Rejected with `secret-tainted value cannot be returned from @export function 'leak'` | Baseline privacy boundary |
 | S036-003 | Exported throw payload repro | `go run ./cli/cmd/tetra check .../export_secret_throw_payload_repro.tetra`; `go run ./cli/cmd/tetra run .../export_secret_throw_payload_repro.tetra` | Passed `check`; `run` printed `exit status 42` after catching `LeakErr.raw(value)` | Confirmed BUG-034 |
 
@@ -5416,7 +5416,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S040-001 | Graphify/source navigation for `PrintStmt` secret-taint policy | `mcp__graphify__.query_graph ... PrintStmt secret tainted ...`; `mcp__graphify__.get_neighbors PrintStmt`; `mcp__graphify__.shortest_path PrintStmt exprSecretTainted`; source reads in `compiler/internal/semantics/checker.go` and `compiler/tests/safety/effects_test.go` | Found `PrintStmt` only requires `io` and printable type; `ReturnStmt` checks `exprSecretTainted`; assignment code can mark local containers tainted after secret writes | Build print and local-container controls |
+| S040-001 | Graphify/source navigation for `PrintStmt` secret-taint policy | `mcp__graphify__.query_graph ... PrintStmt secret tainted ...`; `mcp__graphify__.get_neighbors PrintStmt`; `mcp__graphify__.shortest_path PrintStmt exprSecretTainted`; source reads in `compiler/internal/semantics/semantics_checker.go` and `compiler/tests/safety/effects/effects_test.go` | Found `PrintStmt` only requires `io` and printable type; `ReturnStmt` checks `exprSecretTainted`; assignment code can mark local containers tainted after secret writes | Build print and local-container controls |
 | S040-002 | Exported return control | `go run ./cli/cmd/tetra check .../export_secret_return_rejected_control.tetra` | Rejected with `secret-tainted value cannot be returned from @export function 'leak'` | Baseline privacy boundary |
 | S040-003 | Plain printable byte buffer control | `go run ./cli/cmd/tetra check .../print_plain_u8_buffer_control.tetra`; `go run ./cli/cmd/tetra run .../print_plain_u8_buffer_control.tetra` | Passed `check`; `run` printed `*`, confirming the `[]UInt8` print syntax/runtime path | Baseline printable sink |
 | S040-004 | Local field/index assignment taint controls | `go run ./cli/cmd/tetra check .../export_secret_local_field_assignment_repro.tetra`; `go run ./cli/cmd/tetra check .../export_secret_local_index_assignment_repro.tetra` | Both rejected with `secret-tainted value cannot be returned from @export function 'leak'` | Container taint is preserved when read back |
@@ -5435,7 +5435,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S041-001 | Graphify/source navigation for secret-tainted control flow | `mcp__graphify__.query_graph ... IfStmt secret tainted ...`; `mcp__graphify__.get_neighbors checkStmts()`; `mcp__graphify__.shortest_path IfStmt exprSecretTainted`; source reads in `compiler/internal/semantics/checker.go`, `compiler/tests/safety/effects_test.go`, and privacy docs | Found `IfStmt` checks condition type but does not call `exprSecretTainted` for the condition; `ReturnStmt` and explicit global writes do check expression taint | Build implicit-flow controls |
+| S041-001 | Graphify/source navigation for secret-tainted control flow | `mcp__graphify__.query_graph ... IfStmt secret tainted ...`; `mcp__graphify__.get_neighbors checkStmts()`; `mcp__graphify__.shortest_path IfStmt exprSecretTainted`; source reads in `compiler/internal/semantics/semantics_checker.go`, `compiler/tests/safety/effects/effects_test.go`, and privacy docs | Found `IfStmt` checks condition type but does not call `exprSecretTainted` for the condition; `ReturnStmt` and explicit global writes do check expression taint | Build implicit-flow controls |
 | S041-002 | Exported raw return control | `go run ./cli/cmd/tetra check .../export_secret_return_rejected_control.tetra` | Rejected with `secret-tainted value cannot be returned from @export function 'leak'` | Baseline explicit-flow rejection |
 | S041-003 | Public branch control | `go run ./cli/cmd/tetra check .../export_public_branch_control.tetra`; `go run ./cli/cmd/tetra run .../export_public_branch_control.tetra` | Passed `check`; `run` printed `exit status 42` | Baseline ordinary branch behavior |
 | S041-004 | Secret condition exported return, true branch | `go run ./cli/cmd/tetra check .../export_secret_if_condition_return_repro.tetra`; `go run ./cli/cmd/tetra run .../export_secret_if_condition_return_repro.tetra` | Passed `check`; `run` printed `exit status 42` for `secret_seal_i32(1, token)` | Confirmed implicit branch leak |
@@ -5455,7 +5455,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S042-001 | Graphify/source navigation for `match`/loop secret control flow | `mcp__graphify__.query_graph ... MatchStmt MatchExpr WhileStmt secret ...`; `mcp__graphify__.get_neighbors MatchStmt`; `mcp__graphify__.shortest_path MatchStmt exprSecretTainted`; source reads in `compiler/internal/semantics/checker.go` and `docs/spec/flow_syntax_v1.md` | Found `MatchExpr` result taint ignores the scrutinee control dependency; `MatchStmt` records scrutinee taint for bindings but not case outputs; `WhileStmt` follows the same condition-only type check shape as `IfStmt` | Build extension probes |
+| S042-001 | Graphify/source navigation for `match`/loop secret control flow | `mcp__graphify__.query_graph ... MatchStmt MatchExpr WhileStmt secret ...`; `mcp__graphify__.get_neighbors MatchStmt`; `mcp__graphify__.shortest_path MatchStmt exprSecretTainted`; source reads in `compiler/internal/semantics/semantics_checker.go` and `docs/spec/flow/flow_syntax_v1.md` | Found `MatchExpr` result taint ignores the scrutinee control dependency; `MatchStmt` records scrutinee taint for bindings but not case outputs; `WhileStmt` follows the same condition-only type check shape as `IfStmt` | Build extension probes |
 | S042-002 | Secret `match` expression exported return | `go run ./cli/cmd/tetra check .../export_secret_match_expr_return_repro.tetra`; `go run ./cli/cmd/tetra run .../export_secret_match_expr_return_repro.tetra` | Passed `check`; `run` printed `exit status 42` for `secret_seal_i32(1, token)` | Extends BUG-036 to `MatchExpr` |
 | S042-003 | Secret `match` statement exported return | `go run ./cli/cmd/tetra check .../export_secret_match_stmt_return_repro.tetra`; `go run ./cli/cmd/tetra run .../export_secret_match_stmt_return_repro.tetra` | Passed `check`; `run` printed `exit status 42` for `secret_seal_i32(1, token)` | Extends BUG-036 to `MatchStmt` |
 | S042-004 | Secret `while` condition exported return, true branch | `go run ./cli/cmd/tetra check .../export_secret_while_condition_return_repro.tetra`; `go run ./cli/cmd/tetra run .../export_secret_while_condition_return_repro.tetra` | Passed `check`; `run` printed `exit status 42` for `secret_seal_i32(1, token)` | Extends BUG-036 to loop conditions |
@@ -5476,7 +5476,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S043-001 | Graphify/source navigation for actor mailbox taint | `mcp__graphify__.query_graph ... core.send core.recv secret taint ...`; source reads in `compiler/internal/semantics/checker.go`, `compiler/internal/semantics/exprs.go`, `compiler/internal/semantics/builtins.go`, and `docs/spec/actors.md` | Found `ExprStmt` ignores a tainted call result; `exprSecretTainted` marks tainted `core.*` calls as tainted rather than rejecting side-effect sinks; `core.recv` return provenance is not tied to previous sends | Build mailbox laundering probes |
+| S043-001 | Graphify/source navigation for actor mailbox taint | `mcp__graphify__.query_graph ... core.send core.recv secret taint ...`; source reads in `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/semantics/semantics_expressions.go`, `compiler/internal/semantics/semantics_core.go`, and `docs/spec/runtime/actors.md` | Found `ExprStmt` ignores a tainted call result; `exprSecretTainted` marks tainted `core.*` calls as tainted rather than rejecting side-effect sinks; `core.recv` return provenance is not tied to previous sends | Build mailbox laundering probes |
 | S043-002 | Direct exported return control | `go run ./cli/cmd/tetra check .../export_secret_return_rejected_control.tetra` | Rejected with `secret-tainted value cannot be returned from @export function 'leak'` | Baseline explicit-flow rejection |
 | S043-003 | Public actor self-send control | `go run ./cli/cmd/tetra check .../actor_public_self_send_control.tetra`; `go run ./cli/cmd/tetra run .../actor_public_self_send_control.tetra` | Passed `check`; `run` printed `exit status 42` after `core.send(core.self(), 42)` and `core.recv()` | Baseline actor mailbox round trip |
 | S043-004 | Secret actor mailbox laundering, value 42 | `go run ./cli/cmd/tetra check .../export_secret_actor_mailbox_launder_repro.tetra`; `go run ./cli/cmd/tetra run .../export_secret_actor_mailbox_launder_repro.tetra` | Passed `check`; `run` printed `exit status 42` after sending unsealed `raw` through the mailbox and returning `core.recv()` | Confirmed BUG-037 |
@@ -5496,7 +5496,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S044-001 | Graphify/source navigation for typed/tagged actor mailbox taint | `mcp__graphify__.query_graph ... send_typed recv_typed send_msg recv_msg secret taint ...`; source reads in `compiler/internal/semantics/exprs.go`, `compiler/actors_test.go`, and `docs/spec/actors.md` | Found `send_typed` validates enum/value-only payload shape and transfer payloads, but not secret-tainted payload values; `recv_typed`/`recv_msg` return mailbox data without taint provenance | Build typed/tagged mailbox probes |
+| S044-001 | Graphify/source navigation for typed/tagged actor mailbox taint | `mcp__graphify__.query_graph ... send_typed recv_typed send_msg recv_msg secret taint ...`; source reads in `compiler/internal/semantics/semantics_expressions.go`, `compiler/compiler_suite_test.go`, and `docs/spec/runtime/actors.md` | Found `send_typed` validates enum/value-only payload shape and transfer payloads, but not secret-tainted payload values; `recv_typed`/`recv_msg` return mailbox data without taint provenance | Build typed/tagged mailbox probes |
 | S044-002 | Typed actor mailbox laundering, value 42 | `go run ./cli/cmd/tetra check .../export_secret_typed_actor_mailbox_launder_repro.tetra`; `go run ./cli/cmd/tetra run .../export_secret_typed_actor_mailbox_launder_repro.tetra` | Passed `check`; `run` printed `exit status 42` after `LeakMsg.raw(raw)` round-tripped through `send_typed`/`recv_typed` | Extends BUG-037 to typed actor payloads |
 | S044-003 | Typed actor mailbox laundering, value 7 | `go run ./cli/cmd/tetra check .../export_secret_typed_actor_mailbox_launder_false_value_repro.tetra`; `go run ./cli/cmd/tetra run .../export_secret_typed_actor_mailbox_launder_false_value_repro.tetra` | Passed `check`; `run` printed `exit status 7` | Confirms typed payload tracks secret |
 | S044-004 | Tagged actor mailbox laundering, value 42 | `go run ./cli/cmd/tetra check .../export_secret_tagged_actor_mailbox_launder_repro.tetra`; `go run ./cli/cmd/tetra run .../export_secret_tagged_actor_mailbox_launder_repro.tetra` | Passed `check`; `run` printed `exit status 42` after `core.send_msg(self, raw, 99)` and `core.recv_msg().value` | Extends BUG-037 to tagged actor messages |
@@ -5517,7 +5517,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S045-001 | Graphify/source navigation for raw-memory taint | `mcp__graphify__.query_graph ... core.store_i32 core.load_i32 secret taint ...`; source reads in `compiler/internal/semantics/builtins.go`, `compiler/internal/semantics/checker.go`, `compiler/internal/semantics/exprs.go`, `docs/spec/unsafe.md`, and `docs/spec/effects_capabilities_privacy_v1.md` | Found raw memory is gated by `unsafe`/`cap.mem`, but load/store calls do not model privacy taint provenance across memory cells | Build memory laundering probes |
+| S045-001 | Graphify/source navigation for raw-memory taint | `mcp__graphify__.query_graph ... core.store_i32 core.load_i32 secret taint ...`; source reads in `compiler/internal/semantics/semantics_core.go`, `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/semantics/semantics_expressions.go`, `docs/spec/runtime/unsafe.md`, and `docs/spec/runtime/effects_capabilities_privacy_v1.md` | Found raw memory is gated by `unsafe`/`cap.mem`, but load/store calls do not model privacy taint provenance across memory cells | Build memory laundering probes |
 | S045-002 | Direct exported return control | `go run ./cli/cmd/tetra check .../export_secret_return_rejected_control.tetra` | Rejected with `secret-tainted value cannot be returned from @export function 'leak'` | Baseline explicit-flow rejection |
 | S045-003 | Public raw-memory round trip | `go run ./cli/cmd/tetra check .../public_raw_memory_roundtrip_control.tetra`; `go run ./cli/cmd/tetra run .../public_raw_memory_roundtrip_control.tetra` | Passed `check`; `run` printed `exit status 42` after `core.store_i32`/`core.load_i32` | Baseline unsafe memory path |
 | S045-004 | Secret raw-memory laundering, value 42 | `go run ./cli/cmd/tetra check .../export_secret_raw_memory_launder_repro.tetra`; `go run ./cli/cmd/tetra run .../export_secret_raw_memory_launder_repro.tetra` | Passed `check`; `run` printed `exit status 42` after storing unsealed `raw` and returning the loaded value | Confirmed BUG-038 |
@@ -5537,7 +5537,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S046-001 | Graphify/source navigation for runtime timing taint | `mcp__graphify__.query_graph ... sleep_ms time_now_ms secret taint ...`; source reads in `compiler/internal/semantics/builtins.go`, `compiler/internal/semantics/checker.go`, `compiler/internal/semantics/exprs.go`, and `docs/spec/runtime_abi.md` | Found `sleep_ms` mutates deterministic logical runtime time, while privacy taint tracks call return values but not runtime temporal state | Build timing side-channel probes |
+| S046-001 | Graphify/source navigation for runtime timing taint | `mcp__graphify__.query_graph ... sleep_ms time_now_ms secret taint ...`; source reads in `compiler/internal/semantics/semantics_core.go`, `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/semantics/semantics_expressions.go`, and `docs/spec/runtime/runtime_abi.md` | Found `sleep_ms` mutates deterministic logical runtime time, while privacy taint tracks call return values but not runtime temporal state | Build timing side-channel probes |
 | S046-002 | Public sleep/time control | `go run ./cli/cmd/tetra check .../public_sleep_time_control.tetra`; `go run ./cli/cmd/tetra run .../public_sleep_time_control.tetra` | Passed `check`; `run` printed `exit status 42` after `core.sleep_ms(42)` then `core.time_now_ms()` | Baseline runtime clock behavior |
 | S046-003 | Direct tainted deadline return control | `go run ./cli/cmd/tetra check .../export_secret_deadline_return_rejected_control.tetra` | Rejected with `secret-tainted value cannot be returned from @export function 'leak'` | Direct tainted runtime value is caught |
 | S046-004 | Secret sleep/time laundering, value 42 | `go run ./cli/cmd/tetra check .../export_secret_sleep_time_launder_repro.tetra`; `go run ./cli/cmd/tetra run .../export_secret_sleep_time_launder_repro.tetra` | Passed `check`; `run` printed `exit status 42` after sleeping for unsealed `raw` and returning `time_now_ms()` | Confirmed BUG-039 |
@@ -5560,7 +5560,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S047-001 | Graphify/source navigation for MMIO privacy taint | `mcp__graphify__.query_graph ... core.mmio_write_i32 mmio_read_i32 secret taint ...`; `mcp__graphify__.get_neighbors core.mmio_write_i32`; `mcp__graphify__.shortest_path exprSecretTainted core.mmio_write_i32`; source reads in `compiler/internal/semantics/builtins.go`, `compiler/internal/semantics/checker.go`, `docs/spec/capabilities.md`, and `examples/mmio_smoke.tetra` | Graphify had no direct `core.mmio_write_i32` node, but source/docs show MMIO is `unsafe`/`cap.io` gated and documented as observable; privacy taint tracks call return values, not MMIO locations or sinks | Build MMIO laundering probes |
+| S047-001 | Graphify/source navigation for MMIO privacy taint | `mcp__graphify__.query_graph ... core.mmio_write_i32 mmio_read_i32 secret taint ...`; `mcp__graphify__.get_neighbors core.mmio_write_i32`; `mcp__graphify__.shortest_path exprSecretTainted core.mmio_write_i32`; source reads in `compiler/internal/semantics/semantics_core.go`, `compiler/internal/semantics/semantics_checker.go`, `docs/spec/runtime/capabilities.md`, and `examples/memory/raw/mmio_smoke.tetra` | Graphify had no direct `core.mmio_write_i32` node, but source/docs show MMIO is `unsafe`/`cap.io` gated and documented as observable; privacy taint tracks call return values, not MMIO locations or sinks | Build MMIO laundering probes |
 | S047-002 | Direct exported return control | `go run ./cli/cmd/tetra check .../export_secret_return_rejected_control.tetra` | Rejected with `secret-tainted value cannot be returned from @export function 'leak'` | Baseline explicit-flow rejection |
 | S047-003 | Public MMIO round trip | `go run ./cli/cmd/tetra check .../public_mmio_roundtrip_control.tetra`; `go run ./cli/cmd/tetra run .../public_mmio_roundtrip_control.tetra` | Passed `check`; `run` printed `exit status 42` after `core.mmio_write_i32`/`core.mmio_read_i32` | Baseline unsafe MMIO path |
 | S047-004 | Secret MMIO laundering, value 42 | `go run ./cli/cmd/tetra check .../export_secret_mmio_launder_repro.tetra`; `go run ./cli/cmd/tetra run .../export_secret_mmio_launder_repro.tetra` | Passed `check`; `run` printed `exit status 42` after writing unsealed `raw` through MMIO and returning the read value | Confirmed BUG-040 |
@@ -5580,7 +5580,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S048-001 | Graphify/source navigation for task result taint | `mcp__graphify__.query_graph ... task_spawn_i32 task_join_i32 task.result_i32 secret taint ...`; `mcp__graphify__.get_neighbors core.task_spawn_i32`; `mcp__graphify__.shortest_path task.result_i32 exprSecretTainted`; source reads in `compiler/internal/semantics/checker.go`, `compiler/internal/semantics/exprs.go`, and `examples/task_join_wait_smoke.tetra` | Graphify had no direct task builtin nodes; source shows normal calls propagate `funcReturnSecretTaint`, while task spawn has separate boundary validation | Build direct-call and task-join probes |
+| S048-001 | Graphify/source navigation for task result taint | `mcp__graphify__.query_graph ... task_spawn_i32 task_join_i32 task.result_i32 secret taint ...`; `mcp__graphify__.get_neighbors core.task_spawn_i32`; `mcp__graphify__.shortest_path task.result_i32 exprSecretTainted`; source reads in `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/semantics/semantics_expressions.go`, and `examples/tasks/task_join_wait_smoke.tetra` | Graphify had no direct task builtin nodes; source shows normal calls propagate `funcReturnSecretTaint`, while task spawn has separate boundary validation | Build direct-call and task-join probes |
 | S048-002 | Public task join control | `go run ./cli/cmd/tetra check .../public_task_join_control.tetra`; `go run ./cli/cmd/tetra run .../public_task_join_control.tetra` | Passed `check`; `run` printed `exit status 42` | Baseline task join path |
 | S048-003 | Direct exported worker-return control | `go run ./cli/cmd/tetra check .../export_secret_direct_worker_return_rejected_control.tetra` | Rejected with `secret-tainted value cannot be returned from @export function 'leak'` | Confirms direct function-return taint propagation |
 | S048-004 | Secret-tainted task worker return, value 42 | `go run ./cli/cmd/tetra check .../export_secret_task_join_launder_repro.tetra`; `go run ./cli/cmd/tetra run .../export_secret_task_join_launder_repro.tetra` | Both rejected at `core.task_spawn_i32("worker")` with `target 'worker' uses effect 'privacy' and cannot cross task boundary` | No new bug in this path |
@@ -5601,7 +5601,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S049-001 | Graphify/source navigation for closure capture taint | `mcp__graphify__.query_graph ... closure captures function-typed returns exprSecretTainted secret taint ...`; `mcp__graphify__.get_neighbors ClosureExpr`; `mcp__graphify__.shortest_path ClosureExpr exprSecretTainted`; source reads in `compiler/internal/semantics/checker.go`, `compiler/tests/semantics/closures_semantic_clauses_test.go`, and `compiler/internal/lower/callable_test.go` | Found closure/callable capture metadata is rich for ownership/escape, but `exprSecretTainted` has no closure-capture case and zero-arg function-typed local calls have no tainted argument to propagate | Build closure-capture laundering probes |
+| S049-001 | Graphify/source navigation for closure capture taint | `mcp__graphify__.query_graph ... closure captures function-typed returns exprSecretTainted secret taint ...`; `mcp__graphify__.get_neighbors ClosureExpr`; `mcp__graphify__.shortest_path ClosureExpr exprSecretTainted`; source reads in `compiler/internal/semantics/semantics_checker.go`, `compiler/tests/semantics/semantics_callables_closures_test.go`, and `compiler/internal/lower/lower_suite_test.go` | Found closure/callable capture metadata is rich for ownership/escape, but `exprSecretTainted` has no closure-capture case and zero-arg function-typed local calls have no tainted argument to propagate | Build closure-capture laundering probes |
 | S049-002 | Direct exported return control | `go run ./cli/cmd/tetra check .../export_secret_return_rejected_control.tetra` | Rejected with `secret-tainted value cannot be returned from @export function 'leak'` | Baseline explicit-flow rejection |
 | S049-003 | Public closure capture control | `go run ./cli/cmd/tetra check .../public_closure_capture_control.tetra`; `go run ./cli/cmd/tetra run .../public_closure_capture_control.tetra` | Passed `check`; `run` printed `exit status 42` after a local immutable `Int` capture | Baseline function-typed local call path |
 | S049-004 | Secret closure-capture laundering, value 42 | `go run ./cli/cmd/tetra check .../export_secret_closure_capture_launder_repro.tetra`; `go run ./cli/cmd/tetra run .../export_secret_closure_capture_launder_repro.tetra` | Passed `check`; `run` printed `exit status 42` after `raw` was captured by `fn() -> Int` and returned via `f()` | Confirmed BUG-041 |
@@ -5623,7 +5623,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S050-001 | Graphify/source navigation for catch payload taint | `mcp__graphify__.query_graph ... ThrowStmt CatchExpr catch bindings enum payloads exprSecretTainted secret taint ...`; `mcp__graphify__.get_neighbors CatchExpr`; `mcp__graphify__.shortest_path CatchExpr exprSecretTainted`; source reads in `compiler/internal/semantics/checker.go`, `compiler/internal/semantics/exprs.go`, `docs/spec/flow_syntax_v1.md`, and Session 036 repros | Found `checkCatchExpr` binds ownership/region/resource payload locals, and `exprSecretTainted(CatchExpr)` rechecks the catch call/case values; build repro to see whether exported return catches the thrown payload | Build local catch probes |
+| S050-001 | Graphify/source navigation for catch payload taint | `mcp__graphify__.query_graph ... ThrowStmt CatchExpr catch bindings enum payloads exprSecretTainted secret taint ...`; `mcp__graphify__.get_neighbors CatchExpr`; `mcp__graphify__.shortest_path CatchExpr exprSecretTainted`; source reads in `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/semantics/semantics_expressions.go`, `docs/spec/flow/flow_syntax_v1.md`, and Session 036 repros | Found `checkCatchExpr` binds ownership/region/resource payload locals, and `exprSecretTainted(CatchExpr)` rechecks the catch call/case values; build repro to see whether exported return catches the thrown payload | Build local catch probes |
 | S050-002 | Direct exported return control | `go run ./cli/cmd/tetra check .../export_secret_return_rejected_control.tetra` | Rejected with `secret-tainted value cannot be returned from @export function 'leak'` | Baseline explicit-flow rejection |
 | S050-003 | Public catch payload control | `go run ./cli/cmd/tetra check .../public_catch_payload_control.tetra`; `go run ./cli/cmd/tetra run .../public_catch_payload_control.tetra` | Passed `check`; `run` printed `exit status 42` after `LeakErr.raw(42)` was caught and returned | Baseline catch payload path |
 | S050-004 | Secret catch payload laundering attempt, value 42 | `go run ./cli/cmd/tetra check .../export_secret_catch_payload_launder_repro.tetra`; `go run ./cli/cmd/tetra run .../export_secret_catch_payload_launder_repro.tetra` | Both rejected at the exported `return catch helper(token, value):` with `secret-tainted value cannot be returned from @export function 'leak'` | No new bug in this path |
@@ -5644,7 +5644,7 @@ Evidence to add as probes run:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S051-001 | Graphify/source navigation for opaque capability tokens | `mcp__graphify__.query_graph ... cap.io cap.mem opaque capability tokens core.cap_io core.cap_mem fs_exists load_i32 store_i32 ...`; `mcp__graphify__.get_neighbors cap.io`; `mcp__graphify__.shortest_path cap.io StructLitExpr`; source reads in `compiler/internal/semantics/types.go`, `docs/spec/effects_capabilities_privacy_v1.md`, `docs/spec/capabilities.md`, and `compiler/internal/actorsrt/linux_x64_emit.go` | Docs say `cap.io`/`cap.mem` are opaque tokens only acquired inside `unsafe`; source marks them as `TypeCap` and backend filesystem code does not inspect the token value, so typechecker opacity is the relevant barrier | Build capability forge probes |
+| S051-001 | Graphify/source navigation for opaque capability tokens | `mcp__graphify__.query_graph ... cap.io cap.mem opaque capability tokens core.cap_io core.cap_mem fs_exists load_i32 store_i32 ...`; `mcp__graphify__.get_neighbors cap.io`; `mcp__graphify__.shortest_path cap.io StructLitExpr`; source reads in `compiler/internal/semantics/semantics_core.go`, `docs/spec/runtime/effects_capabilities_privacy_v1.md`, `docs/spec/runtime/capabilities.md`, and `compiler/internal/actorsrt/actorsrt_core.go` | Docs say `cap.io`/`cap.mem` are opaque tokens only acquired inside `unsafe`; source marks them as `TypeCap` and backend filesystem code does not inspect the token value, so typechecker opacity is the relevant barrier | Build capability forge probes |
 | S051-002 | `core.cap_io()` outside `unsafe` control | `go run ./cli/cmd/tetra check .../cap_io_outside_unsafe_rejected_control.tetra` | Rejected with `'core.cap_io' is only allowed in unsafe blocks` | Baseline unsafe-only acquisition check |
 | S051-003 | Valid `core.cap_io()` filesystem control | `go run ./cli/cmd/tetra check .../valid_cap_io_fs_control.tetra`; `go run ./cli/cmd/tetra run .../valid_cap_io_fs_control.tetra` | Passed `check`; `run` printed `exit status 42` when `README.md` existed | Baseline legitimate capability path |
 | S051-004 | `cap.io{}` filesystem forge attempt | `go run ./cli/cmd/tetra check .../cap_io_brace_forge_fs_repro.tetra` | Rejected with `'cap.io' is not a struct` | No new bug for brace-literal `cap.io` forge |
@@ -5780,7 +5780,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S058-001 | Graphify/source navigation for budget contexts | `mcp__graphify__.query_graph ... budget semantic clause lowering guard negative overflow direct calls task spawn loops enforcement`; source reads in `compiler/internal/semantics/checker.go`, `compiler/internal/semantics/exprs.go`, `compiler/internal/lower/lower.go`, `compiler/tests/safety/plan250_safety_runtime_test.go`, and `docs/spec/current_supported_surface.md` | Found budget context validation is a separate AST pass over named calls/spawn strings, while callable semantic-clause checks enforce `realtime`/`noalloc`/`noblock` but not `budget(N)` | Build function-typed underbudget probes |
+| S058-001 | Graphify/source navigation for budget contexts | `mcp__graphify__.query_graph ... budget semantic clause lowering guard negative overflow direct calls task spawn loops enforcement`; source reads in `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/semantics/semantics_expressions.go`, `compiler/internal/lower/lower_core.go`, `compiler/tests/safety/plan250_safety_runtime_test.go`, and `docs/spec/core/current_supported_surface.md` | Found budget context validation is a separate AST pass over named calls/spawn strings, while callable semantic-clause checks enforce `realtime`/`noalloc`/`noblock` but not `budget(N)` | Build function-typed underbudget probes |
 | S058-002 | Direct underbudget call control | `go run ./cli/cmd/tetra check .../budget_direct_underbudget_rejected_control.tetra` | Rejected with `budget context for call to 'callee' requires caller budget at least 6, got 5` | Baseline static budget context rejection |
 | S058-003 | Local function-typed underbudget call | `go run ./cli/cmd/tetra check .../budget_function_typed_local_underbudget_repro.tetra`; `go run ./cli/cmd/tetra run .../budget_function_typed_local_underbudget_repro.tetra` | Passed `check`; `run` printed `exit status 42` after `let f: fn(Int) -> Int uses budget = callee` and `f(41)` | Confirmed BUG-042 |
 | S058-004 | Global function-typed underbudget call | `go run ./cli/cmd/tetra check .../budget_function_typed_global_underbudget_repro.tetra`; `go run ./cli/cmd/tetra run .../budget_function_typed_global_underbudget_repro.tetra` | Passed `check`; `run` printed `exit status 42` after `var cb: fn(Int) -> Int uses budget = callee` and `cb(41)` | Extends BUG-042 to function-typed globals |
@@ -5801,7 +5801,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S059-001 | Source navigation for budget literal constants | Source reads in `compiler/internal/frontend/lexer.go`, `compiler/internal/frontend/parser.go`, `compiler/internal/semantics/types.go`, and `compiler/internal/semantics/checker.go` | Lexer parses decimal tokens as `int64`, parser stores `NumberExpr.Value` as `int32`, and budget validation consumes the already-wrapped value via `constI32` | Build boundary literal probes |
+| S059-001 | Source navigation for budget literal constants | Source reads in `compiler/internal/frontend/frontend_core.go`, `compiler/internal/frontend/frontend_core.go`, `compiler/internal/semantics/semantics_core.go`, and `compiler/internal/semantics/semantics_checker.go` | Lexer parses decimal tokens as `int64`, parser stores `NumberExpr.Value` as `int32`, and budget validation consumes the already-wrapped value via `constI32` | Build boundary literal probes |
 | S059-002 | Negative budget control | `go run ./cli/cmd/tetra check .../budget_negative_rejected_control.tetra` | Rejected with `semantic clause 'budget' requires a non-negative value` | Baseline negative rejection |
 | S059-003 | `2147483648` budget control | `go run ./cli/cmd/tetra check .../budget_int32_plus_one_rejected_control.tetra` | Rejected with `semantic clause 'budget' requires a non-negative value` after wrapping to negative | Rejected, but diagnostic exposes wrapped interpretation |
 | S059-004 | `4294967296` budget wrap repro | `go run ./cli/cmd/tetra check .../budget_uint32_wrap_zero_repro.tetra`; `go run ./cli/cmd/tetra run .../budget_uint32_wrap_zero_repro.tetra` | Passed `check`; `run` printed `exit status 42` | Extends BUG-020 to `budget(...)` semantic-clause arguments |
@@ -5823,7 +5823,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S060-001 | Graphify/source navigation for consent and function-typed signatures | `mcp__graphify__.query_graph ... consent semantic clause consent(token) callback function typed callable validation privacy consent.token bypass`; source reads in `compiler/internal/semantics/checker.go`, `compiler/internal/semantics/resolution.go`, `compiler/internal/semantics/function_types.go`, `compiler/internal/lower/lower.go`, `docs/spec/current_supported_surface.md`, and consent tests | Found `TypeRefFunction` resolves to `fnptr`; nested callable signature metadata is tracked separately for callability but not inspected by `typeUsesSecret` | Build nested function-type consent probes |
+| S060-001 | Graphify/source navigation for consent and function-typed signatures | `mcp__graphify__.query_graph ... consent semantic clause consent(token) callback function typed callable validation privacy consent.token bypass`; source reads in `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/semantics/semantics_core.go`, `compiler/internal/semantics/semantics_expressions.go`, `compiler/internal/lower/lower_core.go`, `docs/spec/core/current_supported_surface.md`, and consent tests | Found `TypeRefFunction` resolves to `fnptr`; nested callable signature metadata is tracked separately for callability but not inspected by `typeUsesSecret` | Build nested function-type consent probes |
 | S060-002 | Direct secret parameter missing consent control | `go run ./cli/cmd/tetra check .../direct_secret_param_missing_consent_rejected_control.tetra` | Rejected with `secret types in function signature require semantic clause consent(<token>)` | Baseline direct secret signature rejection |
 | S060-003 | Function-typed secret parameter without consent | `go run ./cli/cmd/tetra check .../function_typed_secret_param_missing_consent_repro.tetra`; `go run ./cli/cmd/tetra run .../function_typed_secret_param_missing_consent_repro.tetra` | Passed `check`; `run` exited 0 with no consent clause on the enclosing function | Confirmed BUG-043 |
 | S060-004 | Function-typed secret return without consent | `go run ./cli/cmd/tetra check .../function_typed_secret_return_missing_consent_repro.tetra`; `go run ./cli/cmd/tetra run .../function_typed_secret_return_missing_consent_repro.tetra` | Passed `check`; `run` exited 0 with no consent clause on the enclosing function | Extends BUG-043 to callback return types |
@@ -5847,7 +5847,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S061-001 | Graphify/source navigation for exported capability parameters | `mcp__graphify__.query_graph ... @export function cap.io cap.mem consent.token parameter ABI exported capability token forge ...`; source reads in `compiler/internal/semantics/checker.go`, `compiler/internal/lower/lower.go`, `compiler/internal/actorsrt/linux_x64_emit.go`, and capability/privacy specs | Found export validation checks names/duplicates but not `TypeCap` signatures; filesystem/raw-memory lowering consumes token slots without validating token values | Build exported capability probes |
+| S061-001 | Graphify/source navigation for exported capability parameters | `mcp__graphify__.query_graph ... @export function cap.io cap.mem consent.token parameter ABI exported capability token forge ...`; source reads in `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/lower/lower_core.go`, `compiler/internal/actorsrt/actorsrt_core.go`, and capability/privacy specs | Found export validation checks names/duplicates but not `TypeCap` signatures; filesystem/raw-memory lowering consumes token slots without validating token values | Build exported capability probes |
 | S061-002 | Internal literal token controls | `go run ./cli/cmd/tetra check .../cap_io_literal_param_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../consent_literal_param_rejected_control.tetra` | Both rejected with type mismatch diagnostics for argument 1 | Baseline internal source cannot pass integer literals as tokens |
 | S061-003 | Exported `cap.io` filesystem capability parameter | `go run ./cli/cmd/tetra check .../export_cap_io_param_fs_repro.tetra`; `go run ./cli/cmd/tetra run .../export_cap_io_param_fs_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_cap_io_param_fs_repro.tobj .../export_cap_io_param_fs_repro.tetra`; `rg -a -n "ffi_forged_fs_exists|forged_fs_exists" .../export_cap_io_param_fs_repro.tobj` | Passed `check`; `run` printed `exit status 42`; object build succeeded; object contains the export alias and function symbol | Confirmed BUG-044 for `cap.io` |
 | S061-004 | Exported `cap.mem` raw-memory capability parameter | `go run ./cli/cmd/tetra check .../export_cap_mem_param_load_repro.tetra`; `go run ./cli/cmd/tetra run .../export_cap_mem_param_load_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_cap_mem_param_load_repro.tobj .../export_cap_mem_param_load_repro.tetra`; `rg -a -n "ffi_forged_mem_load|forged_mem_load" .../export_cap_mem_param_load_repro.tobj` | Passed `check`; `run` printed `exit status 42`; object build succeeded; object contains the export alias and function symbol | Extends BUG-044 to `cap.mem` |
@@ -5868,7 +5868,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S062-001 | Graphify/source navigation for exported runtime handles | `mcp__graphify__.query_graph ... @export task.group task.i32 actor handle parameter ABI forge ...`; source reads in `compiler/internal/semantics/checker.go`, `compiler/internal/semantics/builtins.go`, `compiler/internal/lower/lower.go`, `compiler/internal/actorsrt/linux_x64_emit.go`, and actor/runtime specs | Found export validation checks names/duplicates only; task/actor builtins lower handles as raw slots; local actor send and join paths derive scheduler pointers from incoming handle integers | Build exported handle probes |
+| S062-001 | Graphify/source navigation for exported runtime handles | `mcp__graphify__.query_graph ... @export task.group task.i32 actor handle parameter ABI forge ...`; source reads in `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/semantics/semantics_core.go`, `compiler/internal/lower/lower_core.go`, `compiler/internal/actorsrt/actorsrt_core.go`, and actor/runtime specs | Found export validation checks names/duplicates only; task/actor builtins lower handles as raw slots; local actor send and join paths derive scheduler pointers from incoming handle integers | Build exported handle probes |
 | S062-002 | Internal literal handle controls | `go run ./cli/cmd/tetra check .../task_group_literal_param_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../task_i32_literal_param_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../actor_literal_param_rejected_control.tetra` | All three rejected with type mismatch diagnostics for argument 1 | Baseline internal source cannot pass integer literals as these handle types |
 | S062-003 | Exported `task.group` close parameter | `go run ./cli/cmd/tetra check .../export_task_group_param_close_repro.tetra`; `go run ./cli/cmd/tetra run .../export_task_group_param_close_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_task_group_param_close_repro.tobj .../export_task_group_param_close_repro.tetra`; `rg -a -n "ffi_close_group|close_group" .../export_task_group_param_close_repro.tobj` | Passed `check`; `run` printed `exit status 42`; object build succeeded; object contains the export alias and function symbol | Confirmed BUG-045 for `task.group` |
 | S062-004 | Exported `task.i32` join parameter | `go run ./cli/cmd/tetra check .../export_task_i32_param_join_repro.tetra`; `go run ./cli/cmd/tetra run .../export_task_i32_param_join_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_task_i32_param_join_repro.tobj .../export_task_i32_param_join_repro.tetra`; `rg -a -n "ffi_join_task|join_task" .../export_task_i32_param_join_repro.tobj` | Passed `check`; `run` printed `exit status 42`; object build succeeded; object contains the export alias and function symbol | Exported-ABI extension of BUG-014 and supporting evidence for BUG-045 |
@@ -5889,7 +5889,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S063-001 | Graphify/source navigation for exported island handles | `mcp__graphify__.query_graph ... @export island handle parameter ABI forge core.island_alloc core.island_make_u8 ...`; source reads in `docs/spec/islands.md`, `docs/spec/stdlib.md`, `compiler/internal/semantics/checker.go`, `compiler/internal/semantics/region.go`, `compiler/internal/lower/lower.go`, and `compiler/internal/backend/x64abi/sysv_unix.go` | Found `island` is an opaque resource handle/base pointer; export validation does not filter it; island make/free code reads allocator header fields from the incoming pointer | Build exported island probes |
+| S063-001 | Graphify/source navigation for exported island handles | `mcp__graphify__.query_graph ... @export island handle parameter ABI forge core.island_alloc core.island_make_u8 ...`; source reads in `docs/spec/memory/islands.md`, `docs/spec/standard_library/stdlib.md`, `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/semantics/semantics_memory_resources.go`, `compiler/internal/lower/lower_core.go`, and `compiler/internal/backend/x64abi/sysv_unix.go` | Found `island` is an opaque resource handle/base pointer; export validation does not filter it; island make/free code reads allocator header fields from the incoming pointer | Build exported island probes |
 | S063-002 | Internal literal island controls | `go run ./cli/cmd/tetra check .../island_literal_param_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../island_free_literal_param_rejected_control.tetra` | Both rejected with type mismatch diagnostics for argument 1 | Baseline internal source cannot pass integer literals as `island` |
 | S063-003 | Exported island slice allocation parameter | `go run ./cli/cmd/tetra check .../export_island_param_slice_repro.tetra`; `go run ./cli/cmd/tetra run .../export_island_param_slice_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_island_param_slice_repro.tobj .../export_island_param_slice_repro.tetra`; `rg -a -n "ffi_island_byte_roundtrip|island_byte_roundtrip" .../export_island_param_slice_repro.tobj` | Passed `check`; `run` printed `exit status 42`; object build succeeded; object contains the export alias and function symbol | Confirmed BUG-046 for `core.island_make_u8` |
 | S063-004 | Exported island free parameter | `go run ./cli/cmd/tetra check .../export_island_param_free_repro.tetra`; `go run ./cli/cmd/tetra run .../export_island_param_free_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_island_param_free_repro.tobj .../export_island_param_free_repro.tetra`; `rg -a -n "ffi_free_island|free_island" .../export_island_param_free_repro.tobj` | Passed `check`; `run` printed `exit status 42`; object build succeeded; object contains the export alias and function symbol | Extends BUG-046 to explicit island cleanup |
@@ -5908,7 +5908,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S064-001 | Graphify/source navigation for exported handle returns | `mcp__graphify__.query_graph ... @export function return type island cap.io cap.mem actor task.group task.i32 ...`; source reads in `compiler/internal/semantics/checker.go`, `compiler/internal/lower/lower.go`, `compiler/internal/backend/x64obj/builder.go`, and handle docs | Found export validation checks names/duplicates only; lowering/backend preserve return slots and export aliases without opaque-handle filtering | Build return-handle probes |
+| S064-001 | Graphify/source navigation for exported handle returns | `mcp__graphify__.query_graph ... @export function return type island cap.io cap.mem actor task.group task.i32 ...`; source reads in `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/lower/lower_core.go`, `compiler/internal/backend/x64obj/builder.go`, and handle docs | Found export validation checks names/duplicates only; lowering/backend preserve return slots and export aliases without opaque-handle filtering | Build return-handle probes |
 | S064-002 | Internal literal return controls | `go run ./cli/cmd/tetra check .../cap_io_return_literal_rejected_control.tetra`; repeated for `cap.mem`, `island`, `actor`, `task.group`, and `task.i32` controls | All rejected with `return type mismatch: expected '<handle>', got 'i32'` | Baseline internal source cannot return integer literals as opaque handles |
 | S064-003 | Exported capability return tokens | `go run ./cli/cmd/tetra check .../export_cap_io_return_repro.tetra`; `go run ./cli/cmd/tetra run .../export_cap_io_return_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_cap_io_return_repro.tobj ...`; `rg -a -n "ffi_mint_io_cap|mint_io_cap" ...`; repeated for `export_cap_mem_return_repro.tetra` and `ffi_mint_mem_cap` | Both passed `check`; both `run` commands printed `exit status 42`; object builds succeeded; objects contain export aliases and internal symbols | Confirmed BUG-047 for `cap.io` and `cap.mem` returns |
 | S064-004 | Exported island/actor return handles | `go run ./cli/cmd/tetra check .../export_island_return_repro.tetra`; `go run ./cli/cmd/tetra run .../export_island_return_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_island_return_repro.tobj ...`; `rg -a -n "ffi_mint_island|mint_island" ...`; repeated for `export_actor_return_repro.tetra` and `ffi_spawn_peer` | Both passed `check`; both `run` commands printed `exit status 42`; object builds succeeded; objects contain export aliases and internal symbols | Extends BUG-047 to `island` and `actor` returns |
@@ -5929,7 +5929,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S065-001 | Graphify/source navigation for aggregate handle signatures | `mcp__graphify__.query_graph ... @export aggregate struct enum optional contains cap.io cap.mem island actor task.group task.i32 ...`; source reads in `compiler/internal/semantics/region.go`, `compiler/internal/semantics/checker.go`, `docs/spec/stdlib.md`, and `docs/spec/ownership_v1.md` | Found recursive `typeContainsResourceHandle` support for structs, enum payloads, arrays, and optionals, but `@export` validation only checks names/aliases and does not use that recursive filter or cover `TypeCap` aggregate fields | Build aggregate export probes |
+| S065-001 | Graphify/source navigation for aggregate handle signatures | `mcp__graphify__.query_graph ... @export aggregate struct enum optional contains cap.io cap.mem island actor task.group task.i32 ...`; source reads in `compiler/internal/semantics/semantics_memory_resources.go`, `compiler/internal/semantics/semantics_checker.go`, `docs/spec/standard_library/stdlib.md`, and `docs/spec/runtime/ownership_v1.md` | Found recursive `typeContainsResourceHandle` support for structs, enum payloads, arrays, and optionals, but `@export` validation only checks names/aliases and does not use that recursive filter or cover `TypeCap` aggregate fields | Build aggregate export probes |
 | S065-002 | Internal nested literal controls | `go run ./cli/cmd/tetra check .../struct_cap_io_literal_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../enum_actor_literal_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../optional_task_group_literal_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../struct_cap_io_return_literal_rejected_control.tetra` | All four rejected: `type mismatch for field 'io'`, enum payload expects `actor`, optional parameter type mismatch, and return field `io` mismatch | Baseline internal source cannot forge nested opaque handles |
 | S065-003 | Exported struct parameter containing `cap.io` | `go run ./cli/cmd/tetra check .../export_struct_cap_io_param_repro.tetra`; `go run ./cli/cmd/tetra run .../export_struct_cap_io_param_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_struct_cap_io_param_repro.tobj ...`; `rg -a -n "ffi_struct_fs_exists|struct_fs_exists" .../export_struct_cap_io_param_repro.tobj` | Passed `check`; `run` printed `exit status 42`; object build succeeded; object contains the export alias and function symbol | Confirms BUG-048 for struct-wrapped capability parameters |
 | S065-004 | Exported enum and optional resource parameters | `go run ./cli/cmd/tetra check .../export_enum_actor_param_repro.tetra`; `go run ./cli/cmd/tetra run .../export_enum_actor_param_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_enum_actor_param_repro.tobj ...`; `rg -a -n "ffi_send_enveloped_actor|send_enveloped_actor" ...`; repeated for `export_optional_task_group_param_repro.tetra` and `ffi_optional_group_status` | Both passed `check`; both `run` commands printed `exit status 42`; object builds succeeded; objects contain export aliases and internal symbols | Extends BUG-048 to enum payloads and optional resource payloads |
@@ -5952,7 +5952,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S066-001 | Graphify/source navigation for exported `fnptr` signatures | `mcp__graphify__.query_graph ... @export function typed parameter return fnptr callable ABI signature validation ...`; source reads in `compiler/internal/semantics/checker.go`, `compiler/internal/semantics/types.go`, `compiler/internal/lower/callables.go`, `docs/spec/runtime_abi.md`, and `docs/spec/current_supported_surface.md` | Found `@export` validation checks names/aliases only; `fnptr` is a public 9-slot type; docs describe 9-slot callable payloads; function-typed parameter calls load hidden capture slots from incoming local slots | Build fnptr export probes |
+| S066-001 | Graphify/source navigation for exported `fnptr` signatures | `mcp__graphify__.query_graph ... @export function typed parameter return fnptr callable ABI signature validation ...`; source reads in `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/semantics/semantics_core.go`, `compiler/internal/lower/lower_callables.go`, `docs/spec/runtime/runtime_abi.md`, and `docs/spec/core/current_supported_surface.md` | Found `@export` validation checks names/aliases only; `fnptr` is a public 9-slot type; docs describe 9-slot callable payloads; function-typed parameter calls load hidden capture slots from incoming local slots | Build fnptr export probes |
 | S066-002 | Internal literal function-typed controls | `go run ./cli/cmd/tetra check .../fnptr_literal_param_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../fnptr_return_literal_rejected_control.tetra` | Both rejected: callback argument literal must be a supported `fnptr` source, and function-typed return must use a supported `fnptr` source | Baseline internal source cannot forge function-typed values with integers |
 | S066-003 | Exported non-capturing function-typed parameter and return | `go run ./cli/cmd/tetra check .../export_fnptr_param_repro.tetra`; `go run ./cli/cmd/tetra run .../export_fnptr_param_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_fnptr_param_repro.tobj ...`; repeated for `export_fnptr_return_repro.tetra`; TOBJ metadata reader over `compiler/internal/format/tobj/object.go` layout | Both passed `check`; both `run` commands printed `exit status 42`; object builds succeeded; `ffi_apply_callback` metadata is `params=10 returns=1`; `ffi_make_callback` metadata is `params=0 returns=9` | Confirms raw fnptr ABI exposure for non-capturing function-typed values |
 | S066-004 | Exported captured callback parameter | `go run ./cli/cmd/tetra check .../export_fnptr_captured_param_repro.tetra`; `go run ./cli/cmd/tetra run .../export_fnptr_captured_param_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_fnptr_captured_param_repro.tobj ...`; `rg -a -n "ffi_apply_captured_callback|apply_captured_callback" ...`; TOBJ metadata reader | Passed `check`; `run` printed `exit status 42`; object build succeeded; alias exists; metadata is `params=10 returns=1` | Confirms BUG-049 for incoming captured callback environments |
@@ -5973,7 +5973,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S067-001 | Graphify/source navigation for aggregate `fnptr` metadata | `mcp__graphify__.query_graph ... @export aggregate struct enum optional contains function-typed fnptr ...`; source reads in `compiler/internal/semantics/function_types.go`, `compiler/internal/lower/callables.go`, and existing callable tests | Found function-typed struct fields and enum payloads carry special metadata and stored-call lowering reads hidden capture slots from aggregate `fnptr` bases | Build aggregate fnptr export probes |
+| S067-001 | Graphify/source navigation for aggregate `fnptr` metadata | `mcp__graphify__.query_graph ... @export aggregate struct enum optional contains function-typed fnptr ...`; source reads in `compiler/internal/semantics/semantics_expressions.go`, `compiler/internal/lower/lower_callables.go`, and existing callable tests | Found function-typed struct fields and enum payloads carry special metadata and stored-call lowering reads hidden capture slots from aggregate `fnptr` bases | Build aggregate fnptr export probes |
 | S067-002 | Internal aggregate literal controls | `go run ./cli/cmd/tetra check .../struct_fnptr_field_literal_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../enum_fnptr_payload_literal_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../struct_fnptr_field_return_literal_rejected_control.tetra` | All rejected with supported-`fnptr` source diagnostics for the struct field, enum payload, and returned struct field | Baseline internal source cannot forge aggregate-contained function-typed values |
 | S067-003 | Exported struct field callback parameter | `go run ./cli/cmd/tetra check .../export_struct_fnptr_field_param_repro.tetra`; `go run ./cli/cmd/tetra run .../export_struct_fnptr_field_param_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_struct_fnptr_field_param_repro.tobj ...`; `rg -a -n "ffi_boxed_callback_apply|boxed_callback_apply" ...`; TOBJ metadata reader | Passed `check`; `run` printed `exit status 42`; object build succeeded; alias exists; metadata is `params=10 returns=1` | Confirms BUG-050 for struct field callback parameters |
 | S067-004 | Exported enum payload callback parameter | `go run ./cli/cmd/tetra check .../export_enum_fnptr_payload_param_repro.tetra`; `go run ./cli/cmd/tetra run .../export_enum_fnptr_payload_param_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_enum_fnptr_payload_param_repro.tobj ...`; `rg -a -n "ffi_enveloped_callback_apply|enveloped_callback_apply" ...`; TOBJ metadata reader | Passed `check`; `run` printed `exit status 42`; object build succeeded; alias exists; metadata is `params=11 returns=1` | Extends BUG-050 to enum payload callback parameters |
@@ -5994,7 +5994,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S068-001 | Graphify/source navigation for exported string/slice views | `mcp__graphify__.query_graph ... @export String str slice []u8 parameter return ptr len ABI signature validation ...`; source reads in `compiler/internal/semantics/checker.go`, `compiler/internal/semantics/types.go`, `docs/spec/stdlib.md`, and `docs/spec/runtime_abi.md` | Found export validation checks names/aliases only; `str` and slices are public two-slot `ptr,len` values; docs describe explicit host `ptr,len` strings as a boundary contract | Build direct String/slice export probes |
+| S068-001 | Graphify/source navigation for exported string/slice views | `mcp__graphify__.query_graph ... @export String str slice []u8 parameter return ptr len ABI signature validation ...`; source reads in `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/semantics/semantics_core.go`, `docs/spec/standard_library/stdlib.md`, and `docs/spec/runtime/runtime_abi.md` | Found export validation checks names/aliases only; `str` and slices are public two-slot `ptr,len` values; docs describe explicit host `ptr,len` strings as a boundary contract | Build direct String/slice export probes |
 | S068-002 | Internal literal String/slice controls | `go run ./cli/cmd/tetra check .../string_literal_param_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../slice_literal_param_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../string_return_literal_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../slice_return_literal_rejected_control.tetra` | All rejected: String and slice argument controls report type mismatches; return controls report expected `str`/`[]u8`, got `i32` | Baseline internal source cannot forge String/slice views from integers |
 | S068-003 | Exported String parameter view | `go run ./cli/cmd/tetra check .../export_string_param_index_repro.tetra`; `go run ./cli/cmd/tetra run .../export_string_param_index_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_string_param_index_repro.tobj ...`; `rg -a -n "ffi_string_first_byte|string_first_byte" ...`; TOBJ metadata reader | Passed `check`; `run` printed `exit status 42`; object build succeeded; alias exists; metadata is `params=2 returns=1` | Confirms BUG-051 for incoming `String` `ptr,len` |
 | S068-004 | Exported slice parameter view | `go run ./cli/cmd/tetra check .../export_slice_param_index_repro.tetra`; `go run ./cli/cmd/tetra run .../export_slice_param_index_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_slice_param_index_repro.tobj ...`; `rg -a -n "ffi_slice_first_byte|slice_first_byte" ...`; TOBJ metadata reader | Passed `check`; `run` printed `exit status 42`; object build succeeded; alias exists; metadata is `params=2 returns=1` | Confirms BUG-051 for incoming `[]u8` `ptr,len` |
@@ -6015,7 +6015,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S069-001 | Graphify/source navigation for aggregate string/slice views | `mcp__graphify__.query_graph ... @export aggregate struct enum optional String str []u8 slice ptr len ABI signature validation ...`; `mcp__graphify__.get_neighbors CheckWorldOpt() relation_filter=call`; source reads in `compiler/internal/semantics/checker.go`, `compiler/internal/semantics/types.go`, `docs/spec/stdlib.md`, and prior aggregate fnptr repros | Found export validation checks names/aliases only; struct slot layout sums field slot counts; `String`/slices are two-slot values and optionals add one tag slot | Build aggregate String/slice export probes |
+| S069-001 | Graphify/source navigation for aggregate string/slice views | `mcp__graphify__.query_graph ... @export aggregate struct enum optional String str []u8 slice ptr len ABI signature validation ...`; `mcp__graphify__.get_neighbors CheckWorldOpt() relation_filter=call`; source reads in `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/semantics/semantics_core.go`, `docs/spec/standard_library/stdlib.md`, and prior aggregate fnptr repros | Found export validation checks names/aliases only; struct slot layout sums field slot counts; `String`/slices are two-slot values and optionals add one tag slot | Build aggregate String/slice export probes |
 | S069-002 | Internal nested literal controls | `go run ./cli/cmd/tetra check .../struct_string_field_literal_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../struct_slice_field_literal_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../enum_string_payload_literal_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../optional_string_literal_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../struct_string_field_return_literal_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../struct_slice_field_return_literal_rejected_control.tetra` | All rejected: field mismatches for `text`/`bytes`, enum payload expected `str`, optional parameter mismatch, and return field mismatches | Baseline internal source cannot forge nested String/slice views from integers |
 | S069-003 | Exported struct field String/slice parameters | `go run ./cli/cmd/tetra check .../export_struct_string_field_param_repro.tetra`; `go run ./cli/cmd/tetra run .../export_struct_string_field_param_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_struct_string_field_param_repro.tobj ...`; repeated for `export_struct_slice_field_param_repro.tetra`; `rg -a -n "ffi_boxed_string_first_byte|boxed_string_first_byte" ...`; `rg -a -n "ffi_boxed_slice_first_byte|boxed_slice_first_byte" ...`; TOBJ metadata reader | Both passed `check`; both `run` commands printed `exit status 42`; object builds succeeded; aliases exist; metadata is `params=2 returns=1` for both aliases | Confirms BUG-052 for struct-contained raw `ptr,len` parameters |
 | S069-004 | Exported enum and optional String payload parameters | `go run ./cli/cmd/tetra check .../export_enum_string_payload_param_repro.tetra`; `go run ./cli/cmd/tetra run .../export_enum_string_payload_param_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_enum_string_payload_param_repro.tobj ...`; repeated for `export_optional_string_param_repro.tetra`; `rg -a -n "ffi_enveloped_string_first_byte|enveloped_string_first_byte" ...`; `rg -a -n "ffi_optional_string_first_byte|optional_string_first_byte" ...`; TOBJ metadata reader | Both passed `check`; both `run` commands printed `exit status 42`; object builds succeeded; aliases exist; both metadata entries are `params=3 returns=1` | Extends BUG-052 to tag-plus-`ptr,len` enum/optional payloads |
@@ -6037,7 +6037,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S070-001 | Graphify/source navigation for fixed-array ABI | `mcp__graphify__.query_graph ... @export fixed array TypeArray [1]u8 ptr len ABI signature validation ...`; `mcp__graphify__.get_neighbors makeArrayTypeInfo`; `mcp__graphify__.get_neighbors resolveAssignTarget`; source reads in `compiler/internal/semantics/types.go`, `compiler/internal/semantics/resolution.go`, `compiler/internal/semantics/checker.go`, `compiler/internal/semantics/exprs.go`, and `compiler/internal/lower/lower.go` | Found `TypeArray` is a two-slot `ptr,len` type; fixed-array `ptr`/`len` assignment is rejected in source; export validation checks names/aliases only | Build direct fixed-array export probes |
+| S070-001 | Graphify/source navigation for fixed-array ABI | `mcp__graphify__.query_graph ... @export fixed array TypeArray [1]u8 ptr len ABI signature validation ...`; `mcp__graphify__.get_neighbors makeArrayTypeInfo`; `mcp__graphify__.get_neighbors resolveAssignTarget`; source reads in `compiler/internal/semantics/semantics_core.go`, `compiler/internal/semantics/semantics_core.go`, `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/semantics/semantics_expressions.go`, and `compiler/internal/lower/lower_core.go` | Found `TypeArray` is a two-slot `ptr,len` type; fixed-array `ptr`/`len` assignment is rejected in source; export validation checks names/aliases only | Build direct fixed-array export probes |
 | S070-002 | Internal fixed-array controls | `go run ./cli/cmd/tetra check .../fixed_array_literal_param_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../fixed_array_return_literal_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../fixed_array_internal_len_assignment_rejected_control.tetra` | All rejected: param literal mismatch, return literal mismatch, and fixed-array internals assignment diagnostic | Baseline source cannot forge `[1]Int` from an integer or mutate fixed-array `len` |
 | S070-003 | Exported fixed-array parameter length reader | `go run ./cli/cmd/tetra check .../export_fixed_array_param_len_repro.tetra`; `go run ./cli/cmd/tetra run .../export_fixed_array_param_len_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_fixed_array_param_len_repro.tobj ...`; `rg -a -n "ffi_fixed_array_len|fixed_array_len" ...`; TOBJ metadata reader | Passed `check`; `run` exited 0; object build succeeded; alias exists; metadata is `params=2 returns=1` | Confirms BUG-053 for incoming fixed-array `ptr,len` metadata |
 | S070-004 | Exported fixed-array index parameter | `go run ./cli/cmd/tetra check .../export_fixed_array_param_index_repro.tetra`; `go run ./cli/cmd/tetra run .../export_fixed_array_param_index_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_fixed_array_param_index_repro.tobj ...`; `rg -a -n "ffi_fixed_array_first|fixed_array_first" ...`; TOBJ metadata reader | Passed `check`; `run` exited 0; object build succeeded; alias exists; metadata is `params=2 returns=1` | Confirms BUG-053 reaches the normal fixed-array index path |
@@ -6058,7 +6058,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S071-001 | Graphify/source navigation for aggregate fixed arrays | `mcp__graphify__.query_graph ... @export aggregate struct enum optional fixed array TypeArray [1]Int ptr len ABI signature validation ...`; source reads in `compiler/internal/semantics/types.go`, `compiler/internal/semantics/checker.go`, `compiler/tests/semantics/array_mvp_test.go`, `docs/spec/stdlib.md`, and BUG-053 | Found `TypeArray` is two-slot `ptr,len`; struct layout sums slot counts; fixed arrays in structs/optionals have build-smoke coverage; export validation checks names/aliases only | Build aggregate fixed-array export probes |
+| S071-001 | Graphify/source navigation for aggregate fixed arrays | `mcp__graphify__.query_graph ... @export aggregate struct enum optional fixed array TypeArray [1]Int ptr len ABI signature validation ...`; source reads in `compiler/internal/semantics/semantics_core.go`, `compiler/internal/semantics/semantics_checker.go`, `compiler/tests/semantics/semantics_core_language_test.go`, `docs/spec/standard_library/stdlib.md`, and BUG-053 | Found `TypeArray` is two-slot `ptr,len`; struct layout sums slot counts; fixed arrays in structs/optionals have build-smoke coverage; export validation checks names/aliases only | Build aggregate fixed-array export probes |
 | S071-002 | Internal aggregate literal controls | `go run ./cli/cmd/tetra check .../struct_fixed_array_field_literal_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../enum_fixed_array_payload_literal_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../optional_fixed_array_literal_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../struct_fixed_array_field_return_literal_rejected_control.tetra` | All rejected: struct field mismatch, enum payload expected `[1]i32`, optional parameter mismatch, and returned struct field mismatch | Baseline source cannot forge nested fixed-array views from integers |
 | S071-003 | Exported struct field fixed-array parameters | `go run ./cli/cmd/tetra check .../export_struct_fixed_array_field_param_repro.tetra`; `go run ./cli/cmd/tetra run .../export_struct_fixed_array_field_param_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_struct_fixed_array_field_param_repro.tobj ...`; repeated for `export_struct_fixed_array_field_index_repro.tetra`; `rg -a -n "ffi_boxed_fixed_array_len|boxed_fixed_array_len" ...`; `rg -a -n "ffi_boxed_fixed_array_first|boxed_fixed_array_first" ...`; TOBJ metadata reader | Both passed `check`; both `run` commands exited 0; object builds succeeded; aliases exist; metadata is `params=2 returns=1` for both aliases | Confirms BUG-054 for struct-contained fixed-array metadata, including index path |
 | S071-004 | Exported enum and optional fixed-array payload parameters | `go run ./cli/cmd/tetra check .../export_enum_fixed_array_payload_param_repro.tetra`; `go run ./cli/cmd/tetra run .../export_enum_fixed_array_payload_param_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_enum_fixed_array_payload_param_repro.tobj ...`; repeated for `export_optional_fixed_array_param_repro.tetra`; `rg -a -n "ffi_enveloped_fixed_array_len|enveloped_fixed_array_len" ...`; `rg -a -n "ffi_optional_fixed_array_len|optional_fixed_array_len" ...`; TOBJ metadata reader | Both passed `check`; both `run` commands exited 0; object builds succeeded; aliases exist; both metadata entries are `params=3 returns=1` | Extends BUG-054 to tag-plus-`ptr,len` enum/optional payloads |
@@ -6079,7 +6079,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S072-001 | Graphify/source navigation for Bool ABI | `mcp__graphify__.query_graph ... @export Bool bool parameter return ABI signature validation ...`; `mcp__graphify__.get_neighbors baseTypes`; source reads in `compiler/internal/semantics/types.go`, `compiler/internal/semantics/checker.go`, `compiler/internal/lower/lower.go`, `compiler/internal/backend/x64core/emit.go`, `compiler/internal/format/tobj/object.go`, and prior Session 015 controls | Found `bool` is a one-slot `TypeBool`; source rejects integer-as-Bool; export validation checks names/aliases only; TOBJ symbol signatures store only slot counts; branch lowering tests one slot for zero/nonzero | Build exported Bool boundary probes |
+| S072-001 | Graphify/source navigation for Bool ABI | `mcp__graphify__.query_graph ... @export Bool bool parameter return ABI signature validation ...`; `mcp__graphify__.get_neighbors baseTypes`; source reads in `compiler/internal/semantics/semantics_core.go`, `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/lower/lower_core.go`, `compiler/internal/backend/x64core/x64core_core.go`, `compiler/internal/format/tobj/object.go`, and prior Session 015 controls | Found `bool` is a one-slot `TypeBool`; source rejects integer-as-Bool; export validation checks names/aliases only; TOBJ symbol signatures store only slot counts; branch lowering tests one slot for zero/nonzero | Build exported Bool boundary probes |
 | S072-002 | Internal Bool integer controls | `go run ./cli/cmd/tetra check .../bool_int_param_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../bool_return_int_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../struct_bool_field_int_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../enum_bool_payload_int_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../optional_bool_int_rejected_control.tetra` | All rejected: direct param mismatch, return mismatch, struct field mismatch, enum payload expected `bool`, and optional parameter mismatch | Baseline source cannot forge Bool values from integers |
 | S072-003 | Exported direct Bool parameter and return | `go run ./cli/cmd/tetra check .../export_bool_param_repro.tetra`; `go run ./cli/cmd/tetra run .../export_bool_param_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_bool_param_repro.tobj ...`; repeated for `export_bool_return_repro.tetra`; `rg -a -n "ffi_bool_gate|bool_gate" ...`; `rg -a -n "ffi_is_ready|is_ready" ...`; TOBJ metadata reader | Both passed `check`; both `run` commands printed `exit status 42`; object builds succeeded; aliases exist; `ffi_bool_gate` metadata is `params=1 returns=1`; `ffi_is_ready` metadata is `params=0 returns=1` | Confirms BUG-055 for direct Bool slots |
 | S072-004 | Exported aggregate Bool parameters | `go run ./cli/cmd/tetra check .../export_struct_bool_field_param_repro.tetra`; `go run ./cli/cmd/tetra run .../export_struct_bool_field_param_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_struct_bool_field_param_repro.tobj ...`; repeated for enum and optional Bool payload repros; `rg -a -n "ffi_boxed_bool_gate|boxed_bool_gate" ...`; `rg -a -n "ffi_enveloped_bool_gate|enveloped_bool_gate" ...`; `rg -a -n "ffi_optional_bool_gate|optional_bool_gate" ...`; TOBJ metadata reader | All three passed `check`; all three `run` commands printed `exit status 42`; object builds succeeded; aliases exist; struct metadata is `params=1 returns=1`; enum and optional metadata are `params=2 returns=1` | Extends BUG-055 to aggregate/tagged Bool payloads |
@@ -6098,7 +6098,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S073-001 | Graphify/source navigation for guarded defaults | `mcp__graphify__.query_graph ... catch expression default guard exhaustive ...`; source reads in `compiler/internal/semantics/exprs.go`, `compiler/internal/semantics/checker.go`, and `compiler/internal/lower/lower.go` | Found `match`/`catch` expression fallback exhaustiveness loops count any default arm, while complete-pattern helpers and statement `matchHasDefault` skip guarded arms | Build guarded-default expression probes |
+| S073-001 | Graphify/source navigation for guarded defaults | `mcp__graphify__.query_graph ... catch expression default guard exhaustive ...`; source reads in `compiler/internal/semantics/semantics_expressions.go`, `compiler/internal/semantics/semantics_checker.go`, and `compiler/internal/lower/lower_core.go` | Found `match`/`catch` expression fallback exhaustiveness loops count any default arm, while complete-pattern helpers and statement `matchHasDefault` skip guarded arms | Build guarded-default expression probes |
 | S073-002 | Guarded concrete case controls | `go run ./cli/cmd/tetra check .../match_guarded_case_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../catch_guarded_case_rejected_control.tetra` | Both rejected with `match expression must be exhaustive` and `catch expression must be exhaustive` | Baseline guarded non-default arms do not count as exhaustive |
 | S073-003 | Unguarded and true-guard default controls | `go run ./cli/cmd/tetra check .../match_unguarded_default_control.tetra`; `go run ./cli/cmd/tetra run .../match_unguarded_default_control.tetra`; repeated for `catch_unguarded_default_control.tetra` and `catch_guarded_default_true_control.tetra` | All passed `check`; all run commands printed `exit status 42`; object builds for catch controls succeeded | Confirms normal default behavior and that guarded defaults are accepted |
 | S073-004 | False-guarded `match` default repro | `go run ./cli/cmd/tetra check .../match_guarded_default_false_repro.tetra`; `go run ./cli/cmd/tetra run .../match_guarded_default_false_repro.tetra`; `go run ./cli/cmd/tetra build -o .../match_guarded_default_false_repro.bin ...` | Passed `check`; `run` printed `exit status 42` from `value == 0` after no guarded arm stored `99`; build succeeded | Confirms BUG-056 for `match` expressions |
@@ -6119,7 +6119,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S074-001 | Collection loop source/navigation follow-up | `mcp__graphify__.get_neighbors collectionElementType`; `mcp__graphify__.get_neighbors lowerIndexLoadKind`; source reads in `compiler/internal/semantics/types.go`, `compiler/internal/semantics/checker.go`, `compiler/internal/lower/lower.go`, and prior Session 022 notes | Found `ensureTypeInfo` already rejects unsupported `[]T`/`[N]T` elements such as `str`, `ptr`, slices, arrays, and multi-slot structs; no new collection-loop bug beyond the fixed-array storage territory already covered by BUG-024/Session 022 | Pivot to ABI boundaries |
+| S074-001 | Collection loop source/navigation follow-up | `mcp__graphify__.get_neighbors collectionElementType`; `mcp__graphify__.get_neighbors lowerIndexLoadKind`; source reads in `compiler/internal/semantics/semantics_core.go`, `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/lower/lower_core.go`, and prior Session 022 notes | Found `ensureTypeInfo` already rejects unsupported `[]T`/`[N]T` elements such as `str`, `ptr`, slices, arrays, and multi-slot structs; no new collection-loop bug beyond the fixed-array storage territory already covered by BUG-024/Session 022 | Pivot to ABI boundaries |
 | S074-002 | Internal enum integer controls | `go run ./cli/cmd/tetra check .../enum_int_param_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../enum_int_return_rejected_control.tetra` | Rejected with `type mismatch for 'route_decision' arg 1` and `return type mismatch: expected 'Route', got 'i32'` | Baseline source cannot forge enum discriminants from integers |
 | S074-003 | Exported direct enum tag parameter | `go run ./cli/cmd/tetra check .../export_enum_tag_param_repro.tetra`; `go run ./cli/cmd/tetra run .../export_enum_tag_param_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_enum_tag_param_repro.tobj ...`; `rg -a -n "ffi_route_decision|route_decision" ...`; TOBJ metadata reader | Passed `check`; `run` printed `exit status 42`; object build succeeded; alias exists; metadata is `params=1 returns=1` for both `ffi_route_decision` and `route_decision` | Confirms BUG-057 for direct enum discriminant slots |
 | S074-004 | Exported enum payload tag parameter | `go run ./cli/cmd/tetra check .../export_enum_payload_tag_param_repro.tetra`; `go run ./cli/cmd/tetra run .../export_enum_payload_tag_param_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_enum_payload_tag_param_repro.tobj ...`; `rg -a -n "ffi_request_decision|request_decision" ...`; TOBJ metadata reader | Passed `check`; `run` printed `exit status 42`; object build succeeded; alias exists; metadata is `params=2 returns=1` for tag plus payload slot | Extends BUG-057 to payload-bearing enums |
@@ -6139,7 +6139,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S075-001 | Graphify/source navigation for optional ABI | `mcp__graphify__.query_graph ... optional presence tag exported ABI ...`; `mcp__graphify__.get_neighbors matchExprHasCompleteOptionalPatterns`; `mcp__graphify__.get_neighbors lowerMatchExpr`; source reads in `docs/spec/flow_syntax_v1.md`, `compiler/internal/lower/lower.go`, `compiler/internal/semantics/types.go`, and `compiler/internal/semantics/checker.go` | Found spec layout is presence tag plus payload slots; lowering emits canonical `0/1` for source values but checks `some` via `IRJmpIfZero`; export validation checks names only | Build optional tag boundary probes |
+| S075-001 | Graphify/source navigation for optional ABI | `mcp__graphify__.query_graph ... optional presence tag exported ABI ...`; `mcp__graphify__.get_neighbors matchExprHasCompleteOptionalPatterns`; `mcp__graphify__.get_neighbors lowerMatchExpr`; source reads in `docs/spec/flow/flow_syntax_v1.md`, `compiler/internal/lower/lower_core.go`, `compiler/internal/semantics/semantics_core.go`, and `compiler/internal/semantics/semantics_checker.go` | Found spec layout is presence tag plus payload slots; lowering emits canonical `0/1` for source values but checks `some` via `IRJmpIfZero`; export validation checks names only | Build optional tag boundary probes |
 | S075-002 | Source optional controls | `go run ./cli/cmd/tetra check .../optional_none_control.tetra`; `go run ./cli/cmd/tetra run .../optional_none_control.tetra`; repeated for `optional_implicit_some_control.tetra`; `go run ./cli/cmd/tetra check .../optional_tag_field_rejected_control.tetra` | `none` and implicit `some` controls passed and printed `exit status 42`; `maybe.tag = 2` was rejected with `'i32?' is not a struct` | Baseline source creates canonical optionals and cannot mutate a tag field |
 | S075-003 | Exported optional `match` parameter | `go run ./cli/cmd/tetra check .../export_optional_int_match_repro.tetra`; `go run ./cli/cmd/tetra run .../export_optional_int_match_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_optional_int_match_repro.tobj ...`; `rg -a -n "ffi_optional_status|optional_status" ...`; TOBJ metadata reader | Passed `check`; `run` printed `exit status 42`; object build succeeded; alias exists; metadata is `params=2 returns=1` for both `ffi_optional_status` and `optional_status` | Confirms BUG-058 for `match` optional unwrapping |
 | S075-004 | Exported optional `if let` parameter | `go run ./cli/cmd/tetra check .../export_optional_int_iflet_repro.tetra`; `go run ./cli/cmd/tetra run .../export_optional_int_iflet_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_optional_int_iflet_repro.tobj ...`; `rg -a -n "ffi_optional_iflet|optional_iflet" ...`; TOBJ metadata reader | Passed `check`; `run` printed `exit status 42`; object build succeeded; alias exists; metadata is `params=2 returns=1` for both `ffi_optional_iflet` and `optional_iflet` | Extends BUG-058 to `if let some(...)` |
@@ -6158,7 +6158,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S076-001 | Graphify/source navigation for consent and secret signatures | `mcp__graphify__.query_graph ... secret.i32 @export function signature consent privacy ...`; `mcp__graphify__.get_neighbors typeUsesSecret`; `mcp__graphify__.get_neighbors validateFunctionPolicyClauses`; source reads in `compiler/internal/semantics/checker.go`, `compiler/internal/semantics/types.go`, `compiler/internal/lower/lower.go`, `compiler/internal/lower/privacy_lowering_test.go`, `compiler/internal/format/tobj/object.go`, and privacy docs | Found `typeUsesSecret()` drives privacy/consent policy checks and taint tracking; export validation checks names/duplicates only; lowering emits an exact sentinel guard for consent clauses; TOBJ signatures store only slot counts | Build consent/secret exported boundary probes |
+| S076-001 | Graphify/source navigation for consent and secret signatures | `mcp__graphify__.query_graph ... secret.i32 @export function signature consent privacy ...`; `mcp__graphify__.get_neighbors typeUsesSecret`; `mcp__graphify__.get_neighbors validateFunctionPolicyClauses`; source reads in `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/semantics/semantics_core.go`, `compiler/internal/lower/lower_core.go`, `compiler/internal/lower/lower_suite_test.go`, `compiler/internal/format/tobj/object.go`, and privacy docs | Found `typeUsesSecret()` drives privacy/consent policy checks and taint tracking; export validation checks names/duplicates only; lowering emits an exact sentinel guard for consent clauses; TOBJ signatures store only slot counts | Build consent/secret exported boundary probes |
 | S076-002 | Internal consent and secret literal controls | `go run ./cli/cmd/tetra check .../consent_literal_param_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../secret_literal_param_rejected_control.tetra` | Rejected with `type mismatch for 'require_consent' arg 1` and `type mismatch for 'consume' arg 2` | Baseline source cannot pass raw integers as `consent.token` or `secret.i32` |
 | S076-003 | Exported consent-token guard | `go run ./cli/cmd/tetra check .../export_consent_token_guard_repro.tetra`; `go run ./cli/cmd/tetra run .../export_consent_token_guard_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_consent_token_guard_repro.tobj ...`; TOBJ metadata/sentinel reader | Passed `check`; `run` printed `exit status 42`; object build succeeded; `ffi_require_consent` and `require_consent` are `params=1 returns=1`; generated code contains sentinel bytes at offsets `27` and `93` | Confirms BUG-059 for the exported consent policy slot |
 | S076-004 | Exported secret-bearing signatures without direct leak | `go run ./cli/cmd/tetra check .../export_secret_param_ignore_probe.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_secret_param_ignore_probe.tobj ...`; `go run ./cli/cmd/tetra check .../export_secret_param_unseal_discard_probe.tetra`; `go run ./cli/cmd/tetra run .../export_secret_param_unseal_discard_probe.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_secret_param_unseal_discard_probe.tobj ...`; TOBJ metadata/sentinel reader | Both passed `check`; unseal-discard printed `exit status 42`; object builds succeeded; exported/internal symbols are `params=2 returns=1`; generated code contains consent sentinel bytes | Shows secret-bearing exports can accept host-supplied consent/secret slots even when taint checks prevent value exfiltration |
@@ -6179,7 +6179,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S077-001 | Graphify/source navigation for exported generics | `mcp__graphify__.query_graph ... @export generic function monomorphization exported symbol ...`; source reads in `compiler/internal/semantics/checker.go`, `compiler/internal/semantics/generics.go`, and generic tests | Found `@export` name validation runs on the generic declaration, generic bodies are skipped in the later concrete checking path, and `cloneGenericFunc()` clears `ExportName` on specializations | Build generic export probes |
+| S077-001 | Graphify/source navigation for exported generics | `mcp__graphify__.query_graph ... @export generic function monomorphization exported symbol ...`; source reads in `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/semantics/semantics_expressions.go`, and generic tests | Found `@export` name validation runs on the generic declaration, generic bodies are skipped in the later concrete checking path, and `cloneGenericFunc()` clears `ExportName` on specializations | Build generic export probes |
 | S077-002 | Unused exported generic | `go run ./cli/cmd/tetra check .../export_generic_unused_repro.tetra`; `go run ./cli/cmd/tetra run .../export_generic_unused_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_generic_unused_repro.tobj ...`; TOBJ symbol reader | Passed `check`; `run` printed `exit status 42`; object build succeeded; TOBJ symbol table contains only `main`, with no `ffi_generic_id` | Confirms `@export` declaration can disappear entirely |
 | S077-003 | Used exported generic | `go run ./cli/cmd/tetra check .../export_generic_used_repro.tetra`; `go run ./cli/cmd/tetra run .../export_generic_used_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_generic_used_repro.tobj ...`; TOBJ symbol reader | Passed `check`; `run` printed `exit status 42`; object build succeeded; TOBJ symbol table contains `id__T_i32` and `main`, with no `ffi_generic_id` alias | Confirms BUG-060 even when monomorphization creates a concrete specialization |
 | S077-004 | Non-generic export control | `go run ./cli/cmd/tetra check .../export_plain_control.tetra`; `go run ./cli/cmd/tetra run .../export_plain_control.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_plain_control.tobj ...`; TOBJ symbol reader | Passed `check`; `run` printed `exit status 42`; object build succeeded; TOBJ includes `ffi_plain_id` and `plain_id`, both `params=1 returns=1` | Baseline export alias emission works for concrete functions |
@@ -6200,7 +6200,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S078-001 | Graphify/source navigation for typed-error export ABI | `mcp__graphify__.query_graph ... @export typed throws function ABI error payload trap status ReturnSlots TOBJ ...`; source reads in `docs/spec/flow_syntax_v1.md`, `compiler/internal/semantics/checker.go`, `compiler/internal/lower/lower.go`, and `compiler/internal/format/tobj/object.go` | Found source typed errors carry success/error/status slot layout; checker computes throwing return slot count; lowering emits only return slots into `IRFunc`; TOBJ records only slot counts | Build throwing export probes |
+| S078-001 | Graphify/source navigation for typed-error export ABI | `mcp__graphify__.query_graph ... @export typed throws function ABI error payload trap status ReturnSlots TOBJ ...`; source reads in `docs/spec/flow/flow_syntax_v1.md`, `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/lower/lower_core.go`, and `compiler/internal/format/tobj/object.go` | Found source typed errors carry success/error/status slot layout; checker computes throwing return slot count; lowering emits only return slots into `IRFunc`; TOBJ records only slot counts | Build throwing export probes |
 | S078-002 | Source throwing controls | `go run ./cli/cmd/tetra check .../throwing_bare_call_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../throwing_catch_control.tetra`; `go run ./cli/cmd/tetra run .../throwing_catch_control.tetra` | Bare call rejected with `call to throwing function 'read' requires try`; catch control passed and printed `exit status 42` | Baseline source preserves typed-error control flow |
 | S078-003 | Exported compact throwing function | `go run ./cli/cmd/tetra check .../export_throwing_compact_repro.tetra`; `go run ./cli/cmd/tetra run .../export_throwing_compact_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_throwing_compact_repro.tobj ...`; TOBJ symbol reader | Passed `check`; `run` printed `exit status 42`; object build succeeded; `ffi_read_compact` and `read_compact` are `params=1 returns=2` | Confirms BUG-061 for compact typed-error export metadata |
 | S078-004 | Exported payload throwing function | `go run ./cli/cmd/tetra check .../export_throwing_payload_repro.tetra`; `go run ./cli/cmd/tetra run .../export_throwing_payload_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_throwing_payload_repro.tobj ...`; TOBJ symbol reader | Passed `check`; `run` printed `exit status 42`; object build succeeded; `ffi_read_payload` and `read_payload` are `params=1 returns=4` | Extends BUG-061 to payload-bearing error enums |
@@ -6221,7 +6221,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S079-001 | Graphify/source navigation for ownership export ABI | `mcp__graphify__.query_graph ... @export borrow consume inout parameter ownership markers ABI TOBJ ...`; `mcp__graphify__.get_neighbors ParamOwnership`; source reads in `docs/spec/current_supported_surface.md`, `compiler/internal/semantics/types.go`, `compiler/internal/semantics/exprs.go`, `compiler/internal/semantics/checker.go`, `compiler/internal/backend/x64obj/builder.go`, and `compiler/internal/format/tobj/object.go` | Found ownership markers are source contracts carried in `ParamOwnership`; checker rejects borrow/inout misuse and actor/task transfers; TOBJ symbols store only slot counts | Build ownership-marked export probes |
+| S079-001 | Graphify/source navigation for ownership export ABI | `mcp__graphify__.query_graph ... @export borrow consume inout parameter ownership markers ABI TOBJ ...`; `mcp__graphify__.get_neighbors ParamOwnership`; source reads in `docs/spec/core/current_supported_surface.md`, `compiler/internal/semantics/semantics_core.go`, `compiler/internal/semantics/semantics_expressions.go`, `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/backend/x64obj/builder.go`, and `compiler/internal/format/tobj/object.go` | Found ownership markers are source contracts carried in `ParamOwnership`; checker rejects borrow/inout misuse and actor/task transfers; TOBJ symbols store only slot counts | Build ownership-marked export probes |
 | S079-002 | Source ownership controls | `go run ./cli/cmd/tetra check .../borrow_to_owned_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../inout_from_borrow_rejected_control.tetra` | Rejected with `borrowed value derived from 'buf' cannot be passed to non-borrow parameter 1 of 'owned_first'` and `borrowed value derived from 'buf' cannot be passed as inout to 'fill_first'` | Baseline source preserves ownership marker semantics |
 | S079-003 | Exported `borrow` slice vs owned slice metadata | `go run ./cli/cmd/tetra check .../export_borrow_slice_repro.tetra`; `go run ./cli/cmd/tetra run .../export_borrow_slice_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_borrow_slice_repro.tobj ...`; repeated `check`, `run`, and object build for `export_owned_slice_control.tetra`; TOBJ symbol reader | Both passed `check`; both `run` commands printed `exit status 42`; object builds succeeded; `ffi_borrow_first`/`borrow_first` and `ffi_owned_first`/`owned_first` are all `params=2 returns=1` | Confirms BUG-062 for borrowed slice exports |
 | S079-004 | Exported `consume` Int vs owned Int metadata | `go run ./cli/cmd/tetra check .../export_consume_int_repro.tetra`; `go run ./cli/cmd/tetra run .../export_consume_int_repro.tetra`; `go run ./cli/cmd/tetra build -emit object -o .../export_consume_int_repro.tobj ...`; repeated for `export_owned_int_control.tetra`; TOBJ symbol reader | Both passed `check`; both `run` commands printed `exit status 42`; object builds succeeded; `ffi_take_int`/`take_int` and `ffi_owned_int`/`owned_int` are all `params=1 returns=1` | Extends BUG-062 to consumed scalar exports |
@@ -6242,7 +6242,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S080-001 | Graphify/source navigation for defer ownership captures | `mcp__graphify__.query_graph ... try catch defer cleanup error propagation lowering semantics ...`; `mcp__graphify__.get_neighbors ParamOwnership`; source reads in `compiler/tests/semantics/defer_test.go`, `compiler/internal/semantics/checker.go`, `compiler/internal/semantics/region.go`, `compiler/internal/semantics/closure_captures.go`, `docs/spec/current_supported_surface.md`, and `docs/spec/ownership_v1.md` | Found tests for simple deferred capture after whole consume, but pending defer validation checks captured base names via `consumedAt(name)` while ordinary whole-value checks have descendant-aware consumed-path logic | Build partial field-consume cleanup probes |
+| S080-001 | Graphify/source navigation for defer ownership captures | `mcp__graphify__.query_graph ... try catch defer cleanup error propagation lowering semantics ...`; `mcp__graphify__.get_neighbors ParamOwnership`; source reads in `compiler/tests/semantics/semantics_core_language_test.go`, `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/semantics/semantics_memory_resources.go`, `compiler/internal/semantics/semantics_memory_resources.go`, `docs/spec/core/current_supported_surface.md`, and `docs/spec/runtime/ownership_v1.md` | Found tests for simple deferred capture after whole consume, but pending defer validation checks captured base names via `consumedAt(name)` while ordinary whole-value checks have descendant-aware consumed-path logic | Build partial field-consume cleanup probes |
 | S080-002 | Immediate and whole-consume controls | `go run ./cli/cmd/tetra check .../immediate_whole_after_field_consume_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../defer_captures_whole_then_whole_consumed_rejected_control.tetra` | Rejected with `cannot use consumed value 'pair.left'` and `defer cleanup captures value 'pair' ... but it was consumed ... before cleanup ran` | Baseline immediate ownership and direct deferred whole-local tracking work |
 | S080-003 | Deferred field capture after same field consume | `go run ./cli/cmd/tetra check .../defer_captures_field_then_field_consumed_repro.tetra`; `go run ./cli/cmd/tetra run .../defer_captures_field_then_field_consumed_repro.tetra`; `go run ./cli/cmd/tetra build -o .../defer_captures_field_then_field_consumed_repro.bin ...` | Passed `check`; `run` printed `fieldexit status 42`; build succeeded | Confirms BUG-063 for direct field cleanup capture |
 | S080-004 | Deferred whole-value capture after child field consume | `go run ./cli/cmd/tetra check .../defer_captures_whole_then_field_consumed_repro.tetra`; `go run ./cli/cmd/tetra run .../defer_captures_whole_then_field_consumed_repro.tetra`; `go run ./cli/cmd/tetra build -o .../defer_captures_whole_then_field_consumed_repro.bin ...` | Passed `check`; `run` printed `wholeexit status 42`; build succeeded | Extends BUG-063 to whole-value cleanup capture with consumed descendant |
@@ -6263,7 +6263,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S081-001 | Graphify/source navigation for payload cleanup captures | `mcp__graphify__.query_graph ... defer cleanup captures enum payload optional payload consume ownership paths ...`; source reads in `compiler/tests/safety/safety_diagnostics_test.go`, `compiler/tests/ownership/ownership_test.go`, `docs/spec/ownership_v1.md`, and `docs/spec/current_supported_surface.md` | Found stable ordinary diagnostics for enum/optional payload consume and whole-value rejection, plus the same defer capture base-name mechanism from Session 080 | Build payload cleanup probes |
+| S081-001 | Graphify/source navigation for payload cleanup captures | `mcp__graphify__.query_graph ... defer cleanup captures enum payload optional payload consume ownership paths ...`; source reads in `compiler/tests/safety/diagnostics/core/safety_diagnostics_test.go`, `compiler/tests/ownership/ownership_test.go`, `docs/spec/runtime/ownership_v1.md`, and `docs/spec/core/current_supported_surface.md` | Found stable ordinary diagnostics for enum/optional payload consume and whole-value rejection, plus the same defer capture base-name mechanism from Session 080 | Build payload cleanup probes |
 | S081-002 | Immediate payload whole-value controls | `go run ./cli/cmd/tetra check .../immediate_enum_whole_after_payload_consume_rejected_control.tetra`; `go run ./cli/cmd/tetra check .../immediate_optional_whole_after_payload_consume_rejected_control.tetra` | Rejected with `cannot use consumed value 'msg.$case0.payload0'` and `cannot use consumed value 'maybe.$elem'` | Baseline ordinary payload ownership works |
 | S081-003 | Direct payload-alias deferred capture control | `go run ./cli/cmd/tetra check .../defer_captures_enum_payload_alias_then_payload_consumed_rejected_control.tetra` | Rejected with `defer cleanup captures value 'left' ... but it was consumed ... before cleanup ran` | Direct alias capture is protected |
 | S081-004 | Deferred whole enum after payload consume | `go run ./cli/cmd/tetra check .../defer_captures_enum_whole_then_payload_consumed_repro.tetra`; `go run ./cli/cmd/tetra run .../defer_captures_enum_whole_then_payload_consumed_repro.tetra`; `go run ./cli/cmd/tetra build -o .../defer_captures_enum_whole_then_payload_consumed_repro.bin ...` | Passed `check`; `run` printed `enumexit status 42`; build succeeded | Extends BUG-063 to enum payload descendants |
@@ -6285,7 +6285,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S082-001 | Graphify/source navigation for defer privacy taint | `mcp__graphify__.query_graph ... defer body privacy secret taint checkDeferBody secretTaint AssignStmt PrintStmt exported return secret.i32 unseal privacy analysis restoreSecretTaint`; source reads in `compiler/internal/semantics/checker.go`, `compiler/internal/lower/lower.go`, and existing privacy bug notes | Found `checkDeferBody()` snapshots and restores `analysis.secretTaint`, `AssignStmt` can taint a local later, global stores reject secret-tainted values only when seen during statement checking, and lowering emits stored defer bodies at scope exit | Build late-taint cleanup probes |
+| S082-001 | Graphify/source navigation for defer privacy taint | `mcp__graphify__.query_graph ... defer body privacy secret taint checkDeferBody secretTaint AssignStmt PrintStmt exported return secret.i32 unseal privacy analysis restoreSecretTaint`; source reads in `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/lower/lower_core.go`, and existing privacy bug notes | Found `checkDeferBody()` snapshots and restores `analysis.secretTaint`, `AssignStmt` can taint a local later, global stores reject secret-tainted values only when seen during statement checking, and lowering emits stored defer bodies at scope exit | Build late-taint cleanup probes |
 | S082-002 | Direct and already-tainted global-store controls | `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../direct_secret_global_store_rejected_control.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../defer_already_secret_global_store_rejected_control.tetra` | Both rejected with `secret-tainted value cannot be stored in global 'leaked'` | Baseline privacy sink and defer-body registration checks work when taint is visible |
 | S082-003 | Late-tainted deferred global-store repro | `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../defer_late_secret_global_store_repro.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra run .../defer_late_secret_global_store_repro.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra build -o .../defer_late_secret_global_store_repro .../defer_late_secret_global_store_repro.tetra` | Passed `check`; `run` printed `exit status 42`; build succeeded | Confirms BUG-064: cleanup uses stale registration-time taint and writes later secret-derived value to global |
 | S082-004 | Public deferred global-store control | `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../defer_public_global_store_control.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra run .../defer_public_global_store_control.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra build -o .../defer_public_global_store_control .../defer_public_global_store_control.tetra` | Passed `check`; `run` printed `exit status 42`; build succeeded | Confirms ordinary public deferred global stores remain valid |
@@ -6304,7 +6304,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S083-001 | Graphify/source navigation for mutable-global worker boundaries | `mcp__graphify__.query_graph ... mutable global state task_spawn_i32 worker assignment global constant touchesMutableGlobals analysis.touchesMutableGlobals AssignStmt IdentExpr global write`; source reads in `compiler/internal/semantics/checker.go`, `compiler/internal/semantics/exprs.go`, `compiler/tests/ownership/actor_task_ownership_test.go`, and existing actor/task bug notes | Found spawn checks use `targetSig.TouchesMutableGlobals`; reads mark `analysis.touchesMutableGlobals`; plain global assignment does not set it except for function-typed globals | Build constant-write probes |
+| S083-001 | Graphify/source navigation for mutable-global worker boundaries | `mcp__graphify__.query_graph ... mutable global state task_spawn_i32 worker assignment global constant touchesMutableGlobals analysis.touchesMutableGlobals AssignStmt IdentExpr global write`; source reads in `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/semantics/semantics_expressions.go`, `compiler/tests/ownership/actor_task/actor_task_ownership_test.go`, and existing actor/task bug notes | Found spawn checks use `targetSig.TouchesMutableGlobals`; reads mark `analysis.touchesMutableGlobals`; plain global assignment does not set it except for function-typed globals | Build constant-write probes |
 | S083-002 | Task worker constant global write | `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../task_worker_constant_global_write_repro.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra run .../task_worker_constant_global_write_repro.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra build -o .../task_worker_constant_global_write_repro .../task_worker_constant_global_write_repro.tetra` | Passed `check`; `run` printed `exit status 42`; build succeeded | Confirms BUG-065 for `core.task_spawn_i32` |
 | S083-003 | Task controls | `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../task_worker_read_write_global_rejected_control.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../task_worker_public_control.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra run .../task_worker_public_control.tetra` | Read-write control rejected with `task_spawn_i32 target 'worker' touches mutable global state`; public control passed and printed `exit status 42` | Baseline task boundary and harness are valid |
 | S083-004 | Actor worker constant global write | `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../actor_worker_constant_global_write_repro.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra run .../actor_worker_constant_global_write_repro.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra build -o .../actor_worker_constant_global_write_repro .../actor_worker_constant_global_write_repro.tetra` | Passed `check`; `run` printed `exit status 42`; build succeeded | Extends BUG-065 to `core.spawn` |
@@ -6323,7 +6323,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S084-001 | Graphify/source navigation for exported async functions | `mcp__graphify__.query_graph ... @export async function ABI async FuncSig Async export validation lowering symbol native boundary`; source reads in `compiler/internal/frontend/parser.go`, `compiler/internal/semantics/checker.go`, `compiler/internal/lower/lower.go`, `compiler/internal/format/tobj/object.go`, and async/export tests | Found parser allows `@export` before `async func`; checker stores and enforces `Async` for source calls/spawns but export validation does not reject async; TOBJ symbols have only slot metadata | Build exported async probes |
+| S084-001 | Graphify/source navigation for exported async functions | `mcp__graphify__.query_graph ... @export async function ABI async FuncSig Async export validation lowering symbol native boundary`; source reads in `compiler/internal/frontend/frontend_core.go`, `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/lower/lower_core.go`, `compiler/internal/format/tobj/object.go`, and async/export tests | Found parser allows `@export` before `async func`; checker stores and enforces `Async` for source calls/spawns but export validation does not reject async; TOBJ symbols have only slot metadata | Build exported async probes |
 | S084-002 | Exported async function repro | `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../export_async_function_repro.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra run .../export_async_function_repro.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra build -emit object -o .../export_async_function_repro.tobj .../export_async_function_repro.tetra` | Passed `check`; `run` printed `exit status 42`; object build succeeded | Confirms BUG-066 acceptance and artifact emission |
 | S084-003 | Async source controls | `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../async_bare_call_rejected_control.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../task_spawn_async_target_rejected_control.tetra` | Rejected with `call to async function 'async_answer' requires await` and `task_spawn_i32 target must be synchronous` | Baseline source-level async restrictions work |
 | S084-004 | Sync export control and symbol comparison | `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../export_sync_function_control.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra run .../export_sync_function_control.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra build -emit object -o .../export_sync_function_control.tobj .../export_sync_function_control.tetra`; `rg -a -n "ffi_async_answer|async_answer|ffi_sync_answer|sync_answer" .../export_async_function_repro.tobj .../export_sync_function_control.tobj` | Sync control passed, ran with `exit status 42`, and built; object grep shows `ffi_async_answer`/`async_answer` and `ffi_sync_answer`/`sync_answer`, with both exported symbols represented as ordinary slot signatures | Shows async export is indistinguishable from sync export at TOBJ metadata level |
@@ -6341,7 +6341,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S085-001 | Graphify/source navigation for exported budgeted functions | `mcp__graphify__.query_graph ... @export effect clauses uses io runtime budget realtime noalloc noblock semantic clauses ABI metadata TOBJ Effects FuncSig`; source reads in `compiler/internal/semantics/checker.go`, `compiler/internal/ir/ir.go`, and `compiler/internal/format/tobj/object.go` | Found `validateBudgetContextEdge()` rejects direct calls into budgeted functions without sufficient caller budget; `IRPolicy` carries budget internally; TOBJ `Symbol` has only name/offset/signature slot counts | Build exported budget probes |
+| S085-001 | Graphify/source navigation for exported budgeted functions | `mcp__graphify__.query_graph ... @export effect clauses uses io runtime budget realtime noalloc noblock semantic clauses ABI metadata TOBJ Effects FuncSig`; source reads in `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/ir/ir.go`, and `compiler/internal/format/tobj/object.go` | Found `validateBudgetContextEdge()` rejects direct calls into budgeted functions without sufficient caller budget; `IRPolicy` carries budget internally; TOBJ `Symbol` has only name/offset/signature slot counts | Build exported budget probes |
 | S085-002 | Direct budget caller controls | `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../direct_missing_budget_rejected_control.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../direct_underbudget_rejected_control.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../direct_budgeted_call_control.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra run .../direct_budgeted_call_control.tetra` | Missing-budget and underbudget controls were rejected with required-budget diagnostics; covered caller passed and ran with `exit status 42` | Baseline source-level budget caller checks work |
 | S085-003 | Exported budgeted function repro | `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../export_budgeted_function_repro.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra run .../export_budgeted_function_repro.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra build -emit object -o .../export_budgeted_function_repro.tobj .../export_budgeted_function_repro.tetra`; `rg -a -n "ffi_budgeted_answer|budgeted_answer|ffi_plain_answer|plain_answer" ...` | Exported budgeted function passed `check`, ran with `exit status 42`, built a TOBJ object, and emitted `ffi_budgeted_answer` / `budgeted_answer` as ordinary symbols | Confirms BUG-067 acceptance and artifact emission |
 | S085-004 | Plain export control | `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../export_plain_function_control.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra run .../export_plain_function_control.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra build -emit object -o .../export_plain_function_control.tobj .../export_plain_function_control.tetra` | Plain export passed, ran with `exit status 42`, built a TOBJ object, and emitted `ffi_plain_answer` / `plain_answer` | Control shows the budgeted export uses the same exported-symbol surface as an ordinary function |
@@ -6359,7 +6359,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S086-001 | Graphify/source navigation for exported effects | `mcp__graphify__.query_graph ... @export semantic clauses noalloc noblock realtime uses io network fs unsafe ABI metadata FuncSig Effects validateExportedOpaqueABISignature TOBJ Symbol`; source reads in `docs/spec/effects_capabilities_privacy_v1.md`, `compiler/internal/semantics/checker.go`, `compiler/internal/semantics/effects.go`, `compiler/internal/backend/x64obj/builder.go`, and `compiler/internal/format/tobj/object.go` | Found source calls propagate `FuncSig.Effects` through `effectContext.require()`, export validation does not reject/preserve `fn.Uses`, and TOBJ `Symbol` has only name/offset/signature slot counts | Build exported effect probes |
+| S086-001 | Graphify/source navigation for exported effects | `mcp__graphify__.query_graph ... @export semantic clauses noalloc noblock realtime uses io network fs unsafe ABI metadata FuncSig Effects validateExportedOpaqueABISignature TOBJ Symbol`; source reads in `docs/spec/runtime/effects_capabilities_privacy_v1.md`, `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/semantics/semantics_memory_resources.go`, `compiler/internal/backend/x64obj/builder.go`, and `compiler/internal/format/tobj/object.go` | Found source calls propagate `FuncSig.Effects` through `effectContext.require()`, export validation does not reject/preserve `fn.Uses`, and TOBJ `Symbol` has only name/offset/signature slot counts | Build exported effect probes |
 | S086-002 | Direct effect caller controls | `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../direct_missing_uses_rejected_control.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../direct_with_uses_control.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra run .../direct_with_uses_control.tetra` | Missing-uses caller was rejected with `function 'main' uses effect 'io' but does not declare it`; covered caller passed, printed `direct`, and exited with `exit status 42` | Baseline source-level effect propagation works |
 | S086-003 | Exported `uses io` function repro | `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../export_effectful_io_repro.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra run .../export_effectful_io_repro.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra build -emit object -o .../export_effectful_io_repro.tobj .../export_effectful_io_repro.tetra`; `rg -a -n "ffi_log_answer|log_answer|ffi_plain_answer|plain_answer" ...` | Exported effectful function passed `check`, ran with `exit status 42`, built a TOBJ object, and emitted `ffi_log_answer` / `log_answer` as ordinary symbols | Confirms BUG-068 acceptance and artifact emission |
 | S086-004 | Pure export control | `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../export_pure_function_control.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra run .../export_pure_function_control.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra build -emit object -o .../export_pure_function_control.tobj .../export_pure_function_control.tetra` | Pure export passed, ran with `exit status 42`, built a TOBJ object, and emitted `ffi_plain_answer` / `plain_answer` | Control shows the effectful export has no distinct exported-symbol metadata surface |
@@ -6378,7 +6378,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S087-001 | Graphify/source navigation for export-name collisions | `mcp__graphify__.query_graph ... @export duplicate exported symbol internal function name ExportName duplicate exported symbol validate export name builder symbolOffsets main TOBJ check build fails`; source reads in `compiler/internal/semantics/checker.go`, `compiler/internal/backend/x64obj/builder.go`, `compiler/internal/format/tobj/object.go`, and `compiler/internal/backend/x64obj/builder_test.go` | Found checker tracks duplicate export aliases only; object builder checks export aliases against already-seen symbols but writes function-name symbols without collision checks | Build declaration-order probes |
+| S087-001 | Graphify/source navigation for export-name collisions | `mcp__graphify__.query_graph ... @export duplicate exported symbol internal function name ExportName duplicate exported symbol validate export name builder symbolOffsets main TOBJ check build fails`; source reads in `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/backend/x64obj/builder.go`, `compiler/internal/format/tobj/object.go`, and `compiler/internal/backend/x64obj/builder_test.go` | Found checker tracks duplicate export aliases only; object builder checks export aliases against already-seen symbols but writes function-name symbols without collision checks | Build declaration-order probes |
 | S087-002 | Later function name collision repro | `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../export_name_collides_later_function_repro.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra run .../export_name_collides_later_function_repro.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra build -emit object -o .../export_name_collides_later_function_repro.tobj ...` | Passed `check`, ran with `exit status 42`, and built a TOBJ object | Confirms the collision is not rejected when the ordinary function appears later |
 | S087-003 | Prior function name collision control | `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../export_name_collides_prior_function_control.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra build -emit object -o .../export_name_collides_prior_function_control.tobj ...` | `check` passed, but object build failed with `duplicate exported symbol 'target'` | Shows the validation gap is order-dependent and deferred past semantics |
 | S087-004 | Non-colliding export control | `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../non_colliding_export_control.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra run .../non_colliding_export_control.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra build -emit object -o .../non_colliding_export_control.tobj ...` | Passed `check`, ran with `exit status 42`, and built a TOBJ object | Baseline alias emission works when the alias is unique |
@@ -6398,7 +6398,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S088-001 | Graphify/source navigation for export symbol grammar | `mcp__graphify__.query_graph ... @export export name validation native symbol grammar empty string whitespace newline nul object symbol validateSymbolRecord writeString linker symbol name`; source reads in `compiler/internal/frontend/parser.go`, `compiler/internal/semantics/checker.go`, `compiler/internal/format/tobj/object.go`, and export/object tests | Found parser rejects only empty export names; checker handles reserved namespaces and duplicate aliases; TOBJ validates only non-empty names | Build malformed-name probes |
+| S088-001 | Graphify/source navigation for export symbol grammar | `mcp__graphify__.query_graph ... @export export name validation native symbol grammar empty string whitespace newline nul object symbol validateSymbolRecord writeString linker symbol name`; source reads in `compiler/internal/frontend/frontend_core.go`, `compiler/internal/semantics/semantics_checker.go`, `compiler/internal/format/tobj/object.go`, and export/object tests | Found parser rejects only empty export names; checker handles reserved namespaces and duplicate aliases; TOBJ validates only non-empty names | Build malformed-name probes |
 | S088-002 | Space export-name repro | `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../export_space_name_repro.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra build -emit object -o .../export_space_name_repro.tobj ...` | Passed `check` and built; TOBJ parser reported `name='ffi log' offset=0 params=0 returns=1` | Confirms BUG-070 for whitespace export names |
 | S088-003 | Newline export-name repro | `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../export_newline_name_repro.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra build -emit object -o .../export_newline_name_repro.tobj ...` | Passed `check` and built; TOBJ parser reported `name='ffi\nlog' offset=0 params=0 returns=1` | Extends BUG-070 to control-character export names |
 | S088-004 | Tab export-name repro | `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../export_tab_name_repro.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra build -emit object -o .../export_tab_name_repro.tobj ...` | Passed `check` and built; TOBJ parser reported `name='ffi\tlog' offset=0 params=0 returns=1` | Extends BUG-070 to tab export names |
@@ -6418,7 +6418,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S089-001 | Graphify/source navigation for `core.sym_addr` native names | `mcp__graphify__.query_graph ... core.sym_addr symbol name validation empty reserved __tetra internal runtime whitespace newline native symbol unsafe link effect checker lower builtin sym_addr`; source reads in `docs/spec/unsafe.md`, `compiler/internal/semantics/exprs.go`, `compiler/internal/lower/lower.go`, `compiler/internal/backend/x64core/emit.go`, `compiler/internal/backend/x64obj/builder.go`, and `compiler/internal/format/tobj/object.go` | Found `core.sym_addr` is always unsafe with `link`, checker/lower validate only non-empty strings, x64 emits `CallPatch`, and TOBJ reloc validation rejects only empty relocation names | Build malformed relocation-name probes |
+| S089-001 | Graphify/source navigation for `core.sym_addr` native names | `mcp__graphify__.query_graph ... core.sym_addr symbol name validation empty reserved __tetra internal runtime whitespace newline native symbol unsafe link effect checker lower builtin sym_addr`; source reads in `docs/spec/runtime/unsafe.md`, `compiler/internal/semantics/semantics_expressions.go`, `compiler/internal/lower/lower_core.go`, `compiler/internal/backend/x64core/x64core_core.go`, `compiler/internal/backend/x64obj/builder.go`, and `compiler/internal/format/tobj/object.go` | Found `core.sym_addr` is always unsafe with `link`, checker/lower validate only non-empty strings, x64 emits `CallPatch`, and TOBJ reloc validation rejects only empty relocation names | Build malformed relocation-name probes |
 | S089-002 | Space `core.sym_addr` repro | `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../sym_addr_space_name_repro.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra build -emit object -o .../sym_addr_space_name_repro.tobj ...` | Passed `check` and built; TOBJ parser reported `reloc kind=1 at=25 name='ffi log' addend=0` | Confirms BUG-071 for whitespace relocation names |
 | S089-003 | Newline `core.sym_addr` repro | `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../sym_addr_newline_name_repro.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra build -emit object -o .../sym_addr_newline_name_repro.tobj ...` | Passed `check` and built; TOBJ parser reported `reloc kind=1 at=25 name='ffi\nlog' addend=0` | Extends BUG-071 to control-character relocation names |
 | S089-004 | Tab `core.sym_addr` repro | `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../sym_addr_tab_name_repro.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra build -emit object -o .../sym_addr_tab_name_repro.tobj ...` | Passed `check` and built; TOBJ parser reported `reloc kind=1 at=25 name='ffi\tlog' addend=0` | Extends BUG-071 to tab relocation names |
@@ -6438,7 +6438,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S090-001 | Graphify/source navigation for string literal and symbol serialization | `mcp__graphify__.query_graph ... lexer string literal raw NUL byte export name sym_addr TOBJ symbol relocation native C string truncation validation`; `mcp__graphify__.get_neighbors readString`; source reads in `compiler/internal/frontend/lexer.go`, `compiler/internal/frontend/parser.go`, `compiler/internal/semantics/exprs.go`, `compiler/internal/lower/lower.go`, and `compiler/internal/format/tobj/object.go` | Found lexer accepts valid UTF-8 source and appends raw non-escape bytes to string literals; export/sym_addr/object validation reject only empty names | Build raw-NUL repros |
+| S090-001 | Graphify/source navigation for string literal and symbol serialization | `mcp__graphify__.query_graph ... lexer string literal raw NUL byte export name sym_addr TOBJ symbol relocation native C string truncation validation`; `mcp__graphify__.get_neighbors readString`; source reads in `compiler/internal/frontend/frontend_core.go`, `compiler/internal/frontend/frontend_core.go`, `compiler/internal/semantics/semantics_expressions.go`, `compiler/internal/lower/lower_core.go`, and `compiler/internal/format/tobj/object.go` | Found lexer accepts valid UTF-8 source and appends raw non-escape bytes to string literals; export/sym_addr/object validation reject only empty names | Build raw-NUL repros |
 | S090-002 | Create raw-NUL repro files | `python -c '<write repro files with raw 0x00 inside @export and core.sym_addr string literals>'` | Created `/tmp/tetra-bug-hunt/session-090/bughunt/export_nul_name_repro.tetra` and `/tmp/tetra-bug-hunt/session-090/bughunt/sym_addr_nul_name_repro.tetra`; Python reported `contains_nul=True` for both | Run check/build |
 | S090-003 | Raw-NUL `@export` repro | `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../export_nul_name_repro.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra build -emit object -o .../export_nul_name_repro.tobj ...` | Passed `check` and built; TOBJ parser reported `symbol name='ffi\x00log' hex=666669006c6f67 offset=0 params=0 returns=1` | Confirms BUG-072 for exported symbols |
 | S090-004 | Raw-NUL `core.sym_addr` repro | `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../sym_addr_nul_name_repro.tetra`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra build -emit object -o .../sym_addr_nul_name_repro.tobj ...` | Passed `check` and built; TOBJ parser reported `reloc kind=1 at=25 name='ffi\x00log' hex=666669006c6f67 addend=0` | Confirms BUG-072 for relocation names |
@@ -6499,7 +6499,7 @@ Evidence:
 
 | ID | Probe | Command | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| S093-001 | Graphify/source navigation for WASM `core.sym_addr` | `mcp__graphify__.query_graph ... WASM core.sym_addr IRSymAddr symbol address lowering unsafe link effect wasm32-wasi wasm32-web unsupported policy function index external symbols`; `mcp__graphify__.get_neighbors IRSymAddr`; `mcp__graphify__.shortest_path IRSymAddr wasm32_web`; source reads in `docs/backend/wasm_architecture.md`, `docs/spec/unsafe.md`, `compiler/internal/semantics/exprs.go`, `compiler/internal/lower/lower.go`, `compiler/internal/backend/wasm32_wasi/codegen.go`, `compiler/internal/backend/wasm32_web/codegen.go`, and `compiler/internal/backend/x64core/emit.go` | Found docs say unresolved symbols are compile errors except configured host imports; `core.sym_addr` is unsafe with `link`; semantics/lower validate only non-empty string literals; WASM backends lower `IRSymAddr` to FNV token `i32.const`; native x64 preserves named relocations | Build missing-external repros |
+| S093-001 | Graphify/source navigation for WASM `core.sym_addr` | `mcp__graphify__.query_graph ... WASM core.sym_addr IRSymAddr symbol address lowering unsafe link effect wasm32-wasi wasm32-web unsupported policy function index external symbols`; `mcp__graphify__.get_neighbors IRSymAddr`; `mcp__graphify__.shortest_path IRSymAddr wasm32_web`; source reads in `docs/backend/wasm_architecture.md`, `docs/spec/runtime/unsafe.md`, `compiler/internal/semantics/semantics_expressions.go`, `compiler/internal/lower/lower_core.go`, `compiler/internal/backend/wasm32_wasi/codegen.go`, `compiler/internal/backend/wasm32_web/codegen.go`, and `compiler/internal/backend/x64core/x64core_core.go` | Found docs say unresolved symbols are compile errors except configured host imports; `core.sym_addr` is unsafe with `link`; semantics/lower validate only non-empty string literals; WASM backends lower `IRSymAddr` to FNV token `i32.const`; native x64 preserves named relocations | Build missing-external repros |
 | S093-002 | Repro/control setup and `check` | Scratch files under `/tmp/tetra-bug-hunt/session-093/bughunt`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra check .../wasm_sym_addr_missing_external_repro.tetra`; checks for internal, empty, and no-sym controls | Missing-external repro passed `check`; internal and no-sym controls passed; empty control rejected with `sym_addr expects a non-empty symbol name` | Confirms the issue is not empty-name validation |
 | S093-003 | WASM missing-external artifacts | `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra build --target wasm32-wasi -o .../out/missing_external.wasi.wasm ...`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra build --target wasm32-web -o .../out/missing_external.web.wasm ...`; `python .../inspect_wasm.py ...`; `GOCACHE=/tmp/tetra-go-cache go run ./tools/cmd/validate-wasm-imports --target wasm32-wasi ...`; `... --target wasm32-web ...` | Both builds passed and both validators exited 0. Parser found no raw `missing_external` bytes, no import/export for that symbol, and `i32.const -1981042209/2313925087` in each artifact | Confirms BUG-075 on WASI and Web |
 | S093-004 | Internal-function token control | `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra build --target wasm32-wasi -o .../out/internal_control.wasi.wasm ...`; `GOCACHE=/tmp/tetra-go-cache go run ./cli/cmd/tetra build --target wasm32-web -o .../out/internal_control.web.wasm ...`; `python .../inspect_wasm.py ...` | Both internal controls built; parser found no raw `callback` bytes and emitted token `-2014301178/2280666118` for `core.sym_addr("callback")` while the function itself returned `7` normally | Shows token lowering is the general WASM mechanism, not a parser artifact |

@@ -1,0 +1,51 @@
+// Backend HTTP Connection header scope microservice smoke.
+module examples.microservices.backend.http.connection.backend_http_connection_scope_service
+import lib.core.http as http
+
+func check_string_scope() -> Int:
+    if !http.request_keep_alive("GET /json HTTP/1.1\r\nHost: local\r\nX-Connection: close\r\n\r\n"):
+        return 1
+    if !http.request_keep_alive("GET /json HTTP/1.1\r\nHost: local\r\nProxy-Connection: close\r\n\r\n"):
+        return 2
+    if !http.request_keep_alive("GET /json HTTP/1.1\r\nHost: local\r\nConnection-Mode: close\r\n\r\n"):
+        return 3
+    if http.request_keep_alive("GET /json HTTP/1.1\r\nHost: local\r\nConnection: close\r\n\r\n"):
+        return 4
+    return 0
+
+func check_byte_scope() -> Int
+uses alloc, mem:
+    var req: []u8 = core.make_u8(320)
+    var pos: Int = 0
+    let first_start: Int = pos
+    pos = http.write_ascii_at(req, pos, "GET /json HTTP/1.1\r\nHost: local\r\nX-Connection: close\r\n\r\n")
+    let first_len: Int = pos - first_start
+    let second_start: Int = pos
+    pos = http.write_ascii_at(req, pos, "GET /plaintext HTTP/1.1\r\nHost: local\r\nProxy-Connection: close\r\n\r\n")
+    let second_len: Int = pos - second_start
+    let third_start: Int = pos
+    pos = http.write_ascii_at(req, pos, "GET /db HTTP/1.1\r\nHost: local\r\nConnection: close\r\n\r\n")
+    let third_len: Int = pos - third_start
+    if !http.request_keep_alive_bytes_at(req, first_start, first_len):
+        return 5
+    if http.contains_connection_close_bytes_at(req, first_start, first_len):
+        return 6
+    if !http.request_keep_alive_bytes_at(req, second_start, second_len):
+        return 7
+    if http.contains_connection_close_bytes_at(req, second_start, second_len):
+        return 8
+    if http.request_keep_alive_bytes_at(req, third_start, third_len):
+        return 9
+    if !http.contains_connection_close_bytes_at(req, third_start, third_len):
+        return 10
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    let strings: Int = check_string_scope()
+    if strings != 0:
+        return strings
+    let bytes: Int = check_byte_scope()
+    if bytes != 0:
+        return bytes
+    return 0

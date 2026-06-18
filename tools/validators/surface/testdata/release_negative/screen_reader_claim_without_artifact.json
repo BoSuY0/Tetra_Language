@@ -1,1 +1,5 @@
-{"validator":"accessibility-release","mutation":"screen_reader_without_artifact","expected_error":"linux_probe_artifact"}
+{
+  "validator": "accessibility-release",
+  "mutation": "screen_reader_without_artifact",
+  "expected_error": "linux_probe_artifact"
+}

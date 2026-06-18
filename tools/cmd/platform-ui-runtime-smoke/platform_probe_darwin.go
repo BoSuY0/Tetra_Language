@@ -11,7 +11,10 @@ import (
 
 func runPlatformWindowProbe(target string) (platformWindowProbeResult, error) {
 	if target != "macos-x64" {
-		return platformWindowProbeResult{}, fmt.Errorf("macOS platform probe cannot run target %s", target)
+		return platformWindowProbeResult{}, fmt.Errorf(
+			"macOS platform probe cannot run target %s",
+			target,
+		)
 	}
 	tmpDir, err := os.MkdirTemp("", "tetra-platform-ui-appkit-*")
 	if err != nil {
@@ -86,13 +89,28 @@ print("ok")
 		return platformWindowProbeResult{}, err
 	}
 	if out, err := exec.Command("swiftc", "-o", binPath, sourcePath).CombinedOutput(); err != nil {
-		return platformWindowProbeResult{}, fmt.Errorf("swiftc AppKit probe failed: %w: %s", err, string(out))
+		return platformWindowProbeResult{}, fmt.Errorf(
+			"swiftc AppKit probe failed: %w: %s",
+			err,
+			string(out),
+		)
 	}
 	if out, err := exec.Command(binPath).CombinedOutput(); err != nil {
-		return platformWindowProbeResult{}, fmt.Errorf("AppKit probe failed: %w: %s", err, string(out))
+		return platformWindowProbeResult{}, fmt.Errorf(
+			"AppKit probe failed: %w: %s",
+			err,
+			string(out),
+		)
 	}
 	return platformWindowProbeResult{
-		API:     "cocoa-appkit",
-		Markers: []string{"platform-window-create:cocoa-appkit", "platform-widget-tree:ok", "platform-event-dispatch:ok", "platform-timer:ok", "platform-redraw:ok", "platform-window-close:cocoa-appkit"},
+		API: "cocoa-appkit",
+		Markers: []string{
+			"platform-window-create:cocoa-appkit",
+			"platform-widget-tree:ok",
+			"platform-event-dispatch:ok",
+			"platform-timer:ok",
+			"platform-redraw:ok",
+			"platform-window-close:cocoa-appkit",
+		},
 	}, nil
 }

@@ -53,7 +53,10 @@ func TestTargetFeatureModelUsesPortableBaselineAndRejectsUnsafeDrift(t *testing.
 		},
 	}).EffectiveTargetFeatures()
 	if err == nil || !strings.Contains(err.Error(), "portable baseline") {
-		t.Fatalf("explicit x64 features without sse2 error = %v, want portable baseline rejection", err)
+		t.Fatalf(
+			"explicit x64 features without sse2 error = %v, want portable baseline rejection",
+			err,
+		)
 	}
 
 	_, err = (CodegenOptions{
@@ -77,11 +80,15 @@ func TestCodegenOptionsTargetFeatureGuardIsEvidenceOnly(t *testing.T) {
 	if evidence.Source != string(TargetFeatureSourcePortableBaseline) {
 		t.Fatalf("evidence source = %q", evidence.Source)
 	}
-	if !evidence.PortableBaselineFallback || !containsTargetFeature(evidence.Features, string(TargetFeatureSSE2)) {
+	if !evidence.PortableBaselineFallback ||
+		!containsTargetFeature(evidence.Features, string(TargetFeatureSSE2)) {
 		t.Fatalf("evidence missing portable baseline sse2: %#v", evidence)
 	}
 	if evidence.ChangesSafeSemantics || evidence.EnablesTargetSpecificOptimization {
-		t.Fatalf("target feature evidence must be semantics-neutral and not enable tuning: %#v", evidence)
+		t.Fatalf(
+			"target feature evidence must be semantics-neutral and not enable tuning: %#v",
+			evidence,
+		)
 	}
 
 	if ok, err := opt.AllowsTargetFeature(TargetFeatureSSE2); err != nil || !ok {

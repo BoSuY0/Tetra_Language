@@ -56,7 +56,8 @@ func hasIATReloc(relocs []tobj.Reloc, name string) bool {
 
 func hasSymbol(symbols []tobj.Symbol, name string, params, returns int) bool {
 	for _, sym := range symbols {
-		if sym.Name == name && sym.HasSignature && sym.ParamSlots == params && sym.ReturnSlots == returns {
+		if sym.Name == name && sym.HasSignature && sym.ParamSlots == params &&
+			sym.ReturnSlots == returns {
 			return true
 		}
 	}

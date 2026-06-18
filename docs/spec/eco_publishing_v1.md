@@ -4,7 +4,8 @@ Status: Originally accepted for Wave 10 completion on 2026-04-26; synchronized
 with the current `v0.4.0` release truth on 2026-05-20. This spec applies to
 the local Eco/Todex contract baseline for the current `v0.4.0` release line.
 
-This document stabilizes local Eco/Todex v1 contracts and defines which network/distributed capabilities are beta vs post-v1.
+This document stabilizes local Eco/Todex v1 contracts and defines which network/distributed
+capabilities are beta vs post-v1.
 
 ## 1) Capsule Manifest v1
 
@@ -32,7 +33,8 @@ Supported fields:
 - `policy:` block with semantic project policy keys:
   `unsafe deny|allow` and `reproducible required|preferred|off`
 
-Backward compatibility rule: manifests without explicit `manifest` are interpreted as `tetra.capsule.v1`.
+Backward compatibility rule: manifests without explicit `manifest` are interpreted as
+`tetra.capsule.v1`.
 
 CLI project discovery rule: `tetra check`, `tetra build`, `tetra run`,
 `tetra test`, and `tetra doc` walk upward from the current/input path, prefer
@@ -114,7 +116,8 @@ Canonical permission model identifier: `tetra.eco.permissions.v1`.
 Rules:
 - `permission` is authoritative.
 - `effect` entries are normalized and added to permissions for compatibility.
-- Dependency checks enforce no permission escalation: a depender must include every permission required by each dependency.
+- Dependency checks enforce no permission escalation: a depender must include every permission
+  required by each dependency.
 - Existing effect-based checks remain in place.
 
 `Tetra.lock` also records each capsule `policy` map and artifact list when
@@ -166,7 +169,8 @@ Materialization schema identifier: `tetra.eco.materialization.v1`.
 Command:
 - `tetra eco materialize <package.todex> --target <triple> --trust <snapshot.json> -C <out>`
 
-Materializer unpacks and writes deterministic `tetra.materialization.json` metadata for the materialized target selection.
+Materializer unpacks and writes deterministic `tetra.materialization.json` metadata for the
+materialized target selection.
 
 ## 7) Reproducible Build Basics v1
 
@@ -363,7 +367,8 @@ Post-v1 (explicitly out of v1 contract):
 - EcoOracle federation/consensus
 - proof-carrying capsule mesh enforcement and live-evolution protocol
 
-Promotion rule: any post-v1 capability needs an explicit schema/version and release-gate command before being treated as v1-stable.
+Promotion rule: any post-v1 capability needs an explicit schema/version and release-gate command
+before being treated as v1-stable.
 
 ## 13) v0.3.0 release evidence
 

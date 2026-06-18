@@ -1,0 +1,19 @@
+// Bool slice for-loop memory microservice smoke.
+//
+// The service fills a heap-backed []bool and sums true lanes through
+// collection-loop lowering.
+module examples.microservices.memory.scalars.loops.memory_bool_for_loop_service
+func main() -> Int
+uses alloc, mem:
+    var flags: []bool = core.make_bool(4)
+    flags[0] = true
+    flags[1] = false
+    flags[2] = true
+    flags[3] = false
+    var total: Int = 0
+    for flag in flags:
+        if flag:
+            total = total + 21
+    if total == 42:
+        return 0
+    return total

@@ -88,8 +88,18 @@ type surfaceProductHashArtifact struct {
 func main() {
 	var opt surfaceProductSummaryOptions
 	flag.StringVar(&opt.ReportDir, "report-dir", "", "Surface product report directory")
-	flag.StringVar(&opt.SummaryPath, "summary", "", "Surface product summary path; defaults to <report-dir>/product-summary.json")
-	flag.StringVar(&opt.ManifestPath, "manifest", "", "Surface product artifact hash manifest path; defaults to <report-dir>/artifact-hashes.json")
+	flag.StringVar(
+		&opt.SummaryPath,
+		"summary",
+		"",
+		"Surface product summary path; defaults to <report-dir>/product-summary.json",
+	)
+	flag.StringVar(
+		&opt.ManifestPath,
+		"manifest",
+		"",
+		"Surface product artifact hash manifest path; defaults to <report-dir>/artifact-hashes.json",
+	)
 	flag.Parse()
 
 	if err := validateSurfaceProductSummary(opt); err != nil {
@@ -128,8 +138,17 @@ func validateSurfaceProductSummary(opt surfaceProductSummaryOptions) error {
 	issues = append(issues, validateProductSummaryRequiredArtifacts(report.RequiredArtifacts)...)
 	issues = append(issues, validateProductSummaryNonclaims(report.Nonclaims)...)
 	issues = append(issues, hashIssues...)
-	issues = append(issues, validateProductCategorySummaries(reportDir, report.RequiredArtifacts, report.FinalVerdict, coveredArtifacts)...)
-	issues = append(issues, validateProductSummaryHashCoverage(report.RequiredArtifacts, coveredArtifacts)...)
+	issues = append(
+		issues,
+		validateProductCategorySummaries(
+			reportDir,
+			report.RequiredArtifacts,
+			report.FinalVerdict,
+			coveredArtifacts,
+		)...)
+	issues = append(
+		issues,
+		validateProductSummaryHashCoverage(report.RequiredArtifacts, coveredArtifacts)...)
 	if len(issues) > 0 {
 		return errors.New(strings.Join(issues, "; "))
 	}
@@ -146,52 +165,127 @@ func validateProductSummaryFields(report surfaceProductSummaryReport) []string {
 		{field: "schema", got: report.Schema, want: surfaceProductSummarySchema},
 		{field: "release_scope", got: report.ReleaseScope, want: surfaceProductReleaseScope},
 		{field: "producer", got: report.Producer, want: "scripts/release/surface/product-gate.sh"},
-		{field: "product_gate_summary", got: report.ProductGateSummary, want: "surface-product-gate-summary.json"},
-		{field: "release_gate_report", got: report.ReleaseGateReport, want: "surface-release-summary.json"},
+		{
+			field: "product_gate_summary",
+			got:   report.ProductGateSummary,
+			want:  "surface-product-gate-summary.json",
+		},
+		{
+			field: "release_gate_report",
+			got:   report.ReleaseGateReport,
+			want:  "surface-release-summary.json",
+		},
 		{field: "artifact_hash_manifest", got: report.ArtifactHashManifest, want: "artifact-hashes.json"},
 		{field: "release_state", got: report.ReleaseState, want: "validated"},
 		{field: "artifact_hashes", got: report.ArtifactHashes, want: "validated"},
 		{field: "claim_scanner", got: report.ClaimScanner, want: "validated"},
 		{field: "manifest", got: report.Manifest, want: "validated"},
 		{field: "docs", got: report.Docs, want: "validated"},
-		{field: "final_verdict_owner", got: report.FinalVerdictOwner, want: surfaceProductFinalVerdictOwner},
+		{
+			field: "final_verdict_owner",
+			got:   report.FinalVerdictOwner,
+			want:  surfaceProductFinalVerdictOwner,
+		},
 		{field: "final_readiness_source", got: report.FinalReadinessSource, want: "product-summary.json"},
-		{field: "inner_release_summary_role", got: report.InnerReleaseSummaryRole, want: "prerequisite_evidence_not_final_signoff"},
+		{
+			field: "inner_release_summary_role",
+			got:   report.InnerReleaseSummaryRole,
+			want:  "prerequisite_evidence_not_final_signoff",
+		},
 	} {
 		if check.got != check.want {
-			issues = append(issues, fmt.Sprintf("product-summary.json %s is %q, want %q", check.field, check.got, check.want))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"product-summary.json %s is %q, want %q",
+					check.field,
+					check.got,
+					check.want,
+				),
+			)
 		}
 	}
-	if report.Status != "product_gate_passed_clean_same_commit_blocked" && report.Status != "product_gate_passed_p29_final_audit_required" {
-		issues = append(issues, fmt.Sprintf("product-summary.json status is %q, want P29 product-gate status", report.Status))
+	if report.Status != "product_gate_passed_clean_same_commit_blocked" &&
+		report.Status != "product_gate_passed_p29_final_audit_required" {
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"product-summary.json status is %q, want P29 product-gate status",
+				report.Status,
+			),
+		)
 	}
-	if report.FinalVerdict != "BLOCKED_DIRTY_CHECKOUT" && report.FinalVerdict != "P29_FINAL_AUDIT_REQUIRED" {
-		issues = append(issues, fmt.Sprintf("product-summary.json final_verdict is %q, want P29 final-audit verdict", report.FinalVerdict))
+	if report.FinalVerdict != "BLOCKED_DIRTY_CHECKOUT" &&
+		report.FinalVerdict != "P29_FINAL_AUDIT_REQUIRED" {
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"product-summary.json final_verdict is %q, want P29 final-audit verdict",
+				report.FinalVerdict,
+			),
+		)
 	}
 	if report.GitDirty == nil {
 		issues = append(issues, "product-summary.json git_dirty is missing")
 	}
 	issues = append(issues, requireBool("ci_required_gate", report.CIRequiredGate, true)...)
-	issues = append(issues, requireBool("continue_on_error_bypass_allowed", report.ContinueOnErrorBypassAllowed, false)...)
+	issues = append(
+		issues,
+		requireBool(
+			"continue_on_error_bypass_allowed",
+			report.ContinueOnErrorBypassAllowed,
+			false,
+		)...)
 	issues = append(issues, requireBool("production_claim", report.ProductionClaim, false)...)
 	issues = append(issues, requireBool("final_signoff", report.FinalSignoff, false)...)
-	issues = append(issues, requireBool("canonical_final_readiness_report", report.CanonicalFinalReadinessReport, true)...)
-	issues = append(issues, requireBool("release_gate_report_final_signoff", report.ReleaseGateReportFinalSignoff, false)...)
-	issues = append(issues, requireBool("clean_same_commit_required", report.CleanSameCommitRequired, true)...)
-	issues = append(issues, requireBool("clean_same_commit_proven", report.CleanSameCommitProven, false)...)
+	issues = append(
+		issues,
+		requireBool(
+			"canonical_final_readiness_report",
+			report.CanonicalFinalReadinessReport,
+			true,
+		)...)
+	issues = append(
+		issues,
+		requireBool(
+			"release_gate_report_final_signoff",
+			report.ReleaseGateReportFinalSignoff,
+			false,
+		)...)
+	issues = append(
+		issues,
+		requireBool("clean_same_commit_required", report.CleanSameCommitRequired, true)...)
+	issues = append(
+		issues,
+		requireBool("clean_same_commit_proven", report.CleanSameCommitProven, false)...)
 	if report.GitDirty != nil && *report.GitDirty {
 		if report.Status != "product_gate_passed_clean_same_commit_blocked" {
-			issues = append(issues, "product-summary.json dirty checkout must use product_gate_passed_clean_same_commit_blocked status")
+			issues = append(
+				issues,
+				("product-summary.json dirty checkout must use product_gate_" +
+					"passed_clean_same_commit_blocked status"),
+			)
 		}
 		if report.FinalVerdict != "BLOCKED_DIRTY_CHECKOUT" {
-			issues = append(issues, "product-summary.json dirty checkout must use BLOCKED_DIRTY_CHECKOUT final_verdict")
+			issues = append(
+				issues,
+				"product-summary.json dirty checkout must use BLOCKED_DIRTY_CHECKOUT final_verdict",
+			)
 		}
 	} else if report.GitDirty != nil {
 		if report.Status != "product_gate_passed_p29_final_audit_required" {
-			issues = append(issues, "product-summary.json clean checkout must use product_gate_passed_p29_final_audit_required status before final signoff")
+			issues = append(
+				issues,
+				("product-summary.json clean checkout must use product_gate_" +
+					"passed_p29_final_audit_required status before final signoff"),
+			)
 		}
 		if report.FinalVerdict != "P29_FINAL_AUDIT_REQUIRED" {
-			issues = append(issues, "product-summary.json clean checkout must use P29_FINAL_AUDIT_REQUIRED final_verdict before final signoff")
+			issues = append(
+				issues,
+				("product-summary.json clean checkout must use P29_FINAL_AUDIT_" +
+					"REQUIRED final_verdict before final signoff"),
+			)
 		}
 	}
 	return issues
@@ -199,12 +293,36 @@ func validateProductSummaryFields(report surfaceProductSummaryReport) []string {
 
 func validateProductSummaryTargets(targets []surfaceProductTarget) []string {
 	required := map[string]surfaceProductTarget{
-		"headless":    {Status: "release-test-evidence", Tier: "evidence-target", Report: "surface-headless-release.json"},
-		"linux-x64":   {Status: "current", Tier: "bounded-linux-web-scope", Report: "surface-linux-x64-release-app-shell.json"},
-		"wasm32-web":  {Status: "current", Tier: "bounded-linux-web-scope", Report: "surface-wasm32-web-release-browser.json"},
-		"macos-x64":   {Status: "unsupported", Tier: "UNSUPPORTED", Report: "surface-macos-x64-target-host-status.json"},
-		"windows-x64": {Status: "unsupported", Tier: "UNSUPPORTED", Report: "surface-windows-x64-target-host-status.json"},
-		"wasm32-wasi": {Status: "unsupported", Tier: "UNSUPPORTED", Report: "surface-release-summary.json"},
+		"headless": {
+			Status: "release-test-evidence",
+			Tier:   "evidence-target",
+			Report: "surface-headless-release.json",
+		},
+		"linux-x64": {
+			Status: "current",
+			Tier:   "bounded-linux-web-scope",
+			Report: "surface-linux-x64-release-app-shell.json",
+		},
+		"wasm32-web": {
+			Status: "current",
+			Tier:   "bounded-linux-web-scope",
+			Report: "surface-wasm32-web-release-browser.json",
+		},
+		"macos-x64": {
+			Status: "unsupported",
+			Tier:   "UNSUPPORTED",
+			Report: "surface-macos-x64-target-host-status.json",
+		},
+		"windows-x64": {
+			Status: "unsupported",
+			Tier:   "UNSUPPORTED",
+			Report: "surface-windows-x64-target-host-status.json",
+		},
+		"wasm32-wasi": {
+			Status: "unsupported",
+			Tier:   "UNSUPPORTED",
+			Report: "surface-release-summary.json",
+		},
 	}
 	claimByTarget := map[string]bool{
 		"headless":    false,
@@ -224,23 +342,39 @@ func validateProductSummaryTargets(targets []surfaceProductTarget) []string {
 			continue
 		}
 		if seenTargets[name] {
-			issues = append(issues, fmt.Sprintf("product-summary.json duplicate target_matrix target %q", name))
+			issues = append(
+				issues,
+				fmt.Sprintf("product-summary.json duplicate target_matrix target %q", name),
+			)
 			continue
 		}
 		seenTargets[name] = true
 		if _, ok := required[name]; !ok {
-			issues = append(issues, fmt.Sprintf("product-summary.json unexpected target_matrix target %q", name))
+			issues = append(
+				issues,
+				fmt.Sprintf("product-summary.json unexpected target_matrix target %q", name),
+			)
 			continue
 		}
 		byTarget[name] = target
 	}
 	if len(targets) != len(required) {
-		issues = append(issues, fmt.Sprintf("product-summary.json target_matrix has %d entries, want %d", len(targets), len(required)))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"product-summary.json target_matrix has %d entries, want %d",
+				len(targets),
+				len(required),
+			),
+		)
 	}
 	for name, want := range required {
 		got, ok := byTarget[name]
 		if !ok {
-			issues = append(issues, fmt.Sprintf("product-summary.json target_matrix missing %q", name))
+			issues = append(
+				issues,
+				fmt.Sprintf("product-summary.json target_matrix missing %q", name),
+			)
 			continue
 		}
 		for _, check := range []struct {
@@ -253,10 +387,25 @@ func validateProductSummaryTargets(targets []surfaceProductTarget) []string {
 			{field: "report", got: got.Report, want: want.Report},
 		} {
 			if check.got != check.want {
-				issues = append(issues, fmt.Sprintf("product-summary.json target_matrix[%s].%s is %q, want %q", name, check.field, check.got, check.want))
+				issues = append(
+					issues,
+					fmt.Sprintf(
+						"product-summary.json target_matrix[%s].%s is %q, want %q",
+						name,
+						check.field,
+						check.got,
+						check.want,
+					),
+				)
 			}
 		}
-		issues = append(issues, requireBool(fmt.Sprintf("target_matrix[%s].production_claim", name), got.ProductionClaim, claimByTarget[name])...)
+		issues = append(
+			issues,
+			requireBool(
+				fmt.Sprintf("target_matrix[%s].production_claim", name),
+				got.ProductionClaim,
+				claimByTarget[name],
+			)...)
 	}
 	return issues
 }
@@ -269,7 +418,15 @@ func validateProductSummaryRequiredArtifacts(required map[string]string) []strin
 	}
 	for key, value := range want {
 		if required[key] != value {
-			issues = append(issues, fmt.Sprintf("product-summary.json required_artifacts.%s is %q, want %q", key, required[key], value))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"product-summary.json required_artifacts.%s is %q, want %q",
+					key,
+					required[key],
+					value,
+				),
+			)
 		}
 	}
 	return issues
@@ -283,13 +440,21 @@ func validateProductSummaryNonclaims(nonclaims []string) []string {
 	var issues []string
 	for _, required := range productSummaryRequiredNonclaims() {
 		if !set[required] {
-			issues = append(issues, fmt.Sprintf("product-summary.json nonclaims missing %q", required))
+			issues = append(
+				issues,
+				fmt.Sprintf("product-summary.json nonclaims missing %q", required),
+			)
 		}
 	}
 	return issues
 }
 
-func validateProductCategorySummaries(reportDir string, required map[string]string, finalVerdict string, coveredArtifacts map[string]bool) []string {
+func validateProductCategorySummaries(
+	reportDir string,
+	required map[string]string,
+	finalVerdict string,
+	coveredArtifacts map[string]bool,
+) []string {
 	categoryByKey := map[string]string{
 		"visual":           "visual",
 		"accessibility":    "accessibility",
@@ -323,11 +488,18 @@ func validateProductCategorySummaries(reportDir string, required map[string]stri
 			{field: "schema", got: summary.Schema, want: surfaceProductCategorySummarySchema},
 			{field: "release_scope", got: summary.ReleaseScope, want: surfaceProductReleaseScope},
 			{field: "category", got: summary.Category, want: category},
-			{field: "final_verdict_owner", got: summary.FinalVerdictOwner, want: surfaceProductFinalVerdictOwner},
+			{
+				field: "final_verdict_owner",
+				got:   summary.FinalVerdictOwner,
+				want:  surfaceProductFinalVerdictOwner,
+			},
 			{field: "final_verdict", got: summary.FinalVerdict, want: finalVerdict},
 		} {
 			if check.got != check.want {
-				issues = append(issues, fmt.Sprintf("%s %s is %q, want %q", path, check.field, check.got, check.want))
+				issues = append(
+					issues,
+					fmt.Sprintf("%s %s is %q, want %q", path, check.field, check.got, check.want),
+				)
 			}
 		}
 		if strings.TrimSpace(summary.Status) == "" {
@@ -342,16 +514,24 @@ func validateProductCategorySummaries(reportDir string, required map[string]stri
 			}
 		} else {
 			if _, err := os.ReadFile(filepath.Join(reportDir, filepath.FromSlash(relPath))); err != nil {
-				issues = append(issues, fmt.Sprintf("%s source_report %q read failed: %v", path, sourceReport, err))
+				issues = append(
+					issues,
+					fmt.Sprintf("%s source_report %q read failed: %v", path, sourceReport, err),
+				)
 			}
 			if !coveredArtifacts[relPath] {
-				issues = append(issues, fmt.Sprintf("%s source_report %q is not hash-covered", path, sourceReport))
+				issues = append(
+					issues,
+					fmt.Sprintf("%s source_report %q is not hash-covered", path, sourceReport),
+				)
 			}
 		}
 		if strings.TrimSpace(summary.Evidence) == "" {
 			issues = append(issues, fmt.Sprintf("%s evidence must not be empty", path))
 		}
-		issues = append(issues, requireBool(path+" production_claim", summary.ProductionClaim, false)...)
+		issues = append(
+			issues,
+			requireBool(path+" production_claim", summary.ProductionClaim, false)...)
 		issues = append(issues, requireBool(path+" final_signoff", summary.FinalSignoff, false)...)
 	}
 	return issues
@@ -369,7 +549,14 @@ func loadProductHashCoverage(manifestPath string) (map[string]bool, []string) {
 	}
 	var issues []string
 	if manifest.Schema != surfaceProductHashManifestSchema {
-		issues = append(issues, fmt.Sprintf("artifact-hashes.json schema is %q, want %q", manifest.Schema, surfaceProductHashManifestSchema))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"artifact-hashes.json schema is %q, want %q",
+				manifest.Schema,
+				surfaceProductHashManifestSchema,
+			),
+		)
 	}
 	for _, artifact := range manifest.Artifacts {
 		covered[filepath.ToSlash(artifact.Path)] = true
@@ -377,14 +564,20 @@ func loadProductHashCoverage(manifestPath string) (map[string]bool, []string) {
 	return covered, issues
 }
 
-func validateProductSummaryHashCoverage(required map[string]string, covered map[string]bool) []string {
+func validateProductSummaryHashCoverage(
+	required map[string]string,
+	covered map[string]bool,
+) []string {
 	var issues []string
 	for key, path := range required {
 		if key == "artifact_hashes" {
 			continue
 		}
 		if !covered[filepath.ToSlash(path)] {
-			issues = append(issues, fmt.Sprintf("artifact-hashes.json missing required product artifact %q", path))
+			issues = append(
+				issues,
+				fmt.Sprintf("artifact-hashes.json missing required product artifact %q", path),
+			)
 		}
 	}
 	return issues
@@ -431,8 +624,8 @@ func productSummaryRequiredArtifacts() map[string]string {
 func productSummaryRequiredNonclaims() []string {
 	return []string{
 		"all-platform-surface-parity",
-		"macos-surface-production",
-		"windows-surface-production",
+		"nonclaim-macos-surface-production-support",
+		"nonclaim-windows-surface-production-support",
 		"wasm32-wasi-surface-ui-runtime",
 		"gpu-renderer",
 		"full-rich-text-editor",

@@ -8,7 +8,7 @@ cd "$repo_root"
 release_artifact="tetra.release.v0_3_0.project-dump.v1"
 
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
-  cat <<'USAGE'
+  cat << 'USAGE'
 Usage: bash scripts/dev/dump-project.sh [dump-project flags...]
 
 Wrapper around:

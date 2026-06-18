@@ -19,7 +19,11 @@ func run(args []string) error {
 	flags := flag.NewFlagSet("validate-techempower-report", flag.ContinueOnError)
 	flags.SetOutput(os.Stderr)
 	reportPath := flags.String("report", "", "path to TechEmpower semantic or matrix JSON report")
-	allowSkipDB := flags.Bool("allow-skip-db", false, "allow local smoke reports that intentionally skip database endpoints")
+	allowSkipDB := flags.Bool(
+		"allow-skip-db",
+		false,
+		"allow local smoke reports that intentionally skip database endpoints",
+	)
 	if err := flags.Parse(args); err != nil {
 		return err
 	}

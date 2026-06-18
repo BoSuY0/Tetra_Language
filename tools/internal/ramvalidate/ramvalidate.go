@@ -8,6 +8,7 @@ import (
 	"os"
 	"reflect"
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -31,24 +32,43 @@ type Report struct {
 }
 
 type Row struct {
-	SiteID           string   `json:"site_id"`
-	ValueID          string   `json:"value_id"`
-	Function         string   `json:"function"`
-	SourceSpan       string   `json:"source_span,omitempty"`
-	Intent           string   `json:"intent"`
-	RequestedBytes   int64    `json:"requested_bytes"`
-	Bounded          bool     `json:"bounded"`
-	Owner            string   `json:"owner"`
-	Lifetime         string   `json:"lifetime"`
-	EscapeStatus     string   `json:"escape_status"`
-	Placement        string   `json:"placement"`
-	ProofIDs         []string `json:"proof_ids"`
-	Blockers         []string `json:"blockers"`
-	CopyReason       string   `json:"copy_reason,omitempty"`
-	FreePoint        string   `json:"free_point,omitempty"`
-	ContractGrade    string   `json:"contract_grade"`
-	ValidationStatus string   `json:"validation_status"`
-	SourceFactID     string   `json:"source_fact_id,omitempty"`
+	SiteID           string        `json:"site_id"`
+	ValueID          string        `json:"value_id"`
+	Function         string        `json:"function"`
+	SourceSpan       string        `json:"source_span,omitempty"`
+	Intent           string        `json:"intent"`
+	RequestedBytes   int64         `json:"requested_bytes"`
+	Bounded          bool          `json:"bounded"`
+	Owner            string        `json:"owner"`
+	Lifetime         string        `json:"lifetime"`
+	EscapeStatus     string        `json:"escape_status"`
+	Placement        string        `json:"placement"`
+	ProofIDs         []string      `json:"proof_ids"`
+	Blockers         []string      `json:"blockers"`
+	CopyReason       string        `json:"copy_reason,omitempty"`
+	FreePoint        string        `json:"free_point,omitempty"`
+	ContractGrade    string        `json:"contract_grade"`
+	ValidationStatus string        `json:"validation_status"`
+	SourceFactID     string        `json:"source_fact_id,omitempty"`
+	Domain           *MemoryDomain `json:"domain,omitempty"`
+}
+
+type MemoryDomain struct {
+	DomainID       string `json:"domain_id"`
+	ParentDomainID string `json:"parent_domain_id,omitempty"`
+	Kind           string `json:"kind"`
+	OwnerKind      string `json:"owner_kind"`
+	OwnerID        string `json:"owner_id"`
+	Lifetime       string `json:"lifetime"`
+	BudgetBytes    int64  `json:"budget_bytes,omitempty"`
+	RequestedBytes int64  `json:"requested_bytes,omitempty"`
+	ReservedBytes  int64  `json:"reserved_bytes,omitempty"`
+	CommittedBytes int64  `json:"committed_bytes,omitempty"`
+	ReleasedBytes  int64  `json:"released_bytes,omitempty"`
+	CurrentBytes   int64  `json:"current_bytes,omitempty"`
+	PeakBytes      int64  `json:"peak_bytes,omitempty"`
+	CopyCount      int    `json:"copy_count,omitempty"`
+	BytesCopied    int64  `json:"bytes_copied,omitempty"`
 }
 
 type ProofSummary struct {
@@ -69,12 +89,32 @@ type FunctionRow struct {
 }
 
 type Summary struct {
-	RowCount      int    `json:"row_count"`
-	ArtifactGrade string `json:"artifact_grade"`
-	HeapRows      int    `json:"heap_rows"`
-	CopyRows      int    `json:"copy_rows"`
-	UnboundedRows int    `json:"unbounded_rows"`
-	BudgetBytes   int64  `json:"budget_bytes"`
+	RowCount      int                   `json:"row_count"`
+	ArtifactGrade string                `json:"artifact_grade"`
+	HeapRows      int                   `json:"heap_rows"`
+	CopyRows      int                   `json:"copy_rows"`
+	UnboundedRows int                   `json:"unbounded_rows"`
+	BudgetBytes   int64                 `json:"budget_bytes"`
+	Domains       []MemoryDomainSummary `json:"domains,omitempty"`
+}
+
+type MemoryDomainSummary struct {
+	DomainID       string `json:"domain_id"`
+	ParentDomainID string `json:"parent_domain_id,omitempty"`
+	Kind           string `json:"kind"`
+	OwnerKind      string `json:"owner_kind"`
+	OwnerID        string `json:"owner_id"`
+	Lifetime       string `json:"lifetime"`
+	RowCount       int    `json:"row_count"`
+	BudgetBytes    int64  `json:"budget_bytes,omitempty"`
+	RequestedBytes int64  `json:"requested_bytes,omitempty"`
+	ReservedBytes  int64  `json:"reserved_bytes,omitempty"`
+	CommittedBytes int64  `json:"committed_bytes,omitempty"`
+	ReleasedBytes  int64  `json:"released_bytes,omitempty"`
+	CurrentBytes   int64  `json:"current_bytes,omitempty"`
+	PeakBytes      int64  `json:"peak_bytes,omitempty"`
+	CopyCount      int    `json:"copy_count,omitempty"`
+	BytesCopied    int64  `json:"bytes_copied,omitempty"`
 }
 
 type GradeReport struct {
@@ -132,13 +172,28 @@ type BlockerReport struct {
 }
 
 type BlockerRow struct {
-	SiteID        string   `json:"site_id"`
-	Function      string   `json:"function"`
-	Intent        string   `json:"intent"`
-	Placement     string   `json:"placement"`
-	Blockers      []string `json:"blockers,omitempty"`
-	CopyReason    string   `json:"copy_reason,omitempty"`
-	ContractGrade string   `json:"contract_grade"`
+	SiteID               string   `json:"site_id"`
+	Function             string   `json:"function"`
+	Intent               string   `json:"intent"`
+	Placement            string   `json:"placement"`
+	Blockers             []string `json:"blockers,omitempty"`
+	CopyReason           string   `json:"copy_reason,omitempty"`
+	ContractGrade        string   `json:"contract_grade"`
+	File                 string   `json:"file,omitempty"`
+	Line                 int      `json:"line,omitempty"`
+	Symbol               string   `json:"symbol,omitempty"`
+	SourceLocationStatus string   `json:"source_location_status"`
+	Severity             string   `json:"severity"`
+	Reason               string   `json:"reason"`
+	SuggestedFix         string   `json:"suggested_fix"`
+	ProofID              string   `json:"proof_id,omitempty"`
+	EvidenceID           string   `json:"evidence_id"`
+	SafeToOptimize       *bool    `json:"safe_to_optimize"`
+	CopyKind             string   `json:"copy_kind,omitempty"`
+	SourceValue          string   `json:"source_value,omitempty"`
+	DestinationValue     string   `json:"destination_value,omitempty"`
+	BytesEstimate        int64    `json:"bytes_estimate,omitempty"`
+	SafetyReason         string   `json:"safety_reason,omitempty"`
 }
 
 var fullGitHeadRE = regexp.MustCompile(`^[0-9a-f]{40}$`)
@@ -184,9 +239,13 @@ func ValidateReportFile(path string) error {
 func ValidateReport(report Report) error {
 	var issues []string
 	if report.SchemaVersion != ReportSchemaV1 {
-		issues = append(issues, fmt.Sprintf("schema_version is %q, want %q", report.SchemaVersion, ReportSchemaV1))
+		issues = append(
+			issues,
+			fmt.Sprintf("schema_version is %q, want %q", report.SchemaVersion, ReportSchemaV1),
+		)
 	}
-	if report.GitHead != "" && report.GitHead != "unknown" && !fullGitHeadRE.MatchString(report.GitHead) {
+	if report.GitHead != "" && report.GitHead != "unknown" &&
+		!fullGitHeadRE.MatchString(report.GitHead) {
 		issues = append(issues, "git_head must be a 40-character lowercase hex commit or unknown")
 	}
 	if strings.TrimSpace(report.Target) == "" || strings.TrimSpace(report.GeneratedBy) == "" {
@@ -204,9 +263,19 @@ func ValidateReport(report Report) error {
 	}
 	expected := SummarizeRows(report.Rows)
 	if !reflect.DeepEqual(report.Summary, expected) {
-		issues = append(issues, fmt.Sprintf("summary mismatch: got %+v want %+v", report.Summary, expected))
+		issues = append(
+			issues,
+			fmt.Sprintf("summary mismatch: got %+v want %+v", report.Summary, expected),
+		)
 		if report.Summary.ArtifactGrade != expected.ArtifactGrade {
-			issues = append(issues, fmt.Sprintf("artifact_grade is %q, want %q", report.Summary.ArtifactGrade, expected.ArtifactGrade))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"artifact_grade is %q, want %q",
+					report.Summary.ArtifactGrade,
+					expected.ArtifactGrade,
+				),
+			)
 		}
 	}
 	issues = append(issues, validateNonClaims(report.NonClaims)...)
@@ -223,7 +292,10 @@ func ValidateGradeReportFile(path string) error {
 	}
 	var issues []string
 	if report.SchemaVersion != GradeReportSchemaV1 {
-		issues = append(issues, fmt.Sprintf("schema_version is %q, want %q", report.SchemaVersion, GradeReportSchemaV1))
+		issues = append(
+			issues,
+			fmt.Sprintf("schema_version is %q, want %q", report.SchemaVersion, GradeReportSchemaV1),
+		)
 	}
 	if !knownGrade(report.ArtifactGrade) {
 		issues = append(issues, fmt.Sprintf("unknown artifact_grade %q", report.ArtifactGrade))
@@ -245,7 +317,14 @@ func ValidateProofStoreSummaryFile(path string) error {
 	}
 	var issues []string
 	if report.SchemaVersion != ProofStoreSummarySchemaV1 {
-		issues = append(issues, fmt.Sprintf("schema_version is %q, want %q", report.SchemaVersion, ProofStoreSummarySchemaV1))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"schema_version is %q, want %q",
+				report.SchemaVersion,
+				ProofStoreSummarySchemaV1,
+			),
+		)
 	}
 	if report.Summary.ProofCount != len(report.Proofs) {
 		issues = append(issues, "proof_count must match proofs length")
@@ -258,33 +337,73 @@ func ValidateProofStoreSummaryFile(path string) error {
 			continue
 		}
 		if seen[proof.ProofID] {
-			issues = append(issues, fmt.Sprintf("proof %d: duplicate proof_id %q", i, proof.ProofID))
+			issues = append(
+				issues,
+				fmt.Sprintf("proof %d: duplicate proof_id %q", i, proof.ProofID),
+			)
 		}
 		seen[proof.ProofID] = true
-		if strings.TrimSpace(proof.Kind) == "" || strings.TrimSpace(proof.Subject) == "" || strings.TrimSpace(proof.StableHash) == "" {
-			issues = append(issues, fmt.Sprintf("proof %s: kind, subject, and stable_hash are required", proof.ProofID))
+		if strings.TrimSpace(proof.Kind) == "" || strings.TrimSpace(proof.Subject) == "" ||
+			strings.TrimSpace(proof.StableHash) == "" {
+			issues = append(
+				issues,
+				fmt.Sprintf("proof %s: kind, subject, and stable_hash are required", proof.ProofID),
+			)
 		}
 		switch proof.Status {
 		case "proven", "conservative", "rejected", "unknown":
 			counts[proof.Status]++
 		default:
-			issues = append(issues, fmt.Sprintf("proof %s: unknown status %q", proof.ProofID, proof.Status))
+			issues = append(
+				issues,
+				fmt.Sprintf("proof %s: unknown status %q", proof.ProofID, proof.Status),
+			)
 		}
-		if proof.Status == "proven" && (strings.Contains(strings.ToLower(proof.Kind), "unsafe_unknown") || strings.Contains(strings.ToLower(proof.Subject), "unsafe_unknown")) {
-			issues = append(issues, fmt.Sprintf("proof %s: unsafe_unknown cannot be promoted to proven", proof.ProofID))
+		if proof.Status == "proven" &&
+			(strings.Contains(
+				strings.ToLower(proof.Kind),
+				"unsafe_unknown",
+			) || strings.Contains(
+				strings.ToLower(proof.Subject),
+				"unsafe_unknown",
+			)) {
+			issues = append(
+				issues,
+				fmt.Sprintf("proof %s: unsafe_unknown cannot be promoted to proven", proof.ProofID),
+			)
 		}
 	}
 	if report.Summary.Proven != counts["proven"] {
-		issues = append(issues, fmt.Sprintf("proven count is %d, want %d", report.Summary.Proven, counts["proven"]))
+		issues = append(
+			issues,
+			fmt.Sprintf("proven count is %d, want %d", report.Summary.Proven, counts["proven"]),
+		)
 	}
 	if report.Summary.Conservative != counts["conservative"] {
-		issues = append(issues, fmt.Sprintf("conservative count is %d, want %d", report.Summary.Conservative, counts["conservative"]))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"conservative count is %d, want %d",
+				report.Summary.Conservative,
+				counts["conservative"],
+			),
+		)
 	}
 	if report.Summary.Rejected != counts["rejected"] {
-		issues = append(issues, fmt.Sprintf("rejected count is %d, want %d", report.Summary.Rejected, counts["rejected"]))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"rejected count is %d, want %d",
+				report.Summary.Rejected,
+				counts["rejected"],
+			),
+		)
 	}
 	if report.Summary.Unknown != counts["unknown"] {
-		issues = append(issues, fmt.Sprintf("unknown count is %d, want %d", report.Summary.Unknown, counts["unknown"]))
+		issues = append(
+			issues,
+			fmt.Sprintf("unknown count is %d, want %d", report.Summary.Unknown, counts["unknown"]),
+		)
 	}
 	issues = append(issues, validateNonClaims(report.NonClaims)...)
 	if len(issues) > 0 {
@@ -300,7 +419,14 @@ func ValidatePipelineCoverageFile(path string) error {
 	}
 	var issues []string
 	if report.SchemaVersion != PipelineCoverageSchemaV1 {
-		issues = append(issues, fmt.Sprintf("schema_version is %q, want %q", report.SchemaVersion, PipelineCoverageSchemaV1))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"schema_version is %q, want %q",
+				report.SchemaVersion,
+				PipelineCoverageSchemaV1,
+			),
+		)
 	}
 	if len(report.Entries) == 0 {
 		issues = append(issues, "entries are required")
@@ -311,16 +437,25 @@ func ValidatePipelineCoverageFile(path string) error {
 			issues = append(issues, fmt.Sprintf("entry %d missing entrypoint", i))
 		}
 		if seenEntrypoints[entry.Entrypoint] {
-			issues = append(issues, fmt.Sprintf("entry %d duplicate entrypoint %q", i, entry.Entrypoint))
+			issues = append(
+				issues,
+				fmt.Sprintf("entry %d duplicate entrypoint %q", i, entry.Entrypoint),
+			)
 		}
 		seenEntrypoints[entry.Entrypoint] = true
 		switch entry.Status {
 		case "validated_by_pipeline":
 			if len(entry.Validators) == 0 {
-				issues = append(issues, fmt.Sprintf("entry %d validated_by_pipeline requires validators", i))
+				issues = append(
+					issues,
+					fmt.Sprintf("entry %d validated_by_pipeline requires validators", i),
+				)
 			}
 			if strings.TrimSpace(entry.ArtifactPath) == "" {
-				issues = append(issues, fmt.Sprintf("entry %d validated_by_pipeline requires artifact_path", i))
+				issues = append(
+					issues,
+					fmt.Sprintf("entry %d validated_by_pipeline requires artifact_path", i),
+				)
 			}
 		case "formal_exemption_with_reason":
 			if strings.TrimSpace(entry.Exemption) == "" {
@@ -335,7 +470,10 @@ func ValidatePipelineCoverageFile(path string) error {
 	}
 	for _, required := range requiredPipelineEntrypoints {
 		if !seenEntrypoints[required] {
-			issues = append(issues, fmt.Sprintf("missing required pipeline entrypoint %s", required))
+			issues = append(
+				issues,
+				fmt.Sprintf("missing required pipeline entrypoint %s", required),
+			)
 		}
 	}
 	issues = append(issues, validateNonClaims(report.NonClaims)...)
@@ -363,9 +501,20 @@ func ValidateBlockerReportFile(path string, kind string) error {
 	if err := ReadStrictJSONFile(path, &report); err != nil {
 		return err
 	}
+	return ValidateBlockerReport(report, kind)
+}
+
+func ValidateBlockerReport(report BlockerReport, kind string) error {
 	var issues []string
 	if report.SchemaVersion != BlockerReportSchemaV1 {
-		issues = append(issues, fmt.Sprintf("schema_version is %q, want %q", report.SchemaVersion, BlockerReportSchemaV1))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"schema_version is %q, want %q",
+				report.SchemaVersion,
+				BlockerReportSchemaV1,
+			),
+		)
 	}
 	if report.Kind != kind {
 		issues = append(issues, fmt.Sprintf("kind is %q, want %q", report.Kind, kind))
@@ -374,18 +523,110 @@ func ValidateBlockerReportFile(path string, kind string) error {
 		if strings.TrimSpace(row.SiteID) == "" || strings.TrimSpace(row.Function) == "" {
 			issues = append(issues, fmt.Sprintf("row %d missing site_id/function", i))
 		}
+		if !knownIntent(row.Intent) {
+			issues = append(issues, fmt.Sprintf("row %d unknown intent %q", i, row.Intent))
+		}
+		if !knownPlacement(row.Placement) {
+			issues = append(issues, fmt.Sprintf("row %d unknown placement %q", i, row.Placement))
+		}
+		if !knownGrade(row.ContractGrade) {
+			issues = append(
+				issues,
+				fmt.Sprintf("row %d unknown contract_grade %q", i, row.ContractGrade),
+			)
+		}
 		if kind == "heap" && len(row.Blockers) == 0 {
 			issues = append(issues, fmt.Sprintf("row %d heap blocker row requires blockers", i))
 		}
 		if kind == "copy" && strings.TrimSpace(row.CopyReason) == "" {
 			issues = append(issues, fmt.Sprintf("row %d copy row requires copy_reason", i))
 		}
+		issues = append(issues, validateActionableBlockerRow(i, row, kind)...)
 	}
 	issues = append(issues, validateNonClaims(report.NonClaims)...)
 	if len(issues) > 0 {
 		return errors.New(strings.Join(issues, "; "))
 	}
 	return nil
+}
+
+func validateActionableBlockerRow(index int, row BlockerRow, kind string) []string {
+	var issues []string
+	prefix := fmt.Sprintf("row %d", index)
+	switch row.SourceLocationStatus {
+	case "available":
+		if strings.TrimSpace(row.File) == "" || row.Line <= 0 {
+			issues = append(
+				issues,
+				prefix+" source_location_status available requires file and positive line",
+			)
+		}
+	case "unavailable", "generated", "internal":
+	default:
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				("%s source_location_status %q is required and must be available, "+
+					"unavailable, generated, or internal"),
+				prefix,
+				row.SourceLocationStatus,
+			),
+		)
+	}
+	if strings.TrimSpace(row.Symbol) == "" {
+		issues = append(issues, prefix+" symbol is required")
+	}
+	switch row.Severity {
+	case "P1", "P2", "P3":
+	default:
+		issues = append(
+			issues,
+			fmt.Sprintf("%s severity %q must be P1, P2, or P3", prefix, row.Severity),
+		)
+	}
+	if strings.TrimSpace(row.Reason) == "" {
+		issues = append(issues, prefix+" reason is required")
+	}
+	if strings.TrimSpace(row.SuggestedFix) == "" {
+		issues = append(issues, prefix+" suggested_fix is required")
+	}
+	if strings.TrimSpace(row.ProofID) == "" && strings.TrimSpace(row.EvidenceID) == "" {
+		issues = append(issues, prefix+" proof_id or evidence_id is required")
+	}
+	if row.SafeToOptimize == nil {
+		issues = append(issues, prefix+" safe_to_optimize is required")
+	}
+	if kind == "copy" {
+		if !knownCopyKind(row.CopyKind) {
+			issues = append(
+				issues,
+				fmt.Sprintf("%s copy_kind %q is not recognized", prefix, row.CopyKind),
+			)
+		}
+		if strings.TrimSpace(row.SourceValue) == "" {
+			issues = append(issues, prefix+" source_value is required")
+		}
+		if strings.TrimSpace(row.DestinationValue) == "" {
+			issues = append(issues, prefix+" destination_value is required")
+		}
+		if row.BytesEstimate < 0 {
+			issues = append(issues, prefix+" bytes_estimate must not be negative")
+		}
+		if strings.TrimSpace(row.SafetyReason) == "" {
+			issues = append(issues, prefix+" safety_reason is required")
+		}
+	}
+	return issues
+}
+
+func knownCopyKind(value string) bool {
+	switch value {
+	case "HOT_PATH_COPY", "RELEASE_TOOL_COPY", "TEST_ONLY_COPY", "ACCEPTABLE_SMALL_COPY",
+		"NEEDS_STREAMING", "NEEDS_CAPACITY_HINT", "NEEDS_ZERO_COPY_OR_BORROWED_VIEW":
+		return true
+	default:
+		return false
+	}
 }
 
 func validateRow(i int, row Row, proofs map[string]ProofSummary) []string {
@@ -404,9 +645,15 @@ func validateRow(i int, row Row, proofs map[string]ProofSummary) []string {
 		issues = append(issues, fmt.Sprintf("%s: unknown placement %q", prefix, row.Placement))
 	}
 	if !knownGrade(row.ContractGrade) {
-		issues = append(issues, fmt.Sprintf("%s: unknown contract_grade %q", prefix, row.ContractGrade))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s: unknown contract_grade %q", prefix, row.ContractGrade),
+		)
 	} else if want := GradeForPlacement(row.Placement); row.ContractGrade != want {
-		issues = append(issues, fmt.Sprintf("%s: contract_grade %q contradicts placement %q", prefix, row.ContractGrade, row.Placement))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s: contract_grade %q contradicts placement %q", prefix, row.ContractGrade, row.Placement),
+		)
 	}
 	if isHeap(row.Placement) && len(row.Blockers) == 0 {
 		issues = append(issues, prefix+": heap placement requires blocker")
@@ -414,35 +661,125 @@ func validateRow(i int, row Row, proofs map[string]ProofSummary) []string {
 	if isCopy(row.Intent) && row.CopyReason == "" {
 		issues = append(issues, prefix+": copy row requires copy_reason")
 	}
+	issues = append(issues, validateMemoryDomain(prefix, row.Domain)...)
 	if trusted(row.Placement) {
 		if row.EscapeStatus != "no_escape" {
-			issues = append(issues, fmt.Sprintf("%s: trusted placement %q requires no_escape escape_status, got %q", prefix, row.Placement, row.EscapeStatus))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"%s: trusted placement %q requires no_escape escape_status, got %q",
+					prefix,
+					row.Placement,
+					row.EscapeStatus,
+				),
+			)
 		}
 		if row.ValidationStatus != "validated" {
-			issues = append(issues, fmt.Sprintf("%s: trusted placement %q requires validated no-escape proof, got validation_status %q", prefix, row.Placement, row.ValidationStatus))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"%s: trusted placement %q requires validated no-escape proof, got validation_status %q",
+					prefix,
+					row.Placement,
+					row.ValidationStatus,
+				),
+			)
 		}
 		if len(row.ProofIDs) == 0 {
-			issues = append(issues, prefix+": proof_ids are required for validated trusted placement")
+			issues = append(
+				issues,
+				prefix+": proof_ids are required for validated trusted placement",
+			)
 		}
 	}
 	for _, proofID := range row.ProofIDs {
 		proof, ok := proofs[proofID]
 		if !ok {
-			issues = append(issues, fmt.Sprintf("%s: proof_id %q missing from proof summary", prefix, proofID))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s: proof_id %q missing from proof summary", prefix, proofID),
+			)
 			continue
 		}
 		if proof.Status == "rejected" || proof.Status == "unknown" {
-			issues = append(issues, fmt.Sprintf("%s: proof_id %q has unusable status %s", prefix, proofID, proof.Status))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"%s: proof_id %q has unusable status %s",
+					prefix,
+					proofID,
+					proof.Status,
+				),
+			)
 		}
 		if trusted(row.Placement) && proof.Status != "proven" {
-			issues = append(issues, fmt.Sprintf("%s: trusted placement proof_id %q must be proven, got %s", prefix, proofID, proof.Status))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"%s: trusted placement proof_id %q must be proven, got %s",
+					prefix,
+					proofID,
+					proof.Status,
+				),
+			)
 		}
 		issues = append(issues, validateScopedPlacementProof(prefix, row, proofID, proof)...)
 	}
 	return issues
 }
 
-func validateScopedPlacementProof(prefix string, row Row, proofID string, proof ProofSummary) []string {
+func validateMemoryDomain(prefix string, domain *MemoryDomain) []string {
+	if domain == nil {
+		return nil
+	}
+	var issues []string
+	if strings.TrimSpace(domain.DomainID) == "" {
+		issues = append(issues, prefix+": domain_id is required")
+	}
+	if !knownDomainKind(domain.Kind) {
+		issues = append(issues, fmt.Sprintf("%s: unknown domain kind %q", prefix, domain.Kind))
+	}
+	if strings.TrimSpace(domain.OwnerKind) == "" {
+		issues = append(issues, prefix+": domain owner_kind is required")
+	}
+	if strings.TrimSpace(domain.OwnerID) == "" {
+		issues = append(issues, prefix+": domain owner_id is required")
+	}
+	if strings.TrimSpace(domain.Lifetime) == "" {
+		issues = append(issues, prefix+": domain lifetime is required")
+	}
+	for name, value := range map[string]int64{
+		"budget_bytes":    domain.BudgetBytes,
+		"requested_bytes": domain.RequestedBytes,
+		"reserved_bytes":  domain.ReservedBytes,
+		"committed_bytes": domain.CommittedBytes,
+		"released_bytes":  domain.ReleasedBytes,
+		"current_bytes":   domain.CurrentBytes,
+		"peak_bytes":      domain.PeakBytes,
+		"bytes_copied":    domain.BytesCopied,
+	} {
+		if value < 0 {
+			issues = append(issues, fmt.Sprintf("%s: domain %s must not be negative", prefix, name))
+		}
+	}
+	if domain.CopyCount < 0 {
+		issues = append(issues, prefix+": domain copy_count must not be negative")
+	}
+	if domain.PeakBytes < domain.CurrentBytes {
+		issues = append(issues, prefix+": domain peak_bytes must be >= current_bytes")
+	}
+	if domain.BytesCopied > 0 && domain.CopyCount == 0 {
+		issues = append(issues, prefix+": domain bytes_copied requires copy_count")
+	}
+	return issues
+}
+
+func validateScopedPlacementProof(
+	prefix string,
+	row Row,
+	proofID string,
+	proof ProofSummary,
+) []string {
 	var issues []string
 	wantKind := ""
 	switch row.Placement {
@@ -454,16 +791,36 @@ func validateScopedPlacementProof(prefix string, row Row, proofID string, proof 
 		return issues
 	}
 	if proof.Kind != wantKind {
-		issues = append(issues, fmt.Sprintf("%s: %s placement proof_id %q must be scoped proof kind %q, got %q", prefix, row.Placement, proofID, wantKind, proof.Kind))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s: %s placement proof_id %q must be scoped proof kind %q, got %q",
+				prefix,
+				row.Placement,
+				proofID,
+				wantKind,
+				proof.Kind,
+			),
+		)
 	}
 	if row.Lifetime == "" || !strings.Contains(proof.Subject, row.Lifetime) {
-		issues = append(issues, fmt.Sprintf("%s: %s placement proof_id %q must bind lifetime %q in proof subject", prefix, row.Placement, proofID, row.Lifetime))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s: %s placement proof_id %q must bind lifetime %q in proof subject",
+				prefix,
+				row.Placement,
+				proofID,
+				row.Lifetime,
+			),
+		)
 	}
 	return issues
 }
 
 func SummarizeRows(rows []Row) Summary {
 	summary := Summary{ArtifactGrade: "M0"}
+	domains := map[string]MemoryDomainSummary{}
 	for _, row := range rows {
 		summary.RowCount++
 		summary.ArtifactGrade = MaxGrade(summary.ArtifactGrade, row.ContractGrade)
@@ -473,14 +830,54 @@ func SummarizeRows(rows []Row) Summary {
 		if isCopy(row.Intent) {
 			summary.CopyRows++
 		}
-		if row.Placement == "heap_unbounded" || row.ContractGrade == "M5" || row.ContractGrade == "M6" {
+		if row.Placement == "heap_unbounded" || row.ContractGrade == "M5" ||
+			row.ContractGrade == "M6" {
 			summary.UnboundedRows++
 		}
 		if row.RequestedBytes > 0 {
 			summary.BudgetBytes += row.RequestedBytes
 		}
+		if row.Domain != nil {
+			key := memoryDomainSummaryKey(*row.Domain)
+			domain := domains[key]
+			if domain.DomainID == "" {
+				domain.DomainID = row.Domain.DomainID
+				domain.ParentDomainID = row.Domain.ParentDomainID
+				domain.Kind = row.Domain.Kind
+				domain.OwnerKind = row.Domain.OwnerKind
+				domain.OwnerID = row.Domain.OwnerID
+				domain.Lifetime = row.Domain.Lifetime
+			}
+			domain.RowCount++
+			domain.BudgetBytes += row.Domain.BudgetBytes
+			domain.RequestedBytes += row.Domain.RequestedBytes
+			domain.ReservedBytes += row.Domain.ReservedBytes
+			domain.CommittedBytes += row.Domain.CommittedBytes
+			domain.ReleasedBytes += row.Domain.ReleasedBytes
+			domain.CurrentBytes += row.Domain.CurrentBytes
+			if row.Domain.PeakBytes > domain.PeakBytes {
+				domain.PeakBytes = row.Domain.PeakBytes
+			}
+			domain.CopyCount += row.Domain.CopyCount
+			domain.BytesCopied += row.Domain.BytesCopied
+			domains[key] = domain
+		}
+	}
+	if len(domains) > 0 {
+		keys := make([]string, 0, len(domains))
+		for key := range domains {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			summary.Domains = append(summary.Domains, domains[key])
+		}
 	}
 	return summary
+}
+
+func memoryDomainSummaryKey(domain MemoryDomain) string {
+	return domain.Kind + "\x00" + domain.DomainID + "\x00" + domain.ParentDomainID + "\x00" + domain.OwnerKind + "\x00" + domain.OwnerID + "\x00" + domain.Lifetime
 }
 
 func GradeForPlacement(placement string) string {
@@ -534,8 +931,18 @@ func knownGrade(grade string) bool { return rank(grade) <= 6 }
 
 func knownIntent(intent string) bool {
 	switch intent {
-	case "allocation", "copy", "intern", "region_alloc", "heap_fallback", "copy_eliminated", "copy_stack_backed",
-		"copy_heap_bounded", "copy_heap_unbounded", "copy_required_boundary", "copy_required_mutable_alias", "copy_into_no_allocation":
+	case "allocation",
+		"copy",
+		"intern",
+		"region_alloc",
+		"heap_fallback",
+		"copy_eliminated",
+		"copy_stack_backed",
+		"copy_heap_bounded",
+		"copy_heap_unbounded",
+		"copy_required_boundary",
+		"copy_required_mutable_alias",
+		"copy_into_no_allocation":
 		return true
 	default:
 		return false
@@ -544,7 +951,26 @@ func knownIntent(intent string) bool {
 
 func knownPlacement(placement string) bool {
 	switch placement {
-	case "eliminated", "register", "stack", "static", "interned", "island", "region", "heap_bounded", "heap_unbounded", "external", "rejected":
+	case "eliminated",
+		"register",
+		"stack",
+		"static",
+		"interned",
+		"island",
+		"region",
+		"heap_bounded",
+		"heap_unbounded",
+		"external",
+		"rejected":
+		return true
+	default:
+		return false
+	}
+}
+
+func knownDomainKind(kind string) bool {
+	switch kind {
+	case "process", "task", "actor", "island", "request", "external":
 		return true
 	default:
 		return false
@@ -579,7 +1005,10 @@ func ValidateNonClaims(nonClaims []string) []string {
 			issues = append(issues, fmt.Sprintf("non_claim %d is empty", i))
 		}
 		if forbiddenClaimWithoutNegation(trimmed) {
-			issues = append(issues, fmt.Sprintf("non_claim %d contains forbidden broad claim: %q", i, claim))
+			issues = append(
+				issues,
+				fmt.Sprintf("non_claim %d contains forbidden broad claim: %q", i, claim),
+			)
 		}
 	}
 	return issues

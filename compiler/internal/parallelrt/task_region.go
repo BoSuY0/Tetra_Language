@@ -53,7 +53,10 @@ func (s *TaskRegionScope) RegionUsed() int {
 	return s.region.Used()
 }
 
-func (s *TaskRegionScope) Run(name string, task func(*stdlibrt.Region) error) (report TaskRegionReport, err error) {
+func (s *TaskRegionScope) Run(
+	name string,
+	task func(*stdlibrt.Region) error,
+) (report TaskRegionReport, err error) {
 	if s == nil || s.region == nil || task == nil {
 		return TaskRegionReport{}, ErrInvalidTaskRegionScope
 	}

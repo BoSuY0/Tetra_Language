@@ -12,7 +12,7 @@ release_gate_command="bash scripts/release/v1_0/gate.sh"
 actor_diagnostic_contains="actor declarations currently support state fields and func methods only"
 
 usage() {
-  cat <<'USAGE'
+  cat << 'USAGE'
 Usage: bash scripts/release/v1_0/gate.sh [--report-dir DIR]
 
 Notes:
@@ -36,7 +36,7 @@ while [[ $# -gt 0 ]]; do
       report_dir="$2"
       shift 2
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;
@@ -69,7 +69,7 @@ check_report_dir_fresh() {
     echo "release/v1_0/gate: choose a fresh --report-dir directory" >&2
     exit 2
   fi
-  if [[ ( -e "$report_dir" || -L "$report_dir" ) && ! -d "$report_dir" ]]; then
+  if [[ (-e "$report_dir" || -L "$report_dir") && ! -d "$report_dir" ]]; then
     echo "release/v1_0/gate: refusing to use non-directory report path: $report_dir" >&2
     echo "release/v1_0/gate: choose a fresh --report-dir directory" >&2
     exit 2
@@ -101,8 +101,8 @@ generated_state_before="$tmp_dir/generated-artifacts.before"
 trap 'rm -rf "$tmp_dir"' EXIT
 
 mkdir -p -- "$logs_dir" "$artifacts_dir"
-: >"$tmp_dir/steps.md"
-: >"$tmp_dir/steps.jsonl"
+: > "$tmp_dir/steps.md"
+: > "$tmp_dir/steps.jsonl"
 
 started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 step_count=0
@@ -128,14 +128,23 @@ record_step() {
   local log_rel="$5"
   local command="$6"
 
-  printf -- '- `%s`: `%s` in %ss, exit `%s`, command `%s` ([%s](%s))\n' "$name" "$status" "$seconds" "$exit_code" "$command" "$log_rel" "$log_rel" >>"$tmp_dir/steps.md"
-  printf '{"name":"%s","status":"%s","duration_seconds":%s,"exit_code":%s,"command":"%s","log":"%s"}\n' \
+  printf -- \
+    '- `%s`: `%s` in %ss, exit `%s`, command `%s` ([%s](%s))\n' \
+    "$name" \
+    "$status" \
+    "$seconds" \
+    "$exit_code" \
+    "$command" \
+    "$log_rel" \
+    "$log_rel" >> "$tmp_dir/steps.md"
+  printf \
+    '{"name":"%s","status":"%s","duration_seconds":%s,"exit_code":%s,"command":"%s","log":"%s"}\n' \
     "$(json_escape "$name")" \
     "$(json_escape "$status")" \
     "$seconds" \
     "$exit_code" \
     "$(json_escape "$command")" \
-    "$(json_escape "$log_rel")" >>"$tmp_dir/steps.jsonl"
+    "$(json_escape "$log_rel")" >> "$tmp_dir/steps.jsonl"
 }
 
 run_step() {
@@ -160,7 +169,7 @@ run_step() {
   printf '== [%s] %s ==\n' "$id" "$name"
   start_s="$(date +%s)"
 
-  if "$@" >"$log_path" 2>&1; then
+  if "$@" > "$log_path" 2>&1; then
     end_s="$(date +%s)"
     record_step "$name" "pass" "$((end_s - start_s))" 0 "$log_rel" "$command"
     printf '   pass (%ss)\n' "$((end_s - start_s))"
@@ -195,7 +204,7 @@ write_summary() {
     echo "## Steps"
     echo
     cat "$tmp_dir/steps.md"
-  } >"$summary_md"
+  } > "$summary_md"
 
   {
     echo "{"
@@ -209,15 +218,19 @@ write_summary() {
     printf '  "failed_count": %s,\n' "$failed_count"
     printf '  "report_dir": "%s",\n' "$(json_escape "$report_dir")"
     echo '  "steps": ['
-    awk 'NR > 1 { printf ",\n" } { printf "    %s", $0 } END { if (NR > 0) printf "\n" }' "$tmp_dir/steps.jsonl"
+    awk '
+      NR > 1 { printf ",\n" }
+      { printf "    %s", $0 }
+      END { if (NR > 0) printf "\n" }
+    ' "$tmp_dir/steps.jsonl"
     echo '  ]'
     echo "}"
-  } >"$summary_json"
+  } > "$summary_json"
 }
 
 check_release_version() {
   local version
-  version="$(./tetra version 2>/dev/null || true)"
+  version="$(./tetra version 2> /dev/null || true)"
   if [[ "$version" != "$release_version" ]]; then
     echo "expected ./tetra version to be $release_version, got '${version:-<missing>}'" >&2
     return 1
@@ -227,10 +240,12 @@ check_release_version() {
 check_short_alias_version() {
   local version
   local short_version
-  version="$(./tetra version 2>/dev/null || true)"
-  short_version="$(./t version 2>/dev/null || true)"
+  version="$(./tetra version 2> /dev/null || true)"
+  short_version="$(./t version 2> /dev/null || true)"
   if [[ "$short_version" != "$version" ]]; then
-    echo "expected ./t version to match ./tetra version ($version), got '${short_version:-<missing>}'" >&2
+    printf "expected ./t version to match ./tetra version (%s), got '%s'\n" \
+      "$version" \
+      "${short_version:-<missing>}" >&2
     return 1
   fi
 }
@@ -242,7 +257,7 @@ capture_generated_artifact_state() {
     git status --porcelain --untracked-files=no -- docs/generated docs/baselines
     echo "## git diff"
     git diff --binary -- docs/generated docs/baselines
-  } >"$out"
+  } > "$out"
 }
 
 check_generated_artifact_churn() {
@@ -264,7 +279,7 @@ check_tetra_doc_output() {
     echo "release/v1_0/gate: no tracked examples found under examples/" >&2
     return 1
   fi
-  ./tetra doc "${tracked_examples[@]}" >"$artifacts_dir/tetra-docs.md"
+  ./tetra doc "${tracked_examples[@]}" > "$artifacts_dir/tetra-docs.md"
   go run ./tools/cmd/validate-api-docs --docs "$artifacts_dir/tetra-docs.md"
 }
 
@@ -275,30 +290,34 @@ check_json_diagnostic_case() {
   local stdout="$tmp_dir/$name.out"
   local diagnostic="$artifacts_dir/$name.json"
   shift 2
-  cat >"$source"
-  if ./tetra check --diagnostics=json "$source" >"$stdout" 2>"$diagnostic"; then
+  cat > "$source"
+  if ./tetra check --diagnostics=json "$source" > "$stdout" 2> "$diagnostic"; then
     echo "expected tetra check --diagnostics=json to fail for $name" >&2
     return 1
   fi
   test ! -s "$stdout"
-  go run ./tools/cmd/validate-diagnostic --diagnostic "$diagnostic" --severity error --contains "$contains" --require-position
+  go run ./tools/cmd/validate-diagnostic \
+    --diagnostic "$diagnostic" \
+    --severity error \
+    --contains "$contains" \
+    --require-position
 }
 
 check_json_diagnostic() {
-  check_json_diagnostic_case "invalid-diagnostic" "unknown function" <<'TETRA'
+  check_json_diagnostic_case "invalid-diagnostic" "unknown function" << 'TETRA'
 func main() -> Int:
     return missing_call()
 TETRA
-  check_json_diagnostic_case "missing-effect-diagnostic" "uses effect 'io'" <<'TETRA'
+  check_json_diagnostic_case "missing-effect-diagnostic" "uses effect 'io'" << 'TETRA'
 func main() -> Int:
     print("missing uses\n")
     return 0
 TETRA
-  check_json_diagnostic_case "tabs-diagnostic" "tabs are not supported" <<'TETRA'
+  check_json_diagnostic_case "tabs-diagnostic" "tabs are not supported" << 'TETRA'
 func main() -> Int:
 	return 0
 TETRA
-  check_json_diagnostic_case "planned-actor-diagnostic" "$actor_diagnostic_contains" <<'TETRA'
+  check_json_diagnostic_case "planned-actor-diagnostic" "$actor_diagnostic_contains" << 'TETRA'
 actor Worker:
     return 0
 TETRA
@@ -319,24 +338,38 @@ check_backend_summary() {
   local version
   commit="$(git rev-parse HEAD)"
   version="$(./tetra version)"
-  cat >"$summary" <<SUMMARY
+  cat > "$summary" << SUMMARY
 # Tetra $release_version Backend Summary
 
 - commit: \`$commit\`
 - version: \`$version\`
 - report_dir: \`$report_dir\`
-- native target reports: \`artifacts/host-smoke.json\`, \`artifacts/linux-smoke.json\`, \`artifacts/macos-smoke.json\`, \`artifacts/windows-smoke.json\`
-- WASM artifact/import reports: \`artifacts/wasm32-wasi-artifact-smoke.json\`, \`artifacts/wasm32-web-artifact-smoke.json\`
+- native target reports:
+  - \`artifacts/host-smoke.json\`
+  - \`artifacts/linux-smoke.json\`
+  - \`artifacts/macos-smoke.json\`
+  - \`artifacts/windows-smoke.json\`
+- WASM artifact/import reports:
+  - \`artifacts/wasm32-wasi-artifact-smoke.json\`
+  - \`artifacts/wasm32-web-artifact-smoke.json\`
 - WASI runtime report: \`artifacts/wasi-smoke.json\`
 - Web UI runtime report: \`artifacts/web-ui-smoke.json\`
-- UI/native boundary: Linux-x64 desktop GUI production evidence is covered by the post-v0.4 WASM/UI/GUI gate; v1 target-matrix evidence does not claim cross-platform native widget runtime.
-- residual backend risks: None recorded by the gate; update \`artifacts/known_issues.md\` before release if review finds an accepted backend risk.
+- UI/native boundary:
+  Linux-x64 desktop GUI production evidence is covered by the post-v0.4
+  WASM/UI/GUI gate; v1 target-matrix evidence does not claim cross-platform
+  native widget runtime.
+- residual backend risks:
+  None recorded by the gate; update \`artifacts/known_issues.md\` before
+  release if review finds an accepted backend risk.
 SUMMARY
   test -s "$summary"
 }
 
 check_api_diff() {
-  bash scripts/release/v1_0/api-diff.sh --report-dir "$artifacts_dir/api-diff" --baseline docs/baselines/api-diff-baseline.v1alpha1.json --enforce no-change
+  bash scripts/release/v1_0/api-diff.sh \
+    --report-dir "$artifacts_dir/api-diff" \
+    --baseline docs/baselines/api-diff-baseline.v1alpha1.json \
+    --enforce no-change
 }
 
 check_performance_regression_artifact() {
@@ -363,7 +396,7 @@ check_repro_build() {
 check_security_review_signoff() {
   local signoff_path="${TETRA_SECURITY_REVIEW_SIGNOFF:-}"
   if [[ -z "$signoff_path" ]]; then
-    cat >"$artifacts_dir/security-review.md" <<EOF
+    cat > "$artifacts_dir/security-review.md" << EOF
 # $release_version Security Review Signoff
 
 Decision: blocked
@@ -396,12 +429,12 @@ write_security_review_detached_hash() {
     echo "release/v1_0/gate: cannot hash missing security review: $review_path" >&2
     return 1
   fi
-  if command -v sha256sum >/dev/null 2>&1; then
+  if command -v sha256sum > /dev/null 2>&1; then
     review_hash="$(sha256sum "$review_path" | awk '{print $1}')"
   else
     review_hash="$(shasum -a 256 "$review_path" | awk '{print $1}')"
   fi
-  printf '%s  artifacts/security-review.md\n' "$review_hash" >"$detached_hash_path"
+  printf '%s  artifacts/security-review.md\n' "$review_hash" > "$detached_hash_path"
 }
 
 check_handoff_signoff_lint() {
@@ -411,16 +444,22 @@ check_handoff_signoff_lint() {
     echo "release/v1_0/gate: missing security review for handoff/signoff lint: $review_path" >&2
     return 1
   fi
-  if ! command -v rg >/dev/null 2>&1; then
+  if ! command -v rg > /dev/null 2>&1; then
     echo "release/v1_0/gate: rg is required for handoff/signoff lint" >&2
     return 1
   fi
-  if lint_output="$(rg -n 'TODO|TBD|<[A-Za-z0-9_ ./:-]+>' docs/release/v1_0_final_handoff.md "$review_path" 2>&1)"; then
+  local rc=0
+  lint_output="$(
+    rg -n \
+      'TODO|TBD|<[-A-Za-z0-9_ ./:]+>' \
+      docs/release/v1_0/v1_0_final_handoff.md \
+      "$review_path" 2>&1
+  )" || rc="$?"
+  if [[ "$rc" -eq 0 ]]; then
     printf '%s\n' "$lint_output" >&2
     echo "release/v1_0/gate: handoff/signoff lint found unresolved placeholders" >&2
     return 1
   fi
-  local rc="$?"
   if [[ "$rc" -eq 1 ]]; then
     return 0
   fi
@@ -434,8 +473,14 @@ check_release_state() {
   else
     write_summary "pass"
   fi
-  go run ./tools/cmd/validate-release-state --expected-version "$release_version" --format=json --report-dir "$report_dir" >"$artifacts_dir/release-state.json"
-  go run ./tools/cmd/validate-release-state --expected-version "$release_version" --format=text --report-dir "$report_dir" >"$artifacts_dir/release-state.txt"
+  go run ./tools/cmd/validate-release-state \
+    --expected-version "$release_version" \
+    --format=json \
+    --report-dir "$report_dir" > "$artifacts_dir/release-state.json"
+  go run ./tools/cmd/validate-release-state \
+    --expected-version "$release_version" \
+    --format=text \
+    --report-dir "$report_dir" > "$artifacts_dir/release-state.txt"
 }
 
 write_known_issues_artifact() {
@@ -445,9 +490,9 @@ write_known_issues_artifact() {
   if [[ "$failed_count" -gt 0 ]]; then
     gate_result="blocked"
   fi
-  version="$(./tetra version 2>/dev/null || echo '<unknown>')"
-  branch="$(git branch --show-current 2>/dev/null || echo '<unknown>')"
-  cat >"$artifacts_dir/known_issues.md" <<KNOWN_ISSUES
+  version="$(./tetra version 2> /dev/null || echo '<unknown>')"
+  branch="$(git branch --show-current 2> /dev/null || echo '<unknown>')"
+  cat > "$artifacts_dir/known_issues.md" << KNOWN_ISSUES
 # Tetra $release_version Known Issues
 
 Generated by \`$release_gate_command\`.
@@ -471,8 +516,72 @@ KNOWN_ISSUES
 }
 
 check_artifact_hash_manifest() {
-  go run ./tools/cmd/validate-artifact-hashes --write --root "$artifacts_dir" --out "$artifacts_dir/artifact-hashes.json"
+  go run ./tools/cmd/validate-artifact-hashes \
+    --write \
+    --root "$artifacts_dir" \
+    --out "$artifacts_dir/artifact-hashes.json"
   go run ./tools/cmd/validate-artifact-hashes --manifest "$artifacts_dir/artifact-hashes.json"
+}
+
+check_targets_report() {
+  local report="$artifacts_dir/targets.json"
+  ./tetra targets --format=json > "$report"
+  go run ./tools/cmd/validate-targets --report "$report"
+}
+
+check_doctor_report() {
+  local report="$artifacts_dir/doctor.json"
+  ./tetra doctor --format=json > "$report"
+  go run ./tools/cmd/validate-doctor --report "$report"
+}
+
+check_tetra_test_report() {
+  local report="$artifacts_dir/tetra-test-report.json"
+  ./tetra test --report=json examples > "$report"
+  go run ./tools/cmd/validate-test-report --report "$report"
+}
+
+check_smoke_list_report() {
+  local report="$artifacts_dir/smoke-list.json"
+  ./tetra smoke --list --format=json > "$report"
+  go run ./tools/cmd/validate-smoke-list \
+    --report "$report" \
+    --examples-root examples
+}
+
+check_smoke_checklist_report() {
+  local report="$1"
+  go run ./tools/cmd/smoke-report-to-checklist \
+    --validate-only \
+    --report "$report"
+}
+
+check_native_host_smoke() {
+  local report="$artifacts_dir/host-smoke.json"
+  ./tetra smoke --target linux-x64 --run=true --report "$report"
+  check_smoke_checklist_report "$report"
+}
+
+check_build_only_smoke() {
+  local target="$1"
+  local report="$2"
+  ./tetra smoke --target "$target" --run=false --report "$report"
+  check_smoke_checklist_report "$report"
+}
+
+check_wasm_artifact_smoke() {
+  local target="$1"
+  local report="$2"
+  ./tetra smoke --target "$target" --run=false --report "$report"
+  check_smoke_checklist_report "$report"
+  if [[ "$target" == "wasm32-wasi" ]]; then
+    go run ./tools/cmd/validate-wasi-smoke-report \
+      --mode artifact \
+      --report "$report"
+  fi
+  go run ./tools/cmd/validate-wasm-imports \
+    --target "$target" \
+    --report "$report"
 }
 
 echo "release/v1_0/gate: bootstrapping local binaries before v1 version preflight" >&2
@@ -482,11 +591,16 @@ if [[ "$failed_count" -gt 0 ]]; then
   exit 1
 fi
 
-version="$(./tetra version 2>/dev/null || true)"
+version="$(./tetra version 2> /dev/null || true)"
 if [[ "$version" != "$release_version" ]]; then
-  echo "release/v1_0/gate: blocked: expected ./tetra version to be $release_version, got '${version:-<missing>}'" >&2
-  echo "release/v1_0/gate: keep the repository on the current release line until v1 scope evidence is complete." >&2
-  echo "release/v1_0/gate: do not promote version metadata until docs/spec/v1_scope.md and docs/checklists/v1_0_release_gate.md are satisfied." >&2
+  printf "release/v1_0/gate: blocked: expected ./tetra version to be %s, got '%s'\n" \
+    "$release_version" \
+    "${version:-<missing>}" >&2
+  echo "release/v1_0/gate: keep the repository on the current release line" \
+    "until v1 scope evidence is complete." >&2
+  echo "release/v1_0/gate: do not promote version metadata until" \
+    "docs/spec/flow/v1_scope.md and docs/checklists/v1_0_release_gate.md" \
+    "are satisfied." >&2
   write_summary "blocked"
   exit 1
 fi
@@ -499,26 +613,52 @@ echo "report_dir: $report_dir"
 run_step "version preflight ($release_version required)" check_release_version
 run_step "short alias version parity" check_short_alias_version
 capture_generated_artifact_state "$generated_state_before"
-run_step "go test packages" env -u TETRA_SECURITY_REVIEW_SIGNOFF -u TETRA_TEST_ALL_RELEASE_VERSION -u TETRA_TEST_ALL_RELEASE_ARTIFACT go test ./compiler/... ./cli/... ./tools/... -count=1
-run_step "full stabilization wrapper" env -u TETRA_SECURITY_REVIEW_SIGNOFF TETRA_TEST_ALL_RELEASE_VERSION="$release_version" TETRA_TEST_ALL_RELEASE_ARTIFACT="tetra.release.v1_0_0.test-all-summary.v1" bash scripts/ci/test-all.sh --full --keep-going --report-dir "$artifacts_dir/test-all"
-run_step "flow-only source scan" go run ./tools/cmd/validate-flow-only examples lib __rt compiler/selfhostrt
-run_step "targets report validation" sh -c './tetra targets --format=json >"$1" && go run ./tools/cmd/validate-targets --report "$1"' sh "$artifacts_dir/targets.json"
-run_step "doctor report validation" sh -c './tetra doctor --format=json >"$1" && go run ./tools/cmd/validate-doctor --report "$1"' sh "$artifacts_dir/doctor.json"
-run_step "tetra check flow hello" ./tetra check examples/flow_hello.tetra
+run_step "go test packages" env \
+  -u TETRA_SECURITY_REVIEW_SIGNOFF \
+  -u TETRA_TEST_ALL_RELEASE_VERSION \
+  -u TETRA_TEST_ALL_RELEASE_ARTIFACT \
+  go test ./compiler/... ./cli/... ./tools/... -count=1
+run_step "full stabilization wrapper" env \
+  -u TETRA_SECURITY_REVIEW_SIGNOFF \
+  TETRA_TEST_ALL_RELEASE_VERSION="$release_version" \
+  TETRA_TEST_ALL_RELEASE_ARTIFACT="tetra.release.v1_0_0.test-all-summary.v1" \
+  bash scripts/ci/test-all.sh \
+    --full \
+    --keep-going \
+    --report-dir "$artifacts_dir/test-all"
+run_step "flow-only source scan" go run ./tools/cmd/validate-flow-only \
+  examples \
+  lib \
+  __rt \
+  compiler/selfhostrt
+run_step "targets report validation" check_targets_report
+run_step "doctor report validation" check_doctor_report
+run_step "tetra check flow hello" ./tetra check examples/flow/flow_hello.tetra
 run_step "formatter check" ./tetra fmt --check examples lib __rt compiler/selfhostrt
-run_step "tetra test examples json" sh -c './tetra test --report=json examples >"$1" && go run ./tools/cmd/validate-test-report --report "$1"' sh "$artifacts_dir/tetra-test-report.json"
+run_step "tetra test examples json" check_tetra_test_report
 run_step "docs manifest regenerate+validate" check_docs_manifest
-run_step "docs verification and doctests" go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
+run_step "docs verification and doctests" go run ./tools/cmd/verify-docs \
+  --manifest docs/generated/manifest.json
 run_step "tetra doc output validation" check_tetra_doc_output
 run_step "json diagnostic shape" check_json_diagnostic
-run_step "smoke list validation" sh -c './tetra smoke --list --format=json >"$1" && go run ./tools/cmd/validate-smoke-list --report "$1" --examples-root examples' sh "$artifacts_dir/smoke-list.json"
-run_step "native host smoke linux-x64" sh -c './tetra smoke --target linux-x64 --run=true --report "$1" && go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$1"' sh "$artifacts_dir/host-smoke.json"
+run_step "smoke list validation" check_smoke_list_report
+run_step "native host smoke linux-x64" check_native_host_smoke
 
-run_step "build-only smoke linux-x64" sh -c './tetra smoke --target linux-x64 --run=false --report "$1" && go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$1"' sh "$artifacts_dir/linux-smoke.json"
-run_step "build-only smoke macos-x64" sh -c './tetra smoke --target macos-x64 --run=false --report "$1" && go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$1"' sh "$artifacts_dir/macos-smoke.json"
-run_step "build-only smoke windows-x64" sh -c './tetra smoke --target windows-x64 --run=false --report "$1" && go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$1"' sh "$artifacts_dir/windows-smoke.json"
-run_step "WASI artifact/import smoke" sh -c './tetra smoke --target wasm32-wasi --run=false --report "$1" && go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$1" && go run ./tools/cmd/validate-wasi-smoke-report --mode artifact --report "$1" && go run ./tools/cmd/validate-wasm-imports --target wasm32-wasi --report "$1"' sh "$artifacts_dir/wasm32-wasi-artifact-smoke.json"
-run_step "Web artifact/import smoke" sh -c './tetra smoke --target wasm32-web --run=false --report "$1" && go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$1" && go run ./tools/cmd/validate-wasm-imports --target wasm32-web --report "$1"' sh "$artifacts_dir/wasm32-web-artifact-smoke.json"
+run_step "build-only smoke linux-x64" check_build_only_smoke \
+  linux-x64 \
+  "$artifacts_dir/linux-smoke.json"
+run_step "build-only smoke macos-x64" check_build_only_smoke \
+  macos-x64 \
+  "$artifacts_dir/macos-smoke.json"
+run_step "build-only smoke windows-x64" check_build_only_smoke \
+  windows-x64 \
+  "$artifacts_dir/windows-smoke.json"
+run_step "WASI artifact/import smoke" check_wasm_artifact_smoke \
+  wasm32-wasi \
+  "$artifacts_dir/wasm32-wasi-artifact-smoke.json"
+run_step "Web artifact/import smoke" check_wasm_artifact_smoke \
+  wasm32-web \
+  "$artifacts_dir/wasm32-web-artifact-smoke.json"
 
 run_step "WASI runner smoke" check_wasi_runner_smoke
 run_step "Web runtime browser smoke" check_web_runtime_smoke
@@ -552,7 +692,8 @@ if ! check_artifact_hash_manifest; then
   rc="$?"
   failed_count=$((failed_count + 1))
   write_summary "blocked"
-  echo "release/v1_0/gate: blocked: final pre-release-state artifact hash refresh failed with exit $rc" >&2
+  echo "release/v1_0/gate: blocked: final pre-release-state artifact hash" \
+    "refresh failed with exit $rc" >&2
   echo "summary: $summary_md" >&2
   echo "json: $summary_json" >&2
   exit 1

@@ -33,10 +33,16 @@ func TestBuildReportRecordsP8MatrixMetadataAndTetraArtifacts(t *testing.T) {
 		t.Fatalf("tetra proof artifacts = %+v, want existing report path", tetra.TetraProofReports)
 	}
 	if len(tetra.TetraAllocationReports) != 1 || !tetra.TetraAllocationReports[0].Exists {
-		t.Fatalf("tetra allocation artifacts = %+v, want existing report path", tetra.TetraAllocationReports)
+		t.Fatalf(
+			"tetra allocation artifacts = %+v, want existing report path",
+			tetra.TetraAllocationReports,
+		)
 	}
 	if len(tetra.TetraBoundsReports) != 1 || !tetra.TetraBoundsReports[0].Exists {
-		t.Fatalf("tetra bounds artifacts = %+v, want existing report path", tetra.TetraBoundsReports)
+		t.Fatalf(
+			"tetra bounds artifacts = %+v, want existing report path",
+			tetra.TetraBoundsReports,
+		)
 	}
 	if report.Host.GOOS == "" || report.Host.CPUs == 0 {
 		t.Fatalf("host info = %+v", report.Host)
@@ -99,7 +105,11 @@ func TestValidateReportRejectsBroadClaims(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "fastest language") {
 		t.Fatalf("validateReport accepted broad fastest-language claim: %v", err)
 	}
-	report.Claims = []string{"On benchmark integer_loop_tetra, report tetra.truth.benchmark.v1, target linux-x64, Tetra ran 10 ms vs Rust 12 ms."}
+	report.Claims = []string{
+		("On benchmark integer_loop_tetra, report " +
+			"tetra.truth.benchmark.v1, target linux-x64, Tetra ran 10 ms vs Rust 12 " +
+			"ms."),
+	}
 	if err := validateReport(report); err != nil {
 		t.Fatalf("validateReport rejected benchmark-specific claim: %v", err)
 	}
@@ -118,8 +128,14 @@ func TestP19GenericCollectionsScopeRequiresTetraCppRustHashTableEquivalents(t *t
 	if len(report.Benchmarks) != 3 {
 		t.Fatalf("P19.1 collections rows = %d, want tetra/cpp/rust only", len(report.Benchmarks))
 	}
-	for _, want := range []string{"generic_collections_hash_table_tetra", "generic_collections_hash_table_cpp", "generic_collections_hash_table_rust"} {
-		if row := findBenchmarkRow(t, report, want); row.Category != "hash table" || row.AlgorithmID != p19GenericCollectionsAlgoID || row.InputDescription == "" {
+	for _, want := range []string{
+		"generic_collections_hash_table_tetra",
+		"generic_collections_hash_table_cpp",
+		"generic_collections_hash_table_rust",
+	} {
+		if row := findBenchmarkRow(t, report, want); row.Category != "hash table" ||
+			row.AlgorithmID != p19GenericCollectionsAlgoID ||
+			row.InputDescription == "" {
 			t.Fatalf("row %s missing equivalent hash-table metadata: %+v", want, row)
 		}
 	}
@@ -143,7 +159,8 @@ func TestP19GenericCollectionsScopeRejectsMissingEquivalenceAndParityClaim(t *te
 	manifest := p19GenericCollectionsManifest(t, dir)
 	manifest.Benchmarks = manifest.Benchmarks[:2]
 	err := validateManifest(manifest)
-	if err == nil || !strings.Contains(err.Error(), "missing benchmark matrix row") || !strings.Contains(err.Error(), "rust") {
+	if err == nil || !strings.Contains(err.Error(), "missing benchmark matrix row") ||
+		!strings.Contains(err.Error(), "rust") {
 		t.Fatalf("validateManifest accepted missing Rust row: %v", err)
 	}
 
@@ -181,7 +198,10 @@ func TestP19HTTPJSONSourceFirstScopeRequiresTetraOnlyHTTPAndJSONRows(t *testing.
 		t.Fatalf("report scope = %q", report.Scope)
 	}
 	if len(report.Benchmarks) != 2 {
-		t.Fatalf("P19.2 HTTP/JSON rows = %d, want plaintext/json Tetra rows", len(report.Benchmarks))
+		t.Fatalf(
+			"P19.2 HTTP/JSON rows = %d, want plaintext/json Tetra rows",
+			len(report.Benchmarks),
+		)
 	}
 	for _, want := range []struct {
 		name     string
@@ -191,7 +211,8 @@ func TestP19HTTPJSONSourceFirstScopeRequiresTetraOnlyHTTPAndJSONRows(t *testing.
 		{name: "http_json_tetra_source", category: "HTTP JSON"},
 	} {
 		row := findBenchmarkRow(t, report, want.name)
-		if row.Category != want.category || row.Language != "tetra" || row.AlgorithmID == "" || !strings.Contains(row.InputDescription, "lib.core") {
+		if row.Category != want.category || row.Language != "tetra" || row.AlgorithmID == "" ||
+			!strings.Contains(row.InputDescription, "lib.core") {
 			t.Fatalf("row %s missing source-first metadata: %+v", want.name, row)
 		}
 		if len(row.TetraProofReports) != 1 || !row.TetraProofReports[0].Exists {
@@ -217,7 +238,8 @@ func TestP19HTTPJSONSourceFirstScopeRejectsRuntimeOnlyAndOfficialClaims(t *testi
 	manifest := p19HTTPJSONSourceFirstManifest(t, dir)
 	manifest.Benchmarks = manifest.Benchmarks[:1]
 	err := validateManifest(manifest)
-	if err == nil || !strings.Contains(err.Error(), "missing benchmark matrix row") || !strings.Contains(err.Error(), "HTTP JSON") {
+	if err == nil || !strings.Contains(err.Error(), "missing benchmark matrix row") ||
+		!strings.Contains(err.Error(), "HTTP JSON") {
 		t.Fatalf("validateManifest accepted missing HTTP JSON row: %v", err)
 	}
 
@@ -255,7 +277,10 @@ func TestP19PostgresSourceFirstScopeRequiresTetraOnlyDBEndpointRows(t *testing.T
 		t.Fatalf("report scope = %q", report.Scope)
 	}
 	if len(report.Benchmarks) != 4 {
-		t.Fatalf("P19.3 PostgreSQL rows = %d, want four Tetra DB endpoint rows", len(report.Benchmarks))
+		t.Fatalf(
+			"P19.3 PostgreSQL rows = %d, want four Tetra DB endpoint rows",
+			len(report.Benchmarks),
+		)
 	}
 	for _, want := range []struct {
 		name     string
@@ -267,7 +292,8 @@ func TestP19PostgresSourceFirstScopeRequiresTetraOnlyDBEndpointRows(t *testing.T
 		{name: "postgres_db_fortunes_tetra_source", category: "DB fortunes"},
 	} {
 		row := findBenchmarkRow(t, report, want.name)
-		if row.Category != want.category || row.Language != "tetra" || row.AlgorithmID == "" || !strings.Contains(row.InputDescription, "lib.core.postgres") {
+		if row.Category != want.category || row.Language != "tetra" || row.AlgorithmID == "" ||
+			!strings.Contains(row.InputDescription, "lib.core.postgres") {
 			t.Fatalf("row %s missing source-first PostgreSQL metadata: %+v", want.name, row)
 		}
 		if len(row.TetraProofReports) != 1 || !row.TetraProofReports[0].Exists {
@@ -293,7 +319,8 @@ func TestP19PostgresSourceFirstScopeRejectsRuntimeOnlyAndFakeDBClaims(t *testing
 	manifest := p19PostgresSourceFirstManifest(t, dir)
 	manifest.Benchmarks = manifest.Benchmarks[:3]
 	err := validateManifest(manifest)
-	if err == nil || !strings.Contains(err.Error(), "missing benchmark matrix row") || !strings.Contains(err.Error(), "DB fortunes") {
+	if err == nil || !strings.Contains(err.Error(), "missing benchmark matrix row") ||
+		!strings.Contains(err.Error(), "DB fortunes") {
 		t.Fatalf("validateManifest accepted missing DB fortunes row: %v", err)
 	}
 
@@ -334,7 +361,17 @@ func TestP20BenchmarkMatrixScopeRequiresMasterPlanRowsRawOutputsAndTetraReports(
 	if len(report.Benchmarks) != wantRows {
 		t.Fatalf("P20.0 benchmark rows = %d, want %d", len(report.Benchmarks), wantRows)
 	}
-	for _, category := range []string{"function calls", "recursion", "matrix multiply", "JSON parse/stringify", "HTTP plaintext/json", "PostgreSQL single/multiple/update", "startup time", "binary size", "compile time"} {
+	for _, category := range []string{
+		"function calls",
+		"recursion",
+		"matrix multiply",
+		"JSON parse/stringify",
+		"HTTP plaintext/json",
+		"PostgreSQL single/multiple/update",
+		"startup time",
+		"binary size",
+		"compile time",
+	} {
 		for _, language := range RequiredBenchmarkLanguages() {
 			row := findBenchmarkRow(t, report, slugCategory(category)+"_"+language)
 			if row.Category != category || row.Language != language {
@@ -347,7 +384,12 @@ func TestP20BenchmarkMatrixScopeRequiresMasterPlanRowsRawOutputsAndTetraReports(
 				t.Fatalf("row %s raw output artifacts = %+v", row.Name, row.RawOutputArtifacts)
 			}
 			if row.TargetCPU != report.Host.TargetCPU {
-				t.Fatalf("row %s target_cpu = %q, want host %q", row.Name, row.TargetCPU, report.Host.TargetCPU)
+				t.Fatalf(
+					"row %s target_cpu = %q, want host %q",
+					row.Name,
+					row.TargetCPU,
+					report.Host.TargetCPU,
+				)
 			}
 		}
 	}
@@ -374,7 +416,8 @@ func TestP20BenchmarkMatrixScopeRejectsWeakEvidenceAndFakeClaims(t *testing.T) {
 	manifest := p20BenchmarkMatrixManifest(t, dir)
 	manifest.Benchmarks = manifest.Benchmarks[:len(manifest.Benchmarks)-1]
 	err := validateManifest(manifest)
-	if err == nil || !strings.Contains(err.Error(), "missing benchmark matrix row") || !strings.Contains(err.Error(), "compile time") {
+	if err == nil || !strings.Contains(err.Error(), "missing benchmark matrix row") ||
+		!strings.Contains(err.Error(), "compile time") {
 		t.Fatalf("validateManifest accepted missing P20.0 row: %v", err)
 	}
 
@@ -441,7 +484,11 @@ func TestP15ActorBenchmarkPrepScopeRequiresRowsRawArtifactsAndNoClaims(t *testin
 			t.Fatalf("row %s should remain dry-run Tier 0 prep until explicitly run", want)
 		}
 		if len(row.RawOutputArtifacts) != 1 || !row.RawOutputArtifacts[0].Exists {
-			t.Fatalf("row %s raw output artifacts = %+v, want existing raw artifact", want, row.RawOutputArtifacts)
+			t.Fatalf(
+				"row %s raw output artifacts = %+v, want existing raw artifact",
+				want,
+				row.RawOutputArtifacts,
+			)
 		}
 	}
 	if err := validateReport(report); err != nil {
@@ -462,7 +509,9 @@ func TestP15ActorBenchmarkPrepRejectsMissingRawArtifactsAndOverclaims(t *testing
 	if err != nil {
 		t.Fatalf("buildReport P15 actor benchmark prep: %v", err)
 	}
-	report.Claims = []string{"Actor benchmark report proves Tetra actors are faster than Rust actors."}
+	report.Claims = []string{
+		"Actor benchmark report proves Tetra actors are faster than Rust actors.",
+	}
 	err = validateReport(report)
 	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "actor benchmark") {
 		t.Fatalf("validateReport accepted actor benchmark superiority claim: %v", err)
@@ -472,7 +521,9 @@ func TestP15ActorBenchmarkPrepRejectsMissingRawArtifactsAndOverclaims(t *testing
 	if err != nil {
 		t.Fatalf("buildReport P15 actor benchmark prep: %v", err)
 	}
-	report.Claims = []string{"The zero_copy_move prototype benchmark proves production runtime zero-copy for actors."}
+	report.Claims = []string{
+		"The zero_copy_move prototype benchmark proves production runtime zero-copy for actors.",
+	}
 	err = validateReport(report)
 	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "zero_copy_move") {
 		t.Fatalf("validateReport accepted zero_copy_move production runtime claim: %v", err)
@@ -490,17 +541,38 @@ func TestP20ClaimTierReportDefinesFiveTiersAndCurrentTierZeroClaims(t *testing.T
 		evidence string
 	}{
 		{id: "tier0_local_smoke_only", label: "Tier 0: local smoke only", evidence: "local_smoke"},
-		{id: "tier1_local_benchmark_evidence", label: "Tier 1: local benchmark evidence", evidence: "local_benchmark"},
-		{id: "tier2_reproducible_cross_machine_benchmark", label: "Tier 2: reproducible cross-machine benchmark", evidence: "cross_machine_reproduction"},
-		{id: "tier3_independent_reproduced_benchmark", label: "Tier 3: independent reproduced benchmark", evidence: "independent_reproduction"},
-		{id: "tier4_official_upstream_benchmark_submission", label: "Tier 4: official upstream benchmark submission", evidence: "official_upstream_submission"},
+		{
+			id:       "tier1_local_benchmark_evidence",
+			label:    "Tier 1: local benchmark evidence",
+			evidence: "local_benchmark",
+		},
+		{
+			id:       "tier2_reproducible_cross_machine_benchmark",
+			label:    "Tier 2: reproducible cross-machine benchmark",
+			evidence: "cross_machine_reproduction",
+		},
+		{
+			id:       "tier3_independent_reproduced_benchmark",
+			label:    "Tier 3: independent reproduced benchmark",
+			evidence: "independent_reproduction",
+		},
+		{
+			id:       "tier4_official_upstream_benchmark_submission",
+			label:    "Tier 4: official upstream benchmark submission",
+			evidence: "official_upstream_submission",
+		},
 	}
 	policies := map[string]ClaimTierPolicy{}
 	for _, policy := range report.Policies {
 		policies[policy.ID] = policy
 	}
 	if len(policies) != len(wantPolicies) {
-		t.Fatalf("claim-tier policies = %d, want %d: %+v", len(policies), len(wantPolicies), report.Policies)
+		t.Fatalf(
+			"claim-tier policies = %d, want %d: %+v",
+			len(policies),
+			len(wantPolicies),
+			report.Policies,
+		)
 	}
 	for rank, want := range wantPolicies {
 		policy, ok := policies[want.id]
@@ -508,10 +580,22 @@ func TestP20ClaimTierReportDefinesFiveTiersAndCurrentTierZeroClaims(t *testing.T
 			t.Fatalf("missing policy %q in %+v", want.id, report.Policies)
 		}
 		if policy.Rank != rank || policy.Label != want.label {
-			t.Fatalf("policy %s rank/label = %d/%q, want %d/%q", want.id, policy.Rank, policy.Label, rank, want.label)
+			t.Fatalf(
+				"policy %s rank/label = %d/%q, want %d/%q",
+				want.id,
+				policy.Rank,
+				policy.Label,
+				rank,
+				want.label,
+			)
 		}
 		if !containsString(policy.RequiredEvidenceClasses, want.evidence) {
-			t.Fatalf("policy %s evidence = %+v, want %q", want.id, policy.RequiredEvidenceClasses, want.evidence)
+			t.Fatalf(
+				"policy %s evidence = %+v, want %q",
+				want.id,
+				policy.RequiredEvidenceClasses,
+				want.evidence,
+			)
 		}
 	}
 	if len(report.Claims) == 0 {
@@ -522,7 +606,14 @@ func TestP20ClaimTierReportDefinesFiveTiersAndCurrentTierZeroClaims(t *testing.T
 		t.Fatalf("current claim id/tier = %q/%q", current.ID, current.Tier)
 	}
 	lower := strings.ToLower(current.Text)
-	for _, want := range []string{"local smoke", "dry-run benchmark matrix", "performance-blocker explanation", "no measured speed", "no c++/rust parity", "no official benchmark"} {
+	for _, want := range []string{
+		"local smoke",
+		"dry-run benchmark matrix",
+		"performance-blocker explanation",
+		"no measured speed",
+		"no c++/rust parity",
+		"no official benchmark",
+	} {
 		if !strings.Contains(lower, want) {
 			t.Fatalf("current Tier 0 claim missing %q: %q", want, current.Text)
 		}
@@ -532,7 +623,14 @@ func TestP20ClaimTierReportDefinesFiveTiersAndCurrentTierZeroClaims(t *testing.T
 			t.Fatalf("current Tier 0 claim evidence = %+v, want class %q", current.Evidence, want)
 		}
 	}
-	for _, want := range []string{"measured speed", "C++/Rust parity", "official benchmark", "official TechEmpower", "cross-machine", "independent reproduced"} {
+	for _, want := range []string{
+		"measured speed",
+		"C++/Rust parity",
+		"official benchmark",
+		"official TechEmpower",
+		"cross-machine",
+		"independent reproduced",
+	} {
 		if !containsString(report.NonClaims, want) {
 			t.Fatalf("claim-tier non-claims = %+v, want %q", report.NonClaims, want)
 		}
@@ -558,12 +656,25 @@ func TestP20ClaimTierReportIncludesActorBenchmarkPrepNonClaims(t *testing.T) {
 		t.Fatalf("actor benchmark claim tier = %q, want tier0_local_smoke_only", actorClaim.Tier)
 	}
 	lower := strings.ToLower(actorClaim.Text)
-	for _, want := range []string{"actor ping-pong", "fanout/fanin", "mailbox throughput", "backpressure latency", "zero_copy_move", "no measured speed", "no official benchmark", "no distributed zero-copy"} {
+	for _, want := range []string{
+		"actor ping-pong",
+		"fanout/fanin",
+		"mailbox throughput",
+		"backpressure latency",
+		"zero_copy_move",
+		"no measured speed",
+		"no official benchmark",
+		"no distributed zero-copy",
+	} {
 		if !strings.Contains(lower, want) {
 			t.Fatalf("actor benchmark Tier 0 claim missing %q: %q", want, actorClaim.Text)
 		}
 	}
-	for _, want := range []string{"production throughput guarantee", "distributed zero-copy", "actor benchmark superiority"} {
+	for _, want := range []string{
+		"production throughput guarantee",
+		"distributed zero-copy",
+		"actor benchmark superiority",
+	} {
 		if !containsString(report.NonClaims, want) {
 			t.Fatalf("claim-tier non-claims = %+v, want %q", report.NonClaims, want)
 		}
@@ -619,7 +730,10 @@ func TestValidateP20ClaimTierReportRejectsOverstatedWording(t *testing.T) {
 	report.Claims[0].Tier = "tier1_local_benchmark_evidence"
 	err := ValidateClaimTierReport(report)
 	if err == nil || !strings.Contains(err.Error(), "local_benchmark") {
-		t.Fatalf("ValidateClaimTierReport accepted Tier 1 without local benchmark evidence: %v", err)
+		t.Fatalf(
+			"ValidateClaimTierReport accepted Tier 1 without local benchmark evidence: %v",
+			err,
+		)
 	}
 
 	report = BuildP20ClaimTierReport()
@@ -645,7 +759,9 @@ func TestValidateClaimsRejectsFakeHigherTierWording(t *testing.T) {
 			t.Fatalf("validateClaims(%q) = %v, want %q", tc.claim, err, tc.wantErr)
 		}
 	}
-	safe := "No official upstream benchmark submission, independent reproduced benchmark, cross-machine benchmark, measured speed, or C++/Rust parity is claimed."
+	safe := ("No official upstream benchmark submission, independent " +
+		"reproduced benchmark, cross-machine benchmark, measured speed, or C++/" +
+		"Rust parity is claimed.")
 	if err := validateClaims([]string{safe}); err != nil {
 		t.Fatalf("validateClaims rejected explicit non-claim: %v", err)
 	}
@@ -684,23 +800,56 @@ func completeP8Manifest(t *testing.T, dir string) Manifest {
 
 func p19GenericCollectionsManifest(t *testing.T, dir string) Manifest {
 	t.Helper()
-	proofPath := writeFixture(t, dir, "generic_collections_hash_table.proof.json", `{"kind":"proof","benchmark":"generic_collections_hash_table"}`)
-	allocPath := writeFixture(t, dir, "generic_collections_hash_table.allocation.json", `{"kind":"allocation","benchmark":"generic_collections_hash_table"}`)
-	boundsPath := writeFixture(t, dir, "generic_collections_hash_table.bounds.json", `{"kind":"bounds","benchmark":"generic_collections_hash_table"}`)
-	perfPath := writeFixture(t, dir, "generic_collections_hash_table.perf.json", `{"kind":"performance","benchmark":"generic_collections_hash_table","claim":"no parity claim"}`)
+	proofPath := writeFixture(
+		t,
+		dir,
+		"generic_collections_hash_table.proof.json",
+		`{"kind":"proof","benchmark":"generic_collections_hash_table"}`,
+	)
+	allocPath := writeFixture(
+		t,
+		dir,
+		"generic_collections_hash_table.allocation.json",
+		`{"kind":"allocation","benchmark":"generic_collections_hash_table"}`,
+	)
+	boundsPath := writeFixture(
+		t,
+		dir,
+		"generic_collections_hash_table.bounds.json",
+		`{"kind":"bounds","benchmark":"generic_collections_hash_table"}`,
+	)
+	perfPath := writeFixture(
+		t,
+		dir,
+		"generic_collections_hash_table.perf.json",
+		`{"kind":"performance","benchmark":"generic_collections_hash_table","claim":"no parity claim"}`,
+	)
 	algorithmID := p19GenericCollectionsAlgoID
-	input := "deterministic 1024-key i32 lookup workload with identical keys, queries, and fallback value"
+	input := ("deterministic 1024-key i32 lookup workload with identical keys, " +
+		"queries, and fallback value")
 	rows := []BenchmarkSpec{
 		{
-			Name:                   "generic_collections_hash_table_tetra",
-			Category:               "hash table",
-			Language:               "tetra",
-			CompilerVersion:        "tetra dev",
-			AlgorithmID:            algorithmID,
-			InputDescription:       input,
-			BuildCommand:           []string{"tetra", "build", "benchmarks/generic_collections/hash_table.tetra", "--explain"},
-			RunCommand:             []string{filepath.Join(dir, "generic_collections_hash_table_tetra")},
-			Binary:                 writeFixture(t, dir, "generic_collections_hash_table_tetra", "binary"),
+			Name:             "generic_collections_hash_table_tetra",
+			Category:         "hash table",
+			Language:         "tetra",
+			CompilerVersion:  "tetra dev",
+			AlgorithmID:      algorithmID,
+			InputDescription: input,
+			BuildCommand: []string{
+				"tetra",
+				"build",
+				"benchmarks/generic_collections/hash_table.tetra",
+				"--explain",
+			},
+			RunCommand: []string{
+				filepath.Join(dir, "generic_collections_hash_table_tetra"),
+			},
+			Binary: writeFixture(
+				t,
+				dir,
+				"generic_collections_hash_table_tetra",
+				"binary",
+			),
 			TetraProofReports:      []string{proofPath},
 			TetraAllocationReports: []string{allocPath},
 			TetraBoundsReports:     []string{boundsPath},
@@ -713,9 +862,15 @@ func p19GenericCollectionsManifest(t *testing.T, dir string) Manifest {
 			CompilerVersion:  "clang++ test",
 			AlgorithmID:      algorithmID,
 			InputDescription: input,
-			BuildCommand:     []string{"clang++", "-O3", "benchmarks/generic_collections/hash_table.cpp", "-o", "generic_collections_hash_table_cpp"},
-			RunCommand:       []string{filepath.Join(dir, "generic_collections_hash_table_cpp")},
-			Binary:           writeFixture(t, dir, "generic_collections_hash_table_cpp", "binary"),
+			BuildCommand: []string{
+				"clang++",
+				"-O3",
+				"benchmarks/generic_collections/hash_table.cpp",
+				"-o",
+				"generic_collections_hash_table_cpp",
+			},
+			RunCommand: []string{filepath.Join(dir, "generic_collections_hash_table_cpp")},
+			Binary:     writeFixture(t, dir, "generic_collections_hash_table_cpp", "binary"),
 		},
 		{
 			Name:             "generic_collections_hash_table_rust",
@@ -724,9 +879,16 @@ func p19GenericCollectionsManifest(t *testing.T, dir string) Manifest {
 			CompilerVersion:  "rustc test",
 			AlgorithmID:      algorithmID,
 			InputDescription: input,
-			BuildCommand:     []string{"rustc", "-C", "opt-level=3", "benchmarks/generic_collections/hash_table.rs", "-o", "generic_collections_hash_table_rust"},
-			RunCommand:       []string{filepath.Join(dir, "generic_collections_hash_table_rust")},
-			Binary:           writeFixture(t, dir, "generic_collections_hash_table_rust", "binary"),
+			BuildCommand: []string{
+				"rustc",
+				"-C",
+				"opt-level=3",
+				"benchmarks/generic_collections/hash_table.rs",
+				"-o",
+				"generic_collections_hash_table_rust",
+			},
+			RunCommand: []string{filepath.Join(dir, "generic_collections_hash_table_rust")},
+			Binary:     writeFixture(t, dir, "generic_collections_hash_table_rust", "binary"),
 		},
 	}
 	return Manifest{Scope: "p19.1_generic_collections", Benchmarks: rows}
@@ -734,23 +896,51 @@ func p19GenericCollectionsManifest(t *testing.T, dir string) Manifest {
 
 func p19HTTPJSONSourceFirstManifest(t *testing.T, dir string) Manifest {
 	t.Helper()
-	proofPath := writeFixture(t, dir, "http-json-source-first.proof.json", `{"kind":"proof","slice":"p19.2_http_json_source_first"}`)
-	allocPath := writeFixture(t, dir, "http-json-source-first.allocation.json", `{"kind":"allocation","slice":"p19.2_http_json_source_first"}`)
-	boundsPath := writeFixture(t, dir, "http-json-source-first.bounds.json", `{"kind":"bounds","slice":"p19.2_http_json_source_first"}`)
-	coveragePath := writeFixture(t, dir, "http-json-source-first.coverage.json", `{"schema_version":"tetra.stdlib.http_json.production_stack.v1","claim":"not official and no C++/Rust parity claim"}`)
+	proofPath := writeFixture(
+		t,
+		dir,
+		"http-json-source-first.proof.json",
+		`{"kind":"proof","slice":"p19.2_http_json_source_first"}`,
+	)
+	allocPath := writeFixture(
+		t,
+		dir,
+		"http-json-source-first.allocation.json",
+		`{"kind":"allocation","slice":"p19.2_http_json_source_first"}`,
+	)
+	boundsPath := writeFixture(
+		t,
+		dir,
+		"http-json-source-first.bounds.json",
+		`{"kind":"bounds","slice":"p19.2_http_json_source_first"}`,
+	)
+	coveragePath := writeFixture(
+		t,
+		dir,
+		"http-json-source-first.coverage.json",
+		`{"schema_version":"tetra.stdlib.http_json.production_stack.v1","claim":"not official and no C++/Rust parity claim"}`,
+	)
 	httpBin := writeFixture(t, dir, "http_plaintext_tetra_source", "binary")
 	jsonBin := writeFixture(t, dir, "http_json_tetra_source", "binary")
 	return Manifest{
 		Scope: scopeP19HTTPJSONSourceFirst,
 		Benchmarks: []BenchmarkSpec{
 			{
-				Name:                   "http_plaintext_tetra_source",
-				Category:               "HTTP plaintext",
-				Language:               "tetra",
-				CompilerVersion:        "tetra dev",
-				AlgorithmID:            "p19.2.http_json.http_plaintext.request_head_response_tetra_source",
-				InputDescription:       "deterministic lib.core.http request-head, pipelining, route, and plaintext response smoke",
-				BuildCommand:           []string{"tetra", "build", "examples/core_http_smoke.tetra", "--explain", "--out", httpBin},
+				Name:            "http_plaintext_tetra_source",
+				Category:        "HTTP plaintext",
+				Language:        "tetra",
+				CompilerVersion: "tetra dev",
+				AlgorithmID:     "p19.2.http_json.http_plaintext.request_head_response_tetra_source",
+				InputDescription: ("deterministic lib.core.http request-head, pipelining, route, " +
+					"and plaintext response smoke"),
+				BuildCommand: []string{
+					"tetra",
+					"build",
+					"examples/core/platform/core_http_smoke.tetra",
+					"--explain",
+					"--out",
+					httpBin,
+				},
 				RunCommand:             []string{httpBin},
 				Binary:                 httpBin,
 				TetraProofReports:      []string{proofPath},
@@ -759,13 +949,21 @@ func p19HTTPJSONSourceFirstManifest(t *testing.T, dir string) Manifest {
 				TetraReports:           []string{coveragePath},
 			},
 			{
-				Name:                   "http_json_tetra_source",
-				Category:               "HTTP JSON",
-				Language:               "tetra",
-				CompilerVersion:        "tetra dev",
-				AlgorithmID:            "p19.2.http_json.json_message_response_tetra_source",
-				InputDescription:       "deterministic lib.core.json message-object writer and lib.core.http JSON response smoke",
-				BuildCommand:           []string{"tetra", "build", "examples/core_json_smoke.tetra", "--explain", "--out", jsonBin},
+				Name:            "http_json_tetra_source",
+				Category:        "HTTP JSON",
+				Language:        "tetra",
+				CompilerVersion: "tetra dev",
+				AlgorithmID:     "p19.2.http_json.json_message_response_tetra_source",
+				InputDescription: ("deterministic lib.core.json message-object writer and " +
+					"lib.core.http JSON response smoke"),
+				BuildCommand: []string{
+					"tetra",
+					"build",
+					"examples/core/data/core_json_smoke.tetra",
+					"--explain",
+					"--out",
+					jsonBin,
+				},
 				RunCommand:             []string{jsonBin},
 				Binary:                 jsonBin,
 				TetraProofReports:      []string{proofPath},
@@ -779,67 +977,145 @@ func p19HTTPJSONSourceFirstManifest(t *testing.T, dir string) Manifest {
 
 func p19PostgresSourceFirstManifest(t *testing.T, dir string) Manifest {
 	t.Helper()
-	proofPath := writeFixture(t, dir, "postgres-source-first.proof.json", `{"kind":"proof","slice":"p19.3_postgres_source_first"}`)
-	allocPath := writeFixture(t, dir, "postgres-source-first.allocation.json", `{"kind":"allocation","slice":"p19.3_postgres_source_first"}`)
-	boundsPath := writeFixture(t, dir, "postgres-source-first.bounds.json", `{"kind":"bounds","slice":"p19.3_postgres_source_first"}`)
-	coveragePath := writeFixture(t, dir, "postgres-source-first.coverage.json", `{"schema_version":"tetra.stdlib.postgresql.production_driver.v1","claim":"not official and no C++/Rust parity claim"}`)
-	input := "deterministic TechEmpower hello_world PostgreSQL workload through lib.core.postgres source helpers and local runtime endpoint coverage"
+	proofPath := writeFixture(
+		t,
+		dir,
+		"postgres-source-first.proof.json",
+		`{"kind":"proof","slice":"p19.3_postgres_source_first"}`,
+	)
+	allocPath := writeFixture(
+		t,
+		dir,
+		"postgres-source-first.allocation.json",
+		`{"kind":"allocation","slice":"p19.3_postgres_source_first"}`,
+	)
+	boundsPath := writeFixture(
+		t,
+		dir,
+		"postgres-source-first.bounds.json",
+		`{"kind":"bounds","slice":"p19.3_postgres_source_first"}`,
+	)
+	coveragePath := writeFixture(
+		t,
+		dir,
+		"postgres-source-first.coverage.json",
+		`{"schema_version":"tetra.stdlib.postgresql.production_driver.v1","claim":"not official and no C++/Rust parity claim"}`,
+	)
+	input := ("deterministic TechEmpower hello_world PostgreSQL workload " +
+		"through lib.core.postgres source helpers and local runtime endpoint " +
+		"coverage")
 	rows := []BenchmarkSpec{
 		{
-			Name:                   "postgres_db_single_query_tetra_source",
-			Category:               "DB single query",
-			Language:               "tetra",
-			CompilerVersion:        "tetra dev",
-			AlgorithmID:            "p19.3.postgres.single_query.world_by_id_tetra_source",
-			InputDescription:       input,
-			BuildCommand:           []string{"tetra", "build", "examples/core_postgres_result_smoke.tetra", "--explain", "--out", filepath.Join(dir, "postgres_db_single_query_tetra_source")},
-			RunCommand:             []string{filepath.Join(dir, "postgres_db_single_query_tetra_source")},
-			Binary:                 writeFixture(t, dir, "postgres_db_single_query_tetra_source", "binary"),
+			Name:             "postgres_db_single_query_tetra_source",
+			Category:         "DB single query",
+			Language:         "tetra",
+			CompilerVersion:  "tetra dev",
+			AlgorithmID:      "p19.3.postgres.single_query.world_by_id_tetra_source",
+			InputDescription: input,
+			BuildCommand: []string{
+				"tetra",
+				"build",
+				"examples/core/runtime/core_postgres_result_smoke.tetra",
+				"--explain",
+				"--out",
+				filepath.Join(dir, "postgres_db_single_query_tetra_source"),
+			},
+			RunCommand: []string{
+				filepath.Join(dir, "postgres_db_single_query_tetra_source"),
+			},
+			Binary: writeFixture(
+				t,
+				dir,
+				"postgres_db_single_query_tetra_source",
+				"binary",
+			),
 			TetraProofReports:      []string{proofPath},
 			TetraAllocationReports: []string{allocPath},
 			TetraBoundsReports:     []string{boundsPath},
 			TetraReports:           []string{coveragePath},
 		},
 		{
-			Name:                   "postgres_db_multiple_queries_tetra_source",
-			Category:               "DB multiple queries",
-			Language:               "tetra",
-			CompilerVersion:        "tetra dev",
-			AlgorithmID:            "p19.3.postgres.multiple_queries.world_by_id_tetra_source",
-			InputDescription:       input,
-			BuildCommand:           []string{"tetra", "build", "examples/core_postgres_prepared_smoke.tetra", "--explain", "--out", filepath.Join(dir, "postgres_db_multiple_queries_tetra_source")},
-			RunCommand:             []string{filepath.Join(dir, "postgres_db_multiple_queries_tetra_source")},
-			Binary:                 writeFixture(t, dir, "postgres_db_multiple_queries_tetra_source", "binary"),
+			Name:             "postgres_db_multiple_queries_tetra_source",
+			Category:         "DB multiple queries",
+			Language:         "tetra",
+			CompilerVersion:  "tetra dev",
+			AlgorithmID:      "p19.3.postgres.multiple_queries.world_by_id_tetra_source",
+			InputDescription: input,
+			BuildCommand: []string{
+				"tetra",
+				"build",
+				"examples/core/runtime/core_postgres_prepared_smoke.tetra",
+				"--explain",
+				"--out",
+				filepath.Join(dir, "postgres_db_multiple_queries_tetra_source"),
+			},
+			RunCommand: []string{
+				filepath.Join(dir, "postgres_db_multiple_queries_tetra_source"),
+			},
+			Binary: writeFixture(
+				t,
+				dir,
+				"postgres_db_multiple_queries_tetra_source",
+				"binary",
+			),
 			TetraProofReports:      []string{proofPath},
 			TetraAllocationReports: []string{allocPath},
 			TetraBoundsReports:     []string{boundsPath},
 			TetraReports:           []string{coveragePath},
 		},
 		{
-			Name:                   "postgres_db_updates_tetra_source",
-			Category:               "DB updates",
-			Language:               "tetra",
-			CompilerVersion:        "tetra dev",
-			AlgorithmID:            "p19.3.postgres.updates.read_then_write_world_tetra_source",
-			InputDescription:       input,
-			BuildCommand:           []string{"tetra", "build", "examples/core_postgres_prepared_smoke.tetra", "--explain", "--out", filepath.Join(dir, "postgres_db_updates_tetra_source")},
-			RunCommand:             []string{filepath.Join(dir, "postgres_db_updates_tetra_source")},
-			Binary:                 writeFixture(t, dir, "postgres_db_updates_tetra_source", "binary"),
+			Name:             "postgres_db_updates_tetra_source",
+			Category:         "DB updates",
+			Language:         "tetra",
+			CompilerVersion:  "tetra dev",
+			AlgorithmID:      "p19.3.postgres.updates.read_then_write_world_tetra_source",
+			InputDescription: input,
+			BuildCommand: []string{
+				"tetra",
+				"build",
+				"examples/core/runtime/core_postgres_prepared_smoke.tetra",
+				"--explain",
+				"--out",
+				filepath.Join(dir, "postgres_db_updates_tetra_source"),
+			},
+			RunCommand: []string{
+				filepath.Join(dir, "postgres_db_updates_tetra_source"),
+			},
+			Binary: writeFixture(
+				t,
+				dir,
+				"postgres_db_updates_tetra_source",
+				"binary",
+			),
 			TetraProofReports:      []string{proofPath},
 			TetraAllocationReports: []string{allocPath},
 			TetraBoundsReports:     []string{boundsPath},
 			TetraReports:           []string{coveragePath},
 		},
 		{
-			Name:                   "postgres_db_fortunes_tetra_source",
-			Category:               "DB fortunes",
-			Language:               "tetra",
-			CompilerVersion:        "tetra dev",
-			AlgorithmID:            "p19.3.postgres.fortunes.select_sort_escape_tetra_source",
-			InputDescription:       input,
-			BuildCommand:           []string{"tetra", "build", "examples/core_postgres_result_smoke.tetra", "--explain", "--out", filepath.Join(dir, "postgres_db_fortunes_tetra_source")},
-			RunCommand:             []string{filepath.Join(dir, "postgres_db_fortunes_tetra_source")},
-			Binary:                 writeFixture(t, dir, "postgres_db_fortunes_tetra_source", "binary"),
+			Name:             "postgres_db_fortunes_tetra_source",
+			Category:         "DB fortunes",
+			Language:         "tetra",
+			CompilerVersion:  "tetra dev",
+			AlgorithmID:      "p19.3.postgres.fortunes.select_sort_escape_tetra_source",
+			InputDescription: input,
+			BuildCommand: []string{
+				"tetra",
+				"build",
+				"examples/core/runtime/core_postgres_result_smoke.tetra",
+				"--explain",
+				"--out",
+				filepath.Join(dir, "postgres_db_fortunes_tetra_source"),
+			},
+			RunCommand: []string{
+				filepath.Join(dir, "postgres_db_fortunes_tetra_source"),
+			},
+			Binary: writeFixture(
+				t,
+				dir,
+				"postgres_db_fortunes_tetra_source",
+				"binary",
+			),
 			TetraProofReports:      []string{proofPath},
 			TetraAllocationReports: []string{allocPath},
 			TetraBoundsReports:     []string{boundsPath},
@@ -851,15 +1127,36 @@ func p19PostgresSourceFirstManifest(t *testing.T, dir string) Manifest {
 
 func p20BenchmarkMatrixManifest(t *testing.T, dir string) Manifest {
 	t.Helper()
-	proofPath := writeFixture(t, dir, "p20.proof.json", `{"kind":"proof","slice":"p20.0_benchmark_matrix"}`)
-	allocPath := writeFixture(t, dir, "p20.allocation.json", `{"kind":"allocation","slice":"p20.0_benchmark_matrix"}`)
-	boundsPath := writeFixture(t, dir, "p20.bounds.json", `{"kind":"bounds","slice":"p20.0_benchmark_matrix"}`)
-	perfPath := writeFixture(t, dir, "p20.perf.json", `{"kind":"performance","slice":"p20.0_benchmark_matrix","claim":"no parity claim"}`)
+	proofPath := writeFixture(
+		t,
+		dir,
+		"p20.proof.json",
+		`{"kind":"proof","slice":"p20.0_benchmark_matrix"}`,
+	)
+	allocPath := writeFixture(
+		t,
+		dir,
+		"p20.allocation.json",
+		`{"kind":"allocation","slice":"p20.0_benchmark_matrix"}`,
+	)
+	boundsPath := writeFixture(
+		t,
+		dir,
+		"p20.bounds.json",
+		`{"kind":"bounds","slice":"p20.0_benchmark_matrix"}`,
+	)
+	perfPath := writeFixture(
+		t,
+		dir,
+		"p20.perf.json",
+		`{"kind":"performance","slice":"p20.0_benchmark_matrix","claim":"no parity claim"}`,
+	)
 	out := Manifest{Scope: scopeP20BenchmarkMatrix}
 	for _, category := range P20BenchmarkCategories() {
 		slug := slugCategory(category)
 		algorithmID := "p20.0." + strings.ReplaceAll(slug, "_", ".")
-		input := "deterministic P20.0 " + category + " workload with identical inputs across Tetra, C, C++, and Rust"
+		input := "deterministic P20.0 " + category + (" workload with identical inputs across " +
+			"Tetra, C, C++, and Rust")
 		for _, language := range RequiredBenchmarkLanguages() {
 			name := slug + "_" + language
 			binary := writeFixture(t, dir, name, "binary")
@@ -890,10 +1187,30 @@ func p20BenchmarkMatrixManifest(t *testing.T, dir string) Manifest {
 
 func p15ActorBenchmarkPrepManifest(t *testing.T, dir string) Manifest {
 	t.Helper()
-	proofPath := writeFixture(t, dir, "p15-actor.proof.json", `{"kind":"proof","slice":"p15_actor_benchmark_prep"}`)
-	allocPath := writeFixture(t, dir, "p15-actor.allocation.json", `{"kind":"allocation","slice":"p15_actor_benchmark_prep"}`)
-	boundsPath := writeFixture(t, dir, "p15-actor.bounds.json", `{"kind":"bounds","slice":"p15_actor_benchmark_prep"}`)
-	perfPath := writeFixture(t, dir, "p15-actor.perf.json", `{"kind":"performance","slice":"p15_actor_benchmark_prep","claim":"Tier 0 prep only; no measured speed"}`)
+	proofPath := writeFixture(
+		t,
+		dir,
+		"p15-actor.proof.json",
+		`{"kind":"proof","slice":"p15_actor_benchmark_prep"}`,
+	)
+	allocPath := writeFixture(
+		t,
+		dir,
+		"p15-actor.allocation.json",
+		`{"kind":"allocation","slice":"p15_actor_benchmark_prep"}`,
+	)
+	boundsPath := writeFixture(
+		t,
+		dir,
+		"p15-actor.bounds.json",
+		`{"kind":"bounds","slice":"p15_actor_benchmark_prep"}`,
+	)
+	perfPath := writeFixture(
+		t,
+		dir,
+		"p15-actor.perf.json",
+		`{"kind":"performance","slice":"p15_actor_benchmark_prep","claim":"Tier 0 prep only; no measured speed"}`,
+	)
 	categories := []struct {
 		name      string
 		category  string
@@ -904,19 +1221,22 @@ func p15ActorBenchmarkPrepManifest(t *testing.T, dir string) Manifest {
 			name:      "actor_ping_pong_tetra",
 			category:  "actor ping-pong",
 			algorithm: "p15.actor.ping_pong.local_mailbox",
-			input:     "dry-run actor ping-pong local Linux-x64 mailbox workload with raw artifact references only",
+			input: ("dry-run actor ping-pong local Linux-x64 mailbox workload with " +
+				"raw artifact references only"),
 		},
 		{
 			name:      "actor_fanout_fanin_tetra",
 			category:  "actor fanout/fanin",
 			algorithm: "p15.actor.fanout_fanin.local_mailbox",
-			input:     "dry-run actor fanout/fanin local Linux-x64 mailbox workload with raw artifact references only",
+			input: ("dry-run actor fanout/fanin local Linux-x64 mailbox workload " +
+				"with raw artifact references only"),
 		},
 		{
 			name:      "actor_mailbox_throughput_tetra",
 			category:  "actor mailbox throughput",
 			algorithm: "p15.actor.mailbox_throughput.local_mailbox",
-			input:     "dry-run actor mailbox throughput local Linux-x64 prep row without production throughput claim",
+			input: ("dry-run actor mailbox throughput local Linux-x64 prep row " +
+				"without production throughput claim"),
 		},
 		{
 			name:      "actor_backpressure_latency_tetra",
@@ -928,21 +1248,34 @@ func p15ActorBenchmarkPrepManifest(t *testing.T, dir string) Manifest {
 			name:      "zero_copy_move_local_typed_mailbox_tetra",
 			category:  "zero_copy_move local typed mailbox",
 			algorithm: "p15.actor.zero_copy_move.local_owned_region",
-			input:     "dry-run local owned-region typed mailbox transfer prep row without distributed zero-copy claim",
+			input: ("dry-run local owned-region typed mailbox transfer prep row " +
+				"without distributed zero-copy claim"),
 		},
 	}
 	out := Manifest{Scope: "p15_actor_benchmark_prep"}
 	for _, category := range categories {
 		binary := writeFixture(t, dir, category.name, "binary")
-		rawOutput := writeFixture(t, dir, category.name+".raw.txt", "raw output for "+category.name+"\n")
+		rawOutput := writeFixture(
+			t,
+			dir,
+			category.name+".raw.txt",
+			"raw output for "+category.name+"\n",
+		)
 		out.Benchmarks = append(out.Benchmarks, BenchmarkSpec{
-			Name:                   category.name,
-			Category:               category.category,
-			Language:               "tetra",
-			CompilerVersion:        "tetra dev",
-			AlgorithmID:            category.algorithm,
-			InputDescription:       category.input,
-			BuildCommand:           []string{"tetra", "build", "examples/actors_pingpong.tetra", "--explain", "--out", binary},
+			Name:             category.name,
+			Category:         category.category,
+			Language:         "tetra",
+			CompilerVersion:  "tetra dev",
+			AlgorithmID:      category.algorithm,
+			InputDescription: category.input,
+			BuildCommand: []string{
+				"tetra",
+				"build",
+				"examples/actors/actors_pingpong.tetra",
+				"--explain",
+				"--out",
+				binary,
+			},
 			RunCommand:             []string{binary},
 			Binary:                 binary,
 			TetraProofReports:      []string{proofPath},

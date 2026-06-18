@@ -1,0 +1,48 @@
+// Memory typed-task error-offset microservice smoke.
+//
+// The service catches typed task error payloads, aliases the scalar payloads
+// into local offsets, and uses those offsets for checked raw-memory writes.
+module examples.microservices.memory.typed_errors.tasks.memory_typed_task_error_offset_service
+import lib.core.capability as cap
+
+enum OffsetErr:
+    case stopped
+    case offset(Int)
+
+func left_worker() -> Int throws OffsetErr:
+    throw OffsetErr.offset(4)
+
+func right_worker() -> Int throws OffsetErr:
+    throw OffsetErr.offset(4)
+
+func main() -> Int
+uses alloc, capability, mem, runtime:
+    let left_task = core.task_spawn_i32_typed<OffsetErr>("left_worker")
+    let left_offset: Int = catch core.task_join_i32_typed<OffsetErr>(left_task):
+    case OffsetErr.stopped:
+        70
+    case OffsetErr.offset(left_code):
+        left_code
+    let group: task.group = core.task_group_open()
+    let right_task = core.task_spawn_group_i32_typed<OffsetErr>(group, "right_worker")
+    let right_offset: Int = catch core.task_join_group_i32_typed<OffsetErr>(right_task):
+    case OffsetErr.stopped:
+        80
+    case OffsetErr.offset(right_code):
+        right_code
+    let close_error: Int = core.task_group_close(group)
+    if close_error != 0:
+        return 90 + close_error
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let left_base: ptr = core.alloc_bytes(8)
+        let right_base: ptr = core.alloc_bytes(8)
+        let left_cell: ptr = core.ptr_add(left_base, left_offset, memory_cap)
+        let right_cell: ptr = core.ptr_add(right_base, right_offset, memory_cap)
+        let _left_write: Int = core.store_i32(left_cell, 20, memory_cap)
+        let _right_write: Int = core.store_i32(right_cell, 22, memory_cap)
+        let total: Int = core.load_i32(left_cell, memory_cap) + core.load_i32(right_cell, memory_cap)
+        if total == 42:
+            return 0
+        return total
+    return 99

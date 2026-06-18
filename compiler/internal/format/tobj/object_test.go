@@ -19,8 +19,21 @@ func TestObjectRoundTripPreservesV4MetadataSymbolsAndRelocs(t *testing.T) {
 		PublicAPIHash:   "api-hash",
 		SrcHash:         sha256.Sum256([]byte("source")),
 		WorldSigHash:    sha256.Sum256([]byte("world")),
-		Code:            []byte{0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0xc3},
-		Data:            []byte("literal!"),
+		Code: []byte{
+			0x90,
+			0x90,
+			0x90,
+			0x90,
+			0x90,
+			0x90,
+			0x90,
+			0x90,
+			0x90,
+			0x90,
+			0x90,
+			0xc3,
+		},
+		Data: []byte("literal!"),
 		Symbols: []Symbol{
 			{Name: "helper", Offset: 0, HasSignature: true, ParamSlots: 1, ReturnSlots: 1},
 			{Name: "main", Offset: 1, HasSignature: true, ParamSlots: 0, ReturnSlots: 1},
@@ -349,7 +362,8 @@ func TestWriteObjectRejectsMalformedSymbolAndRelocRanges(t *testing.T) {
 }
 
 func TestReadObjectRejectsInvalidMagicAndBoolEncoding(t *testing.T) {
-	if _, err := readObject(bytes.NewReader([]byte("NOPE"))); err == nil || !strings.Contains(err.Error(), "invalid object magic") {
+	if _, err := readObject(bytes.NewReader([]byte("NOPE"))); err == nil ||
+		!strings.Contains(err.Error(), "invalid object magic") {
 		t.Fatalf("invalid magic error = %v", err)
 	}
 
@@ -391,7 +405,8 @@ func TestReadObjectRejectsInvalidMagicAndBoolEncoding(t *testing.T) {
 		t.Fatalf("write return slots: %v", err)
 	}
 
-	if _, err := readObject(bytes.NewReader(raw.Bytes())); err == nil || !strings.Contains(err.Error(), "invalid bool value 2") {
+	if _, err := readObject(bytes.NewReader(raw.Bytes())); err == nil ||
+		!strings.Contains(err.Error(), "invalid bool value 2") {
 		t.Fatalf("invalid bool error = %v", err)
 	}
 }
@@ -756,7 +771,14 @@ func writeSymbolRecordForTest(t *testing.T, raw *bytes.Buffer, name string, offs
 	writeU32ForTest(t, raw, 0)
 }
 
-func writeRelocRecordForTest(t *testing.T, raw *bytes.Buffer, kind RelocKind, at uint32, name string, addend uint32) {
+func writeRelocRecordForTest(
+	t *testing.T,
+	raw *bytes.Buffer,
+	kind RelocKind,
+	at uint32,
+	name string,
+	addend uint32,
+) {
 	t.Helper()
 	writeRelocCountForTest(t, raw, 1)
 	if err := writeU8(raw, uint8(kind)); err != nil {

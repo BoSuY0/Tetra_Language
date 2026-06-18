@@ -101,10 +101,20 @@ func (s Store) Validate() error {
 		if term.StableHash == "" {
 			issues = append(issues, prefix+": missing stable_hash")
 		} else if want := StableHash(term); term.StableHash != want {
-			issues = append(issues, fmt.Sprintf("%s: stale stable_hash for %s: got %s want %s", prefix, term.ID, term.StableHash, want))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s: stale stable_hash for %s: got %s want %s", prefix, term.ID, term.StableHash, want),
+			)
 		}
 		if term.Status == StatusProven && termContainsUnsafeUnknown(term) {
-			issues = append(issues, fmt.Sprintf("%s: unsafe_unknown cannot be promoted to proven proof %s", prefix, term.ID))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"%s: unsafe_unknown cannot be promoted to proven proof %s",
+					prefix,
+					term.ID,
+				),
+			)
 		}
 	}
 	if len(issues) > 0 {
@@ -134,14 +144,34 @@ func (s Store) ValidateReferences(refs []Reference) error {
 		}
 		if ref.Subject.Kind != "" || ref.Subject.ID != "" {
 			if ref.Subject != term.Subject {
-				issues = append(issues, fmt.Sprintf("reference %d: subject mismatch for %s: got %+v want %+v", i, ref.ID, ref.Subject, term.Subject))
+				issues = append(
+					issues,
+					fmt.Sprintf(
+						"reference %d: subject mismatch for %s: got %+v want %+v",
+						i,
+						ref.ID,
+						ref.Subject,
+						term.Subject,
+					),
+				)
 			}
 		}
 		if ref.StableHash != "" && ref.StableHash != term.StableHash {
-			issues = append(issues, fmt.Sprintf("reference %d: stable hash mismatch for %s", i, ref.ID))
+			issues = append(
+				issues,
+				fmt.Sprintf("reference %d: stable hash mismatch for %s", i, ref.ID),
+			)
 		}
 		if term.Status == StatusRejected || term.Status == StatusUnknown {
-			issues = append(issues, fmt.Sprintf("reference %d: proof %s has unusable status %s", i, ref.ID, term.Status))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"reference %d: proof %s has unusable status %s",
+					i,
+					ref.ID,
+					term.Status,
+				),
+			)
 		}
 	}
 	if len(issues) > 0 {

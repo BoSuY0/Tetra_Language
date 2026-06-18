@@ -1,12 +1,20 @@
 # Full First-Class Callables Fat Handle Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:executing-plans` to implement this plan task-by-task. Use subagents only after the user explicitly authorizes delegation. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:executing-plans` to implement this
+plan task-by-task. Use subagents only after the user explicitly authorizes delegation. Steps use
+checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Promote `language.full-first-class-callables` from `post-v1` to a real v0.4.0 production feature by adding a safe escaping callable ABI beside the current bounded `fnptr` fast path.
+**Goal:** Promote `language.full-first-class-callables` from `post-v1` to a real v0.4.0 production
+feature by adding a safe escaping callable ABI beside the current bounded `fnptr` fast path.
 
-**Architecture:** Keep the existing `fnptr` layout (`target + 8 env slots`) as the local/direct fast path. Add a fixed-width fat callable handle for escaping function values so larger environments, aggregate storage, returns, globals, and cross-module transfer do not require increasing native return-slot counts. Semantics owns escape classification and capture safety; lowering chooses `fnptr` or fat handle from that classification.
+**Architecture:** Keep the existing `fnptr` layout (`target + 8 env slots`) as the local/direct fast
+path. Add a fixed-width fat callable handle for escaping function values so larger environments,
+aggregate storage, returns, globals, and cross-module transfer do not require increasing native
+return-slot counts. Semantics owns escape classification and capture safety; lowering chooses
+`fnptr` or fat handle from that classification.
 
-**Tech Stack:** Go compiler pipeline, Tetra frontend/semantics/lower/IR/native x64 backends, existing release validators, Graphify code graph.
+**Tech Stack:** Go compiler pipeline, Tetra frontend/semantics/lower/IR/native x64 backends,
+existing release validators, Graphify code graph.
 
 ---
 
@@ -14,22 +22,37 @@
 
 - `compiler/features.go` records `language.full-first-class-callables` as `FeatureStatusPostV1`.
 - `docs/release/v0_4_0_completion_audit.md` records the callable model as partial.
-- `docs/release/v0_4_0_callable_evidence_map.md` records Callable Level 1 and constrained Level 2 as current, with full first-class callables still blocked.
+- `docs/release/v0_4_0_callable_evidence_map.md` records Callable Level 1 and constrained Level 2 as
+  current, with full first-class callables still blocked.
 - `compiler/internal/semantics/types.go` caps `FnPtrEnvSlotCount` at `8`.
-- `compiler/internal/backend/x64core/emit.go` supports native returns through 10 slots and reports `unsupported return slots` beyond that.
-- A previous direct raise to 9 env slots made `fnptr` 10 slots and broke aggregate return paths, so the production path must avoid unbounded slot growth.
+- `compiler/internal/backend/x64core/emit.go` supports native returns through 10 slots and reports
+  `unsupported return slots` beyond that.
+- A previous direct raise to 9 env slots made `fnptr` 10 slots and broke aggregate return paths, so
+  the production path must avoid unbounded slot growth.
 
 ## File Structure
 
-- Modify `compiler/internal/semantics/types.go`: add fixed fat-handle slot count and escape classification metadata.
-- Create `compiler/internal/semantics/callable_escape.go`: central escape classifier and capture policy.
-- Modify `compiler/internal/semantics/checker.go`: call classifier at function-typed assignment, return, global, struct-field, enum-payload, and callback boundaries.
-- Modify `compiler/internal/semantics/diagnostics.go`: add stable diagnostics for heap/global/thread escape and unsupported capture kinds.
-- Modify `compiler/internal/lower/callables.go`: lower escaping callables as fixed-width handles; keep `fnptr` fast path for local snapshots.
-- Modify `compiler/internal/ir/ir.go`: add callable-handle IR instructions only if existing `IRCall` plus runtime helpers cannot express the handle cleanly.
-- Modify `compiler/internal/backend/x64core/emit.go` and `compiler/internal/backend/x64abi/*.go` only for tests proving no new return-slot width is needed.
-- Modify `compiler/tests/callables/function_typed_callable_test.go`, `compiler/tests/semantics/closures_semantic_clauses_test.go`, and `compiler/internal/lower/callable_test.go`: add red/green coverage for escaping handles and diagnostics.
-- Modify `compiler/features.go`, `compiler/tests/semantics/features_test.go`, `docs/release/v0_4_0_callable_evidence_map.md`, `docs/release/v0_4_0_completion_audit.md`, and `docs/spec/current_supported_surface.md` only after implementation gates pass.
+- Modify `compiler/internal/semantics/types.go`: add fixed fat-handle slot count and escape
+  classification metadata.
+- Create `compiler/internal/semantics/callable_escape.go`: central escape classifier and capture
+  policy.
+- Modify `compiler/internal/semantics/checker.go`: call classifier at function-typed assignment,
+  return, global, struct-field, enum-payload, and callback boundaries.
+- Modify `compiler/internal/semantics/diagnostics.go`: add stable diagnostics for heap/global/thread
+  escape and unsupported capture kinds.
+- Modify `compiler/internal/lower/callables.go`: lower escaping callables as fixed-width handles;
+  keep `fnptr` fast path for local snapshots.
+- Modify `compiler/internal/ir/ir.go`: add callable-handle IR instructions only if existing `IRCall`
+  plus runtime helpers cannot express the handle cleanly.
+- Modify `compiler/internal/backend/x64core/emit.go` and `compiler/internal/backend/x64abi/*.go`
+  only for tests proving no new return-slot width is needed.
+- Modify `compiler/tests/callables/function_typed_callable_test.go`,
+  `compiler/tests/semantics/closures_semantic_clauses_test.go`, and
+  `compiler/internal/lower/callable_test.go`: add red/green coverage for escaping handles and
+  diagnostics.
+- Modify `compiler/features.go`, `compiler/tests/semantics/features_test.go`,
+  `docs/release/v0_4_0_callable_evidence_map.md`, `docs/release/v0_4_0_completion_audit.md`, and
+  `docs/spec/current_supported_surface.md` only after implementation gates pass.
 
 ## Task 1: Lock the Current Failing Completion Baseline
 
@@ -61,7 +84,9 @@ go run ./tools/cmd/validate-v0-4-readiness \
   --scope-decisions docs/release/v0_4_0_scope_decisions.json
 ```
 
-Expected before this plan is complete: exit 1 with `feature language.full-first-class-callables status = post-v1, want current` and missing implementation/tests/docs/release gate evidence.
+Expected before this plan is complete: exit 1 with
+`feature language.full-first-class-callables status = post-v1, want current` and missing
+implementation/tests/docs/release gate evidence.
 
 - [x] **Step 3: Confirm current bounded callable gates remain green**
 
@@ -83,7 +108,8 @@ Expected: all three commands exit 0.
 
 - [x] **Step 1: Add a runtime smoke for a 9-capture escaping callable return**
 
-Add this test to `compiler/tests/callables/function_typed_callable_test.go` near the captured callable build smokes:
+Add this test to `compiler/tests/callables/function_typed_callable_test.go` near the captured
+callable build smokes:
 
 ```go
 func TestBuildFullCallableEscapedNineCaptureReturnSmoke(t *testing.T) {
@@ -196,7 +222,8 @@ Run:
 go test ./compiler -run 'TestBuildFullCallableEscapedNineCaptureReturnSmoke|TestBuildFullCallableEscapedGlobalNineCaptureSmoke|TestFullCallableGlobalEscapeRejectsMutableCaptureDiagnostic' -count=1
 ```
 
-Expected before implementation: the first two tests fail with the current oversized-capture diagnostic or lowering failure; the diagnostic test fails until the new diagnostic is wired.
+Expected before implementation: the first two tests fail with the current oversized-capture
+diagnostic or lowering failure; the diagnostic test fails until the new diagnostic is wired.
 
 ## Task 3: Add Callable ABI Metadata and Escape Classification
 
@@ -309,7 +336,8 @@ Run:
 go test ./compiler/internal/semantics ./compiler -run 'Callable|Closure|FunctionType' -count=1
 ```
 
-Expected after this task: the command exits 0; the classifier is compiled but behavior is unchanged until Task 4 wires call sites.
+Expected after this task: the command exits 0; the classifier is compiled but behavior is unchanged
+until Task 4 wires call sites.
 
 ## Task 4: Wire Escape Classification Through Semantics
 
@@ -337,11 +365,17 @@ Progress note:
 
 - [ ] **Step 1: Replace oversized-capture rejection at function-typed return boundaries**
 
-Find `captureSlots > FnPtrEnvSlotCount` branches in return analysis in `compiler/internal/semantics/checker.go`. For function-typed returns, replace direct rejection with `classifyCallableEscape(callableBoundaryReturn, captures, types)`. Store `FunctionEscapeKind` and `FunctionHandleValue` in the returned `FunctionFieldInfo` or return metadata that already carries `FunctionCaptures`.
+Find `captureSlots > FnPtrEnvSlotCount` branches in return analysis in
+`compiler/internal/semantics/checker.go`. For function-typed returns, replace direct rejection with
+`classifyCallableEscape(callableBoundaryReturn, captures, types)`. Store `FunctionEscapeKind` and
+`FunctionHandleValue` in the returned `FunctionFieldInfo` or return metadata that already carries
+`FunctionCaptures`.
 
-- [ ] **Step 2: Replace oversized-capture rejection at local/global/field/payload storage boundaries**
+- [ ] **Step 2: Replace oversized-capture rejection at local/global/field/payload storage
+      boundaries**
 
-For each `unsupportedFunctionTypedStorageCaptureError` call in `checker.go`, classify with the concrete boundary:
+For each `unsupportedFunctionTypedStorageCaptureError` call in `checker.go`, classify with the
+concrete boundary:
 
 ```go
 kind, handle, err := classifyCallableEscape(callableBoundaryStructField, captures, types)
@@ -352,11 +386,14 @@ fieldInfo.FunctionEscapeKind = kind
 fieldInfo.FunctionHandleValue = handle
 ```
 
-Use `callableBoundaryLocal`, `callableBoundaryGlobal`, `callableBoundaryStructField`, or `callableBoundaryEnumPayload` according to the target.
+Use `callableBoundaryLocal`, `callableBoundaryGlobal`, `callableBoundaryStructField`, or
+`callableBoundaryEnumPayload` according to the target.
 
 - [ ] **Step 3: Preserve metadata through aliases and cross-module interface stubs**
 
-When copying `FunctionValue`, `FunctionCaptures`, `FunctionEscapeCaptures`, `FunctionParamName`, or target sets, also copy `FunctionEscapeKind` and `FunctionHandleValue`. Apply this to local aliases, struct fields, enum payloads, function-typed returns, and generated `.t4i` metadata paths.
+When copying `FunctionValue`, `FunctionCaptures`, `FunctionEscapeCaptures`, `FunctionParamName`, or
+target sets, also copy `FunctionEscapeKind` and `FunctionHandleValue`. Apply this to local aliases,
+struct fields, enum payloads, function-typed returns, and generated `.t4i` metadata paths.
 
 - [ ] **Step 4: Run red tests again**
 
@@ -366,14 +403,16 @@ Run:
 go test ./compiler -run 'TestBuildFullCallableEscapedNineCaptureReturnSmoke|TestBuildFullCallableEscapedGlobalNineCaptureSmoke|TestFullCallableGlobalEscapeRejectsMutableCaptureDiagnostic' -count=1
 ```
 
-Expected after this task: the thread diagnostic passes; runtime smokes reach lowering and fail there until handle lowering exists.
+Expected after this task: the thread diagnostic passes; runtime smokes reach lowering and fail there
+until handle lowering exists.
 
 ## Task 5: Lower Fat Callable Handles Without Increasing Return Slots
 
 **Files:**
 - Modify: `compiler/internal/lower/callables.go`
 - Modify: `compiler/internal/lower/lower.go`
-- Modify: `compiler/internal/ir/ir.go` only when existing instructions cannot express the runtime helper calls.
+- Modify: `compiler/internal/ir/ir.go` only when existing instructions cannot express the runtime
+  helper calls.
 
 - [ ] **Step 1: Add runtime helper names in lowering**
 
@@ -401,7 +440,10 @@ The emitted stack shape must be exactly `CallableHandleSlotCount`, independent o
 
 - [ ] **Step 3: Dispatch through handle-aware call path**
 
-For function-typed direct calls, struct-field calls, enum-payload calls, callback arguments, and returned callables, branch on `FunctionHandleValue`. Existing `fnptr` dispatch remains unchanged. Handle dispatch calls `__tetra_callable_invoke` with the handle slots plus user arguments and expects the declared return slot count.
+For function-typed direct calls, struct-field calls, enum-payload calls, callback arguments, and
+returned callables, branch on `FunctionHandleValue`. Existing `fnptr` dispatch remains unchanged.
+Handle dispatch calls `__tetra_callable_invoke` with the handle slots plus user arguments and
+expects the declared return slot count.
 
 - [ ] **Step 4: Add lowerer IR assertions**
 
@@ -413,7 +455,8 @@ if apply.ReturnSlots > 10 {
 }
 ```
 
-and proving emitted callable handle storage uses `semantics.CallableHandleSlotCount`, not capture count.
+and proving emitted callable handle storage uses `semantics.CallableHandleSlotCount`, not capture
+count.
 
 - [ ] **Step 5: Run lowering tests**
 
@@ -424,13 +467,15 @@ go test ./compiler/internal/lower -run 'Callable|FunctionType' -count=1
 go test ./compiler -run 'TestBuildFullCallableEscapedNineCaptureReturnSmoke|TestBuildFullCallableEscapedGlobalNineCaptureSmoke' -count=1
 ```
 
-Expected after this task: lowerer tests pass; runtime smokes may fail at backend/link/runtime helper implementation.
+Expected after this task: lowerer tests pass; runtime smokes may fail at backend/link/runtime helper
+implementation.
 
 ## Task 6: Implement Native Runtime Helpers for Handles
 
 **Files:**
 - Modify: `compiler/internal/backend/x64core/emit.go`
-- Modify: `compiler/internal/backend/x64obj/builder.go` only if symbol patching needs helper registration.
+- Modify: `compiler/internal/backend/x64obj/builder.go` only if symbol patching needs helper
+  registration.
 - Modify: runtime support files that already define `__tetra_*` helper symbols.
 
 - [ ] **Step 1: Locate existing helper symbol registration**
@@ -451,7 +496,8 @@ Implement:
 - `__tetra_callable_slot(handle[4], index: i64, value: i64) -> i64`
 - `__tetra_callable_invoke(handle[4], argc: i64, arg_base: ptr) -> declared return slots`
 
-The helper storage must be deterministic for tests and must not expose raw mutable capture references across thread boundaries.
+The helper storage must be deterministic for tests and must not expose raw mutable capture
+references across thread boundaries.
 
 - [ ] **Step 3: Run native backend tests**
 
@@ -461,7 +507,8 @@ Run:
 go test ./compiler/internal/backend/... ./compiler -run 'Callable|Closure|FunctionType|ABI' -count=1
 ```
 
-Expected after this task: runtime handle smokes pass on linux/amd64; ABI tests still pass without raising return-slot limits.
+Expected after this task: runtime handle smokes pass on linux/amd64; ABI tests still pass without
+raising return-slot limits.
 
 ## Task 7: Complete Cross-Module and Container Matrix
 
@@ -473,7 +520,9 @@ Expected after this task: runtime handle smokes pass on linux/amd64; ABI tests s
 
 - [x] **Step 1: Add cross-module returned handle smoke**
 
-Add a `buildAndRunFiles` smoke where module `callbacks` returns a 9-capture closure as `fn(Int) -> Int`; app imports it and calls through local, struct field, enum payload, callback argument, and return alias.
+Add a `buildAndRunFiles` smoke where module `callbacks` returns a 9-capture closure as
+`fn(Int) -> Int`; app imports it and calls through local, struct field, enum payload, callback
+argument, and return alias.
 
 - [x] **Step 2: Add interface metadata assertions**
 
@@ -531,7 +580,10 @@ Expected: all commands exit 0.
 
 - [x] **Step 2: Promote registry after implementation evidence exists**
 
-Change `language.full-first-class-callables` in `compiler/features.go` from `FeatureStatusPostV1` to `FeatureStatusCurrent` and set `Since: "v0.4.0"`. Update `compiler/tests/semantics/features_test.go` to require current status and scope text covering fat callable handle, escape classifier, capture matrix, and stable diagnostics.
+Change `language.full-first-class-callables` in `compiler/features.go` from `FeatureStatusPostV1` to
+`FeatureStatusCurrent` and set `Since: "v0.4.0"`. Update `compiler/tests/semantics/features_test.go`
+to require current status and scope text covering fat callable handle, escape classifier, capture
+matrix, and stable diagnostics.
 
 - [x] **Step 3: Update release docs**
 
@@ -556,7 +608,8 @@ go run ./tools/cmd/validate-v0-4-readiness \
   --scope-decisions docs/release/v0_4_0_scope_decisions.json
 ```
 
-Expected for callable slice: no `language.full-first-class-callables` status or evidence failure remains. Other v0.4.0 blockers may still fail until their features are implemented.
+Expected for callable slice: no `language.full-first-class-callables` status or evidence failure
+remains. Other v0.4.0 blockers may still fail until their features are implemented.
 
 ## Task 9: Final Verification and Graphify Update
 
@@ -586,7 +639,8 @@ Run:
 graphify update .
 ```
 
-Expected: graph rebuild exits 0 and updates `graphify-out/graph.json` plus `graphify-out/GRAPH_REPORT.md`.
+Expected: graph rebuild exits 0 and updates `graphify-out/graph.json` plus
+`graphify-out/GRAPH_REPORT.md`.
 
 - [x] **Step 3: Record remaining non-callable blockers**
 
@@ -600,28 +654,62 @@ go run ./tools/cmd/validate-v0-4-readiness \
   --scope-decisions docs/release/v0_4_0_scope_decisions.json
 ```
 
-Expected after callable completion: any remaining failures name non-callable blockers such as distributed Eco, distributed actors, native UI runtime, or cross-host runtime evidence. Do not mark the active goal complete unless this command and the objective-specific audit prove every requirement in the user objective is covered.
+Expected after callable completion: any remaining failures name non-callable blockers such as
+distributed Eco, distributed actors, native UI runtime, or cross-host runtime evidence. Do not mark
+the active goal complete unless this command and the objective-specific audit prove every
+requirement in the user objective is covered.
 
 ## 2026-05-06 Narrow Slice Progress
 
-- [x] Direct nine-capture local callable handle smoke is implemented and covered by `TestBuildFullCallableLocalNineCaptureSmoke`.
-- [x] Direct nine-capture mutable local callable reassignment handle smoke is implemented and covered by `TestBuildFullCallableMutableLocalReassignNineCaptureSmoke`.
-- [x] Direct nine-capture function-typed return handle smoke is implemented and covered by `TestBuildFullCallableEscapedNineCaptureReturnSmoke`.
-- [x] Direct nine-capture same-module mutable global snapshot handle smoke is implemented and covered by `TestBuildFullCallableEscapedGlobalNineCaptureSmoke`.
-- [x] Direct nine-capture immutable local struct-field initializer/direct-call handle smoke is implemented and covered by `TestBuildFullCallableStructFieldNineCaptureSmoke`, `TestFullCallableStructFieldNineCapturePassesSemanticClassification`, and `TestFullCallableStructFieldNineCaptureLowersHandleEnvironment`.
-- [x] Direct nine-capture mutable local struct-field reassignment/direct-call handle smoke is implemented and covered by `TestBuildFullCallableStructFieldReassignNineCaptureSmoke`.
-- [x] Direct nine-capture local enum-payload initializer/reassignment and pattern-bound direct-call handle smoke is implemented and covered by `TestBuildFullCallableEnumPayloadNineCaptureSmoke`, `TestBuildFullCallableEnumPayloadReassignNineCaptureSmoke`, `TestFullCallableEnumPayloadNineCapturePassesSemanticClassification`, and `TestFullCallableEnumPayloadNineCaptureLowersHandleEnvironment`.
-- [x] Direct nine-capture closure-literal synchronous callback argument handle smoke is implemented and covered by `TestBuildFullCallableCallbackArgumentNineCaptureSmoke`.
-- [x] Direct nine-capture handle-backed function-typed local synchronous callback argument smoke is implemented and covered by `TestBuildFullCallableLocalCallbackArgumentNineCaptureSmoke`.
-- [x] Cross-module returned nine-capture callable handle matrix smoke is implemented and covered by `TestBuildFullCallableCrossModuleReturnedNineCaptureMatrixSmoke`.
-- [x] Generated `.t4i` direct returned function-value stubs preserve nine-capture heap handle metadata and are covered by `TestGenerateInterfaceFromSourcePreservesReturnedFunctionHandleMetadata`.
-- [x] Mutable/resource escape diagnostics are covered by source-level heap/global resource and heap mutable tests in `TestBuildFunctionTypedCallableMVPRejectsUnsupportedForms`, thread-boundary classifier tests in `TestClassifyCallableEscapeRejectsMutableCaptureAcrossThreadBoundary` and `TestClassifyCallableEscapeRejectsResourceCaptureAcrossThreadBoundary`, existing imported mutable-global ABI diagnostics, and existing unsupported generic callable movement diagnostics.
-- [x] Twelve-capture callable aliases now move through function-typed returns, same-module mutable global snapshots, and synchronous callback arguments, covered by `TestBuildFullCallableReturnAliasTwelveCaptureSmoke`, `TestBuildFullCallableGlobalAliasTwelveCaptureSmoke`, and `TestBuildFullCallableCallbackAliasTwelveCaptureSmoke`.
-- [x] Full first-class callables are promoted: `language.full-first-class-callables` is current since `v0.4.0`; readiness no longer reports callable-specific status or evidence blockers. Remaining readiness failures are non-callable or cross-host evidence blockers.
+- [x] Direct nine-capture local callable handle smoke is implemented and covered by
+      `TestBuildFullCallableLocalNineCaptureSmoke`.
+- [x] Direct nine-capture mutable local callable reassignment handle smoke is implemented and
+      covered by `TestBuildFullCallableMutableLocalReassignNineCaptureSmoke`.
+- [x] Direct nine-capture function-typed return handle smoke is implemented and covered by
+      `TestBuildFullCallableEscapedNineCaptureReturnSmoke`.
+- [x] Direct nine-capture same-module mutable global snapshot handle smoke is implemented and
+      covered by `TestBuildFullCallableEscapedGlobalNineCaptureSmoke`.
+- [x] Direct nine-capture immutable local struct-field initializer/direct-call handle smoke is
+      implemented and covered by `TestBuildFullCallableStructFieldNineCaptureSmoke`,
+      `TestFullCallableStructFieldNineCapturePassesSemanticClassification`, and
+      `TestFullCallableStructFieldNineCaptureLowersHandleEnvironment`.
+- [x] Direct nine-capture mutable local struct-field reassignment/direct-call handle smoke is
+      implemented and covered by `TestBuildFullCallableStructFieldReassignNineCaptureSmoke`.
+- [x] Direct nine-capture local enum-payload initializer/reassignment and pattern-bound direct-call
+      handle smoke is implemented and covered by `TestBuildFullCallableEnumPayloadNineCaptureSmoke`,
+      `TestBuildFullCallableEnumPayloadReassignNineCaptureSmoke`,
+      `TestFullCallableEnumPayloadNineCapturePassesSemanticClassification`, and
+      `TestFullCallableEnumPayloadNineCaptureLowersHandleEnvironment`.
+- [x] Direct nine-capture closure-literal synchronous callback argument handle smoke is implemented
+      and covered by `TestBuildFullCallableCallbackArgumentNineCaptureSmoke`.
+- [x] Direct nine-capture handle-backed function-typed local synchronous callback argument smoke is
+      implemented and covered by `TestBuildFullCallableLocalCallbackArgumentNineCaptureSmoke`.
+- [x] Cross-module returned nine-capture callable handle matrix smoke is implemented and covered by
+      `TestBuildFullCallableCrossModuleReturnedNineCaptureMatrixSmoke`.
+- [x] Generated `.t4i` direct returned function-value stubs preserve nine-capture heap handle
+      metadata and are covered by
+      `TestGenerateInterfaceFromSourcePreservesReturnedFunctionHandleMetadata`.
+- [x] Mutable/resource escape diagnostics are covered by source-level heap/global resource and heap
+      mutable tests in `TestBuildFunctionTypedCallableMVPRejectsUnsupportedForms`, thread-boundary
+      classifier tests in `TestClassifyCallableEscapeRejectsMutableCaptureAcrossThreadBoundary` and
+      `TestClassifyCallableEscapeRejectsResourceCaptureAcrossThreadBoundary`, existing imported
+      mutable-global ABI diagnostics, and existing unsupported generic callable movement
+      diagnostics.
+- [x] Twelve-capture callable aliases now move through function-typed returns, same-module mutable
+      global snapshots, and synchronous callback arguments, covered by
+      `TestBuildFullCallableReturnAliasTwelveCaptureSmoke`,
+      `TestBuildFullCallableGlobalAliasTwelveCaptureSmoke`, and
+      `TestBuildFullCallableCallbackAliasTwelveCaptureSmoke`.
+- [x] Full first-class callables are promoted: `language.full-first-class-callables` is current
+      since `v0.4.0`; readiness no longer reports callable-specific status or evidence blockers.
+      Remaining readiness failures are non-callable or cross-host evidence blockers.
 
 ## Self-Review Notes
 
-- The plan directly maps the user objective to ABI, capture matrix, escape control, storage/return/callback paths, diagnostics, docs, registry, readiness gate, and test evidence.
+- The plan directly maps the user objective to ABI, capture matrix, escape control,
+  storage/return/callback paths, diagnostics, docs, registry, readiness gate, and test evidence.
 - The first implementation task is a red test task; implementation follows TDD.
-- The plan avoids raising `FnPtrEnvSlotCount`, preserving the verified fast path and avoiding the aggregate return-slot failure already observed.
-- The plan does not authorize subagents; it names `executing-plans` as the execution skill because the user has not requested delegation.
+- The plan avoids raising `FnPtrEnvSlotCount`, preserving the verified fast path and avoiding the
+  aggregate return-slot failure already observed.
+- The plan does not authorize subagents; it names `executing-plans` as the execution skill because
+  the user has not requested delegation.

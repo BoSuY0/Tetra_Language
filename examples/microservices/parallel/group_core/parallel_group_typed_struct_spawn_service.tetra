@@ -1,0 +1,31 @@
+// Typed task-group struct spawn microservice smoke.
+//
+// The service carries a task group through a struct field, spawns a typed
+// grouped worker from the recovered handle, joins it, and closes the handle.
+module examples.microservices.parallel.group_core.parallel_group_typed_struct_spawn_service
+enum GroupErr:
+    case stopped
+    case code(Int)
+
+struct GroupBox:
+    group: task.group
+
+func worker() -> Int throws GroupErr:
+    return 42
+
+func main() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let box: GroupBox = GroupBox(group: group)
+    let task = core.task_spawn_group_i32_typed<GroupErr>(box.group, "worker")
+    let status: Int = catch core.task_join_group_i32_typed<GroupErr>(task):
+    case GroupErr.stopped:
+        7
+    case GroupErr.code(code):
+        code
+    let close_error: Int = core.task_group_close(box.group)
+    if close_error != 0:
+        return 20 + close_error
+    if status == 42:
+        return 0
+    return status

@@ -99,7 +99,11 @@ func writeSampleCorpus(t *testing.T) string {
 	if err := os.WriteFile(filepath.Join(dir, "sample.proof.json"), []byte(proof), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "sample.bounds.json"), []byte(`{"totals":{"removed":0,"left":1}}`), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(dir, "sample.bounds.json"),
+		[]byte(`{"totals":{"removed":0,"left":1}}`),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 	return dir

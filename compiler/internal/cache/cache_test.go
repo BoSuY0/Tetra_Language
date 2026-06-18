@@ -28,9 +28,19 @@ func TestCacheKeyIncludesCompilerCacheABI(t *testing.T) {
 	depHash := sha256.Sum256([]byte("deps"))
 
 	got := cacheKey("app.game", "linux-x64", "release-opt", srcHash, depHash)
-	want := expectedCacheKeyWithCompilerCacheABI("app.game", "linux-x64", "release-opt", srcHash, depHash)
+	want := expectedCacheKeyWithCompilerCacheABI(
+		"app.game",
+		"linux-x64",
+		"release-opt",
+		srcHash,
+		depHash,
+	)
 	if got != want {
-		t.Fatalf("cacheKey mismatch without compiler cache ABI discriminator: got %s want %s", got, want)
+		t.Fatalf(
+			"cacheKey mismatch without compiler cache ABI discriminator: got %s want %s",
+			got,
+			want,
+		)
 	}
 }
 
@@ -59,7 +69,14 @@ func TestLoadCachedObjectTreatsCorruptEntryAsMissAndRemovesIt(t *testing.T) {
 		t.Fatalf("write corrupt cache entry: %v", err)
 	}
 
-	obj, hit, err := LoadCachedObject(root, "linux-x64", "release-opt", "app.game", srcHash, depHash)
+	obj, hit, err := LoadCachedObject(
+		root,
+		"linux-x64",
+		"release-opt",
+		"app.game",
+		srcHash,
+		depHash,
+	)
 	if err != nil {
 		t.Fatalf("load corrupt cache entry: %v", err)
 	}
@@ -100,7 +117,10 @@ func expectedCacheKey(module, target, buildTag string, srcHash, depHash [32]byte
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func expectedCacheKeyWithCompilerCacheABI(module, target, buildTag string, srcHash, depHash [32]byte) string {
+func expectedCacheKeyWithCompilerCacheABI(
+	module, target, buildTag string,
+	srcHash, depHash [32]byte,
+) string {
 	h := sha256.New()
 	h.Write([]byte(module))
 	h.Write([]byte{0})

@@ -1,0 +1,19 @@
+// Minimal Block-first Surface model smoke.
+module examples.surface.block_core.surface_block_minimal
+
+import lib.core.surface as surface
+import lib.core.block as block
+
+func main() -> Int:
+    let rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 320, h: 200)
+    let bg: surface.Color = surface.Color(r: 24, g: 32, b: 40, a: 255)
+    let fg: surface.Color = surface.Color(r: 238, g: 242, b: 246, a: 255)
+    let id: block.BlockID = block.id(1)
+    let layout: block.LayoutSpec = block.layout_fixed(rect)
+    let paint: block.PaintSpec = block.paint_from_layer(block.paint_layer_fill(bg))
+    let text: block.TextSpec = block.text_label(18, fg)
+    let props: block.BlockProps = block.props(layout, paint, text, block.image_none(), block.input_clickable(), block.event_click(block.action_primary()), block.state_interactive(), block.motion_fast(), block.accessibility_button(18), block.asset_none())
+    let root: block.Block = block.make(id, block.id_none(), props)
+    if block.id_value(root.id) == 1 && root.props.text_len == 18 && root.props.paint_layers == 1:
+        return 0
+    return 1

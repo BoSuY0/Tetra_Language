@@ -64,6 +64,10 @@ const (
 	AllocationReportReusePolicy           AllocationReportHook = "allocator_reuse_policy"
 	AllocationReportRegionID              AllocationReportHook = "region_id"
 	AllocationReportLifetime              AllocationReportHook = "lifetime"
+	AllocationReportDomainID              AllocationReportHook = "domain_id"
+	AllocationReportDomainKind            AllocationReportHook = "domain_kind"
+	AllocationReportDomainOwner           AllocationReportHook = "domain_owner"
+	AllocationReportDomainLifetime        AllocationReportHook = "domain_lifetime"
 	AllocationReportDebugMode             AllocationReportHook = "debug_mode"
 	AllocationReportRawPointerBounds      AllocationReportHook = "raw_pointer_bounds"
 	AllocationReportRawPointerBase        AllocationReportHook = "raw_pointer_base"
@@ -90,30 +94,36 @@ func RuntimeAllocationContracts() []RuntimeAllocationContract {
 		makeSliceContract("make_i32"),
 		makeSliceContract("make_bool"),
 		{
-			API:                  "core.island_new",
-			RuntimePath:          AllocationPathExplicitIsland,
-			AlignmentBytes:       16,
-			ZeroSizeBehavior:     AllocationZeroRegionHeaderOnly,
-			NegativeBehavior:     AllocationRejectBeforeAllocator,
-			OverflowBehavior:     AllocationRejectBeforeAllocator,
-			FailureBehavior:      AllocationFailureTrapOrStatus,
-			DebugInstrumentation: []AllocationDebugInstrumentation{AllocationDebugDoubleFree, AllocationDebugUseAfterFree},
-			ReportHooks:          RequiredAllocationReportHooks(),
+			API:              "core.island_new",
+			RuntimePath:      AllocationPathExplicitIsland,
+			AlignmentBytes:   16,
+			ZeroSizeBehavior: AllocationZeroRegionHeaderOnly,
+			NegativeBehavior: AllocationRejectBeforeAllocator,
+			OverflowBehavior: AllocationRejectBeforeAllocator,
+			FailureBehavior:  AllocationFailureTrapOrStatus,
+			DebugInstrumentation: []AllocationDebugInstrumentation{
+				AllocationDebugDoubleFree,
+				AllocationDebugUseAfterFree,
+			},
+			ReportHooks: RequiredAllocationReportHooks(),
 		},
 		islandMakeContract("core.island_make_u8"),
 		islandMakeContract("core.island_make_u16"),
 		islandMakeContract("core.island_make_i32"),
 		islandMakeContract("core.island_make_bool"),
 		{
-			API:                  "region.temp",
-			RuntimePath:          AllocationPathRegion,
-			AlignmentBytes:       16,
-			ZeroSizeBehavior:     AllocationZeroCanonicalEmpty,
-			NegativeBehavior:     AllocationRejectBeforeAllocator,
-			OverflowBehavior:     AllocationRejectBeforeAllocator,
-			FailureBehavior:      AllocationFailureTrapOrStatus,
-			DebugInstrumentation: []AllocationDebugInstrumentation{AllocationDebugRegionReset, AllocationDebugUseAfterFree},
-			ReportHooks:          RequiredAllocationReportHooks(),
+			API:              "region.temp",
+			RuntimePath:      AllocationPathRegion,
+			AlignmentBytes:   16,
+			ZeroSizeBehavior: AllocationZeroCanonicalEmpty,
+			NegativeBehavior: AllocationRejectBeforeAllocator,
+			OverflowBehavior: AllocationRejectBeforeAllocator,
+			FailureBehavior:  AllocationFailureTrapOrStatus,
+			DebugInstrumentation: []AllocationDebugInstrumentation{
+				AllocationDebugRegionReset,
+				AllocationDebugUseAfterFree,
+			},
+			ReportHooks: RequiredAllocationReportHooks(),
 		},
 	}
 	sort.Slice(contracts, func(i, j int) bool { return contracts[i].API < contracts[j].API })
@@ -140,6 +150,10 @@ func RequiredAllocationReportHooks() []AllocationReportHook {
 		AllocationReportReusePolicy,
 		AllocationReportRegionID,
 		AllocationReportLifetime,
+		AllocationReportDomainID,
+		AllocationReportDomainKind,
+		AllocationReportDomainOwner,
+		AllocationReportDomainLifetime,
 		AllocationReportDebugMode,
 	}
 }
@@ -152,23 +166,42 @@ func ValidateRuntimeAllocationContract(contract RuntimeAllocationContract) error
 		return fmt.Errorf("runtime allocation contract %s: runtime_path is required", contract.API)
 	}
 	if contract.AlignmentBytes <= 0 || !isPowerOfTwo(contract.AlignmentBytes) {
-		return fmt.Errorf("runtime allocation contract %s: alignment must be a positive power-of-two", contract.API)
+		return fmt.Errorf(
+			"runtime allocation contract %s: alignment must be a positive power-of-two",
+			contract.API,
+		)
 	}
 	if contract.ZeroSizeBehavior == "" {
-		return fmt.Errorf("runtime allocation contract %s: zero-size behavior is required", contract.API)
+		return fmt.Errorf(
+			"runtime allocation contract %s: zero-size behavior is required",
+			contract.API,
+		)
 	}
 	if contract.NegativeBehavior == "" {
-		return fmt.Errorf("runtime allocation contract %s: negative guard behavior is required", contract.API)
+		return fmt.Errorf(
+			"runtime allocation contract %s: negative guard behavior is required",
+			contract.API,
+		)
 	}
 	if contract.OverflowBehavior == "" {
-		return fmt.Errorf("runtime allocation contract %s: overflow guard behavior is required", contract.API)
+		return fmt.Errorf(
+			"runtime allocation contract %s: overflow guard behavior is required",
+			contract.API,
+		)
 	}
 	if contract.FailureBehavior == "" {
-		return fmt.Errorf("runtime allocation contract %s: failure behavior is required", contract.API)
+		return fmt.Errorf(
+			"runtime allocation contract %s: failure behavior is required",
+			contract.API,
+		)
 	}
 	for _, hook := range RequiredAllocationReportHooks() {
 		if !contract.HasReportHook(hook) {
-			return fmt.Errorf("runtime allocation contract %s: missing report hook %s", contract.API, hook)
+			return fmt.Errorf(
+				"runtime allocation contract %s: missing report hook %s",
+				contract.API,
+				hook,
+			)
 		}
 	}
 	return nil
@@ -183,7 +216,9 @@ func (contract RuntimeAllocationContract) HasReportHook(hook AllocationReportHoo
 	return false
 }
 
-func (contract RuntimeAllocationContract) HasDebugInstrumentation(hook AllocationDebugInstrumentation) bool {
+func (contract RuntimeAllocationContract) HasDebugInstrumentation(
+	hook AllocationDebugInstrumentation,
+) bool {
 	for _, candidate := range contract.DebugInstrumentation {
 		if candidate == hook {
 			return true
@@ -224,15 +259,18 @@ func makeSliceContract(api string) RuntimeAllocationContract {
 
 func islandMakeContract(api string) RuntimeAllocationContract {
 	return RuntimeAllocationContract{
-		API:                  api,
-		RuntimePath:          AllocationPathExplicitIsland,
-		AlignmentBytes:       16,
-		ZeroSizeBehavior:     AllocationZeroCanonicalEmptyNoMetadata,
-		NegativeBehavior:     AllocationRejectBeforeMetadata,
-		OverflowBehavior:     AllocationRejectBeforeMetadata,
-		FailureBehavior:      AllocationFailureTrapOrStatus,
-		DebugInstrumentation: []AllocationDebugInstrumentation{AllocationDebugDoubleFree, AllocationDebugUseAfterFree},
-		ReportHooks:          RequiredAllocationReportHooks(),
+		API:              api,
+		RuntimePath:      AllocationPathExplicitIsland,
+		AlignmentBytes:   16,
+		ZeroSizeBehavior: AllocationZeroCanonicalEmptyNoMetadata,
+		NegativeBehavior: AllocationRejectBeforeMetadata,
+		OverflowBehavior: AllocationRejectBeforeMetadata,
+		FailureBehavior:  AllocationFailureTrapOrStatus,
+		DebugInstrumentation: []AllocationDebugInstrumentation{
+			AllocationDebugDoubleFree,
+			AllocationDebugUseAfterFree,
+		},
+		ReportHooks: RequiredAllocationReportHooks(),
 	}
 }
 

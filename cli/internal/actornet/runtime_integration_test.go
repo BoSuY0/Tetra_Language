@@ -45,7 +45,12 @@ uses actors, runtime:
 	}
 
 	outPath := filepath.Join(tmp, "connect-broker")
-	if _, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, "linux-x64", compiler.BuildOptions{Jobs: 1}); err != nil {
+	if _, err := compiler.BuildFileWithStatsOpt(
+		srcPath,
+		outPath,
+		"linux-x64",
+		compiler.BuildOptions{Jobs: 1},
+	); err != nil {
 		t.Fatalf("build linux runtime smoke: %v", err)
 	}
 
@@ -94,7 +99,12 @@ uses actors, runtime:
 		t.Fatalf("write source: %v", err)
 	}
 	outPath := filepath.Join(tmp, "connect-raw")
-	if _, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, "linux-x64", compiler.BuildOptions{Jobs: 1}); err != nil {
+	if _, err := compiler.BuildFileWithStatsOpt(
+		srcPath,
+		outPath,
+		"linux-x64",
+		compiler.BuildOptions{Jobs: 1},
+	); err != nil {
 		t.Fatalf("build linux runtime smoke: %v", err)
 	}
 
@@ -167,7 +177,12 @@ uses actors, runtime:
 	}
 
 	outPath := filepath.Join(tmp, "remote-send-broker")
-	if _, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, "linux-x64", compiler.BuildOptions{Jobs: 1}); err != nil {
+	if _, err := compiler.BuildFileWithStatsOpt(
+		srcPath,
+		outPath,
+		"linux-x64",
+		compiler.BuildOptions{Jobs: 1},
+	); err != nil {
 		t.Fatalf("build linux runtime smoke: %v", err)
 	}
 
@@ -238,7 +253,12 @@ uses actors, runtime:
 	}
 
 	outPath := filepath.Join(tmp, "remote-typed-send-peer")
-	if _, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, "linux-x64", compiler.BuildOptions{Jobs: 1}); err != nil {
+	if _, err := compiler.BuildFileWithStatsOpt(
+		srcPath,
+		outPath,
+		"linux-x64",
+		compiler.BuildOptions{Jobs: 1},
+	); err != nil {
 		t.Fatalf("build linux runtime smoke: %v", err)
 	}
 
@@ -324,7 +344,12 @@ uses actors, runtime:
 	}
 
 	outPath := filepath.Join(tmp, "remote-recv")
-	if _, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, "linux-x64", compiler.BuildOptions{Jobs: 1}); err != nil {
+	if _, err := compiler.BuildFileWithStatsOpt(
+		srcPath,
+		outPath,
+		"linux-x64",
+		compiler.BuildOptions{Jobs: 1},
+	); err != nil {
 		t.Fatalf("build linux runtime smoke: %v", err)
 	}
 
@@ -383,7 +408,11 @@ uses actors, runtime:
 			t.Fatalf("runtime smoke failed: %v output=%q", result.err, result.output)
 		}
 		if result.exitCode != 42 {
-			t.Fatalf("runtime smoke exit code = %d output=%q, want recv payload 42", result.exitCode, result.output)
+			t.Fatalf(
+				"runtime smoke exit code = %d output=%q, want recv payload 42",
+				result.exitCode,
+				result.output,
+			)
 		}
 	case <-ctx.Done():
 		t.Fatalf("runtime smoke timed out")
@@ -425,7 +454,12 @@ uses actors, runtime:
 	}
 
 	outPath := filepath.Join(tmp, "remote-recv-typed-frame-msg")
-	if _, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, "linux-x64", compiler.BuildOptions{Jobs: 1}); err != nil {
+	if _, err := compiler.BuildFileWithStatsOpt(
+		srcPath,
+		outPath,
+		"linux-x64",
+		compiler.BuildOptions{Jobs: 1},
+	); err != nil {
 		t.Fatalf("build linux runtime smoke: %v", err)
 	}
 
@@ -483,7 +517,11 @@ uses actors, runtime:
 			t.Fatalf("runtime smoke failed: %v output=%q", result.err, result.output)
 		}
 		if result.exitCode != 42 {
-			t.Fatalf("runtime smoke exit code = %d output=%q, want typed frame tag 42", result.exitCode, result.output)
+			t.Fatalf(
+				"runtime smoke exit code = %d output=%q, want typed frame tag 42",
+				result.exitCode,
+				result.output,
+			)
 		}
 	case <-ctx.Done():
 		t.Fatalf("runtime smoke timed out")
@@ -533,7 +571,12 @@ uses actors, runtime:
 	}
 
 	outPath := filepath.Join(tmp, "remote-recv-typed-frame-tag-only")
-	if _, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, "linux-x64", compiler.BuildOptions{Jobs: 1}); err != nil {
+	if _, err := compiler.BuildFileWithStatsOpt(
+		srcPath,
+		outPath,
+		"linux-x64",
+		compiler.BuildOptions{Jobs: 1},
+	); err != nil {
 		t.Fatalf("build linux runtime smoke: %v", err)
 	}
 
@@ -592,7 +635,11 @@ uses actors, runtime:
 			t.Fatalf("runtime smoke failed: %v output=%q", result.err, result.output)
 		}
 		if result.exitCode != 42 {
-			t.Fatalf("runtime smoke exit code = %d output=%q, want typed tag-only 42", result.exitCode, result.output)
+			t.Fatalf(
+				"runtime smoke exit code = %d output=%q, want typed tag-only 42",
+				result.exitCode,
+				result.output,
+			)
 		}
 	case <-ctx.Done():
 		t.Fatalf("runtime smoke timed out")
@@ -642,7 +689,12 @@ uses actors, runtime:
 	}
 
 	outPath := filepath.Join(tmp, "remote-recv-typed-frame")
-	if _, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, "linux-x64", compiler.BuildOptions{Jobs: 1}); err != nil {
+	if _, err := compiler.BuildFileWithStatsOpt(
+		srcPath,
+		outPath,
+		"linux-x64",
+		compiler.BuildOptions{Jobs: 1},
+	); err != nil {
 		t.Fatalf("build linux runtime smoke: %v", err)
 	}
 
@@ -702,7 +754,279 @@ uses actors, runtime:
 			t.Fatalf("runtime smoke failed: %v output=%q", result.err, result.output)
 		}
 		if result.exitCode != 42 {
-			t.Fatalf("runtime smoke exit code = %d output=%q, want typed payload sum 42", result.exitCode, result.output)
+			t.Fatalf(
+				"runtime smoke exit code = %d output=%q, want typed payload sum 42",
+				result.exitCode,
+				result.output,
+			)
+		}
+	case <-ctx.Done():
+		t.Fatalf("runtime smoke timed out")
+	}
+}
+
+func TestLinuxRuntimeRemoteReceivePreservesMailboxCount(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 executable smoke only")
+	}
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	defer listener.Close()
+
+	_, portRaw, err := net.SplitHostPort(listener.Addr().String())
+	if err != nil {
+		t.Fatalf("split listener address: %v", err)
+	}
+	port, err := strconv.Atoi(portRaw)
+	if err != nil {
+		t.Fatalf("parse listener port: %v", err)
+	}
+
+	tmp := t.TempDir()
+	srcPath := filepath.Join(tmp, "remote_recv_preserves_mailbox_count.tetra")
+	if err := os.WriteFile(srcPath, []byte(`
+func main() -> Int
+uses actors, runtime:
+    let connected: Int = core.actor_node_connect(1, `+strconv.Itoa(port)+`)
+    if connected != 0:
+        return 10 + connected
+    let msg: Int = core.recv()
+    if msg != 42:
+        return 20 + msg
+    let ack: Int = core.send(core.self(), 7)
+    if ack != 7:
+        return 40
+    let local: actor.recv_result_i32 = core.recv_poll()
+    if local.error != 0:
+        return 50 + local.error
+    if local.value != 7:
+        return 60 + local.value
+    return 0
+`), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	outPath := filepath.Join(tmp, "remote-recv-preserves-mailbox-count")
+	if _, err := compiler.BuildFileWithStatsOpt(
+		srcPath,
+		outPath,
+		"linux-x64",
+		compiler.BuildOptions{Jobs: 1},
+	); err != nil {
+		t.Fatalf("build linux runtime smoke: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, outPath)
+	done := make(chan struct {
+		exitCode int
+		output   string
+		err      error
+	}, 1)
+	go func() {
+		output, err := cmd.CombinedOutput()
+		result := struct {
+			exitCode int
+			output   string
+			err      error
+		}{output: string(output)}
+		if err == nil {
+			done <- result
+			return
+		}
+		exitErr, ok := err.(*exec.ExitError)
+		if !ok {
+			result.err = err
+			done <- result
+			return
+		}
+		result.exitCode = exitErr.ExitCode()
+		done <- result
+	}()
+
+	conn, err := listener.Accept()
+	if err != nil {
+		t.Fatalf("accept: %v", err)
+	}
+	defer conn.Close()
+	if got := readTestFrame(t, conn); got.Type != actorwire.FrameHello || got.SourceNodeID != 1 {
+		t.Fatalf("hello frame = %+v, want hello from node 1", got)
+	}
+	writeTestFrames(t, conn,
+		helloAckFrame(1),
+		actorwire.Frame{
+			Type:         actorwire.FrameSendI32,
+			SourceNodeID: 2,
+			DestNodeID:   1,
+			SequenceID:   1,
+			ActorID:      0,
+			Payload:      []int32{42},
+		},
+	)
+
+	select {
+	case result := <-done:
+		if result.err != nil {
+			t.Fatalf("runtime smoke failed: %v output=%q", result.err, result.output)
+		}
+		if result.exitCode != 0 {
+			t.Fatalf(
+				"runtime smoke exit code = %d output=%q, want remote recv not to underflow mailbox count",
+				result.exitCode,
+				result.output,
+			)
+		}
+	case <-ctx.Done():
+		t.Fatalf("runtime smoke timed out")
+	}
+}
+
+func TestLinuxRuntimeInboundOverflowSetsNodeDownStatus(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 executable smoke only")
+	}
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	defer listener.Close()
+
+	_, portRaw, err := net.SplitHostPort(listener.Addr().String())
+	if err != nil {
+		t.Fatalf("split listener address: %v", err)
+	}
+	port, err := strconv.Atoi(portRaw)
+	if err != nil {
+		t.Fatalf("parse listener port: %v", err)
+	}
+
+	tmp := t.TempDir()
+	srcPath := filepath.Join(tmp, "remote_overflow_sets_node_down.tetra")
+	if err := os.WriteFile(srcPath, []byte(`
+val MAILBOX_CAPACITY: i32 = 256
+val THIRD_ACTOR_LIVE_MESSAGES: i32 = 232
+
+func sleeper() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(100)
+    return 0
+
+func main() -> Int
+uses actors, runtime:
+    let connected: Int = core.actor_node_connect(1, `+strconv.Itoa(port)+`)
+    if connected != 0:
+        return 10 + connected
+    let peer_a: actor = core.spawn("sleeper")
+    let peer_b: actor = core.spawn("sleeper")
+    let peer_c: actor = core.spawn("sleeper")
+
+    var sent_a: Int = 0
+    while sent_a < MAILBOX_CAPACITY:
+        let ack_a: Int = core.send(peer_a, sent_a)
+        if ack_a != sent_a:
+            return 20
+        sent_a = sent_a + 1
+
+    var sent_b: Int = 0
+    while sent_b < MAILBOX_CAPACITY:
+        let ack_b: Int = core.send(peer_b, sent_b)
+        if ack_b != sent_b:
+            return 30
+        sent_b = sent_b + 1
+
+    var sent_c: Int = 0
+    while sent_c < THIRD_ACTOR_LIVE_MESSAGES:
+        let ack_c: Int = core.send(peer_c, sent_c)
+        if ack_c != sent_c:
+            return 40
+        sent_c = sent_c + 1
+
+    let result: actor.recv_result_i32 = core.recv_until(core.deadline_ms(1))
+    if result.error != 2:
+        return 50 + result.error
+    let status: Int = core.actor_node_status(1)
+    if status != 1:
+        return 70 + status
+    return 0
+`), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	outPath := filepath.Join(tmp, "remote-overflow-sets-node-down")
+	if _, err := compiler.BuildFileWithStatsOpt(
+		srcPath,
+		outPath,
+		"linux-x64",
+		compiler.BuildOptions{Jobs: 1},
+	); err != nil {
+		t.Fatalf("build linux runtime smoke: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, outPath)
+	done := make(chan struct {
+		exitCode int
+		output   string
+		err      error
+	}, 1)
+	go func() {
+		output, err := cmd.CombinedOutput()
+		result := struct {
+			exitCode int
+			output   string
+			err      error
+		}{output: string(output)}
+		if err == nil {
+			done <- result
+			return
+		}
+		exitErr, ok := err.(*exec.ExitError)
+		if !ok {
+			result.err = err
+			done <- result
+			return
+		}
+		result.exitCode = exitErr.ExitCode()
+		done <- result
+	}()
+
+	conn, err := listener.Accept()
+	if err != nil {
+		t.Fatalf("accept: %v", err)
+	}
+	defer conn.Close()
+	if got := readTestFrame(t, conn); got.Type != actorwire.FrameHello || got.SourceNodeID != 1 {
+		t.Fatalf("hello frame = %+v, want hello from node 1", got)
+	}
+	writeTestFrames(t, conn,
+		helloAckFrame(1),
+		actorwire.Frame{
+			Type:         actorwire.FrameSendI32,
+			SourceNodeID: 2,
+			DestNodeID:   1,
+			SequenceID:   1,
+			ActorID:      0,
+			Payload:      []int32{42},
+		},
+	)
+
+	select {
+	case result := <-done:
+		if result.err != nil {
+			t.Fatalf("runtime smoke failed: %v output=%q", result.err, result.output)
+		}
+		if result.exitCode != 0 {
+			t.Fatalf(
+				"runtime smoke exit code = %d output=%q, want inbound overflow to surface as node-down status",
+				result.exitCode,
+				result.output,
+			)
 		}
 	case <-ctx.Done():
 		t.Fatalf("runtime smoke timed out")
@@ -753,7 +1077,12 @@ uses actors, runtime:
 	}
 
 	outPath := filepath.Join(tmp, "remote-node-down")
-	if _, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, "linux-x64", compiler.BuildOptions{Jobs: 1}); err != nil {
+	if _, err := compiler.BuildFileWithStatsOpt(
+		srcPath,
+		outPath,
+		"linux-x64",
+		compiler.BuildOptions{Jobs: 1},
+	); err != nil {
 		t.Fatalf("build linux runtime smoke: %v", err)
 	}
 

@@ -89,7 +89,10 @@ func ValidateReportJSON(raw []byte) error {
 func ValidateReport(report Report) error {
 	var issues []string
 	if report.SchemaVersion != ReportSchemaV1 {
-		issues = append(issues, fmt.Sprintf("schema_version is %q, want %q", report.SchemaVersion, ReportSchemaV1))
+		issues = append(
+			issues,
+			fmt.Sprintf("schema_version is %q, want %q", report.SchemaVersion, ReportSchemaV1),
+		)
 	}
 	if len(report.Rows) == 0 {
 		issues = append(issues, "rows are required")
@@ -98,7 +101,16 @@ func ValidateReport(report Report) error {
 		issues = append(issues, validateReportRow(i, row)...)
 	}
 	if index, previous, current, ok := firstNonDeterministicReportRow(report.Rows); ok {
-		issues = append(issues, fmt.Sprintf("row %d: non-deterministic memory report row order: source_fact_id %q sorts before previous source_fact_id %q", index, current.SourceFactID, previous.SourceFactID))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				("row %d: non-deterministic memory report row order: source_fact_"+
+					"id %q sorts before previous source_fact_id %q"),
+				index,
+				current.SourceFactID,
+				previous.SourceFactID,
+			),
+		)
 	}
 	seenFactIDs := map[FactID]int{}
 	for i, row := range report.Rows {
@@ -107,7 +119,15 @@ func ValidateReport(report Report) error {
 			continue
 		}
 		if previous, ok := seenFactIDs[sourceFactID]; ok {
-			issues = append(issues, fmt.Sprintf("row %d: duplicate source_fact_id %q also used by row %d", i, sourceFactID, previous))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"row %d: duplicate source_fact_id %q also used by row %d",
+					i,
+					sourceFactID,
+					previous,
+				),
+			)
 			continue
 		}
 		seenFactIDs[sourceFactID] = i
@@ -186,7 +206,14 @@ func ValidateReportProjection(graph *Graph, report Report) error {
 		}
 		expected, ok := expectedRows[sourceFactID]
 		if !ok {
-			issues = append(issues, fmt.Sprintf("row %d: unknown source_fact_id %q in MemoryFactGraph", index, sourceFactID))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"row %d: unknown source_fact_id %q in MemoryFactGraph",
+					index,
+					sourceFactID,
+				),
+			)
 			continue
 		}
 		seenRows[sourceFactID] = true
@@ -194,7 +221,10 @@ func ValidateReportProjection(graph *Graph, report Report) error {
 	}
 	for _, fact := range graphFactsOrNil(graph) {
 		if !seenRows[fact.ID] {
-			issues = append(issues, fmt.Sprintf("missing report row for source_fact_id %q", fact.ID))
+			issues = append(
+				issues,
+				fmt.Sprintf("missing report row for source_fact_id %q", fact.ID),
+			)
 		}
 	}
 	if len(issues) > 0 {
@@ -267,50 +297,223 @@ func graphFactsOrNil(graph *Graph) []Fact {
 
 func validateReportProjectionRow(index int, row ReportRow, expected ReportRow) []string {
 	var issues []string
-	issues = appendProjectionMismatch(issues, index, "program_id", row.ProgramID, expected.ProgramID)
-	issues = appendProjectionMismatch(issues, index, "function_id", row.FunctionID, expected.FunctionID)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"program_id",
+		row.ProgramID,
+		expected.ProgramID,
+	)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"function_id",
+		row.FunctionID,
+		expected.FunctionID,
+	)
 	issues = appendProjectionMismatch(issues, index, "value_id", row.ValueID, expected.ValueID)
 	issues = appendProjectionMismatch(issues, index, "island_id", row.IslandID, expected.IslandID)
 	issues = appendProjectionMismatch(issues, index, "epoch", row.Epoch, expected.Epoch)
 	issues = appendProjectionMismatch(issues, index, "base_id", row.BaseID, expected.BaseID)
 	issues = appendProjectionMismatch(issues, index, "site_id", row.SiteID, expected.SiteID)
-	issues = appendProjectionMismatch(issues, index, "source_span", row.SourceSpan, expected.SourceSpan)
-	issues = appendProjectionMismatch(issues, index, "source_fact_id", row.SourceFactID, expected.SourceFactID)
-	issues = appendProjectionMismatch(issues, index, "parent_fact_id", row.ParentFactID, expected.ParentFactID)
-	issues = appendProjectionMismatch(issues, index, "lowered_artifact_id", row.LoweredArtifactID, expected.LoweredArtifactID)
-	issues = appendProjectionMismatch(issues, index, "source_stage", row.SourceStage, expected.SourceStage)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"source_span",
+		row.SourceSpan,
+		expected.SourceSpan,
+	)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"source_fact_id",
+		row.SourceFactID,
+		expected.SourceFactID,
+	)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"parent_fact_id",
+		row.ParentFactID,
+		expected.ParentFactID,
+	)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"lowered_artifact_id",
+		row.LoweredArtifactID,
+		expected.LoweredArtifactID,
+	)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"source_stage",
+		row.SourceStage,
+		expected.SourceStage,
+	)
 	issues = appendProjectionMismatch(issues, index, "claim", row.Claim, expected.Claim)
-	issues = appendProjectionMismatch(issues, index, "claim_level", row.ClaimLevel, expected.ClaimLevel)
-	issues = appendProjectionMismatch(issues, index, "provenance_class", row.ProvenanceClass, expected.ProvenanceClass)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"claim_level",
+		row.ClaimLevel,
+		expected.ClaimLevel,
+	)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"provenance_class",
+		row.ProvenanceClass,
+		expected.ProvenanceClass,
+	)
 	issues = appendProjectionMismatch(issues, index, "owner_id", row.OwnerID, expected.OwnerID)
 	if !sameOptionalInt(row.ParamIndex, expected.ParamIndex) {
-		issues = append(issues, fmt.Sprintf("row %d: param_index projection mismatch got %v want %v", index, optionalIntValue(row.ParamIndex), optionalIntValue(expected.ParamIndex)))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"row %d: param_index projection mismatch got %v want %v",
+				index,
+				optionalIntValue(row.ParamIndex),
+				optionalIntValue(expected.ParamIndex),
+			),
+		)
 	}
-	issues = appendProjectionMismatch(issues, index, "param_path", row.ParamPath, expected.ParamPath)
-	issues = appendProjectionMismatch(issues, index, "borrow_state", row.BorrowState, expected.BorrowState)
-	issues = appendProjectionMismatch(issues, index, "escape_state", row.EscapeState, expected.EscapeState)
-	issues = appendProjectionMismatch(issues, index, "alias_state", row.AliasState, expected.AliasState)
-	issues = appendProjectionMismatch(issues, index, "unsafe_class", row.UnsafeClass, expected.UnsafeClass)
-	issues = appendProjectionMismatch(issues, index, "allocation_site_id", row.AllocationSiteID, expected.AllocationSiteID)
-	issues = appendProjectionMismatch(issues, index, "planned_storage", row.PlannedStorage, expected.PlannedStorage)
-	issues = appendProjectionMismatch(issues, index, "actual_lowering_storage", row.ActualLoweringStorage, expected.ActualLoweringStorage)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"param_path",
+		row.ParamPath,
+		expected.ParamPath,
+	)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"borrow_state",
+		row.BorrowState,
+		expected.BorrowState,
+	)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"escape_state",
+		row.EscapeState,
+		expected.EscapeState,
+	)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"alias_state",
+		row.AliasState,
+		expected.AliasState,
+	)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"unsafe_class",
+		row.UnsafeClass,
+		expected.UnsafeClass,
+	)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"allocation_site_id",
+		row.AllocationSiteID,
+		expected.AllocationSiteID,
+	)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"planned_storage",
+		row.PlannedStorage,
+		expected.PlannedStorage,
+	)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"actual_lowering_storage",
+		row.ActualLoweringStorage,
+		expected.ActualLoweringStorage,
+	)
 	issues = appendProjectionMismatch(issues, index, "proof_id", row.ProofID, expected.ProofID)
-	issues = appendProjectionMismatch(issues, index, "proof_kind", row.ProofKind, expected.ProofKind)
-	issues = appendProjectionMismatch(issues, index, "proof_subject_base_id", row.ProofSubjectBaseID, expected.ProofSubjectBaseID)
-	issues = appendProjectionMismatch(issues, index, "proof_index_value_id", row.ProofIndexValueID, expected.ProofIndexValueID)
-	issues = appendProjectionMismatch(issues, index, "proof_operation", row.ProofOperation, expected.ProofOperation)
-	issues = appendProjectionMismatch(issues, index, "proof_range", row.ProofRange, expected.ProofRange)
-	issues = appendProjectionMismatch(issues, index, "validator_name", row.ValidatorName, expected.ValidatorName)
-	issues = appendProjectionMismatch(issues, index, "validator_status", row.ValidatorStatus, expected.ValidatorStatus)
-	issues = appendProjectionMismatch(issues, index, "cost_class", row.CostClass, expected.CostClass)
-	issues = appendProjectionMismatch(issues, index, "normal_build_check", row.NormalBuildCheck, expected.NormalBuildCheck)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"proof_kind",
+		row.ProofKind,
+		expected.ProofKind,
+	)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"proof_subject_base_id",
+		row.ProofSubjectBaseID,
+		expected.ProofSubjectBaseID,
+	)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"proof_index_value_id",
+		row.ProofIndexValueID,
+		expected.ProofIndexValueID,
+	)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"proof_operation",
+		row.ProofOperation,
+		expected.ProofOperation,
+	)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"proof_range",
+		row.ProofRange,
+		expected.ProofRange,
+	)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"validator_name",
+		row.ValidatorName,
+		expected.ValidatorName,
+	)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"validator_status",
+		row.ValidatorStatus,
+		expected.ValidatorStatus,
+	)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"cost_class",
+		row.CostClass,
+		expected.CostClass,
+	)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"normal_build_check",
+		row.NormalBuildCheck,
+		expected.NormalBuildCheck,
+	)
 	issues = appendProjectionMismatch(issues, index, "reason", row.Reason, expected.Reason)
 	return issues
 }
 
-func appendProjectionMismatch[T comparable](issues []string, index int, field string, got T, want T) []string {
+func appendProjectionMismatch[T comparable](
+	issues []string,
+	index int,
+	field string,
+	got T,
+	want T,
+) []string {
 	if got != want {
-		return append(issues, fmt.Sprintf("row %d: %s projection mismatch got %v want %v", index, field, got, want))
+		return append(
+			issues,
+			fmt.Sprintf("row %d: %s projection mismatch got %v want %v", index, field, got, want),
+		)
 	}
 	return issues
 }
@@ -354,7 +557,10 @@ func validateReportRow(index int, row ReportRow) []string {
 		issues = append(issues, fmt.Sprintf("%s: unknown source_stage %q", prefix, row.SourceStage))
 	}
 	if !knownProvenanceClass(row.ProvenanceClass) {
-		issues = append(issues, fmt.Sprintf("%s: unknown provenance_class %q", prefix, row.ProvenanceClass))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s: unknown provenance_class %q", prefix, row.ProvenanceClass),
+		)
 	}
 	if !knownUnsafeClass(row.UnsafeClass) {
 		issues = append(issues, fmt.Sprintf("%s: unknown unsafe_class %q", prefix, row.UnsafeClass))
@@ -363,7 +569,10 @@ func validateReportRow(index int, row ReportRow) []string {
 		issues = append(issues, fmt.Sprintf("%s: unknown claim_level %q", prefix, row.ClaimLevel))
 	}
 	if !knownValidatorStatus(row.ValidatorStatus) {
-		issues = append(issues, fmt.Sprintf("%s: unknown validator_status %q", prefix, row.ValidatorStatus))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s: unknown validator_status %q", prefix, row.ValidatorStatus),
+		)
 	}
 	if !knownAliasState(row.AliasState) {
 		issues = append(issues, fmt.Sprintf("%s: unknown alias_state %q", prefix, row.AliasState))
@@ -381,20 +590,48 @@ func validateReportRow(index int, row ReportRow) []string {
 		issues = append(issues, prefix+": island_id requires base_id")
 	}
 	if dynamicRawRuntimeCheckCostDisallowed(row.Claim, row.CostClass) {
-		issues = append(issues, fmt.Sprintf("%s: dynamic raw check claim %q must use %s, got %s", prefix, row.Claim, CostDynamicCheckRequired, row.CostClass))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s: dynamic raw check claim %q must use %s, got %s",
+				prefix,
+				row.Claim,
+				CostDynamicCheckRequired,
+				row.CostClass,
+			),
+		)
 	}
-	if memoryvocab.ZeroCostProvenClaimDisallowed(row.Claim, string(row.CostClass), string(row.ClaimLevel), string(row.PlannedStorage), string(row.ActualLoweringStorage)) {
-		issues = append(issues, fmt.Sprintf("%s: zero_cost_proven requires validated compiler-owned proof for claim %q", prefix, row.Claim))
+	if memoryvocab.ZeroCostProvenClaimDisallowed(
+		row.Claim,
+		string(row.CostClass),
+		string(row.ClaimLevel),
+		string(row.PlannedStorage),
+		string(row.ActualLoweringStorage),
+	) {
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s: zero_cost_proven requires validated compiler-owned proof for claim %q",
+				prefix,
+				row.Claim,
+			),
+		)
 	}
 	if row.CostClass == CostDynamicCheckRequired && !row.NormalBuildCheck {
 		issues = append(issues, prefix+": dynamic_check_required requires normal_build_check")
 	}
 	if row.Claim == "protocol_dispatch_report_integrity" {
 		if row.CostClass != CostDynamicCheckRequired {
-			issues = append(issues, prefix+": protocol_dispatch_report_integrity requires cost_class dynamic_check_required")
+			issues = append(
+				issues,
+				prefix+": protocol_dispatch_report_integrity requires cost_class dynamic_check_required",
+			)
 		}
 		if !row.NormalBuildCheck {
-			issues = append(issues, prefix+": protocol_dispatch_report_integrity requires normal_build_check")
+			issues = append(
+				issues,
+				prefix+": protocol_dispatch_report_integrity requires normal_build_check",
+			)
 		}
 	}
 	if row.ClaimLevel == ClaimValidated && row.ValidatorStatus != ValidatorPass {
@@ -407,54 +644,178 @@ func validateReportRow(index int, row ReportRow) []string {
 		issues = append(issues, prefix+": validated claim requires validator_name")
 	}
 	if row.ClaimLevel == ClaimValidated && boundsTypedProofClaim(row.Claim) {
-		if missing := missingTypedProofFields(row.ProofID, row.ProofKind, row.ProofSubjectBaseID, row.ProofIndexValueID, row.ProofOperation, row.ProofRange); len(missing) > 0 {
-			issues = append(issues, fmt.Sprintf("%s: validated bounds proof claim %q requires typed proof fields: %s", prefix, row.Claim, strings.Join(missing, ", ")))
+		if missing := missingTypedProofFields(
+			row.ProofID,
+			row.ProofKind,
+			row.ProofSubjectBaseID,
+			row.ProofIndexValueID,
+			row.ProofOperation,
+			row.ProofRange,
+		); len(
+			missing,
+		) > 0 {
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"%s: validated bounds proof claim %q requires typed proof fields: %s",
+					prefix,
+					row.Claim,
+					strings.Join(missing, ", "),
+				),
+			)
 		}
 	}
-	if row.ClaimLevel == ClaimValidated && memoryvocab.IslandKernelClaimValidatorMismatch(row.Claim, row.ValidatorName) {
-		issues = append(issues, fmt.Sprintf("%s: validated island claim %q requires validator_name %q", prefix, row.Claim, memoryvocab.RequiredIslandKernelClaimValidator(row.Claim)))
+	if row.ClaimLevel == ClaimValidated &&
+		memoryvocab.IslandKernelClaimValidatorMismatch(row.Claim, row.ValidatorName) {
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s: validated island claim %q requires validator_name %q",
+				prefix,
+				row.Claim,
+				memoryvocab.RequiredIslandKernelClaimValidator(row.Claim),
+			),
+		)
 	}
 	if hasSafeProvenanceFromUnsafeUnknown(row.ProvenanceClass, row.UnsafeClass) {
-		issues = append(issues, fmt.Sprintf("%s: %s claim cannot be sourced from unsafe_unknown", prefix, row.ProvenanceClass))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s: %s claim cannot be sourced from unsafe_unknown",
+				prefix,
+				row.ProvenanceClass,
+			),
+		)
 	}
-	if hasUnsafeUnknownClass(row.ProvenanceClass, row.UnsafeClass) && unsafeUnknownOptimizationClaim(row.Claim, row.AliasState) {
-		issues = append(issues, fmt.Sprintf("%s: unsafe_unknown cannot authorize optimization claim %q", prefix, row.Claim))
+	if hasUnsafeUnknownClass(row.ProvenanceClass, row.UnsafeClass) &&
+		unsafeUnknownOptimizationClaim(row.Claim, row.AliasState) {
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s: unsafe_unknown cannot authorize optimization claim %q",
+				prefix,
+				row.Claim,
+			),
+		)
 	}
 	if broadNoAliasClaim(row.Claim) {
-		issues = append(issues, fmt.Sprintf("%s: broad noalias claim %q is outside Memory Ideal v0", prefix, row.Claim))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s: broad noalias claim %q is outside Memory Ideal v0", prefix, row.Claim),
+		)
 	}
 	if row.ClaimLevel == ClaimValidated && conservativeNoAliasBoundaryClaim(row.Claim) {
-		issues = append(issues, fmt.Sprintf("%s: conservative noalias boundary claim %q cannot be validated", prefix, row.Claim))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s: conservative noalias boundary claim %q cannot be validated",
+				prefix,
+				row.Claim,
+			),
+		)
 	}
 	if claimRequiresParentFactID(row.Claim) && row.ParentFactID == "" {
-		issues = append(issues, fmt.Sprintf("%s: derived claim %q requires parent_fact_id", prefix, row.Claim))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s: derived claim %q requires parent_fact_id", prefix, row.Claim),
+		)
 	}
 	if row.Claim == "copy_owned" && row.ProvenanceClass != ProvenanceSafeOwned {
-		issues = append(issues, fmt.Sprintf("%s: copy_owned requires safe_owned provenance", prefix))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s: copy_owned requires safe_owned provenance", prefix),
+		)
 	}
-	if hasUnsafeUnknownClass(row.ProvenanceClass, row.UnsafeClass) && row.CostClass == CostZeroCostProven {
-		issues = append(issues, fmt.Sprintf("%s: unsafe_unknown cannot claim %s", prefix, row.CostClass))
+	if hasUnsafeUnknownClass(row.ProvenanceClass, row.UnsafeClass) &&
+		row.CostClass == CostZeroCostProven {
+		issues = append(
+			issues,
+			fmt.Sprintf("%s: unsafe_unknown cannot claim %s", prefix, row.CostClass),
+		)
 	}
-	if row.CostClass == CostDynamicCheckRequired && memoryOptimizationClaim(row.Claim, row.AliasState) && !row.NormalBuildCheck {
-		issues = append(issues, fmt.Sprintf("%s: dynamic_check_required optimization claim %q requires normal_build_check", prefix, row.Claim))
+	if row.CostClass == CostDynamicCheckRequired &&
+		memoryOptimizationClaim(row.Claim, row.AliasState) &&
+		!row.NormalBuildCheck {
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s: dynamic_check_required optimization claim %q requires normal_build_check",
+				prefix,
+				row.Claim,
+			),
+		)
 	}
 	if bareBoundsCheckEliminatedClaim(row.Claim) {
-		issues = append(issues, fmt.Sprintf("%s: bounds_check_eliminated requires compiler-owned proof id; use bounds_check_removed_with_proof_id", prefix))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				("%s: bounds_check_eliminated requires compiler-owned proof id; "+
+					"use bounds_check_removed_with_proof_id"),
+				prefix,
+			),
+		)
 	}
 	if unsafeVerifiedRootDisallowedClaim(row.ProvenanceClass, row.UnsafeClass, row.Claim) {
-		issues = append(issues, fmt.Sprintf("%s: unsafe_verified_root cannot claim %q without bounded raw metadata", prefix, row.Claim))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s: unsafe_verified_root cannot claim %q without bounded raw metadata",
+				prefix,
+				row.Claim,
+			),
+		)
 	}
 	if unsafeCheckedDisallowedClaim(row.ProvenanceClass, row.UnsafeClass, row.Claim) {
-		issues = append(issues, fmt.Sprintf("%s: unsafe_checked cannot claim %q outside checked runtime/bounds evidence", prefix, row.Claim))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s: unsafe_checked cannot claim %q outside checked runtime/bounds evidence",
+				prefix,
+				row.Claim,
+			),
+		)
 	}
 	if capMemDisallowedProofClaim(row.Claim, row.ValidatorName, row.Reason) {
-		issues = append(issues, fmt.Sprintf("%s: cap.mem authorization cannot claim %q; cap.mem authorizes raw operations only and does not prove pointer validity, bounds, ownership, noalias, or safe provenance", prefix, row.Claim))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				("%s: cap.mem authorization cannot claim %q; cap.mem authorizes "+
+					"raw operations only and does not prove pointer validity, bounds, "+
+					"ownership, noalias, or safe provenance"),
+				prefix,
+				row.Claim,
+			),
+		)
 	}
-	if row.ClaimLevel == ClaimValidated && unsafeExternalRootTrustedStorage(row.ProvenanceClass, row.UnsafeClass, row.PlannedStorage, row.ActualLoweringStorage) {
-		issues = append(issues, fmt.Sprintf("%s: unsafe/external root %s/%s cannot validate trusted storage lowering %q/%q", prefix, row.ProvenanceClass, row.UnsafeClass, row.PlannedStorage, row.ActualLoweringStorage))
+	if row.ClaimLevel == ClaimValidated &&
+		unsafeExternalRootTrustedStorage(
+			row.ProvenanceClass,
+			row.UnsafeClass,
+			row.PlannedStorage,
+			row.ActualLoweringStorage,
+		) {
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s: unsafe/external root %s/%s cannot validate trusted storage lowering %q/%q",
+				prefix,
+				row.ProvenanceClass,
+				row.UnsafeClass,
+				row.PlannedStorage,
+				row.ActualLoweringStorage,
+			),
+		)
 	}
-	if row.ClaimLevel == ClaimValidated && strings.Contains(row.Claim, "no_alias") && !validatedNoAliasState(row.AliasState) {
-		issues = append(issues, fmt.Sprintf("%s: validated no_alias requires unique or mutable_exclusive alias_state, got %q", prefix, row.AliasState))
+	if row.ClaimLevel == ClaimValidated && strings.Contains(row.Claim, "no_alias") &&
+		!validatedNoAliasState(row.AliasState) {
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s: validated no_alias requires unique or mutable_exclusive alias_state, got %q",
+				prefix,
+				row.AliasState,
+			),
+		)
 	}
 	if row.ParamIndex != nil && *row.ParamIndex < 0 {
 		issues = append(issues, fmt.Sprintf("%s: negative param_index %d", prefix, *row.ParamIndex))
@@ -463,13 +824,31 @@ func validateReportRow(index int, row ReportRow) []string {
 	if reportRowRequiresArtifact(row) && row.LoweredArtifactID == "" {
 		issues = append(issues, prefix+": storage/lowering claim requires lowered_artifact_id")
 	}
-	if row.ClaimLevel == ClaimValidated && validatedTrustedStorageHeapFallback(row.PlannedStorage, row.ActualLoweringStorage) {
-		issues = append(issues, fmt.Sprintf("%s: validated %s claim cannot lower as Heap", prefix, row.PlannedStorage))
+	if row.ClaimLevel == ClaimValidated &&
+		validatedTrustedStorageHeapFallback(row.PlannedStorage, row.ActualLoweringStorage) {
+		issues = append(
+			issues,
+			fmt.Sprintf("%s: validated %s claim cannot lower as Heap", prefix, row.PlannedStorage),
+		)
 	}
-	if row.ClaimLevel == ClaimValidated && runtimeProofRequiredStorage(row.PlannedStorage, row.ActualLoweringStorage) {
-		issues = append(issues, fmt.Sprintf("%s: validated runtime boundary storage %q/%q requires production runtime proof", prefix, row.PlannedStorage, row.ActualLoweringStorage))
+	if row.ClaimLevel == ClaimValidated &&
+		runtimeProofRequiredStorage(row.PlannedStorage, row.ActualLoweringStorage) {
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s: validated runtime boundary storage %q/%q requires production runtime proof",
+				prefix,
+				row.PlannedStorage,
+				row.ActualLoweringStorage,
+			),
+		)
 	}
-	if storageFallbackRequiresReason(row.PlannedStorage, row.ActualLoweringStorage, row.CostClass) && strings.TrimSpace(row.Reason) == "" {
+	if storageFallbackRequiresReason(
+		row.PlannedStorage,
+		row.ActualLoweringStorage,
+		row.CostClass,
+	) &&
+		strings.TrimSpace(row.Reason) == "" {
 		issues = append(issues, prefix+": storage/conservative fallback requires reason")
 	}
 	return issues
@@ -479,30 +858,55 @@ func validateReportRowStorage(index int, row ReportRow) []string {
 	prefix := fmt.Sprintf("row %d", index)
 	var issues []string
 	if (row.PlannedStorage == "") != (row.ActualLoweringStorage == "") {
-		issues = append(issues, prefix+": planned_storage and actual_lowering_storage must be present together")
+		issues = append(
+			issues,
+			prefix+": planned_storage and actual_lowering_storage must be present together",
+		)
 	}
 	if row.PlannedStorage != "" && !knownStorageClass(row.PlannedStorage) {
-		issues = append(issues, fmt.Sprintf("%s: unknown planned_storage %q", prefix, row.PlannedStorage))
+		issues = append(
+			issues,
+			fmt.Sprintf("%s: unknown planned_storage %q", prefix, row.PlannedStorage),
+		)
 	}
 	if row.ActualLoweringStorage != "" && !knownStorageClass(row.ActualLoweringStorage) {
-		issues = append(issues, fmt.Sprintf("%s: unknown actual_lowering_storage %q", prefix, row.ActualLoweringStorage))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"%s: unknown actual_lowering_storage %q",
+				prefix,
+				row.ActualLoweringStorage,
+			),
+		)
 	}
 	return issues
 }
 
 func islandBackedReportRow(row ReportRow) bool {
-	return strings.TrimSpace(row.IslandID) != "" || row.PlannedStorage == StorageExplicitIsland || row.ActualLoweringStorage == StorageExplicitIsland
+	return strings.TrimSpace(row.IslandID) != "" || row.PlannedStorage == StorageExplicitIsland ||
+		row.ActualLoweringStorage == StorageExplicitIsland
 }
 
 func reportRowRequiresArtifact(row ReportRow) bool {
-	return memoryvocab.RowRequiresArtifact(string(row.PlannedStorage), string(row.ActualLoweringStorage), row.Claim)
+	return memoryvocab.RowRequiresArtifact(
+		string(row.PlannedStorage),
+		string(row.ActualLoweringStorage),
+		row.Claim,
+	)
 }
 
 func boundsTypedProofClaim(claim string) bool {
 	return claim == "bounds_proof_id" || claim == "bounds_check_removed_with_proof_id"
 }
 
-func missingTypedProofFields(proofID string, proofKind string, subjectBaseID string, indexValueID string, operation string, proofRange string) []string {
+func missingTypedProofFields(
+	proofID string,
+	proofKind string,
+	subjectBaseID string,
+	indexValueID string,
+	operation string,
+	proofRange string,
+) []string {
 	var missing []string
 	if strings.TrimSpace(proofID) == "" {
 		missing = append(missing, "proof_id")

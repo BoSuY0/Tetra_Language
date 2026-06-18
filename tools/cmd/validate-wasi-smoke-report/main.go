@@ -23,19 +23,50 @@ var wasiSmokeCases = []struct {
 	expectedExit       int
 	expectedDiagnostic string
 }{
-	{name: "legacy_hello", src: "examples/hello.tetra", expectedExit: 0},
-	{name: "effects_io_smoke", src: "examples/effects_io_smoke.tetra", expectedExit: 0},
-	{name: "ui_web_smoke", src: "examples/ui_web_smoke.tetra", expectedExit: 0},
-	{name: "core_slices_smoke", src: "examples/core_slices_smoke.tetra", expectedExit: 0},
-	{name: "wasm_globals_smoke", src: "examples/wasm_globals_smoke.tetra", expectedExit: 0},
-	{name: "wasm_multi_return_2_smoke", src: "examples/wasm_multi_return_2_smoke.tetra", expectedExit: 0},
-	{name: "wasm_multi_return_3_smoke", src: "examples/wasm_multi_return_3_smoke.tetra", expectedExit: 0},
-	{name: "wasm_multi_return_4_smoke", src: "examples/wasm_multi_return_4_smoke.tetra", expectedExit: 0},
+	{name: "legacy_hello", src: "examples/smoke/basic/hello.tetra", expectedExit: 0},
+	{name: "effects_io_smoke", src: "examples/effects/effects_io_smoke.tetra", expectedExit: 0},
+	{name: "ui_web_smoke", src: "examples/ui/ui_web_smoke.tetra", expectedExit: 0},
+	{name: "core_slices_smoke", src: "examples/core/data/core_slices_smoke.tetra", expectedExit: 0},
+	{name: "wasm_globals_smoke", src: "examples/wasm/wasm_globals_smoke.tetra", expectedExit: 0},
+	{
+		name:         "wasm_multi_return_2_smoke",
+		src:          "examples/wasm/wasm_multi_return_2_smoke.tetra",
+		expectedExit: 0,
+	},
+	{
+		name:         "wasm_multi_return_3_smoke",
+		src:          "examples/wasm/wasm_multi_return_3_smoke.tetra",
+		expectedExit: 0,
+	},
+	{
+		name:         "wasm_multi_return_4_smoke",
+		src:          "examples/wasm/wasm_multi_return_4_smoke.tetra",
+		expectedExit: 0,
+	},
 	{name: "dogfood_wasi", src: "examples/projects/dogfood_wasi/src/main.tetra", expectedExit: 0},
-	{name: "dogfood_web_ui", src: "examples/projects/dogfood_web_ui/src/main.tetra", expectedExit: 0},
-	{name: "time_sleep_smoke", src: "examples/time_sleep_smoke.tetra", expectedExit: 0, expectedDiagnostic: "runtime not supported on wasm32"},
-	{name: "task_smoke", src: "examples/task_smoke.tetra", expectedExit: 42, expectedDiagnostic: "runtime not supported on wasm32"},
-	{name: "actors_pingpong", src: "examples/actors_pingpong.tetra", expectedExit: 0, expectedDiagnostic: "runtime not supported on wasm32"},
+	{
+		name:         "dogfood_web_ui",
+		src:          "examples/projects/dogfood_web_ui/src/main.tetra",
+		expectedExit: 0,
+	},
+	{
+		name:               "time_sleep_smoke",
+		src:                "examples/async/time_sleep_smoke.tetra",
+		expectedExit:       0,
+		expectedDiagnostic: "runtime not supported on wasm32",
+	},
+	{
+		name:               "task_smoke",
+		src:                "examples/tasks/task_smoke.tetra",
+		expectedExit:       42,
+		expectedDiagnostic: "runtime not supported on wasm32",
+	},
+	{
+		name:               "actors_pingpong",
+		src:                "examples/actors/actors_pingpong.tetra",
+		expectedExit:       0,
+		expectedDiagnostic: "runtime not supported on wasm32",
+	},
 }
 
 type wasiSmokeReport struct {
@@ -71,7 +102,12 @@ func main() {
 	var reportPath string
 	var modeRaw string
 	flag.StringVar(&reportPath, "report", "", "path to wasm32-wasi smoke JSON report")
-	flag.StringVar(&modeRaw, "mode", string(validationModeRuntime), "validation mode: runtime or artifact")
+	flag.StringVar(
+		&modeRaw,
+		"mode",
+		string(validationModeRuntime),
+		"validation mode: runtime or artifact",
+	)
 	flag.Parse()
 
 	if reportPath == "" {
@@ -118,7 +154,9 @@ func validateWASISmokeReportContract(report wasiSmokeReport, mode validationMode
 		return fmt.Errorf("WASI smoke report target = %q, want wasm32-wasi", report.Target)
 	}
 	if report.BuildOnly {
-		return fmt.Errorf("WASI smoke report build_only = true, want false for supported wasm32-wasi")
+		return fmt.Errorf(
+			"WASI smoke report build_only = true, want false for supported wasm32-wasi",
+		)
 	}
 	if report.Host == "" {
 		return fmt.Errorf("WASI smoke report missing host")
@@ -129,20 +167,33 @@ func validateWASISmokeReportContract(report wasiSmokeReport, mode validationMode
 	switch mode {
 	case validationModeRuntime:
 		if report.Runner == "" {
-			return fmt.Errorf("WASI runtime report missing WASI runner; missing-runner state must fail before producing a runtime report")
+			return fmt.Errorf(
+				("WASI runtime report missing WASI runner; missing-runner state " +
+					"must fail before producing a runtime report"),
+			)
 		}
 		if report.Runner != "wasmtime" && report.Runner != "node-wasi" {
-			return fmt.Errorf("WASI runtime report runner = %q, want wasmtime or node-wasi", report.Runner)
+			return fmt.Errorf(
+				"WASI runtime report runner = %q, want wasmtime or node-wasi",
+				report.Runner,
+			)
 		}
 	case validationModeArtifact:
 		if report.Runner != "" {
-			return fmt.Errorf("WASI artifact/import preflight report cannot include runner %q", report.Runner)
+			return fmt.Errorf(
+				"WASI artifact/import preflight report cannot include runner %q",
+				report.Runner,
+			)
 		}
 	default:
 		return fmt.Errorf("unsupported WASI smoke validation mode %q", mode)
 	}
 	if len(report.Cases) != len(wasiSmokeCases) {
-		return fmt.Errorf("WASI smoke report case count = %d, want %d", len(report.Cases), len(wasiSmokeCases))
+		return fmt.Errorf(
+			"WASI smoke report case count = %d, want %d",
+			len(report.Cases),
+			len(wasiSmokeCases),
+		)
 	}
 	if report.Total != len(report.Cases) {
 		return fmt.Errorf("WASI smoke report total = %d, want %d", report.Total, len(report.Cases))
@@ -158,7 +209,13 @@ func validateWASISmokeReportContract(report wasiSmokeReport, mode validationMode
 	}
 	failed := len(report.Cases) - passed
 	if report.Passed != passed || report.Failed != failed {
-		return fmt.Errorf("WASI smoke report counts mismatch: got passed=%d failed=%d, computed passed=%d failed=%d", report.Passed, report.Failed, passed, failed)
+		return fmt.Errorf(
+			"WASI smoke report counts mismatch: got passed=%d failed=%d, computed passed=%d failed=%d",
+			report.Passed,
+			report.Failed,
+			passed,
+			failed,
+		)
 	}
 	if report.Failed != 0 {
 		return fmt.Errorf("WASI smoke report contains %d failed cases", report.Failed)
@@ -175,17 +232,32 @@ func validateWASISmokeCase(index int, c wasiSmokeReportCase, mode validationMode
 		return fmt.Errorf("WASI smoke case %s src_path = %q, want %q", c.Name, c.SrcPath, want.src)
 	}
 	if c.ExpectedExit != want.expectedExit {
-		return fmt.Errorf("WASI smoke case %s expected_exit = %d, want %d", c.Name, c.ExpectedExit, want.expectedExit)
+		return fmt.Errorf(
+			"WASI smoke case %s expected_exit = %d, want %d",
+			c.Name,
+			c.ExpectedExit,
+			want.expectedExit,
+		)
 	}
 	if want.expectedDiagnostic != "" {
 		if !c.Unsupported {
 			return fmt.Errorf("WASI smoke case %s must be marked unsupported", c.Name)
 		}
 		if c.ExpectedDiagnostic != want.expectedDiagnostic {
-			return fmt.Errorf("WASI smoke case %s expected_diagnostic = %q, want %q", c.Name, c.ExpectedDiagnostic, want.expectedDiagnostic)
+			return fmt.Errorf(
+				"WASI smoke case %s expected_diagnostic = %q, want %q",
+				c.Name,
+				c.ExpectedDiagnostic,
+				want.expectedDiagnostic,
+			)
 		}
 		if c.Diagnostic == "" || !strings.Contains(c.Diagnostic, want.expectedDiagnostic) {
-			return fmt.Errorf("WASI smoke case %s diagnostic = %q, want containing %q", c.Name, c.Diagnostic, want.expectedDiagnostic)
+			return fmt.Errorf(
+				"WASI smoke case %s diagnostic = %q, want containing %q",
+				c.Name,
+				c.Diagnostic,
+				want.expectedDiagnostic,
+			)
 		}
 		if c.OutPath != "" {
 			return fmt.Errorf("WASI unsupported case %s cannot include out_path", c.Name)
@@ -205,7 +277,10 @@ func validateWASISmokeCase(index int, c wasiSmokeReportCase, mode validationMode
 		return nil
 	}
 	if c.Unsupported || c.ExpectedDiagnostic != "" || c.Diagnostic != "" {
-		return fmt.Errorf("WASI smoke case %s has unsupported diagnostic metadata unexpectedly", c.Name)
+		return fmt.Errorf(
+			"WASI smoke case %s has unsupported diagnostic metadata unexpectedly",
+			c.Name,
+		)
 	}
 	if c.OutPath == "" || !strings.HasSuffix(c.OutPath, ".wasm") {
 		return fmt.Errorf("WASI smoke case %s out_path must end with .wasm", c.Name)
@@ -219,23 +294,39 @@ func validateWASISmokeCase(index int, c wasiSmokeReportCase, mode validationMode
 	switch mode {
 	case validationModeRuntime:
 		if !c.Ran {
-			return fmt.Errorf("WASI runtime case %s did not run; missing-runner state must not be recorded as a passing runtime report", c.Name)
+			return fmt.Errorf(
+				("WASI runtime case %s did not run; missing-runner state must not " +
+					"be recorded as a passing runtime report"),
+				c.Name,
+			)
 		}
 		if c.ActualExit == nil {
 			return fmt.Errorf("WASI runtime case %s ran without actual_exit", c.Name)
 		}
 		if *c.ActualExit < 0 || *c.ActualExit > 255 {
-			return fmt.Errorf("WASI runtime case %s actual_exit = %d, want 0..255", c.Name, *c.ActualExit)
+			return fmt.Errorf(
+				"WASI runtime case %s actual_exit = %d, want 0..255",
+				c.Name,
+				*c.ActualExit,
+			)
 		}
 		if *c.ActualExit != c.ExpectedExit {
-			return fmt.Errorf("WASI runtime case %s actual_exit = %d, want %d", c.Name, *c.ActualExit, c.ExpectedExit)
+			return fmt.Errorf(
+				"WASI runtime case %s actual_exit = %d, want %d",
+				c.Name,
+				*c.ActualExit,
+				c.ExpectedExit,
+			)
 		}
 	case validationModeArtifact:
 		if c.Ran {
 			return fmt.Errorf("WASI artifact/import preflight case %s ran unexpectedly", c.Name)
 		}
 		if c.ActualExit != nil {
-			return fmt.Errorf("WASI artifact/import preflight case %s cannot include actual_exit", c.Name)
+			return fmt.Errorf(
+				"WASI artifact/import preflight case %s cannot include actual_exit",
+				c.Name,
+			)
 		}
 	}
 	return nil

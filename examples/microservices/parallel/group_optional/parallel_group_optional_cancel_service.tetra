@@ -1,0 +1,19 @@
+// Optional task-group cancel microservice smoke.
+//
+// The service carries a task group through an optional payload, cancels the
+// recovered handle, checks the canceled status, and closes it.
+module examples.microservices.parallel.group_optional.parallel_group_optional_cancel_service
+func main() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let maybe: task.group? = group
+    if let handle = maybe:
+        let canceled: task.group = core.task_group_cancel(handle)
+        let status: Int = core.task_group_status(canceled)
+        let close_error: Int = core.task_group_close(canceled)
+        if close_error != 0:
+            return 10 + close_error
+        if status == 2:
+            return 0
+        return status
+    return 99

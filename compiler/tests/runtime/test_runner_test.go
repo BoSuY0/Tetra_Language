@@ -28,7 +28,10 @@ func TestTestRunnerSourcesIncludeCaseMetadata(t *testing.T) {
 	if c.FunctionName != "__tetra_test_0_math_case" {
 		t.Fatalf("function name = %q", c.FunctionName)
 	}
-	if !strings.Contains(string(c.Source), "func __tetra_test_0_math_case() -> Int\nuses actors, alloc, capability, control, islands, io, link, mem, mmio, runtime:") {
+	if !strings.Contains(
+		string(c.Source),
+		"func __tetra_test_0_math_case() -> Int\nuses actors, alloc, capability, control, islands, io, link, mem, mmio, runtime:",
+	) {
 		t.Fatalf("generated source missing test function:\n%s", string(c.Source))
 	}
 }
@@ -103,10 +106,16 @@ func TestTestRunnerSourcesDeclareEffectsForSyntheticFunctions(t *testing.T) {
 		t.Fatalf("TestRunnerSources: %v", err)
 	}
 	generated := string(cases[0].Source)
-	if !strings.Contains(generated, "func __tetra_test_0_io() -> Int\nuses actors, alloc, capability, control, islands, io, link, mem, mmio, runtime:") {
+	if !strings.Contains(
+		generated,
+		"func __tetra_test_0_io() -> Int\nuses actors, alloc, capability, control, islands, io, link, mem, mmio, runtime:",
+	) {
 		t.Fatalf("generated test function missing conservative uses:\n%s", generated)
 	}
-	if !strings.Contains(generated, "func main() -> Int\nuses actors, alloc, capability, control, islands, io, link, mem, mmio, runtime:") {
+	if !strings.Contains(
+		generated,
+		"func main() -> Int\nuses actors, alloc, capability, control, islands, io, link, mem, mmio, runtime:",
+	) {
 		t.Fatalf("generated main missing conservative uses:\n%s", generated)
 	}
 }
@@ -153,18 +162,30 @@ func TestTestRunnerReportCountsPassFailMetadata(t *testing.T) {
 
 	report := compiler.NewTestRunnerReport([]compiler.TestRunnerResult{pass, fail})
 	if report.Total != 2 || report.Passed != 1 || report.Failed != 1 {
-		t.Fatalf("report counts = total:%d passed:%d failed:%d", report.Total, report.Passed, report.Failed)
+		t.Fatalf(
+			"report counts = total:%d passed:%d failed:%d",
+			report.Total,
+			report.Passed,
+			report.Failed,
+		)
 	}
 	if report.DurationMS != 42 {
 		t.Fatalf("report duration = %d, want 42", report.DurationMS)
 	}
-	if len(report.Files) != 1 || report.Files[0].Filename != "suite.tetra" || report.Files[0].Total != 2 || report.Files[0].Passed != 1 || report.Files[0].Failed != 1 || report.Files[0].DurationMS != 42 {
+	if len(report.Files) != 1 || report.Files[0].Filename != "suite.tetra" ||
+		report.Files[0].Total != 2 ||
+		report.Files[0].Passed != 1 ||
+		report.Files[0].Failed != 1 ||
+		report.Files[0].DurationMS != 42 {
 		t.Fatalf("file report = %#v", report.Files)
 	}
-	if !report.Results[0].Passed || report.Results[0].ExitCode != 0 || report.Results[0].DurationMS != 12 {
+	if !report.Results[0].Passed || report.Results[0].ExitCode != 0 ||
+		report.Results[0].DurationMS != 12 {
 		t.Fatalf("pass result = %#v", report.Results[0])
 	}
-	if report.Results[1].Passed || report.Results[1].ExitCode != 1 || report.Results[1].Error != "exit status 1" || report.Results[1].DurationMS != 30 {
+	if report.Results[1].Passed || report.Results[1].ExitCode != 1 ||
+		report.Results[1].Error != "exit status 1" ||
+		report.Results[1].DurationMS != 30 {
 		t.Fatalf("fail result = %#v", report.Results[1])
 	}
 }
@@ -195,10 +216,16 @@ func TestTestRunnerReportAggregatesFilesDeterministically(t *testing.T) {
 	if report.DurationMS != 23 {
 		t.Fatalf("report duration = %d, want 23", report.DurationMS)
 	}
-	if report.Files[0].Filename != "a.tetra" || report.Files[0].Total != 2 || report.Files[0].Passed != 1 || report.Files[0].Failed != 1 || report.Files[0].DurationMS != 18 {
+	if report.Files[0].Filename != "a.tetra" || report.Files[0].Total != 2 ||
+		report.Files[0].Passed != 1 ||
+		report.Files[0].Failed != 1 ||
+		report.Files[0].DurationMS != 18 {
 		t.Fatalf("files[0] = %#v", report.Files[0])
 	}
-	if report.Files[1].Filename != "b.tetra" || report.Files[1].Total != 1 || report.Files[1].Passed != 1 || report.Files[1].Failed != 0 || report.Files[1].DurationMS != 5 {
+	if report.Files[1].Filename != "b.tetra" || report.Files[1].Total != 1 ||
+		report.Files[1].Passed != 1 ||
+		report.Files[1].Failed != 0 ||
+		report.Files[1].DurationMS != 5 {
 		t.Fatalf("files[1] = %#v", report.Files[1])
 	}
 }

@@ -17,7 +17,8 @@ func TestValidateReportAcceptsFullSixEndpointReport(t *testing.T) {
 
 func TestValidateReportRequiresExplicitSkipDBAllowance(t *testing.T) {
 	raw := mustReportJSON(t, reportFixture(true))
-	if err := ValidateReport(raw, Options{}); err == nil || !strings.Contains(err.Error(), "skip-db") {
+	if err := ValidateReport(raw, Options{}); err == nil ||
+		!strings.Contains(err.Error(), "skip-db") {
 		t.Fatalf("ValidateReport skip-db without allowance = %v, want skip-db error", err)
 	}
 	if err := ValidateReport(raw, Options{AllowSkipDB: true}); err != nil {
@@ -47,7 +48,10 @@ func TestValidateReportRejectsCommandSkipDBMismatch(t *testing.T) {
 		t.Fatalf("ValidateReport accepted full report with command skip-db flag")
 	}
 	if !strings.Contains(err.Error(), "command skip-db") {
-		t.Fatalf("ValidateReport full report skip-db command error = %v, want command skip-db rejection", err)
+		t.Fatalf(
+			"ValidateReport full report skip-db command error = %v, want command skip-db rejection",
+			err,
+		)
 	}
 }
 
@@ -114,7 +118,10 @@ func TestValidateReportRejectsEndpointRPSBelowThreshold(t *testing.T) {
 		t.Fatalf("ValidateReport accepted endpoint RPS below threshold")
 	}
 	if !strings.Contains(err.Error(), "below threshold") {
-		t.Fatalf("ValidateReport endpoint threshold error = %v, want below threshold rejection", err)
+		t.Fatalf(
+			"ValidateReport endpoint threshold error = %v, want below threshold rejection",
+			err,
+		)
 	}
 }
 
@@ -164,7 +171,10 @@ func TestValidateReportRejectsInvalidContentTypePrefix(t *testing.T) {
 		t.Fatalf("ValidateReport accepted invalid observed content type prefix")
 	}
 	if !strings.Contains(err.Error(), "observed content type") {
-		t.Fatalf("ValidateReport content type error = %v, want observed content type rejection", err)
+		t.Fatalf(
+			"ValidateReport content type error = %v, want observed content type rejection",
+			err,
+		)
 	}
 }
 
@@ -172,7 +182,12 @@ func TestValidateReportRejectsFortunesWithoutSortingSemanticCheck(t *testing.T) 
 	report := reportFixture(false)
 	for i := range report.Endpoints {
 		if report.Endpoints[i].Path == "/fortunes" {
-			report.Endpoints[i].SemanticChecks = []string{"status 200", "content-type text/html", "request-time fortune present", "HTML escaping sentinel"}
+			report.Endpoints[i].SemanticChecks = []string{
+				"status 200",
+				"content-type text/html",
+				"request-time fortune present",
+				"HTML escaping sentinel",
+			}
 			break
 		}
 	}
@@ -190,14 +205,16 @@ func TestValidateReportRejectsWeakEvidenceAndBadCounters(t *testing.T) {
 	report := reportFixture(false)
 	report.Endpoints[0].Evidence = "placeholder"
 	raw := mustReportJSON(t, report)
-	if err := ValidateReport(raw, Options{}); err == nil || !strings.Contains(err.Error(), "placeholder") {
+	if err := ValidateReport(raw, Options{}); err == nil ||
+		!strings.Contains(err.Error(), "placeholder") {
 		t.Fatalf("ValidateReport weak evidence = %v, want placeholder rejection", err)
 	}
 
 	report = reportFixture(false)
 	report.Endpoints[0].Successes--
 	raw = mustReportJSON(t, report)
-	if err := ValidateReport(raw, Options{}); err == nil || !strings.Contains(err.Error(), "request counters") {
+	if err := ValidateReport(raw, Options{}); err == nil ||
+		!strings.Contains(err.Error(), "request counters") {
 		t.Fatalf("ValidateReport bad counters = %v, want counter rejection", err)
 	}
 }
@@ -235,7 +252,12 @@ func TestValidateReportRejectsMissingCommandConcurrency(t *testing.T) {
 func TestValidateReportRejectsCommandBaseURLMismatch(t *testing.T) {
 	report := reportFixture(false)
 	original := report.Command
-	report.Command = strings.Replace(report.Command, "--base-url http://127.0.0.1:8080", "--base-url http://127.0.0.1:9090", 1)
+	report.Command = strings.Replace(
+		report.Command,
+		"--base-url http://127.0.0.1:8080",
+		"--base-url http://127.0.0.1:9090",
+		1,
+	)
 	if report.Command == original {
 		t.Fatalf("test did not mutate benchmark command base-url")
 	}
@@ -252,7 +274,12 @@ func TestValidateReportRejectsCommandBaseURLMismatch(t *testing.T) {
 func TestValidateReportRejectsBaseURLWithPath(t *testing.T) {
 	report := reportFixture(false)
 	report.BaseURL = "http://127.0.0.1:8080/api"
-	report.Command = strings.Replace(report.Command, "--base-url http://127.0.0.1:8080", "--base-url http://127.0.0.1:8080/api", 1)
+	report.Command = strings.Replace(
+		report.Command,
+		"--base-url http://127.0.0.1:8080",
+		"--base-url http://127.0.0.1:8080/api",
+		1,
+	)
 
 	err := ValidateReport(mustReportJSON(t, report), Options{})
 	if err == nil {
@@ -277,7 +304,14 @@ func TestValidateReportRequiresLatencyPercentilesAndIntegrityMetadata(t *testing
 	if err == nil {
 		t.Fatalf("ValidateReport accepted missing integrity metadata")
 	}
-	for _, want := range []string{"generated_local_at", "environment", "git", "invalid timing metrics", "observed content type", "semantic checks"} {
+	for _, want := range []string{
+		"generated_local_at",
+		"environment",
+		"git",
+		"invalid timing metrics",
+		"observed content type",
+		"semantic checks",
+	} {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("ValidateReport error missing %q: %v", want, err)
 		}
@@ -298,7 +332,16 @@ func TestValidateReportRejectsNonMonotonicLatencyPercentiles(t *testing.T) {
 }
 
 func TestValidateCheckedInSmokeReport(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_local_smoke_skip_db_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_local_smoke_skip_db_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in smoke report: %v", err)
 	}
@@ -308,7 +351,16 @@ func TestValidateCheckedInSmokeReport(t *testing.T) {
 }
 
 func TestValidateCheckedInSCRAMReport(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM report: %v", err)
 	}
@@ -318,7 +370,16 @@ func TestValidateCheckedInSCRAMReport(t *testing.T) {
 }
 
 func TestValidateCheckedInSCRAMMatrixReport(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_matrix_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
 	}
@@ -328,7 +389,16 @@ func TestValidateCheckedInSCRAMMatrixReport(t *testing.T) {
 }
 
 func TestValidateSCRAMMatrixRejectsMissingGitHead(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_matrix_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
 	}
@@ -348,7 +418,16 @@ func TestValidateSCRAMMatrixRejectsMissingGitHead(t *testing.T) {
 }
 
 func TestValidateSCRAMMatrixRejectsNonHexGitHead(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_matrix_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
 	}
@@ -368,7 +447,16 @@ func TestValidateSCRAMMatrixRejectsNonHexGitHead(t *testing.T) {
 }
 
 func TestValidateSCRAMMatrixRejectsWrongCommandProvenance(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_matrix_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
 	}
@@ -388,7 +476,16 @@ func TestValidateSCRAMMatrixRejectsWrongCommandProvenance(t *testing.T) {
 }
 
 func TestValidateSCRAMMatrixRejectsSpoofedCommandExecutable(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_matrix_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
 	}
@@ -408,7 +505,16 @@ func TestValidateSCRAMMatrixRejectsSpoofedCommandExecutable(t *testing.T) {
 }
 
 func TestValidateSCRAMMatrixRejectsArtifactReportPathMismatch(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_matrix_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
 	}
@@ -429,7 +535,16 @@ func TestValidateSCRAMMatrixRejectsArtifactReportPathMismatch(t *testing.T) {
 }
 
 func TestValidateSCRAMMatrixRejectsArtifactGridFlagMismatch(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_matrix_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
 	}
@@ -449,12 +564,24 @@ func TestValidateSCRAMMatrixRejectsArtifactGridFlagMismatch(t *testing.T) {
 		t.Fatalf("ValidateReport accepted matrix report with command/artifact grid flag mismatch")
 	}
 	if !strings.Contains(err.Error(), "command artifact") {
-		t.Fatalf("ValidateReport matrix artifact grid error = %v, want command artifact rejection", err)
+		t.Fatalf(
+			"ValidateReport matrix artifact grid error = %v, want command artifact rejection",
+			err,
+		)
 	}
 }
 
 func TestValidateSCRAMMatrixRejectsCommandDurationMismatch(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_matrix_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
 	}
@@ -478,7 +605,16 @@ func TestValidateSCRAMMatrixRejectsCommandDurationMismatch(t *testing.T) {
 }
 
 func TestValidateSCRAMMatrixRejectsCommandRepeatsMismatch(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_matrix_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
 	}
@@ -502,7 +638,16 @@ func TestValidateSCRAMMatrixRejectsCommandRepeatsMismatch(t *testing.T) {
 }
 
 func TestValidateSCRAMMatrixRejectsCommandWarmupMismatch(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_matrix_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
 	}
@@ -529,7 +674,16 @@ func TestValidateSCRAMMatrixRejectsCommandWarmupMismatch(t *testing.T) {
 }
 
 func TestValidateSCRAMMatrixRejectsWeakEvidenceAndSummaryMismatch(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_matrix_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
 	}
@@ -540,19 +694,33 @@ func TestValidateSCRAMMatrixRejectsWeakEvidenceAndSummaryMismatch(t *testing.T) 
 
 	weak := report
 	weak.Postgres.VerifierPrefix = "md5"
-	if err := ValidateReport(mustMatrixReportJSON(t, weak), Options{}); err == nil || !strings.Contains(err.Error(), "SCRAM") {
+	if err := ValidateReport(mustMatrixReportJSON(t, weak), Options{}); err == nil ||
+		!strings.Contains(err.Error(), "SCRAM") {
 		t.Fatalf("ValidateReport weak matrix SCRAM evidence = %v, want SCRAM error", err)
 	}
 
 	mismatch := report
 	mismatch.Summary.TotalRequests--
-	if err := ValidateReport(mustMatrixReportJSON(t, mismatch), Options{}); err == nil || !strings.Contains(err.Error(), "summary.total_requests") {
-		t.Fatalf("ValidateReport matrix summary mismatch = %v, want summary.total_requests error", err)
+	if err := ValidateReport(mustMatrixReportJSON(t, mismatch), Options{}); err == nil ||
+		!strings.Contains(err.Error(), "summary.total_requests") {
+		t.Fatalf(
+			"ValidateReport matrix summary mismatch = %v, want summary.total_requests error",
+			err,
+		)
 	}
 }
 
 func TestValidateSCRAMMatrixRejectsNonMonotonicLatencyPercentiles(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_matrix_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
 	}
@@ -572,7 +740,16 @@ func TestValidateSCRAMMatrixRejectsNonMonotonicLatencyPercentiles(t *testing.T) 
 }
 
 func TestValidateSCRAMMatrixRejectsNonMonotonicSoakTailLatency(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_matrix_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
 	}
@@ -595,7 +772,16 @@ func TestValidateSCRAMMatrixRejectsNonMonotonicSoakTailLatency(t *testing.T) {
 }
 
 func TestValidateSCRAMMatrixRejectsInvalidSoakMetrics(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_matrix_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
 	}
@@ -622,7 +808,16 @@ func TestValidateSCRAMMatrixRejectsInvalidSoakMetrics(t *testing.T) {
 }
 
 func TestValidateSCRAMMatrixRejectsInconsistentSoakCounters(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_matrix_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
 	}
@@ -645,7 +840,16 @@ func TestValidateSCRAMMatrixRejectsInconsistentSoakCounters(t *testing.T) {
 }
 
 func TestValidateSCRAMMatrixRejectsInflatedSoakRPS(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_matrix_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
 	}
@@ -668,7 +872,16 @@ func TestValidateSCRAMMatrixRejectsInflatedSoakRPS(t *testing.T) {
 }
 
 func TestValidateSCRAMMatrixRejectsCommandSoakMismatch(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_matrix_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
 	}
@@ -695,7 +908,16 @@ func TestValidateSCRAMMatrixRejectsCommandSoakMismatch(t *testing.T) {
 }
 
 func TestValidateSCRAMMatrixRejectsCommandPoolMismatch(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_matrix_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
 	}
@@ -722,7 +944,16 @@ func TestValidateSCRAMMatrixRejectsCommandPoolMismatch(t *testing.T) {
 }
 
 func TestValidateSCRAMMatrixRejectsInvalidResourceSnapshots(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_matrix_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
 	}
@@ -753,7 +984,16 @@ func TestValidateSCRAMMatrixRejectsInvalidResourceSnapshots(t *testing.T) {
 }
 
 func TestValidateSCRAMMatrixRejectsMissingResourceTimestamps(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_matrix_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
 	}
@@ -781,7 +1021,16 @@ func TestValidateSCRAMMatrixRejectsMissingResourceTimestamps(t *testing.T) {
 }
 
 func TestValidateSCRAMMatrixRejectsRegressingResourceSpans(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_matrix_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
 	}
@@ -801,7 +1050,10 @@ func TestValidateSCRAMMatrixRejectsRegressingResourceSpans(t *testing.T) {
 	if err == nil {
 		t.Fatalf("ValidateReport accepted regressing resource spans")
 	}
-	for _, want := range []string{"resource timestamps are not increasing", "resource CPU counters regressed"} {
+	for _, want := range []string{
+		"resource timestamps are not increasing",
+		"resource CPU counters regressed",
+	} {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("ValidateReport resource span error missing %q: %v", want, err)
 		}
@@ -809,7 +1061,16 @@ func TestValidateSCRAMMatrixRejectsRegressingResourceSpans(t *testing.T) {
 }
 
 func TestValidateSCRAMMatrixRejectsResourceTimestampsOutsideReportWindow(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_matrix_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
 	}
@@ -836,7 +1097,16 @@ func TestValidateSCRAMMatrixRejectsResourceTimestampsOutsideReportWindow(t *test
 }
 
 func TestValidateSCRAMMatrixRejectsInvalidEndpointIdentity(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_matrix_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
 	}
@@ -858,12 +1128,24 @@ func TestValidateSCRAMMatrixRejectsInvalidEndpointIdentity(t *testing.T) {
 		t.Fatalf("ValidateReport accepted invalid matrix endpoint identity")
 	}
 	if !strings.Contains(err.Error(), "matrix endpoint identity") {
-		t.Fatalf("ValidateReport endpoint identity error = %v, want matrix endpoint identity rejection", err)
+		t.Fatalf(
+			"ValidateReport endpoint identity error = %v, want matrix endpoint identity rejection",
+			err,
+		)
 	}
 }
 
 func TestValidateSCRAMMatrixRejectsMissingArtifacts(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_matrix_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
 	}
@@ -883,7 +1165,16 @@ func TestValidateSCRAMMatrixRejectsMissingArtifacts(t *testing.T) {
 }
 
 func TestValidateSCRAMMatrixRejectsMissingDeclaredGridCoverage(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_matrix_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
 	}
@@ -907,7 +1198,16 @@ func TestValidateSCRAMMatrixRejectsMissingDeclaredGridCoverage(t *testing.T) {
 }
 
 func TestValidateSCRAMMatrixRejectsInvalidRunRepeat(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_matrix_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
 	}
@@ -930,7 +1230,16 @@ func TestValidateSCRAMMatrixRejectsInvalidRunRepeat(t *testing.T) {
 }
 
 func TestValidateSCRAMMatrixRejectsWarmupRepeatMetadata(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_matrix_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
 	}
@@ -953,7 +1262,16 @@ func TestValidateSCRAMMatrixRejectsWarmupRepeatMetadata(t *testing.T) {
 }
 
 func TestValidateSCRAMMatrixRejectsInflatedRunRPS(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_matrix_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
 	}
@@ -977,7 +1295,16 @@ func TestValidateSCRAMMatrixRejectsInflatedRunRPS(t *testing.T) {
 }
 
 func TestValidateSCRAMMatrixRejectsShortElapsedRunDuration(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_matrix_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
 	}
@@ -1002,7 +1329,16 @@ func TestValidateSCRAMMatrixRejectsShortElapsedRunDuration(t *testing.T) {
 }
 
 func TestValidateSCRAMMatrixRejectsDuplicateRunIdentity(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_matrix_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
 	}
@@ -1021,12 +1357,24 @@ func TestValidateSCRAMMatrixRejectsDuplicateRunIdentity(t *testing.T) {
 		t.Fatalf("ValidateReport accepted duplicate matrix run identity")
 	}
 	if !strings.Contains(err.Error(), "duplicate matrix run") {
-		t.Fatalf("ValidateReport duplicate run error = %v, want duplicate matrix run rejection", err)
+		t.Fatalf(
+			"ValidateReport duplicate run error = %v, want duplicate matrix run rejection",
+			err,
+		)
 	}
 }
 
 func TestValidateSCRAMMatrixRejectsMissingRepeatSequenceCoverage(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	raw, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"docs",
+			"benchmarks",
+			"techempower_scram_single_query_matrix_local_report.json",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
 	}
@@ -1045,12 +1393,22 @@ func TestValidateSCRAMMatrixRejectsMissingRepeatSequenceCoverage(t *testing.T) {
 		t.Fatalf("ValidateReport accepted matrix report with missing repeat sequence coverage")
 	}
 	if !strings.Contains(err.Error(), "matrix repeat coverage") {
-		t.Fatalf("ValidateReport repeat coverage error = %v, want matrix repeat coverage rejection", err)
+		t.Fatalf(
+			"ValidateReport repeat coverage error = %v, want matrix repeat coverage rejection",
+			err,
+		)
 	}
 }
 
 func reportFixture(skipDB bool) Report {
-	paths := []string{"/plaintext", "/json", "/db", "/queries?queries=2", "/updates?queries=2", "/fortunes"}
+	paths := []string{
+		"/plaintext",
+		"/json",
+		"/db",
+		"/queries?queries=2",
+		"/updates?queries=2",
+		"/fortunes",
+	}
 	if skipDB {
 		paths = []string{"/plaintext", "/json"}
 	}
@@ -1082,11 +1440,17 @@ func reportFixture(skipDB bool) Report {
 			Evidence:            "real HTTP request/response validation and concurrent load completed",
 		})
 	}
-	limitations := []string{"local harness evidence; official TechEmpower publication is not implied"}
-	if skipDB {
-		limitations = append(limitations, "skip-db enabled: report covers only /plaintext and /json")
+	limitations := []string{
+		"local harness evidence; official TechEmpower publication is not implied",
 	}
-	command := "tetra-techempower-bench --base-url http://127.0.0.1:8080 --requests 4 --concurrency 2 --min-rps 1.00"
+	if skipDB {
+		limitations = append(
+			limitations,
+			"skip-db enabled: report covers only /plaintext and /json",
+		)
+	}
+	command := ("tetra-techempower-bench --base-url http://127.0.0.1:8080 --" +
+		"requests 4 --concurrency 2 --min-rps 1.00")
 	if skipDB {
 		command += " --skip-db"
 	}
@@ -1136,15 +1500,29 @@ func semanticChecksForPath(path string) []string {
 	case "/plaintext":
 		return []string{"status 200", "content-type text/plain", "body equals Hello, World!"}
 	case "/json":
-		return []string{"status 200", "content-type application/json", "JSON message equals Hello, World!"}
+		return []string{
+			"status 200",
+			"content-type application/json",
+			"JSON message equals Hello, World!",
+		}
 	case "/db":
-		return []string{"status 200", "content-type application/json", "World object id/randomNumber range"}
+		return []string{
+			"status 200",
+			"content-type application/json",
+			"World object id/randomNumber range",
+		}
 	case "/queries?queries=2":
 		return []string{"status 200", "content-type application/json", "World array shape"}
 	case "/updates?queries=2":
 		return []string{"status 200", "content-type application/json", "World update array shape"}
 	case "/fortunes":
-		return []string{"status 200", "content-type text/html", "request-time fortune present", "HTML escaping sentinel", "sorted Fortune rows"}
+		return []string{
+			"status 200",
+			"content-type text/html",
+			"request-time fortune present",
+			"HTML escaping sentinel",
+			"sorted Fortune rows",
+		}
 	default:
 		return []string{"status 200"}
 	}

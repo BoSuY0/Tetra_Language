@@ -6,7 +6,7 @@ repo_root="$(cd "$script_dir/../../.." && pwd)"
 report_dir="$repo_root/reports/post-v0.4-compiler"
 
 usage() {
-  cat <<'USAGE'
+  cat << 'USAGE'
 Usage: bash scripts/release/post_v0_4/memory-parallel-compiler-production-linux-x64-gate.sh [--report-dir DIR]
 
 Runs the ordered Linux-x64 production evidence gates for:
@@ -27,7 +27,7 @@ while [[ $# -gt 0 ]]; do
       report_dir="$2"
       shift 2
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;

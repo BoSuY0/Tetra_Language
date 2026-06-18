@@ -127,17 +127,21 @@ func UIModule(uiJSONFile string) []byte {
 		"}",
 		"",
 		"function renderBindings(host, state, view) {",
-		"  const redrawCount = (Number.parseInt(host.getAttribute(\"data-tetra-redraw-count\") || \"0\", 10) || 0) + 1;",
+		("  const redrawCount = (Number.parseInt(host.getAttribute(\"data-" +
+			"tetra-redraw-count\") || \"0\", 10) || 0) + 1;"),
 		"  host.setAttribute(\"data-tetra-redraw-count\", String(redrawCount));",
 		"  host.setAttribute(\"data-tetra-redraw\", \"bindings\");",
 		"  for (const node of host.querySelectorAll(\"[data-tetra-binding]\")) {",
-		"    const binding = (view.bindings || []).find((item) => item.name === node.getAttribute(\"data-tetra-binding\"));",
+		("    const binding = (view.bindings || []).find((item) => " +
+			"item.name === node.getAttribute(\"data-tetra-binding\"));"),
 		"    if (binding) {",
-		"      node.textContent = \"  bind \" + binding.name + \": \" + binding.type + \" = \" + bindingValue(state, view, binding);",
+		("      node.textContent = \"  bind \" + binding.name + \": \" + " +
+			"binding.type + \" = \" + bindingValue(state, view, binding);"),
 		"    }",
 		"  }",
 		"  for (const input of host.querySelectorAll(\"[data-tetra-input-binding]\")) {",
-		"    const binding = (view.bindings || []).find((item) => item.name === input.getAttribute(\"data-tetra-input-binding\"));",
+		("    const binding = (view.bindings || []).find((item) => " +
+			"item.name === input.getAttribute(\"data-tetra-input-binding\"));"),
 		"    if (binding) {",
 		"      input.value = bindingValue(state, view, binding);",
 		"    }",
@@ -293,7 +297,8 @@ func UIModule(uiJSONFile string) []byte {
 		"    for (const binding of (view.bindings || [])) {",
 		"      const line = document.createElement(\"div\");",
 		"      line.setAttribute(\"data-tetra-binding\", binding.name);",
-		"      line.textContent = \"  bind \" + binding.name + \": \" + binding.type + \" = \" + bindingValue(state, view, binding);",
+		("      line.textContent = \"  bind \" + binding.name + \": \" + " +
+			"binding.type + \" = \" + bindingValue(state, view, binding);"),
 		"      host.appendChild(line);",
 		"      renderInputControl(host, state, view, binding);",
 		"    }",

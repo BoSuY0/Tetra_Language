@@ -30,19 +30,29 @@ func TestSelfHostActorsRuntimePoC(t *testing.T) {
 		t.Fatalf("missing runtime source: %v", err)
 	}
 
-	progSrc := filepath.Join("..", "..", "..", "examples", "actors_pingpong.tetra")
+	progSrc := filepath.Join("..", "..", "..", "examples", "actors", "actors_pingpong.tetra")
 	if _, err := os.Stat(progSrc); err != nil {
 		t.Fatalf("missing example: %v", err)
 	}
 
 	tmp := t.TempDir()
 	rtObj := filepath.Join(tmp, "actors_rt_poc.tobj")
-	if _, err := compiler.BuildFileWithStatsOpt(rtSrc, rtObj, tgt.Triple, compiler.BuildOptions{Emit: compiler.EmitLibrary}); err != nil {
+	if _, err := compiler.BuildFileWithStatsOpt(
+		rtSrc,
+		rtObj,
+		tgt.Triple,
+		compiler.BuildOptions{Emit: compiler.EmitLibrary},
+	); err != nil {
 		t.Fatalf("build runtime object: %v", err)
 	}
 
 	outPath := filepath.Join(tmp, "actors_pingpong"+tgt.ExeExt)
-	if _, err := compiler.BuildFileWithStatsOpt(progSrc, outPath, tgt.Triple, compiler.BuildOptions{RuntimeObjectPath: rtObj}); err != nil {
+	if _, err := compiler.BuildFileWithStatsOpt(
+		progSrc,
+		outPath,
+		tgt.Triple,
+		compiler.BuildOptions{RuntimeObjectPath: rtObj},
+	); err != nil {
 		t.Fatalf("build with runtime override: %v", err)
 	}
 	stdout, exitCode := runBinary(t, outPath)

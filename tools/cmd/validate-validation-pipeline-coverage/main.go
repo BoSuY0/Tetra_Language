@@ -9,7 +9,11 @@ import (
 )
 
 func main() {
-	reportPath := flag.String("report", "", "path to tetra.validation-pipeline-coverage.v1 JSON report")
+	reportPath := flag.String(
+		"report",
+		"",
+		"path to tetra.validation-pipeline-coverage.v1 JSON report",
+	)
 	flag.Parse()
 	if *reportPath == "" {
 		fmt.Fprintln(os.Stderr, "error: --report is required")

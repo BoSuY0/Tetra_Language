@@ -1,0 +1,233 @@
+{
+  "schema": "tetra.gate-contract.v1",
+  "id": "surface-morph-gate-v1",
+  "title": "Experimental Surface Morph gate",
+  "scope": "surface-morph-experimental-linux-web",
+  "producer": "scripts/release/surface/morph-gate.sh",
+  "entrypoint": "scripts/release/surface/morph-gate.sh",
+  "fresh_report_dir_policy": "require-empty-or-new",
+  "host_preconditions": [
+    "linux",
+    "go",
+    "fresh-report-dir"
+  ],
+  "steps": [
+    {
+      "id": "surface-headless-morph-smoke",
+      "kind": "shell",
+      "command": "bash scripts/release/surface/surface-headless-morph-smoke.sh --report-dir \"$REPORT_DIR/headless\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "headless/surface-headless-morph.json",
+        "headless/artifact-hashes.json"
+      ],
+      "validator_refs": [
+        "validate-surface-morph-report",
+        "validate-artifact-hashes"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "validate-surface-morph-report",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-surface-morph-report --report \"$REPORT_DIR/headless/surface-headless-morph.json\" --same-commit \"$GIT_HEAD\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-surface-morph-report"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "validate-surface-token-graph",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-surface-token-graph --contract docs/spec/surface/surface_token_graph_contract.json --report \"$REPORT_DIR/headless/surface-headless-morph.json\" --root \"$REPO_ROOT\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-surface-token-graph"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "write-surface-morph-gate-summary",
+      "kind": "internal-write",
+      "command": "scripts/release/surface/morph-gate.sh writes \"$REPORT_DIR/surface-morph-gate-summary.json\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "surface-morph-gate-summary.json"
+      ],
+      "validator_refs": [
+        "validate-surface-morph-gate-summary"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "artifact-hashes-write",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-artifact-hashes --write --root \"$REPORT_DIR\" --out \"$REPORT_DIR/artifact-hashes.json\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "artifact-hashes.json"
+      ],
+      "validator_refs": [
+        "validate-artifact-hashes"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "artifact-hashes-validate",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-artifact-hashes --manifest \"$REPORT_DIR/artifact-hashes.json\"",
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-artifact-hashes"
+      ],
+      "host_preconditions": [
+        "linux"
+      ],
+      "blocked_status_policy": "block-release"
+    }
+  ],
+  "required_reports": [
+    {
+      "path": "surface-morph-gate-summary.json",
+      "schema": "tetra.surface.morph.gate.v1",
+      "validator": "validate-surface-morph-gate-summary",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "surface_morph_gate_required_reports"
+      ]
+    },
+    {
+      "path": "headless/surface-headless-morph.json",
+      "schema": "tetra.surface.runtime.v1",
+      "validator": "validate-surface-morph-report",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "morph_recipe_authoring",
+        "surface_token_graph",
+        "surface_morph_gate_required_reports"
+      ]
+    },
+    {
+      "path": "headless/artifact-hashes.json",
+      "schema": "tetra.release-artifact-hashes.v1alpha1",
+      "validator": "validate-artifact-hashes",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "artifact_hash_integrity",
+        "surface_morph_gate_required_reports"
+      ]
+    },
+    {
+      "path": "artifact-hashes.json",
+      "schema": "tetra.release-artifact-hashes.v1alpha1",
+      "validator": "validate-artifact-hashes",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "artifact_hash_integrity",
+        "surface_morph_gate_required_reports"
+      ]
+    }
+  ],
+  "validators": [
+    {
+      "id": "validate-surface-morph-report",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-surface-morph-report --report \"$REPORT_DIR/headless/surface-headless-morph.json\" --same-commit \"$GIT_HEAD\""
+    },
+    {
+      "id": "validate-surface-token-graph",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-surface-token-graph --contract docs/spec/surface/surface_token_graph_contract.json --report \"$REPORT_DIR/headless/surface-headless-morph.json\" --root \"$REPO_ROOT\""
+    },
+    {
+      "id": "validate-surface-morph-gate-summary",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-surface-morph-gate-summary --summary \"$REPORT_DIR/surface-morph-gate-summary.json\" --same-commit \"$GIT_HEAD\""
+    },
+    {
+      "id": "validate-artifact-hashes",
+      "kind": "go-run",
+      "command": "go run ./tools/cmd/validate-artifact-hashes --manifest \"$REPORT_DIR/artifact-hashes.json\""
+    }
+  ],
+  "artifact_hashes": {
+    "enabled": true,
+    "required": true,
+    "algorithm": "sha256"
+  },
+  "claims": [
+    {
+      "id": "surface_morph_gate_required_reports",
+      "statement": "The Surface Morph gate contract enumerates the report artifacts required by scripts/release/surface/morph-gate.sh for surface-morph-experimental-linux-web."
+    },
+    {
+      "id": "morph_recipe_authoring",
+      "statement": "Surface Morph recipe authoring evidence is produced by the headless Morph smoke and checked by validate-surface-morph-report."
+    },
+    {
+      "id": "surface_token_graph",
+      "statement": "Surface Morph token graph evidence is checked against docs/spec/surface/surface_token_graph_contract.json by validate-surface-token-graph."
+    },
+    {
+      "id": "artifact_hash_integrity",
+      "statement": "Surface Morph gate report artifacts are covered by required sha256 artifact hash manifests."
+    }
+  ],
+  "nonclaims": [
+    {
+      "id": "not_surface_v1_release_gate",
+      "statement": "This contract represents only the experimental Surface Morph gate and does not claim the full Surface v1 release-gate surface."
+    },
+    {
+      "id": "not_remote_ci_execution",
+      "statement": "This contract represents the local gate plan and required report surface; it does not prove remote CI execution."
+    }
+  ],
+  "ci_artifacts": [
+    {
+      "path": "surface-morph-gate-summary.json",
+      "required": true
+    },
+    {
+      "path": "headless/surface-headless-morph.json",
+      "required": true
+    },
+    {
+      "path": "headless/artifact-hashes.json",
+      "required": true
+    },
+    {
+      "path": "artifact-hashes.json",
+      "required": true
+    }
+  ]
+}

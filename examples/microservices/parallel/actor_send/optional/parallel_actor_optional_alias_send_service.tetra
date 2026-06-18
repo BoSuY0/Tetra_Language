@@ -1,0 +1,28 @@
+// Optional actor alias-send microservice smoke.
+//
+// The service unwraps an optional actor payload, sends the handle through a
+// non-generic alias helper, and sends a request through the returned handle.
+module examples.microservices.parallel.actor_send.optional.parallel_actor_optional_alias_send_service
+func worker() -> Int
+uses actors:
+    let request: Int = core.recv()
+    let _reply: Int = core.send(core.sender(), request + 1)
+    return 0
+
+func alias_actor(peer: actor) -> actor:
+    return peer
+
+func main() -> Int
+uses actors, runtime:
+    let peer: actor = core.spawn("worker")
+    let maybe: actor? = peer
+    if let handle = maybe:
+        let returned: actor = alias_actor(handle)
+        let _sent: Int = core.send(returned, 41)
+        let reply: actor.recv_result_i32 = core.recv_until(core.deadline_ms(5))
+        if reply.error != 0:
+            return 10 + reply.error
+        if reply.value == 42:
+            return 0
+        return reply.value
+    return 99

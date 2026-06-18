@@ -149,7 +149,10 @@ func TestValidateEcoVaultRejectsDuplicateRecordIdentity(t *testing.T) {
 	if recordStart < 0 {
 		t.Fatalf("record not found:\n%s", text)
 	}
-	record := strings.TrimSuffix(strings.TrimSpace(text[recordStart:strings.LastIndex(text, "\n  ]")]), "\n")
+	record := strings.TrimSuffix(
+		strings.TrimSpace(text[recordStart:strings.LastIndex(text, "\n  ]")]),
+		"\n",
+	)
 	text = strings.Replace(text, "\n  ]", ",\n    "+record+"\n  ]", 1)
 	if err := os.WriteFile(filepath.Join(root, "records.json"), []byte(text), 0o644); err != nil {
 		t.Fatal(err)
@@ -170,7 +173,12 @@ func TestValidateEcoVaultAllowsSameObjectForDifferentKinds(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(raw)
-	second := strings.Replace(text[strings.Index(text, `{"hash":`):strings.LastIndex(text, "\n  ]")], `"kind": "source"`, `"kind": "interface"`, 1)
+	second := strings.Replace(
+		text[strings.Index(text, `{"hash":`):strings.LastIndex(text, "\n  ]")],
+		`"kind": "source"`,
+		`"kind": "interface"`,
+		1,
+	)
 	text = strings.Replace(text, "\n  ]", ",\n    "+strings.TrimSpace(second)+"\n  ]", 1)
 	if err := os.WriteFile(filepath.Join(root, "records.json"), []byte(text), 0o644); err != nil {
 		t.Fatal(err)
@@ -193,7 +201,11 @@ func makeVaultStore(t *testing.T, object []byte, sizeOverride int, hashOverride 
 	if err := os.MkdirAll(filepath.Join(root, "objects", "sha256"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, "objects", "sha256", hexSum), object, 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(root, "objects", "sha256", hexSum),
+		object,
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 	size := len(object)
@@ -202,7 +214,7 @@ func makeVaultStore(t *testing.T, object []byte, sizeOverride int, hashOverride 
 	}
 	records := fmt.Sprintf(`{
   "records": [
-    {"hash": %q, "kind": "source", "source": "examples/flow_hello.tetra", "size": %d}
+    {"hash": %q, "kind": "source", "source": "examples/flow/flow_hello.tetra", "size": %d}
   ]
 }
 `, hash, size)

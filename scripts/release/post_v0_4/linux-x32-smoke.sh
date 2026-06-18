@@ -6,7 +6,7 @@ repo_root="$(cd "$script_dir/../../.." && pwd)"
 report_dir="$repo_root/reports/post-v0.4/linux-x32"
 
 usage() {
-  cat <<'USAGE'
+  cat << 'USAGE'
 Usage: bash scripts/release/post_v0_4/linux-x32-smoke.sh [--report-dir DIR]
 
 Runs linux-x32 ABI, atomic, fuzz, and target metadata evidence. This preserves
@@ -25,7 +25,7 @@ while [[ $# -gt 0 ]]; do
       report_dir="$2"
       shift 2
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;
@@ -43,21 +43,21 @@ export GOCACHE
 mkdir -p "$report_dir"
 
 if [[ -n "${TETRA_CMD:-}" ]]; then
-  read -r -a tetra_cmd <<<"$TETRA_CMD"
+  read -r -a tetra_cmd <<< "$TETRA_CMD"
 else
   tetra_cmd=(go run ./cli/cmd/tetra)
 fi
 
 targets_json="$report_dir/targets.json"
-"${tetra_cmd[@]}" targets --format=json >"$targets_json"
+"${tetra_cmd[@]}" targets --format=json > "$targets_json"
 go run ./tools/cmd/validate-targets --report "$targets_json"
 
-"${tetra_cmd[@]}" test --target x32 --abi --report=json >"$report_dir/linux-x32-abi.json"
-"${tetra_cmd[@]}" test --target x32 --atomic-stress --report=json >"$report_dir/linux-x32-atomic-stress.json"
-"${tetra_cmd[@]}" test --target x32 --fuzz --report=json >"$report_dir/linux-x32-fuzz.json"
+"${tetra_cmd[@]}" test --target x32 --abi --report=json > "$report_dir/linux-x32-abi.json"
+"${tetra_cmd[@]}" test --target x32 --atomic-stress --report=json > "$report_dir/linux-x32-atomic-stress.json"
+"${tetra_cmd[@]}" test --target x32 --fuzz --report=json > "$report_dir/linux-x32-fuzz.json"
 
 runner_src="$report_dir/linux-x32-runner-smoke.tetra"
-cat >"$runner_src" <<'TETRA'
+cat > "$runner_src" << 'TETRA'
 func runner_worker() -> Int:
     return 42
 
@@ -119,7 +119,7 @@ test "runner task join":
     expect value == 42
 TETRA
 
-if "${tetra_cmd[@]}" test --diagnostics=json --target x32 --format=json "$runner_src" >"$report_dir/linux-x32-runner.json" 2>"$report_dir/linux-x32-runner.err.json"; then
+if "${tetra_cmd[@]}" test --diagnostics=json --target x32 --format=json "$runner_src" > "$report_dir/linux-x32-runner.json" 2> "$report_dir/linux-x32-runner.err.json"; then
   rm -f "$report_dir/linux-x32-runner.err.json"
 else
   code=$?

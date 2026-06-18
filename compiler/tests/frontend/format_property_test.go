@@ -79,7 +79,10 @@ func TestFormatSourcePropertySuiteCoversCommentRejectionAndMalformedInput(t *tes
 				t.Fatalf("expected formatter diagnostic")
 			}
 			diag := compiler.DiagnosticFromError(err)
-			if diag.Code != tt.wantCode || diag.File != tt.name+".tetra" || diag.Line != tt.wantLine || diag.Column != tt.wantColumn || diag.Severity != "error" {
+			if diag.Code != tt.wantCode || diag.File != tt.name+".tetra" ||
+				diag.Line != tt.wantLine ||
+				diag.Column != tt.wantColumn ||
+				diag.Severity != "error" {
 				t.Fatalf("diagnostic = %#v", diag)
 			}
 			if !strings.Contains(diag.Message, tt.wantMessage) {
@@ -142,7 +145,11 @@ func TestFormatSourceRepositoryParseFormatParseProperty(t *testing.T) {
 				result.formatted++
 			}
 			if result.formatted == 0 {
-				t.Fatalf("no format-compatible corpus files under %s (skipped %d)", root, result.skipped)
+				t.Fatalf(
+					"no format-compatible corpus files under %s (skipped %d)",
+					root,
+					result.skipped,
+				)
 			}
 			results[root] = result
 		})
@@ -221,10 +228,17 @@ func fileSurfaceSignature(file *compiler.FileAST) string {
 		parts = append(parts, "impl:"+impl.Type.Name+":"+impl.Protocol.Name)
 	}
 	for _, fn := range file.Funcs {
-		parts = append(parts, "func:"+fn.Name)
+		parts = append(parts, "func:"+formatSurfaceFuncName(fn.Name))
 	}
 	for _, test := range file.Tests {
 		parts = append(parts, "test:"+test.Name)
 	}
 	return strings.Join(parts, "|")
+}
+
+func formatSurfaceFuncName(name string) string {
+	if strings.HasPrefix(name, "__closure_") {
+		return "__closure"
+	}
+	return name
 }

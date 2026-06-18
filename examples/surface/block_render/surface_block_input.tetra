@@ -1,0 +1,45 @@
+// Block-first editable text input smoke.
+module examples.surface.block_render.surface_block_input
+
+import lib.core.surface as surface
+import lib.core.block as block
+import lib.core.text as text
+
+struct BlockInputApp:
+    focused_id: Int
+    submitted: Bool
+
+struct EditableTextBlock:
+    id: Int
+    rect: surface.Rect
+    spec: block.TextSpec
+    state: text.EditableText
+
+func main() -> Int
+uses alloc, mem:
+    let fg: surface.Color = surface.Color(r: 237, g: 242, b: 247, a: 255)
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 240, h: 120)
+    let input_rect: surface.Rect = surface.Rect(x: 16, y: 24, w: 160, h: 36)
+    var storage: []u8 = core.make_u8(32)
+    var input_state: text.EditableText = text.editable_empty(storage, 2)
+    let focus_status: Int = text.editable_set_focus(input_state, true)
+    var ascii: []u8 = core.make_u8(2)
+    ascii[0] = 79
+    ascii[1] = 75
+    var utf8: []u8 = core.make_u8(2)
+    utf8[0] = 208
+    utf8[1] = 162
+    let ascii_insert: text.TextEditResult = text.editable_text_input(input_state, ascii)
+    let utf8_insert: text.TextEditResult = text.editable_text_input(input_state, utf8)
+    let editable_spec: block.TextSpec = block.text_editable_styled(text.editable_len(input_state), 8, fg, block.text_family_ui(), 14, 400, 18, block.text_align_start(), block.text_wrap_none(), block.text_overflow_clip(), 255)
+    let measured: surface.Size = block.text_measure(editable_spec, input_rect.w - 20)
+    let app: BlockInputApp = BlockInputApp(focused_id: 2, submitted: false)
+    let text_block: EditableTextBlock = EditableTextBlock(id: 2, rect: input_rect, spec: editable_spec, state: input_state)
+    let root_props: block.BlockProps = block.props(block.layout_fixed(root_rect), block.paint_empty(), block.text_none(), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_none(), block.asset_none())
+    let input_props: block.BlockProps = block.props(block.layout_fixed(input_rect), block.paint_empty(), editable_spec, block.image_none(), block.input_text(), block.event_text(block.action_primary()), block.state_interactive(), block.motion_fast(), block.accessibility_text(8), block.asset_none())
+    let root: block.Block = block.make(block.id(1), block.id_none(), root_props)
+    let input: block.Block = block.make(block.id(text_block.id), block.id(1), input_props)
+    let cache_status: Int = block.text_glyph_cache_validate(block.text_glyph_cache_budget_bytes(), 2048, 4)
+    if block.id_value(root.id) == 1 && block.id_value(input.parent_id) == 1 && input.props.text_len == 4 && app.focused_id == 2 && !app.submitted && ascii_insert.ok && utf8_insert.ok && text.editable_len(text_block.state) == 4 && text.editable_caret(text_block.state) == 4 && text.editable_validate(text_block.state) == text.error_none() && block.text_is_editable(text_block.spec) && measured.w > 0 && measured.h == block.text_effective_line_height(text_block.spec) && cache_status == block.text_cache_error_ok() && focus_status == 1:
+        return 0
+    return 1

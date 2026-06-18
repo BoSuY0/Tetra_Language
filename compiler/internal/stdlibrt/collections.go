@@ -307,7 +307,11 @@ func (b *StringBuilder) View() (BytesView, error) {
 
 func (b *StringBuilder) Report() StorageReport {
 	if b == nil {
-		return StorageReport{Component: string(StringBuilderCollection), Storage: StorageHeap, HiddenHeap: true}
+		return StorageReport{
+			Component:  string(StringBuilderCollection),
+			Storage:    StorageHeap,
+			HiddenHeap: true,
+		}
 	}
 	report := b.report
 	report.BytesUsed = b.used
@@ -367,7 +371,11 @@ func (v *VecBytes) View() (BytesView, error) {
 
 func (v *VecBytes) Report() StorageReport {
 	if v == nil {
-		return StorageReport{Component: string(VecCollection), Storage: StorageHeap, HiddenHeap: true}
+		return StorageReport{
+			Component:  string(VecCollection),
+			Storage:    StorageHeap,
+			HiddenHeap: true,
+		}
 	}
 	report := v.report
 	report.BytesUsed = v.used
@@ -516,7 +524,11 @@ func (h *HashMapBytes) Get(key []byte) (BytesView, bool) {
 
 func (h *HashMapBytes) Report() StorageReport {
 	if h == nil {
-		return StorageReport{Component: string(HashMapCollection), Storage: StorageHeap, HiddenHeap: true}
+		return StorageReport{
+			Component:  string(HashMapCollection),
+			Storage:    StorageHeap,
+			HiddenHeap: true,
+		}
 	}
 	report := h.report
 	report.BytesUsed = h.arenaUsed
@@ -635,7 +647,12 @@ func (r *RingBuffer) PeekView(length int) (BytesView, error) {
 		return BytesView{}, ErrViewOutOfRange
 	}
 	if length == 0 {
-		return BytesView{Bytes: r.data[:0], Storage: r.report.Storage, RegionID: r.report.RegionID, Provenance: r.report.Provenance}, nil
+		return BytesView{
+			Bytes:      r.data[:0],
+			Storage:    r.report.Storage,
+			RegionID:   r.report.RegionID,
+			Provenance: r.report.Provenance,
+		}, nil
 	}
 	contiguous := len(r.data) - r.head
 	if contiguous > r.used {
@@ -684,14 +701,23 @@ func (r *RingBuffer) Consume(length int) error {
 
 func (r *RingBuffer) Report() StorageReport {
 	if r == nil {
-		return StorageReport{Component: string(RingBufferCollection), Storage: StorageHeap, HiddenHeap: true}
+		return StorageReport{
+			Component:  string(RingBufferCollection),
+			Storage:    StorageHeap,
+			HiddenHeap: true,
+		}
 	}
 	report := r.report
 	report.BytesUsed = r.used
 	return report
 }
 
-func allocateCollectionBytes(kind CollectionKind, element string, capacity int, region *Region) ([]byte, StorageReport, error) {
+func allocateCollectionBytes(
+	kind CollectionKind,
+	element string,
+	capacity int,
+	region *Region,
+) ([]byte, StorageReport, error) {
 	plan, err := PlanCollection(CollectionSpec{
 		Kind:     kind,
 		Element:  element,

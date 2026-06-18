@@ -69,7 +69,8 @@ func TestValidateFlowOnlyRejectsLegacyBraceFunction(t *testing.T) {
 		t.Fatalf("expected validator failure\n%s", out)
 	}
 	text := string(out)
-	if !strings.Contains(text, "legacy.tetra:1:1") || !strings.Contains(text, "legacy function syntax") {
+	if !strings.Contains(text, "legacy.tetra:1:1") ||
+		!strings.Contains(text, "legacy function syntax") {
 		t.Fatalf("unexpected output:\n%s", out)
 	}
 }
@@ -77,7 +78,11 @@ func TestValidateFlowOnlyRejectsLegacyBraceFunction(t *testing.T) {
 func TestValidateFlowOnlyRejectsLegacyBlockAndSemicolon(t *testing.T) {
 	dir := t.TempDir()
 	src := filepath.Join(dir, "legacy_blocks.tetra")
-	if err := os.WriteFile(src, []byte("func main() -> Int:\n    if (1) {\n        return 1;\n    }\n    return 0\n"), 0o644); err != nil {
+	if err := os.WriteFile(
+		src,
+		[]byte("func main() -> Int:\n    if (1) {\n        return 1;\n    }\n    return 0\n"),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 	out, err := runFlowOnlyValidator(t, src)
@@ -85,7 +90,11 @@ func TestValidateFlowOnlyRejectsLegacyBlockAndSemicolon(t *testing.T) {
 		t.Fatalf("expected validator failure\n%s", out)
 	}
 	text := string(out)
-	for _, want := range []string{"legacy braced if syntax", "trailing semicolon", "legacy brace token"} {
+	for _, want := range []string{
+		"legacy braced if syntax",
+		"trailing semicolon",
+		"legacy brace token",
+	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("unexpected output, missing %q:\n%s", want, out)
 		}
@@ -148,17 +157,26 @@ func TestValidateFlowOnlyIgnoresCommentsAndStrings(t *testing.T) {
 
 func TestValidateFlowOnlyScansDirectories(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "ok.tetra"), []byte("func ok() -> Int:\n    return 0\n"), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(dir, "ok.tetra"),
+		[]byte("func ok() -> Int:\n    return 0\n"),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "bad.tetra"), []byte("while (1) {\n}\n"), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(dir, "bad.tetra"),
+		[]byte("while (1) {\n}\n"),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 	out, err := runFlowOnlyValidator(t, dir)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
 	}
-	if !strings.Contains(string(out), "bad.tetra:1:1") || strings.Contains(string(out), "ok.tetra") {
+	if !strings.Contains(string(out), "bad.tetra:1:1") ||
+		strings.Contains(string(out), "ok.tetra") {
 		t.Fatalf("unexpected output:\n%s", out)
 	}
 }

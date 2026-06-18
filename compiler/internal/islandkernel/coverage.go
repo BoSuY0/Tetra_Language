@@ -54,16 +54,22 @@ func DangerousDecisionRoutes() []DangerousDecisionRoute {
 			KernelFunction: "CanBorrow",
 			SourceFiles: []string{
 				"compiler/internal/islandkernel/kernel.go",
-				"compiler/internal/semantics/region.go",
-				"compiler/internal/memoryfacts/from_plir.go",
+				"compiler/internal/semantics/semantics_memory_resources.go",
+				"compiler/internal/memoryfacts/fromplir/from_plir.go",
 			},
 			TestFiles: []string{
 				"compiler/internal/islandkernel/kernel_test.go",
-				"compiler/internal/memoryfacts/from_plir_test.go",
-				"compiler/internal/memoryfacts/graph_test.go",
+				"compiler/internal/memoryfacts_test/from_plir_test.go",
+				"compiler/internal/memoryfacts_test/graph_test.go",
 			},
-			EvidenceTokens: []string{"CanBorrow", "bindExplicitBorrow", "borrowed_imm", "TestMemoryFactsAcceptsSafeBorrowedView"},
-			Equivalent:     "regionState assigns borrowed regions and MemoryFactGraph projects borrowed facts with parent/source validation.",
+			EvidenceTokens: []string{
+				"CanBorrow",
+				"bindExplicitBorrow",
+				"borrowed_imm",
+				"TestMemoryFactsAcceptsSafeBorrowedView",
+			},
+			Equivalent: ("regionState assigns borrowed regions and MemoryFactGraph " +
+				"projects borrowed facts with parent/source validation."),
 		},
 		{
 			Decision:       "CanReturn",
@@ -80,8 +86,14 @@ func DangerousDecisionRoutes() []DangerousDecisionRoute {
 				"compiler/internal/allocplan/plan_test.go",
 				"compiler/internal/validation/validation_test.go",
 			},
-			EvidenceTokens: []string{"CanReturn", "EscapeReturn", "allocation is returned", "TestValidateAllocationLoweringRejectsReturnedExplicitIslandAllocation"},
-			Equivalent:     "allocation escape classification and validation reject trusted stack/island storage when the allocation escapes by return.",
+			EvidenceTokens: []string{
+				"CanReturn",
+				"EscapeReturn",
+				"allocation is returned",
+				"TestValidateAllocationLoweringRejectsReturnedExplicitIslandAllocation",
+			},
+			Equivalent: ("allocation escape classification and validation reject trusted " +
+				"stack/island storage when the allocation escapes by return."),
 		},
 		{
 			Decision:       "CanStoreGlobal",
@@ -98,8 +110,14 @@ func DangerousDecisionRoutes() []DangerousDecisionRoute {
 				"compiler/internal/allocplan/plan_test.go",
 				"compiler/internal/validation/validation_test.go",
 			},
-			EvidenceTokens: []string{"CanStoreGlobal", "EscapeGlobal", "stored in global state", "TestValidateAllocationLoweringRejectsGlobalStoredStackAllocation"},
-			Equivalent:     "global-store escape classification forces conservative heap storage and validation rejects trusted storage for global escapes.",
+			EvidenceTokens: []string{
+				"CanStoreGlobal",
+				"EscapeGlobal",
+				"stored in global state",
+				"TestValidateAllocationLoweringRejectsGlobalStoredStackAllocation",
+			},
+			Equivalent: ("global-store escape classification forces conservative heap " +
+				"storage and validation rejects trusted storage for global escapes."),
 		},
 		{
 			Decision:       "CanCaptureClosure",
@@ -108,16 +126,23 @@ func DangerousDecisionRoutes() []DangerousDecisionRoute {
 			KernelFunction: "CanCaptureClosure",
 			SourceFiles: []string{
 				"compiler/internal/islandkernel/kernel.go",
-				"compiler/internal/semantics/callable_escape.go",
+				"compiler/internal/semantics/semantics_memory_resources.go",
 				"compiler/internal/allocplan/plan.go",
 			},
 			TestFiles: []string{
 				"compiler/internal/islandkernel/kernel_test.go",
-				"compiler/internal/semantics/callable_escape_test.go",
+				"compiler/internal/semantics/semantics_suite_test.go",
 				"compiler/internal/allocplan/plan_test.go",
 			},
-			EvidenceTokens: []string{"CanCaptureClosure", "classifyCallableEscape", "EscapeClosure", "TestClassifyCallableEscapeUsesHandleForOversizedReturn"},
-			Equivalent:     "callable escape classification rejects unsupported captures and allocation planning treats closure captures as heap/conservative escapes.",
+			EvidenceTokens: []string{
+				"CanCaptureClosure",
+				"classifyCallableEscape",
+				"EscapeClosure",
+				"TestClassifyCallableEscapeUsesHandleForOversizedReturn",
+			},
+			Equivalent: ("callable escape classification rejects unsupported captures and " +
+				"allocation planning treats closure captures as heap/conservative " +
+				"escapes."),
 		},
 		{
 			Decision:       "CanSendToActor",
@@ -126,16 +151,22 @@ func DangerousDecisionRoutes() []DangerousDecisionRoute {
 			KernelFunction: "CanSendToActor",
 			SourceFiles: []string{
 				"compiler/internal/islandkernel/kernel.go",
-				"compiler/internal/memoryfacts/from_plir.go",
+				"compiler/internal/memoryfacts/fromplir/from_plir.go",
 				"compiler/internal/allocplan/plan.go",
 			},
 			TestFiles: []string{
 				"compiler/internal/islandkernel/kernel_test.go",
-				"compiler/internal/memoryfacts/from_plir_test.go",
+				"compiler/internal/memoryfacts_test/from_plir_test.go",
 				"compiler/internal/allocplan/plan_test.go",
 			},
-			EvidenceTokens: []string{"CanSendToActor", "actor_boundary_borrow_rejected", "EscapeActor", "TestMemoryIdealV4ProjectsAsyncTaskActorBoundaryFacts"},
-			Equivalent:     "actor boundary projection rejects borrowed rows and allocation planning avoids trusted storage for actor escapes.",
+			EvidenceTokens: []string{
+				"CanSendToActor",
+				"actor_boundary_borrow_rejected",
+				"EscapeActor",
+				"TestMemoryIdealV4ProjectsAsyncTaskActorBoundaryFacts",
+			},
+			Equivalent: ("actor boundary projection rejects borrowed rows and allocation " +
+				"planning avoids trusted storage for actor escapes."),
 		},
 		{
 			Decision:       "CanSendToTask",
@@ -144,16 +175,22 @@ func DangerousDecisionRoutes() []DangerousDecisionRoute {
 			KernelFunction: "CanSendToTask",
 			SourceFiles: []string{
 				"compiler/internal/islandkernel/kernel.go",
-				"compiler/internal/memoryfacts/from_plir.go",
+				"compiler/internal/memoryfacts/fromplir/from_plir.go",
 				"compiler/internal/allocplan/plan.go",
 			},
 			TestFiles: []string{
 				"compiler/internal/islandkernel/kernel_test.go",
-				"compiler/internal/memoryfacts/from_plir_test.go",
+				"compiler/internal/memoryfacts_test/from_plir_test.go",
 				"compiler/internal/allocplan/plan_test.go",
 			},
-			EvidenceTokens: []string{"CanSendToTask", "task_boundary_borrow_rejected", "EscapeTask", "TestMemoryIdealV4ProjectsAsyncTaskActorBoundaryFacts"},
-			Equivalent:     "task boundary projection rejects borrowed rows and allocation planning avoids trusted storage for task escapes.",
+			EvidenceTokens: []string{
+				"CanSendToTask",
+				"task_boundary_borrow_rejected",
+				"EscapeTask",
+				"TestMemoryIdealV4ProjectsAsyncTaskActorBoundaryFacts",
+			},
+			Equivalent: ("task boundary projection rejects borrowed rows and allocation " +
+				"planning avoids trusted storage for task escapes."),
 		},
 		{
 			Decision:       "CanMoveIsland",
@@ -166,8 +203,13 @@ func DangerousDecisionRoutes() []DangerousDecisionRoute {
 			TestFiles: []string{
 				"compiler/internal/islandkernel/kernel_test.go",
 			},
-			EvidenceTokens: []string{"CanMoveIsland", "ConsumesToken", "token.move_consumes_source"},
-			Equivalent:     "current checked route is the kernel decision API; broader token lifetime expansion remains MEMISL-P05 scope.",
+			EvidenceTokens: []string{
+				"CanMoveIsland",
+				"ConsumesToken",
+				"token.move_consumes_source",
+			},
+			Equivalent: ("current checked route is the kernel decision API; broader token " +
+				"lifetime expansion remains MEMISL-P05 scope."),
 		},
 		{
 			Decision:       "CanFreeIsland",
@@ -183,8 +225,15 @@ func DangerousDecisionRoutes() []DangerousDecisionRoute {
 				"compiler/internal/islandkernel/kernel_test.go",
 				"compiler/internal/validation/validation_test.go",
 			},
-			EvidenceTokens: []string{"CanFreeIsland", "IRIslandFree", "AllocationDebugDoubleFree", "TestValidateAllocationLoweringRejectsExplicitIslandDoubleFree"},
-			Equivalent:     "explicit island validation tracks free operations and runtime contracts name double-free instrumentation; MEMISL-P05 expands token misuse cases.",
+			EvidenceTokens: []string{
+				"CanFreeIsland",
+				"IRIslandFree",
+				"AllocationDebugDoubleFree",
+				"TestValidateAllocationLoweringRejectsExplicitIslandDoubleFree",
+			},
+			Equivalent: ("explicit island validation tracks free operations and runtime " +
+				"contracts name double-free instrumentation; MEMISL-P05 expands token " +
+				"misuse cases."),
 		},
 		{
 			Decision:       "CanResetIsland",
@@ -200,8 +249,15 @@ func DangerousDecisionRoutes() []DangerousDecisionRoute {
 				"compiler/internal/islandkernel/kernel_test.go",
 				"compiler/internal/validation/validation_test.go",
 			},
-			EvidenceTokens: []string{"CanResetIsland", "IRIslandReset", "AllocationDebugRegionReset", "TestValidateAllocationLoweringRejectsExplicitIslandUseAfterReset"},
-			Equivalent:     "explicit island validation tracks reset/use-after-reset and runtime contracts name reset instrumentation; MEMISL-P05 expands epoch matrix coverage.",
+			EvidenceTokens: []string{
+				"CanResetIsland",
+				"IRIslandReset",
+				"AllocationDebugRegionReset",
+				"TestValidateAllocationLoweringRejectsExplicitIslandUseAfterReset",
+			},
+			Equivalent: ("explicit island validation tracks reset/use-after-reset and " +
+				"runtime contracts name reset instrumentation; MEMISL-P05 expands epoch " +
+				"matrix coverage."),
 		},
 		{
 			Decision:       "CanClaimNoAlias",
@@ -210,18 +266,25 @@ func DangerousDecisionRoutes() []DangerousDecisionRoute {
 			KernelFunction: "CanClaimNoAlias",
 			SourceFiles: []string{
 				"compiler/internal/islandkernel/kernel.go",
-				"compiler/internal/memoryfacts/from_plir.go",
+				"compiler/internal/memoryfacts/fromplir/from_plir_copy.go",
 				"compiler/internal/memoryfacts/graph.go",
 				"compiler/internal/memoryfacts/report.go",
 			},
 			TestFiles: []string{
 				"compiler/internal/islandkernel/kernel_test.go",
-				"compiler/internal/memoryfacts/from_plir_test.go",
-				"compiler/internal/memoryfacts/graph_test.go",
-				"compiler/internal/memoryfacts/report_test.go",
+				"compiler/internal/memoryfacts_test/from_plir_boundaries_test.go",
+				"compiler/internal/memoryfacts_test/graph_test.go",
+				"compiler/internal/memoryfacts_test/report_test.go",
 			},
-			EvidenceTokens: []string{"CanClaimNoAlias", "no_alias_validated_narrow_unique_local", "validated no_alias", "TestMemoryIdealV0ProjectsNarrowInoutNoAliasFacts"},
-			Equivalent:     "MemoryFactGraph/report validation accepts only narrow compiler-owned noalias evidence and rejects broad or unsafe_unknown noalias claims.",
+			EvidenceTokens: []string{
+				"CanClaimNoAlias",
+				"no_alias_validated_narrow_unique_local",
+				"validated no_alias",
+				"TestMemoryIdealV0ProjectsNarrowInoutNoAliasFacts",
+			},
+			Equivalent: ("MemoryFactGraph/report validation accepts only narrow compiler-" +
+				"owned noalias evidence and rejects broad or unsafe_unknown noalias " +
+				"claims."),
 		},
 		{
 			Decision:       "CanEliminateBoundsCheck",
@@ -237,11 +300,17 @@ func DangerousDecisionRoutes() []DangerousDecisionRoute {
 			TestFiles: []string{
 				"compiler/internal/islandkernel/kernel_test.go",
 				"compiler/internal/validation/validation_test.go",
-				"compiler/internal/memoryfacts/from_validation_test.go",
-				"compiler/internal/memoryfacts/report_test.go",
+				"compiler/internal/memoryfacts_test/from_validation_test.go",
+				"compiler/internal/memoryfacts_test/report_test.go",
 			},
-			EvidenceTokens: []string{"CanEliminateBoundsCheck", "bounds_check_removed_with_proof_id", "bounds_proof_id_validator", "TestCheckBoundsProofsWithPLIRRejectsTypedProofBaseMismatch"},
-			Equivalent:     "validation emits typed proof terms and memory report validation rejects bare bounds-check elimination without compiler-owned proof ids.",
+			EvidenceTokens: []string{
+				"CanEliminateBoundsCheck",
+				"bounds_check_removed_with_proof_id",
+				"bounds_proof_id_validator",
+				"TestCheckBoundsProofsWithPLIRRejectsTypedProofBaseMismatch",
+			},
+			Equivalent: ("validation emits typed proof terms and memory report validation " +
+				"rejects bare bounds-check elimination without compiler-owned proof ids."),
 		},
 		{
 			Decision:       "CanLowerAsExplicitIsland",
@@ -251,19 +320,26 @@ func DangerousDecisionRoutes() []DangerousDecisionRoute {
 			SourceFiles: []string{
 				"compiler/internal/islandkernel/kernel.go",
 				"compiler/internal/allocplan/plan.go",
-				"compiler/internal/lower/lower.go",
+				"compiler/internal/lower/lower_expressions.go",
 				"compiler/internal/validation/validation.go",
 				"compiler/internal/memoryfacts/report.go",
 			},
 			TestFiles: []string{
 				"compiler/internal/islandkernel/kernel_test.go",
 				"compiler/internal/allocplan/plan_test.go",
-				"compiler/internal/lower/allocation_stack_test.go",
+				"compiler/internal/lower/lower_suite_test.go",
 				"compiler/internal/validation/validation_test.go",
-				"compiler/internal/memoryfacts/report_test.go",
+				"compiler/internal/memoryfacts_test/report_test.go",
 			},
-			EvidenceTokens: []string{"CanLowerAsExplicitIsland", "validated_explicit_island_scope", "lowerExplicitIslandAllocationLet", "TestValidateAllocationLoweringRejectsMissingExplicitIslandIR"},
-			Equivalent:     "allocation planning, lowering, validation, and memory report checks require explicit island storage/lowering agreement and reject escape/fallback mismatches.",
+			EvidenceTokens: []string{
+				"CanLowerAsExplicitIsland",
+				"validated_explicit_island_scope",
+				"lowerExplicitIslandAllocationLet",
+				"TestValidateAllocationLoweringRejectsMissingExplicitIslandIR",
+			},
+			Equivalent: ("allocation planning, lowering, validation, and memory report " +
+				"checks require explicit island storage/lowering agreement and reject " +
+				"escape/fallback mismatches."),
 		},
 		{
 			Decision:       "CanPromoteUnsafeRoot",
@@ -272,18 +348,26 @@ func DangerousDecisionRoutes() []DangerousDecisionRoute {
 			KernelFunction: "CanPromoteUnsafeRoot",
 			SourceFiles: []string{
 				"compiler/internal/islandkernel/kernel.go",
-				"compiler/internal/memoryfacts/from_plir.go",
+				"compiler/internal/memoryfacts/fromplir/from_plir_allocplan.go",
+				"compiler/internal/memoryfacts/fromplir/from_plir_unsafe.go",
 				"compiler/internal/memoryfacts/graph.go",
 				"compiler/internal/memoryfacts/report.go",
 			},
 			TestFiles: []string{
 				"compiler/internal/islandkernel/kernel_test.go",
-				"compiler/internal/memoryfacts/from_plir_test.go",
-				"compiler/internal/memoryfacts/graph_test.go",
-				"compiler/internal/memoryfacts/report_test.go",
+				"compiler/internal/memoryfacts_test/from_plir_boundaries_test.go",
+				"compiler/internal/memoryfacts_test/graph_test.go",
+				"compiler/internal/memoryfacts_test/report_test.go",
 			},
-			EvidenceTokens: []string{"CanPromoteUnsafeRoot", "unsafe_unknown_rejected_safe_facts", "unsafe_verified_root_allocation_base", "TestMemoryIdealV5ProjectsRawPointerUnsafeContractFacts"},
-			Equivalent:     "unsafe_unknown remains rejected/conservative and unsafe_verified_root is limited to bounded allocation-base metadata without safe/noalias promotion.",
+			EvidenceTokens: []string{
+				"CanPromoteUnsafeRoot",
+				"unsafe_unknown_rejected_safe_facts",
+				"unsafe_verified_root_allocation_base",
+				"TestMemoryIdealV5ProjectsRawPointerUnsafeContractFacts",
+			},
+			Equivalent: ("unsafe_unknown remains rejected/conservative and unsafe_" +
+				"verified_root is limited to bounded allocation-base metadata without " +
+				"safe/noalias promotion."),
 		},
 		{
 			Decision:       "CanTrustStorage",
@@ -299,11 +383,17 @@ func DangerousDecisionRoutes() []DangerousDecisionRoute {
 			TestFiles: []string{
 				"compiler/internal/islandkernel/kernel_test.go",
 				"compiler/internal/allocplan/plan_test.go",
-				"compiler/internal/memoryfacts/report_test.go",
-				"compiler/internal/memoryfacts/graph_test.go",
+				"compiler/internal/memoryfacts_test/report_test.go",
+				"compiler/internal/memoryfacts_test/graph_test.go",
 			},
-			EvidenceTokens: []string{"CanTrustStorage", "validatedTrustedStorageHeapFallback", "runtimeProofRequiredStorage", "TestValidateMemoryReportRejectsValidatedTaskActorRegionStorageWithoutRuntimeProof"},
-			Equivalent:     "allocation and memory report validators reject heap fallback, unsafe_unknown, and ungated runtime-boundary storage as trusted storage.",
+			EvidenceTokens: []string{
+				"CanTrustStorage",
+				"validatedTrustedStorageHeapFallback",
+				"runtimeProofRequiredStorage",
+				"TestValidateMemoryReportRejectsValidatedTaskActorRegionStorageWithoutRuntimeProof",
+			},
+			Equivalent: ("allocation and memory report validators reject heap fallback, " +
+				"unsafe_unknown, and ungated runtime-boundary storage as trusted storage."),
 		},
 		{
 			Decision:       "CanEraseRuntimeCheck",
@@ -313,22 +403,32 @@ func DangerousDecisionRoutes() []DangerousDecisionRoute {
 			SourceFiles: []string{
 				"compiler/internal/islandkernel/kernel.go",
 				"compiler/internal/memoryfacts/from_validation.go",
-				"compiler/internal/memoryfacts/from_plir.go",
+				"compiler/internal/memoryfacts/fromplir/from_plir.go",
 				"compiler/internal/memoryfacts/report.go",
 			},
 			TestFiles: []string{
 				"compiler/internal/islandkernel/kernel_test.go",
-				"compiler/internal/memoryfacts/from_validation_test.go",
-				"compiler/internal/memoryfacts/from_plir_test.go",
-				"compiler/internal/memoryfacts/report_test.go",
+				"compiler/internal/memoryfacts_test/from_validation_test.go",
+				"compiler/internal/memoryfacts_test/from_plir_test.go",
+				"compiler/internal/memoryfacts_test/report_test.go",
 			},
-			EvidenceTokens: []string{"CanEraseRuntimeCheck", "bounds_check_retained_dynamic", "raw_bounds_runtime_check_normal_build", "TestMemoryIdealV6ProjectsBoundsProofFacts"},
-			Equivalent:     "dynamic raw/bounds uncertainty stays as normal-build checks unless compiler-owned proof facts authorize a narrow removal.",
+			EvidenceTokens: []string{
+				"CanEraseRuntimeCheck",
+				"bounds_check_retained_dynamic",
+				"raw_bounds_runtime_check_normal_build",
+				"TestMemoryIdealV6ProjectsBoundsProofFacts",
+			},
+			Equivalent: ("dynamic raw/bounds uncertainty stays as normal-build checks " +
+				"unless compiler-owned proof facts authorize a narrow removal."),
 		},
 	}
 }
 
-func ValidateDangerousDecisionRoutes(routes []DangerousDecisionRoute, fileExists func(string) bool, fileContainsToken func(string, string) bool) error {
+func ValidateDangerousDecisionRoutes(
+	routes []DangerousDecisionRoute,
+	fileExists func(string) bool,
+	fileContainsToken func(string, string) bool,
+) error {
 	if len(routes) == 0 {
 		return fmt.Errorf("islandkernel route coverage: no routes")
 	}
@@ -342,7 +442,10 @@ func ValidateDangerousDecisionRoutes(routes []DangerousDecisionRoute, fileExists
 			continue
 		}
 		if _, ok := required[decision]; !ok {
-			issues = append(issues, fmt.Sprintf("%s: decision is not in required dangerous decision set", decision))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s: decision is not in required dangerous decision set", decision),
+			)
 		}
 		if _, ok := seen[decision]; ok {
 			issues = append(issues, fmt.Sprintf("%s: duplicate route", decision))
@@ -352,10 +455,20 @@ func ValidateDangerousDecisionRoutes(routes []DangerousDecisionRoute, fileExists
 			issues = append(issues, fmt.Sprintf("%s: missing review question", decision))
 		}
 		if route.KernelFunction != decision {
-			issues = append(issues, fmt.Sprintf("%s: kernel function %q must match decision", decision, route.KernelFunction))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"%s: kernel function %q must match decision",
+					decision,
+					route.KernelFunction,
+				),
+			)
 		}
 		if !knownRouteStrategy(route.Strategy) {
-			issues = append(issues, fmt.Sprintf("%s: unknown route strategy %q", decision, route.Strategy))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s: unknown route strategy %q", decision, route.Strategy),
+			)
 		}
 		if len(route.SourceFiles) == 0 {
 			issues = append(issues, fmt.Sprintf("%s: missing source files", decision))
@@ -366,13 +479,20 @@ func ValidateDangerousDecisionRoutes(routes []DangerousDecisionRoute, fileExists
 				continue
 			}
 			if fileExists != nil && !fileExists(path) {
-				issues = append(issues, fmt.Sprintf("%s: source/test file %q does not exist", decision, path))
+				issues = append(
+					issues,
+					fmt.Sprintf("%s: source/test file %q does not exist", decision, path),
+				)
 			}
 		}
 		if route.Strategy == RouteValidatedEquivalent && strings.TrimSpace(route.Equivalent) == "" {
-			issues = append(issues, fmt.Sprintf("%s: validated equivalent route needs rationale", decision))
+			issues = append(
+				issues,
+				fmt.Sprintf("%s: validated equivalent route needs rationale", decision),
+			)
 		}
-		if route.Strategy == RouteNotApplicable && strings.TrimSpace(route.NonApplicableReason) == "" {
+		if route.Strategy == RouteNotApplicable &&
+			strings.TrimSpace(route.NonApplicableReason) == "" {
 			issues = append(issues, fmt.Sprintf("%s: non-applicable route needs reason", decision))
 		}
 		if len(route.EvidenceTokens) == 0 {
@@ -394,7 +514,10 @@ func ValidateDangerousDecisionRoutes(routes []DangerousDecisionRoute, fileExists
 				}
 			}
 			if !found {
-				issues = append(issues, fmt.Sprintf("%s: evidence token %q not found in route files", decision, token))
+				issues = append(
+					issues,
+					fmt.Sprintf("%s: evidence token %q not found in route files", decision, token),
+				)
 			}
 		}
 	}

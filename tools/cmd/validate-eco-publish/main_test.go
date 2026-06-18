@@ -21,7 +21,14 @@ func TestValidateEcoPublishAcceptsValidMetadata(t *testing.T) {
 
 func TestValidateEcoPublishAcceptsStableMetadata(t *testing.T) {
 	root, id, version, target := makePublishFixture(t)
-	metaPath := filepath.Join(root, "packages", capsuleIDDirectory(id), version, target, "metadata.json")
+	metaPath := filepath.Join(
+		root,
+		"packages",
+		capsuleIDDirectory(id),
+		version,
+		target,
+		"metadata.json",
+	)
 	raw, err := os.ReadFile(metaPath)
 	if err != nil {
 		t.Fatal(err)
@@ -40,7 +47,14 @@ func TestValidateEcoPublishAcceptsStableMetadata(t *testing.T) {
 
 func TestValidateEcoPublishRejectsHashMismatch(t *testing.T) {
 	root, id, version, target := makePublishFixture(t)
-	path := filepath.Join(root, "packages", capsuleIDDirectory(id), version, target, "package.todex")
+	path := filepath.Join(
+		root,
+		"packages",
+		capsuleIDDirectory(id),
+		version,
+		target,
+		"package.todex",
+	)
 	if err := os.WriteFile(path, []byte("corrupt"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -48,19 +62,32 @@ func TestValidateEcoPublishRejectsHashMismatch(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
 	}
-	if !strings.Contains(string(out), "package size mismatch") && !strings.Contains(string(out), "package hash mismatch") {
+	if !strings.Contains(string(out), "package size mismatch") &&
+		!strings.Contains(string(out), "package hash mismatch") {
 		t.Fatalf("unexpected output:\n%s", out)
 	}
 }
 
 func TestValidateEcoPublishRejectsUnknownMetadataField(t *testing.T) {
 	root, id, version, target := makePublishFixture(t)
-	metaPath := filepath.Join(root, "packages", capsuleIDDirectory(id), version, target, "metadata.json")
+	metaPath := filepath.Join(
+		root,
+		"packages",
+		capsuleIDDirectory(id),
+		version,
+		target,
+		"metadata.json",
+	)
 	raw, err := os.ReadFile(metaPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	text := strings.Replace(string(raw), "\n  \"package\":", "\n  \"unexpected\": true,\n  \"package\":", 1)
+	text := strings.Replace(
+		string(raw),
+		"\n  \"package\":",
+		"\n  \"unexpected\": true,\n  \"package\":",
+		1,
+	)
 	if err := os.WriteFile(metaPath, []byte(text), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -75,12 +102,24 @@ func TestValidateEcoPublishRejectsUnknownMetadataField(t *testing.T) {
 
 func TestValidateEcoPublishRejectsUnsafePackagePath(t *testing.T) {
 	root, id, version, target := makePublishFixture(t)
-	metaPath := filepath.Join(root, "packages", capsuleIDDirectory(id), version, target, "metadata.json")
+	metaPath := filepath.Join(
+		root,
+		"packages",
+		capsuleIDDirectory(id),
+		version,
+		target,
+		"metadata.json",
+	)
 	raw, err := os.ReadFile(metaPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	text := strings.Replace(string(raw), `"file": "package.todex"`, `"file": "../linux-x64/package.todex"`, 1)
+	text := strings.Replace(
+		string(raw),
+		`"file": "package.todex"`,
+		`"file": "../linux-x64/package.todex"`,
+		1,
+	)
 	if err := os.WriteFile(metaPath, []byte(text), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -95,12 +134,24 @@ func TestValidateEcoPublishRejectsUnsafePackagePath(t *testing.T) {
 
 func TestValidateEcoPublishRejectsDownloadPathMismatch(t *testing.T) {
 	root, id, version, target := makePublishFixture(t)
-	metaPath := filepath.Join(root, "packages", capsuleIDDirectory(id), version, target, "metadata.json")
+	metaPath := filepath.Join(
+		root,
+		"packages",
+		capsuleIDDirectory(id),
+		version,
+		target,
+		"metadata.json",
+	)
 	raw, err := os.ReadFile(metaPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	text := strings.Replace(string(raw), `"path": "packages/tetra_demo/0.1.0/linux-x64/package.todex"`, `"path": "packages/tetra_demo/0.1.0/windows-x64/package.todex"`, 1)
+	text := strings.Replace(
+		string(raw),
+		`"path": "packages/tetra_demo/0.1.0/linux-x64/package.todex"`,
+		`"path": "packages/tetra_demo/0.1.0/windows-x64/package.todex"`,
+		1,
+	)
 	if err := os.WriteFile(metaPath, []byte(text), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -115,12 +166,24 @@ func TestValidateEcoPublishRejectsDownloadPathMismatch(t *testing.T) {
 
 func TestValidateEcoPublishRejectsUnsafeTrustSnapshotPath(t *testing.T) {
 	root, id, version, target := makePublishFixture(t)
-	metaPath := filepath.Join(root, "packages", capsuleIDDirectory(id), version, target, "metadata.json")
+	metaPath := filepath.Join(
+		root,
+		"packages",
+		capsuleIDDirectory(id),
+		version,
+		target,
+		"metadata.json",
+	)
 	raw, err := os.ReadFile(metaPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	text := strings.Replace(string(raw), `"snapshot_file": "trust.snapshot.json"`, `"snapshot_file": "../trust.snapshot.json"`, 1)
+	text := strings.Replace(
+		string(raw),
+		`"snapshot_file": "trust.snapshot.json"`,
+		`"snapshot_file": "../trust.snapshot.json"`,
+		1,
+	)
 	if err := os.WriteFile(metaPath, []byte(text), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -135,8 +198,19 @@ func TestValidateEcoPublishRejectsUnsafeTrustSnapshotPath(t *testing.T) {
 
 func TestValidateEcoPublishRejectsTrustSnapshotHashMismatch(t *testing.T) {
 	root, id, version, target := makePublishFixture(t)
-	snapshotPath := filepath.Join(root, "packages", capsuleIDDirectory(id), version, target, "trust.snapshot.json")
-	if err := os.WriteFile(snapshotPath, []byte(`{"schema":"tetra.eco.trust-snapshot.v1","tampered":true}`), 0o644); err != nil {
+	snapshotPath := filepath.Join(
+		root,
+		"packages",
+		capsuleIDDirectory(id),
+		version,
+		target,
+		"trust.snapshot.json",
+	)
+	if err := os.WriteFile(
+		snapshotPath,
+		[]byte(`{"schema":"tetra.eco.trust-snapshot.v1","tampered":true}`),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 	out, err := runPublishValidator(t, root, id, version, target)
@@ -163,7 +237,11 @@ func makePublishFixture(t *testing.T) (root string, id string, version string, t
 	trustSnapshot := []byte(`{"schema":"tetra.eco.trust-snapshot.v1","record_count":0}`)
 	trustSum := sha256.Sum256(trustSnapshot)
 	trustHash := hex.EncodeToString(trustSum[:])
-	if err := os.WriteFile(filepath.Join(dir, "trust.snapshot.json"), trustSnapshot, 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(dir, "trust.snapshot.json"),
+		trustSnapshot,
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "package.todex"), pkg, 0o644); err != nil {
@@ -203,14 +281,41 @@ func makePublishFixture(t *testing.T) (root string, id string, version string, t
 	return root, id, version, target
 }
 
-func runPublishValidator(t *testing.T, registry string, id string, version string, target string) ([]byte, error) {
+func runPublishValidator(
+	t *testing.T,
+	registry string,
+	id string,
+	version string,
+	target string,
+) ([]byte, error) {
 	t.Helper()
 	return runPublishValidatorWithChannel(t, registry, id, version, target, "beta")
 }
 
-func runPublishValidatorWithChannel(t *testing.T, registry string, id string, version string, target string, channel string) ([]byte, error) {
+func runPublishValidatorWithChannel(
+	t *testing.T,
+	registry string,
+	id string,
+	version string,
+	target string,
+	channel string,
+) ([]byte, error) {
 	t.Helper()
-	cmd := exec.Command("go", "run", ".", "--registry", registry, "--id", id, "--version", version, "--target", target, "--channel", channel)
+	cmd := exec.Command(
+		"go",
+		"run",
+		".",
+		"--registry",
+		registry,
+		"--id",
+		id,
+		"--version",
+		version,
+		"--target",
+		target,
+		"--channel",
+		channel,
+	)
 	cmd.Dir = "."
 	return cmd.CombinedOutput()
 }

@@ -111,7 +111,8 @@ func validatePerformanceReport(raw []byte) error {
 	if !strings.Contains(report.Command, "-bench=") {
 		return fmt.Errorf("command must include -bench")
 	}
-	if strings.Contains(strings.ToLower(report.ThresholdDecision), "todo") || strings.Contains(strings.ToLower(report.ThresholdDecision), "tbd") {
+	if strings.Contains(strings.ToLower(report.ThresholdDecision), "todo") ||
+		strings.Contains(strings.ToLower(report.ThresholdDecision), "tbd") {
 		return fmt.Errorf("threshold_decision must not contain TODO/TBD placeholders")
 	}
 	if strings.TrimSpace(report.BaselineArtifact) == "" {
@@ -170,7 +171,12 @@ func validatePerformanceReport(raw []byte) error {
 			"decision":  metric.Decision,
 		} {
 			if phrase, ok := forbiddenPerformanceClaim(value); ok {
-				return fmt.Errorf("metric %s %s contains forbidden %s claim", metric.Name, label, phrase)
+				return fmt.Errorf(
+					"metric %s %s contains forbidden %s claim",
+					metric.Name,
+					label,
+					phrase,
+				)
 			}
 		}
 		if strings.Contains(metric.Name, "BinarySize") && metric.ArtifactBytes <= 0 {
@@ -187,17 +193,33 @@ func validatePerformanceReport(raw []byte) error {
 	}
 
 	if report.Summary.MetricCount != len(report.Metrics) {
-		return fmt.Errorf("summary.metric_count = %d, want %d", report.Summary.MetricCount, len(report.Metrics))
+		return fmt.Errorf(
+			"summary.metric_count = %d, want %d",
+			report.Summary.MetricCount,
+			len(report.Metrics),
+		)
 	}
 	if report.Summary.TotalIterations != totalIterations {
-		return fmt.Errorf("summary.total_iterations = %d, want %d", report.Summary.TotalIterations, totalIterations)
+		return fmt.Errorf(
+			"summary.total_iterations = %d, want %d",
+			report.Summary.TotalIterations,
+			totalIterations,
+		)
 	}
 	if report.Summary.MaxNsPerOp != maxNsPerOp {
-		return fmt.Errorf("summary.max_ns_per_op = %v, want %v", report.Summary.MaxNsPerOp, maxNsPerOp)
+		return fmt.Errorf(
+			"summary.max_ns_per_op = %v, want %v",
+			report.Summary.MaxNsPerOp,
+			maxNsPerOp,
+		)
 	}
 	wantHash := "sha256:" + metricsHash(report.Metrics)
 	if report.Summary.MetricsSHA256 != wantHash {
-		return fmt.Errorf("summary.metrics_sha256 = %q, want %q", report.Summary.MetricsSHA256, wantHash)
+		return fmt.Errorf(
+			"summary.metrics_sha256 = %q, want %q",
+			report.Summary.MetricsSHA256,
+			wantHash,
+		)
 	}
 	return nil
 }
@@ -210,11 +232,23 @@ func forbiddenPerformanceClaim(text string) (string, bool) {
 	switch {
 	case strings.Contains(lower, "fastest language") || strings.Contains(lower, "fastest-language"):
 		return "fastest language", true
-	case strings.Contains(lower, "official benchmark") || strings.Contains(lower, "official techempower"):
+	case strings.Contains(
+		lower,
+		"official benchmark",
+	) || strings.Contains(
+		lower,
+		"official techempower",
+	):
 		return "official benchmark", true
 	case strings.Contains(lower, "target parity") || strings.Contains(lower, "target-parity"):
 		return "target parity", true
-	case strings.Contains(lower, "zero-cost performance") || strings.Contains(lower, "zero cost performance"):
+	case strings.Contains(
+		lower,
+		"zero-cost performance",
+	) || strings.Contains(
+		lower,
+		"zero cost performance",
+	):
 		return "zero-cost performance", true
 	default:
 		return "", false

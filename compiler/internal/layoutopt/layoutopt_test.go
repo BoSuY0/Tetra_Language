@@ -9,7 +9,9 @@ import (
 
 func TestLayoutPolicyDefaultStructAllowsOptimizerFreedom(t *testing.T) {
 	policy := PolicyForStruct(frontend.StructDecl{Name: "Point", Repr: frontend.StructReprDefault})
-	if !policy.MayReorderFields || !policy.MayPackFields || !policy.MaySplitHotCold || !policy.MayScalarReplace || !policy.MayTransformAoSToSoA {
+	if !policy.MayReorderFields || !policy.MayPackFields || !policy.MaySplitHotCold ||
+		!policy.MayScalarReplace ||
+		!policy.MayTransformAoSToSoA {
 		t.Fatalf("default layout policy = %#v, want optimizer freedoms", policy)
 	}
 	if policy.ABILocked {
@@ -22,7 +24,9 @@ func TestLayoutPolicyReprCNeverAllowsLayoutFreedom(t *testing.T) {
 	if !policy.ABILocked {
 		t.Fatalf("repr(C) policy = %#v, want ABI locked", policy)
 	}
-	if policy.MayReorderFields || policy.MayPackFields || policy.MaySplitHotCold || policy.MayScalarReplace || policy.MayTransformAoSToSoA {
+	if policy.MayReorderFields || policy.MayPackFields || policy.MaySplitHotCold ||
+		policy.MayScalarReplace ||
+		policy.MayTransformAoSToSoA {
 		t.Fatalf("repr(C) policy = %#v, want no layout freedoms", policy)
 	}
 }
@@ -91,7 +95,9 @@ func TestEffectOptimizationFactsComeOnlyFromCheckerEnforcedEffects(t *testing.T)
 	if !reflect.DeepEqual(facts, want) {
 		t.Fatalf("facts = %#v, want %#v", facts, want)
 	}
-	if facts := EffectFactsFromEnforcedEffects([]string{"alloc", "actors", "mem"}); len(facts) != 0 {
+	if facts := EffectFactsFromEnforcedEffects([]string{"alloc", "actors", "mem"}); len(
+		facts,
+	) != 0 {
 		t.Fatalf("effects with alloc/actors/mem yielded optimizer facts: %#v", facts)
 	}
 	if facts := EffectFactsFromEnforcedEffects(nil); len(facts) != 5 {

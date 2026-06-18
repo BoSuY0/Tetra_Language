@@ -90,17 +90,24 @@ func validateProjectInfoReport(raw []byte) error {
 			return fmt.Errorf("project info artifact_counts has empty kind")
 		}
 		if count < 0 {
-			return fmt.Errorf("project info artifact_counts[%s] = %d, want non-negative", kind, count)
+			return fmt.Errorf(
+				"project info artifact_counts[%s] = %d, want non-negative",
+				kind,
+				count,
+			)
 		}
 	}
 	return nil
 }
 
 func validateProjectInfoNotFound(report projectInfoReport) error {
-	if report.Root != "" || report.CapsulePath != "" || report.LockPath != "" || report.EntryPath != "" {
+	if report.Root != "" || report.CapsulePath != "" || report.LockPath != "" ||
+		report.EntryPath != "" {
 		return fmt.Errorf("project info not found report must not include project paths")
 	}
-	if len(report.SourceRoots) != 0 || len(report.Targets) != 0 || len(report.DependencyRoots) != 0 || len(report.DependencyCapsules) != 0 {
+	if len(report.SourceRoots) != 0 || len(report.Targets) != 0 ||
+		len(report.DependencyRoots) != 0 ||
+		len(report.DependencyCapsules) != 0 {
 		return fmt.Errorf("project info not found report must not include project lists")
 	}
 	if len(report.ArtifactCounts) != 0 {

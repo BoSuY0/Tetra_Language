@@ -48,7 +48,8 @@ func TestObjectRoundTrip(t *testing.T) {
 	if readObj.Target != obj.Target || readObj.Module != obj.Module {
 		t.Fatalf("header mismatch")
 	}
-	if readObj.CompilerVersion != obj.CompilerVersion || readObj.PublicAPIHash != obj.PublicAPIHash {
+	if readObj.CompilerVersion != obj.CompilerVersion ||
+		readObj.PublicAPIHash != obj.PublicAPIHash {
 		t.Fatalf("metadata mismatch")
 	}
 	if readObj.SrcHash != obj.SrcHash || readObj.WorldSigHash != obj.WorldSigHash {
@@ -57,7 +58,8 @@ func TestObjectRoundTrip(t *testing.T) {
 	if !bytes.Equal(readObj.Code, obj.Code) || !bytes.Equal(readObj.Data, obj.Data) {
 		t.Fatalf("payload mismatch")
 	}
-	if !reflect.DeepEqual(readObj.Symbols, obj.Symbols) || !reflect.DeepEqual(readObj.Relocs, obj.Relocs) {
+	if !reflect.DeepEqual(readObj.Symbols, obj.Symbols) ||
+		!reflect.DeepEqual(readObj.Relocs, obj.Relocs) {
 		t.Fatalf("tables mismatch")
 	}
 }
@@ -213,7 +215,8 @@ func TestObjectReadRejectsInvalidMagicAndVersion(t *testing.T) {
 		if err := os.WriteFile(path, []byte("NOPE"), 0o644); err != nil {
 			t.Fatalf("write: %v", err)
 		}
-		if _, err := compiler.ReadObject(path); err == nil || !strings.Contains(err.Error(), "invalid object magic") {
+		if _, err := compiler.ReadObject(path); err == nil ||
+			!strings.Contains(err.Error(), "invalid object magic") {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
@@ -238,7 +241,8 @@ func TestObjectReadRejectsInvalidMagicAndVersion(t *testing.T) {
 		if err := os.WriteFile(path, data, 0o644); err != nil {
 			t.Fatalf("rewrite: %v", err)
 		}
-		if _, err := compiler.ReadObject(path); err == nil || !strings.Contains(err.Error(), "unsupported object version") {
+		if _, err := compiler.ReadObject(path); err == nil ||
+			!strings.Contains(err.Error(), "unsupported object version") {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})

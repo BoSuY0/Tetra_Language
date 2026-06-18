@@ -2,7 +2,12 @@
 
 Status: current scoped report/gate contract.
 
-The RAM Contract Compiler is the compiler-owned reporting layer that projects existing MemoryFactGraph and AllocPlan evidence into a RAM-focused artifact set. It does not reconstruct truth from JSON reports. The compiler emits `tetra.ram-contract-report.v1`, `tetra.memory-grade-report.v1`, `tetra.proof-store-summary.v1`, and `tetra.validation-pipeline-coverage.v1` from compiler-owned facts, then writes `heap-blockers.json` and `copy-blockers.json` as explicit blocker indexes.
+The RAM Contract Compiler is the compiler-owned reporting layer that projects existing
+MemoryFactGraph and AllocPlan evidence into a RAM-focused artifact set. It does not reconstruct
+truth from JSON reports. The compiler emits `tetra.ram-contract-report.v1`,
+`tetra.memory-grade-report.v1`, `tetra.proof-store-summary.v1`, and
+`tetra.validation-pipeline-coverage.v1` from compiler-owned facts, then writes `heap-blockers.json`
+and `copy-blockers.json` as explicit blocker indexes.
 
 Release bundles add `ram-contract-release-manifest.json`,
 `artifact-hashes.json`, and `fuzz/ram-contract-fuzz-oracle.json`. The release
@@ -12,10 +17,13 @@ pipeline entrypoint coverage, and cross-file heap/copy/grade consistency.
 
 ## Data Flow
 
-- MemoryFactGraph records provenance, unsafe classification, storage class, and proof relationship facts.
+- MemoryFactGraph records provenance, unsafe classification, storage class, and proof relationship
+  facts.
 - AllocPlan records heap, stack, region, static, copy, and boundedness decisions after lowering.
-- ProofStore records stable proof references; stale hashes and unsafe_unknown promotion are rejected.
-- The RAM contract report combines those sources into rows with bytes, grade, boundedness, proof references, and blocker explanations.
+- ProofStore records stable proof references; stale hashes and unsafe_unknown promotion are
+  rejected.
+- The RAM contract report combines those sources into rows with bytes, grade, boundedness, proof
+  references, and blocker explanations.
 - `TETRA4100` is the diagnostic code for RAM contract enforcement failures.
 
 ## Artifacts

@@ -32,7 +32,10 @@ var v040RequiredArtifacts = []struct {
 	{Path: "artifacts/memory-production-linux-x64.json", Schema: "tetra.memory.production.v1"},
 	{Path: "artifacts/parallel-production-linux-x64.json", Schema: "tetra.parallel.production.v1"},
 	{Path: "artifacts/compiler-production-linux-x64.json", Schema: "tetra.compiler.production.v1"},
-	{Path: "artifacts/distributed-actors-linux-x64.json", Schema: "tetra.actors.distributed-runtime.v1"},
+	{
+		Path:   "artifacts/distributed-actors-linux-x64.json",
+		Schema: "tetra.actors.distributed-runtime.v1",
+	},
 	{Path: "artifacts/native-ui-linux-x64.json", Schema: "tetra.ui.native-runtime.v1"},
 	{Path: "artifacts/release-state.json", Schema: "tetra.release.v0_4_0.release-state.v1"},
 	{Path: "artifacts/release-state.txt"},
@@ -113,16 +116,35 @@ func main() {
 	expectations := defaultReleaseGateSummaryExpectations()
 	flag.StringVar(&summaryPath, "summary", "", "path to release_v0_3_0_gate summary.json")
 	flag.StringVar(&reportDir, "report-dir", "", "report directory containing logs")
-	flag.StringVar(&expectations.ReleaseVersion, "expected-version", expectations.ReleaseVersion, "expected release version")
-	flag.StringVar(&expectations.ReleaseArtifact, "expected-artifact", expectations.ReleaseArtifact, "expected release artifact")
-	flag.StringVar(&expectations.ReleaseGateCommand, "expected-command", expectations.ReleaseGateCommand, "expected release gate command")
+	flag.StringVar(
+		&expectations.ReleaseVersion,
+		"expected-version",
+		expectations.ReleaseVersion,
+		"expected release version",
+	)
+	flag.StringVar(
+		&expectations.ReleaseArtifact,
+		"expected-artifact",
+		expectations.ReleaseArtifact,
+		"expected release artifact",
+	)
+	flag.StringVar(
+		&expectations.ReleaseGateCommand,
+		"expected-command",
+		expectations.ReleaseGateCommand,
+		"expected release gate command",
+	)
 	flag.Parse()
 
 	if summaryPath == "" {
 		fmt.Fprintln(os.Stderr, "error: --summary is required")
 		os.Exit(2)
 	}
-	if err := validateReleaseGateSummaryFileWithExpectations(summaryPath, reportDir, expectations); err != nil {
+	if err := validateReleaseGateSummaryFileWithExpectations(
+		summaryPath,
+		reportDir,
+		expectations,
+	); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -137,10 +159,17 @@ func defaultReleaseGateSummaryExpectations() releaseGateSummaryExpectations {
 }
 
 func validateReleaseGateSummaryFile(summaryPath, reportDir string) error {
-	return validateReleaseGateSummaryFileWithExpectations(summaryPath, reportDir, defaultReleaseGateSummaryExpectations())
+	return validateReleaseGateSummaryFileWithExpectations(
+		summaryPath,
+		reportDir,
+		defaultReleaseGateSummaryExpectations(),
+	)
 }
 
-func validateReleaseGateSummaryFileWithExpectations(summaryPath, reportDir string, expectations releaseGateSummaryExpectations) error {
+func validateReleaseGateSummaryFileWithExpectations(
+	summaryPath, reportDir string,
+	expectations releaseGateSummaryExpectations,
+) error {
 	raw, err := os.ReadFile(summaryPath)
 	if err != nil {
 		return err
@@ -152,10 +181,18 @@ func validateReleaseGateSummaryFileWithExpectations(summaryPath, reportDir strin
 }
 
 func validateReleaseGateSummary(raw []byte, reportDir string) error {
-	return validateReleaseGateSummaryWithExpectations(raw, reportDir, defaultReleaseGateSummaryExpectations())
+	return validateReleaseGateSummaryWithExpectations(
+		raw,
+		reportDir,
+		defaultReleaseGateSummaryExpectations(),
+	)
 }
 
-func validateReleaseGateSummaryWithExpectations(raw []byte, reportDir string, expectations releaseGateSummaryExpectations) error {
+func validateReleaseGateSummaryWithExpectations(
+	raw []byte,
+	reportDir string,
+	expectations releaseGateSummaryExpectations,
+) error {
 	var summary releaseGateSummary
 	if err := decodeStrictJSON(raw, &summary); err != nil {
 		return err
@@ -166,13 +203,25 @@ func validateReleaseGateSummaryWithExpectations(raw []byte, reportDir string, ex
 		return fmt.Errorf("invalid status %q", summary.Status)
 	}
 	if summary.ReleaseVersion != expectations.ReleaseVersion {
-		return fmt.Errorf("release_version = %q, want %q", summary.ReleaseVersion, expectations.ReleaseVersion)
+		return fmt.Errorf(
+			"release_version = %q, want %q",
+			summary.ReleaseVersion,
+			expectations.ReleaseVersion,
+		)
 	}
 	if summary.ReleaseArtifact != expectations.ReleaseArtifact {
-		return fmt.Errorf("release_artifact = %q, want %q", summary.ReleaseArtifact, expectations.ReleaseArtifact)
+		return fmt.Errorf(
+			"release_artifact = %q, want %q",
+			summary.ReleaseArtifact,
+			expectations.ReleaseArtifact,
+		)
 	}
 	if summary.ReleaseGateCommand != expectations.ReleaseGateCommand {
-		return fmt.Errorf("release_gate_command = %q, want %q", summary.ReleaseGateCommand, expectations.ReleaseGateCommand)
+		return fmt.Errorf(
+			"release_gate_command = %q, want %q",
+			summary.ReleaseGateCommand,
+			expectations.ReleaseGateCommand,
+		)
 	}
 	if summary.StartedAt == "" {
 		return fmt.Errorf("started_at is required")
@@ -192,7 +241,11 @@ func validateReleaseGateSummaryWithExpectations(raw []byte, reportDir string, ex
 		return fmt.Errorf("ended_at must not be before started_at")
 	}
 	if summary.StepCount != len(summary.Steps) {
-		return fmt.Errorf("step_count mismatch: got %d, computed %d", summary.StepCount, len(summary.Steps))
+		return fmt.Errorf(
+			"step_count mismatch: got %d, computed %d",
+			summary.StepCount,
+			len(summary.Steps),
+		)
 	}
 	if strings.TrimSpace(summary.ReportDir) == "" {
 		return fmt.Errorf("report_dir is required")
@@ -241,8 +294,16 @@ func validateReleaseGateSummaryWithExpectations(raw []byte, reportDir string, ex
 }
 
 func validateV040ReportDir(summary releaseGateSummary, reportDir string) error {
-	if normalizeReleaseGateReportDir(summary.ReportDir) != normalizeReleaseGateReportDir(reportDir) {
-		return fmt.Errorf("passing v0.4.0 summary report_dir = %q, want %q", summary.ReportDir, filepath.ToSlash(reportDir))
+	if normalizeReleaseGateReportDir(
+		summary.ReportDir,
+	) != normalizeReleaseGateReportDir(
+		reportDir,
+	) {
+		return fmt.Errorf(
+			"passing v0.4.0 summary report_dir = %q, want %q",
+			summary.ReportDir,
+			filepath.ToSlash(reportDir),
+		)
 	}
 	return nil
 }
@@ -262,11 +323,20 @@ func validateV040RequiredPassingSteps(summary releaseGateSummary) error {
 			return fmt.Errorf("passing v0.4.0 summary missing required step %q", required)
 		}
 		if step.Status != "pass" {
-			return fmt.Errorf("passing v0.4.0 summary required step %q status = %q, want pass", required, step.Status)
+			return fmt.Errorf(
+				"passing v0.4.0 summary required step %q status = %q, want pass",
+				required,
+				step.Status,
+			)
 		}
 		expectedCommand, ok := expectedV040RequiredStepCommand(required, summary.ReportDir)
 		if ok && !v040RequiredStepCommandMatches(required, step.Command, expectedCommand) {
-			return fmt.Errorf("passing v0.4.0 summary required step %q command = %q, want %q", required, step.Command, expectedCommand)
+			return fmt.Errorf(
+				"passing v0.4.0 summary required step %q command = %q, want %q",
+				required,
+				step.Command,
+				expectedCommand,
+			)
 		}
 	}
 	for i, required := range v040RequiredPassingSteps {
@@ -274,11 +344,21 @@ func validateV040RequiredPassingSteps(summary releaseGateSummary) error {
 			return fmt.Errorf("passing v0.4.0 summary missing required step %q", required)
 		}
 		if summary.Steps[i].Name != required {
-			return fmt.Errorf("passing v0.4.0 summary required step %02d = %q, want %q", i+1, summary.Steps[i].Name, required)
+			return fmt.Errorf(
+				"passing v0.4.0 summary required step %02d = %q, want %q",
+				i+1,
+				summary.Steps[i].Name,
+				required,
+			)
 		}
 		expectedLog := expectedV040RequiredStepLog(i+1, required)
 		if filepath.ToSlash(summary.Steps[i].Log) != expectedLog {
-			return fmt.Errorf("passing v0.4.0 summary required step %q log = %q, want %q", required, summary.Steps[i].Log, expectedLog)
+			return fmt.Errorf(
+				"passing v0.4.0 summary required step %q log = %q, want %q",
+				required,
+				summary.Steps[i].Log,
+				expectedLog,
+			)
 		}
 	}
 	return nil
@@ -301,14 +381,19 @@ func expectedV040RequiredStepCommand(name, summaryReportDir string) (string, boo
 	}
 	switch name {
 	case "readiness preflight":
-		return fmt.Sprintf("go run ./tools/cmd/validate-v0-4-readiness --expected-version v0.4.0 --features %s --targets %s --manifest docs/generated/manifest.json --scope-decisions docs/release/v0_4_0_scope_decisions.json",
+		return fmt.Sprintf(
+			("go run ./tools/cmd/validate-v0-4-readiness --expected-version " +
+				"v0.4.0 --features %s --targets %s --manifest docs/generated/" +
+				"manifest.json --scope-decisions docs/release/v0_4/data/v0_4_0_scope_" +
+				"decisions.json"),
 			artifactPath("features.json"),
 			artifactPath("targets.json"),
 		), true
 	case "version parity":
 		return "check_versions", true
 	case "readiness validator tests":
-		return "go test ./tools/cmd/validate-v0-4-readiness ./tools/cmd/validate-v0-4-completion-audit -count=1", true
+		return ("go test ./tools/cmd/validate-v0-4-readiness ./tools/cmd/" +
+			"validate-v0-4-completion-audit -count=1"), true
 	case "docs verification":
 		return "go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json", true
 	case "techempower report schemas":
@@ -318,29 +403,45 @@ func expectedV040RequiredStepCommand(name, summaryReportDir string) (string, boo
 	case "memory production linux x64 smoke":
 		return "run_memory_production_smoke", true
 	case "validate memory production":
-		return fmt.Sprintf("go run ./tools/cmd/validate-memory-production --report %s", artifactPath("memory-production-linux-x64.json")), true
+		return fmt.Sprintf(
+			"go run ./tools/cmd/validate-memory-production --report %s",
+			artifactPath("memory-production-linux-x64.json"),
+		), true
 	case "parallel production linux x64 smoke":
 		return "run_parallel_production_smoke", true
 	case "validate parallel production":
-		return fmt.Sprintf("go run ./tools/cmd/validate-parallel-production --report %s", artifactPath("parallel-production-linux-x64.json")), true
+		return fmt.Sprintf(
+			"go run ./tools/cmd/validate-parallel-production --report %s",
+			artifactPath("parallel-production-linux-x64.json"),
+		), true
 	case "compiler production linux x64 smoke":
 		return "run_compiler_production_smoke", true
 	case "validate compiler production":
-		return fmt.Sprintf("go run ./tools/cmd/validate-compiler-production --report %s", artifactPath("compiler-production-linux-x64.json")), true
+		return fmt.Sprintf(
+			"go run ./tools/cmd/validate-compiler-production --report %s",
+			artifactPath("compiler-production-linux-x64.json"),
+		), true
 	case "linux host smoke":
 		return "run_linux_host_smoke", true
 	case "distributed actors linux x64 smoke":
 		return "run_distributed_actor_smoke", true
 	case "validate distributed actor runtime":
-		return fmt.Sprintf("go run ./tools/cmd/validate-distributed-actor-runtime --report %s", artifactPath("distributed-actors-linux-x64.json")), true
+		return fmt.Sprintf(
+			"go run ./tools/cmd/validate-distributed-actor-runtime --report %s",
+			artifactPath("distributed-actors-linux-x64.json"),
+		), true
 	case "native ui linux x64 smoke":
 		return "run_native_ui_smoke", true
 	case "validate native ui runtime":
-		return fmt.Sprintf("go run ./tools/cmd/validate-native-ui-runtime --report %s", artifactPath("native-ui-linux-x64.json")), true
+		return fmt.Sprintf(
+			"go run ./tools/cmd/validate-native-ui-runtime --report %s",
+			artifactPath("native-ui-linux-x64.json"),
+		), true
 	case "readiness final":
 		return "check_readiness_final", true
 	case "completion audit validation":
-		return "go run ./tools/cmd/validate-v0-4-completion-audit --audit docs/release/v0_4_0_completion_audit.md --expected-status achieved", true
+		return ("go run ./tools/cmd/validate-v0-4-completion-audit --audit docs/" +
+			"release/v0_4/v0_4_0_completion_audit.md --expected-status achieved"), true
 	case "release state":
 		return "check_release_state", true
 	case "security review signoff":
@@ -366,7 +467,10 @@ func validateV040ReleaseArtifacts(summary releaseGateSummary, reportDir string) 
 	raw, err := os.ReadFile(manifestPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("passing v0.4.0 summary missing artifact hash manifest %s", manifestPath)
+			return fmt.Errorf(
+				"passing v0.4.0 summary missing artifact hash manifest %s",
+				manifestPath,
+			)
 		}
 		return err
 	}
@@ -375,7 +479,11 @@ func validateV040ReleaseArtifacts(summary releaseGateSummary, reportDir string) 
 		return fmt.Errorf("artifact-hashes.json is invalid: %w", err)
 	}
 	if manifest.Schema != releaseArtifactHashesSchema {
-		return fmt.Errorf("artifact-hashes.json schema = %q, want %q", manifest.Schema, releaseArtifactHashesSchema)
+		return fmt.Errorf(
+			"artifact-hashes.json schema = %q, want %q",
+			manifest.Schema,
+			releaseArtifactHashesSchema,
+		)
 	}
 	if manifest.Root != "." {
 		return fmt.Errorf("artifact-hashes.json root = %q, want %q", manifest.Root, ".")
@@ -391,7 +499,11 @@ func validateV040ReleaseArtifacts(summary releaseGateSummary, reportDir string) 
 			return fmt.Errorf("duplicate artifact path %q in artifact-hashes.json", path)
 		}
 		if lastPath != "" && path < lastPath {
-			return fmt.Errorf("artifact-hashes.json artifacts must be sorted by path: %s appears before %s", path, lastPath)
+			return fmt.Errorf(
+				"artifact-hashes.json artifacts must be sorted by path: %s appears before %s",
+				path,
+				lastPath,
+			)
 		}
 		if err := validateReleaseHashArtifactMetadata(artifact, path); err != nil {
 			return err
@@ -402,16 +514,27 @@ func validateV040ReleaseArtifacts(summary releaseGateSummary, reportDir string) 
 	for _, required := range v040RequiredArtifacts {
 		artifact, ok := artifacts[required.Path]
 		if !ok {
-			return fmt.Errorf("passing v0.4.0 summary missing required artifact %s in artifact-hashes.json", required.Path)
+			return fmt.Errorf(
+				"passing v0.4.0 summary missing required artifact %s in artifact-hashes.json",
+				required.Path,
+			)
 		}
 		if required.Schema != "" && artifact.Schema != required.Schema {
-			return fmt.Errorf("artifact %s schema = %q, want %q", required.Path, artifact.Schema, required.Schema)
+			return fmt.Errorf(
+				"artifact %s schema = %q, want %q",
+				required.Path,
+				artifact.Schema,
+				required.Schema,
+			)
 		}
 	}
 	for _, step := range summary.Steps {
 		log := filepath.ToSlash(step.Log)
 		if _, ok := artifacts[log]; !ok {
-			return fmt.Errorf("passing v0.4.0 summary missing step log %s in artifact-hashes.json", log)
+			return fmt.Errorf(
+				"passing v0.4.0 summary missing step log %s in artifact-hashes.json",
+				log,
+			)
 		}
 	}
 	if err := validateV040SecurityReviewDetachedHash(reportDir, artifacts); err != nil {
@@ -420,25 +543,40 @@ func validateV040ReleaseArtifacts(summary releaseGateSummary, reportDir string) 
 	return nil
 }
 
-func validateV040SecurityReviewDetachedHash(reportDir string, artifacts map[string]releaseHashArtifact) error {
+func validateV040SecurityReviewDetachedHash(
+	reportDir string,
+	artifacts map[string]releaseHashArtifact,
+) error {
 	review, ok := artifacts[v040SecurityReviewArtifactPath]
 	if !ok {
-		return fmt.Errorf("passing v0.4.0 summary missing required artifact %s in artifact-hashes.json", v040SecurityReviewArtifactPath)
+		return fmt.Errorf(
+			"passing v0.4.0 summary missing required artifact %s in artifact-hashes.json",
+			v040SecurityReviewArtifactPath,
+		)
 	}
 	if _, ok := artifacts[v040SecurityReviewDetachedHashPath]; !ok {
-		return fmt.Errorf("passing v0.4.0 summary missing required artifact %s in artifact-hashes.json", v040SecurityReviewDetachedHashPath)
+		return fmt.Errorf(
+			"passing v0.4.0 summary missing required artifact %s in artifact-hashes.json",
+			v040SecurityReviewDetachedHashPath,
+		)
 	}
 	path := filepath.Join(reportDir, filepath.FromSlash(v040SecurityReviewDetachedHashPath))
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("passing v0.4.0 summary missing %s file", v040SecurityReviewDetachedHashPath)
+			return fmt.Errorf(
+				"passing v0.4.0 summary missing %s file",
+				v040SecurityReviewDetachedHashPath,
+			)
 		}
 		return err
 	}
 	line := strings.TrimSuffix(string(raw), "\n")
 	if strings.ContainsAny(line, "\r\n") {
-		return fmt.Errorf("%s must contain exactly one detached hash line", v040SecurityReviewDetachedHashPath)
+		return fmt.Errorf(
+			"%s must contain exactly one detached hash line",
+			v040SecurityReviewDetachedHashPath,
+		)
 	}
 	expected := review.SHA256 + "  " + v040SecurityReviewArtifactPath
 	if line != expected {
@@ -503,7 +641,8 @@ func validateReleaseGateStep(step releaseGateStep, reportDir string, expectedInd
 	if step.Log == "" {
 		return fmt.Errorf("step %s missing log", step.Name)
 	}
-	if filepath.IsAbs(step.Log) || strings.Contains(step.Log, "..") || !strings.HasPrefix(filepath.ToSlash(step.Log), "logs/") {
+	if filepath.IsAbs(step.Log) || strings.Contains(step.Log, "..") ||
+		!strings.HasPrefix(filepath.ToSlash(step.Log), "logs/") {
 		return fmt.Errorf("step %s has unsafe log path %s", step.Name, step.Log)
 	}
 	if err := validateLogOrdinal(step.Log, expectedIndex); err != nil {

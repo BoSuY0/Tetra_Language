@@ -1,0 +1,33 @@
+// Core lib.core.surface_app_shell scoped app-shell smoke.
+module examples.core.surface_app.core_surface_app_shell_smoke
+
+import lib.core.surface_app_shell as shell
+
+func main() -> Int:
+    var main_win: shell.ShellWindow = shell.window(1, 5, 560, 420, 1000)
+    var inspector_win: shell.ShellWindow = shell.window(2, 9, 320, 240, 1000)
+    let main_open: Int = shell.open_window(main_win)
+    let inspector_open: Int = shell.open_window(inspector_win)
+    let inspector_close: Int = shell.close_window(inspector_win)
+    let inspector_reopen: Int = shell.reopen_window(inspector_win)
+    let resized: Int = shell.resize_window(main_win, 720, 540)
+    let dpi: Int = shell.set_dpi_scale(main_win, 1250)
+    let cursor: Int = shell.set_cursor(main_win, shell.cursor_text())
+    let menu: shell.ShellFeature = shell.scoped_adapter_feature(shell.feature_app_menu())
+    let lifecycle: shell.ShellFeature = shell.target_evidenced_feature(shell.feature_window_lifecycle())
+    let multi_window: shell.ShellFeature = shell.target_evidenced_feature(shell.feature_multi_window())
+    let clipboard: shell.ShellFeature = shell.target_evidenced_feature(shell.feature_clipboard())
+    let ime: shell.ShellFeature = shell.target_evidenced_feature(shell.feature_ime())
+    let accessibility: shell.ShellFeature = shell.target_evidenced_feature(shell.feature_accessibility_bridge())
+    let crash_recovery: shell.ShellFeature = shell.scoped_adapter_feature(shell.feature_crash_recovery())
+    let error_report: shell.ShellFeature = shell.scoped_adapter_feature(shell.feature_error_report())
+    let dialog: shell.ShellFeature = shell.blocked_pass_feature(shell.feature_dialog())
+    let file_dialog: shell.ShellFeature = shell.blocked_pass_feature(shell.feature_file_dialog())
+    let file_picker: shell.ShellFeature = shell.blocked_pass_feature(shell.feature_file_picker())
+    let notification: shell.ShellFeature = shell.blocked_pass_feature(shell.feature_notification())
+    let tray: shell.ShellFeature = shell.blocked_pass_feature(shell.feature_tray())
+    let deep_link: shell.ShellFeature = shell.blocked_pass_feature(shell.feature_deep_link())
+    let feature_ok: Bool = shell.feature_is_honest(menu) && shell.feature_is_honest(lifecycle) && shell.feature_is_honest(multi_window) && shell.feature_is_honest(clipboard) && shell.feature_is_honest(ime) && shell.feature_is_honest(accessibility) && shell.feature_is_honest(crash_recovery) && shell.feature_is_honest(error_report) && shell.feature_is_honest(dialog) && shell.feature_is_honest(file_dialog) && shell.feature_is_honest(file_picker) && shell.feature_is_honest(notification) && shell.feature_is_honest(tray) && shell.feature_is_honest(deep_link)
+    if main_open == 1 && inspector_open == 1 && inspector_close == 1 && inspector_reopen == 1 && resized == 1 && dpi == 1 && cursor == 1 && main_win.open && inspector_win.open && main_win.width == 720 && main_win.height == 540 && main_win.dpi_scale_milli == 1250 && main_win.cursor == shell.cursor_text() && shell.multi_window_ready(main_win, inspector_win) && feature_ok:
+        return 42
+    return 1

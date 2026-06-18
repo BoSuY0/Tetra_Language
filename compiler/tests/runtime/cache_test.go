@@ -72,7 +72,11 @@ func TestBuildCacheUnrelatedSignatureChangeDoesNotRebuild(t *testing.T) {
 	if err != nil {
 		t.Fatalf("build1: %v", err)
 	}
-	testkit.AssertModules(t, stats1.CompiledModules, []string{"app.game", "engine.audio", "engine.render"})
+	testkit.AssertModules(
+		t,
+		stats1.CompiledModules,
+		[]string{"app.game", "engine.audio", "engine.render"},
+	)
 	if len(stats1.CacheHits) != 0 {
 		t.Fatalf("unexpected cache hits on first build")
 	}
@@ -84,7 +88,11 @@ func TestBuildCacheUnrelatedSignatureChangeDoesNotRebuild(t *testing.T) {
 	if len(stats2.CompiledModules) != 0 {
 		t.Fatalf("expected no compiled modules on cache hit")
 	}
-	testkit.AssertModules(t, stats2.CacheHits, []string{"app.game", "engine.audio", "engine.render"})
+	testkit.AssertModules(
+		t,
+		stats2.CacheHits,
+		[]string{"app.game", "engine.audio", "engine.render"},
+	)
 
 	updatedAudio := "module engine.audio\nfun beep(x: i32, y: i32): i32 {\n  return x\n}\n"
 	audioPath := filepath.Join(tmp, filepath.FromSlash("engine/audio.tetra"))
@@ -154,7 +162,11 @@ func TestBuildCacheTransitiveDoesNotRebuildRoot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("build1: %v", err)
 	}
-	testkit.AssertModules(t, stats1.CompiledModules, []string{"app.game", "engine.core", "engine.math"})
+	testkit.AssertModules(
+		t,
+		stats1.CompiledModules,
+		[]string{"app.game", "engine.core", "engine.math"},
+	)
 	if len(stats1.CacheHits) != 0 {
 		t.Fatalf("unexpected cache hits on first build")
 	}
@@ -295,7 +307,9 @@ func TestBuildCacheCorruptObjectFallsBackToRebuild(t *testing.T) {
 	}
 	testkit.AssertModules(t, stats1.CompiledModules, []string{"app.game", "engine.render"})
 
-	matches, err := filepath.Glob(filepath.Join(tmp, ".tetra_cache", "linux-x64", "engine", "render", "*.tobj"))
+	matches, err := filepath.Glob(
+		filepath.Join(tmp, ".tetra_cache", "linux-x64", "engine", "render", "*.tobj"),
+	)
 	if err != nil {
 		t.Fatalf("glob cache path: %v", err)
 	}
@@ -357,7 +371,10 @@ func TestBuildCacheTargetChangeInvalidatesObjects(t *testing.T) {
 		t.Fatalf("linux build2: %v", err)
 	}
 	if len(stats3.CompiledModules) != 0 {
-		t.Fatalf("expected linux cache hit after target round trip, compiled %v", stats3.CompiledModules)
+		t.Fatalf(
+			"expected linux cache hit after target round trip, compiled %v",
+			stats3.CompiledModules,
+		)
 	}
 	testkit.AssertModules(t, stats3.CacheHits, []string{"app.game", "engine.render"})
 }

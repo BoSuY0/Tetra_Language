@@ -1,0 +1,32 @@
+// Actor poll value memory-offset microservice smoke.
+//
+// The service observes an empty actor poll, then aliases the completed poll
+// result value into a local offset before raw pointer arithmetic.
+module examples.microservices.memory.actor_offsets.core.memory_actor_poll_value_offset_service
+func sender() -> Int
+uses actors, runtime:
+    let _sleep: Int = core.sleep_ms(1)
+    let _sent: Int = core.send(core.sender(), 4)
+    return 0
+
+func main() -> Int
+uses actors, alloc, capability, mem, runtime:
+    let _actor: actor = core.spawn("sender")
+    let early: actor.recv_result_i32 = core.recv_poll()
+    if early.error != 2:
+        return 10 + early.error
+    let _sleep: Int = core.sleep_ms(3)
+    let reply: actor.recv_result_i32 = core.recv_poll()
+    if reply.error != 0:
+        return 20 + reply.error
+    let offset: Int = reply.value
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let base: ptr = core.alloc_bytes(8)
+        let cell: ptr = core.ptr_add(base, offset, memory_cap)
+        let _write: Int = core.store_i32(cell, 42, memory_cap)
+        let value: Int = core.load_i32(cell, memory_cap)
+        if value == 42:
+            return 0
+        return value
+    return 99

@@ -72,7 +72,12 @@ func (a *SysVUnix) SpillParams(e *x64.Emitter, fn ir.IRFunc) {
 	}
 }
 
-func (a *SysVUnix) EmitCall(e *x64.Emitter, instr ir.IRInstr, stackDepth *int, callPatches *[]x64obj.CallPatch) error {
+func (a *SysVUnix) EmitCall(
+	e *x64.Emitter,
+	instr ir.IRInstr,
+	stackDepth *int,
+	callPatches *[]x64obj.CallPatch,
+) error {
 	if stackDepth == nil || callPatches == nil {
 		return fmt.Errorf("internal error: missing stackDepth/callPatches")
 	}
@@ -80,10 +85,20 @@ func (a *SysVUnix) EmitCall(e *x64.Emitter, instr ir.IRInstr, stackDepth *int, c
 		return fmt.Errorf("call is missing target name")
 	}
 	if instr.ArgSlots < 0 || instr.RetSlots < 0 {
-		return fmt.Errorf("call %q has negative ABI slots args=%d rets=%d", instr.Name, instr.ArgSlots, instr.RetSlots)
+		return fmt.Errorf(
+			"call %q has negative ABI slots args=%d rets=%d",
+			instr.Name,
+			instr.ArgSlots,
+			instr.RetSlots,
+		)
 	}
 	if instr.RetSlots > maxCallReturnSlots {
-		return fmt.Errorf("call %q has unsupported return slots %d (max=%d)", instr.Name, instr.RetSlots, maxCallReturnSlots)
+		return fmt.Errorf(
+			"call %q has unsupported return slots %d (max=%d)",
+			instr.Name,
+			instr.RetSlots,
+			maxCallReturnSlots,
+		)
 	}
 	if *stackDepth < instr.ArgSlots {
 		return fmt.Errorf("stack underflow in call to '%s'", instr.Name)
@@ -192,7 +207,11 @@ func (a *SysVUnix) EmitCall(e *x64.Emitter, instr ir.IRInstr, stackDepth *int, c
 	return nil
 }
 
-func (a *SysVUnix) EmitWriteStdout(e *x64.Emitter, stackDepth *int, importPatches *[]x64obj.ImportPatch) error {
+func (a *SysVUnix) EmitWriteStdout(
+	e *x64.Emitter,
+	stackDepth *int,
+	importPatches *[]x64obj.ImportPatch,
+) error {
 	_ = importPatches
 	if stackDepth == nil {
 		return fmt.Errorf("internal error: missing stackDepth")
@@ -209,7 +228,12 @@ func (a *SysVUnix) EmitWriteStdout(e *x64.Emitter, stackDepth *int, importPatche
 	return nil
 }
 
-func (a *SysVUnix) EmitExit(e *x64.Emitter, code int32, stackSlots int, importPatches *[]x64obj.ImportPatch) error {
+func (a *SysVUnix) EmitExit(
+	e *x64.Emitter,
+	code int32,
+	stackSlots int,
+	importPatches *[]x64obj.ImportPatch,
+) error {
 	_ = stackSlots
 	_ = importPatches
 	e.MovEdiImm32(uint32(code))
@@ -218,7 +242,12 @@ func (a *SysVUnix) EmitExit(e *x64.Emitter, code int32, stackSlots int, importPa
 	return nil
 }
 
-func (a *SysVUnix) EmitAllocBytes(e *x64.Emitter, stackDepth *int, opt x64.CodegenOptions, importPatches *[]x64obj.ImportPatch) error {
+func (a *SysVUnix) EmitAllocBytes(
+	e *x64.Emitter,
+	stackDepth *int,
+	opt x64.CodegenOptions,
+	importPatches *[]x64obj.ImportPatch,
+) error {
 	_ = opt
 	_ = importPatches
 	if stackDepth == nil {
@@ -259,7 +288,13 @@ func (a *SysVUnix) EmitAllocBytes(e *x64.Emitter, stackDepth *int, opt x64.Codeg
 	return nil
 }
 
-func (a *SysVUnix) EmitMakeSlice(e *x64.Emitter, kind ir.IRInstrKind, stackDepth *int, opt x64.CodegenOptions, importPatches *[]x64obj.ImportPatch) error {
+func (a *SysVUnix) EmitMakeSlice(
+	e *x64.Emitter,
+	kind ir.IRInstrKind,
+	stackDepth *int,
+	opt x64.CodegenOptions,
+	importPatches *[]x64obj.ImportPatch,
+) error {
 	_ = opt
 	_ = importPatches
 	if stackDepth == nil {
@@ -328,7 +363,12 @@ func (a *SysVUnix) EmitMakeSlice(e *x64.Emitter, kind ir.IRInstrKind, stackDepth
 	return nil
 }
 
-func (a *SysVUnix) EmitIslandNew(e *x64.Emitter, stackDepth *int, opt x64.CodegenOptions, importPatches *[]x64obj.ImportPatch) error {
+func (a *SysVUnix) EmitIslandNew(
+	e *x64.Emitter,
+	stackDepth *int,
+	opt x64.CodegenOptions,
+	importPatches *[]x64obj.ImportPatch,
+) error {
 	_ = importPatches
 	if stackDepth == nil {
 		return fmt.Errorf("internal error: missing stackDepth")
@@ -388,7 +428,13 @@ func (a *SysVUnix) EmitIslandNew(e *x64.Emitter, stackDepth *int, opt x64.Codege
 	return nil
 }
 
-func (a *SysVUnix) EmitIslandMakeSlice(e *x64.Emitter, kind ir.IRInstrKind, stackDepth *int, opt x64.CodegenOptions, importPatches *[]x64obj.ImportPatch) error {
+func (a *SysVUnix) EmitIslandMakeSlice(
+	e *x64.Emitter,
+	kind ir.IRInstrKind,
+	stackDepth *int,
+	opt x64.CodegenOptions,
+	importPatches *[]x64obj.ImportPatch,
+) error {
 	_ = opt
 	_ = importPatches
 	if stackDepth == nil {
@@ -489,7 +535,12 @@ func (a *SysVUnix) emitMmapFailureGuard(e *x64.Emitter, stackSlots int) error {
 	return nil
 }
 
-func (a *SysVUnix) EmitIslandFree(e *x64.Emitter, stackDepth *int, opt x64.CodegenOptions, importPatches *[]x64obj.ImportPatch) error {
+func (a *SysVUnix) EmitIslandFree(
+	e *x64.Emitter,
+	stackDepth *int,
+	opt x64.CodegenOptions,
+	importPatches *[]x64obj.ImportPatch,
+) error {
 	_ = importPatches
 	if stackDepth == nil {
 		return fmt.Errorf("internal error: missing stackDepth")
@@ -527,7 +578,12 @@ func (a *SysVUnix) EmitIslandFree(e *x64.Emitter, stackDepth *int, opt x64.Codeg
 	return nil
 }
 
-func (a *SysVUnix) EmitIslandReset(e *x64.Emitter, stackDepth *int, opt x64.CodegenOptions, importPatches *[]x64obj.ImportPatch) error {
+func (a *SysVUnix) EmitIslandReset(
+	e *x64.Emitter,
+	stackDepth *int,
+	opt x64.CodegenOptions,
+	importPatches *[]x64obj.ImportPatch,
+) error {
 	_ = importPatches
 	if stackDepth == nil {
 		return fmt.Errorf("internal error: missing stackDepth")

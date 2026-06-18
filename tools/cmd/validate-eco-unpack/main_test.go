@@ -33,7 +33,11 @@ func TestValidateEcoUnpackAcceptsT4CapsuleProjectBundle(t *testing.T) {
 }
 
 func TestValidateEcoUnpackAcceptsManifestV1SourcesTargetsProjectBundle(t *testing.T) {
-	root := makeUnpackedProjectWithFiles(t, "Capsule.t4", "app/main.t4", `manifest "tetra.capsule.v1"
+	root := makeUnpackedProjectWithFiles(
+		t,
+		"Capsule.t4",
+		"app/main.t4",
+		`manifest "tetra.capsule.v1"
 capsule App:
     id "tetra://app"
     version "0.1.0"
@@ -43,7 +47,9 @@ capsule App:
     targets:
         linux-x64
         wasm32-wasi
-`, "func main() -> Int:\n    return 0\n")
+`,
+		"func main() -> Int:\n    return 0\n",
+	)
 	out, err := runUnpackValidator(t, root)
 	if err != nil {
 		t.Fatalf("validator failed: %v\n%s", err, out)
@@ -86,13 +92,21 @@ func TestValidateEcoUnpackRejectsMissingSources(t *testing.T) {
 
 func TestValidateEcoUnpackRejectsIncompleteManifest(t *testing.T) {
 	root := t.TempDir()
-	if err := os.WriteFile(filepath.Join(root, "Tetra.capsule"), []byte("capsule App:\n"), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(root, "Tetra.capsule"),
+		[]byte("capsule App:\n"),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.MkdirAll(filepath.Join(root, "src"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, "src", "main.tetra"), []byte("func main() -> Int:\n    return 0\n"), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(root, "src", "main.tetra"),
+		[]byte("func main() -> Int:\n    return 0\n"),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 	out, err := runUnpackValidator(t, root)
@@ -117,7 +131,11 @@ func TestValidateEcoUnpackRejectsInvalidSource(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "src"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, "src", "main.tetra"), []byte("func main() -> Int:\n\treturn 0\n"), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(root, "src", "main.tetra"),
+		[]byte("func main() -> Int:\n\treturn 0\n"),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 	out, err := runUnpackValidator(t, root)
@@ -145,7 +163,11 @@ func TestValidateEcoUnpackRejectsMissingPackageMetadata(t *testing.T) {
 
 func TestValidateEcoUnpackRejectsMetadataHashMismatch(t *testing.T) {
 	root := makeUnpackedProject(t, true, true)
-	if err := os.WriteFile(filepath.Join(root, "src", "main.tetra"), []byte("func main() -> Int:\n    return 1\n"), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(root, "src", "main.tetra"),
+		[]byte("func main() -> Int:\n    return 1\n"),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 	out, err := runUnpackValidator(t, root)
@@ -231,7 +253,11 @@ func makeUnpackedProjectWithManifest(t *testing.T, manifest string, source bool)
 	t.Helper()
 	root := t.TempDir()
 	if manifest != "" {
-		if err := os.WriteFile(filepath.Join(root, "Tetra.capsule"), []byte(manifest), 0o644); err != nil {
+		if err := os.WriteFile(
+			filepath.Join(root, "Tetra.capsule"),
+			[]byte(manifest),
+			0o644,
+		); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -239,7 +265,11 @@ func makeUnpackedProjectWithManifest(t *testing.T, manifest string, source bool)
 		if err := os.MkdirAll(filepath.Join(root, "src"), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(filepath.Join(root, "src", "main.tetra"), []byte("func main() -> Int:\n    return 0\n"), 0o644); err != nil {
+		if err := os.WriteFile(
+			filepath.Join(root, "src", "main.tetra"),
+			[]byte("func main() -> Int:\n    return 0\n"),
+			0o644,
+		); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -247,11 +277,21 @@ func makeUnpackedProjectWithManifest(t *testing.T, manifest string, source bool)
 	return root
 }
 
-func makeUnpackedProjectWithFiles(t *testing.T, manifestRel string, sourceRel string, manifest string, source string) string {
+func makeUnpackedProjectWithFiles(
+	t *testing.T,
+	manifestRel string,
+	sourceRel string,
+	manifest string,
+	source string,
+) string {
 	t.Helper()
 	root := t.TempDir()
 	if manifestRel != "" {
-		if err := os.WriteFile(filepath.Join(root, filepath.FromSlash(manifestRel)), []byte(manifest), 0o644); err != nil {
+		if err := os.WriteFile(
+			filepath.Join(root, filepath.FromSlash(manifestRel)),
+			[]byte(manifest),
+			0o644,
+		); err != nil {
 			t.Fatal(err)
 		}
 	}

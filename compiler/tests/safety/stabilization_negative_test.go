@@ -122,7 +122,11 @@ func main() -> Int:
 		t.Fatalf("Marshal: %v", marshalErr)
 	}
 	out := string(raw)
-	for _, want := range []string{`"code":"` + compiler.DiagnosticCodeSafetyEffect + `"`, `"severity":"error"`, `"message":`} {
+	for _, want := range []string{
+		`"code":"` + compiler.DiagnosticCodeSafetyEffect + `"`,
+		`"severity":"error"`,
+		`"message":`,
+	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("diagnostic JSON missing %q: %s", want, out)
 		}
@@ -143,10 +147,19 @@ func main() -> Int:
 	}
 	diag := compiler.DiagnosticFromError(err)
 	if diag.Code != compiler.DiagnosticCodeSafetyEffect {
-		t.Fatalf("diagnostic code = %q, want %q; diag=%#v", diag.Code, compiler.DiagnosticCodeSafetyEffect, diag)
+		t.Fatalf(
+			"diagnostic code = %q, want %q; diag=%#v",
+			diag.Code,
+			compiler.DiagnosticCodeSafetyEffect,
+			diag,
+		)
 	}
 	if diag.Code == compiler.DiagnosticCodeSemantic {
-		t.Fatalf("diagnostic code regressed to generic semantic code %q; diag=%#v", compiler.DiagnosticCodeSemantic, diag)
+		t.Fatalf(
+			"diagnostic code regressed to generic semantic code %q; diag=%#v",
+			compiler.DiagnosticCodeSemantic,
+			diag,
+		)
 	}
 	if !strings.Contains(diag.Message, "uses effect 'io'") {
 		t.Fatalf("diagnostic message = %q, want substring %q", diag.Message, "uses effect 'io'")
@@ -190,7 +203,12 @@ consent(token):
 			}
 			diag := compiler.DiagnosticFromError(err)
 			if diag.Code != compiler.DiagnosticCodeSafetyPrivacy {
-				t.Fatalf("diagnostic code = %q, want %q; diag=%#v", diag.Code, compiler.DiagnosticCodeSafetyPrivacy, diag)
+				t.Fatalf(
+					"diagnostic code = %q, want %q; diag=%#v",
+					diag.Code,
+					compiler.DiagnosticCodeSafetyPrivacy,
+					diag,
+				)
 			}
 			if !strings.Contains(diag.Message, tt.wantMsg) {
 				t.Fatalf("diagnostic message = %q, want substring %q", diag.Message, tt.wantMsg)
@@ -281,7 +299,8 @@ func main() -> Int:
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
-	if len(prog.Enums) != 1 || len(prog.Enums[0].Cases) != 1 || len(prog.Enums[0].Cases[0].Payload) != 1 {
+	if len(prog.Enums) != 1 || len(prog.Enums[0].Cases) != 1 ||
+		len(prog.Enums[0].Cases[0].Payload) != 1 {
 		t.Fatalf("payload enum = %#v", prog.Enums)
 	}
 }
@@ -358,7 +377,12 @@ func main() -> Int:
 `), 0o644); err != nil {
 		t.Fatalf("write source: %v", err)
 	}
-	_, err := compiler.BuildFileWithStatsOpt(srcPath, filepath.Join(t.TempDir(), "app"), "linux-x64", compiler.BuildOptions{})
+	_, err := compiler.BuildFileWithStatsOpt(
+		srcPath,
+		filepath.Join(t.TempDir(), "app"),
+		"linux-x64",
+		compiler.BuildOptions{},
+	)
 	if err == nil {
 		t.Fatalf("expected const assignment error, got nil")
 	}

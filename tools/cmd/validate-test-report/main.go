@@ -8,6 +8,8 @@ import (
 	"os"
 	"sort"
 	"strings"
+
+	"tetra_language/tools/internal/reportdecode"
 )
 
 type testResult struct {
@@ -45,7 +47,7 @@ const testReportArtifact = "tetra.release.v0_2_0.test-report.v1"
 
 func main() {
 	var reportPath string
-	flag.StringVar(&reportPath, "report", "", "path to tetra test JSON report")
+	flag.StringVar(&reportPath, "report", "", "path to tetra test JSON or TOON report")
 	flag.Parse()
 
 	if reportPath == "" {
@@ -65,7 +67,7 @@ func main() {
 
 func validateTestReport(raw []byte) error {
 	var report testReportEnvelope
-	if err := decodeStrictJSON(raw, &report); err != nil {
+	if err := reportdecode.DecodeStrict(raw, &report); err != nil {
 		return err
 	}
 	if err := unmarshalArray(report.FilesRaw, "files", &report.Files); err != nil {
@@ -85,16 +87,10 @@ func unmarshalArray[T any](raw json.RawMessage, field string, out *[]T) error {
 	if bytes.Equal(trimmed, []byte("null")) || trimmed[0] != '[' {
 		return fmt.Errorf("%s must be an array, not null", field)
 	}
-	if err := decodeStrictJSON(trimmed, out); err != nil {
+	if err := reportdecode.DecodeStrict(trimmed, out); err != nil {
 		return fmt.Errorf("%s: %w", field, err)
 	}
 	return nil
-}
-
-func decodeStrictJSON(raw []byte, out any) error {
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.DisallowUnknownFields()
-	return dec.Decode(out)
 }
 
 func validateTestReportCounts(report testReportEnvelope) error {
@@ -115,7 +111,9 @@ func validateTestReportCounts(report testReportEnvelope) error {
 		}
 		orderKey := fmt.Sprintf("%s\x00%08d", result.Filename, result.Index)
 		if prevOrderKey != "" && orderKey < prevOrderKey {
-			return fmt.Errorf("results must be sorted by filename then index for deterministic evidence output")
+			return fmt.Errorf(
+				"results must be sorted by filename then index for deterministic evidence output",
+			)
 		}
 		prevOrderKey = orderKey
 		resultKey := result.Filename + "\x00" + result.Name
@@ -153,10 +151,23 @@ func validateTestReportCounts(report testReportEnvelope) error {
 	}
 	failed := total - passed
 	if report.Total != total || report.Passed != passed || report.Failed != failed {
-		return fmt.Errorf("report counts mismatch: got total=%d passed=%d failed=%d, computed total=%d passed=%d failed=%d", report.Total, report.Passed, report.Failed, total, passed, failed)
+		return fmt.Errorf(
+			("report counts mismatch: got total=%d passed=%d failed=%d, " +
+				"computed total=%d passed=%d failed=%d"),
+			report.Total,
+			report.Passed,
+			report.Failed,
+			total,
+			passed,
+			failed,
+		)
 	}
 	if report.DurationMS != durationMS {
-		return fmt.Errorf("report duration mismatch: got %d, computed %d", report.DurationMS, durationMS)
+		return fmt.Errorf(
+			"report duration mismatch: got %d, computed %d",
+			report.DurationMS,
+			durationMS,
+		)
 	}
 
 	filenames := make([]string, 0, len(byFile))
@@ -165,7 +176,11 @@ func validateTestReportCounts(report testReportEnvelope) error {
 	}
 	sort.Strings(filenames)
 	if len(report.Files) != len(filenames) {
-		return fmt.Errorf("file report count mismatch: got %d, computed %d", len(report.Files), len(filenames))
+		return fmt.Errorf(
+			"file report count mismatch: got %d, computed %d",
+			len(report.Files),
+			len(filenames),
+		)
 	}
 	for i, filename := range filenames {
 		got := report.Files[i]
@@ -174,7 +189,12 @@ func validateTestReportCounts(report testReportEnvelope) error {
 		}
 		want := *byFile[filename]
 		if got != want {
-			return fmt.Errorf("file report mismatch for %s: got %+v, computed %+v", filename, got, want)
+			return fmt.Errorf(
+				"file report mismatch for %s: got %+v, computed %+v",
+				filename,
+				got,
+				want,
+			)
 		}
 		for index := 0; index < got.Total; index++ {
 			if !indicesByFile[filename][index] {
@@ -215,10 +235,17 @@ func validateTestResult(result testResult) error {
 		return fmt.Errorf("test result %q function_name must use __tetra_test_ prefix", result.Name)
 	}
 	if result.Passed && result.ExitCode != 0 {
-		return fmt.Errorf("test result %q passed result has non-zero exit code %d", result.Name, result.ExitCode)
+		return fmt.Errorf(
+			"test result %q passed result has non-zero exit code %d",
+			result.Name,
+			result.ExitCode,
+		)
 	}
 	if !result.Passed && result.ExitCode == 0 && result.Error == "" {
-		return fmt.Errorf("test result %q failed result must include a non-zero exit code or error", result.Name)
+		return fmt.Errorf(
+			"test result %q failed result must include a non-zero exit code or error",
+			result.Name,
+		)
 	}
 	if result.DurationMS < 0 {
 		return fmt.Errorf("test result %q has negative duration %d", result.Name, result.DurationMS)

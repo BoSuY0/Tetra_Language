@@ -79,7 +79,10 @@ func ValidateReport(raw []byte) error {
 		issues = append(issues, fmt.Sprintf("host is %q, want linux-x64", report.Host))
 	}
 	if report.Runtime != "compiler-linux-x64" {
-		issues = append(issues, fmt.Sprintf("runtime is %q, want compiler-linux-x64", report.Runtime))
+		issues = append(
+			issues,
+			fmt.Sprintf("runtime is %q, want compiler-linux-x64", report.Runtime),
+		)
 	}
 	if strings.TrimSpace(report.Source) == "" {
 		issues = append(issues, "source is required")
@@ -112,7 +115,13 @@ func rejectPaperEvidence(raw []byte) []string {
 	var issues []string
 	for _, marker := range forbidden {
 		if strings.Contains(lower, marker) {
-			issues = append(issues, fmt.Sprintf("report contains forbidden non-production evidence marker %q", strings.Trim(marker, " /\"")))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"report contains forbidden non-production evidence marker %q",
+					strings.Trim(marker, " /\""),
+				),
+			)
 		}
 	}
 	return issues
@@ -121,7 +130,13 @@ func rejectPaperEvidence(raw []byte) []string {
 func validateProcesses(processes []ProcessReport) []string {
 	var issues []string
 	if len(processes) < 4 {
-		issues = append(issues, fmt.Sprintf("process evidence has %d entries, want build, compile, test, and stress processes", len(processes)))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"process evidence has %d entries, want build, compile, test, and stress processes",
+				len(processes),
+			),
+		)
 	}
 	seenKinds := map[string]bool{"build": false, "compile": false, "test": false, "stress": false}
 	names := map[string]bool{}
@@ -135,7 +150,10 @@ func validateProcesses(processes []ProcessReport) []string {
 		if _, ok := seenKinds[p.Kind]; ok {
 			seenKinds[p.Kind] = true
 		} else {
-			issues = append(issues, fmt.Sprintf("process %s kind is %q, want build, compile, test, or stress", p.Name, p.Kind))
+			issues = append(
+				issues,
+				fmt.Sprintf("process %s kind is %q, want build, compile, test, or stress", p.Name, p.Kind),
+			)
 		}
 		if strings.TrimSpace(p.Path) == "" {
 			issues = append(issues, fmt.Sprintf("process %s path is required", p.Name))
@@ -182,7 +200,10 @@ func validateContracts(contracts []ContractReport) []string {
 			required[name] = true
 		}
 		if c.Status != "pass" {
-			issues = append(issues, fmt.Sprintf("contract %s status is %q, want pass", name, c.Status))
+			issues = append(
+				issues,
+				fmt.Sprintf("contract %s status is %q, want pass", name, c.Status),
+			)
 		}
 		if strings.TrimSpace(c.Evidence) == "" {
 			issues = append(issues, fmt.Sprintf("contract %s evidence is required", name))
@@ -232,12 +253,18 @@ func validateCases(cases []CaseReport) []string {
 		case "negative":
 			seenNegative = true
 			if strings.TrimSpace(c.ExpectedError) == "" {
-				issues = append(issues, fmt.Sprintf("negative case %s expected_error is required", name))
+				issues = append(
+					issues,
+					fmt.Sprintf("negative case %s expected_error is required", name),
+				)
 			}
 		case "stress":
 			seenStress = true
 		default:
-			issues = append(issues, fmt.Sprintf("case %s kind is %q, want positive, negative, or stress", name, c.Kind))
+			issues = append(
+				issues,
+				fmt.Sprintf("case %s kind is %q, want positive, negative, or stress", name, c.Kind),
+			)
 		}
 		if !c.Ran {
 			issues = append(issues, fmt.Sprintf("case %s did not run", name))
@@ -290,25 +317,44 @@ func validateAudit(audit []AuditReport) []string {
 			continue
 		}
 		if seen[requirement] {
-			issues = append(issues, fmt.Sprintf("duplicate completion audit requirement %q", requirement))
+			issues = append(
+				issues,
+				fmt.Sprintf("duplicate completion audit requirement %q", requirement),
+			)
 		}
 		seen[requirement] = true
 		if _, ok := required[requirement]; ok {
 			required[requirement] = true
 		}
 		if strings.TrimSpace(row.Artifact) == "" {
-			issues = append(issues, fmt.Sprintf("completion audit requirement %q artifact is required", requirement))
+			issues = append(
+				issues,
+				fmt.Sprintf("completion audit requirement %q artifact is required", requirement),
+			)
 		}
 		if strings.TrimSpace(row.Evidence) == "" {
-			issues = append(issues, fmt.Sprintf("completion audit requirement %q evidence is required", requirement))
+			issues = append(
+				issues,
+				fmt.Sprintf("completion audit requirement %q evidence is required", requirement),
+			)
 		}
 		if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(row.Result)), "pass") {
-			issues = append(issues, fmt.Sprintf("completion audit requirement %q result is %q, want pass", requirement, row.Result))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"completion audit requirement %q result is %q, want pass",
+					requirement,
+					row.Result,
+				),
+			)
 		}
 	}
 	for requirement, ok := range required {
 		if !ok {
-			issues = append(issues, fmt.Sprintf("completion audit missing required requirement %q", requirement))
+			issues = append(
+				issues,
+				fmt.Sprintf("completion audit missing required requirement %q", requirement),
+			)
 		}
 	}
 	return issues

@@ -1,129 +1,268 @@
 # Tetra v1.0 Canonical Scope
 
-Status: pre-release scope contract. This document defines what must be true
-before a build can be labeled `v1.0.0`; it is not a claim that the current
-`v0.4.0` profile, or any separately gated post-v0.4 production evidence,
-already satisfies the scope.
+Status: pre-release scope contract. This document defines what must be true before a build can be
+labeled `v1.0.0`; it is not a claim that the current `v0.4.0` profile, or any separately gated
+post-v0.4 production evidence, already satisfies the scope.
 
-The current release gate is `scripts/release/v0_4_0/gate.sh`, with separate
-post-v0.4 Linux-x64 Memory/Parallelism/UI gates under
-`scripts/release/post_v0_4/`. A true `v1.0.0` gate remains
-`scripts/release/v1_0/gate.sh` and must close from this contract when the
-version is promoted to `v1.0.x` and every mandatory artifact below has fresh
-evidence. The matching release checklist is
-`docs/checklists/v1_0_release_gate.md`, and the final evidence handoff schema
-is `docs/release/v1_0_final_handoff.md`.
+The current release gate is `scripts/release/v0_4_0/gate.sh`, with separate post-v0.4 Linux-x64
+Memory/Parallelism/UI gates under `scripts/release/post_v0_4/`. A true `v1.0.0` gate remains
+`scripts/release/v1_0/gate.sh` and must close from this contract when the version is promoted to
+`v1.0.x` and every mandatory artifact below has fresh evidence. The matching release checklist is
+`docs/checklists/v1_0_release_gate.md`, and the final evidence handoff schema is
+`docs/release/v1_0_final_handoff.md`.
 
-In this document, `Required` means required before a future `v1.0.0` release
-label can close. It does not promote any `planned` feature-registry entry, such
-as `language.full-v1-guarantees`, into current support. Entries that are
-already current in the `v0.4.0` manifest, such as `ui.metadata-v1` and
-`wasm.runtime-execution`, keep their registry-limited scope and do not close
-the full v1 target matrix.
+In this document, `Required` means required before a future `v1.0.0` release label can close. It
+does not promote any `planned` feature-registry entry, such as `language.full-v1-guarantees`, into
+current support. Entries that are already current in the `v0.4.0` manifest, such as `ui.metadata-v1`
+and `wasm.runtime-execution`, keep their registry-limited scope and do not close the full v1 target
+matrix.
 
 ## Mandatory Language Scope
 
-| Feature | v1.0 decision | Required evidence | Blocking gate | Owner / agent slot |
-| --- | --- | --- | --- | --- |
-| Flow syntax as canonical source syntax | Required | Flow-only scan and formatter check over `examples`, `lib`, `__rt`, and `compiler/selfhostrt` | `go run ./tools/cmd/validate-flow-only examples lib __rt compiler/selfhostrt`; `./tetra fmt --check examples lib __rt compiler/selfhostrt` | frontend agent |
-| Parser and diagnostics for supported Flow forms | Required | Frontend parser/diagnostic tests and docs verification | `go test ./compiler/internal/frontend/... -count=1` | frontend agent |
-| Function-type/callable Level 0 MVP boundary | Required as constrained MVP | `fn(T...) -> R` type parsing/checking plus direct-local callable subset are covered, and unsupported callable forms keep stable diagnostics; this is not a full first-class function-value claim | `go test ./compiler/... -run 'Closure|FunctionType|Callable|Type' -count=1` | frontend/semantics agent |
-| Callable Level 1 non-capturing expansion | Experimental until promoted | Symbol-backed non-capturing callable expansion requires explicit experimental labeling, docs verifier coverage, and stable diagnostics before any release claim | `go test ./compiler/... -run 'Closure|FunctionType|Callable' -count=1`; `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json` | frontend/semantics/docs agents |
-| Callable Level 2 captured closure and escape model | Planned/experimental | Captured closures, broader callback movement, lifetime validation, and ABI evidence remain design work until gated; full first-class function values remain outside the current baseline | future gated compiler and runtime ABI tests plus docs verification | frontend/semantics/runtime agents |
-| Top-level `capsule` metadata declaration MVP | Required as metadata-only surface | Parser/semantic validation for capsule key/value metadata; no runtime/ABI coupling in this scope | `go test ./compiler/internal/frontend/... -count=1`; `go test ./compiler/... -run 'Capsule|Property' -count=1` | frontend/semantics agent |
-| Static monomorphized generic functions | Required as constrained MVP | Generic functions with inferred value arguments are parsed, checked, formatted, documented, and statically monomorphized with deterministic specialization names across modules; explicit type arguments, generic structs, higher-ranked generics, runtime generic values, full protocol-bound generic dispatch, and specialization optimization remain outside this claim unless separately promoted | `go test ./compiler/... -run 'Generic|Monomorph|Module|Inference' -count=1`; `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json` | semantics/docs agents |
-| Static protocol conformance | Required as constrained MVP | Protocol declarations and `impl Type: Protocol` are statically checked against extension/static methods, including generic requirement signature shape; no witness tables, trait objects, runtime protocol values, or dynamic dispatch model are part of the v1 claim | `go test ./compiler/... -run 'Protocol|Conformance|Extension|Generic' -count=1`; `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json` | semantics/docs agents |
-| Stable primitive, structural, optional, typed-error, enum payload, extension, and module contracts | Required as the promoted positional enum payload slice only | Compiler tests plus spec alignment for same-module enum payload constructors with positional arguments/bindings and exhaustive enum match/catch coverage; advanced ADT constructors, nested destructuring patterns, guard expansion, and richer payload pattern algebra stay future/post-v1 unless separately promoted | `go test ./compiler/... -run 'Type|Inference|Enum|Optional|Extension|Module' -count=1` | semantics agent |
-| Ownership markers MVP | Required as conservative MVP | `borrow`/`inout`/`consume` call-site marker checks cover local calls, aliasing, use-after-consume, and borrow escape diagnostics | `go test ./compiler/... -run 'Ownership|Borrow|Consume|Inout' -count=1`; `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json` | safety/docs agents |
-| Resource lifetime MVP | Required as conservative MVP | Task handle, task group, island, region-backed slice, and containing-struct lifetime checks reject double use, ambiguous provenance, and common merge hazards | `go test ./compiler/... -run 'Lifetime|Resource|Island|Task' -count=1`; `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json` | safety/docs agents |
-| Actor/task transfer safety MVP | Required as conservative local MVP | Worker entrypoint, sendable-result, handle-transfer, and use-after-transfer checks cover local actor/task safety; distributed actors, full race-safety proofs, cancellation, and structured concurrency stay out of scope | `go test ./compiler/... -run 'Actor|Task|Ownership|Transfer' -count=1`; `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json` | safety/runtime/docs agents |
-| Lifetime SSA local join solver | Current since `v0.4.0` | SSA-like local/control-flow analysis snapshots branch, match, and loop states for ownership consume state, resource finalization state, and maybe-consumed diagnostics; richer interprocedural lifetime proofs and broad alias/race proofs remain full-v1 work | `go test ./compiler/... -run 'Ownership|Borrow|Consume|Inout|Lifetime|Resource|Island|Task' -count=1`; `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json` | safety agent |
-| Ownership, lifetime, island, actor/task transfer, and race-safety checks | Required before release label | Negative tests for use-after-move, escaping borrows, aliasing, invalid transfers, and actor/task races; broad interprocedural proof and distributed race-safety remain outside the local lifetime SSA slice | `go test ./compiler/... -run 'Ownership|Borrow|Consume|Inout|Lifetime|Resource|Island|Actor|Task|Unsafe|Capability|Effect|Privacy|Consent|Budget|MMIO|Mem' -count=1`; `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json` | safety/docs agents |
-| Effects, capabilities, unsafe boundaries, and public diagnostics | Required | Spec/docs validation, stable module effect metadata audit, and diagnostics shape tests | `go test ./compiler/... -run 'Unsafe|Capability|Effect|Privacy|Consent|Budget|MMIO|Mem' -count=1`; `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`; `go test ./tools/cmd/validate-diagnostic/... -count=1` | safety/tooling agent |
-| Privacy, consent, and budget contract | Required as static v1 MVP | Privacy clauses, consent-token signatures, and deterministic budget guards are checked and lowered; distributed/runtime-wide accounting is post-v1 | `go test ./compiler/... -run 'Privacy|Consent|Budget|Effect' -count=1` | safety/tooling agent |
-| Async function MVP | Required as checked synchronous lowering | `async func`/`await` parse, check, and lower; `try await <call>()` is the supported async typed-error boundary form, while `await try <call>()` is rejected with a stable diagnostic | `go test ./compiler/... -run 'Async|Await|Task|TypedError' -count=1` | runtime agent |
-| Task runtime MVP | Required for local typed task handles | Spawn/join/group builtins are typed, `uses runtime` gated, documented, and covered by bounded stress | `go test ./compiler/... -run 'Task|Runtime|Async|Stress' -count=1` | runtime agent |
-| Actors runtime MVP | Required for local actor runtime on supported native targets | Tagged messages, runtime selection, self-host/builtin parity, ownership checks, and target build matrix are tested; Linux-x64 distributed actors are covered by the `actors.distributed-runtime` v0.4.0 production slice, while non-Linux-x64 distributed actor targets and broader structured-concurrency guarantees remain outside this MVP | `go test ./compiler/... -run 'Actor|Actors|Runtime|Ownership' -count=1` | runtime agent |
-| Runtime ABI and TOBJ linking | Required | Reserved `__tetra_*` symbols, TOBJ target metadata, runtime override, repeated link objects, and mismatch diagnostics are tested | `go test ./compiler/... -run 'Runtime|ABI|Object|Link' -count=1` | runtime agent |
-| UI syntax and accessibility metadata | Required as metadata UI surface | `docs/spec/ui_v0.4.0.md`, UI parser/semantic/lowering tests, native shell sidecar smoke, and web browser smoke evidence | `go test ./compiler/... -run 'UI|View|State|Style|Accessibility|NativeShell' -count=1`; `bash scripts/release/v1_0/web-smoke.sh`; `./tetra smoke --target linux-x64 --run=false` | UI agent |
+Each item below records the v1.0 decision, evidence, gates, and owner.
+
+- Flow syntax as canonical source syntax:
+  - Decision: Required.
+  - Evidence: Flow-only scan and formatter check over release source roots.
+  - Gates:
+    - `go run ./tools/cmd/validate-flow-only examples lib __rt compiler/selfhostrt`
+    - `./tetra fmt --check examples lib __rt compiler/selfhostrt`
+  - Owner: frontend agent.
+- Parser and diagnostics for supported Flow forms:
+  - Decision: Required.
+  - Evidence: frontend parser/diagnostic tests and docs verification.
+  - Gate: `go test ./compiler/internal/frontend/... -count=1`.
+  - Owner: frontend agent.
+- Function-type/callable Level 0 MVP boundary:
+  - Decision: required as constrained MVP.
+  - Evidence: `fn(T...) -> R` parsing/checking and direct-local callable subset.
+  - Non-goal: full first-class function-value behavior.
+  - Gate terms: `Closure`, `FunctionType`, `Callable`, `Type`.
+  - Owner: frontend/semantics agent.
+- Callable Level 1 non-capturing expansion:
+  - Decision: experimental until promoted.
+  - Evidence: symbol-backed non-capturing callable expansion stays labeled.
+  - Gate terms: `Closure`, `FunctionType`, `Callable`.
+  - Docs gate: `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`.
+  - Owner: frontend/semantics/docs agents.
+- Callable Level 2 captured closure and escape model:
+  - Decision: planned/experimental.
+  - Evidence: future compiler/runtime ABI gates plus docs verification.
+  - Non-goal: full first-class function values in the current baseline.
+  - Owner: frontend/semantics/runtime agents.
+- Top-level `capsule` metadata declaration MVP:
+  - Decision: required as metadata-only surface.
+  - Evidence: parser/semantic validation for capsule key/value metadata.
+  - Gates: frontend package tests plus compiler tests for `Capsule` and `Property`.
+  - Owner: frontend/semantics agent.
+- Static monomorphized generic functions:
+  - Decision: required as constrained MVP.
+  - Evidence: parsed, checked, formatted, documented, and static specialization.
+  - Non-goals: explicit type args, generic structs, higher-ranked generics.
+  - Gate terms: `Generic`, `Monomorph`, `Module`, `Inference`.
+  - Owner: semantics/docs agents.
+- Static protocol conformance:
+  - Decision: required as constrained MVP.
+  - Evidence: protocol declarations and `impl Type: Protocol` are static checked.
+  - Non-goals: witness tables, trait objects, and dynamic dispatch.
+  - Gate terms: `Protocol`, `Conformance`, `Extension`, `Generic`.
+  - Owner: semantics/docs agents.
+- Primitive, structural, optional, typed-error, enum, extension, and module contracts:
+  - Decision: required as the promoted positional enum payload slice only.
+  - Evidence: compiler tests and spec alignment for same-module enum payloads.
+  - Non-goals: richer constructors, nested destructuring, and guard expansion.
+  - Gate terms: `Type`, `Inference`, `Enum`, `Optional`, `Extension`, `Module`.
+  - Owner: semantics agent.
+- Ownership markers MVP:
+  - Decision: required as conservative MVP.
+  - Evidence: `borrow`, `inout`, and `consume` call-site marker checks.
+  - Gate terms: `Ownership`, `Borrow`, `Consume`, `Inout`.
+  - Owner: safety/docs agents.
+- Resource lifetime MVP:
+  - Decision: required as conservative MVP.
+  - Evidence: task, island, region slice, and containing-struct lifetime checks.
+  - Gate terms: `Lifetime`, `Resource`, `Island`, `Task`.
+  - Owner: safety/docs agents.
+- Actor/task transfer safety MVP:
+  - Decision: required as conservative local MVP.
+  - Evidence: worker entrypoint, sendable-result, transfer, and use-after-transfer.
+  - Non-goals: distributed actors and full race-safety proofs.
+  - Gate terms: `Actor`, `Task`, `Ownership`, `Transfer`.
+  - Owner: safety/runtime/docs agents.
+- Lifetime SSA local join solver:
+  - Decision: current since `v0.4.0`.
+  - Evidence: local/control-flow snapshots for consume and finalization state.
+  - Non-goals: richer interprocedural proofs and broad alias/race proofs.
+  - Gate terms: `Ownership`, `Borrow`, `Consume`, `Inout`, `Lifetime`, `Task`.
+  - Owner: safety agent.
+- Ownership, lifetime, island, actor/task transfer, and race-safety checks:
+  - Decision: required before release label.
+  - Evidence: negative tests for moves, borrows, transfers, and actor/task races.
+  - Gate terms: ownership, effects, privacy, capability, budget, MMIO, and memory.
+  - Owner: safety/docs agents.
+- Effects, capabilities, unsafe boundaries, and public diagnostics:
+  - Decision: Required.
+  - Evidence: specs, module effect metadata audit, and diagnostic shape tests.
+  - Gate terms: `Unsafe`, `Capability`, `Effect`, `Privacy`, `Consent`, `Mem`.
+  - Extra gate: `go test ./tools/cmd/validate-diagnostic/... -count=1`.
+  - Owner: safety/tooling agent.
+- Privacy, consent, and budget contract:
+  - Decision: required as static v1 MVP.
+  - Evidence: privacy clauses, consent-token signatures, and budget guards.
+  - Gate terms: `Privacy`, `Consent`, `Budget`, `Effect`.
+  - Owner: safety/tooling agent.
+- Async function MVP:
+  - Decision: required as checked synchronous lowering.
+  - Evidence: `async func`, `await`, and supported `try await <call>()`.
+  - Gate terms: `Async`, `Await`, `Task`, `TypedError`.
+  - Owner: runtime agent.
+- Task runtime MVP:
+  - Decision: required for local typed task handles.
+  - Evidence: spawn/join/group builtins, `uses runtime`, docs, and stress tests.
+  - Gate terms: `Task`, `Runtime`, `Async`, `Stress`.
+  - Owner: runtime agent.
+- Actors runtime MVP:
+  - Decision: required for local actor runtime on supported native targets.
+  - Evidence: tagged messages, runtime selection, parity, ownership, and targets.
+  - Non-goals: non-Linux-x64 distributed actors and broad structured concurrency.
+  - Gate terms: `Actor`, `Actors`, `Runtime`, `Ownership`.
+  - Owner: runtime agent.
+- Runtime ABI and TOBJ linking:
+  - Decision: Required.
+  - Evidence: reserved symbols, TOBJ metadata, overrides, and diagnostics.
+  - Gate terms: `Runtime`, `ABI`, `Object`, `Link`.
+  - Owner: runtime agent.
+- UI syntax and accessibility metadata:
+  - Decision: required as metadata UI surface.
+  - Evidence: UI specs/tests plus native shell sidecar and web smoke evidence.
+  - Gate terms: `UI`, `View`, `State`, `Style`, `Accessibility`, `NativeShell`.
+  - Extra gates: `bash scripts/release/v1_0/web-smoke.sh`.
+  - Extra gate: `./tetra smoke --target linux-x64 --run=false`.
+  - Owner: UI agent.
 
 ## Mandatory Tooling, CLI, LSP, Docs, And Eco Scope
 
-| Feature | v1.0 decision | Required evidence | Blocking gate | Owner / agent slot |
-| --- | --- | --- | --- | --- |
-| CLI commands: `check`, `build`, `run`, `fmt`, `test`, `doc`, `lsp`, `eco`, `clean`, `version` | Required | CLI package tests and release gate command coverage | `go test ./cli/... -count=1`; current gate: `bash scripts/release/v0_4_0/gate.sh`; future v1 gate: blocked until promotion | CLI agent |
-| Formatter contract | Required | Idempotence and comment-preservation coverage for release sources | `go test ./compiler/... -run 'Format|Formatter|Comment' -count=1`; `./tetra fmt --check examples lib __rt compiler/selfhostrt` | tooling agent |
-| Docs manifest, doctests, and generated API docs | Required | Manifest validation, docs verification, API docs validation | `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`; `go run ./tools/cmd/validate-api-docs --docs <generated-docs>` | docs agent |
-| JSON diagnostics, test reports, target reports, doctor reports, smoke reports | Required | Schema validator tests and release gate validator steps | `go test ./tools/... -count=1`; `bash scripts/ci/test-all.sh --full --keep-going` | tools agent |
-| LSP stdio baseline | Required | LSP validator and transcript coverage | `go test ./tools/cmd/validate-lsp-stdio/... ./tools/cmd/validate-lsp-smoke/... -count=1` | LSP agent |
-| Local Eco package lifecycle | Required | Capsule verify/pack/unpack/vault/publish metadata fixtures plus lock generation/validation through `--lock` workflows | relevant Eco validator tests; `bash scripts/ci/test-all.sh --full --keep-going` | Eco agent |
+- CLI commands `check`, `build`, `run`, `fmt`, `test`, `doc`, `lsp`, `eco`,
+  `clean`, and `version`:
+  - Decision: Required.
+  - Evidence: CLI package tests and release gate command coverage.
+  - Gates: `go test ./cli/... -count=1`; `bash scripts/release/v0_4_0/gate.sh`.
+  - Future gate: v1 gate is blocked until promotion.
+  - Owner: CLI agent.
+- Formatter contract:
+  - Decision: Required.
+  - Evidence: idempotence and comment-preservation coverage.
+  - Gate terms: `Format`, `Formatter`, `Comment`.
+  - Extra gate: `./tetra fmt --check examples lib __rt compiler/selfhostrt`.
+  - Owner: tooling agent.
+- Docs manifest, doctests, and generated API docs:
+  - Decision: Required.
+  - Evidence: manifest validation, docs verification, and API docs validation.
+  - Gate: `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`.
+  - Extra gate: `go run ./tools/cmd/validate-api-docs --docs <generated-docs>`.
+  - Owner: docs agent.
+- JSON diagnostics, test reports, target reports, doctor reports, and smoke reports:
+  - Decision: Required.
+  - Evidence: schema validator tests and release gate validator steps.
+  - Gates: `go test ./tools/... -count=1`; `bash scripts/ci/test-all.sh --full`.
+  - Owner: tools agent.
+- LSP stdio baseline:
+  - Decision: Required.
+  - Evidence: LSP validator and transcript coverage.
+  - Gate: `go test ./tools/cmd/validate-lsp-stdio/...`.
+  - Extra gate: `go test ./tools/cmd/validate-lsp-smoke/... -count=1`.
+  - Owner: LSP agent.
+- Local Eco package lifecycle:
+  - Decision: Required.
+  - Evidence: capsule verify/pack/unpack/vault/publish metadata fixtures.
+  - Extra evidence: lock generation and validation through `--lock` workflows.
+  - Gate: relevant Eco validator tests.
+  - Extra gate: `bash scripts/ci/test-all.sh --full --keep-going`.
+  - Owner: Eco agent.
 
 ## Evidence Artifact Map
 
-Every mandatory v1 feature row must map to a fresh command result and a concrete
-artifact path before the release checklist can close. Paths below are the
-expected archive locations under the same `<report-dir>` used by
-`bash scripts/release/v1_0/gate.sh --report-dir <report-dir>`.
+Every mandatory v1 feature row must map to a fresh command result and a concrete artifact path
+before the release checklist can close. Paths below are the expected archive locations under the
+same `<report-dir>` used by `bash scripts/release/v1_0/gate.sh --report-dir <report-dir>`.
 
-| Scope area | Feature rows | Evidence command | Artifact path |
-| --- | --- | --- | --- |
-| Frontend | Flow syntax, parser diagnostics, formatter, callable/capsule parser boundary | `go test ./compiler/internal/frontend/... -count=1`; `go run ./tools/cmd/validate-flow-only examples lib __rt compiler/selfhostrt`; `./tetra fmt --check examples lib __rt compiler/selfhostrt` | `<report-dir>/logs/*frontend*`; `<report-dir>/logs/*flow-only*`; `<report-dir>/logs/*formatter*` |
-| Semantics | Types, generics, protocols, enums, modules, optionals, typed errors, extensions | `go test ./compiler/... -run 'Type|Inference|Enum|Optional|Protocol|Extension|Module|Generic|Conformance' -count=1`; `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json` | `<report-dir>/logs/*semantic*`; `<report-dir>/logs/*docs*`; `<report-dir>/artifacts/tetra-docs.md` |
-| Safety | Ownership markers, resource lifetimes, actor/task transfer, effects, capabilities, privacy, consent, budgets, MMIO, and memory boundaries | `go test ./compiler/... -run 'Ownership|Borrow|Consume|Inout|Lifetime|Resource|Island|Actor|Task|Unsafe|Capability|Effect|Privacy|Consent|Budget|MMIO|Mem' -count=1`; `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`; `go test ./tools/cmd/validate-diagnostic/... -count=1` | `<report-dir>/logs/*safety*`; `<report-dir>/logs/*docs*`; `<report-dir>/logs/*diagnostic*`; `<report-dir>/artifacts/*diagnostic*.json` |
-| Runtime | Async, task runtime, actor runtime, runtime ABI, TOBJ linking | `go test ./compiler/... -run 'Async|Await|Task|Runtime|Stress|Actor|Actors|Ownership|ABI|Object|Link|SelfHost' -count=1`; `./tetra smoke --target linux-x64 --run=true --report <report-dir>/artifacts/host-smoke.json` | `<report-dir>/logs/*runtime*`; `<report-dir>/artifacts/host-smoke.json`; `<report-dir>/artifacts/*smoke*.json` |
-| Backend | Native targets, WASI/Web artifact/import preflight plus runtime smoke, UI metadata, target smoke | `go test ./compiler/... -run 'WASM|Web|Wasi|UI|NativeShell|Lower|IR|Backend' -count=1`; `bash scripts/release/v1_0/wasi-smoke.sh --report <report-dir>/artifacts/wasi-smoke.json`; `bash scripts/release/v1_0/web-smoke.sh --report <report-dir>/artifacts/web-ui-smoke.json` | `<report-dir>/logs/*backend*`; `<report-dir>/artifacts/wasm32-*-smoke.json`; `<report-dir>/artifacts/wasi-smoke.json`; `<report-dir>/artifacts/web-ui-smoke.json` |
-| CLI/tools | CLI contracts, JSON reports, validators, release-state audit | `go test ./cli/... -count=1`; `go test ./tools/... -count=1`; `go run ./tools/cmd/validate-release-state --expected-version v1.0.0 --format=text --report-dir <report-dir>` | `<report-dir>/logs/*cli*`; `<report-dir>/logs/*tools*`; `<report-dir>/artifacts/release-state.txt`; `<report-dir>/artifacts/*.json` |
-| Docs/LSP/Eco | Docs manifest, generated API docs, examples index, LSP baseline, local Eco lifecycle | `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`; `go run ./tools/cmd/validate-api-docs --docs <report-dir>/artifacts/api-diff/api-docs.md`; `go test ./tools/cmd/validate-lsp-stdio/... ./tools/cmd/validate-lsp-smoke/... -count=1`; `bash scripts/ci/test-all.sh --full --keep-going --report-dir <report-dir>/artifacts/test-all` | `<report-dir>/logs/*docs*`; `<report-dir>/artifacts/api-diff/api-docs.md`; `<report-dir>/logs/*lsp*`; `<report-dir>/artifacts/test-all/summary.json` |
+- Frontend:
+  - Feature rows: Flow syntax, parser diagnostics, formatter, callable/capsule.
+  - Commands: frontend tests, flow-only validation, and formatter check.
+  - Artifacts: `<report-dir>/logs/*frontend*`, `*flow-only*`, and `*formatter*`.
+- Semantics:
+  - Feature rows: types, generics, protocols, enums, modules, typed errors.
+  - Commands: compiler semantic tests and docs verification.
+  - Artifacts: `<report-dir>/logs/*semantic*`, `*docs*`, and `tetra-docs.md`.
+- Safety:
+  - Feature rows: ownership, lifetimes, actors, effects, privacy, budgets, memory.
+  - Commands: compiler safety tests, docs verification, and diagnostic validation.
+  - Artifacts: `<report-dir>/logs/*safety*`, `*docs*`, and `*diagnostic*.json`.
+- Runtime:
+  - Feature rows: async, tasks, actors, runtime ABI, TOBJ linking.
+  - Commands: runtime compiler tests and Linux host smoke when supported.
+  - Artifacts: `<report-dir>/logs/*runtime*` and runtime smoke JSON files.
+- Backend:
+  - Feature rows: native targets, WASI/Web preflight, UI metadata, target smoke.
+  - Commands: backend compiler tests plus v1 WASI and web smoke scripts.
+  - Artifacts: backend logs and `wasm32-*`, WASI, and web UI smoke JSON.
+- CLI/tools:
+  - Feature rows: CLI contracts, JSON reports, validators, release-state audit.
+  - Commands: CLI tests, tools tests, and release-state validator.
+  - Artifacts: CLI/tools logs, release-state text, and JSON reports.
+- Docs/LSP/Eco:
+  - Feature rows: docs manifest, API docs, examples index, LSP, local Eco.
+  - Commands: docs verifier, API-doc validator, LSP tests, and test-all report.
+  - Artifacts: docs/LSP logs, API docs, and `test-all/summary.json`.
 
 ## Target Matrix
 
-| Target | v1.0 status required before release | Required evidence |
-| --- | --- | --- |
-| `linux-x64` | Native build and host smoke when running on Linux | `./tetra smoke --target linux-x64 --run=true --report <path>` |
-| `macos-x64` | Build-only cross-target smoke | `./tetra smoke --target macos-x64 --run=false --report <path>` |
-| `windows-x64` | Build-only cross-target smoke | `./tetra smoke --target windows-x64 --run=false --report <path>` |
-| `wasm32-wasi` | Artifact/import preflight plus WASI runner smoke | `bash scripts/release/v1_0/wasi-smoke.sh --report <path>` |
-| `wasm32-web` | Artifact/import preflight plus browser runtime smoke | `bash scripts/release/v1_0/web-smoke.sh --report <path>` |
+- `linux-x64`: native build and host smoke when running on Linux.
+  - Evidence: `./tetra smoke --target linux-x64 --run=true --report <path>`.
+- `macos-x64`: build-only cross-target smoke.
+  - Evidence: `./tetra smoke --target macos-x64 --run=false --report <path>`.
+- `windows-x64`: build-only cross-target smoke.
+  - Evidence: `./tetra smoke --target windows-x64 --run=false --report <path>`.
+- `wasm32-wasi`: artifact/import preflight plus WASI runner smoke.
+  - Evidence: `bash scripts/release/v1_0/wasi-smoke.sh --report <path>`.
+- `wasm32-web`: artifact/import preflight plus browser runtime smoke.
+  - Evidence: `bash scripts/release/v1_0/web-smoke.sh --report <path>`.
 
 ## Explicitly Post-v1 Unless Promoted By Review
 
-Promotion requires `docs/release/post_v1_promotion_checklist.md` evidence in
-the same branch state as the implementation, tests, docs, gates, compatibility
-notes, and security review when applicable.
+Promotion requires `docs/release/post_v1_promotion_checklist.md` evidence in the same branch state
+as the implementation, tests, docs, gates, compatibility notes, and security review when
+applicable.
 
 - Distributed EcoNet and TetraHub production publishing.
 - Proof-carrying capsules and global trust scoring.
-- EcoOracle, live evolution, time-travel execution, and multiverse optimizer
-  features.
+- EcoOracle, live evolution, time-travel execution, and multiverse optimizer features.
 - Advanced AI/model types and model-runtime integration.
-- Callable Level 2 captured closure and escape semantics, broader callback
-  movement, and full first-class function-value behavior unless promoted with
-  lifetime and ABI evidence.
+- Callable Level 2 captured closure and escape semantics, broader callback movement, and full
+  first-class function-value behavior unless promoted with lifetime and ABI evidence.
 - Distributed actors beyond the release actor/task safety contract.
-- Async typed-error behavior beyond the supported `try await <call>()`
-  synchronous-lowering boundary, plus cancellation and structured concurrency.
-- Runtime generic values, generic structs, explicit type arguments,
-  higher-ranked generics, full protocol-bound generic dispatch, and
-  specialization optimization beyond the static monomorphized generic-function
-  MVP.
-- Protocol witness tables, trait objects, runtime protocol values, protocol
-  existential containers, and dynamic dispatch beyond static conformance checks.
-- Advanced ADT work beyond the promoted positional enum payload slice:
-  arbitrary constructors, nested destructuring patterns, guard expansion, richer
-  payload pattern algebra, and match/catch coverage outside the gated enum
-  payload promotion.
-- Distributed privacy/consent enforcement and runtime-wide resource-budget
-  accounting beyond deterministic local guard lowering.
-- Real macOS/Windows host execution evidence for actor/runtime binaries when
-  collecting it from non-matching Linux hosts.
-- Cross-platform native widget rendering, platform accessibility integration,
-  and runtime UI event dispatch/layout beyond the Linux-x64 post-v0.4 desktop
-  runtime evidence and the UI v0.4.0 metadata artifacts in `docs/spec/ui_v0.4.0.md`.
-- Any feature still labeled `planned`, `beta`, `deferred-post-v1`, or
-  `blocked-by-prerequisite` in the release checklist.
+- Async typed-error behavior beyond the supported `try await <call>()` synchronous-lowering
+  boundary, plus cancellation and structured concurrency.
+- Runtime generic values, generic structs, explicit type arguments, higher-ranked generics, full
+  protocol-bound generic dispatch, and specialization optimization beyond the static monomorphized
+  generic-function MVP.
+- Protocol witness tables, trait objects, runtime protocol values, protocol existential containers,
+  and dynamic dispatch beyond static conformance checks.
+- Advanced ADT work beyond the promoted positional enum payload slice: arbitrary constructors,
+  nested destructuring patterns, guard expansion, richer payload pattern algebra, and match/catch
+  coverage outside the gated enum payload promotion.
+- Distributed privacy/consent enforcement and runtime-wide resource-budget accounting beyond
+  deterministic local guard lowering.
+- Real macOS/Windows host execution evidence for actor/runtime binaries when collecting it from
+  non-matching Linux hosts.
+- Cross-platform native widget rendering, platform accessibility integration, and runtime UI event
+  dispatch/layout beyond the Linux-x64 post-v0.4 desktop runtime evidence and the UI v0.4.0
+  metadata artifacts in `docs/spec/ui_v0.4.0.md`.
+- Any feature still labeled `planned`, `beta`, `deferred-post-v1`, or `blocked-by-prerequisite` in
+  the release checklist.
 
 ## Release Closure Rule
 
-The release checklist, release notes, and artifact archive must cite this
-document. A checkbox may be marked complete only when the implementation,
-tests, documentation, and artifact evidence exist in the same branch state.
+The release checklist, release notes, and artifact archive must cite this document. A checkbox may
+be marked complete only when the implementation, tests, documentation, and artifact evidence exist
+in the same branch state.

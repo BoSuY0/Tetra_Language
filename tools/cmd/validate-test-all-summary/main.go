@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -10,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"tetra_language/tools/internal/reportdecode"
 )
 
 type testAllSummary struct {
@@ -36,8 +36,10 @@ type testAllStep struct {
 func main() {
 	var summaryPath string
 	var reportDir string
-	flag.StringVar(&summaryPath, "summary", "", "path to scripts/ci/test-all.sh summary.json")
+	var format string
+	flag.StringVar(&summaryPath, "summary", "", "path to scripts/ci/test-all.sh summary report")
 	flag.StringVar(&reportDir, "report-dir", "", "report directory containing logs")
+	flag.StringVar(&format, "format", "auto", "summary format: auto, json, or toon")
 	flag.Parse()
 
 	if summaryPath == "" {
@@ -52,15 +54,19 @@ func main() {
 	if reportDir == "" {
 		reportDir = filepath.Dir(summaryPath)
 	}
-	if err := validateTestAllSummary(raw, reportDir); err != nil {
+	if err := validateTestAllSummaryFormat(raw, reportDir, format); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
 func validateTestAllSummary(raw []byte, reportDir string) error {
+	return validateTestAllSummaryFormat(raw, reportDir, "auto")
+}
+
+func validateTestAllSummaryFormat(raw []byte, reportDir string, format string) error {
 	var summary testAllSummary
-	if err := decodeStrictJSON(raw, &summary); err != nil {
+	if err := reportdecode.DecodeStrictFormat(raw, format, &summary); err != nil {
 		return err
 	}
 	switch summary.Mode {
@@ -91,7 +97,11 @@ func validateTestAllSummary(raw []byte, reportDir string) error {
 		return fmt.Errorf("ended_at must not be before started_at")
 	}
 	if summary.StepCount != len(summary.Steps) {
-		return fmt.Errorf("step_count mismatch: got %d, computed %d", summary.StepCount, len(summary.Steps))
+		return fmt.Errorf(
+			"step_count mismatch: got %d, computed %d",
+			summary.StepCount,
+			len(summary.Steps),
+		)
 	}
 	if len(summary.Steps) == 0 {
 		return fmt.Errorf("summary must contain at least one step")
@@ -129,12 +139,23 @@ func validateTestAllSummary(raw []byte, reportDir string) error {
 			return err
 		}
 	}
-	if summary.ReleaseVersion != "" && (!strings.HasPrefix(summary.ReleaseVersion, "v") || strings.ContainsAny(summary.ReleaseVersion, " \t\n\r")) {
+	if summary.ReleaseVersion != "" &&
+		(!strings.HasPrefix(
+			summary.ReleaseVersion,
+			"v",
+		) || strings.ContainsAny(
+			summary.ReleaseVersion,
+			" \t\n\r",
+		)) {
 		return fmt.Errorf("invalid release_version %q", summary.ReleaseVersion)
 	}
 	expectedArtifact := expectedTestAllSummaryArtifact(summary.ReleaseVersion)
 	if summary.ReleaseArtifact != "" && summary.ReleaseArtifact != expectedArtifact {
-		return fmt.Errorf("release_artifact = %q, want %q", summary.ReleaseArtifact, expectedArtifact)
+		return fmt.Errorf(
+			"release_artifact = %q, want %q",
+			summary.ReleaseArtifact,
+			expectedArtifact,
+		)
 	}
 	return nil
 }
@@ -181,12 +202,6 @@ func expectedTestAllSummaryArtifact(version string) string {
 	return "tetra.release.v" + slug + ".test-all-summary.v1"
 }
 
-func decodeStrictJSON(raw []byte, out any) error {
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.DisallowUnknownFields()
-	return dec.Decode(out)
-}
-
 func validateStep(step testAllStep, reportDir string, expectedIndex int) error {
 	if step.Name == "" {
 		return fmt.Errorf("step missing name")
@@ -212,7 +227,8 @@ func validateStep(step testAllStep, reportDir string, expectedIndex int) error {
 	if step.Log == "" {
 		return fmt.Errorf("step %s missing log", step.Name)
 	}
-	if filepath.IsAbs(step.Log) || strings.Contains(step.Log, "..") || !strings.HasPrefix(filepath.ToSlash(step.Log), "logs/") {
+	if filepath.IsAbs(step.Log) || strings.Contains(step.Log, "..") ||
+		!strings.HasPrefix(filepath.ToSlash(step.Log), "logs/") {
 		return fmt.Errorf("step %s has unsafe log path %s", step.Name, step.Log)
 	}
 	if err := validateLogOrdinal(step.Log, expectedIndex); err != nil {

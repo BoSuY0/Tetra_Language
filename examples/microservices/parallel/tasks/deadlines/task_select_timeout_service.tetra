@@ -1,0 +1,22 @@
+// Task select timeout microservice smoke.
+//
+// The service observes a select timeout on a sleeping task and then joins the
+// same task successfully after the worker wakes.
+module examples.microservices.parallel.tasks.deadlines.task_select_timeout_service
+func slow_worker() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(4)
+    return 42
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("slow_worker")
+    let early: task.result_i32 = core.select2_i32(task, core.deadline_ms(1))
+    if early.error != 2:
+        return 10 + early.error
+    let final: task.result_i32 = core.task_join_result_i32(task)
+    if final.error != 0:
+        return 20 + final.error
+    if final.value == 42:
+        return 0
+    return final.value

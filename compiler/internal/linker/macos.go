@@ -19,7 +19,12 @@ func LinkMacOSX64(objects []*tobj.Object, mainName string) (*macho.MachOImage, e
 			return nil, fmt.Errorf("nil object")
 		}
 		if obj.Target != expectedTarget {
-			return nil, fmt.Errorf("linker target mismatch: macos-x64 expects '%s' object, got '%s' (module '%s')", expectedTarget, obj.Target, obj.Module)
+			return nil, fmt.Errorf(
+				"linker target mismatch: macos-x64 expects '%s' object, got '%s' (module '%s')",
+				expectedTarget,
+				obj.Target,
+				obj.Module,
+			)
 		}
 	}
 

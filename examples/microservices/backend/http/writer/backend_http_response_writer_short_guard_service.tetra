@@ -1,0 +1,101 @@
+// Backend HTTP response writer short-buffer guard microservice.
+module examples.microservices.backend.http.writer.backend_http_response_writer_short_guard_service
+import lib.core.http as http
+
+func fill_bytes(dst: inout []u8, count: Int, value: Int) -> Int
+uses mem:
+    var i: Int = 0
+    while i < count:
+        dst[i] = value
+        i = i + 1
+    return count
+
+func all_bytes_equal(src: []u8, count: Int, value: Int) -> Bool
+uses mem:
+    var i: Int = 0
+    while i < count:
+        if src[i] != value:
+            return false
+        i = i + 1
+    return true
+
+func check_valid_responses() -> Bool
+uses alloc, mem:
+    let date: String = "Mon, 01 Jan 2024 00:00:00 GMT"
+    let head_len: Int = http.response_head_len(200, "OK", "Tetra", date, "text/plain", 0, true)
+    var head: []u8 = core.make_u8(head_len)
+    if http.write_response_head(head, 200, "OK", "Tetra", date, "text/plain", 0, true) != head_len:
+        return false
+    if head[0] != 72 || head[1] != 84 || head[2] != 84 || head[3] != 80:
+        return false
+    if head[head_len - 4] != 13 || head[head_len - 3] != 10:
+        return false
+    if head[head_len - 2] != 13 || head[head_len - 1] != 10:
+        return false
+    let plain_len: Int = http.plaintext_response_len("Tetra", date, false)
+    var plain: []u8 = core.make_u8(plain_len)
+    if http.write_plaintext_response(plain, "Tetra", date, false) != plain_len:
+        return false
+    if plain[plain_len - 13] != 72 || plain[plain_len - 1] != 33:
+        return false
+    let json_len: Int = http.json_message_response_len("Tetra", date, "OK", true)
+    var json: []u8 = core.make_u8(json_len)
+    if http.write_json_message_response(json, "Tetra", date, "OK", true) != json_len:
+        return false
+    if json[json_len - 1] != 125:
+        return false
+    return true
+
+func check_empty_response_writes() -> Int
+uses alloc, mem:
+    let date: String = "Mon, 01 Jan 2024 00:00:00 GMT"
+    var empty: []u8 = core.make_u8(0)
+    if http.write_response_head(empty, 200, "OK", "Tetra", date, "text/plain", 0, true) != -1:
+        return 11
+    if http.write_plaintext_response(empty, "Tetra", date, true) != -1:
+        return 12
+    if http.write_json_message_response(empty, "Tetra", date, "OK", true) != -1:
+        return 13
+    return 0
+
+func check_prefix_short_head_write() -> Int
+uses alloc, mem:
+    let date: String = "Mon, 01 Jan 2024 00:00:00 GMT"
+    var prefix: []u8 = core.make_u8(9)
+    fill_bytes(prefix, 9, 7)
+    if http.write_response_head(prefix, 200, "OK", "Tetra", date, "text/plain", 0, true) != -1:
+        return 21
+    if !all_bytes_equal(prefix, 9, 7):
+        return 22
+    return 0
+
+func check_body_short_response_writes() -> Int
+uses alloc, mem:
+    let date: String = "Mon, 01 Jan 2024 00:00:00 GMT"
+    let plain_len: Int = http.plaintext_response_len("Tetra", date, false)
+    var plain: []u8 = core.make_u8(plain_len - 1)
+    fill_bytes(plain, plain_len - 1, 6)
+    if http.write_plaintext_response(plain, "Tetra", date, false) != -1:
+        return 31
+    if !all_bytes_equal(plain, plain_len - 1, 6):
+        return 32
+    let json_len: Int = http.json_message_response_len("Tetra", date, "OK", true)
+    var json: []u8 = core.make_u8(json_len - 1)
+    fill_bytes(json, json_len - 1, 5)
+    if http.write_json_message_response(json, "Tetra", date, "OK", true) != -1:
+        return 33
+    if !all_bytes_equal(json, json_len - 1, 5):
+        return 34
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    if !check_valid_responses():
+        return 1
+    let empty_result: Int = check_empty_response_writes()
+    if empty_result != 0:
+        return empty_result
+    let prefix_result: Int = check_prefix_short_head_write()
+    if prefix_result != 0:
+        return prefix_result
+    return check_body_short_response_writes()

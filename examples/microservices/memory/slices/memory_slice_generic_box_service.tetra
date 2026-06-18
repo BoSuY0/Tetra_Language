@@ -1,0 +1,23 @@
+// Generic slice box memory microservice smoke.
+//
+// The service carries a heap-backed []u8 through a generic struct and reads it
+// after indexed writes.
+module examples.microservices.memory.slices.memory_slice_generic_box_service
+struct Box<T>:
+    value: T
+
+func wrap<T>(value: T) -> Box<T>:
+    return Box<T>(value: value)
+
+func main() -> Int
+uses alloc, mem:
+    var raw: []u8 = core.make_u8(4)
+    raw[0] = 6
+    raw[1] = 9
+    raw[2] = 12
+    raw[3] = 15
+    let box: Box<[]u8> = wrap(raw)
+    let total: Int = box.value[0] + box.value[1] + box.value[2] + box.value[3]
+    if total == 42:
+        return 0
+    return total

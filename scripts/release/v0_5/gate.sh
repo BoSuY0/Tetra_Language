@@ -26,9 +26,9 @@ fi
 echo "$version"
 
 echo "== Formatter/test/smoke =="
-./tetra fmt --check examples/flow_hello.tetra
+./tetra fmt --check examples/flow/flow_hello.tetra
 ./tetra test examples
-./tetra test --report=json examples >"$tmp_dir/tetra-test-report.json"
+./tetra test --report=json examples > "$tmp_dir/tetra-test-report.json"
 go run ./tools/cmd/validate-test-report --report "$tmp_dir/tetra-test-report.json"
 ./tetra smoke --target linux-x64 --run=true --report "$tmp_dir/host-smoke.json"
 go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$tmp_dir/host-smoke.json"
@@ -41,19 +41,19 @@ diff -u docs/generated/manifest.json "$tmp_dir/manifest.json"
 go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
 
 echo "== LSP and generated API docs =="
-./tetra lsp --stdio-smoke examples/flow_hello.tetra >"$tmp_dir/lsp.json"
+./tetra lsp --stdio-smoke examples/flow/flow_hello.tetra > "$tmp_dir/lsp.json"
 go run ./tools/cmd/validate-lsp-smoke --report "$tmp_dir/lsp.json"
-go run ./tools/cmd/gen-docs examples >"$tmp_dir/api-docs.md"
+go run ./tools/cmd/gen-docs examples > "$tmp_dir/api-docs.md"
 go run ./tools/cmd/validate-api-docs --docs "$tmp_dir/api-docs.md"
 
 echo "== Eco graph and local Todex vault =="
-cat >"$tmp_dir/Core.capsule" <<'CAPSULE'
+cat > "$tmp_dir/Core.capsule" << 'CAPSULE'
 capsule Core:
   id "tetra://core"
   version "0.1.0"
   target "linux-x64"
 CAPSULE
-cat >"$tmp_dir/App.capsule" <<'CAPSULE'
+cat > "$tmp_dir/App.capsule" << 'CAPSULE'
 capsule App:
   id "tetra://app"
   version "0.1.0"
@@ -62,7 +62,7 @@ capsule App:
 CAPSULE
 ./tetra eco verify --target linux-x64 --lock "$tmp_dir/tetra.lock.json" "$tmp_dir/App.capsule" "$tmp_dir/Core.capsule"
 go run ./tools/cmd/validate-eco-lock --lock "$tmp_dir/tetra.lock.json"
-./tetra eco vault add --store "$tmp_dir/vault" --kind source examples/flow_hello.tetra
+./tetra eco vault add --store "$tmp_dir/vault" --kind source examples/flow/flow_hello.tetra
 ./tetra eco vault list --store "$tmp_dir/vault"
 ./tetra eco vault verify --store "$tmp_dir/vault"
 go run ./tools/cmd/validate-eco-vault --store "$tmp_dir/vault"

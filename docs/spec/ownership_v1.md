@@ -1,7 +1,8 @@
 # Ownership Markers v1
 
 Ownership markers are part of the checked function-call contract in the current production surface.
-The local lifetime solver is SSA-like for branch, match, and loop joins: it snapshots ownership/resource state, merges incoming edges,
+The local lifetime solver is SSA-like for branch, match, and loop joins: it snapshots
+ownership/resource state, merges incoming edges,
 and reports maybe-consumed or maybe-finalized diagnostics at the first unsafe
 use.
 
@@ -207,7 +208,8 @@ go test ./compiler/... -run "Effect|Uses|Capability|Unsafe|Ownership|Borrow|Cons
 ```
 
 The slice checks allowed borrow forwarding, distinct `borrow`/`inout` locals,
-same-module/cross-module struct-field partial consume with sibling-field reuse, and enum payload binding
+same-module/cross-module struct-field partial consume with sibling-field reuse, and enum payload
+binding
 partial consume with sibling-payload reuse plus whole-value call/let/return
 rejection with stable `TETRA2101` CLI JSON diagnostics, stable
 same-module/cross-module whole-copy CLI JSON rejection after partial struct/enum
@@ -288,7 +290,8 @@ island maybe-freed merge diagnostics, branch/match/loop resource finalization
 merge diagnostics with stable `TETRA2101` JSON evidence, stable `TETRA2101`
 task-group use-after-close CLI JSON diagnostics, same-module/cross-module
 struct-field and enum-payload alias use-after-free CLI JSON diagnostics,
-same-module and interface-only cross-module per-field interprocedural region summaries for aggregate returns
+same-module and interface-only cross-module per-field interprocedural region summaries for aggregate
+returns
 from multiple island parameters, including optional aggregate wrappers, enum
 payload wrappers, branch aggregate wrappers, match aggregate wrappers, if-let
 aggregate wrappers, mixed safe/provenance aggregate branch and match returns,
@@ -297,8 +300,13 @@ same-module/cross-module transitive interprocedural task-handle/task-group/islan
 resource aliases with stable TETRA2101 CLI JSON evidence,
 same-module/cross-module enum-constructor return resource aliases with stable
 TETRA2101 CLI JSON evidence,
-same-module typed-error throw/catch and rethrow-through-try enum-payload resource aliases with stable TETRA2101 JSON diagnostic evidence,
-generated `.t4i` direct/local/aggregate-local-alias/aggregate-field-access/aggregate-field-local-alias resource return, assignment/let/direct-if-let/direct-match/field-local/if-let/match optional and nested/field-local nested optional resource return, typed-error direct/field-local-alias throw, and rethrow-through-`try` direct/field-local-alias provenance stubs,
+same-module typed-error throw/catch and rethrow-through-try enum-payload resource aliases with
+stable TETRA2101 JSON diagnostic evidence,
+generated `.t4i`
+direct/local/aggregate-local-alias/aggregate-field-access/aggregate-field-local-alias resource
+return, assignment/let/direct-if-let/direct-match/field-local/if-let/match optional and
+nested/field-local nested optional resource return, typed-error direct/field-local-alias throw, and
+rethrow-through-`try` direct/field-local-alias provenance stubs,
 enum-payload and if-let/match
 optional-payload return resource alias double-free, including nested struct-field and enum-payload
 optional resource wrappers with stable same-module/cross-module `TETRA2101`
@@ -320,7 +328,8 @@ with stable TETRA2101 CLI JSON evidence,
 same-module/cross-module protocol impl parameter ownership matching plus
 same-module/cross-module protocol impl parameter ownership mismatch diagnostics
 with stable TETRA2001 CLI JSON evidence, and
-same-module/cross-module generic protocol requirement parameter ownership mismatch diagnostics with stable TETRA2001 JSON diagnostic evidence, and
+same-module/cross-module generic protocol requirement parameter ownership mismatch diagnostics with
+stable TETRA2001 JSON diagnostic evidence, and
 ambiguous resource provenance; and verifies
 actor/task handles cannot be used after ownership transfer.
 

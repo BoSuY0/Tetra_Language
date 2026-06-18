@@ -51,7 +51,10 @@ func TestNormalizeFlowForMigrationAPICoversFlowTestAndMatchSurface(t *testing.T)
 }
 
 func TestNormalizeFlowForMigrationAPITabDiagnostic(t *testing.T) {
-	_, err := compiler.NormalizeFlowForMigration([]byte("func main() -> Int:\n\treturn 0\n"), "qa/tabbed.tetra")
+	_, err := compiler.NormalizeFlowForMigration(
+		[]byte("func main() -> Int:\n\treturn 0\n"),
+		"qa/tabbed.tetra",
+	)
 	if err == nil {
 		t.Fatalf("expected diagnostic")
 	}

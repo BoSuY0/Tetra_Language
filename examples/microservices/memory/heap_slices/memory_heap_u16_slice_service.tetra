@@ -1,0 +1,15 @@
+// Heap u16 slice memory microservice smoke.
+//
+// The service allocates a heap-backed u16 slice and verifies indexed
+// read-after-write arithmetic without an island scope.
+module examples.microservices.memory.heap_slices.memory_heap_u16_slice_service
+func main() -> Int
+uses alloc, mem:
+    var lane: []u16 = core.make_u16(4)
+    lane[0] = 9
+    lane[1] = 10
+    lane[2] = lane[0] + lane[1]
+    lane[3] = lane[2] + 23
+    if lane[3] == 42:
+        return 0
+    return lane[3]

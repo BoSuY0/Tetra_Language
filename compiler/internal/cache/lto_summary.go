@@ -38,7 +38,9 @@ type IncrementalModuleSummary struct {
 	LinkerConsumer   bool     `json:"linker_consumer"`
 }
 
-func BuildIncrementalModuleSummary(input IncrementalModuleSummaryInput) (IncrementalModuleSummary, error) {
+func BuildIncrementalModuleSummary(
+	input IncrementalModuleSummaryInput,
+) (IncrementalModuleSummary, error) {
 	sourceHash := sha256.Sum256(input.Source)
 	summary := IncrementalModuleSummary{
 		SchemaVersion:    IncrementalModuleSummarySchemaVersion,
@@ -88,9 +90,14 @@ func ParseIncrementalModuleSummary(raw []byte) (IncrementalModuleSummary, error)
 	}
 	if err := dec.Decode(&struct{}{}); err != io.EOF {
 		if err == nil {
-			return IncrementalModuleSummary{}, fmt.Errorf("incremental module summary: trailing JSON value")
+			return IncrementalModuleSummary{}, fmt.Errorf(
+				"incremental module summary: trailing JSON value",
+			)
 		}
-		return IncrementalModuleSummary{}, fmt.Errorf("incremental module summary: trailing JSON: %w", err)
+		return IncrementalModuleSummary{}, fmt.Errorf(
+			"incremental module summary: trailing JSON: %w",
+			err,
+		)
 	}
 	summary = canonicalIncrementalModuleSummary(summary)
 	if err := ValidateIncrementalModuleSummary(summary); err != nil {
@@ -101,7 +108,11 @@ func ParseIncrementalModuleSummary(raw []byte) (IncrementalModuleSummary, error)
 
 func ValidateIncrementalModuleSummary(summary IncrementalModuleSummary) error {
 	if summary.SchemaVersion != IncrementalModuleSummarySchemaVersion {
-		return fmt.Errorf("incremental module summary: schema_version = %q, want %q", summary.SchemaVersion, IncrementalModuleSummarySchemaVersion)
+		return fmt.Errorf(
+			"incremental module summary: schema_version = %q, want %q",
+			summary.SchemaVersion,
+			IncrementalModuleSummarySchemaVersion,
+		)
 	}
 	if strings.TrimSpace(summary.Module) == "" {
 		return fmt.Errorf("incremental module summary: missing module")
@@ -131,16 +142,26 @@ func ValidateIncrementalModuleSummary(summary IncrementalModuleSummary) error {
 			return fmt.Errorf("incremental module summary: empty external type dependency")
 		}
 	}
-	for _, row := range []string{"source_hash", "dependency_hash_contract", "public_api_hash", "cross_module_signature_inputs", "non_consumer_boundary"} {
+	for _, row := range []string{
+		"source_hash",
+		"dependency_hash_contract",
+		"public_api_hash",
+		"cross_module_signature_inputs",
+		"non_consumer_boundary",
+	} {
 		if !summaryHasString(summary.ValidationRows, row) {
 			return fmt.Errorf("incremental module summary: missing validation row %q", row)
 		}
 	}
 	if summary.CodegenConsumer {
-		return fmt.Errorf("incremental module summary: codegen consumer is not supported for evidence-only summary")
+		return fmt.Errorf(
+			"incremental module summary: codegen consumer is not supported for evidence-only summary",
+		)
 	}
 	if summary.LinkerConsumer {
-		return fmt.Errorf("incremental module summary: linker consumer is not supported for evidence-only summary")
+		return fmt.Errorf(
+			"incremental module summary: linker consumer is not supported for evidence-only summary",
+		)
 	}
 	return nil
 }

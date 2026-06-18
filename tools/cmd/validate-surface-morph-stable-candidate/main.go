@@ -45,18 +45,64 @@ type morphStableRecipeContract struct {
 }
 
 var requiredMorphStableSchemas = map[string][]string{
-	"accessibility_projection": {"schema", "derived_from_block_graph", "safety_overrides_win", "snapshot_evidence", "required_fields", "roles"},
-	"affordance":               {"name", "role", "focusable", "action", "input", "projects_accessibility"},
-	"material":                 {"name", "paint_stack", "fill", "border", "radius", "shadow", "overlay"},
-	"motion_preset":            {"name", "duration_ms", "curve", "properties", "reduced_motion", "deterministic_time"},
-	"recipe":                   {"name", "output", "slots", "inputs", "expands_to_block_graph"},
-	"state_lens":               {"selector", "property", "deterministic"},
-	"token_graph":              {"schema", "namespace", "version", "hash", "source_of_truth", "explicit_imports", "no_global_cascade", "fixed_override_order", "categories", "tokens", "density_dpi", "diagnostics"},
-	"variant":                  {"name", "state_lenses", "materials", "motion"},
+	"accessibility_projection": {
+		"schema",
+		"derived_from_block_graph",
+		"safety_overrides_win",
+		"snapshot_evidence",
+		"required_fields",
+		"roles",
+	},
+	"affordance": {
+		"name",
+		"role",
+		"focusable",
+		"action",
+		"input",
+		"projects_accessibility",
+	},
+	"material": {
+		"name",
+		"paint_stack",
+		"fill",
+		"border",
+		"radius",
+		"shadow",
+		"overlay",
+	},
+	"motion_preset": {
+		"name",
+		"duration_ms",
+		"curve",
+		"properties",
+		"reduced_motion",
+		"deterministic_time",
+	},
+	"recipe":     {"name", "output", "slots", "inputs", "expands_to_block_graph"},
+	"state_lens": {"selector", "property", "deterministic"},
+	"token_graph": {
+		"schema",
+		"namespace",
+		"version",
+		"hash",
+		"source_of_truth",
+		"explicit_imports",
+		"no_global_cascade",
+		"fixed_override_order",
+		"categories",
+		"tokens",
+		"density_dpi",
+		"diagnostics",
+	},
+	"variant": {"name", "state_lenses", "materials", "motion"},
 }
 
 func main() {
-	contractPath := flag.String("contract", "", "path to tetra.surface.morph.stable-candidate.v1 contract JSON")
+	contractPath := flag.String(
+		"contract",
+		"",
+		"path to tetra.surface.morph.stable-candidate.v1 contract JSON",
+	)
 	flag.Parse()
 	if strings.TrimSpace(*contractPath) == "" {
 		fmt.Fprintln(os.Stderr, "error: --contract is required")
@@ -85,22 +131,54 @@ func validateSurfaceMorphStableCandidate(path string) error {
 func validateSurfaceMorphStableCandidateContract(contract morphStableCandidateContract) error {
 	var issues []string
 	if contract.Schema != "tetra.surface.morph.stable-candidate.v1" {
-		issues = append(issues, fmt.Sprintf("schema is %q, want tetra.surface.morph.stable-candidate.v1", contract.Schema))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"schema is %q, want tetra.surface.morph.stable-candidate.v1",
+				contract.Schema,
+			),
+		)
 	}
 	if contract.Status != "design-freeze" {
 		issues = append(issues, fmt.Sprintf("status is %q, want design-freeze", contract.Status))
 	}
-	if !surface.ValidSurfaceClaimTier(contract.CurrentTier) || contract.CurrentTier != string(surface.ClaimTierExperimental) {
-		issues = append(issues, fmt.Sprintf("current_tier is %q, want %s", contract.CurrentTier, surface.ClaimTierExperimental))
+	if !surface.ValidSurfaceClaimTier(contract.CurrentTier) ||
+		contract.CurrentTier != string(surface.ClaimTierExperimental) {
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"current_tier is %q, want %s",
+				contract.CurrentTier,
+				surface.ClaimTierExperimental,
+			),
+		)
 	}
-	if !surface.ValidSurfaceClaimTier(contract.TargetTier) || contract.TargetTier != string(surface.ClaimTierProdStableScoped) {
-		issues = append(issues, fmt.Sprintf("target_tier is %q, want %s", contract.TargetTier, surface.ClaimTierProdStableScoped))
+	if !surface.ValidSurfaceClaimTier(contract.TargetTier) ||
+		contract.TargetTier != string(surface.ClaimTierProdStableScoped) {
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"target_tier is %q, want %s",
+				contract.TargetTier,
+				surface.ClaimTierProdStableScoped,
+			),
+		)
 	}
 	if contract.SurfaceScope != surface.ReleaseScopeSurfaceV1LinuxWeb {
-		issues = append(issues, fmt.Sprintf("surface_scope is %q, want %s", contract.SurfaceScope, surface.ReleaseScopeSurfaceV1LinuxWeb))
+		issues = append(
+			issues,
+			fmt.Sprintf(
+				"surface_scope is %q, want %s",
+				contract.SurfaceScope,
+				surface.ReleaseScopeSurfaceV1LinuxWeb,
+			),
+		)
 	}
 	if contract.ValidatorEnabled {
-		issues = append(issues, "stable Morph promotion validator must remain disabled until P20+ evidence exists")
+		issues = append(
+			issues,
+			"stable Morph promotion validator must remain disabled until P20+ evidence exists",
+		)
 	}
 	if !strings.Contains(strings.ToUpper(contract.DisabledUntil), "P20") {
 		issues = append(issues, "disabled_until must name P20+")
@@ -142,17 +220,28 @@ func validateMorphStableSchemas(schemas map[string]morphStableSchema) []string {
 			issues = append(issues, fmt.Sprintf("stable_schemas missing %s", name))
 			continue
 		}
-		if strings.TrimSpace(schema.Schema) == "" || !strings.HasPrefix(schema.Schema, "tetra.surface.morph.") {
+		if strings.TrimSpace(schema.Schema) == "" ||
+			!strings.HasPrefix(schema.Schema, "tetra.surface.morph.") {
 			issues = append(issues, fmt.Sprintf("stable_schemas.%s schema is invalid", name))
 		}
 		for _, field := range fields {
 			if !containsTextFold(schema.RequiredFields, field) {
-				issues = append(issues, fmt.Sprintf("stable_schemas.%s required_fields missing %s", name, field))
+				issues = append(
+					issues,
+					fmt.Sprintf("stable_schemas.%s required_fields missing %s", name, field),
+				)
 			}
 		}
 		for _, compat := range []string{"versioned_schema", "additive_fields_only"} {
 			if !containsTextFold(schema.BackwardCompatibility, compat) {
-				issues = append(issues, fmt.Sprintf("stable_schemas.%s backward_compatibility missing %s", name, compat))
+				issues = append(
+					issues,
+					fmt.Sprintf(
+						"stable_schemas.%s backward_compatibility missing %s",
+						name,
+						compat,
+					),
+				)
 			}
 		}
 	}
@@ -166,10 +255,16 @@ func validateMorphStableRecipeContract(contract morphStableRecipeContract) []str
 	}
 	for _, forbidden := range []string{"Button", "Card", "TextField", "TextBox", "Sidebar", "Modal"} {
 		if !containsTextFold(contract.ForbiddenOutputs, forbidden) {
-			issues = append(issues, fmt.Sprintf("recipe_contract forbidden_outputs missing %s", forbidden))
+			issues = append(
+				issues,
+				fmt.Sprintf("recipe_contract forbidden_outputs missing %s", forbidden),
+			)
 		}
 		if containsTextFold(contract.AllowedOutputs, forbidden) {
-			issues = append(issues, fmt.Sprintf("recipe_contract allowed_outputs must not include %s", forbidden))
+			issues = append(
+				issues,
+				fmt.Sprintf("recipe_contract allowed_outputs must not include %s", forbidden),
+			)
 		}
 	}
 	if !contract.RequiresExpandsToBlockGraph {
@@ -189,7 +284,13 @@ func validateMorphStableRecipeContract(contract morphStableRecipeContract) []str
 
 func validateMorphStablePromotionGates(gates []string) []string {
 	var issues []string
-	for _, gate := range []string{"validate-surface-morph-report", "validate-surface-claims", "visual regression gate", "target-host evidence"} {
+	for _, gate := range []string{
+		"validate-surface-morph-report",
+		"validate-surface-claims",
+		"visual regression gate",
+		"target-host evidence",
+		"renderer-owned stable proof",
+	} {
 		if !containsTextFold(gates, gate) {
 			issues = append(issues, fmt.Sprintf("promotion_gates missing %q", gate))
 		}
@@ -199,7 +300,13 @@ func validateMorphStablePromotionGates(gates []string) []string {
 
 func validateMorphStableNonClaims(nonclaims []string) []string {
 	var issues []string
-	for _, nonclaim := range []string{"not production Morph today", "no React runtime", "no Electron runtime", "no CSS cascade runtime", "no platform-native widgets"} {
+	for _, nonclaim := range []string{
+		"not production Morph today",
+		"no React runtime",
+		"no Electron runtime",
+		"no CSS cascade runtime",
+		"no platform-native widgets",
+	} {
 		if !containsTextFold(nonclaims, nonclaim) {
 			issues = append(issues, fmt.Sprintf("nonclaims missing %q", nonclaim))
 		}

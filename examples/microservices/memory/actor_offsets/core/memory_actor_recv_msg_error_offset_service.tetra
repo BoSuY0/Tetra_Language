@@ -1,0 +1,33 @@
+// Actor tagged receive error memory-offset microservice smoke.
+//
+// The service observes a tagged receive timeout and uses the direct result
+// error field as a byte offset before draining the delayed tagged reply.
+module examples.microservices.memory.actor_offsets.core.memory_actor_recv_msg_error_offset_service
+func delayed_sender() -> Int
+uses actors, runtime:
+    let _sleep: Int = core.sleep_ms(5)
+    let _sent: Int = core.send_msg(core.sender(), 4, 9)
+    return 0
+
+func main() -> Int
+uses actors, alloc, capability, mem, runtime:
+    let _actor: actor = core.spawn("delayed_sender")
+    let early: actor.recv_msg_result = core.recv_msg_until(core.deadline_ms(1))
+    if early.error != 2:
+        return 10 + early.error
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let base: ptr = core.alloc_bytes(4)
+        let cell: ptr = core.ptr_add(base, early.error, memory_cap)
+        let _write: u8 = core.store_u8(cell, 42, memory_cap)
+        let value: Int = core.load_u8(cell, memory_cap)
+        if value != 42:
+            return value
+    let final: actor.recv_msg_result = core.recv_msg_until(core.deadline_ms(10))
+    if final.error != 0:
+        return 20 + final.error
+    if final.value != 4:
+        return 30 + final.value
+    if final.tag != 9:
+        return 40 + final.tag
+    return 0

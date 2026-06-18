@@ -1,12 +1,41 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"os"
 	"strings"
 )
 
 type ownershipAuditOptions struct {
 	ExpectedStatus string
+}
+
+func main() {
+	auditPath := flag.String(
+		"audit",
+		"docs/release/production/ownership_production_audit.md",
+		"ownership production audit Markdown",
+	)
+	expectedStatus := flag.String(
+		"expected-status",
+		"not-achieved",
+		"expected audit status: not-achieved or achieved",
+	)
+	flag.Parse()
+
+	raw, err := os.ReadFile(*auditPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "validate-ownership-audit: read audit: %v\n", err)
+		os.Exit(2)
+	}
+	if err := validateOwnershipAudit(
+		raw,
+		ownershipAuditOptions{ExpectedStatus: *expectedStatus},
+	); err != nil {
+		fmt.Fprintf(os.Stderr, "validate-ownership-audit: %v\n", err)
+		os.Exit(1)
+	}
 }
 
 func validateOwnershipAudit(raw []byte, options ownershipAuditOptions) error {
@@ -48,7 +77,11 @@ func validateOwnershipAudit(raw []byte, options ownershipAuditOptions) error {
 		if err != nil {
 			return fmt.Errorf("missing work summary is required for not-achieved audit")
 		}
-		for _, phrase := range []string{"interprocedural lifetime", "alias/provenance", "heap/global/thread"} {
+		for _, phrase := range []string{
+			"interprocedural lifetime",
+			"alias/provenance",
+			"heap/global/thread",
+		} {
 			if !strings.Contains(strings.ToLower(summary), phrase) {
 				return fmt.Errorf("missing work summary does not mention %q", phrase)
 			}
@@ -65,7 +98,10 @@ func validateOwnershipAuditRows(rows []ownershipAuditRow, expectedStatus string)
 			return fmt.Errorf("checklist row has empty requirement")
 		}
 		if row.Artifact == "" {
-			return fmt.Errorf("checklist row %q has empty required artifact or command", row.Requirement)
+			return fmt.Errorf(
+				"checklist row %q has empty required artifact or command",
+				row.Requirement,
+			)
 		}
 		if row.Evidence == "" {
 			return fmt.Errorf("checklist row %q has empty current evidence", row.Requirement)
@@ -77,7 +113,11 @@ func validateOwnershipAuditRows(rows []ownershipAuditRow, expectedStatus string)
 		if classification != "pass" {
 			nonPassingRows++
 			if expectedStatus == "achieved" {
-				return fmt.Errorf("achieved audit has non-passing checklist row %q with result %q", row.Requirement, row.Result)
+				return fmt.Errorf(
+					"achieved audit has non-passing checklist row %q with result %q",
+					row.Requirement,
+					row.Result,
+				)
 			}
 		}
 		for _, phrase := range requiredOwnershipAuditEvidencePhrases[row.Requirement] {
@@ -127,7 +167,10 @@ func normalizeOwnershipAuditStatus(status string) string {
 }
 
 func containsOwnershipAuditPhrase(text, phrase string) bool {
-	return strings.Contains(normalizeOwnershipAuditPhraseText(text), normalizeOwnershipAuditPhraseText(phrase))
+	return strings.Contains(
+		normalizeOwnershipAuditPhraseText(text),
+		normalizeOwnershipAuditPhraseText(phrase),
+	)
 }
 
 func normalizeOwnershipAuditPhraseText(text string) string {

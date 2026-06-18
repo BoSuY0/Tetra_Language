@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -14,6 +16,8 @@ import (
 	"tetra_language/compiler"
 	"tetra_language/tools/validators/islandproof"
 )
+
+const maxMemoryFuzzShortJSONSchemaSniffBytes = 64 * 1024
 
 type memoryFuzzShortOptions struct {
 	Tier      string
@@ -77,9 +81,19 @@ type islandProofFuzzCaseResult struct {
 
 func main() {
 	var opt memoryFuzzShortOptions
-	flag.StringVar(&opt.Tier, "tier", "1", "memory fuzz tier to run; only Tier 1 short CI smoke is supported by this command")
+	flag.StringVar(
+		&opt.Tier,
+		"tier",
+		"1",
+		"memory fuzz tier to run; only Tier 1 short CI smoke is supported by this command",
+	)
 	flag.StringVar(&opt.ReportDir, "report-dir", "", "directory for memory fuzz short artifacts")
-	flag.StringVar(&opt.GitHead, "git-head", "", "optional git HEAD provenance to include in the oracle report")
+	flag.StringVar(
+		&opt.GitHead,
+		"git-head",
+		"",
+		"optional git HEAD provenance to include in the oracle report",
+	)
 	flag.Parse()
 	if err := runMemoryFuzzShort(opt); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -109,20 +123,15 @@ func runMemoryFuzzShort(opt memoryFuzzShortOptions) error {
 	if err := compiler.ValidateMemoryFuzzOracleReport(report); err != nil {
 		return err
 	}
-	raw, err := json.MarshalIndent(report, "", "  ")
-	if err != nil {
-		return err
-	}
 	reportPath := filepath.Join(opt.ReportDir, "memory-fuzz-oracle.json")
-	if err := os.WriteFile(reportPath, append(raw, '\n'), 0o644); err != nil {
+	if err := writeMemoryFuzzJSONFile(reportPath, report); err != nil {
 		return err
 	}
 	proofSummary, proofSummaryErr := buildIslandProofFuzzSummary()
-	proofSummaryRaw, err := json.MarshalIndent(proofSummary, "", "  ")
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(filepath.Join(opt.ReportDir, "island-proof-fuzz-summary.json"), append(proofSummaryRaw, '\n'), 0o644); err != nil {
+	if err := writeMemoryFuzzJSONFile(
+		filepath.Join(opt.ReportDir, "island-proof-fuzz-summary.json"),
+		proofSummary,
+	); err != nil {
 		return err
 	}
 	if proofSummaryErr != nil {
@@ -131,17 +140,34 @@ func runMemoryFuzzShort(opt memoryFuzzShortOptions) error {
 	if err := writeMemoryFuzzReproducerPlaceholders(opt.ReportDir); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(opt.ReportDir, "summary.md"), []byte(memoryFuzzShortSummary(report, reportPath, proofSummary)), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(opt.ReportDir, "summary.md"),
+		[]byte(memoryFuzzShortSummary(report, reportPath, proofSummary)),
+		0o644,
+	); err != nil {
 		return err
 	}
-	summaryJSON, err := json.MarshalIndent(memoryFuzzShortSummaryForJSON(opt.ReportDir, opt.GitHead), "", "  ")
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(filepath.Join(opt.ReportDir, "summary.json"), append(summaryJSON, '\n'), 0o644); err != nil {
+	if err := writeMemoryFuzzJSONFile(
+		filepath.Join(opt.ReportDir, "summary.json"),
+		memoryFuzzShortSummaryForJSON(opt.ReportDir, opt.GitHead),
+	); err != nil {
 		return err
 	}
 	return writeMemoryFuzzArtifactHashes(opt.ReportDir)
+}
+
+func writeMemoryFuzzJSONFile(path string, value any) error {
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	enc := json.NewEncoder(file)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(value); err != nil {
+		_ = file.Close()
+		return err
+	}
+	return file.Close()
 }
 
 func writeMemoryFuzzReproducerPlaceholders(reportDir string) error {
@@ -183,23 +209,50 @@ func checkMemoryFuzzShortReportDirFresh(reportDir string) error {
 		return err
 	}
 	if info.Mode()&os.ModeSymlink != 0 {
-		return fmt.Errorf("refusing to use symlink --report-dir %s; choose a real fresh --report-dir", reportDir)
+		return fmt.Errorf(
+			"refusing to use symlink --report-dir %s; choose a real fresh --report-dir",
+			reportDir,
+		)
 	}
 	if !info.IsDir() {
-		return fmt.Errorf("refusing to use non-directory --report-dir %s; choose a fresh --report-dir directory", reportDir)
+		return fmt.Errorf(
+			"refusing to use non-directory --report-dir %s; choose a fresh --report-dir directory",
+			reportDir,
+		)
 	}
 	entries, err := os.ReadDir(reportDir)
 	if err != nil {
 		return err
 	}
 	if len(entries) > 0 {
-		return fmt.Errorf("refusing to reuse non-empty --report-dir %s; choose a fresh --report-dir so stale fuzz artifacts cannot be reused", reportDir)
+		return fmt.Errorf(
+			("refusing to reuse non-empty --report-dir %s; choose a fresh --" +
+				"report-dir so stale fuzz artifacts cannot be reused"),
+			reportDir,
+		)
 	}
 	return nil
 }
 
-func memoryFuzzShortSummary(report compiler.MemoryFuzzOracleReport, reportPath string, proofSummary islandProofFuzzSummaryJSON) string {
-	return fmt.Sprintf("# Memory Fuzz Short Summary\n\n- schema: `%s`\n- scope: `%s`\n- tier: `Tier 1 short CI smoke`\n- report: `%s`\n- summary_json: `summary.json`\n- island_proof_fuzz_summary: `island-proof-fuzz-summary.json`\n- validator: `go run ./tools/cmd/validate-memory-fuzz-oracle --report %s --artifact-dir %s`\n- oracle_categories: `%d`\n- release_evidence_requirements: `%d` (`MEM-FUZZ-001`..`MEM-FUZZ-005`)\n- deterministic_slice_coverage: `%d` (`v0-v11`)\n- tier1_short_ci_smoke_cases: `%d`\n- island_proof_mutations_rejected: `%d/%d`\n\n", report.SchemaVersion, report.Scope, filepath.ToSlash(reportPath), filepath.ToSlash(reportPath), filepath.ToSlash(filepath.Dir(reportPath)), len(report.Rows), len(report.Requirements), len(report.SliceCoverage), report.Tier1ShortCISmokeCases, proofSummary.Rejected, proofSummary.Total)
+func memoryFuzzShortSummary(
+	report compiler.MemoryFuzzOracleReport,
+	reportPath string,
+	proofSummary islandProofFuzzSummaryJSON,
+) string {
+	return fmt.Sprintf(
+		"# Memory Fuzz Short Summary\n\n- schema: `%s`\n- scope: `%s`\n- tier: `Tier 1 short CI smoke`\n- report: `%s`\n- summary_json: `summary.json`\n- island_proof_fuzz_summary: `island-proof-fuzz-summary.json`\n- validator: `go run ./tools/cmd/validate-memory-fuzz-oracle --report %s --artifact-dir %s`\n- oracle_categories: `%d`\n- release_evidence_requirements: `%d` (`MEM-FUZZ-001`..`MEM-FUZZ-005`)\n- deterministic_slice_coverage: `%d` (`v0-v11`)\n- tier1_short_ci_smoke_cases: `%d`\n- island_proof_mutations_rejected: `%d/%d`\n\n",
+		report.SchemaVersion,
+		report.Scope,
+		filepath.ToSlash(reportPath),
+		filepath.ToSlash(reportPath),
+		filepath.ToSlash(filepath.Dir(reportPath)),
+		len(report.Rows),
+		len(report.Requirements),
+		len(report.SliceCoverage),
+		report.Tier1ShortCISmokeCases,
+		proofSummary.Rejected,
+		proofSummary.Total,
+	)
 }
 
 func memoryFuzzShortSummaryForJSON(reportDir string, gitHead string) memoryFuzzShortSummaryJSON {
@@ -243,7 +296,8 @@ func memoryFuzzShortSummaryForJSON(reportDir string, gitHead string) memoryFuzzS
 		},
 		Policies: []string{
 			"Tier 1 deterministic smoke writes report, markdown summary, and machine-readable summary",
-			"Tier 2 nightly seed triage and minimized repro policy remains boundary-recorded in the oracle report",
+			("Tier 2 nightly seed triage and minimized repro policy remains " +
+				"boundary-recorded in the oracle report"),
 			"Tier 3 release-blocking focused memory fuzz blocks promotion until failures are classified",
 		},
 		NonClaims: []string{
@@ -266,14 +320,13 @@ func writeMemoryFuzzArtifactHashes(reportDir string) error {
 	if err != nil {
 		return err
 	}
-	raw, err := json.MarshalIndent(manifest, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(filepath.Join(reportDir, "artifact-hashes.json"), append(raw, '\n'), 0o644)
+	return writeMemoryFuzzJSONFile(filepath.Join(reportDir, "artifact-hashes.json"), manifest)
 }
 
-func buildMemoryFuzzArtifactHashManifest(reportDir string, manifestName string) (memoryFuzzArtifactHashManifest, error) {
+func buildMemoryFuzzArtifactHashManifest(
+	reportDir string,
+	manifestName string,
+) (memoryFuzzArtifactHashManifest, error) {
 	var artifacts []memoryFuzzHashedArtifact
 	err := filepath.WalkDir(reportDir, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
@@ -318,36 +371,165 @@ func hashMemoryFuzzArtifact(reportDir string, rel string) (memoryFuzzHashedArtif
 		return memoryFuzzHashedArtifact{}, err
 	}
 	if info.Mode()&os.ModeSymlink != 0 {
-		return memoryFuzzHashedArtifact{}, fmt.Errorf("memory fuzz artifact %s must not be a symlink", rel)
+		return memoryFuzzHashedArtifact{}, fmt.Errorf(
+			"memory fuzz artifact %s must not be a symlink",
+			rel,
+		)
 	}
 	if !info.Mode().IsRegular() {
-		return memoryFuzzHashedArtifact{}, fmt.Errorf("memory fuzz artifact %s must be a regular file", rel)
+		return memoryFuzzHashedArtifact{}, fmt.Errorf(
+			"memory fuzz artifact %s must be a regular file",
+			rel,
+		)
 	}
-	raw, err := os.ReadFile(path)
+	file, err := os.Open(path)
 	if err != nil {
 		return memoryFuzzHashedArtifact{}, err
 	}
-	sum := sha256.Sum256(raw)
+	defer file.Close()
+	h := sha256.New()
+	prefix := newMemoryFuzzShortSchemaSniffPrefix(maxMemoryFuzzShortJSONSchemaSniffBytes)
+	size, err := io.Copy(io.MultiWriter(h, prefix), file)
+	if err != nil {
+		return memoryFuzzHashedArtifact{}, err
+	}
 	return memoryFuzzHashedArtifact{
 		Path:   filepath.ToSlash(rel),
-		SHA256: "sha256:" + hex.EncodeToString(sum[:]),
-		Size:   int64(len(raw)),
-		Schema: detectMemoryFuzzJSONSchema(raw),
+		SHA256: "sha256:" + hex.EncodeToString(h.Sum(nil)),
+		Size:   size,
+		Schema: detectMemoryFuzzJSONSchemaFromPrefix(
+			path,
+			prefix.Bytes(),
+			size > int64(prefix.Len()),
+		),
 	}, nil
 }
 
-func detectMemoryFuzzJSONSchema(raw []byte) string {
-	var envelope struct {
-		Schema        string `json:"schema"`
-		SchemaVersion string `json:"schema_version"`
-	}
-	if err := json.Unmarshal(raw, &envelope); err != nil {
+func detectMemoryFuzzJSONSchemaFromPrefix(path string, prefix []byte, truncated bool) string {
+	if filepath.Ext(path) != ".json" {
 		return ""
 	}
-	if envelope.Schema != "" {
-		return envelope.Schema
+	return detectMemoryFuzzJSONSchemaPrefix(prefix, truncated)
+}
+
+func detectMemoryFuzzJSONSchemaPrefix(prefix []byte, truncated bool) string {
+	dec := json.NewDecoder(bytes.NewReader(prefix))
+	token, err := dec.Token()
+	if err != nil {
+		return memoryFuzzShortSchemaSniffAfterError("", truncated)
 	}
-	return envelope.SchemaVersion
+	delim, ok := token.(json.Delim)
+	if !ok || delim != '{' {
+		return ""
+	}
+	var schema string
+	var schemaVersion string
+	for dec.More() {
+		token, err := dec.Token()
+		if err != nil {
+			return memoryFuzzShortSchemaSniffAfterError(schema, truncated)
+		}
+		key, ok := token.(string)
+		if !ok {
+			return ""
+		}
+		if key == "schema" || key == "schema_version" {
+			var raw json.RawMessage
+			if err := dec.Decode(&raw); err != nil {
+				return memoryFuzzShortSchemaSniffAfterError(schema, truncated)
+			}
+			value, ok, invalid := memoryFuzzShortSchemaSniffStringValue(raw)
+			if invalid {
+				return ""
+			}
+			if key == "schema" {
+				if ok {
+					schema = value
+				}
+			} else if ok {
+				schemaVersion = value
+			}
+			continue
+		}
+		var discard json.RawMessage
+		if err := dec.Decode(&discard); err != nil {
+			return memoryFuzzShortSchemaSniffAfterError(schema, truncated)
+		}
+	}
+	if _, err := dec.Token(); err != nil {
+		return memoryFuzzShortSchemaSniffAfterError(schema, truncated)
+	}
+	if truncated {
+		return ""
+	}
+	if err := memoryFuzzShortSchemaSniffRequireEOF(dec); err != nil {
+		return ""
+	}
+	return memoryFuzzShortSchemaSniffClosed(schema, schemaVersion)
+}
+
+type memoryFuzzShortSchemaSniffPrefix struct {
+	buf       bytes.Buffer
+	remaining int64
+}
+
+func newMemoryFuzzShortSchemaSniffPrefix(maxBytes int64) *memoryFuzzShortSchemaSniffPrefix {
+	return &memoryFuzzShortSchemaSniffPrefix{remaining: maxBytes}
+}
+
+func (w *memoryFuzzShortSchemaSniffPrefix) Write(p []byte) (int, error) {
+	if w.remaining > 0 {
+		n := len(p)
+		if int64(n) > w.remaining {
+			n = int(w.remaining)
+		}
+		_, _ = w.buf.Write(p[:n])
+		w.remaining -= int64(n)
+	}
+	return len(p), nil
+}
+
+func (w *memoryFuzzShortSchemaSniffPrefix) Bytes() []byte {
+	return w.buf.Bytes()
+}
+
+func (w *memoryFuzzShortSchemaSniffPrefix) Len() int {
+	return w.buf.Len()
+}
+
+func memoryFuzzShortSchemaSniffClosed(schema string, schemaVersion string) string {
+	if schema != "" {
+		return schema
+	}
+	return schemaVersion
+}
+
+func memoryFuzzShortSchemaSniffStringValue(raw json.RawMessage) (string, bool, bool) {
+	if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return "", false, false
+	}
+	var value string
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return "", false, true
+	}
+	return value, true, false
+}
+
+func memoryFuzzShortSchemaSniffRequireEOF(dec *json.Decoder) error {
+	if err := dec.Decode(&struct{}{}); err != io.EOF {
+		return fmt.Errorf("memory fuzz JSON schema sniff must contain a single JSON document")
+	}
+	return nil
+}
+
+func memoryFuzzShortSchemaSniffAfterError(schema string, truncated bool) string {
+	if !truncated {
+		return ""
+	}
+	if schema != "" {
+		return schema
+	}
+	return ""
 }
 
 func buildIslandProofFuzzSummary() (islandProofFuzzSummaryJSON, error) {
@@ -364,7 +546,10 @@ func buildIslandProofFuzzSummary() (islandProofFuzzSummaryJSON, error) {
 	}
 	var accepted []string
 	for _, tc := range cases {
-		err := islandproof.Validate([]byte(tc.proof), islandproof.Options{MemoryReport: []byte(tc.memory)})
+		err := islandproof.Validate(
+			[]byte(tc.proof),
+			islandproof.Options{MemoryReport: []byte(tc.memory)},
+		)
 		result := islandProofFuzzCaseResult{
 			Name:              tc.name,
 			Mutation:          tc.mutation,
@@ -389,7 +574,10 @@ func buildIslandProofFuzzSummary() (islandProofFuzzSummaryJSON, error) {
 	}
 	if len(accepted) > 0 {
 		summary.Status = "fail"
-		return summary, fmt.Errorf("island proof fuzz accepted or misclassified mutations: %s", strings.Join(accepted, ", "))
+		return summary, fmt.Errorf(
+			"island proof fuzz accepted or misclassified mutations: %s",
+			strings.Join(accepted, ", "),
+		)
 	}
 	return summary, nil
 }
@@ -423,51 +611,105 @@ func islandProofFuzzCases() []islandProofFuzzCase {
 		{
 			name:     "mismatched_island_id",
 			mutation: "proof island id differs from memory row",
-			proof:    strings.Replace(baseProof, `"island_id": "island:fuzz:0"`, `"island_id": "island:fuzz:other"`, 1),
-			memory:   baseMemory,
-			want:     "island_id mismatch",
+			proof: strings.Replace(
+				baseProof,
+				`"island_id": "island:fuzz:0"`,
+				`"island_id": "island:fuzz:other"`,
+				1,
+			),
+			memory: baseMemory,
+			want:   "island_id mismatch",
 		},
 		{
 			name:     "wrong_base_allocation",
 			mutation: "proof subject base differs from memory row",
-			proof:    strings.Replace(baseProof, `"subject_base_id": "alloc:fuzz:0"`, `"subject_base_id": "alloc:fuzz:other"`, 1),
-			memory:   baseMemory,
-			want:     "subject_base_id mismatch",
+			proof: strings.Replace(
+				baseProof,
+				`"subject_base_id": "alloc:fuzz:0"`,
+				`"subject_base_id": "alloc:fuzz:other"`,
+				1,
+			),
+			memory: baseMemory,
+			want:   "subject_base_id mismatch",
 		},
 		{
 			name:     "broken_dominance",
 			mutation: "bounds proof has no dominance evidence",
 			proof: strings.Replace(
 				strings.Replace(
-					strings.Replace(baseProof, `"operation": "island_borrow"`, `"operation": "bounds_check_removed"`, 1),
-					`"proof_kind": "island_epoch"`, `"proof_kind": "bounds_check"`, 1),
+					strings.Replace(
+						baseProof,
+						`"operation": "island_borrow"`,
+						`"operation": "bounds_check_removed"`,
+						1,
+					),
+					`"proof_kind": "island_epoch"`,
+					`"proof_kind": "bounds_check"`,
+					1,
+				),
 				`"dominance": "entry dominates island borrow"`, `"dominance": ""`, 1),
-			memory: strings.Replace(strings.Replace(baseMemory, `"proof_operation": "island_borrow"`, `"proof_operation": "bounds_check_removed"`, 1), `"proof_kind": "island_epoch"`, `"proof_kind": "bounds_check"`, 1),
-			want:   "dominance",
+			memory: strings.Replace(
+				strings.Replace(
+					baseMemory,
+					`"proof_operation": "island_borrow"`,
+					`"proof_operation": "bounds_check_removed"`,
+					1,
+				),
+				`"proof_kind": "island_epoch"`,
+				`"proof_kind": "bounds_check"`,
+				1,
+			),
+			want: "dominance",
 		},
 		{
 			name:     "missing_proof_id",
 			mutation: "proof id removed",
-			proof:    strings.Replace(baseProof, `"proof_id": "proof:fuzz:island:borrow:1"`, `"proof_id": ""`, 1),
-			memory:   baseMemory,
-			want:     "proof_id",
+			proof: strings.Replace(
+				baseProof,
+				`"proof_id": "proof:fuzz:island:borrow:1"`,
+				`"proof_id": ""`,
+				1,
+			),
+			memory: baseMemory,
+			want:   "proof_id",
 		},
 		{
 			name:     "wrong_operation",
 			mutation: "proof operation reused for another operation",
-			proof:    strings.Replace(baseProof, `"operation": "island_borrow"`, `"operation": "island_reset"`, 1),
-			memory:   baseMemory,
-			want:     "operation mismatch",
+			proof: strings.Replace(
+				baseProof,
+				`"operation": "island_borrow"`,
+				`"operation": "island_reset"`,
+				1,
+			),
+			memory: baseMemory,
+			want:   "operation mismatch",
 		},
 		{
 			name:     "unsafe_unknown_promotion",
 			mutation: "unsafe_unknown row claims verified island proof",
 			proof: strings.Replace(
-				strings.Replace(baseProof, `"provenance_class": "safe_known"`, `"provenance_class": "unsafe_unknown"`, 1),
-				`"unsafe_class": "safe"`, `"unsafe_class": "unsafe_unknown"`, 1),
+				strings.Replace(
+					baseProof,
+					`"provenance_class": "safe_known"`,
+					`"provenance_class": "unsafe_unknown"`,
+					1,
+				),
+				`"unsafe_class": "safe"`,
+				`"unsafe_class": "unsafe_unknown"`,
+				1,
+			),
 			memory: strings.Replace(
-				strings.Replace(baseMemory, `"provenance_class": "safe_known"`, `"provenance_class": "unsafe_unknown"`, 1),
-				`"unsafe_class": "safe"`, `"unsafe_class": "unsafe_unknown"`, 1),
+				strings.Replace(
+					baseMemory,
+					`"provenance_class": "safe_known"`,
+					`"provenance_class": "unsafe_unknown"`,
+					1,
+				),
+				`"unsafe_class": "safe"`,
+				`"unsafe_class": "unsafe_unknown"`,
+				1,
+			),
 			want: "unsafe_unknown",
 		},
 		{
@@ -475,21 +717,53 @@ func islandProofFuzzCases() []islandProofFuzzCase {
 			mutation: "noalias proof has only one live island",
 			proof: strings.Replace(
 				strings.Replace(
-					strings.Replace(baseProof, `"operation": "island_borrow"`, `"operation": "island_noalias"`, 1),
-					`"claim": "island_proof_verified"`, `"claim": "no_alias"`, 1),
-				`"distinct_live_islands": ["island:fuzz:0", "island:fuzz:1"]`, `"distinct_live_islands": ["island:fuzz:0"]`, 1),
-			memory: strings.Replace(baseMemory, `"proof_operation": "island_borrow"`, `"proof_operation": "island_noalias"`, 1),
-			want:   "distinct live islands",
+					strings.Replace(
+						baseProof,
+						`"operation": "island_borrow"`,
+						`"operation": "island_noalias"`,
+						1,
+					),
+					`"claim": "island_proof_verified"`,
+					`"claim": "no_alias"`,
+					1,
+				),
+				`"distinct_live_islands": ["island:fuzz:0", "island:fuzz:1"]`,
+				`"distinct_live_islands": ["island:fuzz:0"]`,
+				1,
+			),
+			memory: strings.Replace(
+				baseMemory,
+				`"proof_operation": "island_borrow"`,
+				`"proof_operation": "island_noalias"`,
+				1,
+			),
+			want: "distinct live islands",
 		},
 		{
 			name:     "storage_heap_fallback",
 			mutation: "explicit island storage proof falls back to heap",
 			proof: strings.Replace(
-				strings.Replace(baseProof, `"operation": "island_borrow"`, `"operation": "storage_lowering"`, 1),
-				`"actual_lowering_storage": "ExplicitIsland"`, `"actual_lowering_storage": "Heap"`, 1),
+				strings.Replace(
+					baseProof,
+					`"operation": "island_borrow"`,
+					`"operation": "storage_lowering"`,
+					1,
+				),
+				`"actual_lowering_storage": "ExplicitIsland"`,
+				`"actual_lowering_storage": "Heap"`,
+				1,
+			),
 			memory: strings.Replace(
-				strings.Replace(baseMemory, `"proof_operation": "island_borrow"`, `"proof_operation": "storage_lowering"`, 1),
-				`"actual_lowering_storage": "ExplicitIsland"`, `"actual_lowering_storage": "Heap"`, 1),
+				strings.Replace(
+					baseMemory,
+					`"proof_operation": "island_borrow"`,
+					`"proof_operation": "storage_lowering"`,
+					1,
+				),
+				`"actual_lowering_storage": "ExplicitIsland"`,
+				`"actual_lowering_storage": "Heap"`,
+				1,
+			),
 			want: "actual_lowering_storage",
 		},
 		{
@@ -499,8 +773,16 @@ func islandProofFuzzCases() []islandProofFuzzCase {
 			memory: strings.Replace(
 				strings.Replace(
 					strings.Replace(
-						strings.Replace(baseMemory, `"proof_id": "proof:fuzz:island:borrow:1"`, `"proof_id": ""`, 1),
-						`"proof_kind": "island_epoch"`, `"proof_kind": ""`, 1),
+						strings.Replace(
+							baseMemory,
+							`"proof_id": "proof:fuzz:island:borrow:1"`,
+							`"proof_id": ""`,
+							1,
+						),
+						`"proof_kind": "island_epoch"`,
+						`"proof_kind": ""`,
+						1,
+					),
 					`"proof_subject_base_id": "alloc:fuzz:0"`, `"proof_subject_base_id": ""`, 1),
 				`"proof_operation": "island_borrow"`, `"proof_operation": ""`, 1),
 			want: "lost proof metadata",

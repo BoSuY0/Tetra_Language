@@ -8,7 +8,9 @@
 
 ## 1. Overview
 
-**Islands** are Tetra's primary memory management abstraction. An island is a contiguous region of memory that acts as an arena/bump allocator. All allocations within an island are fast (pointer bump), and the entire island is freed as a single unit.
+**Islands** are Tetra's primary memory management abstraction. An island is a contiguous region of
+memory that acts as an arena/bump allocator. All allocations within an island are fast (pointer
+bump), and the entire island is freed as a single unit.
 
 Target boundary (current profile):
 - Island runtime paths are in the current native runtime scope.
@@ -26,9 +28,12 @@ Target boundary (current profile):
 
 ### Safety Guarantees (MVP)
 
-- Attempting to allocate more than the island's remaining capacity causes a controlled program exit (exit code 1)
-- **Double-free is undefined behavior** by default (the memory is already deallocated, so accessing the header is invalid)
-- With `--islands-debug`, double-free is detected and the data pages are protected to catch use-after-free
+- Attempting to allocate more than the island's remaining capacity causes a controlled program exit
+  (exit code 1)
+- **Double-free is undefined behavior** by default (the memory is already deallocated, so accessing
+  the header is invalid)
+- With `--islands-debug`, double-free is detected and the data pages are protected to catch
+  use-after-free
 
 ### Release Evidence Boundary
 
@@ -124,7 +129,8 @@ Allocates a `[]u8` slice of `len` bytes within the given island.
 - If `bump + len > end`: exit(1) — allocation failure
 - Returns slice `{ptr: base + old_bump, len: len}`
 - Updates `bump = bump + len`
-- In safe code, `isl` must be a tracked region (scoped island or a region-carrying parameter); otherwise this call requires `unsafe`.
+- In safe code, `isl` must be a tracked region (scoped island or a region-carrying parameter);
+  otherwise this call requires `unsafe`.
 
 **Example:**
 ```tetra pseudocode
@@ -137,7 +143,8 @@ Allocates a `[]i32` slice of `len` elements within the given island.
 
 **Semantics:**
 - Same as `island_make_u8`, but required bytes = `len * 4`
-- In safe code, `isl` must be a tracked region (scoped island or a region-carrying parameter); otherwise this call requires `unsafe`.
+- In safe code, `isl` must be a tracked region (scoped island or a region-carrying parameter);
+  otherwise this call requires `unsafe`.
 
 **Example:**
 ```tetra pseudocode
@@ -150,7 +157,8 @@ Allocates a `[]u16` slice of `len` elements within the given island.
 
 **Semantics:**
 - Same as `island_make_u8`, but required bytes = `len * 2`
-- In safe code, `isl` must be a tracked region (scoped island or a region-carrying parameter); otherwise this call requires `unsafe`.
+- In safe code, `isl` must be a tracked region (scoped island or a region-carrying parameter);
+  otherwise this call requires `unsafe`.
 
 **Example:**
 ```tetra pseudocode
@@ -165,7 +173,8 @@ Allocates a `[]bool` slice of `len` elements within the given island.
 - Same region/ownership safety contract as `island_make_u8`
 - Current MVP lowering uses the same i32-width allocation layout as `[]i32`
   (required bytes = `len * 4`)
-- In safe code, `isl` must be a tracked region (scoped island or a region-carrying parameter); otherwise this call requires `unsafe`.
+- In safe code, `isl` must be a tracked region (scoped island or a region-carrying parameter);
+  otherwise this call requires `unsafe`.
 
 **Example:**
 ```tetra pseudocode
@@ -202,13 +211,18 @@ Region typing prevents slices from scoped islands escaping their scope.
   - returned from the function,
   - assigned to a variable in an outer scope.
 - `island` handles bound by `island(size) as ...` also cannot escape their scope.
-- Region info propagates through struct literals and field access for fields that can contain regions (slices, islands, or structs/arrays containing them).
-- Region info propagates through function calls when the return is tied to a single region-carrying parameter.
-- After `if`/`while`, a variable assigned from different regions becomes ambiguous and must be reassigned before use (the compiler reports an “ambiguous region after control-flow merge” error).
+- Region info propagates through struct literals and field access for fields that can contain
+  regions (slices, islands, or structs/arrays containing them).
+- Region info propagates through function calls when the return is tied to a single region-carrying
+  parameter.
+- After `if`/`while`, a variable assigned from different regions becomes ambiguous and must be
+  reassigned before use (the compiler reports an “ambiguous region after control-flow merge” error).
 
 **Known limitations (MVP):**
-- Interprocedural propagation is limited to returns derived from a single region-carrying parameter; mixing regions is rejected.
-- Region tracking is still conservative across complex control flow and does not use SSA/phi-based inference.
+- Interprocedural propagation is limited to returns derived from a single region-carrying parameter;
+  mixing regions is rejected.
+- Region tracking is still conservative across complex control flow and does not use SSA/phi-based
+  inference.
 
 ---
 
@@ -219,7 +233,8 @@ free(<expr>)
 ```
 
 Frees the entire island. The expression must evaluate to type `island`.
-Manual `free` is only allowed inside `unsafe` blocks. Scoped islands inject an implicit free on exit.
+Manual `free` is only allowed inside `unsafe` blocks. Scoped islands inject an implicit free on
+exit.
 
 **Semantics:**
 1. Read `total` from header at offset 8
@@ -227,7 +242,8 @@ Manual `free` is only allowed inside `unsafe` blocks. Scoped islands inject an i
    - **Linux/macOS**: `munmap(base, total)`
    - **Windows**: `VirtualFree(base, 0, MEM_RELEASE)`
 
-> **Warning:** Double-free is **undefined behavior** by default. After `free(isl)`, the island's memory is returned to the OS and any access (including another `free`) may crash or corrupt memory.
+> **Warning:** Double-free is **undefined behavior** by default. After `free(isl)`, the island's
+memory is returned to the OS and any access (including another `free`) may crash or corrupt memory.
 >
 > **Debug mode (`--islands-debug`):** The runtime keeps the mapping, sets `flags |= 1`, and protects data pages. A second `free` triggers a controlled exit (exit code 2), and use-after-free faults on protected pages.
 

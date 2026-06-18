@@ -6,7 +6,7 @@ signoff_path=""
 template_path=""
 
 usage() {
-  cat <<'USAGE'
+  cat << 'USAGE'
 Usage:
   bash scripts/release/v0_4_0/security-review.sh --signoff PATH
   bash scripts/release/v0_4_0/security-review.sh --write-template PATH
@@ -24,7 +24,7 @@ current_release_version() {
     version="$(sed -nE 's/^const CompilerVersion = "([^"]+)"/\1/p' compiler/internal/version/version.go | head -n 1)"
   fi
   if [[ -z "$version" && -x ./tetra ]]; then
-    version="$(./tetra version 2>/dev/null || true)"
+    version="$(./tetra version 2> /dev/null || true)"
   fi
   if [[ -z "$version" ]]; then
     echo "release_v0_4_0_security_review: cannot determine current release version" >&2
@@ -47,7 +47,7 @@ while [[ $# -gt 0 ]]; do
       template_path="${2:-}"
       shift 2
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;
@@ -66,7 +66,7 @@ fi
 
 if [[ -n "$template_path" ]]; then
   mkdir -p "$(dirname "$template_path")"
-  cat >"$template_path" <<'TEMPLATE'
+  cat > "$template_path" << 'TEMPLATE'
 # v0.4.0 Security Review Signoff
 
 Reviewer: <name and contact>
@@ -76,7 +76,7 @@ Decision: <approved for v0.4.0 release | blocked>
 
 ## Evidence Commands
 
-- `go run ./tools/cmd/validate-v0-4-readiness --features <features.json> --targets <targets.json> --manifest docs/generated/manifest.json --scope-decisions docs/release/v0_4_0_scope_decisions.json`: <pass/fail, date, log path>
+- `go run ./tools/cmd/validate-v0-4-readiness --features <features.json> --targets <targets.json> --manifest docs/generated/manifest.json --scope-decisions docs/release/v0_4/data/v0_4_0_scope_decisions.json`: <pass/fail, date, log path>
 - `go test ./compiler/... ./cli/... ./tools/... -count=1`: <pass/fail, date, log path>
 - `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`: <pass/fail, date, log path>
 - `go run ./cli/cmd/tetra smoke --target linux-x64 --run=true --report reports/v0.4.0/linux-host-smoke.json`: <pass/fail, date, log path>
@@ -150,14 +150,13 @@ require_line '^## Artifact Hashes$' 'Artifact Hashes section'
 require_line '^## Residual Risks$' 'Residual Risks section'
 
 for command in \
-  'go run ./tools/cmd/validate-v0-4-readiness --features <features.json> --targets <targets.json> --manifest docs/generated/manifest.json --scope-decisions docs/release/v0_4_0_scope_decisions.json' \
+  'go run ./tools/cmd/validate-v0-4-readiness --features <features.json> --targets <targets.json> --manifest docs/generated/manifest.json --scope-decisions docs/release/v0_4/data/v0_4_0_scope_decisions.json' \
   'go test ./compiler/... ./cli/... ./tools/... -count=1' \
   'go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json' \
   'go run ./cli/cmd/tetra smoke --target linux-x64 --run=true --report reports/v0.4.0/linux-host-smoke.json' \
   'bash scripts/release/v0_4_0/distributed-actors-linux-x64-smoke.sh --report-dir reports/v0.4.0' \
   'bash scripts/release/v0_4_0/native-ui-linux-x64-smoke.sh --report-dir reports/v0.4.0' \
-  'git diff --check'
-do
+  'git diff --check'; do
   if [[ "$text" != *"\`$command\`: pass"* ]]; then
     echo "release_v0_4_0_security_review: missing passing evidence command: $command" >&2
     exit 1
@@ -170,8 +169,7 @@ for area in \
   'UI event dispatch and command execution: approved' \
   'distributed actors, scheduling, cancellation, and failure modes: approved' \
   'artifact hashes and release-state integrity: approved' \
-  'excluded EcoNet/WASI/Web/Windows/macOS boundaries are not part of this v0.4.0 production signoff: approved'
-do
+  'excluded EcoNet/WASI/Web/Windows/macOS boundaries are not part of this v0.4.0 production signoff: approved'; do
   if [[ "$text" != *"$area"* ]]; then
     echo "release_v0_4_0_security_review: missing approved security area: $area" >&2
     exit 1

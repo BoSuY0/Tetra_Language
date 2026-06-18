@@ -1,0 +1,70 @@
+// Backend HTTP/JSON pipeline gateway microservice smoke.
+module examples.microservices.backend.http.writer.backend_http_pipeline_gateway_service
+import lib.core.http as http
+import lib.core.json as json
+
+func require_route(buffer: []u8, start: Int, length: Int, expected: Int, expected_keep_alive: Bool) -> Bool
+uses mem:
+    if http.request_head_len_bytes_at(buffer, start, length) != length:
+        return false
+    if http.route_tech_empower_bytes_at(buffer, start, length) != expected:
+        return false
+    if http.request_keep_alive_bytes_at(buffer, start, length) != expected_keep_alive:
+        return false
+    return true
+
+func main() -> Int
+uses alloc, mem:
+    let date: String = "Mon, 01 Jan 2024 00:00:00 GMT"
+    var requests: []u8 = core.make_u8(512)
+    var pos: Int = 0
+    let plaintext_start: Int = pos
+    pos = http.write_ascii_at(requests, pos, "GET /plaintext HTTP/1.1\r\nHost: localhost\r\n\r\n")
+    let plaintext_len: Int = pos - plaintext_start
+    let json_start: Int = pos
+    pos = http.write_ascii_at(requests, pos, "GET /json HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+    let json_len: Int = pos - json_start
+    let db_start: Int = pos
+    pos = http.write_ascii_at(requests, pos, "GET /db HTTP/1.1\r\nHost: localhost\r\n\r\n")
+    let db_len: Int = pos - db_start
+    let queries_start: Int = pos
+    pos = http.write_ascii_at(requests, pos, "GET /queries?queries=17 HTTP/1.1\r\nHost: localhost\r\n\r\n")
+    let queries_len: Int = pos - queries_start
+    let updates_start: Int = pos
+    pos = http.write_ascii_at(requests, pos, "GET /updates?queries=3 HTTP/1.1\r\nHost: localhost\r\n\r\n")
+    let updates_len: Int = pos - updates_start
+    let fortunes_start: Int = pos
+    pos = http.write_ascii_at(requests, pos, "GET /fortunes HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+    let fortunes_len: Int = pos - fortunes_start
+    if !require_route(requests, plaintext_start, plaintext_len, http.route_plaintext(), true):
+        return 1
+    if !require_route(requests, json_start, json_len, http.route_json(), false):
+        return 2
+    if !require_route(requests, db_start, db_len, http.route_db(), true):
+        return 3
+    if !require_route(requests, queries_start, queries_len, http.route_queries(), true):
+        return 4
+    if !require_route(requests, updates_start, updates_len, http.route_updates(), true):
+        return 5
+    if !require_route(requests, fortunes_start, fortunes_len, http.route_fortunes(), false):
+        return 6
+    let missing: Int = http.route_tech_empower("GET /missing HTTP/1.1\r\nHost: localhost\r\n\r\n")
+    let malformed: Int = http.route_tech_empower("POST /json HTTP/1.1\r\nHost: localhost\r\n\r\n")
+    if missing != http.route_not_found() || malformed != http.route_bad_request():
+        return 7
+    var plain: []u8 = core.make_u8(http.plaintext_response_len("Tetra", date, true))
+    let plain_written: Int = http.write_plaintext_response(plain, "Tetra", date, true)
+    if plain_written != http.plaintext_response_len("Tetra", date, true):
+        return 8
+    if plain[0] != 72 || plain[9] != 50 || plain[plain_written - 1] != 33:
+        return 9
+    var json_buf: []u8 = core.make_u8(http.json_message_response_len("Tetra", date, "Hello, World!", false))
+    let json_written: Int = http.write_json_message_response(json_buf, "Tetra", date, "Hello, World!", false)
+    let json_body_start: Int = json_written - json.message_object_len("Hello, World!")
+    if json_written != http.json_message_response_len("Tetra", date, "Hello, World!", false):
+        return 10
+    if json_buf[json_body_start] != 123 || json_buf[json_written - 1] != 125:
+        return 11
+    if json.encoded_string_len("api\n\"edge") != 13:
+        return 12
+    return 0

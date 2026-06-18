@@ -19,10 +19,26 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	proofPath := fs.String("proof", "", "path to tetra.island.proof.v1 JSON proof artifact")
 	memoryReportPath := fs.String("memory-report", "", "path to tetra.memory-report.v1 JSON report")
-	currentGitHead := fs.String("current-git-head", "", "current git commit for --require-same-commit")
-	requireSameCommit := fs.Bool("require-same-commit", false, "require proof git_head to match --current-git-head")
-	_ = fs.String("plir", "", "optional PLIR artifact path; reserved for proof-carrying IR validation")
-	manifestPath := fs.String("manifest", "", "optional release manifest path for proof artifact command metadata validation")
+	currentGitHead := fs.String(
+		"current-git-head",
+		"",
+		"current git commit for --require-same-commit",
+	)
+	requireSameCommit := fs.Bool(
+		"require-same-commit",
+		false,
+		"require proof git_head to match --current-git-head",
+	)
+	_ = fs.String(
+		"plir",
+		"",
+		"optional PLIR artifact path; reserved for proof-carrying IR validation",
+	)
+	manifestPath := fs.String(
+		"manifest",
+		"",
+		"optional release manifest path for proof artifact command metadata validation",
+	)
 	_ = fs.String("report-dir", "", "optional report directory; reserved for release integration")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {

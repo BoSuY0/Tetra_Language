@@ -21,7 +21,12 @@ func TestValidateMemoryReportAcceptsSchemaV1(t *testing.T) {
 
 func TestValidateMemoryReportRejectsValidatedClaimWithoutFact(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory-report.json")
-	raw := strings.Replace(validSchemaV1MemoryReport(), `"source_fact_id": "fact:raw:root"`, `"source_fact_id": ""`, 1)
+	raw := strings.Replace(
+		validSchemaV1MemoryReport(),
+		`"source_fact_id": "fact:raw:root"`,
+		`"source_fact_id": ""`,
+		1,
+	)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +38,12 @@ func TestValidateMemoryReportRejectsValidatedClaimWithoutFact(t *testing.T) {
 
 func TestValidateMemoryReportRejectsStorageClaimWithoutArtifact(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory-report.json")
-	raw := strings.Replace(validSchemaV1MemoryReport(), `"lowered_artifact_id": "ir:main:alloc_bytes:0"`, `"lowered_artifact_id": ""`, 1)
+	raw := strings.Replace(
+		validSchemaV1MemoryReport(),
+		`"lowered_artifact_id": "ir:main:alloc_bytes:0"`,
+		`"lowered_artifact_id": ""`,
+		1,
+	)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +56,12 @@ func TestValidateMemoryReportRejectsStorageClaimWithoutArtifact(t *testing.T) {
 func TestValidateMemoryReportWithAllocReportRejectsFakeLoweredArtifactID(t *testing.T) {
 	dir := t.TempDir()
 	reportPath := filepath.Join(dir, "memory-report.json")
-	raw := strings.Replace(validSchemaV1MemoryReport(), `"lowered_artifact_id": "ir:main:alloc_bytes:0"`, `"lowered_artifact_id": "ir:main:missing:Heap"`, 1)
+	raw := strings.Replace(
+		validSchemaV1MemoryReport(),
+		`"lowered_artifact_id": "ir:main:alloc_bytes:0"`,
+		`"lowered_artifact_id": "ir:main:missing:Heap"`,
+		1,
+	)
 	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -56,15 +71,24 @@ func TestValidateMemoryReportWithAllocReportRejectsFakeLoweredArtifactID(t *test
 	}
 
 	err := validateMemoryReportWithAllocReport(reportPath, allocPath)
-	if err == nil || !strings.Contains(err.Error(), "lowered_artifact_id") || !strings.Contains(err.Error(), "allocation report") {
-		t.Fatalf("validateMemoryReportWithAllocReport error = %v, want fake lowered_artifact_id rejection", err)
+	if err == nil || !strings.Contains(err.Error(), "lowered_artifact_id") ||
+		!strings.Contains(err.Error(), "allocation report") {
+		t.Fatalf(
+			"validateMemoryReportWithAllocReport error = %v, want fake lowered_artifact_id rejection",
+			err,
+		)
 	}
 }
 
 func TestValidateMemoryReportWithAllocReportAcceptsMatchingLoweredArtifactID(t *testing.T) {
 	dir := t.TempDir()
 	reportPath := filepath.Join(dir, "memory-report.json")
-	raw := strings.Replace(validSchemaV1MemoryReport(), `"lowered_artifact_id": "ir:main:alloc_bytes:0"`, `"lowered_artifact_id": "ir:main:alloc_bytes:0:Heap"`, 1)
+	raw := strings.Replace(
+		validSchemaV1MemoryReport(),
+		`"lowered_artifact_id": "ir:main:alloc_bytes:0"`,
+		`"lowered_artifact_id": "ir:main:alloc_bytes:0:Heap"`,
+		1,
+	)
 	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -78,10 +102,88 @@ func TestValidateMemoryReportWithAllocReportAcceptsMatchingLoweredArtifactID(t *
 	}
 }
 
+func TestValidateMemoryReportWithAllocReportAcceptsDomainMetadata(t *testing.T) {
+	dir := t.TempDir()
+	reportPath := filepath.Join(dir, "memory-report.json")
+	raw := strings.Replace(
+		validSchemaV1MemoryReport(),
+		`"lowered_artifact_id": "ir:main:alloc_bytes:0"`,
+		`"lowered_artifact_id": "ir:main:alloc_bytes:0:Heap"`,
+		1,
+	)
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	allocReport := strings.Replace(
+		validSchemaV2AllocationReport(),
+		`"reason": "fixture allocation report row"`,
+		`"reason": "fixture allocation report row",
+          "domain": {
+            "domain_id": "domain:process",
+            "kind": "process",
+            "owner_kind": "process",
+            "owner_id": "current",
+            "lifetime": "process",
+            "requested_bytes": 17,
+            "reserved_bytes": 32
+          }`,
+		1,
+	)
+	allocPath := filepath.Join(dir, "alloc-report.json")
+	if err := os.WriteFile(allocPath, []byte(allocReport), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := validateMemoryReportWithAllocReport(reportPath, allocPath); err != nil {
+		t.Fatalf("validateMemoryReportWithAllocReport rejected allocation domain metadata: %v", err)
+	}
+}
+
+func TestValidateMemoryReportWithAllocReportRejectsInvalidDomainMetadata(t *testing.T) {
+	dir := t.TempDir()
+	reportPath := filepath.Join(dir, "memory-report.json")
+	raw := strings.Replace(
+		validSchemaV1MemoryReport(),
+		`"lowered_artifact_id": "ir:main:alloc_bytes:0"`,
+		`"lowered_artifact_id": "ir:main:alloc_bytes:0:Heap"`,
+		1,
+	)
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	allocReport := strings.Replace(
+		validSchemaV2AllocationReport(),
+		`"reason": "fixture allocation report row"`,
+		`"reason": "fixture allocation report row",
+          "domain": {
+            "domain_id": "domain:process",
+            "kind": "mystery",
+            "owner_kind": "process",
+            "owner_id": "current",
+            "lifetime": "process"
+          }`,
+		1,
+	)
+	allocPath := filepath.Join(dir, "alloc-report.json")
+	if err := os.WriteFile(allocPath, []byte(allocReport), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err := validateMemoryReportWithAllocReport(reportPath, allocPath)
+	if err == nil || !strings.Contains(err.Error(), "unknown domain kind") {
+		t.Fatalf("validateMemoryReportWithAllocReport error = %v, want domain kind rejection", err)
+	}
+}
+
 func TestValidateMemoryReportWithAllocReportRejectsMissingAllocationLengthContract(t *testing.T) {
 	dir := t.TempDir()
 	reportPath := filepath.Join(dir, "memory-report.json")
-	raw := strings.Replace(validSchemaV1MemoryReport(), `"lowered_artifact_id": "ir:main:alloc_bytes:0"`, `"lowered_artifact_id": "ir:main:alloc_bytes:0:Heap"`, 1)
+	raw := strings.Replace(
+		validSchemaV1MemoryReport(),
+		`"lowered_artifact_id": "ir:main:alloc_bytes:0"`,
+		`"lowered_artifact_id": "ir:main:alloc_bytes:0:Heap"`,
+		1,
+	)
 	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -101,14 +203,51 @@ func TestValidateMemoryReportWithAllocReportRejectsMissingAllocationLengthContra
 	}
 
 	err := validateMemoryReportWithAllocReport(reportPath, allocPath)
-	if err == nil || !strings.Contains(err.Error(), "length_status") || !strings.Contains(err.Error(), "zero_guard_status") {
-		t.Fatalf("validateMemoryReportWithAllocReport error = %v, want allocation length contract rejection", err)
+	if err == nil || !strings.Contains(err.Error(), "length_status") ||
+		!strings.Contains(err.Error(), "zero_guard_status") {
+		t.Fatalf(
+			"validateMemoryReportWithAllocReport error = %v, want allocation length contract rejection",
+			err,
+		)
+	}
+}
+
+func TestValidateMemoryReportWithAllocReportRejectsHeapAllocationWithoutReasonCodes(t *testing.T) {
+	dir := t.TempDir()
+	reportPath := filepath.Join(dir, "memory-report.json")
+	raw := strings.Replace(
+		validSchemaV1MemoryReport(),
+		`"lowered_artifact_id": "ir:main:alloc_bytes:0"`,
+		`"lowered_artifact_id": "ir:main:alloc_bytes:0:Heap"`,
+		1,
+	)
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	allocReport := removeJSONLineContaining(validSchemaV2AllocationReport(), `"reason_codes":`)
+	allocReport = removeJSONLineContaining(allocReport, `"heap_reason_codes":`)
+	allocPath := filepath.Join(dir, "alloc-report.json")
+	if err := os.WriteFile(allocPath, []byte(allocReport), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err := validateMemoryReportWithAllocReport(reportPath, allocPath)
+	if err == nil || !strings.Contains(err.Error(), "heap_reason_codes") {
+		t.Fatalf(
+			"validateMemoryReportWithAllocReport error = %v, want heap_reason_codes rejection",
+			err,
+		)
 	}
 }
 
 func TestValidateMemoryReportRejectsPartialStorageFields(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory-report.json")
-	raw := strings.Replace(validSchemaV1MemoryReport(), `"actual_lowering_storage": "Heap"`, `"actual_lowering_storage": ""`, 1)
+	raw := strings.Replace(
+		validSchemaV1MemoryReport(),
+		`"actual_lowering_storage": "Heap"`,
+		`"actual_lowering_storage": ""`,
+		1,
+	)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +259,12 @@ func TestValidateMemoryReportRejectsPartialStorageFields(t *testing.T) {
 
 func TestValidateMemoryReportRejectsUnknownStorageClass(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory-report.json")
-	raw := strings.Replace(validSchemaV1MemoryReport(), `"planned_storage": "Heap"`, `"planned_storage": "Mystery"`, 1)
+	raw := strings.Replace(
+		validSchemaV1MemoryReport(),
+		`"planned_storage": "Heap"`,
+		`"planned_storage": "Mystery"`,
+		1,
+	)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -132,10 +276,30 @@ func TestValidateMemoryReportRejectsUnknownStorageClass(t *testing.T) {
 
 func TestValidateMemoryReportRejectsIslandBackedRowMissingEpoch(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory-report.json")
-	raw := strings.Replace(validSchemaV1MemoryReport(), `"source_fact_id": "fact:raw:root"`, `"island_id": "island:main:0",`+"\n      "+`"base_id": "alloc:main:0",`+"\n      "+`"source_fact_id": "fact:raw:root"`, 1)
-	raw = strings.Replace(raw, `"planned_storage": "Heap"`, `"planned_storage": "ExplicitIsland"`, 1)
-	raw = strings.Replace(raw, `"actual_lowering_storage": "Heap"`, `"actual_lowering_storage": "ExplicitIsland"`, 1)
-	raw = strings.Replace(raw, `"cost_class": "zero_cost_proven"`, `"cost_class": "instrumentation_only"`, 1)
+	raw := strings.Replace(
+		validSchemaV1MemoryReport(),
+		`"source_fact_id": "fact:raw:root"`,
+		`"island_id": "island:main:0",`+"\n      "+`"base_id": "alloc:main:0",`+"\n      "+`"source_fact_id": "fact:raw:root"`,
+		1,
+	)
+	raw = strings.Replace(
+		raw,
+		`"planned_storage": "Heap"`,
+		`"planned_storage": "ExplicitIsland"`,
+		1,
+	)
+	raw = strings.Replace(
+		raw,
+		`"actual_lowering_storage": "Heap"`,
+		`"actual_lowering_storage": "ExplicitIsland"`,
+		1,
+	)
+	raw = strings.Replace(
+		raw,
+		`"cost_class": "zero_cost_proven"`,
+		`"cost_class": "instrumentation_only"`,
+		1,
+	)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -147,10 +311,25 @@ func TestValidateMemoryReportRejectsIslandBackedRowMissingEpoch(t *testing.T) {
 
 func TestValidateMemoryReportRejectsValidatedStackClaimLoweringAsHeap(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory-report.json")
-	raw := strings.Replace(validSchemaV1MemoryReport(), `"claim": "allocation_base_metadata"`, `"claim": "storage_lowering"`, 1)
+	raw := strings.Replace(
+		validSchemaV1MemoryReport(),
+		`"claim": "allocation_base_metadata"`,
+		`"claim": "storage_lowering"`,
+		1,
+	)
 	raw = strings.Replace(raw, `"source_stage": "validation"`, `"source_stage": "allocplan"`, 1)
-	raw = strings.Replace(raw, `"provenance_class": "unsafe_verified_root"`, `"provenance_class": "safe_owned"`, 1)
-	raw = strings.Replace(raw, `"unsafe_class": "unsafe_verified_root"`, `"unsafe_class": "safe"`, 1)
+	raw = strings.Replace(
+		raw,
+		`"provenance_class": "unsafe_verified_root"`,
+		`"provenance_class": "safe_owned"`,
+		1,
+	)
+	raw = strings.Replace(
+		raw,
+		`"unsafe_class": "unsafe_verified_root"`,
+		`"unsafe_class": "safe"`,
+		1,
+	)
 	raw = strings.Replace(raw, `"planned_storage": "Heap"`, `"planned_storage": "Stack"`, 1)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
@@ -161,17 +340,54 @@ func TestValidateMemoryReportRejectsValidatedStackClaimLoweringAsHeap(t *testing
 	}
 }
 
-func TestValidateMemoryReportRejectsValidatedTaskActorRegionStorageWithoutRuntimeProof(t *testing.T) {
+func TestValidateMemoryReportRejectsValidatedTaskActorRegionStorageWithoutRuntimeProof(
+	t *testing.T,
+) {
 	for _, storage := range []string{"TaskRegion", "ActorMoveRegion"} {
 		t.Run(storage, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "memory-report.json")
-			raw := strings.Replace(validSchemaV1MemoryReport(), `"claim": "allocation_base_metadata"`, `"claim": "storage_lowering"`, 1)
-			raw = strings.Replace(raw, `"source_stage": "validation"`, `"source_stage": "allocplan"`, 1)
-			raw = strings.Replace(raw, `"provenance_class": "unsafe_verified_root"`, `"provenance_class": "safe_owned"`, 1)
-			raw = strings.Replace(raw, `"unsafe_class": "unsafe_verified_root"`, `"unsafe_class": "safe"`, 1)
-			raw = strings.Replace(raw, `"planned_storage": "Heap"`, `"planned_storage": "`+storage+`"`, 1)
-			raw = strings.Replace(raw, `"actual_lowering_storage": "Heap"`, `"actual_lowering_storage": "`+storage+`"`, 1)
-			raw = strings.Replace(raw, `"lowered_artifact_id": "ir:main:alloc_bytes:0"`, `"lowered_artifact_id": "ir:main:boundary:`+storage+`"`, 1)
+			raw := strings.Replace(
+				validSchemaV1MemoryReport(),
+				`"claim": "allocation_base_metadata"`,
+				`"claim": "storage_lowering"`,
+				1,
+			)
+			raw = strings.Replace(
+				raw,
+				`"source_stage": "validation"`,
+				`"source_stage": "allocplan"`,
+				1,
+			)
+			raw = strings.Replace(
+				raw,
+				`"provenance_class": "unsafe_verified_root"`,
+				`"provenance_class": "safe_owned"`,
+				1,
+			)
+			raw = strings.Replace(
+				raw,
+				`"unsafe_class": "unsafe_verified_root"`,
+				`"unsafe_class": "safe"`,
+				1,
+			)
+			raw = strings.Replace(
+				raw,
+				`"planned_storage": "Heap"`,
+				`"planned_storage": "`+storage+`"`,
+				1,
+			)
+			raw = strings.Replace(
+				raw,
+				`"actual_lowering_storage": "Heap"`,
+				`"actual_lowering_storage": "`+storage+`"`,
+				1,
+			)
+			raw = strings.Replace(
+				raw,
+				`"lowered_artifact_id": "ir:main:alloc_bytes:0"`,
+				`"lowered_artifact_id": "ir:main:boundary:`+storage+`"`,
+				1,
+			)
 			if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 				t.Fatal(err)
 			}
@@ -185,7 +401,12 @@ func TestValidateMemoryReportRejectsValidatedTaskActorRegionStorageWithoutRuntim
 
 func TestValidateMemoryReportRejectsValidatedClaimWithoutValidatorName(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory-report.json")
-	raw := strings.Replace(validSchemaV1MemoryReport(), `"validator_name": "raw_bounds_validator"`, `"validator_name": ""`, 1)
+	raw := strings.Replace(
+		validSchemaV1MemoryReport(),
+		`"validator_name": "raw_bounds_validator"`,
+		`"validator_name": ""`,
+		1,
+	)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -197,21 +418,33 @@ func TestValidateMemoryReportRejectsValidatedClaimWithoutValidatorName(t *testin
 
 func TestValidateMemoryReportRejectsWhitespaceRequiredFields(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory-report.json")
-	raw := strings.Replace(validSchemaV1MemoryReport(), `"source_fact_id": "fact:raw:root"`, `"source_fact_id": "   "`, 1)
+	raw := strings.Replace(
+		validSchemaV1MemoryReport(),
+		`"source_fact_id": "fact:raw:root"`,
+		`"source_fact_id": "   "`,
+		1,
+	)
 	raw = strings.Replace(raw, `"site_id": "alloc:main:1:1"`, `"site_id": "   "`, 1)
 	raw = strings.Replace(raw, `"claim": "allocation_base_metadata"`, `"claim": "   "`, 1)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	err := validateMemoryReport(path)
-	if err == nil || !strings.Contains(err.Error(), "source_fact_id") || !strings.Contains(err.Error(), "site_id") || !strings.Contains(err.Error(), "claim") {
+	if err == nil || !strings.Contains(err.Error(), "source_fact_id") ||
+		!strings.Contains(err.Error(), "site_id") ||
+		!strings.Contains(err.Error(), "claim") {
 		t.Fatalf("validateMemoryReport error = %v, want whitespace required-field rejection", err)
 	}
 }
 
 func TestValidateMemoryReportRejectsDuplicateSourceFactID(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory-report.json")
-	raw := strings.Replace(validSchemaV1MemoryReport(), "\n    }\n  ]", "\n    },\n    {\n      \"program_id\": \"program\",\n      \"function_id\": \"main\",\n      \"site_id\": \"alloc:main:1:2\",\n      \"source_fact_id\": \"fact:raw:root\",\n      \"source_stage\": \"validation\",\n      \"claim\": \"allocation_base_metadata\",\n      \"claim_level\": \"validated\",\n      \"provenance_class\": \"unsafe_verified_root\",\n      \"unsafe_class\": \"unsafe_verified_root\",\n      \"planned_storage\": \"Heap\",\n      \"actual_lowering_storage\": \"Heap\",\n      \"lowered_artifact_id\": \"ir:main:alloc_bytes:1\",\n      \"validator_name\": \"raw_bounds_validator\",\n      \"validator_status\": \"pass\"\n    }\n  ]", 1)
+	raw := strings.Replace(
+		validSchemaV1MemoryReport(),
+		"\n    }\n  ]",
+		"\n    },\n    {\n      \"program_id\": \"program\",\n      \"function_id\": \"main\",\n      \"site_id\": \"alloc:main:1:2\",\n      \"source_fact_id\": \"fact:raw:root\",\n      \"source_stage\": \"validation\",\n      \"claim\": \"allocation_base_metadata\",\n      \"claim_level\": \"validated\",\n      \"provenance_class\": \"unsafe_verified_root\",\n      \"unsafe_class\": \"unsafe_verified_root\",\n      \"planned_storage\": \"Heap\",\n      \"actual_lowering_storage\": \"Heap\",\n      \"lowered_artifact_id\": \"ir:main:alloc_bytes:1\",\n      \"validator_name\": \"raw_bounds_validator\",\n      \"validator_status\": \"pass\"\n    }\n  ]",
+		1,
+	)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -223,13 +456,21 @@ func TestValidateMemoryReportRejectsDuplicateSourceFactID(t *testing.T) {
 
 func TestValidateMemoryReportRejectsNonDeterministicSourceFactIDOrder(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory-report.json")
-	raw := strings.Replace(validSchemaV1MemoryReport(), "\n    }\n  ]", "\n    },\n    {\n      \"program_id\": \"program\",\n      \"function_id\": \"main\",\n      \"site_id\": \"alloc:main:1:2\",\n      \"source_fact_id\": \"fact:aaa:root\",\n      \"source_stage\": \"validation\",\n      \"claim\": \"allocation_base_metadata\",\n      \"claim_level\": \"validated\",\n      \"provenance_class\": \"unsafe_verified_root\",\n      \"unsafe_class\": \"unsafe_verified_root\",\n      \"planned_storage\": \"Heap\",\n      \"actual_lowering_storage\": \"Heap\",\n      \"lowered_artifact_id\": \"ir:main:alloc_bytes:1\",\n      \"cost_class\": \"zero_cost_proven\",\n      \"validator_name\": \"raw_bounds_validator\",\n      \"validator_status\": \"pass\",\n      \"reason\": \"verified core.alloc_bytes root\"\n    }\n  ]", 1)
+	raw := strings.Replace(
+		validSchemaV1MemoryReport(),
+		"\n    }\n  ]",
+		"\n    },\n    {\n      \"program_id\": \"program\",\n      \"function_id\": \"main\",\n      \"site_id\": \"alloc:main:1:2\",\n      \"source_fact_id\": \"fact:aaa:root\",\n      \"source_stage\": \"validation\",\n      \"claim\": \"allocation_base_metadata\",\n      \"claim_level\": \"validated\",\n      \"provenance_class\": \"unsafe_verified_root\",\n      \"unsafe_class\": \"unsafe_verified_root\",\n      \"planned_storage\": \"Heap\",\n      \"actual_lowering_storage\": \"Heap\",\n      \"lowered_artifact_id\": \"ir:main:alloc_bytes:1\",\n      \"cost_class\": \"zero_cost_proven\",\n      \"validator_name\": \"raw_bounds_validator\",\n      \"validator_status\": \"pass\",\n      \"reason\": \"verified core.alloc_bytes root\"\n    }\n  ]",
+		1,
+	)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	err := validateMemoryReport(path)
 	if err == nil || !strings.Contains(err.Error(), "deterministic") {
-		t.Fatalf("validateMemoryReport error = %v, want deterministic source_fact_id order rejection", err)
+		t.Fatalf(
+			"validateMemoryReport error = %v, want deterministic source_fact_id order rejection",
+			err,
+		)
 	}
 }
 
@@ -237,10 +478,25 @@ func TestValidateMemoryReportRejectsV1DerivedBorrowRowsWithoutParent(t *testing.
 	for _, claim := range []string{"enum_payload_contains_borrow", "generic_wrapper_contains_borrow"} {
 		t.Run(claim, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "memory-report.json")
-			raw := strings.Replace(validSchemaV1MemoryReport(), `"claim": "allocation_base_metadata"`, `"claim": "`+claim+`"`, 1)
+			raw := strings.Replace(
+				validSchemaV1MemoryReport(),
+				`"claim": "allocation_base_metadata"`,
+				`"claim": "`+claim+`"`,
+				1,
+			)
 			raw = strings.Replace(raw, `"source_stage": "validation"`, `"source_stage": "plir"`, 1)
-			raw = strings.Replace(raw, `"provenance_class": "unsafe_verified_root"`, `"provenance_class": "safe_borrowed"`, 1)
-			raw = strings.Replace(raw, `"unsafe_class": "unsafe_verified_root"`, `"unsafe_class": "safe"`, 1)
+			raw = strings.Replace(
+				raw,
+				`"provenance_class": "unsafe_verified_root"`,
+				`"provenance_class": "safe_borrowed"`,
+				1,
+			)
+			raw = strings.Replace(
+				raw,
+				`"unsafe_class": "unsafe_verified_root"`,
+				`"unsafe_class": "safe"`,
+				1,
+			)
 			if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 				t.Fatal(err)
 			}
@@ -253,13 +509,32 @@ func TestValidateMemoryReportRejectsV1DerivedBorrowRowsWithoutParent(t *testing.
 }
 
 func TestValidateMemoryReportRejectsV2DerivedRowsWithoutParent(t *testing.T) {
-	for _, claim := range []string{"function_value_contains_borrow", "callback_arg_contains_borrow", "callback_inout_conservative"} {
+	for _, claim := range []string{
+		"function_value_contains_borrow",
+		"callback_arg_contains_borrow",
+		"callback_inout_conservative",
+	} {
 		t.Run(claim, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "memory-report.json")
-			raw := strings.Replace(validSchemaV1MemoryReport(), `"claim": "allocation_base_metadata"`, `"claim": "`+claim+`"`, 1)
+			raw := strings.Replace(
+				validSchemaV1MemoryReport(),
+				`"claim": "allocation_base_metadata"`,
+				`"claim": "`+claim+`"`,
+				1,
+			)
 			raw = strings.Replace(raw, `"source_stage": "validation"`, `"source_stage": "plir"`, 1)
-			raw = strings.Replace(raw, `"provenance_class": "unsafe_verified_root"`, `"provenance_class": "safe_borrowed"`, 1)
-			raw = strings.Replace(raw, `"unsafe_class": "unsafe_verified_root"`, `"unsafe_class": "safe"`, 1)
+			raw = strings.Replace(
+				raw,
+				`"provenance_class": "unsafe_verified_root"`,
+				`"provenance_class": "safe_borrowed"`,
+				1,
+			)
+			raw = strings.Replace(
+				raw,
+				`"unsafe_class": "unsafe_verified_root"`,
+				`"unsafe_class": "safe"`,
+				1,
+			)
 			if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 				t.Fatal(err)
 			}
@@ -272,13 +547,32 @@ func TestValidateMemoryReportRejectsV2DerivedRowsWithoutParent(t *testing.T) {
 }
 
 func TestValidateMemoryReportRejectsV3DerivedRowsWithoutParent(t *testing.T) {
-	for _, claim := range []string{"interface_value_contains_borrow", "protocol_dispatch_borrow_conservative", "protocol_dispatch_noalias_conservative"} {
+	for _, claim := range []string{
+		"interface_value_contains_borrow",
+		"protocol_dispatch_borrow_conservative",
+		"protocol_dispatch_noalias_conservative",
+	} {
 		t.Run(claim, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "memory-report.json")
-			raw := strings.Replace(validSchemaV1MemoryReport(), `"claim": "allocation_base_metadata"`, `"claim": "`+claim+`"`, 1)
+			raw := strings.Replace(
+				validSchemaV1MemoryReport(),
+				`"claim": "allocation_base_metadata"`,
+				`"claim": "`+claim+`"`,
+				1,
+			)
 			raw = strings.Replace(raw, `"source_stage": "validation"`, `"source_stage": "plir"`, 1)
-			raw = strings.Replace(raw, `"provenance_class": "unsafe_verified_root"`, `"provenance_class": "safe_borrowed"`, 1)
-			raw = strings.Replace(raw, `"unsafe_class": "unsafe_verified_root"`, `"unsafe_class": "safe"`, 1)
+			raw = strings.Replace(
+				raw,
+				`"provenance_class": "unsafe_verified_root"`,
+				`"provenance_class": "safe_borrowed"`,
+				1,
+			)
+			raw = strings.Replace(
+				raw,
+				`"unsafe_class": "unsafe_verified_root"`,
+				`"unsafe_class": "safe"`,
+				1,
+			)
 			if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 				t.Fatal(err)
 			}
@@ -291,13 +585,33 @@ func TestValidateMemoryReportRejectsV3DerivedRowsWithoutParent(t *testing.T) {
 }
 
 func TestValidateMemoryReportRejectsV4DerivedRowsWithoutParent(t *testing.T) {
-	for _, claim := range []string{"async_boundary_borrow_conservative", "task_boundary_borrow_rejected", "actor_boundary_borrow_rejected", "boundary_noalias_conservative"} {
+	for _, claim := range []string{
+		"async_boundary_borrow_conservative",
+		"task_boundary_borrow_rejected",
+		"actor_boundary_borrow_rejected",
+		"boundary_noalias_conservative",
+	} {
 		t.Run(claim, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "memory-report.json")
-			raw := strings.Replace(validSchemaV1MemoryReport(), `"claim": "allocation_base_metadata"`, `"claim": "`+claim+`"`, 1)
+			raw := strings.Replace(
+				validSchemaV1MemoryReport(),
+				`"claim": "allocation_base_metadata"`,
+				`"claim": "`+claim+`"`,
+				1,
+			)
 			raw = strings.Replace(raw, `"source_stage": "validation"`, `"source_stage": "plir"`, 1)
-			raw = strings.Replace(raw, `"provenance_class": "unsafe_verified_root"`, `"provenance_class": "safe_borrowed"`, 1)
-			raw = strings.Replace(raw, `"unsafe_class": "unsafe_verified_root"`, `"unsafe_class": "safe"`, 1)
+			raw = strings.Replace(
+				raw,
+				`"provenance_class": "unsafe_verified_root"`,
+				`"provenance_class": "safe_borrowed"`,
+				1,
+			)
+			raw = strings.Replace(
+				raw,
+				`"unsafe_class": "unsafe_verified_root"`,
+				`"unsafe_class": "safe"`,
+				1,
+			)
 			if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 				t.Fatal(err)
 			}
@@ -310,18 +624,61 @@ func TestValidateMemoryReportRejectsV4DerivedRowsWithoutParent(t *testing.T) {
 }
 
 func TestValidateMemoryReportRejectsV5DerivedRowsWithoutParent(t *testing.T) {
-	for _, claim := range []string{"unsafe_unknown_rejected_safe_facts", "unsafe_verified_root_allocation_base"} {
+	for _, claim := range []string{
+		"unsafe_unknown_rejected_safe_facts",
+		"unsafe_verified_root_allocation_base",
+	} {
 		t.Run(claim, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "memory-report.json")
-			raw := strings.Replace(memoryIdealV5UnsafeContractReport(), `"claim": "unsafe_unknown_rejected_safe_facts"`, `"claim": "`+claim+`"`, 1)
-			raw = strings.Replace(raw, `"parent_fact_id": "fact:unsafe:unknown",`, `"parent_fact_id": "",`, 1)
+			raw := strings.Replace(
+				memoryIdealV5UnsafeContractReport(),
+				`"claim": "unsafe_unknown_rejected_safe_facts"`,
+				`"claim": "`+claim+`"`,
+				1,
+			)
+			raw = strings.Replace(
+				raw,
+				`"parent_fact_id": "fact:unsafe:unknown",`,
+				`"parent_fact_id": "",`,
+				1,
+			)
 			if claim == "unsafe_verified_root_allocation_base" {
-				raw = strings.Replace(raw, `"provenance_class": "unsafe_unknown"`, `"provenance_class": "unsafe_verified_root"`, 1)
-				raw = strings.Replace(raw, `"unsafe_class": "unsafe_unknown"`, `"unsafe_class": "unsafe_verified_root"`, 1)
-				raw = strings.Replace(raw, `"claim_level": "rejected"`, `"claim_level": "validated"`, 1)
-				raw = strings.Replace(raw, `"cost_class": "unsupported_rejected"`, `"cost_class": "zero_cost_proven"`, 1)
-				raw = strings.Replace(raw, `"validator_name": "unsafe_unknown_fact_validator"`, `"validator_name": "unsafe_verified_root_bounds_validator"`, 1)
-				raw = strings.Replace(raw, `"validator_status": "fail"`, `"validator_status": "pass"`, 1)
+				raw = strings.Replace(
+					raw,
+					`"provenance_class": "unsafe_unknown"`,
+					`"provenance_class": "unsafe_verified_root"`,
+					1,
+				)
+				raw = strings.Replace(
+					raw,
+					`"unsafe_class": "unsafe_unknown"`,
+					`"unsafe_class": "unsafe_verified_root"`,
+					1,
+				)
+				raw = strings.Replace(
+					raw,
+					`"claim_level": "rejected"`,
+					`"claim_level": "validated"`,
+					1,
+				)
+				raw = strings.Replace(
+					raw,
+					`"cost_class": "unsupported_rejected"`,
+					`"cost_class": "zero_cost_proven"`,
+					1,
+				)
+				raw = strings.Replace(
+					raw,
+					`"validator_name": "unsafe_unknown_fact_validator"`,
+					`"validator_name": "unsafe_verified_root_bounds_validator"`,
+					1,
+				)
+				raw = strings.Replace(
+					raw,
+					`"validator_status": "fail"`,
+					`"validator_status": "pass"`,
+					1,
+				)
 			}
 			if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 				t.Fatal(err)
@@ -335,19 +692,62 @@ func TestValidateMemoryReportRejectsV5DerivedRowsWithoutParent(t *testing.T) {
 }
 
 func TestValidateMemoryReportRejectsV6BoundsRowsWithoutParent(t *testing.T) {
-	for _, claim := range []string{"bounds_check_removed_with_proof_id", "raw_bounds_runtime_check_normal_build"} {
+	for _, claim := range []string{
+		"bounds_check_removed_with_proof_id",
+		"raw_bounds_runtime_check_normal_build",
+	} {
 		t.Run(claim, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "memory-report.json")
-			raw := strings.Replace(memoryIdealV6BoundsReport(), `"claim": "bounds_check_removed_with_proof_id"`, `"claim": "`+claim+`"`, 1)
-			raw = strings.Replace(raw, `"parent_fact_id": "fact:bounds:proof-guard",`, `"parent_fact_id": "",`, 1)
+			raw := strings.Replace(
+				memoryIdealV6BoundsReport(),
+				`"claim": "bounds_check_removed_with_proof_id"`,
+				`"claim": "`+claim+`"`,
+				1,
+			)
+			raw = strings.Replace(
+				raw,
+				`"parent_fact_id": "fact:bounds:proof-guard",`,
+				`"parent_fact_id": "",`,
+				1,
+			)
 			if claim == "raw_bounds_runtime_check_normal_build" {
-				raw = strings.Replace(raw, `"validator_name": "bounds_proof_id_validator"`, `"validator_name": "raw_bounds_width_validator"`, 1)
-				raw = strings.Replace(raw, `"cost_class": "zero_cost_proven"`, `"cost_class": "dynamic_check_required"`, 1)
-				raw = strings.Replace(raw, `"provenance_class": "safe_known"`, `"provenance_class": "unsafe_checked"`, 1)
-				raw = strings.Replace(raw, `"unsafe_class": "safe"`, `"unsafe_class": "unsafe_checked"`, 1)
-				raw = strings.Replace(raw, `"source_stage": "validation"`, `"source_stage": "plir"`, 1)
-				raw = strings.Replace(raw, `"reason": "removed bounds check has compiler-owned proof id"`, `"normal_build_check": true,
-      "reason": "raw bounds uncertainty keeps normal-build check"`, 1)
+				raw = strings.Replace(
+					raw,
+					`"validator_name": "bounds_proof_id_validator"`,
+					`"validator_name": "raw_bounds_width_validator"`,
+					1,
+				)
+				raw = strings.Replace(
+					raw,
+					`"cost_class": "zero_cost_proven"`,
+					`"cost_class": "dynamic_check_required"`,
+					1,
+				)
+				raw = strings.Replace(
+					raw,
+					`"provenance_class": "safe_known"`,
+					`"provenance_class": "unsafe_checked"`,
+					1,
+				)
+				raw = strings.Replace(
+					raw,
+					`"unsafe_class": "safe"`,
+					`"unsafe_class": "unsafe_checked"`,
+					1,
+				)
+				raw = strings.Replace(
+					raw,
+					`"source_stage": "validation"`,
+					`"source_stage": "plir"`,
+					1,
+				)
+				raw = strings.Replace(
+					raw,
+					`"reason": "removed bounds check has compiler-owned proof id"`,
+					`"normal_build_check": true,
+      "reason": "raw bounds uncertainty keeps normal-build check"`,
+					1,
+				)
 			}
 			if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 				t.Fatal(err)
@@ -362,20 +762,31 @@ func TestValidateMemoryReportRejectsV6BoundsRowsWithoutParent(t *testing.T) {
 
 func TestValidateMemoryReportRejectsBoundsProofWithoutTypedProofFields(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory-report.json")
-	raw := strings.Replace(memoryIdealV6BoundsReport(), `"proof_kind": "bounds_check",`, `"proof_kind": "",`, 1)
+	raw := strings.Replace(
+		memoryIdealV6BoundsReport(),
+		`"proof_kind": "bounds_check",`,
+		`"proof_kind": "",`,
+		1,
+	)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	err := validateMemoryReport(path)
-	if err == nil || !strings.Contains(err.Error(), "typed proof fields") || !strings.Contains(err.Error(), "proof_kind") {
+	if err == nil || !strings.Contains(err.Error(), "typed proof fields") ||
+		!strings.Contains(err.Error(), "proof_kind") {
 		t.Fatalf("validateMemoryReport error = %v, want typed proof field rejection", err)
 	}
 }
 
 func TestValidateMemoryReportRejectsSafeViewRetainedBoundsWithoutParent(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory-report.json")
-	raw := strings.Replace(memoryIdealV6BoundsReport(), `"parent_fact_id": "fact:bounds:retained-window",`, `"parent_fact_id": "",`, 1)
+	raw := strings.Replace(
+		memoryIdealV6BoundsReport(),
+		`"parent_fact_id": "fact:bounds:retained-window",`,
+		`"parent_fact_id": "",`,
+		1,
+	)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -386,30 +797,104 @@ func TestValidateMemoryReportRejectsSafeViewRetainedBoundsWithoutParent(t *testi
 }
 
 func TestValidateMemoryReportRejectsB03CopyIntoRowsWithoutParent(t *testing.T) {
-	for _, claim := range []string{"copy_into_destination_length_check", "copy_into_overlap_rejected", "copy_into_overlap_conservative"} {
+	for _, claim := range []string{
+		"copy_into_destination_length_check",
+		"copy_into_overlap_rejected",
+		"copy_into_overlap_conservative",
+	} {
 		t.Run(claim, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "memory-report.json")
-			raw := strings.Replace(validSchemaV1MemoryReport(), `"claim": "allocation_base_metadata"`, `"claim": "`+claim+`"`, 1)
+			raw := strings.Replace(
+				validSchemaV1MemoryReport(),
+				`"claim": "allocation_base_metadata"`,
+				`"claim": "`+claim+`"`,
+				1,
+			)
 			raw = strings.Replace(raw, `"source_stage": "validation"`, `"source_stage": "plir"`, 1)
-			raw = strings.Replace(raw, `"provenance_class": "unsafe_verified_root"`, `"provenance_class": "safe_known"`, 1)
-			raw = strings.Replace(raw, `"unsafe_class": "unsafe_verified_root"`, `"unsafe_class": "safe"`, 1)
-			raw = strings.Replace(raw, `"validator_name": "raw_bounds_validator"`, `"validator_name": "copy_into_overlap_validator"`, 1)
+			raw = strings.Replace(
+				raw,
+				`"provenance_class": "unsafe_verified_root"`,
+				`"provenance_class": "safe_known"`,
+				1,
+			)
+			raw = strings.Replace(
+				raw,
+				`"unsafe_class": "unsafe_verified_root"`,
+				`"unsafe_class": "safe"`,
+				1,
+			)
+			raw = strings.Replace(
+				raw,
+				`"validator_name": "raw_bounds_validator"`,
+				`"validator_name": "copy_into_overlap_validator"`,
+				1,
+			)
 			if claim == "copy_into_destination_length_check" {
-				raw = strings.Replace(raw, `"cost_class": "zero_cost_proven"`, `"cost_class": "dynamic_check_required"`, 1)
-				raw = strings.Replace(raw, `"reason": "verified core.alloc_bytes root"`, `"normal_build_check": true,
-      "reason": "copy_into destination capacity check is retained in normal builds"`, 1)
+				raw = strings.Replace(
+					raw,
+					`"cost_class": "zero_cost_proven"`,
+					`"cost_class": "dynamic_check_required"`,
+					1,
+				)
+				raw = strings.Replace(
+					raw,
+					`"reason": "verified core.alloc_bytes root"`,
+					`"normal_build_check": true,
+      "reason": "copy_into destination capacity check is retained in normal builds"`,
+					1,
+				)
 			}
 			if claim == "copy_into_overlap_rejected" {
-				raw = strings.Replace(raw, `"claim_level": "validated"`, `"claim_level": "rejected"`, 1)
-				raw = strings.Replace(raw, `"cost_class": "zero_cost_proven"`, `"cost_class": "unsupported_rejected"`, 1)
-				raw = strings.Replace(raw, `"validator_status": "pass"`, `"validator_status": "fail"`, 1)
+				raw = strings.Replace(
+					raw,
+					`"claim_level": "validated"`,
+					`"claim_level": "rejected"`,
+					1,
+				)
+				raw = strings.Replace(
+					raw,
+					`"cost_class": "zero_cost_proven"`,
+					`"cost_class": "unsupported_rejected"`,
+					1,
+				)
+				raw = strings.Replace(
+					raw,
+					`"validator_status": "pass"`,
+					`"validator_status": "fail"`,
+					1,
+				)
 			}
 			if claim == "copy_into_overlap_conservative" {
-				raw = strings.Replace(raw, `"claim_level": "validated"`, `"claim_level": "conservative"`, 1)
-				raw = strings.Replace(raw, `"provenance_class": "safe_known"`, `"provenance_class": "unsafe_unknown"`, 1)
-				raw = strings.Replace(raw, `"unsafe_class": "safe"`, `"unsafe_class": "unsafe_unknown"`, 1)
-				raw = strings.Replace(raw, `"cost_class": "zero_cost_proven"`, `"cost_class": "conservative_fallback"`, 1)
-				raw = strings.Replace(raw, `"validator_status": "pass"`, `"validator_status": "not_applicable"`, 1)
+				raw = strings.Replace(
+					raw,
+					`"claim_level": "validated"`,
+					`"claim_level": "conservative"`,
+					1,
+				)
+				raw = strings.Replace(
+					raw,
+					`"provenance_class": "safe_known"`,
+					`"provenance_class": "unsafe_unknown"`,
+					1,
+				)
+				raw = strings.Replace(
+					raw,
+					`"unsafe_class": "safe"`,
+					`"unsafe_class": "unsafe_unknown"`,
+					1,
+				)
+				raw = strings.Replace(
+					raw,
+					`"cost_class": "zero_cost_proven"`,
+					`"cost_class": "conservative_fallback"`,
+					1,
+				)
+				raw = strings.Replace(
+					raw,
+					`"validator_status": "pass"`,
+					`"validator_status": "not_applicable"`,
+					1,
+				)
 			}
 			if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 				t.Fatal(err)
@@ -436,7 +921,12 @@ func TestValidateMemoryReportRejectsTrailingData(t *testing.T) {
 
 func TestValidateMemoryReportRejectsUnknownAliasState(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory-report.json")
-	raw := strings.Replace(validSchemaV1MemoryReport(), `"reason": "verified core.alloc_bytes root"`, `"alias_state": "mystery_alias",`+"\n      "+`"reason": "verified core.alloc_bytes root"`, 1)
+	raw := strings.Replace(
+		validSchemaV1MemoryReport(),
+		`"reason": "verified core.alloc_bytes root"`,
+		`"alias_state": "mystery_alias",`+"\n      "+`"reason": "verified core.alloc_bytes root"`,
+		1,
+	)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -448,8 +938,18 @@ func TestValidateMemoryReportRejectsUnknownAliasState(t *testing.T) {
 
 func TestValidateMemoryReportRejectsValidatedNoAliasWithUnknownAliasState(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory-report.json")
-	raw := strings.Replace(validSchemaV1MemoryReport(), `"claim": "allocation_base_metadata"`, `"claim": "no_alias"`, 1)
-	raw = strings.Replace(raw, `"reason": "verified core.alloc_bytes root"`, `"alias_state": "unknown_alias",`+"\n      "+`"reason": "verified core.alloc_bytes root"`, 1)
+	raw := strings.Replace(
+		validSchemaV1MemoryReport(),
+		`"claim": "allocation_base_metadata"`,
+		`"claim": "no_alias"`,
+		1,
+	)
+	raw = strings.Replace(
+		raw,
+		`"reason": "verified core.alloc_bytes root"`,
+		`"alias_state": "unknown_alias",`+"\n      "+`"reason": "verified core.alloc_bytes root"`,
+		1,
+	)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -461,8 +961,18 @@ func TestValidateMemoryReportRejectsValidatedNoAliasWithUnknownAliasState(t *tes
 
 func TestValidateMemoryReportRejectsSafeKnownFromUnsafeUnknown(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory-report.json")
-	raw := strings.Replace(validSchemaV1MemoryReport(), `"provenance_class": "unsafe_verified_root"`, `"provenance_class": "safe_known"`, 1)
-	raw = strings.Replace(raw, `"unsafe_class": "unsafe_verified_root"`, `"unsafe_class": "unsafe_unknown"`, 1)
+	raw := strings.Replace(
+		validSchemaV1MemoryReport(),
+		`"provenance_class": "unsafe_verified_root"`,
+		`"provenance_class": "safe_known"`,
+		1,
+	)
+	raw = strings.Replace(
+		raw,
+		`"unsafe_class": "unsafe_verified_root"`,
+		`"unsafe_class": "unsafe_unknown"`,
+		1,
+	)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -474,8 +984,18 @@ func TestValidateMemoryReportRejectsSafeKnownFromUnsafeUnknown(t *testing.T) {
 
 func TestValidateMemoryReportRejectsSafeBorrowedFromUnsafeUnknown(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory-report.json")
-	raw := strings.Replace(validSchemaV1MemoryReport(), `"provenance_class": "unsafe_verified_root"`, `"provenance_class": "safe_borrowed"`, 1)
-	raw = strings.Replace(raw, `"unsafe_class": "unsafe_verified_root"`, `"unsafe_class": "unsafe_unknown"`, 1)
+	raw := strings.Replace(
+		validSchemaV1MemoryReport(),
+		`"provenance_class": "unsafe_verified_root"`,
+		`"provenance_class": "safe_borrowed"`,
+		1,
+	)
+	raw = strings.Replace(
+		raw,
+		`"unsafe_class": "unsafe_verified_root"`,
+		`"unsafe_class": "unsafe_unknown"`,
+		1,
+	)
 	raw = strings.Replace(raw, `"claim": "allocation_base_metadata"`, `"claim": "borrowed_imm"`, 1)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
@@ -488,8 +1008,18 @@ func TestValidateMemoryReportRejectsSafeBorrowedFromUnsafeUnknown(t *testing.T) 
 
 func TestValidateMemoryReportRejectsUnsafeUnknownOptimizationClaim(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory-report.json")
-	raw := strings.Replace(conservativeUnknownRawPointerReport(), `"claim": "checked_external_unknown"`, `"claim": "no_alias"`, 1)
-	raw = strings.Replace(raw, `"reason": "unknown raw pointer remains conservative"`, `"alias_state": "mutable_exclusive",`+"\n      "+`"reason": "unknown raw pointer remains conservative"`, 1)
+	raw := strings.Replace(
+		conservativeUnknownRawPointerReport(),
+		`"claim": "checked_external_unknown"`,
+		`"claim": "no_alias"`,
+		1,
+	)
+	raw = strings.Replace(
+		raw,
+		`"reason": "unknown raw pointer remains conservative"`,
+		`"alias_state": "mutable_exclusive",`+"\n      "+`"reason": "unknown raw pointer remains conservative"`,
+		1,
+	)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -508,17 +1038,42 @@ func TestValidateMemoryReportRejectsUnsafeCheckedGenericPromotion(t *testing.T) 
 		want       string
 	}{
 		{name: "safe known", claim: "safe_known", provenance: "safe_known", want: "unsafe_checked"},
-		{name: "provenance known", claim: "provenance_known", provenance: "unsafe_checked", want: "unsafe_checked"},
+		{
+			name:       "provenance known",
+			claim:      "provenance_known",
+			provenance: "unsafe_checked",
+			want:       "unsafe_checked",
+		},
 		{name: "noalias", claim: "no_alias", provenance: "unsafe_checked", alias: `,
       "alias_state": "unique"`, want: "unsafe_checked"},
-		{name: "bounds check elimination", claim: "bounds_check_eliminated", provenance: "unsafe_checked", want: "proof id"},
+		{
+			name:       "bounds check elimination",
+			claim:      "bounds_check_eliminated",
+			provenance: "unsafe_checked",
+			want:       "proof id",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "memory-report.json")
-			raw := strings.Replace(validSchemaV1MemoryReport(), `"claim": "allocation_base_metadata"`, `"claim": "`+tc.claim+`"`, 1)
+			raw := strings.Replace(
+				validSchemaV1MemoryReport(),
+				`"claim": "allocation_base_metadata"`,
+				`"claim": "`+tc.claim+`"`,
+				1,
+			)
 			raw = strings.Replace(raw, `"source_stage": "validation"`, `"source_stage": "plir"`, 1)
-			raw = strings.Replace(raw, `"provenance_class": "unsafe_verified_root"`, `"provenance_class": "`+tc.provenance+`"`, 1)
-			raw = strings.Replace(raw, `"unsafe_class": "unsafe_verified_root"`, `"unsafe_class": "unsafe_checked"`+tc.alias, 1)
+			raw = strings.Replace(
+				raw,
+				`"provenance_class": "unsafe_verified_root"`,
+				`"provenance_class": "`+tc.provenance+`"`,
+				1,
+			)
+			raw = strings.Replace(
+				raw,
+				`"unsafe_class": "unsafe_verified_root"`,
+				`"unsafe_class": "unsafe_checked"`+tc.alias,
+				1,
+			)
 			if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 				t.Fatal(err)
 			}
@@ -532,24 +1087,75 @@ func TestValidateMemoryReportRejectsUnsafeCheckedGenericPromotion(t *testing.T) 
 
 func TestValidateMemoryReportRejectsDynamicRawOffsetZeroCostPromotion(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory-report.json")
-	raw := strings.Replace(validSchemaV1MemoryReport(), `"function_id": "main"`, `"function_id": "read_at"`, 1)
+	raw := strings.Replace(
+		validSchemaV1MemoryReport(),
+		`"function_id": "main"`,
+		`"function_id": "read_at"`,
+		1,
+	)
 	raw = strings.Replace(raw, `"site_id": "alloc:main:1:1"`, `"site_id": "test.tetra:6:17"`, 1)
-	raw = strings.Replace(raw, `"source_span": "main.tetra:1:1"`, `"source_span": "test.tetra:6:17"`, 1)
-	raw = strings.Replace(raw, `"source_fact_id": "fact:raw:root"`, `"source_fact_id": "fact:dynamic:raw-offset"`, 1)
-	raw = strings.Replace(raw, `"lowered_artifact_id": "ir:main:alloc_bytes:0",`+"\n      "+`"source_stage": "validation"`, `"source_stage": "plir"`, 1)
-	raw = strings.Replace(raw, `"claim": "allocation_base_metadata"`, `"claim": "derived_allocation_offset"`, 1)
+	raw = strings.Replace(
+		raw,
+		`"source_span": "main.tetra:1:1"`,
+		`"source_span": "test.tetra:6:17"`,
+		1,
+	)
+	raw = strings.Replace(
+		raw,
+		`"source_fact_id": "fact:raw:root"`,
+		`"source_fact_id": "fact:dynamic:raw-offset"`,
+		1,
+	)
+	raw = strings.Replace(
+		raw,
+		`"lowered_artifact_id": "ir:main:alloc_bytes:0",`+"\n      "+`"source_stage": "validation"`,
+		`"source_stage": "plir"`,
+		1,
+	)
+	raw = strings.Replace(
+		raw,
+		`"claim": "allocation_base_metadata"`,
+		`"claim": "derived_allocation_offset"`,
+		1,
+	)
 	raw = strings.Replace(raw, `"claim_level": "validated"`, `"claim_level": "evidence_only"`, 1)
-	raw = strings.Replace(raw, `"provenance_class": "unsafe_verified_root"`, `"provenance_class": "unsafe_checked"`, 1)
-	raw = strings.Replace(raw, `"unsafe_class": "unsafe_verified_root"`, `"unsafe_class": "unsafe_checked"`, 1)
-	raw = strings.Replace(raw, `"planned_storage": "Heap",`+"\n      "+`"actual_lowering_storage": "Heap",`+"\n      ", "", 1)
-	raw = strings.Replace(raw, `"validator_name": "raw_bounds_validator"`, `"validator_name": ""`, 1)
+	raw = strings.Replace(
+		raw,
+		`"provenance_class": "unsafe_verified_root"`,
+		`"provenance_class": "unsafe_checked"`,
+		1,
+	)
+	raw = strings.Replace(
+		raw,
+		`"unsafe_class": "unsafe_verified_root"`,
+		`"unsafe_class": "unsafe_checked"`,
+		1,
+	)
+	raw = strings.Replace(
+		raw,
+		`"planned_storage": "Heap",`+"\n      "+`"actual_lowering_storage": "Heap",`+"\n      ",
+		"",
+		1,
+	)
+	raw = strings.Replace(
+		raw,
+		`"validator_name": "raw_bounds_validator"`,
+		`"validator_name": ""`,
+		1,
+	)
 	raw = strings.Replace(raw, `"validator_status": "pass"`, `"validator_status": "not_run"`, 1)
-	raw = strings.Replace(raw, `"reason": "verified core.alloc_bytes root"`, `"reason": "core.ptr_add raw_pointer_bounds: checked_external_unknown base:p offset:n"`, 1)
+	raw = strings.Replace(
+		raw,
+		`"reason": "verified core.alloc_bytes root"`,
+		`"reason": "core.ptr_add raw_pointer_bounds: checked_external_unknown base:p offset:n"`,
+		1,
+	)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	err := validateMemoryReport(path)
-	if err == nil || !strings.Contains(err.Error(), "dynamic raw") || !strings.Contains(err.Error(), "zero_cost_proven") {
+	if err == nil || !strings.Contains(err.Error(), "dynamic raw") ||
+		!strings.Contains(err.Error(), "zero_cost_proven") {
 		t.Fatalf("validateMemoryReport error = %v, want dynamic raw zero-cost rejection", err)
 	}
 }
@@ -568,13 +1174,43 @@ func TestValidateMemoryReportRejectsValidatedCapMemAsProof(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "memory-report.json")
-			raw := strings.Replace(validSchemaV1MemoryReport(), `"claim": "allocation_base_metadata"`, `"claim": "`+tc.claim+`"`, 1)
+			raw := strings.Replace(
+				validSchemaV1MemoryReport(),
+				`"claim": "allocation_base_metadata"`,
+				`"claim": "`+tc.claim+`"`,
+				1,
+			)
 			raw = strings.Replace(raw, `"source_stage": "validation"`, `"source_stage": "plir"`, 1)
-			raw = strings.Replace(raw, `"provenance_class": "unsafe_verified_root"`, `"provenance_class": "safe_known"`, 1)
-			raw = strings.Replace(raw, `"unsafe_class": "unsafe_verified_root"`, `"unsafe_class": "safe"`+tc.alias, 1)
-			raw = strings.Replace(raw, `"validator_name": "raw_bounds_validator"`, `"validator_name": "cap_mem_authorization_validator"`, 1)
-			raw = strings.Replace(raw, `"reason": "verified core.alloc_bytes root"`, `"reason": "cap.mem authorized raw helper call"`, 1)
-			raw = strings.Replace(raw, `"planned_storage": "Heap",`+"\n      "+`"actual_lowering_storage": "Heap",`+"\n      "+`"lowered_artifact_id": "ir:main:alloc_bytes:0",`, "", 1)
+			raw = strings.Replace(
+				raw,
+				`"provenance_class": "unsafe_verified_root"`,
+				`"provenance_class": "safe_known"`,
+				1,
+			)
+			raw = strings.Replace(
+				raw,
+				`"unsafe_class": "unsafe_verified_root"`,
+				`"unsafe_class": "safe"`+tc.alias,
+				1,
+			)
+			raw = strings.Replace(
+				raw,
+				`"validator_name": "raw_bounds_validator"`,
+				`"validator_name": "cap_mem_authorization_validator"`,
+				1,
+			)
+			raw = strings.Replace(
+				raw,
+				`"reason": "verified core.alloc_bytes root"`,
+				`"reason": "cap.mem authorized raw helper call"`,
+				1,
+			)
+			raw = strings.Replace(
+				raw,
+				`"planned_storage": "Heap",`+"\n      "+`"actual_lowering_storage": "Heap",`+"\n      "+`"lowered_artifact_id": "ir:main:alloc_bytes:0",`,
+				"",
+				1,
+			)
 			if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 				t.Fatal(err)
 			}
@@ -588,7 +1224,12 @@ func TestValidateMemoryReportRejectsValidatedCapMemAsProof(t *testing.T) {
 
 func TestValidateMemoryReportRejectsMissingCostClass(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory-report.json")
-	raw := strings.Replace(validSchemaV1MemoryReport(), "\n      \"cost_class\": \"zero_cost_proven\",", "", 1)
+	raw := strings.Replace(
+		validSchemaV1MemoryReport(),
+		"\n      \"cost_class\": \"zero_cost_proven\",",
+		"",
+		1,
+	)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -600,7 +1241,12 @@ func TestValidateMemoryReportRejectsMissingCostClass(t *testing.T) {
 
 func TestValidateMemoryReportRejectsUnknownCostClass(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory-report.json")
-	raw := strings.Replace(validSchemaV1MemoryReport(), `"cost_class": "zero_cost_proven"`, `"cost_class": "mystery_cost"`, 1)
+	raw := strings.Replace(
+		validSchemaV1MemoryReport(),
+		`"cost_class": "zero_cost_proven"`,
+		`"cost_class": "mystery_cost"`,
+		1,
+	)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -612,15 +1258,50 @@ func TestValidateMemoryReportRejectsUnknownCostClass(t *testing.T) {
 
 func TestValidateMemoryReportRejectsConservativeZeroCost(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory-report.json")
-	raw := strings.Replace(validSchemaV1MemoryReport(), `"claim": "allocation_base_metadata"`, `"claim": "callback_inout_conservative"`, 1)
+	raw := strings.Replace(
+		validSchemaV1MemoryReport(),
+		`"claim": "allocation_base_metadata"`,
+		`"claim": "callback_inout_conservative"`,
+		1,
+	)
 	raw = strings.Replace(raw, `"claim_level": "validated"`, `"claim_level": "conservative"`, 1)
 	raw = strings.Replace(raw, `"source_stage": "validation"`, `"source_stage": "plir"`, 1)
-	raw = strings.Replace(raw, `"provenance_class": "unsafe_verified_root"`, `"provenance_class": "unsafe_unknown"`, 1)
-	raw = strings.Replace(raw, `"unsafe_class": "unsafe_verified_root"`, `"unsafe_class": "unsafe_unknown"`, 1)
-	raw = strings.Replace(raw, `"planned_storage": "Heap",`+"\n      "+`"actual_lowering_storage": "Heap",`+"\n      "+`"lowered_artifact_id": "ir:main:alloc_bytes:0",`, "", 1)
-	raw = strings.Replace(raw, `"validator_name": "raw_bounds_validator"`, `"validator_name": "callback_alias_conservative_validator"`, 1)
-	raw = strings.Replace(raw, `"validator_status": "pass"`, `"validator_status": "not_applicable"`, 1)
-	raw = strings.Replace(raw, `"source_fact_id": "fact:raw:root"`, `"source_fact_id": "fact:callback:boundary",`+"\n      "+`"parent_fact_id": "fact:callback:borrow"`, 1)
+	raw = strings.Replace(
+		raw,
+		`"provenance_class": "unsafe_verified_root"`,
+		`"provenance_class": "unsafe_unknown"`,
+		1,
+	)
+	raw = strings.Replace(
+		raw,
+		`"unsafe_class": "unsafe_verified_root"`,
+		`"unsafe_class": "unsafe_unknown"`,
+		1,
+	)
+	raw = strings.Replace(
+		raw,
+		`"planned_storage": "Heap",`+"\n      "+`"actual_lowering_storage": "Heap",`+"\n      "+`"lowered_artifact_id": "ir:main:alloc_bytes:0",`,
+		"",
+		1,
+	)
+	raw = strings.Replace(
+		raw,
+		`"validator_name": "raw_bounds_validator"`,
+		`"validator_name": "callback_alias_conservative_validator"`,
+		1,
+	)
+	raw = strings.Replace(
+		raw,
+		`"validator_status": "pass"`,
+		`"validator_status": "not_applicable"`,
+		1,
+	)
+	raw = strings.Replace(
+		raw,
+		`"source_fact_id": "fact:raw:root"`,
+		`"source_fact_id": "fact:callback:boundary",`+"\n      "+`"parent_fact_id": "fact:callback:borrow"`,
+		1,
+	)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -632,14 +1313,39 @@ func TestValidateMemoryReportRejectsConservativeZeroCost(t *testing.T) {
 
 func TestValidateMemoryReportRejectsUnvalidatedStorageLoweringZeroCost(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory-report.json")
-	raw := strings.Replace(validSchemaV1MemoryReport(), `"claim": "allocation_base_metadata"`, `"claim": "storage_lowering"`, 1)
+	raw := strings.Replace(
+		validSchemaV1MemoryReport(),
+		`"claim": "allocation_base_metadata"`,
+		`"claim": "storage_lowering"`,
+		1,
+	)
 	raw = strings.Replace(raw, `"claim_level": "validated"`, `"claim_level": "evidence_only"`, 1)
 	raw = strings.Replace(raw, `"source_stage": "validation"`, `"source_stage": "allocplan"`, 1)
-	raw = strings.Replace(raw, `"provenance_class": "unsafe_verified_root"`, `"provenance_class": "safe_owned"`, 1)
-	raw = strings.Replace(raw, `"unsafe_class": "unsafe_verified_root"`, `"unsafe_class": "safe"`, 1)
+	raw = strings.Replace(
+		raw,
+		`"provenance_class": "unsafe_verified_root"`,
+		`"provenance_class": "safe_owned"`,
+		1,
+	)
+	raw = strings.Replace(
+		raw,
+		`"unsafe_class": "unsafe_verified_root"`,
+		`"unsafe_class": "safe"`,
+		1,
+	)
 	raw = strings.Replace(raw, `"planned_storage": "Heap"`, `"planned_storage": "Stack"`, 1)
-	raw = strings.Replace(raw, `"actual_lowering_storage": "Heap"`, `"actual_lowering_storage": "Stack"`, 1)
-	raw = strings.Replace(raw, `"validator_name": "raw_bounds_validator"`, `"validator_name": ""`, 1)
+	raw = strings.Replace(
+		raw,
+		`"actual_lowering_storage": "Heap"`,
+		`"actual_lowering_storage": "Stack"`,
+		1,
+	)
+	raw = strings.Replace(
+		raw,
+		`"validator_name": "raw_bounds_validator"`,
+		`"validator_name": ""`,
+		1,
+	)
 	raw = strings.Replace(raw, `"validator_status": "pass"`, `"validator_status": "not_run"`, 1)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
@@ -652,23 +1358,54 @@ func TestValidateMemoryReportRejectsUnvalidatedStorageLoweringZeroCost(t *testin
 
 func TestValidateMemoryReportRejectsDynamicOptimizationWithoutNormalBuildCheck(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory-report.json")
-	raw := strings.Replace(validSchemaV1MemoryReport(), `"claim": "allocation_base_metadata"`, `"claim": "bounds_check_eliminated"`, 1)
-	raw = strings.Replace(raw, `"cost_class": "zero_cost_proven"`, `"cost_class": "dynamic_check_required"`, 1)
+	raw := strings.Replace(
+		validSchemaV1MemoryReport(),
+		`"claim": "allocation_base_metadata"`,
+		`"claim": "bounds_check_eliminated"`,
+		1,
+	)
+	raw = strings.Replace(
+		raw,
+		`"cost_class": "zero_cost_proven"`,
+		`"cost_class": "dynamic_check_required"`,
+		1,
+	)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	err := validateMemoryReport(path)
-	if err == nil || !strings.Contains(err.Error(), "dynamic_check_required") || !strings.Contains(err.Error(), "normal_build_check") {
+	if err == nil || !strings.Contains(err.Error(), "dynamic_check_required") ||
+		!strings.Contains(err.Error(), "normal_build_check") {
 		t.Fatalf("validateMemoryReport error = %v, want dynamic check rejection", err)
 	}
 }
 
 func TestValidateMemoryReportRejectsBareBoundsCheckEliminatedWithoutProofID(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory-report.json")
-	raw := strings.Replace(validSchemaV1MemoryReport(), `"claim": "allocation_base_metadata"`, `"claim": "bounds_check_eliminated"`, 1)
-	raw = strings.Replace(raw, `"provenance_class": "unsafe_verified_root"`, `"provenance_class": "safe_known"`, 1)
-	raw = strings.Replace(raw, `"unsafe_class": "unsafe_verified_root"`, `"unsafe_class": "safe"`, 1)
-	raw = strings.Replace(raw, `"validator_name": "raw_bounds_validator"`, `"validator_name": "bounds_proof_id_validator"`, 1)
+	raw := strings.Replace(
+		validSchemaV1MemoryReport(),
+		`"claim": "allocation_base_metadata"`,
+		`"claim": "bounds_check_eliminated"`,
+		1,
+	)
+	raw = strings.Replace(
+		raw,
+		`"provenance_class": "unsafe_verified_root"`,
+		`"provenance_class": "safe_known"`,
+		1,
+	)
+	raw = strings.Replace(
+		raw,
+		`"unsafe_class": "unsafe_verified_root"`,
+		`"unsafe_class": "safe"`,
+		1,
+	)
+	raw = strings.Replace(
+		raw,
+		`"validator_name": "raw_bounds_validator"`,
+		`"validator_name": "bounds_proof_id_validator"`,
+		1,
+	)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -680,57 +1417,112 @@ func TestValidateMemoryReportRejectsBareBoundsCheckEliminatedWithoutProofID(t *t
 
 func TestValidateMemoryReportRejectsUnsafeUnknownZeroCost(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory-report.json")
-	raw := strings.Replace(conservativeUnknownRawPointerReport(), `"cost_class": "conservative_fallback"`, `"cost_class": "zero_cost_proven"`, 1)
+	raw := strings.Replace(
+		conservativeUnknownRawPointerReport(),
+		`"cost_class": "conservative_fallback"`,
+		`"cost_class": "zero_cost_proven"`,
+		1,
+	)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	err := validateMemoryReport(path)
-	if err == nil || !strings.Contains(err.Error(), "unsafe_unknown") || !strings.Contains(err.Error(), "zero_cost_proven") {
+	if err == nil || !strings.Contains(err.Error(), "unsafe_unknown") ||
+		!strings.Contains(err.Error(), "zero_cost_proven") {
 		t.Fatalf("validateMemoryReport error = %v, want unsafe zero-cost rejection", err)
 	}
 }
 
 func TestValidateMemoryReportRejectsUnsafeUnknownProvenanceKnownClaim(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory-report.json")
-	raw := strings.Replace(conservativeUnknownRawPointerReport(), `"claim": "checked_external_unknown"`, `"claim": "provenance_known"`, 1)
+	raw := strings.Replace(
+		conservativeUnknownRawPointerReport(),
+		`"claim": "checked_external_unknown"`,
+		`"claim": "provenance_known"`,
+		1,
+	)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	err := validateMemoryReport(path)
 	if err == nil || !strings.Contains(err.Error(), "unsafe_unknown") {
-		t.Fatalf("validateMemoryReport error = %v, want unsafe_unknown provenance_known rejection", err)
+		t.Fatalf(
+			"validateMemoryReport error = %v, want unsafe_unknown provenance_known rejection",
+			err,
+		)
 	}
 }
 
 func TestValidateMemoryReportRejectsUnsafeVerifiedRootGenericClaim(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory-report.json")
-	raw := strings.Replace(validSchemaV1MemoryReport(), `"claim": "allocation_base_metadata"`, `"claim": "provenance_known"`, 1)
+	raw := strings.Replace(
+		validSchemaV1MemoryReport(),
+		`"claim": "allocation_base_metadata"`,
+		`"claim": "provenance_known"`,
+		1,
+	)
 	raw = strings.Replace(raw, `"claim_level": "validated"`, `"claim_level": "evidence_only"`, 1)
-	raw = strings.Replace(raw, `"validator_name": "raw_bounds_validator"`, `"validator_name": ""`, 1)
+	raw = strings.Replace(
+		raw,
+		`"validator_name": "raw_bounds_validator"`,
+		`"validator_name": ""`,
+		1,
+	)
 	raw = strings.Replace(raw, `"validator_status": "pass"`, `"validator_status": "not_run"`, 1)
-	raw = strings.Replace(raw, `"planned_storage": "Heap",`+"\n      "+`"actual_lowering_storage": "Heap",`+"\n      "+`"validator_name": ""`, `"validator_name": ""`, 1)
-	raw = strings.Replace(raw, `"lowered_artifact_id": "ir:main:alloc_bytes:0",`+"\n      "+`"source_stage"`, `"source_stage"`, 1)
+	raw = strings.Replace(
+		raw,
+		`"planned_storage": "Heap",`+"\n      "+`"actual_lowering_storage": "Heap",`+"\n      "+`"validator_name": ""`,
+		`"validator_name": ""`,
+		1,
+	)
+	raw = strings.Replace(
+		raw,
+		`"lowered_artifact_id": "ir:main:alloc_bytes:0",`+"\n      "+`"source_stage"`,
+		`"source_stage"`,
+		1,
+	)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	err := validateMemoryReport(path)
 	if err == nil || !strings.Contains(err.Error(), "unsafe_verified_root") {
-		t.Fatalf("validateMemoryReport error = %v, want unsafe_verified_root generic-claim rejection", err)
+		t.Fatalf(
+			"validateMemoryReport error = %v, want unsafe_verified_root generic-claim rejection",
+			err,
+		)
 	}
 }
 
 func TestValidateMemoryReportRejectsUnsafeUnknownTrustedStorage(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory-report.json")
-	raw := strings.Replace(validSchemaV1MemoryReport(), `"provenance_class": "unsafe_verified_root"`, `"provenance_class": "unsafe_unknown"`, 1)
-	raw = strings.Replace(raw, `"unsafe_class": "unsafe_verified_root"`, `"unsafe_class": "unsafe_unknown"`, 1)
+	raw := strings.Replace(
+		validSchemaV1MemoryReport(),
+		`"provenance_class": "unsafe_verified_root"`,
+		`"provenance_class": "unsafe_unknown"`,
+		1,
+	)
+	raw = strings.Replace(
+		raw,
+		`"unsafe_class": "unsafe_verified_root"`,
+		`"unsafe_class": "unsafe_unknown"`,
+		1,
+	)
 	raw = strings.Replace(raw, `"planned_storage": "Heap"`, `"planned_storage": "Stack"`, 1)
-	raw = strings.Replace(raw, `"actual_lowering_storage": "Heap"`, `"actual_lowering_storage": "Stack"`, 1)
+	raw = strings.Replace(
+		raw,
+		`"actual_lowering_storage": "Heap"`,
+		`"actual_lowering_storage": "Stack"`,
+		1,
+	)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	err := validateMemoryReport(path)
 	if err == nil || !strings.Contains(err.Error(), "unsafe_unknown") {
-		t.Fatalf("validateMemoryReport error = %v, want unsafe_unknown trusted-storage rejection", err)
+		t.Fatalf(
+			"validateMemoryReport error = %v, want unsafe_unknown trusted-storage rejection",
+			err,
+		)
 	}
 }
 
@@ -738,16 +1530,40 @@ func TestValidateMemoryReportRejectsUnsafeVerifiedRootTrustedStorage(t *testing.
 	for _, storage := range []string{"Stack", "Region", "FunctionTempRegion"} {
 		t.Run(storage, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "memory-report.json")
-			raw := strings.Replace(validSchemaV1MemoryReport(), `"planned_storage": "Heap"`, `"planned_storage": "`+storage+`"`, 1)
-			raw = strings.Replace(raw, `"actual_lowering_storage": "Heap"`, `"actual_lowering_storage": "`+storage+`"`, 1)
-			raw = strings.Replace(raw, `"lowered_artifact_id": "ir:main:alloc_bytes:0"`, `"lowered_artifact_id": "ir:main:ffi:`+storage+`"`, 1)
-			raw = strings.Replace(raw, `"reason": "verified core.alloc_bytes root"`, `"reason": "raw FFI root must not become trusted storage"`, 1)
+			raw := strings.Replace(
+				validSchemaV1MemoryReport(),
+				`"planned_storage": "Heap"`,
+				`"planned_storage": "`+storage+`"`,
+				1,
+			)
+			raw = strings.Replace(
+				raw,
+				`"actual_lowering_storage": "Heap"`,
+				`"actual_lowering_storage": "`+storage+`"`,
+				1,
+			)
+			raw = strings.Replace(
+				raw,
+				`"lowered_artifact_id": "ir:main:alloc_bytes:0"`,
+				`"lowered_artifact_id": "ir:main:ffi:`+storage+`"`,
+				1,
+			)
+			raw = strings.Replace(
+				raw,
+				`"reason": "verified core.alloc_bytes root"`,
+				`"reason": "raw FFI root must not become trusted storage"`,
+				1,
+			)
 			if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 				t.Fatal(err)
 			}
 			err := validateMemoryReport(path)
-			if err == nil || !strings.Contains(err.Error(), "unsafe_verified_root") || !strings.Contains(err.Error(), "trusted storage") {
-				t.Fatalf("validateMemoryReport error = %v, want unsafe_verified_root trusted-storage rejection", err)
+			if err == nil || !strings.Contains(err.Error(), "unsafe_verified_root") ||
+				!strings.Contains(err.Error(), "trusted storage") {
+				t.Fatalf(
+					"validateMemoryReport error = %v, want unsafe_verified_root trusted-storage rejection",
+					err,
+				)
 			}
 		})
 	}
@@ -775,7 +1591,11 @@ func TestValidateMemoryReportAcceptsRawSliceRejectedEvidenceRows(t *testing.T) {
 
 func TestValidateMemoryReportAcceptsMemoryIdealV5UnsafeContractRows(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory-report.json")
-	if err := os.WriteFile(path, []byte(canonicalMemoryReportString(t, memoryIdealV5UnsafeContractReport())), 0o644); err != nil {
+	if err := os.WriteFile(
+		path,
+		[]byte(canonicalMemoryReportString(t, memoryIdealV5UnsafeContractReport())),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 	if err := validateMemoryReport(path); err != nil {
@@ -784,7 +1604,10 @@ func TestValidateMemoryReportAcceptsMemoryIdealV5UnsafeContractRows(t *testing.T
 }
 
 func TestValidateMemoryReportAcceptsMemoryIdealV7FFIRows(t *testing.T) {
-	if err := validateMemoryReportString(t, canonicalMemoryReportString(t, memoryIdealV7FFIReport())); err != nil {
+	if err := validateMemoryReportString(
+		t,
+		canonicalMemoryReportString(t, memoryIdealV7FFIReport()),
+	); err != nil {
 		t.Fatalf("validateMemoryReport v7 FFI rows: %v", err)
 	}
 }
@@ -830,7 +1653,10 @@ func TestValidateMemoryReportRejectsValidatedCallbackInoutConservativeRow(t *tes
 }`
 	err := validateMemoryReportString(t, raw)
 	if err == nil || !strings.Contains(err.Error(), "conservative") {
-		t.Fatalf("validateMemoryReport error = %v, want conservative noalias boundary validation rejection", err)
+		t.Fatalf(
+			"validateMemoryReport error = %v, want conservative noalias boundary validation rejection",
+			err,
+		)
 	}
 }
 
@@ -908,6 +1734,8 @@ func validSchemaV2AllocationReport() string {
           "actual_lowering_storage": "Heap",
           "validation_status": "validated_heap_runtime",
           "lowering_status": "heap_runtime",
+          "reason_codes": ["heap.required_dynamic_lifetime"],
+          "heap_reason_codes": ["heap.required_dynamic_lifetime"],
           "reason": "fixture allocation report row"
         }
       ]
@@ -1172,7 +2000,8 @@ func memoryIdealV7ParentlessFFIReport(claim string) string {
 	status := "not_applicable"
 	cost := "conservative_fallback"
 	alias := ""
-	if claim == "safe_wrapper_promotion_rejected_without_contract" || claim == "external_pointer_provenance_rejected" {
+	if claim == "safe_wrapper_promotion_rejected_without_contract" ||
+		claim == "external_pointer_provenance_rejected" {
 		level = "rejected"
 		status = "fail"
 		cost = "unsupported_rejected"

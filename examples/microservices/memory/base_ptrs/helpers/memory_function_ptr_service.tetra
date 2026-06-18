@@ -1,0 +1,32 @@
+// Memory function-pointer microservice smoke.
+//
+// The service carries allocation-base pointers through function and generic
+// identity helpers, then derives checked cells only after the pointers return.
+module examples.microservices.memory.base_ptrs.helpers.memory_function_ptr_service
+import lib.core.capability as cap
+
+func keep_ptr(value: ptr) -> ptr:
+    return value
+
+func id<T>(value: T) -> T:
+    return value
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let left_base: ptr = core.alloc_bytes(8)
+        let right_base: ptr = core.alloc_bytes(8)
+        let left_cell: ptr = core.ptr_add(left_base, 4, memory_cap)
+        let right_cell: ptr = core.ptr_add(right_base, 4, memory_cap)
+        let _left_write: Int = core.store_i32(left_cell, 20, memory_cap)
+        let _right_write: Int = core.store_i32(right_cell, 22, memory_cap)
+        let kept_left: ptr = keep_ptr(left_base)
+        let kept_right: ptr = id(right_base)
+        let loaded_left: ptr = core.ptr_add(kept_left, 4, memory_cap)
+        let loaded_right: ptr = core.ptr_add(kept_right, 4, memory_cap)
+        let total: Int = core.load_i32(loaded_left, memory_cap) + core.load_i32(loaded_right, memory_cap)
+        if total == 42:
+            return 0
+        return total
+    return 99

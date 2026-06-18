@@ -97,16 +97,22 @@ func ValidateIOReactorCoverage(report IOReactorCoverageReport) error {
 		return fmt.Errorf("io reactor coverage: schema = %q", report.SchemaVersion)
 	}
 	if report.FullProductionWebStackClaimed {
-		return fmt.Errorf("io reactor coverage: full production web stack claim is forbidden for P18.3")
+		return fmt.Errorf(
+			"io reactor coverage: full production web stack claim is forbidden for P18.3",
+		)
 	}
 	if report.CrossPlatformParityClaimed {
-		return fmt.Errorf("io reactor coverage: cross-platform reactor parity claim is forbidden for P18.3")
+		return fmt.Errorf(
+			"io reactor coverage: cross-platform reactor parity claim is forbidden for P18.3",
+		)
 	}
 	if report.IOUringClaimed {
 		return fmt.Errorf("io reactor coverage: io_uring claim is forbidden until a later slice")
 	}
 	if report.RuntimeBehaviorChanged {
-		return fmt.Errorf("io reactor coverage: runtime behavior change claim is forbidden for report-only P18.3 evidence")
+		return fmt.Errorf(
+			"io reactor coverage: runtime behavior change claim is forbidden for report-only P18.3 evidence",
+		)
 	}
 	for _, want := range []string{
 		"full production web stack is not claimed",
@@ -137,7 +143,11 @@ func ValidateIOReactorCoverage(report IOReactorCoverageReport) error {
 		IOReactorStressEvidence:             IOReactorEvidenceOnly,
 	}
 	if len(report.Rows) != len(expectedStatus) {
-		return fmt.Errorf("io reactor coverage: row count = %d, want %d", len(report.Rows), len(expectedStatus))
+		return fmt.Errorf(
+			"io reactor coverage: row count = %d, want %d",
+			len(report.Rows),
+			len(expectedStatus),
+		)
 	}
 	rows := map[IOReactorEvidenceID]IOReactorEvidenceRow{}
 	for _, row := range report.Rows {
@@ -153,19 +163,31 @@ func ValidateIOReactorCoverage(report IOReactorCoverageReport) error {
 		}
 		rows[row.ID] = row
 		if row.Status != wantStatus {
-			return fmt.Errorf("io reactor coverage: row %q status = %q, want %q", row.ID, row.Status, wantStatus)
+			return fmt.Errorf(
+				"io reactor coverage: row %q status = %q, want %q",
+				row.ID,
+				row.Status,
+				wantStatus,
+			)
 		}
-		if strings.TrimSpace(row.Name) == "" || strings.TrimSpace(row.Evidence) == "" || strings.TrimSpace(row.Boundary) == "" {
+		if strings.TrimSpace(row.Name) == "" || strings.TrimSpace(row.Evidence) == "" ||
+			strings.TrimSpace(row.Boundary) == "" {
 			return fmt.Errorf("io reactor coverage: row %q missing evidence or boundary", row.ID)
 		}
 		if len(row.RequiredFacts) == 0 {
 			return fmt.Errorf("io reactor coverage: row %q missing required facts", row.ID)
 		}
 		if row.ClaimsFullProductionWebStack {
-			return fmt.Errorf("io reactor coverage: row %q claims full production web stack", row.ID)
+			return fmt.Errorf(
+				"io reactor coverage: row %q claims full production web stack",
+				row.ID,
+			)
 		}
 		if row.ClaimsCrossPlatformParity {
-			return fmt.Errorf("io reactor coverage: row %q claims cross-platform reactor parity", row.ID)
+			return fmt.Errorf(
+				"io reactor coverage: row %q claims cross-platform reactor parity",
+				row.ID,
+			)
 		}
 		if row.ClaimsIOUring {
 			return fmt.Errorf("io reactor coverage: row %q claims io_uring support", row.ID)
@@ -180,49 +202,135 @@ func ValidateIOReactorCoverage(report IOReactorCoverageReport) error {
 		}
 	}
 
-	if err := requireIOReactorCoverageFacts(rows[IOReactorLinuxEpollV1], "linux epoll v1", "epoll v1", "NewPoller", "EPOLLIN", "EPOLLOUT"); err != nil {
+	if err := requireIOReactorCoverageFacts(
+		rows[IOReactorLinuxEpollV1],
+		"linux epoll v1",
+		"epoll v1",
+		"NewPoller",
+		"EPOLLIN",
+		"EPOLLOUT",
+	); err != nil {
 		return err
 	}
-	if err := requireIOReactorCoverageFacts(rows[IOReactorIOUringFuture], "io_uring", "io_uring later after epoll stable", "not implemented"); err != nil {
+	if err := requireIOReactorCoverageFacts(
+		rows[IOReactorIOUringFuture],
+		"io_uring",
+		"io_uring later after epoll stable",
+		"not implemented",
+	); err != nil {
 		return err
 	}
-	if err := requireIOReactorCoverageFacts(rows[IOReactorKqueueBoundary], "kqueue", "kqueue macOS", "not implemented"); err != nil {
+	if err := requireIOReactorCoverageFacts(
+		rows[IOReactorKqueueBoundary],
+		"kqueue",
+		"kqueue macOS",
+		"not implemented",
+	); err != nil {
 		return err
 	}
-	if err := requireIOReactorCoverageFacts(rows[IOReactorIOCPBoundary], "IOCP", "IOCP Windows", "not implemented"); err != nil {
+	if err := requireIOReactorCoverageFacts(
+		rows[IOReactorIOCPBoundary],
+		"IOCP",
+		"IOCP Windows",
+		"not implemented",
+	); err != nil {
 		return err
 	}
-	if err := requireIOReactorCoverageFacts(rows[IOReactorWASIWebBoundary], "WASI/web", "WASI/web event adapters", "not implemented"); err != nil {
+	if err := requireIOReactorCoverageFacts(
+		rows[IOReactorWASIWebBoundary],
+		"WASI/web",
+		"WASI/web event adapters",
+		"not implemented",
+	); err != nil {
 		return err
 	}
-	if err := requireIOReactorCoverageFacts(rows[IOReactorNonblockingAcceptReadWrite], "nonblocking accept/read/write", "Accept4", "SOCK_NONBLOCK", "Read", "Write"); err != nil {
+	if err := requireIOReactorCoverageFacts(
+		rows[IOReactorNonblockingAcceptReadWrite],
+		"nonblocking accept/read/write",
+		"Accept4",
+		"SOCK_NONBLOCK",
+		"Read",
+		"Write",
+	); err != nil {
 		return err
 	}
-	if err := requireIOReactorCoverageFacts(rows[IOReactorReadinessPolling], "readiness polling", "Poller.Wait", "wait-one readiness", "TestNetRuntimeEpollReadiness"); err != nil {
+	if err := requireIOReactorCoverageFacts(
+		rows[IOReactorReadinessPolling],
+		"readiness polling",
+		"Poller.Wait",
+		"wait-one readiness",
+		"TestNetRuntimeEpollReadiness",
+	); err != nil {
 		return err
 	}
-	if err := requireIOReactorCoverageFacts(rows[IOReactorTaskWakeupsFromIO], "I/O task wakeups", "I/O readiness wakes", "poller.Wait", "core.task_spawn_i32"); err != nil {
+	if err := requireIOReactorCoverageFacts(
+		rows[IOReactorTaskWakeupsFromIO],
+		"I/O task wakeups",
+		"I/O readiness wakes",
+		"poller.Wait",
+		"core.task_spawn_i32",
+	); err != nil {
 		return err
 	}
-	if err := requireIOReactorCoverageFacts(rows[IOReactorTimerIntegration], "timer integration", "50ms poll timeout", "sleep_ms", "wake in deadline order"); err != nil {
+	if err := requireIOReactorCoverageFacts(
+		rows[IOReactorTimerIntegration],
+		"timer integration",
+		"50ms poll timeout",
+		"sleep_ms",
+		"wake in deadline order",
+	); err != nil {
 		return err
 	}
-	if err := requireIOReactorCoverageFacts(rows[IOReactorCancellation], "cancellation", "context cancellation", "Close", "task_group_cancel"); err != nil {
+	if err := requireIOReactorCoverageFacts(
+		rows[IOReactorCancellation],
+		"cancellation",
+		"context cancellation",
+		"Close",
+		"task_group_cancel",
+	); err != nil {
 		return err
 	}
-	if err := requireIOReactorCoverageFacts(rows[IOReactorBackpressure], "backpressure", "EPOLLOUT", "ErrPoolExhausted", "output buffer"); err != nil {
+	if err := requireIOReactorCoverageFacts(
+		rows[IOReactorBackpressure],
+		"backpressure",
+		"EPOLLOUT",
+		"ErrPoolExhausted",
+		"output buffer",
+	); err != nil {
 		return err
 	}
-	if err := requireIOReactorCoverageFacts(rows[IOReactorReportRows], "reactor report rows", "tetra.techempower.benchmark.v1", "ValidateReport"); err != nil {
+	if err := requireIOReactorCoverageFacts(
+		rows[IOReactorReportRows],
+		"reactor report rows",
+		"tetra.techempower.benchmark.v1",
+		"ValidateReport",
+	); err != nil {
 		return err
 	}
-	if err := requireIOReactorCoverageFacts(rows[IOReactorHTTPSmoke], "HTTP smoke", "plaintext", "json", "pipelining"); err != nil {
+	if err := requireIOReactorCoverageFacts(
+		rows[IOReactorHTTPSmoke],
+		"HTTP smoke",
+		"plaintext",
+		"json",
+		"pipelining",
+	); err != nil {
 		return err
 	}
-	if err := requireIOReactorCoverageFacts(rows[IOReactorDBSmoke], "DB smoke", "PostgreSQL", "prepared statement", "pool"); err != nil {
+	if err := requireIOReactorCoverageFacts(
+		rows[IOReactorDBSmoke],
+		"DB smoke",
+		"PostgreSQL",
+		"prepared statement",
+		"pool",
+	); err != nil {
 		return err
 	}
-	if err := requireIOReactorCoverageFacts(rows[IOReactorStressEvidence], "stress evidence", "go test -race ./compiler/internal/netrt", "many readiness waits"); err != nil {
+	if err := requireIOReactorCoverageFacts(
+		rows[IOReactorStressEvidence],
+		"stress evidence",
+		"go test -race ./compiler/internal/netrt",
+		"many readiness waits",
+	); err != nil {
 		return err
 	}
 	return nil
@@ -235,12 +343,21 @@ func linuxEpollV1Row() IOReactorEvidenceRow {
 		Status:   IOReactorImplementedNarrow,
 		Platform: "linux",
 		RequiredFacts: []string{
-			"epoll v1 is implemented by NewPoller, Poller.AddRead, Poller.AddReadWrite, Poller.Mod, Poller.Remove, and Poller.Wait",
+			("epoll v1 is implemented by NewPoller, Poller.AddRead, " +
+				"Poller.AddReadWrite, Poller.Mod, Poller.Remove, and " +
+				"Poller.Wait"),
 			"events capture EPOLLIN, EPOLLOUT, EPOLLERR, and EPOLLHUP readiness flags",
-			"compiler/internal/netrt/netrt_linux_test.go::TestPollerSignalsReadableDataAndSyscallReadWriteRoundTrip covers Linux epoll readiness",
+			("compiler/internal/netrt/netrt_linux_test.go::" +
+				"TestPollerSignalsReadableDataAndSyscallReadWriteRoundTrip " +
+				"covers Linux epoll readiness"),
 		},
-		Evidence: "compiler/internal/netrt/netrt_linux.go::NewPoller; compiler/internal/netrt/netrt_linux.go::Poller.Wait; compiler/internal/netrt/netrt_linux_test.go::TestPollerSignalsReadableDataAndSyscallReadWriteRoundTrip",
-		Boundary: "Linux epoll v1 is implemented narrowly for current netrt sockets; this does not implement io_uring or a portable event-loop abstraction",
+		Evidence: ("compiler/internal/netrt/netrt_linux.go::NewPoller; " +
+			"compiler/internal/netrt/netrt_linux.go::Poller.Wait; " +
+			"compiler/internal/netrt/netrt_linux_test.go::" +
+			"TestPollerSignalsReadableDataAndSyscallReadWriteRoundTrip"),
+		Boundary: ("Linux epoll v1 is implemented narrowly for current netrt " +
+			"sockets; this does not implement io_uring or a portable " +
+			"event-loop abstraction"),
 	}
 }
 
@@ -260,8 +377,10 @@ func ioUringFutureRow() IOReactorEvidenceRow {
 			"io_uring cancellation and backpressure tests",
 			"io_uring parity with epoll evidence",
 		},
-		Evidence: "/home/tetra/Downloads/tetra_ideal_master_plan_20260602.md::P18.3; compiler/internal/netrt/netrt_linux.go::NewPoller",
-		Boundary: "io_uring remains future work until a separate evidence slice implements and validates it",
+		Evidence: ("/home/tetra/Downloads/tetra_ideal_master_plan_20260602.md::" +
+			"P18.3; compiler/internal/netrt/netrt_linux.go::NewPoller"),
+		Boundary: ("io_uring remains future work until a separate evidence " +
+			"slice implements and validates it"),
 	}
 }
 
@@ -281,8 +400,10 @@ func kqueueBoundaryRow() IOReactorEvidenceRow {
 			"macOS nonblocking socket runtime smoke",
 			"macOS cancellation/backpressure validation",
 		},
-		Evidence: "/home/tetra/Downloads/tetra_ideal_master_plan_20260602.md::P18.3; compiler/internal/netrt/netrt_unsupported.go",
-		Boundary: "macOS kqueue support is a documented platform boundary, not implemented reactor parity",
+		Evidence: ("/home/tetra/Downloads/tetra_ideal_master_plan_20260602.md::" +
+			"P18.3; compiler/internal/netrt/netrt_unsupported.go"),
+		Boundary: ("macOS kqueue support is a documented platform boundary, not " +
+			"implemented reactor parity"),
 	}
 }
 
@@ -302,8 +423,10 @@ func iocpBoundaryRow() IOReactorEvidenceRow {
 			"Windows socket runtime smoke",
 			"Windows cancellation/backpressure validation",
 		},
-		Evidence: "/home/tetra/Downloads/tetra_ideal_master_plan_20260602.md::P18.3; compiler/internal/netrt/netrt_unsupported.go",
-		Boundary: "Windows IOCP support is a documented platform boundary, not implemented reactor parity",
+		Evidence: ("/home/tetra/Downloads/tetra_ideal_master_plan_20260602.md::" +
+			"P18.3; compiler/internal/netrt/netrt_unsupported.go"),
+		Boundary: ("Windows IOCP support is a documented platform boundary, not " +
+			"implemented reactor parity"),
 	}
 }
 
@@ -316,15 +439,18 @@ func wasiWebBoundaryRow() IOReactorEvidenceRow {
 		RequiredFacts: []string{
 			"WASI/web event adapters are documented in the P18.3 cross-platform path",
 			"WASI/web event adapters are not implemented in netrt",
-			"non-Linux netrt calls return ErrUnsupported through compiler/internal/netrt/netrt_unsupported.go",
+			("non-Linux netrt calls return ErrUnsupported through " +
+				"compiler/internal/netrt/netrt_unsupported.go"),
 		},
 		MissingFacts: []string{
 			"WASI/web event adapter implementation",
 			"browser or WASI readiness integration smoke",
 			"WASI/web cancellation/backpressure validation",
 		},
-		Evidence: "/home/tetra/Downloads/tetra_ideal_master_plan_20260602.md::P18.3; compiler/internal/netrt/netrt_unsupported.go",
-		Boundary: "WASI/web event adapters remain future adapter work and are not claimed as reactor parity",
+		Evidence: ("/home/tetra/Downloads/tetra_ideal_master_plan_20260602.md::" +
+			"P18.3; compiler/internal/netrt/netrt_unsupported.go"),
+		Boundary: ("WASI/web event adapters remain future adapter work and are " +
+			"not claimed as reactor parity"),
 	}
 }
 
@@ -339,8 +465,16 @@ func nonblockingAcceptReadWriteRow() IOReactorEvidenceRow {
 			"Read and Write use direct syscall read/write paths",
 			"Recv and Send round trips are covered by the Linux netrt test suite",
 		},
-		Evidence: "compiler/internal/netrt/netrt_linux.go::Accept; compiler/internal/netrt/netrt_linux.go::Read; compiler/internal/netrt/netrt_linux.go::Write; compiler/internal/netrt/netrt_linux_test.go::TestListenTCP4AcceptsNonblockingConnections; compiler/internal/netrt/netrt_linux_test.go::TestRecvSendRoundTripOnConnectedTCP",
-		Boundary: "current evidence covers Linux TCP sockets and syscall-style I/O helpers; DNS, TLS, UDP, and portable sockets remain outside this row",
+		Evidence: ("compiler/internal/netrt/netrt_linux.go::Accept; " +
+			"compiler/internal/netrt/netrt_linux.go::Read; " +
+			"compiler/internal/netrt/netrt_linux.go::Write; " +
+			"compiler/internal/netrt/netrt_linux_test.go::" +
+			"TestListenTCP4AcceptsNonblockingConnections; " +
+			"compiler/internal/netrt/netrt_linux_test.go::" +
+			"TestRecvSendRoundTripOnConnectedTCP"),
+		Boundary: ("current evidence covers Linux TCP sockets and syscall-style " +
+			"I/O helpers; DNS, TLS, UDP, and portable sockets remain " +
+			"outside this row"),
 	}
 }
 
@@ -352,11 +486,21 @@ func readinessPollingRow() IOReactorEvidenceRow {
 		Platform: "linux",
 		RequiredFacts: []string{
 			"Poller.Wait exposes readiness events for registered file descriptors",
-			"core.net_epoll_wait_one wait-one readiness and wait-one-into flag capture are covered by TestNetRuntimeEpollReadiness build/run smokes",
+			("core.net_epoll_wait_one wait-one readiness and " +
+				"wait-one-into flag capture are covered by " +
+				"TestNetRuntimeEpollReadiness build/run smokes"),
 			"wait-one readiness predicates include EPOLLIN, EPOLLOUT, EPOLLERR, and EPOLLHUP",
 		},
-		Evidence: "compiler/internal/netrt/netrt_linux.go::Poller.Wait; compiler/net_runtime_test.go::testTargetNetworkingEpollReadiness; compiler/net_runtime_test.go::TestX86NetworkingEpollReadinessBuildsAndRunsWhenHostSupportsX86; compiler/net_runtime_test.go::TestX32NetworkingEpollReadinessBuildsAndRunsWhenHostSupportsX32",
-		Boundary: "readiness polling is implemented for the current Linux native net runtime; it is not a full cross-platform reactor",
+		Evidence: ("compiler/internal/netrt/netrt_linux.go::Poller.Wait; " +
+			"compiler/compiler_suite_test.go::" +
+			"testTargetNetworkingEpollReadiness; " +
+			"compiler/compiler_suite_test.go::" +
+			"TestX86NetworkingEpollReadinessBuildsAndRunsWhenHostSupports" +
+			"X86; compiler/compiler_suite_test.go::" +
+			"TestX32NetworkingEpollReadinessBuildsAndRunsWhenHostSupports" +
+			"X32"),
+		Boundary: ("readiness polling is implemented for the current Linux " +
+			"native net runtime; it is not a full cross-platform reactor"),
 	}
 }
 
@@ -371,8 +515,17 @@ func taskWakeupsFromIORow() IOReactorEvidenceRow {
 			"poller.Wait events dispatch acceptReady, readReady, and flush paths",
 			"compiled networking lifecycle composes with core.task_spawn_i32 and task join smokes",
 		},
-		Evidence: "compiler/internal/webrt/server.go::Server.Serve; compiler/internal/webrt/server.go::acceptReady; compiler/internal/webrt/server.go::readReady; compiler/internal/webrt/server.go::flush; compiler/net_runtime_test.go::TestX86NetworkingLifecycleRuntimeComposesWithTaskScheduler; compiler/net_runtime_test.go::TestX32NetworkingLifecycleRuntimeComposesWithTaskScheduler",
-		Boundary: "this proves current I/O readiness dispatch and scheduler composition smoke evidence; it does not wire a production per-core task scheduler into every I/O wait",
+		Evidence: ("compiler/internal/webrt/server.go::Server.Serve; " +
+			"compiler/internal/webrt/server.go::acceptReady; " +
+			"compiler/internal/webrt/server.go::readReady; " +
+			"compiler/internal/webrt/server.go::flush; " +
+			"compiler/compiler_suite_test.go::" +
+			"TestX86NetworkingLifecycleRuntimeComposesWithTaskScheduler; " +
+			"compiler/compiler_suite_test.go::" +
+			"TestX32NetworkingLifecycleRuntimeComposesWithTaskScheduler"),
+		Boundary: ("this proves current I/O readiness dispatch and scheduler " +
+			"composition smoke evidence; it does not wire a production " +
+			"per-core task scheduler into every I/O wait"),
 	}
 }
 
@@ -383,12 +536,20 @@ func timerIntegrationRow() IOReactorEvidenceRow {
 		Status:   IOReactorEvidenceOnly,
 		Platform: "linux",
 		RequiredFacts: []string{
-			"webrt.Server.Serve uses a 50ms poll timeout so context cancellation and timers are not starved by an indefinite wait",
+			("webrt.Server.Serve uses a 50ms poll timeout so context " +
+				"cancellation and timers are not starved by an indefinite " +
+				"wait"),
 			"P18.2 task runtime evidence covers sleep_ms and wake in deadline order",
 			"timer integration evidence is bounded to poll timeouts plus existing task timer smokes",
 		},
-		Evidence: "compiler/internal/webrt/server.go::Server.Serve; compiler/task_runtime_test.go::TestTaskSleepTimersWakeInDeadlineOrderBuildAndRun; compiler/internal/parallelrt/per_core_scheduler.go::timersSleepWakeRow",
-		Boundary: "timer evidence is report-only composition evidence; no new timer wheel, deadline queue, or production scheduler integration is claimed",
+		Evidence: ("compiler/internal/webrt/server.go::Server.Serve; " +
+			"compiler/compiler_suite_test.go::" +
+			"TestTaskSleepTimersWakeInDeadlineOrderBuildAndRun; " +
+			"compiler/internal/parallelrt/per_core_scheduler.go::" +
+			"timersSleepWakeRow"),
+		Boundary: ("timer evidence is report-only composition evidence; no new " +
+			"timer wheel, deadline queue, or production scheduler " +
+			"integration is claimed"),
 	}
 }
 
@@ -401,10 +562,16 @@ func cancellationRow() IOReactorEvidenceRow {
 		RequiredFacts: []string{
 			"webrt.Server.Serve checks context cancellation before and after Poller.Wait",
 			"Server.Close closes the poller and connections so the serve loop can exit",
-			"task_group_cancel evidence remains inherited from P18.2 and is not promoted to a full structured-concurrency reactor",
+			("task_group_cancel evidence remains inherited from P18.2 and " +
+				"is not promoted to a full structured-concurrency reactor"),
 		},
-		Evidence: "compiler/internal/webrt/server.go::Server.Serve; compiler/internal/webrt/server.go::Server.Close; compiler/internal/parallelrt/per_core_scheduler.go::taskGroupCancelRow; compiler/task_runtime_test.go",
-		Boundary: "cancellation evidence covers context-driven server shutdown and existing task-group cancellation smokes; no full structured-concurrency reactor is claimed",
+		Evidence: ("compiler/internal/webrt/server.go::Server.Serve; " +
+			"compiler/internal/webrt/server.go::Server.Close; " +
+			"compiler/internal/parallelrt/per_core_scheduler.go::" +
+			"taskGroupCancelRow; compiler/compiler_suite_test.go"),
+		Boundary: ("cancellation evidence covers context-driven server shutdown " +
+			"and existing task-group cancellation smokes; no full " +
+			"structured-concurrency reactor is claimed"),
 	}
 }
 
@@ -419,8 +586,13 @@ func backpressureRow() IOReactorEvidenceRow {
 			"the output buffer is drained before keep-alive reuse or close-after-write",
 			"pgrt.Pool.Checkout reports ErrPoolExhausted as bounded PostgreSQL pool backpressure",
 		},
-		Evidence: "compiler/internal/webrt/server.go::flush; compiler/internal/webrt/server.go::updateInterest; compiler/internal/pgrt/pool.go::Checkout; compiler/internal/pgrt/pool_test.go",
-		Boundary: "backpressure evidence covers output-buffer interest updates and bounded DB pool exhaustion; it does not claim global queue pressure propagation across every runtime subsystem",
+		Evidence: ("compiler/internal/webrt/server.go::flush; " +
+			"compiler/internal/webrt/server.go::updateInterest; " +
+			"compiler/internal/pgrt/pool.go::Checkout; " +
+			"compiler/internal/pgrt/pool_test.go"),
+		Boundary: ("backpressure evidence covers output-buffer interest updates " +
+			"and bounded DB pool exhaustion; it does not claim global " +
+			"queue pressure propagation across every runtime subsystem"),
 	}
 }
 
@@ -434,8 +606,14 @@ func reactorReportRowsRow() IOReactorEvidenceRow {
 			"ValidateReport rejects weak endpoint, command, threshold, skip-db, and identity evidence",
 			"P18.3 reactor coverage itself is schema tetra.runtime.io_reactor.v1",
 		},
-		Evidence: "tools/validators/techempower/report.go::ValidateReport; tools/validators/techempower/report_test.go::TestValidateReportAcceptsFullSixEndpointReport; compiler/internal/netrt/io_reactor_coverage.go::ValidateIOReactorCoverage",
-		Boundary: "report rows are local evidence contracts and do not imply an official TechEmpower result or production web-stack readiness",
+		Evidence: ("tools/validators/techempower/report.go::ValidateReport; " +
+			"tools/validators/techempower/report_test.go::" +
+			"TestValidateReportAcceptsFullSixEndpointReport; " +
+			"compiler/internal/netrt/io_reactor_coverage.go::" +
+			"ValidateIOReactorCoverage"),
+		Boundary: ("report rows are local evidence contracts and do not imply " +
+			"an official TechEmpower result or production web-stack " +
+			"readiness"),
 	}
 }
 
@@ -449,8 +627,14 @@ func httpSmokeRow() IOReactorEvidenceRow {
 			"webrt server smoke covers json responses",
 			"webrt server smoke covers keep-alive pipelining and partial request reads",
 		},
-		Evidence: "compiler/internal/webrt/server_test.go::TestServerPlaintextKeepAliveAndPipelining; compiler/internal/webrt/server_test.go::TestServerJSONEndpointKeepAliveAndPipelining; compiler/internal/webrt/server_test.go::TestServerHandlesPartialRequestRead",
-		Boundary: "HTTP smoke is local runtime evidence; P19.2 still owns production HTTP/JSON stack promotion",
+		Evidence: ("compiler/internal/webrt/webrt_test.go::" +
+			"TestServerPlaintextKeepAliveAndPipelining; " +
+			"compiler/internal/webrt/webrt_test.go::" +
+			"TestServerJSONEndpointKeepAliveAndPipelining; " +
+			"compiler/internal/webrt/webrt_test.go::" +
+			"TestServerHandlesPartialRequestRead"),
+		Boundary: ("HTTP smoke is local runtime evidence; P19.2 still owns " +
+			"production HTTP/JSON stack promotion"),
 	}
 }
 
@@ -464,8 +648,15 @@ func dbSmokeRow() IOReactorEvidenceRow {
 			"DB handler smoke proves prepared statement usage",
 			"DB handler smoke uses a bounded pgrt pool",
 		},
-		Evidence: "compiler/internal/webrt/db_test.go::TestServerDBEndpointUsesPoolAndSerializesWorld; compiler/internal/webrt/db_test.go::TestServerQueriesEndpointNormalizesCountAndSerializesWorldArray; compiler/internal/webrt/db_test.go::TestServerUpdatesEndpointReadsUpdatesThenSerializesWorldArray; compiler/internal/pgrt/pool.go",
-		Boundary: "DB smoke is local PostgreSQL protocol and handler evidence; P19.3 still owns production driver and pool promotion",
+		Evidence: ("compiler/internal/webrt/webrt_test.go::" +
+			"TestServerDBEndpointUsesPoolAndSerializesWorld; " +
+			"compiler/internal/webrt/webrt_test.go::" +
+			"TestServerQueriesEndpointNormalizesCountAndSerializesWorldAr" +
+			"ray; compiler/internal/webrt/webrt_test.go::" +
+			"TestServerUpdatesEndpointReadsUpdatesThenSerializesWorldArra" +
+			"y; compiler/internal/pgrt/pool.go"),
+		Boundary: ("DB smoke is local PostgreSQL protocol and handler evidence; " +
+			"P19.3 still owns production driver and pool promotion"),
 	}
 }
 
@@ -476,12 +667,19 @@ func stressEvidenceRow() IOReactorEvidenceRow {
 		Status:   IOReactorEvidenceOnly,
 		Platform: "linux",
 		RequiredFacts: []string{
-			"go test -race ./compiler/internal/netrt is the applicable race evidence gate for the Go netrt model",
+			("go test -race ./compiler/internal/netrt is the applicable " +
+				"race evidence gate for the Go netrt model"),
 			"many readiness waits are covered by TestPollerHandlesManyReadinessWaitsAndTimeouts",
 			"compiled net runtime server readiness smokes use process timeouts to reject hangs",
 		},
-		Evidence: "compiler/internal/netrt/netrt_linux_test.go::TestPollerHandlesManyReadinessWaitsAndTimeouts; compiler/net_runtime_test.go::runTargetTCPServerReadinessOrSkip; go test -race ./compiler/internal/netrt",
-		Boundary: "stress evidence is focused on netrt and compiled readiness smokes; it does not prove full cross-target race safety or production web throughput",
+		Evidence: ("compiler/internal/netrt/netrt_linux_test.go::" +
+			"TestPollerHandlesManyReadinessWaitsAndTimeouts; " +
+			"compiler/compiler_suite_test.go::" +
+			"runTargetTCPServerReadinessOrSkip; go test -race " +
+			"./compiler/internal/netrt"),
+		Boundary: ("stress evidence is focused on netrt and compiled readiness " +
+			"smokes; it does not prove full cross-target race safety or " +
+			"production web throughput"),
 	}
 }
 

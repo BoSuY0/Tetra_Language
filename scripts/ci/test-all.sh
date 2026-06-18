@@ -9,10 +9,13 @@ mode="full"
 report_dir=""
 keep_going=false
 json_only=false
+report_format="json"
 
 usage() {
-  cat <<'USAGE'
-Usage: bash scripts/ci/test-all.sh [--quick|--full|--stabilization] [--keep-going] [--json-only] [--report-dir DIR]
+  cat << 'USAGE'
+Usage: bash scripts/ci/test-all.sh [--quick|--full|--stabilization]
+       [--keep-going] [--json-only] [--report-dir DIR]
+       [--report-format json|toon|both]
 
 Modes:
   --quick          Run the fast stabilization gate for local iteration.
@@ -22,9 +25,13 @@ Modes:
 Output:
   --keep-going  Run remaining steps after a failure and exit 1 at the end.
   --json-only   Suppress progress logs and print summary JSON to stdout.
+  --report-format FORMAT
+                Write structured summary artifacts as json, toon, or both.
+                summary.json remains the canonical machine report.
 
 Artifacts:
   The script writes per-step logs plus summary.md and summary.json to DIR.
+  With --report-format toon|both it also writes summary.toon to DIR.
   summary.json records each step name, status, duration_seconds, exit_code, and log.
   It also includes top-level step_count and failed_count fields.
   release_artifact defaults to tetra.release.<version-slug>.test-all-summary.v1.
@@ -67,7 +74,19 @@ while [[ $# -gt 0 ]]; do
       json_only=true
       shift
       ;;
-    -h|--help)
+    --report-format)
+      if [[ $# -lt 2 ]]; then
+        echo "--report-format requires json, toon, or both" >&2
+        exit 2
+      fi
+      report_format="$2"
+      shift 2
+      ;;
+    --report-format=*)
+      report_format="${1#--report-format=}"
+      shift
+      ;;
+    -h | --help)
       usage
       exit 0
       ;;
@@ -79,13 +98,25 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+case "$report_format" in
+  json | toon | both)
+    ;;
+  *)
+    echo "--report-format must be json, toon, or both" >&2
+    exit 2
+    ;;
+esac
+
 release_version="${TETRA_TEST_ALL_RELEASE_VERSION:-}"
 if [[ -z "$release_version" ]]; then
   release_version="$(./tetra version)"
 fi
 release_slug="${release_version#v}"
 release_slug="${release_slug//./_}"
-release_artifact="${TETRA_TEST_ALL_RELEASE_ARTIFACT:-tetra.release.v${release_slug}.test-all-summary.v1}"
+release_artifact="$(
+  printf '%s' \
+    "${TETRA_TEST_ALL_RELEASE_ARTIFACT:-tetra.release.v${release_slug}.test-all-summary.v1}"
+)"
 
 timestamp="$(date -u +%Y%m%d-%H%M%S)"
 if [[ -z "$report_dir" ]]; then
@@ -113,7 +144,7 @@ check_report_dir_fresh() {
     exit 2
   fi
 
-  if [[ ( -e "$find_report_dir" || -L "$find_report_dir" ) && ! -d "$find_report_dir" ]]; then
+  if [[ (-e "$find_report_dir" || -L "$find_report_dir") && ! -d "$find_report_dir" ]]; then
     echo "refusing to use non-directory report path: $report_dir" >&2
     echo "choose a fresh --report-dir directory" >&2
     exit 2
@@ -135,14 +166,15 @@ check_report_dir_fresh
 logs_dir="$report_dir/logs"
 summary_md="$report_dir/summary.md"
 summary_json="$report_dir/summary.json"
+summary_toon="$report_dir/summary.toon"
 tmp_dir="$(mktemp -d)"
 started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 step_count=0
 failed_count=0
 
 mkdir -p -- "$logs_dir"
-: >"$tmp_dir/steps.md"
-: >"$tmp_dir/steps.jsonl"
+: > "$tmp_dir/steps.md"
+: > "$tmp_dir/steps.jsonl"
 
 cleanup() {
   rm -rf "$tmp_dir"
@@ -155,6 +187,10 @@ json_escape() {
   s="${s//\"/\\\"}"
   s="${s//$'\n'/\\n}"
   printf '%s' "$s"
+}
+
+wants_toon_summary() {
+  [[ "$report_format" == "toon" || "$report_format" == "both" ]]
 }
 
 write_summary() {
@@ -177,7 +213,7 @@ write_summary() {
     echo "## Steps"
     echo
     cat -- "$tmp_dir/steps.md"
-  } >"$summary_md"
+  } > "$summary_md"
 
   {
     echo "{"
@@ -190,14 +226,33 @@ write_summary() {
     printf '  "release_version": "%s",\n' "$(json_escape "$release_version")"
     printf '  "release_artifact": "%s",\n' "$(json_escape "$release_artifact")"
     echo '  "steps": ['
-    awk 'NR > 1 { printf ",\n" } { printf "    %s", $0 } END { if (NR > 0) printf "\n" }' "$tmp_dir/steps.jsonl"
+    awk '
+      NR > 1 { printf ",\n" }
+      { printf "    %s", $0 }
+      END { if (NR > 0) printf "\n" }
+    ' "$tmp_dir/steps.jsonl"
     echo '  ]'
     echo "}"
-  } >"$summary_json"
+  } > "$summary_json"
+
+  if wants_toon_summary; then
+    go run ./tools/cmd/json-to-toon --in "$summary_json" --out "$summary_toon"
+  fi
 }
 
 validate_summary() {
-  go run ./tools/cmd/validate-test-all-summary --summary "$summary_json" --report-dir "$report_dir"
+  local failures=0
+  go run ./tools/cmd/validate-test-all-summary \
+    --summary "$summary_json" \
+    --report-dir "$report_dir" \
+    --format=json || failures=1
+  if wants_toon_summary; then
+    go run ./tools/cmd/validate-test-all-summary \
+      --summary "$summary_toon" \
+      --report-dir "$report_dir" \
+      --format=toon || failures=1
+  fi
+  return "$failures"
 }
 
 validate_summary_best_effort() {
@@ -214,14 +269,18 @@ record_step() {
   local log_rel="$5"
   local command="$6"
 
-  printf -- '- `%s`: `%s` in %ss, exit `%s`, command `%s` ([%s](%s))\n' "$name" "$status" "$seconds" "$exit_code" "$command" "$log_rel" "$log_rel" >>"$tmp_dir/steps.md"
-  printf '{"name":"%s","status":"%s","duration_seconds":%s,"exit_code":%s,"command":"%s","log":"%s"}\n' \
+  printf -- \
+    '- `%s`: `%s` in %ss, exit `%s`, command `%s` ([%s](%s))\n' \
+    "$name" "$status" "$seconds" "$exit_code" "$command" \
+    "$log_rel" "$log_rel" >> "$tmp_dir/steps.md"
+  printf \
+    '{"name":"%s","status":"%s","duration_seconds":%s,"exit_code":%s,"command":"%s","log":"%s"}\n' \
     "$(json_escape "$name")" \
     "$(json_escape "$status")" \
     "$seconds" \
     "$exit_code" \
     "$(json_escape "$command")" \
-    "$(json_escape "$log_rel")" >>"$tmp_dir/steps.jsonl"
+    "$(json_escape "$log_rel")" >> "$tmp_dir/steps.jsonl"
 }
 
 slugify() {
@@ -251,7 +310,7 @@ run_step() {
   local end_s
   start_s="$(date +%s)"
 
-  if "$@" >"$log_path" 2>&1; then
+  if "$@" > "$log_path" 2>&1; then
     end_s="$(date +%s)"
     record_step "$name" "pass" "$((end_s - start_s))" 0 "$log_rel" "$command"
     if [[ "$json_only" != true ]]; then
@@ -280,7 +339,7 @@ run_step() {
 }
 
 check_working_tree_whitespace() {
-  if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  if git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
     git diff --check
   else
     echo "not a git work tree; skipping whitespace audit"
@@ -310,13 +369,13 @@ check_short_alias_version() {
 }
 
 check_test_json() {
-  ./tetra test --report=json examples >"$report_dir/tetra-test-report.json"
+  ./tetra test --report=json examples > "$report_dir/tetra-test-report.json"
   test -s "$report_dir/tetra-test-report.json"
   go run ./tools/cmd/validate-test-report --report "$report_dir/tetra-test-report.json"
 }
 
 check_tetra_doc() {
-  ./tetra doc examples >"$report_dir/tetra-docs.md"
+  ./tetra doc examples > "$report_dir/tetra-docs.md"
   go run ./tools/cmd/validate-api-docs --docs "$report_dir/tetra-docs.md"
 }
 
@@ -327,47 +386,58 @@ check_json_diagnostic_case() {
   local stdout="$tmp_dir/$name.out"
   local diagnostic="$report_dir/$name.json"
   shift 2
-  cat >"$source"
-  if ./tetra check --diagnostics=json "$source" >"$stdout" 2>"$diagnostic"; then
+  cat > "$source"
+  if ./tetra check --diagnostics=json "$source" > "$stdout" 2> "$diagnostic"; then
     echo "expected tetra check --diagnostics=json to fail for $name" >&2
     return 1
   fi
   test ! -s "$stdout"
-  go run ./tools/cmd/validate-diagnostic --diagnostic "$diagnostic" --severity error --contains "$contains" --require-position
+  go run ./tools/cmd/validate-diagnostic \
+    --diagnostic "$diagnostic" \
+    --severity error \
+    --contains "$contains" \
+    --require-position
 }
 
 check_json_diagnostic() {
-  check_json_diagnostic_case "invalid-diagnostic" "unknown function" <<'TETRA'
+  check_json_diagnostic_case "invalid-diagnostic" "unknown function" << 'TETRA'
 func main() -> Int:
     return missing_call()
 TETRA
-  check_json_diagnostic_case "missing-effect-diagnostic" "uses effect 'io'" <<'TETRA'
+  check_json_diagnostic_case "missing-effect-diagnostic" "uses effect 'io'" << 'TETRA'
 func main() -> Int:
     print("missing uses\n")
     return 0
 TETRA
-  check_json_diagnostic_case "tabs-diagnostic" "tabs are not supported" <<'TETRA'
+  check_json_diagnostic_case "tabs-diagnostic" "tabs are not supported" << 'TETRA'
 func main() -> Int:
 	return 0
 TETRA
-  check_json_diagnostic_case "planned-actor-diagnostic" "actor declarations currently support state fields and func methods only" <<'TETRA'
+  check_json_diagnostic_case \
+    "planned-actor-diagnostic" \
+    "actor declarations currently support state fields and func methods only" << 'TETRA'
 actor Worker:
     return 0
 TETRA
 
   local wasm_out="$tmp_dir/hello.wasm"
-  ./tetra build --target wasm32-wasi -o "$wasm_out" examples/hello.tetra >"$tmp_dir/wasm-target-build.out" 2>"$report_dir/wasm-target-build.err"
+  ./tetra build \
+    --target wasm32-wasi \
+    -o "$wasm_out" \
+    examples/smoke/basic/hello.tetra \
+    > "$tmp_dir/wasm-target-build.out" \
+    2> "$report_dir/wasm-target-build.err"
   test -s "$wasm_out"
   test "$(od -An -tx1 -N4 "$wasm_out" | tr -d ' \n')" = "0061736d"
 }
 
 check_targets_report() {
-  ./tetra targets --format=json >"$report_dir/targets.json"
+  ./tetra targets --format=json > "$report_dir/targets.json"
   go run ./tools/cmd/validate-targets --report "$report_dir/targets.json"
 }
 
 check_doctor_report() {
-  ./tetra doctor --format=json >"$report_dir/doctor.json"
+  ./tetra doctor --format=json > "$report_dir/doctor.json"
   go run ./tools/cmd/validate-doctor --report "$report_dir/doctor.json"
 }
 
@@ -379,14 +449,18 @@ check_docs_manifest() {
 }
 
 check_safety_readiness() {
-  ./tetra features --format=json >"$report_dir/safety-features.json"
+  ./tetra features --format=json > "$report_dir/safety-features.json"
   go run ./tools/cmd/validate-safety-readiness \
     --features "$report_dir/safety-features.json" \
-    --current-surface docs/spec/current_supported_surface.md \
-    --ownership-spec docs/spec/ownership_v1.md \
-    --effects-spec docs/spec/effects_capabilities_privacy_v1.md \
+    --current-surface docs/spec/core/current_supported_surface.md \
+    --ownership-spec docs/spec/runtime/ownership_v1.md \
+    --effects-spec docs/spec/runtime/effects_capabilities_privacy_v1.md \
     --out "$report_dir/safety-readiness.json" || return 1
-  go test ./compiler/... -run 'Ownership|Borrow|Consume|Inout|Lifetime|Resource|Island|Actor|Task|Unsafe|Capability|Effect|Privacy|Consent|Budget|MMIO|Mem' -count=1 || return 1
+  local safety_pattern
+  safety_pattern='Ownership|Borrow|Consume|Inout|Lifetime|Resource|Island'
+  safety_pattern+='|Actor|Task|Unsafe|Capability|Effect|Privacy|Consent'
+  safety_pattern+='|Budget|MMIO|Mem'
+  go test ./compiler/... -run "$safety_pattern" -count=1 || return 1
 }
 
 require_named_go_test_names() {
@@ -441,16 +515,21 @@ check_unsafe_promotion_blockers() {
     TestValidateMemoryReportRejectsUnsafeCheckedGenericPromotions \
     TestValidateMemoryReportRejectsUnsafeVerifiedRootGenericClaims \
     TestValidateMemoryReportRejectsValidatedUnsafeUnknownTrustedStorage || return 1
-  go test ./compiler/internal/memoryfacts -run 'UnsafeUnknown|UnsafeVerified|Promotion' -count=1 || return 1
+  go test ./compiler/internal/memoryfacts \
+    -run 'UnsafeUnknown|UnsafeVerified|Promotion' \
+    -count=1 || return 1
 
-  require_go_test_names ./tools/cmd/validate-memory-report 'Unsafe|Promotion|Optimization|TrustedStorage' \
+  unsafe_report_pattern='Unsafe|Promotion|Optimization|TrustedStorage'
+  require_go_test_names ./tools/cmd/validate-memory-report "$unsafe_report_pattern" \
     TestValidateMemoryReportRejectsSafeKnownFromUnsafeUnknown \
     TestValidateMemoryReportRejectsUnsafeUnknownOptimizationClaim \
     TestValidateMemoryReportRejectsUnsafeCheckedGenericPromotion \
     TestValidateMemoryReportRejectsUnsafeUnknownZeroCost \
     TestValidateMemoryReportRejectsUnsafeVerifiedRootGenericClaim \
     TestValidateMemoryReportRejectsUnsafeUnknownTrustedStorage || return 1
-  go test ./tools/cmd/validate-memory-report -run 'Unsafe|Promotion|Optimization|TrustedStorage' -count=1 || return 1
+  go test ./tools/cmd/validate-memory-report \
+    -run "$unsafe_report_pattern" \
+    -count=1 || return 1
 
   require_go_test_names ./compiler 'Unsafe|Raw|MemoryFuzzOracle' \
     TestMemoryFuzzOracleReportCoversMPC15CategoriesAndInvariants \
@@ -460,11 +539,16 @@ check_unsafe_promotion_blockers() {
     TestValidateMemoryFuzzOracleReportRejectsV12ReleaseEvidenceDrift || return 1
   go test ./compiler -run 'Unsafe|Raw|MemoryFuzzOracle' -count=1 || return 1
 
-  require_go_test_names ./tools/cmd/validate-memory-fuzz-oracle 'MemoryFuzzOracle|Unsafe|Promotion|Blocking' \
+  memory_fuzz_report_pattern='MemoryFuzzOracle|Unsafe|Promotion|Blocking'
+  require_go_test_names \
+    ./tools/cmd/validate-memory-fuzz-oracle \
+    "$memory_fuzz_report_pattern" \
     TestValidateMemoryFuzzOracleReportFileAcceptsCompilerReport \
     TestValidateMemoryFuzzOracleReportFileRejectsInvalidReport \
     TestValidateMemoryFuzzOracleReportFileRejectsMissingV12ReleaseEvidence || return 1
-  go test ./tools/cmd/validate-memory-fuzz-oracle -run 'MemoryFuzzOracle|Unsafe|Promotion|Blocking' -count=1
+  go test ./tools/cmd/validate-memory-fuzz-oracle \
+    -run "$memory_fuzz_report_pattern" \
+    -count=1
 }
 
 check_bounds_proof_blockers() {
@@ -479,7 +563,12 @@ check_bounds_proof_blockers() {
     TestForSliceLoopUsesProofTaggedUncheckedIndexLoad \
     TestWhileLessThanLenUsesProofTaggedUncheckedIndexLoad \
     TestCopyLoopSourceLoadUsesProofTaggedUncheckedIndexLoad || return 1
-  go test ./compiler/internal/plir ./compiler/internal/lower ./compiler/internal/validation -run 'Bounds|Proof|Unchecked' -count=1 || return 1
+  go test \
+    ./compiler/internal/plir \
+    ./compiler/internal/lower \
+    ./compiler/internal/validation \
+    -run 'Bounds|Proof|Unchecked' \
+    -count=1 || return 1
 
   require_bounds_go_test_names ./compiler/internal/memoryfacts 'Bounds|Proof' \
     TestMemoryIdealV6ProjectsBoundsProofFacts \
@@ -489,7 +578,11 @@ check_bounds_proof_blockers() {
   require_bounds_go_test_names ./tools/cmd/validate-memory-report 'Bounds|Proof' \
     TestValidateMemoryReportRejectsV6BoundsRowsWithoutParent \
     TestValidateMemoryReportRejectsBareBoundsCheckEliminatedWithoutProofID || return 1
-  go test ./compiler/internal/memoryfacts ./tools/cmd/validate-memory-report -run 'Bounds|Proof' -count=1 || return 1
+  go test \
+    ./compiler/internal/memoryfacts \
+    ./tools/cmd/validate-memory-report \
+    -run 'Bounds|Proof' \
+    -count=1 || return 1
 
   require_bounds_go_test_names ./compiler 'Bounds|MemoryFuzzOracle' \
     TestMemoryFuzzOracleReportCoversMPC15CategoriesAndInvariants \
@@ -506,7 +599,9 @@ check_memory_fuzz_oracle_gate() {
     TestRunMemoryFuzzShortWritesValidatedArtifacts \
     TestRunMemoryFuzzShortRejectsUnsupportedTier \
     TestRunMemoryFuzzShortRejectsStaleReportDir || return 1
-  require_memory_fuzz_go_test_names ./tools/cmd/validate-memory-fuzz-oracle 'MemoryFuzzOracle|Artifact|Provenance' \
+  require_memory_fuzz_go_test_names \
+    ./tools/cmd/validate-memory-fuzz-oracle \
+    'MemoryFuzzOracle|Artifact|Provenance' \
     TestValidateMemoryFuzzOracleReportFileAcceptsCompilerReport \
     TestValidateMemoryFuzzOracleReportFileAcceptsTier1ArtifactBundle \
     TestValidateMemoryFuzzOracleReportFileRejectsInvalidReport \
@@ -521,9 +616,14 @@ check_memory_fuzz_oracle_gate() {
     TestValidateMemoryFuzzOracleReportRejectsV12ReleaseEvidenceDrift || return 1
 
   go test ./compiler -run MemoryFuzzOracle -count=1 || return 1
-  go test ./tools/cmd/memory-fuzz-short ./tools/cmd/validate-memory-fuzz-oracle -count=1 || return 1
+  go test \
+    ./tools/cmd/memory-fuzz-short \
+    ./tools/cmd/validate-memory-fuzz-oracle \
+    -count=1 || return 1
   go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir "$fuzz_dir" || return 1
-  go run ./tools/cmd/validate-memory-fuzz-oracle --report "$fuzz_dir/memory-fuzz-oracle.json" --artifact-dir "$fuzz_dir" || return 1
+  go run ./tools/cmd/validate-memory-fuzz-oracle \
+    --report "$fuzz_dir/memory-fuzz-oracle.json" \
+    --artifact-dir "$fuzz_dir" || return 1
   test -s "$fuzz_dir/memory-fuzz-oracle.json" || return 1
   test -s "$fuzz_dir/summary.md" || return 1
   test -s "$fuzz_dir/summary.json"
@@ -532,13 +632,19 @@ check_memory_fuzz_oracle_gate() {
 check_ram_contract_fuzz_oracle_gate() {
   local fuzz_dir="$report_dir/ram-contract-fuzz"
 
-  require_ram_contract_go_test_names ./tools/cmd/ram-contract-fuzz-short 'RAMContract|Fuzz|ReportDir' \
+  require_ram_contract_go_test_names \
+    ./tools/cmd/ram-contract-fuzz-short \
+    'RAMContract|Fuzz|ReportDir' \
     TestRunRAMContractFuzzShortWritesValidatedArtifacts \
     TestRunRAMContractFuzzShortRejectsStaleReportDir || return 1
-  require_ram_contract_go_test_names ./tools/cmd/validate-ram-contract-fuzz-oracle 'RAMContract|Fuzz|Oracle' \
+  require_ram_contract_go_test_names \
+    ./tools/cmd/validate-ram-contract-fuzz-oracle \
+    'RAMContract|Fuzz|Oracle' \
     TestValidateRAMContractFuzzOracleAcceptsArtifactBundle \
     TestValidateRAMContractFuzzOracleRejectsMissingReport || return 1
-  require_ram_contract_go_test_names ./tools/cmd/validate-ram-contract-report 'RAMContract|Blocker|Missing' \
+  require_ram_contract_go_test_names \
+    ./tools/cmd/validate-ram-contract-report \
+    'RAMContract|Blocker|Missing' \
     TestValidateRAMContractReportFileAcceptsCompilerReport \
     TestValidateRAMContractReportRejectsMissingBlocker || return 1
   require_ram_contract_go_test_names ./compiler/internal/ramcontract 'RAMContract|Enforce|Report' \
@@ -546,13 +652,25 @@ check_ram_contract_fuzz_oracle_gate() {
     TestRAMContractRejectsMissingBlockerExplanation \
     TestRAMContractEnforcementFailsForHeap || return 1
 
-  go test ./compiler/internal/ramcontract ./tools/cmd/validate-ram-contract-report ./tools/cmd/ram-contract-fuzz-short ./tools/cmd/validate-ram-contract-fuzz-oracle -run 'RAMContract|Fuzz|Blocker|Enforce' -count=1 || return 1
+  go test \
+    ./compiler/internal/ramcontract \
+    ./tools/cmd/validate-ram-contract-report \
+    ./tools/cmd/ram-contract-fuzz-short \
+    ./tools/cmd/validate-ram-contract-fuzz-oracle \
+    -run 'RAMContract|Fuzz|Blocker|Enforce' \
+    -count=1 || return 1
   go run ./tools/cmd/ram-contract-fuzz-short --report-dir "$fuzz_dir" || return 1
-  go run ./tools/cmd/validate-ram-contract-fuzz-oracle --report "$fuzz_dir/ram-contract-fuzz-oracle.json" --artifact-dir "$fuzz_dir" || return 1
-  go run ./tools/cmd/validate-ram-contract-report --report "$fuzz_dir/ram-contract-report.json" || return 1
-  go run ./tools/cmd/validate-memory-grade-report --report "$fuzz_dir/memory-grade-report.json" || return 1
-  go run ./tools/cmd/validate-proof-store-summary --report "$fuzz_dir/proof-store-summary.json" || return 1
-  go run ./tools/cmd/validate-validation-pipeline-coverage --report "$fuzz_dir/validation-pipeline-coverage.json" || return 1
+  go run ./tools/cmd/validate-ram-contract-fuzz-oracle \
+    --report "$fuzz_dir/ram-contract-fuzz-oracle.json" \
+    --artifact-dir "$fuzz_dir" || return 1
+  go run ./tools/cmd/validate-ram-contract-report \
+    --report "$fuzz_dir/ram-contract-report.json" || return 1
+  go run ./tools/cmd/validate-memory-grade-report \
+    --report "$fuzz_dir/memory-grade-report.json" || return 1
+  go run ./tools/cmd/validate-proof-store-summary \
+    --report "$fuzz_dir/proof-store-summary.json" || return 1
+  go run ./tools/cmd/validate-validation-pipeline-coverage \
+    --report "$fuzz_dir/validation-pipeline-coverage.json" || return 1
   go run ./tools/cmd/validate-heap-blockers --report "$fuzz_dir/heap-blockers.json" || return 1
   go run ./tools/cmd/validate-copy-blockers --report "$fuzz_dir/copy-blockers.json" || return 1
   test -s "$fuzz_dir/ram-contract-fuzz-oracle.json" || return 1
@@ -561,6 +679,7 @@ check_ram_contract_fuzz_oracle_gate() {
 
 check_host_leak_blockers() {
   require_host_leak_go_test_names ./cli/internal/actornet 'Broker|Leak|CloseWithoutCancel' \
+    TestBrokerCloseReopenWithoutGoroutineLeak \
     TestBrokerCloseWithoutCancelStopsServeWatcher \
     TestBrokerRoutesFramesBetweenLoopbackNodesAndWritesReport \
     TestBrokerReportsNodeDownForMissingDestination || return 1
@@ -569,11 +688,20 @@ check_host_leak_blockers() {
 
 check_memory100_prod_stable_gate() {
   local memory100_dir="$report_dir/memory-100-prod-stable"
-  mkdir -p "$repo_root/.cache/go-build-memory-100-test-all" "$repo_root/.cache/go-tmp-memory-100-test-all"
-  env GOTELEMETRY=off GOCACHE="$repo_root/.cache/go-build-memory-100-test-all" GOTMPDIR="$repo_root/.cache/go-tmp-memory-100-test-all" bash scripts/release/post_v0_4/memory-100-prod-stable-gate.sh --report-dir "$memory100_dir" || return 1
+  local memory100_go_cache="$repo_root/.cache/go-build-memory-100-test-all"
+  local memory100_go_tmp="$repo_root/.cache/go-tmp-memory-100-test-all"
+  mkdir -p "$memory100_go_cache" "$memory100_go_tmp"
+  env \
+    GOTELEMETRY=off \
+    GOCACHE="$memory100_go_cache" \
+    GOTMPDIR="$memory100_go_tmp" \
+    bash scripts/release/post_v0_4/memory-100-prod-stable-gate.sh \
+    --report-dir "$memory100_dir" || return 1
   test -s "$memory100_dir/memory-100-prod-stable-manifest.json" || return 1
   test -s "$memory100_dir/artifact-hashes.json" || return 1
-  go run ./tools/cmd/validate-memory-100-prod-stable --report-dir "$memory100_dir" --current-git-head "$(git rev-parse HEAD)"
+  go run ./tools/cmd/validate-memory-100-prod-stable \
+    --report-dir "$memory100_dir" \
+    --current-git-head "$(git rev-parse HEAD)"
 }
 
 check_performance_report() {
@@ -610,6 +738,10 @@ check_techempower_reports() {
   fi
 }
 
+compact_json() {
+  tr -d '\n'
+}
+
 check_lsp_stdio() {
   local lsp_init
   local lsp_open
@@ -625,24 +757,96 @@ check_lsp_stdio() {
   local lsp_shutdown
   local lsp_exit
   lsp_init='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
-  lsp_open='{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///sample.tetra","languageId":"tetra","version":1,"text":"const answer: Int = 42\n\nfunc main() -> Int:\n  return answer\n"}}}'
-  lsp_symbols='{"jsonrpc":"2.0","id":2,"method":"textDocument/documentSymbol","params":{"textDocument":{"uri":"file:///sample.tetra"}}}'
-  lsp_hover='{"jsonrpc":"2.0","id":3,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///sample.tetra"},"position":{"line":0,"character":6}}}'
-  lsp_completion='{"jsonrpc":"2.0","id":4,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///sample.tetra"},"position":{"line":3,"character":9}}}'
-  lsp_definition='{"jsonrpc":"2.0","id":5,"method":"textDocument/definition","params":{"textDocument":{"uri":"file:///sample.tetra"},"position":{"line":3,"character":9}}}'
-  lsp_references='{"jsonrpc":"2.0","id":6,"method":"textDocument/references","params":{"textDocument":{"uri":"file:///sample.tetra"},"position":{"line":3,"character":9},"context":{"includeDeclaration":true}}}'
-  lsp_rename='{"jsonrpc":"2.0","id":7,"method":"textDocument/rename","params":{"textDocument":{"uri":"file:///sample.tetra"},"position":{"line":3,"character":9},"newName":"value"}}'
-  lsp_formatting='{"jsonrpc":"2.0","id":8,"method":"textDocument/formatting","params":{"textDocument":{"uri":"file:///sample.tetra"},"options":{"tabSize":4,"insertSpaces":true}}}'
-  lsp_change='{"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":"file:///sample.tetra","version":2},"contentChanges":[{"text":"const answer: Int = 42\n\nfunc main() -> Int:\n    print(\"x\")\n    return answer\n"}]}}'
-  lsp_code_action='{"jsonrpc":"2.0","id":9,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///sample.tetra"},"range":{"start":{"line":3,"character":4},"end":{"line":3,"character":9}},"context":{"diagnostics":[{"range":{"start":{"line":3,"character":4},"end":{"line":3,"character":9}},"severity":1,"code":"TETRA2001","source":"tetra","message":"function '\''main'\'' uses effect '\''io'\'' but does not declare it"}]}}}'
+  lsp_open="$(
+    compact_json << 'JSON'
+{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{
+"uri":"file:///sample.tetra","languageId":"tetra","version":1,
+"text":"const answer: Int = 42\n\nfunc main() -> Int:\n  return answer\n"}}}
+JSON
+  )"
+  lsp_symbols="$(
+    compact_json << 'JSON'
+{"jsonrpc":"2.0","id":2,"method":"textDocument/documentSymbol",
+"params":{"textDocument":{"uri":"file:///sample.tetra"}}}
+JSON
+  )"
+  lsp_hover="$(
+    compact_json << 'JSON'
+{"jsonrpc":"2.0","id":3,"method":"textDocument/hover","params":{
+"textDocument":{"uri":"file:///sample.tetra"},"position":{"line":0,"character":6}}}
+JSON
+  )"
+  lsp_completion="$(
+    compact_json << 'JSON'
+{"jsonrpc":"2.0","id":4,"method":"textDocument/completion","params":{
+"textDocument":{"uri":"file:///sample.tetra"},"position":{"line":3,"character":9}}}
+JSON
+  )"
+  lsp_definition="$(
+    compact_json << 'JSON'
+{"jsonrpc":"2.0","id":5,"method":"textDocument/definition","params":{
+"textDocument":{"uri":"file:///sample.tetra"},"position":{"line":3,"character":9}}}
+JSON
+  )"
+  lsp_references="$(
+    compact_json << 'JSON'
+{"jsonrpc":"2.0","id":6,"method":"textDocument/references","params":{
+"textDocument":{"uri":"file:///sample.tetra"},"position":{"line":3,"character":9},
+"context":{"includeDeclaration":true}}}
+JSON
+  )"
+  lsp_rename="$(
+    compact_json << 'JSON'
+{"jsonrpc":"2.0","id":7,"method":"textDocument/rename","params":{
+"textDocument":{"uri":"file:///sample.tetra"},"position":{"line":3,"character":9},
+"newName":"value"}}
+JSON
+  )"
+  lsp_formatting="$(
+    compact_json << 'JSON'
+{"jsonrpc":"2.0","id":8,"method":"textDocument/formatting","params":{
+"textDocument":{"uri":"file:///sample.tetra"},"options":{"tabSize":4,"insertSpaces":true}}}
+JSON
+  )"
+  lsp_change="$(
+    compact_json << 'JSON'
+{"jsonrpc":"2.0","method":"textDocument/didChange","params":{
+"textDocument":{"uri":"file:///sample.tetra","version":2},
+"contentChanges":[{"text":"const answer: Int = 42\n\nfunc main() -> Int:\n    print(\"x\")\n
+    return answer\n"}]}}
+JSON
+  )"
+  lsp_code_action="$(
+    compact_json << 'JSON'
+{"jsonrpc":"2.0","id":9,"method":"textDocument/codeAction","params":{
+"textDocument":{"uri":"file:///sample.tetra"},
+"range":{"start":{"line":3,"character":4},"end":{"line":3,"character":9}},
+"context":{"diagnostics":[{"range":{"start":{"line":3,"character":4},
+"end":{"line":3,"character":9}},"severity":1,"code":"TETRA2001","source":"tetra",
+"message":"function 'main' uses effect 'io' but does not declare it"}]}}}
+JSON
+  )"
   lsp_shutdown='{"jsonrpc":"2.0","id":10,"method":"shutdown","params":{}}'
   lsp_exit='{"jsonrpc":"2.0","method":"exit","params":{}}'
 
   {
-    for body in "$lsp_init" "$lsp_open" "$lsp_symbols" "$lsp_hover" "$lsp_completion" "$lsp_definition" "$lsp_references" "$lsp_rename" "$lsp_formatting" "$lsp_change" "$lsp_code_action" "$lsp_shutdown" "$lsp_exit"; do
+    for body in \
+      "$lsp_init" \
+      "$lsp_open" \
+      "$lsp_symbols" \
+      "$lsp_hover" \
+      "$lsp_completion" \
+      "$lsp_definition" \
+      "$lsp_references" \
+      "$lsp_rename" \
+      "$lsp_formatting" \
+      "$lsp_change" \
+      "$lsp_code_action" \
+      "$lsp_shutdown" \
+      "$lsp_exit"; do
       printf 'Content-Length: %s\r\n\r\n%s' "$(printf '%s' "$body" | wc -c)" "$body"
     done
-  } | ./tetra lsp --stdio >"$tmp_dir/lsp-stdio.out"
+  } | ./tetra lsp --stdio > "$tmp_dir/lsp-stdio.out"
 
   go run ./tools/cmd/validate-lsp-stdio --transcript "$tmp_dir/lsp-stdio.out"
   grep -q '"capabilities"' "$tmp_dir/lsp-stdio.out"
@@ -650,7 +854,7 @@ check_lsp_stdio() {
 }
 
 check_lsp_smoke() {
-  ./tetra lsp --stdio-smoke examples/flow_hello.tetra >"$report_dir/lsp-smoke.json"
+  ./tetra lsp --stdio-smoke examples/flow/flow_hello.tetra > "$report_dir/lsp-smoke.json"
   go run ./tools/cmd/validate-lsp-smoke --report "$report_dir/lsp-smoke.json"
 }
 
@@ -658,8 +862,26 @@ run_tetra_smoke_target() {
   local target="$1"
   local run_binaries="$2"
   local report_path="$3"
-  ./tetra smoke --target "$target" --run="$run_binaries" --report "$report_path"
-  go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$report_path"
+  local smoke_report_format="json"
+  if wants_toon_summary; then
+    smoke_report_format="both"
+  fi
+  ./tetra smoke \
+    --target "$target" \
+    --run="$run_binaries" \
+    --report "$report_path" \
+    --report-format "$smoke_report_format"
+  go run ./tools/cmd/smoke-report-to-checklist \
+    --validate-only \
+    --report "$report_path" \
+    --format=json
+  if wants_toon_summary; then
+    local toon_report_path="${report_path%.*}.toon"
+    go run ./tools/cmd/smoke-report-to-checklist \
+      --validate-only \
+      --report "$toon_report_path" \
+      --format=toon
+  fi
 }
 
 check_host_smoke() {
@@ -667,18 +889,28 @@ check_host_smoke() {
 }
 
 check_smoke_list() {
-  ./tetra smoke --list --target linux-x64 --format=json >"$report_dir/smoke-list.json"
-  go run ./tools/cmd/validate-smoke-list --report "$report_dir/smoke-list.json" --examples-root examples
+  ./tetra smoke --list --target linux-x64 --format=json > "$report_dir/smoke-list.json"
+  go run ./tools/cmd/validate-smoke-list \
+    --report "$report_dir/smoke-list.json" \
+    --examples-root examples \
+    --format=json
+  if wants_toon_summary; then
+    ./tetra smoke --list --target linux-x64 --format=toon > "$report_dir/smoke-list.toon"
+    go run ./tools/cmd/validate-smoke-list \
+      --report "$report_dir/smoke-list.toon" \
+      --examples-root examples \
+      --format=toon
+  fi
 }
 
 check_generated_api_docs() {
-  go run ./tools/cmd/gen-docs examples >"$report_dir/api-docs.md"
+  go run ./tools/cmd/gen-docs examples > "$report_dir/api-docs.md"
   go run ./tools/cmd/validate-api-docs --docs "$report_dir/api-docs.md"
 }
 
 check_eco_suite() {
   mkdir -p "$tmp_dir/project/src"
-  cat >"$tmp_dir/project/Tetra.capsule" <<'CAPSULE'
+  cat > "$tmp_dir/project/Tetra.capsule" << 'CAPSULE'
 manifest "tetra.capsule.v1"
 capsule App:
   id "tetra://app"
@@ -687,7 +919,7 @@ capsule App:
   permission "io"
   dependency "tetra://core" "0.1.0"
 CAPSULE
-  cat >"$tmp_dir/Core.capsule" <<'CAPSULE'
+  cat > "$tmp_dir/Core.capsule" << 'CAPSULE'
 manifest "tetra.capsule.v1"
 capsule Core:
   id "tetra://core"
@@ -695,16 +927,26 @@ capsule Core:
   target "linux-x64"
   permission "io"
 CAPSULE
-  cat >"$tmp_dir/project/src/main.tetra" <<'TETRA'
+  cat > "$tmp_dir/project/src/main.tetra" << 'TETRA'
 func main() -> Int:
     return 0
 TETRA
 
-  ./tetra eco verify --target linux-x64 --lock "$tmp_dir/tetra.lock.json" "$tmp_dir/project/Tetra.capsule" "$tmp_dir/Core.capsule"
+  ./tetra eco verify \
+    --target linux-x64 \
+    --lock "$tmp_dir/tetra.lock.json" \
+    "$tmp_dir/project/Tetra.capsule" \
+    "$tmp_dir/Core.capsule"
   go run ./tools/cmd/validate-eco-lock --lock "$tmp_dir/tetra.lock.json"
-  ./tetra eco seed export --out "$tmp_dir/tetra.seed.json" "$tmp_dir/project/Tetra.capsule" "$tmp_dir/Core.capsule"
+  ./tetra eco seed export \
+    --out "$tmp_dir/tetra.seed.json" \
+    "$tmp_dir/project/Tetra.capsule" \
+    "$tmp_dir/Core.capsule"
   go run ./tools/cmd/validate-eco-seed --seed "$tmp_dir/tetra.seed.json"
-  ./tetra eco seed import --seed "$tmp_dir/tetra.seed.json" --lock "$tmp_dir/tetra.seed.lock.json" --capsules-dir "$tmp_dir/seed-capsules"
+  ./tetra eco seed import \
+    --seed "$tmp_dir/tetra.seed.json" \
+    --lock "$tmp_dir/tetra.seed.lock.json" \
+    --capsules-dir "$tmp_dir/seed-capsules"
   go run ./tools/cmd/validate-eco-lock --lock "$tmp_dir/tetra.seed.lock.json"
   ./tetra eco needmap --lock "$tmp_dir/tetra.lock.json" -o "$tmp_dir/tetra.needmap.json"
   go run ./tools/cmd/validate-eco-needmap --needmap "$tmp_dir/tetra.needmap.json"
@@ -713,21 +955,50 @@ TETRA
   ./tetra eco unpack "$tmp_dir/project.todex" -C "$tmp_dir/unpacked"
   go run ./tools/cmd/validate-eco-unpack --dir "$tmp_dir/unpacked"
   test -f "$tmp_dir/unpacked/src/main.tetra"
-  ./tetra eco vault add --store "$tmp_dir/vault" --kind source examples/flow_hello.tetra
+  ./tetra eco vault add --store "$tmp_dir/vault" --kind source examples/flow/flow_hello.tetra
   ./tetra eco vault list --store "$tmp_dir/vault"
   ./tetra eco vault verify --store "$tmp_dir/vault"
   go run ./tools/cmd/validate-eco-vault --store "$tmp_dir/vault"
-  ./tetra eco trust snapshot --lock "$tmp_dir/tetra.lock.json" --store "$tmp_dir/vault" -o "$tmp_dir/tetra.trust-snapshot.json"
+  ./tetra eco trust snapshot \
+    --lock "$tmp_dir/tetra.lock.json" \
+    --store "$tmp_dir/vault" \
+    -o "$tmp_dir/tetra.trust-snapshot.json"
   go run ./tools/cmd/validate-eco-trust --trust "$tmp_dir/tetra.trust-snapshot.json"
-  ./tetra eco materialize "$tmp_dir/project.todex" --target linux-x64 --trust "$tmp_dir/tetra.trust-snapshot.json" -C "$tmp_dir/materialized"
+  ./tetra eco materialize "$tmp_dir/project.todex" \
+    --target linux-x64 \
+    --trust "$tmp_dir/tetra.trust-snapshot.json" \
+    -C "$tmp_dir/materialized"
   test -f "$tmp_dir/materialized/tetra.materialization.json"
-  go run ./tools/cmd/validate-eco-materialization --materialization "$tmp_dir/materialized/tetra.materialization.json"
-  ./tetra eco publish --package "$tmp_dir/project.todex" --registry "$tmp_dir/registry" --target linux-x64 --trust "$tmp_dir/tetra.trust-snapshot.json"
-  go run ./tools/cmd/validate-eco-publish --registry "$tmp_dir/registry" --id tetra://app --version 0.1.0 --target linux-x64
-  ./tetra eco download --id tetra://app --version 0.1.0 --target linux-x64 --registry "$tmp_dir/registry" -o "$tmp_dir/downloaded.todex"
+  go run ./tools/cmd/validate-eco-materialization \
+    --materialization "$tmp_dir/materialized/tetra.materialization.json"
+  ./tetra eco publish \
+    --package "$tmp_dir/project.todex" \
+    --registry "$tmp_dir/registry" \
+    --target linux-x64 \
+    --trust "$tmp_dir/tetra.trust-snapshot.json"
+  go run ./tools/cmd/validate-eco-publish \
+    --registry "$tmp_dir/registry" \
+    --id tetra://app \
+    --version 0.1.0 \
+    --target linux-x64
+  ./tetra eco download \
+    --id tetra://app \
+    --version 0.1.0 \
+    --target linux-x64 \
+    --registry "$tmp_dir/registry" \
+    -o "$tmp_dir/downloaded.todex"
   test -f "$tmp_dir/downloaded.todex"
-  ./tetra eco tetrahub publish --package "$tmp_dir/project.todex" --store "$tmp_dir/tetrahub-beta" --target linux-x64 --trust "$tmp_dir/tetra.trust-snapshot.json"
-  ./tetra eco tetrahub download --id tetra://app --version 0.1.0 --target linux-x64 --store "$tmp_dir/tetrahub-beta" -o "$tmp_dir/hub-downloaded.todex"
+  ./tetra eco tetrahub publish \
+    --package "$tmp_dir/project.todex" \
+    --store "$tmp_dir/tetrahub-beta" \
+    --target linux-x64 \
+    --trust "$tmp_dir/tetra.trust-snapshot.json"
+  ./tetra eco tetrahub download \
+    --id tetra://app \
+    --version 0.1.0 \
+    --target linux-x64 \
+    --store "$tmp_dir/tetrahub-beta" \
+    -o "$tmp_dir/hub-downloaded.todex"
   test -f "$tmp_dir/hub-downloaded.todex"
 }
 
@@ -786,7 +1057,7 @@ write_tooling_summary() {
     local bytes
     for rel in "${artifacts[@]}"; do
       if [[ -f "$report_dir/$rel" ]]; then
-        bytes="$(wc -c <"$report_dir/$rel" | tr -d ' ')"
+        bytes="$(wc -c < "$report_dir/$rel" | tr -d ' ')"
       else
         bytes=0
       fi
@@ -796,15 +1067,19 @@ write_tooling_summary() {
         echo ","
       fi
       if [[ -f "$report_dir/$rel" ]]; then
-        printf '    {"path":"%s","required":true,"exists":true,"bytes":%s,"size_bytes":%s}' "$(json_escape "$rel")" "$bytes" "$bytes"
+        printf \
+          '    {"path":"%s","required":true,"exists":true,"bytes":%s,"size_bytes":%s}' \
+          "$(json_escape "$rel")" "$bytes" "$bytes"
       else
-        printf '    {"path":"%s","required":true,"exists":false,"bytes":0,"size_bytes":0}' "$(json_escape "$rel")"
+        printf \
+          '    {"path":"%s","required":true,"exists":false,"bytes":0,"size_bytes":0}' \
+          "$(json_escape "$rel")"
       fi
     done
     echo
     echo '  ]'
     echo "}"
-  } >"$summary"
+  } > "$summary"
 
   {
     echo "# Tooling Summary"
@@ -817,13 +1092,13 @@ write_tooling_summary() {
     echo
     for rel in "${artifacts[@]}"; do
       if [[ -f "$report_dir/$rel" ]]; then
-        bytes="$(wc -c <"$report_dir/$rel" | tr -d ' ')"
+        bytes="$(wc -c < "$report_dir/$rel" | tr -d ' ')"
         echo "- \`$rel\`: required, exists:true, bytes:$bytes"
       else
         echo "- \`$rel\`: required, exists:false, bytes:0"
       fi
     done
-  } >"$summary_md"
+  } > "$summary_md"
 
   for rel in "${artifacts[@]}"; do
     if [[ ! -f "$report_dir/$rel" ]]; then
@@ -846,7 +1121,11 @@ if [[ "$json_only" != true ]]; then
   printf 'report_dir: %s\n\n' "$report_dir"
 fi
 
-run_step "go test all packages" env -u TETRA_TEST_ALL_RELEASE_VERSION -u TETRA_TEST_ALL_RELEASE_ARTIFACT -u TETRA_SECURITY_REVIEW_SIGNOFF go test ./compiler/... ./cli/... ./tools/... -count=1
+run_step "go test all packages" env \
+  -u TETRA_TEST_ALL_RELEASE_VERSION \
+  -u TETRA_TEST_ALL_RELEASE_ARTIFACT \
+  -u TETRA_SECURITY_REVIEW_SIGNOFF \
+  go test ./compiler/... ./cli/... ./tools/... -count=1
 run_step "unsafe promotion blocker suite" check_unsafe_promotion_blockers
 run_step "bounds proof blocker suite" check_bounds_proof_blockers
 run_step "memory fuzz oracle artifact gate" check_memory_fuzz_oracle_gate
@@ -855,17 +1134,23 @@ run_step "host leak blocker suite" check_host_leak_blockers
 run_step "Memory100 prod-stable gate" check_memory100_prod_stable_gate
 
 if [[ "$mode" == "full" || "$mode" == "stabilization" ]]; then
-  run_step "repo test script" env -u TETRA_TEST_ALL_RELEASE_VERSION -u TETRA_TEST_ALL_RELEASE_ARTIFACT -u TETRA_SECURITY_REVIEW_SIGNOFF bash scripts/ci/test.sh
+  run_step "repo test script" env \
+    -u TETRA_TEST_ALL_RELEASE_VERSION \
+    -u TETRA_TEST_ALL_RELEASE_ARTIFACT \
+    -u TETRA_SECURITY_REVIEW_SIGNOFF \
+    bash scripts/ci/test.sh
 fi
 
 run_step "bootstrap" bash scripts/dev/bootstrap.sh
 run_step "version preflight" check_release_version
 run_step "short alias version" check_short_alias_version
-run_step "formatter check examples lib runtime" ./tetra fmt --check examples lib __rt compiler/selfhostrt
-run_step "flow-only source scan" go run ./tools/cmd/validate-flow-only examples lib __rt compiler/selfhostrt
+run_step "formatter check examples lib runtime" \
+  ./tetra fmt --check examples lib __rt compiler/selfhostrt
+run_step "flow-only source scan" \
+  go run ./tools/cmd/validate-flow-only examples lib __rt compiler/selfhostrt
 run_step "targets json report" check_targets_report
 run_step "doctor json report" check_doctor_report
-run_step "tetra check flow hello" ./tetra check examples/flow_hello.tetra
+run_step "tetra check flow hello" ./tetra check examples/flow/flow_hello.tetra
 run_step "json diagnostic shape" check_json_diagnostic
 run_step "smoke list json report" check_smoke_list
 run_step "tetra test examples" ./tetra test examples
@@ -878,9 +1163,13 @@ run_step "host smoke linux-x64" check_host_smoke
 
 if [[ "$mode" == "full" || "$mode" == "stabilization" ]]; then
   run_step "docs manifest diff" check_docs_manifest
-  run_step "docs verification" go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
+  run_step "docs verification" \
+    go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
   run_step "safety readiness evidence" check_safety_readiness
-  run_step "ownership production audit" go run ./tools/cmd/validate-ownership-audit --audit docs/release/ownership_production_audit.md --expected-status achieved
+  run_step "ownership production audit" \
+    go run ./tools/cmd/validate-ownership-audit \
+    --audit docs/release/production/ownership_production_audit.md \
+    --expected-status achieved
   run_step "performance report schema" check_performance_report
   run_step "techempower report schemas" check_techempower_reports
   run_step "lsp stdio smoke" check_lsp_smoke
@@ -889,21 +1178,63 @@ if [[ "$mode" == "full" || "$mode" == "stabilization" ]]; then
   run_step "generated api docs" check_generated_api_docs
   run_step "eco graph bundle vault" check_eco_suite
   run_step "cross-target build smoke" check_cross_target_smoke
-  run_step "wasm32-wasi smoke schema" check_wasm_smoke_schema "wasm32-wasi"
-  run_step "wasm32-web smoke schema" check_wasm_smoke_schema "wasm32-web"
+  run_step "wasm32-wasi smoke schema" \
+    check_wasm_smoke_schema "wasm32-wasi"
+  run_step "wasm32-web smoke schema" \
+    check_wasm_smoke_schema "wasm32-web"
 fi
 
 if [[ "$mode" == "stabilization" ]]; then
-  run_step "compiler pipeline focused gate" go test ./compiler/... -run 'Pipeline|Build|Target|Backend|Cache|Object|Link|Stats|Runtime|ABI' -count=1
-  run_step "frontend callable focused gate" go test ./compiler/... -run 'Diagnostic|Parser|Frontend|Flow|Lexer|FunctionTyped|Callable|Closure|Type|Inference|Enum|Optional|Protocol|Extension|Module' -count=1
-  run_step "safety runtime focused gate" go test ./compiler/... -run 'Ownership|Borrow|Lifetime|Island|Actor|Task|Unsafe|Capability|Effect|Privacy|Consent|Budget|MMIO|Mem|Async|Await|TypedError|Stress|SelfHost|Builtin' -count=1
-  run_step "lowering ir focused gate" go test ./compiler/internal/lower ./compiler -run 'Lower|IR|Verify|Unsupported|Loop|Task|Actor|UI|Unsafe|Runtime|Island|Budget' -count=1
-  run_step "wasm ui focused gate" go test ./compiler/... -run 'UI|View|State|Style|Accessibility|NativeShell|WASM|Web' -count=1
-  run_step "eco dx focused gate" go test ./cli/... ./tools/... -run 'Eco|Project|Workspace|Permission|Capsule|Trust|Lock|Vault|Publish|Unpack|Materialize|Download|TetraHub' -count=1
-  run_step "lsp docs validators focused gate" go test ./tools/cmd/validate-lsp-stdio/... ./tools/cmd/validate-lsp-smoke/... ./tools/cmd/validate-diagnostic/... ./tools/cmd/validate-api-docs/... ./tools/cmd/validate-wasi-smoke-report/... ./tools/cmd/verify-docs/... -count=1
-  run_step "wasi runner smoke" bash scripts/release/v1_0/wasi-smoke.sh --report "$report_dir/wasi-smoke.json"
-  run_step "web runtime browser smoke" bash scripts/release/v1_0/web-smoke.sh --report "$report_dir/web-ui-smoke.json"
-  run_step "api diff no-change" bash scripts/release/v1_0/api-diff.sh --report-dir "$report_dir/api-diff" --baseline docs/baselines/api-diff-baseline.v1alpha1.json --enforce no-change
+  compiler_pipeline_pattern='Pipeline|Build|Target|Backend|Cache|Object'
+  compiler_pipeline_pattern+='|Link|Stats|Runtime|ABI'
+  run_step "compiler pipeline focused gate" \
+    go test ./compiler/... -run "$compiler_pipeline_pattern" -count=1
+
+  frontend_callable_pattern='Diagnostic|Parser|Frontend|Flow|Lexer'
+  frontend_callable_pattern+='|FunctionTyped|Callable|Closure|Type'
+  frontend_callable_pattern+='|Inference|Enum|Optional|Protocol|Extension|Module'
+  run_step "frontend callable focused gate" \
+    go test ./compiler/... -run "$frontend_callable_pattern" -count=1
+
+  safety_runtime_pattern='Ownership|Borrow|Lifetime|Island|Actor|Task|Unsafe'
+  safety_runtime_pattern+='|Capability|Effect|Privacy|Consent|Budget|MMIO|Mem'
+  safety_runtime_pattern+='|Async|Await|TypedError|Stress|SelfHost|Builtin'
+  run_step "safety runtime focused gate" \
+    go test ./compiler/... -run "$safety_runtime_pattern" -count=1
+
+  lowering_ir_pattern='Lower|IR|Verify|Unsupported|Loop|Task|Actor|UI'
+  lowering_ir_pattern+='|Unsafe|Runtime|Island|Budget'
+  run_step "lowering ir focused gate" \
+    go test ./compiler/internal/lower ./compiler -run "$lowering_ir_pattern" -count=1
+
+  run_step "wasm ui focused gate" \
+    go test ./compiler/... -run 'UI|View|State|Style|Accessibility|NativeShell|WASM|Web' -count=1
+
+  eco_dx_pattern='Eco|Project|Workspace|Permission|Capsule|Trust|Lock'
+  eco_dx_pattern+='|Vault|Publish|Unpack|Materialize|Download|TetraHub'
+  run_step "eco dx focused gate" \
+    go test ./cli/... ./tools/... -run "$eco_dx_pattern" -count=1
+
+  run_step "lsp docs validators focused gate" \
+    go test \
+    ./tools/cmd/validate-lsp-stdio/... \
+    ./tools/cmd/validate-lsp-smoke/... \
+    ./tools/cmd/validate-diagnostic/... \
+    ./tools/cmd/validate-api-docs/... \
+    ./tools/cmd/validate-wasi-smoke-report/... \
+    ./tools/cmd/verify-docs/... \
+    -count=1
+  run_step "wasi runner smoke" \
+    bash scripts/release/v1_0/wasi-smoke.sh \
+    --report "$report_dir/wasi-smoke.json"
+  run_step "web runtime browser smoke" \
+    bash scripts/release/v1_0/web-smoke.sh \
+    --report "$report_dir/web-ui-smoke.json"
+  run_step "api diff no-change" \
+    bash scripts/release/v1_0/api-diff.sh \
+    --report-dir "$report_dir/api-diff" \
+    --baseline docs/baselines/api-diff-baseline.v1alpha1.json \
+    --enforce no-change
   run_step "working tree whitespace audit" check_working_tree_whitespace
 fi
 

@@ -1,0 +1,35 @@
+// Backend PostgreSQL DataRow bounds guard microservice.
+module examples.microservices.backend.postgres.row.backend_postgres_data_row_bounds_guard_service
+import lib.core.postgres as pg
+
+func main() -> Int
+uses alloc, mem:
+    var row: []u8 = core.make_u8(40)
+    var i: Int = pg.write_i16_be_at(row, 0, 2)
+    i = pg.write_i32_be_at(row, i, 2)
+    i = pg.write_ascii_at(row, i, "42")
+    i = pg.write_i32_be_at(row, i, 1)
+    i = pg.write_ascii_at(row, i, "7")
+    if pg.data_row_column_count(row, 0) != 2:
+        return 10
+    if pg.data_row_value_len_at(row, 0, 0) != 2:
+        return 11
+    if pg.data_row_value_start_at(row, 0, 0) != 6:
+        return 12
+    if pg.data_row_i32_at(row, 0, 0) != 42:
+        return 13
+    if pg.data_row_value_len_at(row, 0, 1) != 1:
+        return 14
+    if pg.data_row_i32_at(row, 0, 1) != 7:
+        return 15
+    if pg.data_row_value_len_at(row, 0, -1) != -1:
+        return 16
+    if pg.data_row_value_start_at(row, 0, 2) != -1:
+        return 17
+    if pg.data_row_value_len_at(row, -1, 0) != -1:
+        return 18
+    if pg.data_row_value_start_at(row, -1, 0) != -1:
+        return 19
+    if pg.data_row_i32_at(row, -1, 0) != 0:
+        return 20
+    return 0

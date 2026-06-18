@@ -1,0 +1,20 @@
+module examples.memory.safe_view.safe_view_task_copy_boundary
+
+enum TaskErr:
+    case code(Int)
+
+func worker() -> Int throws TaskErr:
+    return 0
+
+func main() -> Int
+uses alloc, mem, runtime:
+    var xs: []u8 = make_u8(1)
+    xs[0] = 42
+    let copied: []u8 = __method.copy(xs.borrow())
+    if copied[0] != 42:
+        return 1
+    let task = core.task_spawn_i32_typed<TaskErr>("worker")
+    let status: Int = catch core.task_join_i32_typed<TaskErr>(task):
+    case TaskErr.code(value):
+        value
+    return status

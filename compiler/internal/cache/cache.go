@@ -52,7 +52,10 @@ func moduleToCachePath(module string) string {
 	return filepath.FromSlash(strings.ReplaceAll(module, ".", "/"))
 }
 
-func LoadCachedObject(root, target, buildTag, module string, srcHash, depSigHash [32]byte) (*tobj.Object, bool, error) {
+func LoadCachedObject(
+	root, target, buildTag, module string,
+	srcHash, depSigHash [32]byte,
+) (*tobj.Object, bool, error) {
 	path := cachePath(root, target, buildTag, module, srcHash, depSigHash)
 	obj, err := tobj.ReadObject(path)
 	if err != nil {
@@ -130,7 +133,11 @@ func BuildSigMap(checked *semantics.CheckedProgram) map[string]semantics.FuncSig
 	return sigMap
 }
 
-func ModuleDepSigHash(module string, funcs []ir.IRFunc, sigMap map[string]semantics.FuncSig) ([32]byte, error) {
+func ModuleDepSigHash(
+	module string,
+	funcs []ir.IRFunc,
+	sigMap map[string]semantics.FuncSig,
+) ([32]byte, error) {
 	deps := make(map[string]struct{})
 	for _, fn := range funcs {
 		for _, instr := range fn.Instrs {
@@ -337,7 +344,15 @@ func formatFuncSig(name string, sig semantics.FuncSig) string {
 	if sig.ThrowsType != "" {
 		throws = " throws " + sig.ThrowsType
 	}
-	return fmt.Sprintf("%s:%s(%s)->%s%s uses %s", prefix, name, strings.Join(params, ","), sig.ReturnType, throws, strings.Join(sig.Effects, ","))
+	return fmt.Sprintf(
+		"%s:%s(%s)->%s%s uses %s",
+		prefix,
+		name,
+		strings.Join(params, ","),
+		sig.ReturnType,
+		throws,
+		strings.Join(sig.Effects, ","),
+	)
 }
 
 func formatTypeSig(name, sig string) string {

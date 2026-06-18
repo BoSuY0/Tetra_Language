@@ -1,0 +1,38 @@
+// Backend memory/io buffer microservice smoke.
+module examples.microservices.backend.misc.backend_memory_io_buffer_service
+import lib.core.capability as capability
+import lib.core.io as io
+import lib.core.memory as memory
+
+func main() -> Int
+uses alloc, capability, io, mem, mmio:
+    unsafe:
+        let mem_cap: cap.mem = capability.mem()
+        let io_cap: cap.io = io.capability_io()
+        let src: ptr = core.alloc_bytes(8)
+        let dst: ptr = core.alloc_bytes(8)
+        if memory.memset_u8(src, 0, 8, mem_cap) != 0:
+            return 1
+        if memory.memset_u8(dst, 9, 8, mem_cap) != 0:
+            return 2
+        if memory.memcpy_u8(dst, src, 0, mem_cap) != 0:
+            return 3
+        if core.load_u8(dst, mem_cap) != 9:
+            return 4
+        if memory.memset_u8(src, 42, 4, mem_cap) != 0:
+            return 5
+        if memory.memcpy_u8(dst, src, 4, mem_cap) != 0:
+            return 6
+        if core.load_u8(dst, mem_cap) != 42:
+            return 7
+        if memory.memset_u8(dst, 1, -1, mem_cap) != 2:
+            return 8
+        if memory.memcpy_u8(dst, src, -1, mem_cap) != 2:
+            return 9
+        let mmio_cell: ptr = core.alloc_bytes(4)
+        let written: Int = io.mmio_write_i32(mmio_cell, 1234, io_cap)
+        let observed: Int = io.mmio_read_i32(mmio_cell, io_cap)
+        if written != 1234 || observed != 1234:
+            return 10
+        return 0
+    return 99

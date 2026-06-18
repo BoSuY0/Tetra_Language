@@ -76,6 +76,17 @@ const (
 	ValidationUnknown      ValidationStatus = "unknown"
 )
 
+type MemoryDomainKind string
+
+const (
+	DomainProcess  MemoryDomainKind = "process"
+	DomainTask     MemoryDomainKind = "task"
+	DomainActor    MemoryDomainKind = "actor"
+	DomainIsland   MemoryDomainKind = "island"
+	DomainRequest  MemoryDomainKind = "request"
+	DomainExternal MemoryDomainKind = "external"
+)
+
 type Report struct {
 	SchemaVersion string         `json:"schema_version"`
 	GitHead       string         `json:"git_head,omitempty"`
@@ -103,11 +114,32 @@ type Row struct {
 	Placement        Placement        `json:"placement"`
 	ProofIDs         []string         `json:"proof_ids"`
 	Blockers         []string         `json:"blockers"`
+	ReasonCodes      []string         `json:"reason_codes,omitempty"`
+	HeapReasonCodes  []string         `json:"heap_reason_codes,omitempty"`
 	CopyReason       string           `json:"copy_reason,omitempty"`
 	FreePoint        string           `json:"free_point,omitempty"`
 	ContractGrade    MemoryGrade      `json:"contract_grade"`
 	ValidationStatus ValidationStatus `json:"validation_status"`
 	SourceFactID     string           `json:"source_fact_id,omitempty"`
+	Domain           *MemoryDomain    `json:"domain,omitempty"`
+}
+
+type MemoryDomain struct {
+	DomainID       string           `json:"domain_id"`
+	ParentDomainID string           `json:"parent_domain_id,omitempty"`
+	Kind           MemoryDomainKind `json:"kind"`
+	OwnerKind      string           `json:"owner_kind"`
+	OwnerID        string           `json:"owner_id"`
+	Lifetime       string           `json:"lifetime"`
+	BudgetBytes    int64            `json:"budget_bytes,omitempty"`
+	RequestedBytes int64            `json:"requested_bytes,omitempty"`
+	ReservedBytes  int64            `json:"reserved_bytes,omitempty"`
+	CommittedBytes int64            `json:"committed_bytes,omitempty"`
+	ReleasedBytes  int64            `json:"released_bytes,omitempty"`
+	CurrentBytes   int64            `json:"current_bytes,omitempty"`
+	PeakBytes      int64            `json:"peak_bytes,omitempty"`
+	CopyCount      int              `json:"copy_count,omitempty"`
+	BytesCopied    int64            `json:"bytes_copied,omitempty"`
 }
 
 type ProofSummary struct {
@@ -128,12 +160,32 @@ type FunctionRow struct {
 }
 
 type Summary struct {
-	RowCount      int         `json:"row_count"`
-	ArtifactGrade MemoryGrade `json:"artifact_grade"`
-	HeapRows      int         `json:"heap_rows"`
-	CopyRows      int         `json:"copy_rows"`
-	UnboundedRows int         `json:"unbounded_rows"`
-	BudgetBytes   int64       `json:"budget_bytes"`
+	RowCount      int                   `json:"row_count"`
+	ArtifactGrade MemoryGrade           `json:"artifact_grade"`
+	HeapRows      int                   `json:"heap_rows"`
+	CopyRows      int                   `json:"copy_rows"`
+	UnboundedRows int                   `json:"unbounded_rows"`
+	BudgetBytes   int64                 `json:"budget_bytes"`
+	Domains       []MemoryDomainSummary `json:"domains,omitempty"`
+}
+
+type MemoryDomainSummary struct {
+	DomainID       string           `json:"domain_id"`
+	ParentDomainID string           `json:"parent_domain_id,omitempty"`
+	Kind           MemoryDomainKind `json:"kind"`
+	OwnerKind      string           `json:"owner_kind"`
+	OwnerID        string           `json:"owner_id"`
+	Lifetime       string           `json:"lifetime"`
+	RowCount       int              `json:"row_count"`
+	BudgetBytes    int64            `json:"budget_bytes,omitempty"`
+	RequestedBytes int64            `json:"requested_bytes,omitempty"`
+	ReservedBytes  int64            `json:"reserved_bytes,omitempty"`
+	CommittedBytes int64            `json:"committed_bytes,omitempty"`
+	ReleasedBytes  int64            `json:"released_bytes,omitempty"`
+	CurrentBytes   int64            `json:"current_bytes,omitempty"`
+	PeakBytes      int64            `json:"peak_bytes,omitempty"`
+	CopyCount      int              `json:"copy_count,omitempty"`
+	BytesCopied    int64            `json:"bytes_copied,omitempty"`
 }
 
 type GradeReport struct {
@@ -191,13 +243,30 @@ type BlockerReport struct {
 }
 
 type BlockerRow struct {
-	SiteID        string      `json:"site_id"`
-	Function      string      `json:"function"`
-	Intent        Intent      `json:"intent"`
-	Placement     Placement   `json:"placement"`
-	Blockers      []string    `json:"blockers,omitempty"`
-	CopyReason    string      `json:"copy_reason,omitempty"`
-	ContractGrade MemoryGrade `json:"contract_grade"`
+	SiteID               string      `json:"site_id"`
+	Function             string      `json:"function"`
+	Intent               Intent      `json:"intent"`
+	Placement            Placement   `json:"placement"`
+	Blockers             []string    `json:"blockers,omitempty"`
+	ReasonCodes          []string    `json:"reason_codes,omitempty"`
+	HeapReasonCodes      []string    `json:"heap_reason_codes,omitempty"`
+	CopyReason           string      `json:"copy_reason,omitempty"`
+	ContractGrade        MemoryGrade `json:"contract_grade"`
+	File                 string      `json:"file,omitempty"`
+	Line                 int         `json:"line,omitempty"`
+	Symbol               string      `json:"symbol,omitempty"`
+	SourceLocationStatus string      `json:"source_location_status"`
+	Severity             string      `json:"severity"`
+	Reason               string      `json:"reason"`
+	SuggestedFix         string      `json:"suggested_fix"`
+	ProofID              string      `json:"proof_id,omitempty"`
+	EvidenceID           string      `json:"evidence_id"`
+	SafeToOptimize       bool        `json:"safe_to_optimize"`
+	CopyKind             string      `json:"copy_kind,omitempty"`
+	SourceValue          string      `json:"source_value,omitempty"`
+	DestinationValue     string      `json:"destination_value,omitempty"`
+	BytesEstimate        int64       `json:"bytes_estimate,omitempty"`
+	SafetyReason         string      `json:"safety_reason,omitempty"`
 }
 
 func nowRFC3339() string {

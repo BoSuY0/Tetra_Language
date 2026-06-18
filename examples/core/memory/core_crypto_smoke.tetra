@@ -1,0 +1,26 @@
+// Stable core crypto interface smoke.
+module examples.core.memory.core_crypto_smoke
+
+import lib.core.crypto as crypto
+
+func main() -> Int
+uses alloc, mem:
+    var lhs: []u8 = core.make_u8(2)
+    lhs[0] = 20
+    lhs[1] = 22
+    var rhs: []u8 = core.make_u8(2)
+    rhs[0] = 20
+    rhs[1] = 22
+    var changed: []u8 = core.make_u8(2)
+    changed[0] = 20
+    changed[1] = 23
+    var shorter: []u8 = core.make_u8(1)
+    shorter[0] = 20
+    let checksum: Int = crypto.checksum_u8(lhs)
+    let mixed: Int = crypto.mix_seed(checksum, crypto.interface_strength())
+    let equal_match: Bool = crypto.constant_time_eq_u8(lhs, rhs)
+    let value_mismatch: Bool = crypto.constant_time_eq_u8(lhs, changed)
+    let length_mismatch: Bool = crypto.constant_time_eq_u8(lhs, shorter)
+    if equal_match && !value_mismatch && !length_mismatch && checksum == 42 && mixed == 1407 && crypto.interface_strength() == 21:
+        return 42
+    return 1

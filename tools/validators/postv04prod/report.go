@@ -63,7 +63,11 @@ func RequiredChecklist() []RequiredItem {
 		{Layer: "memory", Requirement: "raw pointer bounds metadata"},
 		{Layer: "memory", Requirement: "stress/fuzz evidence"},
 		{Layer: "memory", Requirement: "measured memory benchmark improvement"},
-		{Layer: "memory", Requirement: "use-after-free, double-free, borrow escape, and aliasing safety"},
+		{Layer: "memory", Requirement: "allocator benchmark evidence classification"},
+		{
+			Layer:       "memory",
+			Requirement: "use-after-free, double-free, borrow escape, and aliasing safety",
+		},
 		{Layer: "memory", Requirement: "actor/task transfer safety"},
 		{Layer: "memory", Requirement: "leak/resource finalization evidence"},
 		{Layer: "memory", Requirement: "real memory examples"},
@@ -74,7 +78,10 @@ func RequiredChecklist() []RequiredItem {
 		{Layer: "parallelism", Requirement: "actor mailbox backpressure and failure handling"},
 		{Layer: "parallelism", Requirement: "task/actor/thread-boundary transfer rules"},
 		{Layer: "parallelism", Requirement: "race-safety model or conservative rejections"},
-		{Layer: "parallelism", Requirement: "stress evidence for tasks, actor messages, cancellation storms, and timeouts"},
+		{
+			Layer:       "parallelism",
+			Requirement: "stress evidence for tasks, actor messages, cancellation storms, and timeouts",
+		},
 		{Layer: "parallelism", Requirement: "safe/unsafe/forbidden parallelism documentation"},
 		{Layer: "parallelism", Requirement: "stable parallel diagnostics"},
 		{Layer: "parallelism", Requirement: "actor benchmark Tier 0/Tier 1 preparation"},
@@ -103,7 +110,9 @@ func BuildReport(reportDir string) (Report, error) {
 	if err != nil {
 		return Report{}, err
 	}
-	parallel, err := readParallelReport(filepath.Join(reportDir, "parallel-production-linux-x64.json"))
+	parallel, err := readParallelReport(
+		filepath.Join(reportDir, "parallel-production-linux-x64.json"),
+	)
 	if err != nil {
 		return Report{}, err
 	}
@@ -122,17 +131,59 @@ func BuildReport(reportDir string) (Report, error) {
 		CombinedGate: "scripts/release/post_v0_4/memory-parallel-ui-production-linux-x64-gate.sh",
 		ReportDir:    reportDir,
 		Layers: []LayerReport{
-			{Name: "memory", Artifact: "memory-production-linux-x64.json", Schema: memoryprod.SchemaV1, Validator: "go run ./tools/cmd/validate-memory-production --report <path>", Status: memory.Status, ProcessCount: len(memory.Processes), CaseCount: len(memory.Cases), AuditCount: len(memory.Audit)},
-			{Name: "parallelism", Artifact: "parallel-production-linux-x64.json", Schema: parallelprod.SchemaV1, Validator: "go run ./tools/cmd/validate-parallel-production --report <path>", Status: parallel.Status, ProcessCount: len(parallel.Processes), CaseCount: len(parallel.Cases), AuditCount: len(parallel.Audit)},
-			{Name: "ui", Artifact: "ui-production-runtime-linux-x64.json", Schema: uiprod.SchemaV1, Validator: "go run ./tools/cmd/validate-ui-production-runtime --report <path>", Status: ui.Status, ProcessCount: len(ui.Processes), CaseCount: len(ui.Cases), AuditCount: len(ui.Audit)},
+			{
+				Name:         "memory",
+				Artifact:     "memory-production-linux-x64.json",
+				Schema:       memoryprod.SchemaV1,
+				Validator:    "go run ./tools/cmd/validate-memory-production --report <path>",
+				Status:       memory.Status,
+				ProcessCount: len(memory.Processes),
+				CaseCount:    len(memory.Cases),
+				AuditCount:   len(memory.Audit),
+			},
+			{
+				Name:         "parallelism",
+				Artifact:     "parallel-production-linux-x64.json",
+				Schema:       parallelprod.SchemaV1,
+				Validator:    "go run ./tools/cmd/validate-parallel-production --report <path>",
+				Status:       parallel.Status,
+				ProcessCount: len(parallel.Processes),
+				CaseCount:    len(parallel.Cases),
+				AuditCount:   len(parallel.Audit),
+			},
+			{
+				Name:         "ui",
+				Artifact:     "ui-production-runtime-linux-x64.json",
+				Schema:       uiprod.SchemaV1,
+				Validator:    "go run ./tools/cmd/validate-ui-production-runtime --report <path>",
+				Status:       ui.Status,
+				ProcessCount: len(ui.Processes),
+				CaseCount:    len(ui.Cases),
+				AuditCount:   len(ui.Audit),
+			},
 		},
 	}
 	report.Checklist = append(report.Checklist, memoryChecklist(memory.Audit)...)
 	report.Checklist = append(report.Checklist, parallelChecklist(parallel.Audit)...)
 	report.Checklist = append(report.Checklist, uiChecklist(ui.Audit)...)
-	report.Checklist = append(report.Checklist,
-		ChecklistItem{Layer: "combined", Requirement: "ordered Memory Parallelism UI gate", Artifact: report.CombinedGate, Evidence: "combined gate runs memory, then parallelism, then UI release-gate entrypoints", Result: "pass"},
-		ChecklistItem{Layer: "combined", Requirement: "artifact hash manifest", Artifact: "artifact-hashes.json", Evidence: "manifest lists memory-production-linux-x64.json, parallel-production-linux-x64.json, ui-production-runtime-linux-x64.json, and native-ui-runtime-linux-x64.integration.json", Result: "pass"},
+	report.Checklist = append(
+		report.Checklist,
+		ChecklistItem{
+			Layer:       "combined",
+			Requirement: "ordered Memory Parallelism UI gate",
+			Artifact:    report.CombinedGate,
+			Evidence:    "combined gate runs memory, then parallelism, then UI release-gate entrypoints",
+			Result:      "pass",
+		},
+		ChecklistItem{
+			Layer:       "combined",
+			Requirement: "artifact hash manifest",
+			Artifact:    "artifact-hashes.json",
+			Evidence: ("manifest lists memory-production-linux-x64.json, parallel-" +
+				"production-linux-x64.json, ui-production-runtime-linux-x64.json, and " +
+				"native-ui-runtime-linux-x64.integration.json"),
+			Result: "pass",
+		},
 	)
 	if err := ValidateReport(report); err != nil {
 		return Report{}, err
@@ -173,7 +224,9 @@ func ValidateReport(report Report) error {
 	if report.Target != "linux-x64" {
 		issues = append(issues, fmt.Sprintf("target is %q, want linux-x64", report.Target))
 	}
-	if strings.TrimSpace(report.CombinedGate) != "scripts/release/post_v0_4/memory-parallel-ui-production-linux-x64-gate.sh" {
+	if strings.TrimSpace(
+		report.CombinedGate,
+	) != "scripts/release/post_v0_4/memory-parallel-ui-production-linux-x64-gate.sh" {
 		issues = append(issues, "combined_gate must name the ordered post-v0.4 production gate")
 	}
 	if strings.TrimSpace(report.ReportDir) == "" {
@@ -207,10 +260,16 @@ func validateLayers(layers []LayerReport) []string {
 		}
 		seen[name] = true
 		if wantSchema, ok := required[name]; ok && layer.Schema != wantSchema {
-			issues = append(issues, fmt.Sprintf("layer %s schema is %q, want %q", name, layer.Schema, wantSchema))
+			issues = append(
+				issues,
+				fmt.Sprintf("layer %s schema is %q, want %q", name, layer.Schema, wantSchema),
+			)
 		}
 		if layer.Status != "pass" {
-			issues = append(issues, fmt.Sprintf("layer %s status is %q, want pass", name, layer.Status))
+			issues = append(
+				issues,
+				fmt.Sprintf("layer %s status is %q, want pass", name, layer.Status),
+			)
 		}
 		if strings.TrimSpace(layer.Artifact) == "" {
 			issues = append(issues, fmt.Sprintf("layer %s artifact is required", name))
@@ -219,7 +278,10 @@ func validateLayers(layers []LayerReport) []string {
 			issues = append(issues, fmt.Sprintf("layer %s validator is required", name))
 		}
 		if layer.ProcessCount == 0 || layer.CaseCount == 0 || layer.AuditCount == 0 {
-			issues = append(issues, fmt.Sprintf("layer %s must include process, case, and audit counts", name))
+			issues = append(
+				issues,
+				fmt.Sprintf("layer %s must include process, case, and audit counts", name),
+			)
 		}
 	}
 	for name := range required {
@@ -232,7 +294,15 @@ func validateLayers(layers []LayerReport) []string {
 			continue
 		}
 		if got := strings.TrimSpace(layers[idx].Name); got != want {
-			issues = append(issues, fmt.Sprintf("layers must be ordered memory, parallelism, ui: position %d is %q, want %q", idx+1, got, want))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"layers must be ordered memory, parallelism, ui: position %d is %q, want %q",
+					idx+1,
+					got,
+					want,
+				),
+			)
 		}
 	}
 	return issues
@@ -254,25 +324,45 @@ func validateChecklist(checklist []ChecklistItem) []string {
 		}
 		key := checklistKey(layer, requirement)
 		if seen[key] {
-			issues = append(issues, fmt.Sprintf("duplicate checklist item %s/%s", layer, requirement))
+			issues = append(
+				issues,
+				fmt.Sprintf("duplicate checklist item %s/%s", layer, requirement),
+			)
 		}
 		seen[key] = true
 		if _, ok := required[key]; ok {
 			required[key] = true
 		}
 		if strings.TrimSpace(item.Artifact) == "" {
-			issues = append(issues, fmt.Sprintf("checklist item %s/%s artifact is required", layer, requirement))
+			issues = append(
+				issues,
+				fmt.Sprintf("checklist item %s/%s artifact is required", layer, requirement),
+			)
 		}
 		if strings.TrimSpace(item.Evidence) == "" {
-			issues = append(issues, fmt.Sprintf("checklist item %s/%s evidence is required", layer, requirement))
+			issues = append(
+				issues,
+				fmt.Sprintf("checklist item %s/%s evidence is required", layer, requirement),
+			)
 		}
 		if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(item.Result)), "pass") {
-			issues = append(issues, fmt.Sprintf("checklist item %s/%s result is %q, want pass", layer, requirement, item.Result))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"checklist item %s/%s result is %q, want pass",
+					layer,
+					requirement,
+					item.Result,
+				),
+			)
 		}
 	}
 	for _, item := range RequiredChecklist() {
 		if !required[checklistKey(item.Layer, item.Requirement)] {
-			issues = append(issues, fmt.Sprintf("missing checklist requirement %s/%s", item.Layer, item.Requirement))
+			issues = append(
+				issues,
+				fmt.Sprintf("missing checklist requirement %s/%s", item.Layer, item.Requirement),
+			)
 		}
 	}
 	return issues
@@ -296,7 +386,15 @@ func validateChecklistArtifactReferences(reportDir string, checklist []Checklist
 			if artifactRefExists(repoRoot, reportDir, ref) {
 				continue
 			}
-			issues = append(issues, fmt.Sprintf("checklist item %s/%s references missing artifact %s", item.Layer, item.Requirement, ref))
+			issues = append(
+				issues,
+				fmt.Sprintf(
+					"checklist item %s/%s references missing artifact %s",
+					item.Layer,
+					item.Requirement,
+					ref,
+				),
+			)
 		}
 	}
 	if len(issues) > 0 {
@@ -379,7 +477,16 @@ func findRepoRoot() (string, error) {
 func memoryChecklist(audit []memoryprod.AuditReport) []ChecklistItem {
 	items := make([]ChecklistItem, 0, len(audit))
 	for _, row := range audit {
-		items = append(items, ChecklistItem{Layer: "memory", Requirement: row.Requirement, Artifact: row.Artifact, Evidence: row.Evidence, Result: row.Result})
+		items = append(
+			items,
+			ChecklistItem{
+				Layer:       "memory",
+				Requirement: row.Requirement,
+				Artifact:    row.Artifact,
+				Evidence:    row.Evidence,
+				Result:      row.Result,
+			},
+		)
 	}
 	return items
 }
@@ -387,7 +494,16 @@ func memoryChecklist(audit []memoryprod.AuditReport) []ChecklistItem {
 func parallelChecklist(audit []parallelprod.AuditReport) []ChecklistItem {
 	items := make([]ChecklistItem, 0, len(audit))
 	for _, row := range audit {
-		items = append(items, ChecklistItem{Layer: "parallelism", Requirement: row.Requirement, Artifact: row.Artifact, Evidence: row.Evidence, Result: row.Result})
+		items = append(
+			items,
+			ChecklistItem{
+				Layer:       "parallelism",
+				Requirement: row.Requirement,
+				Artifact:    row.Artifact,
+				Evidence:    row.Evidence,
+				Result:      row.Result,
+			},
+		)
 	}
 	return items
 }
@@ -395,7 +511,16 @@ func parallelChecklist(audit []parallelprod.AuditReport) []ChecklistItem {
 func uiChecklist(audit []uiprod.AuditReport) []ChecklistItem {
 	items := make([]ChecklistItem, 0, len(audit))
 	for _, row := range audit {
-		items = append(items, ChecklistItem{Layer: "ui", Requirement: row.Requirement, Artifact: row.Artifact, Evidence: row.Evidence, Result: row.Result})
+		items = append(
+			items,
+			ChecklistItem{
+				Layer:       "ui",
+				Requirement: row.Requirement,
+				Artifact:    row.Artifact,
+				Evidence:    row.Evidence,
+				Result:      row.Result,
+			},
+		)
 	}
 	return items
 }
@@ -468,7 +593,10 @@ func requireManifestSchemas(reportDir string, includeAudit bool) error {
 		return err
 	}
 	if manifest.Schema != "tetra.release-artifact-hashes.v1alpha1" {
-		return fmt.Errorf("artifact-hashes.json schema is %q, want tetra.release-artifact-hashes.v1alpha1", manifest.Schema)
+		return fmt.Errorf(
+			"artifact-hashes.json schema is %q, want tetra.release-artifact-hashes.v1alpha1",
+			manifest.Schema,
+		)
 	}
 	required := map[string]string{
 		"memory-production-linux-x64.json":             memoryprod.SchemaV1,
@@ -488,7 +616,12 @@ func requireManifestSchemas(reportDir string, includeAudit bool) error {
 			return fmt.Errorf("artifact-hashes.json missing %s", path)
 		}
 		if seen[path] != schema {
-			return fmt.Errorf("artifact-hashes.json schema for %s is %q, want %q", path, seen[path], schema)
+			return fmt.Errorf(
+				"artifact-hashes.json schema for %s is %q, want %q",
+				path,
+				seen[path],
+				schema,
+			)
 		}
 	}
 	return nil

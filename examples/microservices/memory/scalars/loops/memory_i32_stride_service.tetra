@@ -1,0 +1,24 @@
+// Memory i32 stride microservice smoke.
+//
+// The service writes four i32 cells at allocation-base offsets and verifies the
+// stride checksum.
+module examples.microservices.memory.scalars.loops.memory_i32_stride_service
+import lib.core.capability as cap
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let base: ptr = core.alloc_bytes(20)
+        let one: ptr = core.ptr_add(base, 4, memory_cap)
+        let two: ptr = core.ptr_add(base, 8, memory_cap)
+        let three: ptr = core.ptr_add(base, 12, memory_cap)
+        let _write_zero: Int = core.store_i32(base, 9, memory_cap)
+        let _write_one: Int = core.store_i32(one, 10, memory_cap)
+        let _write_two: Int = core.store_i32(two, 11, memory_cap)
+        let _write_three: Int = core.store_i32(three, 12, memory_cap)
+        let total: Int = core.load_i32(base, memory_cap) + core.load_i32(one, memory_cap) + core.load_i32(two, memory_cap) + core.load_i32(three, memory_cap)
+        if total == 42:
+            return 0
+        return total
+    return 95

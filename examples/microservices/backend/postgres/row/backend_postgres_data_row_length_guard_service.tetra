@@ -1,0 +1,41 @@
+// Backend PostgreSQL DataRow signed-length guard microservice.
+module examples.microservices.backend.postgres.row.backend_postgres_data_row_length_guard_service
+import lib.core.postgres as pg
+
+func write_negative_two_len_at(dst: inout []u8, start: Int) -> Int
+uses mem:
+    dst[start] = 255
+    dst[start + 1] = 255
+    dst[start + 2] = 255
+    dst[start + 3] = 254
+    return start + 4
+
+func main() -> Int
+uses alloc, mem:
+    var row: []u8 = core.make_u8(32)
+    var i: Int = pg.write_i16_be_at(row, 0, 3)
+    i = pg.write_i32_be_at(row, i, 2)
+    i = pg.write_ascii_at(row, i, "42")
+    let malformed_len_pos: Int = i
+    i = write_negative_two_len_at(row, i)
+    i = pg.write_i32_be_at(row, i, 1)
+    i = pg.write_ascii_at(row, i, "7")
+    if pg.data_row_column_count(row, 0) != 3:
+        return 1
+    if pg.data_row_value_len_at(row, 0, 0) != 2:
+        return 2
+    if pg.data_row_i32_at(row, 0, 0) != 42:
+        return 3
+    if pg.read_i32_be_signed(row, malformed_len_pos) != -1:
+        return 4
+    if pg.data_row_value_len_at(row, 0, 1) != -1:
+        return 5
+    if pg.data_row_value_start_at(row, 0, 1) != -1:
+        return 6
+    if pg.data_row_i32_at(row, 0, 1) != 0:
+        return 7
+    if pg.data_row_value_len_at(row, 0, 2) != 1:
+        return 8
+    if pg.data_row_i32_at(row, 0, 2) != 7:
+        return 9
+    return 0

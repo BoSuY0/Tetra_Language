@@ -2,7 +2,8 @@
 
 Git head: cafefd6865afca1de0d263b6cee71b2f8dcbc92e
 Working tree: clean detached worktree evidence for the P22 RAM Contract refresh; this is
-not a remote release-candidate checkout claim and not a historical dirty working tree cleanup claim for older RAM audits.
+not a remote release-candidate checkout claim and not a historical dirty working tree cleanup claim
+for older RAM audits.
 Verdict: `SCOPED_READY`
 
 ## Scope

@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	ctarget "tetra_language/compiler/target"
+	"tetra_language/tools/internal/reportdecode"
 )
 
 type ecoLockEnvelope struct {
@@ -100,7 +101,9 @@ const (
 
 func main() {
 	var lockPath string
+	var reportFormat string
 	flag.StringVar(&lockPath, "lock", "", "path to tetra eco lock JSON")
+	flag.StringVar(&reportFormat, "format", "auto", "report format: auto, json, or toon")
 	flag.Parse()
 
 	if lockPath == "" {
@@ -112,17 +115,19 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err := validateEcoLock(raw); err != nil {
+	if err := validateEcoLockFormat(raw, reportFormat); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
 func validateEcoLock(raw []byte) error {
+	return validateEcoLockFormat(raw, "auto")
+}
+
+func validateEcoLockFormat(raw []byte, format string) error {
 	var lock ecoLockEnvelope
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&lock); err != nil {
+	if err := reportdecode.DecodeStrictFormat(raw, format, &lock); err != nil {
 		return err
 	}
 	if lock.Schema != "" && lock.Schema != lockSchemaV1 {
@@ -165,16 +170,30 @@ func validateEcoLock(raw []byte) error {
 				return fmt.Errorf("capsule %s has dependency with empty id", capsule.ID)
 			}
 			if !strings.HasPrefix(dep.ID, "tetra://") {
-				return fmt.Errorf("capsule %s dependency %s must use tetra:// prefix", capsule.ID, dep.ID)
+				return fmt.Errorf(
+					"capsule %s dependency %s must use tetra:// prefix",
+					capsule.ID,
+					dep.ID,
+				)
 			}
 			if dep.Version == "" || !isCapsuleSemver(dep.Version) {
-				return fmt.Errorf("capsule %s dependency %s has invalid semver version %s", capsule.ID, dep.ID, dep.Version)
+				return fmt.Errorf(
+					"capsule %s dependency %s has invalid semver version %s",
+					capsule.ID,
+					dep.ID,
+					dep.Version,
+				)
 			}
 			if dep.ID == capsule.ID {
 				return fmt.Errorf("capsule %s cannot depend on itself", capsule.ID)
 			}
 			if dep.Path != "" && strings.Contains(dep.Path, "\\") {
-				return fmt.Errorf("capsule %s dependency %s has non-normalized path %s", capsule.ID, dep.ID, dep.Path)
+				return fmt.Errorf(
+					"capsule %s dependency %s has non-normalized path %s",
+					capsule.ID,
+					dep.ID,
+					dep.Path,
+				)
 			}
 			if seenDeps[dep.ID] {
 				return fmt.Errorf("capsule %s has duplicate dependency %s", capsule.ID, dep.ID)
@@ -185,16 +204,32 @@ func validateEcoLock(raw []byte) error {
 				return fmt.Errorf("capsule %s references unknown dependency %s", capsule.ID, dep.ID)
 			}
 			if resolved.Version != dep.Version {
-				return fmt.Errorf("capsule %s dependency %s version mismatch: wants %s, lock has %s", capsule.ID, dep.ID, dep.Version, resolved.Version)
+				return fmt.Errorf(
+					"capsule %s dependency %s version mismatch: wants %s, lock has %s",
+					capsule.ID,
+					dep.ID,
+					dep.Version,
+					resolved.Version,
+				)
 			}
 			for _, effect := range resolved.Effects {
 				if !containsString(capsule.Effects, effect) {
-					return fmt.Errorf("capsule %s missing required effect %s for dependency %s", capsule.ID, effect, dep.ID)
+					return fmt.Errorf(
+						"capsule %s missing required effect %s for dependency %s",
+						capsule.ID,
+						effect,
+						dep.ID,
+					)
 				}
 			}
 			for _, permission := range resolved.Permissions {
 				if !containsString(capsule.Permissions, permission) {
-					return fmt.Errorf("capsule %s missing required permission %s for dependency %s", capsule.ID, permission, dep.ID)
+					return fmt.Errorf(
+						"capsule %s missing required permission %s for dependency %s",
+						capsule.ID,
+						permission,
+						dep.ID,
+					)
 				}
 			}
 		}
@@ -203,7 +238,11 @@ func validateEcoLock(raw []byte) error {
 		sum := sha256.Sum256([]byte(lockGraphFingerprint(normalized)))
 		expected := "sha256:" + hex.EncodeToString(sum[:])
 		if lock.GraphSHA256 != expected {
-			return fmt.Errorf("graph_sha256 mismatch: metadata has %s, computed %s", lock.GraphSHA256, expected)
+			return fmt.Errorf(
+				"graph_sha256 mismatch: metadata has %s, computed %s",
+				lock.GraphSHA256,
+				expected,
+			)
 		}
 	}
 	return nil
@@ -268,10 +307,18 @@ func validateCapsule(capsule ecoLockCapsule) (ecoLockCapsule, error) {
 			return ecoLockCapsule{}, fmt.Errorf("capsule %s has empty target", capsule.ID)
 		}
 		if !supportedTargets[target] {
-			return ecoLockCapsule{}, fmt.Errorf("capsule %s has unsupported target %s", capsule.ID, target)
+			return ecoLockCapsule{}, fmt.Errorf(
+				"capsule %s has unsupported target %s",
+				capsule.ID,
+				target,
+			)
 		}
 		if seenTargets[target] {
-			return ecoLockCapsule{}, fmt.Errorf("capsule %s has duplicate target %s", capsule.ID, target)
+			return ecoLockCapsule{}, fmt.Errorf(
+				"capsule %s has duplicate target %s",
+				capsule.ID,
+				target,
+			)
 		}
 		seenTargets[target] = true
 	}
@@ -283,7 +330,11 @@ func validateCapsule(capsule ecoLockCapsule) (ecoLockCapsule, error) {
 			return ecoLockCapsule{}, fmt.Errorf("capsule %s %v", capsule.ID, err)
 		}
 		if seenEffects[normalized] {
-			return ecoLockCapsule{}, fmt.Errorf("capsule %s has duplicate effect %s", capsule.ID, normalized)
+			return ecoLockCapsule{}, fmt.Errorf(
+				"capsule %s has duplicate effect %s",
+				capsule.ID,
+				normalized,
+			)
 		}
 		seenEffects[normalized] = true
 		normalizedEffects = append(normalizedEffects, normalized)
@@ -315,10 +366,18 @@ func validateCapsule(capsule ecoLockCapsule) (ecoLockCapsule, error) {
 		}
 		if artifact.Target != "" {
 			if !supportedTargets[artifact.Target] {
-				return ecoLockCapsule{}, fmt.Errorf("capsule %s artifact %s has unsupported target %s", capsule.ID, artifact.Path, artifact.Target)
+				return ecoLockCapsule{}, fmt.Errorf(
+					"capsule %s artifact %s has unsupported target %s",
+					capsule.ID,
+					artifact.Path,
+					artifact.Target,
+				)
 			}
 			if kind != "object" {
-				return ecoLockCapsule{}, fmt.Errorf("capsule %s only object artifacts accept a target", capsule.ID)
+				return ecoLockCapsule{}, fmt.Errorf(
+					"capsule %s only object artifacts accept a target",
+					capsule.ID,
+				)
 			}
 		}
 		cleanPath, err := cleanArtifactPath(artifact.Path)
@@ -330,17 +389,32 @@ func validateCapsule(capsule ecoLockCapsule) (ecoLockCapsule, error) {
 		}
 		if artifact.SHA256 != "" {
 			if _, err := parseSHA256Hash(artifact.SHA256); err != nil {
-				return ecoLockCapsule{}, fmt.Errorf("capsule %s artifact %s has invalid sha256: %w", capsule.ID, cleanPath, err)
+				return ecoLockCapsule{}, fmt.Errorf(
+					"capsule %s artifact %s has invalid sha256: %w",
+					capsule.ID,
+					cleanPath,
+					err,
+				)
 			}
 		}
 		if artifact.PublicAPIHash != "" {
 			if _, err := parseSHA256Hash(artifact.PublicAPIHash); err != nil {
-				return ecoLockCapsule{}, fmt.Errorf("capsule %s artifact %s has invalid public_api_hash: %w", capsule.ID, cleanPath, err)
+				return ecoLockCapsule{}, fmt.Errorf(
+					"capsule %s artifact %s has invalid public_api_hash: %w",
+					capsule.ID,
+					cleanPath,
+					err,
+				)
 			}
 		}
 		key := kind + "\x00" + artifact.Target + "\x00" + cleanPath
 		if seenArtifacts[key] {
-			return ecoLockCapsule{}, fmt.Errorf("capsule %s has duplicate artifact %s %s", capsule.ID, kind, cleanPath)
+			return ecoLockCapsule{}, fmt.Errorf(
+				"capsule %s has duplicate artifact %s %s",
+				capsule.ID,
+				kind,
+				cleanPath,
+			)
 		}
 		seenArtifacts[key] = true
 		normalizedArtifacts = append(normalizedArtifacts, ecoLockArtifact{

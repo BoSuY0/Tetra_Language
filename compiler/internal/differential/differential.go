@@ -173,7 +173,10 @@ func CheckScalarI32(tc ScalarI32Case) (Report, error) {
 		return Report{}, err
 	}
 	if !ok {
-		return Report{}, fmt.Errorf("differential scalar-i32: %s is outside register backend stable subset", tc.Function.Name)
+		return Report{}, fmt.Errorf(
+			"differential scalar-i32: %s is outside register backend stable subset",
+			tc.Function.Name,
+		)
 	}
 	optFn := tc.Function
 	if len(tc.Optimizations) > 0 {
@@ -191,25 +194,48 @@ func CheckScalarI32(tc ScalarI32Case) (Report, error) {
 		SchemaVersion: "tetra.differential.scalar_i32.v1",
 		Case:          tc.Name,
 		StableSubset:  "scalar_i32_stack_ir_and_machine_ir_v1",
-		Lanes:         []Lane{LaneSourceInterpreter, LaneStackBackend, LaneRegisterBackend, LaneOptimizedBackend},
-		Samples:       make([]SampleReport, 0, len(samples)),
+		Lanes: []Lane{
+			LaneSourceInterpreter,
+			LaneStackBackend,
+			LaneRegisterBackend,
+			LaneOptimizedBackend,
+		},
+		Samples: make([]SampleReport, 0, len(samples)),
 	}
 	for _, args := range samples {
 		source, ok := tc.Source(append([]int32(nil), args...))
 		if !ok {
-			return report, fmt.Errorf("differential scalar-i32: source interpreter rejected args=%v", args)
+			return report, fmt.Errorf(
+				"differential scalar-i32: source interpreter rejected args=%v",
+				args,
+			)
 		}
 		stackValue, err := EvalStackI32(tc.Function, args)
 		if err != nil {
-			return report, fmt.Errorf("differential scalar-i32: stack backend %s args=%v: %w", tc.Function.Name, args, err)
+			return report, fmt.Errorf(
+				"differential scalar-i32: stack backend %s args=%v: %w",
+				tc.Function.Name,
+				args,
+				err,
+			)
 		}
 		registerValue, err := EvalMachineI32(mfn, args)
 		if err != nil {
-			return report, fmt.Errorf("differential scalar-i32: register backend %s args=%v: %w", tc.Function.Name, args, err)
+			return report, fmt.Errorf(
+				"differential scalar-i32: register backend %s args=%v: %w",
+				tc.Function.Name,
+				args,
+				err,
+			)
 		}
 		optimizedValue, err := EvalStackI32(optFn, args)
 		if err != nil {
-			return report, fmt.Errorf("differential scalar-i32: optimized backend %s args=%v: %w", optFn.Name, args, err)
+			return report, fmt.Errorf(
+				"differential scalar-i32: optimized backend %s args=%v: %w",
+				optFn.Name,
+				args,
+				err,
+			)
 		}
 		results := []LaneResult{
 			{Lane: LaneSourceInterpreter, Value: source},
@@ -219,10 +245,20 @@ func CheckScalarI32(tc ScalarI32Case) (Report, error) {
 		}
 		for _, result := range results[1:] {
 			if result.Value != source {
-				return report, fmt.Errorf("differential mismatch for %s args=%v lane=%s source=%d got=%d", tc.Name, args, result.Lane, source, result.Value)
+				return report, fmt.Errorf(
+					"differential mismatch for %s args=%v lane=%s source=%d got=%d",
+					tc.Name,
+					args,
+					result.Lane,
+					source,
+					result.Value,
+				)
 			}
 		}
-		report.Samples = append(report.Samples, SampleReport{Args: append([]int32(nil), args...), Results: results})
+		report.Samples = append(
+			report.Samples,
+			SampleReport{Args: append([]int32(nil), args...), Results: results},
+		)
 	}
 	return report, nil
 }
@@ -242,7 +278,10 @@ func CheckBackendMatrix(tc BackendMatrixCase) (MatrixReport, error) {
 	}
 	funcs := cloneIRFuncs(tc.Functions)
 	if _, ok := irFuncByName(funcs, tc.Entry); !ok {
-		return MatrixReport{}, fmt.Errorf("backend differential matrix: entry %q not found", tc.Entry)
+		return MatrixReport{}, fmt.Errorf(
+			"backend differential matrix: entry %q not found",
+			tc.Entry,
+		)
 	}
 	samples := normalizeMatrixSamples(tc)
 	report := MatrixReport{
@@ -295,12 +334,19 @@ func CheckBackendMatrix(tc BackendMatrixCase) (MatrixReport, error) {
 	}
 	report.Unsupported = append(report.Unsupported, unsupported...)
 	if len(report.Unsupported) > 0 {
-		return report, fmt.Errorf("backend differential matrix: unsupported functions: %s", formatUnsupportedRows(report.Unsupported))
+		return report, fmt.Errorf(
+			"backend differential matrix: unsupported functions: %s",
+			formatUnsupportedRows(report.Unsupported),
+		)
 	}
 	for _, sample := range samples {
 		source, ok := tc.Source(cloneMatrixSample(sample))
 		if !ok {
-			return report, fmt.Errorf("backend differential matrix: source interpreter rejected sample %s args=%v", sampleName(sample), sample.Args)
+			return report, fmt.Errorf(
+				"backend differential matrix: source interpreter rejected sample %s args=%v",
+				sampleName(sample),
+				sample.Args,
+			)
 		}
 		results := []LaneResult{{Lane: LaneSourceInterpreter, Value: source}}
 		laneValues := []struct {
@@ -328,7 +374,12 @@ func CheckBackendMatrix(tc BackendMatrixCase) (MatrixReport, error) {
 			{
 				lane: LaneMachineIRInterpreter,
 				run: func() (int32, error) {
-					return EvalMachineProgramI32(machineFuncs, tc.Entry, sample.Args, sample.I32Slices)
+					return EvalMachineProgramI32(
+						machineFuncs,
+						tc.Entry,
+						sample.Args,
+						sample.I32Slices,
+					)
 				},
 			},
 		}
@@ -346,21 +397,62 @@ func CheckBackendMatrix(tc BackendMatrixCase) (MatrixReport, error) {
 		for _, lane := range laneValues {
 			value, err := lane.run()
 			if err != nil {
-				return report, fmt.Errorf("backend differential matrix: %s sample %s args=%v lane=%s: %w", tc.Name, sampleName(sample), sample.Args, lane.lane, err)
+				return report, fmt.Errorf(
+					"backend differential matrix: %s sample %s args=%v lane=%s: %w",
+					tc.Name,
+					sampleName(sample),
+					sample.Args,
+					lane.lane,
+					err,
+				)
 			}
 			results = append(results, LaneResult{Lane: lane.lane, Value: value})
 			if value != source {
-				report.Mismatch = matrixMismatch(tc.Name, sample, lane.lane, source, value, len(samples))
-				report.Samples = append(report.Samples, MatrixSampleReport{Name: sample.Name, Args: append([]int32(nil), sample.Args...), Results: results})
-				return report, fmt.Errorf("differential mismatch for %s sample=%s args=%v lane=%s source=%d got=%d", tc.Name, sampleName(sample), sample.Args, lane.lane, source, value)
+				report.Mismatch = matrixMismatch(
+					tc.Name,
+					sample,
+					lane.lane,
+					source,
+					value,
+					len(samples),
+				)
+				report.Samples = append(
+					report.Samples,
+					MatrixSampleReport{
+						Name:    sample.Name,
+						Args:    append([]int32(nil), sample.Args...),
+						Results: results,
+					},
+				)
+				return report, fmt.Errorf(
+					"differential mismatch for %s sample=%s args=%v lane=%s source=%d got=%d",
+					tc.Name,
+					sampleName(sample),
+					sample.Args,
+					lane.lane,
+					source,
+					value,
+				)
 			}
 		}
-		report.Samples = append(report.Samples, MatrixSampleReport{Name: sample.Name, Args: append([]int32(nil), sample.Args...), Results: results})
+		report.Samples = append(
+			report.Samples,
+			MatrixSampleReport{
+				Name:    sample.Name,
+				Args:    append([]int32(nil), sample.Args...),
+				Results: results,
+			},
+		)
 	}
 	return report, nil
 }
 
-func EvalStackProgramI32(funcs []ir.IRFunc, entry string, args []int32, memory map[int32][]int32) (int32, error) {
+func EvalStackProgramI32(
+	funcs []ir.IRFunc,
+	entry string,
+	args []int32,
+	memory map[int32][]int32,
+) (int32, error) {
 	funcsByName := map[string]ir.IRFunc{}
 	for _, fn := range funcs {
 		funcsByName[fn.Name] = fn
@@ -375,7 +467,13 @@ func EvalStackI32(fn ir.IRFunc, args []int32) (int32, error) {
 	return EvalStackProgramI32([]ir.IRFunc{fn}, fn.Name, args, nil)
 }
 
-func evalStackFunctionI32(funcs map[string]ir.IRFunc, entry string, args []int32, memory map[int32][]int32, depth int) (int32, error) {
+func evalStackFunctionI32(
+	funcs map[string]ir.IRFunc,
+	entry string,
+	args []int32,
+	memory map[int32][]int32,
+	depth int,
+) (int32, error) {
 	if depth > 64 {
 		return 0, fmt.Errorf("%s exceeded call depth limit", entry)
 	}
@@ -390,7 +488,12 @@ func evalStackFunctionI32(funcs map[string]ir.IRFunc, entry string, args []int32
 		return 0, fmt.Errorf("%s return slots %d, want 1", fn.Name, fn.ReturnSlots)
 	}
 	if fn.LocalSlots < fn.ParamSlots {
-		return 0, fmt.Errorf("%s local slots %d smaller than params %d", fn.Name, fn.LocalSlots, fn.ParamSlots)
+		return 0, fmt.Errorf(
+			"%s local slots %d smaller than params %d",
+			fn.Name,
+			fn.LocalSlots,
+			fn.ParamSlots,
+		)
 	}
 	labels := map[int]int{}
 	for i, instr := range fn.Instrs {
@@ -463,7 +566,13 @@ func evalStackFunctionI32(funcs map[string]ir.IRFunc, entry string, args []int32
 			stack = append(stack, -value)
 		case ir.IRCall:
 			if instr.Name == "" || instr.ArgSlots < 0 || instr.RetSlots != 1 {
-				return 0, fmt.Errorf("%s call %q has unsupported ABI args=%d rets=%d", fn.Name, instr.Name, instr.ArgSlots, instr.RetSlots)
+				return 0, fmt.Errorf(
+					"%s call %q has unsupported ABI args=%d rets=%d",
+					fn.Name,
+					instr.Name,
+					instr.ArgSlots,
+					instr.RetSlots,
+				)
 			}
 			callArgs := make([]int32, instr.ArgSlots)
 			for i := instr.ArgSlots - 1; i >= 0; i-- {
@@ -529,7 +638,11 @@ func evalStackFunctionI32(funcs map[string]ir.IRFunc, entry string, args []int32
 			}
 			return value, nil
 		default:
-			return 0, fmt.Errorf("%s instruction %d is outside stable scalar-i32 subset", fn.Name, instr.Kind)
+			return 0, fmt.Errorf(
+				"%s instruction %d is outside stable scalar-i32 subset",
+				fn.Name,
+				instr.Kind,
+			)
 		}
 	}
 	return 0, fmt.Errorf("%s fell off end without return", fn.Name)
@@ -539,14 +652,25 @@ func EvalMachineI32(fn machine.Function, args []int32) (int32, error) {
 	return EvalMachineProgramI32(map[string]machine.Function{fn.Name: fn}, fn.Name, args, nil)
 }
 
-func EvalMachineProgramI32(funcs map[string]machine.Function, entry string, args []int32, memory map[int32][]int32) (int32, error) {
+func EvalMachineProgramI32(
+	funcs map[string]machine.Function,
+	entry string,
+	args []int32,
+	memory map[int32][]int32,
+) (int32, error) {
 	if _, ok := funcs[entry]; !ok {
 		return 0, fmt.Errorf("machine ir interpreter: entry %q not found", entry)
 	}
 	return evalMachineFunctionI32(funcs, entry, args, cloneI32Slices(memory), 0)
 }
 
-func evalMachineFunctionI32(funcs map[string]machine.Function, entry string, args []int32, memory map[int32][]int32, depth int) (int32, error) {
+func evalMachineFunctionI32(
+	funcs map[string]machine.Function,
+	entry string,
+	args []int32,
+	memory map[int32][]int32,
+	depth int,
+) (int32, error) {
 	if depth > 64 {
 		return 0, fmt.Errorf("%s exceeded machine call depth limit", entry)
 	}
@@ -677,7 +801,11 @@ func evalMachineFunctionI32(funcs map[string]machine.Function, entry string, arg
 				}
 				return read(instr.Uses[0])
 			default:
-				return 0, fmt.Errorf("%s opcode %s is outside stable scalar-i32 machine subset", fn.Name, instr.Op)
+				return 0, fmt.Errorf(
+					"%s opcode %s is outside stable scalar-i32 machine subset",
+					fn.Name,
+					instr.Op,
+				)
 			}
 		}
 		if nextBlock == "" {
@@ -688,14 +816,25 @@ func evalMachineFunctionI32(funcs map[string]machine.Function, entry string, arg
 	return 0, fmt.Errorf("%s exceeded machine interpreter step limit", fn.Name)
 }
 
-func EvalSSAProgramI32(funcs map[string]ssair.Function, entry string, args []int32, memory map[int32][]int32) (int32, error) {
+func EvalSSAProgramI32(
+	funcs map[string]ssair.Function,
+	entry string,
+	args []int32,
+	memory map[int32][]int32,
+) (int32, error) {
 	if _, ok := funcs[entry]; !ok {
 		return 0, fmt.Errorf("ssa interpreter: entry %q not found", entry)
 	}
 	return evalSSAFunctionI32(funcs, entry, args, cloneI32Slices(memory), 0)
 }
 
-func evalSSAFunctionI32(funcs map[string]ssair.Function, entry string, args []int32, memory map[int32][]int32, depth int) (int32, error) {
+func evalSSAFunctionI32(
+	funcs map[string]ssair.Function,
+	entry string,
+	args []int32,
+	memory map[int32][]int32,
+	depth int,
+) (int32, error) {
 	if depth > 64 {
 		return 0, fmt.Errorf("%s exceeded ssa call depth limit", entry)
 	}
@@ -719,7 +858,12 @@ func evalSSAFunctionI32(funcs map[string]ssair.Function, entry string, args []in
 			values[value.ID] = 0
 		case value.Origin == "param":
 			if paramIndex >= len(args) {
-				return 0, fmt.Errorf("%s param count %d, want at least %d", fn.Name, len(args), paramIndex+1)
+				return 0, fmt.Errorf(
+					"%s param count %d, want at least %d",
+					fn.Name,
+					len(args),
+					paramIndex+1,
+				)
 			}
 			values[value.ID] = args[paramIndex]
 			paramIndex++
@@ -740,7 +884,13 @@ func evalSSAFunctionI32(funcs map[string]ssair.Function, entry string, args []in
 			return 0, fmt.Errorf("%s unknown ssa block %s", fn.Name, current)
 		}
 		if len(branchArgs) != len(block.Params) {
-			return 0, fmt.Errorf("%s block %s arg count %d, want %d", fn.Name, block.ID, len(branchArgs), len(block.Params))
+			return 0, fmt.Errorf(
+				"%s block %s arg count %d, want %d",
+				fn.Name,
+				block.ID,
+				len(branchArgs),
+				len(block.Params),
+			)
 		}
 		for i, param := range block.Params {
 			values[param] = branchArgs[i]
@@ -788,13 +938,24 @@ func evalSSAFunctionI32(funcs map[string]ssair.Function, entry string, args []in
 				branchArgs = args
 			}
 		default:
-			return 0, fmt.Errorf("%s block %s has unsupported ssa terminator %s", fn.Name, block.ID, block.Term.Kind)
+			return 0, fmt.Errorf(
+				"%s block %s has unsupported ssa terminator %s",
+				fn.Name,
+				block.ID,
+				block.Term.Kind,
+			)
 		}
 	}
 	return 0, fmt.Errorf("%s exceeded ssa interpreter step limit", fn.Name)
 }
 
-func evalSSAInstr(funcs map[string]ssair.Function, instr ssair.Instr, values map[ssair.ValueID]int32, memory map[int32][]int32, depth int) (int32, bool, error) {
+func evalSSAInstr(
+	funcs map[string]ssair.Function,
+	instr ssair.Instr,
+	values map[ssair.ValueID]int32,
+	memory map[int32][]int32,
+	depth int,
+) (int32, bool, error) {
 	switch instr.Kind {
 	case ssair.OpConstI32:
 		return instr.Imm, true, nil
@@ -838,7 +999,10 @@ func evalSSAInstr(funcs map[string]ssair.Function, instr ssair.Instr, values map
 		}
 		return value, true, err
 	default:
-		return 0, false, fmt.Errorf("ssa instruction %s is outside backend differential subset", instr.Kind)
+		return 0, false, fmt.Errorf(
+			"ssa instruction %s is outside backend differential subset",
+			instr.Kind,
+		)
 	}
 }
 
@@ -970,9 +1134,18 @@ func evalSSABinary(kind ssair.OpKind, left int32, right int32) (int32, error) {
 	}
 }
 
-func EvalNativeLinuxX64Exit(funcs []ir.IRFunc, entry string, workDir string, name string) (int32, error) {
+func EvalNativeLinuxX64Exit(
+	funcs []ir.IRFunc,
+	entry string,
+	workDir string,
+	name string,
+) (int32, error) {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
-		return 0, fmt.Errorf("native linux-x64 execution requires linux/amd64 host, got %s/%s", runtime.GOOS, runtime.GOARCH)
+		return 0, fmt.Errorf(
+			"native linux-x64 execution requires linux/amd64 host, got %s/%s",
+			runtime.GOOS,
+			runtime.GOARCH,
+		)
 	}
 	if workDir == "" {
 		return 0, fmt.Errorf("native linux-x64 execution requires workDir")
@@ -1019,7 +1192,10 @@ func normalizeMatrixSamples(tc BackendMatrixCase) []MatrixSample {
 	if len(samples) == 0 {
 		if entry, ok := irFuncByName(tc.Functions, tc.Entry); ok {
 			for i, args := range defaultSamples(entry.ParamSlots) {
-				samples = append(samples, MatrixSample{Name: fmt.Sprintf("default-%d", i), Args: args})
+				samples = append(
+					samples,
+					MatrixSample{Name: fmt.Sprintf("default-%d", i), Args: args},
+				)
 			}
 		}
 	}
@@ -1062,10 +1238,17 @@ func ssaMatrixFunctions(funcs []ir.IRFunc) (map[string]ssair.Function, []Unsuppo
 	for _, fn := range funcs {
 		ssaFn, ok, err := ssair.FromStackIRFunction(fn)
 		if err != nil {
-			return nil, nil, fmt.Errorf("backend differential matrix: ssa lowering %s: %w", fn.Name, err)
+			return nil, nil, fmt.Errorf(
+				"backend differential matrix: ssa lowering %s: %w",
+				fn.Name,
+				err,
+			)
 		}
 		if !ok {
-			unsupported = append(unsupported, UnsupportedRow{Function: fn.Name, Reason: "ssa_lowering_unsupported"})
+			unsupported = append(
+				unsupported,
+				UnsupportedRow{Function: fn.Name, Reason: "ssa_lowering_unsupported"},
+			)
 			continue
 		}
 		out[fn.Name] = ssaFn
@@ -1073,16 +1256,25 @@ func ssaMatrixFunctions(funcs []ir.IRFunc) (map[string]ssair.Function, []Unsuppo
 	return out, unsupported, nil
 }
 
-func machineMatrixFunctions(funcs []ir.IRFunc) (map[string]machine.Function, []UnsupportedRow, error) {
+func machineMatrixFunctions(
+	funcs []ir.IRFunc,
+) (map[string]machine.Function, []UnsupportedRow, error) {
 	out := map[string]machine.Function{}
 	var unsupported []UnsupportedRow
 	for _, fn := range funcs {
 		mfn, ok, err := machineScalarFunction(fn)
 		if err != nil {
-			return nil, nil, fmt.Errorf("backend differential matrix: machine lowering %s: %w", fn.Name, err)
+			return nil, nil, fmt.Errorf(
+				"backend differential matrix: machine lowering %s: %w",
+				fn.Name,
+				err,
+			)
 		}
 		if !ok {
-			unsupported = append(unsupported, UnsupportedRow{Function: fn.Name, Reason: "machine_lowering_unsupported"})
+			unsupported = append(
+				unsupported,
+				UnsupportedRow{Function: fn.Name, Reason: "machine_lowering_unsupported"},
+			)
 			continue
 		}
 		out[fn.Name] = mfn
@@ -1117,7 +1309,14 @@ func classifyMatrixCases(funcs []ir.IRFunc) map[string]int {
 	return out
 }
 
-func matrixMismatch(caseName string, sample MatrixSample, lane Lane, expected int32, got int32, sampleCount int) *MismatchReport {
+func matrixMismatch(
+	caseName string,
+	sample MatrixSample,
+	lane Lane,
+	expected int32,
+	got int32,
+	sampleCount int,
+) *MismatchReport {
 	return &MismatchReport{
 		Case:          caseName,
 		SampleName:    sampleName(sample),
@@ -1127,7 +1326,14 @@ func matrixMismatch(caseName string, sample MatrixSample, lane Lane, expected in
 		Expected:      expected,
 		Got:           got,
 		ReducerStatus: "reduced_to_single_sample",
-		Reproducer:    fmt.Sprintf("case=%s sample=%s args=%v lane=%s original_samples=%d", caseName, sampleName(sample), sample.Args, lane, sampleCount),
+		Reproducer: fmt.Sprintf(
+			"case=%s sample=%s args=%v lane=%s original_samples=%d",
+			caseName,
+			sampleName(sample),
+			sample.Args,
+			lane,
+			sampleCount,
+		),
 	}
 }
 
@@ -1139,7 +1345,11 @@ func readSSAValue(fnName string, values map[ssair.ValueID]int32, id ssair.ValueI
 	return value, nil
 }
 
-func readSSAArgs(fnName string, values map[ssair.ValueID]int32, args []ssair.ValueID) ([]int32, error) {
+func readSSAArgs(
+	fnName string,
+	values map[ssair.ValueID]int32,
+	args []ssair.ValueID,
+) ([]int32, error) {
 	out := make([]int32, len(args))
 	for i, arg := range args {
 		value, err := readSSAValue(fnName, values, arg)
@@ -1151,7 +1361,10 @@ func readSSAArgs(fnName string, values map[ssair.ValueID]int32, args []ssair.Val
 	return out, nil
 }
 
-func readSSASliceAccess(values map[ssair.ValueID]int32, args []ssair.ValueID) (int32, int32, int32, error) {
+func readSSASliceAccess(
+	values map[ssair.ValueID]int32,
+	args []ssair.ValueID,
+) (int32, int32, int32, error) {
 	if len(args) != 3 {
 		return 0, 0, 0, fmt.Errorf("ssa index load arg count %d, want 3", len(args))
 	}
@@ -1170,7 +1383,11 @@ func readSSASliceAccess(values map[ssair.ValueID]int32, args []ssair.ValueID) (i
 	return base, length, index, nil
 }
 
-func popSliceAccess(fnName string, kind ir.IRInstrKind, pop func(ir.IRInstrKind) (int32, error)) (int32, int32, int32, error) {
+func popSliceAccess(
+	fnName string,
+	kind ir.IRInstrKind,
+	pop func(ir.IRInstrKind) (int32, error),
+) (int32, int32, int32, error) {
 	index, err := pop(kind)
 	if err != nil {
 		return 0, 0, 0, err
@@ -1189,7 +1406,13 @@ func popSliceAccess(fnName string, kind ir.IRInstrKind, pop func(ir.IRInstrKind)
 	return index, length, base, nil
 }
 
-func loadI32Slice(memory map[int32][]int32, base int32, length int32, index int32, checked bool) (int32, error) {
+func loadI32Slice(
+	memory map[int32][]int32,
+	base int32,
+	length int32,
+	index int32,
+	checked bool,
+) (int32, error) {
 	if checked && (index < 0 || index >= length) {
 		return 0, fmt.Errorf("index %d out of bounds len %d", index, length)
 	}
@@ -1198,12 +1421,23 @@ func loadI32Slice(memory map[int32][]int32, base int32, length int32, index int3
 		return 0, fmt.Errorf("missing i32 slice base %d", base)
 	}
 	if index < 0 || index >= int32(len(xs)) || index >= length {
-		return 0, fmt.Errorf("index %d outside backing len %d logical len %d", index, len(xs), length)
+		return 0, fmt.Errorf(
+			"index %d outside backing len %d logical len %d",
+			index,
+			len(xs),
+			length,
+		)
 	}
 	return xs[index], nil
 }
 
-func storeI32Slice(memory map[int32][]int32, base int32, length int32, index int32, value int32) error {
+func storeI32Slice(
+	memory map[int32][]int32,
+	base int32,
+	length int32,
+	index int32,
+	value int32,
+) error {
 	if index < 0 || index >= length {
 		return fmt.Errorf("index %d out of bounds len %d", index, length)
 	}

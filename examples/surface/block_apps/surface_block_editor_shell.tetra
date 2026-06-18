@@ -1,0 +1,241 @@
+// Polished editor shell scene composed only from Block configuration.
+module examples.surface.block_apps.surface_block_editor_shell
+
+import lib.core.surface as surface
+import lib.core.block as block
+
+func rgba(r: Int, g: Int, b: Int, a: Int) -> surface.Color:
+    return surface.Color(r: r, g: g, b: b, a: a)
+
+func theme_dark() -> surface.Color:
+    return surface.Color(r: 16, g: 19, b: 24, a: 255)
+
+func theme_light() -> surface.Color:
+    return surface.Color(r: 235, g: 240, b: 246, a: 255)
+
+func violet() -> surface.Color:
+    return surface.Color(r: 144, g: 126, b: 244, a: 255)
+
+func cyan() -> surface.Color:
+    return surface.Color(r: 96, g: 190, b: 220, a: 255)
+
+func chrome_paint() -> block.PaintSpec:
+    let fill = block.paint_layer_fill_radius(rgba(22, 27, 34, 255), 10)
+    let grad_a = rgba(30, 36, 44, 255)
+    let grad_b = rgba(20, 24, 30, 255)
+    let grad = block.paint_layer_linear_gradient(grad_a, grad_b, 10)
+    let border = block.paint_layer_border(rgba(64, 76, 92, 255), 1, 10)
+    let shadow = block.paint_layer_shadow(rgba(0, 0, 0, 82), 14, 0, 4)
+    let outline = block.paint_layer_outline(violet(), 1, 12)
+    return block.paint_stack5(fill, grad, border, shadow, outline)
+
+func tab_paint(active: Bool) -> block.PaintSpec:
+    if active:
+        let active_fill = block.paint_layer_fill_radius(rgba(44, 46, 68, 255), 8)
+        let active_border = block.paint_layer_border(violet(), 1, 8)
+        let active_shadow = block.paint_layer_shadow(rgba(0, 0, 0, 52), 8, 0, 2)
+        let active_outline = block.paint_layer_outline(cyan(), 1, 10)
+        return block.paint_stack4(active_fill, active_border, active_shadow, active_outline)
+    let fill = block.paint_layer_fill_radius(rgba(26, 31, 38, 255), 8)
+    let border = block.paint_layer_border(rgba(52, 64, 78, 255), 1, 8)
+    let shadow = block.paint_layer_shadow(rgba(0, 0, 0, 40), 6, 0, 1)
+    return block.paint_stack3(fill, border, shadow)
+
+func ui_motion(ms: Int, y: Int, scale: Int) -> block.MotionSpec:
+    let ease = block.motion_ease_standard()
+    return block.motion_transition(ms, 0, ease, true, true, true, 0, y, scale)
+
+func tab_rect(x: Int) -> surface.Rect:
+    return surface.Rect(x: x, y: 24, w: 112, h: 34)
+
+func code_line_rect(y: Int) -> surface.Rect:
+    return surface.Rect(x: 178, y: y, w: 286, h: 22)
+
+func tab_text(n: Int) -> block.TextSpec:
+    let ui = block.text_family_ui()
+    let align = block.text_align_start()
+    let wrap = block.text_wrap_none()
+    let overflow = block.text_overflow_ellipsis()
+    return block.text_styled(n, theme_light(), ui, 13, 700, 18, align, wrap, overflow, 255)
+
+func rail_text() -> block.TextSpec:
+    let ui = block.text_family_ui()
+    let align = block.text_align_start()
+    let wrap = block.text_wrap_word()
+    let overflow = block.text_overflow_ellipsis()
+    return block.text_styled(8, theme_light(), ui, 14, 800, 18, align, wrap, overflow, 255)
+
+func code_text(n: Int, color: surface.Color) -> block.TextSpec:
+    let mono = block.text_family_monospace()
+    let align = block.text_align_start()
+    let wrap = block.text_wrap_none()
+    let overflow = block.text_overflow_ellipsis()
+    return block.text_styled(n, color, mono, 13, 500, 18, align, wrap, overflow, 255)
+
+func make_tab(idv: Int, p: Int, x: Int, n: Int, active: Bool, hash: Int) -> block.Block:
+    let rect = tab_rect(x)
+    let icon: block.AssetRef = block.asset_icon(idv, 14, 14, hash)
+    let text = tab_text(n)
+    var state: block.StateSpec = block.state_interactive()
+    if active:
+        state = block.state_with_selector(block.state_selector_selected(), 3)
+    let motion = ui_motion(130, -1, 101)
+    let layout = block.layout_row(rect, 8)
+    let paint = tab_paint(active)
+    let image = block.image_asset_tinted_scaled(icon, 14, 14, cyan(), 1)
+    let input = block.input_clickable()
+    let event = block.event_click(block.action_primary())
+    let a11y = block.accessibility_button(n)
+    let props = block.props(layout, paint, text, image, input, event, state, motion, a11y, icon)
+    return block.make(block.id(idv), block.id(p), props)
+
+func code_line_paint() -> block.PaintSpec:
+    let fill = block.paint_layer_fill_radius(rgba(18, 22, 28, 255), 4)
+    let border = block.paint_layer_border(rgba(40, 50, 62, 255), 1, 4)
+    let shadow = block.paint_layer_shadow(rgba(0, 0, 0, 20), 4, 0, 1)
+    return block.paint_stack3(fill, border, shadow)
+
+func make_code_line(idv: Int, p: Int, y: Int, n: Int, selected: Bool) -> block.Block:
+    let rect = code_line_rect(y)
+    var line_color: surface.Color = rgba(122, 166, 210, 255)
+    if selected:
+        line_color = cyan()
+    let layout = block.layout_row(rect, 6)
+    let paint = code_line_paint()
+    let text = code_text(n, line_color)
+    let image = block.image_none()
+    let input = block.input_none()
+    let event = block.event_none()
+    let state = block.state_base()
+    let motion = block.motion_none()
+    let a11y = block.accessibility_text(n)
+    let asset = block.asset_font(3, 8303)
+    let props = block.props(layout, paint, text, image, input, event, state, motion, a11y, asset)
+    return block.make(block.id(idv), block.id(p), props)
+
+func scene_frame_checksum() -> Int:
+    let hover: block.StateSelector = block.state_selector_hover()
+    let focus: block.StateSelector = block.state_selector_focused()
+    let pressed: block.StateSelector = block.state_selector_pressed()
+    let motion: block.MotionSpec = ui_motion(130, -1, 101)
+    let paint: block.PaintSpec = tab_paint(true)
+    let hover_tint: Int = block.state_resolve_int(122, 160, hover, hover)
+    let focus_outline: Int = block.state_resolve_int(1, 2, focus, focus)
+    let pressed_y: Int = block.motion_resolve_translate_y(motion, 65)
+    if block.state_selector_matches(pressed, pressed):
+        return block.paint_feature_flags(paint) + hover_tint + focus_outline + pressed_y
+    return 0
+
+func scene_checksum() -> Int:
+    return scene_frame_checksum()
+
+func make_root_props(rect: surface.Rect) -> block.BlockProps:
+    let layout = block.layout_row(rect, 12)
+    let fill = block.paint_layer_fill_radius(theme_dark(), 0)
+    let overlay = block.paint_layer_overlay(violet(), 24, 0)
+    let paint = block.paint_stack2(fill, overlay)
+    let text = block.text_none()
+    let image = block.image_none()
+    let input = block.input_none()
+    let event = block.event_none()
+    let state = block.state_base()
+    let motion = block.motion_none()
+    let a11y = block.accessibility_text(12)
+    let asset = block.asset_none()
+    return block.props(layout, paint, text, image, input, event, state, motion, a11y, asset)
+
+func make_shell_props(rect: surface.Rect, rail: Bool) -> block.BlockProps:
+    var layout: block.LayoutSpec = block.layout_column(rect, 10)
+    var text: block.TextSpec = block.text_none()
+    var a11y: block.AccessibilitySpec = block.accessibility_text(12)
+    if rail:
+        layout = block.layout_column(rect, 8)
+        text = rail_text()
+        a11y = block.accessibility_text(8)
+    let image = block.image_none()
+    let input = block.input_none()
+    let event = block.event_none()
+    let state = block.state_base()
+    let motion = block.motion_fast()
+    let asset = block.asset_none()
+    let paint = chrome_paint()
+    return block.props(layout, paint, text, image, input, event, state, motion, a11y, asset)
+
+func code_scroll_layout(rect: surface.Rect) -> block.LayoutSpec:
+    return block.layout_scroll(rect, 298, 360, 24)
+
+func code_scroll_offset(rect: surface.Rect) -> Int:
+    return block.layout_scroll_offset_y(code_scroll_layout(rect))
+
+func code_panel_paint() -> block.PaintSpec:
+    let fill = block.paint_layer_fill_radius(rgba(14, 18, 23, 255), 8)
+    let border = block.paint_layer_border(rgba(48, 58, 72, 255), 1, 8)
+    let shadow = block.paint_layer_shadow(rgba(0, 0, 0, 64), 12, 0, 4)
+    return block.paint_stack3(fill, border, shadow)
+
+func make_code_props(rect: surface.Rect) -> block.BlockProps:
+    let layout = code_scroll_layout(rect)
+    let paint = code_panel_paint()
+    let text = block.text_none()
+    let image = block.image_none()
+    let input = block.input_none()
+    let event = block.event_none()
+    let state = block.state_base()
+    let motion = block.motion_none()
+    let a11y = block.accessibility_text(10)
+    let asset = block.asset_none()
+    return block.props(layout, paint, text, image, input, event, state, motion, a11y, asset)
+
+func add_root(tree: inout block.BlockTree, child: block.Block, bounds: surface.Rect) -> Int:
+    return block.tree_add_root(tree, child, bounds)
+
+func add_child(t: inout block.BlockTree, p: Int, child: block.Block, r: surface.Rect) -> Int:
+    return block.tree_add_child(t, block.id(p), child, r)
+
+func shell_ids_ok(root: Int, rail: Int, editor: Int, tab_a: Int, tab_b: Int) -> Bool:
+    let shell = root == 1 && rail == 2 && editor == 3
+    return shell && tab_a == 4 && tab_b == 5
+
+func code_ids_ok(code: Int, line1: Int, line2: Int, line3: Int) -> Bool:
+    let panel = code == 6 && line1 == 7
+    return panel && line2 == 8 && line3 == 9
+
+func state_ok(valid: Int, focus0: Int, focus1: Int, scroll: Int) -> Bool:
+    let valid_tree = valid == block.tree_error_ok()
+    let focus_ready = focus0 == 4 && focus1 == 5
+    return valid_tree && focus_ready && scroll == 24
+
+func visual_ok() -> Bool:
+    let paint_ok = block.paint_validate_visual_grammar(chrome_paint()) == block.paint_error_ok()
+    return paint_ok && scene_checksum() > 0
+
+func main() -> Int
+uses alloc, mem:
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 500, h: 300)
+    let rail_rect: surface.Rect = surface.Rect(x: 16, y: 16, w: 126, h: 268)
+    let editor_rect: surface.Rect = surface.Rect(x: 154, y: 16, w: 330, h: 268)
+    let code_rect: surface.Rect = surface.Rect(x: 170, y: 72, w: 298, h: 194)
+    var tree: block.BlockTree = block.tree_init(12)
+    let root_block = block.make(block.id(1), block.id_none(), make_root_props(root_rect))
+    let rail_block = block.make(block.id(2), block.id(1), make_shell_props(rail_rect, true))
+    let editor_block = block.make(block.id(3), block.id(1), make_shell_props(editor_rect, false))
+    let code_block = block.make(block.id(6), block.id(3), make_code_props(code_rect))
+    let root: Int = add_root(tree, root_block, root_rect)
+    let rail: Int = add_child(tree, 1, rail_block, rail_rect)
+    let editor: Int = add_child(tree, 1, editor_block, editor_rect)
+    let tab_a: Int = add_child(tree, 3, make_tab(4, 3, 170, 10, true, 801), tab_rect(170))
+    let tab_b: Int = add_child(tree, 3, make_tab(5, 3, 290, 9, false, 802), tab_rect(290))
+    let code: Int = add_child(tree, 3, code_block, code_rect)
+    let line1: Int = add_child(tree, 6, make_code_line(7, 6, 86, 24, false), code_line_rect(86))
+    let line2: Int = add_child(tree, 6, make_code_line(8, 6, 112, 32, true), code_line_rect(112))
+    let line3: Int = add_child(tree, 6, make_code_line(9, 6, 138, 18, false), code_line_rect(138))
+    let valid: Int = block.tree_validate(tree)
+    let focus0: Int = block.id_value(block.focus_order_at(tree, 0))
+    let focus1: Int = block.id_value(block.focus_order_at(tree, 1))
+    let scroll_offset: Int = code_scroll_offset(code_rect)
+    let shell_ids = shell_ids_ok(root, rail, editor, tab_a, tab_b)
+    let code_ids = code_ids_ok(code, line1, line2, line3)
+    let state_ready = state_ok(valid, focus0, focus1, scroll_offset)
+    if shell_ids && code_ids && state_ready && visual_ok():
+        return 0
+    return 1

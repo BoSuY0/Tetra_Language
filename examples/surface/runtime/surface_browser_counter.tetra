@@ -1,0 +1,165 @@
+// Pure Tetra Surface browser-canvas counter/input smoke.
+module examples.surface.runtime.surface_browser_counter
+
+import lib.core.surface as surface
+import lib.core.draw as draw
+import lib.core.component as component
+
+struct CounterButton:
+    rect: surface.Rect
+    focused: Bool
+    text_len_seen: Int
+
+struct CounterApp:
+    count: Int
+    key_count: Int
+    width: Int
+    button: CounterButton
+
+extension CounterButton:
+    func measure(self: borrow CounterButton, max: surface.Size) -> surface.Size:
+        let desired: surface.Size = surface.Size(w: 160, h: 48)
+        return component.clamp_size(desired, max)
+    func layout(self: inout CounterButton, rect: surface.Rect) -> Int:
+        self.rect = rect
+        return 0
+    func draw(self: borrow CounterButton, ctx: inout draw.DrawContext) -> Int
+    uses mem:
+        let fg: surface.Color = surface.Color(r: 242, g: 244, b: 248, a: 255)
+        let accent: surface.Color = surface.Color(r: 54, g: 130, b: 218, a: 255)
+        let _: Int = draw.rect(ctx, self.rect, accent)
+        if self.focused:
+            let focus_ring: surface.Rect = surface.Rect(x: self.rect.x - 4, y: self.rect.y - 4, w: self.rect.w + 8, h: self.rect.h + 8)
+            let __: Int = draw.rect_outline(ctx, focus_ring, fg)
+        return draw.rect_outline(ctx, self.rect, fg)
+    func event(self: inout CounterButton, event: surface.Event) -> Int:
+        if event.kind == surface.event_mouse_up() && rect_contains(self.rect, event.x, event.y):
+            return 1
+        return 0
+    func text_input(self: inout CounterButton, event: surface.Event) -> Int:
+        if event.kind == surface.event_text_input() && event.text_len > 0:
+            self.text_len_seen = event.text_len
+            return 1
+        return 0
+    func focus(self: inout CounterButton, focused: Bool) -> Int:
+        self.focused = focused
+        return 1
+    func accessibility_role(self: borrow CounterButton) -> Int:
+        return component.accessibility_role_button()
+
+extension CounterApp:
+    func measure(self: borrow CounterApp, max: surface.Size) -> surface.Size:
+        let desired: surface.Size = surface.Size(w: max.w, h: max.h)
+        return component.clamp_size(desired, max)
+    func layout(self: inout CounterApp, rect: surface.Rect) -> Int:
+        let button_size: surface.Size = CounterButton.measure(self.button, surface.Size(w: rect.w, h: rect.h))
+        let button_rect: surface.Rect = surface.Rect(x: rect.x + 32, y: rect.y + 88, w: button_size.w, h: button_size.h)
+        return CounterButton.layout(self.button, button_rect)
+    func focus(self: inout CounterApp, focused: Bool) -> Int:
+        return CounterButton.focus(self.button, focused)
+    func accessibility_role(self: borrow CounterApp) -> Int:
+        return CounterButton.accessibility_role(self.button)
+    func draw(self: borrow CounterApp, ctx: inout draw.DrawContext) -> Int
+    uses mem:
+        let bg: surface.Color = surface.Color(r: 24, g: 22, b: 34, a: 255)
+        let fg: surface.Color = surface.Color(r: 242, g: 244, b: 248, a: 255)
+        let key_fg: surface.Color = surface.Color(r: 42, g: 170, b: 112, a: 255)
+        let text_fg: surface.Color = surface.Color(r: 218, g: 184, b: 58, a: 255)
+        let _: Int = draw.clear(ctx, bg)
+        let __: Int = draw.text(ctx, "Count", 32, 28, fg)
+        if self.count > 0:
+            let active: surface.Rect = surface.Rect(x: 88, y: 28, w: 24 + self.count * 8, h: 7)
+            let ___: Int = draw.rect(ctx, active, fg)
+        let ____: Int = draw.text(ctx, "Key", 32, 52, fg)
+        if self.key_count > 0:
+            let key_active: surface.Rect = surface.Rect(x: 88, y: 52, w: 24, h: 7)
+            let _____: Int = draw.rect(ctx, key_active, key_fg)
+        let ______: Int = draw.text(ctx, "Text", 32, 68, fg)
+        let text_active: surface.Rect = surface.Rect(x: 88, y: 68, w: 18, h: 7)
+        let _______: Int = draw.rect(ctx, text_active, text_fg)
+        let border: surface.Rect = surface.Rect(x: 0, y: 0, w: ctx.frame.width, h: ctx.frame.height)
+        let ________: Int = draw.rect_outline(ctx, border, fg)
+        return CounterButton.draw(self.button, ctx)
+    func event(self: inout CounterApp, event: surface.Event) -> Int:
+        if event.kind == surface.event_resize():
+            self.width = event.width
+            let _: Int = CounterApp.layout(self, surface.Rect(x: 0, y: 0, w: event.width, h: event.height))
+            return 1
+        if event.kind == surface.event_key_down():
+            self.key_count = self.key_count + 1
+            self.count = self.count + 1
+            return 1
+        let inside_button: Bool = rect_contains(self.button.rect, event.x, event.y)
+        let handled: Int = CounterButton.event(self.button, event)
+        if event.kind == surface.event_mouse_up() && inside_button:
+            self.count = self.count + 1
+            return 1
+        return handled
+    func text_input(self: inout CounterApp, event: surface.Event) -> Int:
+        return CounterButton.text_input(self.button, event)
+
+func rect_contains(rect: surface.Rect, x: Int, y: Int) -> Bool:
+    return x >= rect.x && y >= rect.y && x < rect.x + rect.w && y < rect.y + rect.h
+
+func main() -> Int
+uses alloc, mem, surface:
+    var app: CounterApp = CounterApp(count: 0, key_count: 0, width: 320, button: CounterButton(rect: surface.Rect(x: 0, y: 0, w: 0, h: 0), focused: false, text_len_seen: 0))
+    var win: surface.Surface = surface.open("Surface Browser Counter", 320, 200)
+    let measured: surface.Size = CounterApp.measure(app, surface.Size(w: 320, h: 200))
+    let layout_status: Int = CounterApp.layout(app, surface.Rect(x: 0, y: 0, w: measured.w, h: measured.h))
+    let focus_status: Int = CounterApp.focus(app, true)
+    let accessibility_status: Int = CounterApp.accessibility_role(app)
+    var before_frame: surface.Frame = surface.begin_frame(win)
+    var before_ctx: draw.DrawContext = draw.DrawContext(frame: before_frame)
+    let _: Int = CounterApp.draw(app, before_ctx)
+    let first_presented: Int = surface.present(before_ctx.frame)
+    let click_event: surface.Event = surface.poll_event(win)
+    let click_status: Int = CounterApp.event(app, click_event)
+    let key_event: surface.Event = surface.poll_event(win)
+    let key_status: Int = CounterApp.event(app, key_event)
+    let resize_event: surface.Event = surface.poll_event(win)
+    let resize_status: Int = CounterApp.event(app, resize_event)
+    win.width = resize_event.width
+    win.height = resize_event.height
+    let host_text_event: surface.Event = surface.poll_event(win)
+    var text_bytes: []u8 = core.make_u8(4)
+    let host_text_len: Int = surface.poll_event_text_len(win)
+    let copied_text_len: Int = surface.poll_event_text_into(win, text_bytes)
+    let text_event: surface.Event = surface.Event(kind: host_text_event.kind, x: host_text_event.x, y: host_text_event.y, button: host_text_event.button, key: host_text_event.key, width: host_text_event.width, height: host_text_event.height, timestamp_ms: host_text_event.timestamp_ms, text_len: copied_text_len)
+    let text_status: Int = CounterApp.text_input(app, text_event)
+    var after_frame: surface.Frame = surface.begin_frame(win)
+    var after_ctx: draw.DrawContext = draw.DrawContext(frame: after_frame)
+    let __: Int = CounterApp.draw(app, after_ctx)
+    let second_presented: Int = surface.present(after_ctx.frame)
+    let closed: Int = surface.close(win)
+    if app.count < 2:
+        return 31
+    if app.key_count < 1:
+        return 32
+    if app.button.text_len_seen < 2:
+        return 33
+    if app.width < 400:
+        return 34
+    if resize_event.height < 240:
+        return 35
+    if first_presented > 0:
+        return 36
+    if second_presented > 0:
+        return 37
+    if closed > 0:
+        return 38
+    if click_status < 1:
+        return 39
+    if key_status < 1:
+        return 40
+    if resize_status < 1:
+        return 41
+    if text_status < 1:
+        return 42
+    if copied_text_len < 2:
+        return 43
+    if text_bytes[0] < 79:
+        return 44
+    if text_bytes[1] < 75:
+        return 45
+    return 1 + layout_status - layout_status + focus_status - focus_status + accessibility_status - accessibility_status + host_text_len - host_text_len

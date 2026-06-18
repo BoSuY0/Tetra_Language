@@ -1,0 +1,15 @@
+// Heap bool slice memory microservice smoke.
+//
+// The service allocates a heap-backed bool slice and verifies boolean
+// read-after-write through indexed slice lanes.
+module examples.microservices.memory.heap_slices.memory_heap_bool_flags_service
+func main() -> Int
+uses alloc, mem:
+    var flags: []bool = core.make_bool(4)
+    flags[0] = true
+    flags[1] = false
+    flags[2] = true
+    flags[3] = flags[0] && !flags[1] && flags[2]
+    if flags[3]:
+        return 0
+    return 42

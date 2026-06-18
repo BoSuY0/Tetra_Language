@@ -1,0 +1,1003 @@
+{
+  "schema": "tetra.gate-contract.v1",
+  "id": "memory-100-prod-stable-linux-x64-v1",
+  "title": "Memory100 prod-stable Linux-x64 aggregate release gate",
+  "scope": "memory-100-prod-stable-linux-x64",
+  "producer": "scripts/release/post_v0_4/memory-100-prod-stable-gate.sh",
+  "entrypoint": "scripts/release/post_v0_4/memory-100-prod-stable-gate.sh",
+  "fresh_report_dir_policy": "require-empty-or-new",
+  "host_preconditions": [
+    "linux",
+    "go",
+    "fresh-report-dir"
+  ],
+  "steps": [
+    {
+      "id": "memory-production-gate",
+      "kind": "bash",
+      "command_parts": [
+        "bash",
+        "scripts/release/post_v0_4/memory-production-linux-x64-smoke.sh",
+        "--report-dir",
+        "\"$REPORT_DIR/memory-production\""
+      ],
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "memory-production/memory-production-linux-x64.json",
+        "memory-production/memory-release-manifest.json",
+        "memory-production/artifact-hashes.json"
+      ],
+      "validator_refs": [
+        "validate-memory-production",
+        "validate-artifact-hashes"
+      ],
+      "host_preconditions": [
+        "linux",
+        "go"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "ram-contract-gate",
+      "kind": "bash",
+      "command_parts": [
+        "bash",
+        "scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh",
+        "--report-dir",
+        "\"$REPORT_DIR/ram-contract\""
+      ],
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "ram-contract/ram-contract-release-manifest.json",
+        "ram-contract/ram-contract-report.json",
+        "ram-contract/memory-grade-report.json",
+        "ram-contract/proof-store-summary.json",
+        "ram-contract/validation-pipeline-coverage.json",
+        "ram-contract/heap-blockers.json",
+        "ram-contract/copy-blockers.json",
+        "ram-contract/fuzz/ram-contract-fuzz-oracle.json",
+        "ram-contract/artifact-hashes.json"
+      ],
+      "validator_refs": [
+        "validate-ram-contract-release",
+        "validate-artifact-hashes"
+      ],
+      "host_preconditions": [
+        "linux",
+        "go"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "integrated-gate",
+      "kind": "bash",
+      "command_parts": [
+        "bash",
+        "scripts/release/post_v0_4/memory-islands-surface-production-gate.sh",
+        "--report-dir",
+        "\"$REPORT_DIR/integrated\""
+      ],
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "integrated/memory-islands-surface-production-manifest.json",
+        "integrated/artifact-hashes.json"
+      ],
+      "validator_refs": [
+        "validate-memory-islands-surface-production",
+        "validate-artifact-hashes"
+      ],
+      "host_preconditions": [
+        "linux",
+        "go"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "write-raw-memory-contract",
+      "kind": "internal-write",
+      "command_parts": [
+        "scripts/release/post_v0_4/memory-100-prod-stable-gate.sh",
+        "writes",
+        "\"$REPORT_DIR/raw-memory-contract/raw-memory-contract.json\""
+      ],
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "raw-memory-contract/raw-memory-contract.json"
+      ],
+      "validator_refs": [
+        "validate-memory-100-prod-stable"
+      ],
+      "host_preconditions": [
+        "linux",
+        "go"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "write-allocation-lowering-report",
+      "kind": "internal-write",
+      "command_parts": [
+        "scripts/release/post_v0_4/memory-100-prod-stable-gate.sh",
+        "writes",
+        "\"$REPORT_DIR/allocation-lowering/allocation-lowering-report.json\""
+      ],
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "allocation-lowering/allocation-lowering-report.json"
+      ],
+      "validator_refs": [
+        "validate-memory-100-prod-stable"
+      ],
+      "host_preconditions": [
+        "linux",
+        "go"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "copy-proof-store-summary",
+      "kind": "internal-write",
+      "command_parts": [
+        "scripts/release/post_v0_4/memory-100-prod-stable-gate.sh",
+        "writes",
+        "\"$REPORT_DIR/proof-store/proof-store-summary.json\""
+      ],
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "proof-store/proof-store-summary.json"
+      ],
+      "validator_refs": [
+        "validate-memory-100-prod-stable"
+      ],
+      "host_preconditions": [
+        "linux",
+        "go"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "write-proof-transition-report",
+      "kind": "internal-write",
+      "command_parts": [
+        "scripts/release/post_v0_4/memory-100-prod-stable-gate.sh",
+        "writes",
+        "\"$REPORT_DIR/proof-transition/proof-transition-report.json\""
+      ],
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "proof-transition/proof-transition-report.json"
+      ],
+      "validator_refs": [
+        "validate-memory-100-prod-stable"
+      ],
+      "host_preconditions": [
+        "linux",
+        "go"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "write-runtime-memory-contract",
+      "kind": "internal-write",
+      "command_parts": [
+        "scripts/release/post_v0_4/memory-100-prod-stable-gate.sh",
+        "writes",
+        "\"$REPORT_DIR/runtime-memory/runtime-memory-contract.json\""
+      ],
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "runtime-memory/runtime-memory-contract.json"
+      ],
+      "validator_refs": [
+        "validate-memory-100-prod-stable"
+      ],
+      "host_preconditions": [
+        "linux",
+        "go"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "memory-fuzz-short",
+      "kind": "go-run",
+      "command_parts": [
+        "go",
+        "run",
+        "./tools/cmd/memory-fuzz-short",
+        "--tier",
+        "1",
+        "--report-dir",
+        "\"$REPORT_DIR/memory-fuzz\"",
+        "--git-head",
+        "\"$GIT_HEAD\""
+      ],
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "memory-fuzz/memory-fuzz-oracle.json",
+        "memory-fuzz/artifact-hashes.json"
+      ],
+      "validator_refs": [
+        "validate-memory-fuzz-oracle",
+        "validate-artifact-hashes"
+      ],
+      "host_preconditions": [
+        "linux",
+        "go"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "memory-fuzz-validator",
+      "kind": "go-run",
+      "command_parts": [
+        "go",
+        "run",
+        "./tools/cmd/validate-memory-fuzz-oracle",
+        "--report",
+        "\"$REPORT_DIR/memory-fuzz/memory-fuzz-oracle.json\"",
+        "--artifact-dir",
+        "\"$REPORT_DIR/memory-fuzz\"",
+        "--current-git-head",
+        "\"$GIT_HEAD\""
+      ],
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-memory-fuzz-oracle"
+      ],
+      "host_preconditions": [
+        "linux",
+        "go"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "write-semantic-safety-matrix",
+      "kind": "internal-write",
+      "command_parts": [
+        "scripts/release/post_v0_4/memory-100-prod-stable-gate.sh",
+        "writes",
+        "\"$REPORT_DIR/semantic-safety/memory-semantic-safety-matrix.json\""
+      ],
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "semantic-safety/memory-semantic-safety-matrix.json"
+      ],
+      "validator_refs": [
+        "validate-memory-100-prod-stable"
+      ],
+      "host_preconditions": [
+        "linux",
+        "go"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "write-leak-resource-report",
+      "kind": "internal-write",
+      "command_parts": [
+        "scripts/release/post_v0_4/memory-100-prod-stable-gate.sh",
+        "writes",
+        "\"$REPORT_DIR/leak-resource/leak-resource-report.json\""
+      ],
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "leak-resource/leak-resource-report.json"
+      ],
+      "validator_refs": [
+        "validate-memory-100-prod-stable"
+      ],
+      "host_preconditions": [
+        "linux",
+        "go"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "write-docs-claim-policy",
+      "kind": "internal-write",
+      "command_parts": [
+        "scripts/release/post_v0_4/memory-100-prod-stable-gate.sh",
+        "writes",
+        "\"$REPORT_DIR/docs-manifest/claim-policy.json\""
+      ],
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "docs-manifest/claim-policy.json"
+      ],
+      "validator_refs": [
+        "validate-memory-100-prod-stable"
+      ],
+      "host_preconditions": [
+        "linux",
+        "go"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "write-memory-100-prod-stable-manifest",
+      "kind": "internal-write",
+      "command_parts": [
+        "scripts/release/post_v0_4/memory-100-prod-stable-gate.sh",
+        "writes",
+        "\"$REPORT_DIR/memory-100-prod-stable-manifest.json\""
+      ],
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "memory-100-prod-stable-manifest.json"
+      ],
+      "validator_refs": [
+        "validate-memory-100-prod-stable"
+      ],
+      "host_preconditions": [
+        "linux",
+        "go"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "artifact-hashes-write",
+      "kind": "go-run",
+      "command_parts": [
+        "go",
+        "run",
+        "./tools/cmd/validate-artifact-hashes",
+        "--write",
+        "--root",
+        "\"$REPORT_DIR\"",
+        "--out",
+        "\"$REPORT_DIR/artifact-hashes.json\""
+      ],
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [
+        "artifact-hashes.json"
+      ],
+      "validator_refs": [
+        "validate-artifact-hashes"
+      ],
+      "host_preconditions": [
+        "linux",
+        "go"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "artifact-hashes-validate",
+      "kind": "go-run",
+      "command_parts": [
+        "go",
+        "run",
+        "./tools/cmd/validate-artifact-hashes",
+        "--manifest",
+        "\"$REPORT_DIR/artifact-hashes.json\""
+      ],
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-artifact-hashes"
+      ],
+      "host_preconditions": [
+        "linux",
+        "go"
+      ],
+      "blocked_status_policy": "block-release"
+    },
+    {
+      "id": "memory-100-validator",
+      "kind": "go-run",
+      "command_parts": [
+        "go",
+        "run",
+        "./tools/cmd/validate-memory-100-prod-stable",
+        "--report-dir",
+        "\"$REPORT_DIR\"",
+        "--current-git-head",
+        "\"$GIT_HEAD\""
+      ],
+      "working_dir": ".",
+      "required": true,
+      "report_outputs": [],
+      "validator_refs": [
+        "validate-memory-100-prod-stable"
+      ],
+      "host_preconditions": [
+        "linux",
+        "go"
+      ],
+      "blocked_status_policy": "block-release"
+    }
+  ],
+  "required_reports": [
+    {
+      "path": "memory-100-prod-stable-manifest.json",
+      "schema": "tetra.memory-100.prod-stable.v1",
+      "validator": "validate-memory-100-prod-stable",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "memory100_scoped_aggregate_evidence",
+        "final_validator"
+      ]
+    },
+    {
+      "path": "memory-production/memory-production-linux-x64.json",
+      "schema": "tetra.memory.production.v1",
+      "validator": "validate-memory-production",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "nested_memory_production_evidence"
+      ]
+    },
+    {
+      "path": "memory-production/memory-release-manifest.json",
+      "schema": "tetra.memory.release-manifest.v1",
+      "validator": "validate-memory-production",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "nested_memory_production_evidence"
+      ]
+    },
+    {
+      "path": "memory-production/artifact-hashes.json",
+      "schema": "tetra.release-artifact-hashes.v1alpha1",
+      "validator": "validate-artifact-hashes",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "nested_memory_production_evidence",
+        "artifact_hash_integrity"
+      ]
+    },
+    {
+      "path": "ram-contract/ram-contract-release-manifest.json",
+      "schema": "tetra.ram-contract.release-manifest.v1",
+      "validator": "validate-ram-contract-release",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "nested_ram_contract_evidence"
+      ]
+    },
+    {
+      "path": "ram-contract/ram-contract-report.json",
+      "schema": "tetra.ram-contract-report.v1",
+      "validator": "validate-ram-contract-release",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "nested_ram_contract_evidence"
+      ]
+    },
+    {
+      "path": "ram-contract/memory-grade-report.json",
+      "schema": "tetra.memory-grade-report.v1",
+      "validator": "validate-ram-contract-release",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "nested_ram_contract_evidence"
+      ]
+    },
+    {
+      "path": "ram-contract/proof-store-summary.json",
+      "schema": "tetra.proof-store-summary.v1",
+      "validator": "validate-ram-contract-release",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "nested_ram_contract_evidence"
+      ]
+    },
+    {
+      "path": "ram-contract/validation-pipeline-coverage.json",
+      "schema": "tetra.validation-pipeline-coverage.v1",
+      "validator": "validate-ram-contract-release",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "nested_ram_contract_evidence"
+      ]
+    },
+    {
+      "path": "ram-contract/heap-blockers.json",
+      "schema": "tetra.ram-blockers.v1",
+      "validator": "validate-ram-contract-release",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "nested_ram_contract_evidence"
+      ]
+    },
+    {
+      "path": "ram-contract/copy-blockers.json",
+      "schema": "tetra.ram-blockers.v1",
+      "validator": "validate-ram-contract-release",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "nested_ram_contract_evidence"
+      ]
+    },
+    {
+      "path": "ram-contract/fuzz/ram-contract-fuzz-oracle.json",
+      "schema": "tetra.ram-contract-fuzz-oracle.v1",
+      "validator": "validate-ram-contract-release",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "nested_ram_contract_evidence"
+      ]
+    },
+    {
+      "path": "ram-contract/artifact-hashes.json",
+      "schema": "tetra.release-artifact-hashes.v1alpha1",
+      "validator": "validate-artifact-hashes",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "nested_ram_contract_evidence",
+        "artifact_hash_integrity"
+      ]
+    },
+    {
+      "path": "raw-memory-contract/raw-memory-contract.json",
+      "schema": "tetra.raw-memory-contract.v1",
+      "validator": "validate-memory-100-prod-stable",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "raw_allocation_proof_runtime_evidence",
+        "final_validator"
+      ]
+    },
+    {
+      "path": "allocation-lowering/allocation-lowering-report.json",
+      "schema": "tetra.allocation-lowering.v1",
+      "validator": "validate-memory-100-prod-stable",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "raw_allocation_proof_runtime_evidence",
+        "final_validator"
+      ]
+    },
+    {
+      "path": "proof-store/proof-store-summary.json",
+      "schema": "tetra.proof-store-summary.v1",
+      "validator": "validate-memory-100-prod-stable",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "raw_allocation_proof_runtime_evidence",
+        "final_validator"
+      ]
+    },
+    {
+      "path": "proof-transition/proof-transition-report.json",
+      "schema": "tetra.proof-transition-report.v1",
+      "validator": "validate-memory-100-prod-stable",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "raw_allocation_proof_runtime_evidence",
+        "final_validator"
+      ]
+    },
+    {
+      "path": "runtime-memory/runtime-memory-contract.json",
+      "schema": "tetra.runtime-memory-contract.v1",
+      "validator": "validate-memory-100-prod-stable",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "raw_allocation_proof_runtime_evidence",
+        "final_validator"
+      ]
+    },
+    {
+      "path": "memory-fuzz/memory-fuzz-oracle.json",
+      "schema": "tetra.memory-fuzz.oracle.v1",
+      "validator": "validate-memory-fuzz-oracle",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "memory_fuzz_semantic_leak_evidence"
+      ]
+    },
+    {
+      "path": "memory-fuzz/artifact-hashes.json",
+      "schema": "tetra.release-artifact-hashes.v1alpha1",
+      "validator": "validate-artifact-hashes",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "memory_fuzz_semantic_leak_evidence",
+        "artifact_hash_integrity"
+      ]
+    },
+    {
+      "path": "semantic-safety/memory-semantic-safety-matrix.json",
+      "schema": "tetra.memory-semantic-safety-matrix.v1",
+      "validator": "validate-memory-100-prod-stable",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "memory_fuzz_semantic_leak_evidence",
+        "final_validator"
+      ]
+    },
+    {
+      "path": "leak-resource/leak-resource-report.json",
+      "schema": "tetra.leak-resource.v1",
+      "validator": "validate-memory-100-prod-stable",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "memory_fuzz_semantic_leak_evidence",
+        "final_validator"
+      ]
+    },
+    {
+      "path": "integrated/memory-islands-surface-production-manifest.json",
+      "schema": "tetra.memory-islands-surface.production-gate.v1",
+      "validator": "validate-memory-islands-surface-production",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "nested_integrated_surface_evidence"
+      ]
+    },
+    {
+      "path": "integrated/artifact-hashes.json",
+      "schema": "tetra.release-artifact-hashes.v1alpha1",
+      "validator": "validate-artifact-hashes",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "nested_integrated_surface_evidence",
+        "artifact_hash_integrity"
+      ]
+    },
+    {
+      "path": "docs-manifest/claim-policy.json",
+      "schema": "tetra.memory-100.claim-policy.v1",
+      "validator": "validate-memory-100-prod-stable",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "docs_claim_policy_evidence",
+        "final_validator"
+      ]
+    },
+    {
+      "path": "artifact-hashes.json",
+      "schema": "tetra.release-artifact-hashes.v1alpha1",
+      "validator": "validate-artifact-hashes",
+      "same_commit_required": true,
+      "artifact_hash_required": true,
+      "claim_refs": [
+        "artifact_hash_integrity",
+        "final_validator"
+      ]
+    }
+  ],
+  "validators": [
+    {
+      "id": "validate-memory-production",
+      "kind": "go-run",
+      "command_parts": [
+        "go",
+        "run",
+        "./tools/cmd/validate-memory-production",
+        "--report",
+        "\"$REPORT_DIR/memory-production/memory-production-linux-x64.json\"",
+        "--manifest",
+        "\"$REPORT_DIR/memory-production/memory-release-manifest.json\"",
+        "--report-dir",
+        "\"$REPORT_DIR/memory-production\"",
+        "--current-git-head",
+        "\"$GIT_HEAD\""
+      ]
+    },
+    {
+      "id": "validate-ram-contract-release",
+      "kind": "go-run",
+      "command_parts": [
+        "go",
+        "run",
+        "./tools/cmd/validate-ram-contract-release",
+        "--report-dir",
+        "\"$REPORT_DIR/ram-contract\"",
+        "--current-git-head",
+        "\"$GIT_HEAD\""
+      ]
+    },
+    {
+      "id": "validate-memory-islands-surface-production",
+      "kind": "go-run",
+      "command_parts": [
+        "go",
+        "run",
+        "./tools/cmd/validate-memory-islands-surface-production",
+        "--report-dir",
+        "\"$REPORT_DIR/integrated\"",
+        "--current-git-head",
+        "\"$GIT_HEAD\""
+      ]
+    },
+    {
+      "id": "validate-memory-fuzz-oracle",
+      "kind": "go-run",
+      "command_parts": [
+        "go",
+        "run",
+        "./tools/cmd/validate-memory-fuzz-oracle",
+        "--report",
+        "\"$REPORT_DIR/memory-fuzz/memory-fuzz-oracle.json\"",
+        "--artifact-dir",
+        "\"$REPORT_DIR/memory-fuzz\"",
+        "--current-git-head",
+        "\"$GIT_HEAD\""
+      ]
+    },
+    {
+      "id": "validate-artifact-hashes",
+      "kind": "go-run",
+      "command_parts": [
+        "go",
+        "run",
+        "./tools/cmd/validate-artifact-hashes",
+        "--manifest",
+        "\"$REPORT_DIR/artifact-hashes.json\""
+      ]
+    },
+    {
+      "id": "validate-memory-100-prod-stable",
+      "kind": "go-run",
+      "command_parts": [
+        "go",
+        "run",
+        "./tools/cmd/validate-memory-100-prod-stable",
+        "--report-dir",
+        "\"$REPORT_DIR\"",
+        "--current-git-head",
+        "\"$GIT_HEAD\""
+      ]
+    }
+  ],
+  "artifact_hashes": {
+    "enabled": true,
+    "required": true,
+    "algorithm": "sha256"
+  },
+  "claims": [
+    {
+      "id": "memory100_scoped_aggregate_evidence",
+      "statement": "The gate produces scoped Linux-x64 Memory/RAM prod-stable aggregate evidence."
+    },
+    {
+      "id": "nested_memory_production_evidence",
+      "statement": "The gate requires nested Linux-x64 memory production evidence."
+    },
+    {
+      "id": "nested_ram_contract_evidence",
+      "statement": "The gate requires nested RAM contract release evidence."
+    },
+    {
+      "id": "nested_integrated_surface_evidence",
+      "statement": "The gate requires integrated Memory/Islands/Surface evidence."
+    },
+    {
+      "id": "raw_allocation_proof_runtime_evidence",
+      "statement_parts": [
+        "The",
+        "gate",
+        "requires",
+        "raw",
+        "memory,",
+        "allocation",
+        "lowering,",
+        "proof",
+        "transition,",
+        "proof",
+        "store,",
+        "and",
+        "runtime",
+        "memory",
+        "evidence."
+      ]
+    },
+    {
+      "id": "memory_fuzz_semantic_leak_evidence",
+      "statement": "The gate requires memory fuzz, semantic safety, and leak/resource evidence."
+    },
+    {
+      "id": "docs_claim_policy_evidence",
+      "statement": "The gate requires scoped docs claim-policy evidence."
+    },
+    {
+      "id": "artifact_hash_integrity",
+      "statement_parts": [
+        "The",
+        "gate",
+        "requires",
+        "SHA-256",
+        "artifact",
+        "hash",
+        "integrity",
+        "for",
+        "nested",
+        "and",
+        "aggregate",
+        "reports."
+      ]
+    },
+    {
+      "id": "final_validator",
+      "statement_parts": [
+        "The",
+        "final",
+        "Memory100",
+        "validator",
+        "checks",
+        "the",
+        "aggregate",
+        "report",
+        "directory",
+        "and",
+        "same-commit",
+        "evidence."
+      ]
+    }
+  ],
+  "nonclaims": [
+    {
+      "id": "no_universal_memory100_claim",
+      "statement": "This gate does not claim universal Memory 100% readiness."
+    },
+    {
+      "id": "no_full_formal_proof_claim",
+      "statement": "This gate does not claim a full formal proof of memory safety."
+    },
+    {
+      "id": "no_all_target_memory_parity_claim",
+      "statement": "This gate does not claim all-target memory parity."
+    },
+    {
+      "id": "no_arbitrary_unsafe_external_pointer_safety",
+      "statement": "This gate does not claim arbitrary unsafe external pointer safety."
+    },
+    {
+      "id": "no_c_rust_parity_or_performance_superiority",
+      "statement": "This gate does not claim C/Rust parity or performance superiority."
+    },
+    {
+      "id": "no_official_benchmark_claim",
+      "statement": "This gate does not claim an official benchmark result."
+    }
+  ],
+  "ci_artifacts": [
+    {
+      "path": "memory-100-prod-stable-manifest.json",
+      "required": true
+    },
+    {
+      "path": "memory-production/memory-production-linux-x64.json",
+      "required": true
+    },
+    {
+      "path": "memory-production/memory-release-manifest.json",
+      "required": true
+    },
+    {
+      "path": "memory-production/artifact-hashes.json",
+      "required": true
+    },
+    {
+      "path": "ram-contract/ram-contract-release-manifest.json",
+      "required": true
+    },
+    {
+      "path": "ram-contract/ram-contract-report.json",
+      "required": true
+    },
+    {
+      "path": "ram-contract/memory-grade-report.json",
+      "required": true
+    },
+    {
+      "path": "ram-contract/proof-store-summary.json",
+      "required": true
+    },
+    {
+      "path": "ram-contract/validation-pipeline-coverage.json",
+      "required": true
+    },
+    {
+      "path": "ram-contract/heap-blockers.json",
+      "required": true
+    },
+    {
+      "path": "ram-contract/copy-blockers.json",
+      "required": true
+    },
+    {
+      "path": "ram-contract/fuzz/ram-contract-fuzz-oracle.json",
+      "required": true
+    },
+    {
+      "path": "ram-contract/artifact-hashes.json",
+      "required": true
+    },
+    {
+      "path": "raw-memory-contract/raw-memory-contract.json",
+      "required": true
+    },
+    {
+      "path": "allocation-lowering/allocation-lowering-report.json",
+      "required": true
+    },
+    {
+      "path": "proof-store/proof-store-summary.json",
+      "required": true
+    },
+    {
+      "path": "proof-transition/proof-transition-report.json",
+      "required": true
+    },
+    {
+      "path": "runtime-memory/runtime-memory-contract.json",
+      "required": true
+    },
+    {
+      "path": "memory-fuzz/memory-fuzz-oracle.json",
+      "required": true
+    },
+    {
+      "path": "memory-fuzz/artifact-hashes.json",
+      "required": true
+    },
+    {
+      "path": "semantic-safety/memory-semantic-safety-matrix.json",
+      "required": true
+    },
+    {
+      "path": "leak-resource/leak-resource-report.json",
+      "required": true
+    },
+    {
+      "path": "integrated/memory-islands-surface-production-manifest.json",
+      "required": true
+    },
+    {
+      "path": "integrated/artifact-hashes.json",
+      "required": true
+    },
+    {
+      "path": "docs-manifest/claim-policy.json",
+      "required": true
+    },
+    {
+      "path": "artifact-hashes.json",
+      "required": true
+    }
+  ]
+}

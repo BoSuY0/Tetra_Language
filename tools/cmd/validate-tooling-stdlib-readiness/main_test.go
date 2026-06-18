@@ -18,7 +18,7 @@ func TestValidateToolingStdlibReadinessAcceptsProductionEvidence(t *testing.T) {
       "since": "v0.2.0",
       "scope": "check/build/run/fmt/test/doc/doctor/targets/features/formats/new/interface/project/workspace/smoke/eco/clean/version/lsp local workflows",
       "stability": "production daily-development workflows",
-      "docs": ["docs/spec/cli_contracts.md"]
+      "docs": ["docs/spec/policy/cli_contracts.md"]
     },
     {
       "id": "stdlib.core-current",
@@ -27,7 +27,7 @@ func TestValidateToolingStdlibReadinessAcceptsProductionEvidence(t *testing.T) {
       "since": "v0.4.0",
       "scope": "production lib.core modules for collections, strings, slices, math, IO, filesystem, networking, async, sync, testing, serialization, time, and crypto interfaces",
       "stability": "production API contracts with bounded host API claims",
-      "docs": ["docs/spec/stdlib.md"]
+      "docs": ["docs/spec/standard_library/stdlib.md"]
     },
     {
       "id": "stdlib.experimental-mirrors",
@@ -36,7 +36,7 @@ func TestValidateToolingStdlibReadinessAcceptsProductionEvidence(t *testing.T) {
       "since": "v0.4.0",
       "scope": "compatibility mirrors under lib.experimental.* forward to lib.core.* modules for legacy source compatibility",
       "stability": "compatibility bridge only",
-      "docs": ["docs/spec/stdlib.md"]
+      "docs": ["docs/spec/standard_library/stdlib.md"]
     }
   ]
 }`),
@@ -83,7 +83,7 @@ func TestValidateToolingStdlibReadinessRejectsTextualLSPMVPClaims(t *testing.T) 
       "since": "v0.2.0",
       "scope": "check/build/run/fmt/test/doc/doctor/targets/features/formats/new/interface/project/workspace/smoke/eco/clean/version/lsp local workflows",
       "stability": "production daily-development workflows",
-      "docs": ["docs/spec/cli_contracts.md"]
+      "docs": ["docs/spec/policy/cli_contracts.md"]
     },
     {
       "id": "stdlib.core-current",
@@ -92,7 +92,7 @@ func TestValidateToolingStdlibReadinessRejectsTextualLSPMVPClaims(t *testing.T) 
       "since": "v0.4.0",
       "scope": "production lib.core modules for collections, strings, slices, math, IO, filesystem, networking, async, sync, testing, serialization, time, and crypto interfaces",
       "stability": "production API contracts with no provisional host API claims",
-      "docs": ["docs/spec/stdlib.md"]
+      "docs": ["docs/spec/standard_library/stdlib.md"]
     },
     {
       "id": "stdlib.experimental-mirrors",
@@ -101,7 +101,7 @@ func TestValidateToolingStdlibReadinessRejectsTextualLSPMVPClaims(t *testing.T) 
       "since": "v0.4.0",
       "scope": "compatibility mirrors under lib.experimental.* forward to lib.core.* modules for legacy source compatibility",
       "stability": "compatibility bridge only",
-      "docs": ["docs/spec/stdlib.md"]
+      "docs": ["docs/spec/standard_library/stdlib.md"]
     }
   ]
 }`),
@@ -135,7 +135,7 @@ Rename support is a single-file textual MVP. Syntax-aware rename is not implemen
 		t.Fatalf("expected LSP MVP readiness failure")
 	}
 	for _, want := range []string{
-		"docs/spec/cli_contracts.md",
+		"docs/spec/policy/cli_contracts.md",
 		"single-file textual MVP",
 	} {
 		if !strings.Contains(err.Error(), want) {
@@ -157,7 +157,7 @@ func TestValidateToolingStdlibReadinessRejectsPlaceholderStdlibClaims(t *testing
       "since": "v0.2.0",
       "scope": "check/build/run/fmt/test/doc/doctor/targets/features/formats/new/interface/project/workspace/smoke/eco/clean/version/lsp local workflows",
       "stability": "supported in the current v0.4.0 local profile",
-      "docs": ["docs/spec/cli_contracts.md"]
+      "docs": ["docs/spec/policy/cli_contracts.md"]
     },
     {
       "id": "stdlib.core-current",
@@ -166,7 +166,7 @@ func TestValidateToolingStdlibReadinessRejectsPlaceholderStdlibClaims(t *testing
       "since": "v0.2.0",
       "scope": "release-covered lib.core helper modules with explicit placeholder labels for filesystem, networking, and crypto surfaces",
       "stability": "current import paths and smoke coverage; placeholder modules are not production host APIs",
-      "docs": ["docs/spec/stdlib.md"]
+      "docs": ["docs/spec/standard_library/stdlib.md"]
     },
     {
       "id": "stdlib.experimental-mirrors",
@@ -175,12 +175,16 @@ func TestValidateToolingStdlibReadinessRejectsPlaceholderStdlibClaims(t *testing
       "since": "v0.4.0",
       "scope": "production compatibility mirrors under lib.experimental.* forward to lib.core.* modules for legacy source compatibility",
       "stability": "current compatibility bridge",
-      "docs": ["docs/spec/stdlib.md"]
+      "docs": ["docs/spec/standard_library/stdlib.md"]
     }
   ]
 }`),
-		StdlibDocs:   []byte("lib.core.filesystem is a stable placeholder interface, not a host filesystem implementation."),
-		CLIContracts: []byte("Status: future v1 required tooling contract.\ncurrent public profile for this branch are `v0.3.0`."),
+		StdlibDocs: []byte(
+			"lib.core.filesystem is a stable placeholder interface, not a host filesystem implementation.",
+		),
+		CLIContracts: []byte(
+			"Status: future v1 required tooling contract.\ncurrent public profile for this branch are `v0.3.0`.",
+		),
 	}
 
 	err := validateToolingStdlibReadiness(evidence)
@@ -190,8 +194,8 @@ func TestValidateToolingStdlibReadinessRejectsPlaceholderStdlibClaims(t *testing
 	for _, want := range []string{
 		"stdlib.core-current",
 		"placeholder",
-		"docs/spec/stdlib.md",
-		"docs/spec/cli_contracts.md",
+		"docs/spec/standard_library/stdlib.md",
+		"docs/spec/policy/cli_contracts.md",
 	} {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("error = %v, want substring %q", err, want)

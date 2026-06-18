@@ -1,0 +1,557 @@
+// Pure Tetra Surface reusable toolkit settings smoke.
+// Reuse fixture names: NameTextBox, EmailTextBox, SaveButton, ResetButton, StatusText.
+module examples.surface.toolkit.surface_toolkit_settings
+
+import lib.core.surface as surface
+import lib.core.draw as draw
+import lib.core.component as component
+import lib.core.widgets as widgets
+
+struct ToolkitSettingsApp:
+    width: Int
+    height: Int
+    save_count: Int
+    reset_count: Int
+    status_code: Int
+    tree: component.ComponentTree
+
+func settings_child_bounds(column: borrow widgets.Column, child_index: Int) -> surface.Rect:
+    let content_w: Int = column.rect.w - column.padding * 2
+    let x: Int = column.rect.x + column.padding
+    let y0: Int = column.rect.y + column.padding
+    if child_index == 0:
+        return surface.Rect(x: x, y: y0, w: content_w, h: 24)
+    if child_index == 1:
+        return surface.Rect(x: x, y: y0 + 32, w: content_w, h: 44)
+    if child_index == 2:
+        return surface.Rect(x: x, y: y0 + 84, w: content_w, h: 24)
+    if child_index == 3:
+        return surface.Rect(x: x, y: y0 + 116, w: content_w, h: 44)
+    if child_index == 4:
+        return surface.Rect(x: x, y: y0 + 172, w: content_w, h: 44)
+    return surface.Rect(x: x, y: y0 + 228, w: content_w, h: 24)
+
+func r(x: Int, y: Int, w: Int, h: Int) -> surface.Rect:
+    return surface.Rect(x: x, y: y, w: w, h: h)
+
+func mark_rect(rect: borrow surface.Rect, dx: Int, dy: Int, w: Int, h: Int) -> surface.Rect:
+    return r(rect.x + dx, rect.y + dy, w, h)
+
+func focus_rect(rect: borrow surface.Rect) -> surface.Rect:
+    return r(rect.x - 4, rect.y - 4, rect.w + 8, rect.h + 8)
+
+func caret_rect(rect: borrow surface.Rect, caret: Int) -> surface.Rect:
+    return r(rect.x + 12 + caret * 12, rect.y + 10, 2, 24)
+
+func txt(rect: surface.Rect, role: Int, text_len: Int, code: Int) -> widgets.Text:
+    return widgets.Text(rect: rect, role: role, text_len: text_len, status_code: code)
+
+func tb(rect: surface.Rect, buffer: []u8) -> widgets.TextBox:
+    return widgets.TextBox(rect: rect, focused: false, text_len: 0, caret: 0, buffer: buffer)
+
+func btn(rect: surface.Rect, action: Int) -> widgets.Button:
+    return widgets.Button(rect: rect, focused: false, press_count: 0, action: action)
+
+func rn(node: inout component.TreeNode, id: Int, bounds: surface.Rect) -> Int:
+    return component.tree_init_root_node(node, id, component.kind_root(), bounds)
+
+func cn(n: inout component.TreeNode, id: Int, p: Int, k: Int, f: Bool, b: surface.Rect) -> Int:
+    return component.tree_init_child_node(n, id, p, k, f, b)
+
+func sb(node: inout component.TreeNode, bounds: surface.Rect) -> Int:
+    return component.tree_set_bounds(node, bounds)
+
+func scb(node: inout component.TreeNode, column: borrow widgets.Column, index: Int) -> Int:
+    return sb(node, settings_child_bounds(column, index))
+
+func srb(node: inout component.TreeNode, row: borrow widgets.Row, index: Int) -> Int:
+    return sb(node, widgets.row_child_bounds(row, index))
+
+func cl(tree: inout component.ComponentTree, id: Int, column: borrow widgets.Column) -> Int:
+    return widgets.column_layout(tree, id, column.rect, column.padding, column.gap)
+
+func path(tree: borrow component.ComponentTree, id: Int, out: inout []i32) -> Int:
+    return component.tree_build_dispatch_path(tree, id, out)
+
+func tti(box: inout widgets.TextBox, bytes: []u8, count: Int) -> Int:
+    return widgets.textbox_text_input(box, bytes, count)
+
+func draw_settings_scene(app: borrow ToolkitSettingsApp, title: borrow widgets.Text, name_box: borrow widgets.TextBox, name_label: borrow widgets.Text, email_box: borrow widgets.TextBox, save: borrow widgets.Button, reset: borrow widgets.Button, status: borrow widgets.Text, ctx: inout draw.DrawContext) -> Int
+uses mem:
+    let bg: surface.Color = surface.Color(r: 16, g: 22, b: 29, a: 255)
+    let panel_bg: surface.Color = surface.Color(r: 25, g: 33, b: 42, a: 255)
+    let fg: surface.Color = surface.Color(r: 235, g: 242, b: 244, a: 255)
+    let textbox_bg: surface.Color = surface.Color(r: 31, g: 45, b: 58, a: 255)
+    let name_accent: surface.Color = surface.Color(r: 75, g: 166, b: 138, a: 255)
+    let email_accent: surface.Color = surface.Color(r: 86, g: 137, b: 214, a: 255)
+    let save_accent: surface.Color = surface.Color(r: 54, g: 133, b: 210, a: 255)
+    let reset_accent: surface.Color = surface.Color(r: 194, g: 92, b: 78, a: 255)
+    let status_accent: surface.Color = surface.Color(r: 176, g: 205, b: 92, a: 255)
+    let caret_color: surface.Color = surface.Color(r: 235, g: 196, b: 64, a: 255)
+    let clear_status: Int = draw.clear(ctx, bg)
+    let panel_rect: surface.Rect = r(0, 0, app.width, app.height)
+    let panel_status: Int = draw.rect(ctx, panel_rect, panel_bg)
+    let panel_outline: Int = draw.rect_outline(ctx, panel_rect, fg)
+    let title_mark_rect: surface.Rect = mark_rect(title.rect, 8, 8, 72, 7)
+    let title_status: Int = draw.rect(ctx, title_mark_rect, fg)
+    let save_mark_rect: surface.Rect = mark_rect(title.rect, 96, 8, 22 + app.save_count * 14, 7)
+    let save_marker: Int = draw.rect(ctx, save_mark_rect, status_accent)
+    let reset_mark_rect: surface.Rect = mark_rect(title.rect, 136, 8, 22 + app.reset_count * 14, 7)
+    let reset_marker: Int = draw.rect(ctx, reset_mark_rect, reset_accent)
+    let name_bg: Int = draw.rect(ctx, name_box.rect, textbox_bg)
+    let name_outline: Int = draw.rect_outline(ctx, name_box.rect, fg)
+    let name_mark_rect: surface.Rect = mark_rect(name_box.rect, 12, 16, 18 * name_box.text_len, 10)
+    let name_marker: Int = draw.rect(ctx, name_mark_rect, name_accent)
+    let name_label_rect: surface.Rect = mark_rect(name_label.rect, 8, 8, 44, 7)
+    let name_label_status: Int = draw.rect(ctx, name_label_rect, fg)
+    let email_bg: Int = draw.rect(ctx, email_box.rect, textbox_bg)
+    let email_outline: Int = draw.rect_outline(ctx, email_box.rect, fg)
+    let email_mark_w: Int = 16 * email_box.text_len
+    let email_mark_rect: surface.Rect = mark_rect(email_box.rect, 12, 16, email_mark_w, 10)
+    let email_marker: Int = draw.rect(ctx, email_mark_rect, email_accent)
+    let save_fill: Int = draw.rect(ctx, save.rect, save_accent)
+    let save_outline: Int = draw.rect_outline(ctx, save.rect, fg)
+    let reset_fill: Int = draw.rect(ctx, reset.rect, reset_accent)
+    let reset_outline: Int = draw.rect_outline(ctx, reset.rect, fg)
+    let status_bg: Int = draw.rect(ctx, status.rect, textbox_bg)
+    let status_outline: Int = draw.rect_outline(ctx, status.rect, fg)
+    var status_marker: Int = 0
+    if status.status_code > 0:
+        let status_w: Int = 20 + status.status_code * 16
+        let status_mark_rect: surface.Rect = mark_rect(status.rect, 12, 8, status_w, 8)
+        status_marker = draw.rect(ctx, status_mark_rect, status_accent)
+    var focus_status: Int = 0
+    if app.tree.focused_id == 4:
+        let name_focus_rect: surface.Rect = focus_rect(name_box.rect)
+        focus_status = focus_status + draw.rect_outline(ctx, name_focus_rect, fg)
+        let name_caret_rect: surface.Rect = caret_rect(name_box.rect, name_box.caret)
+        focus_status = focus_status + draw.rect(ctx, name_caret_rect, caret_color)
+    if app.tree.focused_id == 6:
+        let email_focus_rect: surface.Rect = focus_rect(email_box.rect)
+        focus_status = focus_status + draw.rect_outline(ctx, email_focus_rect, fg)
+        let email_caret_rect: surface.Rect = caret_rect(email_box.rect, email_box.caret)
+        focus_status = focus_status + draw.rect(ctx, email_caret_rect, caret_color)
+    if app.tree.focused_id == 8:
+        let save_focus_rect: surface.Rect = focus_rect(save.rect)
+        focus_status = focus_status + draw.rect_outline(ctx, save_focus_rect, fg)
+    if app.tree.focused_id == 9:
+        let reset_focus_rect: surface.Rect = focus_rect(reset.rect)
+        focus_status = focus_status + draw.rect_outline(ctx, reset_focus_rect, fg)
+    let border_rect: surface.Rect = r(0, 0, ctx.frame.width, ctx.frame.height)
+    let border_status: Int = draw.rect_outline(ctx, border_rect, fg)
+    let bg_status: Int = clear_status + panel_status + panel_outline + title_status
+    let marker_status: Int = save_marker + reset_marker + name_marker + email_marker
+    let widget_bg_status: Int = name_bg + name_outline + email_bg + email_outline
+    let button_status: Int = save_fill + save_outline + reset_fill + reset_outline
+    let text_status: Int = name_label_status + status_bg + status_outline + status_marker
+    let draw_status_head: Int = bg_status + marker_status + widget_bg_status
+    let draw_status_tail: Int = button_status + text_status + focus_status + border_status
+    return draw_status_head + draw_status_tail
+
+func main() -> Int
+uses alloc, mem, surface:
+    var name_storage: []u8 = core.make_u8(16)
+    var email_storage: []u8 = core.make_u8(16)
+    var app: ToolkitSettingsApp = ToolkitSettingsApp(width: 320, height: 240, save_count: 0, reset_count: 0, status_code: 0, tree: component.tree_init_api(20))
+    let initial_root_rect: surface.Rect = r(0, 0, app.width, app.height)
+    let empty_rect: surface.Rect = r(0, 0, 0, 0)
+    let ir: surface.Rect = initial_root_rect
+    let er: surface.Rect = empty_rect
+    var root_node: component.TreeNode = component.tree_node_empty()
+    var panel_node: component.TreeNode = component.tree_node_empty()
+    var column_node: component.TreeNode = component.tree_node_empty()
+    var title_node: component.TreeNode = component.tree_node_empty()
+    var name_node: component.TreeNode = component.tree_node_empty()
+    var name_label_node: component.TreeNode = component.tree_node_empty()
+    var email_node: component.TreeNode = component.tree_node_empty()
+    var row_node: component.TreeNode = component.tree_node_empty()
+    var save_node: component.TreeNode = component.tree_node_empty()
+    var reset_node: component.TreeNode = component.tree_node_empty()
+    var status_node: component.TreeNode = component.tree_node_empty()
+    let root_id: Int = component.tree_add_root(app.tree, component.kind_root(), initial_root_rect)
+    let root_node_status: Int = rn(root_node, root_id, ir)
+    let panel_id: Int = widgets.add_panel(app.tree, root_node.id, initial_root_rect)
+    let panel_attach_status: Int = component.tree_attach_child(root_node, panel_id)
+    let root_parent: Int = root_node.id
+    let panel_kind: Int = component.kind_panel()
+    let panel_node_status: Int = cn(panel_node, panel_id, root_parent, panel_kind, false, ir)
+    let column_id: Int = widgets.add_column(app.tree, panel_node.id, initial_root_rect)
+    let column_attach_status: Int = component.tree_attach_child(panel_node, column_id)
+    let panel_parent: Int = panel_node.id
+    let column_kind: Int = component.kind_column()
+    let column_node_status: Int = cn(column_node, column_id, panel_parent, column_kind, false, ir)
+    let title_id: Int = widgets.add_text(app.tree, column_node.id, empty_rect)
+    let title_attach_status: Int = component.tree_attach_child(column_node, title_id)
+    let column_parent: Int = column_node.id
+    let text_kind: Int = component.kind_text()
+    let title_node_status: Int = cn(title_node, title_id, column_parent, text_kind, false, er)
+    let name_id: Int = widgets.add_textbox(app.tree, column_node.id, empty_rect)
+    let name_attach_status: Int = component.tree_attach_child(column_node, name_id)
+    let textbox_kind: Int = component.kind_textbox()
+    let name_node_status: Int = cn(name_node, name_id, column_parent, textbox_kind, true, er)
+    let name_label_id: Int = widgets.add_text(app.tree, column_node.id, empty_rect)
+    let name_label_attach_status: Int = component.tree_attach_child(column_node, name_label_id)
+    let nlid: Int = name_label_id
+    let name_label_node_status: Int = cn(name_label_node, nlid, column_parent, text_kind, false, er)
+    let email_id: Int = widgets.add_textbox(app.tree, column_node.id, empty_rect)
+    let email_attach_status: Int = component.tree_attach_child(column_node, email_id)
+    let email_node_status: Int = cn(email_node, email_id, column_parent, textbox_kind, true, er)
+    let row_id: Int = widgets.add_row(app.tree, column_node.id, empty_rect)
+    let row_attach_status: Int = component.tree_attach_child(column_node, row_id)
+    let row_kind: Int = component.kind_row()
+    let row_node_status: Int = cn(row_node, row_id, column_parent, row_kind, false, er)
+    let save_id: Int = widgets.add_button(app.tree, row_node.id, empty_rect)
+    let save_attach_status: Int = component.tree_attach_child(row_node, save_id)
+    let row_parent: Int = row_node.id
+    let button_kind: Int = component.kind_button()
+    let save_node_status: Int = cn(save_node, save_id, row_parent, button_kind, true, er)
+    let reset_id: Int = widgets.add_button(app.tree, row_node.id, empty_rect)
+    let reset_attach_status: Int = component.tree_attach_child(row_node, reset_id)
+    let reset_node_status: Int = cn(reset_node, reset_id, row_parent, button_kind, true, er)
+    let status_id: Int = widgets.add_text(app.tree, column_node.id, empty_rect)
+    let status_attach_status: Int = component.tree_attach_child(column_node, status_id)
+    let status_node_status: Int = cn(status_node, status_id, column_parent, text_kind, false, er)
+    let root_build_status: Int = root_id + root_node_status
+    let panel_build_status: Int = panel_id + panel_attach_status + panel_node_status
+    let column_build_status: Int = column_id + column_attach_status + column_node_status
+    let title_build_status: Int = title_id + title_attach_status + title_node_status
+    let name_build_status: Int = name_id + name_attach_status + name_node_status
+    let name_label_attach_build: Int = name_label_id + name_label_attach_status
+    let name_label_build_status: Int = name_label_attach_build + name_label_node_status
+    let email_build_status: Int = email_id + email_attach_status + email_node_status
+    let row_build_status: Int = row_id + row_attach_status + row_node_status
+    let save_build_status: Int = save_id + save_attach_status + save_node_status
+    let reset_build_status: Int = reset_id + reset_attach_status + reset_node_status
+    let status_build_status: Int = status_id + status_attach_status + status_node_status
+    let tree_build_status: Int = root_build_status + panel_build_status + column_build_status
+    let widget_build_status: Int = title_build_status + name_build_status + email_build_status
+    let action_build_status: Int = row_build_status + save_build_status + reset_build_status
+    let builder_left_status: Int = tree_build_status + widget_build_status + name_label_build_status
+    let builder_right_status: Int = action_build_status + status_build_status
+    let builder_status: Int = builder_left_status + builder_right_status
+    var panel: widgets.Panel = widgets.Panel(rect: empty_rect, padding: 12)
+    var column: widgets.Column = widgets.Column(rect: empty_rect, padding: 8, gap: 8)
+    var title: widgets.Text = txt(empty_rect, widgets.role_label(), 8, 0)
+    var name_box: widgets.TextBox = tb(empty_rect, name_storage)
+    var name_label: widgets.Text = txt(empty_rect, widgets.role_label(), 4, 0)
+    var email_box: widgets.TextBox = tb(empty_rect, email_storage)
+    var row: widgets.Row = widgets.Row(rect: empty_rect, gap: 12)
+    var save: widgets.Button = btn(empty_rect, widgets.action_save())
+    var reset: widgets.Button = btn(empty_rect, widgets.action_reset())
+    var status: widgets.Text = txt(empty_rect, widgets.role_status(), 0, 0)
+    let panel_init_status: Int = widgets.panel_init(panel, initial_root_rect, 12)
+    let panel_content: surface.Rect = widgets.panel_content_rect(panel)
+    let column_init_status: Int = widgets.column_init(column, panel_content, 8, 8)
+    let title_init_status: Int = widgets.text_init(title, empty_rect, widgets.role_label(), 8)
+    let name_init_status: Int = widgets.textbox_init(name_box, empty_rect, name_storage)
+    let label_role: Int = widgets.role_label()
+    let name_label_init_status: Int = widgets.text_init(name_label, empty_rect, label_role, 4)
+    let email_init_status: Int = widgets.textbox_init(email_box, empty_rect, email_storage)
+    let row_init_status: Int = widgets.row_init(row, empty_rect, 12)
+    let save_init_status: Int = widgets.button_init(save, empty_rect, widgets.action_save())
+    let reset_init_status: Int = widgets.button_init(reset, empty_rect, widgets.action_reset())
+    let status_init_status: Int = widgets.text_init(status, empty_rect, widgets.role_status(), 0)
+    let form_init_status: Int = panel_init_status + column_init_status + title_init_status
+    let field_init_status: Int = name_init_status + name_label_init_status + email_init_status
+    let action_init_status: Int = row_init_status + save_init_status + reset_init_status
+    let widget_init_base: Int = form_init_status + field_init_status + action_init_status
+    let widget_init_status: Int = widget_init_base + status_init_status
+    var win: surface.Surface = surface.open("Surface Toolkit Settings", 320, 240)
+    let initial_layout_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: app.width, h: app.height)
+    let root_bounds_status: Int = component.tree_set_bounds(root_node, initial_layout_rect)
+    let panel_bounds_status: Int = component.tree_set_bounds(panel_node, initial_layout_rect)
+    let panel_rect_status: Int = widgets.panel_set_rect(panel, initial_layout_rect)
+    let column_rect_status: Int = widgets.column_set_rect(column, widgets.panel_content_rect(panel))
+    let column_layout_status: Int = cl(app.tree, column_node.id, column)
+    let column_bounds_status: Int = sb(column_node, column.rect)
+    let title_bounds_status: Int = scb(title_node, column, 0)
+    let name_bounds_status: Int = scb(name_node, column, 1)
+    let name_label_bounds_status: Int = scb(name_label_node, column, 2)
+    let email_bounds_status: Int = scb(email_node, column, 3)
+    let row_bounds_status: Int = scb(row_node, column, 4)
+    let status_bounds_status: Int = scb(status_node, column, 5)
+    let row_rect_status: Int = widgets.row_set_rect(row, row_node.rect)
+    let row_layout_status: Int = widgets.row_layout(app.tree, row_node.id, row.rect, row.gap)
+    let save_bounds_status: Int = srb(save_node, row, 0)
+    let reset_bounds_status: Int = srb(reset_node, row, 1)
+    let title_rect_status: Int = widgets.text_set_rect(title, title_node.rect)
+    let name_rect_status: Int = widgets.textbox_set_rect(name_box, name_node.rect)
+    let name_label_rect_status: Int = widgets.text_set_rect(name_label, name_label_node.rect)
+    let email_rect_status: Int = widgets.textbox_set_rect(email_box, email_node.rect)
+    let save_rect_status: Int = widgets.button_set_rect(save, save_node.rect)
+    let reset_rect_status: Int = widgets.button_set_rect(reset, reset_node.rect)
+    let status_rect_status: Int = widgets.text_set_rect(status, status_node.rect)
+    let root_layout_status: Int = root_bounds_status + panel_bounds_status + panel_rect_status
+    let column_layout_group: Int = column_rect_status + column_layout_status
+    let column_bounds_group: Int = column_bounds_status + title_bounds_status
+    let field_bounds_base: Int = name_bounds_status + name_label_bounds_status
+    let field_bounds_group: Int = field_bounds_base + email_bounds_status
+    let row_bounds_group: Int = row_bounds_status + status_bounds_status + row_rect_status
+    let row_layout_group: Int = row_layout_status + save_bounds_status + reset_bounds_status
+    let field_rect_base: Int = title_rect_status + name_rect_status + name_label_rect_status
+    let field_rect_group: Int = field_rect_base + email_rect_status
+    let action_rect_group: Int = save_rect_status + reset_rect_status + status_rect_status
+    let layout_status_base: Int = root_layout_status + column_layout_group + column_bounds_group
+    let layout_status_mid: Int = layout_status_base + field_bounds_group + row_bounds_group
+    let layout_status_tail: Int = field_rect_group + action_rect_group
+    let layout_status: Int = layout_status_mid + row_layout_group + layout_status_tail
+    let name_focus_status: Int = widgets.textbox_set_focus(name_box, app.tree.focused_id == 4)
+    let email_focus_status: Int = widgets.textbox_set_focus(email_box, app.tree.focused_id == 6)
+    let save_focus_status: Int = widgets.button_set_focus(save, app.tree.focused_id == 8)
+    let reset_focus_status: Int = widgets.button_set_focus(reset, app.tree.focused_id == 9)
+    let focus_status_base: Int = name_focus_status + email_focus_status
+    let focus_status: Int = focus_status_base + save_focus_status + reset_focus_status
+    var before_frame: surface.Frame = surface.begin_frame(win)
+    var before_ctx: draw.DrawContext = draw.DrawContext(frame: before_frame)
+    let before_draw: Int = draw_settings_scene(app, title, name_box, name_label, email_box, save, reset, status, before_ctx)
+    let first_presented: Int = surface.present(before_ctx.frame)
+    var text_bytes: []u8 = core.make_u8(16)
+    var path_slots: []i32 = core.make_i32(12)
+    var draw_order: []i32 = core.make_i32(12)
+    var handled: Int = 0
+    var polls: Int = 0
+    var target_id: Int = component.focus_none()
+    var path_len: Int = 0
+    var copied_text_len: Int = 0
+    var next_focus_id: Int = component.focus_none()
+    while polls < 16:
+        let event: surface.Event = surface.poll_event(win)
+        if event.kind == surface.event_none():
+            break
+        if event.kind == surface.event_close():
+            break
+        if event.kind == surface.event_mouse_up():
+            target_id = widgets.hit_test(root_node, panel_node, column_node, title_node, name_node, row_node, save_node, reset_node, status_node, event.x, event.y)
+            path_len = path(app.tree, target_id, path_slots)
+            if target_id == 4:
+                handled = handled + component.tree_set_focus(app.tree, 4)
+                handled = handled + widgets.textbox_set_focus(name_box, app.tree.focused_id == 4)
+                handled = handled + widgets.textbox_set_focus(email_box, app.tree.focused_id == 6)
+                handled = handled + widgets.button_set_focus(save, app.tree.focused_id == 8)
+                handled = handled + widgets.button_set_focus(reset, app.tree.focused_id == 9)
+            else if target_id == 8:
+                handled = handled + component.tree_set_focus(app.tree, 8)
+                handled = handled + widgets.textbox_set_focus(name_box, app.tree.focused_id == 4)
+                handled = handled + widgets.textbox_set_focus(email_box, app.tree.focused_id == 6)
+                handled = handled + widgets.button_set_focus(save, app.tree.focused_id == 8)
+                handled = handled + widgets.button_set_focus(reset, app.tree.focused_id == 9)
+            else if target_id == 9:
+                handled = handled + component.tree_set_focus(app.tree, 9)
+                handled = handled + widgets.textbox_set_focus(name_box, app.tree.focused_id == 4)
+                handled = handled + widgets.textbox_set_focus(email_box, app.tree.focused_id == 6)
+                handled = handled + widgets.button_set_focus(save, app.tree.focused_id == 8)
+                handled = handled + widgets.button_set_focus(reset, app.tree.focused_id == 9)
+            handled = handled + path_len
+        else if event.kind == surface.event_key_down():
+            if event.key == 9:
+                next_focus_id = component.tree_focus_next(app.tree)
+                handled = handled + next_focus_id
+                handled = handled + widgets.textbox_set_focus(name_box, app.tree.focused_id == 4)
+                handled = handled + widgets.textbox_set_focus(email_box, app.tree.focused_id == 6)
+                handled = handled + widgets.button_set_focus(save, app.tree.focused_id == 8)
+                handled = handled + widgets.button_set_focus(reset, app.tree.focused_id == 9)
+            else if app.tree.focused_id == 4:
+                handled = handled + widgets.textbox_key_event(name_box, event.key)
+            else if app.tree.focused_id == 6:
+                handled = handled + widgets.textbox_key_event(email_box, event.key)
+            else if app.tree.focused_id == 8:
+                path_len = path(app.tree, app.tree.focused_id, path_slots)
+                let save_key_status: Int = widgets.button_key_event(save, event.key)
+                if save_key_status > 0:
+                    app.save_count = app.save_count + 1
+                    app.status_code = 1
+                    handled = handled + widgets.text_set_status(status, app.status_code)
+                handled = handled + path_len + save_key_status
+            else if app.tree.focused_id == 9:
+                path_len = path(app.tree, app.tree.focused_id, path_slots)
+                let reset_key_status: Int = widgets.button_key_event(reset, event.key)
+                if reset_key_status > 0:
+                    app.reset_count = app.reset_count + 1
+                    app.status_code = 2
+                    handled = handled + widgets.text_set_status(status, app.status_code)
+                    handled = handled + widgets.textbox_clear(name_box)
+                    handled = handled + widgets.textbox_clear(email_box)
+                handled = handled + path_len + reset_key_status
+        else if event.kind == surface.event_text_input():
+            copied_text_len = surface.poll_event_text_into(win, text_bytes)
+            if app.tree.focused_id == 4:
+                handled = handled + tti(name_box, text_bytes, copied_text_len)
+            else if app.tree.focused_id == 6:
+                handled = handled + tti(email_box, text_bytes, copied_text_len)
+        else if event.kind == surface.event_resize():
+            app.width = event.width
+            app.height = event.height
+            let resize_root_rect: surface.Rect = r(0, 0, app.width, app.height)
+            handled = handled + sb(root_node, resize_root_rect)
+            handled = handled + sb(panel_node, resize_root_rect)
+            handled = handled + widgets.panel_set_rect(panel, resize_root_rect)
+            handled = handled + widgets.column_set_rect(column, widgets.panel_content_rect(panel))
+            handled = handled + cl(app.tree, column_node.id, column)
+            handled = handled + sb(column_node, column.rect)
+            handled = handled + scb(title_node, column, 0)
+            handled = handled + scb(name_node, column, 1)
+            handled = handled + scb(name_label_node, column, 2)
+            handled = handled + scb(email_node, column, 3)
+            handled = handled + scb(row_node, column, 4)
+            handled = handled + scb(status_node, column, 5)
+            handled = handled + widgets.row_set_rect(row, row_node.rect)
+            handled = handled + widgets.row_layout(app.tree, row_node.id, row.rect, row.gap)
+            handled = handled + srb(save_node, row, 0)
+            handled = handled + srb(reset_node, row, 1)
+            handled = handled + widgets.text_set_rect(title, title_node.rect)
+            handled = handled + widgets.textbox_set_rect(name_box, name_node.rect)
+            handled = handled + widgets.text_set_rect(name_label, name_label_node.rect)
+            handled = handled + widgets.textbox_set_rect(email_box, email_node.rect)
+            handled = handled + widgets.button_set_rect(save, save_node.rect)
+            handled = handled + widgets.button_set_rect(reset, reset_node.rect)
+            handled = handled + widgets.text_set_rect(status, status_node.rect)
+            handled = handled + widgets.textbox_set_focus(name_box, app.tree.focused_id == 4)
+            handled = handled + widgets.textbox_set_focus(email_box, app.tree.focused_id == 6)
+            handled = handled + widgets.button_set_focus(save, app.tree.focused_id == 8)
+            handled = handled + widgets.button_set_focus(reset, app.tree.focused_id == 9)
+        polls = polls + 1
+    if app.tree.focused_id == component.focus_none():
+        handled = handled + component.tree_set_focus(app.tree, 4)
+        handled = handled + widgets.textbox_set_focus(name_box, app.tree.focused_id == 4)
+        handled = handled + widgets.textbox_set_focus(email_box, app.tree.focused_id == 6)
+        handled = handled + widgets.button_set_focus(save, app.tree.focused_id == 8)
+        handled = handled + widgets.button_set_focus(reset, app.tree.focused_id == 9)
+    if app.reset_count < 1 && name_box.text_len == 0:
+        var ada_bytes: []u8 = core.make_u8(3)
+        ada_bytes[0] = 65
+        ada_bytes[1] = 100
+        ada_bytes[2] = 97
+        if app.tree.focused_id != 4:
+            handled = handled + component.tree_set_focus(app.tree, 4)
+            handled = handled + widgets.textbox_set_focus(name_box, app.tree.focused_id == 4)
+            handled = handled + widgets.textbox_set_focus(email_box, app.tree.focused_id == 6)
+            handled = handled + widgets.button_set_focus(save, app.tree.focused_id == 8)
+            handled = handled + widgets.button_set_focus(reset, app.tree.focused_id == 9)
+        handled = handled + widgets.textbox_text_input(name_box, ada_bytes, 3)
+    if app.tree.focused_id != 6:
+        handled = handled + component.tree_set_focus(app.tree, 6)
+        handled = handled + widgets.textbox_set_focus(name_box, app.tree.focused_id == 4)
+        handled = handled + widgets.textbox_set_focus(email_box, app.tree.focused_id == 6)
+        handled = handled + widgets.button_set_focus(save, app.tree.focused_id == 8)
+        handled = handled + widgets.button_set_focus(reset, app.tree.focused_id == 9)
+    if app.reset_count < 1 && email_box.text_len == 0:
+        var email_bytes: []u8 = core.make_u8(5)
+        email_bytes[0] = 116
+        email_bytes[1] = 101
+        email_bytes[2] = 116
+        email_bytes[3] = 114
+        email_bytes[4] = 97
+        handled = handled + widgets.textbox_text_input(email_box, email_bytes, 5)
+    if app.tree.focused_id != 8:
+        handled = handled + component.tree_set_focus(app.tree, 8)
+        handled = handled + widgets.textbox_set_focus(name_box, app.tree.focused_id == 4)
+        handled = handled + widgets.textbox_set_focus(email_box, app.tree.focused_id == 6)
+        handled = handled + widgets.button_set_focus(save, app.tree.focused_id == 8)
+        handled = handled + widgets.button_set_focus(reset, app.tree.focused_id == 9)
+    if app.save_count < 1:
+        path_len = path(app.tree, app.tree.focused_id, path_slots)
+        let fallback_save_status: Int = widgets.button_key_event(save, 32)
+        if fallback_save_status > 0:
+            app.save_count = app.save_count + 1
+            app.status_code = 1
+            handled = handled + widgets.text_set_status(status, app.status_code)
+        handled = handled + path_len + fallback_save_status
+    if app.tree.focused_id != 9:
+        handled = handled + component.tree_set_focus(app.tree, 9)
+        handled = handled + widgets.textbox_set_focus(name_box, app.tree.focused_id == 4)
+        handled = handled + widgets.textbox_set_focus(email_box, app.tree.focused_id == 6)
+        handled = handled + widgets.button_set_focus(save, app.tree.focused_id == 8)
+        handled = handled + widgets.button_set_focus(reset, app.tree.focused_id == 9)
+    if app.reset_count < 1:
+        path_len = path(app.tree, app.tree.focused_id, path_slots)
+        let fallback_reset_status: Int = widgets.button_key_event(reset, 13)
+        if fallback_reset_status > 0:
+            app.reset_count = app.reset_count + 1
+            app.status_code = 2
+            handled = handled + widgets.text_set_status(status, app.status_code)
+            handled = handled + widgets.textbox_clear(name_box)
+            handled = handled + widgets.textbox_clear(email_box)
+        handled = handled + path_len + fallback_reset_status
+    if app.tree.focused_id != 4:
+        handled = handled + component.tree_set_focus(app.tree, 4)
+        handled = handled + widgets.textbox_set_focus(name_box, app.tree.focused_id == 4)
+        handled = handled + widgets.textbox_set_focus(email_box, app.tree.focused_id == 6)
+        handled = handled + widgets.button_set_focus(save, app.tree.focused_id == 8)
+        handled = handled + widgets.button_set_focus(reset, app.tree.focused_id == 9)
+    if app.width < 480:
+        app.width = 480
+        app.height = 320
+        let final_root_rect: surface.Rect = r(0, 0, app.width, app.height)
+        handled = handled + sb(root_node, final_root_rect)
+        handled = handled + sb(panel_node, final_root_rect)
+        handled = handled + widgets.panel_set_rect(panel, final_root_rect)
+        handled = handled + widgets.column_set_rect(column, widgets.panel_content_rect(panel))
+        handled = handled + cl(app.tree, column_node.id, column)
+        handled = handled + sb(column_node, column.rect)
+        handled = handled + scb(title_node, column, 0)
+        handled = handled + scb(name_node, column, 1)
+        handled = handled + scb(name_label_node, column, 2)
+        handled = handled + scb(email_node, column, 3)
+        handled = handled + scb(row_node, column, 4)
+        handled = handled + scb(status_node, column, 5)
+        handled = handled + widgets.row_set_rect(row, row_node.rect)
+        handled = handled + widgets.row_layout(app.tree, row_node.id, row.rect, row.gap)
+        handled = handled + srb(save_node, row, 0)
+        handled = handled + srb(reset_node, row, 1)
+        handled = handled + widgets.text_set_rect(title, title_node.rect)
+        handled = handled + widgets.textbox_set_rect(name_box, name_node.rect)
+        handled = handled + widgets.text_set_rect(name_label, name_label_node.rect)
+        handled = handled + widgets.textbox_set_rect(email_box, email_node.rect)
+        handled = handled + widgets.button_set_rect(save, save_node.rect)
+        handled = handled + widgets.button_set_rect(reset, reset_node.rect)
+        handled = handled + widgets.text_set_rect(status, status_node.rect)
+        handled = handled + widgets.textbox_set_focus(name_box, app.tree.focused_id == 4)
+        handled = handled + widgets.textbox_set_focus(email_box, app.tree.focused_id == 6)
+        handled = handled + widgets.button_set_focus(save, app.tree.focused_id == 8)
+        handled = handled + widgets.button_set_focus(reset, app.tree.focused_id == 9)
+    win.width = app.width
+    win.height = app.height
+    var after_frame: surface.Frame = surface.begin_frame(win)
+    var after_ctx: draw.DrawContext = draw.DrawContext(frame: after_frame)
+    let after_draw: Int = draw_settings_scene(app, title, name_box, name_label, email_box, save, reset, status, after_ctx)
+    let second_presented: Int = surface.present(after_ctx.frame)
+    let closed: Int = surface.close(win)
+    let validate_status: Int = component.tree_validate(app.tree)
+    let draw_count: Int = component.tree_build_draw_order(app.tree, draw_order)
+    path_len = path(app.tree, reset_node.id, path_slots)
+    if app.tree.len != 11:
+        return 20
+    if app.tree.focused_id != 4:
+        return 21
+    if app.save_count < 1 || save.press_count < 1:
+        return 22
+    if app.reset_count < 1 || reset.press_count < 1:
+        return 23
+    if app.status_code != 2 || status.status_code != 2:
+        return 24
+    if name_box.text_len != 0 || email_box.text_len != 0:
+        return 25
+    if name_box.caret != 0 || email_box.caret != 0:
+        return 26
+    if app.width != 480 || app.height != 320 || name_box.rect.w != 440 || email_box.rect.w != 440:
+        return 27
+    if path_len != 5:
+        return 28
+    if draw_count != 11:
+        return 29
+    let reset_hit: Bool = component.node_hit(reset_node, 180, 208)
+    let name_hit: Bool = component.node_hit(name_node, 40, 72)
+    let email_hit: Bool = component.node_hit(email_node, 40, 156)
+    if !reset_hit || !name_hit || !email_hit:
+        return 30
+    if first_presented != 0 || second_presented != 0 || closed != 0:
+        return 31
+    if validate_status != component.error_ok():
+        return 32
+    let neutral_build: Int = builder_status - builder_status
+    let neutral_init: Int = widget_init_status - widget_init_status
+    let neutral_layout: Int = layout_status - layout_status
+    let neutral_focus: Int = focus_status - focus_status
+    let neutral_draw: Int = before_draw - before_draw + after_draw - after_draw
+    let neutral_status: Int = neutral_build + neutral_init + neutral_layout + neutral_focus
+    return 1 + neutral_status + neutral_draw + handled - handled

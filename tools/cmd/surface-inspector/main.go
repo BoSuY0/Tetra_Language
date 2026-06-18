@@ -21,12 +21,13 @@ type runtimeReportInput struct {
 }
 
 type runtimeReport struct {
-	Input  runtimeReportInput
-	Raw    map[string]any
-	Schema string
-	Status string
-	Source string
-	Target string
+	Input               runtimeReportInput
+	Raw                 map[string]any
+	Schema              string
+	Status              string
+	Source              string
+	Target              string
+	MorphRenderedBeauty *surface.MorphRenderedBeautyReport
 }
 
 func main() {
@@ -55,11 +56,12 @@ func (f *runtimeReportFlag) Set(value string) error {
 		return fmt.Errorf("--runtime-report must include non-empty kind and path")
 	}
 	allowed := map[string]bool{
-		"block":         true,
-		"morph":         true,
-		"app-model":     true,
-		"accessibility": true,
-		"events":        true,
+		"block":                 true,
+		"morph":                 true,
+		"morph-rendered-beauty": true,
+		"app-model":             true,
+		"accessibility":         true,
+		"events":                true,
 	}
 	if !allowed[kind] {
 		return fmt.Errorf("unsupported runtime report kind %q", kind)
@@ -139,12 +141,36 @@ func readRuntimeReports(inputs []runtimeReportInput) ([]runtimeReport, error) {
 			Source: stringField(decoded, "source"),
 			Target: stringField(decoded, "target"),
 		}
+		if input.Kind == "morph-rendered-beauty" {
+			if err := surface.ValidateMorphRenderedBeautyReport(raw); err != nil {
+				return nil, fmt.Errorf(
+					"%s Morph rendered beauty validation failed: %w",
+					input.Path,
+					err,
+				)
+			}
+			var mrb surface.MorphRenderedBeautyReport
+			if err := json.Unmarshal(raw, &mrb); err != nil {
+				return nil, fmt.Errorf(
+					"%s Morph rendered beauty decode failed: %w",
+					input.Path,
+					err,
+				)
+			}
+			report.MorphRenderedBeauty = &mrb
+			report.Source = mrb.MorphEvidence.Source
+			report.Target = mrb.Target
+		}
 		reports = append(reports, report)
 	}
 	return reports, nil
 }
 
-func buildInspectorReport(reports []runtimeReport, outPath string, htmlPath string) (surface.SurfaceInspectorReport, error) {
+func buildInspectorReport(
+	reports []runtimeReport,
+	outPath string,
+	htmlPath string,
+) (surface.SurfaceInspectorReport, error) {
 	byKind := map[string]runtimeReport{}
 	for _, report := range reports {
 		if _, exists := byKind[report.Input.Kind]; !exists {
@@ -153,7 +179,10 @@ func buildInspectorReport(reports []runtimeReport, outPath string, htmlPath stri
 	}
 	for _, required := range []string{"block", "morph", "app-model", "accessibility"} {
 		if _, ok := byKind[required]; !ok {
-			return surface.SurfaceInspectorReport{}, fmt.Errorf("runtime reports missing %s", required)
+			return surface.SurfaceInspectorReport{}, fmt.Errorf(
+				"runtime reports missing %s",
+				required,
+			)
 		}
 	}
 
@@ -179,19 +208,94 @@ func buildInspectorReport(reports []runtimeReport, outPath string, htmlPath stri
 			Column: 1,
 		})
 	}
+	var morphToPixels *surface.MorphToPixelsChainReport
+	if report, ok := byKind["morph-rendered-beauty"]; ok {
+		chain := surface.MorphToPixelsChainFromRenderedBeauty(
+			reportPathForBundle(report.Input.Path),
+			*report.MorphRenderedBeauty,
+		)
+		morphToPixels = &chain
+		sourceLocations = append(sourceLocations, surface.SurfaceInspectorSourceLocation{
+			Kind:   "morph-rendered-beauty",
+			Path:   chain.Source,
+			Line:   1,
+			Column: 1,
+		})
+	}
 	sort.Slice(inputReports, func(i, j int) bool {
 		return inputReports[i].Kind < inputReports[j].Kind
 	})
 
 	sections := surface.SurfaceInspectorSections{
-		BlockTree:     section("block_graph.nodes + component_tree.nodes", countArrays(reports, "block_graph.nodes", "component_tree.nodes")),
-		MorphTokens:   section("morph.token_graph.tokens", countArrays(reports, "morph.token_graph.tokens")),
-		Layout:        section("layout_passes + layout_constraints + component_tree.layout_passes", countArrays(reports, "layout_passes", "layout_constraints", "component_tree.layout_passes")),
-		Paint:         section("paint_commands + paint_layers", countArrays(reports, "paint_commands", "paint_layers")),
-		Accessibility: section("block_accessibility_tree.nodes + accessibility_tree.nodes", countArrays(reports, "block_accessibility_tree.nodes", "accessibility_tree.nodes")),
-		EventRoutes:   section("block_event_routes + events + app_model.event_bindings", countArrays(reports, "block_event_routes", "events", "app_model.event_bindings")),
-		Focus:         section("block_focus_transitions + app_model.focus_scopes + block_graph.focus_order", countArrays(reports, "block_focus_transitions", "app_model.focus_scopes", "block_graph.focus_order")),
-		PerfCounters:  section("surface_performance_budget + renderer.cache_stats + block_system.memory_budget", countObjects(reports, "surface_performance_budget", "renderer.cache_stats", "block_system.memory_budget")),
+		BlockTree: section(
+			"block_graph.nodes + component_tree.nodes",
+			countArrays(reports, "block_graph.nodes", "component_tree.nodes"),
+		),
+		MorphTokens: section(
+			"morph.token_graph.tokens",
+			countArrays(reports, "morph.token_graph.tokens"),
+		),
+		Layout: section(
+			"layout_passes + layout_constraints + component_tree.layout_passes",
+			countArrays(
+				reports,
+				"layout_passes",
+				"layout_constraints",
+				"component_tree.layout_passes",
+			),
+		),
+		Paint: section(
+			"paint_commands + paint_layers",
+			countArrays(reports, "paint_commands", "paint_layers"),
+		),
+		Accessibility: section(
+			"block_accessibility_tree.nodes + accessibility_tree.nodes",
+			countArrays(reports, "block_accessibility_tree.nodes", "accessibility_tree.nodes"),
+		),
+		EventRoutes: section(
+			"block_event_routes + events + app_model.event_bindings",
+			countArrays(reports, "block_event_routes", "events", "app_model.event_bindings"),
+		),
+		Focus: section(
+			"block_focus_transitions + app_model.focus_scopes + block_graph.focus_order",
+			countArrays(
+				reports,
+				"block_focus_transitions",
+				"app_model.focus_scopes",
+				"block_graph.focus_order",
+			),
+		),
+		PerfCounters: section(
+			"surface_performance_budget + renderer.cache_stats + block_system.memory_budget",
+			countObjects(
+				reports,
+				"surface_performance_budget",
+				"renderer.cache_stats",
+				"block_system.memory_budget",
+			),
+		),
+	}
+	if morphToPixels != nil {
+		sections.RecipeExpansions = section(
+			"morph_to_pixels.recipe_expansion_count",
+			morphToPixels.RecipeExpansionCount,
+		)
+		sections.BlockSceneNodes = section(
+			"morph_to_pixels.block_scene_node_count",
+			morphToPixels.BlockSceneNodeCount,
+		)
+		sections.RenderCommands = section(
+			"morph_to_pixels.render_command_count",
+			morphToPixels.RenderCommandCount,
+		)
+		sections.FrameArtifacts = section(
+			"morph_to_pixels.frame_artifact",
+			presentCount(morphToPixels.FrameArtifact),
+		)
+		sections.GoldenDiff = section(
+			"morph_to_pixels.golden_artifact + diff metrics",
+			presentCount(morphToPixels.GoldenArtifact),
+		)
 	}
 
 	return surface.SurfaceInspectorReport{
@@ -205,6 +309,7 @@ func buildInspectorReport(reports []runtimeReport, outPath string, htmlPath stri
 		InputReports:    inputReports,
 		SourceLocations: sourceLocations,
 		Sections:        sections,
+		MorphToPixels:   morphToPixels,
 		StaticArtifacts: surface.SurfaceInspectorStaticArtifacts{
 			JSON:           reportPathForBundle(outPath),
 			HTML:           reportPathForBundle(htmlPath),
@@ -225,6 +330,13 @@ func buildInspectorReport(reports []runtimeReport, outPath string, htmlPath stri
 	}, nil
 }
 
+func presentCount(value string) int {
+	if strings.TrimSpace(value) == "" {
+		return 0
+	}
+	return 1
+}
+
 func section(source string, count int) surface.SurfaceInspectorSection {
 	return surface.SurfaceInspectorSection{
 		Present: count > 0,
@@ -235,11 +347,20 @@ func section(source string, count int) surface.SurfaceInspectorSection {
 
 func renderInspectorHTML(report surface.SurfaceInspectorReport) string {
 	var b strings.Builder
-	b.WriteString("<!doctype html><html><head><meta charset=\"utf-8\"><title>Surface Inspector</title>")
-	b.WriteString("<style>body{font-family:sans-serif;margin:24px;color:#172026;background:#fff}table{border-collapse:collapse;width:100%;max-width:960px}th,td{border:1px solid #ccd3d8;padding:6px 8px;text-align:left}th{background:#eef3f7}</style>")
+	b.WriteString(
+		"<!doctype html><html><head><meta charset=\"utf-8\"><title>Surface Inspector</title>",
+	)
+	b.WriteString(
+		("<style>body{font-family:sans-" +
+			"serif;margin:24px;color:#172026;background:#fff}table{border-" +
+			"collapse:collapse;width:100%;max-width:960px}th,td{border:1px solid " +
+			"#ccd3d8;padding:6px 8px;text-align:left}th{background:#eef3f7}</style>"),
+	)
 	b.WriteString("</head><body><h1>Surface Inspector</h1><p>static tool report for ")
 	b.WriteString(html.EscapeString(report.ReleaseScope))
-	b.WriteString("</p><table><thead><tr><th>Section</th><th>Count</th><th>Source</th></tr></thead><tbody>")
+	b.WriteString(
+		"</p><table><thead><tr><th>Section</th><th>Count</th><th>Source</th></tr></thead><tbody>",
+	)
 	for _, row := range []struct {
 		Name    string
 		Section surface.SurfaceInspectorSection
@@ -252,7 +373,15 @@ func renderInspectorHTML(report surface.SurfaceInspectorReport) string {
 		{Name: "event_routes", Section: report.Sections.EventRoutes},
 		{Name: "focus", Section: report.Sections.Focus},
 		{Name: "perf_counters", Section: report.Sections.PerfCounters},
+		{Name: "recipe_expansions", Section: report.Sections.RecipeExpansions},
+		{Name: "block_scene_nodes", Section: report.Sections.BlockSceneNodes},
+		{Name: "render_commands", Section: report.Sections.RenderCommands},
+		{Name: "frame_artifacts", Section: report.Sections.FrameArtifacts},
+		{Name: "golden_diff", Section: report.Sections.GoldenDiff},
 	} {
+		if !row.Section.Present {
+			continue
+		}
 		b.WriteString("<tr><td>")
 		b.WriteString(html.EscapeString(row.Name))
 		b.WriteString("</td><td>")
@@ -261,7 +390,29 @@ func renderInspectorHTML(report surface.SurfaceInspectorReport) string {
 		b.WriteString(html.EscapeString(row.Section.Source))
 		b.WriteString("</td></tr>")
 	}
-	b.WriteString("</tbody></table></body></html>\n")
+	b.WriteString("</tbody></table>")
+	if report.MorphToPixels != nil {
+		b.WriteString("<h2>Morph to pixels</h2><table><tbody>")
+		for _, row := range []struct {
+			Name  string
+			Value string
+		}{
+			{Name: "chain_id", Value: report.MorphToPixels.ChainID},
+			{Name: "source", Value: report.MorphToPixels.Source},
+			{Name: "block_scene_hash", Value: report.MorphToPixels.BlockSceneHash},
+			{Name: "render_command_stream_hash", Value: report.MorphToPixels.RenderCommandStreamHash},
+			{Name: "frame_artifact", Value: report.MorphToPixels.FrameArtifact},
+			{Name: "golden_artifact", Value: report.MorphToPixels.GoldenArtifact},
+		} {
+			b.WriteString("<tr><td>")
+			b.WriteString(html.EscapeString(row.Name))
+			b.WriteString("</td><td>")
+			b.WriteString(html.EscapeString(row.Value))
+			b.WriteString("</td></tr>")
+		}
+		b.WriteString("</tbody></table>")
+	}
+	b.WriteString("</body></html>\n")
 	return b.String()
 }
 
@@ -272,7 +423,8 @@ func rejectHiddenState(path string, raw map[string]any) error {
 	if len(arrayField(raw, "hidden_state_findings")) > 0 {
 		return fmt.Errorf("%s contains hidden_state_findings", path)
 	}
-	if hidden, ok := raw["hidden_state"].(map[string]any); ok && len(arrayField(hidden, "findings")) > 0 {
+	if hidden, ok := raw["hidden_state"].(map[string]any); ok &&
+		len(arrayField(hidden, "findings")) > 0 {
 		return fmt.Errorf("%s contains hidden_state.findings", path)
 	}
 	return nil

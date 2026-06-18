@@ -6,12 +6,27 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"tetra_language/internal/toon"
 )
 
 func TestValidateEcoTrustAcceptsValidSnapshot(t *testing.T) {
 	out, err := runEcoTrustValidator(t, validTrustSnapshot())
 	if err != nil {
 		t.Fatalf("validator failed: %v\n%s", err, out)
+	}
+}
+
+func TestValidateEcoTrustAcceptsTOON(t *testing.T) {
+	toonRaw, err := toon.ConvertJSONToTOON(
+		[]byte(validTrustSnapshot()),
+		toon.Options{Strict: true, Deterministic: true},
+	)
+	if err != nil {
+		t.Fatalf("json->toon: %v", err)
+	}
+	if err := validateEcoTrustSnapshotFormat(toonRaw, "toon"); err != nil {
+		t.Fatalf("validateEcoTrustSnapshotFormat TOON: %v\n%s", err, toonRaw)
 	}
 }
 
@@ -26,7 +41,12 @@ func TestValidateEcoTrustRejectsMalformedJSON(t *testing.T) {
 }
 
 func TestValidateEcoTrustRejectsUnknownTopLevelField(t *testing.T) {
-	snapshot := strings.Replace(validTrustSnapshot(), "\n  \"record_count\":", "\n  \"strict_extra\": true,\n  \"record_count\":", 1)
+	snapshot := strings.Replace(
+		validTrustSnapshot(),
+		"\n  \"record_count\":",
+		"\n  \"strict_extra\": true,\n  \"record_count\":",
+		1,
+	)
 	out, err := runEcoTrustValidator(t, snapshot)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
@@ -37,7 +57,12 @@ func TestValidateEcoTrustRejectsUnknownTopLevelField(t *testing.T) {
 }
 
 func TestValidateEcoTrustRejectsUnknownCapsuleField(t *testing.T) {
-	snapshot := strings.Replace(validTrustSnapshot(), `"trust_score": 95,`, `"trust_score": 95, "unexpected": true,`, 1)
+	snapshot := strings.Replace(
+		validTrustSnapshot(),
+		`"trust_score": 95,`,
+		`"trust_score": 95, "unexpected": true,`,
+		1,
+	)
 	out, err := runEcoTrustValidator(t, snapshot)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
@@ -70,7 +95,12 @@ func TestValidateEcoTrustRejectsMissingRequiredCapsuleField(t *testing.T) {
 }
 
 func TestValidateEcoTrustRejectsBadHash(t *testing.T) {
-	snapshot := strings.Replace(validTrustSnapshot(), `"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"`, `"sha256:not-hex"`, 1)
+	snapshot := strings.Replace(
+		validTrustSnapshot(),
+		`"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"`,
+		`"sha256:not-hex"`,
+		1,
+	)
 	out, err := runEcoTrustValidator(t, snapshot)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
@@ -81,7 +111,12 @@ func TestValidateEcoTrustRejectsBadHash(t *testing.T) {
 }
 
 func TestValidateEcoTrustRejectsNegativeRecordCount(t *testing.T) {
-	snapshot := strings.Replace(validTrustSnapshot(), `  "record_count": 2,`, `  "record_count": -1,`, 1)
+	snapshot := strings.Replace(
+		validTrustSnapshot(),
+		`  "record_count": 2,`,
+		`  "record_count": -1,`,
+		1,
+	)
 	out, err := runEcoTrustValidator(t, snapshot)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
@@ -92,7 +127,12 @@ func TestValidateEcoTrustRejectsNegativeRecordCount(t *testing.T) {
 }
 
 func TestValidateEcoTrustRejectsRecordCountMismatch(t *testing.T) {
-	snapshot := strings.Replace(validTrustSnapshot(), `  "record_count": 2,`, `  "record_count": 3,`, 1)
+	snapshot := strings.Replace(
+		validTrustSnapshot(),
+		`  "record_count": 2,`,
+		`  "record_count": 3,`,
+		1,
+	)
 	out, err := runEcoTrustValidator(t, snapshot)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
@@ -103,7 +143,12 @@ func TestValidateEcoTrustRejectsRecordCountMismatch(t *testing.T) {
 }
 
 func TestValidateEcoTrustRejectsTierScoreMismatch(t *testing.T) {
-	snapshot := strings.Replace(validTrustSnapshot(), `"trust_tier": "high"`, `"trust_tier": "medium"`, 1)
+	snapshot := strings.Replace(
+		validTrustSnapshot(),
+		`"trust_tier": "high"`,
+		`"trust_tier": "medium"`,
+		1,
+	)
 	out, err := runEcoTrustValidator(t, snapshot)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
@@ -114,7 +159,12 @@ func TestValidateEcoTrustRejectsTierScoreMismatch(t *testing.T) {
 }
 
 func TestValidateEcoTrustRejectsDuplicateCapsule(t *testing.T) {
-	snapshot := strings.Replace(validTrustSnapshot(), `"id": "tetra://core"`, `"id": "tetra://app"`, 1)
+	snapshot := strings.Replace(
+		validTrustSnapshot(),
+		`"id": "tetra://core"`,
+		`"id": "tetra://app"`,
+		1,
+	)
 	out, err := runEcoTrustValidator(t, snapshot)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)

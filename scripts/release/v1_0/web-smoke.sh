@@ -5,7 +5,14 @@ report_path=""
 source_override=""
 browser_override="${TETRA_WEB_SMOKE_BROWSER:-}"
 browser_runner=""
-browser_flags=(--headless --no-sandbox --disable-gpu --disable-dev-shm-usage --disable-crash-reporter --disable-breakpad)
+browser_flags=(
+  --headless
+  --no-sandbox
+  --disable-gpu
+  --disable-dev-shm-usage
+  --disable-crash-reporter
+  --disable-breakpad
+)
 automation="browser-discovery ${browser_flags[*]} --dump-dom"
 browser_candidates=("chromium" "chromium-browser" "google-chrome" "chrome")
 
@@ -17,8 +24,9 @@ mkdir -p "$GOCACHE"
 export GOCACHE
 
 usage() {
-  cat <<'USAGE'
-Usage: bash scripts/release/v1_0/web-smoke.sh [--report PATH] [--source examples/file.tetra] [--browser PATH_OR_NAME]
+  cat << 'USAGE'
+Usage: bash scripts/release/v1_0/web-smoke.sh [--report PATH]
+       [--source examples/file.tetra] [--browser PATH_OR_NAME]
 
 Runs wasm32-web smoke in a discovered headless Chromium-compatible browser.
 Host/browser limits write a validated blocked report and fail the script. If no
@@ -78,7 +86,7 @@ while [[ $# -gt 0 ]]; do
       browser_override="$2"
       shift 2
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;
@@ -134,35 +142,67 @@ json_bool() {
 
 write_web_smoke_report() {
   local generated_at
-  if command -v date >/dev/null 2>&1; then
+  if command -v date > /dev/null 2>&1; then
     generated_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)" || generated_at="1970-01-01T00:00:00Z"
   else
     generated_at="1970-01-01T00:00:00Z"
   fi
   {
     printf '{\n'
-    printf '  "schema": '; json_string 'tetra.web-ui-smoke.v1alpha1'; printf ',\n'
-    printf '  "generated_at": '; json_string "$generated_at"; printf ',\n'
-    printf '  "target": '; json_string 'wasm32-web'; printf ',\n'
-    printf '  "ui_scope_active": '; json_bool "$scope_active"; printf ',\n'
-    printf '  "source": '; json_string "$source_path"; printf ',\n'
-    printf '  "used_fallback_source": '; json_bool "$used_fallback"; printf ',\n'
-    printf '  "automation": '; json_string "$automation"; printf ',\n'
-    printf '  "status": '; json_string "$status"; printf ',\n'
-    printf '  "result": '; json_string "$result"; printf ',\n'
-    printf '  "runtime_trace": '; json_string "$runtime_trace"; printf ',\n'
-    printf '  "blocker": '; json_string "$blocker"; printf ',\n'
-    printf '  "dom_snapshot": '; json_string "$dom_path"; printf ',\n'
-    printf '  "chromium_stderr": '; json_string "$chromium_err_path"; printf ',\n'
-    printf '  "ui_schema": '; json_string "$ui_schema"; printf ',\n'
-    printf '  "ui_bundle_path": '; json_string "$ui_bundle_path"; printf ',\n'
-    printf '  "ui_module_path": '; json_string "$ui_module_path"; printf '\n'
+    printf '  "schema": '
+    json_string 'tetra.web-ui-smoke.v1alpha1'
+    printf ',\n'
+    printf '  "generated_at": '
+    json_string "$generated_at"
+    printf ',\n'
+    printf '  "target": '
+    json_string 'wasm32-web'
+    printf ',\n'
+    printf '  "ui_scope_active": '
+    json_bool "$scope_active"
+    printf ',\n'
+    printf '  "source": '
+    json_string "$source_path"
+    printf ',\n'
+    printf '  "used_fallback_source": '
+    json_bool "$used_fallback"
+    printf ',\n'
+    printf '  "automation": '
+    json_string "$automation"
+    printf ',\n'
+    printf '  "status": '
+    json_string "$status"
+    printf ',\n'
+    printf '  "result": '
+    json_string "$result"
+    printf ',\n'
+    printf '  "runtime_trace": '
+    json_string "$runtime_trace"
+    printf ',\n'
+    printf '  "blocker": '
+    json_string "$blocker"
+    printf ',\n'
+    printf '  "dom_snapshot": '
+    json_string "$dom_path"
+    printf ',\n'
+    printf '  "chromium_stderr": '
+    json_string "$chromium_err_path"
+    printf ',\n'
+    printf '  "ui_schema": '
+    json_string "$ui_schema"
+    printf ',\n'
+    printf '  "ui_bundle_path": '
+    json_string "$ui_bundle_path"
+    printf ',\n'
+    printf '  "ui_module_path": '
+    json_string "$ui_module_path"
+    printf '\n'
     printf '}\n'
-  } >"$report_path"
+  } > "$report_path"
 }
 
-if ! command -v node >/dev/null 2>&1; then
-  source_path="${source_override:-examples/flow_hello.tetra}"
+if ! command -v node > /dev/null 2>&1; then
+  source_path="${source_override:-examples/flow/flow_hello.tetra}"
   blocker="runtime prerequisite unavailable: node"
   write_web_smoke_report
   go run ./tools/cmd/validate-web-ui-smoke --report "$report_path"
@@ -174,14 +214,14 @@ probe_browser_runner() {
   local runner="$1"
   local probe_out="$tmp_dir/browser-probe.dom"
   local probe_err="$tmp_dir/browser-probe.err"
-  "$runner" "${browser_flags[@]}" --dump-dom about:blank >"$probe_out" 2>"$probe_err"
+  "$runner" "${browser_flags[@]}" --dump-dom about:blank > "$probe_out" 2> "$probe_err"
 }
 
 discover_browser() {
   if [[ -n "$browser_override" ]]; then
     browser_runner="$browser_override"
     automation="${browser_runner} ${browser_flags[*]} --dump-dom"
-    if command -v "$browser_runner" >/dev/null 2>&1 && probe_browser_runner "$browser_runner"; then
+    if command -v "$browser_runner" > /dev/null 2>&1 && probe_browser_runner "$browser_runner"; then
       return 0
     fi
     blocker="browser runner unavailable: ${browser_runner} failed headless probe"
@@ -191,7 +231,7 @@ discover_browser() {
   local candidate
   local probe_failure=""
   for candidate in "${browser_candidates[@]}"; do
-    if command -v "$candidate" >/dev/null 2>&1; then
+    if command -v "$candidate" > /dev/null 2>&1; then
       browser_runner="$candidate"
       automation="${browser_runner} ${browser_flags[*]} --dump-dom"
       if probe_browser_runner "$browser_runner"; then
@@ -214,8 +254,8 @@ server_pid=""
 
 stop_web_smoke_server() {
   if [[ -n "${server_pid:-}" ]]; then
-    kill "$server_pid" >/dev/null 2>&1 || true
-    wait "$server_pid" >/dev/null 2>&1 || true
+    kill "$server_pid" > /dev/null 2>&1 || true
+    wait "$server_pid" > /dev/null 2>&1 || true
     server_pid=""
   fi
 }
@@ -229,7 +269,7 @@ trap cleanup_web_smoke EXIT
 smoke_source_for_case() {
   local list_path="$1"
   local case_name="$2"
-  node - "$list_path" "$case_name" <<'JS'
+  node - "$list_path" "$case_name" << 'JS'
 const fs = require('fs');
 const listPath = process.argv[2];
 const caseName = process.argv[3];
@@ -243,7 +283,7 @@ JS
 }
 
 smoke_list="$tmp_dir/wasm32-web-smoke-list.json"
-./tetra smoke --list --target wasm32-web --format=json >"$smoke_list"
+./tetra smoke --list --target wasm32-web --format=json > "$smoke_list"
 go run ./tools/cmd/validate-smoke-list --report "$smoke_list"
 
 wait_for_server_port() {
@@ -255,7 +295,7 @@ wait_for_server_port() {
       port="$observed"
       return 0
     fi
-    if ! kill -0 "$server_pid" >/dev/null 2>&1; then
+    if ! kill -0 "$server_pid" > /dev/null 2>&1; then
       return 1
     fi
     sleep 0.1
@@ -277,7 +317,7 @@ else
   else
     source_path="$(smoke_source_for_case "$smoke_list" "legacy_hello" || true)"
     if [[ -z "$source_path" ]]; then
-      source_path="examples/flow_hello.tetra"
+      source_path="examples/flow/flow_hello.tetra"
     fi
     scope_active="false"
     used_fallback="true"
@@ -288,7 +328,12 @@ if ! discover_browser; then
   status="blocked"
 else
   build_out="$tmp_dir/web_smoke"
-  if ./tetra build --target wasm32-web -o "$build_out" "$source_path" >"$tmp_dir/build.out" 2>"$tmp_dir/build.err"; then
+  if ./tetra build \
+    --target wasm32-web \
+    -o "$build_out" \
+    "$source_path" \
+    > "$tmp_dir/build.out" \
+    2> "$tmp_dir/build.err"; then
     if ! go run ./tools/cmd/validate-wasm-imports --target wasm32-web "$build_out"; then
       status="fail"
       blocker="wasm32-web import validation failed for ${source_path}"
@@ -297,23 +342,35 @@ else
     main_probe_out="$tmp_dir/web_main_probe"
     runtime_probe_src="$tmp_dir/web_runtime_probe.tetra"
     runtime_probe_out="$tmp_dir/web_runtime_probe"
-    cat >"$main_probe_src" <<'TETRA'
+    cat > "$main_probe_src" << 'TETRA'
 func main() -> Int:
     return 0
 TETRA
-    cat >"$runtime_probe_src" <<'TETRA'
+    cat > "$runtime_probe_src" << 'TETRA'
 func main() -> Int
 uses io:
     print("web runtime smoke stdout\n")
     return 7
 TETRA
     if [[ "$status" != "fail" ]]; then
-      if ./tetra build --target wasm32-web -o "$main_probe_out" "$main_probe_src" >"$tmp_dir/main-probe.build.out" 2>"$tmp_dir/main-probe.build.err" \
-        && ./tetra build --target wasm32-web -o "$runtime_probe_out" "$runtime_probe_src" >"$tmp_dir/runtime-probe.build.out" 2>"$tmp_dir/runtime-probe.build.err"; then
+      if ./tetra build \
+        --target wasm32-web \
+        -o "$main_probe_out" \
+        "$main_probe_src" \
+        > "$tmp_dir/main-probe.build.out" \
+        2> "$tmp_dir/main-probe.build.err" &&
+        ./tetra build \
+          --target wasm32-web \
+          -o "$runtime_probe_out" \
+          "$runtime_probe_src" \
+          > "$tmp_dir/runtime-probe.build.out" \
+          2> "$tmp_dir/runtime-probe.build.err"; then
         if ! go run ./tools/cmd/validate-wasm-imports --target wasm32-web "$main_probe_out"; then
           status="fail"
           blocker="wasm32-web import validation failed for main probe"
-        elif ! go run ./tools/cmd/validate-wasm-imports --target wasm32-web "$runtime_probe_out"; then
+        elif ! go run ./tools/cmd/validate-wasm-imports \
+          --target wasm32-web \
+          "$runtime_probe_out"; then
           status="fail"
           blocker="wasm32-web import validation failed for runtime probe"
         fi
@@ -329,12 +386,13 @@ TETRA
         status="fail"
         blocker="missing UI metadata sidecars for ${source_path}"
       else
-        if ! ui_schema="$(node - "$ui_bundle_path" <<'JS'
+        if ! ui_schema="$(
+          node - "$ui_bundle_path" << 'JS'
 const fs = require('fs');
 const raw = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 process.stdout.write(String(raw.schema || ''));
 JS
-)"; then
+        )"; then
           status="fail"
           blocker="unable to parse UI metadata schema for ${source_path}"
         fi
@@ -343,7 +401,7 @@ JS
     if [[ "$status" == "fail" ]]; then
       :
     elif [[ "$scope_active" == "true" ]]; then
-      cat >"$tmp_dir/index.html" <<'HTML'
+      cat > "$tmp_dir/index.html" << 'HTML'
 <!doctype html>
 <html>
   <body>
@@ -352,7 +410,10 @@ JS
     <script type="module">
       import { runTetra, instantiateTetra } from './web_smoke.mjs';
       import { runTetra as runMainProbe } from './web_main_probe.mjs';
-      import { runTetra as runRuntimeProbe, instantiateTetra as instantiateRuntimeProbe } from './web_runtime_probe.mjs';
+      import {
+        runTetra as runRuntimeProbe,
+        instantiateTetra as instantiateRuntimeProbe,
+      } from './web_runtime_probe.mjs';
       import { mountTetraUI } from './web_smoke.ui.web.mjs';
       const el = document.getElementById('result');
       const traceEl = document.getElementById('runtime-trace');
@@ -376,13 +437,23 @@ JS
           throw new Error(`ui-schema:${String(bundle && bundle.schema)}`);
         }
         const host = document.querySelector('[data-tetra-ui="v1"]');
-        mark('window-mount', typeof window === 'object' && typeof document === 'object', 'missing browser globals');
+        mark(
+          'window-mount',
+          typeof window === 'object' && typeof document === 'object',
+          'missing browser globals',
+        );
         mark('root-mount', !!host && document.body.contains(host), 'missing mounted root');
         const rect = host.getBoundingClientRect();
-        mark('layout', rect.width >= 0 && rect.height >= 0 && host.style.minWidth === '320px', `rect=${rect.width}x${rect.height}`);
+        const layoutOK =
+          rect.width >= 0 &&
+          rect.height >= 0 &&
+          host.style.minWidth === '320px';
+        mark('layout', layoutOK, `rect=${rect.width}x${rect.height}`);
         mark('panel', host.getAttribute('data-tetra-widget') === 'panel', 'missing panel widget');
         const binding = host.querySelector('[data-tetra-binding]');
-        mark('text', !!binding && host.textContent.includes('Tetra UI Shell'), 'missing text/binding node');
+        const hasBoundText =
+          !!binding && host.textContent.includes('Tetra UI Shell');
+        mark('text', hasBoundText, 'missing text/binding node');
         const button = host.querySelector('button');
         mark('button', !!button && button.textContent.includes('event'), 'missing button widget');
         const input = host.querySelector('input[data-tetra-widget="input"]');
@@ -399,21 +470,31 @@ JS
         mark('change', binding.textContent.includes('6'), binding.textContent);
         select.value = 'item-2';
         select.dispatchEvent(new Event('change', { bubbles: true }));
-        mark('select', host.getAttribute('data-tetra-selected') === 'item-2', host.getAttribute('data-tetra-selected') || 'missing');
+        const selectedItem = host.getAttribute('data-tetra-selected');
+        mark('select', selectedItem === 'item-2', selectedItem || 'missing');
         const beforeClick = binding.textContent;
         button.click();
-        mark('click', binding.textContent !== beforeClick, `${beforeClick} -> ${binding.textContent}`);
+        const clickChanged = binding.textContent !== beforeClick;
+        mark('click', clickChanged, `${beforeClick} -> ${binding.textContent}`);
         await Promise.resolve();
-        mark('async-command', host.getAttribute('data-tetra-async') === 'complete', host.getAttribute('data-tetra-async') || 'missing');
+        const asyncState = host.getAttribute('data-tetra-async');
+        mark('async-command', asyncState === 'complete', asyncState || 'missing');
         await new Promise((resolve) => setTimeout(resolve, 25));
-        mark('timer', host.getAttribute('data-tetra-timer') === 'tick', host.getAttribute('data-tetra-timer') || 'missing');
-        mark('redraw-update', Number.parseInt(host.getAttribute('data-tetra-redraw-count') || '0', 10) >= 3, host.getAttribute('data-tetra-redraw-count') || '0');
-        const invalidUIURL = URL.createObjectURL(new Blob(['{"schema":"tetra.ui.invalid"}'], { type: 'application/json' }));
+        const timerState = host.getAttribute('data-tetra-timer');
+        mark('timer', timerState === 'tick', timerState || 'missing');
+        const redrawCount = host.getAttribute('data-tetra-redraw-count') || '0';
+        mark('redraw-update', Number.parseInt(redrawCount, 10) >= 3, redrawCount);
+        const invalidUIURL = URL.createObjectURL(
+          new Blob(['{"schema":"tetra.ui.invalid"}'], {
+            type: 'application/json',
+          }),
+        );
         try {
           await mountTetraUI(document.body, invalidUIURL);
           mark('error-recovery', false, 'missing UI metadata unexpectedly mounted');
         } catch (err) {
-          mark('error-recovery', document.body.contains(host), String(err && err.message ? err.message : err));
+          const recoveryError = String(err && err.message ? err.message : err);
+          mark('error-recovery', document.body.contains(host), recoveryError);
         } finally {
           URL.revokeObjectURL(invalidUIURL);
         }
@@ -422,24 +503,39 @@ JS
         mark('main-exit', code === 0, `exit=${code}`);
         const stdoutStart = logs.length;
         const probeCode = await runRuntimeProbe();
-        mark('stdout', logs.slice(stdoutStart).some((line) => line.includes('web runtime smoke stdout')), 'missing console output');
+        const sawStdout = logs
+          .slice(stdoutStart)
+          .some((line) => line.includes('web runtime smoke stdout'));
+        mark('stdout', sawStdout, 'missing console output');
         mark('nonzero-exit', probeCode === 7, `exit=${probeCode}`);
         try {
           await runTetra(new URL('./missing-web-smoke.wasm', import.meta.url));
           mark('failure-propagation', false, 'missing module resolved');
         } catch (err) {
           const message = String(err && err.message ? err.message : err);
-          mark('failure-propagation', message.includes('fetch failed') || message.includes('404'), message);
+          const failurePropagated =
+            message.includes('fetch failed') || message.includes('404');
+          mark('failure-propagation', failurePropagated, message);
         }
         const firstProbe = await instantiateRuntimeProbe();
         const secondProbe = await instantiateRuntimeProbe();
         mark(
           'repeated-instantiation',
-          firstProbe && secondProbe && firstProbe.instance && secondProbe.instance && firstProbe.instance !== secondProbe.instance,
+          firstProbe &&
+            secondProbe &&
+            firstProbe.instance &&
+            secondProbe.instance &&
+            firstProbe.instance !== secondProbe.instance,
           'instances were not distinct',
         );
         const firstMain = await instantiateTetra();
-        mark('main-instantiation', firstMain && firstMain.instance && typeof firstMain.instance.exports.tetra_main === 'function', 'missing tetra_main');
+        const mainExports =
+          firstMain && firstMain.instance && firstMain.instance.exports;
+        mark(
+          'main-instantiation',
+          mainExports && typeof mainExports.tetra_main === 'function',
+          'missing tetra_main',
+        );
         const views = Array.isArray(bundle.views) ? bundle.views.length : 0;
         el.textContent = `ok:${code}:ui=${views}:runtime=ok`;
       } catch (err) {
@@ -453,7 +549,7 @@ JS
 </html>
 HTML
     else
-    cat >"$tmp_dir/index.html" <<'HTML'
+      cat > "$tmp_dir/index.html" << 'HTML'
 <!doctype html>
 <html>
   <body>
@@ -462,7 +558,10 @@ HTML
     <script type="module">
       import { runTetra, instantiateTetra } from './web_smoke.mjs';
       import { runTetra as runMainProbe } from './web_main_probe.mjs';
-      import { runTetra as runRuntimeProbe, instantiateTetra as instantiateRuntimeProbe } from './web_runtime_probe.mjs';
+      import {
+        runTetra as runRuntimeProbe,
+        instantiateTetra as instantiateRuntimeProbe,
+      } from './web_runtime_probe.mjs';
       const el = document.getElementById('result');
       const traceEl = document.getElementById('runtime-trace');
       const trace = [];
@@ -483,24 +582,39 @@ HTML
         mark('main-exit', code === 0, `exit=${code}`);
         const stdoutStart = logs.length;
         const probeCode = await runRuntimeProbe();
-        mark('stdout', logs.slice(stdoutStart).some((line) => line.includes('web runtime smoke stdout')), 'missing console output');
+        const sawStdout = logs
+          .slice(stdoutStart)
+          .some((line) => line.includes('web runtime smoke stdout'));
+        mark('stdout', sawStdout, 'missing console output');
         mark('nonzero-exit', probeCode === 7, `exit=${probeCode}`);
         try {
           await runTetra(new URL('./missing-web-smoke.wasm', import.meta.url));
           mark('failure-propagation', false, 'missing module resolved');
         } catch (err) {
           const message = String(err && err.message ? err.message : err);
-          mark('failure-propagation', message.includes('fetch failed') || message.includes('404'), message);
+          const failurePropagated =
+            message.includes('fetch failed') || message.includes('404');
+          mark('failure-propagation', failurePropagated, message);
         }
         const firstProbe = await instantiateRuntimeProbe();
         const secondProbe = await instantiateRuntimeProbe();
         mark(
           'repeated-instantiation',
-          firstProbe && secondProbe && firstProbe.instance && secondProbe.instance && firstProbe.instance !== secondProbe.instance,
+          firstProbe &&
+            secondProbe &&
+            firstProbe.instance &&
+            secondProbe.instance &&
+            firstProbe.instance !== secondProbe.instance,
           'instances were not distinct',
         );
         const firstMain = await instantiateTetra();
-        mark('main-instantiation', firstMain && firstMain.instance && typeof firstMain.instance.exports.tetra_main === 'function', 'missing tetra_main');
+        const mainExports =
+          firstMain && firstMain.instance && firstMain.instance.exports;
+        mark(
+          'main-instantiation',
+          mainExports && typeof mainExports.tetra_main === 'function',
+          'missing tetra_main',
+        );
         el.textContent = `ok:${code}:runtime=ok`;
       } catch (err) {
         el.textContent = `error:${String(err)}`;
@@ -516,11 +630,14 @@ HTML
 
     if [[ "$status" != "fail" ]]; then
       port="0"
-      if ! command -v python3 >/dev/null 2>&1; then
+      if ! command -v python3 > /dev/null 2>&1; then
         blocker="runtime prerequisite unavailable: python3 -m http.server"
         status="blocked"
       else
-        python3 -m http.server "$port" --bind 127.0.0.1 --directory "$tmp_dir" >"$tmp_dir/server.log" 2>&1 &
+        python3 -m http.server "$port" \
+          --bind 127.0.0.1 \
+          --directory "$tmp_dir" \
+          > "$tmp_dir/server.log" 2>&1 &
         server_pid=$!
         if ! wait_for_server_port "$tmp_dir/server.log"; then
           blocker="unable to allocate local HTTP port"
@@ -530,11 +647,44 @@ HTML
         fi
         dom_out="$tmp_dir/dom.html"
         chromium_err="$tmp_dir/chromium.err"
-        if [[ "$status" != "blocked" ]] && "$browser_runner" "${browser_flags[@]}" --virtual-time-budget=12000 --dump-dom "http://127.0.0.1:${port}/index.html" >"$dom_out" 2>"$chromium_err"; then
+        if [[ "$status" != "blocked" ]] &&
+          "$browser_runner" "${browser_flags[@]}" \
+            --virtual-time-budget=12000 \
+            --dump-dom "http://127.0.0.1:${port}/index.html" \
+            > "$dom_out" \
+            2> "$chromium_err"; then
           result="$(sed -n 's/.*id="result">\([^<]*\)<.*/\1/p' "$dom_out" | head -n 1)"
-          runtime_trace="$(sed -n 's/.*id="runtime-trace">\([^<]*\)<.*/\1/p' "$dom_out" | head -n 1)"
+          runtime_trace="$(
+            sed -n 's/.*id="runtime-trace">\([^<]*\)<.*/\1/p' "$dom_out" |
+              head -n 1
+          )"
           if [[ "$result" == ok:* ]]; then
-            for marker in window-mount:ok root-mount:ok layout:ok text:ok button:ok input:ok list:ok panel:ok focus:ok input-event:ok change:ok select:ok click:ok timer:ok async-command:ok redraw-update:ok error-recovery:ok main-exit:ok stdout:ok nonzero-exit:ok failure-propagation:ok repeated-instantiation:ok ui-event-dispatch:web-command-dispatch; do
+            required_runtime_markers=(
+              window-mount:ok
+              root-mount:ok
+              layout:ok
+              text:ok
+              button:ok
+              input:ok
+              list:ok
+              panel:ok
+              focus:ok
+              input-event:ok
+              change:ok
+              select:ok
+              click:ok
+              timer:ok
+              async-command:ok
+              redraw-update:ok
+              error-recovery:ok
+              main-exit:ok
+              stdout:ok
+              nonzero-exit:ok
+              failure-propagation:ok
+              repeated-instantiation:ok
+              ui-event-dispatch:web-command-dispatch
+            )
+            for marker in "${required_runtime_markers[@]}"; do
               if [[ "$runtime_trace" != *"$marker"* ]]; then
                 status="fail"
                 blocker="browser runtime trace missing ${marker}"
@@ -555,7 +705,8 @@ HTML
               fi
             else
               status="blocked"
-              blocker="no UI-specific smoke source found in examples/; fallback wasm web smoke ran successfully"
+              blocker="no UI-specific smoke source found in examples/; "
+              blocker+="fallback wasm web smoke ran successfully"
             fi
           else
             status="fail"

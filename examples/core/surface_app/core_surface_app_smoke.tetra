@@ -1,0 +1,24 @@
+// Core lib.core.surface_app command/reducer smoke.
+module examples.core.surface_app.core_surface_app_smoke
+
+import lib.core.surface_app as appmodel
+
+func main() -> Int:
+    var state: appmodel.AppState = appmodel.init_state()
+    let focus_binding: appmodel.EventBinding = appmodel.bind_event(appmodel.event_mouse_up(), appmodel.target_name(), appmodel.cmd_focus_name())
+    let text_binding: appmodel.EventBinding = appmodel.bind_event(appmodel.event_text_input(), appmodel.target_name(), appmodel.cmd_text_insert())
+    let focus_status: Int = appmodel.apply_focus_name(state)
+    let edit_status: Int = appmodel.apply_text_insert(state, 3)
+    let push_status: Int = appmodel.apply_nav_push_settings(state)
+    let task_id: Int = appmodel.apply_async_save_start(state, 1)
+    let completed: Bool = appmodel.apply_async_save_complete(state, task_id)
+    let undo: Bool = appmodel.apply_history_undo(state)
+    let redo: Bool = appmodel.apply_history_redo(state)
+    let back_underflow: Bool = appmodel.apply_nav_back(state)
+    let underflow: Bool = appmodel.apply_nav_back(state)
+    var dialog: appmodel.FocusScope = appmodel.focus_scope_dialog()
+    let dialog_next: Int = appmodel.focus_scope_next(dialog)
+    let escape_rejected: Bool = appmodel.focus_scope_reject_escape(dialog)
+    if focus_status == 1 && edit_status == 1 && push_status == 1 && completed && undo && redo && !back_underflow && underflow && appmodel.binding_valid(focus_binding, appmodel.event_mouse_up(), appmodel.target_name(), appmodel.cmd_focus_name()) && appmodel.binding_valid(text_binding, appmodel.event_text_input(), appmodel.target_name(), appmodel.cmd_text_insert()) && appmodel.command_registry_count() == 9 && state.route == appmodel.route_home() && state.focused == appmodel.focus_name() && state.name_len == 3 && state.save_count == 1 && state.pending_task == 0 && state.history_depth == 1 && state.redo_depth == 0 && dialog_next == appmodel.focus_save() && escape_rejected && !dialog.escaped:
+        return 42
+    return 1

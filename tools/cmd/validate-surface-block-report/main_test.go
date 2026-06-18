@@ -29,11 +29,23 @@ func TestBlockReportCLIRejectsSymlinkedReportDir(t *testing.T) {
 func TestBlockReportCLIRejectsArtifactOutsideReportDir(t *testing.T) {
 	reportDir := t.TempDir()
 	outside := filepath.Join(t.TempDir(), "outside-artifact")
-	artifact := surface.ArtifactReport{Kind: "component-app", Path: outside, SHA256: "sha256:" + strings.Repeat("a", 64), Size: 16}
+	artifact := surface.ArtifactReport{
+		Kind:   "component-app",
+		Path:   outside,
+		SHA256: "sha256:" + strings.Repeat("a", 64),
+		Size:   16,
+	}
 	scan := surface.ArtifactScanReport{Root: filepath.Dir(outside), FilesChecked: 1, Pass: true}
-	err := validateBlockReportArtifactLocality(filepath.Join(reportDir, "surface-headless-block-system.json"), scan, []surface.ArtifactReport{artifact})
+	err := validateBlockReportArtifactLocality(
+		filepath.Join(reportDir, "surface-headless-block-system.json"),
+		scan,
+		[]surface.ArtifactReport{artifact},
+	)
 	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "outside") {
-		t.Fatalf("validateBlockReportArtifactLocality err = %v, want outside report dir rejection", err)
+		t.Fatalf(
+			"validateBlockReportArtifactLocality err = %v, want outside report dir rejection",
+			err,
+		)
 	}
 }
 
@@ -43,15 +55,28 @@ func TestBlockReportCLIRejectsStaleArtifactHash(t *testing.T) {
 	if err := os.WriteFile(artifactPath, []byte("fresh artifact"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	stale := surface.ArtifactReport{Kind: "component-app", Path: artifactPath, SHA256: "sha256:" + strings.Repeat("b", 64), Size: int64(len("fresh artifact"))}
+	stale := surface.ArtifactReport{
+		Kind:   "component-app",
+		Path:   artifactPath,
+		SHA256: "sha256:" + strings.Repeat("b", 64),
+		Size:   int64(len("fresh artifact")),
+	}
 	err := validateBlockReportArtifactFiles(reportDir, []surface.ArtifactReport{stale})
 	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "sha256") {
 		t.Fatalf("validateBlockReportArtifactFiles stale hash err = %v, want sha256 rejection", err)
 	}
 
 	sum := sha256.Sum256([]byte("fresh artifact"))
-	valid := surface.ArtifactReport{Kind: "component-app", Path: artifactPath, SHA256: fmt.Sprintf("sha256:%x", sum), Size: int64(len("fresh artifact"))}
-	if err := validateBlockReportArtifactFiles(reportDir, []surface.ArtifactReport{valid}); err != nil {
+	valid := surface.ArtifactReport{
+		Kind:   "component-app",
+		Path:   artifactPath,
+		SHA256: fmt.Sprintf("sha256:%x", sum),
+		Size:   int64(len("fresh artifact")),
+	}
+	if err := validateBlockReportArtifactFiles(
+		reportDir,
+		[]surface.ArtifactReport{valid},
+	); err != nil {
 		t.Fatalf("validateBlockReportArtifactFiles valid artifact: %v", err)
 	}
 }

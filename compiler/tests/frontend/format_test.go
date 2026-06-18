@@ -39,6 +39,64 @@ func TestFormatterPublicAPITestsLiveInFrontend(t *testing.T) {
 	}
 }
 
+func TestT4FormatRegistryDeclaresOfficialFamily(t *testing.T) {
+	formats := compiler.T4Formats()
+	byName := map[string]compiler.FormatInfo{}
+	for _, format := range formats {
+		if format.Name == "" {
+			t.Fatalf("format with empty name: %#v", format)
+		}
+		byName[format.Name] = format
+	}
+
+	tests := []struct {
+		name     string
+		ext      string
+		role     string
+		primary  bool
+		legacy   bool
+		fileName string
+	}{
+		{name: "T4 Source Format", ext: ".t4", role: "source", primary: true},
+		{name: "Legacy Tetra Source Format", ext: ".tetra", role: "source", legacy: true},
+		{name: "Todex Fragment", ext: ".tdx", role: "todex-fragment"},
+		{name: "T4 Seed", ext: ".t4s", role: "offline-seed"},
+		{name: "T4 Interface", ext: ".t4i", role: "interface"},
+		{name: "T4 Proof", ext: ".t4p", role: "proof"},
+		{name: "T4 Replay", ext: ".t4r", role: "replay"},
+		{name: "T4 Quest", ext: ".t4q", role: "quest"},
+		{name: "Tetra NeedMap", ext: ".tneed", role: "needmap"},
+		{name: "Tetra Semantic Lock", role: "semantic-lock", fileName: "Tetra.lock"},
+	}
+	for _, tt := range tests {
+		format, ok := byName[tt.name]
+		if !ok {
+			t.Fatalf("missing format %q in %#v", tt.name, formats)
+		}
+		if format.Extension != tt.ext || format.Role != tt.role || format.Primary != tt.primary ||
+			format.Legacy != tt.legacy ||
+			format.FileName != tt.fileName {
+			t.Fatalf("%s = %#v", tt.name, format)
+		}
+	}
+}
+
+func TestSourceFileHelpersPreferT4AndKeepLegacyTetra(t *testing.T) {
+	if got := compiler.SourceExtensions(); len(got) != 2 || got[0] != ".t4" || got[1] != ".tetra" {
+		t.Fatalf("SourceExtensions() = %#v, want [.t4 .tetra]", got)
+	}
+	for _, path := range []string{"main.t4", "ui/CounterView.t4", "legacy/main.tetra"} {
+		if !compiler.IsSourceFile(path) {
+			t.Fatalf("IsSourceFile(%q) = false, want true", path)
+		}
+	}
+	for _, path := range []string{"fragment.tdx", "seed.t4s", "Tetra.lock", "notes.txt"} {
+		if compiler.IsSourceFile(path) {
+			t.Fatalf("IsSourceFile(%q) = true, want false", path)
+		}
+	}
+}
+
 func TestFormatSourceFlowMVP(t *testing.T) {
 	src := []byte(`func main() -> Int
 uses mem, io:
@@ -168,6 +226,68 @@ func main() -> Int:
 `
 	if string(got) != want {
 		t.Fatalf("formatted source:\n%s\nwant:\n%s", string(got), want)
+	}
+}
+
+func TestFormatSourceWrapsLongStructLiteral(t *testing.T) {
+	src := []byte(strings.Join([]string{
+		"struct Recipe:",
+		"    name_hash: Int",
+		"    output_kind: Int",
+		"    slot_count: Int",
+		"    input_count: Int",
+		"    hidden_app_state: Bool",
+		"    platform_widgets: Bool",
+		"    core_primitive_promotion: Bool",
+		"    deterministic: Bool",
+		"",
+		"func recipe() -> Recipe:",
+		"    return Recipe(" +
+			"name_hash: 1, output_kind: 1, slot_count: 8, input_count: 6, " +
+			"hidden_app_state: false, platform_widgets: false, " +
+			"core_primitive_promotion: false, deterministic: true)",
+		"",
+	}, "\n"))
+	got, err := compiler.FormatSource(src, "long_struct_literal.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource: %v", err)
+	}
+	want := `struct Recipe:
+    name_hash: Int
+    output_kind: Int
+    slot_count: Int
+    input_count: Int
+    hidden_app_state: Bool
+    platform_widgets: Bool
+    core_primitive_promotion: Bool
+    deterministic: Bool
+
+func recipe() -> Recipe:
+    return Recipe(
+        name_hash: 1,
+        output_kind: 1,
+        slot_count: 8,
+        input_count: 6,
+        hidden_app_state: false,
+        platform_widgets: false,
+        core_primitive_promotion: false,
+        deterministic: true,
+    )
+`
+	if string(got) != want {
+		t.Fatalf("formatted source:\n%s\nwant:\n%s", string(got), want)
+	}
+	again, err := compiler.FormatSource(got, "long_struct_literal.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource again: %v", err)
+	}
+	if string(again) != want {
+		t.Fatalf("format not idempotent:\n%s", string(again))
+	}
+	for lineNo, line := range strings.Split(strings.TrimRight(string(got), "\n"), "\n") {
+		if len([]rune(line)) > 100 {
+			t.Fatalf("line %d is %d chars: %s", lineNo+1, len([]rune(line)), line)
+		}
 	}
 }
 
@@ -319,7 +439,10 @@ test "math":
 }
 
 func TestFormatSourceRejectsInlineCommentsConservatively(t *testing.T) {
-	_, err := compiler.FormatSource([]byte("func main() -> Int:\n    return 0 // trailing\n"), "main.tetra")
+	_, err := compiler.FormatSource(
+		[]byte("func main() -> Int:\n    return 0 // trailing\n"),
+		"main.tetra",
+	)
 	if err == nil {
 		t.Fatalf("expected comment-preservation diagnostic")
 	}
@@ -329,12 +452,16 @@ func TestFormatSourceRejectsInlineCommentsConservatively(t *testing.T) {
 }
 
 func TestFormatSourceInlineCommentDiagnosticHasLocation(t *testing.T) {
-	_, err := compiler.FormatSource([]byte("func main() -> Int:\n    return 0 // trailing\n"), "main.tetra")
+	_, err := compiler.FormatSource(
+		[]byte("func main() -> Int:\n    return 0 // trailing\n"),
+		"main.tetra",
+	)
 	if err == nil {
 		t.Fatalf("expected comment-preservation diagnostic")
 	}
 	diag := compiler.DiagnosticFromError(err)
-	if diag.Code != "TETRA_FMT001" || diag.File != "main.tetra" || diag.Line != 2 || diag.Column != 14 {
+	if diag.Code != "TETRA_FMT001" || diag.File != "main.tetra" || diag.Line != 2 ||
+		diag.Column != 14 {
 		t.Fatalf("diagnostic = %#v", diag)
 	}
 }
@@ -345,7 +472,9 @@ func TestFormatSourceMalformedInputDiagnosticHasStableLocation(t *testing.T) {
 		t.Fatalf("expected malformed-input diagnostic")
 	}
 	diag := compiler.DiagnosticFromError(err)
-	if diag.Code != "TETRA0001" || diag.File != "tabbed.tetra" || diag.Line != 2 || diag.Column != 1 || diag.Severity != "error" {
+	if diag.Code != "TETRA0001" || diag.File != "tabbed.tetra" || diag.Line != 2 ||
+		diag.Column != 1 ||
+		diag.Severity != "error" {
 		t.Fatalf("diagnostic = %#v", diag)
 	}
 	if !strings.Contains(diag.Message, "tabs are not supported") {
@@ -611,7 +740,10 @@ uses actors:
 	if string(twice) != string(once) {
 		t.Fatalf("format not idempotent:\nonce:\n%s\ntwice:\n%s", string(once), string(twice))
 	}
-	if !strings.Contains(string(once), "actor Worker:\n    val id: Int = 7\n    func run() -> Int\n    uses actors:") {
+	if !strings.Contains(
+		string(once),
+		"actor Worker:\n    val id: Int = 7\n    func run() -> Int\n    uses actors:",
+	) {
 		t.Fatalf("formatted actor declaration missing:\n%s", string(once))
 	}
 }
@@ -989,7 +1121,11 @@ func TestFormatSourceExamplesAreIdempotent(t *testing.T) {
 				t.Fatalf("FormatSource twice: %v", err)
 			}
 			if string(twice) != string(once) {
-				t.Fatalf("format not idempotent:\nonce:\n%s\ntwice:\n%s", string(once), string(twice))
+				t.Fatalf(
+					"format not idempotent:\nonce:\n%s\ntwice:\n%s",
+					string(once),
+					string(twice),
+				)
 			}
 		})
 		return nil
@@ -1029,7 +1165,11 @@ func TestPlan250FormatRepresentativeCorpusIsIdempotent(t *testing.T) {
 					t.Fatalf("FormatSource twice: %v", err)
 				}
 				if string(twice) != string(once) {
-					t.Fatalf("format not idempotent:\nonce:\n%s\ntwice:\n%s", string(once), string(twice))
+					t.Fatalf(
+						"format not idempotent:\nonce:\n%s\ntwice:\n%s",
+						string(once),
+						string(twice),
+					)
 				}
 			})
 			return nil
@@ -1120,12 +1260,17 @@ func main() -> Int:
 }
 
 func TestPlan250FormatMalformedSyntaxDiagnostics(t *testing.T) {
-	_, err := compiler.FormatSource([]byte("func main() -> Int:\n    return @\n"), "malformed_fmt.tetra")
+	_, err := compiler.FormatSource(
+		[]byte("func main() -> Int:\n    return @\n"),
+		"malformed_fmt.tetra",
+	)
 	if err == nil {
 		t.Fatalf("expected formatter diagnostic")
 	}
 	diag := compiler.DiagnosticFromError(err)
-	if diag.Code != "TETRA0001" || diag.File != "malformed_fmt.tetra" || diag.Line != 2 || diag.Column != 12 || diag.Severity != "error" {
+	if diag.Code != "TETRA0001" || diag.File != "malformed_fmt.tetra" || diag.Line != 2 ||
+		diag.Column != 12 ||
+		diag.Severity != "error" {
 		t.Fatalf("diagnostic = %#v", diag)
 	}
 	if diag.Message != "expected expression, got ?" {
@@ -1134,14 +1279,14 @@ func TestPlan250FormatMalformedSyntaxDiagnostics(t *testing.T) {
 }
 
 func TestFlowGrammarSurfaceExampleCoversCanonicalForms(t *testing.T) {
-	path := filepath.Join(repoRoot(t), "examples", "flow_grammar_surface_smoke.tetra")
+	path := filepath.Join(repoRoot(t), "examples", "flow", "flow_grammar_surface_smoke.tetra")
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
 	src := string(raw)
 	for _, want := range []string{
-		"module examples.flow_grammar_surface_smoke",
+		"module examples.flow.flow_grammar_surface_smoke",
 		"state CounterState:",
 		"view CounterView(state: CounterState):",
 		"func id<T>(x: T) -> T:",
@@ -1163,7 +1308,7 @@ func TestFlowGrammarSurfaceExampleCoversCanonicalForms(t *testing.T) {
 }
 
 func TestPlan250FlowSyntaxSourceOfTruthExamplesCompileAndFormat(t *testing.T) {
-	path := filepath.Join(repoRoot(t), "docs", "spec", "flow_syntax_v1.md")
+	path := filepath.Join(repoRoot(t), "docs", "spec", "flow", "flow_syntax_v1.md")
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("ReadFile(%s): %v", path, err)

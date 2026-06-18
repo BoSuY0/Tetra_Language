@@ -8,7 +8,9 @@ import (
 	"tetra_language/compiler/internal/semantics"
 )
 
-func CollectExternalCalleesByModule(checked *semantics.CheckedProgram) map[string]map[string]struct{} {
+func CollectExternalCalleesByModule(
+	checked *semantics.CheckedProgram,
+) map[string]map[string]struct{} {
 	deps := make(map[string]map[string]struct{})
 	if checked == nil {
 		return deps
@@ -31,7 +33,15 @@ func CollectExternalCalleesByModule(checked *semantics.CheckedProgram) map[strin
 	return deps
 }
 
-func collectCalleesFromStmt(stmt frontend.Stmt, mod string, out map[string]struct{}, types map[string]*semantics.TypeInfo, locals map[string]semantics.LocalInfo, globals map[string]semantics.GlobalInfo, imports map[string]string) {
+func collectCalleesFromStmt(
+	stmt frontend.Stmt,
+	mod string,
+	out map[string]struct{},
+	types map[string]*semantics.TypeInfo,
+	locals map[string]semantics.LocalInfo,
+	globals map[string]semantics.GlobalInfo,
+	imports map[string]string,
+) {
 	switch s := stmt.(type) {
 	case *frontend.PrintStmt:
 		collectCalleesFromExpr(s.Value, mod, out, types, locals, globals, imports)
@@ -90,7 +100,15 @@ func collectCalleesFromStmt(stmt frontend.Stmt, mod string, out map[string]struc
 	}
 }
 
-func collectCalleesFromExpr(expr frontend.Expr, mod string, out map[string]struct{}, types map[string]*semantics.TypeInfo, locals map[string]semantics.LocalInfo, globals map[string]semantics.GlobalInfo, imports map[string]string) {
+func collectCalleesFromExpr(
+	expr frontend.Expr,
+	mod string,
+	out map[string]struct{},
+	types map[string]*semantics.TypeInfo,
+	locals map[string]semantics.LocalInfo,
+	globals map[string]semantics.GlobalInfo,
+	imports map[string]string,
+) {
 	switch e := expr.(type) {
 	case *frontend.MatchExpr:
 		collectCalleesFromExpr(e.Value, mod, out, types, locals, globals, imports)
@@ -180,7 +198,12 @@ func collectCalleesFromExpr(expr frontend.Expr, mod string, out map[string]struc
 	}
 }
 
-func isEnumCaseConstructorName(name string, mod string, types map[string]*semantics.TypeInfo, imports map[string]string) bool {
+func isEnumCaseConstructorName(
+	name string,
+	mod string,
+	types map[string]*semantics.TypeInfo,
+	imports map[string]string,
+) bool {
 	parts := strings.Split(name, ".")
 	if len(parts) < 2 {
 		return false
@@ -188,7 +211,8 @@ func isEnumCaseConstructorName(name string, mod string, types map[string]*semant
 	caseName := parts[len(parts)-1]
 	typeParts := parts[:len(parts)-1]
 	candidates := []string{strings.Join(typeParts, ".")}
-	if resolved, ok := resolveImportedTypePath(typeParts, imports); ok && resolved != candidates[0] {
+	if resolved, ok := resolveImportedTypePath(typeParts, imports); ok &&
+		resolved != candidates[0] {
 		candidates = append(candidates, resolved)
 	}
 	if mod != "" && len(typeParts) == 1 {
@@ -206,7 +230,10 @@ func isEnumCaseConstructorName(name string, mod string, types map[string]*semant
 	return false
 }
 
-func importedFunctionTargetName(expr *frontend.FieldAccessExpr, imports map[string]string) (string, bool) {
+func importedFunctionTargetName(
+	expr *frontend.FieldAccessExpr,
+	imports map[string]string,
+) (string, bool) {
 	if expr == nil {
 		return "", false
 	}
@@ -221,7 +248,11 @@ func importedFunctionTargetName(expr *frontend.FieldAccessExpr, imports map[stri
 	return module + "." + expr.Field, true
 }
 
-func isEnumCaseOrImportedTypeFieldAccess(expr *frontend.FieldAccessExpr, types map[string]*semantics.TypeInfo, imports map[string]string) bool {
+func isEnumCaseOrImportedTypeFieldAccess(
+	expr *frontend.FieldAccessExpr,
+	types map[string]*semantics.TypeInfo,
+	imports map[string]string,
+) bool {
 	parts := fieldAccessParts(expr)
 	if len(parts) < 2 {
 		return false
@@ -276,7 +307,9 @@ func resolveImportedTypePath(parts []string, imports map[string]string) (string,
 	return strings.Join(parts, "."), true
 }
 
-func CollectExternalTypesByModule(checked *semantics.CheckedProgram) map[string]map[string]struct{} {
+func CollectExternalTypesByModule(
+	checked *semantics.CheckedProgram,
+) map[string]map[string]struct{} {
 	deps := make(map[string]map[string]struct{})
 	if checked == nil {
 		return deps
@@ -395,7 +428,10 @@ func isFunctionFieldCallName(name string, locals map[string]semantics.LocalInfo)
 	return ok
 }
 
-func functionTypedGlobalFieldTargetFromExpr(expr *frontend.FieldAccessExpr, globals map[string]semantics.GlobalInfo) (string, bool) {
+func functionTypedGlobalFieldTargetFromExpr(
+	expr *frontend.FieldAccessExpr,
+	globals map[string]semantics.GlobalInfo,
+) (string, bool) {
 	if expr == nil {
 		return "", false
 	}

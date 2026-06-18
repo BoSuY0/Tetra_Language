@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	ctarget "tetra_language/compiler/target"
+	"tetra_language/tools/internal/reportdecode"
 )
 
 const (
@@ -31,7 +32,14 @@ type materializationReport struct {
 
 func main() {
 	var materializationPath string
-	flag.StringVar(&materializationPath, "materialization", "", "path to tetra.eco.materialization.v1 JSON report")
+	var reportFormat string
+	flag.StringVar(
+		&materializationPath,
+		"materialization",
+		"",
+		"path to tetra.eco.materialization.v1 JSON report",
+	)
+	flag.StringVar(&reportFormat, "format", "auto", "report format: auto, json, or toon")
 	flag.Parse()
 
 	if materializationPath == "" {
@@ -43,15 +51,19 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err := validateEcoMaterialization(raw); err != nil {
+	if err := validateEcoMaterializationFormat(raw, reportFormat); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
 func validateEcoMaterialization(raw []byte) error {
+	return validateEcoMaterializationFormat(raw, "auto")
+}
+
+func validateEcoMaterializationFormat(raw []byte, format string) error {
 	var report materializationReport
-	if err := decodeStrictJSON(raw, &report); err != nil {
+	if err := reportdecode.DecodeStrictFormat(raw, format, &report); err != nil {
 		return err
 	}
 	if report.Schema == "" {

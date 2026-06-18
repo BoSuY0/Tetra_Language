@@ -10,9 +10,26 @@ import (
 
 func BenchmarkCompileRepresentativeExamples(b *testing.B) {
 	examples := map[string]string{
-		"flow_hello":  filepath.Join("..", "..", "..", "examples", "flow_hello.tetra"),
-		"core_math":   filepath.Join("..", "..", "..", "examples", "core_math_smoke.tetra"),
-		"dogfood_cli": filepath.Join("..", "..", "..", "examples", "projects", "dogfood_cli", "src", "main.tetra"),
+		"flow_hello": filepath.Join("..", "..", "..", "examples", "flow", "flow_hello.tetra"),
+		"core_math": filepath.Join(
+			"..",
+			"..",
+			"..",
+			"examples",
+			"core",
+			"data",
+			"core_math_smoke.tetra",
+		),
+		"dogfood_cli": filepath.Join(
+			"..",
+			"..",
+			"..",
+			"examples",
+			"projects",
+			"dogfood_cli",
+			"src",
+			"main.tetra",
+		),
 	}
 	for name, src := range examples {
 		b.Run(name, func(b *testing.B) {
@@ -30,8 +47,17 @@ func BenchmarkCompileRepresentativeExamples(b *testing.B) {
 
 func BenchmarkFormatRepresentativeSources(b *testing.B) {
 	sources := map[string]string{
-		"flow_hello": filepath.Join("..", "..", "..", "examples", "flow_hello.tetra"),
-		"web_ui":     filepath.Join("..", "..", "..", "examples", "projects", "dogfood_web_ui", "src", "main.tetra"),
+		"flow_hello": filepath.Join("..", "..", "..", "examples", "flow", "flow_hello.tetra"),
+		"web_ui": filepath.Join(
+			"..",
+			"..",
+			"..",
+			"examples",
+			"projects",
+			"dogfood_web_ui",
+			"src",
+			"main.tetra",
+		),
 	}
 	for name, path := range sources {
 		raw, err := os.ReadFile(path)
@@ -66,11 +92,49 @@ func BenchmarkBinarySizeBaselines(b *testing.B) {
 		target string
 		src    string
 	}{
-		{name: "linux_flow_hello", target: "linux-x64", src: filepath.Join("..", "..", "..", "examples", "flow_hello.tetra")},
-		{name: "macos_flow_hello", target: "macos-x64", src: filepath.Join("..", "..", "..", "examples", "flow_hello.tetra")},
-		{name: "windows_flow_hello", target: "windows-x64", src: filepath.Join("..", "..", "..", "examples", "flow_hello.tetra")},
-		{name: "wasi_dogfood", target: "wasm32-wasi", src: filepath.Join("..", "..", "..", "examples", "projects", "dogfood_wasi", "src", "main.tetra")},
-		{name: "web_dogfood", target: "wasm32-web", src: filepath.Join("..", "..", "..", "examples", "projects", "dogfood_web_ui", "src", "main.tetra")},
+		{
+			name:   "linux_flow_hello",
+			target: "linux-x64",
+			src:    filepath.Join("..", "..", "..", "examples", "flow", "flow_hello.tetra"),
+		},
+		{
+			name:   "macos_flow_hello",
+			target: "macos-x64",
+			src:    filepath.Join("..", "..", "..", "examples", "flow", "flow_hello.tetra"),
+		},
+		{
+			name:   "windows_flow_hello",
+			target: "windows-x64",
+			src:    filepath.Join("..", "..", "..", "examples", "flow", "flow_hello.tetra"),
+		},
+		{
+			name:   "wasi_dogfood",
+			target: "wasm32-wasi",
+			src: filepath.Join(
+				"..",
+				"..",
+				"..",
+				"examples",
+				"projects",
+				"dogfood_wasi",
+				"src",
+				"main.tetra",
+			),
+		},
+		{
+			name:   "web_dogfood",
+			target: "wasm32-web",
+			src: filepath.Join(
+				"..",
+				"..",
+				"..",
+				"examples",
+				"projects",
+				"dogfood_web_ui",
+				"src",
+				"main.tetra",
+			),
+		},
 	}
 	for _, tc := range cases {
 		b.Run(tc.name, func(b *testing.B) {

@@ -9,8 +9,16 @@ import (
 )
 
 func main() {
-	reportPath := flag.String("report", "", "path to tetra.actors.distributed-runtime.v1 JSON report")
-	currentGitHead := flag.String("current-git-head", "", "optional current git HEAD required to match report git_head")
+	reportPath := flag.String(
+		"report",
+		"",
+		"path to tetra.actors.distributed-runtime.v1 JSON report",
+	)
+	currentGitHead := flag.String(
+		"current-git-head",
+		"",
+		"optional current git HEAD required to match report git_head",
+	)
 	flag.Parse()
 	if *reportPath == "" {
 		fmt.Fprintln(os.Stderr, "error: --report is required")

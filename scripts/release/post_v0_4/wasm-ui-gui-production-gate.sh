@@ -7,7 +7,7 @@ report_dir="$repo_root/reports/wasm-ui-gui"
 artifact_id="tetra.release.post_v0_4.wasm_ui_gui.production-gate.v1"
 
 usage() {
-  cat <<'USAGE'
+  cat << 'USAGE'
 Usage: bash scripts/release/post_v0_4/wasm-ui-gui-production-gate.sh [--report-dir DIR]
 
 Runs the ordered post-v0.4 production evidence gate for:
@@ -29,7 +29,7 @@ while [[ $# -gt 0 ]]; do
       report_dir="$2"
       shift 2
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;
@@ -86,7 +86,7 @@ go run ./tools/cmd/validate-ui-production-runtime --report "$report_dir/ui-produ
 
 summary_path="$report_dir/wasm-ui-gui-production-gate.json"
 generated_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-cat >"$summary_path" <<JSON
+cat > "$summary_path" << JSON
 {
   "schema": "tetra.release.post_v0_4.wasm_ui_gui.production-gate.summary.v1",
   "artifact": "$artifact_id",

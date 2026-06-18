@@ -55,7 +55,10 @@ func TestDiagnosticFromCapsuleParserError(t *testing.T) {
 	if !strings.Contains(diag.Message, "capsule requires at least one metadata entry") {
 		t.Fatalf("message = %q", diag.Message)
 	}
-	if !strings.Contains(err.Error(), "ui/view.tetra:1:1: capsule requires at least one metadata entry") {
+	if !strings.Contains(
+		err.Error(),
+		"ui/view.tetra:1:1: capsule requires at least one metadata entry",
+	) {
 		t.Fatalf("text diagnostic changed unexpectedly: %q", err.Error())
 	}
 }
@@ -149,7 +152,12 @@ func main() -> Int:
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
 	}
-	for _, want := range []string{`"code":"TETRA2001"`, `"line":3`, `"column":5`, `"severity":"error"`} {
+	for _, want := range []string{
+		`"code":"TETRA2001"`,
+		`"line":3`,
+		`"column":5`,
+		`"severity":"error"`,
+	} {
 		if !strings.Contains(string(raw), want) {
 			t.Fatalf("json = %s, missing %s", raw, want)
 		}
@@ -231,7 +239,12 @@ func TestDiagnosticFromFlowTabIndentationError(t *testing.T) {
 		t.Fatalf("diagnostic identity = %#v", diag)
 	}
 	if diag.File != "app/tabbed.tetra" || diag.Line != 2 || diag.Column != 1 {
-		t.Fatalf("position = %q:%d:%d, want app/tabbed.tetra:2:1", diag.File, diag.Line, diag.Column)
+		t.Fatalf(
+			"position = %q:%d:%d, want app/tabbed.tetra:2:1",
+			diag.File,
+			diag.Line,
+			diag.Column,
+		)
 	}
 	if diag.Message != "tabs are not supported in Flow indentation" {
 		t.Fatalf("message = %q", diag.Message)
@@ -242,7 +255,10 @@ func TestDiagnosticFromFlowTabIndentationError(t *testing.T) {
 }
 
 func TestDiagnosticFromMalformedFlowTestDeclaration(t *testing.T) {
-	_, err := compiler.ParseFile([]byte("test math:\n    expect 1 == 1\n"), "qa/bad_test_decl.tetra")
+	_, err := compiler.ParseFile(
+		[]byte("test math:\n    expect 1 == 1\n"),
+		"qa/bad_test_decl.tetra",
+	)
 	if err == nil {
 		t.Fatalf("expected parse error")
 	}
@@ -251,7 +267,12 @@ func TestDiagnosticFromMalformedFlowTestDeclaration(t *testing.T) {
 		t.Fatalf("diagnostic identity = %#v", diag)
 	}
 	if diag.File != "qa/bad_test_decl.tetra" || diag.Line != 1 || diag.Column != 6 {
-		t.Fatalf("position = %q:%d:%d, want qa/bad_test_decl.tetra:1:6", diag.File, diag.Line, diag.Column)
+		t.Fatalf(
+			"position = %q:%d:%d, want qa/bad_test_decl.tetra:1:6",
+			diag.File,
+			diag.Line,
+			diag.Column,
+		)
 	}
 	if diag.Message != "expected string, got identifier" {
 		t.Fatalf("message = %q", diag.Message)
@@ -269,7 +290,12 @@ func TestDiagnosticFromFlowTestSpanCRLFUnicode(t *testing.T) {
 	}
 	diag := compiler.DiagnosticFromError(err)
 	if diag.File != "qa/span_unicode.tetra" || diag.Line != 2 || diag.Column != 8 {
-		t.Fatalf("position = %q:%d:%d, want qa/span_unicode.tetra:2:8", diag.File, diag.Line, diag.Column)
+		t.Fatalf(
+			"position = %q:%d:%d, want qa/span_unicode.tetra:2:8",
+			diag.File,
+			diag.Line,
+			diag.Column,
+		)
 	}
 	if diag.Message != "expected expression, got ?" {
 		t.Fatalf("message = %q", diag.Message)
@@ -389,7 +415,10 @@ func main() -> Int:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := compiler.ParseFile([]byte(tt.src), "fixtures/"+strings.ReplaceAll(tt.name, " ", "_")+".tetra")
+			_, err := compiler.ParseFile(
+				[]byte(tt.src),
+				"fixtures/"+strings.ReplaceAll(tt.name, " ", "_")+".tetra",
+			)
 			if err == nil {
 				t.Fatalf("expected parser diagnostic")
 			}
@@ -398,7 +427,14 @@ func main() -> Int:
 				t.Fatalf("diagnostic identity = %#v", diag)
 			}
 			if diag.Line != tt.line || diag.Column != tt.column {
-				t.Fatalf("position = %d:%d, want %d:%d; err=%v", diag.Line, diag.Column, tt.line, tt.column, err)
+				t.Fatalf(
+					"position = %d:%d, want %d:%d; err=%v",
+					diag.Line,
+					diag.Column,
+					tt.line,
+					tt.column,
+					err,
+				)
 			}
 			if diag.Message != tt.message {
 				t.Fatalf("message = %q, want %q", diag.Message, tt.message)

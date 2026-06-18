@@ -31,7 +31,9 @@ func AlignRegionBytes(bytes int64) (int64, bool) {
 	if bytes < 0 || bytes >= int64(MaxRegionMapBytes) {
 		return 0, false
 	}
-	aligned := (bytes + int64(RegionAllocatorAlignmentBytes-1)) & ^int64(RegionAllocatorAlignmentBytes-1)
+	aligned := (bytes + int64(RegionAllocatorAlignmentBytes-1)) & ^int64(
+		RegionAllocatorAlignmentBytes-1,
+	)
 	if aligned >= int64(MaxRegionMapBytes) {
 		return 0, false
 	}

@@ -1,0 +1,125 @@
+// Pure Tetra Surface live-window counter app.
+module examples.surface.runtime.surface_window_counter
+
+import lib.core.surface as surface
+import lib.core.draw as draw
+import lib.core.component as component
+
+struct CounterButton:
+    rect: surface.Rect
+    text_len_seen: Int
+
+struct CounterApp:
+    count: Int
+    key_count: Int
+    width: Int
+    closed: Bool
+    button: CounterButton
+
+extension CounterButton:
+    func measure(self: borrow CounterButton, max: surface.Size) -> surface.Size:
+        let desired: surface.Size = surface.Size(w: 160, h: 48)
+        return component.clamp_size(desired, max)
+    func layout(self: inout CounterButton, rect: surface.Rect) -> Int:
+        self.rect = rect
+        return 0
+    func draw(self: borrow CounterButton, ctx: inout draw.DrawContext) -> Int
+    uses mem:
+        let fg: surface.Color = surface.Color(r: 238, g: 241, b: 245, a: 255)
+        let accent: surface.Color = surface.Color(r: 32, g: 132, b: 214, a: 255)
+        let _: Int = draw.rect(ctx, self.rect, accent)
+        return draw.rect_outline(ctx, self.rect, fg)
+    func event(self: inout CounterButton, event: surface.Event) -> Int:
+        if event.kind == surface.event_mouse_up() && rect_contains(self.rect, event.x, event.y):
+            return 1
+        return 0
+    func text_input(self: inout CounterButton, event: surface.Event) -> Int:
+        if event.kind == surface.event_text_input() && event.text_len > 0:
+            self.text_len_seen = event.text_len
+            return 1
+        return 0
+    func focus(self: inout CounterButton, focused: Bool) -> Int:
+        return 1
+    func accessibility_role(self: borrow CounterButton) -> Int:
+        return component.accessibility_role_button()
+
+extension CounterApp:
+    func measure(self: borrow CounterApp, max: surface.Size) -> surface.Size:
+        let desired: surface.Size = surface.Size(w: max.w, h: max.h)
+        return component.clamp_size(desired, max)
+    func layout(self: inout CounterApp, rect: surface.Rect) -> Int:
+        let button_size: surface.Size = CounterButton.measure(self.button, surface.Size(w: rect.w, h: rect.h))
+        let button_rect: surface.Rect = surface.Rect(x: rect.x + 32, y: rect.y + 88, w: button_size.w, h: button_size.h)
+        return CounterButton.layout(self.button, button_rect)
+    func focus(self: inout CounterApp, focused: Bool) -> Int:
+        return CounterButton.focus(self.button, focused)
+    func accessibility_role(self: borrow CounterApp) -> Int:
+        return CounterButton.accessibility_role(self.button)
+    func draw(self: borrow CounterApp, ctx: inout draw.DrawContext) -> Int
+    uses mem:
+        let bg: surface.Color = surface.Color(r: 18, g: 22, b: 27, a: 255)
+        let fg: surface.Color = surface.Color(r: 238, g: 241, b: 245, a: 255)
+        let key_fg: surface.Color = surface.Color(r: 34, g: 160, b: 104, a: 255)
+        let _: Int = draw.clear(ctx, bg)
+        let __: Int = draw.text(ctx, "Count", 32, 28, fg)
+        if self.count > 0:
+            let active: surface.Rect = surface.Rect(x: 88, y: 28, w: 24 + self.count * 8, h: 7)
+            let ___: Int = draw.rect(ctx, active, fg)
+        let ____: Int = draw.text(ctx, "Key", 32, 52, fg)
+        if self.key_count > 0:
+            let key_active: surface.Rect = surface.Rect(x: 88, y: 52, w: 24, h: 7)
+            let _____: Int = draw.rect(ctx, key_active, key_fg)
+        let border: surface.Rect = surface.Rect(x: 0, y: 0, w: ctx.frame.width, h: ctx.frame.height)
+        let ______: Int = draw.rect_outline(ctx, border, fg)
+        return CounterButton.draw(self.button, ctx)
+    func event(self: inout CounterApp, event: surface.Event) -> Int:
+        if event.kind == surface.event_close():
+            self.closed = true
+            return 1
+        if event.kind == surface.event_resize():
+            self.width = event.width
+            let _: Int = CounterApp.layout(self, surface.Rect(x: 0, y: 0, w: event.width, h: event.height))
+            return 1
+        if event.kind == surface.event_key_down():
+            self.key_count = self.key_count + 1
+            self.count = self.count + 1
+            return 1
+        let inside_button: Bool = rect_contains(self.button.rect, event.x, event.y)
+        let handled: Int = CounterButton.event(self.button, event)
+        if event.kind == surface.event_mouse_up() && inside_button:
+            self.count = self.count + 1
+            return 1
+        return handled
+    func text_input(self: inout CounterApp, event: surface.Event) -> Int:
+        return CounterButton.text_input(self.button, event)
+
+func rect_contains(rect: surface.Rect, x: Int, y: Int) -> Bool:
+    return x >= rect.x && y >= rect.y && x < rect.x + rect.w && y < rect.y + rect.h
+
+func main() -> Int
+uses alloc, mem, surface:
+    var app: CounterApp = CounterApp(count: 0, key_count: 0, width: 320, closed: false, button: CounterButton(rect: surface.Rect(x: 0, y: 0, w: 0, h: 0), text_len_seen: 0))
+    var win: surface.Surface = surface.open("Surface Window Counter", 320, 200)
+    let measured: surface.Size = CounterApp.measure(app, surface.Size(w: 320, h: 200))
+    let layout_status: Int = CounterApp.layout(app, surface.Rect(x: 0, y: 0, w: measured.w, h: measured.h))
+    let focus_status: Int = CounterApp.focus(app, true)
+    let accessibility_status: Int = CounterApp.accessibility_role(app)
+    var status: Int = layout_status + focus_status - focus_status + accessibility_status - accessibility_status
+    while app.closed == false:
+        let event: surface.Event = surface.poll_event(win)
+        if event.kind != surface.event_none():
+            status = status + CounterApp.event(app, event)
+            if event.kind == surface.event_resize():
+                win.width = event.width
+                win.height = event.height
+        var frame: surface.Frame = surface.begin_frame(win)
+        var ctx: draw.DrawContext = draw.DrawContext(frame: frame)
+        let _: Int = CounterApp.draw(app, ctx)
+        status = status + surface.present(ctx.frame)
+        let __: Int = surface.request_redraw(win)
+    let closed: Int = surface.close(win)
+    if app.closed == false:
+        return 37
+    if closed > 0:
+        return 40
+    return 1 + status - status + app.count - app.count + app.key_count - app.key_count + app.width - app.width

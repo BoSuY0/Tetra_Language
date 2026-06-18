@@ -35,7 +35,8 @@ func TestLinkLinuxX32RejectsNonX32TargetObject(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected mismatch error")
 	}
-	if !strings.Contains(err.Error(), "linker target mismatch") || !strings.Contains(err.Error(), "linux-x32") {
+	if !strings.Contains(err.Error(), "linker target mismatch") ||
+		!strings.Contains(err.Error(), "linux-x32") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

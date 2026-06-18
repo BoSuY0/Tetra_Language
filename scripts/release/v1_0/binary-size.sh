@@ -6,12 +6,12 @@ repo_root="$(cd "$script_dir/../../.." && pwd)"
 cd "$repo_root"
 
 report_path=""
-source_path="examples/flow_struct_smoke.tetra"
+source_path="examples/flow/flow_struct_smoke.tetra"
 targets=("linux-x64" "macos-x64" "windows-x64" "wasm32-wasi" "wasm32-web")
 
 usage() {
-  cat <<'USAGE'
-Usage: bash scripts/release/v1_0/binary-size.sh --report PATH [--source examples/flow_struct_smoke.tetra]
+  cat << 'USAGE'
+Usage: bash scripts/release/v1_0/binary-size.sh --report PATH [--source examples/flow/flow_struct_smoke.tetra]
 
 Builds the v1 release target matrix and records soft/hard binary-size threshold evidence.
 USAGE
@@ -57,7 +57,7 @@ while [[ $# -gt 0 ]]; do
       source_path="$2"
       shift 2
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;
@@ -94,15 +94,15 @@ json_escape() {
 
 sha256_file() {
   local file="$1"
-  if command -v sha256sum >/dev/null 2>&1; then
+  if command -v sha256sum > /dev/null 2>&1; then
     sha256sum "$file" | awk '{print $1}'
     return 0
   fi
-  if command -v shasum >/dev/null 2>&1; then
+  if command -v shasum > /dev/null 2>&1; then
     shasum -a 256 "$file" | awk '{print $1}'
     return 0
   fi
-  if command -v openssl >/dev/null 2>&1; then
+  if command -v openssl > /dev/null 2>&1; then
     openssl dgst -sha256 "$file" | awk '{print $NF}'
     return 0
   fi
@@ -115,7 +115,7 @@ target_ext() {
     windows-x64)
       printf '.exe'
       ;;
-    wasm32-wasi|wasm32-web)
+    wasm32-wasi | wasm32-web)
       printf '.wasm'
       ;;
     *)
@@ -126,7 +126,7 @@ target_ext() {
 
 soft_limit() {
   case "$1" in
-    wasm32-wasi|wasm32-web)
+    wasm32-wasi | wasm32-web)
       printf '524288'
       ;;
     *)
@@ -137,7 +137,7 @@ soft_limit() {
 
 hard_limit() {
   case "$1" in
-    wasm32-wasi|wasm32-web)
+    wasm32-wasi | wasm32-web)
       printf '1048576'
       ;;
     *)
@@ -147,7 +147,7 @@ hard_limit() {
 }
 
 artifacts_json="$tmp_dir/artifacts.jsonl"
-: >"$artifacts_json"
+: > "$artifacts_json"
 status="pass"
 pass_count=0
 warn_count=0
@@ -161,15 +161,15 @@ for target in "${targets[@]}"; do
   ext="$(target_ext "$target")"
   out="$tmp_dir/$target$ext"
   ./tetra build --target "$target" -o "$out" "$source_path"
-  size="$(wc -c <"$out" | tr -d '[:space:]')"
+  size="$(wc -c < "$out" | tr -d '[:space:]')"
   soft="$(soft_limit "$target")"
   hard="$(hard_limit "$target")"
   result="pass"
-  if (( size > hard )); then
+  if ((size > hard)); then
     result="fail"
     status="fail"
     fail_count=$((fail_count + 1))
-  elif (( size > soft )); then
+  elif ((size > soft)); then
     result="warn"
     if [[ "$status" == "pass" ]]; then
       status="warn"
@@ -179,7 +179,7 @@ for target in "${targets[@]}"; do
     pass_count=$((pass_count + 1))
   fi
   total_size_bytes=$((total_size_bytes + size))
-  if (( size > max_size_bytes )); then
+  if ((size > max_size_bytes)); then
     max_size_bytes="$size"
   fi
   printf '{"target":"%s","artifact_name":"%s","size_bytes":%s,"soft_limit_bytes":%s,"hard_limit_bytes":%s,"status":"%s"}\n' \
@@ -188,7 +188,7 @@ for target in "${targets[@]}"; do
     "$size" \
     "$soft" \
     "$hard" \
-    "$result" >>"$artifacts_json"
+    "$result" >> "$artifacts_json"
 done
 
 {
@@ -219,7 +219,7 @@ done
   echo '  ],'
   printf '  "status": "%s"\n' "$status"
   echo "}"
-} >"$report_path"
+} > "$report_path"
 
 if [[ "$status" == "fail" ]]; then
   echo "release/v1_0/binary-size: one or more artifacts exceeded hard size thresholds" >&2

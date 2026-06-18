@@ -20,7 +20,10 @@ func TestRenderFortunesSortsByMessageAndEscapesMessages(t *testing.T) {
 		{ID: 5, Message: "Alpha & Beta"},
 	}))
 
-	if !strings.HasPrefix(body, "<!DOCTYPE html><html><head><title>Fortunes</title></head><body><table>") {
+	if !strings.HasPrefix(
+		body,
+		"<!DOCTYPE html><html><head><title>Fortunes</title></head><body><table>",
+	) {
 		t.Fatalf("RenderFortunes missing compact HTML prefix:\n%s", body)
 	}
 	if strings.Contains(body, `<script>alert("x");</script>`) {

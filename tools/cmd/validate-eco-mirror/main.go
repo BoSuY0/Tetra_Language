@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	ctarget "tetra_language/compiler/target"
+	"tetra_language/tools/internal/reportdecode"
 )
 
 const (
@@ -41,7 +42,9 @@ type mirrorReport struct {
 
 func main() {
 	var mirrorPath string
+	var reportFormat string
 	flag.StringVar(&mirrorPath, "mirror", "", "path to tetra.eco.mirror.v1 JSON report")
+	flag.StringVar(&reportFormat, "format", "auto", "report format: auto, json, or toon")
 	flag.Parse()
 
 	if mirrorPath == "" {
@@ -53,15 +56,19 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err := validateEcoMirror(raw); err != nil {
+	if err := validateEcoMirrorFormat(raw, reportFormat); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
 func validateEcoMirror(raw []byte) error {
+	return validateEcoMirrorFormat(raw, "auto")
+}
+
+func validateEcoMirrorFormat(raw []byte, format string) error {
 	var report mirrorReport
-	if err := decodeStrictJSON(raw, &report); err != nil {
+	if err := reportdecode.DecodeStrictFormat(raw, format, &report); err != nil {
 		return err
 	}
 	if report.Schema == "" {
@@ -107,15 +114,28 @@ func validateEcoMirror(raw []byte) error {
 		return fmt.Errorf("invalid metadata_sha256: %w", err)
 	}
 
-	expectedBase := filepath.ToSlash(filepath.Join("packages", capsuleIDDirectory(report.ID), report.Version, report.Target))
+	expectedBase := filepath.ToSlash(
+		filepath.Join("packages", capsuleIDDirectory(report.ID), report.Version, report.Target),
+	)
 	if report.PackagePath != filepath.ToSlash(filepath.Join(expectedBase, "package.todex")) {
-		return fmt.Errorf("package_path mismatch: metadata has %s, expected %s", report.PackagePath, filepath.ToSlash(filepath.Join(expectedBase, "package.todex")))
+		return fmt.Errorf(
+			"package_path mismatch: metadata has %s, expected %s",
+			report.PackagePath,
+			filepath.ToSlash(filepath.Join(expectedBase, "package.todex")),
+		)
 	}
 	if report.MetadataPath != filepath.ToSlash(filepath.Join(expectedBase, "metadata.json")) {
-		return fmt.Errorf("metadata_path mismatch: metadata has %s, expected %s", report.MetadataPath, filepath.ToSlash(filepath.Join(expectedBase, "metadata.json")))
+		return fmt.Errorf(
+			"metadata_path mismatch: metadata has %s, expected %s",
+			report.MetadataPath,
+			filepath.ToSlash(filepath.Join(expectedBase, "metadata.json")),
+		)
 	}
 	if report.TrustSnapshotPath != "" || report.TrustSnapshotSHA256 != "" {
-		if err := validateMirrorRelativePath(report.TrustSnapshotPath, "trust_snapshot_path"); err != nil {
+		if err := validateMirrorRelativePath(
+			report.TrustSnapshotPath,
+			"trust_snapshot_path",
+		); err != nil {
 			return err
 		}
 		if _, err := parseSHA256Hash(report.TrustSnapshotSHA256); err != nil {
@@ -123,7 +143,11 @@ func validateEcoMirror(raw []byte) error {
 		}
 		expectedTrustPath := filepath.ToSlash(filepath.Join(expectedBase, "trust.snapshot.json"))
 		if report.TrustSnapshotPath != expectedTrustPath {
-			return fmt.Errorf("trust_snapshot_path mismatch: metadata has %s, expected %s", report.TrustSnapshotPath, expectedTrustPath)
+			return fmt.Errorf(
+				"trust_snapshot_path mismatch: metadata has %s, expected %s",
+				report.TrustSnapshotPath,
+				expectedTrustPath,
+			)
 		}
 	}
 	return nil

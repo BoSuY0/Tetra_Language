@@ -184,7 +184,8 @@ func parseHeaderLine(line string) (Header, error) {
 }
 
 func applyHeaderMetadata(req *Request, limits Limits) error {
-	if value := req.Header("Transfer-Encoding"); value != "" && !strings.EqualFold(value, "identity") {
+	if value := req.Header("Transfer-Encoding"); value != "" &&
+		!strings.EqualFold(value, "identity") {
 		return ErrUnsupportedTransferEncoding
 	}
 	req.ContentLength = 0
@@ -327,7 +328,10 @@ func (r *Router) Use(middleware Middleware) {
 }
 
 func (r *Router) Handle(method string, path string, handler Handler) {
-	r.routes = append(r.routes, route{method: method, path: path, handler: r.wrap(handler), params: routeParams(path)})
+	r.routes = append(
+		r.routes,
+		route{method: method, path: path, handler: r.wrap(handler), params: routeParams(path)},
+	)
 }
 
 func (r *Router) Route(req Request) (Response, bool) {

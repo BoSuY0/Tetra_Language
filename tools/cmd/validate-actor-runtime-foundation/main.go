@@ -10,7 +10,11 @@ import (
 
 func main() {
 	reportDir := flag.String("report-dir", "", "path to actor runtime foundation report directory")
-	currentGitHead := flag.String("current-git-head", "", "optional git head expected in the actor foundation manifest")
+	currentGitHead := flag.String(
+		"current-git-head",
+		"",
+		"optional git head expected in the actor foundation manifest",
+	)
 	flag.Parse()
 	if *reportDir == "" {
 		fmt.Fprintln(os.Stderr, "error: --report-dir is required")

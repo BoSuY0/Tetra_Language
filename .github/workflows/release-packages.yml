@@ -10,6 +10,13 @@ on:
         description: "Release version, e.g. v0.4.0"
         required: true
         default: "v0.4.0"
+      dry_run:
+        description: >-
+          Build packages and release evidence without creating a GitHub
+          Release, pushing GHCR, or updating Homebrew
+        required: true
+        type: boolean
+        default: true
       update_homebrew_tap:
         description: "Commit Formula/tetra.rb to the Homebrew tap repository"
         required: true
@@ -36,6 +43,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       HOMEBREW_TAP_REPOSITORY: ${{ inputs.homebrew_tap_repository || 'BoSuY0/homebrew-tetra' }}
       UPDATE_HOMEBREW_TAP: ${{ inputs.update_homebrew_tap && 'true' || 'false' }}
+      RELEASE_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }} # line-length: ignore
     steps:
       - uses: actions/checkout@v4
         with:
@@ -70,7 +78,10 @@ jobs:
 
       - name: Build release archives
         shell: bash
-        run: bash scripts/release/packages/build-release-archives.sh --version "${{ steps.meta.outputs.version }}" --out "${{ steps.meta.outputs.out_dir }}"
+        run: |
+          bash scripts/release/packages/build-release-archives.sh \
+            --version "${{ steps.meta.outputs.version }}" \
+            --out "${{ steps.meta.outputs.out_dir }}"
 
       - name: Render Homebrew formula
         shell: bash
@@ -79,7 +90,11 @@ jobs:
           version="${{ steps.meta.outputs.version }}"
           out_dir="${{ steps.meta.outputs.out_dir }}"
           source_archive="tetra-${version}-source.tar.gz"
-          source_sha="$(awk -v file="$source_archive" '$2 == file { print $1 }' "$out_dir/checksums.txt")"
+          source_sha="$(
+            awk -v file="$source_archive" \
+              '$2 == file { print $1 }' \
+              "$out_dir/checksums.txt"
+          )"
           if [[ -z "$source_sha" ]]; then
             echo "missing source archive checksum for $source_archive" >&2
             exit 1
@@ -101,27 +116,44 @@ jobs:
           tar -xzf "$archive" -C "${{ steps.meta.outputs.out_dir }}/smoke"
           "${{ steps.meta.outputs.out_dir }}/smoke/tetra-${version}-linux-x64/bin/tetra" version
 
+      - name: Dry-run package proof
+        if: env.RELEASE_DRY_RUN == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "release-packages dry run: package build, smoke, release gates,"
+          echo "and artifact upload will run; external publishing steps are skipped"
+
       - name: Memory production release gate
         shell: bash
         run: |
           set -euo pipefail
+          export GOTELEMETRY=off
+          export GOCACHE="${PWD}/.cache/go-build-memory-production-release"
+          export GOTMPDIR="${PWD}/.cache/go-tmp-memory-production-release"
+          mkdir -p "$GOCACHE" "$GOTMPDIR"
           report_dir="${{ steps.meta.outputs.out_dir }}/memory-production-linux-x64"
-          bash scripts/release/post_v0_4/memory-production-linux-x64-smoke.sh --report-dir "$report_dir"
+          bash scripts/release/post_v0_4/memory-production-linux-x64-smoke.sh \
+            --report-dir "$report_dir"
 
       - name: Surface product gate
         shell: bash
         run: |
           set -euo pipefail
           report_dir="${{ steps.meta.outputs.out_dir }}/surface-product-v1"
-          if ! command -v weston >/dev/null 2>&1; then
+          if ! command -v weston >/dev/null 2>&1 || ! command -v rg >/dev/null 2>&1; then
             sudo apt-get update
-            sudo apt-get install -y weston
+            sudo apt-get install -y weston ripgrep
           fi
           export XDG_RUNTIME_DIR="${RUNNER_TEMP:-/tmp}/surface-wayland-runtime"
           mkdir -p "$XDG_RUNTIME_DIR"
           chmod 700 "$XDG_RUNTIME_DIR"
           weston_log="${RUNNER_TEMP:-/tmp}/surface-weston.log"
-          weston --backend=headless-backend.so --socket=wayland-surface-release --idle-time=0 >"$weston_log" 2>&1 &
+          weston \
+            --backend=headless-backend.so \
+            --socket=wayland-surface-release \
+            --idle-time=0 \
+            >"$weston_log" 2>&1 &
           weston_pid=$!
           cleanup_weston() {
             kill "$weston_pid" >/dev/null 2>&1
@@ -178,16 +210,24 @@ jobs:
             --product-report-dir "$product_report_dir" \
             --expected-scope surface-v1-linux-web \
             --current-git-head "${GITHUB_SHA}"
-          go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"
+          go run ./tools/cmd/validate-artifact-hashes \
+            --write \
+            --root "$report_dir" \
+            --out "$report_dir/artifact-hashes.json"
           go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-hashes.json"
-          go run ./tools/cmd/validate-surface-final-readiness --report-dir "$report_dir" --expected-scope surface-v1-linux-web --require-clean --require-package
+          go run ./tools/cmd/validate-surface-final-readiness \
+            --report-dir "$report_dir" \
+            --expected-scope surface-v1-linux-web \
+            --require-clean \
+            --require-package
 
       - name: Integrated Memory/Islands/Surface release gate
         shell: bash
         run: |
           set -euo pipefail
           report_dir="${{ steps.meta.outputs.out_dir }}/memory-islands-surface-production"
-          bash scripts/release/post_v0_4/memory-islands-surface-production-gate.sh --report-dir "$report_dir"
+          bash scripts/release/post_v0_4/memory-islands-surface-production-gate.sh \
+            --report-dir "$report_dir"
 
       - name: RAM contract release gate
         shell: bash
@@ -209,7 +249,8 @@ jobs:
           export GOTMPDIR="${PWD}/.cache/go-tmp-actor-runtime-foundation-release"
           mkdir -p "$GOCACHE" "$GOTMPDIR"
           report_dir="${{ steps.meta.outputs.out_dir }}/actor-runtime-foundation-linux-x64"
-          bash scripts/release/post_v0_4/actor-runtime-foundation-linux-x64-gate.sh --report-dir "$report_dir"
+          bash scripts/release/post_v0_4/actor-runtime-foundation-linux-x64-gate.sh \
+            --report-dir "$report_dir"
 
       - name: Memory100 prod-stable gate
         shell: bash
@@ -244,6 +285,7 @@ jobs:
             ${{ steps.meta.outputs.out_dir }}/memory-100-prod-stable/**
 
       - name: Create or update GitHub Release
+        if: env.RELEASE_DRY_RUN != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -252,7 +294,11 @@ jobs:
           notes="$out_dir/release-notes.md"
           release_image="${{ steps.meta.outputs.image }}"
           release_image_version="${{ steps.meta.outputs.image_version }}"
-          VERSION="$version" NOTES="$notes" RELEASE_IMAGE="$release_image" RELEASE_IMAGE_VERSION="$release_image_version" python - <<'PY'
+          export VERSION="$version"
+          export NOTES="$notes"
+          export RELEASE_IMAGE="$release_image"
+          export RELEASE_IMAGE_VERSION="$release_image_version"
+          python - <<'PY'
           import os
           import textwrap
           from pathlib import Path
@@ -277,28 +323,78 @@ jobs:
           docker run --rm {image}:{image_version} tetra version
           ```
 
-          This release publishes the current v0.4.0 local compiler/tooling profile. Linux x64 is the release binary baseline; other runtime target claims remain gated by project evidence.
-          Package publishing for this workflow runs the Linux-x64 memory production release gate and uploads its `memory-production-linux-x64.json`, `targets.json`, and `artifact-hashes.json` evidence.
-          RAM Contract Compiler evidence runs the strict Linux-x64 RAM contract release gate before publishing and uploads its `ram-contract-report.json`, `memory-grade-report.json`, `proof-store-summary.json`, `validation-pipeline-coverage.json`, `heap-blockers.json`, `copy-blockers.json`, and `ram-contract-fuzz-oracle.json` evidence.
-          Memory production evidence remains Linux-x64 scoped unless a target-specific runtime gate says otherwise.
-          Surface v1 product evidence runs the Surface product gate, experimental regression gate, safe-view lifetime gate, API stability gate, and final readiness validator before publishing.
-          Integrated Memory/Islands/Surface evidence runs the strict integrated gate before publishing and uploads its `memory-islands-surface-production-manifest.json`, `artifact-hashes.json`, `islands-debug-smoke.json`, `island-proof-verifier.json`, and `island-proof-fuzz-summary.json` evidence.
-          Actor runtime foundation evidence runs the strict Linux-x64 gate before publishing and uploads its `actor-runtime-foundation-manifest.json`, `artifact-hashes.json`, `distributed-actors-linux-x64/distributed-actors-linux-x64.json`, and `parallel-production-linux-x64/parallel-production-linux-x64.json` evidence.
-          Memory100 scoped prod-stable evidence runs the strict aggregate gate before publishing and uploads its `memory-100-prod-stable-manifest.json`, `artifact-hashes.json`, `runtime-memory/runtime-memory-contract.json`, and `proof-transition/proof-transition-report.json` evidence.
-          Actor runtime foundation evidence remains Linux-x64 scoped; Erlang/OTP, cluster membership, reconnect/retry production, non-Linux distributed runtime, distributed zero-copy transfer, and formal race proof are not claimed.
-          Surface v1 package notes are scoped to headless, linux-x64 real-window, and wasm32-web browser-canvas evidence; macOS, Windows, wasm32-wasi, GPU rendering, platform-native widgets, DOM/React/user-JS app UI, rich text editor, and full screen-reader support are not claimed.
-          No fastest-language, official benchmark, target parity, or broad zero-cost performance claim is made by these package notes.
+          This release publishes the current v0.4.0 local compiler/tooling
+          profile. Linux x64 is the release binary baseline; other runtime
+          target claims remain gated by project evidence.
+          Package publishing for this workflow runs the Linux-x64 memory
+          production release gate and uploads its
+          `memory-production-linux-x64.json`, `memory-release-manifest.json`,
+          `ram-measurement.json`, `targets.json`, and `artifact-hashes.json`
+          evidence.
+          RAM Contract Compiler evidence runs the strict Linux-x64 RAM contract
+          release gate before publishing and uploads its
+          `ram-contract-release-manifest.json`, `ram-contract-report.json`,
+          `memory-grade-report.json`, `proof-store-summary.json`,
+          `validation-pipeline-coverage.json`, `heap-blockers.json`,
+          `copy-blockers.json`, `fuzz/ram-contract-fuzz-oracle.json`, and
+          `artifact-hashes.json` evidence.
+          Memory production evidence remains Linux-x64 scoped unless a
+          target-specific runtime gate says otherwise.
+          Surface v1 product evidence runs the Surface product gate,
+          experimental regression gate, safe-view lifetime gate, API stability
+          gate, and final readiness validator before publishing.
+          Integrated Memory/Islands/Surface evidence runs the strict integrated
+          gate before publishing and uploads its
+          `memory-islands-surface-production-manifest.json`,
+          `artifact-hashes.json`, `islands-debug-smoke.json`,
+          `island-proof-verifier.json`, and
+          `island-proof-fuzz-summary.json` evidence.
+          Actor runtime foundation evidence runs the strict Linux-x64 gate
+          before publishing and uploads its
+          `actor-runtime-foundation-manifest.json`, `artifact-hashes.json`,
+          `distributed-actors-linux-x64/distributed-actors-linux-x64.json`,
+          and `parallel-production-linux-x64/parallel-production-linux-x64.json`
+          evidence.
+          Memory100 scoped prod-stable evidence runs the strict aggregate gate
+          before publishing and uploads its
+          `memory-100-prod-stable-manifest.json`, `artifact-hashes.json`,
+          `runtime-memory/runtime-memory-contract.json`, and
+          `proof-transition/proof-transition-report.json` evidence.
+          Actor runtime foundation evidence remains Linux-x64 scoped;
+          Erlang/OTP, cluster membership, reconnect/retry production,
+          non-Linux distributed runtime, distributed zero-copy transfer, and
+          formal race proof are not claimed.
+          Surface v1 package notes are scoped to headless, linux-x64
+          real-window, and wasm32-web browser-canvas evidence; macOS, Windows,
+          wasm32-wasi, GPU rendering, platform-native widgets,
+          DOM/React/user-JS app UI, rich text editor, and full screen-reader
+          support are not claimed.
+          No fastest-language, official benchmark, target parity, or broad
+          zero-cost performance claim is made by these package notes.
           """), encoding="utf-8")
           PY
           if gh release view "$version" >/dev/null 2>&1; then
-            existing_target="$(gh release view "$version" --json targetCommitish -q .targetCommitish)"
+            existing_target="$(
+              gh release view "$version" --json targetCommitish -q .targetCommitish
+            )"
             if [[ "$existing_target" != "$GITHUB_SHA" ]]; then
               echo "release target $existing_target does not match current commit $GITHUB_SHA" >&2
               exit 1
             fi
-            gh release upload "$version" "$out_dir"/install.sh "$out_dir"/*.tar.gz "$out_dir"/*.sha256 "$out_dir"/checksums.txt "$out_dir"/tetra.rb --clobber
+            gh release upload "$version" \
+              "$out_dir"/install.sh \
+              "$out_dir"/*.tar.gz \
+              "$out_dir"/*.sha256 \
+              "$out_dir"/checksums.txt \
+              "$out_dir"/tetra.rb \
+              --clobber
           else
-            gh release create "$version" "$out_dir"/install.sh "$out_dir"/*.tar.gz "$out_dir"/*.sha256 "$out_dir"/checksums.txt "$out_dir"/tetra.rb \
+            gh release create "$version" \
+              "$out_dir"/install.sh \
+              "$out_dir"/*.tar.gz \
+              "$out_dir"/*.sha256 \
+              "$out_dir"/checksums.txt \
+              "$out_dir"/tetra.rb \
               --title "Tetra Language ${version}" \
               --notes-file "$notes" \
               --target "$GITHUB_SHA" \
@@ -316,6 +412,7 @@ jobs:
             .
 
       - name: Publish GHCR image
+        if: env.RELEASE_DRY_RUN != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -326,7 +423,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
 
       - name: Update Homebrew tap
-        if: env.UPDATE_HOMEBREW_TAP == 'true'
+        if: env.UPDATE_HOMEBREW_TAP == 'true' && env.RELEASE_DRY_RUN != 'true'
         shell: bash
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
@@ -339,15 +436,19 @@ jobs:
           tap_repo="${HOMEBREW_TAP_REPOSITORY}"
           work_dir="$(mktemp -d)"
           trap 'rm -rf "$work_dir"' EXIT
-          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/${tap_repo}.git" "$work_dir/tap"
+          git clone \
+            "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/${tap_repo}.git" \
+            "$work_dir/tap"
           mkdir -p "$work_dir/tap/Formula"
           cp "${{ steps.meta.outputs.out_dir }}/tetra.rb" "$work_dir/tap/Formula/tetra.rb"
           git -C "$work_dir/tap" config user.name "github-actions[bot]"
-          git -C "$work_dir/tap" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C "$work_dir/tap" config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
           git -C "$work_dir/tap" add Formula/tetra.rb
           if git -C "$work_dir/tap" diff --cached --quiet; then
             echo "Homebrew tap already up to date"
           else
-            git -C "$work_dir/tap" commit -m "Update Tetra formula to ${{ steps.meta.outputs.version }}"
+            git -C "$work_dir/tap" commit -m \
+              "Update Tetra formula to ${{ steps.meta.outputs.version }}"
             git -C "$work_dir/tap" push
           fi

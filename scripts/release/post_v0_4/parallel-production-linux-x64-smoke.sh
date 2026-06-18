@@ -6,7 +6,7 @@ repo_root="$(cd "$script_dir/../../.." && pwd)"
 report_dir="$repo_root/reports/post-v0.4"
 
 usage() {
-  cat <<'USAGE'
+  cat << 'USAGE'
 Usage: bash scripts/release/post_v0_4/parallel-production-linux-x64-smoke.sh [--report-dir DIR]
 
 Runs executable Linux-x64 Parallelism Production Core smoke and writes tetra.parallel.production.v1 evidence.
@@ -24,7 +24,7 @@ while [[ $# -gt 0 ]]; do
       report_dir="$2"
       shift 2
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;

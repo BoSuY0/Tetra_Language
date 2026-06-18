@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"tetra_language/internal/toon"
 )
 
 func nativeSmokeListForTest(omit string) []byte {
@@ -15,35 +17,70 @@ func nativeSmokeListForTest(omit string) []byte {
 		targetGroup  string
 		expectedExit int
 	}{
-		{"flow_hello", "examples/flow_hello.tetra", "native", 0},
-		{"actors_pingpong", "examples/actors_pingpong.tetra", "native", 0},
-		{"enum_match_smoke", "examples/enum_match_smoke.tetra", "native", 42},
-		{"effects_io_smoke", "examples/effects_io_smoke.tetra", "native", 0},
-		{"typed_errors_smoke", "examples/typed_errors_smoke.tetra", "native", 42},
-		{"protocol_impl_smoke", "examples/protocol_impl_smoke.tetra", "native", 42},
-		{"for_collection_smoke", "examples/for_collection_smoke.tetra", "native", 42},
-		{"core_async_smoke", "examples/core_async_smoke.tetra", "native", 42},
-		{"core_capability_smoke", "examples/core_capability_smoke.tetra", "native", 42},
-		{"core_collections_smoke", "examples/core_collections_smoke.tetra", "native", 42},
-		{"core_component_smoke", "examples/core_component_smoke.tetra", "native", 42},
-		{"core_crypto_smoke", "examples/core_crypto_smoke.tetra", "native", 42},
-		{"core_filesystem_smoke", "examples/core_filesystem_smoke.tetra", "native", 42},
-		{"core_io_smoke", "examples/core_io_smoke.tetra", "native", 42},
-		{"core_math_smoke", "examples/core_math_smoke.tetra", "native", 42},
-		{"core_memory_smoke", "examples/core_memory_smoke.tetra", "native", 42},
-		{"core_networking_smoke", "examples/core_networking_smoke.tetra", "native", 42},
-		{"core_serialization_smoke", "examples/core_serialization_smoke.tetra", "native", 42},
-		{"core_slices_smoke", "examples/core_slices_smoke.tetra", "native", 42},
-		{"core_strings_smoke", "examples/core_strings_smoke.tetra", "native", 42},
-		{"core_sync_smoke", "examples/core_sync_smoke.tetra", "native", 42},
-		{"core_testing_smoke", "examples/core_testing_smoke.tetra", "native", 42},
-		{"core_time_smoke", "examples/core_time_smoke.tetra", "native", 42},
-		{"surface_counter", "examples/surface_counter.tetra", "native", 1},
-		{"surface_text_input", "examples/surface_text_input.tetra", "native", 42},
-		{"surface_migration_ui_web_smoke", "examples/surface_migration_ui_web_smoke.tetra", "native", 2},
-		{"surface_migration_ui_native_shell_smoke", "examples/surface_migration_ui_native_shell_smoke.tetra", "native", 11},
-		{"surface_migration_dogfood_web_ui", "examples/surface_migration_dogfood_web_ui.tetra", "native", 3},
-		{"surface_migration_tetra_control_center", "examples/surface_migration_tetra_control_center.tetra", "native", 5},
+		{"flow_hello", "examples/flow/flow_hello.tetra", "native", 0},
+		{"actors_pingpong", "examples/actors/actors_pingpong.tetra", "native", 0},
+		{"enum_match_smoke", "examples/smoke/types/enum_match_smoke.tetra", "native", 42},
+		{"effects_io_smoke", "examples/effects/effects_io_smoke.tetra", "native", 0},
+		{"typed_errors_smoke", "examples/smoke/errors/typed_errors_smoke.tetra", "native", 42},
+		{"protocol_impl_smoke", "examples/smoke/language/protocol_impl_smoke.tetra", "native", 42},
+		{"for_collection_smoke", "examples/smoke/control/for_collection_smoke.tetra", "native", 42},
+		{"core_async_smoke", "examples/async/core_async_smoke.tetra", "native", 42},
+		{"core_capability_smoke", "examples/core/memory/core_capability_smoke.tetra", "native", 42},
+		{"core_collections_smoke", "examples/core/data/core_collections_smoke.tetra", "native", 42},
+		{"core_component_smoke", "examples/core/surface/core_component_smoke.tetra", "native", 42},
+		{"core_crypto_smoke", "examples/core/memory/core_crypto_smoke.tetra", "native", 42},
+		{
+			"core_filesystem_smoke",
+			"examples/core/platform/core_filesystem_smoke.tetra",
+			"native",
+			42,
+		},
+		{"core_io_smoke", "examples/core/platform/core_io_smoke.tetra", "native", 42},
+		{"core_math_smoke", "examples/core/data/core_math_smoke.tetra", "native", 42},
+		{"core_memory_smoke", "examples/core/memory/core_memory_smoke.tetra", "native", 42},
+		{
+			"core_networking_smoke",
+			"examples/core/platform/core_networking_smoke.tetra",
+			"native",
+			42,
+		},
+		{
+			"core_serialization_smoke",
+			"examples/core/data/core_serialization_smoke.tetra",
+			"native",
+			42,
+		},
+		{"core_slices_smoke", "examples/core/data/core_slices_smoke.tetra", "native", 42},
+		{"core_strings_smoke", "examples/core/data/core_strings_smoke.tetra", "native", 42},
+		{"core_sync_smoke", "examples/core/runtime/core_sync_smoke.tetra", "native", 42},
+		{"core_testing_smoke", "examples/core/runtime/core_testing_smoke.tetra", "native", 42},
+		{"core_time_smoke", "examples/core/platform/core_time_smoke.tetra", "native", 42},
+		{"surface_counter", "examples/surface/runtime/surface_counter.tetra", "native", 1},
+		{"surface_text_input", "examples/surface/runtime/surface_text_input.tetra", "native", 42},
+		{
+			"surface_migration_ui_web_smoke",
+			"examples/surface/migration/surface_migration_ui_web_smoke.tetra",
+			"native",
+			2,
+		},
+		{
+			"surface_migration_ui_native_shell_smoke",
+			"examples/surface/migration/surface_migration_ui_native_shell_smoke.tetra",
+			"native",
+			11,
+		},
+		{
+			"surface_migration_dogfood_web_ui",
+			"examples/surface/migration/surface_migration_dogfood_web_ui.tetra",
+			"native",
+			3,
+		},
+		{
+			"surface_migration_tetra_control_center",
+			"examples/surface/migration/surface_migration_tetra_control_center.tetra",
+			"native",
+			5,
+		},
 	}
 	for i := 1; len(cases) < 40; i++ {
 		name := fmt.Sprintf("filler_case_%02d", i)
@@ -52,7 +89,12 @@ func nativeSmokeListForTest(omit string) []byte {
 			srcPath      string
 			targetGroup  string
 			expectedExit int
-		}{name: name, srcPath: fmt.Sprintf("examples/%s.tetra", name), targetGroup: "native", expectedExit: 0})
+		}{
+			name:         name,
+			srcPath:      fmt.Sprintf("examples/%s.tetra", name),
+			targetGroup:  "native",
+			expectedExit: 0,
+		})
 	}
 	var b strings.Builder
 	b.WriteString(`{"target":"linux-x64","total":`)
@@ -71,7 +113,14 @@ func nativeSmokeListForTest(omit string) []byte {
 			b.WriteByte(',')
 		}
 		first = false
-		fmt.Fprintf(&b, `{"name":%q,"src_path":%q,"target_group":%q,"expected_exit":%d}`, c.name, c.srcPath, c.targetGroup, c.expectedExit)
+		fmt.Fprintf(
+			&b,
+			`{"name":%q,"src_path":%q,"target_group":%q,"expected_exit":%d}`,
+			c.name,
+			c.srcPath,
+			c.targetGroup,
+			c.expectedExit,
+		)
 	}
 	b.WriteString(`]}`)
 	return []byte(b.String())
@@ -84,6 +133,17 @@ func TestValidateSmokeListAcceptsExpectedShape(t *testing.T) {
 	}
 }
 
+func TestValidateSmokeListAcceptsTOONFormat(t *testing.T) {
+	raw := nativeSmokeListForTest("")
+	toonRaw, err := toon.ConvertJSONToTOON(raw, toon.Options{Deterministic: true, Strict: true})
+	if err != nil {
+		t.Fatalf("convert smoke list to TOON: %v", err)
+	}
+	if err := validateSmokeListWithExamplesRootFormat(toonRaw, "", "toon"); err != nil {
+		t.Fatalf("validate TOON smoke list: %v\n%s", err, toonRaw)
+	}
+}
+
 func TestValidateSmokeListAcceptsWASMBuildOnlyProfile(t *testing.T) {
 	raw := []byte(`{
   "target": "wasm32-web",
@@ -92,21 +152,102 @@ func TestValidateSmokeListAcceptsWASMBuildOnlyProfile(t *testing.T) {
   "total": 15,
   "islands_debug": false,
   "cases": [
-    {"name":"legacy_hello","src_path":"examples/hello.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"effects_io_smoke","src_path":"examples/effects_io_smoke.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"ui_web_smoke","src_path":"examples/ui_web_smoke.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"core_slices_smoke","src_path":"examples/core_slices_smoke.tetra","target_group":"wasm","expected_exit":42},
-    {"name":"wasm_globals_smoke","src_path":"examples/wasm_globals_smoke.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"surface_counter","src_path":"examples/surface_counter.tetra","target_group":"wasm","expected_exit":1},
-    {"name":"surface_text_input","src_path":"examples/surface_text_input.tetra","target_group":"wasm","expected_exit":42},
-    {"name":"wasm_multi_return_2_smoke","src_path":"examples/wasm_multi_return_2_smoke.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"wasm_multi_return_3_smoke","src_path":"examples/wasm_multi_return_3_smoke.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"wasm_multi_return_4_smoke","src_path":"examples/wasm_multi_return_4_smoke.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"dogfood_wasi","src_path":"examples/projects/dogfood_wasi/src/main.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"dogfood_web_ui","src_path":"examples/projects/dogfood_web_ui/src/main.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"time_sleep_smoke","src_path":"examples/time_sleep_smoke.tetra","target_group":"wasm","expected_exit":0,"unsupported":true,"expected_diagnostic":"runtime not supported on wasm32"},
-    {"name":"task_smoke","src_path":"examples/task_smoke.tetra","target_group":"wasm","expected_exit":42,"unsupported":true,"expected_diagnostic":"runtime not supported on wasm32"},
-    {"name":"actors_pingpong","src_path":"examples/actors_pingpong.tetra","target_group":"wasm","expected_exit":0,"unsupported":true,"expected_diagnostic":"runtime not supported on wasm32"}
+    {
+      "name": "legacy_hello",
+      "src_path": "examples/smoke/basic/hello.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "effects_io_smoke",
+      "src_path": "examples/effects/effects_io_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "ui_web_smoke",
+      "src_path": "examples/ui/ui_web_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "core_slices_smoke",
+      "src_path": "examples/core/data/core_slices_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 42
+    },
+    {
+      "name": "wasm_globals_smoke",
+      "src_path": "examples/wasm/wasm_globals_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "surface_counter",
+      "src_path": "examples/surface/runtime/surface_counter.tetra",
+      "target_group": "wasm",
+      "expected_exit": 1
+    },
+    {
+      "name": "surface_text_input",
+      "src_path": "examples/surface/runtime/surface_text_input.tetra",
+      "target_group": "wasm",
+      "expected_exit": 42
+    },
+    {
+      "name": "wasm_multi_return_2_smoke",
+      "src_path": "examples/wasm/wasm_multi_return_2_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "wasm_multi_return_3_smoke",
+      "src_path": "examples/wasm/wasm_multi_return_3_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "wasm_multi_return_4_smoke",
+      "src_path": "examples/wasm/wasm_multi_return_4_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "dogfood_wasi",
+      "src_path": "examples/projects/dogfood_wasi/src/main.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "dogfood_web_ui",
+      "src_path": "examples/projects/dogfood_web_ui/src/main.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "time_sleep_smoke",
+      "src_path": "examples/async/time_sleep_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0,
+      "unsupported": true,
+      "expected_diagnostic": "runtime not supported on wasm32"
+    },
+    {
+      "name": "task_smoke",
+      "src_path": "examples/tasks/task_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 42,
+      "unsupported": true,
+      "expected_diagnostic": "runtime not supported on wasm32"
+    },
+    {
+      "name": "actors_pingpong",
+      "src_path": "examples/actors/actors_pingpong.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0,
+      "unsupported": true,
+      "expected_diagnostic": "runtime not supported on wasm32"
+    }
   ]
 }`)
 	if err := validateSmokeList(raw); err != nil {
@@ -122,11 +263,36 @@ func TestValidateSmokeListRejectsUnknownFields(t *testing.T) {
   "total": 14,
   "islands_debug": false,
   "cases": [
-    {"name":"legacy_hello","src_path":"examples/hello.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"effects_io_smoke","src_path":"examples/effects_io_smoke.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"ui_web_smoke","src_path":"examples/ui_web_smoke.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"dogfood_wasi","src_path":"examples/projects/dogfood_wasi/src/main.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"dogfood_web_ui","src_path":"examples/projects/dogfood_web_ui/src/main.tetra","target_group":"wasm","expected_exit":0}
+    {
+      "name": "legacy_hello",
+      "src_path": "examples/smoke/basic/hello.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "effects_io_smoke",
+      "src_path": "examples/effects/effects_io_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "ui_web_smoke",
+      "src_path": "examples/ui/ui_web_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "dogfood_wasi",
+      "src_path": "examples/projects/dogfood_wasi/src/main.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "dogfood_web_ui",
+      "src_path": "examples/projects/dogfood_web_ui/src/main.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    }
   ],
   "extra": true
 }`)
@@ -140,11 +306,37 @@ func TestValidateSmokeListRejectsUnknownFields(t *testing.T) {
   "total": 14,
   "islands_debug": false,
   "cases": [
-    {"name":"legacy_hello","src_path":"examples/hello.tetra","target_group":"wasm","expected_exit":0,"extra":true},
-    {"name":"effects_io_smoke","src_path":"examples/effects_io_smoke.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"ui_web_smoke","src_path":"examples/ui_web_smoke.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"dogfood_wasi","src_path":"examples/projects/dogfood_wasi/src/main.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"dogfood_web_ui","src_path":"examples/projects/dogfood_web_ui/src/main.tetra","target_group":"wasm","expected_exit":0}
+    {
+      "name": "legacy_hello",
+      "src_path": "examples/smoke/basic/hello.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0,
+      "extra": true
+    },
+    {
+      "name": "effects_io_smoke",
+      "src_path": "examples/effects/effects_io_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "ui_web_smoke",
+      "src_path": "examples/ui/ui_web_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "dogfood_wasi",
+      "src_path": "examples/projects/dogfood_wasi/src/main.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "dogfood_web_ui",
+      "src_path": "examples/projects/dogfood_web_ui/src/main.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    }
   ]
 }`)
 	if err := validateSmokeList(raw); err == nil {
@@ -153,7 +345,9 @@ func TestValidateSmokeListRejectsUnknownFields(t *testing.T) {
 }
 
 func TestValidateSmokeListRejectsMissingRequiredCase(t *testing.T) {
-	raw := []byte(`{"total":1,"cases":[{"name":"flow_hello","src_path":"examples/flow_hello.tetra"}]}`)
+	raw := []byte(
+		`{"total":1,"cases":[{"name":"flow_hello","src_path":"examples/flow/flow_hello.tetra"}]}`,
+	)
 	if err := validateSmokeList(raw); err == nil {
 		t.Fatalf("expected missing required case failure")
 	}
@@ -200,20 +394,96 @@ func TestValidateSmokeListRejectsMissingWASMSurfaceTextInput(t *testing.T) {
   "total": 14,
   "islands_debug": false,
   "cases": [
-    {"name":"legacy_hello","src_path":"examples/hello.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"effects_io_smoke","src_path":"examples/effects_io_smoke.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"ui_web_smoke","src_path":"examples/ui_web_smoke.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"core_slices_smoke","src_path":"examples/core_slices_smoke.tetra","target_group":"wasm","expected_exit":42},
-    {"name":"wasm_globals_smoke","src_path":"examples/wasm_globals_smoke.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"surface_counter","src_path":"examples/surface_counter.tetra","target_group":"wasm","expected_exit":1},
-    {"name":"wasm_multi_return_2_smoke","src_path":"examples/wasm_multi_return_2_smoke.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"wasm_multi_return_3_smoke","src_path":"examples/wasm_multi_return_3_smoke.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"wasm_multi_return_4_smoke","src_path":"examples/wasm_multi_return_4_smoke.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"dogfood_wasi","src_path":"examples/projects/dogfood_wasi/src/main.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"dogfood_web_ui","src_path":"examples/projects/dogfood_web_ui/src/main.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"time_sleep_smoke","src_path":"examples/time_sleep_smoke.tetra","target_group":"wasm","expected_exit":0,"unsupported":true,"expected_diagnostic":"runtime not supported on wasm32"},
-    {"name":"task_smoke","src_path":"examples/task_smoke.tetra","target_group":"wasm","expected_exit":42,"unsupported":true,"expected_diagnostic":"runtime not supported on wasm32"},
-    {"name":"actors_pingpong","src_path":"examples/actors_pingpong.tetra","target_group":"wasm","expected_exit":0,"unsupported":true,"expected_diagnostic":"runtime not supported on wasm32"}
+    {
+      "name": "legacy_hello",
+      "src_path": "examples/smoke/basic/hello.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "effects_io_smoke",
+      "src_path": "examples/effects/effects_io_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "ui_web_smoke",
+      "src_path": "examples/ui/ui_web_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "core_slices_smoke",
+      "src_path": "examples/core/data/core_slices_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 42
+    },
+    {
+      "name": "wasm_globals_smoke",
+      "src_path": "examples/wasm/wasm_globals_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "surface_counter",
+      "src_path": "examples/surface/runtime/surface_counter.tetra",
+      "target_group": "wasm",
+      "expected_exit": 1
+    },
+    {
+      "name": "wasm_multi_return_2_smoke",
+      "src_path": "examples/wasm/wasm_multi_return_2_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "wasm_multi_return_3_smoke",
+      "src_path": "examples/wasm/wasm_multi_return_3_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "wasm_multi_return_4_smoke",
+      "src_path": "examples/wasm/wasm_multi_return_4_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "dogfood_wasi",
+      "src_path": "examples/projects/dogfood_wasi/src/main.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "dogfood_web_ui",
+      "src_path": "examples/projects/dogfood_web_ui/src/main.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "time_sleep_smoke",
+      "src_path": "examples/async/time_sleep_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0,
+      "unsupported": true,
+      "expected_diagnostic": "runtime not supported on wasm32"
+    },
+    {
+      "name": "task_smoke",
+      "src_path": "examples/tasks/task_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 42,
+      "unsupported": true,
+      "expected_diagnostic": "runtime not supported on wasm32"
+    },
+    {
+      "name": "actors_pingpong",
+      "src_path": "examples/actors/actors_pingpong.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0,
+      "unsupported": true,
+      "expected_diagnostic": "runtime not supported on wasm32"
+    }
   ]
 }`)
 	err := validateSmokeList(raw)
@@ -229,15 +499,19 @@ func TestValidateSmokeListRejectsDebugOnlyWithoutFlag(t *testing.T) {
 	raw := []byte(`{
   "total": 39,
   "cases": [
-    {"name":"flow_hello","src_path":"examples/flow_hello.tetra"},
-    {"name":"actors_pingpong","src_path":"examples/actors_pingpong.tetra"},
-    {"name":"enum_match_smoke","src_path":"examples/enum_match_smoke.tetra"},
-    {"name":"effects_io_smoke","src_path":"examples/effects_io_smoke.tetra"},
-    {"name":"typed_errors_smoke","src_path":"examples/typed_errors_smoke.tetra"},
-    {"name":"protocol_impl_smoke","src_path":"examples/protocol_impl_smoke.tetra"},
-    {"name":"core_memory_smoke","src_path":"examples/core_memory_smoke.tetra"},
-    {"name":"for_collection_smoke","src_path":"examples/for_collection_smoke.tetra"},
-    {"name":"islands_double_free","src_path":"examples/islands_double_free.tetra","debug_only":true},
+    {"name":"flow_hello","src_path":"examples/flow/flow_hello.tetra"},
+    {"name":"actors_pingpong","src_path":"examples/actors/actors_pingpong.tetra"},
+    {"name":"enum_match_smoke","src_path":"examples/smoke/types/enum_match_smoke.tetra"},
+    {"name":"effects_io_smoke","src_path":"examples/effects/effects_io_smoke.tetra"},
+    {"name":"typed_errors_smoke","src_path":"examples/smoke/errors/typed_errors_smoke.tetra"},
+    {"name":"protocol_impl_smoke","src_path":"examples/smoke/language/protocol_impl_smoke.tetra"},
+    {"name":"core_memory_smoke","src_path":"examples/core/memory/core_memory_smoke.tetra"},
+    {"name":"for_collection_smoke","src_path":"examples/smoke/control/for_collection_smoke.tetra"},
+    {
+      "name": "islands_double_free",
+      "src_path": "examples/memory/islands/islands_double_free.tetra",
+      "debug_only": true
+    },
     {"name":"case10","src_path":"examples/10.tetra"},
     {"name":"case11","src_path":"examples/11.tetra"},
     {"name":"case12","src_path":"examples/12.tetra"},
@@ -280,14 +554,38 @@ func TestValidateSmokeListRejectsDuplicateSourcePath(t *testing.T) {
   "total": 39,
   "islands_debug": false,
   "cases": [
-    {"name":"flow_hello","src_path":"examples/flow_hello.tetra","expected_exit":0},
-    {"name":"actors_pingpong","src_path":"examples/flow_hello.tetra","expected_exit":0},
-    {"name":"enum_match_smoke","src_path":"examples/enum_match_smoke.tetra","expected_exit":42},
-    {"name":"effects_io_smoke","src_path":"examples/effects_io_smoke.tetra","expected_exit":0},
-    {"name":"typed_errors_smoke","src_path":"examples/typed_errors_smoke.tetra","expected_exit":42},
-    {"name":"protocol_impl_smoke","src_path":"examples/protocol_impl_smoke.tetra","expected_exit":42},
-    {"name":"core_memory_smoke","src_path":"examples/core_memory_smoke.tetra","expected_exit":42},
-    {"name":"for_collection_smoke","src_path":"examples/for_collection_smoke.tetra","expected_exit":42},
+    {"name":"flow_hello","src_path":"examples/flow/flow_hello.tetra","expected_exit":0},
+    {"name":"actors_pingpong","src_path":"examples/flow/flow_hello.tetra","expected_exit":0},
+    {
+      "name": "enum_match_smoke",
+      "src_path": "examples/smoke/types/enum_match_smoke.tetra",
+      "expected_exit": 42
+    },
+    {
+      "name": "effects_io_smoke",
+      "src_path": "examples/effects/effects_io_smoke.tetra",
+      "expected_exit": 0
+    },
+    {
+      "name": "typed_errors_smoke",
+      "src_path": "examples/smoke/errors/typed_errors_smoke.tetra",
+      "expected_exit": 42
+    },
+    {
+      "name": "protocol_impl_smoke",
+      "src_path": "examples/smoke/language/protocol_impl_smoke.tetra",
+      "expected_exit": 42
+    },
+    {
+      "name": "core_memory_smoke",
+      "src_path": "examples/core/memory/core_memory_smoke.tetra",
+      "expected_exit": 42
+    },
+    {
+      "name": "for_collection_smoke",
+      "src_path": "examples/smoke/control/for_collection_smoke.tetra",
+      "expected_exit": 42
+    },
     {"name":"case09","src_path":"examples/09.tetra","expected_exit":0},
     {"name":"case10","src_path":"examples/10.tetra","expected_exit":0},
     {"name":"case11","src_path":"examples/11.tetra","expected_exit":0},
@@ -331,14 +629,38 @@ func TestValidateSmokeListRejectsInvalidExitCode(t *testing.T) {
   "total": 39,
   "islands_debug": false,
   "cases": [
-    {"name":"flow_hello","src_path":"examples/flow_hello.tetra","expected_exit":300},
-    {"name":"actors_pingpong","src_path":"examples/actors_pingpong.tetra","expected_exit":0},
-    {"name":"enum_match_smoke","src_path":"examples/enum_match_smoke.tetra","expected_exit":42},
-    {"name":"effects_io_smoke","src_path":"examples/effects_io_smoke.tetra","expected_exit":0},
-    {"name":"typed_errors_smoke","src_path":"examples/typed_errors_smoke.tetra","expected_exit":42},
-    {"name":"protocol_impl_smoke","src_path":"examples/protocol_impl_smoke.tetra","expected_exit":42},
-    {"name":"core_memory_smoke","src_path":"examples/core_memory_smoke.tetra","expected_exit":42},
-    {"name":"for_collection_smoke","src_path":"examples/for_collection_smoke.tetra","expected_exit":42},
+    {"name":"flow_hello","src_path":"examples/flow/flow_hello.tetra","expected_exit":300},
+    {"name":"actors_pingpong","src_path":"examples/actors/actors_pingpong.tetra","expected_exit":0},
+    {
+      "name": "enum_match_smoke",
+      "src_path": "examples/smoke/types/enum_match_smoke.tetra",
+      "expected_exit": 42
+    },
+    {
+      "name": "effects_io_smoke",
+      "src_path": "examples/effects/effects_io_smoke.tetra",
+      "expected_exit": 0
+    },
+    {
+      "name": "typed_errors_smoke",
+      "src_path": "examples/smoke/errors/typed_errors_smoke.tetra",
+      "expected_exit": 42
+    },
+    {
+      "name": "protocol_impl_smoke",
+      "src_path": "examples/smoke/language/protocol_impl_smoke.tetra",
+      "expected_exit": 42
+    },
+    {
+      "name": "core_memory_smoke",
+      "src_path": "examples/core/memory/core_memory_smoke.tetra",
+      "expected_exit": 42
+    },
+    {
+      "name": "for_collection_smoke",
+      "src_path": "examples/smoke/control/for_collection_smoke.tetra",
+      "expected_exit": 42
+    },
     {"name":"case09","src_path":"examples/09.tetra","expected_exit":0},
     {"name":"case10","src_path":"examples/10.tetra","expected_exit":0},
     {"name":"case11","src_path":"examples/11.tetra","expected_exit":0},
@@ -383,14 +705,49 @@ func TestValidateSmokeListRejectsMissingTargetGroup(t *testing.T) {
   "total":39,
   "islands_debug":false,
   "cases":[
-    {"name":"flow_hello","src_path":"examples/flow_hello.tetra","expected_exit":0},
-    {"name":"actors_pingpong","src_path":"examples/actors_pingpong.tetra","target_group":"native","expected_exit":0},
-    {"name":"enum_match_smoke","src_path":"examples/enum_match_smoke.tetra","target_group":"native","expected_exit":42},
-    {"name":"effects_io_smoke","src_path":"examples/effects_io_smoke.tetra","target_group":"native","expected_exit":0},
-    {"name":"typed_errors_smoke","src_path":"examples/typed_errors_smoke.tetra","target_group":"native","expected_exit":42},
-    {"name":"protocol_impl_smoke","src_path":"examples/protocol_impl_smoke.tetra","target_group":"native","expected_exit":42},
-    {"name":"core_memory_smoke","src_path":"examples/core_memory_smoke.tetra","target_group":"native","expected_exit":42},
-    {"name":"for_collection_smoke","src_path":"examples/for_collection_smoke.tetra","target_group":"native","expected_exit":42},
+    {"name":"flow_hello","src_path":"examples/flow/flow_hello.tetra","expected_exit":0},
+    {
+      "name": "actors_pingpong",
+      "src_path": "examples/actors/actors_pingpong.tetra",
+      "target_group": "native",
+      "expected_exit": 0
+    },
+    {
+      "name": "enum_match_smoke",
+      "src_path": "examples/smoke/types/enum_match_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "effects_io_smoke",
+      "src_path": "examples/effects/effects_io_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 0
+    },
+    {
+      "name": "typed_errors_smoke",
+      "src_path": "examples/smoke/errors/typed_errors_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "protocol_impl_smoke",
+      "src_path": "examples/smoke/language/protocol_impl_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "core_memory_smoke",
+      "src_path": "examples/core/memory/core_memory_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "for_collection_smoke",
+      "src_path": "examples/smoke/control/for_collection_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
     {"name":"case09","src_path":"examples/09.tetra","target_group":"native","expected_exit":0},
     {"name":"case10","src_path":"examples/10.tetra","target_group":"native","expected_exit":0},
     {"name":"case11","src_path":"examples/11.tetra","target_group":"native","expected_exit":0},
@@ -450,21 +807,102 @@ func TestValidateSmokeListRejectsUnassignedExampleWhenRootProvided(t *testing.T)
   "total": 15,
   "islands_debug": false,
   "cases": [
-    {"name":"legacy_hello","src_path":"examples/hello.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"effects_io_smoke","src_path":"examples/effects_io_smoke.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"ui_web_smoke","src_path":"examples/ui_web_smoke.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"core_slices_smoke","src_path":"examples/core_slices_smoke.tetra","target_group":"wasm","expected_exit":42},
-    {"name":"wasm_globals_smoke","src_path":"examples/wasm_globals_smoke.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"surface_counter","src_path":"examples/surface_counter.tetra","target_group":"wasm","expected_exit":1},
-    {"name":"surface_text_input","src_path":"examples/surface_text_input.tetra","target_group":"wasm","expected_exit":42},
-    {"name":"wasm_multi_return_2_smoke","src_path":"examples/wasm_multi_return_2_smoke.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"wasm_multi_return_3_smoke","src_path":"examples/wasm_multi_return_3_smoke.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"wasm_multi_return_4_smoke","src_path":"examples/wasm_multi_return_4_smoke.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"dogfood_wasi","src_path":"examples/projects/dogfood_wasi/src/main.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"dogfood_web_ui","src_path":"examples/covered.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"time_sleep_smoke","src_path":"examples/time_sleep_smoke.tetra","target_group":"wasm","expected_exit":0,"unsupported":true,"expected_diagnostic":"runtime not supported on wasm32"},
-    {"name":"task_smoke","src_path":"examples/task_smoke.tetra","target_group":"wasm","expected_exit":42,"unsupported":true,"expected_diagnostic":"runtime not supported on wasm32"},
-    {"name":"actors_pingpong","src_path":"examples/actors_pingpong.tetra","target_group":"wasm","expected_exit":0,"unsupported":true,"expected_diagnostic":"runtime not supported on wasm32"}
+    {
+      "name": "legacy_hello",
+      "src_path": "examples/smoke/basic/hello.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "effects_io_smoke",
+      "src_path": "examples/effects/effects_io_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "ui_web_smoke",
+      "src_path": "examples/ui/ui_web_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "core_slices_smoke",
+      "src_path": "examples/core/data/core_slices_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 42
+    },
+    {
+      "name": "wasm_globals_smoke",
+      "src_path": "examples/wasm/wasm_globals_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "surface_counter",
+      "src_path": "examples/surface/runtime/surface_counter.tetra",
+      "target_group": "wasm",
+      "expected_exit": 1
+    },
+    {
+      "name": "surface_text_input",
+      "src_path": "examples/surface/runtime/surface_text_input.tetra",
+      "target_group": "wasm",
+      "expected_exit": 42
+    },
+    {
+      "name": "wasm_multi_return_2_smoke",
+      "src_path": "examples/wasm/wasm_multi_return_2_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "wasm_multi_return_3_smoke",
+      "src_path": "examples/wasm/wasm_multi_return_3_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "wasm_multi_return_4_smoke",
+      "src_path": "examples/wasm/wasm_multi_return_4_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "dogfood_wasi",
+      "src_path": "examples/projects/dogfood_wasi/src/main.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "dogfood_web_ui",
+      "src_path": "examples/covered.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "time_sleep_smoke",
+      "src_path": "examples/async/time_sleep_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0,
+      "unsupported": true,
+      "expected_diagnostic": "runtime not supported on wasm32"
+    },
+    {
+      "name": "task_smoke",
+      "src_path": "examples/tasks/task_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 42,
+      "unsupported": true,
+      "expected_diagnostic": "runtime not supported on wasm32"
+    },
+    {
+      "name": "actors_pingpong",
+      "src_path": "examples/actors/actors_pingpong.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0,
+      "unsupported": true,
+      "expected_diagnostic": "runtime not supported on wasm32"
+    }
   ]
 }`)
 
@@ -488,21 +926,102 @@ func TestValidateSmokeListAcceptsDocumentedExampleExclusion(t *testing.T) {
   "total": 15,
   "islands_debug": false,
   "cases": [
-    {"name":"legacy_hello","src_path":"examples/hello.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"effects_io_smoke","src_path":"examples/effects_io_smoke.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"ui_web_smoke","src_path":"examples/ui_web_smoke.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"core_slices_smoke","src_path":"examples/core_slices_smoke.tetra","target_group":"wasm","expected_exit":42},
-    {"name":"wasm_globals_smoke","src_path":"examples/wasm_globals_smoke.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"surface_counter","src_path":"examples/surface_counter.tetra","target_group":"wasm","expected_exit":1},
-    {"name":"surface_text_input","src_path":"examples/surface_text_input.tetra","target_group":"wasm","expected_exit":42},
-    {"name":"wasm_multi_return_2_smoke","src_path":"examples/wasm_multi_return_2_smoke.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"wasm_multi_return_3_smoke","src_path":"examples/wasm_multi_return_3_smoke.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"wasm_multi_return_4_smoke","src_path":"examples/wasm_multi_return_4_smoke.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"dogfood_wasi","src_path":"examples/projects/dogfood_wasi/src/main.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"dogfood_web_ui","src_path":"examples/projects/dogfood_web_ui/src/main.tetra","target_group":"wasm","expected_exit":0},
-    {"name":"time_sleep_smoke","src_path":"examples/time_sleep_smoke.tetra","target_group":"wasm","expected_exit":0,"unsupported":true,"expected_diagnostic":"runtime not supported on wasm32"},
-    {"name":"task_smoke","src_path":"examples/task_smoke.tetra","target_group":"wasm","expected_exit":42,"unsupported":true,"expected_diagnostic":"runtime not supported on wasm32"},
-    {"name":"actors_pingpong","src_path":"examples/actors_pingpong.tetra","target_group":"wasm","expected_exit":0,"unsupported":true,"expected_diagnostic":"runtime not supported on wasm32"}
+    {
+      "name": "legacy_hello",
+      "src_path": "examples/smoke/basic/hello.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "effects_io_smoke",
+      "src_path": "examples/effects/effects_io_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "ui_web_smoke",
+      "src_path": "examples/ui/ui_web_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "core_slices_smoke",
+      "src_path": "examples/core/data/core_slices_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 42
+    },
+    {
+      "name": "wasm_globals_smoke",
+      "src_path": "examples/wasm/wasm_globals_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "surface_counter",
+      "src_path": "examples/surface/runtime/surface_counter.tetra",
+      "target_group": "wasm",
+      "expected_exit": 1
+    },
+    {
+      "name": "surface_text_input",
+      "src_path": "examples/surface/runtime/surface_text_input.tetra",
+      "target_group": "wasm",
+      "expected_exit": 42
+    },
+    {
+      "name": "wasm_multi_return_2_smoke",
+      "src_path": "examples/wasm/wasm_multi_return_2_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "wasm_multi_return_3_smoke",
+      "src_path": "examples/wasm/wasm_multi_return_3_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "wasm_multi_return_4_smoke",
+      "src_path": "examples/wasm/wasm_multi_return_4_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "dogfood_wasi",
+      "src_path": "examples/projects/dogfood_wasi/src/main.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "dogfood_web_ui",
+      "src_path": "examples/projects/dogfood_web_ui/src/main.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0
+    },
+    {
+      "name": "time_sleep_smoke",
+      "src_path": "examples/async/time_sleep_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0,
+      "unsupported": true,
+      "expected_diagnostic": "runtime not supported on wasm32"
+    },
+    {
+      "name": "task_smoke",
+      "src_path": "examples/tasks/task_smoke.tetra",
+      "target_group": "wasm",
+      "expected_exit": 42,
+      "unsupported": true,
+      "expected_diagnostic": "runtime not supported on wasm32"
+    },
+    {
+      "name": "actors_pingpong",
+      "src_path": "examples/actors/actors_pingpong.tetra",
+      "target_group": "wasm",
+      "expected_exit": 0,
+      "unsupported": true,
+      "expected_diagnostic": "runtime not supported on wasm32"
+    }
   ],
   "excluded_examples": [
     {"src_path":"examples/excluded.t4","reason":"not part of wasm32-web smoke profile"}
