@@ -1,0 +1,74 @@
+// Settings form scene built through the experimental Morph Capsule recipe layer.
+module examples.surface_morph_settings
+
+import lib.core.surface as surface
+import lib.core.block as block
+import lib.core.morph as morph
+
+func root_block(rect: surface.Rect) -> block.Block:
+    let paint: block.PaintSpec = block.paint_stack2(
+        block.paint_layer_fill_radius(morph.theme_dark(), 0),
+        block.paint_layer_overlay(morph.accent(), 26, 0)
+    )
+    let props: block.BlockProps = block.props(block.layout_row(rect, 12), paint, block.text_none(), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_text(13), block.asset_none())
+    return block.make(block.id(1), block.id_none(), props)
+
+func scene_checksum() -> Int:
+    let hover: block.StateSelector = block.state_selector_hover()
+    let focus: block.StateSelector = block.state_selector_focused()
+    let pressed: block.StateSelector = block.state_selector_pressed()
+    let motion: block.MotionSpec = block.motion_transition(120, 0, block.motion_ease_standard(), true, true, true, 0, -2, 102)
+    let field: block.PaintSpec = morph.field_paint()
+    let hover_border: Int = block.state_resolve_int(1, 2, hover, hover)
+    let focus_state: block.StateSpec = block.state_resolve(block.state_base(), block.state_with_selector(focus, 4), focus)
+    let focus_variant: Int = focus_state.variant
+    let pressed_scale: Int = block.motion_resolve_scale(motion, 60)
+    if block.state_selector_matches(pressed, pressed):
+        return block.paint_feature_flags(field) + hover_border + focus_variant + pressed_scale
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 480, h: 300)
+    let panel_rect: surface.Rect = surface.Rect(x: 32, y: 24, w: 416, h: 252)
+    let name_label_rect: surface.Rect = surface.Rect(x: 56, y: 64, w: 150, h: 18)
+    let name_rect: surface.Rect = surface.Rect(x: 56, y: 86, w: 368, h: 42)
+    let email_label_rect: surface.Rect = surface.Rect(x: 56, y: 142, w: 150, h: 18)
+    let email_rect: surface.Rect = surface.Rect(x: 56, y: 164, w: 368, h: 42)
+    let save_rect: surface.Rect = surface.Rect(x: 188, y: 222, w: 108, h: 36)
+    let reset_rect: surface.Rect = surface.Rect(x: 312, y: 222, w: 108, h: 36)
+
+    let capsule: morph.Capsule = morph.capsule_default()
+    let panel_recipe: morph.Recipe = morph.recipe_region_panel()
+    let field_recipe: morph.Recipe = morph.recipe_field_text()
+    let action_recipe: morph.Recipe = morph.recipe_control_action()
+
+    var tree: block.BlockTree = block.tree_init(10)
+    let root: Int = block.tree_add_root(tree, root_block(root_rect), root_rect)
+    let panel: Int = block.tree_add_child(tree, block.id(1), morph.expand_region_panel(2, 1, panel_rect, 8), panel_rect)
+    let name_label: Int = block.tree_add_child(tree, block.id(2), morph.expand_label(3, 2, 4, name_label_rect, 12), name_label_rect)
+    let name_field: Int = block.tree_add_child(tree, block.id(2), morph.expand_field_text(4, 2, 3, name_rect, 14, 12), name_rect)
+    let email_label: Int = block.tree_add_child(tree, block.id(2), morph.expand_label(5, 2, 6, email_label_rect, 13), email_label_rect)
+    let email_field: Int = block.tree_add_child(tree, block.id(2), morph.expand_field_text(6, 2, 5, email_rect, 16, 14), email_rect)
+    let save: Int = block.tree_add_child(tree, block.id(2), morph.expand_control_action(7, 2, save_rect, 13, 701, true), save_rect)
+    let reset: Int = block.tree_add_child(tree, block.id(2), morph.expand_control_action(8, 2, reset_rect, 5, 702, false), reset_rect)
+
+    let panel_expansion: morph.RecipeExpansion = morph.recipe_expansion(panel_recipe, block.id(2))
+    let field_expansion: morph.RecipeExpansion = morph.recipe_expansion(field_recipe, block.id(4))
+    let action_expansion: morph.RecipeExpansion = morph.recipe_expansion(action_recipe, block.id(7))
+    let valid: Int = block.tree_validate(tree)
+    let focus0: Int = block.id_value(block.focus_order_at(tree, 0))
+    let focus3: Int = block.id_value(block.focus_order_at(tree, 3))
+
+    if root == 1 && panel == 2 && name_label == 3 && name_field == 4 && email_label == 5 && email_field == 6 && save == 7 && reset == 8 &&
+       valid == block.tree_error_ok() &&
+       focus0 == 4 && focus3 == 8 &&
+       morph.capsule_valid(capsule) &&
+       morph.accessibility_projection_ok(3, 4, 12) &&
+       morph.expansion_valid(panel_expansion) &&
+       morph.expansion_valid(field_expansion) &&
+       morph.expansion_valid(action_expansion) &&
+       morph.memory_budget_ok(block.tree_len(tree), 4, 480 * 300 * 4) &&
+       scene_checksum() > 0:
+        return 0
+    return 1
