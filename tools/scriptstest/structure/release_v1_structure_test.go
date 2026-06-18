@@ -385,3 +385,24 @@ func TestReleaseV1TestsAreSplitByFixtureDomain(t *testing.T) {
 		}
 	}
 }
+
+func TestTestAllBehaviorFixtureIsCanonicalInScriptstest(t *testing.T) {
+	path := filepath.Join(repoRoot(t), "cli", "cmd", "tetra", "test_all_script_test.go")
+	raw, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return
+	}
+	if err != nil {
+		t.Fatalf("read cli test-all smoke test: %v", err)
+	}
+	text := string(raw)
+	for _, forbidden := range []string{
+		"func TestTestAllScriptKeepGoingJSONOnly(",
+		"./tools/cmd/ram-contract-fuzz-short",
+		"scripts/ci/test-all.sh\", scriptRaw",
+	} {
+		if strings.Contains(text, forbidden) {
+			t.Fatalf("cli/cmd/tetra/test_all_script_test.go must not duplicate test-all behavior fixture %q; keep it in tools/scriptstest", forbidden)
+		}
+	}
+}

@@ -91,6 +91,12 @@ func TestTypedActorOwnershipTransferCoverageCoversP18PlanList(t *testing.T) {
 			t.Fatalf("wrapper matrix row missing fact %q: %#v", want, wrapperRow.RequiredFacts)
 		}
 	}
+	wrapperRow := byID[TypedActorOwnershipWrapperPayloadRejection]
+	for _, want := range []string{"optional wrapper borrowed payload rejected", "generic wrapper borrowed payload rejected", "function-typed wrapper payload rejected"} {
+		if !hasOwnershipTransferText(wrapperRow.RequiredFacts, want) {
+			t.Fatalf("wrapper matrix row missing fact %q: %#v", want, wrapperRow.RequiredFacts)
+		}
+	}
 	for _, want := range []string{"owned region can move", "bytes_copied=0", "zero_copy_move"} {
 		if !hasOwnershipTransferText(byID[TypedActorOwnershipOwnedRegionMove].RequiredFacts, want) {
 			t.Fatalf(
