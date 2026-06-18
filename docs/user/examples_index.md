@@ -118,6 +118,7 @@ or Modal primitives.
 - `settings`
 - `dashboard`
 - `editor-shell`
+- `studio-shell`
 - `multi-window-notes`
 - `web-canvas`
 

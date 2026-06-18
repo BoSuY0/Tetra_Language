@@ -83,7 +83,9 @@ sources.
 ./tetra doctor --format=json
 ./tetra actor-net --addr 127.0.0.1:47777 --report reports/actornet.json
 ./tetra smoke --list --format=json
+./tetra smoke --list --format=toon
 ./tetra smoke --target linux-x64 --run=true --report reports/smoke-linux.json
+./tetra smoke --target linux-x64 --run=false --report reports/smoke-linux.json --report-format=both
 ```
 
 The current target truth is documented in
@@ -151,6 +153,7 @@ alias for local package paths.
 ./tetra check --diagnostics=json examples/flow_hello.tetra
 ./tetra build --diagnostics=json examples/flow_hello.tetra
 ./tetra test --report=json examples
+./tetra test --report=toon examples
 ```
 
 JSON diagnostics use stable fields for tooling: `code`, `message`, `file`,
@@ -165,6 +168,10 @@ go test ./tools/cmd/validate-diagnostic/... -count=1
 The validator accepts severities `error`, `warning`, `info`, and `hint`, and it
 requires `file`, `line`, and `column` to appear together when a source position
 is present.
+
+TOON is opt-in for selected structured reports. JSON remains the default and
+canonical format, while `--report-format=both` writes a `.toon` mirror beside
+the JSON path when that command supports it.
 
 ## Plan250 CLI Evidence
 

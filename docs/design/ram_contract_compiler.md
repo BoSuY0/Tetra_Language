@@ -32,8 +32,12 @@ pipeline entrypoint coverage, and cross-file heap/copy/grade consistency.
 - `memory-grade-report.json`: `tetra.memory-grade-report.v1`.
 - `proof-store-summary.json`: `tetra.proof-store-summary.v1`.
 - `validation-pipeline-coverage.json`: `tetra.validation-pipeline-coverage.v1`.
-- `heap-blockers.json`: heap blocker rows.
-- `copy-blockers.json`: copy blocker rows.
+- `heap-blockers.json`: heap blocker rows with source location status,
+  severity, reason, fix hint, evidence/proof reference, and conservative
+  `safe_to_optimize` metadata.
+- `copy-blockers.json`: copy blocker rows with copy kind, source/destination
+  values, byte estimate, safety reason, fix hint, and conservative
+  `safe_to_optimize` metadata.
 - `fuzz/ram-contract-fuzz-oracle.json`: deterministic fake-evidence mutation
   evidence with validator commands, non-zero exits, excerpts, and mutated file
   paths.
@@ -47,6 +51,8 @@ The compiler accepts `--emit-ram-contract-report`, `--fail-if-heap`,
 `--ram-contract`. The release gate is
 `scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh`; it validates every
 artifact before upload and rejects stale report directories.
+Its machine-readable gate contract is
+`scripts/release/post_v0_4/contracts/ram-contract-linux-x64.json`.
 
 ## Nonclaims
 

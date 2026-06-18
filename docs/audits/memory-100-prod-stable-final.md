@@ -12,6 +12,14 @@ This audit covers the local Linux-x64 Memory100 prod-stable aggregate evidence
 created by `scripts/release/post_v0_4/memory-100-prod-stable-gate.sh` and the
 final local ladder under `reports/memory-100/final/`.
 
+Contract refactor note (2026-06-16): the gate's machine-readable contract is
+`scripts/release/post_v0_4/contracts/memory-100-prod-stable-linux-x64.json`.
+It enumerates the same scoped aggregate manifest, nested Memory Production,
+nested RAM Contract, integrated Memory/Islands/Surface, raw/allocation/proof,
+runtime-memory, fuzz, semantic-safety, leak/resource, docs claim-policy, and
+artifact-hash evidence surfaces that the validator already requires. This does
+not upgrade the dirty-checkout downgrade or add a universal Memory 100% claim.
+
 The original aggregate gate produced scoped local evidence. A later current
 dirty-tier refresh produced the plan-aligned verdict:
 `MEMORY100_SCOPED_READY_DIRTY`.

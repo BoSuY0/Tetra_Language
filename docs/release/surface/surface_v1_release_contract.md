@@ -34,6 +34,27 @@ The product gate is mandatory product evidence. It is not the final
 `PROD_STABLE_SCOPED` verdict; `docs/release/surface_product_readiness_audit.md`
 and the final verdict are owned by P29.
 
+## Machine-Readable Gate Contract
+
+`scripts/release/surface/contracts/surface-release-v1.json` is the
+machine-readable gate contract for the same Surface v1 docs/gate surface. It
+uses `schema:"tetra.gate-contract.v1"` and `id:"surface-release-v1"`, lists 33
+required reports, 33 CI artifacts, 41 ordered steps, and 14 validators, and
+binds claim ids `surface_release_required_reports`, `crash_reporting`,
+`surface_release_summary`, `artifact_hash_integrity`, `release_state_current`,
+and `unsupported_target_nonclaim_evidence`. It also records nonclaim ids
+`not_remote_ci_execution` and `not_unsupported_target_runtime_support`.
+
+The shell release/product gates remain the evidence producers. The JSON
+contract, dry-run plan, and validators prevent docs/manifest/claim drift; they
+do not prove remote CI execution, do not promote macOS/Windows runtime support,
+and do not mean `run-gate` executes the gate yet. Run the dry-run plan against
+an empty report directory:
+
+```sh
+go run ./tools/cmd/run-gate --contract scripts/release/surface/contracts/surface-release-v1.json --report-dir reports/surface-product-v1 --dry-run --json
+```
+
 ## Supported
 
 - pure-Tetra user UI code
@@ -236,7 +257,7 @@ runtime, browser devtools, React devtools, and hidden state dependencies.
 
 `surface-template-smoke-v1` is onboarding evidence for generated Surface
 projects. The release gate must include `surface-template-smoke.json` with
-`tetra.surface.template-smoke.v1`, all six template kinds, generated app
+`tetra.surface.template-smoke.v1`, all seven template kinds, generated app
 check/build/run rows, inspector evidence, visual diff evidence, package
 artifacts, and negative guards against React/Electron/runtime imports,
 DOM-authored app UI trees, CSS runtime dependencies, core widget primitives,
@@ -260,8 +281,10 @@ the migration compatibility example.
 Linux/web release scope. The release gate must include `surface-package.json`
 with `tetra.surface.package.v1`, `surface-app-package-v1` manifests,
 linux-x64 and wasm32-web tar.gz artifacts, local asset sha256 hashes, installed
-linux-x64 package execution for a reference app, web bundle HTML/wasm/
-compiler-owned loader output, and a hash-pinned
+linux-x64 package execution for the default reference app or an explicitly
+named product-slice app such as `studio-shell`, web bundle HTML/wasm/
+compiler-owned loader output, explicit expected app-state exit code when it is
+nonzero, and a hash-pinned
 `tetra.surface.update-channel.v1` manifest. Negative guards must reject
 docs-only package claims, remote asset fetching, signing or notarization claims
 without platform evidence, and automatic runtime or network update claims

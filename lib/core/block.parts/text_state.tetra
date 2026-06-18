@@ -1,0 +1,687 @@
+module lib.core.block
+
+func text_none() -> TextSpec:
+    return TextSpec(text_len: 0, r: 0, g: 0, b: 0, a: 0, font_size: 0, font_weight: 0, line_height: 0, flags: 0, placeholder_len: 0)
+
+func text_label(text_len: Int, color: surface.Color) -> TextSpec:
+    return TextSpec(text_len: text_len, r: color.r, g: color.g, b: color.b, a: color.a, font_size: 14, font_weight: 400, line_height: 18, flags: 0, placeholder_len: 0)
+
+func text_editable(text_len: Int, placeholder_len: Int, color: surface.Color) -> TextSpec:
+    return TextSpec(text_len: text_len, r: color.r, g: color.g, b: color.b, a: color.a, font_size: 14, font_weight: 400, line_height: 18, flags: 1, placeholder_len: placeholder_len)
+
+func text_family_system() -> Int:
+    return 1
+
+func text_family_ui() -> Int:
+    return 2
+
+func text_family_monospace() -> Int:
+    return 3
+
+func text_align_start() -> Int:
+    return 1
+
+func text_align_center() -> Int:
+    return 2
+
+func text_align_end() -> Int:
+    return 3
+
+func text_wrap_none() -> Int:
+    return 0
+
+func text_wrap_word() -> Int:
+    return 1
+
+func text_wrap_char() -> Int:
+    return 2
+
+func text_overflow_clip() -> Int:
+    return 0
+
+func text_overflow_ellipsis() -> Int:
+    return 1
+
+func text_feature_editable() -> Int:
+    return 1
+
+func text_feature_fallback() -> Int:
+    return 2
+
+func text_flags(family: Int, align: Int, wrap: Int, overflow: Int) -> Int:
+    return text_feature_fallback() + family * 10 + align * 100 + wrap * 1000 + overflow * 10000
+
+func text_flags_editable(family: Int, align: Int, wrap: Int, overflow: Int) -> Int:
+    return text_flags(family, align, wrap, overflow) + text_feature_editable()
+
+func text_clamp_opacity(opacity: Int, fallback: Int) -> Int:
+    if opacity <= 0:
+        return fallback
+    if opacity > 255:
+        return 255
+    return opacity
+
+func text_styled(text_len: Int, color: surface.Color, family: Int, font_size: Int, font_weight: Int, line_height: Int, align: Int, wrap: Int, overflow: Int, opacity: Int) -> TextSpec:
+    return TextSpec(text_len: text_len, r: color.r, g: color.g, b: color.b, a: text_clamp_opacity(opacity, color.a), font_size: font_size, font_weight: font_weight, line_height: line_height, flags: text_flags(family, align, wrap, overflow), placeholder_len: 0)
+
+func text_editable_styled(text_len: Int, placeholder_len: Int, color: surface.Color, family: Int, font_size: Int, font_weight: Int, line_height: Int, align: Int, wrap: Int, overflow: Int, opacity: Int) -> TextSpec:
+    return TextSpec(text_len: text_len, r: color.r, g: color.g, b: color.b, a: text_clamp_opacity(opacity, color.a), font_size: font_size, font_weight: font_weight, line_height: line_height, flags: text_flags_editable(family, align, wrap, overflow), placeholder_len: placeholder_len)
+
+func text_is_editable(spec: TextSpec) -> Bool:
+    return spec.flags % 2 == 1
+
+func text_has_fallback(spec: TextSpec) -> Bool:
+    return spec.flags / text_feature_fallback() % 2 == 1
+
+func text_family_value(spec: TextSpec) -> Int:
+    let value: Int = spec.flags / 10 % 10
+    if value <= 0:
+        return text_family_system()
+    return value
+
+func text_align_value(spec: TextSpec) -> Int:
+    let value: Int = spec.flags / 100 % 10
+    if value <= 0:
+        return text_align_start()
+    return value
+
+func text_wrap_value(spec: TextSpec) -> Int:
+    return spec.flags / 1000 % 10
+
+func text_overflow_value(spec: TextSpec) -> Int:
+    return spec.flags / 10000 % 10
+
+func text_effective_font_size(spec: TextSpec) -> Int:
+    if spec.font_size <= 0:
+        return 14
+    return spec.font_size
+
+func text_effective_line_height(spec: TextSpec) -> Int:
+    if spec.line_height <= 0:
+        return text_effective_font_size(spec) + 4
+    return spec.line_height
+
+func text_char_width(spec: TextSpec) -> Int:
+    var width: Int = text_effective_font_size(spec) * 6 / 10
+    if spec.font_weight >= 600:
+        width = width + 1
+    if text_family_value(spec) == text_family_monospace():
+        width = width + 1
+    if width < 1:
+        return 1
+    return width
+
+func text_raw_width(spec: TextSpec) -> Int:
+    return spec.text_len * text_char_width(spec)
+
+func text_wrap_line_count(spec: TextSpec, max_width: Int) -> Int:
+    if spec.text_len <= 0:
+        return 1
+    if text_wrap_value(spec) == text_wrap_none() || max_width <= 0:
+        return 1
+    let char_width: Int = text_char_width(spec)
+    var chars_per_line: Int = max_width / char_width
+    if chars_per_line < 1:
+        chars_per_line = 1
+    return (spec.text_len + chars_per_line - 1) / chars_per_line
+
+func text_ellipsized_len(spec: TextSpec, max_width: Int) -> Int:
+    if spec.text_len <= 0:
+        return 0
+    if text_overflow_value(spec) != text_overflow_ellipsis() || max_width <= 0:
+        return spec.text_len
+    let char_width: Int = text_char_width(spec)
+    var chars: Int = max_width / char_width
+    if chars >= spec.text_len:
+        return spec.text_len
+    if chars <= 3:
+        return chars
+    return chars - 3
+
+func text_measure(spec: TextSpec, max_width: Int) -> surface.Size:
+    let lines: Int = text_wrap_line_count(spec, max_width)
+    var width: Int = text_raw_width(spec)
+    if max_width > 0 && width > max_width:
+        width = max_width
+    if width <= 0 && spec.text_len > 0:
+        width = text_char_width(spec)
+    return surface.Size(w: width, h: text_effective_line_height(spec) * lines)
+
+func text_measure_width(spec: TextSpec, max_width: Int) -> Int:
+    let measured: surface.Size = text_measure(spec, max_width)
+    return measured.w
+
+func text_measure_height(spec: TextSpec, max_width: Int) -> Int:
+    let measured: surface.Size = text_measure(spec, max_width)
+    return measured.h
+
+func text_font_fallback_chain_len(spec: TextSpec) -> Int:
+    if text_has_fallback(spec):
+        return 3
+    return 1
+
+func text_glyph_cache_budget_bytes() -> Int:
+    return 65536
+
+func text_glyph_cache_entry_limit() -> Int:
+    return 512
+
+func text_cache_error_ok() -> Int:
+    return 0
+
+func text_cache_error_unbounded() -> Int:
+    return 1
+
+func text_cache_error_over_budget() -> Int:
+    return 2
+
+func text_cache_error_too_many_entries() -> Int:
+    return 3
+
+func text_glyph_cache_validate(budget_bytes: Int, used_bytes: Int, entry_count: Int) -> Int:
+    if budget_bytes <= 0 || budget_bytes > text_glyph_cache_budget_bytes():
+        return text_cache_error_unbounded()
+    if used_bytes < 0 || used_bytes > budget_bytes:
+        return text_cache_error_over_budget()
+    if entry_count < 0 || entry_count > text_glyph_cache_entry_limit():
+        return text_cache_error_too_many_entries()
+    return text_cache_error_ok()
+
+func image_none() -> ImageSpec:
+    return ImageSpec(asset_kind: 0, asset_index: -1, width: 0, height: 0, fit: 0, opacity: 0, tint_r: 0, tint_g: 0, tint_b: 0, tint_a: 0)
+
+func image_asset(asset: AssetRef, width: Int, height: Int) -> ImageSpec:
+    return ImageSpec(asset_kind: asset.kind, asset_index: asset.index, width: width, height: height, fit: 1, opacity: 255, tint_r: 255, tint_g: 255, tint_b: 255, tint_a: 255)
+
+func image_asset_tinted_scaled(asset: AssetRef, width: Int, height: Int, tint: surface.Color, scale: Int) -> ImageSpec:
+    return ImageSpec(asset_kind: asset.kind, asset_index: asset.index, width: width, height: height, fit: scale, opacity: tint.a, tint_r: tint.r, tint_g: tint.g, tint_b: tint.b, tint_a: tint.a)
+
+func input_none() -> InputSpec:
+    return InputSpec(accepts_pointer: false, accepts_keyboard: false, accepts_text: false, focusable: false, disabled: false, cursor: 0)
+
+func input_clickable() -> InputSpec:
+    return InputSpec(accepts_pointer: true, accepts_keyboard: true, accepts_text: false, focusable: true, disabled: false, cursor: 1)
+
+func input_text() -> InputSpec:
+    return InputSpec(accepts_pointer: true, accepts_keyboard: true, accepts_text: true, focusable: true, disabled: false, cursor: 2)
+
+func input_disabled(input: InputSpec) -> InputSpec:
+    return InputSpec(accepts_pointer: input.accepts_pointer, accepts_keyboard: input.accepts_keyboard, accepts_text: input.accepts_text, focusable: false, disabled: true, cursor: input.cursor)
+
+func action_none() -> Int:
+    return 0
+
+func action_primary() -> Int:
+    return 1
+
+func action_secondary() -> Int:
+    return 2
+
+func event_kind_pointer_enter() -> Int:
+    return 1
+
+func event_kind_pointer_leave() -> Int:
+    return 2
+
+func event_kind_pointer_move() -> Int:
+    return 3
+
+func event_kind_pointer_down() -> Int:
+    return 4
+
+func event_kind_pointer_up() -> Int:
+    return 5
+
+func event_kind_click() -> Int:
+    return 6
+
+func event_kind_double_click() -> Int:
+    return 7
+
+func event_kind_key() -> Int:
+    return 8
+
+func event_kind_text() -> Int:
+    return 9
+
+func event_kind_focus() -> Int:
+    return 10
+
+func event_kind_blur() -> Int:
+    return 11
+
+func event_kind_scroll() -> Int:
+    return 12
+
+func event_kind_resize() -> Int:
+    return 13
+
+func event_kind_close() -> Int:
+    return 14
+
+func event_kind_frame() -> Int:
+    return 15
+
+func event_policy_capture_bubble_direct() -> Int:
+    return 1
+
+func event_route_delivered() -> Int:
+    return 1
+
+func event_route_rejected_disabled() -> Int:
+    return 2
+
+func event_route_rejected_unfocused() -> Int:
+    return 3
+
+func event_route_rejected_not_accepted() -> Int:
+    return 4
+
+func event_route_rejected_not_editable() -> Int:
+    return 5
+
+func event_kind_is_pointer(kind: Int) -> Bool:
+    return kind == event_kind_pointer_enter() || kind == event_kind_pointer_leave() || kind == event_kind_pointer_move() || kind == event_kind_pointer_down() || kind == event_kind_pointer_up() || kind == event_kind_click() || kind == event_kind_double_click()
+
+func event_dispatch_status(input: InputSpec, kind: Int, focused: Bool) -> Int:
+    if input.disabled:
+        return event_route_rejected_disabled()
+    if kind == event_kind_text():
+        if !input.accepts_text:
+            return event_route_rejected_not_editable()
+        if !focused:
+            return event_route_rejected_unfocused()
+        return event_route_delivered()
+    if kind == event_kind_key():
+        if !input.accepts_keyboard:
+            return event_route_rejected_not_accepted()
+        if !focused:
+            return event_route_rejected_unfocused()
+        return event_route_delivered()
+    if event_kind_is_pointer(kind):
+        if input.accepts_pointer:
+            return event_route_delivered()
+        return event_route_rejected_not_accepted()
+    if kind == event_kind_focus() || kind == event_kind_blur():
+        if input.focusable:
+            return event_route_delivered()
+        return event_route_rejected_not_accepted()
+    return event_route_delivered()
+
+func event_none() -> EventSpec:
+    return EventSpec(click_action: action_none(), pointer_action: action_none(), key_action: action_none(), text_action: action_none(), submit_action: action_none())
+
+func event_click(action: Int) -> EventSpec:
+    return EventSpec(click_action: action, pointer_action: action, key_action: action, text_action: action_none(), submit_action: action)
+
+func event_text(action: Int) -> EventSpec:
+    return EventSpec(click_action: action_none(), pointer_action: action_none(), key_action: action_none(), text_action: action, submit_action: action_none())
+
+func state_selector_none() -> StateSelector:
+    return StateSelector(hovered: false, pressed: false, focused: false, selected: false, disabled: false, error: false, loading: false)
+
+func state_selector(hovered: Bool, pressed: Bool, focused: Bool, selected: Bool, disabled: Bool, error: Bool, loading: Bool) -> StateSelector:
+    return StateSelector(hovered: hovered, pressed: pressed, focused: focused, selected: selected, disabled: disabled, error: error, loading: loading)
+
+func state_selector_hover() -> StateSelector:
+    return state_selector(true, false, false, false, false, false, false)
+
+func state_selector_pressed() -> StateSelector:
+    return state_selector(false, true, false, false, false, false, false)
+
+func state_selector_focused() -> StateSelector:
+    return state_selector(false, false, true, false, false, false, false)
+
+func state_selector_selected() -> StateSelector:
+    return state_selector(false, false, false, true, false, false, false)
+
+func state_selector_disabled() -> StateSelector:
+    return state_selector(false, false, false, false, true, false, false)
+
+func state_selector_error() -> StateSelector:
+    return state_selector(false, false, false, false, false, true, false)
+
+func state_selector_loading() -> StateSelector:
+    return state_selector(false, false, false, false, false, false, true)
+
+func state_flags(selector: StateSelector) -> Int:
+    var flags: Int = 0
+    if selector.hovered:
+        flags = flags + 1
+    if selector.pressed:
+        flags = flags + 2
+    if selector.focused:
+        flags = flags + 4
+    if selector.selected:
+        flags = flags + 8
+    if selector.disabled:
+        flags = flags + 16
+    if selector.error:
+        flags = flags + 32
+    if selector.loading:
+        flags = flags + 64
+    return flags
+
+func state_base() -> StateSpec:
+    return StateSpec(selector_flags: 0, variant: 0, selected: false, disabled: false, error: false, loading: false)
+
+func state_interactive() -> StateSpec:
+    let selector: StateSelector = StateSelector(hovered: false, pressed: false, focused: false, selected: false, disabled: false, error: false, loading: false)
+    return StateSpec(selector_flags: state_flags(selector), variant: 1, selected: false, disabled: false, error: false, loading: false)
+
+func state_variant(variant: Int) -> StateSpec:
+    return StateSpec(selector_flags: 0, variant: variant, selected: false, disabled: false, error: false, loading: false)
+
+func state_with_selector(selector: StateSelector, variant: Int) -> StateSpec:
+    return StateSpec(selector_flags: state_flags(selector), variant: variant, selected: selector.selected, disabled: selector.disabled, error: selector.error, loading: selector.loading)
+
+func state_resolver_order_base() -> Int:
+    return 1
+
+func state_resolver_order_variant() -> Int:
+    return 2
+
+func state_resolver_order_hover() -> Int:
+    return 3
+
+func state_resolver_order_pressed() -> Int:
+    return 4
+
+func state_resolver_order_focused() -> Int:
+    return 5
+
+func state_resolver_order_selected() -> Int:
+    return 6
+
+func state_resolver_order_disabled() -> Int:
+    return 7
+
+func state_resolver_order_error() -> Int:
+    return 8
+
+func state_resolver_order_loading() -> Int:
+    return 9
+
+func state_resolver_order_motion() -> Int:
+    return 10
+
+func state_flags_has(flags: Int, bit: Int) -> Bool:
+    if bit <= 0:
+        return false
+    let bucket: Int = flags / bit
+    return bucket % 2 == 1
+
+func state_flags_match(active_flags: Int, selector_flags: Int) -> Bool:
+    if selector_flags == 0:
+        return true
+    if state_flags_has(selector_flags, 1):
+        if !state_flags_has(active_flags, 1):
+            return false
+    if state_flags_has(selector_flags, 2):
+        if !state_flags_has(active_flags, 2):
+            return false
+    if state_flags_has(selector_flags, 4):
+        if !state_flags_has(active_flags, 4):
+            return false
+    if state_flags_has(selector_flags, 8):
+        if !state_flags_has(active_flags, 8):
+            return false
+    if state_flags_has(selector_flags, 16):
+        if !state_flags_has(active_flags, 16):
+            return false
+    if state_flags_has(selector_flags, 32):
+        if !state_flags_has(active_flags, 32):
+            return false
+    if state_flags_has(selector_flags, 64):
+        if !state_flags_has(active_flags, 64):
+            return false
+    return true
+
+func state_selector_matches(active: StateSelector, selector: StateSelector) -> Bool:
+    return state_flags_match(state_flags(active), state_flags(selector))
+
+func state_resolve(base: StateSpec, override: StateSpec, active: StateSelector) -> StateSpec:
+    if !state_flags_match(state_flags(active), override.selector_flags):
+        return base
+    var variant: Int = base.variant
+    if override.variant != 0:
+        variant = override.variant
+    var selected: Bool = base.selected
+    var disabled: Bool = base.disabled
+    var error: Bool = base.error
+    var loading: Bool = base.loading
+    if override.selected:
+        selected = true
+    if override.disabled:
+        disabled = true
+    if override.error:
+        error = true
+    if override.loading:
+        loading = true
+    return StateSpec(selector_flags: base.selector_flags + override.selector_flags, variant: variant, selected: selected, disabled: disabled, error: error, loading: loading)
+
+func state_resolve_int(base: Int, override: Int, active: StateSelector, selector: StateSelector) -> Int:
+    if state_selector_matches(active, selector):
+        return override
+    return base
+
+func motion_ease_none() -> Int:
+    return 0
+
+func motion_ease_linear() -> Int:
+    return 1
+
+func motion_ease_standard() -> Int:
+    return 2
+
+func motion_quality_level() -> Int:
+    return 1
+
+func motion_clock_deterministic() -> Int:
+    return 1
+
+func motion_clamp_nonnegative(value: Int) -> Int:
+    if value < 0:
+        return 0
+    return value
+
+func motion_clamp_scale(value: Int) -> Int:
+    if value <= 0:
+        return 100
+    return value
+
+func motion_none() -> MotionSpec:
+    return MotionSpec(duration_ms: 0, delay_ms: 0, easing: motion_ease_none(), reduced: false, animate_opacity: false, animate_color: false, animate_transform: false, translate_x: 0, translate_y: 0, scale: 100)
+
+func motion_fast() -> MotionSpec:
+    return MotionSpec(duration_ms: 120, delay_ms: 0, easing: motion_ease_standard(), reduced: false, animate_opacity: true, animate_color: true, animate_transform: true, translate_x: 0, translate_y: 0, scale: 100)
+
+func motion_transition(duration_ms: Int, delay_ms: Int, easing: Int, animate_opacity: Bool, animate_color: Bool, animate_transform: Bool, translate_x: Int, translate_y: Int, scale: Int) -> MotionSpec:
+    return MotionSpec(duration_ms: motion_clamp_nonnegative(duration_ms), delay_ms: motion_clamp_nonnegative(delay_ms), easing: easing, reduced: false, animate_opacity: animate_opacity, animate_color: animate_color, animate_transform: animate_transform, translate_x: translate_x, translate_y: translate_y, scale: motion_clamp_scale(scale))
+
+func motion_reduced(motion: MotionSpec) -> MotionSpec:
+    return MotionSpec(duration_ms: motion.duration_ms, delay_ms: motion.delay_ms, easing: motion.easing, reduced: true, animate_opacity: motion.animate_opacity, animate_color: motion.animate_color, animate_transform: motion.animate_transform, translate_x: motion.translate_x, translate_y: motion.translate_y, scale: motion.scale)
+
+func motion_duration(motion: MotionSpec) -> Int:
+    return motion.duration_ms
+
+func motion_delay(motion: MotionSpec) -> Int:
+    return motion.delay_ms
+
+func motion_easing(motion: MotionSpec) -> Int:
+    return motion.easing
+
+func motion_total_ms(motion: MotionSpec) -> Int:
+    return motion.delay_ms + motion.duration_ms
+
+func motion_progress(motion: MotionSpec, elapsed_ms: Int) -> Int:
+    if motion.reduced:
+        return 1000
+    if motion.duration_ms <= 0:
+        return 1000
+    if elapsed_ms <= motion.delay_ms:
+        return 0
+    let local_ms: Int = elapsed_ms - motion.delay_ms
+    if local_ms >= motion.duration_ms:
+        return 1000
+    return local_ms * 1000 / motion.duration_ms
+
+func motion_lerp_int(start: Int, finish: Int, progress: Int) -> Int:
+    return start + (finish - start) * progress / 1000
+
+func motion_resolve_int(start: Int, finish: Int, motion: MotionSpec, elapsed_ms: Int) -> Int:
+    return motion_lerp_int(start, finish, motion_progress(motion, elapsed_ms))
+
+func motion_resolve_opacity(start: Int, finish: Int, motion: MotionSpec, elapsed_ms: Int) -> Int:
+    if !motion.animate_opacity:
+        return start
+    return motion_resolve_int(start, finish, motion, elapsed_ms)
+
+func motion_resolve_color_channel(start: Int, finish: Int, motion: MotionSpec, elapsed_ms: Int) -> Int:
+    if !motion.animate_color:
+        return start
+    return motion_resolve_int(start, finish, motion, elapsed_ms)
+
+func motion_resolve_translate_x(motion: MotionSpec, elapsed_ms: Int) -> Int:
+    if !motion.animate_transform:
+        return 0
+    return motion_resolve_int(0, motion.translate_x, motion, elapsed_ms)
+
+func motion_resolve_translate_y(motion: MotionSpec, elapsed_ms: Int) -> Int:
+    if !motion.animate_transform:
+        return 0
+    return motion_resolve_int(0, motion.translate_y, motion, elapsed_ms)
+
+func motion_resolve_scale(motion: MotionSpec, elapsed_ms: Int) -> Int:
+    if !motion.animate_transform:
+        return 100
+    return motion_resolve_int(100, motion.scale, motion, elapsed_ms)
+
+func motion_is_complete(motion: MotionSpec, elapsed_ms: Int) -> Bool:
+    return motion_progress(motion, elapsed_ms) >= 1000
+
+func motion_should_schedule(motion: MotionSpec, elapsed_ms: Int) -> Bool:
+    if motion.reduced:
+        return false
+    return !motion_is_complete(motion, elapsed_ms)
+
+func accessibility_role_none() -> Int:
+    return 0
+
+func accessibility_role_button() -> Int:
+    return 1
+
+func accessibility_role_text() -> Int:
+    return 2
+
+func accessibility_role_textbox() -> Int:
+    return 3
+
+func accessibility_role_checkbox() -> Int:
+    return 4
+
+func accessibility_role_navigation() -> Int:
+    return 5
+
+func accessibility_role_region() -> Int:
+    return 6
+
+func accessibility_role_dialog() -> Int:
+    return 7
+
+func accessibility_role_status() -> Int:
+    return 8
+
+func accessibility_none() -> AccessibilitySpec:
+    return AccessibilitySpec(role: accessibility_role_none(), label_len: 0, labelled_by: id_none(), described_by: id_none(), focus_order: -1, reading_order: -1, actions: 0, hidden: false)
+
+func accessibility_button(label_len: Int) -> AccessibilitySpec:
+    return AccessibilitySpec(role: accessibility_role_button(), label_len: label_len, labelled_by: id_none(), described_by: id_none(), focus_order: 0, reading_order: 0, actions: action_primary(), hidden: false)
+
+func accessibility_text(label_len: Int) -> AccessibilitySpec:
+    return AccessibilitySpec(role: accessibility_role_text(), label_len: label_len, labelled_by: id_none(), described_by: id_none(), focus_order: -1, reading_order: 0, actions: 0, hidden: false)
+
+func accessibility_label_for(label_len: Int, target_id: BlockID) -> AccessibilitySpec:
+    return AccessibilitySpec(role: accessibility_role_text(), label_len: label_len, labelled_by: id_none(), described_by: target_id, focus_order: -1, reading_order: 0, actions: 0, hidden: false)
+
+func accessibility_button_labelled_by(label_len: Int, label_id: BlockID, action: Int) -> AccessibilitySpec:
+    return AccessibilitySpec(role: accessibility_role_button(), label_len: label_len, labelled_by: label_id, described_by: id_none(), focus_order: 0, reading_order: 0, actions: action, hidden: false)
+
+func accessibility_textbox_labelled_by(label_len: Int, label_id: BlockID) -> AccessibilitySpec:
+    return AccessibilitySpec(role: accessibility_role_textbox(), label_len: label_len, labelled_by: label_id, described_by: id_none(), focus_order: 0, reading_order: 0, actions: action_primary(), hidden: false)
+
+func accessibility_checkbox(label_len: Int) -> AccessibilitySpec:
+    return AccessibilitySpec(role: accessibility_role_checkbox(), label_len: label_len, labelled_by: id_none(), described_by: id_none(), focus_order: 0, reading_order: 0, actions: action_primary(), hidden: false)
+
+func accessibility_navigation(label_len: Int) -> AccessibilitySpec:
+    return AccessibilitySpec(role: accessibility_role_navigation(), label_len: label_len, labelled_by: id_none(), described_by: id_none(), focus_order: -1, reading_order: 0, actions: 0, hidden: false)
+
+func accessibility_region(label_len: Int) -> AccessibilitySpec:
+    return AccessibilitySpec(role: accessibility_role_region(), label_len: label_len, labelled_by: id_none(), described_by: id_none(), focus_order: -1, reading_order: 0, actions: 0, hidden: false)
+
+func accessibility_dialog(label_len: Int) -> AccessibilitySpec:
+    return AccessibilitySpec(role: accessibility_role_dialog(), label_len: label_len, labelled_by: id_none(), described_by: id_none(), focus_order: 0, reading_order: 0, actions: action_primary(), hidden: false)
+
+func accessibility_status(label_len: Int) -> AccessibilitySpec:
+    return AccessibilitySpec(role: accessibility_role_status(), label_len: label_len, labelled_by: id_none(), described_by: id_none(), focus_order: -1, reading_order: 0, actions: 0, hidden: false)
+
+func accessibility_focusable_has_name(spec: AccessibilitySpec) -> Bool:
+    let focusable: Bool = spec.focus_order >= 0 || spec.actions > 0 || spec.role == accessibility_role_button() || spec.role == accessibility_role_textbox() || spec.role == accessibility_role_checkbox() || spec.role == accessibility_role_dialog()
+    if !focusable:
+        return true
+    return spec.label_len > 0 || id_value(spec.labelled_by) != id_value(id_none())
+
+func accessibility_relationship_matches(label: AccessibilitySpec, target: AccessibilitySpec, label_id: BlockID, target_id: BlockID) -> Bool:
+    return id_value(label.described_by) == id_value(target_id) && id_value(target.labelled_by) == id_value(label_id) && id_value(label_id) != id_value(id_none()) && id_value(target_id) != id_value(id_none())
+
+func accessibility_reading_order_matches(before: Int, after: Int) -> Bool:
+    return before >= 0 && after > before
+
+func accessibility_metadata_claim_scoped(platform_host_integration: Bool, dom_aria_integration: Bool, screen_reader_evidence: Bool) -> Bool:
+    return !platform_host_integration && !dom_aria_integration && !screen_reader_evidence
+
+func accessibility_screen_reader_claim_allowed(platform_host_integration: Bool, screen_reader_evidence: Bool) -> Bool:
+    if screen_reader_evidence:
+        return platform_host_integration
+    return true
+
+func input_flags(input: InputSpec) -> Int:
+    var flags: Int = input.cursor
+    if input.accepts_pointer:
+        flags = flags + 10
+    if input.accepts_keyboard:
+        flags = flags + 20
+    if input.accepts_text:
+        flags = flags + 40
+    if input.focusable:
+        flags = flags + 80
+    if input.disabled:
+        flags = flags + 160
+    return flags
+
+func props(layout: LayoutSpec, paint: PaintSpec, text: TextSpec, image: ImageSpec, input: InputSpec, event: EventSpec, state: StateSpec, motion: MotionSpec, accessibility: AccessibilitySpec, asset: AssetRef) -> BlockProps:
+    let interaction: Int = input_flags(input) + event.click_action + event.text_action + event.submit_action
+    let visual_asset: Int = image.asset_index + asset.hash - asset.hash
+    let state_summary: Int = state.selector_flags + state.variant
+    return BlockProps(layout_mode: layout.mode, paint_layers: paint.layer_count, text_len: text.text_len, visual_asset: visual_asset, interaction_flags: interaction, state_flags: state_summary, motion_ms: motion.duration_ms, accessibility_role: accessibility.role)
+
+func props_default(rect: surface.Rect) -> BlockProps:
+    return props(layout_fixed(rect), paint_empty(), text_none(), image_none(), input_none(), event_none(), state_base(), motion_none(), accessibility_none(), asset_none())
+
+func make(id: BlockID, parent_id: BlockID, props: BlockProps) -> Block:
+    return Block(id: id, parent_id: parent_id, props: props)
+
+func with_paint(block: Block, paint: PaintSpec) -> Block:
+    var next: Block = block
+    next.props.paint_layers = paint.layer_count
+    return next
+
+func with_text(block: Block, text: TextSpec) -> Block:
+    var next: Block = block
+    next.props.text_len = text.text_len
+    return next
+
+func with_accessibility(block: Block, accessibility: AccessibilitySpec) -> Block:
+    var next: Block = block
+    next.props.accessibility_role = accessibility.role
+    return next

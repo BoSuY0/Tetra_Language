@@ -26,6 +26,74 @@ go run ./tools/cmd/validate-surface-morph-stable-candidate \
 - Current target evidence is deterministic headless Morph evidence. Stable
   promotion needs target evidence for the scoped production Surface targets.
 
+## MRB-13 Audit, 2026-06-16
+
+MRB-13 does not promote Morph. It records a stable-promotion denial on the
+current evidence set.
+
+Evidence reviewed:
+
+- `reports/surface/mrb13-morph-rendered-beauty-gate-audit-20260616200009/morph-rendered-beauty-gate-summary.json`
+- `reports/surface/mrb13-product-slice-gate-audit-20260616200041/surface-product-slice-summary.json`
+- `reports/stabilization/surface_morph_rendered_beauty_mrb_13_stable_promotion_audit.md`
+
+Findings:
+
+- Morph rendered beauty gate status is `validated_with_target_blockers`, not
+  a full target promotion result.
+- `headless` is validated, but `linux-x64-real-window` and
+  `wasm32-web-browser-canvas` remain `BLOCKED` for Morph rendered beauty
+  product claim in the integrated gate.
+- Product-slice summary passes its current gate but keeps
+  `product_claim=false` and `final_signoff=false`.
+- The worktree is not clean, so this is not a clean-checkout promotion audit.
+- MRB-12 uses `morph.render_studio_shell_frame` as an evidence bridge for
+  Morph-authored flagship pixels. That helper must not be treated as a stable
+  renderer path or a new core primitive.
+
+Decision:
+
+- Current tier remains `EXPERIMENTAL`.
+- Target tier remains a future `PROD_STABLE_SCOPED` candidate only.
+- Stable promotion requires complete target evidence, explicit product/final
+  signoff, and replacement or strict nonclaim containment of the MRB-12 frame
+  rendering bridge.
+
+## Post-Audit Target Evidence Follow-Ups, 2026-06-16
+
+Later same-day follow-ups removed the explicit target blockers from newly
+generated Morph rendered beauty gates:
+
+- `wasm32-web-browser-canvas-morph` now provides app-produced browser-canvas
+  Morph frame evidence.
+- `linux-x64-real-window-morph` now provides app-produced real-window Morph
+  frame evidence through `wayland-shm-rgba`.
+- Fresh evidence:
+  `reports/surface/mrb-linux-real-window-morph-gate-final-20260616-verify/morph-rendered-beauty-gate-summary.json`
+  reports `status=validated`, validates `headless`, `linux-x64-real-window`,
+  and `wasm32-web-browser-canvas`, and has `target_blockers=[]`.
+
+This still does not promote Morph. The current tier remains `EXPERIMENTAL`
+because the worktree is dirty, product/final signoff remains false, and the
+MRB-12 frame rendering bridge is not yet renderer-owned stable proof.
+
+## Renderer-Owned Stable Proof Boundary
+
+Stable promotion requires a `renderer-owned stable proof` promotion gate. Morph
+rendered beauty reports may validate target artifacts, but any bridge-owned
+pixels from `morph.render_studio_shell_frame` are not sufficient for stable
+promotion.
+
+The promotion proof must be renderer-owned, Block-first, derived from the render
+command stream, and eligible for stable promotion in the
+`renderer_stable_proof` section of the Morph rendered beauty report.
+
+Post-MRB-13 follow-up evidence now satisfies that boundary for `headless`,
+`linux-x64-real-window`, and `wasm32-web-browser-canvas` through a
+command-stream-derived byte-for-byte frame checksum proof. Morph remains
+`EXPERIMENTAL` until clean checkout audit, product claim, and final signoff
+are intentionally promoted.
+
 ## Promotion Tiers
 
 - Current tier: `EXPERIMENTAL`.
@@ -34,8 +102,8 @@ go run ./tools/cmd/validate-surface-morph-stable-candidate \
 - Stable promotion validator status: disabled until P20+ evidence exists.
 
 Morph may be described as stable only after the stable-candidate contract, target
-evidence, visual regression evidence, claim scanner, release reports, and final
-product gate all pass on the same commit.
+evidence, renderer-owned stable proof, visual regression evidence, claim scanner,
+release reports, and final product gate all pass on the same commit.
 
 ## Stable Schema Set
 
@@ -71,6 +139,10 @@ Stable Morph promotion requires same-commit evidence for:
 - `linux-x64-real-window`
 - `wasm32-web-browser-canvas`
 
+The same-commit evidence must include renderer-owned stable proof. Target
+artifacts that are valid but bridge-owned remain product-slice evidence only and
+do not promote Morph.
+
 Windows and macOS remain outside the stable production claim until separate
 target-host evidence exists and the platform packets promote them.
 
@@ -89,4 +161,5 @@ The stable candidate validator must reject:
   `Modal`;
 - missing stable schema contracts, including `variant`;
 - stable promotion validator enabled before P20+ evidence exists;
+- missing `renderer-owned stable proof` promotion gate;
 - missing nonclaims or promotion gates.

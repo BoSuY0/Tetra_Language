@@ -197,6 +197,8 @@ and validates `reports/actor-runtime-foundation/final/artifact-hashes.json`,
 that through `.github/workflows/ci.yml`; package publishing records it through
 `.github/workflows/release-packages.yml` before upload/release/container/Homebrew
 publish steps.
+The machine-readable gate contract is
+`scripts/release/post_v0_4/contracts/actor-runtime-foundation-linux-x64.json`.
 
 Actor foundation nonclaims remain explicit: no full Erlang/OTP actor runtime
 claim, no cluster membership or reconnect/retry production claim, no non-Linux

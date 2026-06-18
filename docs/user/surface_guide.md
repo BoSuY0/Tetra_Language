@@ -222,15 +222,19 @@ tetra surface dev \
   --target linux-x64 \
   --out-dir reports/surface-dev-workflow/dev-artifacts \
   --report reports/surface-dev-workflow/surface-dev-workflow.json \
+  --morph-rendered-beauty-report reports/surface/morph-rendered-beauty.json \
   --change-file token:path/to/design/tokens.tetra \
   --change-file recipe:path/to/design/recipes.tetra \
   --change-file source:path/to/app/main.tetra
 ```
 
 The report records the initial build, warm-cache rebuild, token/recipe/source
-changed rebuilds, source diagnostics, and artifact hashes. It is intentionally
-described as fast rebuild evidence: it is not hot reload, not an Electron dev
-server, and not React Fast Refresh.
+changed rebuilds, source diagnostics, artifact hashes, and, when a validated
+`tetra.surface.morph-rendered-beauty.v1` report is attached, a
+`morph_to_pixels` chain for Morph tokens, recipe expansion, Block scene,
+render command stream, frame artifact, golden artifact, and diff metrics. It is
+intentionally described as fast rebuild evidence: it is not hot reload, not an
+Electron dev server, and not React Fast Refresh.
 
 ## Surface Inspector
 
@@ -241,6 +245,7 @@ a static `tetra.surface.inspector.v1` report:
 go run ./tools/cmd/surface-inspector \
   --runtime-report block:path/to/surface-headless-block-system.json \
   --runtime-report morph:path/to/surface-headless-morph.json \
+  --runtime-report morph-rendered-beauty:path/to/morph-rendered-beauty.json \
   --runtime-report app-model:path/to/surface-headless-app-model.json \
   --runtime-report accessibility:path/to/surface-headless-release-accessibility.json \
   --out reports/surface-inspector/surface-inspector.json \
@@ -248,7 +253,10 @@ go run ./tools/cmd/surface-inspector \
 ```
 
 The report exposes Block tree, resolved Morph tokens, layout, paint,
-accessibility, event route, focus, and perf-counter state, plus source
+accessibility, event route, focus, and perf-counter state. With a
+`morph-rendered-beauty` input, it also exposes recipe expansions, Block scene
+nodes, render commands, frame artifacts, golden diff result, and the
+source-linked `morph_to_pixels` hash chain. The report also includes source
 locations, input report coverage, hidden-state scan results, and optional static
 HTML. The HTML is a tool report only. It is not browser devtools, React
 devtools, DOM runtime UI, hidden app state, hot reload, or a replacement for
@@ -263,6 +271,7 @@ tetra new surface-app --template command-palette my-palette
 tetra new surface-app --template settings my-settings
 tetra new surface-app --template dashboard my-dashboard
 tetra new surface-app --template editor-shell my-editor
+tetra new surface-app --template studio-shell my-studio
 tetra new surface-app --template multi-window-notes my-notes
 tetra new surface-app --template web-canvas my-web-canvas
 ```
@@ -314,15 +323,34 @@ bash scripts/release/surface/surface-package-smoke.sh \
   --report-dir reports/surface-packages/gate
 ```
 
+For the product-slice flagship app, run the same verified script with an
+explicit source and app id:
+
+```text
+bash scripts/release/surface/surface-package-smoke.sh \
+  --report-dir reports/surface-product-slice/package \
+  --source examples/surface_migration_tetra_control_center.tetra \
+  --app-id studio-shell \
+  --app-title "Tetra Studio Shell" \
+  --expected-exit-code 5
+```
+
 The smoke writes `tetra.surface.package.v1` / `surface-package-v1` evidence for
-the command-palette reference app. It creates a linux-x64 tar.gz package, a
+the default command-palette reference app or an explicitly named app such as
+the `studio-shell` flagship. It creates a linux-x64 tar.gz package, a
 wasm32-web tar.gz bundle with HTML, wasm, and the compiler-owned loader, local
 asset manifests with sha256 hashes, an installed linux-x64 package run, and a
-hash-pinned update channel manifest. The report keeps signing, notarization,
+hash-pinned update channel manifest. The flagship report records
+`expected_exit_code: 5` because the current Surface app-state smoke returns `5`
+as its deterministic success value; this is install/run evidence, not a
+process-manager success-code claim. The report keeps signing, notarization,
 automatic runtime updates, network update fetching, Electron runtime, React
 runtime, CSS cascade runtime, DOM-authored app UI trees, remote asset fetching,
 and user JavaScript app logic as nonclaims unless later platform/runtime
 evidence promotes them.
+
+For the competitive product-slice boundary, see
+`docs/user/surface_electron_comparison.md`.
 
 Use the crash report smoke to prove bounded diagnostic behavior:
 

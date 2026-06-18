@@ -14,6 +14,7 @@ tetra new surface-app --template command-palette my-palette
 tetra new surface-app --template settings my-settings
 tetra new surface-app --template dashboard my-dashboard
 tetra new surface-app --template editor-shell my-editor
+tetra new surface-app --template studio-shell my-studio
 tetra new surface-app --template multi-window-notes my-notes
 tetra new surface-app --template web-canvas my-web-canvas
 ```
@@ -116,7 +117,7 @@ for experimental Morph evidence.
 
 ## Visual Evidence
 
-Visual quality is evidence-backed, not screenshot-only:
+Visual evidence is evidence-backed, not screenshot-only:
 
 ```sh
 bash scripts/release/surface/visual-gate.sh \
@@ -185,7 +186,7 @@ bash scripts/release/surface/surface-template-smoke.sh \
   --report-dir reports/surface-templates/gate
 ```
 
-It generates all six templates, checks, builds, runs, inspects, visually tests,
+It generates all seven templates, checks, builds, runs, inspects, visually tests,
 packages them as tar archives, and validates
 `tetra.surface.template-smoke.v1` / `surface-template-smoke-v1` evidence.
 

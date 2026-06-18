@@ -33,11 +33,14 @@ Rows record `site_id`, `value_id`, `function`, optional `source_span`,
 `intent`, `requested_bytes`, `bounded`, `owner`, `lifetime`, `escape_status`,
 `placement`, `proof_ids`, `blockers`, optional `copy_reason`, optional
 `free_point`, `contract_grade`, `validation_status`, and optional
-`source_fact_id`. Heap placements require blocker explanations. Copy intents
-require `copy_reason`. Trusted validated placements require usable proof IDs.
+`source_fact_id`. Rows may also carry optional `domain` metadata as defined in
+`docs/spec/memory_domains_vnext.md`. Heap placements require blocker
+explanations. Copy intents require `copy_reason`. Trusted validated placements
+require usable proof IDs.
 
 `summary` records `row_count`, `artifact_grade`, `heap_rows`, `copy_rows`,
-`unbounded_rows`, and `budget_bytes`; it must match the rows exactly.
+`unbounded_rows`, `budget_bytes`, and optional per-domain summaries; it must
+match the rows exactly.
 
 `tetra.memory-grade-report.v1` records `artifact_grade`, `functions`,
 `summary`, and `non_claims`. In a release bundle, its top-level
@@ -57,6 +60,14 @@ Non-exercised release entrypoints require specific
 release bundle, heap rows and copy rows are indexed by `site_id` in both
 directions against `ram-contract-report.json`; extra blocker rows and missing
 blocker rows are invalid.
+
+Blocker rows are implementation inputs, not just summaries. Non-empty blocker
+rows record `file`, `line`, `symbol`, `source_location_status`, `severity`,
+`reason`, `suggested_fix`, `evidence_id` or `proof_id`, and
+`safe_to_optimize`. Copy blocker rows also record `copy_kind`, `source_value`,
+`destination_value`, `bytes_estimate`, and `safety_reason`. If a real source
+span is not available, producers must set `source_location_status` to
+`unavailable`, `generated`, or `internal` rather than inventing a file or line.
 
 ## Nonclaims
 

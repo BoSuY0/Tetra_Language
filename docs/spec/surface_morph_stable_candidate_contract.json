@@ -157,7 +157,8 @@
     "validate-surface-claims",
     "surface block-system gate",
     "visual regression gate",
-    "target-host evidence"
+    "target-host evidence",
+    "renderer-owned stable proof"
   ],
   "nonclaims": [
     "not production Morph today",

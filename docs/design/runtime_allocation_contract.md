@@ -1,6 +1,6 @@
 # Runtime Allocation Contract
 
-Status: P15.3 raw pointer bounds metadata v1. This document defines the allocator behavior
+Status: P15.4 domain-aware allocation report evidence. This document defines the allocator behavior
 that P5 runtime implementations must satisfy before claiming faster heap or
 region allocation. P5.1 implements the first `linux-x64` safe-slice small heap
 path; P5.2 hardens explicit island/region allocation; P5.3 lets the planner
@@ -8,7 +8,9 @@ name bounded function-local temporary regions while the backend still reports
 the current heap fallback; P15.2 upgrades the small safe-slice evidence to a
 per-core/thread-local allocator ABI with size-class free-list reuse; P15.3 adds
 raw allocation-base metadata for unsafe `core.alloc_bytes` reports while keeping
-arbitrary raw pointers checked and external/unknown.
+arbitrary raw pointers checked and external/unknown; P15.4 adds domain-aware
+allocation report metadata for process/default and explicit-island ownership
+accounting without changing allocator behavior.
 
 ## Scope
 
@@ -19,6 +21,12 @@ The contract covers:
 - explicit island allocation through `core.island_new` and
   `core.island_make_*`;
 - reserved compiler-owned temporary regions such as `region.temp`.
+
+`docs/spec/memory_backend_vnext.md` extends this contract with a target-neutral
+MemoryBackend vocabulary for `reserve`, `commit`, `decommit`, `release`,
+`trim`, and `footprint`. That vocabulary describes backend and report evidence;
+it does not replace the allocation paths below and does not turn
+allocation-report estimates into runtime RSS/footprint measurements.
 
 P5.3 does not make implicit compiler-selected regions production-grade in
 lowered code. Region rows must show both the planned region and the current
@@ -148,6 +156,10 @@ be able to expose:
 - allocator reuse policy;
 - region id when applicable;
 - lifetime;
+- domain id;
+- domain kind;
+- domain owner;
+- domain lifetime;
 - debug mode.
 
 P5.1 allocation plan reports populate these hooks for constant-size `linux-x64`
@@ -164,12 +176,29 @@ and per-region summaries, and validation rejects any summary that does not
 match the exact plan rows. P15.2 heap safe-slice rows use
 `runtime_path: per_core_small_heap`, `allocator_class: small_<N>`,
 `allocator_scope: core:0` for the single-threaded report model, and
-`allocator_reuse_policy: same_core_same_size_class_free_list`.
+`allocator_reuse_policy: same_core_same_size_class_free_list`. P15.4 adds a
+nested `domain` object to allocation plan rows and per-domain summaries:
+default heap/small-heap/stack/register/eliminated rows are charged to
+`domain:process`, explicit islands are charged to `domain:<island-region>`,
+and external rows are charged to an external domain. Planned function-temp and
+actor-move storage remains conservative in allocation reports until runtime
+ownership transfer evidence exists.
 
-P5 completion evidence for measured memory improvement is owned by
+P5 allocator benchmark evidence classification is owned by
 `tools/cmd/memory-production-smoke` and `tools/validators/memoryprod`. The
 smoke tool builds a generated Linux-x64 small-allocation benchmark with
-`--emit-alloc-report`, reads the schema-v2 allocation summary, requires 64
-`per_core_small_heap` allocation rows with
-`same_core_same_size_class_free_list`, and records the estimated syscall
-reduction from 64 mmap-per-allocation calls to one 64 KiB chunk refill.
+`--emit-alloc-report`, reads the schema-v2 allocation summary, and records the
+small heap benchmark as `evidence_class: allocation_report_estimate` with
+`method: allocation_report_summary`. The benchmark records the estimated
+syscall reduction from 64 mmap-per-allocation calls to one 64 KiB chunk refill;
+it does not claim runtime RSS, pprof, MemStats, `/usr/bin/time -v`, or `strace`
+measurement unless a separate `runtime_measured` artifact is present.
+Memory production release bundles now include `ram-measurement.json` as that
+separate capture artifact, using schema `tetra.memory.ram-measurement.v1` and
+MemStats snapshots when available. The artifact carries a `summary` and
+required `metric_samples` for heap allocation bytes, requested/reserved bytes,
+copied bytes, current/peak RSS, and per-actor domain bytes. The validator keeps
+those metrics separated by evidence class: MemStats heap bytes may be
+`runtime_measured`, allocation-report bytes must stay estimates when present,
+and MemStats RSS is rejected as a fake RSS measurement unless a real RSS-capable
+method such as `time_v`, `strace`, or `pprof` supplies that metric.
