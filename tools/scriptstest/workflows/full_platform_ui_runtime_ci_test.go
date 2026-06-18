@@ -70,6 +70,22 @@ func TestFullPlatformUIRuntimeWorkflowRunsOnBranchPush(t *testing.T) {
 	}
 }
 
+func TestFullPlatformUIRuntimeWorkflowFetchesHistoryForDocVerification(t *testing.T) {
+	path := filepath.Join(repoRoot(t), ".github", "workflows", "full-platform-ui-runtime.yml")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read full-platform UI runtime workflow: %v", err)
+	}
+	text := string(raw)
+	if !strings.Contains(text, "target-host-ui-runtime:") || !strings.Contains(text, "fetch-depth: 2") {
+		t.Fatalf("full-platform UI runtime target-host jobs must fetch HEAD^ for report git-head checks")
+	}
+	gateSection := workflowJobSection(text, "full-platform-ui-runtime-gate-linux:")
+	if !strings.Contains(gateSection, "fetch-depth: 0") {
+		t.Fatalf("full-platform UI runtime Linux aggregation gate must fetch full history for docs verification")
+	}
+}
+
 func TestFullPlatformUIRuntimeWorkflowAggregatesTargetHostReports(t *testing.T) {
 	path := filepath.Join(repoRoot(t), ".github", "workflows", "full-platform-ui-runtime.yml")
 	raw, err := os.ReadFile(path)
@@ -88,6 +104,8 @@ func TestFullPlatformUIRuntimeWorkflowAggregatesTargetHostReports(t *testing.T) 
 			"targets/tetra-full-platform-ui-runtime-${{ github.sha }}-macos-x64/" +
 			"macos-ui-runtime.json"),
 		"uses: actions/download-artifact@v4",
+		"Build CLI for aggregation gate",
+		"go build -o ./tetra ./cli/cmd/tetra",
 		"pattern: tetra-full-platform-ui-runtime-${{ github.sha }}-*",
 		"path: reports/full-platform-ui-runtime-targets",
 		("bash scripts/release/full_platform/ui-runtime-gate.sh --report-" +
@@ -144,6 +162,8 @@ func TestMainCIWorkflowRunsFullPlatformUIRuntimeFanIn(t *testing.T) {
 		("TETRA_MACOS_UI_RUNTIME_REPORT: reports/full-platform-ui-runtime-" +
 			"targets/tetra-full-platform-ui-runtime-${{ github.sha }}-macos-x64/" +
 			"macos-ui-runtime.json"),
+		"Build CLI for aggregation gate",
+		"go build -o ./tetra ./cli/cmd/tetra",
 		("bash scripts/release/full_platform/ui-runtime-gate.sh --report-" +
 			"dir reports/full-platform-ui-runtime"),
 	} {

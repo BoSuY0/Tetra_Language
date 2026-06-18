@@ -22,6 +22,11 @@ on:
         required: true
         type: boolean
         default: false
+      publish_container:
+        description: "Publish the release image to GHCR; tag releases always publish"
+        required: true
+        type: boolean
+        default: false
       homebrew_tap_repository:
         description: "owner/repo for the tap; requires HOMEBREW_TAP_TOKEN"
         required: true
@@ -51,7 +56,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.20.x"
+          go-version: "1.25.x"
 
       - name: Prepare release metadata
         id: meta
@@ -69,11 +74,13 @@ jobs:
           esac
           image_owner="$(printf '%s' "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
           image="ghcr.io/${image_owner}/tetra-language"
+          publish_container="${{ github.event_name != 'workflow_dispatch' || inputs.publish_container }}"
           {
             echo "version=${version}"
             echo "image_version=${version#v}"
             echo "image=${image}"
             echo "out_dir=dist/releases/${version}"
+            echo "publish_container=${publish_container}"
           } >> "$GITHUB_OUTPUT"
 
       - name: Build release archives
@@ -141,44 +148,16 @@ jobs:
         run: |
           set -euo pipefail
           report_dir="${{ steps.meta.outputs.out_dir }}/surface-product-v1"
-          if ! command -v weston >/dev/null 2>&1 || ! command -v rg >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y weston ripgrep
-          fi
-          export XDG_RUNTIME_DIR="${RUNNER_TEMP:-/tmp}/surface-wayland-runtime"
-          mkdir -p "$XDG_RUNTIME_DIR"
-          chmod 700 "$XDG_RUNTIME_DIR"
-          weston_log="${RUNNER_TEMP:-/tmp}/surface-weston.log"
-          weston \
-            --backend=headless-backend.so \
-            --socket=wayland-surface-release \
-            --idle-time=0 \
-            >"$weston_log" 2>&1 &
-          weston_pid=$!
-          cleanup_weston() {
-            kill "$weston_pid" >/dev/null 2>&1
-          }
-          trap cleanup_weston EXIT
-          waited=0
-          while [[ ! -S "$XDG_RUNTIME_DIR/wayland-surface-release" && "$waited" -lt 100 ]]; do
-            sleep 0.1
-            waited=$((waited + 1))
-          done
-          if [[ ! -S "$XDG_RUNTIME_DIR/wayland-surface-release" ]]; then
-            if [[ -f "$weston_log" ]]; then
-              cat "$weston_log" >&2
-            fi
-            exit 1
-          fi
-          export WAYLAND_DISPLAY=wayland-surface-release
-          bash scripts/release/surface/product-gate.sh --report-dir "$report_dir"
+          bash scripts/ci/with-headless-wayland.sh --socket wayland-surface-release -- \
+            bash scripts/release/surface/product-gate.sh --report-dir "$report_dir"
 
       - name: Surface experimental regression gate
         shell: bash
         run: |
           set -euo pipefail
           report_dir="${{ steps.meta.outputs.out_dir }}/surface-experimental-regression"
-          bash scripts/release/surface/gate.sh --report-dir "$report_dir"
+          bash scripts/ci/with-headless-wayland.sh --socket wayland-surface-experimental-release -- \
+            bash scripts/release/surface/gate.sh --report-dir "$report_dir"
 
       - name: Safe view lifetime gate
         shell: bash
@@ -226,8 +205,8 @@ jobs:
         run: |
           set -euo pipefail
           report_dir="${{ steps.meta.outputs.out_dir }}/memory-islands-surface-production"
-          bash scripts/release/post_v0_4/memory-islands-surface-production-gate.sh \
-            --report-dir "$report_dir"
+          bash scripts/ci/with-headless-wayland.sh --socket wayland-memory-islands-surface-release -- \
+            bash scripts/release/post_v0_4/memory-islands-surface-production-gate.sh --report-dir "$report_dir"
 
       - name: RAM contract release gate
         shell: bash
@@ -261,7 +240,8 @@ jobs:
           export GOTMPDIR="${PWD}/.cache/go-tmp-memory-100-prod-stable-release"
           mkdir -p "$GOCACHE" "$GOTMPDIR"
           report_dir="${{ steps.meta.outputs.out_dir }}/memory-100-prod-stable"
-          bash scripts/release/post_v0_4/memory-100-prod-stable-gate.sh --report-dir "$report_dir"
+          bash scripts/ci/with-headless-wayland.sh --socket wayland-memory-100-release -- \
+            bash scripts/release/post_v0_4/memory-100-prod-stable-gate.sh --report-dir "$report_dir"
 
       - name: Upload package artifacts
         uses: actions/upload-artifact@v4
@@ -294,11 +274,7 @@ jobs:
           notes="$out_dir/release-notes.md"
           release_image="${{ steps.meta.outputs.image }}"
           release_image_version="${{ steps.meta.outputs.image_version }}"
-          export VERSION="$version"
-          export NOTES="$notes"
-          export RELEASE_IMAGE="$release_image"
-          export RELEASE_IMAGE_VERSION="$release_image_version"
-          python - <<'PY'
+          VERSION="$version" NOTES="$notes" RELEASE_IMAGE="$release_image" RELEASE_IMAGE_VERSION="$release_image_version" PUBLISH_CONTAINER="${{ steps.meta.outputs.publish_container }}" python - <<'PY'
           import os
           import textwrap
           from pathlib import Path
@@ -307,6 +283,17 @@ jobs:
           repository = os.environ["GITHUB_REPOSITORY"]
           image = os.environ["RELEASE_IMAGE"]
           image_version = os.environ["RELEASE_IMAGE_VERSION"]
+          publish_container = os.environ["PUBLISH_CONTAINER"] == "true"
+          if publish_container:
+              container_section = f"""\
+          Container:
+
+          ```sh
+          docker run --rm {image}:{image_version} tetra version
+          ```
+          """
+          else:
+              container_section = "Container publishing was not requested for this manual workflow run.\n"
           notes = Path(os.environ["NOTES"])
           notes.write_text(textwrap.dedent(f"""\
           Tetra Language {version}
@@ -317,12 +304,7 @@ jobs:
           curl -fsSL https://github.com/{repository}/releases/download/{version}/install.sh | bash
           ```
 
-          Container:
-
-          ```sh
-          docker run --rm {image}:{image_version} tetra version
-          ```
-
+          {container_section}
           This release publishes the current v0.4.0 local compiler/tooling
           profile. Linux x64 is the release binary baseline; other runtime
           target claims remain gated by project evidence.
@@ -373,6 +355,7 @@ jobs:
           zero-cost performance claim is made by these package notes.
           """), encoding="utf-8")
           PY
+          go run ./tools/cmd/validate-actor-capabilities --manifest docs/contracts/actors/actor-capability-manifest.v1.json --release-notes "$notes"
           if gh release view "$version" >/dev/null 2>&1; then
             existing_target="$(
               gh release view "$version" --json targetCommitish -q .targetCommitish
@@ -402,6 +385,7 @@ jobs:
           fi
 
       - name: Build container image
+        if: steps.meta.outputs.publish_container == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -412,7 +396,7 @@ jobs:
             .
 
       - name: Publish GHCR image
-        if: env.RELEASE_DRY_RUN != 'true'
+        if: steps.meta.outputs.publish_container == 'true' && env.RELEASE_DRY_RUN != 'true'
         shell: bash
         run: |
           set -euo pipefail

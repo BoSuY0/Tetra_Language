@@ -140,6 +140,17 @@ json_bool() {
   fi
 }
 
+is_supported_ui_schema() {
+  case "${1:-}" in
+    tetra.ui.v1|tetra.ui.v0.4.0)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 write_web_smoke_report() {
   local generated_at
   if command -v date > /dev/null 2>&1; then
@@ -433,7 +444,7 @@ JS
       }
       try {
         const bundle = await mountTetraUI(document.body);
-        if (!bundle || bundle.schema !== 'tetra.ui.v1') {
+        if (!bundle || !['tetra.ui.v1', 'tetra.ui.v0.4.0'].includes(bundle.schema)) {
           throw new Error(`ui-schema:${String(bundle && bundle.schema)}`);
         }
         const host = document.querySelector('[data-tetra-ui="v1"]');
@@ -634,10 +645,7 @@ HTML
         blocker="runtime prerequisite unavailable: python3 -m http.server"
         status="blocked"
       else
-        python3 -m http.server "$port" \
-          --bind 127.0.0.1 \
-          --directory "$tmp_dir" \
-          > "$tmp_dir/server.log" 2>&1 &
+        python3 -u -m http.server "$port" --bind 127.0.0.1 --directory "$tmp_dir" >"$tmp_dir/server.log" 2>&1 &
         server_pid=$!
         if ! wait_for_server_port "$tmp_dir/server.log"; then
           blocker="unable to allocate local HTTP port"
@@ -694,7 +702,7 @@ HTML
             if [[ "$scope_active" == "true" ]]; then
               if [[ "$status" == "fail" ]]; then
                 :
-              elif [[ "$ui_schema" != "tetra.ui.v1" ]]; then
+              elif ! is_supported_ui_schema "$ui_schema"; then
                 status="fail"
                 blocker="unexpected UI schema '${ui_schema}'"
               elif [[ "$result" != ok:*:ui=* ]]; then

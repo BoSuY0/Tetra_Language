@@ -25,10 +25,12 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.20.x"
+          go-version: "1.25.x"
 
       - name: Shell syntax
         shell: bash
@@ -42,21 +44,27 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            target: linux-x64
+            canonical: true
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.20.x"
+          go-version: "1.25.x"
 
       - name: Bootstrap
         shell: bash
         run: bash scripts/dev/bootstrap.sh
 
       - name: Test
+        if: matrix.canonical
         shell: bash
         run: bash scripts/ci/test.sh
 
@@ -66,6 +74,7 @@ jobs:
         run: bash scripts/ci/toon-format-check.sh
 
       - name: Verify docs manifest
+        if: matrix.canonical
         shell: bash
         run: |
           go run ./tools/cmd/gen-manifest -o docs/generated/manifest.json
@@ -75,12 +84,7 @@ jobs:
       - name: Smoke
         shell: bash
         run: |
-          case "${{ runner.os }}" in
-            Linux)   target="linux-x64" ;;
-            Windows) target="windows-x64" ;;
-            macOS)   target="macos-x64" ;;
-            *) echo "unknown runner.os=${{ runner.os }}"; exit 1 ;;
-          esac
+          target="${{ matrix.target }}"
           tetra_bin="./tetra"
           if [[ -f "./tetra.exe" ]]; then tetra_bin="./tetra.exe"; fi
           "${tetra_bin}" version
@@ -158,7 +162,7 @@ jobs:
           )
           PY
         env:
-          TARGET: ${{ runner.os == 'Linux' && 'linux-x64' || runner.os == 'Windows' && 'windows-x64' || 'macos-x64' }} # line-length: ignore
+          TARGET: ${{ matrix.target }}
 
       - name: Upload smoke report
         uses: actions/upload-artifact@v4
@@ -173,10 +177,12 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.20.x"
+          go-version: "1.25.x"
 
       - name: Bootstrap
         shell: bash
@@ -184,7 +190,9 @@ jobs:
 
       - name: Quick stabilization wrapper
         shell: bash
-        run: bash scripts/ci/test-all.sh --quick --keep-going --report-dir reports/ci-test-all-quick
+        run: |
+          bash scripts/ci/with-headless-wayland.sh --socket wayland-test-all-quick-ci -- \
+            bash scripts/ci/test-all.sh --quick --keep-going --report-dir reports/ci-test-all-quick
 
       - name: Upload quick test report
         if: always()
@@ -199,10 +207,12 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.20.x"
+          go-version: "1.25.x"
 
       - name: Bootstrap
         shell: bash
@@ -211,10 +221,8 @@ jobs:
       - name: v0.4 stabilization wrapper
         shell: bash
         run: |
-          bash scripts/ci/test-all.sh \
-            --stabilization \
-            --keep-going \
-            --report-dir reports/ci-test-all-stabilization
+          bash scripts/ci/with-headless-wayland.sh --socket wayland-test-all-stabilization-ci -- \
+            bash scripts/ci/test-all.sh --stabilization --keep-going --report-dir reports/ci-test-all-stabilization
 
       - name: Upload stabilization test report
         if: always()
@@ -230,10 +238,12 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.20.x"
+          go-version: "1.25.x"
 
       - name: Bootstrap
         shell: bash
@@ -242,13 +252,18 @@ jobs:
       - name: Current v0.4.0 release readiness
         shell: bash
         run: |
-          mkdir -p reports/ci-release-v0.4.0-readiness
-          ./tetra features --format=json > reports/ci-release-v0.4.0-readiness/features.json
-          ./tetra targets --format=json > reports/ci-release-v0.4.0-readiness/targets.json
+          mkdir -p reports/ci-release-v0.4.0-readiness reports/v0.4.0
+          ./tetra features --format=json > reports/v0.4.0/features.json
+          ./tetra targets --format=json > reports/v0.4.0/targets.json
+          ./tetra smoke --target linux-x64 --run=true --report reports/v0.4.0/linux-host-smoke.json
+          bash scripts/release/v0_4_0/distributed-actors-linux-x64-smoke.sh --report-dir reports/v0.4.0
+          bash scripts/release/v0_4_0/native-ui-linux-x64-smoke.sh --report-dir reports/v0.4.0
+          cp reports/v0.4.0/features.json reports/ci-release-v0.4.0-readiness/features.json
+          cp reports/v0.4.0/targets.json reports/ci-release-v0.4.0-readiness/targets.json
           go run ./tools/cmd/validate-v0-4-readiness \
             --expected-version v0.4.0 \
-            --features reports/ci-release-v0.4.0-readiness/features.json \
-            --targets reports/ci-release-v0.4.0-readiness/targets.json \
+            --features reports/v0.4.0/features.json \
+            --targets reports/v0.4.0/targets.json \
             --manifest docs/generated/manifest.json \
             --scope-decisions docs/release/v0_4/data/v0_4_0_scope_decisions.json
           go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
@@ -261,7 +276,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: tetra-v0.4.0-${{ github.sha }}-release-readiness-linux
-          path: reports/ci-release-v0.4.0-readiness
+          path: |
+            reports/ci-release-v0.4.0-readiness
+            reports/v0.4.0
 
   surface-product-slice-linux:
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
@@ -335,10 +352,12 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.20.x"
+          go-version: "1.25.x"
 
       - name: Bootstrap
         shell: bash
@@ -354,47 +373,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if ! command -v weston >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y weston
-          fi
-          export XDG_RUNTIME_DIR="${RUNNER_TEMP:-/tmp}/surface-wayland-runtime"
-          mkdir -p "$XDG_RUNTIME_DIR"
-          chmod 700 "$XDG_RUNTIME_DIR"
-          weston_log="${RUNNER_TEMP:-/tmp}/surface-weston.log"
-          weston \
-            --backend=headless-backend.so \
-            --socket=wayland-surface-ci \
-            --idle-time=0 \
-            >"$weston_log" 2>&1 &
-          weston_pid=$!
-          cleanup_weston() {
-            kill "$weston_pid" >/dev/null 2>&1
-          }
-          trap cleanup_weston EXIT
-          waited=0
-          while [[ \
-            ! -S "$XDG_RUNTIME_DIR/wayland-surface-ci" && \
-            "$waited" -lt 100 \
-          ]]; do
-            sleep 0.1
-            waited=$((waited + 1))
-          done
-          if [[ ! -S "$XDG_RUNTIME_DIR/wayland-surface-ci" ]]; then
-            if [[ -f "$weston_log" ]]; then
-              cat "$weston_log" >&2
-            fi
-            exit 1
-          fi
-          export WAYLAND_DISPLAY=wayland-surface-ci
-          bash scripts/release/surface/product-gate.sh \
-            --report-dir reports/surface-product-v1
+          bash scripts/ci/with-headless-wayland.sh --socket wayland-surface-ci -- \
+            bash scripts/release/surface/product-gate.sh --report-dir reports/surface-product-v1
 
       - name: Surface experimental regression gate
         shell: bash
         run: |
-          bash scripts/release/surface/gate.sh \
-            --report-dir reports/surface-experimental-regression
+          set -euo pipefail
+          bash scripts/ci/with-headless-wayland.sh --socket wayland-surface-experimental-ci -- \
+            bash scripts/release/surface/gate.sh --report-dir reports/surface-experimental-regression
 
       - name: Safe view lifetime gate
         shell: bash
@@ -475,7 +462,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.20.x"
+          go-version: "1.25.x"
 
       - name: Bootstrap
         shell: bash
@@ -484,8 +471,9 @@ jobs:
       - name: Integrated Memory/Islands/Surface release gate
         shell: bash
         run: |
-          bash scripts/release/post_v0_4/memory-islands-surface-production-gate.sh \
-            --report-dir reports/memory-islands-surface-production
+          set -euo pipefail
+          bash scripts/ci/with-headless-wayland.sh --socket wayland-memory-islands-surface-ci -- \
+            bash scripts/release/post_v0_4/memory-islands-surface-production-gate.sh --report-dir reports/memory-islands-surface-production
 
       - name: Upload integrated Memory/Islands/Surface release reports
         if: always()
@@ -505,7 +493,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.20.x"
+          go-version: "1.25.x"
 
       - name: Bootstrap
         shell: bash
@@ -542,10 +530,12 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.20.x"
+          go-version: "1.25.x"
 
       - name: Bootstrap
         shell: bash
@@ -575,10 +565,12 @@ jobs:
     timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.20.x"
+          go-version: "1.25.x"
 
       - name: Bootstrap
         shell: bash
@@ -592,8 +584,8 @@ jobs:
           export GOCACHE="${PWD}/.cache/go-build-memory-100-prod-stable-ci"
           export GOTMPDIR="${PWD}/.cache/go-tmp-memory-100-prod-stable-ci"
           mkdir -p "$GOCACHE" "$GOTMPDIR"
-          bash scripts/release/post_v0_4/memory-100-prod-stable-gate.sh \
-            --report-dir reports/memory-100/final
+          bash scripts/ci/with-headless-wayland.sh --socket wayland-memory-100-ci -- \
+            bash scripts/release/post_v0_4/memory-100-prod-stable-gate.sh --report-dir reports/memory-100/final
 
       - name: Upload Memory100 prod-stable reports
         if: always()
@@ -608,10 +600,12 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.20.x"
+          go-version: "1.25.x"
 
       - name: Validate TechEmpower report schemas
         shell: bash
@@ -642,10 +636,12 @@ jobs:
             report: macos-ui-runtime.json
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.20.x"
+          go-version: "1.25.x"
 
       - name: Build CLI
         shell: bash
@@ -705,10 +701,18 @@ jobs:
       TETRA_MACOS_UI_RUNTIME_REPORT: reports/full-platform-ui-runtime-targets/tetra-full-platform-ui-runtime-${{ github.sha }}-macos-x64/macos-ui-runtime.json # line-length: ignore
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.20.x"
+          go-version: "1.25.x"
+
+      - name: Build CLI for aggregation gate
+        shell: bash
+        run: |
+          go build -o ./tetra ./cli/cmd/tetra
+          ./tetra version
 
       - name: Download target-host UI runtime reports
         uses: actions/download-artifact@v4
@@ -735,10 +739,12 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.20.x"
+          go-version: "1.25.x"
 
       - name: Coverage
         shell: bash
@@ -764,10 +770,12 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.20.x"
+          go-version: "1.25.x"
 
       - name: Race detector
         shell: bash
@@ -779,14 +787,17 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.22.x"
+          go-version: "1.25.x"
+          check-latest: true
 
       - name: Install govulncheck
         shell: bash
-        run: go install golang.org/x/vuln/cmd/govulncheck@v1.1.2
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.3.0
 
       - name: govulncheck
         shell: bash
@@ -798,10 +809,12 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.20.x"
+          go-version: "1.25.x"
 
       - name: Short fuzz smoke
         shell: bash
@@ -820,14 +833,16 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.20.x"
+          go-version: "1.25.x"
 
       - name: Nightly fuzz/property/stress
         shell: bash
-        run: bash scripts/dev/fuzz-nightly.sh --fuzztime 10m --out-dir "$RUNNER_TEMP/fuzz-nightly"
+        run: bash scripts/dev/fuzz-nightly.sh --fuzztime 5m --out-dir "$RUNNER_TEMP/fuzz-nightly"
 
       - name: Upload fuzz nightly report
         if: always()

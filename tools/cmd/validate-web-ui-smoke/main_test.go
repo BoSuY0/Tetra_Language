@@ -39,6 +39,31 @@ func TestValidateWebUISmokeReportAcceptsPass(t *testing.T) {
 	}
 }
 
+func TestValidateWebUISmokeReportAcceptsCurrentUIBundleSchema(t *testing.T) {
+	uiBundlePath, uiModulePath := writeWebUISidecarArtifacts(t)
+	rewriteUIBundleSchema(t, uiBundlePath, "tetra.ui.v0.4.0")
+	domSnapshotPath := writeWebUIDOMSnapshotArtifact(t)
+	report := webUISmokeReport{
+		Schema:             "tetra.web-ui-smoke.v1alpha1",
+		GeneratedAt:        "2026-04-27T12:00:00Z",
+		Target:             "wasm32-web",
+		UIScopeActive:      true,
+		Source:             "examples/projects/dogfood_web_ui/src/main.tetra",
+		UsedFallbackSource: false,
+		Automation:         "chromium --headless --dump-dom",
+		Status:             "pass",
+		Result:             "ok:0",
+		RuntimeTrace:       validWebUIRuntimeTrace,
+		DOMSnapshot:        domSnapshotPath,
+		UISchema:           "tetra.ui.v0.4.0",
+		UIBundlePath:       uiBundlePath,
+		UIModulePath:       uiModulePath,
+	}
+	if err := validateWebUISmokeReport(report); err != nil {
+		t.Fatalf("current UI metadata schema should be valid web smoke evidence: %v", err)
+	}
+}
+
 func TestValidateWebUISmokeReportAcceptsRootModuleUIBundle(t *testing.T) {
 	uiBundlePath, uiModulePath := writeWebUISidecarArtifacts(t)
 	domSnapshotPath := writeWebUIDOMSnapshotArtifact(t)
@@ -545,6 +570,13 @@ func TestValidateUIBundleSchemaArtifactAcceptsCheckedInSchema(t *testing.T) {
 	}
 }
 
+func TestValidateUIBundleSchemaArtifactAcceptsCurrentCheckedInSchema(t *testing.T) {
+	schemaPath := filepath.Join("..", "..", "..", "docs", "schemas", "tetra.ui.v0.4.0.schema.json")
+	if err := validateUIBundleSchemaArtifact(schemaPath); err != nil {
+		t.Fatalf("checked-in current UI metadata schema artifact should be valid: %v", err)
+	}
+}
+
 func TestValidateUIBundleSchemaArtifactRejectsInvalidID(t *testing.T) {
 	schemaPath := filepath.Join("..", "..", "..", "docs", "schemas", "tetra.ui.v1.schema.json")
 	raw, err := os.ReadFile(schemaPath)
@@ -671,6 +703,18 @@ func writeWebUISidecarArtifacts(t *testing.T) (string, string) {
 		t.Fatalf("write ui module artifact: %v", err)
 	}
 	return uiBundlePath, uiModulePath
+}
+
+func rewriteUIBundleSchema(t *testing.T, path string, schema string) {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = []byte(strings.Replace(string(raw), `"schema":"tetra.ui.v1"`, `"schema":"`+schema+`"`, 1))
+	if err := os.WriteFile(path, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func writeWebUIDOMSnapshotArtifact(t *testing.T) string {

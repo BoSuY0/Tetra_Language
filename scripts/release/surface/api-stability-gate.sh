@@ -48,6 +48,10 @@ mkdir -p "$report_dir/artifacts"
 report_dir="$(cd "$report_dir" && pwd)"
 artifacts_dir="$report_dir/artifacts"
 
+if [[ ! -x "./tetra" ]]; then
+  go build -o ./tetra ./cli/cmd/tetra
+fi
+
 stable_modules=(
 	"lib.core.surface"
 	"lib.core.draw"

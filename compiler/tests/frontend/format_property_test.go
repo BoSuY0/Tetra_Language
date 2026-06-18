@@ -13,8 +13,9 @@ import (
 
 func TestFormatSourceIdempotencePropertySuite(t *testing.T) {
 	fixtures := map[string]string{
-		"function": "func main() -> Int:\n    return 42\n",
-		"comments": "// property fixture\nfunc main() -> Int:\n    // stable body\n    return 0\n",
+		"function":       "func main() -> Int:\n    return 42\n",
+		"comments":       "// property fixture\nfunc main() -> Int:\n    // stable body\n    return 0\n",
+		"control_escape": "func main() -> String:\n    return \"\b\"\n",
 		"view": `state CounterState:
     var count: Int = 0
 
@@ -45,6 +46,20 @@ view CounterView(state: CounterState):
 	}
 }
 
+func TestFormatSourceUsesParserSupportedStringEscapes(t *testing.T) {
+	src := []byte("func A()->A:\n    return \"\b\"\n")
+	formatted, err := compiler.FormatSource(src, "control_escape.tetra")
+	if err != nil {
+		t.Fatalf("format: %v", err)
+	}
+	if !strings.Contains(string(formatted), `return "\x08"`) {
+		t.Fatalf("formatted source = %q, want parser-supported hex escape", formatted)
+	}
+	if _, err := compiler.FormatSource(formatted, "control_escape.tetra"); err != nil {
+		t.Fatalf("reformat: %v\n%s", err, formatted)
+	}
+}
+
 func TestFormatSourcePropertySuiteCoversCommentRejectionAndMalformedInput(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -67,6 +82,14 @@ func TestFormatSourcePropertySuiteCoversCommentRejectionAndMalformedInput(t *tes
 			src:         "func main() -> Int:\n\treturn 0\n",
 			wantCode:    "TETRA0001",
 			wantMessage: "tabs are not supported",
+			wantLine:    2,
+			wantColumn:  1,
+		},
+		{
+			name:        "incomplete_function_body",
+			src:         "func A()->A:\n ;",
+			wantCode:    "TETRA0001",
+			wantMessage: "expected indented block after ':'",
 			wantLine:    2,
 			wantColumn:  1,
 		},

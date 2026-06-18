@@ -328,6 +328,7 @@ func TestReleasePackagesRunsActorRuntimeFoundationGateBeforePublishing(t *testin
 			"Erlang/OTP, cluster membership, reconnect/retry production, non-Linux " +
 			"distributed runtime, distributed zero-copy transfer, and formal race " +
 			"proof are not claimed."),
+		`go run ./tools/cmd/validate-actor-capabilities --manifest docs/contracts/actors/actor-capability-manifest.v1.json --release-notes "$notes"`,
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf(
@@ -372,6 +373,12 @@ func TestReleasePackagesRunsActorRuntimeFoundationGateBeforePublishing(t *testin
 		t.Fatalf("release-packages workflow missing Upload package artifacts section")
 	}
 	assertWorkflowUploadsContractArtifacts(t, uploadSection, reportRoot, contract)
+	assertOrderedFragments(t, text,
+		`notes="$out_dir/release-notes.md"`,
+		"notes.write_text(textwrap.dedent",
+		`go run ./tools/cmd/validate-actor-capabilities --manifest docs/contracts/actors/actor-capability-manifest.v1.json --release-notes "$notes"`,
+		`gh release upload "$version"`,
+	)
 }
 
 func TestReleasePackagesWorkflowSupportsNonPublishingDryRun(t *testing.T) {
@@ -417,7 +424,7 @@ func TestReleasePackagesWorkflowSupportsNonPublishingDryRun(t *testing.T) {
 		{
 			name: "name: Publish GHCR image",
 			next: "name: Update Homebrew tap",
-			want: "if: env.RELEASE_DRY_RUN != 'true'",
+			want: "if: steps.meta.outputs.publish_container == 'true' && env.RELEASE_DRY_RUN != 'true'",
 		},
 		{
 			name: "name: Update Homebrew tap",
@@ -545,6 +552,29 @@ func TestReleasePackagesWorkflowBindsPublishedArtifactsToCurrentCommit(t *testin
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("release-packages workflow missing same-commit publish guard %q", want)
+		}
+	}
+}
+
+func TestReleasePackagesWorkflowMakesManualContainerPublishOptIn(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "release-packages.yml"))
+	if err != nil {
+		t.Fatalf("read release-packages workflow: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		"publish_container:",
+		"description: \"Publish the release image to GHCR; tag releases always publish\"",
+		"default: false",
+		`publish_container="${{ github.event_name != 'workflow_dispatch' || inputs.publish_container }}"`,
+		`echo "publish_container=${publish_container}"`,
+		`PUBLISH_CONTAINER="${{ steps.meta.outputs.publish_container }}"`,
+		`publish_container = os.environ["PUBLISH_CONTAINER"] == "true"`,
+		"Container publishing was not requested for this manual workflow run.",
+		"if: steps.meta.outputs.publish_container == 'true'",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("release-packages workflow missing manual container publish guard %q", want)
 		}
 	}
 }

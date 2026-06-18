@@ -1,0 +1,83 @@
+name: actor-claims-regression
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/actor-claims-regression.yml"
+      - ".github/workflows/release-packages.yml"
+      - "docs/contracts/actors/**"
+      - "docs/spec/actors.md"
+      - "docs/spec/runtime/actors.md"
+      - "docs/user/async_actors_guide.md"
+      - "docs/user/platform/async_actors_guide.md"
+      - "docs/audits/actor-runtime-production-boundary-v1.md"
+      - "docs/audits/runtime/actors/**"
+      - "docs/design/actor_region_transfer.md"
+      - "docs/plans/**actor**"
+      - "docs/plans/**actors**"
+      - "scripts/release/post_v0_4/actor-runtime-foundation-linux-x64-gate.sh"
+      - "scripts/release/post_v0_4/contracts/actor-runtime-foundation-linux-x64.json"
+      - "scripts/release/v0_4_0/distributed-actors-linux-x64-smoke.sh"
+      - "scripts/release/post_v0_4/parallel-production-linux-x64-smoke.sh"
+      - "tools/cmd/validate-actor-capabilities/**"
+      - "tools/cmd/validate-actor-runtime-foundation/**"
+      - "tools/cmd/validate-distributed-actor-runtime/**"
+      - "tools/validators/actorprod/**"
+      - "tools/validators/actordist/**"
+      - "tools/scriptstest/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/actor-claims-regression.yml"
+      - ".github/workflows/release-packages.yml"
+      - "docs/contracts/actors/**"
+      - "docs/spec/actors.md"
+      - "docs/spec/runtime/actors.md"
+      - "docs/user/async_actors_guide.md"
+      - "docs/user/platform/async_actors_guide.md"
+      - "docs/audits/actor-runtime-production-boundary-v1.md"
+      - "docs/audits/runtime/actors/**"
+      - "docs/design/actor_region_transfer.md"
+      - "docs/plans/**actor**"
+      - "docs/plans/**actors**"
+      - "scripts/release/post_v0_4/actor-runtime-foundation-linux-x64-gate.sh"
+      - "scripts/release/post_v0_4/contracts/actor-runtime-foundation-linux-x64.json"
+      - "scripts/release/v0_4_0/distributed-actors-linux-x64-smoke.sh"
+      - "scripts/release/post_v0_4/parallel-production-linux-x64-smoke.sh"
+      - "tools/cmd/validate-actor-capabilities/**"
+      - "tools/cmd/validate-actor-runtime-foundation/**"
+      - "tools/cmd/validate-distributed-actor-runtime/**"
+      - "tools/validators/actorprod/**"
+      - "tools/validators/actordist/**"
+      - "tools/scriptstest/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  actor-claims-regression-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.20.x"
+
+      - name: Actor claims regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          export GOTELEMETRY=off
+          export GOCACHE="${PWD}/.cache/go-build-actor-claims-regression-ci"
+          export GOTMPDIR="${PWD}/.cache/go-tmp-actor-claims-regression-ci"
+          mkdir -p "$GOCACHE" "$GOTMPDIR"
+          go run ./tools/cmd/validate-actor-capabilities --manifest docs/contracts/actors/actor-capability-manifest.v1.json
+          go test ./tools/cmd/validate-actor-capabilities ./tools/validators/actorprod ./tools/validators/actordist ./tools/cmd/validate-actor-runtime-foundation ./tools/cmd/validate-distributed-actor-runtime ./tools/scriptstest -run 'ActorCapability|ActorRuntimeFoundation|DistributedActor|ActorClaimsRegression' -count=1

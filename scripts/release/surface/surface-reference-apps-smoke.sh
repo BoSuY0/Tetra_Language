@@ -166,40 +166,36 @@ join_json_entries() {
 	printf "%s" "$*"
 }
 
+scan_source_regex() {
+  local pattern="$1"
+  local source="$2"
+  if command -v rg >/dev/null 2>&1; then
+    rg -n "$pattern" "$source"
+  else
+    grep -En "$pattern" "$source"
+  fi
+}
+
 check_reference_source() {
-	local shape="$1"
-	local source="$2"
-	local scan_path="$3"
-	for forbidden_pattern in \
-		'React' \
-		'Electron' \
-		'Chromium' \
-		'DOM' \
-		'CSS' \
-		'JavaScript' \
-		'platform_widget' \
-		'native_widget' \
-		'platform widget' \
-		'native widget' \
-		'lib\.core\.component'; do
-		if rg -n "$forbidden_pattern" "$source" >"$scan_path"; then
-			echo "error: reference app mentions forbidden runtime: $source" >&2
-			cat "$scan_path" >&2
-			exit 1
-		fi
-	done
-	if [[ "$shape" == "migration" ]]; then
-		if ! rg -n 'import lib\.core\.widgets as widgets' "$source" >>"$scan_path"; then
-			echo "error: migration reference app must include lib.core.widgets: $source" >&2
-			exit 1
-		fi
-	elif rg -n 'lib\.core\.widgets|Button|Card|TextField|TextBox|Sidebar|Modal' \
-		"$source" >>"$scan_path"; then
-		echo "error: non-migration app uses widget/component vocabulary: $source" >&2
-		cat "$scan_path" >&2
-		exit 1
-	fi
-	: >>"$scan_path"
+  local shape="$1"
+  local source="$2"
+  local scan_path="$3"
+  if scan_source_regex 'React|Electron|Chromium|DOM|CSS|JavaScript|platform_widget|native_widget|platform widget|native widget|lib\.core\.component' "$source" > "$scan_path"; then
+    echo "error: reference app imports or mentions a forbidden runtime: $source" >&2
+    cat "$scan_path" >&2
+    exit 1
+  fi
+  if [[ "$shape" == "migration" ]]; then
+    if ! scan_source_regex 'import lib\.core\.widgets as widgets' "$source" >> "$scan_path"; then
+      echo "error: migration reference app must include lib.core.widgets compatibility evidence: $source" >&2
+      exit 1
+    fi
+  elif scan_source_regex 'lib\.core\.widgets|Button|Card|TextField|TextBox|Sidebar|Modal' "$source" >> "$scan_path"; then
+    echo "error: non-migration reference app uses widget/component primitive vocabulary: $source" >&2
+    cat "$scan_path" >&2
+    exit 1
+  fi
+  : >> "$scan_path"
 }
 
 required_targets=("headless" "linux-x64-real-window" "wasm32-web-browser-canvas")

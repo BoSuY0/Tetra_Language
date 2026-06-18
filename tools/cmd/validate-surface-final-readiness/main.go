@@ -666,6 +666,8 @@ func surfaceFinalReadinessNonclaims() []string {
 		"all-platform-surface-parity",
 		"nonclaim-macos-surface-production-support",
 		"nonclaim-windows-surface-production-support",
+		"macos-surface-production-nonclaim",
+		"windows-surface-production-nonclaim",
 		"wasm32-wasi-surface-ui-runtime",
 		"gpu-renderer",
 		"full-rich-text-editor",
