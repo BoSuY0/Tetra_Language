@@ -105,6 +105,60 @@ func TestSplitDumpFileKeepsChunksUnderLimitAndMarkdown(t *testing.T) {
 	}
 }
 
+func TestMaxDumpFileBytesIsFiveMiB(t *testing.T) {
+	const want = 5 * 1024 * 1024
+	if maxDumpFileBytes != want {
+		t.Fatalf("maxDumpFileBytes = %d, want %d", maxDumpFileBytes, want)
+	}
+}
+
+func TestSplitDumpFileSplitsGeneratedDumpAtSectionBoundaries(t *testing.T) {
+	root := t.TempDir()
+	source := filepath.Join(root, "dumps", "project_dump.md")
+	if err := os.MkdirAll(filepath.Dir(source), 0o755); err != nil {
+		t.Fatalf("mkdir dumps: %v", err)
+	}
+	header := "Project dump\nGenerated: test\n\n"
+	sections := []string{
+		testDumpSection("alpha.go", strings.Repeat("alpha line\n", 6)),
+		testDumpSection("bravo.go", strings.Repeat("bravo line\n", 6)),
+		testDumpSection("charlie.go", strings.Repeat("charlie line\n", 6)),
+	}
+	data := header + strings.Join(sections, "")
+	if err := os.WriteFile(source, []byte(data), 0o644); err != nil {
+		t.Fatalf("write source dump: %v", err)
+	}
+
+	maxBytes := int64(len(header) + len(sections[0]) + 48)
+	paths, err := splitDumpFile(source, maxBytes)
+	if err != nil {
+		t.Fatalf("split dump: %v", err)
+	}
+	if len(paths) < 2 {
+		t.Fatalf("chunks = %d, want multiple chunks", len(paths))
+	}
+	for _, path := range paths {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read chunk %q: %v", path, err)
+		}
+		if int64(len(raw)) > maxBytes {
+			t.Fatalf("chunk %q size = %d, want <= %d", path, len(raw), maxBytes)
+		}
+		text := string(raw)
+		if !strings.HasPrefix(text, header) {
+			prefixLen := len(text)
+			if prefixLen > 80 {
+				prefixLen = 80
+			}
+			t.Fatalf("chunk %q starts mid-dump:\n%s", path, text[:prefixLen])
+		}
+		if !strings.Contains(text, "FILE: ") {
+			t.Fatalf("chunk %q has no complete file section:\n%s", path, text)
+		}
+	}
+}
+
 func TestRemovePreviousDumpFilesDeletesTopLevelFilesOnly(t *testing.T) {
 	root := t.TempDir()
 	dumpDir := filepath.Join(root, "dumps")
@@ -141,4 +195,14 @@ func TestRemovePreviousDumpFilesDeletesTopLevelFilesOnly(t *testing.T) {
 	if _, err := os.Stat(nested); err != nil {
 		t.Fatalf("nested file should be preserved: %v", err)
 	}
+}
+
+func testDumpSection(rel, body string) string {
+	return strings.Repeat("=", 88) + "\n" +
+		"FILE: " + rel + "\n" +
+		"SIZE: 1\n" +
+		"SHA256: test\n" +
+		"STATUS: OK\n" +
+		strings.Repeat("-", 88) + "\n" +
+		body
 }

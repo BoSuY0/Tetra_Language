@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,7 +10,7 @@ import (
 	"time"
 )
 
-const maxDumpFileBytes = 10 * 1024 * 1024
+const maxDumpFileBytes = 5 * 1024 * 1024
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
@@ -80,7 +79,7 @@ func printUsage() {
 	fmt.Fprint(os.Stdout, `Usage: go run ./create_dumps.go [--out dumps/project_dump.md]
 
 Creates whole-project dump artifacts under ./dumps/ while preserving gitignore filtering.
-Each dump artifact is Markdown and is capped at 10 MiB per .md file.
+Each dump artifact is Markdown and is capped at 5 MiB per .md file.
 Before creating a new dump, existing top-level files under ./dumps/ are removed.
 The full project is always included; do not pass --all, --only, or other dump-mode flags.
 
@@ -232,47 +231,114 @@ func splitDumpFile(path string, maxBytes int64) ([]string, error) {
 		return []string{path}, nil
 	}
 
-	in, err := os.Open(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("open dump for splitting: %w", err)
+		return nil, fmt.Errorf("read dump for splitting: %w", err)
 	}
-
-	chunkSize, err := intFromInt64(maxBytes)
+	chunks, err := splitDumpBytes(data, maxBytes)
 	if err != nil {
-		in.Close()
 		return nil, err
 	}
-	buf := make([]byte, chunkSize)
+
 	base := strings.TrimSuffix(path, filepath.Ext(path))
 	var paths []string
 
-	for part := 1; ; part++ {
-		n, readErr := io.ReadFull(in, buf)
-		if readErr == io.EOF {
-			break
-		}
-		if readErr != nil && readErr != io.ErrUnexpectedEOF {
-			in.Close()
-			return nil, fmt.Errorf("read dump chunk: %w", readErr)
-		}
-		chunkPath := fmt.Sprintf("%s_part_%03d.md", base, part)
-		if err := os.WriteFile(chunkPath, buf[:n], 0o644); err != nil {
-			in.Close()
+	for i, chunk := range chunks {
+		chunkPath := fmt.Sprintf("%s_part_%03d.md", base, i+1)
+		if err := os.WriteFile(chunkPath, chunk, 0o644); err != nil {
 			return nil, fmt.Errorf("write dump chunk: %w", err)
 		}
 		paths = append(paths, chunkPath)
-		if readErr == io.ErrUnexpectedEOF {
-			break
-		}
 	}
 
-	if err := in.Close(); err != nil {
-		return nil, fmt.Errorf("close dump before replacing with chunks: %w", err)
-	}
 	if err := os.Remove(path); err != nil {
 		return nil, fmt.Errorf("remove oversized dump after splitting: %w", err)
 	}
 	return paths, nil
+}
+
+func splitDumpBytes(data []byte, maxBytes int64) ([][]byte, error) {
+	sectionStarts := findDumpSectionStarts(data)
+	if len(sectionStarts) == 0 {
+		return splitRawBytes(data, maxBytes)
+	}
+
+	header := data[:sectionStarts[0]]
+	current := dumpChunkHeader(header, 1)
+	if int64(len(current)) > maxBytes {
+		return nil, fmt.Errorf("dump header exceeds file limit")
+	}
+
+	var chunks [][]byte
+	sectionsInCurrent := 0
+	for i, start := range sectionStarts {
+		end := len(data)
+		if i+1 < len(sectionStarts) {
+			end = sectionStarts[i+1]
+		}
+		section := data[start:end]
+		if int64(len(current)+len(section)) > maxBytes && sectionsInCurrent > 0 {
+			chunks = append(chunks, current)
+			current = dumpChunkHeader(header, len(chunks)+1)
+			sectionsInCurrent = 0
+		}
+		if int64(len(current)+len(section)) > maxBytes {
+			return nil, fmt.Errorf("dump section exceeds file limit")
+		}
+		current = append(current, section...)
+		sectionsInCurrent++
+	}
+	if sectionsInCurrent > 0 {
+		chunks = append(chunks, current)
+	}
+	return chunks, nil
+}
+
+func dumpChunkHeader(header []byte, part int) []byte {
+	out := append([]byte{}, header...)
+	if len(out) > 0 && !bytes.HasSuffix(out, []byte("\n")) {
+		out = append(out, '\n')
+	}
+	out = append(out, []byte(fmt.Sprintf("Dump part: %03d\n\n", part))...)
+	return out
+}
+
+func findDumpSectionStarts(data []byte) []int {
+	marker := append(bytes.Repeat([]byte{'='}, 88), '\n')
+	filePrefix := []byte("FILE: ")
+	var starts []int
+	for offset := 0; offset < len(data); {
+		idx := bytes.Index(data[offset:], marker)
+		if idx < 0 {
+			break
+		}
+		start := offset + idx
+		after := start + len(marker)
+		if (start == 0 || data[start-1] == '\n') &&
+			after < len(data) &&
+			bytes.HasPrefix(data[after:], filePrefix) {
+			starts = append(starts, start)
+		}
+		offset = start + 1
+	}
+	return starts
+}
+
+func splitRawBytes(data []byte, maxBytes int64) ([][]byte, error) {
+	chunkSize, err := intFromInt64(maxBytes)
+	if err != nil {
+		return nil, err
+	}
+	var chunks [][]byte
+	for len(data) > 0 {
+		n := chunkSize
+		if len(data) < n {
+			n = len(data)
+		}
+		chunks = append(chunks, append([]byte{}, data[:n]...))
+		data = data[n:]
+	}
+	return chunks, nil
 }
 
 func removeExistingChunks(path string) error {
