@@ -343,7 +343,7 @@ func TestFromStackIRSliceSumConstantStrideRejectsInvalidStep(t *testing.T) {
 }
 
 func TestFromPLIRProgramChainsCallEffects(t *testing.T) {
-	prog, err := FromPLIR(&plir.Program{Funcs: []plir.Function{{
+	prog, err := BuildFromProgramIR(&plir.Program{Funcs: []plir.Function{{
 		Name: "plir_call",
 		Values: []plir.Value{
 			{ID: "arg", Type: "Int"},
@@ -377,7 +377,7 @@ func TestFromPLIRProgramChainsCallEffects(t *testing.T) {
 }
 
 func TestFromPLIRProgramLowersSliceIndexLoadWithMemoryEffect(t *testing.T) {
-	prog, err := FromPLIR(&plir.Program{Funcs: []plir.Function{{
+	prog, err := BuildFromProgramIR(&plir.Program{Funcs: []plir.Function{{
 		Name: "plir_slice",
 		Values: []plir.Value{
 			{ID: "xs", Type: "[]i32"},

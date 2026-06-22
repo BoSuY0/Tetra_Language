@@ -98,7 +98,9 @@ a complete production allocator by documentation alone.
 The static side must reject borrow escape through returns, owned/consume/inout calls, mutable
 globals, aggregate fields, enum/optional payloads, closure captures, and actor/task transfer when
 the value carries a pointer, region, or runtime-owned memory handle that cannot be proven sendable.
-The diagnostic policy is conservative rejection: ambiguous provenance, hidden aliasing, or
+The memory production extension treats heap, slices, structs, closures, borrow escape, and
+actor/task transfer as one audited ownership boundary. The diagnostic policy is conservative rejection:
+ambiguous provenance, hidden aliasing, or
 unsupported transfer across task/actor/thread boundaries must be rejected with stable ownership
 diagnostics instead of being accepted optimistically.
 

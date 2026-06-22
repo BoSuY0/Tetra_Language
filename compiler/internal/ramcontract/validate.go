@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"tetra_language/compiler/internal/allocplan"
+	"tetra_language/compiler/internal/runtimeabi"
 )
 
 var fullGitHeadRE = regexp.MustCompile(`^[0-9a-f]{40}$`)
@@ -259,6 +260,9 @@ func validateMemoryDomain(prefix string, domain *MemoryDomain) []string {
 		return nil
 	}
 	var issues []string
+	if err := runtimeabi.ValidateMemoryDomain(*domain); err != nil {
+		issues = append(issues, prefix+": "+err.Error())
+	}
 	if strings.TrimSpace(domain.DomainID) == "" {
 		issues = append(issues, prefix+": domain_id is required")
 	}
@@ -806,12 +810,7 @@ func knownValidationStatus(status ValidationStatus) bool {
 }
 
 func knownDomainKind(kind MemoryDomainKind) bool {
-	switch kind {
-	case DomainProcess, DomainTask, DomainActor, DomainIsland, DomainRequest, DomainExternal:
-		return true
-	default:
-		return false
-	}
+	return runtimeabi.KnownMemoryDomainKind(kind)
 }
 
 func validateNonClaims(nonClaims []string) []string {

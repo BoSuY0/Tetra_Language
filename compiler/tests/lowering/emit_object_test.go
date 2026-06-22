@@ -10,6 +10,7 @@ import (
 
 	compiler "tetra_language/compiler"
 	"tetra_language/compiler/internal/lower"
+	"tetra_language/compiler/internal/memorypipeline"
 )
 
 func TestEmitLibraryAllowsNoMainAndWritesTOBJ(t *testing.T) {
@@ -119,11 +120,22 @@ uses alloc, capability, mem:
 	if err != nil {
 		t.Fatalf("check: %v", err)
 	}
-	irProg, err := lower.LowerWithOptions(checked, lower.Options{OwnedAllocDropLowering: true})
+	state, err := memorypipeline.Build(checked, memorypipeline.Options{})
 	if err != nil {
-		t.Fatalf("lower with owned alloc drops: %v", err)
+		t.Fatalf("memorypipeline build: %v", err)
 	}
-	obj, err := compiler.CodegenObjectLinuxX64(irProg.Funcs)
+	loweringResult, err := lower.LowerPlannedProgram(
+		checked,
+		state.Plan,
+		lower.Options{OwnedAllocDropLowering: true},
+	)
+	if err != nil {
+		t.Fatalf("lower planned with owned alloc drops: %v", err)
+	}
+	if err := state.ApplyLowering(loweringResult.Program, loweringResult.Evidence); err != nil {
+		t.Fatalf("apply lowering evidence: %v", err)
+	}
+	obj, err := compiler.CodegenObjectLinuxX64(loweringResult.Program.Funcs)
 	if err != nil {
 		t.Fatalf("codegen linux x64 object: %v", err)
 	}

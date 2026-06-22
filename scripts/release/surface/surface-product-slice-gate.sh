@@ -68,11 +68,7 @@ fi
 mkdir -p "$GOCACHE" "$GOTMPDIR"
 
 report_dir_arg="${report_dir%/}"
-surface_release_require_fresh_report_dir \
-  "$report_dir_arg" \
-  "$repo_root" \
-  "surface_product_slice_gate:" \
-  >/dev/null
+surface_release_require_fresh_report_dir "$report_dir_arg" "$repo_root" "surface_product_slice_gate:" >/dev/null
 report_dir="$report_dir_arg"
 git_head="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
 git_dirty=false
@@ -163,18 +159,9 @@ headless_report="$flagship_dir/headless-block-system.json"
 linux_report="$flagship_dir/linux-x64-real-window-block-system.json"
 wasm_report="$flagship_dir/wasm32-web-browser-canvas-block-system.json"
 
-go run ./tools/cmd/surface-runtime-smoke \
-	--mode headless-block-system \
-	--source "$flagship_source" \
-	--report "$headless_report"
-go run ./tools/cmd/surface-runtime-smoke \
-	--mode linux-x64-real-window-block-system \
-	--source "$flagship_source" \
-	--report "$linux_report"
-go run ./tools/cmd/surface-runtime-smoke \
-	--mode wasm32-web-browser-canvas-block-system \
-	--source "$flagship_source" \
-	--report "$wasm_report"
+go run ./tools/cmd/surface-runtime-smoke --mode headless-block-system --source "$flagship_source" --report "$headless_report"
+go run ./tools/cmd/surface-runtime-smoke --mode linux-x64-real-window-block-system --source "$flagship_source" --report "$linux_report"
+go run ./tools/cmd/surface-runtime-smoke --mode wasm32-web-browser-canvas-block-system --source "$flagship_source" --report "$wasm_report"
 
 dev_report="$dev_dir/surface-dev-workflow.json"
 go run ./cli/cmd/tetra surface dev \
@@ -276,7 +263,7 @@ if [[ -n "$formatted_args" ]]; then
 	command_line+=" $formatted_args"
 fi
 
-cat >"$summary_path" <<JSON
+cat > "$summary_path" <<JSON
 {
   "schema": "tetra.surface.product-slice-summary.v1",
   "release_scope": "surface-v1-linux-web",
@@ -348,10 +335,7 @@ cat >"$summary_path" <<JSON
 }
 JSON
 
-go run ./tools/cmd/validate-artifact-hashes \
-	--write \
-	--root "$report_dir" \
-	--out "$report_dir/artifact-hashes.json"
+go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"
 go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-hashes.json"
 go run ./tools/cmd/validate-surface-product-slice --report-dir "$report_dir"
 go run ./tools/cmd/validate-surface-claims --root "$repo_root" --report-dir "$report_dir"

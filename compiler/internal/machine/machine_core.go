@@ -6921,7 +6921,7 @@ func RegionIslandAllocationMainPlanFromStackIR(
 		fn.ReturnSlots != 1 || fn.LocalSlots < 5 {
 		return RegionIslandAllocationMainPlan{}, false, nil
 	}
-	if len(fn.Instrs) != 46 {
+	if len(fn.Instrs) != 46 && len(fn.Instrs) != 50 {
 		return RegionIslandAllocationMainPlan{}, false, nil
 	}
 	in := fn.Instrs
@@ -6982,33 +6982,44 @@ func RegionIslandAllocationMainPlanFromStackIR(
 		!isStore(in[28], checksumLocal) {
 		return RegionIslandAllocationMainPlan{}, false, nil
 	}
-	if !isLoad(in[29], islandLocal) ||
-		in[30].Kind != ir.IRIslandFree ||
-		!isLoad(in[31], indexLocal) ||
-		in[32].Kind != ir.IRConstI32 ||
-		in[32].Imm != regionIslandAllocationMainStep ||
-		in[33].Kind != ir.IRAddI32 ||
-		!isStore(in[34], indexLocal) ||
-		in[35].Kind != ir.IRJmp ||
-		in[35].Label != startLabel ||
-		in[36].Kind != ir.IRLabel ||
-		in[36].Label != endLabel {
+	freeIndex := 30
+	if len(in) == 50 {
+		if !isConstStore(in[29], in[31], 0) ||
+			!isConstStore(in[30], in[32], 0) ||
+			!((in[31].Local == sliceLenLocal && in[32].Local == slicePtrLocal) ||
+				(in[31].Local == slicePtrLocal && in[32].Local == sliceLenLocal)) {
+			return RegionIslandAllocationMainPlan{}, false, nil
+		}
+		freeIndex = 34
+	}
+	if !isLoad(in[freeIndex-1], islandLocal) ||
+		in[freeIndex].Kind != ir.IRIslandFree ||
+		!isLoad(in[freeIndex+1], indexLocal) ||
+		in[freeIndex+2].Kind != ir.IRConstI32 ||
+		in[freeIndex+2].Imm != regionIslandAllocationMainStep ||
+		in[freeIndex+3].Kind != ir.IRAddI32 ||
+		!isStore(in[freeIndex+4], indexLocal) ||
+		in[freeIndex+5].Kind != ir.IRJmp ||
+		in[freeIndex+5].Label != startLabel ||
+		in[freeIndex+6].Kind != ir.IRLabel ||
+		in[freeIndex+6].Label != endLabel {
 		return RegionIslandAllocationMainPlan{}, false, nil
 	}
-	if !isLoad(in[37], checksumLocal) ||
-		in[38].Kind != ir.IRConstI32 ||
-		in[38].Imm != 0 ||
-		in[39].Kind != ir.IRCmpGtI32 ||
-		in[40].Kind != ir.IRJmpIfZero ||
-		in[40].Label != 2 ||
-		in[41].Kind != ir.IRConstI32 ||
-		in[41].Imm != 0 ||
-		in[42].Kind != ir.IRReturn ||
-		in[43].Kind != ir.IRLabel ||
-		in[43].Label != in[40].Label ||
-		in[44].Kind != ir.IRConstI32 ||
-		in[44].Imm != 1 ||
-		in[45].Kind != ir.IRReturn {
+	afterLoop := freeIndex + 7
+	if !isLoad(in[afterLoop], checksumLocal) ||
+		in[afterLoop+1].Kind != ir.IRConstI32 ||
+		in[afterLoop+1].Imm != 0 ||
+		in[afterLoop+2].Kind != ir.IRCmpGtI32 ||
+		in[afterLoop+3].Kind != ir.IRJmpIfZero ||
+		in[afterLoop+3].Label != 2 ||
+		in[afterLoop+4].Kind != ir.IRConstI32 ||
+		in[afterLoop+4].Imm != 0 ||
+		in[afterLoop+5].Kind != ir.IRReturn ||
+		in[afterLoop+6].Kind != ir.IRLabel ||
+		in[afterLoop+6].Label != in[afterLoop+3].Label ||
+		in[afterLoop+7].Kind != ir.IRConstI32 ||
+		in[afterLoop+7].Imm != 1 ||
+		in[afterLoop+8].Kind != ir.IRReturn {
 		return RegionIslandAllocationMainPlan{}, false, nil
 	}
 	for _, local := range []struct {
@@ -7047,11 +7058,11 @@ func RegionIslandAllocationMainPlanFromStackIR(
 		Step:          regionIslandAllocationMainStep,
 		StartLabel:    startLabel,
 		EndLabel:      endLabel,
-		FailureLabel:  in[40].Label,
+		FailureLabel:  in[afterLoop+3].Label,
 		StoreProofID:  in[21].ProofID,
 		LoadProofID:   in[26].ProofID,
-		SuccessReturn: in[41].Imm,
-		FailureReturn: in[44].Imm,
+		SuccessReturn: in[afterLoop+4].Imm,
+		FailureReturn: in[afterLoop+7].Imm,
 		BoundsChecks:  0,
 	}
 	out, err := buildRegionIslandAllocationMainMachineFunction(fn.Name, plan)

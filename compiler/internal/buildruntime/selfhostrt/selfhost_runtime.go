@@ -1,12 +1,15 @@
 package selfhostrt
 
 import (
+	"tetra_language/compiler/internal/allocplan"
 	"tetra_language/compiler/internal/format/tobj"
 	"tetra_language/compiler/internal/frontend"
 	"tetra_language/compiler/internal/ir"
 	"tetra_language/compiler/internal/lower"
+	"tetra_language/compiler/internal/memorypipeline"
 	"tetra_language/compiler/internal/module"
 	"tetra_language/compiler/internal/semantics"
+	"tetra_language/compiler/internal/validation"
 )
 
 func BuildEmbeddedSelfHostRuntimeObject(
@@ -34,7 +37,28 @@ func BuildEmbeddedSelfHostRuntimeObject(
 		return nil, err
 	}
 
-	funcs, err := lower.LowerModule(checked, world.EntryModule)
+	state, err := memorypipeline.Build(checked, memorypipeline.Options{
+		Target:    target,
+		AllocPlan: selfHostAllocPlanOptions(target),
+	})
+	if err != nil {
+		return nil, err
+	}
+	lowering, err := lower.LowerPlannedProgram(
+		checked,
+		state.Plan,
+		selfHostLowerOptions(target),
+	)
+	if err != nil {
+		return nil, err
+	}
+	if err := state.ApplyLowering(lowering.Program, lowering.Evidence); err != nil {
+		return nil, err
+	}
+	if err := validation.ValidateAllocationLowering(state.Plan, lowering.Program); err != nil {
+		return nil, err
+	}
+	funcs, err := lowering.ModuleFuncs(world.EntryModule)
 	if err != nil {
 		return nil, err
 	}
@@ -47,4 +71,29 @@ func BuildEmbeddedSelfHostRuntimeObject(
 	obj.Target = target
 	obj.Module = "__selfhostrt"
 	return obj, nil
+}
+
+func selfHostAllocPlanOptions(target string) allocplan.Options {
+	return allocplan.Options{
+		EnableStackLowering:    selfHostTargetSupportsStackAllocationLowering(target),
+		EnableSmallHeapRuntime: target == "linux-x64",
+		EnableRegionPlanning:   target == "linux-x64",
+		EnableRegionLowering:   target == "linux-x64",
+	}
+}
+
+func selfHostLowerOptions(target string) lower.Options {
+	return lower.Options{
+		StackAllocationLowering:    selfHostTargetSupportsStackAllocationLowering(target),
+		FunctionTempRegionLowering: target == "linux-x64",
+	}
+}
+
+func selfHostTargetSupportsStackAllocationLowering(target string) bool {
+	switch target {
+	case "linux-x64", "macos-x64", "windows-x64":
+		return true
+	default:
+		return false
+	}
 }

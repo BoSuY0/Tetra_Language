@@ -19,12 +19,14 @@ type ModuleBuildJob struct {
 }
 
 type ModuleBuildPlan struct {
-	Modules           []string
-	PublicAPIHashes   map[string]string
-	BuildTag          string
-	ObjectsByModule   map[string]*tobj.Object
-	ObjectlessModules map[string]bool
-	ToCompile         []ModuleBuildJob
+	Modules               []string
+	PublicAPIHashes       map[string]string
+	MemoryPlanDigests     map[string]string
+	MemoryLoweringDigests map[string]string
+	BuildTag              string
+	ObjectsByModule       map[string]*tobj.Object
+	ObjectlessModules     map[string]bool
+	ToCompile             []ModuleBuildJob
 }
 
 func SourceModules(world *module.World) []string {

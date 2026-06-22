@@ -8,14 +8,39 @@ import (
 
 	"tetra_language/compiler/internal/allocplan"
 	"tetra_language/compiler/internal/ir"
+	"tetra_language/compiler/internal/islandkernel"
 	"tetra_language/compiler/internal/lower"
+	"tetra_language/compiler/internal/memoryfacts"
 )
 
 func ValidateAllocationPlan(plan *allocplan.Plan) error {
+	if allocationPlanIsPlannedOnly(plan) {
+		if err := allocplan.VerifyPlanned(plan); err != nil {
+			return fmt.Errorf("allocation validation: %w", err)
+		}
+		return nil
+	}
 	if err := allocplan.VerifyPlan(plan); err != nil {
 		return fmt.Errorf("allocation validation: %w", err)
 	}
 	return nil
+}
+
+func allocationPlanIsPlannedOnly(plan *allocplan.Plan) bool {
+	if plan == nil {
+		return false
+	}
+	seenAllocation := false
+	for _, fn := range plan.Functions {
+		for _, alloc := range fn.Allocations {
+			seenAllocation = true
+			if alloc.ActualLoweringStorage != allocplan.StorageUnknownConservative ||
+				alloc.LoweringStatus != "pending" {
+				return false
+			}
+		}
+	}
+	return seenAllocation
 }
 
 func ValidateAllocationLowering(plan *allocplan.Plan, prog *ir.IRProgram) error {
@@ -64,6 +89,9 @@ func validateAllocationLowering(
 			return fmt.Errorf("allocation lowering validation: summary IR invalid: %w", err)
 		}
 	}
+	if allocationPlanIsPlannedOnly(plan) {
+		return nil
+	}
 	expected := map[string]map[string]allocplan.StorageClass{}
 	stackAllocs := map[string]map[string]bool{}
 	expectedRegion := map[string]map[string]ir.IRInstrKind{}
@@ -83,7 +111,9 @@ func validateAllocationLowering(
 				}
 				stackAllocs[fn.Name][alloc.ID] = true
 			case allocplan.StorageEliminated:
-				if alloc.LoweringStatus == "eliminated_no_backing_storage" {
+				if alloc.LoweringStatus == "eliminated_no_backing_storage" ||
+					(alloc.LoweringStatus == "eliminated_lowering" &&
+						alloc.LengthStatus == allocplan.LengthStatusValidEmpty) {
 					if expected[fn.Name] == nil {
 						expected[fn.Name] = map[string]allocplan.StorageClass{}
 					}
@@ -135,6 +165,9 @@ func validateAllocationLowering(
 						alloc.ID,
 					)
 				}
+				if err := validateExplicitIslandStorageDecision(fn.Name, alloc); err != nil {
+					return err
+				}
 				if expectedIsland[fn.Name] == nil {
 					expectedIsland[fn.Name] = map[string]islandExpectation{}
 				}
@@ -159,7 +192,7 @@ func validateAllocationLowering(
 		for i, instr := range fn.Instrs {
 			switch instr.Kind {
 			case ir.IRStackSliceU8, ir.IRStackSliceU16, ir.IRStackSliceI32:
-				want, ok := expected[fn.Name][instr.Name]
+				want, matchedName, ok := lookupStorageExpectation(expected[fn.Name], instr.Name)
 				if !ok {
 					return fmt.Errorf(
 						("allocation lowering validation: %s instruction %d stack-lowers " +
@@ -187,7 +220,7 @@ func validateAllocationLowering(
 				if seen[fn.Name] == nil {
 					seen[fn.Name] = map[string]bool{}
 				}
-				seen[fn.Name][instr.Name] = true
+				seen[fn.Name][matchedName] = true
 			case ir.IRRegionMakeSliceU8, ir.IRRegionMakeSliceU16, ir.IRRegionMakeSliceI32:
 				want, ok := expectedRegion[fn.Name][instr.Name]
 				if !ok {
@@ -326,6 +359,23 @@ type stackEscapeState struct {
 	idx    int
 	stack  []string
 	locals []string
+}
+
+func lookupStorageExpectation(
+	expected map[string]allocplan.StorageClass,
+	name string,
+) (allocplan.StorageClass, string, bool) {
+	if expected == nil {
+		return "", "", false
+	}
+	if storage, ok := expected[name]; ok {
+		return storage, name, true
+	}
+	alias := "alloc_intent:" + name
+	if storage, ok := expected[alias]; ok {
+		return storage, alias, true
+	}
+	return "", "", false
 }
 
 type stackCallSummary struct {
@@ -632,6 +682,14 @@ func stepExplicitIslandLifetimeState(
 				tag,
 			)
 		}
+		if decision := islandkernel.CanFreeIsland(islandKernelTokenRequest(fn.Name, tag, stack, locals)); decision.Decision != islandkernel.Accept {
+			return nil, fmt.Errorf(
+				"allocation lowering validation: %s instruction %d explicit island free rejected by islandkernel: %s",
+				fn.Name,
+				cur.idx,
+				decision.Reason.Code,
+			)
+		}
 		freed[tag] = true
 		stack = rest
 	case ir.IRIslandReset:
@@ -657,6 +715,14 @@ func stepExplicitIslandLifetimeState(
 				cur.idx,
 				live,
 				tag,
+			)
+		}
+		if decision := islandkernel.CanResetIsland(islandKernelTokenRequest(fn.Name, tag, stack, locals)); decision.Decision != islandkernel.Accept {
+			return nil, fmt.Errorf(
+				"allocation lowering validation: %s instruction %d explicit island reset rejected by islandkernel: %s",
+				fn.Name,
+				cur.idx,
+				decision.Reason.Code,
 			)
 		}
 		freed[tag] = true
@@ -776,6 +842,104 @@ func stepExplicitIslandLifetimeState(
 	default:
 		return []islandLifetimeState{next}, nil
 	}
+}
+
+func validateExplicitIslandStorageDecision(functionName string, alloc allocplan.Allocation) error {
+	req := islandKernelStorageRequest(alloc)
+	if decision := islandkernel.CanLowerAsExplicitIsland(req); decision.Decision != islandkernel.Accept {
+		return fmt.Errorf(
+			"allocation lowering validation: %s allocation %q explicit island lowering rejected by islandkernel: %s",
+			functionName,
+			alloc.ID,
+			decision.Reason.Code,
+		)
+	}
+	if decision := islandkernel.CanTrustStorage(req); decision.Decision != islandkernel.Accept {
+		return fmt.Errorf(
+			"allocation lowering validation: %s allocation %q trusted storage rejected by islandkernel: %s",
+			functionName,
+			alloc.ID,
+			decision.Reason.Code,
+		)
+	}
+	return nil
+}
+
+func islandKernelStorageRequest(alloc allocplan.Allocation) islandkernel.StorageRequest {
+	epoch := uint64(1)
+	if alloc.Domain != nil && alloc.Domain.Epoch > 0 {
+		epoch = alloc.Domain.Epoch
+	}
+	return islandkernel.StorageRequest{
+		Ref: islandkernel.MemoryRef{
+			BaseID:      alloc.ValueID,
+			IslandID:    alloc.RegionID,
+			Epoch:       epoch,
+			OwnerID:     alloc.RegionID,
+			Provenance:  memoryfacts.ProvenanceSafeOwned,
+			UnsafeClass: memoryfacts.UnsafeSafe,
+		},
+		PlannedStorage:  memoryfacts.StorageClass(alloc.PlannedStorage),
+		ActualStorage:   memoryfacts.StorageClass(alloc.ActualLoweringStorage),
+		Proof:           islandKernelStorageProofForAllocation(alloc, epoch),
+		EscapesLifetime: alloc.Escape != allocplan.EscapeNoEscape,
+	}
+}
+
+func islandKernelStorageProofForAllocation(
+	alloc allocplan.Allocation,
+	epoch uint64,
+) islandkernel.Proof {
+	proofID := ""
+	for _, id := range alloc.ProofIDs {
+		if strings.Contains(id, "storage") {
+			proofID = id
+			break
+		}
+		if proofID == "" {
+			proofID = id
+		}
+	}
+	return islandkernel.Proof{
+		ID:            proofID,
+		Kind:          memoryfacts.ProofStorage,
+		SubjectBaseID: alloc.ValueID,
+		IslandID:      alloc.RegionID,
+		Epoch:         epoch,
+		Operation:     islandkernel.OperationExplicitIslandStorage,
+		Verified:      proofID != "",
+	}
+}
+
+func islandKernelTokenRequest(
+	functionName string,
+	tag string,
+	stack []string,
+	locals []string,
+) islandkernel.TokenRequest {
+	return islandkernel.TokenRequest{
+		Token: islandkernel.Token{
+			IslandID: tag,
+			Epoch:    0,
+			OwnerID:  functionName,
+		},
+		LiveBorrows: liveIslandSliceCount(stack, locals, tag),
+	}
+}
+
+func liveIslandSliceCount(stack []string, locals []string, handleTag string) int {
+	count := 0
+	for _, tag := range stack {
+		if _, tagHandle, ok := islandSliceTagParts(tag); ok && tagHandle == handleTag {
+			count++
+		}
+	}
+	for _, tag := range locals {
+		if _, tagHandle, ok := islandSliceTagParts(tag); ok && tagHandle == handleTag {
+			count++
+		}
+	}
+	return count
 }
 
 func inferIslandReturnSummaries(prog *ir.IRProgram) map[string]islandReturnSummary {

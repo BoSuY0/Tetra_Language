@@ -1,7 +1,5 @@
 package memoryfacts
 
-import "tetra_language/compiler/memoryvocab"
-
 func isUnsafeUnknown(f Fact) bool {
 	return f.ProvenanceClass == ProvenanceUnsafeUnknown || f.UnsafeClass == UnsafeUnknown
 }
@@ -11,7 +9,7 @@ func hasUnsafeUnknownClass(provenance ProvenanceClass, unsafe UnsafeClass) bool 
 }
 
 func isSafeProvenance(p ProvenanceClass) bool {
-	return memoryvocab.SafeProvenanceClass(string(p))
+	return SafeProvenanceClass(string(p))
 }
 
 func hasSafeProvenanceFromUnsafeUnknown(provenance ProvenanceClass, unsafe UnsafeClass) bool {
@@ -19,7 +17,7 @@ func hasSafeProvenanceFromUnsafeUnknown(provenance ProvenanceClass, unsafe Unsaf
 }
 
 func requiresLoweredArtifact(f Fact) bool {
-	return memoryvocab.RowRequiresArtifact(
+	return RowRequiresArtifact(
 		string(f.StoragePlan),
 		string(f.ActualLoweringStorage),
 		f.Claim,
@@ -27,19 +25,19 @@ func requiresLoweredArtifact(f Fact) bool {
 }
 
 func unsafeUnknownOptimizationClaim(claim string, alias AliasState) bool {
-	return memoryvocab.UnsafeUnknownOptimizationClaim(claim, string(alias))
+	return UnsafeUnknownOptimizationClaim(claim, string(alias))
 }
 
 func memoryOptimizationClaim(claim string, alias AliasState) bool {
-	return memoryvocab.MemoryOptimizationClaim(claim, string(alias))
+	return MemoryOptimizationClaim(claim, string(alias))
 }
 
 func bareBoundsCheckEliminatedClaim(claim string) bool {
-	return memoryvocab.BareBoundsCheckEliminatedClaim(claim)
+	return BareBoundsCheckEliminatedClaim(claim)
 }
 
 func dynamicRawRuntimeCheckCostDisallowed(claim string, cost CostClass) bool {
-	return memoryvocab.DynamicRawRuntimeCheckCostDisallowed(claim, string(cost))
+	return DynamicRawRuntimeCheckCostDisallowed(claim, string(cost))
 }
 
 func unsafeCheckedDisallowedClaim(
@@ -47,21 +45,21 @@ func unsafeCheckedDisallowedClaim(
 	unsafe UnsafeClass,
 	claim string,
 ) bool {
-	return memoryvocab.UnsafeCheckedDisallowedClaim(string(provenance), string(unsafe), claim)
+	return UnsafeCheckedDisallowedClaim(string(provenance), string(unsafe), claim)
 }
 
 func knownCostClass(class CostClass) bool {
-	return memoryvocab.KnownCostClass(string(class))
+	return KnownCostClass(string(class))
 }
 
 func inferCostClass(f Fact) CostClass {
-	if memoryvocab.ZeroCostValidationRequiredClaim(f.Claim) && f.ValidationState != ValidationPass {
+	if ZeroCostValidationRequiredClaim(f.Claim) && f.ValidationState != ValidationPass {
 		if isUnsafeUnknown(f) {
 			return CostConservativeFallback
 		}
 		return CostInstrumentationOnly
 	}
-	return CostClass(memoryvocab.InferredCostClass(
+	return CostClass(InferredCostClass(
 		f.Claim,
 		string(f.StoragePlan),
 		string(f.ActualLoweringStorage),
@@ -82,15 +80,15 @@ func unsafeVerifiedRootDisallowedClaim(
 	unsafe UnsafeClass,
 	claim string,
 ) bool {
-	return memoryvocab.UnsafeVerifiedRootDisallowedClaim(string(provenance), string(unsafe), claim)
+	return UnsafeVerifiedRootDisallowedClaim(string(provenance), string(unsafe), claim)
 }
 
 func capMemDisallowedProofClaim(claim string, validatorName string, reason string) bool {
-	return memoryvocab.CapMemDisallowedProofClaim(claim, validatorName, reason)
+	return CapMemDisallowedProofClaim(claim, validatorName, reason)
 }
 
 func zeroCostProvenClaimDisallowed(f Fact) bool {
-	return memoryvocab.ZeroCostProvenClaimDisallowed(
+	return ZeroCostProvenClaimDisallowed(
 		f.Claim,
 		string(f.CostClass),
 		factClaimLevelForCost(f),
@@ -100,7 +98,7 @@ func zeroCostProvenClaimDisallowed(f Fact) bool {
 }
 
 func zeroCostValidationRequiredClaim(claim string) bool {
-	return memoryvocab.ZeroCostValidationRequiredClaim(claim)
+	return ZeroCostValidationRequiredClaim(claim)
 }
 
 func factClaimLevelForCost(f Fact) string {
@@ -118,7 +116,7 @@ func factClaimLevelForCost(f Fact) string {
 }
 
 func unsafeUnknownTrustedStorage(planned, actual StorageClass) bool {
-	return memoryvocab.UnsafeUnknownTrustedStorage(string(planned), string(actual))
+	return UnsafeUnknownTrustedStorage(string(planned), string(actual))
 }
 
 func unsafeExternalRootTrustedStorage(
@@ -126,7 +124,7 @@ func unsafeExternalRootTrustedStorage(
 	unsafe UnsafeClass,
 	planned, actual StorageClass,
 ) bool {
-	return memoryvocab.UnsafeExternalRootTrustedStorage(
+	return UnsafeExternalRootTrustedStorage(
 		string(provenance),
 		string(unsafe),
 		string(planned),
@@ -135,15 +133,15 @@ func unsafeExternalRootTrustedStorage(
 }
 
 func validatedTrustedStorageHeapFallback(planned, actual StorageClass) bool {
-	return memoryvocab.ValidatedTrustedStorageHeapFallback(string(planned), string(actual))
+	return ValidatedTrustedStorageHeapFallback(string(planned), string(actual))
 }
 
 func runtimeProofRequiredStorage(planned, actual StorageClass) bool {
-	return memoryvocab.RuntimeProofRequiredStorage(string(planned), string(actual))
+	return RuntimeProofRequiredStorage(string(planned), string(actual))
 }
 
 func trustedStorageHeapFallback(planned, actual StorageClass) bool {
-	return memoryvocab.ValidatedTrustedStorageHeapFallback(string(planned), string(actual))
+	return ValidatedTrustedStorageHeapFallback(string(planned), string(actual))
 }
 
 func storageFallbackRequiresReason(planned, actual StorageClass, cost CostClass) bool {
@@ -157,53 +155,61 @@ func storageFallbackRequiresReason(planned, actual StorageClass, cost CostClass)
 }
 
 func trustedStorageForUnsafeUnknown(class StorageClass) bool {
-	return memoryvocab.UnsafeUnknownTrustedStorage(string(class), "")
+	return UnsafeUnknownTrustedStorage(string(class), "")
 }
 
 func knownSourceStage(stage SourceStage) bool {
-	return memoryvocab.KnownSourceStage(string(stage))
+	return KnownSourceStage(string(stage))
 }
 
 func knownProvenanceClass(class ProvenanceClass) bool {
-	return memoryvocab.KnownProvenanceClass(string(class))
+	return KnownProvenanceClass(string(class))
 }
 
 func knownUnsafeClass(class UnsafeClass) bool {
-	return memoryvocab.KnownUnsafeClass(string(class))
+	return KnownUnsafeClass(string(class))
 }
 
 func knownStorageClass(class StorageClass) bool {
-	return memoryvocab.KnownStorageClass(string(class))
+	return KnownStorageClass(string(class))
+}
+
+func knownDomainKind(kind DomainKind) bool {
+	return KnownDomainKind(string(kind))
+}
+
+func knownTransferKind(kind TransferKind) bool {
+	return KnownTransferKind(string(kind))
 }
 
 func knownAliasState(state AliasState) bool {
-	return memoryvocab.KnownAliasState(string(state))
+	return KnownAliasState(string(state))
 }
 
 func validatedNoAliasState(state AliasState) bool {
-	return memoryvocab.ValidatedNoAliasState(string(state))
+	return ValidatedNoAliasState(string(state))
 }
 
 func broadNoAliasClaim(claim string) bool {
-	return memoryvocab.BroadNoAliasClaim(claim)
+	return BroadNoAliasClaim(claim)
 }
 
 func conservativeNoAliasBoundaryClaim(claim string) bool {
-	return memoryvocab.ConservativeNoAliasBoundaryClaim(claim)
+	return ConservativeNoAliasBoundaryClaim(claim)
 }
 
 func claimRequiresParentFactID(claim string) bool {
-	return memoryvocab.ClaimRequiresParentFactID(claim)
+	return ClaimRequiresParentFactID(claim)
 }
 
 func knownClaimLevel(level ClaimLevel) bool {
-	return memoryvocab.KnownClaimLevel(string(level))
+	return KnownClaimLevel(string(level))
 }
 
 func knownValidatorStatus(status ValidatorStatus) bool {
-	return memoryvocab.KnownValidatorStatus(string(status))
+	return KnownValidatorStatus(string(status))
 }
 
 func knownReportClaim(claim string) bool {
-	return memoryvocab.KnownReportClaim(claim)
+	return KnownReportClaim(claim)
 }

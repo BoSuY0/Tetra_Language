@@ -19199,7 +19199,7 @@ TestValidateMemoryReportRejectsV6BoundsRowsWithoutParent
 TestValidateMemoryReportRejectsBareBoundsCheckEliminatedWithoutProofID
 TESTS
         ;;
-      ./tools/cmd/validate-memory-report)
+      ./compiler/cmd/validate-memory-report)
         cat <<'TESTS'
 TestValidateMemoryReportRejectsSafeKnownFromUnsafeUnknown
 TestValidateMemoryReportRejectsUnsafeUnknownOptimizationClaim

@@ -1,0 +1,104 @@
+{
+  "schema": "tetra.memory-core-v2.evidence.v1",
+  "git_head": "0123456789abcdef0123456789abcdef01234567",
+  "target": "linux-x64",
+  "program_id": "program:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "memory_graph_digest": "memory-graph:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "module_plan_digests": {
+    "main": "memory-plan:sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "module_lowering_digests": {
+    "main": "lowering:sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  },
+  "normal_build_state_built": true,
+  "report_flag_decision_parity": true,
+  "cache_attestation_checked": true,
+  "island_routes_total": 16,
+  "island_routes_direct": 16,
+  "memorymodel_outcomes_total": 50,
+  "memorymodel_outcomes_real_pipeline": 50,
+  "backend_operation_support": [
+    {
+      "target": "linux-x64",
+      "operation": "reserve",
+      "supported": true,
+      "evidence": "compiler/internal/runtimeabi memory backend tests"
+    },
+    {
+      "target": "linux-x64",
+      "operation": "commit",
+      "supported": true,
+      "evidence": "compiler/internal/runtimeabi memory backend tests"
+    },
+    {
+      "target": "linux-x64",
+      "operation": "decommit",
+      "supported": true,
+      "evidence": "compiler/internal/runtimeabi memory backend tests"
+    },
+    {
+      "target": "linux-x64",
+      "operation": "release",
+      "supported": true,
+      "evidence": "compiler/internal/runtimeabi memory backend tests"
+    },
+    {
+      "target": "wasm32-wasi",
+      "operation": "reserve",
+      "supported": false,
+      "unsupported_reason": "runtime memory backend operation is not implemented for wasm32-wasi"
+    }
+  ],
+  "optimizer_memory_rewrites": 4,
+  "optimizer_rewrites_with_proof_ids": 4,
+  "negative_guards": [
+    {
+      "name": "missing-digest",
+      "status": "pass",
+      "evidence": "negative fixture proves the validator rejects missing digests"
+    },
+    {
+      "name": "report-only-state",
+      "status": "pass",
+      "evidence": "negative fixture proves the validator rejects report-only state"
+    },
+    {
+      "name": "route-count-mismatch",
+      "status": "pass",
+      "evidence": "negative fixture proves the validator rejects route count mismatch"
+    },
+    {
+      "name": "proofless-optimizer-rewrite",
+      "status": "pass",
+      "evidence": "negative fixture proves the validator rejects optimizer rewrites without proof ids"
+    },
+    {
+      "name": "unsupported-backend-marked-supported",
+      "status": "pass",
+      "evidence": "negative fixture proves the validator rejects unsupported backend operations marked supported"
+    },
+    {
+      "name": "memorymodel-parity-incomplete",
+      "status": "pass",
+      "evidence": "negative fixture proves the validator rejects incomplete memorymodel parity"
+    },
+    {
+      "name": "broad-claim",
+      "status": "pass",
+      "evidence": "negative fixture proves the validator rejects broad unsupported claims"
+    },
+    {
+      "name": "final-signoff-failed-requirement",
+      "status": "pass",
+      "evidence": "negative fixture proves the validator rejects final signoff when any requirement failed"
+    }
+  ],
+  "nonclaims": [
+    "no universal memory safety claim",
+    "no universal performance claim",
+    "no zero heap for all programs claim",
+    "no all-target memory support claim",
+    "no all-target backend runtime claim"
+  ],
+  "final_signoff": true
+}

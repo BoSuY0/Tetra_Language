@@ -48,9 +48,7 @@ jobs:
       - name: Target-host UI runtime smoke
         shell: bash
         run: |
-          go run ./tools/cmd/platform-ui-runtime-smoke \
-            --target "${{ matrix.target }}" \
-            --report "${{ matrix.report }}"
+          go run ./tools/cmd/platform-ui-runtime-smoke --target "${{ matrix.target }}" --report "${{ matrix.report }}"
 
       - name: Validate target-host UI runtime report
         shell: bash
@@ -59,16 +57,10 @@ jobs:
           expected_git_head="$(git rev-parse HEAD)"
           case "${{ matrix.target }}" in
             windows-x64)
-              go run ./tools/cmd/validate-windows-ui-runtime \
-                --report windows-ui-runtime.json \
-                --expected-version "$expected_version" \
-                --expected-git-head "$expected_git_head"
+              go run ./tools/cmd/validate-windows-ui-runtime --report windows-ui-runtime.json --expected-version "$expected_version" --expected-git-head "$expected_git_head"
               ;;
             macos-x64)
-              go run ./tools/cmd/validate-macos-ui-runtime \
-                --report macos-ui-runtime.json \
-                --expected-version "$expected_version" \
-                --expected-git-head "$expected_git_head"
+              go run ./tools/cmd/validate-macos-ui-runtime --report macos-ui-runtime.json --expected-version "$expected_version" --expected-git-head "$expected_git_head"
               ;;
             *)
               echo "unexpected target ${{ matrix.target }}" >&2
@@ -114,8 +106,7 @@ jobs:
       - name: Full-platform UI runtime gate
         shell: bash
         run: |
-          bash scripts/release/full_platform/ui-runtime-gate.sh \
-            --report-dir reports/full-platform-ui-runtime
+          bash scripts/release/full_platform/ui-runtime-gate.sh --report-dir reports/full-platform-ui-runtime
 
       - name: Upload full-platform UI runtime gate report
         if: always()

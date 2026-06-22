@@ -603,6 +603,9 @@ func validateNoForbiddenActorPromotions(label, text string, allowedNonclaims, fo
 	for _, allowed := range allowedNonclaims {
 		normalized = strings.ReplaceAll(normalized, normalizeActorText(allowed), " ")
 	}
+	for _, allowed := range allowedActorRuntimeNonclaimSentences() {
+		normalized = strings.ReplaceAll(normalized, normalizeActorText(allowed), " ")
+	}
 	normalized = normalizeActorText(normalized)
 	var issues []string
 	for _, forbidden := range forbiddenClaims {
@@ -615,6 +618,12 @@ func validateNoForbiddenActorPromotions(label, text string, allowedNonclaims, fo
 		}
 	}
 	return issues
+}
+
+func allowedActorRuntimeNonclaimSentences() []string {
+	return []string{
+		"Actor runtime foundation evidence remains Linux-x64 scoped; Erlang/OTP, cluster membership, reconnect/retry production, non-Linux distributed runtime, distributed zero-copy transfer, and formal race proof are not claimed.",
+	}
 }
 
 func validateCapabilities(root string, capabilities []actorCapability, forbiddenClaims []string, validatorIDs map[string]bool, required []requiredCapabilityContract) []string {

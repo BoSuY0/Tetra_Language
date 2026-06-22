@@ -9,10 +9,18 @@ import (
 	"strings"
 
 	"tetra_language/compiler/internal/allocplan"
+	"tetra_language/compiler/internal/memoryfacts"
+	"tetra_language/compiler/internal/runtimeabi"
 )
 
-func BuildReportFromAllocPlan(
-	plan *allocplan.Plan,
+type Input struct {
+	Facts   memoryfacts.Snapshot
+	Plan    *allocplan.Plan
+	Domains []runtimeabi.MemoryDomain
+}
+
+func BuildReport(
+	input Input,
 	target string,
 	gitHead string,
 	generatedBy string,
@@ -25,14 +33,16 @@ func BuildReportFromAllocPlan(
 		GeneratedAt:   nowRFC3339(),
 		NonClaims:     DefaultNonClaims(),
 	}
+	plan := input.Plan
 	if plan == nil {
 		report.Summary = SummarizeRows(nil)
 		return report
 	}
+	domains := domainsByID(input.Domains)
 	proofs := map[string]ProofSummary{}
 	for _, fn := range plan.Functions {
 		for _, alloc := range fn.Allocations {
-			row, proof := rowFromAllocation(fn.Name, alloc)
+			row, proof := rowFromAllocation(fn.Name, alloc, domains)
 			if proof.ProofID != "" {
 				proofs[proof.ProofID] = proof
 			}
@@ -63,7 +73,11 @@ func BuildReportFromAllocPlan(
 	return report
 }
 
-func rowFromAllocation(function string, alloc allocplan.Allocation) (Row, ProofSummary) {
+func rowFromAllocation(
+	function string,
+	alloc allocplan.Allocation,
+	domains map[string]runtimeabi.MemoryDomain,
+) (Row, ProofSummary) {
 	placement := placementFromAllocation(alloc)
 	intent := intentFromAllocation(alloc, placement)
 	row := Row{
@@ -85,9 +99,9 @@ func rowFromAllocation(function string, alloc allocplan.Allocation) (Row, ProofS
 		FreePoint:        freePointFromAllocation(alloc, function),
 		ContractGrade:    GradeForPlacement(placement),
 		ValidationStatus: validationStatusFromAllocation(alloc, placement),
-		SourceFactID:     "fact:ram:" + sanitizeID(alloc.SiteID),
+		SourceFactID:     firstString(alloc.SourceFactIDs),
 	}
-	row.Domain = memoryDomainFromAllocation(function, alloc, row)
+	row.Domain = canonicalDomainForAllocation(alloc, domains)
 	if trustedPlacement(placement) && row.ValidationStatus == ValidationValidated {
 		proof := proofForAllocation(function, alloc, row)
 		row.ProofIDs = []string{proof.ProofID}
@@ -96,89 +110,31 @@ func rowFromAllocation(function string, alloc allocplan.Allocation) (Row, ProofS
 	return row, ProofSummary{}
 }
 
-func memoryDomainFromAllocation(
-	function string,
+func domainsByID(domains []runtimeabi.MemoryDomain) map[string]runtimeabi.MemoryDomain {
+	out := map[string]runtimeabi.MemoryDomain{}
+	for _, domain := range domains {
+		if strings.TrimSpace(domain.DomainID) == "" {
+			continue
+		}
+		out[domain.DomainID] = domain
+	}
+	return out
+}
+
+func canonicalDomainForAllocation(
 	alloc allocplan.Allocation,
-	row Row,
+	domains map[string]runtimeabi.MemoryDomain,
 ) *MemoryDomain {
-	requested := row.RequestedBytes
-	reserved := int64(alloc.BytesReserved)
-	if reserved == 0 {
-		reserved = int64(allocationBytes(alloc))
-		if reserved == 0 {
-			reserved = requested
+	if alloc.Domain == nil {
+		return nil
+	}
+	domain := *alloc.Domain
+	if domains != nil {
+		if supplied, ok := domains[domain.DomainID]; ok {
+			domain = supplied
 		}
 	}
-	domain := &MemoryDomain{
-		DomainID:       "domain:process",
-		Kind:           DomainProcess,
-		OwnerKind:      "process",
-		OwnerID:        "current",
-		Lifetime:       "process",
-		BudgetBytes:    requested,
-		RequestedBytes: requested,
-		ReservedBytes:  reserved,
-		CommittedBytes: int64(alloc.BytesCommitted),
-		ReleasedBytes:  int64(alloc.BytesReleased),
-	}
-	if alloc.MemoryBackend != nil {
-		domain.CurrentBytes = alloc.MemoryBackend.FootprintCurrentBytes
-		domain.PeakBytes = alloc.MemoryBackend.FootprintPeakBytes
-	}
-	switch alloc.ActualLoweringStorage {
-	case allocplan.StorageExplicitIsland:
-		domain.Kind = DomainIsland
-		domain.DomainID = memoryDomainID("island", alloc.RegionID, alloc.SiteID)
-		domain.OwnerKind = "island"
-		domain.OwnerID = ownerIDFromRegion("island", alloc.RegionID, alloc.ValueID)
-		domain.Lifetime = row.Lifetime
-	case allocplan.StorageTaskRegion:
-		domain.Kind = DomainTask
-		domain.DomainID = memoryDomainID("task", alloc.RegionID, alloc.SiteID)
-		domain.OwnerKind = "task"
-		domain.OwnerID = ownerIDFromRegion("task", alloc.RegionID, function)
-		domain.Lifetime = row.Lifetime
-	case allocplan.StorageActorMoveRegion:
-		domain.Kind = DomainActor
-		domain.DomainID = memoryDomainID("actor", alloc.RegionID, alloc.SiteID)
-		domain.OwnerKind = "actor"
-		domain.OwnerID = ownerIDFromRegion("actor", alloc.RegionID, function)
-		domain.Lifetime = row.Lifetime
-	case allocplan.StorageExternal:
-		domain.Kind = DomainExternal
-		domain.DomainID = memoryDomainID("external", alloc.RegionID, alloc.SiteID)
-		domain.OwnerKind = "external"
-		domain.OwnerID = ownerIDFromRegion("external", alloc.RegionID, alloc.ValueID)
-		domain.Lifetime = row.Lifetime
-	}
-	if isCopyIntent(row.Intent) {
-		domain.CopyCount = 1
-		domain.BytesCopied = requested
-	}
-	return domain
-}
-
-func memoryDomainID(kind string, regionID string, fallback string) string {
-	regionID = strings.TrimSpace(regionID)
-	if regionID != "" {
-		return "domain:" + sanitizeID(regionID)
-	}
-	return "domain:" + kind + ":" + sanitizeID(fallback)
-}
-
-func ownerIDFromRegion(kind string, regionID string, fallback string) string {
-	regionID = strings.TrimSpace(regionID)
-	prefix := kind + ":"
-	if strings.HasPrefix(regionID, prefix) {
-		value := strings.TrimSpace(strings.TrimPrefix(regionID, prefix))
-		if value != "" {
-			return sanitizeID(value)
-		}
-	}
-	if regionID != "" {
-		return sanitizeID(regionID)
-	}
-	return sanitizeID(fallback)
+	return &domain
 }
 
 func placementFromAllocation(alloc allocplan.Allocation) Placement {

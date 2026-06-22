@@ -66,6 +66,38 @@ func checkedFilePLIRProgram(t *testing.T, src string) *Program {
 	return prog
 }
 
+func TestCopyLoopProofUsesAssignedCopyTargetName(t *testing.T) {
+	prog := checkedPLIRProgram(t, `
+func main() -> Int
+uses alloc, mem:
+    var xs: []i32 = make_i32(4)
+    xs[0] = 10
+    xs[1] = 20
+    let ys: []i32 = xs.window(1, 2).copy()
+    return ys[0]
+`)
+	var mainFn Function
+	for _, fn := range prog.Funcs {
+		if fn.Name == "main" {
+			mainFn = fn
+			break
+		}
+	}
+	if mainFn.Name == "" {
+		t.Fatalf("main PLIR function not found: %s", FormatText(prog))
+	}
+	for _, guard := range mainFn.ProofGuards {
+		if strings.HasPrefix(guard.ID, "proof:copy-loop:ys:") {
+			return
+		}
+	}
+	t.Fatalf(
+		"copy-loop proof guards = %#v, want proof:copy-loop:ys prefix\n%s",
+		mainFn.ProofGuards,
+		FormatText(prog),
+	)
+}
+
 func TestFunctionSummaryRecordsBorrowReturnOwnership(t *testing.T) {
 	prog := checkedPLIRProgram(t, `
 func view_bytes(xs: borrow []u8) -> borrow []u8:

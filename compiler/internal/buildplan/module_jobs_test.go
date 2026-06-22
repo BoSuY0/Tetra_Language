@@ -74,12 +74,16 @@ func TestApplyModuleObjectMetadata(t *testing.T) {
 
 	obj := &tobj.Object{}
 	ApplyModuleObjectMetadata(obj, ModuleObjectMetadata{
-		Target:          "linux-x64",
-		Module:          "app.main",
-		CompilerVersion: "test-version",
-		PublicAPIHash:   "api-hash",
-		SrcHash:         srcHash,
-		WorldSigHash:    depHash,
+		Target:               "linux-x64",
+		Module:               "app.main",
+		CompilerVersion:      "test-version",
+		PublicAPIHash:        "api-hash",
+		MemoryPlanSchema:     tobj.MemoryPlanSchemaV2,
+		MemoryPlanDigest:     "memory-plan:sha256:abc",
+		MemoryLoweringSchema: tobj.MemoryLoweringSchemaV2,
+		MemoryLoweringDigest: "lowering:sha256:def",
+		SrcHash:              srcHash,
+		WorldSigHash:         depHash,
 	})
 
 	if obj.Target != "linux-x64" || obj.Module != "app.main" {
@@ -91,6 +95,12 @@ func TestApplyModuleObjectMetadata(t *testing.T) {
 			obj.CompilerVersion,
 			obj.PublicAPIHash,
 		)
+	}
+	if obj.MemoryPlanSchema != tobj.MemoryPlanSchemaV2 ||
+		obj.MemoryPlanDigest != "memory-plan:sha256:abc" ||
+		obj.MemoryLoweringSchema != tobj.MemoryLoweringSchemaV2 ||
+		obj.MemoryLoweringDigest != "lowering:sha256:def" {
+		t.Fatalf("memory metadata was not applied: %#v", obj)
 	}
 	if obj.SrcHash != srcHash || obj.WorldSigHash != depHash {
 		t.Fatalf("hash metadata was not applied")

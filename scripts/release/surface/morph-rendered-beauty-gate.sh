@@ -67,12 +67,7 @@ fi
 mkdir -p "$GOCACHE" "$GOTMPDIR"
 
 report_dir_arg="${report_dir%/}"
-report_dir="$(
-  surface_release_require_fresh_report_dir \
-    "$report_dir_arg" \
-    "$repo_root" \
-    "surface_morph_rendered_beauty_gate:"
-)"
+report_dir="$(surface_release_require_fresh_report_dir "$report_dir_arg" "$repo_root" "surface_morph_rendered_beauty_gate:")"
 report_dir_rel="$(realpath --relative-to="$repo_root" "$report_dir")"
 
 format_command() {
@@ -347,9 +342,7 @@ bash scripts/release/surface/surface-reference-apps-smoke.sh --report-dir "$refe
 go run ./tools/cmd/validate-surface-reference-apps --report "$reference_dir/surface-reference-apps.json"
 
 docs_claims_log="$docs_claims_dir/surface-docs-claims-gate.log"
-bash scripts/release/surface/surface-docs-claims-gate.sh \
-	--report-dir "$report_dir" \
-	>"$docs_claims_log"
+bash scripts/release/surface/surface-docs-claims-gate.sh --report-dir "$report_dir" >"$docs_claims_log"
 printf "surface docs claims gate validated for %s\n" "$report_dir" >>"$docs_claims_log"
 
 headless_renderer_owned="$(renderer_owned_stable_proof "$mrb_report")"
@@ -405,7 +398,7 @@ if [[ "${#stable_promotion_blockers[@]}" -gt 0 ]]; then
 	gate_status="validated_with_target_blockers"
 fi
 
-cat >"$summary_path" <<JSON
+cat > "$summary_path" <<JSON
 {
   "schema": "tetra.surface.morph-rendered-beauty.gate.v1",
   "status": $(json_string "$gate_status"),
@@ -536,10 +529,7 @@ for report in "${required_reports[@]}"; do
 	fi
 done
 
-go run ./tools/cmd/validate-artifact-hashes \
-	--write \
-	--root "$report_dir" \
-	--out "$report_dir/artifact-hashes.json"
+go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"
 go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-hashes.json"
 
 echo "Surface Morph rendered beauty gate reports: $report_dir"

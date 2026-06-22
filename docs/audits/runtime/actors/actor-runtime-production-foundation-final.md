@@ -2,8 +2,7 @@
 
 Date: 2026-06-10
 
-Historical audit note: this document is historical supporting evidence, subordinate to current
-same-commit actor foundation gates. Do not use it as current release proof unless its recorded git
+Historical audit note: this document is historical supporting evidence, subordinate to current same-commit actor foundation gates. Do not use it as current release proof unless its recorded git
 head and artifacts are revalidated by the current actor foundation gate, artifact hash validator,
 and foundation validator.
 

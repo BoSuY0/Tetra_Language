@@ -802,7 +802,7 @@ func (b *builder) recordCopyCall(
 		},
 	)
 	b.addFact(Fact{Kind: FactRegionAlive, ValueID: id, Region: value.Region})
-	b.addCopyLoopRangeProof(name, call, op)
+	b.addCopyLoopRangeProof(targetName, call, op)
 }
 
 func (b *builder) addCopyLoopRangeProof(name string, call *frontend.CallExpr, op Operation) {

@@ -231,6 +231,18 @@ func RequiredSurfaceSymbols() []string {
 func SignatureForSymbol(name string) (Signature, bool) {
 	actorRefSlots := ActorHandleABI().RefSlots
 	switch name {
+	case MemoryBackendReserveSymbol:
+		return Signature{ParamSlots: 1, ReturnSlots: 1}, true
+	case MemoryBackendCommitSymbol:
+		return Signature{ParamSlots: 2, ReturnSlots: 1}, true
+	case MemoryBackendDecommitSymbol:
+		return Signature{ParamSlots: 2, ReturnSlots: 1}, true
+	case MemoryBackendReleaseSymbol:
+		return Signature{ParamSlots: 2, ReturnSlots: 1}, true
+	case MemoryBackendTrimSymbol:
+		return Signature{ParamSlots: 0, ReturnSlots: 1}, true
+	case MemoryBackendFootprintSymbol:
+		return Signature{ParamSlots: 0, ReturnSlots: 2}, true
 	case "__tetra_entry":
 		return Signature{ParamSlots: 0, ReturnSlots: 1}, true
 	case "__tetra_actor_spawn":

@@ -7,7 +7,7 @@ import (
 	"tetra_language/compiler/internal/plir"
 )
 
-func FromPLIR(prog *plir.Program) (*Program, error) {
+func BuildFromProgramIR(prog *plir.Program) (*Program, error) {
 	if prog == nil {
 		return nil, nil
 	}
@@ -43,7 +43,7 @@ func FromPLIRFunction(fn plir.Function) (Function, error) {
 		out.Values = append(out.Values, Value{ID: id, Type: typ, Origin: origin})
 	}
 	for _, value := range fn.Values {
-		addValue(ValueID(value.ID), typeFromPLIR(value.Type), "plir_value")
+		addValue(ValueID(value.ID), typeFromProgramIR(value.Type), "plir_value")
 	}
 	effect := ValueID("effect0")
 	addValue(effect, TypeEffect, "entry_effect")
@@ -154,7 +154,7 @@ func valueIDs(values []string) []ValueID {
 	return out
 }
 
-func typeFromPLIR(typ string) Type {
+func typeFromProgramIR(typ string) Type {
 	switch strings.ToLower(strings.TrimSpace(typ)) {
 	case "", "void":
 		return TypeVoid

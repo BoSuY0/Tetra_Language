@@ -69,6 +69,74 @@ uses actors, runtime:
 	}
 }
 
+func TestLinuxRuntimeNodeConnectReturnsZeroWithRegisteredPeer(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 executable smoke only")
+	}
+
+	broker, stop := startTestBroker(t, Config{Addr: "127.0.0.1:0"})
+	defer stop()
+
+	_, portRaw, err := net.SplitHostPort(broker.Addr())
+	if err != nil {
+		t.Fatalf("split broker address: %v", err)
+	}
+	port, err := strconv.Atoi(portRaw)
+	if err != nil {
+		t.Fatalf("parse broker port: %v", err)
+	}
+
+	peer := dialTestNode(t, broker.Addr())
+	defer peer.Close()
+	writeTestFrame(t, peer, actorwire.Frame{
+		Type:         actorwire.FrameHello,
+		SourceNodeID: 2,
+		DestNodeID:   2,
+	})
+	if got := readTestFrame(t, peer); got.Type != actorwire.FrameHelloAck ||
+		got.Status != actorwire.StatusOK {
+		t.Fatalf("peer hello ack = %+v, want hello_ack ok", got)
+	}
+
+	tmp := t.TempDir()
+	srcPath := filepath.Join(tmp, "connect_registered_peer.tetra")
+	if err := os.WriteFile(srcPath, []byte(`
+enum RemoteMsg:
+    case ping(Int)
+
+func worker() -> Int:
+    return 0
+
+func main() -> Int
+uses actors, runtime:
+    let connected: Int = core.actor_node_connect(1, `+strconv.Itoa(port)+`)
+    return connected
+`), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	outPath := filepath.Join(tmp, "connect-registered-peer")
+	if _, err := compiler.BuildFileWithStatsOpt(
+		srcPath,
+		outPath,
+		"linux-x64",
+		compiler.BuildOptions{Jobs: 1},
+	); err != nil {
+		t.Fatalf("build linux runtime smoke: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, outPath)
+	output, err := cmd.CombinedOutput()
+	if ctx.Err() == context.DeadlineExceeded {
+		t.Fatalf("runtime smoke timed out")
+	}
+	if err != nil {
+		t.Fatalf("runtime smoke failed: %v output=%q", err, string(output))
+	}
+}
+
 func TestLinuxRuntimeConnectWritesHelloFrame(t *testing.T) {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
 		t.Skip("linux/amd64 executable smoke only")

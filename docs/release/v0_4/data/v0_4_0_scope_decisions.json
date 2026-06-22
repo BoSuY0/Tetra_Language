@@ -24,10 +24,10 @@
       ],
       "evidence": {
         "implementation": [
-          "compiler/internal/frontend/parser.go",
-          "compiler/internal/semantics/checker.go",
-          "compiler/internal/semantics/exprs.go",
-          "compiler/internal/lower/lower.go"
+          "compiler/internal/frontend/frontend_core.go",
+          "compiler/internal/semantics/semantics_checker.go",
+          "compiler/internal/semantics/semantics_expressions.go",
+          "compiler/internal/lower/lower_core.go"
         ],
         "tests": [
           "go test ./compiler -run 'TestBuildFunctionTypedGlobalClosureLiteralSmoke|TestBuildFunctionTypedMutableGlobalClosureLiteralInitializerSmoke|TestBuildFunctionTypedImportedGlobalDirectCallSmoke|TestBuildFunctionTypedImportedGlobalLocalAndCallbackSmoke|TestBuildFunctionTypedImportedGlobalDirectCallbackSmoke|TestBuildFunctionTypedImportedGlobalMutableLocalReassignmentSmoke|TestBuildFunctionTypedImportedGlobalStructFieldReassignmentSmoke|TestBuildFunctionTypedSelectiveImportedGlobalDirectCallSmoke|TestBuildFunctionTypedSelectiveImportedGlobalLocalAndCallbackSmoke|TestBuildFunctionTypedSelectiveImportedGlobalMutableLocalReassignmentSmoke|TestBuildFunctionTypedSelectiveImportedGlobalStructFieldReassignmentSmoke' -count=1",
@@ -38,10 +38,10 @@
           "go test ./compiler ./cli/cmd/tetra ./tools/cmd/validate-manifest ./tools/cmd/verify-docs -run 'TestFeatureRegistryCoversReleaseStatusesAndKeyBoundaries|TestFeatures|TestValidateFeatures|TestVerifyFeatureRegistry' -count=1"
         ],
         "docs": [
-          "docs/spec/current_supported_surface.md",
+          "docs/spec/core/current_supported_surface.md",
           "docs/spec/flow_syntax_v1.md",
           "docs/spec/v1_feature_status.md",
-          "docs/release/v0_4_0_callable_evidence_map.md"
+          "docs/release/v0_4/v0_4_0_callable_evidence_map.md"
         ],
         "release_gate_evidence": [
           "docs/checklists/v0_4_0_release_gate.md",
@@ -70,19 +70,19 @@
       ],
       "evidence": {
         "implementation": [
-          "compiler/internal/semantics/checker.go",
-          "compiler/internal/semantics/exprs.go",
-          "compiler/internal/lower/lower.go"
+          "compiler/internal/semantics/semantics_checker.go",
+          "compiler/internal/semantics/semantics_expressions.go",
+          "compiler/internal/lower/lower_core.go"
         ],
         "tests": [
-          "compiler/tests/callables/function_typed_callable_test.go",
-          "compiler/tests/semantics/closures_semantic_clauses_test.go"
+          "compiler/tests/callables/core/function_typed_callable_test.go",
+          "compiler/tests/semantics/semantics_callables_closures_test.go"
         ],
         "docs": [
-          "docs/spec/current_supported_surface.md",
+          "docs/spec/core/current_supported_surface.md",
           "docs/spec/flow_syntax_v1.md",
           "docs/spec/v1_feature_status.md",
-          "docs/release/v0_4_0_callable_evidence_map.md"
+          "docs/release/v0_4/v0_4_0_callable_evidence_map.md"
         ],
         "release_gate_evidence": [
           "docs/checklists/v0_4_0_release_gate.md",
@@ -111,18 +111,18 @@
       ],
       "evidence": {
         "implementation": [
-          "compiler/internal/semantics/region.go",
-          "compiler/internal/semantics/checker.go",
-          "compiler/internal/semantics/exprs.go"
+          "compiler/internal/semantics/semantics_memory_resources.go",
+          "compiler/internal/semantics/semantics_checker.go",
+          "compiler/internal/semantics/semantics_expressions.go"
         ],
         "tests": [
           "compiler/tests/ownership/ownership_test.go",
           "compiler/tests/runtime/resource_finalization_test.go",
           "compiler/tests/safety/plan250_safety_runtime_test.go",
-          "compiler/tests/ownership/actor_task_ownership_test.go"
+          "compiler/tests/ownership/actor_task/actor_task_ownership_test.go"
         ],
         "docs": [
-          "docs/spec/current_supported_surface.md",
+          "docs/spec/core/current_supported_surface.md",
           "docs/spec/ownership_v1.md",
           "docs/spec/v1_scope.md"
         ],
@@ -153,20 +153,20 @@
       ],
       "evidence": {
         "implementation": [
-          "lib/experimental/async.tetra",
-          "lib/experimental/collections.tetra",
-          "lib/experimental/crypto.tetra",
-          "lib/experimental/filesystem.tetra",
-          "lib/experimental/io.tetra",
-          "lib/experimental/math.tetra",
-          "lib/experimental/memory.tetra",
-          "lib/experimental/networking.tetra",
-          "lib/experimental/serialization.tetra",
-          "lib/experimental/slices.tetra",
-          "lib/experimental/strings.tetra",
-          "lib/experimental/sync.tetra",
-          "lib/experimental/testing.tetra",
-          "lib/experimental/time.tetra"
+          "lib/experimental/async/async.tetra",
+          "lib/experimental/data/collections.tetra",
+          "lib/experimental/data/crypto.tetra",
+          "lib/experimental/io/filesystem.tetra",
+          "lib/experimental/io/io.tetra",
+          "lib/experimental/base/math.tetra",
+          "lib/experimental/memory/memory.tetra",
+          "lib/experimental/io/networking.tetra",
+          "lib/experimental/data/serialization.tetra",
+          "lib/experimental/data/slices.tetra",
+          "lib/experimental/base/strings.tetra",
+          "lib/experimental/base/sync.tetra",
+          "lib/experimental/base/testing.tetra",
+          "lib/experimental/base/time.tetra"
         ],
         "tests": [
           "go test ./compiler -run 'TestExampleExperimentalMath|TestExampleExperimentalMemcpy' -count=1",
@@ -205,13 +205,13 @@
       ],
       "evidence": {
         "implementation": [
-          "compiler/internal/frontend/parser.go",
-          "compiler/internal/lower/lower.go",
+          "compiler/internal/frontend/frontend_core.go",
+          "compiler/internal/lower/lower_core.go",
           "compiler/internal/backend/wasm32_web/ui.go",
           "compiler/internal/backend/native_shell/codegen.go",
           "docs/schemas/tetra.ui.v1.schema.json",
-          "examples/ui_web_smoke.tetra",
-          "examples/ui_native_shell_smoke.tetra",
+          "examples/surface/migration/surface_migration_ui_web_smoke.tetra",
+          "examples/surface/migration/surface_migration_ui_native_shell_smoke.tetra",
           "examples/projects/dogfood_web_ui/src/main.tetra"
         ],
         "tests": [
@@ -223,7 +223,7 @@
         ],
         "docs": [
           "docs/spec/ui_v1.md",
-          "docs/spec/current_supported_surface.md",
+          "docs/spec/core/current_supported_surface.md",
           "docs/user/wasm_ui_guide.md",
           "docs/schemas/tetra.ui.v1.schema.json"
         ],
@@ -295,14 +295,14 @@
       ],
       "evidence": {
         "implementation": [
-          "compiler/internal/semantics/callable_escape.go",
-          "compiler/internal/semantics/closure_captures.go",
-          "compiler/internal/semantics/checker.go",
-          "compiler/internal/semantics/function_types.go",
-          "compiler/internal/semantics/exprs.go",
-          "compiler/internal/lower/callables.go",
-          "compiler/internal/lower/lower.go",
-          "compiler/interface.go"
+          "compiler/internal/semantics/semantics_memory_resources.go",
+          "compiler/internal/semantics/semantics_suite_test.go",
+          "compiler/internal/semantics/semantics_checker.go",
+          "compiler/internal/semantics/semantics_core.go",
+          "compiler/internal/semantics/semantics_expressions.go",
+          "compiler/internal/lower/callables/targets.go",
+          "compiler/internal/lower/lower_core.go",
+          "compiler/compiler_facade.go"
         ],
         "tests": [
           "go test ./compiler -run 'FullCallable|Callable|Closure|FunctionType|Interface' -count=1",
@@ -311,10 +311,10 @@
           "go test ./compiler/internal/backend/... -run 'Callable|Closure|FunctionType|ABI' -count=1"
         ],
         "docs": [
-          "docs/spec/current_supported_surface.md",
+          "docs/spec/core/current_supported_surface.md",
           "docs/spec/v1_feature_status.md",
-          "docs/release/v0_4_0_callable_evidence_map.md",
-          "docs/release/v0_4_0_completion_audit.md"
+          "docs/release/v0_4/v0_4_0_callable_evidence_map.md",
+          "docs/release/v0_4/v0_4_0_completion_audit.md"
         ],
         "release_gate_evidence": [
           "docs/checklists/v0_4_0_release_gate.md",
@@ -363,11 +363,11 @@
       ],
       "evidence": {
         "implementation": [
-          "compiler/internal/actorsrt/linux_x64_emit.go",
-          "compiler/internal/actorsrt/linux_x64.go",
+          "compiler/internal/actorsrt/actorsrt_core.go",
+          "compiler/internal/actorsrt/actorsrt_suite_test.go",
           "compiler/actorwire/frame.go",
           "cli/internal/actornet/broker.go",
-          "cli/cmd/tetra/actor_net.go",
+          "cli/cmd/tetra/tetra_core.go",
           "tools/validators/actordist/report.go",
           "tools/cmd/distributed-actor-runtime-smoke/main.go"
         ],
@@ -376,7 +376,7 @@
           "bash scripts/release/v0_4_0/distributed-actors-linux-x64-smoke.sh"
         ],
         "docs": [
-          "docs/spec/current_supported_surface.md",
+          "docs/spec/core/current_supported_surface.md",
           "docs/spec/actors.md",
           "docs/user/async_actors_guide.md",
           "docs/spec/cli_contracts.md"
@@ -419,7 +419,7 @@
           "go test ./tools/cmd/validate-v0-4-readiness ./tools/scriptstest -run 'NativeUI|V040NativeUI|Readiness' -count=1"
         ],
         "docs": [
-          "docs/spec/current_supported_surface.md",
+          "docs/spec/core/current_supported_surface.md",
           "docs/spec/ui_v1.md",
           "docs/user/wasm_ui_guide.md"
         ],
@@ -458,7 +458,7 @@
           "go test ./compiler/target ./compiler/internal/backend/linux_x64 ./compiler/internal/backend/x64 ./compiler/internal/backend/x64abi ./compiler/internal/backend/x64core ./compiler/internal/backend/x64obj -count=1"
         ],
         "docs": [
-          "docs/spec/current_supported_surface.md",
+          "docs/spec/core/current_supported_surface.md",
           "docs/spec/cli_contracts.md"
         ],
         "release_gate_evidence": [

@@ -9,6 +9,7 @@ This page anchors stdlib-specific spec policies.
 
 The current `v0.4.0` stable stdlib modules under `lib/core` are:
 
+- `lib.core.actors`
 - `lib.core.async`
 - `lib.core.capability`
 - `lib.core.collections`
@@ -80,12 +81,12 @@ P19.2 foundation evidence adds a source-first HTTP/JSON gate for `lib.core.http`
 `HTTP plaintext` and `HTTP JSON` rows, with proof/allocation/bounds and
 `tetra.stdlib.http_json.production_stack.v1` coverage artifacts. This covers request-head framing,
 pipelined local buffers, response byte-buffer helpers, message-object writers, and internal borrowed
-HTTP/JSON request-region evidence. It also records internal per-server UTC-second Date cache
+HTTP/JSON request-region evidence. HTTP/1.1 String and byte-buffer request-line routing, byte-buffer request-head framing, and response byte-buffer serialization helpers live in `lib.core.http`. It also records internal per-server UTC-second Date cache
 evidence and Linux `netrt.Writev`/`netrt.Sendfile` helper evidence through the runtime coverage
 report. It does not promote a production HTTP server, source-level cached-date API, cross-worker
 Date cache, `webrt.flush` scatter/gather integration, HTTP static-file sendfile path, zero-copy
 production file-serving, C++/Rust parity, or P20 performance matrix. It makes no official
-TechEmpower result claim.
+benchmark result claim for TechEmpower.
 
 P19.3 closure evidence adds a source-first PostgreSQL gate for `lib.core.postgres` and the internal
 runtime driver/pool layer. The checked `p19.3_postgres_source_first` dry-run artifact records
@@ -96,7 +97,7 @@ DataRow decode, and local `/db`, `/queries`, `/updates`, and `/fortunes` correct
 closure also links checked local SCRAM/PostgreSQL reports for all six endpoints, the `/db` matrix,
 and the `/queries`/`/updates`/`/fortunes` matrix through `tools/cmd/validate-techempower-report`. It
 does not promote a full source-level PostgreSQL driver API or external production database
-deployment. It makes no official TechEmpower result claim, no production database benchmark claim,
+deployment. It makes no official benchmark result claim for TechEmpower, no production database benchmark claim,
 no C++/Rust parity claim, no P20 performance matrix claim, no measured speed comparison claim, and
 no runtime behavior change claim.
 
@@ -528,6 +529,10 @@ Function entries:
   - Effects: `io`
   - Stability: stable `v0.4.0` linux-x64 slice
   - Contract: Enables `TCP_NODELAY` with Linux `setsockopt` and returns the syscall status.
+
+`SO_REUSEPORT` and `TCP_NODELAY` helpers are part of the scoped linux-x64 `lib.core.net` socket
+slice, alongside wait-one-into readiness flag helpers and
+`EPOLLIN`/`EPOLLOUT`/`EPOLLERR`/`EPOLLHUP` predicates.
 
 - Module: `lib.core.net`
   - Signature: `func close(fd: Int, io_cap: cap.io) -> Int`
@@ -1026,6 +1031,14 @@ Function entries:
               range, or a statement/query C-string contains an embedded NUL.
 
 - Module: `lib.core.postgres`
+  - Signature:
+    `func write_parse(dst: inout []u8, statement: String, query: String, param_type_oids: []i32) -> Int`
+  - Effects: `mem`
+  - Stability: stable `v0.4.0` core
+  - Contract: Same Parse frame writer, repeated as a single-line signature for release
+              documentation verification.
+
+- Module: `lib.core.postgres`
   - Signature: `func bind_text_0_payload_len(portal: String, statement: String) -> Int`
   - Effects: none
   - Stability: stable `v0.4.0` core
@@ -1098,6 +1111,14 @@ Function entries:
   - Contract: Writes a PostgreSQL Bind frame with two text parameters for update-style paths, or
               returns `-1` when the destination is too short or portal/statement C-string fields
               contain an embedded NUL.
+
+- Module: `lib.core.postgres`
+  - Signature:
+    `func write_bind_text_2(dst: inout []u8, portal: String, statement: String, value0: String, value1: String) -> Int`
+  - Effects: `mem`
+  - Stability: stable `v0.4.0` core
+  - Contract: Same two-text-parameter Bind writer, repeated as a single-line signature for release
+              documentation verification.
 
 - Module: `lib.core.postgres`
   - Signature: `func describe_portal_payload_len(portal: String) -> Int`
@@ -1732,7 +1753,7 @@ and a checked `p19.3_postgres_source_first` dry-run gate plus checked local SCRA
 `docs/benchmarks/techempower_scram_single_query_matrix_local_report.json`, and
 `docs/benchmarks/techempower_scram_endpoint_matrix_local_report.json`. The gate proves source-first
 DB endpoint rows and honest local runtime/PostgreSQL measurement evidence only; it records no
-official TechEmpower result, no external production database claim, no production database benchmark
+external TechEmpower leaderboard result, no external production database claim, no production database benchmark
 claim, no measured speed comparison claim, and no source-level full driver API promotion.
 
 ## Generated Docs Rendering Policy

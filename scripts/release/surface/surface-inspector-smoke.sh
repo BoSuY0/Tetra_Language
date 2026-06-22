@@ -76,14 +76,8 @@ open(dst, "wb").write(data)
 PY
 }
 
-go run ./tools/cmd/surface-runtime-smoke \
-	--mode headless-block-system \
-	--source examples/surface/block_core/surface_block_system.tetra \
-	--report "$block_report"
-go run ./tools/cmd/surface-runtime-smoke \
-	--mode headless-morph \
-	--source examples/surface/morph_core/surface_morph_command_palette.tetra \
-	--report "$morph_report"
+go run ./tools/cmd/surface-runtime-smoke --mode headless-block-system --source examples/surface/block_core/surface_block_system.tetra --report "$block_report"
+go run ./tools/cmd/surface-runtime-smoke --mode headless-morph --source examples/surface/morph_core/surface_morph_command_palette.tetra --report "$morph_report"
 go run ./tools/cmd/surface-runtime-smoke \
 	--mode headless-morph \
 	--source "$morph_rendered_beauty_source" \
@@ -118,18 +112,9 @@ go run ./tools/cmd/surface-runtime-smoke \
 	--visual-report "$morph_rendered_beauty_visual" \
 	--morph-rendered-beauty-report "$morph_rendered_beauty_report"
 go run ./tools/cmd/validate-surface-morph-rendered-beauty --report "$morph_rendered_beauty_report"
-go run ./tools/cmd/surface-runtime-smoke \
-	--mode headless-app-model \
-	--source examples/surface/toolkit/surface_app_model.tetra \
-	--report "$app_model_report"
-go run ./tools/cmd/surface-runtime-smoke \
-	--mode headless-release-accessibility \
-	--source examples/surface/release/surface_release_accessibility.tetra \
-	--report "$accessibility_report"
-go run ./tools/cmd/surface-runtime-smoke \
-	--mode headless-block-events \
-	--source examples/surface/block_core/surface_block_events.tetra \
-	--report "$events_report"
+go run ./tools/cmd/surface-runtime-smoke --mode headless-app-model --source examples/surface/toolkit/surface_app_model.tetra --report "$app_model_report"
+go run ./tools/cmd/surface-runtime-smoke --mode headless-release-accessibility --source examples/surface/release/surface_release_accessibility.tetra --report "$accessibility_report"
+go run ./tools/cmd/surface-runtime-smoke --mode headless-block-events --source examples/surface/block_core/surface_block_events.tetra --report "$events_report"
 go run ./tools/cmd/surface-inspector \
 	--runtime-report "block:$block_report" \
 	--runtime-report "morph:$morph_report" \

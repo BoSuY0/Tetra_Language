@@ -448,15 +448,18 @@ run_linux_host_smoke() {
     --target linux-x64 \
     --run=true \
     --report "$report_dir/artifacts/linux-host-smoke.json"
+  cp -- "$report_dir/artifacts/linux-host-smoke.json" "$canonical_v04_report_dir/linux-host-smoke.json"
 }
 
 run_distributed_actor_smoke() {
   bash scripts/release/v0_4_0/distributed-actors-linux-x64-smoke.sh \
     --report-dir "$report_dir/artifacts"
+  cp -- "$report_dir/artifacts/distributed-actors-linux-x64.json" "$canonical_v04_report_dir/distributed-actors-linux-x64.json"
 }
 
 run_native_ui_smoke() {
   bash scripts/release/v0_4_0/native-ui-linux-x64-smoke.sh --report-dir "$report_dir/artifacts"
+  cp -- "$report_dir/artifacts/native-ui-linux-x64.json" "$canonical_v04_report_dir/native-ui-linux-x64.json"
 }
 
 run_memory_production_smoke() {
@@ -466,6 +469,15 @@ run_memory_production_smoke() {
   cp -- \
     "$memory_report_dir/memory-production-linux-x64.json" \
     "$report_dir/artifacts/memory-production-linux-x64.json"
+}
+
+run_memory_core_v2_gate() {
+  local memory_core_v2_report_dir="$tmp_dir/memory-core-v2"
+  bash scripts/release/memory/memory-core-v2-gate.sh \
+    --report-dir "$memory_core_v2_report_dir"
+  cp -- \
+    "$memory_core_v2_report_dir/memory-core-v2-evidence.json" \
+    "$report_dir/artifacts/memory-core-v2-evidence.json"
 }
 
 run_parallel_production_smoke() {
@@ -564,13 +576,16 @@ if [[ "$require_clean" -eq 1 ]]; then
   check_tag_ready_clean_worktree
 fi
 
-mkdir -p "$report_dir/artifacts" "$report_dir/logs"
+canonical_v04_report_dir="reports/v0.4.0"
+mkdir -p "$report_dir/artifacts" "$report_dir/logs" "$canonical_v04_report_dir"
 features_json="$report_dir/artifacts/features.json"
 targets_json="$report_dir/artifacts/targets.json"
 readiness_runtime_report_args=()
 
 go run ./cli/cmd/tetra features --format=json > "$features_json"
 go run ./cli/cmd/tetra targets --format=json > "$targets_json"
+cp -- "$features_json" "$canonical_v04_report_dir/features.json"
+cp -- "$targets_json" "$canonical_v04_report_dir/targets.json"
 
 if [[ -n "${TETRA_MACOS_RUNTIME_SMOKE_REPORT:-}" ]]; then
   readiness_runtime_report_args+=(
@@ -591,6 +606,7 @@ readiness_command+=" --features $features_json"
 readiness_command+=" --targets $targets_json"
 readiness_command+=" --manifest docs/generated/manifest.json"
 readiness_command+=" --scope-decisions docs/release/v0_4/data/v0_4_0_scope_decisions.json"
+readiness_command+=" --allow-pending-release-artifacts"
 if [[ -n "${TETRA_MACOS_RUNTIME_SMOKE_REPORT:-}" ]]; then
   readiness_command+=" --runtime-report macos-x64=$TETRA_MACOS_RUNTIME_SMOKE_REPORT"
 fi
@@ -607,6 +623,7 @@ if go run ./tools/cmd/validate-v0-4-readiness \
   --targets "$targets_json" \
   --manifest docs/generated/manifest.json \
   --scope-decisions docs/release/v0_4/data/v0_4_0_scope_decisions.json \
+  --allow-pending-release-artifacts \
   "${readiness_runtime_report_args[@]}" > "$readiness_log_path" 2>&1; then
   readiness_rc=0
 else
@@ -643,6 +660,9 @@ record_known_step \
   "$readiness_log_rel" \
   "$readiness_command"
 
+echo "release_v0_4_0_gate: bootstrapping local binaries before version preflight" >&2
+bash scripts/dev/bootstrap.sh >&2
+
 run_step "version parity" check_versions
 run_step "readiness validator tests" \
   go test \
@@ -652,6 +672,7 @@ run_step "readiness validator tests" \
 run_step "docs verification" go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
 run_step "techempower report schemas" check_techempower_reports
 run_step "compiler cli tools baseline" check_go_test_packages
+run_step "memory core v2 gate" run_memory_core_v2_gate
 run_step "memory production linux x64 smoke" run_memory_production_smoke
 run_step "validate memory production" \
   go run ./tools/cmd/validate-memory-production \

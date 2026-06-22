@@ -5,18 +5,17 @@ import (
 	"testing"
 
 	. "tetra_language/compiler/internal/memoryfacts"
-	"tetra_language/compiler/memoryvocab"
 )
 
 func TestMemoryFactsValidationUsesSharedVocabulary(t *testing.T) {
-	for _, stage := range memoryvocab.SourceStages() {
+	for _, stage := range SourceStages() {
 		graph := NewGraph("program")
 		if _, err := graph.AddFact(Fact{
 			ID:              FactID("fact:stage:" + strings.ReplaceAll(stage, ":", "_")),
 			FunctionID:      "main",
 			SiteID:          "site:" + stage,
 			SourceStage:     SourceStage(stage),
-			Claim:           memoryvocab.ClaimBorrowedImm,
+			Claim:           ClaimBorrowedImm,
 			ProvenanceClass: ProvenanceSafeBorrowed,
 			UnsafeClass:     UnsafeSafe,
 			BorrowState:     BorrowImmutable,
@@ -28,7 +27,7 @@ func TestMemoryFactsValidationUsesSharedVocabulary(t *testing.T) {
 	zeroCost := validMemoryReport().Rows[0]
 	dynamicCost := vocabularyReportRow(
 		"fact:cost:dynamic",
-		memoryvocab.ClaimRawBoundsRuntimeCheckNormalBuild,
+		ClaimRawBoundsRuntimeCheckNormalBuild,
 		ClaimValidated,
 		ProvenanceUnsafeChecked,
 		UnsafeChecked,
@@ -40,7 +39,7 @@ func TestMemoryFactsValidationUsesSharedVocabulary(t *testing.T) {
 	dynamicCost.ValidatorStatus = ValidatorPass
 	instrumentationCost := vocabularyReportRow(
 		"fact:cost:instrumentation",
-		memoryvocab.ClaimNormalBuildBoundsCheckGuard,
+		ClaimNormalBuildBoundsCheckGuard,
 		ClaimEvidenceOnly,
 		ProvenanceSafeKnown,
 		UnsafeSafe,
@@ -49,7 +48,7 @@ func TestMemoryFactsValidationUsesSharedVocabulary(t *testing.T) {
 	instrumentationCost.NormalBuildCheck = true
 	rejectedCost := vocabularyReportRow(
 		"fact:cost:rejected",
-		memoryvocab.ClaimUnsafeUnknownRejectedSafeFacts,
+		ClaimUnsafeUnknownRejectedSafeFacts,
 		ClaimRejected,
 		ProvenanceUnsafeUnknown,
 		UnsafeUnknown,
@@ -60,7 +59,7 @@ func TestMemoryFactsValidationUsesSharedVocabulary(t *testing.T) {
 	rejectedCost.ValidatorStatus = ValidatorFail
 	conservativeCost := vocabularyReportRow(
 		"fact:cost:conservative",
-		memoryvocab.ClaimExternalUnknown,
+		ClaimExternalUnknown,
 		ClaimConservative,
 		ProvenanceUnsafeUnknown,
 		UnsafeUnknown,
@@ -68,13 +67,13 @@ func TestMemoryFactsValidationUsesSharedVocabulary(t *testing.T) {
 	)
 	conservativeCost.ValidatorStatus = ValidatorNotApplicable
 	costRows := map[string]ReportRow{
-		memoryvocab.CostZeroCostProven:       zeroCost,
-		memoryvocab.CostDynamicCheckRequired: dynamicCost,
-		memoryvocab.CostInstrumentationOnly:  instrumentationCost,
-		memoryvocab.CostUnsupportedRejected:  rejectedCost,
-		memoryvocab.CostConservativeFallback: conservativeCost,
+		string(CostZeroCostProven):       zeroCost,
+		string(CostDynamicCheckRequired): dynamicCost,
+		string(CostInstrumentationOnly):  instrumentationCost,
+		string(CostUnsupportedRejected):  rejectedCost,
+		string(CostConservativeFallback): conservativeCost,
 	}
-	for _, class := range memoryvocab.CostClasses() {
+	for _, class := range CostClasses() {
 		row, ok := costRows[class]
 		if !ok {
 			t.Fatalf("missing public validation fixture for registered cost class %q", class)
@@ -86,7 +85,7 @@ func TestMemoryFactsValidationUsesSharedVocabulary(t *testing.T) {
 		}
 	}
 
-	for _, claim := range memoryvocab.ReportClaims() {
+	for _, claim := range ReportClaims() {
 		row := vocabularyReportRow(
 			"fact:claim:"+claim,
 			claim,
@@ -101,7 +100,7 @@ func TestMemoryFactsValidationUsesSharedVocabulary(t *testing.T) {
 		}
 	}
 
-	for _, claim := range memoryvocab.ParentRequiredClaims() {
+	for _, claim := range ParentRequiredClaims() {
 		row := vocabularyReportRow(
 			"fact:parent-required:"+claim,
 			claim,
@@ -123,7 +122,7 @@ func TestMemoryFactsValidationUsesSharedVocabulary(t *testing.T) {
 	report := Report{SchemaVersion: ReportSchemaV1, Rows: []ReportRow{
 		vocabularyReportRow(
 			"fact:unsafe-checked:noalias",
-			memoryvocab.ClaimNoAlias,
+			ClaimNoAlias,
 			ClaimEvidenceOnly,
 			ProvenanceUnsafeChecked,
 			UnsafeChecked,
@@ -140,7 +139,7 @@ func TestMemoryFactsValidationUsesSharedVocabulary(t *testing.T) {
 
 	rawBounds := vocabularyReportRow(
 		"fact:unsafe-checked:raw-bounds",
-		memoryvocab.ClaimRawBoundsRuntimeCheckNormalBuild,
+		ClaimRawBoundsRuntimeCheckNormalBuild,
 		ClaimValidated,
 		ProvenanceUnsafeChecked,
 		UnsafeChecked,
@@ -227,7 +226,7 @@ func TestMemoryFactsRejectIslandProofClaimWithoutIslandVerifier(t *testing.T) {
 			SiteID:          "site",
 			SourceFactID:    "fact:island-proof",
 			SourceStage:     StageValidation,
-			Claim:           memoryvocab.ClaimIslandProofVerified,
+			Claim:           ClaimIslandProofVerified,
 			ClaimLevel:      ClaimValidated,
 			ProvenanceClass: ProvenanceSafeKnown,
 			UnsafeClass:     UnsafeSafe,
@@ -243,7 +242,7 @@ func TestMemoryFactsRejectIslandProofClaimWithoutIslandVerifier(t *testing.T) {
 			"expected memoryfacts report validation to reject island proof claim without island verifier",
 		)
 	}
-	if got := err.Error(); !strings.Contains(got, memoryvocab.ClaimIslandProofVerified) ||
+	if got := err.Error(); !strings.Contains(got, ClaimIslandProofVerified) ||
 		!strings.Contains(got, "validate-island-proof") {
 		t.Fatalf("ValidateReport error = %v, want validate-island-proof rejection", err)
 	}

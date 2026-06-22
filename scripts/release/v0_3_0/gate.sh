@@ -293,9 +293,7 @@ write_summary() {
 }
 
 validate_summary() {
-  go run ./tools/cmd/validate-release-gate-summary \
-    --summary "$summary_json" \
-    --report-dir "$report_dir"
+  go run ./tools/cmd/validate-release-gate-summary --summary "$summary_json" --report-dir "$report_dir"
 }
 
 check_release_version() {
@@ -341,10 +339,7 @@ check_release_state() {
 }
 
 check_artifact_hash_manifest() {
-  go run ./tools/cmd/validate-artifact-hashes \
-    --write \
-    --root "$report_dir" \
-    --out "$report_dir/artifact-hashes.json"
+  go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"
   canonicalize_artifact_hash_manifest "$report_dir/artifact-hashes.json"
   go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-hashes.json"
 }
@@ -1108,16 +1103,8 @@ echo "release_v0_3_0_gate: artifact mapping $release_artifact" >&2
 run_step "version preflight ($release_version required)" check_release_version
 run_step "short alias version parity" check_short_alias_version
 run_step "go test packages" check_go_test_packages
-run_step "stabilization wrapper" \
-  env TETRA_TEST_ALL_RELEASE_VERSION="$release_version" \
-  bash scripts/ci/test-all.sh \
-  --stabilization \
-  --keep-going \
-  --report-dir "$artifacts_dir/test-all"
-run_step "short fuzz smoke" \
-  bash scripts/dev/fuzz-nightly.sh \
-  --short \
-  --out-dir "$artifacts_dir/fuzz-short"
+run_step "stabilization wrapper" env TETRA_TEST_ALL_RELEASE_VERSION="$release_version" bash scripts/ci/test-all.sh --stabilization --keep-going --report-dir "$artifacts_dir/test-all"
+run_step "short fuzz smoke" bash scripts/dev/fuzz-nightly.sh --short --out-dir "$artifacts_dir/fuzz-short"
 run_step "fuzz artifact validation" check_short_fuzz_summary
 run_step "unstable seed triage" check_unstable_seed_triage
 run_step "docs verification" go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json

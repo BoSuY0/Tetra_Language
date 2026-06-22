@@ -54,10 +54,7 @@ makes no target parity claim and does not promote broader Surface support.
 
 - Command:
   ```text
-  go test -race -buildvcs=false ./compiler/internal/islandkernel
-  ./compiler/internal/memoryfacts ./compiler/internal/memorymodel
-  ./compiler/internal/semantics ./compiler/internal/plir
-  ./compiler/internal/validation ./cli/internal/actornet -count=1
+  go test -race -buildvcs=false ./compiler/internal/islandkernel ./compiler/internal/memoryfacts ./compiler/internal/memoryfacts_test ./compiler/internal/semantics ./compiler/internal/plir ./compiler/internal/validation ./cli/internal/actornet -count=1
   ```
   Status: PASS
   Log: `reports/memory-islands-ideal/P19/race-critical-packages.log`

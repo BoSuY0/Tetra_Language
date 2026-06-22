@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"tetra_language/compiler/internal/allocplan"
 	"tetra_language/compiler/internal/backend/linux_x64"
 	"tetra_language/compiler/internal/backend/linux_x86"
 	"tetra_language/compiler/internal/backend/macos_x64"
@@ -31,7 +30,10 @@ import (
 	"tetra_language/compiler/internal/ir"
 	"tetra_language/compiler/internal/linker"
 	"tetra_language/compiler/internal/lower"
+	"tetra_language/compiler/internal/memoryfacts/fromoptimizer"
+	"tetra_language/compiler/internal/memorypipeline"
 	"tetra_language/compiler/internal/module"
+	optimizer "tetra_language/compiler/internal/opt"
 	"tetra_language/compiler/internal/plir"
 	"tetra_language/compiler/internal/semantics"
 	"tetra_language/compiler/internal/t4iface"
@@ -107,7 +109,20 @@ func CheckWorldOpt(world *World, opt CheckOptions) (*CheckedProgram, error) {
 }
 
 func Lower(checked *CheckedProgram) (*IRProgram, error) {
-	return lower.Lower(checked)
+	state, err := memorypipeline.Build(checked, memorypipeline.Options{
+		AllocPlan: allocationPlanOptionsForTarget(""),
+	})
+	if err != nil {
+		return nil, err
+	}
+	result, err := lower.LowerPlannedProgram(checked, state.Plan, lower.Options{})
+	if err != nil {
+		return nil, err
+	}
+	if err := state.ApplyLowering(result.Program, result.Evidence); err != nil {
+		return nil, err
+	}
+	return result.Program, nil
 }
 
 func BuildPLIR(checked *CheckedProgram) (*PLIRProgram, error) {
@@ -126,7 +141,20 @@ func FormatPLIR(prog *PLIRProgram) string {
 }
 
 func LowerModule(checked *CheckedProgram, module string) ([]IRFunc, error) {
-	return lower.LowerModule(checked, module)
+	state, err := memorypipeline.Build(checked, memorypipeline.Options{
+		AllocPlan: allocationPlanOptionsForTarget(""),
+	})
+	if err != nil {
+		return nil, err
+	}
+	result, err := lower.LowerPlannedProgram(checked, state.Plan, lower.Options{})
+	if err != nil {
+		return nil, err
+	}
+	if err := state.ApplyLowering(result.Program, result.Evidence); err != nil {
+		return nil, err
+	}
+	return result.ModuleFuncs(module)
 }
 
 func LowerModules(checked *CheckedProgram) (map[string][]IRFunc, error) {
@@ -290,6 +318,8 @@ func BuildFileWithStatsOpt(
 	var build checkedBuildWorld
 	var linkedObjects []linkedObject
 	var plan moduleBuildPlan
+	var memoryState *memorypipeline.State
+	var loweringResult *lower.ProgramResult
 	var objects []*Object
 	defer func() {
 		if profiler == nil || profileWritten || err == nil {
@@ -300,10 +330,14 @@ func BuildFileWithStatsOpt(
 		linkedObjects = nil
 		objects = nil
 		plan.PublicAPIHashes = nil
+		plan.MemoryPlanDigests = nil
+		plan.MemoryLoweringDigests = nil
 		plan.ObjectsByModule = nil
 		plan.ObjectlessModules = nil
 		plan.Modules = nil
 		plan.ToCompile = nil
+		memoryState = nil
+		loweringResult = nil
 		if compilerProcessMemoryRelease != nil {
 			compilerProcessMemoryRelease()
 		}
@@ -370,6 +404,22 @@ func BuildFileWithStatsOpt(
 	if err != nil {
 		return nil, err
 	}
+	memoryState, err = buildMemoryStateForTarget(build.checked, native.triple)
+	if err != nil {
+		return nil, err
+	}
+	if explainReportsRequireLowering(opt) {
+		loweringResult, err = lowerMemoryStateForBuild(
+			build.checked,
+			memoryState,
+			native.triple,
+			opt,
+			nil,
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	plan, stats, err = planNativeModuleBuild(
 		build.world,
@@ -377,6 +427,8 @@ func BuildFileWithStatsOpt(
 		native.triple,
 		opt,
 		linkedObjects,
+		memoryState,
+		loweringResult,
 	)
 	if err != nil {
 		return nil, err
@@ -395,7 +447,7 @@ func BuildFileWithStatsOpt(
 		)
 		profiler.setWorkerDecision(decision.Count, decision.Reason)
 	}
-	if err := compileNativeModulePlan(
+	loweringResult, err = compileNativeModulePlan(
 		build.world,
 		build.checked,
 		native,
@@ -403,7 +455,10 @@ func BuildFileWithStatsOpt(
 		plan,
 		stats,
 		profiler,
-	); err != nil {
+		memoryState,
+		loweringResult,
+	)
+	if err != nil {
 		return nil, err
 	}
 	build.world = nil
@@ -449,7 +504,14 @@ func BuildFileWithStatsOpt(
 	if err := emitUIArtifacts(outputPath, native.triple, build.checked); err != nil {
 		return nil, err
 	}
-	if err := emitExplainReports(outputPath, native.triple, build.checked, opt); err != nil {
+	if err := emitExplainReports(
+		outputPath,
+		native.triple,
+		build.checked,
+		opt,
+		memoryState,
+		loweringResult,
+	); err != nil {
 		return nil, err
 	}
 	if profiler != nil {
@@ -756,13 +818,104 @@ func prepareLinkedObjects(
 	return linkedObjects, nil
 }
 
+func buildMemoryStateForTarget(
+	checked *semantics.CheckedProgram,
+	target string,
+) (*memorypipeline.State, error) {
+	return memorypipeline.Build(checked, memorypipeline.Options{
+		Target:    target,
+		AllocPlan: allocationPlanOptionsForTarget(target),
+	})
+}
+
+func lowerMemoryStateForBuild(
+	checked *semantics.CheckedProgram,
+	state *memorypipeline.State,
+	target string,
+	opt BuildOptions,
+	prepared *lower.ProgramResult,
+) (*lower.ProgramResult, error) {
+	if state == nil {
+		return nil, fmt.Errorf("compiler: missing memory pipeline state")
+	}
+	result := prepared
+	if result == nil {
+		var err error
+		result, err = lower.LowerPlannedProgram(
+			checked,
+			state.Plan,
+			lowerOptionsForBuild(target, opt),
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if state.Phase != memorypipeline.PhaseLowered &&
+		state.Phase != memorypipeline.PhaseOptimized {
+		if err := state.ApplyLowering(result.Program, result.Evidence); err != nil {
+			return nil, err
+		}
+	}
+	if err := optimizeMemoryStateForBuild(state, result, opt); err != nil {
+		return nil, err
+	}
+	if err := validation.ValidateAllocationLowering(state.Plan, result.Program); err != nil {
+		return nil, err
+	}
+	if _, err := validation.CheckBoundsProofsWithPLIR(result.Program, state.PLIR); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func optimizeMemoryStateForBuild(
+	state *memorypipeline.State,
+	result *lower.ProgramResult,
+	opt BuildOptions,
+) error {
+	if state == nil {
+		return fmt.Errorf("compiler: missing memory pipeline state")
+	}
+	if result == nil || result.Program == nil {
+		return fmt.Errorf("compiler: missing lowering result")
+	}
+	if state.Phase == memorypipeline.PhaseOptimized {
+		return nil
+	}
+	if !opt.ReleaseOptimize {
+		return state.SkipOptimization()
+	}
+	snapshot, err := state.Snapshot()
+	if err != nil {
+		return err
+	}
+	report, err := optimizer.NewManager().RunWithOptions(
+		result.Program,
+		optimizer.Options{MemoryFacts: snapshot},
+		optimizer.RegisteredPasses()...,
+	)
+	if err != nil {
+		return err
+	}
+	delta, err := fromoptimizer.Delta(report)
+	if err != nil {
+		return err
+	}
+	return state.ApplyOptimization(delta)
+}
+
 func planNativeModuleBuild(
 	world *World,
 	checked *semantics.CheckedProgram,
 	target string,
 	opt BuildOptions,
 	linkedObjects []linkedObject,
+	memoryState *memorypipeline.State,
+	expectedLowering *lower.ProgramResult,
 ) (moduleBuildPlan, *BuildStats, error) {
+	if memoryState == nil {
+		return moduleBuildPlan{}, nil, fmt.Errorf("compiler: missing memory pipeline state")
+	}
 	sigMap := cache.BuildSigMap(checked)
 	depsByModule := deps.CollectExternalCalleesByModule(checked)
 	typeDepsByModule := deps.CollectExternalTypesByModule(checked)
@@ -791,12 +944,27 @@ func planNativeModuleBuild(
 		buildTag = buildplan.WithStackAllocationBuildTag(buildTag)
 	}
 	objectsByModule := make(map[string]*Object, len(modules))
+	memoryPlanDigests := make(map[string]string, len(modules))
+	memoryLoweringDigests := make(map[string]string, len(modules))
 	var toCompile []moduleBuildJob
 
 	for _, module := range modules {
 		file := world.ByModule[module]
 		if file == nil {
 			return moduleBuildPlan{}, nil, fmt.Errorf("missing module '%s'", module)
+		}
+		memoryPlanDigest, err := memoryState.ModulePlanDigest(module)
+		if err != nil {
+			return moduleBuildPlan{}, nil, err
+		}
+		memoryPlanDigests[module] = memoryPlanDigest
+		expectedMemoryLoweringDigest := ""
+		if expectedLowering != nil {
+			expectedMemoryLoweringDigest, err = expectedLowering.ModuleLoweringDigest(module)
+			if err != nil {
+				return moduleBuildPlan{}, nil, err
+			}
+			memoryLoweringDigests[module] = expectedMemoryLoweringDigest
 		}
 		srcHash := sha256.Sum256(file.Src)
 		depSet := depsByModule[module]
@@ -829,6 +997,8 @@ func planNativeModuleBuild(
 				module,
 				srcHash,
 				depHash,
+				memoryPlanDigest,
+				expectedMemoryLoweringDigest,
 			)
 			if err != nil {
 				return moduleBuildPlan{}, nil, err
@@ -846,12 +1016,14 @@ func planNativeModuleBuild(
 	}
 
 	return moduleBuildPlan{
-		Modules:           modules,
-		PublicAPIHashes:   publicAPIHashes,
-		BuildTag:          buildTag,
-		ObjectsByModule:   objectsByModule,
-		ObjectlessModules: make(map[string]bool),
-		ToCompile:         toCompile,
+		Modules:               modules,
+		PublicAPIHashes:       publicAPIHashes,
+		MemoryPlanDigests:     memoryPlanDigests,
+		MemoryLoweringDigests: memoryLoweringDigests,
+		BuildTag:              buildTag,
+		ObjectsByModule:       objectsByModule,
+		ObjectlessModules:     make(map[string]bool),
+		ToCompile:             toCompile,
 	}, stats, nil
 }
 
@@ -871,17 +1043,24 @@ func compileNativeModulePlan(
 	plan moduleBuildPlan,
 	stats *BuildStats,
 	profiler *compilerPhaseProfiler,
-) error {
+	memoryState *memorypipeline.State,
+	preparedLowering *lower.ProgramResult,
+) (*lower.ProgramResult, error) {
+	if memoryState == nil {
+		return nil, fmt.Errorf("compiler: missing memory pipeline state")
+	}
 	if len(plan.ToCompile) == 0 {
 		if profiler != nil {
 			counts := withRetainedCompilerStateCounts(compilerPhaseProfileCounts{
-				ModuleCount:         len(plan.Modules),
-				ModulesToCompile:    len(plan.ToCompile),
-				CacheHitCount:       len(stats.CacheHits),
-				CompiledModuleCount: len(stats.CompiledModules),
-				LoweredModuleCount:  len(stats.LoweredModules),
-				ObjectCount:         len(plan.ObjectsByModule),
-				IRFunctionCount:     len(checked.Funcs),
+				ModuleCount:                    len(plan.Modules),
+				ModulesToCompile:               len(plan.ToCompile),
+				CacheHitCount:                  len(stats.CacheHits),
+				CompiledModuleCount:            len(stats.CompiledModules),
+				LoweredModuleCount:             len(stats.LoweredModules),
+				ObjectCount:                    len(plan.ObjectsByModule),
+				IRFunctionCount:                len(memoryState.PLIR.Funcs),
+				AllocationPlanFunctionCount:    len(memoryState.PLIR.Funcs),
+				SetAllocationPlanFunctionCount: true,
 			}, world, checked)
 			profiler.capture("plir_construction", counts)
 			profiler.capture("allocation_planning", counts)
@@ -889,106 +1068,76 @@ func compileNativeModulePlan(
 			profiler.capture("module_codegen", counts)
 		}
 		sortBuildStats(stats)
-		return nil
+		return preparedLowering, nil
 	}
-	var allocationPlan *allocplan.Plan
 	allocationPlanFunctionCount := 0
-	var allocationSummaryProgram *ir.IRProgram
-	if targetSupportsStackAllocationLowering(native.triple) {
-		plirProg, err := plir.FromCheckedProgram(checked)
-		if err != nil {
-			return err
-		}
-		if err := plir.VerifyProgram(plirProg); err != nil {
-			return err
-		}
-		if profiler != nil {
-			profiler.capture(
-				"plir_construction",
-				withRetainedCompilerStateCounts(
-					compilerPhaseProfileCounts{
-						ModuleCount:                    len(plan.Modules),
-						ModulesToCompile:               len(plan.ToCompile),
-						CacheHitCount:                  len(stats.CacheHits),
-						IRFunctionCount:                len(plirProg.Funcs),
-						TransientIRFunctionCount:       len(plirProg.Funcs),
-						SetTransientIRFunctionCount:    true,
-						AllocationPlanFunctionCount:    0,
-						SetAllocationPlanFunctionCount: true,
-					},
-					world,
-					checked,
-				),
-			)
-		}
-		allocationPlan, err = allocplan.FromPLIRWithOptions(
-			plirProg,
-			allocationPlanOptionsForTarget(native.triple),
+	if profiler != nil {
+		profiler.capture(
+			"plir_construction",
+			withRetainedCompilerStateCounts(
+				compilerPhaseProfileCounts{
+					ModuleCount:                    len(plan.Modules),
+					ModulesToCompile:               len(plan.ToCompile),
+					CacheHitCount:                  len(stats.CacheHits),
+					IRFunctionCount:                len(memoryState.PLIR.Funcs),
+					TransientIRFunctionCount:       len(memoryState.PLIR.Funcs),
+					SetTransientIRFunctionCount:    true,
+					AllocationPlanFunctionCount:    0,
+					SetAllocationPlanFunctionCount: true,
+				},
+				world,
+				checked,
+			),
 		)
-		if err != nil {
-			return err
-		}
-		allocationPlanFunctionCount = len(plirProg.Funcs)
-		if profiler != nil {
-			profiler.capture(
-				"allocation_planning",
-				withRetainedCompilerStateCounts(
-					compilerPhaseProfileCounts{
-						ModuleCount:                    len(plan.Modules),
-						ModulesToCompile:               len(plan.ToCompile),
-						CacheHitCount:                  len(stats.CacheHits),
-						IRFunctionCount:                len(plirProg.Funcs),
-						TransientIRFunctionCount:       len(plirProg.Funcs),
-						SetTransientIRFunctionCount:    true,
-						AllocationPlanFunctionCount:    allocationPlanFunctionCount,
-						SetAllocationPlanFunctionCount: true,
-					},
-					world,
-					checked,
-				),
-			)
-		}
-		plirProg = nil
-		allocationSummaryProgram, err = lower.LowerWithOptions(
-			checked,
-			lowerOptionsForBuild(native.triple, opt),
+	}
+	allocationPlanFunctionCount = len(memoryState.PLIR.Funcs)
+	if profiler != nil {
+		profiler.capture(
+			"allocation_planning",
+			withRetainedCompilerStateCounts(
+				compilerPhaseProfileCounts{
+					ModuleCount:                    len(plan.Modules),
+					ModulesToCompile:               len(plan.ToCompile),
+					CacheHitCount:                  len(stats.CacheHits),
+					IRFunctionCount:                len(memoryState.PLIR.Funcs),
+					TransientIRFunctionCount:       len(memoryState.PLIR.Funcs),
+					SetTransientIRFunctionCount:    true,
+					AllocationPlanFunctionCount:    allocationPlanFunctionCount,
+					SetAllocationPlanFunctionCount: true,
+				},
+				world,
+				checked,
+			),
 		)
-		if err != nil {
-			return err
-		}
-		if profiler != nil {
-			profiler.capture(
-				"ir_lowering",
-				withRetainedCompilerStateCounts(
-					compilerPhaseProfileCounts{
-						ModuleCount:                    len(plan.Modules),
-						ModulesToCompile:               len(plan.ToCompile),
-						CacheHitCount:                  len(stats.CacheHits),
-						IRFunctionCount:                len(allocationSummaryProgram.Funcs),
-						TransientIRFunctionCount:       len(allocationSummaryProgram.Funcs),
-						SetTransientIRFunctionCount:    true,
-						AllocationPlanFunctionCount:    allocationPlanFunctionCount,
-						SetAllocationPlanFunctionCount: true,
-					},
-					world,
-					checked,
-				),
-			)
-		}
-	} else if profiler != nil {
-		counts := withRetainedCompilerStateCounts(compilerPhaseProfileCounts{
-			ModuleCount:                    len(plan.Modules),
-			ModulesToCompile:               len(plan.ToCompile),
-			CacheHitCount:                  len(stats.CacheHits),
-			IRFunctionCount:                len(checked.Funcs),
-			TransientIRFunctionCount:       0,
-			SetTransientIRFunctionCount:    true,
-			AllocationPlanFunctionCount:    0,
-			SetAllocationPlanFunctionCount: true,
-		}, world, checked)
-		profiler.capture("plir_construction", counts)
-		profiler.capture("allocation_planning", counts)
-		profiler.capture("ir_lowering", counts)
+	}
+	loweringResult, err := lowerMemoryStateForBuild(
+		checked,
+		memoryState,
+		native.triple,
+		opt,
+		preparedLowering,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if profiler != nil {
+		profiler.capture(
+			"ir_lowering",
+			withRetainedCompilerStateCounts(
+				compilerPhaseProfileCounts{
+					ModuleCount:                    len(plan.Modules),
+					ModulesToCompile:               len(plan.ToCompile),
+					CacheHitCount:                  len(stats.CacheHits),
+					IRFunctionCount:                len(loweringResult.Program.Funcs),
+					TransientIRFunctionCount:       len(loweringResult.Program.Funcs),
+					SetTransientIRFunctionCount:    true,
+					AllocationPlanFunctionCount:    allocationPlanFunctionCount,
+					SetAllocationPlanFunctionCount: true,
+				},
+				world,
+				checked,
+			),
+		)
 	}
 	decision := buildplan.EffectiveWorkerDecision(
 		opt.Jobs,
@@ -1033,11 +1182,7 @@ func compileNativeModulePlan(
 			if getErr() != nil {
 				continue
 			}
-			funcs, err := lower.LowerModuleWithOptions(
-				checked,
-				job.Module,
-				lowerOptionsForBuild(native.triple, opt),
-			)
+			funcs, err := loweringResult.ModuleFuncs(job.Module)
 			if err != nil {
 				setErr(err)
 				continue
@@ -1045,16 +1190,6 @@ func compileNativeModulePlan(
 			if err := validateTargetAtomicIR(funcs, native.target); err != nil {
 				setErr(err)
 				continue
-			}
-			if allocationPlan != nil {
-				if err := validation.ValidateAllocationLoweringWithSummaryProgram(
-					allocationPlanForIRFuncs(allocationPlan, funcs),
-					&ir.IRProgram{Funcs: funcs},
-					allocationSummaryProgram,
-				); err != nil {
-					setErr(err)
-					continue
-				}
 			}
 			mu.Lock()
 			stats.LoweredModules = append(stats.LoweredModules, job.Module)
@@ -1072,13 +1207,22 @@ func compileNativeModulePlan(
 				setErr(err)
 				continue
 			}
+			memoryLoweringDigest, err := loweringResult.ModuleLoweringDigest(job.Module)
+			if err != nil {
+				setErr(err)
+				continue
+			}
 			buildplan.ApplyModuleObjectMetadata(obj, buildplan.ModuleObjectMetadata{
-				Target:          native.triple,
-				Module:          job.Module,
-				CompilerVersion: version.CompilerVersion,
-				PublicAPIHash:   plan.PublicAPIHashes[job.Module],
-				SrcHash:         job.SrcHash,
-				WorldSigHash:    job.DepHash,
+				Target:               native.triple,
+				Module:               job.Module,
+				CompilerVersion:      version.CompilerVersion,
+				PublicAPIHash:        plan.PublicAPIHashes[job.Module],
+				MemoryPlanSchema:     tobj.MemoryPlanSchemaV2,
+				MemoryPlanDigest:     plan.MemoryPlanDigests[job.Module],
+				MemoryLoweringSchema: tobj.MemoryLoweringSchemaV2,
+				MemoryLoweringDigest: memoryLoweringDigest,
+				SrcHash:              job.SrcHash,
+				WorldSigHash:         job.DepHash,
 			})
 			if !opt.EmitRuntimeHeapTelemetry {
 				if err := cache.StoreCachedObject(world.Root, native.triple, plan.BuildTag, obj); err != nil {
@@ -1103,10 +1247,8 @@ func compileNativeModulePlan(
 	close(jobsCh)
 	wg.Wait()
 	if err := getErr(); err != nil {
-		return err
+		return nil, err
 	}
-	allocationPlan = nil
-	allocationSummaryProgram = nil
 	sortBuildStats(stats)
 	if profiler != nil {
 		profiler.capture(
@@ -1130,7 +1272,7 @@ func compileNativeModulePlan(
 			),
 		)
 	}
-	return nil
+	return loweringResult, nil
 }
 
 func sortBuildStats(stats *BuildStats) {
@@ -3982,7 +4124,7 @@ func FeatureRegistry() []FeatureInfo {
 				"formalcore.ValidateSpec, differential.CheckBackendMatrix, " +
 				"compiler.Parse, compiler.Check, BuildPLIR, " +
 				"plir.VerifyProgram, validation.CheckBoundsProofsWithPLIR, " +
-				"allocplan.FromPLIR, validation.ValidateAllocationLowering, " +
+					"memorypipeline.Build, allocplan.Build, validation.ValidateAllocationLowering, " +
 				"runtimeabi.NewRawAllocationBounds, " +
 				"runtimeabi.DeriveRawPointerBounds, and " +
 				"runtimeabi.RawSliceBoundsFromParts; validator rejects " +

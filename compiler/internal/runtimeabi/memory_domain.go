@@ -16,53 +16,64 @@ const (
 	DomainExternal MemoryDomainKind = "external"
 )
 
+type MemoryDomainState string
+
+const (
+	DomainStateActive MemoryDomainState = "active"
+	DomainStateClosed MemoryDomainState = "closed"
+)
+
 type MemoryDomain struct {
-	DomainID       string           `json:"domain_id"`
-	ParentDomainID string           `json:"parent_domain_id,omitempty"`
-	Kind           MemoryDomainKind `json:"kind"`
-	OwnerKind      string           `json:"owner_kind"`
-	OwnerID        string           `json:"owner_id"`
-	Lifetime       string           `json:"lifetime"`
-	BudgetBytes    int64            `json:"budget_bytes,omitempty"`
-	RequestedBytes int64            `json:"requested_bytes,omitempty"`
-	ReservedBytes  int64            `json:"reserved_bytes,omitempty"`
-	CommittedBytes int64            `json:"committed_bytes,omitempty"`
-	ReleasedBytes  int64            `json:"released_bytes,omitempty"`
-	CurrentBytes   int64            `json:"current_bytes,omitempty"`
-	PeakBytes      int64            `json:"peak_bytes,omitempty"`
-	CopyCount      int              `json:"copy_count,omitempty"`
-	BytesCopied    int64            `json:"bytes_copied,omitempty"`
+	DomainID         string            `json:"domain_id"`
+	ParentDomainID   string            `json:"parent_domain_id,omitempty"`
+	Kind             MemoryDomainKind  `json:"kind"`
+	OwnerKind        string            `json:"owner_kind"`
+	OwnerID          string            `json:"owner_id"`
+	Lifetime         string            `json:"lifetime"`
+	State            MemoryDomainState `json:"state,omitempty"`
+	Epoch            uint64            `json:"epoch,omitempty"`
+	BudgetBytes      int64             `json:"budget_bytes,omitempty"`
+	RequestedBytes   int64             `json:"requested_bytes,omitempty"`
+	ReservedBytes    int64             `json:"reserved_bytes,omitempty"`
+	CommittedBytes   int64             `json:"committed_bytes,omitempty"`
+	DecommittedBytes int64             `json:"decommitted_bytes,omitempty"`
+	ReleasedBytes    int64             `json:"released_bytes,omitempty"`
+	CurrentBytes     int64             `json:"current_bytes,omitempty"`
+	PeakBytes        int64             `json:"peak_bytes,omitempty"`
+	CopyCount        int               `json:"copy_count,omitempty"`
+	BytesCopied      int64             `json:"bytes_copied,omitempty"`
 }
 
 type MemoryDomainSummary struct {
-	DomainID       string           `json:"domain_id"`
-	ParentDomainID string           `json:"parent_domain_id,omitempty"`
-	Kind           MemoryDomainKind `json:"kind"`
-	OwnerKind      string           `json:"owner_kind"`
-	OwnerID        string           `json:"owner_id"`
-	Lifetime       string           `json:"lifetime"`
-	RowCount       int              `json:"row_count"`
-	BudgetBytes    int64            `json:"budget_bytes,omitempty"`
-	RequestedBytes int64            `json:"requested_bytes,omitempty"`
-	ReservedBytes  int64            `json:"reserved_bytes,omitempty"`
-	CommittedBytes int64            `json:"committed_bytes,omitempty"`
-	ReleasedBytes  int64            `json:"released_bytes,omitempty"`
-	CurrentBytes   int64            `json:"current_bytes,omitempty"`
-	PeakBytes      int64            `json:"peak_bytes,omitempty"`
-	CopyCount      int              `json:"copy_count,omitempty"`
-	BytesCopied    int64            `json:"bytes_copied,omitempty"`
+	DomainID         string            `json:"domain_id"`
+	ParentDomainID   string            `json:"parent_domain_id,omitempty"`
+	Kind             MemoryDomainKind  `json:"kind"`
+	OwnerKind        string            `json:"owner_kind"`
+	OwnerID          string            `json:"owner_id"`
+	Lifetime         string            `json:"lifetime"`
+	State            MemoryDomainState `json:"state,omitempty"`
+	Epoch            uint64            `json:"epoch,omitempty"`
+	RowCount         int               `json:"row_count"`
+	BudgetBytes      int64             `json:"budget_bytes,omitempty"`
+	RequestedBytes   int64             `json:"requested_bytes,omitempty"`
+	ReservedBytes    int64             `json:"reserved_bytes,omitempty"`
+	CommittedBytes   int64             `json:"committed_bytes,omitempty"`
+	DecommittedBytes int64             `json:"decommitted_bytes,omitempty"`
+	ReleasedBytes    int64             `json:"released_bytes,omitempty"`
+	CurrentBytes     int64             `json:"current_bytes,omitempty"`
+	PeakBytes        int64             `json:"peak_bytes,omitempty"`
+	CopyCount        int               `json:"copy_count,omitempty"`
+	BytesCopied      int64             `json:"bytes_copied,omitempty"`
 }
 
 func DefaultProcessMemoryDomain(requested int64, reserved int64) MemoryDomain {
 	return MemoryDomain{
-		DomainID:       "domain:process",
-		Kind:           DomainProcess,
-		OwnerKind:      "process",
-		OwnerID:        "current",
-		Lifetime:       "process",
-		BudgetBytes:    requested,
-		RequestedBytes: requested,
-		ReservedBytes:  reserved,
+		DomainID:  "domain:process",
+		Kind:      DomainProcess,
+		OwnerKind: "process",
+		OwnerID:   "current",
+		Lifetime:  "process",
+		State:     DomainStateActive,
 	}
 }
 
@@ -79,7 +90,7 @@ func IslandMemoryDomain(
 		OwnerKind:      "island",
 		OwnerID:        owner,
 		Lifetime:       defaultDomainString(strings.TrimSpace(lifetime), "island"),
-		BudgetBytes:    requested,
+		State:          DomainStateActive,
 		RequestedBytes: requested,
 		ReservedBytes:  reserved,
 	}
@@ -98,9 +109,61 @@ func ExternalMemoryDomain(
 		OwnerKind:      "external",
 		OwnerID:        owner,
 		Lifetime:       defaultDomainString(strings.TrimSpace(lifetime), "external"),
-		BudgetBytes:    requested,
+		State:          DomainStateActive,
 		RequestedBytes: requested,
 		ReservedBytes:  reserved,
+	}
+}
+
+func TaskMemoryDomain(
+	ownerID string,
+	parentDomainID string,
+	lifetime string,
+	budgetBytes int64,
+) MemoryDomain {
+	return typedMemoryDomain(DomainTask, "task", ownerID, parentDomainID, lifetime, budgetBytes)
+}
+
+func ActorMemoryDomain(
+	ownerID string,
+	parentDomainID string,
+	lifetime string,
+	budgetBytes int64,
+) MemoryDomain {
+	return typedMemoryDomain(DomainActor, "actor", ownerID, parentDomainID, lifetime, budgetBytes)
+}
+
+func RequestMemoryDomain(
+	ownerID string,
+	parentDomainID string,
+	lifetime string,
+	budgetBytes int64,
+) MemoryDomain {
+	return typedMemoryDomain(DomainRequest, "request", ownerID, parentDomainID, lifetime, budgetBytes)
+}
+
+func typedMemoryDomain(
+	kind MemoryDomainKind,
+	ownerKind string,
+	ownerID string,
+	parentDomainID string,
+	lifetime string,
+	budgetBytes int64,
+) MemoryDomain {
+	owner := cleanDomainOwner(ownerID, ownerKind)
+	parent := ""
+	if strings.TrimSpace(parentDomainID) != "" {
+		parent = cleanDomainID(parentDomainID)
+	}
+	return MemoryDomain{
+		DomainID:       domainID(kind, ownerID, owner),
+		ParentDomainID: parent,
+		Kind:           kind,
+		OwnerKind:      ownerKind,
+		OwnerID:        owner,
+		Lifetime:       defaultDomainString(strings.TrimSpace(lifetime), ownerKind),
+		State:          DomainStateActive,
+		BudgetBytes:    budgetBytes,
 	}
 }
 
@@ -122,12 +185,15 @@ func AggregateMemoryDomainSummary(domains []MemoryDomain) []MemoryDomainSummary 
 			summary.OwnerKind = domain.OwnerKind
 			summary.OwnerID = domain.OwnerID
 			summary.Lifetime = domain.Lifetime
+			summary.State = domain.State
+			summary.Epoch = domain.Epoch
 		}
 		summary.RowCount++
 		summary.BudgetBytes += domain.BudgetBytes
 		summary.RequestedBytes += domain.RequestedBytes
 		summary.ReservedBytes += domain.ReservedBytes
 		summary.CommittedBytes += domain.CommittedBytes
+		summary.DecommittedBytes += domain.DecommittedBytes
 		summary.ReleasedBytes += domain.ReleasedBytes
 		summary.CurrentBytes += domain.CurrentBytes
 		if domain.PeakBytes > summary.PeakBytes {
@@ -165,9 +231,12 @@ func ValidateMemoryDomain(domain MemoryDomain) error {
 	if strings.TrimSpace(domain.Lifetime) == "" {
 		return fmt.Errorf("memory domain %s: lifetime is required", domain.DomainID)
 	}
+	if domain.State != "" && domain.State != DomainStateActive && domain.State != DomainStateClosed {
+		return fmt.Errorf("memory domain %s: unknown state %q", domain.DomainID, domain.State)
+	}
 	if domain.BudgetBytes < 0 || domain.RequestedBytes < 0 || domain.ReservedBytes < 0 ||
-		domain.CommittedBytes < 0 || domain.ReleasedBytes < 0 || domain.CurrentBytes < 0 ||
-		domain.PeakBytes < 0 || domain.BytesCopied < 0 {
+		domain.CommittedBytes < 0 || domain.DecommittedBytes < 0 || domain.ReleasedBytes < 0 ||
+		domain.CurrentBytes < 0 || domain.PeakBytes < 0 || domain.BytesCopied < 0 {
 		return fmt.Errorf("memory domain %s: byte fields must not be negative", domain.DomainID)
 	}
 	if domain.CopyCount < 0 {
@@ -175,6 +244,12 @@ func ValidateMemoryDomain(domain MemoryDomain) error {
 	}
 	if domain.PeakBytes < domain.CurrentBytes {
 		return fmt.Errorf("memory domain %s: peak_bytes must be >= current_bytes", domain.DomainID)
+	}
+	if domain.BudgetBytes > 0 && domain.CurrentBytes > domain.BudgetBytes {
+		return fmt.Errorf("memory domain %s: budget exceeded", domain.DomainID)
+	}
+	if domain.CurrentBytes > domain.CommittedBytes || domain.CommittedBytes > domain.ReservedBytes {
+		return fmt.Errorf("memory domain %s: accounting invariant current <= committed <= reserved", domain.DomainID)
 	}
 	if domain.BytesCopied > 0 && domain.CopyCount == 0 {
 		return fmt.Errorf("memory domain %s: bytes_copied requires copy_count", domain.DomainID)

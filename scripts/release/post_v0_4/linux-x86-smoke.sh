@@ -43,7 +43,7 @@ export GOCACHE
 mkdir -p "$report_dir"
 
 if [[ -n "${TETRA_CMD:-}" ]]; then
-  read -r -a tetra_cmd <<< "$TETRA_CMD"
+  read -r -a tetra_cmd <<<"$TETRA_CMD"
 else
   tetra_cmd=(go run ./cli/cmd/tetra)
 fi

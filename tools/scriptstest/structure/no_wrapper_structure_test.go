@@ -170,6 +170,7 @@ func TestNoWrapperCompilerRootTestsAreDocumentedExceptions(t *testing.T) {
 		"compiler_language_world_test.go":           true,
 		"compiler_pipeline_stage_test.go":           true,
 		"compiler_suite_test.go":                    true,
+		"compiler_t13_optimizer_test.go":            true,
 		"compiler_targets_cache_test.go":            true,
 		"compiler_test.go":                          true,
 		"distributed_actor_runtime_test.go":         true,

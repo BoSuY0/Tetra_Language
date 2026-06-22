@@ -58,11 +58,7 @@ report_dir_arg="${report_dir%/}"
 if [[ -z "$report_dir_arg" ]]; then
 	report_dir_arg="$report_dir"
 fi
-surface_release_require_fresh_report_dir \
-  "$report_dir_arg" \
-  "$repo_root" \
-  "surface_product_gate:" \
-  >/dev/null
+surface_release_require_fresh_report_dir "$report_dir_arg" "$repo_root" "surface_product_gate:" >/dev/null
 report_dir="$report_dir_arg"
 
 format_command() {
@@ -144,7 +140,7 @@ write_product_category_summary() {
 JSON
 }
 
-cat >"$summary_path" <<JSON
+cat > "$summary_path" <<JSON
 {
   "schema": "tetra.surface.product-gate.v1",
   "release_scope": "surface-v1-linux-web",
@@ -172,7 +168,7 @@ cat >"$summary_path" <<JSON
 }
 JSON
 
-cat >"$product_summary_path" <<JSON
+cat > "$product_summary_path" <<JSON
 {
   "schema": "tetra.surface.product-summary.v1",
   "release_scope": "surface-v1-linux-web",
@@ -320,10 +316,7 @@ write_product_category_summary \
 	"validated-evidence-summary" \
 	"claim scanner, manifest validator, and docs verifier passed for this product gate run"
 
-go run ./tools/cmd/validate-artifact-hashes \
-	--write \
-	--root "$report_dir" \
-	--out "$report_dir/artifact-hashes.json"
+go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"
 go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-hashes.json"
 go run ./tools/cmd/validate-surface-product-summary --report-dir "$report_dir"
 go run ./tools/cmd/validate-surface-claims --root "$repo_root" --report-dir "$report_dir"

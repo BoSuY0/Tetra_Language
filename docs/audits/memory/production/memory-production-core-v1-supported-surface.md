@@ -6,6 +6,22 @@ The supported surface is intentionally narrower than the long-term memory vision
 features and unsafe boundaries that have current compiler evidence, plus the schema-v1 report slice
 introduced by this goal.
 
+## Memory Core v2 Current Surface
+
+Memory Core v2 keeps the current supported surface narrow and evidence-bound:
+
+- canonical memory state is created in the normal build path;
+- memory, allocation, and RAM reports are projections of that state;
+- island direct-route and domain lifecycle evidence is required for island claims;
+- Linux-x64 backend operation evidence is required for supported backend rows;
+- optimizer memory rewrites require canonical proof IDs;
+- cache hits require memory plan and lowering attestations.
+
+It carries explicit boundaries: no universal memory safety claim, no universal
+performance claim, no zero heap for all programs claim, and no all-target memory
+or backend runtime claim. See `docs/spec/memory/memory_core_v2.md` and
+`docs/audits/memory/README.md`.
+
 ## Supported Safe Surface
 
 - Safe slice and String byte views: `window`, `prefix`, `suffix`, `borrow`, `copy`, and `copy_into`.

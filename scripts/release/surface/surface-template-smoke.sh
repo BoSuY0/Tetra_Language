@@ -220,19 +220,13 @@ morph_report="$runtime_dir/surface-template-morph.json"
 app_model_report="$runtime_dir/surface-template-app-model.json"
 accessibility_report="$runtime_dir/surface-template-accessibility.json"
 
-go run ./tools/cmd/surface-runtime-smoke \
-	--mode headless-block-system \
-	--source examples/surface/block_core/surface_block_system.tetra \
-	--report "$block_report"
+go run ./tools/cmd/surface-runtime-smoke --mode headless-block-system --source examples/surface/block_core/surface_block_system.tetra --report "$block_report"
 mkdir -p "$golden_runtime_dir"
 go run ./tools/cmd/surface-runtime-smoke \
 	--mode headless-block-system \
 	--source examples/surface/block_core/surface_block_system.tetra \
 	--report "$golden_block_report"
-go run ./tools/cmd/surface-runtime-smoke \
-	--mode headless-morph \
-	--source examples/surface/morph_core/surface_morph_command_palette.tetra \
-	--report "$morph_report"
+go run ./tools/cmd/surface-runtime-smoke --mode headless-morph --source examples/surface/morph_core/surface_morph_command_palette.tetra --report "$morph_report"
 mrb_source="$templates_dir/studio-shell/src/main.tetra"
 mkdir -p "$mrb_dir" "$mrb_golden_dir"
 go run ./tools/cmd/surface-runtime-smoke \
@@ -288,20 +282,12 @@ go run ./tools/cmd/surface-inspector \
 	--runtime-report "accessibility:$accessibility_report" \
 	--out "$inspector_report" \
 	--html "$inspector_html"
-block_golden_base="examples/surface/block_core/surface_block_system.tetra,headless,"
-block_golden_artifact_dir="$golden_runtime_dir/surface-headless-block-system-artifacts"
-block_golden_order_1="${block_golden_base}1,"
-block_golden_order_1+="$block_golden_artifact_dir/surface-block-system-frame-order-1-initial.rgba"
-block_golden_order_2="${block_golden_base}2,"
-block_golden_order_2+="$block_golden_artifact_dir/surface-block-system-frame-order-2-focused.rgba"
-block_golden_order_3="${block_golden_base}3,"
-block_golden_order_3+="$block_golden_artifact_dir/surface-block-system-frame-order-3-motion.rgba"
 go run ./tools/cmd/surface-visual-diff \
 	--runtime-report "$block_report" \
 	--required-target headless \
-	--golden-artifact "$block_golden_order_1" \
-	--golden-artifact "$block_golden_order_2" \
-	--golden-artifact "$block_golden_order_3" \
+	--golden-artifact "examples/surface/block_core/surface_block_system.tetra,headless,1,$golden_runtime_dir/surface-headless-block-system-artifacts/surface-block-system-frame-order-1-initial.rgba" \
+	--golden-artifact "examples/surface/block_core/surface_block_system.tetra,headless,2,$golden_runtime_dir/surface-headless-block-system-artifacts/surface-block-system-frame-order-2-focused.rgba" \
+	--golden-artifact "examples/surface/block_core/surface_block_system.tetra,headless,3,$golden_runtime_dir/surface-headless-block-system-artifacts/surface-block-system-frame-order-3-motion.rgba" \
 	--out "$visual_report"
 
 templates_json="$(

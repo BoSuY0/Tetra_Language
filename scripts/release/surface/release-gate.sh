@@ -15,9 +15,7 @@ It requires headless release evidence, linux-x64 real-window release evidence,
 wasm32-web browser-canvas release evidence, strict Surface v1 validators,
 artifact hash integrity, and docs/generated manifest state.
 
-Surface v1 release gate must fail, not skip, when Chromium-compatible browser,
-Linux Wayland/display, accessibility probe, or clipboard harness evidence is
-unavailable.
+Surface v1 release gate must fail, not skip, when Chromium-compatible browser, Linux Wayland/display, accessibility probe, or clipboard harness evidence is unavailable.
 USAGE
 }
 
@@ -57,18 +55,11 @@ fi
 mkdir -p "$GOCACHE" "$GOTMPDIR"
 report_dir_arg="${report_dir%/}"
 report_dir="$report_dir_arg"
-report_dir="$(
-	surface_release_require_fresh_report_dir \
-		"$report_dir" \
-		"$repo_root" \
-		"surface_release_gate:"
-)"
+report_dir="$(surface_release_require_fresh_report_dir "$report_dir" "$repo_root" "surface_release_gate:")"
 
 if [[ "${TETRA_RUN_GATE_CONTRACT_EXEC:-}" != "1" ]]; then
-	go run ./tools/cmd/run-gate \
-		--contract "$gate_contract" \
-		--report-dir "$report_dir_arg"
-	exit $?
+	go run ./tools/cmd/run-gate --contract "$gate_contract" --report-dir "$report_dir_arg"
+  exit $?
 fi
 
 if [[ "${TETRA_RUN_GATE_CONTRACT_ID:-}" != "$gate_contract_id" ]]; then
@@ -83,10 +74,7 @@ if [[ -n "${TETRA_RUN_GATE_REPORT_DIR:-}" &&
 	exit 2
 fi
 
-go run ./tools/cmd/run-gate \
-	--contract "$gate_contract" \
-	--report-dir "$report_dir_arg" \
-	--dry-run >/dev/null
+go run ./tools/cmd/run-gate --contract "$gate_contract" --report-dir "$report_dir_arg" --dry-run >/dev/null
 block_system_report_dir="$report_dir_arg/block-system"
 morph_report_dir="$report_dir_arg/morph"
 
@@ -115,62 +103,30 @@ json_string() {
 	printf '"%s"' "$value"
 }
 
-surface_gate_scripts=(
-	scripts/release/surface/surface-headless-release-smoke.sh
-	scripts/release/surface/surface-headless-release-text-input-smoke.sh
-	scripts/release/surface/surface-headless-release-toolkit-smoke.sh
-	scripts/release/surface/surface-headless-release-accessibility-smoke.sh
-	scripts/release/surface/surface-headless-app-model-smoke.sh
-	scripts/release/surface/surface-linux-x64-release-window-smoke.sh
-	scripts/release/surface/surface-linux-x64-release-app-shell-smoke.sh
-	scripts/release/surface/surface-dev-workflow-smoke.sh
-	scripts/release/surface/surface-inspector-smoke.sh
-	scripts/release/surface/surface-template-smoke.sh
-	scripts/release/surface/surface-reference-apps-smoke.sh
-	scripts/release/surface/surface-package-smoke.sh
-	scripts/release/surface/surface-crash-report-smoke.sh
-	scripts/release/surface/surface-i18n-smoke.sh
-	scripts/release/surface/surface-widget-migration-smoke.sh
-	scripts/release/surface/surface-linux-x64-release-text-input-smoke.sh
-	scripts/release/surface/surface-linux-x64-release-toolkit-smoke.sh
-	scripts/release/surface/surface-linux-x64-release-accessibility-smoke.sh
-	scripts/release/surface/surface-wasm32-web-release-browser-smoke.sh
-	scripts/release/surface/surface-wasm32-web-release-text-input-smoke.sh
-	scripts/release/surface/surface-wasm32-web-release-toolkit-smoke.sh
-	scripts/release/surface/surface-wasm32-web-release-accessibility-smoke.sh
-	scripts/release/surface/block-system-gate.sh
-	scripts/release/surface/morph-gate.sh
-)
-surface_gate_report_dirs=(
-	"$report_dir"
-	"$report_dir"
-	"$report_dir"
-	"$report_dir"
-	"$report_dir"
-	"$report_dir"
-	"$report_dir"
-	"$report_dir"
-	"$report_dir"
-	"$report_dir"
-	"$report_dir_arg"
-	"$report_dir_arg"
-	"$report_dir_arg"
-	"$report_dir_arg"
-	"$report_dir_arg"
-	"$report_dir"
-	"$report_dir"
-	"$report_dir"
-	"$report_dir"
-	"$report_dir"
-	"$report_dir"
-	"$report_dir"
-	"$block_system_report_dir"
-	"$morph_report_dir"
-)
-
-for i in "${!surface_gate_scripts[@]}"; do
-	bash "${surface_gate_scripts[$i]}" --report-dir "${surface_gate_report_dirs[$i]}"
-done
+bash scripts/release/surface/surface-headless-release-smoke.sh --report-dir "$report_dir"
+bash scripts/release/surface/surface-headless-release-text-input-smoke.sh --report-dir "$report_dir"
+bash scripts/release/surface/surface-headless-release-toolkit-smoke.sh --report-dir "$report_dir"
+bash scripts/release/surface/surface-headless-release-accessibility-smoke.sh --report-dir "$report_dir"
+bash scripts/release/surface/surface-headless-app-model-smoke.sh --report-dir "$report_dir"
+bash scripts/release/surface/surface-linux-x64-release-window-smoke.sh --report-dir "$report_dir"
+bash scripts/release/surface/surface-linux-x64-release-app-shell-smoke.sh --report-dir "$report_dir"
+bash scripts/release/surface/surface-dev-workflow-smoke.sh --report-dir "$report_dir"
+bash scripts/release/surface/surface-inspector-smoke.sh --report-dir "$report_dir"
+bash scripts/release/surface/surface-template-smoke.sh --report-dir "$report_dir"
+bash scripts/release/surface/surface-reference-apps-smoke.sh --report-dir "$report_dir_arg"
+bash scripts/release/surface/surface-package-smoke.sh --report-dir "$report_dir_arg"
+bash scripts/release/surface/surface-crash-report-smoke.sh --report-dir "$report_dir_arg"
+bash scripts/release/surface/surface-i18n-smoke.sh --report-dir "$report_dir_arg"
+bash scripts/release/surface/surface-widget-migration-smoke.sh --report-dir "$report_dir_arg"
+bash scripts/release/surface/surface-linux-x64-release-text-input-smoke.sh --report-dir "$report_dir"
+bash scripts/release/surface/surface-linux-x64-release-toolkit-smoke.sh --report-dir "$report_dir"
+bash scripts/release/surface/surface-linux-x64-release-accessibility-smoke.sh --report-dir "$report_dir"
+bash scripts/release/surface/surface-wasm32-web-release-browser-smoke.sh --report-dir "$report_dir"
+bash scripts/release/surface/surface-wasm32-web-release-text-input-smoke.sh --report-dir "$report_dir"
+bash scripts/release/surface/surface-wasm32-web-release-toolkit-smoke.sh --report-dir "$report_dir"
+bash scripts/release/surface/surface-wasm32-web-release-accessibility-smoke.sh --report-dir "$report_dir"
+bash scripts/release/surface/block-system-gate.sh --report-dir "$block_system_report_dir"
+bash scripts/release/surface/morph-gate.sh --report-dir "$morph_report_dir"
 
 summary_path="$report_dir/surface-release-summary.json"
 git_head="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
@@ -390,34 +346,20 @@ for report in "${required_reports[@]}"; do
 	fi
 done
 
-go run ./tools/cmd/validate-surface-runtime \
-	--report "$report_dir/surface-release-summary.json" \
-	--release surface-v1
-go run ./tools/cmd/validate-surface-security-report \
-	--report "$report_dir/surface-linux-x64-release-app-shell.json"
-go run ./tools/cmd/validate-surface-performance-budget \
-	--report "$report_dir/surface-linux-x64-release-app-shell.json"
+go run ./tools/cmd/validate-surface-runtime --report "$report_dir/surface-release-summary.json" --release surface-v1
+go run ./tools/cmd/validate-surface-security-report --report "$report_dir/surface-linux-x64-release-app-shell.json"
+go run ./tools/cmd/validate-surface-performance-budget --report "$report_dir/surface-linux-x64-release-app-shell.json"
 go run ./tools/cmd/validate-surface-dev-workflow --report "$report_dir/surface-dev-workflow.json"
 go run ./tools/cmd/validate-surface-inspector --report "$report_dir/surface-inspector.json"
-go run ./tools/cmd/validate-surface-template-smoke \
-	--report "$report_dir/surface-template-smoke.json"
-go run ./tools/cmd/validate-surface-reference-apps \
-	--report "$report_dir/surface-reference-apps.json"
+go run ./tools/cmd/validate-surface-template-smoke --report "$report_dir/surface-template-smoke.json"
+go run ./tools/cmd/validate-surface-reference-apps --report "$report_dir/surface-reference-apps.json"
 go run ./tools/cmd/validate-surface-package --report "$report_dir/surface-package.json"
 go run ./tools/cmd/validate-surface-crash-report --report "$report_dir/surface-crash-report.json"
 go run ./tools/cmd/validate-surface-i18n --report "$report_dir/surface-i18n.json"
-go run ./tools/cmd/validate-surface-widget-migration \
-	--report "$report_dir/surface-widget-migration.json"
-go run ./tools/cmd/validate-artifact-hashes \
-	--write \
-	--root "$report_dir" \
-	--out "$report_dir/artifact-hashes.json"
+go run ./tools/cmd/validate-surface-widget-migration --report "$report_dir/surface-widget-migration.json"
+go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"
 go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-hashes.json"
-go run ./tools/cmd/validate-surface-release-state \
-	--report-dir "$report_dir" \
-	--expected-status current \
-	--scope surface-v1-linux-web \
-	--manifest docs/generated/manifest.json
+go run ./tools/cmd/validate-surface-release-state --report-dir "$report_dir" --expected-status current --scope surface-v1-linux-web --manifest docs/generated/manifest.json
 go run ./tools/cmd/validate-surface-claims --root "$repo_root" --report-dir "$report_dir"
 
 echo "Surface v1 release gate reports: $report_dir"

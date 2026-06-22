@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"tetra_language/compiler/internal/format/tobj"
 	"tetra_language/compiler/internal/semantics"
 	"tetra_language/compiler/internal/version"
 )
@@ -52,6 +53,13 @@ func TestCompilerCacheABIVersionDocumentsActorRefV2ABI(t *testing.T) {
 			compilerCacheABIVersion,
 		)
 	}
+	if !strings.Contains(compilerCacheABIVersion, tobj.MemoryPlanSchemaV2) ||
+		!strings.Contains(compilerCacheABIVersion, tobj.MemoryLoweringSchemaV2) {
+		t.Fatalf(
+			"compilerCacheABIVersion = %q, want memory schema discriminators",
+			compilerCacheABIVersion,
+		)
+	}
 }
 
 func TestCacheKeyIncludesTargetAndBuildTag(t *testing.T) {
@@ -86,6 +94,8 @@ func TestLoadCachedObjectTreatsCorruptEntryAsMissAndRemovesIt(t *testing.T) {
 		"app.game",
 		srcHash,
 		depHash,
+		"memory-plan:sha256:test",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("load corrupt cache entry: %v", err)
@@ -95,6 +105,68 @@ func TestLoadCachedObjectTreatsCorruptEntryAsMissAndRemovesIt(t *testing.T) {
 	}
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Fatalf("corrupt cache entry should be removed, stat err=%v", err)
+	}
+}
+
+func TestLoadCachedObjectRequiresMemoryAttestation(t *testing.T) {
+	root := t.TempDir()
+	srcHash := sha256.Sum256([]byte("source"))
+	depHash := sha256.Sum256([]byte("deps"))
+	obj := &tobj.Object{
+		Target:       "linux-x64",
+		Module:       "app.game",
+		SrcHash:      srcHash,
+		WorldSigHash: depHash,
+		Code:         []byte{0xc3},
+		Symbols:      []tobj.Symbol{{Name: "main", Offset: 0}},
+	}
+	if err := StoreCachedObject(root, "linux-x64", "release-opt", obj); err != nil {
+		t.Fatalf("store unattested object: %v", err)
+	}
+	if got, hit, err := LoadCachedObject(
+		root,
+		"linux-x64",
+		"release-opt",
+		"app.game",
+		srcHash,
+		depHash,
+		"memory-plan:sha256:expected",
+		"",
+	); err != nil || hit || got != nil {
+		t.Fatalf("unattested object hit=%v obj=%#v err=%v, want miss", hit, got, err)
+	}
+
+	obj.MemoryPlanSchema = tobj.MemoryPlanSchemaV2
+	obj.MemoryPlanDigest = "memory-plan:sha256:expected"
+	obj.MemoryLoweringSchema = tobj.MemoryLoweringSchemaV2
+	obj.MemoryLoweringDigest = "lowering:sha256:actual"
+	if err := StoreCachedObject(root, "linux-x64", "release-opt", obj); err != nil {
+		t.Fatalf("store attested object: %v", err)
+	}
+	if got, hit, err := LoadCachedObject(
+		root,
+		"linux-x64",
+		"release-opt",
+		"app.game",
+		srcHash,
+		depHash,
+		"memory-plan:sha256:expected",
+		"lowering:sha256:mismatch",
+	); err != nil || hit || got != nil {
+		t.Fatalf("mismatched lowering hit=%v obj=%#v err=%v, want miss", hit, got, err)
+	}
+	got, hit, err := LoadCachedObject(
+		root,
+		"linux-x64",
+		"release-opt",
+		"app.game",
+		srcHash,
+		depHash,
+		"memory-plan:sha256:expected",
+		"lowering:sha256:actual",
+	)
+	if err != nil || !hit || got == nil {
+		t.Fatalf("attested object hit=%v obj=%#v err=%v, want hit", hit, got, err)
 	}
 }
 

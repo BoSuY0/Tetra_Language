@@ -15,11 +15,10 @@ import (
 	"tetra_language/compiler/internal/lower"
 	"tetra_language/compiler/internal/machine"
 	"tetra_language/compiler/internal/memoryfacts"
-	"tetra_language/compiler/internal/memoryfacts/fromplir"
+	"tetra_language/compiler/internal/memorypipeline"
 	"tetra_language/compiler/internal/plir"
 	"tetra_language/compiler/internal/ramcontract"
 	"tetra_language/compiler/internal/semantics"
-	"tetra_language/compiler/internal/validation"
 )
 
 // ---- reports.go ----
@@ -222,44 +221,38 @@ func emitExplainReports(
 	target string,
 	checked *semantics.CheckedProgram,
 	opt BuildOptions,
+	state *memorypipeline.State,
+	loweringResult *lower.ProgramResult,
 ) error {
-	if !opt.Explain && !opt.EmitPLIR && !opt.EmitProof && !opt.EmitBoundsReport &&
-		!opt.EmitAllocReport &&
-		!opt.EmitMemoryReport &&
-		!ramContractRequested(opt) {
+	if !explainReportsRequested(opt) {
 		return nil
 	}
-	plirOnly := opt.EmitPLIR && !opt.Explain && !opt.EmitProof && !opt.EmitBoundsReport &&
-		!opt.EmitAllocReport &&
-		!opt.EmitMemoryReport &&
-		!ramContractRequested(opt)
-	plirProg, err := plir.FromCheckedProgram(checked)
-	if err != nil {
-		return err
-	}
-	if err := plir.VerifyProgram(plirProg); err != nil {
-		return err
-	}
+	plirOnly := explainReportsPLIROnly(opt)
 	if plirOnly {
+		if state != nil {
+			return writePLIRReports(outputPath, state.PLIR)
+		}
+		plirProg, err := BuildPLIR(checked)
+		if err != nil {
+			return err
+		}
 		return writePLIRReports(outputPath, plirProg)
 	}
-	allocPlan, err := allocplan.FromPLIRWithOptions(
-		plirProg,
-		allocationPlanOptionsForTarget(target),
-	)
+	if state == nil {
+		var err error
+		state, err = buildMemoryStateForTarget(checked, target)
+		if err != nil {
+			return err
+		}
+	}
+	plirProg := state.PLIR
+	allocPlan := state.Plan
+	var err error
+	loweringResult, err = lowerMemoryStateForBuild(checked, state, target, opt, loweringResult)
 	if err != nil {
 		return err
 	}
-	irProg, err := lower.LowerWithOptions(checked, lowerOptionsForBuild(target, opt))
-	if err != nil {
-		return err
-	}
-	if err := validation.ValidateAllocationLowering(allocPlan, irProg); err != nil {
-		return err
-	}
-	if _, err := validation.CheckBoundsProofsWithPLIR(irProg, plirProg); err != nil {
-		return err
-	}
+	irProg := loweringResult.Program
 	bounds := buildBoundsReport(irProg, checked, target)
 	if opt.Explain || opt.EmitPLIR {
 		if err := writePLIRReports(outputPath, plirProg); err != nil {
@@ -296,12 +289,8 @@ func emitExplainReports(
 		}
 	}
 	if opt.EmitMemoryReport {
-		graph, err := fromplir.FromPLIRAndAllocPlan(target, plirProg, allocPlan)
-		if err != nil {
-			return err
-		}
-		report := memoryfacts.BuildReportFromGraph(graph)
-		if err := validateMemoryReportForEmission(graph, report); err != nil {
+		report := memoryfacts.BuildReportFromGraph(state.Graph)
+		if err := validateMemoryReportForEmission(state.Graph, report); err != nil {
 			return err
 		}
 		if err := writeReport(outputPath+".memory.json", report); err != nil {
@@ -309,8 +298,16 @@ func emitExplainReports(
 		}
 	}
 	if opt.Explain || opt.EmitRAMContractReport || ramContractEnforcementRequested(opt) {
-		ramReport := ramcontract.BuildReportFromAllocPlan(
-			allocPlan,
+		snapshot, err := state.Snapshot()
+		if err != nil {
+			return err
+		}
+		ramReport := ramcontract.BuildReport(
+			ramcontract.Input{
+				Facts:   snapshot,
+				Plan:    allocPlan,
+				Domains: allocplan.MemoryDomains(allocPlan),
+			},
 			target,
 			reportGitHead(),
 			"tetra-compiler",
@@ -417,6 +414,24 @@ func emitExplainReports(
 		}
 	}
 	return nil
+}
+
+func explainReportsRequested(opt BuildOptions) bool {
+	return opt.Explain || opt.EmitPLIR || opt.EmitProof || opt.EmitBoundsReport ||
+		opt.EmitAllocReport ||
+		opt.EmitMemoryReport ||
+		ramContractRequested(opt)
+}
+
+func explainReportsPLIROnly(opt BuildOptions) bool {
+	return opt.EmitPLIR && !opt.Explain && !opt.EmitProof && !opt.EmitBoundsReport &&
+		!opt.EmitAllocReport &&
+		!opt.EmitMemoryReport &&
+		!ramContractRequested(opt)
+}
+
+func explainReportsRequireLowering(opt BuildOptions) bool {
+	return explainReportsRequested(opt) && !explainReportsPLIROnly(opt)
 }
 
 func ramContractRequested(opt BuildOptions) bool {

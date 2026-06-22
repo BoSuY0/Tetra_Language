@@ -668,13 +668,13 @@ func TestVerifyMemoryIslandsFinalProductionReadinessAuditAcceptsWrappedCommands(
 	body := validMemoryIslandsFinalProductionReadinessAuditBody()
 	original := strings.Join([]string{
 		"`go test -race -buildvcs=false ./compiler/internal/islandkernel",
-		"./compiler/internal/memoryfacts ./compiler/internal/memorymodel",
+		"./compiler/internal/memoryfacts ./compiler/internal/memoryfacts_test",
 		"./compiler/internal/semantics ./compiler/internal/plir",
 		"./compiler/internal/validation ./cli/internal/actornet -count=1`",
 	}, " ")
 	wrapped := strings.Join([]string{
 		"`go test -race -buildvcs=false ./compiler/internal/islandkernel",
-		"./compiler/internal/memoryfacts ./compiler/internal/memorymodel",
+		"./compiler/internal/memoryfacts ./compiler/internal/memoryfacts_test",
 		"./compiler/internal/semantics ./compiler/internal/plir",
 		"./compiler/internal/validation ./cli/internal/actornet -count=1`",
 	}, "\n")

@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"tetra_language/compiler/internal/ir"
+	"tetra_language/compiler/internal/islandkernel"
+	"tetra_language/compiler/internal/memoryfacts"
 	"tetra_language/compiler/internal/plir"
 )
 
@@ -276,7 +278,24 @@ func CheckBoundsProofsWithPLIR(prog *ir.IRProgram, proofProg *plir.Program) (Pro
 				want,
 			)
 		}
-		removed.ProofTerm = validationProofTermFromPLIR(term)
+		proofReq := islandKernelProofRequest(term, want)
+		if decision := islandkernel.CanEliminateBoundsCheck(proofReq); decision.Decision != islandkernel.Accept {
+			return report, fmt.Errorf(
+				"proof checker: %s removed bounds check proof id %q rejected by islandkernel: %s",
+				removed.Function,
+				removed.ProofID,
+				decision.Reason.Code,
+			)
+		}
+		if decision := islandkernel.CanEraseRuntimeCheck(proofReq); decision.Decision != islandkernel.Accept {
+			return report, fmt.Errorf(
+				"proof checker: %s removed runtime check proof id %q rejected by islandkernel: %s",
+				removed.Function,
+				removed.ProofID,
+				decision.Reason.Code,
+			)
+		}
+		removed.ProofTerm = validationProofTermFromProgramIR(term)
 	}
 	return report, nil
 }
@@ -350,7 +369,7 @@ func proofUseOperationMatches(use plirProofUseEvidence, operation string) bool {
 	}
 }
 
-func validationProofTermFromPLIR(term plir.ProofTerm) *ProofTerm {
+func validationProofTermFromProgramIR(term plir.ProofTerm) *ProofTerm {
 	return &ProofTerm{
 		ID:            term.ID,
 		Kind:          term.Kind,
@@ -363,6 +382,48 @@ func validationProofTermFromPLIR(term plir.ProofTerm) *ProofTerm {
 		BaseID:        term.BaseID,
 		Source:        term.Source,
 		FactsUsed:     append([]string(nil), term.FactsUsed...),
+	}
+}
+
+func islandKernelProofRequest(term plir.ProofTerm, operation string) islandkernel.ProofRequest {
+	if operation == "" {
+		operation = term.Operation
+	}
+	baseID := term.SubjectBaseID
+	if baseID == "" {
+		baseID = term.BaseID
+	}
+	epoch := uint64(0)
+	if term.Epoch > 0 {
+		epoch = uint64(term.Epoch)
+	}
+	return islandkernel.ProofRequest{
+		Ref: islandkernel.MemoryRef{
+			BaseID:      baseID,
+			IslandID:    term.IslandID,
+			Epoch:       epoch,
+			Provenance:  memoryfacts.ProvenanceSafeOwned,
+			UnsafeClass: memoryfacts.UnsafeSafe,
+		},
+		Proof: islandkernel.Proof{
+			ID:            term.ID,
+			Kind:          islandKernelProofKind(term),
+			SubjectBaseID: baseID,
+			IslandID:      term.IslandID,
+			Epoch:         epoch,
+			Operation:     operation,
+			Verified:      true,
+		},
+		Operation: operation,
+	}
+}
+
+func islandKernelProofKind(term plir.ProofTerm) memoryfacts.ProofKind {
+	switch term.Kind {
+	case string(memoryfacts.ProofBounds), "bounds_check":
+		return memoryfacts.ProofBounds
+	default:
+		return memoryfacts.ProofKind(term.Kind)
 	}
 }
 

@@ -44,10 +44,7 @@ mkdir -p "$report_dir"
 report_dir="$(cd "$report_dir" && pwd)"
 report_path="$report_dir/surface-headless-app-model.json"
 
-go run ./tools/cmd/surface-runtime-smoke \
-	--mode headless-app-model \
-	--source examples/surface/toolkit/surface_app_model.tetra \
-	--report "$report_path"
+go run ./tools/cmd/surface-runtime-smoke --mode headless-app-model --source examples/surface/toolkit/surface_app_model.tetra --report "$report_path"
 go run ./tools/cmd/validate-surface-runtime --report "$report_path" --release app-model
 go run ./tools/cmd/validate-artifact-hashes \
 	--write \

@@ -8,6 +8,7 @@ import (
 	"tetra_language/compiler/internal/frontend"
 	"tetra_language/compiler/internal/ir"
 	"tetra_language/compiler/internal/lower"
+	"tetra_language/compiler/internal/memorypipeline"
 	"tetra_language/compiler/internal/plir"
 	"tetra_language/compiler/internal/semantics"
 )
@@ -432,11 +433,18 @@ func lowerAndPLIRForProofValidation(t *testing.T, src string) (*ir.IRProgram, *p
 	if err != nil {
 		t.Fatalf("PLIR: %v", err)
 	}
-	irProg, err := lower.Lower(checked)
+	state, err := memorypipeline.Build(checked, memorypipeline.Options{})
 	if err != nil {
-		t.Fatalf("Lower: %v", err)
+		t.Fatalf("memorypipeline.Build: %v", err)
 	}
-	return irProg, proofProg
+	if state.PLIR != nil {
+		proofProg = state.PLIR
+	}
+	result, err := lower.LowerPlannedProgram(checked, state.Plan, lower.Options{})
+	if err != nil {
+		t.Fatalf("LowerPlannedProgram: %v", err)
+	}
+	return result.Program, proofProg
 }
 
 func proofReportHasPrefix(report ProofReport, prefix string) bool {
@@ -810,6 +818,7 @@ func TestValidateAllocationLoweringRejectsMissingExplicitIslandIR(t *testing.T) 
 			LoweringStatus:        "explicit_island_lowering",
 			RegionID:              "island:isl",
 			Lifetime:              "island:isl:scope",
+			ProofIDs:              explicitIslandStorageProofIDs("bad", "alloc_intent:xs"),
 			Reason:                "test",
 		}},
 	}}}
@@ -856,6 +865,7 @@ func TestValidateAllocationLoweringAcceptsExplicitIslandIR(t *testing.T) {
 			LoweringStatus:        "explicit_island_lowering",
 			RegionID:              "island:isl",
 			Lifetime:              "island:isl:scope",
+			ProofIDs:              explicitIslandStorageProofIDs("main", "alloc_intent:xs"),
 			Reason:                "test",
 		}},
 	}}}
@@ -898,6 +908,7 @@ func TestValidateAllocationLoweringAcceptsExplicitIslandParamDerivedReturn(t *te
 			Lifetime:                           "island:isl:scope",
 			ExplicitIslandHandleParamSlotKnown: true,
 			ExplicitIslandHandleParamSlot:      0,
+			ProofIDs:                           explicitIslandStorageProofIDs("make_buf", "alloc_intent:buf"),
 			Reason:                             "test",
 		}},
 	}}}
@@ -1024,6 +1035,8 @@ func TestValidateAllocationLoweringAcceptsExplicitIslandRecreatedAtLoopSite(t *t
 			{Kind: ir.IRConstI32, Imm: 4},
 			{Kind: ir.IRIslandMakeSliceI32, Name: "xs"},
 			{Kind: ir.IRStoreLocal, Local: 2},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRConstI32, Imm: 0},
 			{Kind: ir.IRStoreLocal, Local: 1},
 			{Kind: ir.IRLoadLocal, Local: 0},
 			{Kind: ir.IRIslandFree},
@@ -1173,6 +1186,8 @@ func TestValidateAllocationLoweringRejectsExplicitIslandDoubleFree(t *testing.T)
 			{Kind: ir.IRIslandMakeSliceI32, Name: "xs"},
 			{Kind: ir.IRStoreLocal, Local: 2},
 			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRStoreLocal, Local: 1},
 			{Kind: ir.IRLoadLocal, Local: 0},
 			{Kind: ir.IRIslandFree},
 			{Kind: ir.IRLoadLocal, Local: 0},
@@ -1202,6 +1217,8 @@ func TestValidateAllocationLoweringRejectsExplicitIslandDoubleFreeOnBranchMerge(
 			{Kind: ir.IRConstI32, Imm: 4},
 			{Kind: ir.IRIslandMakeSliceI32, Name: "xs"},
 			{Kind: ir.IRStoreLocal, Local: 2},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRConstI32, Imm: 0},
 			{Kind: ir.IRStoreLocal, Local: 1},
 			{Kind: ir.IRConstI32, Imm: 0},
 			{Kind: ir.IRJmpIfZero, Label: 1},
@@ -1247,8 +1264,8 @@ func TestValidateAllocationLoweringRejectsExplicitIslandUseAfterFreeThroughIndex
 		},
 	}}}
 	err := ValidateAllocationLowering(plan, prog)
-	if err == nil || !strings.Contains(err.Error(), "use after free") {
-		t.Fatalf("ValidateAllocationLowering error = %v, want index use-after-free rejection", err)
+	if err == nil || !strings.Contains(err.Error(), "token.free_live_borrows") {
+		t.Fatalf("ValidateAllocationLowering error = %v, want live-borrow free rejection", err)
 	}
 }
 
@@ -1266,6 +1283,8 @@ func TestValidateAllocationLoweringAcceptsExplicitIslandResetReturnedHandle(t *t
 			{Kind: ir.IRConstI32, Imm: 4},
 			{Kind: ir.IRIslandMakeSliceI32, Name: "xs"},
 			{Kind: ir.IRStoreLocal, Local: 2},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRConstI32, Imm: 0},
 			{Kind: ir.IRStoreLocal, Local: 1},
 			{Kind: ir.IRLoadLocal, Local: 0},
 			{Kind: ir.IRIslandFree},
@@ -1457,9 +1476,14 @@ func explicitIslandValidationPlan(functionName string) *allocplan.Plan {
 			LoweringStatus:        "explicit_island_lowering",
 			RegionID:              "island:isl",
 			Lifetime:              "island:isl:scope",
+			ProofIDs:              explicitIslandStorageProofIDs(functionName, "alloc_intent:xs"),
 			Reason:                "test",
 		}},
 	}}}
+}
+
+func explicitIslandStorageProofIDs(functionName string, valueID string) []string {
+	return []string{"proof:storage:" + functionName + ":" + valueID}
 }
 
 func TestValidateAllocationLoweringRejectsMissingFunctionTempRegionIR(t *testing.T) {

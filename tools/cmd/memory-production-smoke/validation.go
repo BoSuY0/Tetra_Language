@@ -10,7 +10,7 @@ import (
 
 func validateMemoryReportCommand(outPath string) []string {
 	return []string{
-		"run", "./tools/cmd/validate-memory-report",
+		"run", "./compiler/cmd/validate-memory-report",
 		"--report", outPath + ".memory.json",
 		"--alloc-report", outPath + ".alloc.json",
 	}
@@ -679,14 +679,14 @@ func smallHeapBenchmarkSource(allocationCount, bytesPerAllocation int) string {
 	b.WriteString("func main() -> Int\n")
 	b.WriteString("uses alloc, mem:\n")
 	for i := 0; i < allocationCount; i++ {
-		fmt.Fprintf(&b, "    let xs_%02d: []u8 = make_%02d()\n", i, i)
+		fmt.Fprintf(&b, "    let keep_%02d: []u8 = make_%02d()\n", i, i)
 	}
 	b.WriteString("    return ")
 	for i := 0; i < allocationCount; i++ {
 		if i > 0 {
 			b.WriteString(" + ")
 		}
-		fmt.Fprintf(&b, "xs_%02d.len", i)
+		fmt.Fprintf(&b, "keep_%02d.len", i)
 	}
 	b.WriteString("\n")
 	return b.String()

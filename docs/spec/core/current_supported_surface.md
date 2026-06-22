@@ -56,7 +56,7 @@ The combined Memory/Islands/Surface claim is scoped by
 sanitizer smoke, `island-proof-fuzz-summary` mutation evidence, leak/resource finalization evidence,
 and `surface-v1-linux-web` Surface release evidence into
 `memory-islands-surface-production-manifest.json` plus `artifact-hashes.json`. This is no Memory
-100% claim, no arbitrary unsafe external pointer safety claim, no full formal proof, no full target
+100% claim, no arbitrary unsafe external pointer safety claim, no complete formal-methods proof, no full target
 parity claim, no all-target Surface claim, and not a clean release-candidate checkout claim unless a
 final release audit proves that separate checkout state.
 
@@ -194,7 +194,7 @@ final release audit proves that separate checkout state.
   check-elimination validity; and a security review gate for unsafe APIs, capabilities, memory
   allocator, network runtime, actor runtime, DB protocol, package/Eco system, build scripts, supply
   chain, and required audit artifacts. This is evidence infrastructure, not a public source
-  interpreter mode, backend selector, full self-hosting claim, or full formal proof of Tetra, and
+  interpreter mode, backend selector, full self-hosting claim, or complete formal-methods proof of Tetra, and
   not a security certification or release signoff.
 - Static protocol conformance: protocol declarations and `impl Type: Protocol` are checked against
   extension/static methods, including compatible effects, async, throws, parameter ownership
@@ -666,7 +666,7 @@ final release audit proves that separate checkout state.
 - P23.0 translation validation v2 is current as internal evidence: `tetra.translation.validation.v2`
   records registered optimizer pass coverage, symbolic scalar equivalence, supported i32 slice
   memory samples, loop and call/inlining differential samples, bounds proof preservation, allocation
-  plan preservation, and sha256 before/after optimization metadata. It is not a full formal proof,
+  plan preservation, and sha256 before/after optimization metadata. It is not a complete formal-methods proof,
   exhaustive optimizer completeness claim, broad memory/alias model, broad loop theorem prover,
   performance claim, runtime behavior change, or safe-program semantics change.
 - P23.1 fuzz/property/differential expansion is current as internal evidence:
@@ -680,7 +680,7 @@ final release audit proves that separate checkout state.
 - P23.2 formal core v1 is current as internal evidence: `tetra.formal_core.v1` records values,
   borrows and owned/copy, provenance and regions, bounds proof id semantics, allocation length
   contracts, allocation intent lowering, raw pointer bounds metadata, and check-elimination validity
-  through existing machine checks. It is not a full formal proof, broad language theorem prover,
+  through existing machine checks. This is not a complete formal-methods proof claim, no broad language theorem prover,
   unsafe-policy change, runtime behavior change, safe-program-semantics change, performance claim,
   public source interpreter, or public backend selector.
 - P23.3 self-hosting gate v1 is current as internal evidence: `tetra.self_hosting.gate.v1` records
@@ -697,11 +697,24 @@ final release audit proves that separate checkout state.
   the required artifacts `docs/audits/security/security-review.md`,
   `docs/audits/security/threat-model.md`, `docs/audits/security/unsafe-surface-map.md`, and
   `docs/audits/security/capability-surface-map.md`. It reuses existing validators for runtime
-  allocation contracts, raw-pointer bounds metadata, IO reactor coverage, actor production
+  allocation contracts, raw-pointer bounds metadata, IO readiness coverage, actor production
   boundaries, PostgreSQL protocol coverage, Eco validator paths, release security-review scripts,
   and artifact presence. It is not security certification, an external penetration test, CVE-free
   status, release security signoff, runtime behavior change, safe-program-semantics change, or a
   performance claim.
+- Networking runtime boundary: TechEmpower-compatible web stack evidence has no production HTTP
+  server, full HTTP header/body parser, full event-loop abstraction, io_uring path, per-core worker
+  runtime, or database deployment claim. `lib.core.net` now provides executable linux-x64 TCP socket
+  open/bind/connect/listen/accept/read/recv/write/send/nonblocking/close helpers, `SO_REUSEPORT`
+  and `TCP_NODELAY` helpers, plus epoll create/add-read/add-read-write/mod-read/mod-read-write/delete/wait-one,
+  wait-one-into readiness flag helpers, `SOCK_NONBLOCK`/`SOCK_CLOEXEC`, and
+  `EPOLLIN`/`EPOLLOUT`/`EPOLLERR`/`EPOLLHUP` predicates. `lib.core.http` now provides executable
+  HTTP/1.1 String and byte-buffer request-line routing, byte-buffer request-head framing, and
+  response byte-buffer helpers. `lib.core.json` provides executable JSON response byte-buffer
+  helpers. `lib.core.postgres` provides wire-frame byte-buffer helpers for
+  Parse/Bind/Describe/Execute/Sync and RowDescription/DataRow/CommandComplete/ReadyForQuery.
+  `lib.core.net` event-loop/socket-option expansion remains future work.
+  Networking parser nonclaims: parser, full event-loop abstraction, io_uring path, per-core worker runtime.
 - P24.1 runtime hardening v1 is current as internal audit evidence: `tetra.runtime.hardening.v1`
   records deterministic traps, OOM policy, the stack overflow guard boundary, integer overflow
   semantics, allocator corruption instrumentation, region double-free/use-after-free
@@ -1181,7 +1194,7 @@ final release audit proves that separate checkout state.
   backend: deterministic paint command order through fill, gradient, image fill, border, radius
   clip, shadow, overlay, outline, text, and icon; compositor layers; dirty rects; invalidations;
   bounded renderer cache stats; deterministic frame checksums; and explicit rejection of unsupported
-  GPU, blur, and backdrop-blur production claims. This is software renderer baseline evidence for
+  renderer acceleration claims for GPU paths, blur, and backdrop-blur. This is software renderer baseline evidence for
   the Block track, not a GPU renderer claim, not a CSS/browser compositor claim, and not a broad
   Electron renderer parity claim. The experimental visual regression gate is
   `scripts/release/surface/visual-gate.sh --report-dir reports/surface-visual/gate`. It writes

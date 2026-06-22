@@ -57,12 +57,7 @@ fi
 mkdir -p "$GOCACHE"
 
 report_dir_arg="${report_dir%/}"
-report_dir="$(
-  surface_release_require_fresh_report_dir \
-    "$report_dir_arg" \
-    "$repo_root" \
-    "surface_visual_gate:"
-)"
+report_dir="$(surface_release_require_fresh_report_dir "$report_dir_arg" "$repo_root" "surface_visual_gate:")"
 block_system_report_dir="$report_dir_arg/block-system"
 visual_report_path="$report_dir/surface-visual-regression.json"
 summary_path="$report_dir/surface-visual-gate-summary.json"
@@ -111,15 +106,10 @@ fi
 
 bash scripts/release/surface/block-system-gate.sh --report-dir "$block_system_report_dir"
 
-linux_visual_runtime="$report_dir/block-system/linux-x64-real-window"
-linux_visual_runtime+="/surface-block-system-linux-x64.json"
-wasm_visual_runtime="$report_dir/block-system/wasm32-web-browser-canvas"
-wasm_visual_runtime+="/surface-block-system-wasm32-web.json"
-
 go run ./tools/cmd/surface-visual-diff \
 	--runtime-report "$report_dir/block-system/headless/surface-headless-block-system.json" \
-	--runtime-report "$linux_visual_runtime" \
-	--runtime-report "$wasm_visual_runtime" \
+	--runtime-report "$report_dir/block-system/linux-x64-real-window/surface-block-system-linux-x64.json" \
+	--runtime-report "$report_dir/block-system/wasm32-web-browser-canvas/surface-block-system-wasm32-web.json" \
 	--block-examples-report "$report_dir/block-system/headless/surface-block-examples.json" \
 	--required-target headless \
 	--required-target linux-x64-real-window \
@@ -129,7 +119,7 @@ go run ./tools/cmd/surface-visual-diff \
 
 go run ./tools/cmd/validate-surface-visual-report --report "$visual_report_path"
 
-cat >"$summary_path" <<JSON
+cat > "$summary_path" <<JSON
 {
   "schema": "tetra.surface.visual-regression.gate.v1",
   "status": "current",
@@ -174,10 +164,7 @@ for report in "${required_reports[@]}"; do
 	fi
 done
 
-go run ./tools/cmd/validate-artifact-hashes \
-	--write \
-	--root "$report_dir" \
-	--out "$report_dir/artifact-hashes.json"
+go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"
 go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-hashes.json"
 
 echo "Surface visual gate reports: $report_dir"

@@ -112,11 +112,7 @@ go run ./tools/cmd/validate-smoke-list \
   --examples-root examples \
   --format=toon
 
-run_tetra smoke \
-  --target linux-x64 \
-  --run=false \
-  --report "$tmp_dir/host-smoke.json" \
-  --report-format=both
+run_tetra smoke --target linux-x64 --run=false --report "$tmp_dir/host-smoke.json" --report-format=both
 go run ./tools/cmd/smoke-report-to-checklist \
   --validate-only \
   --report "$tmp_dir/host-smoke.json" \

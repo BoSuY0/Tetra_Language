@@ -11,8 +11,10 @@ import (
 	"tetra_language/compiler/internal/backend/x64"
 	"tetra_language/compiler/internal/cache"
 	"tetra_language/compiler/internal/ir"
+	"tetra_language/compiler/internal/islandkernel"
 	"tetra_language/compiler/internal/lower"
 	"tetra_language/compiler/internal/machine"
+	"tetra_language/compiler/internal/memoryfacts"
 	"tetra_language/compiler/internal/semantics"
 	"tetra_language/compiler/internal/ssair"
 	"tetra_language/compiler/internal/validation"
@@ -1304,6 +1306,7 @@ func InlineSmallPurePass() Pass {
 		RequiredFacts:             []Fact{FactIRVerified},
 		PreservedFacts:            []Fact{FactBoundsProofs},
 		InvalidatedFacts:          []Fact{FactLiveness},
+		PreservedProofKinds:       []memoryfacts.ProofKind{memoryfacts.ProofBounds},
 		ProofRule:                 ProofRulePreserveBoundsInvalidateLiveness,
 		ValidationStrategy:        ValidationTranslation,
 		TranslationValidationHook: TranslationHookValidateTranslation,
@@ -1316,7 +1319,8 @@ func InlineSmallPurePass() Pass {
 	}
 }
 
-func (s *inlineSmallPureState) run(prog *ir.IRProgram) error {
+func (s *inlineSmallPureState) run(ctx *PassContext) error {
+	prog := ctxProgram(ctx)
 	if prog == nil {
 		return fmt.Errorf("inline-small-pure: missing IR program")
 	}
@@ -1598,6 +1602,8 @@ func LICMPureInvariantPass() Pass {
 		RequiredFacts:             []Fact{FactIRVerified, FactBoundsProofs},
 		PreservedFacts:            []Fact{FactBoundsProofs},
 		InvalidatedFacts:          []Fact{FactLiveness},
+		RequiredProofKinds:        []memoryfacts.ProofKind{memoryfacts.ProofBounds},
+		PreservedProofKinds:       []memoryfacts.ProofKind{memoryfacts.ProofBounds},
 		ProofRule:                 ProofRulePreserveBoundsInvalidateLiveness,
 		ValidationStrategy:        ValidationTranslation,
 		TranslationValidationHook: TranslationHookValidateTranslation,
@@ -1610,13 +1616,14 @@ func LICMPureInvariantPass() Pass {
 	}
 }
 
-func (s *licmPureInvariantState) run(prog *ir.IRProgram) error {
+func (s *licmPureInvariantState) run(ctx *PassContext) error {
+	prog := ctxProgram(ctx)
 	if prog == nil {
 		return fmt.Errorf("licm-pure-invariant: missing IR program")
 	}
 	s.decisions = nil
 	for i := range prog.Funcs {
-		s.rewriteFunc(&prog.Funcs[i])
+		s.rewriteFunc(ctx, &prog.Funcs[i])
 	}
 	return nil
 }
@@ -1625,7 +1632,7 @@ func (s *licmPureInvariantState) reportDecisions() []PassDecision {
 	return append([]PassDecision(nil), s.decisions...)
 }
 
-func (s *licmPureInvariantState) rewriteFunc(fn *ir.IRFunc) {
+func (s *licmPureInvariantState) rewriteFunc(ctx *PassContext, fn *ir.IRFunc) {
 	instrs := fn.Instrs
 	out := make([]ir.IRInstr, 0, len(instrs))
 	for i := 0; i < len(instrs); {
@@ -1654,6 +1661,20 @@ func (s *licmPureInvariantState) rewriteFunc(fn *ir.IRFunc) {
 			i++
 			continue
 		}
+		proofIDs := loopBoundsProofIDs(instrs[candidate.condJump+1 : candidate.backJump])
+		proofFactIDs, decision, ok := ctx.requireMemoryProofs(
+			fn.Name,
+			proofIDs,
+			memoryfacts.ProofBounds,
+			RewriteLICM,
+			invariant.start,
+		)
+		if !ok {
+			s.decisions = append(s.decisions, *decision)
+			out = append(out, instrs[i])
+			i++
+			continue
+		}
 		hoistedLocal := fn.LocalSlots
 		fn.LocalSlots++
 		out = append(out, hoistInvariantExpression(instrs, invariant, hoistedLocal)...)
@@ -1666,12 +1687,15 @@ func (s *licmPureInvariantState) rewriteFunc(fn *ir.IRFunc) {
 			)...)
 		s.decisions = append(
 			s.decisions,
-			PassDecision{
-				Action: "hoisted",
-				Caller: fn.Name,
-				Site:   invariant.start,
-				Reason: invariant.reason,
-			},
+			memoryRewriteDecision(
+				"hoisted",
+				fn.Name,
+				invariant.start,
+				invariant.reason,
+				RewriteLICM,
+				proofIDs,
+				proofFactIDs,
+			),
 		)
 		i = candidate.backJump + 1
 	}
@@ -1908,6 +1932,8 @@ func LoopCanonicalizationPass() Pass {
 		RequiredFacts:             []Fact{FactIRVerified, FactBoundsProofs},
 		PreservedFacts:            []Fact{FactBoundsProofs},
 		InvalidatedFacts:          []Fact{FactLiveness},
+		RequiredProofKinds:        []memoryfacts.ProofKind{memoryfacts.ProofBounds},
+		PreservedProofKinds:       []memoryfacts.ProofKind{memoryfacts.ProofBounds},
 		ProofRule:                 ProofRulePreserveBoundsInvalidateLiveness,
 		ValidationStrategy:        ValidationTranslation,
 		TranslationValidationHook: TranslationHookValidateTranslation,
@@ -1920,13 +1946,14 @@ func LoopCanonicalizationPass() Pass {
 	}
 }
 
-func (s *loopCanonicalizationState) run(prog *ir.IRProgram) error {
+func (s *loopCanonicalizationState) run(ctx *PassContext) error {
+	prog := ctxProgram(ctx)
 	if prog == nil {
 		return fmt.Errorf("loop-canonicalization: missing IR program")
 	}
 	s.decisions = nil
 	for i := range prog.Funcs {
-		s.rewriteFunc(&prog.Funcs[i])
+		s.rewriteFunc(ctx, &prog.Funcs[i])
 	}
 	return nil
 }
@@ -1935,7 +1962,7 @@ func (s *loopCanonicalizationState) reportDecisions() []PassDecision {
 	return append([]PassDecision(nil), s.decisions...)
 }
 
-func (s *loopCanonicalizationState) rewriteFunc(fn *ir.IRFunc) {
+func (s *loopCanonicalizationState) rewriteFunc(ctx *PassContext, fn *ir.IRFunc) {
 	instrs := fn.Instrs
 	out := make([]ir.IRInstr, 0, len(instrs))
 	for i := 0; i < len(instrs); {
@@ -1950,6 +1977,20 @@ func (s *loopCanonicalizationState) rewriteFunc(fn *ir.IRFunc) {
 				s.decisions,
 				PassDecision{Action: "not_hoisted", Caller: fn.Name, Site: i, Reason: reason},
 			)
+			out = append(out, instrs[i])
+			i++
+			continue
+		}
+		proofIDs := loopBoundsProofIDs(instrs[candidate.condJump+1 : candidate.backJump])
+		proofFactIDs, decision, ok := ctx.requireMemoryProofs(
+			fn.Name,
+			proofIDs,
+			memoryfacts.ProofBounds,
+			RewriteBoundsCheckRemoval,
+			i,
+		)
+		if !ok {
+			s.decisions = append(s.decisions, *decision)
 			out = append(out, instrs[i])
 			i++
 			continue
@@ -1971,7 +2012,15 @@ func (s *loopCanonicalizationState) rewriteFunc(fn *ir.IRFunc) {
 		}
 		s.decisions = append(
 			s.decisions,
-			PassDecision{Action: action, Caller: fn.Name, Site: i, Reason: decisionReason},
+			memoryRewriteDecision(
+				action,
+				fn.Name,
+				i,
+				decisionReason,
+				RewriteBoundsCheckRemoval,
+				proofIDs,
+				proofFactIDs,
+			),
 		)
 		i = candidate.backJump + 1
 	}
@@ -2086,15 +2135,20 @@ func replaceLoopLenLoads(instrs []ir.IRInstr, lenLocal int, hoistedLocal int) []
 }
 
 func loopHasWhileProofLoad(instrs []ir.IRInstr) bool {
+	return len(loopBoundsProofIDs(instrs)) > 0
+}
+
+func loopBoundsProofIDs(instrs []ir.IRInstr) []string {
+	var out []string
 	for _, instr := range instrs {
 		switch instr.Kind {
 		case ir.IRIndexLoadI32Unchecked, ir.IRIndexLoadU8Unchecked, ir.IRIndexLoadU16Unchecked:
 			if strings.HasPrefix(instr.ProofID, "proof:while:") {
-				return true
+				out = append(out, instr.ProofID)
 			}
 		}
 	}
-	return false
+	return cleanProofIDs(out)
 }
 
 func loopMutationReason(instrs []ir.IRInstr, lenLocal int) string {
@@ -2174,6 +2228,29 @@ const (
 	ProofRuleInvalidateBoundsProofsAndLiveness ProofRule = "invalidate_bounds_proofs_and_liveness"
 )
 
+type RewriteCategory string
+
+const (
+	RewriteBoundsCheckRemoval   RewriteCategory = "bounds_check_removal"
+	RewriteNoAliasRewrite       RewriteCategory = "noalias_rewrite"
+	RewriteTrustedAllocation    RewriteCategory = "trusted_allocation"
+	RewriteScalarReplacement    RewriteCategory = "scalar_replacement"
+	RewriteLICM                 RewriteCategory = "licm"
+	RewriteInlineMemoryBoundary RewriteCategory = "inline_memory_boundary"
+	RewriteRuntimeCheckErasure  RewriteCategory = "runtime_check_erasure"
+)
+
+type DecisionCode string
+
+const (
+	DecisionCodeRewriteApplied    DecisionCode = "optimizer:rewrite_applied"
+	DecisionCodeProofMissing      DecisionCode = "optimizer:proof_missing"
+	DecisionCodeProofMismatched   DecisionCode = "optimizer:proof_mismatched"
+	DecisionCodeProofInvalidated  DecisionCode = "optimizer:proof_invalidated"
+	DecisionCodeProofUnsafe       DecisionCode = "optimizer:proof_unsafe"
+	DecisionCodeProofNotValidated DecisionCode = "optimizer:proof_not_validated"
+)
+
 type Pass struct {
 	Name                      string
 	InputKind                 IRKind
@@ -2183,6 +2260,9 @@ type Pass struct {
 	RequiredFacts             []Fact
 	PreservedFacts            []Fact
 	InvalidatedFacts          []Fact
+	RequiredProofKinds        []memoryfacts.ProofKind
+	PreservedProofKinds       []memoryfacts.ProofKind
+	InvalidatedProofKinds     []memoryfacts.ProofKind
 	ProofRule                 ProofRule
 	ValidationStrategy        ValidationStrategy
 	TranslationValidationHook string
@@ -2190,7 +2270,7 @@ type Pass struct {
 	ReportRows                []string
 	NegativeTestMarker        string
 	ProfileInputPolicy        ProfileInputPolicy
-	Run                       func(*ir.IRProgram) error
+	Run                       func(*PassContext) error
 	Decisions                 func() []PassDecision
 }
 
@@ -2199,10 +2279,14 @@ type Manager struct{}
 type Options struct {
 	OnlyPass     string
 	ProfileInput *ProfileCollection
+	MemoryFacts  memoryfacts.Snapshot
 }
 
 type Report struct {
-	Passes []PassReport `json:"passes"`
+	Passes               []PassReport      `json:"passes"`
+	MemorySnapshotBefore string            `json:"memory_snapshot_before,omitempty"`
+	MemorySnapshotAfter  string            `json:"memory_snapshot_after,omitempty"`
+	MemoryDelta          memoryfacts.Delta `json:"memory_delta,omitempty"`
 }
 
 type (
@@ -2223,6 +2307,9 @@ type PassReport struct {
 	RequiredFacts             passFactSet               `json:"required_facts,omitempty"`
 	PreservedFacts            passFactSet               `json:"preserved_facts,omitempty"`
 	InvalidatedFacts          passFactSet               `json:"invalidated_facts,omitempty"`
+	RequiredProofKinds        []memoryfacts.ProofKind   `json:"required_proof_kinds,omitempty"`
+	PreservedProofKinds       []memoryfacts.ProofKind   `json:"preserved_proof_kinds,omitempty"`
+	InvalidatedProofKinds     []memoryfacts.ProofKind   `json:"invalidated_proof_kinds,omitempty"`
 	ProofRule                 ProofRule                 `json:"proof_rule"`
 	ValidationStrategy        ValidationStrategy        `json:"validation_strategy"`
 	TranslationValidationHook string                    `json:"translation_validation_hook"`
@@ -2240,14 +2327,209 @@ type PassReport struct {
 	TranslationReport         *passTranslationReport    `json:"translation_report,omitempty"`
 	ValidationMetadata        *passOptimizationMetadata `json:"validation_metadata,omitempty"`
 	Decisions                 []PassDecision            `json:"decisions,omitempty"`
+	MemorySnapshotBefore      string                    `json:"memory_snapshot_before,omitempty"`
+	MemorySnapshotAfter       string                    `json:"memory_snapshot_after,omitempty"`
+	MemoryDelta               memoryfacts.Delta         `json:"memory_delta,omitempty"`
 }
 
 type PassDecision struct {
-	Action string `json:"action"`
-	Caller string `json:"caller,omitempty"`
-	Callee string `json:"callee,omitempty"`
-	Site   int    `json:"site"`
-	Reason string `json:"reason"`
+	Action          string          `json:"action"`
+	Caller          string          `json:"caller,omitempty"`
+	Callee          string          `json:"callee,omitempty"`
+	Site            int             `json:"site"`
+	Reason          string          `json:"reason"`
+	DecisionCode    DecisionCode    `json:"decision_code,omitempty"`
+	RewriteCategory RewriteCategory `json:"rewrite_category,omitempty"`
+	ProofIDs        []string        `json:"proof_ids,omitempty"`
+	ProofFactIDs    []string        `json:"proof_fact_ids,omitempty"`
+}
+
+type MemoryContext struct {
+	Snapshot memoryfacts.Snapshot
+	Enabled  bool
+}
+
+type PassContext struct {
+	Program     *ir.IRProgram
+	PassName    string
+	Memory      *MemoryContext
+	memoryDelta memoryfacts.Delta
+}
+
+func ctxProgram(ctx *PassContext) *ir.IRProgram {
+	if ctx == nil {
+		return nil
+	}
+	return ctx.Program
+}
+
+func newMemoryContext(snapshot memoryfacts.Snapshot) *MemoryContext {
+	enabled := snapshot.ProgramID() != "" || len(snapshot.Facts()) > 0
+	return &MemoryContext{Snapshot: snapshot, Enabled: enabled}
+}
+
+func (ctx *PassContext) requireMemoryProofs(
+	function string,
+	proofIDs []string,
+	kind memoryfacts.ProofKind,
+	category RewriteCategory,
+	site int,
+) ([]string, *PassDecision, bool) {
+	if ctx == nil || ctx.Memory == nil || !ctx.Memory.Enabled {
+		return nil, nil, true
+	}
+	cleanProofIDs := cleanProofIDs(proofIDs)
+	if len(cleanProofIDs) == 0 {
+		decision := memoryProofDecision(
+			function,
+			site,
+			category,
+			DecisionCodeProofMissing,
+			nil,
+			nil,
+			"canonical proof id is required",
+		)
+		return nil, &decision, false
+	}
+	proofFactIDs := make([]string, 0, len(cleanProofIDs))
+	for _, proofID := range cleanProofIDs {
+		proof, ok := ctx.Memory.Snapshot.ResolveProof(memoryfacts.ProofQuery{
+			FunctionID: function,
+			ProofID:    proofID,
+			Kind:       kind,
+		})
+		if !ok {
+			code, factIDs := ctx.Memory.proofFailure(function, proofID, kind)
+			decision := memoryProofDecision(
+				function,
+				site,
+				category,
+				code,
+				[]string{proofID},
+				factIDs,
+				string(code),
+			)
+			return proofFactIDs, &decision, false
+		}
+		proofFactIDs = append(proofFactIDs, string(proof.FactID))
+	}
+	return proofFactIDs, nil, true
+}
+
+func (ctx *PassContext) InvalidateProof(factID memoryfacts.FactID, reason string) {
+	if ctx == nil || factID == "" {
+		return
+	}
+	if ctx.memoryDelta.Stage == "" {
+		ctx.memoryDelta.Stage = memoryfacts.StageOptimization
+	}
+	ctx.memoryDelta.Invalidate = append(ctx.memoryDelta.Invalidate, memoryfacts.Invalidation{
+		FactID: factID,
+		Reason: strings.TrimSpace(reason),
+	})
+}
+
+func (m *MemoryContext) proofFailure(
+	function string,
+	proofID string,
+	kind memoryfacts.ProofKind,
+) (DecisionCode, []string) {
+	if m == nil {
+		return DecisionCodeProofMissing, nil
+	}
+	facts := m.Snapshot.FactsForProof(memoryfacts.ProofKey{FunctionID: function, ProofID: proofID})
+	if len(facts) == 0 {
+		for _, fact := range m.Snapshot.Facts() {
+			if fact.ProofID == proofID {
+				facts = append(facts, fact)
+			}
+		}
+	}
+	if len(facts) == 0 {
+		return DecisionCodeProofMissing, nil
+	}
+	factIDs := make([]string, 0, len(facts))
+	code := DecisionCodeProofNotValidated
+	for _, fact := range facts {
+		factIDs = append(factIDs, string(fact.ID))
+		switch {
+		case fact.ValidationState == memoryfacts.ValidationInvalidated:
+			return DecisionCodeProofInvalidated, factIDs
+		case fact.ProofKind != kind:
+			code = DecisionCodeProofMismatched
+		case fact.ProvenanceClass == memoryfacts.ProvenanceUnsafeUnknown ||
+			fact.UnsafeClass == memoryfacts.UnsafeUnknown:
+			return DecisionCodeProofUnsafe, factIDs
+		case fact.ValidationState != memoryfacts.ValidationPass ||
+			strings.TrimSpace(fact.ValidatorName) == "":
+			code = DecisionCodeProofNotValidated
+		}
+	}
+	return code, factIDs
+}
+
+func memoryProofDecision(
+	function string,
+	site int,
+	category RewriteCategory,
+	code DecisionCode,
+	proofIDs []string,
+	proofFactIDs []string,
+	reason string,
+) PassDecision {
+	return PassDecision{
+		Action:          "skipped",
+		Caller:          function,
+		Site:            site,
+		Reason:          reason,
+		DecisionCode:    code,
+		RewriteCategory: category,
+		ProofIDs:        append([]string(nil), proofIDs...),
+		ProofFactIDs:    append([]string(nil), proofFactIDs...),
+	}
+}
+
+func memoryRewriteDecision(
+	action string,
+	function string,
+	site int,
+	reason string,
+	category RewriteCategory,
+	proofIDs []string,
+	proofFactIDs []string,
+) PassDecision {
+	return PassDecision{
+		Action:          action,
+		Caller:          function,
+		Site:            site,
+		Reason:          reason,
+		DecisionCode:    DecisionCodeRewriteApplied,
+		RewriteCategory: category,
+		ProofIDs:        append([]string(nil), cleanProofIDs(proofIDs)...),
+		ProofFactIDs:    append([]string(nil), cleanStrings(proofFactIDs)...),
+	}
+}
+
+func cleanProofIDs(ids []string) []string {
+	return cleanStrings(ids)
+}
+
+func cleanStrings(values []string) []string {
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func NewManager() Manager {
@@ -2282,32 +2564,48 @@ func (m Manager) RunWithOptions(prog *ir.IRProgram, opt Options, passes ...Pass)
 		}
 		profileEvidence = &evidence
 	}
-	return m.runSelected(prog, profileEvidence, selected...)
+	return m.runSelected(prog, opt, profileEvidence, selected...)
 }
 
 func (m Manager) runSelected(
 	prog *ir.IRProgram,
+	opt Options,
 	profileEvidence *OptimizerProfileInputEvidence,
 	passes ...Pass,
 ) (Report, error) {
 	report := Report{Passes: make([]PassReport, 0, len(passes))}
-	for _, pass := range passes {
+	memoryCtx := newMemoryContext(opt.MemoryFacts)
+	if memoryCtx.Enabled {
+		report.MemorySnapshotBefore = memoryCtx.Snapshot.Digest()
+		report.MemorySnapshotAfter = report.MemorySnapshotBefore
+		report.MemoryDelta.Stage = memoryfacts.StageOptimization
+	}
+	for passIndex, pass := range passes {
 		if err := validatePassMetadata(pass); err != nil {
 			return report, err
 		}
 		row := newPassReport(pass, profileEvidence)
+		if memoryCtx.Enabled {
+			row.MemorySnapshotBefore = memoryCtx.Snapshot.Digest()
+		}
 		if err := lower.VerifyProgram(prog); err != nil {
 			return report, fmt.Errorf("%s input verification failed: %w", pass.Name, err)
 		}
 		row.VerifiedInput = true
 		row.BeforeDump = FormatProgram(prog)
 		before := cloneProgram(prog)
-		if err := pass.Run(prog); err != nil {
+		passCtx := &PassContext{Program: prog, PassName: pass.Name, Memory: memoryCtx}
+		if err := pass.Run(passCtx); err != nil {
 			report.Passes = append(report.Passes, row)
 			return report, fmt.Errorf("%s failed: %w", pass.Name, err)
 		}
 		if pass.Decisions != nil {
 			row.Decisions = append([]PassDecision(nil), pass.Decisions()...)
+		}
+		row.MemoryDelta = passCtx.memoryDelta
+		if err := validateMemoryDecisionEvidence(pass, row); err != nil {
+			report.Passes = append(report.Passes, row)
+			return report, fmt.Errorf("%s memory decision evidence failed: %w", pass.Name, err)
 		}
 		row.AfterDump = FormatProgram(prog)
 		if err := lower.VerifyProgram(prog); err != nil {
@@ -2362,6 +2660,19 @@ func (m Manager) runSelected(
 			return report, fmt.Errorf("%s proof verification failed: %w", pass.Name, err)
 		}
 		row.VerifiedProofs = true
+		if memoryCtx.Enabled {
+			passDelta := buildOptimizerMemoryDelta(passIndex, row)
+			row.MemoryDelta = passDelta
+			nextSnapshot, err := applyOptimizerDeltaToSnapshot(memoryCtx.Snapshot, passDelta)
+			if err != nil {
+				report.Passes = append(report.Passes, row)
+				return report, fmt.Errorf("%s memory delta failed: %w", pass.Name, err)
+			}
+			memoryCtx.Snapshot = nextSnapshot
+			row.MemorySnapshotAfter = nextSnapshot.Digest()
+			report.MemoryDelta = mergeMemoryDeltas(report.MemoryDelta, passDelta)
+			report.MemorySnapshotAfter = row.MemorySnapshotAfter
+		}
 		report.Passes = append(report.Passes, row)
 	}
 	return report, nil
@@ -2439,6 +2750,9 @@ func ValidatePassContract(pass Pass) error {
 	if err := validateProofRule(pass); err != nil {
 		return err
 	}
+	if err := validateProofKindMetadata(pass); err != nil {
+		return err
+	}
 	if pass.ValidationStrategy == "" {
 		return fmt.Errorf("optimizer pass %q missing validation strategy", pass.Name)
 	}
@@ -2505,6 +2819,53 @@ func ValidatePassContract(pass Pass) error {
 	return nil
 }
 
+func validateProofKindMetadata(pass Pass) error {
+	for _, preserved := range pass.PreservedProofKinds {
+		for _, invalidated := range pass.InvalidatedProofKinds {
+			if preserved == invalidated {
+				return fmt.Errorf(
+					"optimizer pass %q cannot preserve and invalidate proof kind %q",
+					pass.Name,
+					preserved,
+				)
+			}
+		}
+	}
+	if passMentionsBoundsFacts(pass) && !passMentionsProofKind(pass, memoryfacts.ProofBounds) {
+		return fmt.Errorf(
+			"optimizer pass %q mentions bounds facts but lacks %q proof kind metadata",
+			pass.Name,
+			memoryfacts.ProofBounds,
+		)
+	}
+	return nil
+}
+
+func passMentionsBoundsFacts(pass Pass) bool {
+	return hasFact(pass.RequiredFacts, FactBoundsProofs) ||
+		hasFact(pass.PreservedFacts, FactBoundsProofs) ||
+		hasFact(pass.InvalidatedFacts, FactBoundsProofs)
+}
+
+func passMentionsProofKind(pass Pass, kind memoryfacts.ProofKind) bool {
+	for _, candidate := range pass.RequiredProofKinds {
+		if candidate == kind {
+			return true
+		}
+	}
+	for _, candidate := range pass.PreservedProofKinds {
+		if candidate == kind {
+			return true
+		}
+	}
+	for _, candidate := range pass.InvalidatedProofKinds {
+		if candidate == kind {
+			return true
+		}
+	}
+	return false
+}
+
 func RequiredP17ReportRows() []string {
 	return []string{
 		"input_verifier",
@@ -2517,6 +2878,154 @@ func RequiredP17ReportRows() []string {
 		"after_dump",
 		"profile_input_policy",
 	}
+}
+
+func validateMemoryDecisionEvidence(pass Pass, row PassReport) error {
+	for _, decision := range row.Decisions {
+		if decision.DecisionCode == DecisionCodeRewriteApplied &&
+			decision.RewriteCategory != "" &&
+			len(cleanProofIDs(decision.ProofIDs)) == 0 {
+			return fmt.Errorf(
+				"memory rewrite %q at site %d missing proof id",
+				decision.RewriteCategory,
+				decision.Site,
+			)
+		}
+	}
+	if len(pass.InvalidatedProofKinds) > 0 && performedMemoryRewrite(row.Decisions) &&
+		len(row.MemoryDelta.Invalidate) == 0 {
+		return fmt.Errorf("invalidating memory rewrite missing memoryfacts invalidation delta")
+	}
+	return nil
+}
+
+func performedMemoryRewrite(decisions []PassDecision) bool {
+	for _, decision := range decisions {
+		if decision.DecisionCode == DecisionCodeRewriteApplied && decision.RewriteCategory != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func buildOptimizerMemoryDelta(passIndex int, row PassReport) memoryfacts.Delta {
+	delta := memoryfacts.Delta{Stage: memoryfacts.StageOptimization}
+	delta.Add = append(delta.Add, optimizerPassFact(passIndex, row))
+	for decisionIndex, decision := range row.Decisions {
+		if decision.DecisionCode == "" &&
+			decision.RewriteCategory == "" &&
+			len(decision.ProofIDs) == 0 {
+			continue
+		}
+		delta.Add = append(delta.Add, optimizerDecisionFact(passIndex, decisionIndex, row, decision))
+	}
+	delta.Invalidate = append(delta.Invalidate, row.MemoryDelta.Invalidate...)
+	return delta
+}
+
+func optimizerPassFact(passIndex int, row PassReport) memoryfacts.Fact {
+	return memoryfacts.Fact{
+		ID:              memoryfacts.FactID(fmt.Sprintf("optimizer:pass:%03d:%s", passIndex, safeFactPart(row.Name))),
+		FunctionID:      "",
+		SourceStage:     memoryfacts.StageOptimization,
+		Claim:           memoryfacts.ClaimOptimizerPass,
+		ProvenanceClass: memoryfacts.ProvenanceSafeKnown,
+		UnsafeClass:     memoryfacts.UnsafeSafe,
+		Reason:          row.Name,
+	}
+}
+
+func optimizerDecisionFact(
+	passIndex int,
+	decisionIndex int,
+	row PassReport,
+	decision PassDecision,
+) memoryfacts.Fact {
+	proofIDs := cleanProofIDs(decision.ProofIDs)
+	proofFactIDs := cleanStrings(decision.ProofFactIDs)
+	fact := memoryfacts.Fact{
+		ID: memoryfacts.FactID(fmt.Sprintf(
+			"optimizer:decision:%03d:%03d:%s:%d",
+			passIndex,
+			decisionIndex,
+			safeFactPart(row.Name+"-"+decision.Action),
+			decision.Site,
+		)),
+		FunctionID:      decision.Caller,
+		SiteID:          fmt.Sprintf("%d", decision.Site),
+		SourceStage:     memoryfacts.StageOptimization,
+		Claim:           memoryfacts.ClaimOptimizerDecision,
+		ProvenanceClass: memoryfacts.ProvenanceSafeKnown,
+		UnsafeClass:     memoryfacts.UnsafeSafe,
+		ProofID:         firstString(proofIDs),
+		DecisionCode:    string(decision.DecisionCode),
+		Reason: fmt.Sprintf(
+			"%s site=%d action=%s reason=%s",
+			row.Name,
+			decision.Site,
+			decision.Action,
+			decision.Reason,
+		),
+	}
+	if len(proofFactIDs) > 0 {
+		fact.ParentFactID = memoryfacts.FactID(proofFactIDs[0])
+	}
+	if decision.DecisionCode == DecisionCodeProofUnsafe {
+		fact.ProvenanceClass = memoryfacts.ProvenanceUnsafeUnknown
+		fact.UnsafeClass = memoryfacts.UnsafeUnknown
+		fact.AliasState = memoryfacts.AliasUnknownConservative
+	}
+	return fact
+}
+
+func applyOptimizerDeltaToSnapshot(
+	snapshot memoryfacts.Snapshot,
+	delta memoryfacts.Delta,
+) (memoryfacts.Snapshot, error) {
+	graph := memoryfacts.NewGraph(snapshot.ProgramID())
+	for _, fact := range snapshot.Facts() {
+		if _, err := graph.AddFact(fact); err != nil {
+			return memoryfacts.Snapshot{}, err
+		}
+	}
+	if err := graph.Apply(delta); err != nil {
+		return memoryfacts.Snapshot{}, err
+	}
+	return graph.Snapshot()
+}
+
+func mergeMemoryDeltas(left memoryfacts.Delta, right memoryfacts.Delta) memoryfacts.Delta {
+	if left.Stage == "" {
+		left.Stage = right.Stage
+	}
+	left.Add = append(left.Add, right.Add...)
+	left.Invalidate = append(left.Invalidate, right.Invalidate...)
+	left.Attach = append(left.Attach, right.Attach...)
+	left.Validate = append(left.Validate, right.Validate...)
+	return left
+}
+
+func safeFactPart(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "unknown"
+	}
+	replacer := strings.NewReplacer(
+		" ", "_",
+		":", "_",
+		"/", "_",
+		"\\", "_",
+		"\t", "_",
+		"\n", "_",
+	)
+	return replacer.Replace(value)
+}
+
+func firstString(values []string) string {
+	if len(values) == 0 {
+		return ""
+	}
+	return values[0]
 }
 
 func supportsVerifier(kind IRKind, verifier string) bool {
@@ -2622,6 +3131,9 @@ func newPassReport(pass Pass, profileEvidence *OptimizerProfileInputEvidence) Pa
 		RequiredFacts:             append([]Fact(nil), pass.RequiredFacts...),
 		PreservedFacts:            append([]Fact(nil), pass.PreservedFacts...),
 		InvalidatedFacts:          append([]Fact(nil), pass.InvalidatedFacts...),
+		RequiredProofKinds:        append([]memoryfacts.ProofKind(nil), pass.RequiredProofKinds...),
+		PreservedProofKinds:       append([]memoryfacts.ProofKind(nil), pass.PreservedProofKinds...),
+		InvalidatedProofKinds:     append([]memoryfacts.ProofKind(nil), pass.InvalidatedProofKinds...),
 		ProofRule:                 pass.ProofRule,
 		ValidationStrategy:        pass.ValidationStrategy,
 		TranslationValidationHook: pass.TranslationValidationHook,
@@ -2792,6 +3304,7 @@ func Mem2RegPass() Pass {
 		RequiredFacts:             []Fact{FactIRVerified},
 		PreservedFacts:            []Fact{FactBoundsProofs},
 		InvalidatedFacts:          []Fact{FactLiveness},
+		PreservedProofKinds:       []memoryfacts.ProofKind{memoryfacts.ProofBounds},
 		ProofRule:                 ProofRulePreserveBoundsInvalidateLiveness,
 		ValidationStrategy:        ValidationTranslation,
 		TranslationValidationHook: TranslationHookValidateTranslation,
@@ -2804,7 +3317,8 @@ func Mem2RegPass() Pass {
 	}
 }
 
-func (s *mem2regState) run(prog *ir.IRProgram) error {
+func (s *mem2regState) run(ctx *PassContext) error {
+	prog := ctxProgram(ctx)
 	if prog == nil {
 		return fmt.Errorf("mem2reg-single-assignment: missing IR program")
 	}
@@ -4477,6 +4991,7 @@ func pgoInputEvidencePass() Pass {
 		RequiredFacts:             []Fact{FactIRVerified},
 		PreservedFacts:            []Fact{FactBoundsProofs},
 		InvalidatedFacts:          []Fact{FactLiveness},
+		PreservedProofKinds:       []memoryfacts.ProofKind{memoryfacts.ProofBounds},
 		ProofRule:                 ProofRulePreserveBoundsInvalidateLiveness,
 		ValidationStrategy:        ValidationTranslation,
 		TranslationValidationHook: TranslationHookValidateTranslation,
@@ -4484,7 +4999,7 @@ func pgoInputEvidencePass() Pass {
 		ReportRows:                RequiredP17ReportRows(),
 		NegativeTestMarker:        NegativeTestPassContractV1,
 		ProfileInputPolicy:        ProfileInputUnused,
-		Run:                       func(p *ir.IRProgram) error { return nil },
+		Run:                       func(ctx *PassContext) error { return nil },
 	}
 }
 
@@ -4535,6 +5050,7 @@ func BasicScalarPass() Pass {
 		RequiredFacts:             []Fact{FactIRVerified},
 		PreservedFacts:            []Fact{FactBoundsProofs},
 		InvalidatedFacts:          []Fact{FactLiveness},
+		PreservedProofKinds:       []memoryfacts.ProofKind{memoryfacts.ProofBounds},
 		ProofRule:                 ProofRulePreserveBoundsInvalidateLiveness,
 		ValidationStrategy:        ValidationTranslation,
 		TranslationValidationHook: TranslationHookValidateTranslation,
@@ -4546,7 +5062,8 @@ func BasicScalarPass() Pass {
 	}
 }
 
-func runBasicScalarPass(prog *ir.IRProgram) error {
+func runBasicScalarPass(ctx *PassContext) error {
+	prog := ctxProgram(ctx)
 	if prog == nil {
 		return fmt.Errorf("basic-scalar: missing IR program")
 	}
@@ -5606,6 +6123,7 @@ func SCCPPass() Pass {
 		RequiredFacts:             []Fact{FactIRVerified},
 		PreservedFacts:            []Fact{FactBoundsProofs},
 		InvalidatedFacts:          []Fact{FactLiveness},
+		PreservedProofKinds:       []memoryfacts.ProofKind{memoryfacts.ProofBounds},
 		ProofRule:                 ProofRulePreserveBoundsInvalidateLiveness,
 		ValidationStrategy:        ValidationTranslation,
 		TranslationValidationHook: TranslationHookValidateTranslation,
@@ -5618,7 +6136,8 @@ func SCCPPass() Pass {
 	}
 }
 
-func (s *sccpState) run(prog *ir.IRProgram) error {
+func (s *sccpState) run(ctx *PassContext) error {
+	prog := ctxProgram(ctx)
 	if prog == nil {
 		return fmt.Errorf("sccp-constant-branch: missing IR program")
 	}
@@ -7715,6 +8234,13 @@ func vectorizationCopyU8Row() (VectorizationCoverageRow, error) {
 				"not match vector-u8x16-copy machine shape"),
 		)
 	}
+	noAliasDecision := islandkernel.CanClaimNoAlias(islandKernelVectorCopyNoAliasRequest(vectorPlan.ProofID))
+	if noAliasDecision.Decision != islandkernel.Accept {
+		return VectorizationCoverageRow{}, fmt.Errorf(
+			"vectorization coverage: copy_u8 noalias rejected by island kernel: %s",
+			noAliasDecision.Reason.Code,
+		)
+	}
 	return VectorizationCoverageRow{
 		ID:            VectorizationCopyU8,
 		Name:          "copy []u8",
@@ -7728,6 +8254,7 @@ func vectorizationCopyU8Row() (VectorizationCoverageRow, error) {
 		RequiredFacts: []string{
 			"range_proof",
 			"noalias_source_dest_disjoint_owned_copy_result",
+			noAliasDecision.Reason.Code,
 			"safe_unaligned_vector_path",
 			"vector_backend_lowering",
 			"tail_handling",
@@ -7737,7 +8264,7 @@ func vectorizationCopyU8Row() (VectorizationCoverageRow, error) {
 		},
 		Reason: ("vectorized:" +
 			"proof_tagged_copy_u8_linux_x64_native_simd_with_stack_fallba" +
-			"ck_differential_validation"),
+			"ck_differential_validation:" + noAliasDecision.Reason.Code),
 		Evidence: ("compiler/internal/plir/plir.go::addCopyLoopRangeProof; " +
 			"compiler/internal/plir/plir_test/plir_test.go::" +
 			"TestFromCheckedProgramRecordsBorrowCopyFacts; " +
@@ -7764,6 +8291,40 @@ func vectorizationCopyU8Row() (VectorizationCoverageRow, error) {
 			"copy, overlapping slices, memset/memcpy, map []i32, " +
 			"throughput, or C/Rust parity"),
 	}, nil
+}
+
+func islandKernelVectorCopyNoAliasRequest(proofID string) islandkernel.NoAliasRequest {
+	left := islandkernel.MemoryRef{
+		BaseID:      "vector.copy_u8.src",
+		IslandID:    "vector.copy_u8.src",
+		Epoch:       1,
+		OwnerID:     "vector.copy_u8",
+		Provenance:  islandkernel.ProvenanceOwned,
+		AliasState:  islandkernel.AliasUniqueLocal,
+		UnsafeClass: islandkernel.UnsafeSafe,
+	}
+	right := islandkernel.MemoryRef{
+		BaseID:      "vector.copy_u8.dst",
+		IslandID:    "vector.copy_u8.dst",
+		Epoch:       1,
+		OwnerID:     "vector.copy_u8",
+		Provenance:  islandkernel.ProvenanceOwned,
+		AliasState:  islandkernel.AliasUniqueLocal,
+		UnsafeClass: islandkernel.UnsafeSafe,
+	}
+	return islandkernel.NoAliasRequest{
+		Left:  left,
+		Right: right,
+		Proof: islandkernel.Proof{
+			ID:            proofID,
+			Kind:          islandkernel.ProofNoAlias,
+			SubjectBaseID: left.BaseID,
+			IslandID:      left.IslandID,
+			Epoch:         left.Epoch,
+			Operation:     islandkernel.OperationNoAlias,
+			Verified:      strings.TrimSpace(proofID) != "",
+		},
+	}
 }
 
 func vectorizationSumI32Row() (VectorizationCoverageRow, error) {

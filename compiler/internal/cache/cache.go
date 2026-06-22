@@ -16,7 +16,8 @@ import (
 	"tetra_language/compiler/internal/version"
 )
 
-const compilerCacheABIVersion = "linux-x64-memory-runtime-abi-v8-actor-ref-v2"
+const compilerCacheABIVersion = ("linux-x64-memory-runtime-abi-v10-actor-ref-v2-" +
+	tobj.MemoryPlanSchemaV2 + "-" + tobj.MemoryLoweringSchemaV2)
 
 func cacheDir(root, target string) string {
 	return filepath.Join(root, ".tetra_cache", target)
@@ -55,6 +56,8 @@ func moduleToCachePath(module string) string {
 func LoadCachedObject(
 	root, target, buildTag, module string,
 	srcHash, depSigHash [32]byte,
+	expectedMemoryPlanDigest string,
+	expectedMemoryLoweringDigest string,
 ) (*tobj.Object, bool, error) {
 	path := cachePath(root, target, buildTag, module, srcHash, depSigHash)
 	obj, err := tobj.ReadObject(path)
@@ -77,7 +80,40 @@ func LoadCachedObject(
 	if obj.SrcHash != srcHash || obj.WorldSigHash != depSigHash {
 		return nil, false, nil
 	}
+	if !memoryAttestationMatches(
+		obj,
+		expectedMemoryPlanDigest,
+		expectedMemoryLoweringDigest,
+	) {
+		return nil, false, nil
+	}
 	return obj, true, nil
+}
+
+func memoryAttestationMatches(
+	obj *tobj.Object,
+	expectedMemoryPlanDigest string,
+	expectedMemoryLoweringDigest string,
+) bool {
+	if obj == nil {
+		return false
+	}
+	if obj.MemoryPlanSchema != tobj.MemoryPlanSchemaV2 ||
+		obj.MemoryLoweringSchema != tobj.MemoryLoweringSchemaV2 {
+		return false
+	}
+	if strings.TrimSpace(expectedMemoryPlanDigest) == "" ||
+		obj.MemoryPlanDigest != expectedMemoryPlanDigest {
+		return false
+	}
+	if strings.TrimSpace(obj.MemoryLoweringDigest) == "" {
+		return false
+	}
+	if strings.TrimSpace(expectedMemoryLoweringDigest) != "" &&
+		obj.MemoryLoweringDigest != expectedMemoryLoweringDigest {
+		return false
+	}
+	return true
 }
 
 func StoreCachedObject(root, target, buildTag string, obj *tobj.Object) error {

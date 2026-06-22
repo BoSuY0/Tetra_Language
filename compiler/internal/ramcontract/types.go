@@ -1,6 +1,10 @@
 package ramcontract
 
-import "time"
+import (
+	"time"
+
+	"tetra_language/compiler/internal/runtimeabi"
+)
 
 const ReportSchemaV1 = "tetra.ram-contract-report.v1"
 const GradeReportSchemaV1 = "tetra.memory-grade-report.v1"
@@ -76,15 +80,15 @@ const (
 	ValidationUnknown      ValidationStatus = "unknown"
 )
 
-type MemoryDomainKind string
+type MemoryDomainKind = runtimeabi.MemoryDomainKind
 
 const (
-	DomainProcess  MemoryDomainKind = "process"
-	DomainTask     MemoryDomainKind = "task"
-	DomainActor    MemoryDomainKind = "actor"
-	DomainIsland   MemoryDomainKind = "island"
-	DomainRequest  MemoryDomainKind = "request"
-	DomainExternal MemoryDomainKind = "external"
+	DomainProcess  = runtimeabi.DomainProcess
+	DomainTask     = runtimeabi.DomainTask
+	DomainActor    = runtimeabi.DomainActor
+	DomainIsland   = runtimeabi.DomainIsland
+	DomainRequest  = runtimeabi.DomainRequest
+	DomainExternal = runtimeabi.DomainExternal
 )
 
 type Report struct {
@@ -124,23 +128,7 @@ type Row struct {
 	Domain           *MemoryDomain    `json:"domain,omitempty"`
 }
 
-type MemoryDomain struct {
-	DomainID       string           `json:"domain_id"`
-	ParentDomainID string           `json:"parent_domain_id,omitempty"`
-	Kind           MemoryDomainKind `json:"kind"`
-	OwnerKind      string           `json:"owner_kind"`
-	OwnerID        string           `json:"owner_id"`
-	Lifetime       string           `json:"lifetime"`
-	BudgetBytes    int64            `json:"budget_bytes,omitempty"`
-	RequestedBytes int64            `json:"requested_bytes,omitempty"`
-	ReservedBytes  int64            `json:"reserved_bytes,omitempty"`
-	CommittedBytes int64            `json:"committed_bytes,omitempty"`
-	ReleasedBytes  int64            `json:"released_bytes,omitempty"`
-	CurrentBytes   int64            `json:"current_bytes,omitempty"`
-	PeakBytes      int64            `json:"peak_bytes,omitempty"`
-	CopyCount      int              `json:"copy_count,omitempty"`
-	BytesCopied    int64            `json:"bytes_copied,omitempty"`
-}
+type MemoryDomain = runtimeabi.MemoryDomain
 
 type ProofSummary struct {
 	ProofID    string `json:"proof_id"`
@@ -169,24 +157,7 @@ type Summary struct {
 	Domains       []MemoryDomainSummary `json:"domains,omitempty"`
 }
 
-type MemoryDomainSummary struct {
-	DomainID       string           `json:"domain_id"`
-	ParentDomainID string           `json:"parent_domain_id,omitempty"`
-	Kind           MemoryDomainKind `json:"kind"`
-	OwnerKind      string           `json:"owner_kind"`
-	OwnerID        string           `json:"owner_id"`
-	Lifetime       string           `json:"lifetime"`
-	RowCount       int              `json:"row_count"`
-	BudgetBytes    int64            `json:"budget_bytes,omitempty"`
-	RequestedBytes int64            `json:"requested_bytes,omitempty"`
-	ReservedBytes  int64            `json:"reserved_bytes,omitempty"`
-	CommittedBytes int64            `json:"committed_bytes,omitempty"`
-	ReleasedBytes  int64            `json:"released_bytes,omitempty"`
-	CurrentBytes   int64            `json:"current_bytes,omitempty"`
-	PeakBytes      int64            `json:"peak_bytes,omitempty"`
-	CopyCount      int              `json:"copy_count,omitempty"`
-	BytesCopied    int64            `json:"bytes_copied,omitempty"`
-}
+type MemoryDomainSummary = runtimeabi.MemoryDomainSummary
 
 type GradeReport struct {
 	SchemaVersion string        `json:"schema_version"`

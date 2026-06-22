@@ -869,10 +869,10 @@ func compileFunction(
 		case ir.IRSymAddr:
 			writeI32Const(&body, int32(wasmSymbolToken(instr.Name)))
 			push(1)
-		case ir.IRMakeSliceU8, ir.IRMakeSliceU16, ir.IRMakeSliceI32:
-			if err := pop(1, "make_slice"); err != nil {
-				return nil, err
-			}
+			case ir.IRMakeSliceU8, ir.IRMakeSliceU16, ir.IRMakeSliceI32:
+				if err := pop(1, "make_slice"); err != nil {
+					return nil, err
+				}
 			body.WriteByte(0x21) // local.set tempLen
 			writeULEB(&body, uint32(tempLen))
 			emitWasmMakeSliceContract(
@@ -886,12 +886,21 @@ func compileFunction(
 			)
 			body.WriteByte(0x20) // local.get tempPtr
 			writeULEB(&body, uint32(tempPtr))
-			body.WriteByte(0x20) // local.get tempLen
-			writeULEB(&body, uint32(tempLen))
-			push(2)
-		case ir.IRRawSliceFromParts:
-			if err := pop(3, "raw_slice_from_parts"); err != nil {
-				return nil, err
+				body.WriteByte(0x20) // local.get tempLen
+				writeULEB(&body, uint32(tempLen))
+				push(2)
+			case ir.IRStackSliceU8, ir.IRStackSliceU16, ir.IRStackSliceI32:
+				if !wasmZeroStackSliceSentinel(instr) {
+					return nil, wasmUnsupportedInstrError(fn.Name, instr.Kind)
+				}
+				if err := pop(1, "zero_stack_slice"); err != nil {
+					return nil, err
+				}
+				emitWasmZeroSliceSentinel(&body)
+				push(2)
+			case ir.IRRawSliceFromParts:
+				if err := pop(3, "raw_slice_from_parts"); err != nil {
+					return nil, err
 			}
 			body.WriteByte(0x21) // local.set tempByteLen, discard cap.mem token
 			writeULEB(&body, uint32(tempByteLen))

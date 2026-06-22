@@ -30,7 +30,6 @@ import (
 	"tetra_language/compiler/internal/runtimeabi"
 	"tetra_language/compiler/internal/semantics"
 	"tetra_language/compiler/internal/testkit"
-	"tetra_language/compiler/memoryvocab"
 	ctarget "tetra_language/compiler/target"
 	"time"
 )
@@ -11133,7 +11132,19 @@ func TestPipelineNativeModulePlanInvalidatesWhenLinkedObjectContentChanges(t *te
 			contentHash: sha256.Sum256([]byte("dep-v1")),
 		},
 	}
-	plan1, stats1, err := planNativeModuleBuild(build.world, build.checked, target, opt, linkedA)
+	memoryState1, err := buildMemoryStateForTarget(build.checked, target)
+	if err != nil {
+		t.Fatalf("memory state first build: %v", err)
+	}
+	plan1, stats1, err := planNativeModuleBuild(
+		build.world,
+		build.checked,
+		target,
+		opt,
+		linkedA,
+		memoryState1,
+		nil,
+	)
 	if err != nil {
 		t.Fatalf("plan first build: %v", err)
 	}
@@ -11153,7 +11164,7 @@ func TestPipelineNativeModulePlanInvalidatesWhenLinkedObjectContentChanges(t *te
 		t.Fatalf("native backend: %s", tgt.Triple)
 	}
 	native := nativeBuildTarget{target: tgt, triple: tgt.Triple, backend: backend, codegen: codegen}
-	if err := compileNativeModulePlan(
+	if _, err := compileNativeModulePlan(
 		build.world,
 		build.checked,
 		native,
@@ -11161,11 +11172,25 @@ func TestPipelineNativeModulePlanInvalidatesWhenLinkedObjectContentChanges(t *te
 		plan1,
 		stats1,
 		nil,
+		memoryState1,
+		nil,
 	); err != nil {
 		t.Fatalf("compile first plan: %v", err)
 	}
 
-	plan2, stats2, err := planNativeModuleBuild(build.world, build.checked, target, opt, linkedA)
+	memoryState2, err := buildMemoryStateForTarget(build.checked, target)
+	if err != nil {
+		t.Fatalf("memory state cached build: %v", err)
+	}
+	plan2, stats2, err := planNativeModuleBuild(
+		build.world,
+		build.checked,
+		target,
+		opt,
+		linkedA,
+		memoryState2,
+		nil,
+	)
 	if err != nil {
 		t.Fatalf("plan cached build: %v", err)
 	}
@@ -11184,7 +11209,19 @@ func TestPipelineNativeModulePlanInvalidatesWhenLinkedObjectContentChanges(t *te
 			contentHash: sha256.Sum256([]byte("dep-v2")),
 		},
 	}
-	plan3, stats3, err := planNativeModuleBuild(build.world, build.checked, target, opt, linkedB)
+	memoryState3, err := buildMemoryStateForTarget(build.checked, target)
+	if err != nil {
+		t.Fatalf("memory state changed link build: %v", err)
+	}
+	plan3, stats3, err := planNativeModuleBuild(
+		build.world,
+		build.checked,
+		target,
+		opt,
+		linkedB,
+		memoryState3,
+		nil,
+	)
 	if err != nil {
 		t.Fatalf("plan changed link object build: %v", err)
 	}
@@ -11224,7 +11261,19 @@ func TestPipelineNativeModulePlanCacheStages(t *testing.T) {
 	}
 	native := nativeBuildTarget{target: tgt, triple: tgt.Triple, backend: backend, codegen: codegen}
 
-	plan1, stats1, err := planNativeModuleBuild(build.world, build.checked, native.triple, opt, nil)
+	memoryState1, err := buildMemoryStateForTarget(build.checked, native.triple)
+	if err != nil {
+		t.Fatalf("memory state first build: %v", err)
+	}
+	plan1, stats1, err := planNativeModuleBuild(
+		build.world,
+		build.checked,
+		native.triple,
+		opt,
+		nil,
+		memoryState1,
+		nil,
+	)
 	if err != nil {
 		t.Fatalf("plan first build: %v", err)
 	}
@@ -11235,13 +11284,15 @@ func TestPipelineNativeModulePlanCacheStages(t *testing.T) {
 	if len(stats1.CacheHits) != 0 {
 		t.Fatalf("first plan cache hits = %#v, want none", stats1.CacheHits)
 	}
-	if err := compileNativeModulePlan(
+	if _, err := compileNativeModulePlan(
 		build.world,
 		build.checked,
 		native,
 		opt,
 		plan1,
 		stats1,
+		nil,
+		memoryState1,
 		nil,
 	); err != nil {
 		t.Fatalf("compile first plan: %v", err)
@@ -11256,7 +11307,19 @@ func TestPipelineNativeModulePlanCacheStages(t *testing.T) {
 		t.Fatalf("objects len = %d, want 2", len(objects))
 	}
 
-	plan2, stats2, err := planNativeModuleBuild(build.world, build.checked, native.triple, opt, nil)
+	memoryState2, err := buildMemoryStateForTarget(build.checked, native.triple)
+	if err != nil {
+		t.Fatalf("memory state cached build: %v", err)
+	}
+	plan2, stats2, err := planNativeModuleBuild(
+		build.world,
+		build.checked,
+		native.triple,
+		opt,
+		nil,
+		memoryState2,
+		nil,
+	)
 	if err != nil {
 		t.Fatalf("plan cached build: %v", err)
 	}
@@ -11264,13 +11327,15 @@ func TestPipelineNativeModulePlanCacheStages(t *testing.T) {
 		t.Fatalf("cached plan ToCompile = %#v, want none", plan2.ToCompile)
 	}
 	testkit.AssertModules(t, stats2.CacheHits, []string{"app.game", "engine.render"})
-	if err := compileNativeModulePlan(
+	if _, err := compileNativeModulePlan(
 		build.world,
 		build.checked,
 		native,
 		opt,
 		plan2,
 		stats2,
+		nil,
+		memoryState2,
 		nil,
 	); err != nil {
 		t.Fatalf("compile cached plan: %v", err)
@@ -11660,7 +11725,7 @@ func TestP7EmitPLIROnlyReturnsBeforeAllocPlanAndIRReportIntermediates(t *testing
 	if fastPath < 0 {
 		t.Fatal("emitExplainReports missing PLIR-only fast path before heavy report intermediates")
 	}
-	for _, heavy := range []string{"allocplan.FromPLIRWithOptions", "lower.LowerWithOptions"} {
+	for _, heavy := range []string{"buildMemoryStateForTarget", "lowerMemoryStateForBuild"} {
 		pos := strings.Index(body, heavy)
 		if pos < 0 {
 			t.Fatalf("emitExplainReports missing expected heavy report intermediate %q", heavy)
@@ -17581,7 +17646,7 @@ func TestMemoryFuzzOracleRejectsUnknownVocabularyStatus(t *testing.T) {
 		!strings.Contains(err.Error(), "looks_good_to_me") {
 		t.Fatalf("error = %v, want unknown status rejection", err)
 	}
-	if !memoryvocab.KnownMemoryFuzzStatus(memoryvocab.FuzzStatusCovered) {
+	if !memoryfacts.KnownMemoryFuzzStatus(memoryfacts.FuzzStatusCovered) {
 		t.Fatalf("shared memory vocabulary must include covered fuzz status")
 	}
 }
@@ -21797,10 +21862,7 @@ uses alloc, mem:
 	if err != nil {
 		t.Fatalf("CheckWorld: %v", err)
 	}
-	prog, err := lowerpkg.LowerWithOptions(checked, lowerpkg.Options{StackAllocationLowering: true})
-	if err != nil {
-		t.Fatalf("LowerWithOptions: %v", err)
-	}
+	prog := lowerCheckedForBackendReport(t, checked, "linux-x64")
 
 	report := buildBackendReport("linux-x64", prog)
 	rows := backendRowsByFunction(report.Functions)
@@ -24298,10 +24360,7 @@ uses alloc, mem:
 	if err != nil {
 		t.Fatalf("CheckWorld: %v", err)
 	}
-	irProg, err := lowerpkg.LowerWithOptions(checked, lowerpkg.Options{StackAllocationLowering: true})
-	if err != nil {
-		t.Fatalf("LowerWithOptions: %v", err)
-	}
+	irProg := lowerCheckedForBackendReport(t, checked, "linux-x64")
 	mainFn := findIRFunc(t, irProg.Funcs, "p25.slice_sum.main")
 	if _, ok, err := machine.ScalarI32SliceSumLoopFunctionFromStackIR(mainFn); err != nil || ok {
 		t.Fatalf(
@@ -24412,10 +24471,7 @@ uses alloc, mem:
 	if err != nil {
 		t.Fatalf("CheckWorld: %v", err)
 	}
-	irProg, err := lowerpkg.LowerWithOptions(checked, lowerpkg.Options{StackAllocationLowering: true})
-	if err != nil {
-		t.Fatalf("LowerWithOptions: %v", err)
-	}
+	irProg := lowerCheckedForBackendReport(t, checked, "linux-x64")
 	mainFn := findIRFunc(t, irProg.Funcs, "p25.matrix_multiply.main")
 
 	report := buildBackendReport("linux-x64", irProg)
@@ -29248,6 +29304,19 @@ func findIRFunc(t *testing.T, funcs []IRFunc, name string) IRFunc {
 	return IRFunc{}
 }
 
+func lowerCheckedForBackendReport(t *testing.T, checked *CheckedProgram, target string) *IRProgram {
+	t.Helper()
+	state, err := buildMemoryStateForTarget(checked, target)
+	if err != nil {
+		t.Fatalf("buildMemoryStateForTarget(%s): %v", target, err)
+	}
+	result, err := lowerMemoryStateForBuild(checked, state, target, BuildOptions{}, nil)
+	if err != nil {
+		t.Fatalf("lowerMemoryStateForBuild(%s): %v", target, err)
+	}
+	return result.Program
+}
+
 func hasIRCall(fn IRFunc, name string) bool {
 	for _, instr := range fn.Instrs {
 		if instr.Kind == ir.IRCall && instr.Name == name {
@@ -32591,15 +32660,13 @@ func wrap_region(region: island) -> IslandBox:
 
 func main() -> Int
 uses alloc, islands, mem:
-    unsafe:
-        let region: island = core.island_new(128)
+    island(128) as region:
         let boxed: IslandBox = wrap_region(region)
         var bytes: []u8 = core.island_make_u8(boxed.region, 3)
         bytes[0] = 12
         bytes[1] = 13
         bytes[2] = 17
         let total: Int = bytes[0] + bytes[1] + bytes[2]
-        free(boxed.region)
         return total
     return 99
 `)

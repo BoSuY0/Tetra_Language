@@ -889,7 +889,7 @@ export async function runSurfaceBrowserCanvas({ wasmURL, canvas, scenario = "cou
       dispatchTextFocusInputBrowserInput(surface);
       return;
     }
-    if (scenario === "studio-shell") {
+    if (scenario === 'studio-shell') {
       dispatchStudioShellBrowserInput(surface);
       return;
     }

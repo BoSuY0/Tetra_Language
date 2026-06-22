@@ -1,6 +1,8 @@
 package ramcontract
 
 import (
+	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -178,7 +180,7 @@ func TestRAMContractFromAllocPlanTracksRowsAndBlockers(t *testing.T) {
 			}},
 		}},
 	}
-	report := BuildReportFromAllocPlan(
+	report := buildReportForPlanForTest(
 		plan,
 		"linux-x64",
 		"e2c19b8ee276158f8eb2c54cf61e11bd84952893",
@@ -205,7 +207,76 @@ func TestRAMContractFromAllocPlanTracksRowsAndBlockers(t *testing.T) {
 	}
 }
 
+func TestRAMContractReportDeterministicProjection(t *testing.T) {
+	plan := &allocplan.Plan{
+		Functions: []allocplan.FunctionPlan{{
+			Name: "main",
+			Allocations: []allocplan.Allocation{{
+				ID:                    "z",
+				SiteID:                "site:main:z",
+				ValueID:               "z",
+				Escape:                allocplan.EscapeNoEscape,
+				PlannedStorage:        allocplan.StorageStack,
+				ActualLoweringStorage: allocplan.StorageStack,
+				ValidationStatus:      "validated_stack_lowering",
+			}, {
+				ID:                    "a",
+				SiteID:                "site:main:a",
+				ValueID:               "a",
+				Escape:                allocplan.EscapeNoEscape,
+				PlannedStorage:        allocplan.StorageStack,
+				ActualLoweringStorage: allocplan.StorageStack,
+				ValidationStatus:      "validated_stack_lowering",
+			}},
+		}},
+	}
+
+	first := buildReportForPlanForTest(
+		plan,
+		"linux-x64",
+		"e2c19b8ee276158f8eb2c54cf61e11bd84952893",
+		"test",
+	)
+	second := buildReportForPlanForTest(
+		plan,
+		"linux-x64",
+		"e2c19b8ee276158f8eb2c54cf61e11bd84952893",
+		"test",
+	)
+	first.GeneratedAt = ""
+	second.GeneratedAt = ""
+	if !reflect.DeepEqual(first, second) {
+		t.Fatalf("RAM report projection is not deterministic:\n%#v\n%#v", first, second)
+	}
+	if got := []string{first.Rows[0].SiteID, first.Rows[1].SiteID}; !reflect.DeepEqual(
+		got,
+		[]string{"site:main:a", "site:main:z"},
+	) {
+		t.Fatalf("row order = %v, want site-sorted deterministic order", got)
+	}
+}
+
 func TestRAMContractFromAllocPlanAttachesMemoryDomainMetadata(t *testing.T) {
+	heapDomain := MemoryDomain{
+		DomainID:       "domain:process",
+		Kind:           DomainProcess,
+		OwnerKind:      "process",
+		OwnerID:        "current",
+		Lifetime:       "process",
+		BudgetBytes:    32,
+		RequestedBytes: 32,
+		ReservedBytes:  32,
+	}
+	islandDomain := MemoryDomain{
+		DomainID:       "domain:island:isl",
+		Kind:           DomainIsland,
+		OwnerKind:      "island",
+		OwnerID:        "isl",
+		Lifetime:       "island:isl:scope",
+		BudgetBytes:    64,
+		RequestedBytes: 64,
+		ReservedBytes:  64,
+	}
 	plan := &allocplan.Plan{
 		Functions: []allocplan.FunctionPlan{{
 			Name: "main",
@@ -225,6 +296,7 @@ func TestRAMContractFromAllocPlanAttachesMemoryDomainMetadata(t *testing.T) {
 					HeapReasonCodes:       []string{allocplan.HeapReasonEscapeReturn},
 					Reason:                "returned heap allocation",
 					ValidationStatus:      "validated_heap_fallback",
+					Domain:                &heapDomain,
 				},
 				{
 					SiteID:                "site:main:island",
@@ -241,11 +313,12 @@ func TestRAMContractFromAllocPlanAttachesMemoryDomainMetadata(t *testing.T) {
 					Lifetime:              "island:isl:scope",
 					RegionID:              "island:isl",
 					Reason:                "explicit island scope proof",
+					Domain:                &islandDomain,
 				},
 			},
 		}},
 	}
-	report := BuildReportFromAllocPlan(
+	report := buildReportForPlanForTest(
 		plan,
 		"linux-x64",
 		"e2c19b8ee276158f8eb2c54cf61e11bd84952893",
@@ -273,6 +346,66 @@ func TestRAMContractFromAllocPlanAttachesMemoryDomainMetadata(t *testing.T) {
 		if domain.DomainID == "domain:island:isl" && domain.BudgetBytes != 64 {
 			t.Fatalf("island summary budget = %d, want 64", domain.BudgetBytes)
 		}
+	}
+}
+
+func TestRAMContractReportJSONMutationDoesNotMutatePlan(t *testing.T) {
+	domain := MemoryDomain{
+		DomainID:       "domain:process",
+		Kind:           DomainProcess,
+		OwnerKind:      "process",
+		OwnerID:        "current",
+		Lifetime:       "process",
+		BudgetBytes:    32,
+		RequestedBytes: 32,
+		ReservedBytes:  32,
+	}
+	plan := &allocplan.Plan{
+		Functions: []allocplan.FunctionPlan{{
+			Name: "main",
+			Allocations: []allocplan.Allocation{{
+				ID:                    "alloc0",
+				SiteID:                "site:main:alloc0",
+				ValueID:               "alloc0",
+				BytesRequested:        32,
+				BytesReserved:         32,
+				Escape:                allocplan.EscapeReturn,
+				PlannedStorage:        allocplan.StorageHeap,
+				ActualLoweringStorage: allocplan.StorageHeap,
+				ReasonCodes:           []string{allocplan.HeapReasonEscapeReturn},
+				HeapReasonCodes:       []string{allocplan.HeapReasonEscapeReturn},
+				ValidationStatus:      "validated_heap_fallback",
+				Domain:                &domain,
+			}},
+		}},
+	}
+	report := buildReportForPlanForTest(
+		plan,
+		"linux-x64",
+		"e2c19b8ee276158f8eb2c54cf61e11bd84952893",
+		"test",
+	)
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded Report
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	decoded.Rows[0].ReasonCodes[0] = "mutated"
+	decoded.Rows[0].HeapReasonCodes[0] = "mutated"
+	decoded.Rows[0].Domain.DomainID = "domain:mutated"
+
+	alloc := plan.Functions[0].Allocations[0]
+	if got := alloc.ReasonCodes[0]; got != allocplan.HeapReasonEscapeReturn {
+		t.Fatalf("plan reason code changed through report JSON: %q", got)
+	}
+	if got := alloc.HeapReasonCodes[0]; got != allocplan.HeapReasonEscapeReturn {
+		t.Fatalf("plan heap reason code changed through report JSON: %q", got)
+	}
+	if alloc.Domain == nil || alloc.Domain.DomainID != "domain:process" {
+		t.Fatalf("plan domain changed through report JSON: %+v", alloc.Domain)
 	}
 }
 
@@ -307,7 +440,7 @@ func TestRAMContractHeapBlockerReportCarriesActionableSourceMetadata(t *testing.
 			}},
 		}},
 	}
-	report := BuildReportFromAllocPlan(
+	report := buildReportForPlanForTest(
 		plan,
 		"linux-x64",
 		"e2c19b8ee276158f8eb2c54cf61e11bd84952893",
@@ -413,7 +546,7 @@ func TestRAMContractFromAllocPlanDoesNotProveUnknownCallTrustedLowering(t *testi
 			}},
 		}},
 	}
-	report := BuildReportFromAllocPlan(
+	report := buildReportForPlanForTest(
 		plan,
 		"linux-x64",
 		"e2c19b8ee276158f8eb2c54cf61e11bd84952893",
@@ -495,7 +628,7 @@ func TestRAMContractFromAllocPlanEmitsScopedRegionIslandProofs(t *testing.T) {
 			},
 		}},
 	}
-	report := BuildReportFromAllocPlan(
+	report := buildReportForPlanForTest(
 		plan,
 		"linux-x64",
 		"e2c19b8ee276158f8eb2c54cf61e11bd84952893",
@@ -593,6 +726,23 @@ func validReportForTest() Report {
 		Summary:       SummarizeRows(rows),
 		NonClaims:     DefaultNonClaims(),
 	}
+}
+
+func buildReportForPlanForTest(
+	plan *allocplan.Plan,
+	target string,
+	gitHead string,
+	generatedBy string,
+) Report {
+	return BuildReport(
+		Input{
+			Plan:    plan,
+			Domains: allocplan.MemoryDomains(plan),
+		},
+		target,
+		gitHead,
+		generatedBy,
+	)
 }
 
 func validPipelineCoverageForTest() PipelineCoverageReport {

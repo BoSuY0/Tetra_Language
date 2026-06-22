@@ -242,15 +242,9 @@ write_summary() {
 
 validate_summary() {
   local failures=0
-  go run ./tools/cmd/validate-test-all-summary \
-    --summary "$summary_json" \
-    --report-dir "$report_dir" \
-    --format=json || failures=1
+  go run ./tools/cmd/validate-test-all-summary --summary "$summary_json" --report-dir "$report_dir" --format=json || failures=1
   if wants_toon_summary; then
-    go run ./tools/cmd/validate-test-all-summary \
-      --summary "$summary_toon" \
-      --report-dir "$report_dir" \
-      --format=toon || failures=1
+    go run ./tools/cmd/validate-test-all-summary --summary "$summary_toon" --report-dir "$report_dir" --format=toon || failures=1
   fi
   return "$failures"
 }
@@ -375,7 +369,7 @@ check_test_json() {
 }
 
 check_tetra_doc() {
-  ./tetra doc examples > "$report_dir/tetra-docs.md"
+  ./tetra doc examples >"$report_dir/tetra-docs.md"
   go run ./tools/cmd/validate-api-docs --docs "$report_dir/tetra-docs.md"
 }
 
@@ -413,31 +407,24 @@ TETRA
 func main() -> Int:
 	return 0
 TETRA
-  check_json_diagnostic_case \
-    "planned-actor-diagnostic" \
-    "actor declarations currently support state fields and func methods only" << 'TETRA'
+  check_json_diagnostic_case "planned-actor-diagnostic" "actor declarations currently support state fields and func methods only" << 'TETRA'
 actor Worker:
     return 0
 TETRA
 
   local wasm_out="$tmp_dir/hello.wasm"
-  ./tetra build \
-    --target wasm32-wasi \
-    -o "$wasm_out" \
-    examples/smoke/basic/hello.tetra \
-    > "$tmp_dir/wasm-target-build.out" \
-    2> "$report_dir/wasm-target-build.err"
+  ./tetra build --target wasm32-wasi -o "$wasm_out" examples/smoke/basic/hello.tetra >"$tmp_dir/wasm-target-build.out" 2>"$report_dir/wasm-target-build.err"
   test -s "$wasm_out"
   test "$(od -An -tx1 -N4 "$wasm_out" | tr -d ' \n')" = "0061736d"
 }
 
 check_targets_report() {
-  ./tetra targets --format=json > "$report_dir/targets.json"
+  ./tetra targets --format=json >"$report_dir/targets.json"
   go run ./tools/cmd/validate-targets --report "$report_dir/targets.json"
 }
 
 check_doctor_report() {
-  ./tetra doctor --format=json > "$report_dir/doctor.json"
+  ./tetra doctor --format=json >"$report_dir/doctor.json"
   go run ./tools/cmd/validate-doctor --report "$report_dir/doctor.json"
 }
 
@@ -456,11 +443,7 @@ check_safety_readiness() {
     --ownership-spec docs/spec/runtime/ownership_v1.md \
     --effects-spec docs/spec/runtime/effects_capabilities_privacy_v1.md \
     --out "$report_dir/safety-readiness.json" || return 1
-  local safety_pattern
-  safety_pattern='Ownership|Borrow|Consume|Inout|Lifetime|Resource|Island'
-  safety_pattern+='|Actor|Task|Unsafe|Capability|Effect|Privacy|Consent'
-  safety_pattern+='|Budget|MMIO|Mem'
-  go test ./compiler/... -run "$safety_pattern" -count=1 || return 1
+  go test ./compiler/... -run 'Ownership|Borrow|Consume|Inout|Lifetime|Resource|Island|Actor|Task|Unsafe|Capability|Effect|Privacy|Consent|Budget|MMIO|Mem' -count=1 || return 1
 }
 
 require_named_go_test_names() {
@@ -515,19 +498,17 @@ check_unsafe_promotion_blockers() {
     TestValidateMemoryReportRejectsUnsafeCheckedGenericPromotions \
     TestValidateMemoryReportRejectsUnsafeVerifiedRootGenericClaims \
     TestValidateMemoryReportRejectsValidatedUnsafeUnknownTrustedStorage || return 1
-  go test ./compiler/internal/memoryfacts \
-    -run 'UnsafeUnknown|UnsafeVerified|Promotion' \
-    -count=1 || return 1
+  go test ./compiler/internal/memoryfacts -run 'UnsafeUnknown|UnsafeVerified|Promotion' -count=1 || return 1
 
   unsafe_report_pattern='Unsafe|Promotion|Optimization|TrustedStorage'
-  require_go_test_names ./tools/cmd/validate-memory-report "$unsafe_report_pattern" \
+  require_go_test_names ./compiler/cmd/validate-memory-report "$unsafe_report_pattern" \
     TestValidateMemoryReportRejectsSafeKnownFromUnsafeUnknown \
     TestValidateMemoryReportRejectsUnsafeUnknownOptimizationClaim \
     TestValidateMemoryReportRejectsUnsafeCheckedGenericPromotion \
     TestValidateMemoryReportRejectsUnsafeUnknownZeroCost \
     TestValidateMemoryReportRejectsUnsafeVerifiedRootGenericClaim \
     TestValidateMemoryReportRejectsUnsafeUnknownTrustedStorage || return 1
-  go test ./tools/cmd/validate-memory-report \
+  go test ./compiler/cmd/validate-memory-report \
     -run "$unsafe_report_pattern" \
     -count=1 || return 1
 
@@ -563,24 +544,19 @@ check_bounds_proof_blockers() {
     TestForSliceLoopUsesProofTaggedUncheckedIndexLoad \
     TestWhileLessThanLenUsesProofTaggedUncheckedIndexLoad \
     TestCopyLoopSourceLoadUsesProofTaggedUncheckedIndexLoad || return 1
-  go test \
-    ./compiler/internal/plir \
-    ./compiler/internal/lower \
-    ./compiler/internal/validation \
-    -run 'Bounds|Proof|Unchecked' \
-    -count=1 || return 1
+  go test ./compiler/internal/plir ./compiler/internal/lower ./compiler/internal/validation -run 'Bounds|Proof|Unchecked' -count=1 || return 1
 
   require_bounds_go_test_names ./compiler/internal/memoryfacts 'Bounds|Proof' \
     TestMemoryIdealV6ProjectsBoundsProofFacts \
     TestMemoryIdealV6ProjectsMissingProofRejection \
     TestValidateMemoryReportRejectsV6BoundsRowsWithoutParent \
     TestValidateMemoryReportRejectsBareBoundsCheckEliminatedWithoutProofID || return 1
-  require_bounds_go_test_names ./tools/cmd/validate-memory-report 'Bounds|Proof' \
+  require_bounds_go_test_names ./compiler/cmd/validate-memory-report 'Bounds|Proof' \
     TestValidateMemoryReportRejectsV6BoundsRowsWithoutParent \
     TestValidateMemoryReportRejectsBareBoundsCheckEliminatedWithoutProofID || return 1
   go test \
     ./compiler/internal/memoryfacts \
-    ./tools/cmd/validate-memory-report \
+    ./compiler/cmd/validate-memory-report \
     -run 'Bounds|Proof' \
     -count=1 || return 1
 
@@ -621,9 +597,7 @@ check_memory_fuzz_oracle_gate() {
     ./tools/cmd/validate-memory-fuzz-oracle \
     -count=1 || return 1
   go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir "$fuzz_dir" || return 1
-  go run ./tools/cmd/validate-memory-fuzz-oracle \
-    --report "$fuzz_dir/memory-fuzz-oracle.json" \
-    --artifact-dir "$fuzz_dir" || return 1
+  go run ./tools/cmd/validate-memory-fuzz-oracle --report "$fuzz_dir/memory-fuzz-oracle.json" --artifact-dir "$fuzz_dir" || return 1
   test -s "$fuzz_dir/memory-fuzz-oracle.json" || return 1
   test -s "$fuzz_dir/summary.md" || return 1
   test -s "$fuzz_dir/summary.json"
@@ -660,11 +634,8 @@ check_ram_contract_fuzz_oracle_gate() {
     -run 'RAMContract|Fuzz|Blocker|Enforce' \
     -count=1 || return 1
   go run ./tools/cmd/ram-contract-fuzz-short --report-dir "$fuzz_dir" || return 1
-  go run ./tools/cmd/validate-ram-contract-fuzz-oracle \
-    --report "$fuzz_dir/ram-contract-fuzz-oracle.json" \
-    --artifact-dir "$fuzz_dir" || return 1
-  go run ./tools/cmd/validate-ram-contract-report \
-    --report "$fuzz_dir/ram-contract-report.json" || return 1
+  go run ./tools/cmd/validate-ram-contract-fuzz-oracle --report "$fuzz_dir/ram-contract-fuzz-oracle.json" --artifact-dir "$fuzz_dir" || return 1
+  go run ./tools/cmd/validate-ram-contract-report --report "$fuzz_dir/ram-contract-report.json" || return 1
   go run ./tools/cmd/validate-memory-grade-report \
     --report "$fuzz_dir/memory-grade-report.json" || return 1
   go run ./tools/cmd/validate-proof-store-summary \
@@ -691,17 +662,10 @@ check_memory100_prod_stable_gate() {
   local memory100_go_cache="$repo_root/.cache/go-build-memory-100-test-all"
   local memory100_go_tmp="$repo_root/.cache/go-tmp-memory-100-test-all"
   mkdir -p "$memory100_go_cache" "$memory100_go_tmp"
-  env \
-    GOTELEMETRY=off \
-    GOCACHE="$memory100_go_cache" \
-    GOTMPDIR="$memory100_go_tmp" \
-    bash scripts/release/post_v0_4/memory-100-prod-stable-gate.sh \
-    --report-dir "$memory100_dir" || return 1
+  env GOTELEMETRY=off GOCACHE="$repo_root/.cache/go-build-memory-100-test-all" GOTMPDIR="$repo_root/.cache/go-tmp-memory-100-test-all" bash scripts/release/post_v0_4/memory-100-prod-stable-gate.sh --report-dir "$memory100_dir" || return 1
   test -s "$memory100_dir/memory-100-prod-stable-manifest.json" || return 1
   test -s "$memory100_dir/artifact-hashes.json" || return 1
-  go run ./tools/cmd/validate-memory-100-prod-stable \
-    --report-dir "$memory100_dir" \
-    --current-git-head "$(git rev-parse HEAD)"
+  go run ./tools/cmd/validate-memory-100-prod-stable --report-dir "$memory100_dir" --current-git-head "$(git rev-parse HEAD)"
 }
 
 check_performance_report() {
@@ -854,7 +818,7 @@ JSON
 }
 
 check_lsp_smoke() {
-  ./tetra lsp --stdio-smoke examples/flow/flow_hello.tetra > "$report_dir/lsp-smoke.json"
+  ./tetra lsp --stdio-smoke examples/flow/flow_hello.tetra >"$report_dir/lsp-smoke.json"
   go run ./tools/cmd/validate-lsp-smoke --report "$report_dir/lsp-smoke.json"
 }
 
@@ -871,16 +835,10 @@ run_tetra_smoke_target() {
     --run="$run_binaries" \
     --report "$report_path" \
     --report-format "$smoke_report_format"
-  go run ./tools/cmd/smoke-report-to-checklist \
-    --validate-only \
-    --report "$report_path" \
-    --format=json
+  go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$report_path" --format=json
   if wants_toon_summary; then
     local toon_report_path="${report_path%.*}.toon"
-    go run ./tools/cmd/smoke-report-to-checklist \
-      --validate-only \
-      --report "$toon_report_path" \
-      --format=toon
+    go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$toon_report_path" --format=toon
   fi
 }
 
@@ -889,22 +847,16 @@ check_host_smoke() {
 }
 
 check_smoke_list() {
-  ./tetra smoke --list --target linux-x64 --format=json > "$report_dir/smoke-list.json"
-  go run ./tools/cmd/validate-smoke-list \
-    --report "$report_dir/smoke-list.json" \
-    --examples-root examples \
-    --format=json
+  ./tetra smoke --list --target linux-x64 --format=json >"$report_dir/smoke-list.json"
+  go run ./tools/cmd/validate-smoke-list --report "$report_dir/smoke-list.json" --examples-root examples --format=json
   if wants_toon_summary; then
-    ./tetra smoke --list --target linux-x64 --format=toon > "$report_dir/smoke-list.toon"
-    go run ./tools/cmd/validate-smoke-list \
-      --report "$report_dir/smoke-list.toon" \
-      --examples-root examples \
-      --format=toon
+    ./tetra smoke --list --target linux-x64 --format=toon >"$report_dir/smoke-list.toon"
+    go run ./tools/cmd/validate-smoke-list --report "$report_dir/smoke-list.toon" --examples-root examples --format=toon
   fi
 }
 
 check_generated_api_docs() {
-  go run ./tools/cmd/gen-docs examples > "$report_dir/api-docs.md"
+  go run ./tools/cmd/gen-docs examples >"$report_dir/api-docs.md"
   go run ./tools/cmd/validate-api-docs --docs "$report_dir/api-docs.md"
 }
 
@@ -969,8 +921,7 @@ TETRA
     --trust "$tmp_dir/tetra.trust-snapshot.json" \
     -C "$tmp_dir/materialized"
   test -f "$tmp_dir/materialized/tetra.materialization.json"
-  go run ./tools/cmd/validate-eco-materialization \
-    --materialization "$tmp_dir/materialized/tetra.materialization.json"
+  go run ./tools/cmd/validate-eco-materialization --materialization "$tmp_dir/materialized/tetra.materialization.json"
   ./tetra eco publish \
     --package "$tmp_dir/project.todex" \
     --registry "$tmp_dir/registry" \
@@ -1121,11 +1072,7 @@ if [[ "$json_only" != true ]]; then
   printf 'report_dir: %s\n\n' "$report_dir"
 fi
 
-run_step "go test all packages" env \
-  -u TETRA_TEST_ALL_RELEASE_VERSION \
-  -u TETRA_TEST_ALL_RELEASE_ARTIFACT \
-  -u TETRA_SECURITY_REVIEW_SIGNOFF \
-  go test ./compiler/... ./cli/... ./tools/... -count=1
+run_step "go test all packages" env -u TETRA_TEST_ALL_RELEASE_VERSION -u TETRA_TEST_ALL_RELEASE_ARTIFACT -u TETRA_SECURITY_REVIEW_SIGNOFF go test ./compiler/... ./cli/... ./tools/... -count=1
 run_step "unsafe promotion blocker suite" check_unsafe_promotion_blockers
 run_step "bounds proof blocker suite" check_bounds_proof_blockers
 run_step "memory fuzz oracle artifact gate" check_memory_fuzz_oracle_gate
@@ -1134,20 +1081,14 @@ run_step "host leak blocker suite" check_host_leak_blockers
 run_step "Memory100 prod-stable gate" check_memory100_prod_stable_gate
 
 if [[ "$mode" == "full" || "$mode" == "stabilization" ]]; then
-  run_step "repo test script" env \
-    -u TETRA_TEST_ALL_RELEASE_VERSION \
-    -u TETRA_TEST_ALL_RELEASE_ARTIFACT \
-    -u TETRA_SECURITY_REVIEW_SIGNOFF \
-    bash scripts/ci/test.sh
+  run_step "repo test script" env -u TETRA_TEST_ALL_RELEASE_VERSION -u TETRA_TEST_ALL_RELEASE_ARTIFACT -u TETRA_SECURITY_REVIEW_SIGNOFF bash scripts/ci/test.sh
 fi
 
 run_step "bootstrap" bash scripts/dev/bootstrap.sh
 run_step "version preflight" check_release_version
 run_step "short alias version" check_short_alias_version
-run_step "formatter check examples lib runtime" \
-  ./tetra fmt --check examples lib __rt compiler/selfhostrt
-run_step "flow-only source scan" \
-  go run ./tools/cmd/validate-flow-only examples lib __rt compiler/selfhostrt
+run_step "formatter check examples lib runtime" ./tetra fmt --check examples lib __rt compiler/selfhostrt
+run_step "flow-only source scan" go run ./tools/cmd/validate-flow-only examples lib __rt compiler/selfhostrt
 run_step "targets json report" check_targets_report
 run_step "doctor json report" check_doctor_report
 run_step "tetra check flow hello" ./tetra check examples/flow/flow_hello.tetra
@@ -1166,10 +1107,7 @@ if [[ "$mode" == "full" || "$mode" == "stabilization" ]]; then
   run_step "docs verification" \
     go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
   run_step "safety readiness evidence" check_safety_readiness
-  run_step "ownership production audit" \
-    go run ./tools/cmd/validate-ownership-audit \
-    --audit docs/release/production/ownership_production_audit.md \
-    --expected-status achieved
+  run_step "ownership production audit" go run ./tools/cmd/validate-ownership-audit --audit docs/release/production/ownership_production_audit.md --expected-status achieved
   run_step "performance report schema" check_performance_report
   run_step "techempower report schemas" check_techempower_reports
   run_step "lsp stdio smoke" check_lsp_smoke

@@ -53,12 +53,7 @@ fi
 mkdir -p "$GOCACHE"
 
 report_dir_arg="${report_dir%/}"
-report_dir="$(
-  surface_release_require_fresh_report_dir \
-    "$report_dir_arg" \
-    "$repo_root" \
-    "surface_block_system_gate:"
-)"
+report_dir="$(surface_release_require_fresh_report_dir "$report_dir_arg" "$repo_root" "surface_block_system_gate:")"
 headless_report_dir="$report_dir_arg/headless"
 linux_report_dir="$report_dir_arg/linux-x64-real-window"
 wasm_report_dir="$report_dir_arg/wasm32-web-browser-canvas"
@@ -106,25 +101,19 @@ if [[ -n "$formatted_args" ]]; then
 fi
 
 bash scripts/release/surface/surface-headless-block-system-smoke.sh --report-dir "$headless_report_dir"
-go run ./tools/cmd/validate-surface-block-report \
-	--report "$report_dir/headless/surface-headless-block-system.json" \
-	--same-commit "$git_head"
+go run ./tools/cmd/validate-surface-block-report --report "$report_dir/headless/surface-headless-block-system.json" --same-commit "$git_head"
 go run ./tools/cmd/validate-surface-block-contract \
 	--contract docs/spec/surface/surface_block_contract.json \
 	--report "$report_dir/headless/surface-headless-block-system.json"
 
 bash scripts/release/surface/surface-linux-x64-real-window-block-system-smoke.sh --report-dir "$linux_report_dir"
-go run ./tools/cmd/validate-surface-block-report \
-	--report "$report_dir/linux-x64-real-window/surface-block-system-linux-x64.json" \
-	--same-commit "$git_head"
+go run ./tools/cmd/validate-surface-block-report --report "$report_dir/linux-x64-real-window/surface-block-system-linux-x64.json" --same-commit "$git_head"
 go run ./tools/cmd/validate-surface-block-contract \
 	--contract docs/spec/surface/surface_block_contract.json \
 	--report "$report_dir/linux-x64-real-window/surface-block-system-linux-x64.json"
 
 bash scripts/release/surface/surface-wasm32-web-browser-canvas-block-system-smoke.sh --report-dir "$wasm_report_dir"
-go run ./tools/cmd/validate-surface-block-report \
-	--report "$report_dir/wasm32-web-browser-canvas/surface-block-system-wasm32-web.json" \
-	--same-commit "$git_head"
+go run ./tools/cmd/validate-surface-block-report --report "$report_dir/wasm32-web-browser-canvas/surface-block-system-wasm32-web.json" --same-commit "$git_head"
 go run ./tools/cmd/validate-surface-block-contract \
 	--contract docs/spec/surface/surface_block_contract.json \
 	--report "$report_dir/wasm32-web-browser-canvas/surface-block-system-wasm32-web.json"
@@ -146,7 +135,7 @@ for report in "${required_reports[@]}"; do
 done
 
 summary_path="$report_dir/surface-block-system-gate-summary.json"
-cat >"$summary_path" <<JSON
+cat > "$summary_path" <<JSON
 {
   "schema": "tetra.surface.block-system.gate.v1",
   "status": "current",
@@ -186,10 +175,7 @@ cat >"$summary_path" <<JSON
 }
 JSON
 
-go run ./tools/cmd/validate-artifact-hashes \
-	--write \
-	--root "$report_dir" \
-	--out "$report_dir/artifact-hashes.json"
+go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"
 go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-hashes.json"
 
 echo "Surface Block System gate reports: $report_dir"

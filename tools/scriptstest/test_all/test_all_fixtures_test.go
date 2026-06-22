@@ -420,7 +420,7 @@ if [[ "${1:-}" == "test" ]]; then
           TestValidateMemoryReportRejectsV6BoundsRowsWithoutParent \
           TestValidateMemoryReportRejectsBareBoundsCheckEliminatedWithoutProofID
         ;;
-      ./tools/cmd/validate-memory-report)
+      ./compiler/cmd/validate-memory-report)
         printf '%s\n' \
           TestValidateMemoryReportRejectsSafeKnownFromUnsafeUnknown \
           TestValidateMemoryReportRejectsUnsafeUnknownOptimizationClaim \

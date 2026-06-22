@@ -1625,8 +1625,23 @@ uses alloc, mem:
 		t.Fatalf("read alloc report: %v", err)
 	}
 	allocText := string(allocRaw)
-	if strings.Contains(allocText, "copy_into") || strings.Contains(allocText, "alloc_intent:n") {
-		t.Fatalf("copy_into should not appear as a fresh allocation:\n%s", allocText)
+	var allocReport struct {
+		Functions []struct {
+			Allocations []struct {
+				ValueID string `json:"value_id"`
+				Builtin string `json:"builtin"`
+			} `json:"allocations"`
+		} `json:"functions"`
+	}
+	if err := json.Unmarshal(allocRaw, &allocReport); err != nil {
+		t.Fatalf("parse alloc report: %v", err)
+	}
+	for _, fn := range allocReport.Functions {
+		for _, alloc := range fn.Allocations {
+			if alloc.ValueID == "alloc_intent:n" || strings.Contains(alloc.Builtin, "copy_into") {
+				t.Fatalf("copy_into should not appear as a fresh allocation:\n%s", allocText)
+			}
+		}
 	}
 	for _, want := range []string{`"value_id": "alloc_intent:src"`, `"value_id": "alloc_intent:dst"`} {
 		if !strings.Contains(allocText, want) {

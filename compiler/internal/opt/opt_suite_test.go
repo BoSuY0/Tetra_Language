@@ -13,6 +13,7 @@ import (
 	"tetra_language/compiler/internal/format/tobj"
 	"tetra_language/compiler/internal/ir"
 	"tetra_language/compiler/internal/linker"
+	"tetra_language/compiler/internal/memoryfacts"
 )
 
 // ---- coverage_test.go ----
@@ -2544,7 +2545,8 @@ func TestManagerRejectsPassThatProducesInvalidIR(t *testing.T) {
 	}
 	manager := NewManager()
 	pass := p17ContractTestPass("break-return")
-	pass.Run = func(p *ir.IRProgram) error {
+	pass.Run = func(ctx *PassContext) error {
+		p := ctx.Program
 		p.Funcs[0].Instrs = p.Funcs[0].Instrs[:1]
 		return nil
 	}
@@ -2570,12 +2572,12 @@ func TestManagerCanRunOnePassByNameForTests(t *testing.T) {
 	manager := NewManager()
 	ran := []string{}
 	first := p17ContractTestPass("first")
-	first.Run = func(p *ir.IRProgram) error {
+	first.Run = func(ctx *PassContext) error {
 		ran = append(ran, "first")
 		return nil
 	}
 	second := p17ContractTestPass("second")
-	second.Run = func(p *ir.IRProgram) error {
+	second.Run = func(ctx *PassContext) error {
 		ran = append(ran, "second")
 		return nil
 	}
@@ -2596,7 +2598,7 @@ func TestManagerRejectsMissingPassMetadata(t *testing.T) {
 	manager := NewManager()
 	_, err := manager.Run(prog, Pass{
 		Name: "nameless-metadata",
-		Run:  func(p *ir.IRProgram) error { return nil },
+		Run:  func(ctx *PassContext) error { return nil },
 	})
 	if err == nil || !strings.Contains(err.Error(), "missing input IR kind") {
 		t.Fatalf("Run error = %v, want metadata rejection", err)
@@ -2628,7 +2630,8 @@ func TestManagerRunsTranslationValidationStrategy(t *testing.T) {
 	}
 	manager := NewManager()
 	pass := p17ContractTestPass("bad-delete-helper")
-	pass.Run = func(p *ir.IRProgram) error {
+	pass.Run = func(ctx *PassContext) error {
+		p := ctx.Program
 		p.Funcs = p.Funcs[:1]
 		return nil
 	}
@@ -2652,7 +2655,8 @@ func TestManagerRejectsSemanticChangingTranslationPass(t *testing.T) {
 		}},
 	}
 	pass := p17ContractTestPass("bad-constant-fold")
-	pass.Run = func(p *ir.IRProgram) error {
+	pass.Run = func(ctx *PassContext) error {
+		p := ctx.Program
 		p.Funcs[0].Instrs[0].Imm = 2
 		return nil
 	}
@@ -2962,6 +2966,7 @@ func p17ContractTestPass(name string) Pass {
 		RequiredFacts:             []Fact{FactIRVerified},
 		PreservedFacts:            []Fact{FactBoundsProofs},
 		InvalidatedFacts:          []Fact{FactLiveness},
+		PreservedProofKinds:       []memoryfacts.ProofKind{memoryfacts.ProofBounds},
 		ProofRule:                 ProofRulePreserveBoundsInvalidateLiveness,
 		ValidationStrategy:        ValidationTranslation,
 		TranslationValidationHook: TranslationHookValidateTranslation,
@@ -2969,7 +2974,7 @@ func p17ContractTestPass(name string) Pass {
 		ReportRows:                RequiredP17ReportRows(),
 		NegativeTestMarker:        NegativeTestPassContractV1,
 		ProfileInputPolicy:        ProfileInputUnused,
-		Run:                       func(p *ir.IRProgram) error { return nil },
+		Run:                       func(ctx *PassContext) error { return nil },
 	}
 }
 

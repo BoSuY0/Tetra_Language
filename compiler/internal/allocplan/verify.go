@@ -116,7 +116,8 @@ func VerifyPlan(plan *Plan) error {
 				{name: "actual lowering storage", storage: alloc.ActualLoweringStorage},
 			} {
 				if alloc.Escape != EscapeNoEscape &&
-					trustedStorageRequiresNoEscape(observed.storage, alloc.LengthStatus) {
+					trustedStorageRequiresNoEscape(observed.storage, alloc.LengthStatus) &&
+					!trustedBoundaryStorageForEscape(alloc.Escape, observed.storage) {
 					return fmt.Errorf(
 						"allocplan verifier: %s escaping allocation %q cannot use %s %s",
 						fn.Name,
@@ -146,6 +147,15 @@ func VerifyPlan(plan *Plan) error {
 					"allocplan verifier: %s island allocation %q cannot escape its island scope",
 					fn.Name,
 					alloc.ValueID,
+				)
+			}
+			if trustedBoundaryStorageForEscape(alloc.Escape, alloc.ActualLoweringStorage) &&
+				alloc.PlannedStorage != alloc.ActualLoweringStorage {
+				return fmt.Errorf(
+					"allocplan verifier: %s allocation %q actual lowering storage %s requires matching proof-carrying planned storage",
+					fn.Name,
+					alloc.ValueID,
+					alloc.ActualLoweringStorage,
 				)
 			}
 			if err := validateAllocationMemoryBackendEvidence(fn.Name, alloc); err != nil {
@@ -299,6 +309,9 @@ func isKnownHeapReasonCode(code string) bool {
 		HeapReasonUnknownCall,
 		HeapReasonActorBoundary,
 		HeapReasonTaskBoundary,
+		HeapReasonActorMoveUnproven,
+		HeapReasonTaskMoveUnproven,
+		HeapReasonRequestOwnerUnproven,
 		HeapReasonDynamicLifetime,
 		HeapReasonLargeObject,
 		HeapReasonFFIExternal,
@@ -317,6 +330,17 @@ func trustedStorageRequiresNoEscape(storage StorageClass, lengthStatus LengthSta
 	case StorageRegister, StorageStack, StorageRegion, StorageFunctionTempRegion,
 		StorageExplicitIsland, StorageTaskRegion, StorageActorMoveRegion:
 		return true
+	default:
+		return false
+	}
+}
+
+func trustedBoundaryStorageForEscape(escape EscapeClass, storage StorageClass) bool {
+	switch storage {
+	case StorageTaskRegion:
+		return escape == EscapeTask
+	case StorageActorMoveRegion:
+		return escape == EscapeActor
 	default:
 		return false
 	}

@@ -956,6 +956,13 @@ func TestCodegenObjectLinuxX64UsesSharedSmallHeapAllocatorForMakeSlices(t *testi
 			obj.Code,
 		)
 	}
+	if got := countBytes(obj.Code, []byte{0xB8, 0x0A, 0x00, 0x00, 0x00, 0x0F, 0x05}); got != 2 {
+		t.Fatalf(
+			"small heap helper should commit chunk refill plus large fallback through mprotect, got %d\ncode=% x",
+			got,
+			obj.Code,
+		)
+	}
 	if got := countBytes(obj.Code, []byte{0xE8}); got < 2 {
 		t.Fatalf(
 			"small make-slice sites should call the shared helper, helper calls=%d\ncode=% x",
@@ -971,6 +978,20 @@ func TestCodegenObjectLinuxX64UsesSharedSmallHeapAllocatorForMakeSlices(t *testi
 	}
 	if len(obj.Data) < 16 {
 		t.Fatalf("small heap helper data size = %d, want at least bump/end state", len(obj.Data))
+	}
+}
+
+func TestCodegenObjectLinuxX64MemoryBackendRuntimeSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+	if got := buildLinkRunLinuxX64(
+		t,
+		[]ir.IRFunc{memoryBackendSmokeMainIRFunc()},
+		x64.CodegenOptions{},
+		"memory-backend-smoke",
+	); got != 0 {
+		t.Fatalf("memory backend smoke exit = %d, want 0", got)
 	}
 }
 
@@ -2342,6 +2363,61 @@ func largeMakeSliceMainIRFunc() ir.IRFunc {
 			{Kind: ir.IRLoadLocal, Local: 1},
 			{Kind: ir.IRConstI32, Imm: 4999},
 			{Kind: ir.IRIndexLoadU8},
+			{Kind: ir.IRReturn},
+		},
+	}
+}
+
+func memoryBackendSmokeMainIRFunc() ir.IRFunc {
+	return ir.IRFunc{
+		Name:        "main",
+		LocalSlots:  5,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 32},
+			{Kind: ir.IRAllocBytes, Name: "owned_heap"},
+			{
+				Kind:            ir.IRDropOwned,
+				LayoutID:        "layout:owned_heap",
+				OwnershipDomain: ir.IROwnershipDomainHeap,
+				ReleaseKind:     ir.IRReleaseKindLinuxMmap,
+			},
+			{
+				Kind:            ir.IRReleaseAllocation,
+				LayoutID:        "layout:owned_heap",
+				OwnershipDomain: ir.IROwnershipDomainHeap,
+				ReleaseKind:     ir.IRReleaseKindLinuxMmap,
+			},
+			{Kind: ir.IRRegionEnter},
+			{Kind: ir.IRConstI32, Imm: 8},
+			{Kind: ir.IRRegionMakeSliceU8, Name: "region_bytes"},
+			{Kind: ir.IRStoreLocal, Local: 2},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRLoadLocal, Local: 1},
+			{Kind: ir.IRLoadLocal, Local: 2},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRConstI32, Imm: 7},
+			{Kind: ir.IRIndexStoreU8},
+			{Kind: ir.IRRegionReset},
+			{Kind: ir.IRConstI32, Imm: 64},
+			{Kind: ir.IRIslandNew},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 4},
+			{Kind: ir.IRIslandMakeSliceU8, Name: "island_bytes"},
+			{Kind: ir.IRStoreLocal, Local: 4},
+			{Kind: ir.IRStoreLocal, Local: 3},
+			{Kind: ir.IRLoadLocal, Local: 3},
+			{Kind: ir.IRLoadLocal, Local: 4},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRConstI32, Imm: 35},
+			{Kind: ir.IRIndexStoreU8},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRIslandReset},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRIslandFree},
+			{Kind: ir.IRConstI32, Imm: 0},
 			{Kind: ir.IRReturn},
 		},
 	}

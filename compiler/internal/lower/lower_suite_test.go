@@ -6,12 +6,35 @@ import (
 	"testing"
 	"tetra_language/compiler/internal/frontend"
 	"tetra_language/compiler/internal/ir"
+	"tetra_language/compiler/internal/memorypipeline"
 	"tetra_language/compiler/internal/module"
 	"tetra_language/compiler/internal/plir"
 	"tetra_language/compiler/internal/runtimeabi"
 	"tetra_language/compiler/internal/semantics"
 	"tetra_language/compiler/target"
 )
+
+func lowerTestProgram(checked *semantics.CheckedProgram) (*ir.IRProgram, error) {
+	return lowerTestProgramWithOptions(checked, Options{})
+}
+
+func lowerTestProgramWithOptions(
+	checked *semantics.CheckedProgram,
+	opt Options,
+) (*ir.IRProgram, error) {
+	state, err := memorypipeline.Build(
+		checked,
+		memorypipeline.Options{AllocPlan: allocationPlannerOptions(opt)},
+	)
+	if err != nil {
+		return nil, err
+	}
+	result, err := LowerPlannedProgram(checked, state.Plan, opt)
+	if err != nil {
+		return nil, err
+	}
+	return result.Program, nil
+}
 
 // ---- actor_state_test.go ----
 
@@ -38,7 +61,7 @@ uses actors:
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
-	irProg, err := Lower(checked)
+	irProg, err := lowerTestProgram(checked)
 	if err != nil {
 		t.Fatalf("Lower: %v", err)
 	}
@@ -76,7 +99,7 @@ uses actors:
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
-	irProg, err := Lower(checked)
+	irProg, err := lowerTestProgram(checked)
 	if err != nil {
 		t.Fatalf("Lower: %v", err)
 	}
@@ -122,7 +145,7 @@ func lowerStackAllocationProgram(t *testing.T, src string) *ir.IRProgram {
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
-	out, err := LowerWithOptions(checked, Options{StackAllocationLowering: true})
+	out, err := lowerTestProgramWithOptions(checked, Options{StackAllocationLowering: true})
 	if err != nil {
 		t.Fatalf("LowerWithOptions: %v", err)
 	}
@@ -139,7 +162,7 @@ func lowerFunctionTempRegionProgram(t *testing.T, src string) *ir.IRProgram {
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
-	out, err := LowerWithOptions(
+	out, err := lowerTestProgramWithOptions(
 		checked,
 		Options{StackAllocationLowering: true, FunctionTempRegionLowering: true},
 	)
@@ -159,7 +182,7 @@ func lowerOwnedAllocDropProgram(t *testing.T, src string) *ir.IRProgram {
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
-	out, err := LowerWithOptions(checked, Options{OwnedAllocDropLowering: true})
+	out, err := lowerTestProgramWithOptions(checked, Options{OwnedAllocDropLowering: true})
 	if err != nil {
 		t.Fatalf("LowerWithOptions: %v", err)
 	}
@@ -176,7 +199,7 @@ func lowerOwnedAllocDropProgramError(t *testing.T, src string) error {
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
-	_, err = LowerWithOptions(checked, Options{OwnedAllocDropLowering: true})
+	_, err = lowerTestProgramWithOptions(checked, Options{OwnedAllocDropLowering: true})
 	return err
 }
 
@@ -195,7 +218,7 @@ func lowerOwnedAllocDropFileProgram(t *testing.T, src string) *ir.IRProgram {
 	if err != nil {
 		t.Fatalf("CheckWorld: %v", err)
 	}
-	out, err := LowerWithOptions(checked, Options{OwnedAllocDropLowering: true})
+	out, err := lowerTestProgramWithOptions(checked, Options{OwnedAllocDropLowering: true})
 	if err != nil {
 		t.Fatalf("LowerWithOptions: %v", err)
 	}
@@ -217,7 +240,7 @@ func lowerOwnedAllocDropFileProgramError(t *testing.T, src string) error {
 	if err != nil {
 		t.Fatalf("CheckWorld: %v", err)
 	}
-	_, err = LowerWithOptions(checked, Options{OwnedAllocDropLowering: true})
+	_, err = lowerTestProgramWithOptions(checked, Options{OwnedAllocDropLowering: true})
 	return err
 }
 
@@ -9219,7 +9242,7 @@ func lowerCallableFunc(t *testing.T, src string, name string) ir.IRFunc {
 func lowerCallableProgram(t *testing.T, src string) *ir.IRProgram {
 	t.Helper()
 	checked := checkCallableProgram(t, src)
-	prog, err := Lower(checked)
+	prog, err := lowerTestProgram(checked)
 	if err != nil {
 		t.Fatalf("Lower: %v", err)
 	}
@@ -9254,7 +9277,7 @@ func lowerCallableFileProgram(t *testing.T, src string) *ir.IRProgram {
 	if err != nil {
 		t.Fatalf("CheckWorld: %v", err)
 	}
-	prog, err := Lower(checked)
+	prog, err := lowerTestProgram(checked)
 	if err != nil {
 		t.Fatalf("Lower: %v", err)
 	}
@@ -9605,7 +9628,7 @@ func lowerProgramForCatchTest(t *testing.T, src string) *ir.IRProgram {
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
-	irProg, err := Lower(checked)
+	irProg, err := lowerTestProgram(checked)
 	if err != nil {
 		t.Fatalf("Lower: %v", err)
 	}
@@ -9684,7 +9707,7 @@ uses actors, runtime:
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
-	irProg, err := Lower(checked)
+	irProg, err := lowerTestProgram(checked)
 	if err != nil {
 		t.Fatalf("Lower: %v", err)
 	}
@@ -9719,7 +9742,7 @@ uses actors:
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
-	irProg, err := Lower(checked)
+	irProg, err := lowerTestProgram(checked)
 	if err != nil {
 		t.Fatalf("Lower: %v", err)
 	}
@@ -9770,7 +9793,7 @@ uses actors:
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
-	irProg, err := Lower(checked)
+	irProg, err := lowerTestProgram(checked)
 	if err != nil {
 		t.Fatalf("Lower: %v", err)
 	}
@@ -9826,7 +9849,7 @@ func main() -> Int:
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
-	irProg, err := Lower(checked)
+	irProg, err := lowerTestProgram(checked)
 	if err != nil {
 		t.Fatalf("Lower: %v", err)
 	}
@@ -10004,7 +10027,7 @@ func lowerMainForEnumPayloadTest(t *testing.T, src string) ir.IRFunc {
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
-	irProg, err := Lower(checked)
+	irProg, err := lowerTestProgram(checked)
 	if err != nil {
 		t.Fatalf("Lower: %v", err)
 	}
@@ -10158,7 +10181,7 @@ func lowerGlobalAssignmentProgram(t *testing.T, src string) (*semantics.CheckedP
 	if err != nil {
 		t.Fatalf("CheckWorld: %v", err)
 	}
-	irProg, err := Lower(checked)
+	irProg, err := lowerTestProgram(checked)
 	if err != nil {
 		t.Fatalf("Lower: %v", err)
 	}
@@ -10366,7 +10389,7 @@ func main() -> Int:
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
-	irProg, err := Lower(checked)
+	irProg, err := lowerTestProgram(checked)
 	if err != nil {
 		t.Fatalf("Lower: %v", err)
 	}
@@ -10409,7 +10432,7 @@ privacy:
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
-	irProg, err := Lower(checked)
+	irProg, err := lowerTestProgram(checked)
 	if err != nil {
 		t.Fatalf("Lower: %v", err)
 	}
@@ -10524,14 +10547,7 @@ func lowerProofProgram(t *testing.T, src string) *ir.IRProgram {
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
-	proofProg, err := plir.FromCheckedProgram(checked)
-	if err != nil {
-		t.Fatalf("PLIR: %v", err)
-	}
-	if err := plir.VerifyProgram(proofProg); err != nil {
-		t.Fatalf("PLIR verify: %v", err)
-	}
-	out, err := Lower(checked)
+	out, err := lowerTestProgram(checked)
 	if err != nil {
 		t.Fatalf("Lower: %v", err)
 	}
@@ -10553,14 +10569,7 @@ func lowerProofFileProgram(t *testing.T, src string) *ir.IRProgram {
 	if err != nil {
 		t.Fatalf("CheckWorld: %v", err)
 	}
-	proofProg, err := plir.FromCheckedProgram(checked)
-	if err != nil {
-		t.Fatalf("PLIR: %v", err)
-	}
-	if err := plir.VerifyProgram(proofProg); err != nil {
-		t.Fatalf("PLIR verify: %v", err)
-	}
-	out, err := Lower(checked)
+	out, err := lowerTestProgram(checked)
 	if err != nil {
 		t.Fatalf("Lower: %v", err)
 	}
@@ -10582,14 +10591,17 @@ func proofPLIRFileProgram(t *testing.T, src string) *plir.Program {
 	if err != nil {
 		t.Fatalf("CheckWorld: %v", err)
 	}
-	proofProg, err := plir.FromCheckedProgram(checked)
+	state, err := memorypipeline.Build(
+		checked,
+		memorypipeline.Options{AllocPlan: allocationPlannerOptions(Options{})},
+	)
 	if err != nil {
-		t.Fatalf("PLIR: %v", err)
+		t.Fatalf("memorypipeline.Build: %v", err)
 	}
-	if err := plir.VerifyProgram(proofProg); err != nil {
-		t.Fatalf("PLIR verify: %v", err)
+	if state.PLIR == nil {
+		t.Fatalf("memorypipeline.Build returned nil PLIR")
 	}
-	return proofProg
+	return state.PLIR
 }
 
 func TestForSliceLoopUsesProofTaggedUncheckedIndexLoad(t *testing.T) {
@@ -13838,7 +13850,7 @@ uses alloc, islands, mem:
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
-	irProg, err := Lower(checked)
+	irProg, err := lowerTestProgram(checked)
 	if err != nil {
 		t.Fatalf("Lower: %v", err)
 	}
@@ -13901,7 +13913,7 @@ uses surface, alloc, mem:
     return handle + event + event_x + event_y + event_button + event_copied + event_text_len + event_text_copied + clipboard_write + clipboard_read + composition_copied + presented + redraw + closed + core.surface_now_ms()
 `)
 
-	prog, err := Lower(checked)
+	prog, err := lowerTestProgram(checked)
 	if err != nil {
 		t.Fatalf("Lower: %v", err)
 	}
@@ -14447,7 +14459,7 @@ func main() -> Int:
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
-	irProg, err := Lower(checked)
+	irProg, err := lowerTestProgram(checked)
 	if err != nil {
 		t.Fatalf("Lower: %v", err)
 	}
@@ -14475,7 +14487,7 @@ func main() -> Int:
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
-	irProg, err := Lower(checked)
+	irProg, err := lowerTestProgram(checked)
 	if err != nil {
 		t.Fatalf("Lower: %v", err)
 	}
@@ -14544,6 +14556,27 @@ func TestVerifyProgramRejectsInvalidMainMetadata(t *testing.T) {
 	}
 	if diag.Code != DiagnosticCodeIRVerifier || diag.Severity != "error" {
 		t.Fatalf("diagnostic = %#v", diag)
+	}
+}
+
+func TestVerifyProgramAllowsLibraryProgramWithoutMainMetadata(t *testing.T) {
+	prog := &ir.IRProgram{
+		MainIndex: -1,
+		Funcs: []ir.IRFunc{
+			{
+				Name:        "ffi_identity",
+				LocalSlots:  1,
+				ParamSlots:  1,
+				ReturnSlots: 1,
+				Instrs: []ir.IRInstr{
+					{Kind: ir.IRLoadLocal, Local: 0},
+					{Kind: ir.IRReturn},
+				},
+			},
+		},
+	}
+	if err := VerifyProgram(prog); err != nil {
+		t.Fatalf("VerifyProgram: %v", err)
 	}
 }
 
@@ -14763,7 +14796,7 @@ func TestLowerRunsProgramLevelVerifier(t *testing.T) {
 	}
 	checked.MainIndex = len(checked.Funcs) + 1
 
-	_, err = Lower(checked)
+	_, err = lowerTestProgram(checked)
 	if err == nil {
 		t.Fatalf("expected program verifier error")
 	}
@@ -15687,7 +15720,7 @@ budget(32):
 			if err != nil {
 				t.Fatalf("Check: %v", err)
 			}
-			irProg, err := Lower(checked)
+			irProg, err := lowerTestProgram(checked)
 			if err != nil {
 				t.Fatalf("Lower: %v", err)
 			}

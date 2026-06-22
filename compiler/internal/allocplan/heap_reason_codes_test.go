@@ -30,7 +30,7 @@ uses alloc, mem:
 	large := findAllocation(t, plan, "large_local", "xs")
 	assertHeapReasonCode(t, large, "heap.required_large_object")
 
-	unknownPlan, err := FromPLIRWithOptions(&plir.Program{Funcs: []plir.Function{
+	unknownPlan, err := buildPlanFromProgram(&plir.Program{Funcs: []plir.Function{
 		syntheticEscapeFunction(
 			"unknown_call",
 			plir.Operation{
@@ -41,12 +41,12 @@ uses alloc, mem:
 		),
 	}}, Options{EnableSmallHeapRuntime: true})
 	if err != nil {
-		t.Fatalf("FromPLIRWithOptions unknown: %v", err)
+		t.Fatalf("buildPlanFromProgram unknown: %v", err)
 	}
 	assertHeapReasonCode(
 		t,
 		findAllocation(t, unknownPlan, "unknown_call", "xs"),
-		"heap.required_unknown_call",
+		"heap.required_dynamic_lifetime",
 	)
 
 	summary := Summarize(plan)
@@ -73,13 +73,13 @@ uses alloc, mem:
 }
 
 func TestPlannerReportsHeapReasonCodesForActorTaskAndRegionFallbacks(t *testing.T) {
-	plan, err := FromPLIRWithOptions(&plir.Program{Funcs: []plir.Function{
+	plan, err := buildPlanFromProgram(&plir.Program{Funcs: []plir.Function{
 		syntheticEscapeFunction(
 			"actor",
 			plir.Operation{
-				Kind:   plir.OpCall,
-				Inputs: []string{"xs"},
-				Note:   "core.send_typed sends actor payload",
+				Kind:   plir.OpActorSend,
+				Inputs: []string{"mailbox", "xs"},
+				Note:   "typed actor send payload",
 			},
 		),
 		syntheticEscapeFunction(
@@ -92,7 +92,7 @@ func TestPlannerReportsHeapReasonCodesForActorTaskAndRegionFallbacks(t *testing.
 		),
 	}}, Options{EnableSmallHeapRuntime: true})
 	if err != nil {
-		t.Fatalf("FromPLIRWithOptions: %v", err)
+		t.Fatalf("buildPlanbuildPlanFromProgram: %v", err)
 	}
 	assertHeapReasonCode(t, findAllocation(t, plan, "actor", "xs"), "heap.required_actor_boundary")
 	assertHeapReasonCode(t, findAllocation(t, plan, "task", "xs"), "heap.required_task_boundary")
@@ -109,7 +109,9 @@ uses alloc, mem:
     return local_copy(2)
 `, Options{EnableRegionPlanning: true})
 	copied := findAllocation(t, regionPlan, "local_copy", "copied")
-	assertHeapReasonCode(t, copied, "heap.required_region_lowering_unavailable")
+	if len(copied.HeapReasonCodes) != 0 {
+		t.Fatalf("planned function-temp region has heap reason codes before lowering: %+v", copied)
+	}
 }
 
 func assertHeapReasonCode(t *testing.T, alloc Allocation, want string) {

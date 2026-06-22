@@ -2850,12 +2850,7 @@ func runRealWindowProbe(opt smokeOptions) error {
 	} else {
 		frame = renderWindowCounterFrameRGBA(2, 1, opt.ProbeFrameWidth, opt.ProbeFrameHeight, true)
 	}
-	return presentRealWindowSurface(
-		opt.ProbeTitle,
-		frame,
-		350*time.Millisecond,
-		opt.ProbeHoldUntilClose,
-	)
+	return presentRealWindowSurface(opt.ProbeTitle, frame, 350*time.Millisecond, opt.ProbeHoldUntilClose)
 }
 func runPresentedFrameProbeAndReadExpectedPixels(path string, want []byte) ([]byte, int, error) {
 	cmd := exec.Command(path)
@@ -4149,11 +4144,11 @@ func renderWindowCounterFrameRGBA(
 	button := rect{X: 32, Y: 88, W: 160, H: 48}
 
 	clearRGBA(frame, bg)
-	textMaskRGBA(frame, 32, 28, 5, fg)
+	textStringRGBA(frame, 32, 28, "Count", fg)
 	if count > 0 {
 		rectRGBA(frame, rect{X: 88, Y: 28, W: 24 + count*8, H: 7}, fg)
 	}
-	textMaskRGBA(frame, 32, 52, 3, fg)
+	textStringRGBA(frame, 32, 52, "Key", fg)
 	if keyCount > 0 {
 		rectRGBA(frame, rect{X: 88, Y: 52, W: 24, H: 7}, keyAccent)
 	}
@@ -4186,15 +4181,15 @@ func renderBrowserCounterFrameRGBA(
 	button := rect{X: 32, Y: 88, W: 160, H: 48}
 
 	clearRGBA(frame, bg)
-	textMaskRGBA(frame, 32, 28, 5, fg)
+	textStringRGBA(frame, 32, 28, "Count", fg)
 	if count > 0 {
 		rectRGBA(frame, rect{X: 88, Y: 28, W: 24 + count*8, H: 7}, fg)
 	}
-	textMaskRGBA(frame, 32, 52, 3, fg)
+	textStringRGBA(frame, 32, 52, "Key", fg)
 	if keyCount > 0 {
 		rectRGBA(frame, rect{X: 88, Y: 52, W: 24, H: 7}, keyAccent)
 	}
-	textMaskRGBA(frame, 32, 68, 4, fg)
+	textStringRGBA(frame, 32, 68, "Text", fg)
 	rectRGBA(frame, rect{X: 88, Y: 68, W: 18, H: 7}, textAccent)
 	rectRGBA(frame, button, accent)
 	if focused {
@@ -4224,10 +4219,10 @@ func renderReleaseCounterFrameRGBA(
 	resetAccent := rgbaColor{R: 210, G: 96, B: 78, A: 255}
 	statusAccent := rgbaColor{R: 88, G: 174, B: 128, A: 255}
 	clearRGBA(frame, bg)
-	textMaskRGBA(frame, 32, 28, 23, fg)
-	textMaskRGBA(frame, 32, 56, 5, fg)
+	textStringRGBA(frame, 32, 28, "Surface Release Counter", fg)
+	textStringRGBA(frame, 32, 56, "Count", fg)
 	rectRGBA(frame, rect{X: 96, Y: 58, W: 24 + count*8, H: 8}, statusAccent)
-	textMaskRGBA(frame, 32, 76, 3, fg)
+	textStringRGBA(frame, 32, 76, "Key", fg)
 	if keyCount > 0 {
 		rectRGBA(frame, rect{X: 96, Y: 78, W: 24 + keyCount*8, H: 8}, accent)
 	}
@@ -4266,8 +4261,8 @@ func renderTextFocusInputFrameRGBA(
 	button := rect{X: 32, Y: 128, W: 128, H: 44}
 
 	clearRGBA(frame, bg)
-	textMaskRGBA(frame, 32, 28, 5, fg)
-	textMaskRGBA(frame, 32, 44, 5, fg)
+	textStringRGBA(frame, 32, 28, "TextBox", fg)
+	textStringRGBA(frame, 32, 44, "Ready", fg)
 	rectRGBA(frame, textbox, textBg)
 	rectOutlineRGBA(frame, textbox, fg)
 	if textLen > 0 {
@@ -4909,9 +4904,19 @@ func rectRGBA(frame rgbaFrame, r rect, color rgbaColor) {
 		}
 	}
 }
-func textMaskRGBA(frame rgbaFrame, x int, y int, textLen int, color rgbaColor) {
-	for glyph := 0; glyph < textLen; glyph++ {
-		glyphMask5x7RGBA(frame, x+glyph*6, y, glyph, color)
+func textStringRGBA(frame rgbaFrame, x int, y int, text string, color rgbaColor) {
+	for glyph, ch := range []byte(text) {
+		glyphMask5x7CharRGBA(frame, x+glyph*6, y, ch, color)
+	}
+}
+func glyphMask5x7CharRGBA(frame rgbaFrame, x int, y int, ch byte, color rgbaColor) {
+	for row := 0; row < 7; row++ {
+		mask := glyphRow5x7(ch, row)
+		for col := 0; col < 5; col++ {
+			if glyphMaskPixelOn(mask, col) {
+				rectRGBA(frame, rect{X: x + col, Y: y + row, W: 1, H: 1}, color)
+			}
+		}
 	}
 }
 func glyphMask5x7RGBA(frame rgbaFrame, x int, y int, glyphIndex int, color rgbaColor) {
@@ -4931,6 +4936,143 @@ func glyphPixelOn(glyphIndex int, row int, col int) bool {
 		return (glyphIndex+row)%2 == 0
 	}
 	return (glyphIndex+row*2+col*3)%4 == 0
+}
+func glyphMaskPixelOn(mask int, col int) bool {
+	return (mask/glyphBitValue(col))%2 == 1
+}
+func glyphBitValue(col int) int {
+	switch col {
+	case 0:
+		return 16
+	case 1:
+		return 8
+	case 2:
+		return 4
+	case 3:
+		return 2
+	default:
+		return 1
+	}
+}
+func glyphRow5x7(ch byte, row int) int {
+	code := int(ch)
+	if code >= 'a' && code <= 'z' {
+		code -= 32
+	}
+	switch {
+	case code == ' ':
+		return 0
+	case code == '-':
+		return glyphPick(row, 0, 0, 0, 31, 0, 0, 0)
+	case code == '.':
+		return glyphPick(row, 0, 0, 0, 0, 0, 12, 12)
+	case code == ':':
+		return glyphPick(row, 0, 12, 12, 0, 12, 12, 0)
+	case code >= '0' && code <= '9':
+		return glyphDigitRow(code, row)
+	case code >= 'A' && code <= 'Z':
+		return glyphLetterRow(code, row)
+	default:
+		return glyphPick(row, 31, 1, 2, 4, 4, 0, 4)
+	}
+}
+func glyphDigitRow(code int, row int) int {
+	switch code {
+	case '0':
+		return glyphPick(row, 14, 17, 19, 21, 25, 17, 14)
+	case '1':
+		return glyphPick(row, 4, 12, 4, 4, 4, 4, 14)
+	case '2':
+		return glyphPick(row, 14, 17, 1, 2, 4, 8, 31)
+	case '3':
+		return glyphPick(row, 30, 1, 1, 14, 1, 1, 30)
+	case '4':
+		return glyphPick(row, 2, 6, 10, 18, 31, 2, 2)
+	case '5':
+		return glyphPick(row, 31, 16, 30, 1, 1, 17, 14)
+	case '6':
+		return glyphPick(row, 6, 8, 16, 30, 17, 17, 14)
+	case '7':
+		return glyphPick(row, 31, 1, 2, 4, 8, 8, 8)
+	case '8':
+		return glyphPick(row, 14, 17, 17, 14, 17, 17, 14)
+	default:
+		return glyphPick(row, 14, 17, 17, 15, 1, 2, 12)
+	}
+}
+func glyphLetterRow(code int, row int) int {
+	switch code {
+	case 'A':
+		return glyphPick(row, 14, 17, 17, 31, 17, 17, 17)
+	case 'B':
+		return glyphPick(row, 30, 17, 17, 30, 17, 17, 30)
+	case 'C':
+		return glyphPick(row, 14, 17, 16, 16, 16, 17, 14)
+	case 'D':
+		return glyphPick(row, 30, 17, 17, 17, 17, 17, 30)
+	case 'E':
+		return glyphPick(row, 31, 16, 16, 30, 16, 16, 31)
+	case 'F':
+		return glyphPick(row, 31, 16, 16, 30, 16, 16, 16)
+	case 'G':
+		return glyphPick(row, 14, 17, 16, 23, 17, 17, 15)
+	case 'H':
+		return glyphPick(row, 17, 17, 17, 31, 17, 17, 17)
+	case 'I':
+		return glyphPick(row, 31, 4, 4, 4, 4, 4, 31)
+	case 'J':
+		return glyphPick(row, 7, 2, 2, 2, 18, 18, 12)
+	case 'K':
+		return glyphPick(row, 17, 18, 20, 24, 20, 18, 17)
+	case 'L':
+		return glyphPick(row, 16, 16, 16, 16, 16, 16, 31)
+	case 'M':
+		return glyphPick(row, 17, 27, 21, 21, 17, 17, 17)
+	case 'N':
+		return glyphPick(row, 17, 25, 21, 19, 17, 17, 17)
+	case 'O':
+		return glyphPick(row, 14, 17, 17, 17, 17, 17, 14)
+	case 'P':
+		return glyphPick(row, 30, 17, 17, 30, 16, 16, 16)
+	case 'Q':
+		return glyphPick(row, 14, 17, 17, 17, 21, 18, 13)
+	case 'R':
+		return glyphPick(row, 30, 17, 17, 30, 20, 18, 17)
+	case 'S':
+		return glyphPick(row, 15, 16, 16, 14, 1, 1, 30)
+	case 'T':
+		return glyphPick(row, 31, 4, 4, 4, 4, 4, 4)
+	case 'U':
+		return glyphPick(row, 17, 17, 17, 17, 17, 17, 14)
+	case 'V':
+		return glyphPick(row, 17, 17, 17, 17, 17, 10, 4)
+	case 'W':
+		return glyphPick(row, 17, 17, 17, 21, 21, 21, 10)
+	case 'X':
+		return glyphPick(row, 17, 17, 10, 4, 10, 17, 17)
+	case 'Y':
+		return glyphPick(row, 17, 17, 10, 4, 4, 4, 4)
+	default:
+		return glyphPick(row, 31, 1, 2, 4, 8, 16, 31)
+	}
+}
+func glyphPick(row int, r0 int, r1 int, r2 int, r3 int, r4 int, r5 int, r6 int) int {
+	switch row {
+	case 0:
+		return r0
+	case 1:
+		return r1
+	case 2:
+		return r2
+	case 3:
+		return r3
+	case 4:
+		return r4
+	case 5:
+		return r5
+	default:
+		return r6
+	}
 }
 func checksumRGBA(pixels []byte) string {
 	sum := sha256.Sum256(pixels)

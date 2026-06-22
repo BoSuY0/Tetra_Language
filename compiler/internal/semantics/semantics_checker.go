@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"tetra_language/compiler/internal/frontend"
+	"tetra_language/compiler/internal/islandkernel"
 	"tetra_language/compiler/internal/module"
 	semanticsdeclarations "tetra_language/compiler/internal/semantics/declarations"
 	semanticsflow "tetra_language/compiler/internal/semantics/flow"
@@ -9924,6 +9925,14 @@ func checkBorrowedReturnContract(
 			)
 		}
 		if _, ok := borrowedParams[borrowedName]; ok {
+			if decision := islandkernel.CanBorrow(islandKernelSemanticBorrowRequest(borrowedName)); decision.Decision != islandkernel.Accept {
+				return lifetimeDiagnosticf(
+					pos,
+					"borrowed return owner '%s' rejected by island kernel (%s)",
+					borrowedName,
+					decision.Reason.Code,
+				)
+			}
 			if err := recordBorrowedReturnOwner(analysis, borrowedName, pos); err != nil {
 				return err
 			}
@@ -9966,22 +9975,65 @@ func checkBorrowedReturnContract(
 		effects,
 		analysis,
 		func(borrowedName string) error {
+			if decision := islandkernel.CanBorrow(islandKernelSemanticBorrowRequest(borrowedName)); decision.Decision != islandkernel.Accept {
+				return lifetimeDiagnosticf(
+					pos,
+					"borrowed local '%s' cannot escape via return (%s)",
+					borrowedName,
+					decision.Reason.Code,
+				)
+			}
+			decision := islandkernel.CanReturn(islandkernel.EscapeRequest{
+				Ref: islandKernelSemanticBorrowRef(borrowedName),
+			})
+			if decision.Decision == islandkernel.Accept {
+				return nil
+			}
 			kind, display, directView := borrowedReturnDirectViewLabels(returnType, types)
 			if directView {
 				return lifetimeDiagnosticf(
 					pos,
-					"borrowed %s return requires '-> borrow %s' or '.copy()'",
+					"borrowed %s return requires '-> borrow %s' or '.copy()' (%s)",
 					kind,
 					display,
+					decision.Reason.Code,
 				)
 			}
 			return lifetimeDiagnosticf(
 				pos,
-				"borrowed local '%s' cannot escape via return",
+				"borrowed local '%s' cannot escape via return (%s)",
 				borrowedName,
+				decision.Reason.Code,
 			)
 		},
 	)
+}
+
+func islandKernelSemanticBorrowRequest(owner string) islandkernel.BorrowRequest {
+	ref := islandKernelSemanticBorrowRef(owner)
+	return islandkernel.BorrowRequest{
+		Ref: ref,
+		Token: islandkernel.Token{
+			IslandID: ref.IslandID,
+			Epoch:    ref.Epoch,
+			OwnerID:  ref.OwnerID,
+		},
+	}
+}
+
+func islandKernelSemanticBorrowRef(owner string) islandkernel.MemoryRef {
+	owner = strings.TrimSpace(owner)
+	if owner == "" {
+		owner = "<unknown-borrow>"
+	}
+	return islandkernel.MemoryRef{
+		BaseID:      owner,
+		IslandID:    "semantic-borrow:" + owner,
+		Epoch:       1,
+		OwnerID:     owner,
+		Provenance:  islandkernel.ProvenanceBorrowedView,
+		UnsafeClass: islandkernel.UnsafeSafe,
+	}
 }
 
 func recordBorrowedReturnOwner(
@@ -16886,9 +16938,15 @@ func checkStmts(
 							return err
 						}
 						if err := checkBorrowedEscape(s.Value, locals, globals, funcs, types, module, imports, state, effects, analysis, func(borrowedName string) error {
+							decision := islandkernel.CanStoreGlobal(islandkernel.EscapeRequest{
+								Ref: islandKernelSemanticBorrowRef(borrowedName),
+							})
+							if decision.Decision == islandkernel.Accept {
+								return nil
+							}
 							return lifetimeDiagnosticf(s.At, (("borrowed local '%s' cannot escape via global " +
 								"assignment to ") +
-								"'%s'"), borrowedName, id.Name)
+								"'%s' (%s)"), borrowedName, id.Name, decision.Reason.Code)
 						}); err != nil {
 							return err
 						}
@@ -17120,9 +17178,15 @@ func checkStmts(
 						return err
 					}
 					if err := checkBorrowedEscape(s.Value, locals, globals, funcs, types, module, imports, state, effects, analysis, func(borrowedName string) error {
+						decision := islandkernel.CanStoreGlobal(islandkernel.EscapeRequest{
+							Ref: islandKernelSemanticBorrowRef(borrowedName),
+						})
+						if decision.Decision == islandkernel.Accept {
+							return nil
+						}
 						return lifetimeDiagnosticf(s.At, (("borrowed local '%s' cannot escape via global " +
 							"assignment to ") +
-							"'%s'"), borrowedName, targetInfo.Name)
+							"'%s' (%s)"), borrowedName, targetInfo.Name, decision.Reason.Code)
 					}); err != nil {
 						return err
 					}

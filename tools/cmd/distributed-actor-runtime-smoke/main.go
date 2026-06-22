@@ -334,6 +334,7 @@ func (r *smokeRunner) runSenderCase(ctx context.Context) error {
 				SequenceID:   frame.SequenceID,
 				ActorID:      frame.ActorID,
 				Status:       actorwire.StatusOK,
+				Payload:      []int32{1, 1},
 			}
 			if err := writeFrame(peer, ack); err != nil {
 				return err

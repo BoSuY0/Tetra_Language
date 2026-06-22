@@ -7,9 +7,10 @@ import (
 )
 
 type Graph struct {
-	programID string
-	facts     map[FactID]Fact
-	order     []FactID
+	programID    string
+	facts        map[FactID]Fact
+	order        []FactID
+	currentStage SourceStage
 }
 
 func NewGraph(programID string) *Graph {
@@ -114,6 +115,37 @@ func (g *Graph) AttachLoweredArtifact(factID FactID, artifactID string) error {
 		return fmt.Errorf("memoryfacts: fact_id %q does not exist", factID)
 	}
 	f.LoweredArtifactID = artifactID
+	g.facts[factID] = f
+	return nil
+}
+
+func (g *Graph) AttachLoweringStorage(
+	factID FactID,
+	plannedStorage StorageClass,
+	actualStorage StorageClass,
+	artifactID string,
+) error {
+	if g == nil {
+		return fmt.Errorf("memoryfacts: nil graph")
+	}
+	if plannedStorage == "" {
+		return fmt.Errorf("memoryfacts: planned_storage is required")
+	}
+	if actualStorage == "" {
+		return fmt.Errorf("memoryfacts: actual_lowering_storage is required")
+	}
+	f, ok := g.facts[factID]
+	if !ok {
+		return fmt.Errorf("memoryfacts: fact_id %q does not exist", factID)
+	}
+	f.StoragePlan = plannedStorage
+	f.ActualLoweringStorage = actualStorage
+	if strings.TrimSpace(artifactID) != "" {
+		f.LoweredArtifactID = artifactID
+	}
+	if err := g.validateFact(f); err != nil {
+		return err
+	}
 	g.facts[factID] = f
 	return nil
 }
@@ -226,6 +258,12 @@ func (g *Graph) validateFact(f Fact) error {
 	}
 	if !knownAliasState(f.AliasState) {
 		return fmt.Errorf("memoryfacts: unknown alias_state %q", f.AliasState)
+	}
+	if !knownDomainKind(f.DomainKind) {
+		return fmt.Errorf("memoryfacts: unknown domain_kind %q", f.DomainKind)
+	}
+	if !knownTransferKind(f.TransferKind) {
+		return fmt.Errorf("memoryfacts: unknown transfer_kind %q", f.TransferKind)
 	}
 	if !knownCostClass(f.CostClass) {
 		return fmt.Errorf("memoryfacts: unknown cost_class %q", f.CostClass)
