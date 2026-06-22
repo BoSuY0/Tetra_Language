@@ -789,9 +789,13 @@ func TestCollectTetraMetadataPrefersRuntimeDomainBytesOverAllocationReport(t *te
 						CurrentBytes:         128,
 						PeakBytes:            192,
 						BytesCopied:          7,
-						MailboxCurrentBytes:  128,
-						MailboxPeakBytes:     192,
-						ByteBudget:           1024,
+						MailboxCurrentBytes:  64,
+						MailboxPeakBytes:     96,
+						StackLiveBytes:       64,
+						StackReservedBytes:   96,
+						StackRetainedBytes:   0,
+						StackReleasedBytes:   0,
+						ByteBudget:           1088,
 						OverBudgetCount:      3,
 						BackpressureEvents:   4,
 						ActorDomainFieldsSet: true,
@@ -826,8 +830,10 @@ func TestCollectTetraMetadataPrefersRuntimeDomainBytesOverAllocationReport(t *te
 		domain.RequestedBytes != 32 || domain.ReservedBytes != 64 ||
 		domain.CommittedBytes != 64 || domain.CurrentBytes != 128 ||
 		domain.PeakBytes != 192 || domain.BytesCopied != 7 ||
-		domain.MailboxCurrentBytes != 128 || domain.MailboxPeakBytes != 192 ||
-		domain.ByteBudget != 1024 || domain.OverBudgetCount != 3 ||
+		domain.MailboxCurrentBytes != 64 || domain.MailboxPeakBytes != 96 ||
+		domain.StackLiveBytes != 64 || domain.StackReservedBytes != 96 ||
+		domain.StackRetainedBytes != 0 || domain.StackReleasedBytes != 0 ||
+		domain.ByteBudget != 1088 || domain.OverBudgetCount != 3 ||
 		domain.BackpressureEvents != 4 ||
 		domain.EvidenceClass != "runtime_measured" ||
 		domain.Method != heaptelemetry.MethodLinuxX64HeapTelemetryV1 ||
@@ -856,6 +862,10 @@ func TestCollectTetraMetadataActorFieldsOnlyMarshalForRuntimeActorDomains(t *tes
 				BytesCopied:          88,
 				MailboxCurrentBytes:  0,
 				MailboxPeakBytes:     88,
+				StackLiveBytes:       0,
+				StackReservedBytes:   65536,
+				StackRetainedBytes:   65536,
+				StackReleasedBytes:   0,
 				ByteBudget:           22528,
 				OverBudgetCount:      0,
 				BackpressureEvents:   0,
@@ -881,6 +891,10 @@ func TestCollectTetraMetadataActorFieldsOnlyMarshalForRuntimeActorDomains(t *tes
 	for _, key := range []string{
 		"mailbox_current_bytes",
 		"mailbox_peak_bytes",
+		"stack_live_bytes",
+		"stack_reserved_bytes",
+		"stack_retained_bytes",
+		"stack_released_bytes",
 		"byte_budget",
 		"over_budget_count",
 		"backpressure_events",
@@ -894,6 +908,12 @@ func TestCollectTetraMetadataActorFieldsOnlyMarshalForRuntimeActorDomains(t *tes
 	}
 	if got := decoded.DomainBytes[1]["mailbox_current_bytes"]; got != float64(0) {
 		t.Fatalf("actor mailbox_current_bytes = %#v, want encoded zero", got)
+	}
+	if got := decoded.DomainBytes[1]["stack_live_bytes"]; got != float64(0) {
+		t.Fatalf("actor stack_live_bytes = %#v, want encoded zero", got)
+	}
+	if got := decoded.DomainBytes[1]["stack_reserved_bytes"]; got != float64(65536) {
+		t.Fatalf("actor stack_reserved_bytes = %#v, want encoded 65536", got)
 	}
 	if got := decoded.DomainBytes[1]["over_budget_count"]; got != float64(0) {
 		t.Fatalf("actor over_budget_count = %#v, want encoded zero", got)

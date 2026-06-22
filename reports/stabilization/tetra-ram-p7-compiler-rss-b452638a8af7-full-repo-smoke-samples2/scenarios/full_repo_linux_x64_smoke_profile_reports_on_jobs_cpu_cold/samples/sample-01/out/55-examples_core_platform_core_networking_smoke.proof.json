@@ -1,0 +1,1542 @@
+{
+  "schema_version": 1,
+  "kind": "proof",
+  "target": "linux-x64",
+  "bounds": {
+    "schema_version": 1,
+    "kind": "bounds",
+    "target": "linux-x64",
+    "totals": {
+      "removed": 0,
+      "left": 0
+    },
+    "functions": null
+  },
+  "plir": {
+    "funcs": [
+      {
+        "name": "lib.core.networking.default_port_http",
+        "module": "lib.core.networking",
+        "summary": {
+          "public": true,
+          "return_type": "i32"
+        },
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "return",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:22:5",
+            "inputs": [
+              "80"
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "pure_call",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:21:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f1",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:21:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f2",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:21:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f3",
+            "kind": "no_mem_write",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:21:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f4",
+            "kind": "no_unknown_escape",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:21:6",
+            "reason": "semantics checker enforced declared effects"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "exit": true,
+            "ops": [
+              "op0"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:21:6"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "lib.core.networking.default_port_https",
+        "module": "lib.core.networking",
+        "summary": {
+          "public": true,
+          "return_type": "i32"
+        },
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "return",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:25:5",
+            "inputs": [
+              "443"
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "pure_call",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:24:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f1",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:24:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f2",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:24:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f3",
+            "kind": "no_mem_write",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:24:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f4",
+            "kind": "no_unknown_escape",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:24:8",
+            "reason": "semantics checker enforced declared effects"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "exit": true,
+            "ops": [
+              "op0"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:24:8"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "lib.core.networking.clamp_port",
+        "module": "lib.core.networking",
+        "summary": {
+          "public": true,
+          "param_names": [
+            "port"
+          ],
+          "param_types": [
+            "i32"
+          ],
+          "param_ownership": [
+            ""
+          ],
+          "return_type": "i32"
+        },
+        "values": [
+          {
+            "id": "param:port",
+            "kind": "param",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:27:8",
+            "region": "fn:lib.core.networking.clamp_port",
+            "provenance": {
+              "kind": "param",
+              "root": "param:port"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "port"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "guard",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:28:5",
+            "inputs": [
+              "port < 0"
+            ],
+            "note": "port < 0"
+          },
+          {
+            "id": "op1",
+            "kind": "return",
+            "block": "if_then:0",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:29:9",
+            "inputs": [
+              "0"
+            ]
+          },
+          {
+            "id": "op2",
+            "kind": "guard",
+            "block": "if_join:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:30:7",
+            "inputs": [
+              "port > 65535"
+            ],
+            "note": "port > 65535"
+          },
+          {
+            "id": "op3",
+            "kind": "return",
+            "block": "if_then:2",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:31:9",
+            "inputs": [
+              "65535"
+            ]
+          },
+          {
+            "id": "op4",
+            "kind": "return",
+            "block": "if_join:3",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:32:7",
+            "inputs": [
+              "port"
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "pure_call",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:27:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f1",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:27:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f2",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:27:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f3",
+            "kind": "no_mem_write",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:27:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f4",
+            "kind": "no_unknown_escape",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:27:8",
+            "reason": "semantics checker enforced declared effects"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "succs": [
+              "if_join:1",
+              "if_then:0"
+            ],
+            "ops": [
+              "op0"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:27:8"
+          },
+          {
+            "id": "if_then:0",
+            "kind": "if_then",
+            "preds": [
+              "entry"
+            ],
+            "succs": [
+              "if_join:1"
+            ],
+            "ops": [
+              "op1"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:28:5"
+          },
+          {
+            "id": "if_join:1",
+            "kind": "if_join",
+            "preds": [
+              "entry",
+              "if_then:0"
+            ],
+            "succs": [
+              "if_join:3",
+              "if_then:2"
+            ],
+            "ops": [
+              "op2"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:28:5"
+          },
+          {
+            "id": "if_then:2",
+            "kind": "if_then",
+            "preds": [
+              "if_join:1"
+            ],
+            "succs": [
+              "if_join:3"
+            ],
+            "ops": [
+              "op3"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:30:7"
+          },
+          {
+            "id": "if_join:3",
+            "kind": "if_join",
+            "exit": true,
+            "preds": [
+              "if_join:1",
+              "if_then:2"
+            ],
+            "ops": [
+              "op4"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:30:7"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          },
+          {
+            "block": "if_then:0",
+            "dominators": [
+              "entry",
+              "if_then:0"
+            ]
+          },
+          {
+            "block": "if_join:1",
+            "dominators": [
+              "entry",
+              "if_join:1"
+            ]
+          },
+          {
+            "block": "if_then:2",
+            "dominators": [
+              "entry",
+              "if_join:1",
+              "if_then:2"
+            ]
+          },
+          {
+            "block": "if_join:3",
+            "dominators": [
+              "entry",
+              "if_join:1",
+              "if_join:3"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "lib.core.networking.is_valid_port",
+        "module": "lib.core.networking",
+        "summary": {
+          "public": true,
+          "param_names": [
+            "port"
+          ],
+          "param_types": [
+            "i32"
+          ],
+          "param_ownership": [
+            ""
+          ],
+          "return_type": "bool"
+        },
+        "values": [
+          {
+            "id": "param:port",
+            "kind": "param",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:34:8",
+            "region": "fn:lib.core.networking.is_valid_port",
+            "provenance": {
+              "kind": "param",
+              "root": "param:port"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "port"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "return",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:35:5",
+            "inputs": [
+              ""
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "pure_call",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:34:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f1",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:34:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f2",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:34:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f3",
+            "kind": "no_mem_write",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:34:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f4",
+            "kind": "no_unknown_escape",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:34:8",
+            "reason": "semantics checker enforced declared effects"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "exit": true,
+            "ops": [
+              "op0"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:34:8"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "lib.core.networking.choose_port",
+        "module": "lib.core.networking",
+        "summary": {
+          "public": true,
+          "param_names": [
+            "preferred",
+            "fallback"
+          ],
+          "param_types": [
+            "i32",
+            "i32"
+          ],
+          "param_ownership": [
+            "",
+            ""
+          ],
+          "return_type": "i32"
+        },
+        "values": [
+          {
+            "id": "param:fallback",
+            "kind": "param",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:37:8",
+            "region": "fn:lib.core.networking.choose_port",
+            "provenance": {
+              "kind": "param",
+              "root": "param:fallback"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "fallback"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          },
+          {
+            "id": "param:preferred",
+            "kind": "param",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:37:8",
+            "region": "fn:lib.core.networking.choose_port",
+            "provenance": {
+              "kind": "param",
+              "root": "param:preferred"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "preferred"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:38:8",
+            "inputs": [
+              "preferred"
+            ],
+            "note": "lib.core.networking.is_valid_port"
+          },
+          {
+            "id": "op1",
+            "kind": "guard",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:38:5",
+            "inputs": [
+              ""
+            ]
+          },
+          {
+            "id": "op2",
+            "kind": "return",
+            "block": "if_then:0",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:39:9",
+            "inputs": [
+              "preferred"
+            ]
+          },
+          {
+            "id": "op3",
+            "kind": "call",
+            "block": "if_join:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:40:14",
+            "inputs": [
+              "fallback"
+            ],
+            "note": "lib.core.networking.clamp_port"
+          },
+          {
+            "id": "op4",
+            "kind": "return",
+            "block": "if_join:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:40:7",
+            "inputs": [
+              ""
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "pure_call",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:37:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f1",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:37:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f2",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:37:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f3",
+            "kind": "no_mem_write",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:37:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f4",
+            "kind": "no_unknown_escape",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:37:8",
+            "reason": "semantics checker enforced declared effects"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "succs": [
+              "if_join:1",
+              "if_then:0"
+            ],
+            "ops": [
+              "op0",
+              "op1"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:37:8"
+          },
+          {
+            "id": "if_then:0",
+            "kind": "if_then",
+            "preds": [
+              "entry"
+            ],
+            "succs": [
+              "if_join:1"
+            ],
+            "ops": [
+              "op2"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:38:5"
+          },
+          {
+            "id": "if_join:1",
+            "kind": "if_join",
+            "exit": true,
+            "preds": [
+              "entry",
+              "if_then:0"
+            ],
+            "ops": [
+              "op3",
+              "op4"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:38:5"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          },
+          {
+            "block": "if_then:0",
+            "dominators": [
+              "entry",
+              "if_then:0"
+            ]
+          },
+          {
+            "block": "if_join:1",
+            "dominators": [
+              "entry",
+              "if_join:1"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "lib.core.networking.retry_backoff_ms",
+        "module": "lib.core.networking",
+        "summary": {
+          "public": true,
+          "param_names": [
+            "attempt",
+            "base_ms",
+            "max_ms"
+          ],
+          "param_types": [
+            "i32",
+            "i32",
+            "i32"
+          ],
+          "param_ownership": [
+            "",
+            "",
+            ""
+          ],
+          "return_type": "i32"
+        },
+        "values": [
+          {
+            "id": "local:cap_ms",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:42:8",
+            "region": "fn:lib.core.networking.retry_backoff_ms",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:cap_ms"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "cap_ms"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "local:step",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:42:8",
+            "region": "fn:lib.core.networking.retry_backoff_ms",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:step"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "step"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "local:value",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:42:8",
+            "region": "fn:lib.core.networking.retry_backoff_ms",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:value"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "value"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "param:attempt",
+            "kind": "param",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:42:8",
+            "region": "fn:lib.core.networking.retry_backoff_ms",
+            "provenance": {
+              "kind": "param",
+              "root": "param:attempt"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "attempt"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          },
+          {
+            "id": "param:base_ms",
+            "kind": "param",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:42:8",
+            "region": "fn:lib.core.networking.retry_backoff_ms",
+            "provenance": {
+              "kind": "param",
+              "root": "param:base_ms"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "base_ms"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          },
+          {
+            "id": "param:max_ms",
+            "kind": "param",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:42:8",
+            "region": "fn:lib.core.networking.retry_backoff_ms",
+            "provenance": {
+              "kind": "param",
+              "root": "param:max_ms"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "max_ms"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "assign",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:43:5",
+            "inputs": [
+              "base_ms"
+            ],
+            "outputs": [
+              "value"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op1",
+            "kind": "guard",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:44:5",
+            "inputs": [
+              "value < 0"
+            ],
+            "note": "value < 0"
+          },
+          {
+            "id": "op2",
+            "kind": "assign",
+            "block": "if_then:0",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:45:9",
+            "inputs": [
+              "0"
+            ],
+            "outputs": [
+              "value"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op3",
+            "kind": "assign",
+            "block": "if_join:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:46:7",
+            "inputs": [
+              "max_ms"
+            ],
+            "outputs": [
+              "cap_ms"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op4",
+            "kind": "guard",
+            "block": "if_join:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:47:5",
+            "inputs": [
+              "cap_ms < 0"
+            ],
+            "note": "cap_ms < 0"
+          },
+          {
+            "id": "op5",
+            "kind": "assign",
+            "block": "if_then:2",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:48:9",
+            "inputs": [
+              "2147483647"
+            ],
+            "outputs": [
+              "cap_ms"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op6",
+            "kind": "assign",
+            "block": "if_join:3",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:49:7",
+            "inputs": [
+              "0"
+            ],
+            "outputs": [
+              "step"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op7",
+            "kind": "guard",
+            "block": "while_header:4",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:50:5",
+            "inputs": [
+              "step < attempt"
+            ],
+            "note": "step < attempt"
+          },
+          {
+            "id": "op8",
+            "kind": "guard",
+            "block": "while_body:5",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:51:9",
+            "inputs": [
+              "value > cap_ms / 2"
+            ],
+            "note": "value > cap_ms / 2"
+          },
+          {
+            "id": "op9",
+            "kind": "return",
+            "block": "if_then:7",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:52:13",
+            "inputs": [
+              "cap_ms"
+            ]
+          },
+          {
+            "id": "op10",
+            "kind": "assign",
+            "block": "if_join:8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:53:11",
+            "inputs": [
+              "value * 2"
+            ],
+            "outputs": [
+              "value"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op11",
+            "kind": "assign",
+            "block": "if_join:8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:54:9",
+            "inputs": [
+              "step + 1"
+            ],
+            "outputs": [
+              "step"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op12",
+            "kind": "guard",
+            "block": "while_after:6",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:55:7",
+            "inputs": [
+              "value > cap_ms"
+            ],
+            "note": "value > cap_ms"
+          },
+          {
+            "id": "op13",
+            "kind": "return",
+            "block": "if_then:9",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:56:9",
+            "inputs": [
+              "cap_ms"
+            ]
+          },
+          {
+            "id": "op14",
+            "kind": "return",
+            "block": "if_join:10",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:57:7",
+            "inputs": [
+              "value"
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "pure_call",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:42:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f1",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:42:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f2",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:42:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f3",
+            "kind": "no_mem_write",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:42:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f4",
+            "kind": "no_unknown_escape",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:42:8",
+            "reason": "semantics checker enforced declared effects"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "succs": [
+              "if_join:1",
+              "if_then:0"
+            ],
+            "ops": [
+              "op0",
+              "op1"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:42:8"
+          },
+          {
+            "id": "if_then:0",
+            "kind": "if_then",
+            "preds": [
+              "entry"
+            ],
+            "succs": [
+              "if_join:1"
+            ],
+            "ops": [
+              "op2"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:44:5"
+          },
+          {
+            "id": "if_join:1",
+            "kind": "if_join",
+            "preds": [
+              "entry",
+              "if_then:0"
+            ],
+            "succs": [
+              "if_join:3",
+              "if_then:2"
+            ],
+            "ops": [
+              "op3",
+              "op4"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:44:5"
+          },
+          {
+            "id": "if_then:2",
+            "kind": "if_then",
+            "preds": [
+              "if_join:1"
+            ],
+            "succs": [
+              "if_join:3"
+            ],
+            "ops": [
+              "op5"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:47:5"
+          },
+          {
+            "id": "if_join:3",
+            "kind": "if_join",
+            "preds": [
+              "if_join:1",
+              "if_then:2"
+            ],
+            "succs": [
+              "while_header:4"
+            ],
+            "ops": [
+              "op6"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:47:5"
+          },
+          {
+            "id": "while_header:4",
+            "kind": "while_header",
+            "preds": [
+              "if_join:3",
+              "if_join:8"
+            ],
+            "succs": [
+              "while_after:6",
+              "while_body:5"
+            ],
+            "ops": [
+              "op7"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:50:5"
+          },
+          {
+            "id": "while_body:5",
+            "kind": "while_body",
+            "preds": [
+              "while_header:4"
+            ],
+            "succs": [
+              "if_join:8",
+              "if_then:7"
+            ],
+            "ops": [
+              "op8"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:50:5"
+          },
+          {
+            "id": "while_after:6",
+            "kind": "while_after",
+            "preds": [
+              "while_header:4"
+            ],
+            "succs": [
+              "if_join:10",
+              "if_then:9"
+            ],
+            "ops": [
+              "op12"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:50:5"
+          },
+          {
+            "id": "if_then:7",
+            "kind": "if_then",
+            "preds": [
+              "while_body:5"
+            ],
+            "succs": [
+              "if_join:8"
+            ],
+            "ops": [
+              "op9"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:51:9"
+          },
+          {
+            "id": "if_join:8",
+            "kind": "if_join",
+            "preds": [
+              "if_then:7",
+              "while_body:5"
+            ],
+            "succs": [
+              "while_header:4"
+            ],
+            "ops": [
+              "op10",
+              "op11"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:51:9"
+          },
+          {
+            "id": "if_then:9",
+            "kind": "if_then",
+            "preds": [
+              "while_after:6"
+            ],
+            "succs": [
+              "if_join:10"
+            ],
+            "ops": [
+              "op13"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:55:7"
+          },
+          {
+            "id": "if_join:10",
+            "kind": "if_join",
+            "exit": true,
+            "preds": [
+              "if_then:9",
+              "while_after:6"
+            ],
+            "ops": [
+              "op14"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/networking.tetra:55:7"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          },
+          {
+            "block": "if_then:0",
+            "dominators": [
+              "entry",
+              "if_then:0"
+            ]
+          },
+          {
+            "block": "if_join:1",
+            "dominators": [
+              "entry",
+              "if_join:1"
+            ]
+          },
+          {
+            "block": "if_then:2",
+            "dominators": [
+              "entry",
+              "if_join:1",
+              "if_then:2"
+            ]
+          },
+          {
+            "block": "if_join:3",
+            "dominators": [
+              "entry",
+              "if_join:1",
+              "if_join:3"
+            ]
+          },
+          {
+            "block": "while_header:4",
+            "dominators": [
+              "entry",
+              "if_join:1",
+              "if_join:3",
+              "while_header:4"
+            ]
+          },
+          {
+            "block": "while_body:5",
+            "dominators": [
+              "entry",
+              "if_join:1",
+              "if_join:3",
+              "while_body:5",
+              "while_header:4"
+            ]
+          },
+          {
+            "block": "while_after:6",
+            "dominators": [
+              "entry",
+              "if_join:1",
+              "if_join:3",
+              "while_after:6",
+              "while_header:4"
+            ]
+          },
+          {
+            "block": "if_then:7",
+            "dominators": [
+              "entry",
+              "if_join:1",
+              "if_join:3",
+              "if_then:7",
+              "while_body:5",
+              "while_header:4"
+            ]
+          },
+          {
+            "block": "if_join:8",
+            "dominators": [
+              "entry",
+              "if_join:1",
+              "if_join:3",
+              "if_join:8",
+              "while_body:5",
+              "while_header:4"
+            ]
+          },
+          {
+            "block": "if_then:9",
+            "dominators": [
+              "entry",
+              "if_join:1",
+              "if_join:3",
+              "if_then:9",
+              "while_after:6",
+              "while_header:4"
+            ]
+          },
+          {
+            "block": "if_join:10",
+            "dominators": [
+              "entry",
+              "if_join:1",
+              "if_join:10",
+              "if_join:3",
+              "while_after:6",
+              "while_header:4"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "examples.core.platform.core_networking_smoke.main",
+        "module": "examples.core.platform.core_networking_smoke",
+        "summary": {
+          "public": true,
+          "return_type": "i32"
+        },
+        "values": [
+          {
+            "id": "local:backoff",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/platform/core_networking_smoke.tetra:6:6",
+            "region": "fn:examples.core.platform.core_networking_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:backoff"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "backoff"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:selected",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/platform/core_networking_smoke.tetra:6:6",
+            "region": "fn:examples.core.platform.core_networking_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:selected"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "selected"
+            },
+            "escape": "unknown"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/platform/core_networking_smoke.tetra:7:54",
+            "note": "lib.core.networking.default_port_https"
+          },
+          {
+            "id": "op1",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/platform/core_networking_smoke.tetra:7:25",
+            "inputs": [
+              "8080"
+            ],
+            "note": "lib.core.networking.choose_port"
+          },
+          {
+            "id": "op2",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/platform/core_networking_smoke.tetra:8:24",
+            "inputs": [
+              "3",
+              "7",
+              "42"
+            ],
+            "note": "lib.core.networking.retry_backoff_ms"
+          },
+          {
+            "id": "op3",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/platform/core_networking_smoke.tetra:9:45",
+            "inputs": [
+              "65535"
+            ],
+            "note": "lib.core.networking.is_valid_port"
+          },
+          {
+            "id": "op4",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/platform/core_networking_smoke.tetra:9:81",
+            "inputs": [
+              "90000"
+            ],
+            "note": "lib.core.networking.is_valid_port"
+          },
+          {
+            "id": "op5",
+            "kind": "guard",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/platform/core_networking_smoke.tetra:9:5",
+            "inputs": [
+              ""
+            ]
+          },
+          {
+            "id": "op6",
+            "kind": "return",
+            "block": "if_then:0",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/platform/core_networking_smoke.tetra:10:9",
+            "inputs": [
+              "42"
+            ]
+          },
+          {
+            "id": "op7",
+            "kind": "return",
+            "block": "if_join:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/platform/core_networking_smoke.tetra:11:7",
+            "inputs": [
+              "1"
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "pure_call",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/platform/core_networking_smoke.tetra:6:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f1",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/platform/core_networking_smoke.tetra:6:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f2",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/platform/core_networking_smoke.tetra:6:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f3",
+            "kind": "no_mem_write",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/platform/core_networking_smoke.tetra:6:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f4",
+            "kind": "no_unknown_escape",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/platform/core_networking_smoke.tetra:6:6",
+            "reason": "semantics checker enforced declared effects"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "succs": [
+              "if_join:1",
+              "if_then:0"
+            ],
+            "ops": [
+              "op0",
+              "op1",
+              "op2",
+              "op3",
+              "op4",
+              "op5"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/platform/core_networking_smoke.tetra:6:6"
+          },
+          {
+            "id": "if_then:0",
+            "kind": "if_then",
+            "preds": [
+              "entry"
+            ],
+            "succs": [
+              "if_join:1"
+            ],
+            "ops": [
+              "op6"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/platform/core_networking_smoke.tetra:9:5"
+          },
+          {
+            "id": "if_join:1",
+            "kind": "if_join",
+            "exit": true,
+            "preds": [
+              "entry",
+              "if_then:0"
+            ],
+            "ops": [
+              "op7"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/platform/core_networking_smoke.tetra:9:5"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          },
+          {
+            "block": "if_then:0",
+            "dominators": [
+              "entry",
+              "if_then:0"
+            ]
+          },
+          {
+            "block": "if_join:1",
+            "dominators": [
+              "entry",
+              "if_join:1"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

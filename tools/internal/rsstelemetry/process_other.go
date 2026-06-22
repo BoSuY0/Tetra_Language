@@ -11,3 +11,11 @@ func ReadProcessRSSBytes(pid int) (uint64, bool) {
 func ProcessStateMaxRSS(state *os.ProcessState) (uint64, uint64, string, bool) {
 	return 0, 0, "", false
 }
+
+func ReadProcessMappingCount(pid int) (uint64, bool) {
+	return 0, false
+}
+
+func ReadProcessSmapsRollup(pid int) ([]byte, bool) {
+	return nil, false
+}

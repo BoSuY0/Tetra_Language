@@ -30,16 +30,35 @@ const (
 	remoteHandleMask = uint32(1 << 31)
 	nodeIDMask       = uint32(0x7f)
 	actorIDMask      = uint32(0xffff)
+
+	actorRefVersion        = uint64(1)
+	actorRefVersionShift   = 60
+	actorRefKindRemoteMask = uint64(1) << 59
+	actorRefNodeIDShift    = 48
+	actorRefNodeIDMask     = uint64(0x7ff)
+	actorRefNodeEpochShift = 32
+	actorRefSlotShift      = 16
+	actorRefField16Mask    = uint64(0xffff)
 )
 
 var (
-	ErrBadMagic           = errors.New("actor wire: bad magic")
-	ErrUnsupportedVersion = errors.New("actor wire: unsupported version")
-	ErrInvalidFrameType   = errors.New("actor wire: invalid frame type")
-	ErrInvalidNodeID      = errors.New("actor wire: invalid node id")
-	ErrInvalidSlotCount   = errors.New("actor wire: invalid slot count")
-	ErrShortFrame         = errors.New("actor wire: short frame")
-	ErrLocalActorHandle   = errors.New("actor wire: local actor handle")
+	ErrBadMagic             = errors.New("actor wire: bad magic")
+	ErrUnsupportedVersion   = errors.New("actor wire: unsupported version")
+	ErrInvalidFrameType     = errors.New("actor wire: invalid frame type")
+	ErrInvalidNodeID        = errors.New("actor wire: invalid node id")
+	ErrInvalidSlotCount     = errors.New("actor wire: invalid slot count")
+	ErrShortFrame           = errors.New("actor wire: short frame")
+	ErrLocalActorHandle     = errors.New("actor wire: local actor handle")
+	ErrActorWireABIMismatch = errors.New(
+		"actor wire: frame ABI mismatch with runtime actor reference width",
+	)
+
+	ErrUnsupportedActorRefVersion = errors.New("actor wire: unsupported actor ref version")
+	ErrInvalidActorRef            = errors.New("actor wire: invalid actor ref")
+	ErrInvalidActorGeneration     = errors.New("actor wire: invalid actor generation")
+	ErrInvalidNodeEpoch           = errors.New("actor wire: invalid node epoch")
+	ErrStaleActorGeneration       = errors.New("actor wire: stale actor generation")
+	ErrStaleNodeEpoch             = errors.New("actor wire: stale node epoch")
 )
 
 type FrameType uint16
@@ -77,6 +96,124 @@ type Frame struct {
 type RemoteHandle struct {
 	NodeID  uint16
 	ActorID uint16
+}
+
+type ActorRefKind uint8
+
+const (
+	ActorRefLocal ActorRefKind = iota
+	ActorRefRemote
+)
+
+type ActorRef uint64
+
+type ActorRefParts struct {
+	Kind       ActorRefKind
+	NodeID     uint16
+	NodeEpoch  uint16
+	Slot       uint16
+	Generation uint16
+}
+
+func NewLocalActorRef(slot, generation uint16) (ActorRef, error) {
+	if err := validateActorGeneration(generation); err != nil {
+		return 0, err
+	}
+	raw := (actorRefVersion << actorRefVersionShift) |
+		(uint64(slot) << actorRefSlotShift) |
+		uint64(generation)
+	return ActorRef(raw), nil
+}
+
+func NewRemoteActorRef(nodeID, nodeEpoch, slot, generation uint16) (ActorRef, error) {
+	if err := validateNodeID(nodeID); err != nil {
+		return 0, err
+	}
+	if err := validateNodeEpoch(nodeEpoch); err != nil {
+		return 0, err
+	}
+	if err := validateActorGeneration(generation); err != nil {
+		return 0, err
+	}
+	raw := (actorRefVersion << actorRefVersionShift) |
+		actorRefKindRemoteMask |
+		(uint64(nodeID) << actorRefNodeIDShift) |
+		(uint64(nodeEpoch) << actorRefNodeEpochShift) |
+		(uint64(slot) << actorRefSlotShift) |
+		uint64(generation)
+	return ActorRef(raw), nil
+}
+
+func (ref ActorRef) Raw() uint64 {
+	return uint64(ref)
+}
+
+func (ref ActorRef) IsRemote() bool {
+	return ref.Raw()&actorRefKindRemoteMask != 0
+}
+
+func DecodeActorRefV2(raw uint64) (ActorRefParts, error) {
+	if got := raw >> actorRefVersionShift; got != actorRefVersion {
+		return ActorRefParts{}, fmt.Errorf("%w: %d", ErrUnsupportedActorRefVersion, got)
+	}
+	parts := ActorRefParts{
+		Kind:       ActorRefLocal,
+		NodeID:     uint16((raw >> actorRefNodeIDShift) & actorRefNodeIDMask),
+		NodeEpoch:  uint16((raw >> actorRefNodeEpochShift) & actorRefField16Mask),
+		Slot:       uint16((raw >> actorRefSlotShift) & actorRefField16Mask),
+		Generation: uint16(raw & actorRefField16Mask),
+	}
+	if raw&actorRefKindRemoteMask != 0 {
+		parts.Kind = ActorRefRemote
+		if err := validateNodeID(parts.NodeID); err != nil {
+			return ActorRefParts{}, err
+		}
+		if err := validateNodeEpoch(parts.NodeEpoch); err != nil {
+			return ActorRefParts{}, err
+		}
+	} else if parts.NodeID != 0 || parts.NodeEpoch != 0 {
+		return ActorRefParts{}, fmt.Errorf("%w: local ref carries node identity", ErrInvalidActorRef)
+	}
+	if err := validateActorGeneration(parts.Generation); err != nil {
+		return ActorRefParts{}, err
+	}
+	return parts, nil
+}
+
+func ValidateActorRefGeneration(raw uint64, currentGeneration uint16) error {
+	parts, err := DecodeActorRefV2(raw)
+	if err != nil {
+		return err
+	}
+	if err := validateActorGeneration(currentGeneration); err != nil {
+		return err
+	}
+	if parts.Generation != currentGeneration {
+		return fmt.Errorf(
+			"%w: got %d want %d",
+			ErrStaleActorGeneration,
+			parts.Generation,
+			currentGeneration,
+		)
+	}
+	return nil
+}
+
+func ValidateActorRefEpoch(raw uint64, currentNodeEpoch uint16) error {
+	parts, err := DecodeActorRefV2(raw)
+	if err != nil {
+		return err
+	}
+	if parts.Kind != ActorRefRemote {
+		return ErrLocalActorHandle
+	}
+	if err := validateNodeEpoch(currentNodeEpoch); err != nil {
+		return err
+	}
+	if parts.NodeEpoch != currentNodeEpoch {
+		return fmt.Errorf("%w: got %d want %d", ErrStaleNodeEpoch, parts.NodeEpoch, currentNodeEpoch)
+	}
+	return nil
 }
 
 func EncodeFrame(frame Frame) ([]byte, error) {
@@ -136,6 +273,27 @@ func DecodeFrame(data []byte) (Frame, error) {
 		frame.Payload[i] = int32(binary.LittleEndian.Uint32(data[offset:]))
 	}
 	return frame, nil
+}
+
+func DecodeFrameForActorRefSlots(data []byte, actorRefSlots int) (Frame, error) {
+	if actorRefSlots <= 1 {
+		return DecodeFrame(data)
+	}
+	if len(data) < FrameSize {
+		return Frame{}, fmt.Errorf("%w: got %d bytes, want %d", ErrShortFrame, len(data), FrameSize)
+	}
+	if got := binary.LittleEndian.Uint32(data[FrameMagicOffset:]); got != Magic {
+		return Frame{}, fmt.Errorf("%w: 0x%x", ErrBadMagic, got)
+	}
+	if got := binary.LittleEndian.Uint16(data[FrameVersionOffset:]); got <= Version {
+		return Frame{}, fmt.Errorf(
+			"%w: frame version %d cannot carry %d-slot actor refs",
+			ErrActorWireABIMismatch,
+			got,
+			actorRefSlots,
+		)
+	}
+	return DecodeFrame(data)
 }
 
 func TypedMessageTagBase(typeName string) int32 {
@@ -211,6 +369,20 @@ func isKnownFrameType(frameType FrameType) bool {
 func validateNodeID(nodeID uint16) error {
 	if nodeID == 0 || nodeID > MaxNodeID {
 		return fmt.Errorf("%w: %d", ErrInvalidNodeID, nodeID)
+	}
+	return nil
+}
+
+func validateNodeEpoch(epoch uint16) error {
+	if epoch == 0 {
+		return fmt.Errorf("%w: %d", ErrInvalidNodeEpoch, epoch)
+	}
+	return nil
+}
+
+func validateActorGeneration(generation uint16) error {
+	if generation == 0 {
+		return fmt.Errorf("%w: %d", ErrInvalidActorGeneration, generation)
 	}
 	return nil
 }

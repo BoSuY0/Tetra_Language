@@ -280,10 +280,10 @@ uses alloc, mem:
 `, Options{EnableSmallHeapRuntime: true})
 
 	small := findAllocation(t, plan, "ret_small", "xs")
-	if small.RuntimePath != runtimeabi.AllocationPathPerCoreSmallHeap ||
+	if small.RuntimePath != runtimeabi.AllocationPathProcessBumpSmallHeapV0 ||
 		small.AllocatorClass != "small_32" {
 		t.Fatalf(
-			"small allocation runtime evidence = %+v, want per_core_small_heap/small_32",
+			"small allocation runtime evidence = %+v, want process_bump_small_heap_v0/small_32",
 			small,
 		)
 	}
@@ -294,19 +294,19 @@ uses alloc, mem:
 			small.BytesReserved,
 		)
 	}
-	if small.BytesCommitted != 32 || small.BytesReleased != 32 {
+	if small.BytesCommitted != 32 || small.BytesReleased != 0 {
 		t.Fatalf(
-			"small allocation backend bytes = committed %d released %d, want 32/32",
+			"small allocation backend bytes = committed %d released %d, want 32/0",
 			small.BytesCommitted,
 			small.BytesReleased,
 		)
 	}
 	if small.MemoryBackend == nil ||
 		small.MemoryBackend.BackendClass != runtimeabi.MemoryBackendClassSmallHeap ||
-		small.MemoryBackend.Adapter != "runtime.small_heap.per_core_v1" ||
+		small.MemoryBackend.Adapter != "runtime.small_heap.process_bump_v0" ||
 		small.MemoryBackend.EvidenceClass != runtimeabi.MemoryFootprintEstimated {
 		t.Fatalf(
-			"small allocation memory backend evidence = %+v, want small heap allocation estimate",
+			"small allocation memory backend evidence = %+v, want process bump small heap estimate",
 			small.MemoryBackend,
 		)
 	}
@@ -329,9 +329,10 @@ uses alloc, mem:
 	if large.MemoryBackend == nil ||
 		large.MemoryBackend.BackendClass != runtimeabi.MemoryBackendClassLargeBackend ||
 		large.MemoryBackend.Adapter != "target.large_mmap_v1" ||
-		large.MemoryBackend.EvidenceClass != runtimeabi.MemoryFootprintEstimated {
+		large.MemoryBackend.EvidenceClass != runtimeabi.MemoryFootprintEstimated ||
+		large.MemoryBackend.ReleaseBytes != 0 {
 		t.Fatalf(
-			"large allocation memory backend evidence = %+v, want large backend allocation estimate",
+			"large allocation memory backend evidence = %+v, want large mmap reserve/commit estimate without release",
 			large.MemoryBackend,
 		)
 	}
@@ -340,7 +341,7 @@ uses alloc, mem:
 	}
 }
 
-func TestPlannerReportsPerCoreSmallHeapAllocatorEvidence(t *testing.T) {
+func TestPlannerReportsProcessBumpSmallHeapAllocatorEvidence(t *testing.T) {
 	plan := allocationPlanWithOptions(t, `
 func ret_small() -> []u8
 uses alloc, mem:
@@ -353,11 +354,11 @@ uses alloc, mem:
 `, Options{EnableSmallHeapRuntime: true})
 
 	small := findAllocation(t, plan, "ret_small", "xs")
-	if small.RuntimePath != runtimeabi.AllocationPathPerCoreSmallHeap {
+	if small.RuntimePath != runtimeabi.AllocationPathProcessBumpSmallHeapV0 {
 		t.Fatalf(
 			"small allocation runtime_path = %q, want %q: %+v",
 			small.RuntimePath,
-			runtimeabi.AllocationPathPerCoreSmallHeap,
+			runtimeabi.AllocationPathProcessBumpSmallHeapV0,
 			small,
 		)
 	}
@@ -368,16 +369,16 @@ uses alloc, mem:
 			small,
 		)
 	}
-	if small.AllocatorScope != "core:0" {
+	if small.AllocatorScope != "process" {
 		t.Fatalf(
-			"small allocation allocator_scope = %q, want core:0: %+v",
+			"small allocation allocator_scope = %q, want process: %+v",
 			small.AllocatorScope,
 			small,
 		)
 	}
-	if small.AllocatorReusePolicy != "same_core_same_size_class_free_list" {
+	if small.AllocatorReusePolicy != "bump_no_reuse_v0" {
 		t.Fatalf(
-			"small allocation reuse policy = %q, want same-core free list: %+v",
+			"small allocation reuse policy = %q, want bump_no_reuse_v0: %+v",
 			small.AllocatorReusePolicy,
 			small,
 		)
@@ -392,24 +393,27 @@ uses alloc, mem:
 	}
 
 	summary := Summarize(plan)
-	if summary.RuntimePaths[string(runtimeabi.AllocationPathPerCoreSmallHeap)] != 1 {
-		t.Fatalf("runtime path summary = %+v, want per_core_small_heap count", summary.RuntimePaths)
+	if summary.RuntimePaths[string(runtimeabi.AllocationPathProcessBumpSmallHeapV0)] != 1 {
+		t.Fatalf(
+			"runtime path summary = %+v, want process_bump_small_heap_v0 count",
+			summary.RuntimePaths,
+		)
 	}
 	if summary.AllocatorClasses["small_32"] != 1 {
 		t.Fatalf("allocator class summary = %+v, want small_32 count", summary.AllocatorClasses)
 	}
-	if summary.AllocatorScopes["core:0"] != 1 {
-		t.Fatalf("allocator scope summary = %+v, want core:0 count", summary.AllocatorScopes)
+	if summary.AllocatorScopes["process"] != 1 {
+		t.Fatalf("allocator scope summary = %+v, want process count", summary.AllocatorScopes)
 	}
-	if summary.AllocatorReusePolicies["same_core_same_size_class_free_list"] != 1 {
+	if summary.AllocatorReusePolicies["bump_no_reuse_v0"] != 1 {
 		t.Fatalf(
-			"allocator reuse summary = %+v, want same-core reuse policy count",
+			"allocator reuse summary = %+v, want bump_no_reuse_v0 count",
 			summary.AllocatorReusePolicies,
 		)
 	}
-	if summary.BytesCommitted != 32 || summary.BytesReleased != 32 {
+	if summary.BytesCommitted != 32 || summary.BytesReleased != 0 {
 		t.Fatalf(
-			"backend byte summary = committed %d released %d, want 32/32",
+			"backend byte summary = committed %d released %d, want 32/0",
 			summary.BytesCommitted,
 			summary.BytesReleased,
 		)
@@ -421,10 +425,9 @@ uses alloc, mem:
 		)
 	}
 	if summary.MemoryBackendOperations[string(runtimeabi.MemoryBackendCommit)] != 1 ||
-		summary.MemoryBackendOperations[string(runtimeabi.MemoryBackendRelease)] != 1 ||
 		summary.MemoryBackendOperations[string(runtimeabi.MemoryBackendFootprint)] != 1 {
 		t.Fatalf(
-			"memory backend operation summary = %+v, want commit/release/footprint counts",
+			"memory backend operation summary = %+v, want commit/footprint counts without release",
 			summary.MemoryBackendOperations,
 		)
 	}
@@ -434,19 +437,18 @@ uses alloc, mem:
 	}
 	text := FormatText(plan)
 	for _, want := range []string{
-		"runtime_path: per_core_small_heap",
+		"runtime_path: process_bump_small_heap_v0",
 		"allocator_class: small_32",
-		"allocator_scope: core:0",
-		"allocator_reuse_policy: same_core_same_size_class_free_list",
+		"allocator_scope: process",
+		"allocator_reuse_policy: bump_no_reuse_v0",
 		"allocator_chunk_bytes: 65536",
 		"memory_backend: small_heap",
-		"memory_backend_ops: commit,footprint,release,reserve",
+		"memory_backend_ops: commit,footprint,reserve",
 		"bytes_committed: 32",
-		"bytes_released: 32",
 		"domain_id: domain:process",
 		"memory_backend_classes:small_heap=1",
-		"memory_backend_operations:commit=1,footprint=1,release=1,reserve=1",
-		"allocator_reuse_policies:same_core_same_size_class_free_list=1",
+		"memory_backend_operations:commit=1,footprint=1,reserve=1",
+		"allocator_reuse_policies:bump_no_reuse_v0=1",
 		"domains:domain:process=17/32",
 	} {
 		if !strings.Contains(text, want) {
@@ -496,7 +498,7 @@ uses alloc, capability, mem:
 			raw,
 		)
 	}
-	if raw.RuntimePath != runtimeabi.AllocationPathPerCoreSmallHeap {
+	if raw.RuntimePath != runtimeabi.AllocationPathProcessBumpSmallHeapV0 {
 		t.Fatalf(
 			("raw allocation runtime path = %q, want small heap optimization " +
 				"to be visible without trusting arbitrary pointers: %+v"),
@@ -781,7 +783,7 @@ uses alloc, mem:
 			copied,
 		)
 	}
-	if copied.RuntimePath != runtimeabi.AllocationPathRegion ||
+	if copied.RuntimePath != runtimeabi.AllocationPathScopedSingleMappingV0 ||
 		copied.AllocatorClass != "function_temp_region" ||
 		copied.RegionID != "region:local_copy:temp" {
 		t.Fatalf("temporary copy region report evidence = %+v, want function temp region", copied)
@@ -799,7 +801,7 @@ uses alloc, mem:
 	for _, want := range []string{
 		"planned_storage: FunctionTempRegion",
 		"actual_lowering_storage: FunctionTempRegion",
-		"runtime_path: region",
+		"runtime_path: scoped_single_mapping_v0",
 		"allocator_class: function_temp_region",
 		"memory_backend: region",
 		"function_temp_region:1",

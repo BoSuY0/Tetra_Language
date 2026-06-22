@@ -11,6 +11,7 @@ func TestOptionsExposeLoweringFlags(t *testing.T) {
 	opt := Options{
 		StackAllocationLowering:    true,
 		FunctionTempRegionLowering: true,
+		OwnedAllocDropLowering:     true,
 	}
 
 	if !opt.StackAllocationLowering {
@@ -18,6 +19,9 @@ func TestOptionsExposeLoweringFlags(t *testing.T) {
 	}
 	if !opt.FunctionTempRegionLowering {
 		t.Fatalf("FunctionTempRegionLowering was not retained")
+	}
+	if !opt.OwnedAllocDropLowering {
+		t.Fatalf("OwnedAllocDropLowering was not retained")
 	}
 }
 

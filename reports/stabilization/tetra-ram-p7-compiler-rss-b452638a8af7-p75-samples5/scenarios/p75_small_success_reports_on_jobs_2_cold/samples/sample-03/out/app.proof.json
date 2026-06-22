@@ -1,0 +1,423 @@
+{
+  "schema_version": 1,
+  "kind": "proof",
+  "target": "linux-x64",
+  "bounds": {
+    "schema_version": 1,
+    "kind": "bounds",
+    "target": "linux-x64",
+    "totals": {
+      "removed": 0,
+      "left": 0
+    },
+    "functions": null
+  },
+  "plir": {
+    "funcs": [
+      {
+        "name": "bench.m0.value_0",
+        "module": "bench.m0",
+        "summary": {
+          "public": true,
+          "param_names": [
+            "x"
+          ],
+          "param_types": [
+            "i32"
+          ],
+          "param_ownership": [
+            ""
+          ],
+          "return_type": "i32"
+        },
+        "values": [
+          {
+            "id": "param:x",
+            "kind": "param",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/bench/m0.t4:2:5",
+            "region": "fn:bench.m0.value_0",
+            "provenance": {
+              "kind": "param",
+              "root": "param:x"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "x"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "return",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/bench/m0.t4:3:3",
+            "inputs": [
+              "x + 1"
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "pure_call",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/bench/m0.t4:2:5",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f1",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/bench/m0.t4:2:5",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f2",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/bench/m0.t4:2:5",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f3",
+            "kind": "no_mem_write",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/bench/m0.t4:2:5",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f4",
+            "kind": "no_unknown_escape",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/bench/m0.t4:2:5",
+            "reason": "semantics checker enforced declared effects"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "exit": true,
+            "ops": [
+              "op0"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/bench/m0.t4:2:5"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "bench.m1.value_1",
+        "module": "bench.m1",
+        "summary": {
+          "public": true,
+          "param_names": [
+            "x"
+          ],
+          "param_types": [
+            "i32"
+          ],
+          "param_ownership": [
+            ""
+          ],
+          "return_type": "i32"
+        },
+        "values": [
+          {
+            "id": "param:x",
+            "kind": "param",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/bench/m1.t4:3:5",
+            "region": "fn:bench.m1.value_1",
+            "provenance": {
+              "kind": "param",
+              "root": "param:x"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "x"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/bench/m1.t4:4:10",
+            "inputs": [
+              "x"
+            ],
+            "note": "bench.m0.value_0"
+          },
+          {
+            "id": "op1",
+            "kind": "return",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/bench/m1.t4:4:3",
+            "inputs": [
+              ""
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "pure_call",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/bench/m1.t4:3:5",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f1",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/bench/m1.t4:3:5",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f2",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/bench/m1.t4:3:5",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f3",
+            "kind": "no_mem_write",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/bench/m1.t4:3:5",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f4",
+            "kind": "no_unknown_escape",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/bench/m1.t4:3:5",
+            "reason": "semantics checker enforced declared effects"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "exit": true,
+            "ops": [
+              "op0",
+              "op1"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/bench/m1.t4:3:5"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "bench.m2.value_2",
+        "module": "bench.m2",
+        "summary": {
+          "public": true,
+          "param_names": [
+            "x"
+          ],
+          "param_types": [
+            "i32"
+          ],
+          "param_ownership": [
+            ""
+          ],
+          "return_type": "i32"
+        },
+        "values": [
+          {
+            "id": "param:x",
+            "kind": "param",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/bench/m2.t4:3:5",
+            "region": "fn:bench.m2.value_2",
+            "provenance": {
+              "kind": "param",
+              "root": "param:x"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "x"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/bench/m2.t4:4:10",
+            "inputs": [
+              "x"
+            ],
+            "note": "bench.m1.value_1"
+          },
+          {
+            "id": "op1",
+            "kind": "return",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/bench/m2.t4:4:3",
+            "inputs": [
+              ""
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "pure_call",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/bench/m2.t4:3:5",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f1",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/bench/m2.t4:3:5",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f2",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/bench/m2.t4:3:5",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f3",
+            "kind": "no_mem_write",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/bench/m2.t4:3:5",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f4",
+            "kind": "no_unknown_escape",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/bench/m2.t4:3:5",
+            "reason": "semantics checker enforced declared effects"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "exit": true,
+            "ops": [
+              "op0",
+              "op1"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/bench/m2.t4:3:5"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "app.main.main",
+        "module": "app.main",
+        "summary": {
+          "public": true,
+          "return_type": "i32"
+        },
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/app/main.t4:4:10",
+            "inputs": [
+              "0"
+            ],
+            "note": "bench.m2.value_2"
+          },
+          {
+            "id": "op1",
+            "kind": "return",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/app/main.t4:4:3",
+            "inputs": [
+              ""
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "pure_call",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/app/main.t4:3:5",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f1",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/app/main.t4:3:5",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f2",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/app/main.t4:3:5",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f3",
+            "kind": "no_mem_write",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/app/main.t4:3:5",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f4",
+            "kind": "no_unknown_escape",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/app/main.t4:3:5",
+            "reason": "semantics checker enforced declared effects"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "exit": true,
+            "ops": [
+              "op0",
+              "op1"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_small_success_reports_on_jobs_2_cold/samples/sample-03/src/app/main.t4:3:5"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

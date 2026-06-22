@@ -18,10 +18,22 @@ Runtime heap sidecars use:
 tetra.runtime.heap_telemetry.v1
 ```
 
+P0 truthful-evidence sidecars use:
+
+```text
+tetra.runtime.heap_telemetry.v2
+```
+
 The current measured method is:
 
 ```text
 tetra_linux_x64_heap_telemetry_v1
+```
+
+The P0 v2 method is:
+
+```text
+tetra_linux_x64_heap_telemetry_v2
 ```
 
 The first target is:
@@ -48,7 +60,40 @@ linux-x64
 - `allocation_paths`: count by allocation path, such as `small_heap_bump`, `small_heap_refill`,
   `large_mmap`, or `alloc_bytes_mmap`.
 - `domain_bytes`: optional per-domain byte summary.
+- `actor_snapshot_record_count`: optional actor-telemetry record count when actor domains are
+  emitted; this includes live actors plus reusable/done slots that still carry retained or released
+  accounting state.
+- `actor_live_count`: optional actor-telemetry live slot count when actor domains are emitted; this
+  excludes `done` and `free` actor slots from the live total.
 - `notes`: optional limitations or implementation notes.
+
+## V2 Truth Fields
+
+`tetra.runtime.heap_telemetry.v2` preserves v1 compatibility where useful, but its claim-bearing
+fields are separated from compile-time estimates and report labels:
+
+- `allocator_mode`: truthful emitted allocator mode, for example `process_bump_small_heap_v0`.
+- `allocator_state_scope`: ownership of allocator state, for example `process`.
+- `allocator_claims`: optional capability labels; labels such as `per_core` must match real emitted
+  state scope.
+- `successful_alloc_payload_bytes`: payload bytes actually accepted by counted runtime allocation
+  paths.
+- `successful_drop_payload_bytes`: payload bytes actually dropped/freed by counted runtime paths.
+- `payload_transfer_current_delta_bytes`: signed adjustment for documented ownership transfers that
+  preserve global totals.
+- `payload_live_current_bytes`: measured current payload bytes.
+- `free_count`: successful runtime free/drop count.
+- `reuse_count`: successful runtime reuse count.
+- `released_total_bytes`: bytes reported as released/decommitted only after successful OS/runtime
+  release.
+- `os_release_attempt_count`, `os_release_success_count`, `os_release_success_bytes`: release
+  operation counters at the runtime memory ABI boundary.
+- `metric_sources`: per-metric provenance. Claim-bearing numeric fields must be
+  `runtime_measured` or `os_measured`, not `allocation_plan_estimate`, `planned`, or `estimated`.
+- `unsupported_metrics`: metrics unavailable for the current target/configuration; unsupported
+  metrics must be absent rather than encoded as numeric zero.
+- `not_sampled_metrics`: metrics omitted because the run did not sample them; not-sampled metrics
+  must be absent rather than encoded as numeric zero.
 
 `started_unix_nano` and `finished_unix_nano` are optional because some minimal native runtimes may
 not have a time source wired into the telemetry path.
@@ -62,6 +107,17 @@ not have a time source wired into the telemetry path.
 - every `allocation_paths` key must be non-empty and every count must be positive.
 - every `domain_bytes` item must have a non-empty `domain_id` and `kind`.
 - per-domain `peak_bytes` must be greater than or equal to per-domain `current_bytes`.
+- when present, `actor_snapshot_record_count >= actor_live_count`; reusable/done actor slots must
+  not be counted as live actors merely because they still have snapshot records for retained or
+  released stack accounting.
+- v2 `payload_live_current_bytes` must reconcile with successful alloc/drop counters and documented
+  transfer deltas.
+- v2 `released_total_bytes` must not exceed successful OS/runtime release bytes and must not be
+  positive when `os_release_success_count` is zero or absent.
+- v2 `free_count` must not exceed counted successful allocations.
+- v2 `per_core` claims are invalid for process-global allocator state.
+- v2 claim-bearing measured fields must not use allocation-plan or compiler-estimate provenance.
+- v2 unsupported or not-sampled metrics must be omitted/null rather than encoded as zero.
 
 ## Evidence Mapping
 
@@ -88,6 +144,7 @@ The following are not valid evidence for `heap_alloc_bytes.runtime_measured`:
 - Go `runtime.MemStats` from the benchmark runner or compiler process.
 - process RSS from `/proc`, `getrusage`, or another process sampler.
 - allocation-plan reports or compiler estimates.
+- allocation-plan reports or compiler estimates in v2 `metric_sources`.
 - binary size.
 - `mmap` reserved bytes alone.
 - C, C++, Rust, wasm, linux-x86, linux-x32, macOS, or Windows observations.

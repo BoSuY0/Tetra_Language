@@ -1,0 +1,10 @@
+// Stable core async stdlib smoke.
+module examples.async.core_async_smoke
+
+import lib.core.async as async_lib
+
+async func core_async_probe() -> Int:
+    return await async_lib.pair_sum(20, 22)
+
+func main() -> Int:
+    return async_lib.select_or(42, 0)

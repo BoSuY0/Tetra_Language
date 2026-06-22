@@ -161,6 +161,8 @@ func coreStdlibBucket(name string) string {
 		return "memory"
 	case "async":
 		return "async"
+	case "actors":
+		return "actors"
 	case "accessibility", "component", "draw", "i18n", "surface", "text":
 		return "surface"
 	case "style", "surface_app", "surface_app_shell", "widgets":

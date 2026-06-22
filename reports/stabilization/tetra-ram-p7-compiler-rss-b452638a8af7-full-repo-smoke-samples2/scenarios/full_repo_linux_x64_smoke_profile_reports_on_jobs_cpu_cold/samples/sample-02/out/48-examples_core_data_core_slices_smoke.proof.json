@@ -1,0 +1,2261 @@
+{
+  "schema_version": 1,
+  "kind": "proof",
+  "target": "linux-x64",
+  "bounds": {
+    "schema_version": 1,
+    "kind": "bounds",
+    "target": "linux-x64",
+    "totals": {
+      "removed": 5,
+      "left": 4
+    },
+    "functions": [
+      {
+        "function": "lib.core.slices.sum_i32",
+        "removed": 1,
+        "left": 0,
+        "sites": [
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:19:5",
+            "kind": "i32.load",
+            "removed": true,
+            "proof_id": "proof:for-collection:value:19:5",
+            "reason": "removed_by_for_loop_range"
+          }
+        ]
+      },
+      {
+        "function": "lib.core.slices.weighted_sum_i32",
+        "removed": 1,
+        "left": 0,
+        "sites": [
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:27:5",
+            "kind": "i32.load",
+            "removed": true,
+            "proof_id": "proof:for-collection:value:27:5",
+            "reason": "removed_by_for_loop_range"
+          }
+        ]
+      },
+      {
+        "function": "lib.core.slices.sum_u8",
+        "removed": 1,
+        "left": 0,
+        "sites": [
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:35:5",
+            "kind": "u8.load",
+            "removed": true,
+            "proof_id": "proof:for-collection:value:35:5",
+            "reason": "removed_by_for_loop_range"
+          }
+        ]
+      },
+      {
+        "function": "examples.core.data.core_slices_smoke.main",
+        "removed": 2,
+        "left": 4,
+        "sites": [
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:10:9",
+            "kind": "i32.store",
+            "removed": true,
+            "proof_id": "proof:allocation-zero:literal0:xs:10:9",
+            "reason": "removed_by_allocation_literal_zero_length"
+          },
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:11:9",
+            "kind": "i32.store",
+            "removed": false,
+            "reason": "left_missing_dominance"
+          },
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:12:9",
+            "kind": "i32.store",
+            "removed": false,
+            "reason": "left_missing_dominance"
+          },
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:16:9",
+            "kind": "u8.store",
+            "removed": true,
+            "proof_id": "proof:allocation-zero:literal0:bytes:16:9",
+            "reason": "removed_by_allocation_literal_zero_length"
+          },
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:17:9",
+            "kind": "u8.store",
+            "removed": false,
+            "reason": "left_missing_dominance"
+          },
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:18:9",
+            "kind": "u8.store",
+            "removed": false,
+            "reason": "left_missing_dominance"
+          }
+        ]
+      }
+    ]
+  },
+  "proofs": [
+    {
+      "proof_id": "proof:for-collection:value:19:5",
+      "kind": "range",
+      "guard": "__for_index_19_5 < values.len",
+      "dominates": "bounds_check op1",
+      "fact": "__for_index_19_5 in [0, values.len); derivation: non_negative, less_than_len",
+      "reason": "for loop range proof",
+      "removed_bounds_check": true
+    },
+    {
+      "proof_id": "proof:for-collection:value:27:5",
+      "kind": "range",
+      "guard": "__for_index_27_5 < values.len",
+      "dominates": "bounds_check op2",
+      "fact": "__for_index_27_5 in [0, values.len); derivation: non_negative, less_than_len",
+      "reason": "for loop range proof",
+      "removed_bounds_check": true
+    },
+    {
+      "proof_id": "proof:for-collection:value:35:5",
+      "kind": "range",
+      "guard": "__for_index_35_5 < values.len",
+      "dominates": "bounds_check op1",
+      "fact": "__for_index_35_5 in [0, values.len); derivation: non_negative, less_than_len",
+      "reason": "for loop range proof",
+      "removed_bounds_check": true
+    },
+    {
+      "proof_id": "proof:allocation-zero:literal0:xs:10:9:index_store",
+      "kind": "range",
+      "guard": "0 < xs.len && xs.len == 3",
+      "dominates": "bounds_check op1",
+      "fact": "0 in [0, xs.len); derivation: non_negative, less_than_len, allocation_literal_zero, allocation_length_positive",
+      "reason": "allocation literal-zero length proof",
+      "removed_bounds_check": true
+    },
+    {
+      "proof_id": "proof:allocation-zero:literal0:bytes:16:9:index_store",
+      "kind": "range",
+      "guard": "0 < bytes.len && bytes.len == 3",
+      "dominates": "bounds_check op7",
+      "fact": "0 in [0, bytes.len); derivation: non_negative, less_than_len, allocation_literal_zero, allocation_length_positive",
+      "reason": "allocation literal-zero length proof",
+      "removed_bounds_check": true
+    }
+  ],
+  "plir": {
+    "funcs": [
+      {
+        "name": "lib.core.slices.sum_i32",
+        "module": "lib.core.slices",
+        "summary": {
+          "public": true,
+          "param_names": [
+            "values"
+          ],
+          "param_types": [
+            "[]i32"
+          ],
+          "param_ownership": [
+            ""
+          ],
+          "return_type": "i32",
+          "effects": [
+            "mem"
+          ]
+        },
+        "values": [
+          {
+            "id": "local:__for_end_19_5",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:16:6",
+            "region": "fn:lib.core.slices.sum_i32",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:__for_end_19_5"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "__for_end_19_5"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:__for_index_19_5",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:16:6",
+            "region": "fn:lib.core.slices.sum_i32",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:__for_index_19_5"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "__for_index_19_5"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:__for_iter_19_5",
+            "kind": "local",
+            "type": "[]i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:16:6",
+            "region": "fn:lib.core.slices.sum_i32",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:__for_iter_19_5"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "__for_iter_19_5"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:total",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:16:6",
+            "region": "fn:lib.core.slices.sum_i32",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:total"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "total"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "local:value",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:16:6",
+            "region": "fn:lib.core.slices.sum_i32",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:value"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "value"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "loop_index:__for_index_19_5",
+            "kind": "loop_index",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:19:5",
+            "region": "fn:lib.core.slices.sum_i32",
+            "provenance": {
+              "kind": "stack",
+              "root": "__for_index_19_5"
+            },
+            "lifetime": {
+              "birth": "loop:start",
+              "death": "loop:end",
+              "owner": "__for_index_19_5"
+            },
+            "escape": "no_escape"
+          },
+          {
+            "id": "param:values",
+            "kind": "param",
+            "type": "[]i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:16:6",
+            "region": "fn:lib.core.slices.sum_i32",
+            "provenance": {
+              "kind": "param",
+              "root": "param:values"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "values"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          },
+          {
+            "id": "view:__for_iter_19_5",
+            "kind": "view",
+            "type": "[]i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:19:18",
+            "region": "fn:lib.core.slices.sum_i32",
+            "provenance": {
+              "kind": "param",
+              "root": "param:values"
+            },
+            "lifetime": {
+              "birth": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:19:18",
+              "death": "loop:end",
+              "owner": "values"
+            },
+            "borrow": "immutable",
+            "escape": "no_escape"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "assign",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:18:5",
+            "inputs": [
+              "0"
+            ],
+            "outputs": [
+              "total"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op1",
+            "kind": "for_slice",
+            "block": "for_header:0",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:19:5",
+            "inputs": [
+              "view:__for_iter_19_5",
+              "loop_index:__for_index_19_5"
+            ],
+            "outputs": [
+              "local:value"
+            ],
+            "note": "range: 0..values.len"
+          },
+          {
+            "id": "op2",
+            "kind": "assign",
+            "block": "for_body:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:20:9",
+            "inputs": [
+              "total + value"
+            ],
+            "outputs": [
+              "total"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op3",
+            "kind": "return",
+            "block": "for_after:2",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:21:7",
+            "inputs": [
+              "total"
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:16:6",
+            "reason": "semantics checker enforced declared effects",
+            "uses": [
+              "mem"
+            ]
+          },
+          {
+            "id": "f1",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:16:6",
+            "reason": "semantics checker enforced declared effects",
+            "uses": [
+              "mem"
+            ]
+          },
+          {
+            "id": "f2",
+            "kind": "provenance_known",
+            "value_id": "local:__for_iter_19_5",
+            "reason": "checked parameter/local memory value"
+          },
+          {
+            "id": "f3",
+            "kind": "region_alive",
+            "value_id": "local:__for_iter_19_5",
+            "region": "fn:lib.core.slices.sum_i32",
+            "reason": "function region is alive"
+          },
+          {
+            "id": "f4",
+            "kind": "provenance_known",
+            "value_id": "param:values",
+            "reason": "checked parameter/local memory value"
+          },
+          {
+            "id": "f5",
+            "kind": "region_alive",
+            "value_id": "param:values",
+            "region": "fn:lib.core.slices.sum_i32",
+            "reason": "function region is alive"
+          },
+          {
+            "id": "f6",
+            "kind": "len_stable",
+            "value_id": "param:values",
+            "reason": "safe code cannot mutate slice/string metadata"
+          },
+          {
+            "id": "f7",
+            "kind": "borrowed_imm",
+            "value_id": "param:values"
+          },
+          {
+            "id": "f8",
+            "kind": "provenance_known",
+            "value_id": "view:__for_iter_19_5",
+            "reason": "for collection iterable view preserves source provenance"
+          },
+          {
+            "id": "f9",
+            "kind": "region_alive",
+            "value_id": "view:__for_iter_19_5",
+            "region": "fn:lib.core.slices.sum_i32"
+          },
+          {
+            "id": "f10",
+            "kind": "borrowed_imm",
+            "value_id": "view:__for_iter_19_5"
+          },
+          {
+            "id": "f11",
+            "kind": "no_escape",
+            "value_id": "view:__for_iter_19_5",
+            "reason": "for collection iterable view may not escape its owner"
+          },
+          {
+            "id": "f12",
+            "kind": "index_in_range",
+            "value_id": "loop_index:__for_index_19_5",
+            "range": "0..values.len",
+            "proof_id": "proof:for-collection:value:19:5",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:19:5",
+            "reason": "for collection loop index is dominated by index < iterable.len guard",
+            "uses": [
+              "view:__for_iter_19_5"
+            ]
+          },
+          {
+            "id": "f13",
+            "kind": "len_stable",
+            "value_id": "view:__for_iter_19_5",
+            "reason": "for collection iterable is copied into hidden slice header"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "succs": [
+              "for_header:0"
+            ],
+            "ops": [
+              "op0"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:16:6"
+          },
+          {
+            "id": "for_header:0",
+            "kind": "for_header",
+            "preds": [
+              "entry",
+              "for_body:1"
+            ],
+            "succs": [
+              "for_after:2",
+              "for_body:1"
+            ],
+            "ops": [
+              "op1"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:19:5"
+          },
+          {
+            "id": "for_body:1",
+            "kind": "for_body",
+            "preds": [
+              "for_header:0"
+            ],
+            "succs": [
+              "for_header:0"
+            ],
+            "ops": [
+              "op2"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:19:5"
+          },
+          {
+            "id": "for_after:2",
+            "kind": "for_after",
+            "exit": true,
+            "preds": [
+              "for_header:0"
+            ],
+            "ops": [
+              "op3"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:19:5"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          },
+          {
+            "block": "for_header:0",
+            "dominators": [
+              "entry",
+              "for_header:0"
+            ]
+          },
+          {
+            "block": "for_body:1",
+            "dominators": [
+              "entry",
+              "for_body:1",
+              "for_header:0"
+            ]
+          },
+          {
+            "block": "for_after:2",
+            "dominators": [
+              "entry",
+              "for_after:2",
+              "for_header:0"
+            ]
+          }
+        ],
+        "proof_guards": [
+          {
+            "id": "proof:for-collection:value:19:5",
+            "kind": "range",
+            "block": "for_body:1",
+            "op_id": "op1",
+            "condition": "__for_index_19_5 < values.len",
+            "reason": "for loop range proof",
+            "dominates": [
+              {
+                "proof_id": "proof:for-collection:value:19:5",
+                "block": "for_body:1",
+                "op_id": "op1",
+                "use_kind": "bounds_check",
+                "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:19:5"
+              }
+            ]
+          }
+        ],
+        "proof_uses": [
+          {
+            "proof_id": "proof:for-collection:value:19:5",
+            "block": "for_body:1",
+            "op_id": "op1",
+            "use_kind": "bounds_check",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:19:5"
+          }
+        ],
+        "proof_terms": [
+          {
+            "id": "proof:for-collection:value:19:5",
+            "kind": "bounds_check",
+            "subject_base_id": "values",
+            "index_value_id": "loop_index:__for_index_19_5",
+            "operation": "index_load",
+            "range": "0..values.len",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:19:5",
+            "facts_used": [
+              "non_negative",
+              "less_than_len"
+            ]
+          }
+        ],
+        "range_facts": [
+          {
+            "value": "loop_index:__for_index_19_5",
+            "lower": {
+              "kind": "const"
+            },
+            "upper": {
+              "kind": "symbol",
+              "symbol": "values.len"
+            },
+            "inclusive_lower": true,
+            "inclusive_upper": false,
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:19:5",
+            "proof_id": "proof:for-collection:value:19:5",
+            "reason": "for loop range proof",
+            "derivation": [
+              "non_negative",
+              "less_than_len"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "lib.core.slices.weighted_sum_i32",
+        "module": "lib.core.slices",
+        "summary": {
+          "public": true,
+          "param_names": [
+            "values"
+          ],
+          "param_types": [
+            "[]i32"
+          ],
+          "param_ownership": [
+            ""
+          ],
+          "return_type": "i32",
+          "effects": [
+            "mem"
+          ]
+        },
+        "values": [
+          {
+            "id": "local:__for_end_27_5",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:23:8",
+            "region": "fn:lib.core.slices.weighted_sum_i32",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:__for_end_27_5"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "__for_end_27_5"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:__for_index_27_5",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:23:8",
+            "region": "fn:lib.core.slices.weighted_sum_i32",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:__for_index_27_5"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "__for_index_27_5"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:__for_iter_27_5",
+            "kind": "local",
+            "type": "[]i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:23:8",
+            "region": "fn:lib.core.slices.weighted_sum_i32",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:__for_iter_27_5"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "__for_iter_27_5"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:total",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:23:8",
+            "region": "fn:lib.core.slices.weighted_sum_i32",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:total"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "total"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "local:value",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:23:8",
+            "region": "fn:lib.core.slices.weighted_sum_i32",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:value"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "value"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:weight",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:23:8",
+            "region": "fn:lib.core.slices.weighted_sum_i32",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:weight"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "weight"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "loop_index:__for_index_27_5",
+            "kind": "loop_index",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:27:5",
+            "region": "fn:lib.core.slices.weighted_sum_i32",
+            "provenance": {
+              "kind": "stack",
+              "root": "__for_index_27_5"
+            },
+            "lifetime": {
+              "birth": "loop:start",
+              "death": "loop:end",
+              "owner": "__for_index_27_5"
+            },
+            "escape": "no_escape"
+          },
+          {
+            "id": "param:values",
+            "kind": "param",
+            "type": "[]i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:23:8",
+            "region": "fn:lib.core.slices.weighted_sum_i32",
+            "provenance": {
+              "kind": "param",
+              "root": "param:values"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "values"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          },
+          {
+            "id": "view:__for_iter_27_5",
+            "kind": "view",
+            "type": "[]i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:27:18",
+            "region": "fn:lib.core.slices.weighted_sum_i32",
+            "provenance": {
+              "kind": "param",
+              "root": "param:values"
+            },
+            "lifetime": {
+              "birth": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:27:18",
+              "death": "loop:end",
+              "owner": "values"
+            },
+            "borrow": "immutable",
+            "escape": "no_escape"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "assign",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:25:5",
+            "inputs": [
+              "0"
+            ],
+            "outputs": [
+              "total"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op1",
+            "kind": "assign",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:26:5",
+            "inputs": [
+              "1"
+            ],
+            "outputs": [
+              "weight"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op2",
+            "kind": "for_slice",
+            "block": "for_header:0",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:27:5",
+            "inputs": [
+              "view:__for_iter_27_5",
+              "loop_index:__for_index_27_5"
+            ],
+            "outputs": [
+              "local:value"
+            ],
+            "note": "range: 0..values.len"
+          },
+          {
+            "id": "op3",
+            "kind": "assign",
+            "block": "for_body:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:28:9",
+            "inputs": [
+              "total + value * weight"
+            ],
+            "outputs": [
+              "total"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op4",
+            "kind": "assign",
+            "block": "for_body:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:29:9",
+            "inputs": [
+              "weight + 1"
+            ],
+            "outputs": [
+              "weight"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op5",
+            "kind": "return",
+            "block": "for_after:2",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:30:7",
+            "inputs": [
+              "total"
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:23:8",
+            "reason": "semantics checker enforced declared effects",
+            "uses": [
+              "mem"
+            ]
+          },
+          {
+            "id": "f1",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:23:8",
+            "reason": "semantics checker enforced declared effects",
+            "uses": [
+              "mem"
+            ]
+          },
+          {
+            "id": "f2",
+            "kind": "provenance_known",
+            "value_id": "local:__for_iter_27_5",
+            "reason": "checked parameter/local memory value"
+          },
+          {
+            "id": "f3",
+            "kind": "region_alive",
+            "value_id": "local:__for_iter_27_5",
+            "region": "fn:lib.core.slices.weighted_sum_i32",
+            "reason": "function region is alive"
+          },
+          {
+            "id": "f4",
+            "kind": "provenance_known",
+            "value_id": "param:values",
+            "reason": "checked parameter/local memory value"
+          },
+          {
+            "id": "f5",
+            "kind": "region_alive",
+            "value_id": "param:values",
+            "region": "fn:lib.core.slices.weighted_sum_i32",
+            "reason": "function region is alive"
+          },
+          {
+            "id": "f6",
+            "kind": "len_stable",
+            "value_id": "param:values",
+            "reason": "safe code cannot mutate slice/string metadata"
+          },
+          {
+            "id": "f7",
+            "kind": "borrowed_imm",
+            "value_id": "param:values"
+          },
+          {
+            "id": "f8",
+            "kind": "provenance_known",
+            "value_id": "view:__for_iter_27_5",
+            "reason": "for collection iterable view preserves source provenance"
+          },
+          {
+            "id": "f9",
+            "kind": "region_alive",
+            "value_id": "view:__for_iter_27_5",
+            "region": "fn:lib.core.slices.weighted_sum_i32"
+          },
+          {
+            "id": "f10",
+            "kind": "borrowed_imm",
+            "value_id": "view:__for_iter_27_5"
+          },
+          {
+            "id": "f11",
+            "kind": "no_escape",
+            "value_id": "view:__for_iter_27_5",
+            "reason": "for collection iterable view may not escape its owner"
+          },
+          {
+            "id": "f12",
+            "kind": "index_in_range",
+            "value_id": "loop_index:__for_index_27_5",
+            "range": "0..values.len",
+            "proof_id": "proof:for-collection:value:27:5",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:27:5",
+            "reason": "for collection loop index is dominated by index < iterable.len guard",
+            "uses": [
+              "view:__for_iter_27_5"
+            ]
+          },
+          {
+            "id": "f13",
+            "kind": "len_stable",
+            "value_id": "view:__for_iter_27_5",
+            "reason": "for collection iterable is copied into hidden slice header"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "succs": [
+              "for_header:0"
+            ],
+            "ops": [
+              "op0",
+              "op1"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:23:8"
+          },
+          {
+            "id": "for_header:0",
+            "kind": "for_header",
+            "preds": [
+              "entry",
+              "for_body:1"
+            ],
+            "succs": [
+              "for_after:2",
+              "for_body:1"
+            ],
+            "ops": [
+              "op2"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:27:5"
+          },
+          {
+            "id": "for_body:1",
+            "kind": "for_body",
+            "preds": [
+              "for_header:0"
+            ],
+            "succs": [
+              "for_header:0"
+            ],
+            "ops": [
+              "op3",
+              "op4"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:27:5"
+          },
+          {
+            "id": "for_after:2",
+            "kind": "for_after",
+            "exit": true,
+            "preds": [
+              "for_header:0"
+            ],
+            "ops": [
+              "op5"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:27:5"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          },
+          {
+            "block": "for_header:0",
+            "dominators": [
+              "entry",
+              "for_header:0"
+            ]
+          },
+          {
+            "block": "for_body:1",
+            "dominators": [
+              "entry",
+              "for_body:1",
+              "for_header:0"
+            ]
+          },
+          {
+            "block": "for_after:2",
+            "dominators": [
+              "entry",
+              "for_after:2",
+              "for_header:0"
+            ]
+          }
+        ],
+        "proof_guards": [
+          {
+            "id": "proof:for-collection:value:27:5",
+            "kind": "range",
+            "block": "for_body:1",
+            "op_id": "op2",
+            "condition": "__for_index_27_5 < values.len",
+            "reason": "for loop range proof",
+            "dominates": [
+              {
+                "proof_id": "proof:for-collection:value:27:5",
+                "block": "for_body:1",
+                "op_id": "op2",
+                "use_kind": "bounds_check",
+                "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:27:5"
+              }
+            ]
+          }
+        ],
+        "proof_uses": [
+          {
+            "proof_id": "proof:for-collection:value:27:5",
+            "block": "for_body:1",
+            "op_id": "op2",
+            "use_kind": "bounds_check",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:27:5"
+          }
+        ],
+        "proof_terms": [
+          {
+            "id": "proof:for-collection:value:27:5",
+            "kind": "bounds_check",
+            "subject_base_id": "values",
+            "index_value_id": "loop_index:__for_index_27_5",
+            "operation": "index_load",
+            "range": "0..values.len",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:27:5",
+            "facts_used": [
+              "non_negative",
+              "less_than_len"
+            ]
+          }
+        ],
+        "range_facts": [
+          {
+            "value": "loop_index:__for_index_27_5",
+            "lower": {
+              "kind": "const"
+            },
+            "upper": {
+              "kind": "symbol",
+              "symbol": "values.len"
+            },
+            "inclusive_lower": true,
+            "inclusive_upper": false,
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:27:5",
+            "proof_id": "proof:for-collection:value:27:5",
+            "reason": "for loop range proof",
+            "derivation": [
+              "non_negative",
+              "less_than_len"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "lib.core.slices.sum_u8",
+        "module": "lib.core.slices",
+        "summary": {
+          "public": true,
+          "param_names": [
+            "values"
+          ],
+          "param_types": [
+            "[]u8"
+          ],
+          "param_ownership": [
+            ""
+          ],
+          "return_type": "i32",
+          "effects": [
+            "mem"
+          ]
+        },
+        "values": [
+          {
+            "id": "local:__for_end_35_5",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:32:8",
+            "region": "fn:lib.core.slices.sum_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:__for_end_35_5"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "__for_end_35_5"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:__for_index_35_5",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:32:8",
+            "region": "fn:lib.core.slices.sum_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:__for_index_35_5"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "__for_index_35_5"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:__for_iter_35_5",
+            "kind": "local",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:32:8",
+            "region": "fn:lib.core.slices.sum_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:__for_iter_35_5"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "__for_iter_35_5"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:total",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:32:8",
+            "region": "fn:lib.core.slices.sum_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:total"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "total"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "local:value",
+            "kind": "local",
+            "type": "u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:32:8",
+            "region": "fn:lib.core.slices.sum_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:value"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "value"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "loop_index:__for_index_35_5",
+            "kind": "loop_index",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:35:5",
+            "region": "fn:lib.core.slices.sum_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "__for_index_35_5"
+            },
+            "lifetime": {
+              "birth": "loop:start",
+              "death": "loop:end",
+              "owner": "__for_index_35_5"
+            },
+            "escape": "no_escape"
+          },
+          {
+            "id": "param:values",
+            "kind": "param",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:32:8",
+            "region": "fn:lib.core.slices.sum_u8",
+            "provenance": {
+              "kind": "param",
+              "root": "param:values"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "values"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          },
+          {
+            "id": "view:__for_iter_35_5",
+            "kind": "view",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:35:18",
+            "region": "fn:lib.core.slices.sum_u8",
+            "provenance": {
+              "kind": "param",
+              "root": "param:values"
+            },
+            "lifetime": {
+              "birth": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:35:18",
+              "death": "loop:end",
+              "owner": "values"
+            },
+            "borrow": "immutable",
+            "escape": "no_escape"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "assign",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:34:5",
+            "inputs": [
+              "0"
+            ],
+            "outputs": [
+              "total"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op1",
+            "kind": "for_slice",
+            "block": "for_header:0",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:35:5",
+            "inputs": [
+              "view:__for_iter_35_5",
+              "loop_index:__for_index_35_5"
+            ],
+            "outputs": [
+              "local:value"
+            ],
+            "note": "range: 0..values.len"
+          },
+          {
+            "id": "op2",
+            "kind": "assign",
+            "block": "for_body:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:36:9",
+            "inputs": [
+              "total + value"
+            ],
+            "outputs": [
+              "total"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op3",
+            "kind": "return",
+            "block": "for_after:2",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:37:7",
+            "inputs": [
+              "total"
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:32:8",
+            "reason": "semantics checker enforced declared effects",
+            "uses": [
+              "mem"
+            ]
+          },
+          {
+            "id": "f1",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:32:8",
+            "reason": "semantics checker enforced declared effects",
+            "uses": [
+              "mem"
+            ]
+          },
+          {
+            "id": "f2",
+            "kind": "provenance_known",
+            "value_id": "local:__for_iter_35_5",
+            "reason": "checked parameter/local memory value"
+          },
+          {
+            "id": "f3",
+            "kind": "region_alive",
+            "value_id": "local:__for_iter_35_5",
+            "region": "fn:lib.core.slices.sum_u8",
+            "reason": "function region is alive"
+          },
+          {
+            "id": "f4",
+            "kind": "provenance_known",
+            "value_id": "param:values",
+            "reason": "checked parameter/local memory value"
+          },
+          {
+            "id": "f5",
+            "kind": "region_alive",
+            "value_id": "param:values",
+            "region": "fn:lib.core.slices.sum_u8",
+            "reason": "function region is alive"
+          },
+          {
+            "id": "f6",
+            "kind": "len_stable",
+            "value_id": "param:values",
+            "reason": "safe code cannot mutate slice/string metadata"
+          },
+          {
+            "id": "f7",
+            "kind": "borrowed_imm",
+            "value_id": "param:values"
+          },
+          {
+            "id": "f8",
+            "kind": "provenance_known",
+            "value_id": "view:__for_iter_35_5",
+            "reason": "for collection iterable view preserves source provenance"
+          },
+          {
+            "id": "f9",
+            "kind": "region_alive",
+            "value_id": "view:__for_iter_35_5",
+            "region": "fn:lib.core.slices.sum_u8"
+          },
+          {
+            "id": "f10",
+            "kind": "borrowed_imm",
+            "value_id": "view:__for_iter_35_5"
+          },
+          {
+            "id": "f11",
+            "kind": "no_escape",
+            "value_id": "view:__for_iter_35_5",
+            "reason": "for collection iterable view may not escape its owner"
+          },
+          {
+            "id": "f12",
+            "kind": "index_in_range",
+            "value_id": "loop_index:__for_index_35_5",
+            "range": "0..values.len",
+            "proof_id": "proof:for-collection:value:35:5",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:35:5",
+            "reason": "for collection loop index is dominated by index < iterable.len guard",
+            "uses": [
+              "view:__for_iter_35_5"
+            ]
+          },
+          {
+            "id": "f13",
+            "kind": "len_stable",
+            "value_id": "view:__for_iter_35_5",
+            "reason": "for collection iterable is copied into hidden slice header"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "succs": [
+              "for_header:0"
+            ],
+            "ops": [
+              "op0"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:32:8"
+          },
+          {
+            "id": "for_header:0",
+            "kind": "for_header",
+            "preds": [
+              "entry",
+              "for_body:1"
+            ],
+            "succs": [
+              "for_after:2",
+              "for_body:1"
+            ],
+            "ops": [
+              "op1"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:35:5"
+          },
+          {
+            "id": "for_body:1",
+            "kind": "for_body",
+            "preds": [
+              "for_header:0"
+            ],
+            "succs": [
+              "for_header:0"
+            ],
+            "ops": [
+              "op2"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:35:5"
+          },
+          {
+            "id": "for_after:2",
+            "kind": "for_after",
+            "exit": true,
+            "preds": [
+              "for_header:0"
+            ],
+            "ops": [
+              "op3"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:35:5"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          },
+          {
+            "block": "for_header:0",
+            "dominators": [
+              "entry",
+              "for_header:0"
+            ]
+          },
+          {
+            "block": "for_body:1",
+            "dominators": [
+              "entry",
+              "for_body:1",
+              "for_header:0"
+            ]
+          },
+          {
+            "block": "for_after:2",
+            "dominators": [
+              "entry",
+              "for_after:2",
+              "for_header:0"
+            ]
+          }
+        ],
+        "proof_guards": [
+          {
+            "id": "proof:for-collection:value:35:5",
+            "kind": "range",
+            "block": "for_body:1",
+            "op_id": "op1",
+            "condition": "__for_index_35_5 < values.len",
+            "reason": "for loop range proof",
+            "dominates": [
+              {
+                "proof_id": "proof:for-collection:value:35:5",
+                "block": "for_body:1",
+                "op_id": "op1",
+                "use_kind": "bounds_check",
+                "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:35:5"
+              }
+            ]
+          }
+        ],
+        "proof_uses": [
+          {
+            "proof_id": "proof:for-collection:value:35:5",
+            "block": "for_body:1",
+            "op_id": "op1",
+            "use_kind": "bounds_check",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:35:5"
+          }
+        ],
+        "proof_terms": [
+          {
+            "id": "proof:for-collection:value:35:5",
+            "kind": "bounds_check",
+            "subject_base_id": "values",
+            "index_value_id": "loop_index:__for_index_35_5",
+            "operation": "index_load",
+            "range": "0..values.len",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:35:5",
+            "facts_used": [
+              "non_negative",
+              "less_than_len"
+            ]
+          }
+        ],
+        "range_facts": [
+          {
+            "value": "loop_index:__for_index_35_5",
+            "lower": {
+              "kind": "const"
+            },
+            "upper": {
+              "kind": "symbol",
+              "symbol": "values.len"
+            },
+            "inclusive_lower": true,
+            "inclusive_upper": false,
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:35:5",
+            "proof_id": "proof:for-collection:value:35:5",
+            "reason": "for loop range proof",
+            "derivation": [
+              "non_negative",
+              "less_than_len"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "examples.core.data.core_slices_smoke.main",
+        "module": "examples.core.data.core_slices_smoke",
+        "summary": {
+          "public": true,
+          "return_type": "i32",
+          "effects": [
+            "alloc",
+            "islands",
+            "mem"
+          ]
+        },
+        "values": [
+          {
+            "id": "alloc_intent:bytes",
+            "kind": "alloc_intent",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:15:27",
+            "region": "island:isl",
+            "alloc": {
+              "element_type": "u8",
+              "element_size": 1,
+              "length_expr": "3",
+              "length_const_known": true,
+              "length_const": 3,
+              "zero_guard_status": "valid_empty_no_metadata_access",
+              "negative_guard_status": "reject_before_metadata_access",
+              "overflow_guard_status": "reject_before_metadata_access",
+              "builtin": "core.island_make_u8",
+              "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:15:27"
+            },
+            "provenance": {
+              "kind": "island",
+              "root": "isl"
+            },
+            "lifetime": {
+              "birth": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:15:27",
+              "owner": "bytes"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "alloc_intent:xs",
+            "kind": "alloc_intent",
+            "type": "[]i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:9:25",
+            "region": "island:isl",
+            "alloc": {
+              "element_type": "i32",
+              "element_size": 4,
+              "length_expr": "3",
+              "length_const_known": true,
+              "length_const": 3,
+              "zero_guard_status": "valid_empty_no_metadata_access",
+              "negative_guard_status": "reject_before_metadata_access",
+              "overflow_guard_status": "reject_before_metadata_access",
+              "builtin": "core.island_make_i32",
+              "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:9:25"
+            },
+            "provenance": {
+              "kind": "island",
+              "root": "isl"
+            },
+            "lifetime": {
+              "birth": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:9:25",
+              "owner": "xs"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "local:0",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:10:9",
+            "region": "fn:examples.core.data.core_slices_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "0"
+            },
+            "lifetime": {
+              "birth": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:10:9",
+              "owner": "0"
+            },
+            "escape": "no_escape"
+          },
+          {
+            "id": "local:byte_sum",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:6:6",
+            "region": "fn:examples.core.data.core_slices_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:byte_sum"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "byte_sum"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:bytes",
+            "kind": "local",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:6:6",
+            "region": "fn:examples.core.data.core_slices_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:bytes"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "bytes"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "local:isl",
+            "kind": "local",
+            "type": "island",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:6:6",
+            "region": "fn:examples.core.data.core_slices_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:isl"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "isl"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:sum",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:6:6",
+            "region": "fn:examples.core.data.core_slices_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:sum"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "sum"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:weighted",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:6:6",
+            "region": "fn:examples.core.data.core_slices_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:weighted"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "weighted"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:xs",
+            "kind": "local",
+            "type": "[]i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:6:6",
+            "region": "fn:examples.core.data.core_slices_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:xs"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "xs"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "alloc_intent",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:9:25",
+            "inputs": [
+              "isl",
+              "3"
+            ],
+            "outputs": [
+              "alloc_intent:xs"
+            ],
+            "note": "island_make<i32> length contract: zero valid, negative and overflow reject before island metadata access"
+          },
+          {
+            "id": "op1",
+            "kind": "index_store",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:10:9",
+            "inputs": [
+              "xs",
+              "0"
+            ]
+          },
+          {
+            "id": "op2",
+            "kind": "index_store",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:11:9",
+            "inputs": [
+              "xs",
+              "1"
+            ]
+          },
+          {
+            "id": "op3",
+            "kind": "index_store",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:12:9",
+            "inputs": [
+              "xs",
+              "2"
+            ]
+          },
+          {
+            "id": "op4",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:13:24",
+            "inputs": [
+              "xs"
+            ],
+            "note": "lib.core.slices.sum_i32"
+          },
+          {
+            "id": "op5",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:14:29",
+            "inputs": [
+              "xs"
+            ],
+            "note": "lib.core.slices.weighted_sum_i32"
+          },
+          {
+            "id": "op6",
+            "kind": "alloc_intent",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:15:27",
+            "inputs": [
+              "isl",
+              "3"
+            ],
+            "outputs": [
+              "alloc_intent:bytes"
+            ],
+            "note": "island_make<u8> length contract: zero valid, negative and overflow reject before island metadata access"
+          },
+          {
+            "id": "op7",
+            "kind": "index_store",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:16:9",
+            "inputs": [
+              "bytes",
+              "0"
+            ]
+          },
+          {
+            "id": "op8",
+            "kind": "index_store",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:17:9",
+            "inputs": [
+              "bytes",
+              "1"
+            ]
+          },
+          {
+            "id": "op9",
+            "kind": "index_store",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:18:9",
+            "inputs": [
+              "bytes",
+              "2"
+            ]
+          },
+          {
+            "id": "op10",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:19:29",
+            "inputs": [
+              "bytes"
+            ],
+            "note": "lib.core.slices.sum_u8"
+          },
+          {
+            "id": "op11",
+            "kind": "guard",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:20:9",
+            "inputs": [
+              ""
+            ]
+          },
+          {
+            "id": "op12",
+            "kind": "return",
+            "block": "if_then:0",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:21:13",
+            "inputs": [
+              "42"
+            ]
+          },
+          {
+            "id": "op13",
+            "kind": "return",
+            "block": "if_join:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:22:9",
+            "inputs": [
+              "1"
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:6:6",
+            "reason": "semantics checker enforced declared effects",
+            "uses": [
+              "alloc",
+              "islands",
+              "mem"
+            ]
+          },
+          {
+            "id": "f1",
+            "kind": "provenance_known",
+            "value_id": "local:bytes",
+            "reason": "checked parameter/local memory value"
+          },
+          {
+            "id": "f2",
+            "kind": "region_alive",
+            "value_id": "local:bytes",
+            "region": "fn:examples.core.data.core_slices_smoke.main",
+            "reason": "function region is alive"
+          },
+          {
+            "id": "f3",
+            "kind": "provenance_known",
+            "value_id": "local:xs",
+            "reason": "checked parameter/local memory value"
+          },
+          {
+            "id": "f4",
+            "kind": "region_alive",
+            "value_id": "local:xs",
+            "region": "fn:examples.core.data.core_slices_smoke.main",
+            "reason": "function region is alive"
+          },
+          {
+            "id": "f5",
+            "kind": "provenance_known",
+            "value_id": "alloc_intent:xs",
+            "island_id": "island:isl",
+            "epoch": 1,
+            "base_id": "alloc_intent:xs",
+            "reason": "compiler-known allocation intent"
+          },
+          {
+            "id": "f6",
+            "kind": "len_stable",
+            "value_id": "alloc_intent:xs",
+            "island_id": "island:isl",
+            "epoch": 1,
+            "base_id": "alloc_intent:xs",
+            "reason": "slice metadata is opaque in safe code"
+          },
+          {
+            "id": "f7",
+            "kind": "region_alive",
+            "value_id": "alloc_intent:xs",
+            "island_id": "island:isl",
+            "epoch": 1,
+            "base_id": "alloc_intent:xs",
+            "region": "island:isl"
+          },
+          {
+            "id": "f8",
+            "kind": "aligned",
+            "value_id": "alloc_intent:xs",
+            "island_id": "island:isl",
+            "epoch": 1,
+            "base_id": "alloc_intent:xs",
+            "region": "island:isl",
+            "reason": "island region allocator returns 16-byte aligned payloads"
+          },
+          {
+            "id": "f9",
+            "kind": "index_in_range",
+            "value_id": "local:0",
+            "range": "0 in [0, xs.len)",
+            "proof_id": "proof:allocation-zero:literal0:xs:10:9:index_store",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:10:9",
+            "reason": "allocation literal-zero length proof"
+          },
+          {
+            "id": "f10",
+            "kind": "provenance_known",
+            "value_id": "alloc_intent:bytes",
+            "island_id": "island:isl",
+            "epoch": 1,
+            "base_id": "alloc_intent:bytes",
+            "reason": "compiler-known allocation intent"
+          },
+          {
+            "id": "f11",
+            "kind": "len_stable",
+            "value_id": "alloc_intent:bytes",
+            "island_id": "island:isl",
+            "epoch": 1,
+            "base_id": "alloc_intent:bytes",
+            "reason": "slice metadata is opaque in safe code"
+          },
+          {
+            "id": "f12",
+            "kind": "region_alive",
+            "value_id": "alloc_intent:bytes",
+            "island_id": "island:isl",
+            "epoch": 1,
+            "base_id": "alloc_intent:bytes",
+            "region": "island:isl"
+          },
+          {
+            "id": "f13",
+            "kind": "aligned",
+            "value_id": "alloc_intent:bytes",
+            "island_id": "island:isl",
+            "epoch": 1,
+            "base_id": "alloc_intent:bytes",
+            "region": "island:isl",
+            "reason": "island region allocator returns 16-byte aligned payloads"
+          },
+          {
+            "id": "f14",
+            "kind": "index_in_range",
+            "value_id": "local:0",
+            "range": "0 in [0, bytes.len)",
+            "proof_id": "proof:allocation-zero:literal0:bytes:16:9:index_store",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:16:9",
+            "reason": "allocation literal-zero length proof"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "succs": [
+              "if_join:1",
+              "if_then:0"
+            ],
+            "ops": [
+              "op0",
+              "op1",
+              "op2",
+              "op3",
+              "op4",
+              "op5",
+              "op6",
+              "op7",
+              "op8",
+              "op9",
+              "op10",
+              "op11"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:6:6"
+          },
+          {
+            "id": "if_then:0",
+            "kind": "if_then",
+            "preds": [
+              "entry"
+            ],
+            "succs": [
+              "if_join:1"
+            ],
+            "ops": [
+              "op12"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:20:9"
+          },
+          {
+            "id": "if_join:1",
+            "kind": "if_join",
+            "exit": true,
+            "preds": [
+              "entry",
+              "if_then:0"
+            ],
+            "ops": [
+              "op13"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:20:9"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          },
+          {
+            "block": "if_then:0",
+            "dominators": [
+              "entry",
+              "if_then:0"
+            ]
+          },
+          {
+            "block": "if_join:1",
+            "dominators": [
+              "entry",
+              "if_join:1"
+            ]
+          }
+        ],
+        "proof_guards": [
+          {
+            "id": "proof:allocation-zero:literal0:xs:10:9:index_store",
+            "kind": "range",
+            "block": "entry",
+            "condition": "0 < xs.len && xs.len == 3",
+            "reason": "allocation literal-zero length proof",
+            "dominates": [
+              {
+                "proof_id": "proof:allocation-zero:literal0:xs:10:9:index_store",
+                "block": "entry",
+                "op_id": "op1",
+                "use_kind": "bounds_check",
+                "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:10:9"
+              }
+            ]
+          },
+          {
+            "id": "proof:allocation-zero:literal0:bytes:16:9:index_store",
+            "kind": "range",
+            "block": "entry",
+            "condition": "0 < bytes.len && bytes.len == 3",
+            "reason": "allocation literal-zero length proof",
+            "dominates": [
+              {
+                "proof_id": "proof:allocation-zero:literal0:bytes:16:9:index_store",
+                "block": "entry",
+                "op_id": "op7",
+                "use_kind": "bounds_check",
+                "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:16:9"
+              }
+            ]
+          }
+        ],
+        "proof_uses": [
+          {
+            "proof_id": "proof:allocation-zero:literal0:xs:10:9:index_store",
+            "block": "entry",
+            "op_id": "op1",
+            "use_kind": "bounds_check",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:10:9"
+          },
+          {
+            "proof_id": "proof:allocation-zero:literal0:bytes:16:9:index_store",
+            "block": "entry",
+            "op_id": "op7",
+            "use_kind": "bounds_check",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:16:9"
+          }
+        ],
+        "proof_terms": [
+          {
+            "id": "proof:allocation-zero:literal0:xs:10:9:index_store",
+            "kind": "bounds_check",
+            "subject_base_id": "xs",
+            "index_value_id": "local:0",
+            "operation": "index_store",
+            "range": "0 in [0, xs.len)",
+            "island_id": "island:isl",
+            "epoch": 1,
+            "base_id": "alloc_intent:xs",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:10:9",
+            "facts_used": [
+              "non_negative",
+              "less_than_len",
+              "allocation_literal_zero",
+              "allocation_length_positive"
+            ]
+          },
+          {
+            "id": "proof:allocation-zero:literal0:bytes:16:9:index_store",
+            "kind": "bounds_check",
+            "subject_base_id": "bytes",
+            "index_value_id": "local:0",
+            "operation": "index_store",
+            "range": "0 in [0, bytes.len)",
+            "island_id": "island:isl",
+            "epoch": 1,
+            "base_id": "alloc_intent:bytes",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:16:9",
+            "facts_used": [
+              "non_negative",
+              "less_than_len",
+              "allocation_literal_zero",
+              "allocation_length_positive"
+            ]
+          }
+        ],
+        "range_facts": [
+          {
+            "value": "local:0",
+            "lower": {
+              "kind": "const"
+            },
+            "upper": {
+              "kind": "symbol",
+              "symbol": "xs.len"
+            },
+            "inclusive_lower": true,
+            "inclusive_upper": false,
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:10:9",
+            "proof_id": "proof:allocation-zero:literal0:xs:10:9:index_store",
+            "reason": "allocation literal-zero length proof",
+            "derivation": [
+              "non_negative",
+              "less_than_len",
+              "allocation_literal_zero",
+              "allocation_length_positive"
+            ]
+          },
+          {
+            "value": "local:0",
+            "lower": {
+              "kind": "const"
+            },
+            "upper": {
+              "kind": "symbol",
+              "symbol": "bytes.len"
+            },
+            "inclusive_lower": true,
+            "inclusive_upper": false,
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:16:9",
+            "proof_id": "proof:allocation-zero:literal0:bytes:16:9:index_store",
+            "reason": "allocation literal-zero length proof",
+            "derivation": [
+              "non_negative",
+              "less_than_len",
+              "allocation_literal_zero",
+              "allocation_length_positive"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

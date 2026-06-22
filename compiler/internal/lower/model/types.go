@@ -3,6 +3,7 @@ package model
 type Options struct {
 	StackAllocationLowering    bool
 	FunctionTempRegionLowering bool
+	OwnedAllocDropLowering     bool
 }
 
 const UIBundleSchema = "tetra.ui.v0.4.0"

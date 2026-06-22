@@ -1,18 +1,19 @@
 package buildruntime
 
 type RuntimeObjectPlanUsage struct {
-	ActorsUsed            bool
-	ActorRuntimeUsed      bool
-	ActorStateUsed        bool
-	TasksUsed             bool
-	TaskGroupsUsed        bool
-	TypedTasksUsed        bool
-	TimeRuntimeUsed       bool
-	FilesystemRuntimeUsed bool
-	NetRuntimeUsed        bool
-	NetRuntimeSupported   bool
-	SurfaceRuntimeUsed    bool
-	DistributedActorsUsed bool
+	ActorsUsed             bool
+	ActorRuntimeUsed       bool
+	ActorSystemReceiveUsed bool
+	ActorStateUsed         bool
+	TasksUsed              bool
+	TaskGroupsUsed         bool
+	TypedTasksUsed         bool
+	TimeRuntimeUsed        bool
+	FilesystemRuntimeUsed  bool
+	NetRuntimeUsed         bool
+	NetRuntimeSupported    bool
+	SurfaceRuntimeUsed     bool
+	DistributedActorsUsed  bool
 }
 
 type RuntimeObjectPlanDecision struct {
@@ -28,6 +29,8 @@ func DecideRuntimeObjectPlan(
 	usage RuntimeObjectPlanUsage,
 ) RuntimeObjectPlanDecision {
 	runtimeUsed := usage.ActorsUsed ||
+		usage.ActorRuntimeUsed ||
+		usage.ActorSystemReceiveUsed ||
 		usage.ActorStateUsed ||
 		usage.TasksUsed ||
 		usage.TaskGroupsUsed ||
@@ -41,6 +44,7 @@ func DecideRuntimeObjectPlan(
 	timeOnlyRuntime := caps.TimeOnlyWithoutScheduler &&
 		!runtimeObjectOverride &&
 		usage.TimeRuntimeUsed &&
+		!usage.ActorSystemReceiveUsed &&
 		!usage.ActorRuntimeUsed &&
 		!usage.ActorStateUsed &&
 		!usage.TasksUsed &&
@@ -57,6 +61,7 @@ func DecideRuntimeObjectPlan(
 		usage.NetRuntimeSupported &&
 		!usage.ActorsUsed &&
 		!usage.ActorRuntimeUsed &&
+		!usage.ActorSystemReceiveUsed &&
 		!usage.ActorStateUsed &&
 		!usage.TasksUsed &&
 		!usage.TaskGroupsUsed &&

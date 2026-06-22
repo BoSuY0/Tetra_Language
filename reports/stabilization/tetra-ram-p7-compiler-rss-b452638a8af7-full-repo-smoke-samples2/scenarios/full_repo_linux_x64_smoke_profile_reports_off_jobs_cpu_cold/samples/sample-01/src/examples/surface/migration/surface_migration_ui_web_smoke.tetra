@@ -1,0 +1,50 @@
+// Pure Tetra Surface migration of examples/ui/ui_web_smoke.tetra.
+module examples.surface.migration.surface_migration_ui_web_smoke
+
+import lib.core.surface as surface
+import lib.core.draw as draw
+
+struct WebCounterSurface:
+    count: Int
+
+extension WebCounterSurface:
+    func draw(self: borrow WebCounterSurface, ctx: inout draw.DrawContext) -> Int
+    uses mem:
+        let count_panel: surface.Rect = surface.Rect(x: 24, y: 56, w: 272, h: 48)
+        let button: surface.Rect = surface.Rect(x: 24, y: 124, w: 180, h: 48)
+        let bg: surface.Color = surface.Color(r: 15, g: 19, b: 23, a: 255)
+        let panel: surface.Color = surface.Color(r: 35, g: 43, b: 51, a: 255)
+        let text: surface.Color = surface.Color(r: 235, g: 239, b: 244, a: 255)
+        let accent: surface.Color = surface.Color(r: 34, g: 132, b: 212, a: 255)
+        let clear_status: Int = draw.clear(ctx, bg)
+        let title_status: Int = draw.text(ctx, "Wave 9 Web", 24, 24, text)
+        let count_status: Int = draw.rect(ctx, count_panel, panel)
+        let count_text_status: Int = draw.text(ctx, "countValue", count_panel.x + 12, count_panel.y + 14, text)
+        let button_status: Int = draw.rect(ctx, button, accent)
+        let button_text_status: Int = draw.text(ctx, "Increment counter", button.x + 12, button.y + 18, text)
+        let outline_status: Int = draw.rect_outline(ctx, button, text)
+        return clear_status + title_status + count_status + count_text_status + button_status + button_text_status + outline_status + self.count
+    func event(self: inout WebCounterSurface, event: surface.Event) -> Int:
+        let button: surface.Rect = surface.Rect(x: 24, y: 124, w: 180, h: 48)
+        if event.kind == surface.event_mouse_up() && rect_contains(button, event.x, event.y):
+            self.count = self.count + 1
+            return 1
+        return 0
+
+func rect_contains(rect: surface.Rect, x: Int, y: Int) -> Bool:
+    return x >= rect.x && y >= rect.y && x < rect.x + rect.w && y < rect.y + rect.h
+
+func main() -> Int
+uses alloc, mem, surface:
+    var app: WebCounterSurface = WebCounterSurface(count: 0)
+    let win: surface.Surface = surface.open("Surface Migration Web", 320, 200)
+    let polled: surface.Event = surface.poll_event(win)
+    let poll_status: Int = WebCounterSurface.event(app, polled)
+    let click: surface.Event = surface.Event(kind: surface.event_mouse_up(), x: 48, y: 148, button: 1, key: 0, width: 320, height: 200, timestamp_ms: 1, text_len: 0)
+    let click_status: Int = WebCounterSurface.event(app, click)
+    var frame: surface.Frame = surface.begin_frame(win)
+    var ctx: draw.DrawContext = draw.DrawContext(frame: frame)
+    let draw_status: Int = WebCounterSurface.draw(app, ctx)
+    let presented: Int = surface.present(ctx.frame)
+    let closed: Int = surface.close(win)
+    return poll_status + click_status + draw_status + presented + closed

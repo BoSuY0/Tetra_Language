@@ -1,0 +1,9 @@
+func main() -> Int
+uses alloc, capability, mem:
+    var out: Int = 1
+    unsafe:
+        let mem: cap.mem = core.cap_mem()
+        let p: ptr = core.alloc_bytes(4)
+        let _: Int = core.store_i32(p, 42, mem)
+        out = core.load_i32(p, mem)
+    return out

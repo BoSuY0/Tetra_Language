@@ -1,0 +1,53 @@
+enum PairMsg:
+    case both(Int, Int)
+    case empty
+
+struct Pair:
+    left: Int
+    right: Int
+
+protocol Sink:
+    func sink(self: consume Pair) -> Int
+
+extension Pair:
+    func sink(self: consume Pair) -> Int:
+        return self.left + self.right
+
+impl Pair: Sink
+
+func add_one(x: borrow Int) -> Int:
+    return x + 1
+
+func take(x: consume Int) -> Int:
+    return x
+
+func bump(x: inout Int) -> Int:
+    x = x + 1
+    return x
+
+func optional_ptr_score(value: borrow ptr?) -> Int:
+    match value:
+    case some(raw):
+        return 1
+    case none:
+        return 0
+
+func enum_score() -> Int:
+    let msg: PairMsg = PairMsg.both(3, 4)
+    match msg:
+    case PairMsg.both(left, right):
+        let moved: Int = take(left)
+        return moved + right
+    case PairMsg.empty:
+        return 0
+
+func main() -> Int:
+    let a: Int = 40
+    let b: Int = add_one(a)
+    var pair: Pair = Pair(left: 1, right: 2)
+    let moved: Int = take(pair.left)
+    pair.left = moved
+    pair = Pair(left: pair.left, right: pair.right)
+    var c: Int = take(b)
+    let none_ptr: ptr? = none
+    return bump(c) + optional_ptr_score(none_ptr) + enum_score() - 7

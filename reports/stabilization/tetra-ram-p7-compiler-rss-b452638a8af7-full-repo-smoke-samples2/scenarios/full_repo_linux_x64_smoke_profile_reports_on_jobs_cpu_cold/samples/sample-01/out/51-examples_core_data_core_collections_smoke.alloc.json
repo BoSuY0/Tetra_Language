@@ -1,0 +1,281 @@
+{
+  "schema_version": 2,
+  "kind": "allocation_plan",
+  "target": "linux-x64",
+  "target_memory_claim_level": "production/host_runtime",
+  "storage_evidence_scope": "host_runtime_verified",
+  "summary": {
+    "allocation_count": 3,
+    "storage_classes": {
+      "Heap": 3
+    },
+    "actual_lowering_storage_classes": {
+      "Heap": 3
+    },
+    "runtime_paths": {
+      "process_bump_small_heap_v0": 3
+    },
+    "allocator_classes": {
+      "small_16": 2,
+      "small_32": 1
+    },
+    "allocator_scopes": {
+      "process": 3
+    },
+    "allocator_reuse_policies": {
+      "bump_no_reuse_v0": 3
+    },
+    "memory_backend_classes": {
+      "small_heap": 3
+    },
+    "memory_backend_operations": {
+      "commit": 3,
+      "footprint": 3,
+      "reserve": 3
+    },
+    "memory_backend_evidence_classes": {
+      "allocation_report_estimate": 3
+    },
+    "heap_reason_codes": {
+      "heap.required_unknown_call": 3
+    },
+    "bytes_requested": 36,
+    "bytes_reserved": 64,
+    "bytes_committed": 64,
+    "domains": [
+      {
+        "domain_id": "domain:process",
+        "kind": "process",
+        "owner_kind": "process",
+        "owner_id": "current",
+        "lifetime": "process",
+        "row_count": 3,
+        "budget_bytes": 36,
+        "requested_bytes": 36,
+        "reserved_bytes": 64,
+        "committed_bytes": 64,
+        "current_bytes": 64,
+        "peak_bytes": 32
+      }
+    ]
+  },
+  "totals": {
+    "eliminated": 0,
+    "register": 0,
+    "stack": 0,
+    "region": 0,
+    "function_temp_region": 0,
+    "explicit_island": 0,
+    "task_region": 0,
+    "actor_move_region": 0,
+    "heap": 3,
+    "mmap_large": 0,
+    "external": 0,
+    "unknown": 0
+  },
+  "functions": [
+    {
+      "name": "examples.core.data.core_collections_smoke.main",
+      "allocations": [
+        {
+          "id": "keys",
+          "site_id": "allocsite:examples.core.data.core_collections_smoke.main:keys:_home_tetra_Desktop_Projects_Tetra_Language_reports_stabilization_tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2_scenarios_full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold_samples_sample-01_src_examples_core_data_core_collections_smoke.tetra_17_23",
+          "value_id": "alloc_intent:keys",
+          "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_collections_smoke.tetra:17:23",
+          "builtin": "core.make_i32",
+          "element_type": "i32",
+          "element_size": 4,
+          "length_expr": "2",
+          "length_status": "normal_allocation",
+          "zero_guard_status": "valid_empty_no_allocator",
+          "negative_guard_status": "reject_before_allocation",
+          "overflow_guard_status": "reject_before_allocation",
+          "byte_size": 8,
+          "escape": "EscapesCallUnknown",
+          "storage": "Heap",
+          "planned_storage": "Heap",
+          "actual_lowering_storage": "Heap",
+          "reason": "unknown call escape requires conservative heap fallback; allocation is passed to a call without interprocedural escape facts; current emitted linux-x64 runtime allocator uses a process-global bump small heap with 16-byte size classes and 64KiB chunk refills; free-list reuse/reclamation is not claimed",
+          "validation_status": "validated_heap_fallback",
+          "lowering_status": "process_bump_small_heap_v0_runtime",
+          "reason_codes": [
+            "heap.required_unknown_call"
+          ],
+          "heap_reason_codes": [
+            "heap.required_unknown_call"
+          ],
+          "runtime_path": "process_bump_small_heap_v0",
+          "allocator_class": "small_16",
+          "allocator_scope": "process",
+          "allocator_reuse_policy": "bump_no_reuse_v0",
+          "allocator_chunk_bytes": 65536,
+          "memory_backend": {
+            "schema": "tetra.memory.backend-allocation.v1",
+            "backend_class": "small_heap",
+            "adapter": "runtime.small_heap.process_bump_v0",
+            "runtime_path": "process_bump_small_heap_v0",
+            "operations": [
+              "reserve",
+              "commit",
+              "footprint"
+            ],
+            "evidence_class": "allocation_report_estimate",
+            "method": "allocation_report_memory_backend_v1",
+            "reserve_bytes": 16,
+            "commit_bytes": 16,
+            "footprint_current_bytes": 16,
+            "footprint_peak_bytes": 16
+          },
+          "bytes_requested": 8,
+          "bytes_reserved": 16,
+          "bytes_committed": 16,
+          "domain": {
+            "domain_id": "domain:process",
+            "kind": "process",
+            "owner_kind": "process",
+            "owner_id": "current",
+            "lifetime": "process",
+            "budget_bytes": 8,
+            "requested_bytes": 8,
+            "reserved_bytes": 16,
+            "committed_bytes": 16,
+            "current_bytes": 16,
+            "peak_bytes": 16
+          }
+        },
+        {
+          "id": "values",
+          "site_id": "allocsite:examples.core.data.core_collections_smoke.main:values:_home_tetra_Desktop_Projects_Tetra_Language_reports_stabilization_tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2_scenarios_full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold_samples_sample-01_src_examples_core_data_core_collections_smoke.tetra_18_25",
+          "value_id": "alloc_intent:values",
+          "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_collections_smoke.tetra:18:25",
+          "builtin": "core.make_i32",
+          "element_type": "i32",
+          "element_size": 4,
+          "length_expr": "2",
+          "length_status": "normal_allocation",
+          "zero_guard_status": "valid_empty_no_allocator",
+          "negative_guard_status": "reject_before_allocation",
+          "overflow_guard_status": "reject_before_allocation",
+          "byte_size": 8,
+          "escape": "EscapesCallUnknown",
+          "storage": "Heap",
+          "planned_storage": "Heap",
+          "actual_lowering_storage": "Heap",
+          "reason": "unknown call escape requires conservative heap fallback; allocation is passed to a call without interprocedural escape facts; current emitted linux-x64 runtime allocator uses a process-global bump small heap with 16-byte size classes and 64KiB chunk refills; free-list reuse/reclamation is not claimed",
+          "validation_status": "validated_heap_fallback",
+          "lowering_status": "process_bump_small_heap_v0_runtime",
+          "reason_codes": [
+            "heap.required_unknown_call"
+          ],
+          "heap_reason_codes": [
+            "heap.required_unknown_call"
+          ],
+          "runtime_path": "process_bump_small_heap_v0",
+          "allocator_class": "small_16",
+          "allocator_scope": "process",
+          "allocator_reuse_policy": "bump_no_reuse_v0",
+          "allocator_chunk_bytes": 65536,
+          "memory_backend": {
+            "schema": "tetra.memory.backend-allocation.v1",
+            "backend_class": "small_heap",
+            "adapter": "runtime.small_heap.process_bump_v0",
+            "runtime_path": "process_bump_small_heap_v0",
+            "operations": [
+              "reserve",
+              "commit",
+              "footprint"
+            ],
+            "evidence_class": "allocation_report_estimate",
+            "method": "allocation_report_memory_backend_v1",
+            "reserve_bytes": 16,
+            "commit_bytes": 16,
+            "footprint_current_bytes": 16,
+            "footprint_peak_bytes": 16
+          },
+          "bytes_requested": 8,
+          "bytes_reserved": 16,
+          "bytes_committed": 16,
+          "domain": {
+            "domain_id": "domain:process",
+            "kind": "process",
+            "owner_kind": "process",
+            "owner_id": "current",
+            "lifetime": "process",
+            "budget_bytes": 8,
+            "requested_bytes": 8,
+            "reserved_bytes": 16,
+            "committed_bytes": 16,
+            "current_bytes": 16,
+            "peak_bytes": 16
+          }
+        },
+        {
+          "id": "xs",
+          "site_id": "allocsite:examples.core.data.core_collections_smoke.main:xs:_home_tetra_Desktop_Projects_Tetra_Language_reports_stabilization_tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2_scenarios_full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold_samples_sample-01_src_examples_core_data_core_collections_smoke.tetra_8_21",
+          "value_id": "alloc_intent:xs",
+          "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_collections_smoke.tetra:8:21",
+          "builtin": "core.make_i32",
+          "element_type": "i32",
+          "element_size": 4,
+          "length_expr": "5",
+          "length_status": "normal_allocation",
+          "zero_guard_status": "valid_empty_no_allocator",
+          "negative_guard_status": "reject_before_allocation",
+          "overflow_guard_status": "reject_before_allocation",
+          "byte_size": 20,
+          "escape": "EscapesCallUnknown",
+          "storage": "Heap",
+          "planned_storage": "Heap",
+          "actual_lowering_storage": "Heap",
+          "reason": "unknown call escape requires conservative heap fallback; allocation is passed to a call without interprocedural escape facts; current emitted linux-x64 runtime allocator uses a process-global bump small heap with 16-byte size classes and 64KiB chunk refills; free-list reuse/reclamation is not claimed",
+          "validation_status": "validated_heap_fallback",
+          "lowering_status": "process_bump_small_heap_v0_runtime",
+          "reason_codes": [
+            "heap.required_unknown_call"
+          ],
+          "heap_reason_codes": [
+            "heap.required_unknown_call"
+          ],
+          "runtime_path": "process_bump_small_heap_v0",
+          "allocator_class": "small_32",
+          "allocator_scope": "process",
+          "allocator_reuse_policy": "bump_no_reuse_v0",
+          "allocator_chunk_bytes": 65536,
+          "memory_backend": {
+            "schema": "tetra.memory.backend-allocation.v1",
+            "backend_class": "small_heap",
+            "adapter": "runtime.small_heap.process_bump_v0",
+            "runtime_path": "process_bump_small_heap_v0",
+            "operations": [
+              "reserve",
+              "commit",
+              "footprint"
+            ],
+            "evidence_class": "allocation_report_estimate",
+            "method": "allocation_report_memory_backend_v1",
+            "reserve_bytes": 32,
+            "commit_bytes": 32,
+            "footprint_current_bytes": 32,
+            "footprint_peak_bytes": 32
+          },
+          "bytes_requested": 20,
+          "bytes_reserved": 32,
+          "bytes_committed": 32,
+          "domain": {
+            "domain_id": "domain:process",
+            "kind": "process",
+            "owner_kind": "process",
+            "owner_id": "current",
+            "lifetime": "process",
+            "budget_bytes": 20,
+            "requested_bytes": 20,
+            "reserved_bytes": 32,
+            "committed_bytes": 32,
+            "current_bytes": 32,
+            "peak_bytes": 32
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+func worker() -> Int:
+    return 21
+
+func echo() -> Int
+uses actors:
+    var msg: actor.msg = core.recv_msg()
+    if msg.tag != 7:
+        return 7
+    var _sent: Int = core.send_msg(core.sender(), msg.value + 1, 8)
+    return 0
+
+func main() -> Int
+uses actors, runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let task_value: Int = core.task_join_i32(task)
+    var peer: actor = core.spawn("echo")
+    var _sent: Int = core.send_msg(peer, 20, 7)
+    var msg: actor.msg = core.recv_msg()
+    if msg.tag != 8:
+        return 8
+    if task_value + msg.value == 42:
+        return 0
+    return 1

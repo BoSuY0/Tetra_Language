@@ -247,7 +247,7 @@ func emitScalarRegisterCall(
 			instr.RetSlots,
 		)
 	}
-	if instr.RetSlots > 1 {
+	if instr.RetSlots > 2 {
 		return fmt.Errorf(
 			"x64 scalar register backend: call %q has unsupported register return slots %d",
 			instr.Name,
@@ -277,8 +277,12 @@ func emitScalarRegisterCall(
 	at := e.CallRel32()
 	*callPatches = append(*callPatches, x64obj.CallPatch{At: at, Name: instr.Name})
 	emitScalarCallFrameEpilogue(e, kind)
-	if instr.RetSlots == 1 {
+	if instr.RetSlots >= 1 {
 		e.MovMem64RbpDispRax(scratchOffset(*depth))
+		*depth++
+	}
+	if instr.RetSlots >= 2 {
+		e.MovMem64RbpDispRdx(scratchOffset(*depth))
 		*depth++
 	}
 	return nil
@@ -1346,6 +1350,60 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 			case ir.IRAllocBytes:
 				if err := abi.EmitAllocBytes(e, &stackDepth, opt, importPatches); err != nil {
 					return err
+				}
+				if opt.EmitRuntimeHeapTelemetry && opt.RuntimeHeapTelemetryV2 {
+					telemetry, err := ensureRuntimeHeapTelemetryState()
+					if err != nil {
+						return err
+					}
+					if err := emitRuntimeHeapTelemetryRecordAllocBytesAllocation(
+						e,
+						leaPatches,
+						telemetry,
+					); err != nil {
+						return err
+					}
+				}
+			case ir.IRDropOwned:
+				// Typed lifecycle marker: release lowering consumes the token next.
+			case ir.IRReleaseAllocation:
+				if instr.LayoutID == "" || instr.OwnershipDomain == "" || instr.ReleaseKind == "" {
+					return fmt.Errorf("x64 backend: release_allocation is missing typed metadata")
+				}
+				if instr.OwnershipDomain != ir.IROwnershipDomainHeap ||
+					instr.ReleaseKind != ir.IRReleaseKindLinuxMmap {
+					return fmt.Errorf(
+						"x64 backend: unsupported release kind %q for ownership domain %q",
+						instr.ReleaseKind,
+						instr.OwnershipDomain,
+					)
+				}
+				var telemetry *runtimeHeapTelemetryState
+				if opt.EmitRuntimeHeapTelemetry && opt.RuntimeHeapTelemetryV2 {
+					var err error
+					telemetry, err = ensureRuntimeHeapTelemetryState()
+					if err != nil {
+						return err
+					}
+					if err := emitRuntimeHeapTelemetryRecordReleaseAttempt(
+						e,
+						leaPatches,
+						telemetry,
+					); err != nil {
+						return err
+					}
+				}
+				if err := abi.EmitReleaseAllocation(e, &stackDepth, opt, importPatches); err != nil {
+					return err
+				}
+				if opt.EmitRuntimeHeapTelemetry && opt.RuntimeHeapTelemetryV2 {
+					if err := emitRuntimeHeapTelemetryRecordReleaseSuccess(
+						e,
+						leaPatches,
+						telemetry,
+					); err != nil {
+						return err
+					}
 				}
 			case ir.IRMakeSliceU8, ir.IRMakeSliceU16, ir.IRMakeSliceI32:
 				if emitSmallHeapMakeSliceEnabled(abi, opt, pointerWidthBytes) {
@@ -3151,9 +3209,11 @@ func patchSliceViewFailure(
 // ---- heap_telemetry.go ----
 
 const (
-	runtimeHeapTelemetrySchema = "tetra.runtime.heap_telemetry.v1"
-	runtimeHeapTelemetryTarget = "linux-x64"
-	runtimeHeapTelemetryMethod = "tetra_linux_x64_heap_telemetry_v1"
+	runtimeHeapTelemetrySchemaV1 = "tetra.runtime.heap_telemetry.v1"
+	runtimeHeapTelemetrySchemaV2 = "tetra.runtime.heap_telemetry.v2"
+	runtimeHeapTelemetryTarget   = "linux-x64"
+	runtimeHeapTelemetryMethodV1 = "tetra_linux_x64_heap_telemetry_v1"
+	runtimeHeapTelemetryMethodV2 = "tetra_linux_x64_heap_telemetry_v2"
 
 	runtimeHeapTelemetryActorSnapshotSymbol = "__tetra_actor_memory_snapshot"
 	runtimeHeapTelemetryNumberWidth         = 20
@@ -3172,21 +3232,35 @@ const (
 	runtimeHeapTelemetryRequestedOffset
 	runtimeHeapTelemetryReservedOffset
 	runtimeHeapTelemetrySmallPathCountOffset
+	runtimeHeapTelemetryDropPayloadOffset
+	runtimeHeapTelemetryFreeCountOffset
+	runtimeHeapTelemetryReleasedTotalOffset
+	runtimeHeapTelemetryOSReleaseAttemptOffset
+	runtimeHeapTelemetryOSReleaseSuccessOffset
+	runtimeHeapTelemetryOSReleaseSuccessBytesOffset
+	runtimeHeapTelemetryPendingReleaseBytesOffset
 )
 
 const (
-	runtimeHeapTelemetryActorCountOffset              = runtimeHeapTelemetrySmallPathCountOffset + 8
-	runtimeHeapTelemetryActorRecord0Offset            = runtimeHeapTelemetryActorCountOffset + 8
-	runtimeHeapTelemetryActorRecordSize         int32 = 56
-	runtimeHeapTelemetryActorMaxDomains               = 128
-	runtimeHeapTelemetryActorRecordIDOffset           = 0
-	runtimeHeapTelemetryActorCurrentOffset            = 8
-	runtimeHeapTelemetryActorPeakOffset               = 16
-	runtimeHeapTelemetryActorCopiedOffset             = 24
-	runtimeHeapTelemetryActorByteBudgetOffset         = 32
-	runtimeHeapTelemetryActorOverBudgetOffset         = 40
-	runtimeHeapTelemetryActorBackpressureOffset       = 48
-	runtimeHeapTelemetryHeaderSize                    = runtimeHeapTelemetryActorRecord0Offset + runtimeHeapTelemetryActorMaxDomains*runtimeHeapTelemetryActorRecordSize
+	runtimeHeapTelemetryActorCountOffset                = runtimeHeapTelemetryPendingReleaseBytesOffset + 8
+	runtimeHeapTelemetryActorLiveCountOffset            = runtimeHeapTelemetryActorCountOffset + 8
+	runtimeHeapTelemetryActorRecord0Offset              = runtimeHeapTelemetryActorLiveCountOffset + 8
+	runtimeHeapTelemetryActorRecordSize           int32 = 104
+	runtimeHeapTelemetryActorMaxDomains                 = 128
+	runtimeHeapTelemetryActorRecordIDOffset             = 0
+	runtimeHeapTelemetryActorCurrentOffset              = 8
+	runtimeHeapTelemetryActorPeakOffset                 = 16
+	runtimeHeapTelemetryActorCopiedOffset               = 24
+	runtimeHeapTelemetryActorByteBudgetOffset           = 32
+	runtimeHeapTelemetryActorOverBudgetOffset           = 40
+	runtimeHeapTelemetryActorBackpressureOffset         = 48
+	runtimeHeapTelemetryActorMailboxCurrentOffset       = 56
+	runtimeHeapTelemetryActorMailboxPeakOffset          = 64
+	runtimeHeapTelemetryActorStackLiveOffset            = 72
+	runtimeHeapTelemetryActorStackReservedOffset        = 80
+	runtimeHeapTelemetryActorStackRetainedOffset        = 88
+	runtimeHeapTelemetryActorStackReleasedOffset        = 96
+	runtimeHeapTelemetryHeaderSize                      = runtimeHeapTelemetryActorRecord0Offset + runtimeHeapTelemetryActorMaxDomains*runtimeHeapTelemetryActorRecordSize
 )
 
 type runtimeHeapTelemetryState struct {
@@ -3214,17 +3288,43 @@ type runtimeHeapTelemetryLayout struct {
 }
 
 type runtimeHeapTelemetryNumberOffsets struct {
-	current         int32
-	peak            int32
-	total           int32
-	count           int32
-	requested       int32
-	reserved        int32
-	domainRequested int32
-	domainReserved  int32
-	domainCurrent   int32
-	domainPeak      int32
-	smallPath       int32
+	current          int32
+	peak             int32
+	total            int32
+	count            int32
+	requested        int32
+	reserved         int32
+	domainRequested  int32
+	domainReserved   int32
+	domainCurrent    int32
+	domainPeak       int32
+	smallPath        int32
+	successfulAlloc  int32
+	dropPayload      int32
+	payloadLive      int32
+	freeCount        int32
+	releasedTotal    int32
+	osAttempt        int32
+	osSuccess        int32
+	osSuccessBytes   int32
+	actorRecordCount int32
+	actorLiveCount   int32
+}
+
+func newRuntimeHeapTelemetryNumberOffsets() runtimeHeapTelemetryNumberOffsets {
+	return runtimeHeapTelemetryNumberOffsets{
+		smallPath:        -1,
+		successfulAlloc:  -1,
+		dropPayload:      -1,
+		payloadLive:      -1,
+		freeCount:        -1,
+		releasedTotal:    -1,
+		osAttempt:        -1,
+		osSuccess:        -1,
+		osSuccessBytes:   -1,
+		actorRecordCount: -1,
+		actorLiveCount:   -1,
+	}
 }
 
 type runtimeHeapTelemetryActorTemplate struct {
@@ -3241,6 +3341,10 @@ type runtimeHeapTelemetryActorNumberOffsets struct {
 	bytesCopied        int32
 	mailboxCurrent     int32
 	mailboxPeak        int32
+	stackLive          int32
+	stackReserved      int32
+	stackRetained      int32
+	stackReleased      int32
 	byteBudget         int32
 	overBudgetCount    int32
 	backpressureEvents int32
@@ -3277,8 +3381,8 @@ func buildRuntimeHeapTelemetryBlob(
 	}
 	sidecarPath := path.Join(strings.ReplaceAll(dir, "\\", "/"), program+".heap.json")
 
-	zeroJSON, zeroNumbers := runtimeHeapTelemetryJSON(program, false)
-	pathJSON, pathNumbers := runtimeHeapTelemetryJSON(program, true)
+	zeroJSON, zeroNumbers := runtimeHeapTelemetryJSON(program, false, opt.RuntimeHeapTelemetryV2)
+	pathJSON, pathNumbers := runtimeHeapTelemetryJSON(program, true, opt.RuntimeHeapTelemetryV2)
 
 	blob := make([]byte, 0, 64+len(sidecarPath)+1+len(zeroJSON)+len(pathJSON))
 	blob = append(blob, make([]byte, int(runtimeHeapTelemetryHeaderSize))...)
@@ -3302,10 +3406,12 @@ func buildRuntimeHeapTelemetryBlob(
 		zeroActorJSON, zeroActorNumbers, zeroActorTemplate := runtimeHeapTelemetryActorJSON(
 			program,
 			false,
+			opt.RuntimeHeapTelemetryV2,
 		)
 		pathActorJSON, pathActorNumbers, pathActorTemplate := runtimeHeapTelemetryActorJSON(
 			program,
 			true,
+			opt.RuntimeHeapTelemetryV2,
 		)
 
 		layout.zeroActorJSONOffset = int32(len(blob))
@@ -3328,9 +3434,10 @@ func buildRuntimeHeapTelemetryBlob(
 func runtimeHeapTelemetryJSON(
 	program string,
 	includePaths bool,
+	v2 bool,
 ) ([]byte, runtimeHeapTelemetryNumberOffsets) {
 	var b bytes.Buffer
-	numbers := runtimeHeapTelemetryNumberOffsets{smallPath: -1}
+	numbers := newRuntimeHeapTelemetryNumberOffsets()
 	placeholder := strings.Repeat(" ", runtimeHeapTelemetryNumberWidth)
 
 	writeString := func(name string, value string, comma bool) {
@@ -3362,9 +3469,15 @@ func runtimeHeapTelemetryJSON(
 	}
 
 	b.WriteString("{\n")
-	writeString("schema", runtimeHeapTelemetrySchema, true)
+	schema := runtimeHeapTelemetrySchemaV1
+	method := runtimeHeapTelemetryMethodV1
+	if v2 {
+		schema = runtimeHeapTelemetrySchemaV2
+		method = runtimeHeapTelemetryMethodV2
+	}
+	writeString("schema", schema, true)
 	writeString("target", runtimeHeapTelemetryTarget, true)
-	writeString("method", runtimeHeapTelemetryMethod, true)
+	writeString("method", method, true)
 	writeString("program", program, true)
 	numbers.current = writeNumber("heap_current_bytes", true)
 	numbers.peak = writeNumber("heap_peak_bytes", true)
@@ -3372,10 +3485,37 @@ func runtimeHeapTelemetryJSON(
 	numbers.count = writeNumber("heap_allocation_count", true)
 	numbers.requested = writeNumber("bytes_requested", true)
 	numbers.reserved = writeNumber("bytes_reserved", true)
+	if v2 {
+		writeString("allocator_mode", "owned_alloc_bytes_linux_mmap_v0", true)
+		writeString("allocator_state_scope", "process", true)
+		numbers.successfulAlloc = writeNumber("successful_alloc_payload_bytes", true)
+		numbers.dropPayload = writeNumber("successful_drop_payload_bytes", true)
+		b.WriteString("  \"payload_transfer_current_delta_bytes\": 0,\n")
+		numbers.payloadLive = writeNumber("payload_live_current_bytes", true)
+		numbers.freeCount = writeNumber("free_count", true)
+		b.WriteString("  \"reuse_count\": 0,\n")
+		numbers.releasedTotal = writeNumber("released_total_bytes", true)
+		numbers.osAttempt = writeNumber("os_release_attempt_count", true)
+		numbers.osSuccess = writeNumber("os_release_success_count", true)
+		numbers.osSuccessBytes = writeNumber("os_release_success_bytes", true)
+		b.WriteString("  \"metric_sources\": {\n")
+		b.WriteString("    \"payload_live_current_bytes\": \"runtime_measured\",\n")
+		b.WriteString("    \"released_total_bytes\": \"runtime_measured\",\n")
+		b.WriteString("    \"successful_alloc_payload_bytes\": \"runtime_measured\",\n")
+		b.WriteString("    \"successful_drop_payload_bytes\": \"runtime_measured\",\n")
+		b.WriteString("    \"os_release_attempt_count\": \"runtime_measured\",\n")
+		b.WriteString("    \"os_release_success_count\": \"runtime_measured\",\n")
+		b.WriteString("    \"os_release_success_bytes\": \"runtime_measured\"\n")
+		b.WriteString("  },\n")
+	}
 	b.WriteString("  \"exit_status\": 0,\n")
 	if includePaths {
 		b.WriteString("  \"allocation_paths\": {\n")
-		numbers.smallPath = writeIndentedNumber("    ", "small_heap_make_slice", false)
+		pathName := "small_heap_make_slice"
+		if v2 {
+			pathName = "owned_alloc_bytes_linux_mmap"
+		}
+		numbers.smallPath = writeIndentedNumber("    ", pathName, false)
 		b.WriteString("  },\n")
 	}
 	b.WriteString("  \"domain_bytes\": [\n")
@@ -3388,9 +3528,15 @@ func runtimeHeapTelemetryJSON(
 	numbers.domainPeak = writeIndentedNumber("      ", "peak_bytes", false)
 	b.WriteString("    }\n")
 	b.WriteString("  ],\n")
-	b.WriteString(
-		"  \"notes\": [\"bytes_reserved is 0 because this sidecar counts Tetra heap allocation requests, not OS mmap reservations\"]\n",
-	)
+	if v2 {
+		b.WriteString(
+			"  \"notes\": [\"owned alloc drop telemetry counts runtime payload bytes and successful linux munmap syscall arguments\"]\n",
+		)
+	} else {
+		b.WriteString(
+			"  \"notes\": [\"bytes_reserved is 0 because this sidecar counts Tetra heap allocation requests, not OS mmap reservations\"]\n",
+		)
+	}
 	b.WriteString("}\n")
 	return b.Bytes(), numbers
 }
@@ -3398,9 +3544,10 @@ func runtimeHeapTelemetryJSON(
 func runtimeHeapTelemetryActorJSON(
 	program string,
 	includePaths bool,
+	v2 bool,
 ) ([]byte, runtimeHeapTelemetryNumberOffsets, runtimeHeapTelemetryActorTemplate) {
 	var b bytes.Buffer
-	numbers := runtimeHeapTelemetryNumberOffsets{smallPath: -1}
+	numbers := newRuntimeHeapTelemetryNumberOffsets()
 	actorNumbers := make(
 		[]runtimeHeapTelemetryActorNumberOffsets,
 		runtimeHeapTelemetryActorMaxDomains,
@@ -3436,9 +3583,15 @@ func runtimeHeapTelemetryActorJSON(
 	}
 
 	b.WriteString("{\n")
-	writeString("schema", runtimeHeapTelemetrySchema, true)
+	schema := runtimeHeapTelemetrySchemaV1
+	method := runtimeHeapTelemetryMethodV1
+	if v2 {
+		schema = runtimeHeapTelemetrySchemaV2
+		method = runtimeHeapTelemetryMethodV2
+	}
+	writeString("schema", schema, true)
 	writeString("target", runtimeHeapTelemetryTarget, true)
-	writeString("method", runtimeHeapTelemetryMethod, true)
+	writeString("method", method, true)
 	writeString("program", program, true)
 	numbers.current = writeNumber("heap_current_bytes", true)
 	numbers.peak = writeNumber("heap_peak_bytes", true)
@@ -3446,10 +3599,39 @@ func runtimeHeapTelemetryActorJSON(
 	numbers.count = writeNumber("heap_allocation_count", true)
 	numbers.requested = writeNumber("bytes_requested", true)
 	numbers.reserved = writeNumber("bytes_reserved", true)
+	if v2 {
+		writeString("allocator_mode", "owned_alloc_bytes_linux_mmap_v0", true)
+		writeString("allocator_state_scope", "process", true)
+		numbers.successfulAlloc = writeNumber("successful_alloc_payload_bytes", true)
+		numbers.dropPayload = writeNumber("successful_drop_payload_bytes", true)
+		b.WriteString("  \"payload_transfer_current_delta_bytes\": 0,\n")
+		numbers.payloadLive = writeNumber("payload_live_current_bytes", true)
+		numbers.freeCount = writeNumber("free_count", true)
+		b.WriteString("  \"reuse_count\": 0,\n")
+		numbers.releasedTotal = writeNumber("released_total_bytes", true)
+		numbers.osAttempt = writeNumber("os_release_attempt_count", true)
+		numbers.osSuccess = writeNumber("os_release_success_count", true)
+		numbers.osSuccessBytes = writeNumber("os_release_success_bytes", true)
+		b.WriteString("  \"metric_sources\": {\n")
+		b.WriteString("    \"payload_live_current_bytes\": \"runtime_measured\",\n")
+		b.WriteString("    \"released_total_bytes\": \"runtime_measured\",\n")
+		b.WriteString("    \"successful_alloc_payload_bytes\": \"runtime_measured\",\n")
+		b.WriteString("    \"successful_drop_payload_bytes\": \"runtime_measured\",\n")
+		b.WriteString("    \"os_release_attempt_count\": \"runtime_measured\",\n")
+		b.WriteString("    \"os_release_success_count\": \"runtime_measured\",\n")
+		b.WriteString("    \"os_release_success_bytes\": \"runtime_measured\"\n")
+		b.WriteString("  },\n")
+	}
 	b.WriteString("  \"exit_status\": 0,\n")
+	numbers.actorRecordCount = writeNumber("actor_snapshot_record_count", true)
+	numbers.actorLiveCount = writeNumber("actor_live_count", true)
 	if includePaths {
 		b.WriteString("  \"allocation_paths\": {\n")
-		numbers.smallPath = writeIndentedNumber("    ", "small_heap_make_slice", false)
+		pathName := "small_heap_make_slice"
+		if v2 {
+			pathName = "owned_alloc_bytes_linux_mmap"
+		}
+		numbers.smallPath = writeIndentedNumber("    ", pathName, false)
 		b.WriteString("  },\n")
 	}
 	b.WriteString("  \"domain_bytes\": [\n")
@@ -3485,6 +3667,22 @@ func runtimeHeapTelemetryActorJSON(
 			true,
 		)
 		actorNumbers[i].mailboxPeak = writeIndentedNumber("      ", "mailbox_peak_bytes", true)
+		actorNumbers[i].stackLive = writeIndentedNumber("      ", "stack_live_bytes", true)
+		actorNumbers[i].stackReserved = writeIndentedNumber(
+			"      ",
+			"stack_reserved_bytes",
+			true,
+		)
+		actorNumbers[i].stackRetained = writeIndentedNumber(
+			"      ",
+			"stack_retained_bytes",
+			true,
+		)
+		actorNumbers[i].stackReleased = writeIndentedNumber(
+			"      ",
+			"stack_released_bytes",
+			true,
+		)
 		actorNumbers[i].byteBudget = writeIndentedNumber("      ", "byte_budget", true)
 		actorNumbers[i].overBudgetCount = writeIndentedNumber(
 			"      ",
@@ -3504,9 +3702,15 @@ func runtimeHeapTelemetryActorJSON(
 
 	template.suffixOffset = int32(b.Len())
 	b.WriteString("\n  ],\n")
-	b.WriteString(
-		"  \"notes\": [\"bytes_reserved is 0 because this sidecar counts Tetra heap allocation requests, not OS mmap reservations\"]\n",
-	)
+	if v2 {
+		b.WriteString(
+			"  \"notes\": [\"owned alloc drop telemetry counts runtime payload bytes and successful linux munmap syscall arguments\"]\n",
+		)
+	} else {
+		b.WriteString(
+			"  \"notes\": [\"bytes_reserved is 0 because this sidecar counts Tetra heap allocation requests, not OS mmap reservations\"]\n",
+		)
+	}
 	b.WriteString("}\n")
 	template.suffixLength = int32(b.Len()) - template.suffixOffset
 	template.numbers = actorNumbers
@@ -3530,6 +3734,66 @@ func (o runtimeHeapTelemetryNumberOffsets) fields() []runtimeHeapTelemetryNumber
 		fields = append(fields, runtimeHeapTelemetryNumberField{
 			counterOffset: runtimeHeapTelemetrySmallPathCountOffset,
 			fieldOffset:   o.smallPath,
+		})
+	}
+	if o.successfulAlloc >= 0 {
+		fields = append(fields, runtimeHeapTelemetryNumberField{
+			counterOffset: runtimeHeapTelemetryTotalOffset,
+			fieldOffset:   o.successfulAlloc,
+		})
+	}
+	if o.dropPayload >= 0 {
+		fields = append(fields, runtimeHeapTelemetryNumberField{
+			counterOffset: runtimeHeapTelemetryDropPayloadOffset,
+			fieldOffset:   o.dropPayload,
+		})
+	}
+	if o.payloadLive >= 0 {
+		fields = append(fields, runtimeHeapTelemetryNumberField{
+			counterOffset: runtimeHeapTelemetryCurrentOffset,
+			fieldOffset:   o.payloadLive,
+		})
+	}
+	if o.freeCount >= 0 {
+		fields = append(fields, runtimeHeapTelemetryNumberField{
+			counterOffset: runtimeHeapTelemetryFreeCountOffset,
+			fieldOffset:   o.freeCount,
+		})
+	}
+	if o.releasedTotal >= 0 {
+		fields = append(fields, runtimeHeapTelemetryNumberField{
+			counterOffset: runtimeHeapTelemetryReleasedTotalOffset,
+			fieldOffset:   o.releasedTotal,
+		})
+	}
+	if o.osAttempt >= 0 {
+		fields = append(fields, runtimeHeapTelemetryNumberField{
+			counterOffset: runtimeHeapTelemetryOSReleaseAttemptOffset,
+			fieldOffset:   o.osAttempt,
+		})
+	}
+	if o.osSuccess >= 0 {
+		fields = append(fields, runtimeHeapTelemetryNumberField{
+			counterOffset: runtimeHeapTelemetryOSReleaseSuccessOffset,
+			fieldOffset:   o.osSuccess,
+		})
+	}
+	if o.osSuccessBytes >= 0 {
+		fields = append(fields, runtimeHeapTelemetryNumberField{
+			counterOffset: runtimeHeapTelemetryOSReleaseSuccessBytesOffset,
+			fieldOffset:   o.osSuccessBytes,
+		})
+	}
+	if o.actorRecordCount >= 0 {
+		fields = append(fields, runtimeHeapTelemetryNumberField{
+			counterOffset: runtimeHeapTelemetryActorCountOffset,
+			fieldOffset:   o.actorRecordCount,
+		})
+	}
+	if o.actorLiveCount >= 0 {
+		fields = append(fields, runtimeHeapTelemetryNumberField{
+			counterOffset: runtimeHeapTelemetryActorLiveCountOffset,
+			fieldOffset:   o.actorLiveCount,
 		})
 	}
 	return fields
@@ -3585,6 +3849,193 @@ func emitRuntimeHeapTelemetryRecordAllocation(
 	e.PopRdx()
 	e.PopRdi()
 	e.PopRax()
+	return nil
+}
+
+func emitRuntimeHeapTelemetryRecordAllocBytesAllocation(
+	e *x64.Emitter,
+	leaPatches *[]x64obj.LeaPatch,
+	state *runtimeHeapTelemetryState,
+) error {
+	if state == nil {
+		return nil
+	}
+	e.PushRax()
+	e.PushRdi()
+	e.MovRaxFromRspDisp(16)
+	e.MovEdxFromRaxDisp(-8)
+	e.MovRsiRdx()
+	e.MovR8Rdx()
+	e.AddR8Imm32(8)
+	e.PopRdi()
+	e.PopRax()
+	if err := emitRuntimeHeapTelemetryRecordAllocation(e, leaPatches, state); err != nil {
+		return err
+	}
+	return emitRuntimeHeapTelemetryAddCounter(
+		e,
+		leaPatches,
+		state,
+		runtimeHeapTelemetryReservedOffset,
+		runtimeHeapTelemetryPendingValueR8,
+	)
+}
+
+type runtimeHeapTelemetryPendingValue int
+
+const (
+	runtimeHeapTelemetryPendingValueOne runtimeHeapTelemetryPendingValue = iota
+	runtimeHeapTelemetryPendingValueR8
+)
+
+func emitRuntimeHeapTelemetryRecordReleaseAttempt(
+	e *x64.Emitter,
+	leaPatches *[]x64obj.LeaPatch,
+	state *runtimeHeapTelemetryState,
+) error {
+	if state == nil {
+		return nil
+	}
+	if leaPatches == nil {
+		return fmt.Errorf("runtime heap telemetry: missing data patches")
+	}
+	e.PushRax()
+	e.PushRdi()
+	e.PushRdx()
+	e.PushRsi()
+	e.PushR8()
+
+	e.MovRaxFromRspDisp(40)
+	e.MovEdxFromRaxDisp(-8)
+	e.MovRsiRdx()
+	e.MovR8Rdx()
+	e.AddR8Imm32(8)
+
+	emitRuntimeHeapTelemetryLoadBase(e, leaPatches, state)
+	e.MovRdiRdx()
+	e.MovRaxFromRdiDisp(runtimeHeapTelemetryCurrentOffset)
+	e.MovRdiRsi()
+	e.SubRaxRdi()
+	e.MovRdiRdx()
+	e.MovMem64RdiDispRax(runtimeHeapTelemetryCurrentOffset)
+
+	if err := emitRuntimeHeapTelemetryAddCounterWithBase(
+		e,
+		runtimeHeapTelemetryDropPayloadOffset,
+		runtimeHeapTelemetryPendingValueRsi,
+	); err != nil {
+		return err
+	}
+	if err := emitRuntimeHeapTelemetryAddCounterWithBase(
+		e,
+		runtimeHeapTelemetryFreeCountOffset,
+		runtimeHeapTelemetryPendingValueOne,
+	); err != nil {
+		return err
+	}
+	if err := emitRuntimeHeapTelemetryAddCounterWithBase(
+		e,
+		runtimeHeapTelemetryOSReleaseAttemptOffset,
+		runtimeHeapTelemetryPendingValueOne,
+	); err != nil {
+		return err
+	}
+	e.MovMem64RdiDispR8(runtimeHeapTelemetryPendingReleaseBytesOffset)
+
+	e.PopR8()
+	e.PopRsi()
+	e.PopRdx()
+	e.PopRdi()
+	e.PopRax()
+	return nil
+}
+
+const runtimeHeapTelemetryPendingValueRsi runtimeHeapTelemetryPendingValue = 2
+
+func emitRuntimeHeapTelemetryRecordReleaseSuccess(
+	e *x64.Emitter,
+	leaPatches *[]x64obj.LeaPatch,
+	state *runtimeHeapTelemetryState,
+) error {
+	if state == nil {
+		return nil
+	}
+	if leaPatches == nil {
+		return fmt.Errorf("runtime heap telemetry: missing data patches")
+	}
+	e.TestRaxRax()
+	skipAt := e.JnzRel32()
+	e.PushRax()
+	e.PushRdi()
+	e.PushRdx()
+	e.PushR8()
+
+	emitRuntimeHeapTelemetryLoadBase(e, leaPatches, state)
+	e.MovRdiRdx()
+	e.MovR8FromRdiDisp(runtimeHeapTelemetryPendingReleaseBytesOffset)
+	if err := emitRuntimeHeapTelemetryAddCounterWithBase(
+		e,
+		runtimeHeapTelemetryReleasedTotalOffset,
+		runtimeHeapTelemetryPendingValueR8,
+	); err != nil {
+		return err
+	}
+	if err := emitRuntimeHeapTelemetryAddCounterWithBase(
+		e,
+		runtimeHeapTelemetryOSReleaseSuccessOffset,
+		runtimeHeapTelemetryPendingValueOne,
+	); err != nil {
+		return err
+	}
+	if err := emitRuntimeHeapTelemetryAddCounterWithBase(
+		e,
+		runtimeHeapTelemetryOSReleaseSuccessBytesOffset,
+		runtimeHeapTelemetryPendingValueR8,
+	); err != nil {
+		return err
+	}
+
+	e.PopR8()
+	e.PopRdx()
+	e.PopRdi()
+	e.PopRax()
+	skipOff := len(e.Buf)
+	return x64.PatchRel32(e.Buf, skipAt, skipOff)
+}
+
+func emitRuntimeHeapTelemetryAddCounter(
+	e *x64.Emitter,
+	leaPatches *[]x64obj.LeaPatch,
+	state *runtimeHeapTelemetryState,
+	counterOffset int32,
+	value runtimeHeapTelemetryPendingValue,
+) error {
+	if leaPatches == nil {
+		return fmt.Errorf("runtime heap telemetry: missing data patches")
+	}
+	emitRuntimeHeapTelemetryLoadBase(e, leaPatches, state)
+	e.MovRdiRdx()
+	return emitRuntimeHeapTelemetryAddCounterWithBase(e, counterOffset, value)
+}
+
+func emitRuntimeHeapTelemetryAddCounterWithBase(
+	e *x64.Emitter,
+	counterOffset int32,
+	value runtimeHeapTelemetryPendingValue,
+) error {
+	e.MovRaxFromRdiDisp(counterOffset)
+	switch value {
+	case runtimeHeapTelemetryPendingValueOne:
+		e.AddRaxImm32(1)
+	case runtimeHeapTelemetryPendingValueR8:
+		e.MovRdxR8()
+		e.AddRaxRdx()
+	case runtimeHeapTelemetryPendingValueRsi:
+		e.AddRaxRsi()
+	default:
+		return fmt.Errorf("runtime heap telemetry: unsupported pending value %d", value)
+	}
+	e.MovMem64RdiDispRax(counterOffset)
 	return nil
 }
 
@@ -3786,9 +4237,12 @@ func emitRuntimeHeapTelemetryCaptureActors(
 		x64obj.CallPatch{At: at, Name: runtimeHeapTelemetryActorSnapshotSymbol},
 	)
 
+	e.PushRdx()
 	emitRuntimeHeapTelemetryLoadBase(e, leaPatches, state)
 	e.MovRdiRdx()
 	e.MovMem64RdiDispRax(runtimeHeapTelemetryActorCountOffset)
+	e.PopRdx()
+	e.MovMem64RdiDispRdx(runtimeHeapTelemetryActorLiveCountOffset)
 	return nil
 }
 
@@ -3817,12 +4271,28 @@ func emitRuntimeHeapTelemetryFillActorTemplate(
 				fieldOffset:   numbers.bytesCopied,
 			},
 			{
-				counterOffset: recordOffset + runtimeHeapTelemetryActorCurrentOffset,
+				counterOffset: recordOffset + runtimeHeapTelemetryActorMailboxCurrentOffset,
 				fieldOffset:   numbers.mailboxCurrent,
 			},
 			{
-				counterOffset: recordOffset + runtimeHeapTelemetryActorPeakOffset,
+				counterOffset: recordOffset + runtimeHeapTelemetryActorMailboxPeakOffset,
 				fieldOffset:   numbers.mailboxPeak,
+			},
+			{
+				counterOffset: recordOffset + runtimeHeapTelemetryActorStackLiveOffset,
+				fieldOffset:   numbers.stackLive,
+			},
+			{
+				counterOffset: recordOffset + runtimeHeapTelemetryActorStackReservedOffset,
+				fieldOffset:   numbers.stackReserved,
+			},
+			{
+				counterOffset: recordOffset + runtimeHeapTelemetryActorStackRetainedOffset,
+				fieldOffset:   numbers.stackRetained,
+			},
+			{
+				counterOffset: recordOffset + runtimeHeapTelemetryActorStackReleasedOffset,
+				fieldOffset:   numbers.stackReleased,
 			},
 			{
 				counterOffset: recordOffset + runtimeHeapTelemetryActorByteBudgetOffset,
@@ -4360,7 +4830,7 @@ func emitActorPingPongRuntimeCallRegisterFunction(
 
 	e.PushRbp()
 	e.MovRbpRsp()
-	const actorPingPongScratchSlots = 2
+	actorPingPongScratchSlots := runtimeabi.ActorHandleABI().RefSlots + 1
 	localSize := x64.AlignStackSize((fn.LocalSlots + actorPingPongScratchSlots) * 8)
 	if localSize > 0 {
 		e.SubRspImm32(int32(localSize))
@@ -4423,11 +4893,12 @@ func emitActorPingPongRuntimeCallRegisterFunction(
 		e.MovEaxFromRbpDisp(scalarRegisterSlotOffset(plan.ValueLocal))
 		e.CmpEaxImm32(41)
 		failAt := e.JnzRel32()
-		if err := emitCall("__tetra_actor_sender", 0, 1); err != nil {
+		actorSlots := runtimeabi.ActorHandleABI().RefSlots
+		if err := emitCall("__tetra_actor_sender", 0, actorSlots); err != nil {
 			return true, err
 		}
 		pushConst(42)
-		if err := emitCall("__tetra_actor_send", 2, 1); err != nil {
+		if err := emitCall("__tetra_actor_send", actorSlots+1, 1); err != nil {
 			return true, err
 		}
 		if err := storeLocalFromTop(plan.SentLocal); err != nil {
@@ -4444,16 +4915,21 @@ func emitActorPingPongRuntimeCallRegisterFunction(
 			return true, err
 		}
 	case "machine-ir-actor-ping-pong-main":
+		actorSlots := runtimeabi.ActorHandleABI().RefSlots
 		pushConst(plan.SpawnEntryID)
-		if err := emitCall("__tetra_actor_spawn", 1, 1); err != nil {
+		if err := emitCall("__tetra_actor_spawn", 1, actorSlots); err != nil {
+			return true, err
+		}
+		if err := storeLocalFromTop(plan.ActorLocal + 1); err != nil {
 			return true, err
 		}
 		if err := storeLocalFromTop(plan.ActorLocal); err != nil {
 			return true, err
 		}
 		pushLocal(plan.ActorLocal)
+		pushLocal(plan.ActorLocal + 1)
 		pushConst(41)
-		if err := emitCall("__tetra_actor_send", 2, 1); err != nil {
+		if err := emitCall("__tetra_actor_send", actorSlots+1, 1); err != nil {
 			return true, err
 		}
 		if err := storeLocalFromTop(plan.SentLocal); err != nil {

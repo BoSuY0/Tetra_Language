@@ -86,7 +86,9 @@ Each item below records the v1.0 decision, evidence, gates, and owner.
 - Actor/task transfer safety MVP:
   - Decision: required as conservative local MVP.
   - Evidence: worker entrypoint, sendable-result, transfer, and use-after-transfer.
-  - Non-goals: distributed actors and full race-safety proofs.
+  - Non-goals: non-Linux distributed actor parity, distributed pointer zero-copy, and full
+    race-safety proofs. Linux-x64 distributed actors are part of the native actor platform release
+    closure and are gated separately by the actor capability manifest.
   - Gate terms: `Actor`, `Task`, `Ownership`, `Transfer`.
   - Owner: safety/runtime/docs agents.
 - Lifetime SSA local join solver:
@@ -124,9 +126,25 @@ Each item below records the v1.0 decision, evidence, gates, and owner.
 - Actors runtime MVP:
   - Decision: required for local actor runtime on supported native targets.
   - Evidence: tagged messages, runtime selection, parity, ownership, and targets.
-  - Non-goals: non-Linux-x64 distributed actors and broad structured concurrency.
+  - Non-goals: non-Linux-x64 distributed production parity, exactly-once delivery, and broad
+    Erlang/OTP compatibility. Linux-x64 multi-core scheduling, supervision, structured concurrency,
+    authenticated distributed actors, and cluster membership are mandatory for the native actor
+    platform final verdict.
   - Gate terms: `Actor`, `Actors`, `Runtime`, `Ownership`.
   - Owner: runtime agent.
+- Native actor platform Linux-x64 release closure:
+  - Decision: required before the final v1 native actor platform verdict.
+  - Evidence: `docs/contracts/actors/actor-capability-manifest.v1.json`, every required
+    `actor-*.json`, `surface-*.json`, `flagship-native-app.json`,
+    `benchmark-rust-c-parity.json`, `runtime-stress-invariants.json`, `artifact-hashes.json`, and
+    `final-readiness.json` report from one fresh same-head run.
+  - Gate:
+    `bash scripts/release/v1_0/native-actor-platform-linux-x64-gate.sh --report-dir <report-dir>`.
+  - Final verdict: `TETRA_V1_NATIVE_ACTOR_PLATFORM_LINUX_X64_PROD_STABLE`.
+  - Non-goals: full Erlang/OTP replacement, exactly-once messaging, distributed pointer zero-copy,
+    highly available consensus control plane, formal race/liveness proof, and non-Linux distributed
+    production runtime parity.
+  - Owner: runtime/surface/release agents.
 - Runtime ABI and TOBJ linking:
   - Decision: Required.
   - Evidence: reserved symbols, TOBJ metadata, overrides, and diagnostics.
@@ -240,9 +258,12 @@ applicable.
 - Advanced AI/model types and model-runtime integration.
 - Callable Level 2 captured closure and escape semantics, broader callback movement, and full
   first-class function-value behavior unless promoted with lifetime and ABI evidence.
-- Distributed actors beyond the release actor/task safety contract.
+- Non-Linux distributed actor production parity, exactly-once distributed delivery, distributed
+  pointer zero-copy, and highly available consensus control plane behavior beyond the Linux-x64
+  broker-authoritative v1 model.
 - Async typed-error behavior beyond the supported `try await <call>()` synchronous-lowering
-  boundary, plus cancellation and structured concurrency.
+  boundary. Full Linux-x64 actor/task structured concurrency is not optional for the native actor
+  platform final verdict; behavior outside that matrix remains post-v1 unless promoted.
 - Runtime generic values, generic structs, explicit type arguments, higher-ranked generics, full
   protocol-bound generic dispatch, and specialization optimization beyond the static monomorphized
   generic-function MVP.

@@ -90,6 +90,28 @@ func TestDecodeRejectsBadHeaderAndInvalidSlotCount(t *testing.T) {
 	}
 }
 
+func TestDecodeForActorRuntimeABIV2RejectsOldWireFrame(t *testing.T) {
+	frame := Frame{
+		Type:         FrameSendI32,
+		SourceNodeID: 1,
+		DestNodeID:   2,
+		SequenceID:   1,
+		ActorID:      3,
+		Payload:      []int32{5},
+	}
+	data, err := EncodeFrame(frame)
+	if err != nil {
+		t.Fatalf("EncodeFrame returned error: %v", err)
+	}
+
+	if _, err := DecodeFrameForActorRefSlots(data, 2); !errors.Is(err, ErrActorWireABIMismatch) {
+		t.Fatalf("DecodeFrameForActorRefSlots old-wire error = %v, want %v", err, ErrActorWireABIMismatch)
+	}
+	if _, err := DecodeFrameForActorRefSlots(data, 1); err != nil {
+		t.Fatalf("DecodeFrameForActorRefSlots legacy slots returned error: %v", err)
+	}
+}
+
 func TestEncodeRejectsFramesOutsideProtocolBounds(t *testing.T) {
 	oversized := Frame{
 		Type:         FrameSendTyped,
@@ -142,5 +164,81 @@ func TestRemoteActorHandleEncoding(t *testing.T) {
 	}
 	if _, err := DecodeRemoteHandle(7); !errors.Is(err, ErrLocalActorHandle) {
 		t.Fatalf("DecodeRemoteHandle local handle error = %v, want %v", err, ErrLocalActorHandle)
+	}
+}
+
+func TestActorRefV2LocalRoundTripCarriesSlotAndGeneration(t *testing.T) {
+	ref, err := NewLocalActorRef(42, 9)
+	if err != nil {
+		t.Fatalf("NewLocalActorRef returned error: %v", err)
+	}
+	if ref.IsRemote() {
+		t.Fatalf("local actor ref was detected as remote")
+	}
+	parts, err := DecodeActorRefV2(ref.Raw())
+	if err != nil {
+		t.Fatalf("DecodeActorRefV2 returned error: %v", err)
+	}
+	if parts.Kind != ActorRefLocal || parts.Slot != 42 || parts.Generation != 9 ||
+		parts.NodeID != 0 || parts.NodeEpoch != 0 {
+		t.Fatalf("decoded local actor ref = %+v", parts)
+	}
+	if err := ValidateActorRefGeneration(ref.Raw(), 9); err != nil {
+		t.Fatalf("ValidateActorRefGeneration current generation failed: %v", err)
+	}
+}
+
+func TestActorRefV2RemoteRoundTripCarriesNodeEpochSlotAndGeneration(t *testing.T) {
+	ref, err := NewRemoteActorRef(7, 11, 42, 9)
+	if err != nil {
+		t.Fatalf("NewRemoteActorRef returned error: %v", err)
+	}
+	if !ref.IsRemote() {
+		t.Fatalf("remote actor ref was detected as local")
+	}
+	parts, err := DecodeActorRefV2(ref.Raw())
+	if err != nil {
+		t.Fatalf("DecodeActorRefV2 returned error: %v", err)
+	}
+	if parts.Kind != ActorRefRemote || parts.NodeID != 7 || parts.NodeEpoch != 11 ||
+		parts.Slot != 42 || parts.Generation != 9 {
+		t.Fatalf("decoded remote actor ref = %+v", parts)
+	}
+	if err := ValidateActorRefEpoch(ref.Raw(), 11); err != nil {
+		t.Fatalf("ValidateActorRefEpoch current epoch failed: %v", err)
+	}
+}
+
+func TestActorRefV2RejectsForgedLegacyAndZeroGenerationHandles(t *testing.T) {
+	legacy, err := EncodeRemoteHandle(2, 7)
+	if err != nil {
+		t.Fatalf("EncodeRemoteHandle returned error: %v", err)
+	}
+	if _, err := DecodeActorRefV2(uint64(uint32(legacy))); !errors.Is(err, ErrUnsupportedActorRefVersion) {
+		t.Fatalf("DecodeActorRefV2 legacy handle error = %v, want %v", err, ErrUnsupportedActorRefVersion)
+	}
+	if _, err := NewLocalActorRef(42, 0); !errors.Is(err, ErrInvalidActorGeneration) {
+		t.Fatalf("NewLocalActorRef zero generation error = %v, want %v", err, ErrInvalidActorGeneration)
+	}
+	if _, err := NewRemoteActorRef(7, 0, 42, 9); !errors.Is(err, ErrInvalidNodeEpoch) {
+		t.Fatalf("NewRemoteActorRef zero epoch error = %v, want %v", err, ErrInvalidNodeEpoch)
+	}
+}
+
+func TestActorRefV2RejectsStaleGenerationAndNodeEpoch(t *testing.T) {
+	local, err := NewLocalActorRef(42, 9)
+	if err != nil {
+		t.Fatalf("NewLocalActorRef returned error: %v", err)
+	}
+	if err := ValidateActorRefGeneration(local.Raw(), 10); !errors.Is(err, ErrStaleActorGeneration) {
+		t.Fatalf("ValidateActorRefGeneration stale error = %v, want %v", err, ErrStaleActorGeneration)
+	}
+
+	remote, err := NewRemoteActorRef(7, 11, 42, 9)
+	if err != nil {
+		t.Fatalf("NewRemoteActorRef returned error: %v", err)
+	}
+	if err := ValidateActorRefEpoch(remote.Raw(), 12); !errors.Is(err, ErrStaleNodeEpoch) {
+		t.Fatalf("ValidateActorRefEpoch stale error = %v, want %v", err, ErrStaleNodeEpoch)
 	}
 }

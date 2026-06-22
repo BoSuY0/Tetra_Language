@@ -1,0 +1,384 @@
+{
+  "schema_version": 1,
+  "kind": "proof",
+  "target": "linux-x64",
+  "bounds": {
+    "schema_version": 1,
+    "kind": "bounds",
+    "target": "linux-x64",
+    "totals": {
+      "removed": 1,
+      "left": 2
+    },
+    "functions": [
+      {
+        "function": "main",
+        "removed": 1,
+        "left": 2,
+        "sites": [
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/flow/flow_islands_smoke.tetra:5:9",
+            "kind": "u8.store",
+            "removed": true,
+            "proof_id": "proof:allocation-zero:literal0:msg:5:9",
+            "reason": "removed_by_allocation_literal_zero_length"
+          },
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/flow/flow_islands_smoke.tetra:6:9",
+            "kind": "u8.store",
+            "removed": false,
+            "reason": "left_missing_dominance"
+          },
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/flow/flow_islands_smoke.tetra:7:9",
+            "kind": "u8.store",
+            "removed": false,
+            "reason": "left_missing_dominance"
+          }
+        ]
+      }
+    ]
+  },
+  "proofs": [
+    {
+      "proof_id": "proof:allocation-zero:literal0:msg:5:9:index_store",
+      "kind": "range",
+      "guard": "0 < msg.len && msg.len == 3",
+      "dominates": "bounds_check op1",
+      "fact": "0 in [0, msg.len); derivation: non_negative, less_than_len, allocation_literal_zero, allocation_length_positive",
+      "reason": "allocation literal-zero length proof",
+      "removed_bounds_check": true
+    }
+  ],
+  "plir": {
+    "funcs": [
+      {
+        "name": "main",
+        "summary": {
+          "public": true,
+          "return_type": "i32",
+          "effects": [
+            "alloc",
+            "io",
+            "islands",
+            "mem"
+          ]
+        },
+        "values": [
+          {
+            "id": "alloc_intent:msg",
+            "kind": "alloc_intent",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/flow/flow_islands_smoke.tetra:4:28",
+            "region": "island:isl",
+            "alloc": {
+              "element_type": "u8",
+              "element_size": 1,
+              "length_expr": "3",
+              "length_const_known": true,
+              "length_const": 3,
+              "zero_guard_status": "valid_empty_no_metadata_access",
+              "negative_guard_status": "reject_before_metadata_access",
+              "overflow_guard_status": "reject_before_metadata_access",
+              "builtin": "core.island_make_u8",
+              "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/flow/flow_islands_smoke.tetra:4:28"
+            },
+            "provenance": {
+              "kind": "island",
+              "root": "isl"
+            },
+            "lifetime": {
+              "birth": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/flow/flow_islands_smoke.tetra:4:28",
+              "owner": "msg"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "local:0",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/flow/flow_islands_smoke.tetra:5:9",
+            "region": "fn:main",
+            "provenance": {
+              "kind": "stack",
+              "root": "0"
+            },
+            "lifetime": {
+              "birth": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/flow/flow_islands_smoke.tetra:5:9",
+              "owner": "0"
+            },
+            "escape": "no_escape"
+          },
+          {
+            "id": "local:isl",
+            "kind": "local",
+            "type": "island",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/flow/flow_islands_smoke.tetra:1:6",
+            "region": "fn:main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:isl"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "isl"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:msg",
+            "kind": "local",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/flow/flow_islands_smoke.tetra:1:6",
+            "region": "fn:main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:msg"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "msg"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "alloc_intent",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/flow/flow_islands_smoke.tetra:4:28",
+            "inputs": [
+              "isl",
+              "3"
+            ],
+            "outputs": [
+              "alloc_intent:msg"
+            ],
+            "note": "island_make<u8> length contract: zero valid, negative and overflow reject before island metadata access"
+          },
+          {
+            "id": "op1",
+            "kind": "index_store",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/flow/flow_islands_smoke.tetra:5:9",
+            "inputs": [
+              "msg",
+              "0"
+            ]
+          },
+          {
+            "id": "op2",
+            "kind": "index_store",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/flow/flow_islands_smoke.tetra:6:9",
+            "inputs": [
+              "msg",
+              "1"
+            ]
+          },
+          {
+            "id": "op3",
+            "kind": "index_store",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/flow/flow_islands_smoke.tetra:7:9",
+            "inputs": [
+              "msg",
+              "2"
+            ]
+          },
+          {
+            "id": "op4",
+            "kind": "print",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/flow/flow_islands_smoke.tetra:8:9",
+            "inputs": [
+              "msg"
+            ]
+          },
+          {
+            "id": "op5",
+            "kind": "return",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/flow/flow_islands_smoke.tetra:9:7",
+            "inputs": [
+              "0"
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/flow/flow_islands_smoke.tetra:1:6",
+            "reason": "semantics checker enforced declared effects",
+            "uses": [
+              "alloc",
+              "io",
+              "islands",
+              "mem"
+            ]
+          },
+          {
+            "id": "f1",
+            "kind": "provenance_known",
+            "value_id": "local:msg",
+            "reason": "checked parameter/local memory value"
+          },
+          {
+            "id": "f2",
+            "kind": "region_alive",
+            "value_id": "local:msg",
+            "region": "fn:main",
+            "reason": "function region is alive"
+          },
+          {
+            "id": "f3",
+            "kind": "provenance_known",
+            "value_id": "alloc_intent:msg",
+            "island_id": "island:isl",
+            "epoch": 1,
+            "base_id": "alloc_intent:msg",
+            "reason": "compiler-known allocation intent"
+          },
+          {
+            "id": "f4",
+            "kind": "len_stable",
+            "value_id": "alloc_intent:msg",
+            "island_id": "island:isl",
+            "epoch": 1,
+            "base_id": "alloc_intent:msg",
+            "reason": "slice metadata is opaque in safe code"
+          },
+          {
+            "id": "f5",
+            "kind": "region_alive",
+            "value_id": "alloc_intent:msg",
+            "island_id": "island:isl",
+            "epoch": 1,
+            "base_id": "alloc_intent:msg",
+            "region": "island:isl"
+          },
+          {
+            "id": "f6",
+            "kind": "aligned",
+            "value_id": "alloc_intent:msg",
+            "island_id": "island:isl",
+            "epoch": 1,
+            "base_id": "alloc_intent:msg",
+            "region": "island:isl",
+            "reason": "island region allocator returns 16-byte aligned payloads"
+          },
+          {
+            "id": "f7",
+            "kind": "index_in_range",
+            "value_id": "local:0",
+            "range": "0 in [0, msg.len)",
+            "proof_id": "proof:allocation-zero:literal0:msg:5:9:index_store",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/flow/flow_islands_smoke.tetra:5:9",
+            "reason": "allocation literal-zero length proof"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "exit": true,
+            "ops": [
+              "op0",
+              "op1",
+              "op2",
+              "op3",
+              "op4",
+              "op5"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/flow/flow_islands_smoke.tetra:1:6"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          }
+        ],
+        "proof_guards": [
+          {
+            "id": "proof:allocation-zero:literal0:msg:5:9:index_store",
+            "kind": "range",
+            "block": "entry",
+            "condition": "0 < msg.len && msg.len == 3",
+            "reason": "allocation literal-zero length proof",
+            "dominates": [
+              {
+                "proof_id": "proof:allocation-zero:literal0:msg:5:9:index_store",
+                "block": "entry",
+                "op_id": "op1",
+                "use_kind": "bounds_check",
+                "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/flow/flow_islands_smoke.tetra:5:9"
+              }
+            ]
+          }
+        ],
+        "proof_uses": [
+          {
+            "proof_id": "proof:allocation-zero:literal0:msg:5:9:index_store",
+            "block": "entry",
+            "op_id": "op1",
+            "use_kind": "bounds_check",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/flow/flow_islands_smoke.tetra:5:9"
+          }
+        ],
+        "proof_terms": [
+          {
+            "id": "proof:allocation-zero:literal0:msg:5:9:index_store",
+            "kind": "bounds_check",
+            "subject_base_id": "msg",
+            "index_value_id": "local:0",
+            "operation": "index_store",
+            "range": "0 in [0, msg.len)",
+            "island_id": "island:isl",
+            "epoch": 1,
+            "base_id": "alloc_intent:msg",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/flow/flow_islands_smoke.tetra:5:9",
+            "facts_used": [
+              "non_negative",
+              "less_than_len",
+              "allocation_literal_zero",
+              "allocation_length_positive"
+            ]
+          }
+        ],
+        "range_facts": [
+          {
+            "value": "local:0",
+            "lower": {
+              "kind": "const"
+            },
+            "upper": {
+              "kind": "symbol",
+              "symbol": "msg.len"
+            },
+            "inclusive_lower": true,
+            "inclusive_upper": false,
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/flow/flow_islands_smoke.tetra:5:9",
+            "proof_id": "proof:allocation-zero:literal0:msg:5:9:index_store",
+            "reason": "allocation literal-zero length proof",
+            "derivation": [
+              "non_negative",
+              "less_than_len",
+              "allocation_literal_zero",
+              "allocation_length_positive"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

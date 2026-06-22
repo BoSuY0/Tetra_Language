@@ -1,0 +1,1161 @@
+{
+  "schema_version": 1,
+  "kind": "proof",
+  "target": "linux-x64",
+  "bounds": {
+    "schema_version": 1,
+    "kind": "bounds",
+    "target": "linux-x64",
+    "totals": {
+      "removed": 0,
+      "left": 0
+    },
+    "functions": null
+  },
+  "plir": {
+    "funcs": [
+      {
+        "name": "lib.core.sync.merge_status",
+        "module": "lib.core.sync",
+        "summary": {
+          "public": true,
+          "param_names": [
+            "lhs",
+            "rhs"
+          ],
+          "param_types": [
+            "i32",
+            "i32"
+          ],
+          "param_ownership": [
+            "",
+            ""
+          ],
+          "return_type": "i32"
+        },
+        "values": [
+          {
+            "id": "param:lhs",
+            "kind": "param",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:13:6",
+            "region": "fn:lib.core.sync.merge_status",
+            "provenance": {
+              "kind": "param",
+              "root": "param:lhs"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "lhs"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          },
+          {
+            "id": "param:rhs",
+            "kind": "param",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:13:6",
+            "region": "fn:lib.core.sync.merge_status",
+            "provenance": {
+              "kind": "param",
+              "root": "param:rhs"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "rhs"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "guard",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:14:5",
+            "inputs": [
+              "lhs != 0"
+            ],
+            "note": "lhs != 0"
+          },
+          {
+            "id": "op1",
+            "kind": "return",
+            "block": "if_then:0",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:15:9",
+            "inputs": [
+              "lhs"
+            ]
+          },
+          {
+            "id": "op2",
+            "kind": "return",
+            "block": "if_join:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:16:7",
+            "inputs": [
+              "rhs"
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "pure_call",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:13:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f1",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:13:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f2",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:13:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f3",
+            "kind": "no_mem_write",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:13:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f4",
+            "kind": "no_unknown_escape",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:13:6",
+            "reason": "semantics checker enforced declared effects"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "succs": [
+              "if_join:1",
+              "if_then:0"
+            ],
+            "ops": [
+              "op0"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:13:6"
+          },
+          {
+            "id": "if_then:0",
+            "kind": "if_then",
+            "preds": [
+              "entry"
+            ],
+            "succs": [
+              "if_join:1"
+            ],
+            "ops": [
+              "op1"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:14:5"
+          },
+          {
+            "id": "if_join:1",
+            "kind": "if_join",
+            "exit": true,
+            "preds": [
+              "entry",
+              "if_then:0"
+            ],
+            "ops": [
+              "op2"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:14:5"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          },
+          {
+            "block": "if_then:0",
+            "dominators": [
+              "entry",
+              "if_then:0"
+            ]
+          },
+          {
+            "block": "if_join:1",
+            "dominators": [
+              "entry",
+              "if_join:1"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "lib.core.sync.all_ready",
+        "module": "lib.core.sync",
+        "summary": {
+          "public": true,
+          "param_names": [
+            "lhs",
+            "rhs"
+          ],
+          "param_types": [
+            "bool",
+            "bool"
+          ],
+          "param_ownership": [
+            "",
+            ""
+          ],
+          "return_type": "bool"
+        },
+        "values": [
+          {
+            "id": "param:lhs",
+            "kind": "param",
+            "type": "bool",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:18:8",
+            "region": "fn:lib.core.sync.all_ready",
+            "provenance": {
+              "kind": "param",
+              "root": "param:lhs"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "lhs"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          },
+          {
+            "id": "param:rhs",
+            "kind": "param",
+            "type": "bool",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:18:8",
+            "region": "fn:lib.core.sync.all_ready",
+            "provenance": {
+              "kind": "param",
+              "root": "param:rhs"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "rhs"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "return",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:19:5",
+            "inputs": [
+              ""
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "pure_call",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:18:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f1",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:18:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f2",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:18:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f3",
+            "kind": "no_mem_write",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:18:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f4",
+            "kind": "no_unknown_escape",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:18:8",
+            "reason": "semantics checker enforced declared effects"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "exit": true,
+            "ops": [
+              "op0"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:18:8"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "lib.core.sync.spin_countdown",
+        "module": "lib.core.sync",
+        "summary": {
+          "public": true,
+          "param_names": [
+            "start",
+            "ticks"
+          ],
+          "param_types": [
+            "i32",
+            "i32"
+          ],
+          "param_ownership": [
+            "",
+            ""
+          ],
+          "return_type": "i32"
+        },
+        "values": [
+          {
+            "id": "local:remaining",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:21:8",
+            "region": "fn:lib.core.sync.spin_countdown",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:remaining"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "remaining"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "local:value",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:21:8",
+            "region": "fn:lib.core.sync.spin_countdown",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:value"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "value"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "param:start",
+            "kind": "param",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:21:8",
+            "region": "fn:lib.core.sync.spin_countdown",
+            "provenance": {
+              "kind": "param",
+              "root": "param:start"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "start"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          },
+          {
+            "id": "param:ticks",
+            "kind": "param",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:21:8",
+            "region": "fn:lib.core.sync.spin_countdown",
+            "provenance": {
+              "kind": "param",
+              "root": "param:ticks"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "ticks"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "assign",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:22:5",
+            "inputs": [
+              "start"
+            ],
+            "outputs": [
+              "value"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op1",
+            "kind": "assign",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:23:5",
+            "inputs": [
+              "ticks"
+            ],
+            "outputs": [
+              "remaining"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op2",
+            "kind": "guard",
+            "block": "while_header:0",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:24:5",
+            "inputs": [
+              ""
+            ]
+          },
+          {
+            "id": "op3",
+            "kind": "assign",
+            "block": "while_body:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:25:9",
+            "inputs": [
+              "value - 1"
+            ],
+            "outputs": [
+              "value"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op4",
+            "kind": "assign",
+            "block": "while_body:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:26:9",
+            "inputs": [
+              "remaining - 1"
+            ],
+            "outputs": [
+              "remaining"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op5",
+            "kind": "guard",
+            "block": "while_after:2",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:27:7",
+            "inputs": [
+              "value < 0"
+            ],
+            "note": "value < 0"
+          },
+          {
+            "id": "op6",
+            "kind": "return",
+            "block": "if_then:3",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:28:9",
+            "inputs": [
+              "0"
+            ]
+          },
+          {
+            "id": "op7",
+            "kind": "return",
+            "block": "if_join:4",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:29:7",
+            "inputs": [
+              "value"
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "pure_call",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:21:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f1",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:21:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f2",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:21:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f3",
+            "kind": "no_mem_write",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:21:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f4",
+            "kind": "no_unknown_escape",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:21:8",
+            "reason": "semantics checker enforced declared effects"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "succs": [
+              "while_header:0"
+            ],
+            "ops": [
+              "op0",
+              "op1"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:21:8"
+          },
+          {
+            "id": "while_header:0",
+            "kind": "while_header",
+            "preds": [
+              "entry",
+              "while_body:1"
+            ],
+            "succs": [
+              "while_after:2",
+              "while_body:1"
+            ],
+            "ops": [
+              "op2"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:24:5"
+          },
+          {
+            "id": "while_body:1",
+            "kind": "while_body",
+            "preds": [
+              "while_header:0"
+            ],
+            "succs": [
+              "while_header:0"
+            ],
+            "ops": [
+              "op3",
+              "op4"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:24:5"
+          },
+          {
+            "id": "while_after:2",
+            "kind": "while_after",
+            "preds": [
+              "while_header:0"
+            ],
+            "succs": [
+              "if_join:4",
+              "if_then:3"
+            ],
+            "ops": [
+              "op5"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:24:5"
+          },
+          {
+            "id": "if_then:3",
+            "kind": "if_then",
+            "preds": [
+              "while_after:2"
+            ],
+            "succs": [
+              "if_join:4"
+            ],
+            "ops": [
+              "op6"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:27:7"
+          },
+          {
+            "id": "if_join:4",
+            "kind": "if_join",
+            "exit": true,
+            "preds": [
+              "if_then:3",
+              "while_after:2"
+            ],
+            "ops": [
+              "op7"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:27:7"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          },
+          {
+            "block": "while_header:0",
+            "dominators": [
+              "entry",
+              "while_header:0"
+            ]
+          },
+          {
+            "block": "while_body:1",
+            "dominators": [
+              "entry",
+              "while_body:1",
+              "while_header:0"
+            ]
+          },
+          {
+            "block": "while_after:2",
+            "dominators": [
+              "entry",
+              "while_after:2",
+              "while_header:0"
+            ]
+          },
+          {
+            "block": "if_then:3",
+            "dominators": [
+              "entry",
+              "if_then:3",
+              "while_after:2",
+              "while_header:0"
+            ]
+          },
+          {
+            "block": "if_join:4",
+            "dominators": [
+              "entry",
+              "if_join:4",
+              "while_after:2",
+              "while_header:0"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "lib.core.sync.barrier_target",
+        "module": "lib.core.sync",
+        "summary": {
+          "public": true,
+          "param_names": [
+            "workers"
+          ],
+          "param_types": [
+            "i32"
+          ],
+          "param_ownership": [
+            ""
+          ],
+          "return_type": "i32"
+        },
+        "values": [
+          {
+            "id": "param:workers",
+            "kind": "param",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:31:8",
+            "region": "fn:lib.core.sync.barrier_target",
+            "provenance": {
+              "kind": "param",
+              "root": "param:workers"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "workers"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "guard",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:32:5",
+            "inputs": [
+              "workers < 0"
+            ],
+            "note": "workers < 0"
+          },
+          {
+            "id": "op1",
+            "kind": "return",
+            "block": "if_then:0",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:33:9",
+            "inputs": [
+              "0"
+            ]
+          },
+          {
+            "id": "op2",
+            "kind": "return",
+            "block": "if_join:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:34:7",
+            "inputs": [
+              "workers"
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "pure_call",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:31:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f1",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:31:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f2",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:31:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f3",
+            "kind": "no_mem_write",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:31:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f4",
+            "kind": "no_unknown_escape",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:31:8",
+            "reason": "semantics checker enforced declared effects"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "succs": [
+              "if_join:1",
+              "if_then:0"
+            ],
+            "ops": [
+              "op0"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:31:8"
+          },
+          {
+            "id": "if_then:0",
+            "kind": "if_then",
+            "preds": [
+              "entry"
+            ],
+            "succs": [
+              "if_join:1"
+            ],
+            "ops": [
+              "op1"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:32:5"
+          },
+          {
+            "id": "if_join:1",
+            "kind": "if_join",
+            "exit": true,
+            "preds": [
+              "entry",
+              "if_then:0"
+            ],
+            "ops": [
+              "op2"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/sync.tetra:32:5"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          },
+          {
+            "block": "if_then:0",
+            "dominators": [
+              "entry",
+              "if_then:0"
+            ]
+          },
+          {
+            "block": "if_join:1",
+            "dominators": [
+              "entry",
+              "if_join:1"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "examples.core.runtime.core_sync_smoke.main",
+        "module": "examples.core.runtime.core_sync_smoke",
+        "summary": {
+          "public": true,
+          "return_type": "i32"
+        },
+        "values": [
+          {
+            "id": "local:barrier_closed",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/runtime/core_sync_smoke.tetra:6:6",
+            "region": "fn:examples.core.runtime.core_sync_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:barrier_closed"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "barrier_closed"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:barrier_ok",
+            "kind": "local",
+            "type": "bool",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/runtime/core_sync_smoke.tetra:6:6",
+            "region": "fn:examples.core.runtime.core_sync_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:barrier_ok"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "barrier_ok"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:barrier_open",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/runtime/core_sync_smoke.tetra:6:6",
+            "region": "fn:examples.core.runtime.core_sync_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:barrier_open"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "barrier_open"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:merge_ok",
+            "kind": "local",
+            "type": "bool",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/runtime/core_sync_smoke.tetra:6:6",
+            "region": "fn:examples.core.runtime.core_sync_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:merge_ok"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "merge_ok"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:merged",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/runtime/core_sync_smoke.tetra:6:6",
+            "region": "fn:examples.core.runtime.core_sync_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:merged"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "merged"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:merged_nonzero",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/runtime/core_sync_smoke.tetra:6:6",
+            "region": "fn:examples.core.runtime.core_sync_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:merged_nonzero"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "merged_nonzero"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:remaining",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/runtime/core_sync_smoke.tetra:6:6",
+            "region": "fn:examples.core.runtime.core_sync_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:remaining"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "remaining"
+            },
+            "escape": "unknown"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/runtime/core_sync_smoke.tetra:7:23",
+            "inputs": [
+              "0",
+              "0"
+            ],
+            "note": "lib.core.sync.merge_status"
+          },
+          {
+            "id": "op1",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/runtime/core_sync_smoke.tetra:8:31",
+            "inputs": [
+              "7",
+              "3"
+            ],
+            "note": "lib.core.sync.merge_status"
+          },
+          {
+            "id": "op2",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/runtime/core_sync_smoke.tetra:9:26",
+            "inputs": [
+              "5",
+              "3"
+            ],
+            "note": "lib.core.sync.spin_countdown"
+          },
+          {
+            "id": "op3",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/runtime/core_sync_smoke.tetra:10:29",
+            "inputs": [
+              "4"
+            ],
+            "note": "lib.core.sync.barrier_target"
+          },
+          {
+            "id": "op4",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/runtime/core_sync_smoke.tetra:11:31",
+            "inputs": [
+              "-1"
+            ],
+            "note": "lib.core.sync.barrier_target"
+          },
+          {
+            "id": "op5",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/runtime/core_sync_smoke.tetra:14:52",
+            "note": "lib.core.sync.all_ready"
+          },
+          {
+            "id": "op6",
+            "kind": "guard",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/runtime/core_sync_smoke.tetra:14:5",
+            "inputs": [
+              ""
+            ]
+          },
+          {
+            "id": "op7",
+            "kind": "return",
+            "block": "if_then:0",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/runtime/core_sync_smoke.tetra:15:9",
+            "inputs": [
+              "42"
+            ]
+          },
+          {
+            "id": "op8",
+            "kind": "return",
+            "block": "if_join:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/runtime/core_sync_smoke.tetra:16:7",
+            "inputs": [
+              "1"
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "pure_call",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/runtime/core_sync_smoke.tetra:6:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f1",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/runtime/core_sync_smoke.tetra:6:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f2",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/runtime/core_sync_smoke.tetra:6:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f3",
+            "kind": "no_mem_write",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/runtime/core_sync_smoke.tetra:6:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f4",
+            "kind": "no_unknown_escape",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/runtime/core_sync_smoke.tetra:6:6",
+            "reason": "semantics checker enforced declared effects"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "succs": [
+              "if_join:1",
+              "if_then:0"
+            ],
+            "ops": [
+              "op0",
+              "op1",
+              "op2",
+              "op3",
+              "op4",
+              "op5",
+              "op6"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/runtime/core_sync_smoke.tetra:6:6"
+          },
+          {
+            "id": "if_then:0",
+            "kind": "if_then",
+            "preds": [
+              "entry"
+            ],
+            "succs": [
+              "if_join:1"
+            ],
+            "ops": [
+              "op7"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/runtime/core_sync_smoke.tetra:14:5"
+          },
+          {
+            "id": "if_join:1",
+            "kind": "if_join",
+            "exit": true,
+            "preds": [
+              "entry",
+              "if_then:0"
+            ],
+            "ops": [
+              "op8"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/runtime/core_sync_smoke.tetra:14:5"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          },
+          {
+            "block": "if_then:0",
+            "dominators": [
+              "entry",
+              "if_then:0"
+            ]
+          },
+          {
+            "block": "if_join:1",
+            "dominators": [
+              "entry",
+              "if_join:1"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

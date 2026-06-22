@@ -717,6 +717,9 @@ func (l *lowerer) lowerCallableExplicitArgument(
 	index int,
 ) (int, error) {
 	if index < len(paramTypes) {
+		if err := l.rejectLocalStagedOwnedEnumPayloadValue(arg, paramTypes[index], arg.Pos()); err != nil {
+			return 0, err
+		}
 		return l.lowerExprAs(arg, paramTypes[index])
 	}
 	return l.lowerExpr(arg)

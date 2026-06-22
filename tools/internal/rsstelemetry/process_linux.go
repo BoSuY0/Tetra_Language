@@ -3,6 +3,7 @@
 package rsstelemetry
 
 import (
+	"bytes"
 	"os"
 	"strconv"
 	"strings"
@@ -44,4 +45,33 @@ func ProcessStateMaxRSS(state *os.ProcessState) (uint64, uint64, string, bool) {
 	}
 	raw := uint64(usage.Maxrss)
 	return raw, raw * 1024, UnitKilobytes, true
+}
+
+func ReadProcessMappingCount(pid int) (uint64, bool) {
+	if pid <= 0 {
+		return 0, false
+	}
+	raw, err := os.ReadFile("/proc/" + strconv.Itoa(pid) + "/maps")
+	if err != nil || len(raw) == 0 {
+		return 0, false
+	}
+	count := uint64(bytes.Count(raw, []byte{'\n'}))
+	if raw[len(raw)-1] != '\n' {
+		count++
+	}
+	if count == 0 {
+		return 0, false
+	}
+	return count, true
+}
+
+func ReadProcessSmapsRollup(pid int) ([]byte, bool) {
+	if pid <= 0 {
+		return nil, false
+	}
+	raw, err := os.ReadFile("/proc/" + strconv.Itoa(pid) + "/smaps_rollup")
+	if err != nil || len(raw) == 0 {
+		return nil, false
+	}
+	return raw, true
 }

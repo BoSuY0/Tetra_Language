@@ -1082,7 +1082,7 @@ func SysVCallABIInfo() CallABIInfo {
 		Name:        "sysv",
 		Clobbers:    LinuxX64CallerSaved(),
 		MaxArgSlots: 6,
-		MaxRetSlots: 1,
+		MaxRetSlots: 2,
 	}
 }
 
@@ -1856,6 +1856,9 @@ func ScalarIntFunctionFromStackIRWithCallABI(
 			if instr.Name == "" || instr.ArgSlots < 0 || instr.RetSlots < 0 {
 				return Function{}, false, nil
 			}
+			if instr.RetSlots > 1 {
+				return Function{}, false, nil
+			}
 			if instr.ArgSlots > callABI.MaxArgSlots || instr.RetSlots > callABI.MaxRetSlots {
 				return Function{}, false, nil
 			}
@@ -2010,6 +2013,7 @@ func actorPingPongPongPlanFromStackIR(
 	fn ir.IRFunc,
 	callABI CallABIInfo,
 ) (ActorPingPongRuntimeCallPlan, bool, error) {
+	actorSlots := runtimeabi.ActorHandleABI().RefSlots
 	if fn.Name != "pong" || fn.ParamSlots != 0 || fn.ReturnSlots != 1 ||
 		fn.LocalSlots < 2 || len(fn.Instrs) != 15 {
 		return ActorPingPongRuntimeCallPlan{}, false, nil
@@ -2021,9 +2025,9 @@ func actorPingPongPongPlanFromStackIR(
 		in[3].Kind != ir.IRConstI32 || in[3].Imm != 41 ||
 		in[4].Kind != ir.IRCmpEqI32 ||
 		in[5].Kind != ir.IRJmpIfZero || in[5].Label < 0 ||
-		!actorPingPongCallShape(in[6], actorPingPongRuntimeSenderSymbol, 0, 1, callABI) ||
+		!actorPingPongCallShape(in[6], actorPingPongRuntimeSenderSymbol, 0, actorSlots, callABI) ||
 		in[7].Kind != ir.IRConstI32 || in[7].Imm != 42 ||
-		!actorPingPongCallShape(in[8], actorPingPongRuntimeSendSymbol, 2, 1, callABI) ||
+		!actorPingPongCallShape(in[8], actorPingPongRuntimeSendSymbol, actorSlots+1, 1, callABI) ||
 		!isStore(in[9], in[9].Local) ||
 		in[10].Kind != ir.IRConstI32 || in[10].Imm != 0 ||
 		in[11].Kind != ir.IRReturn ||
@@ -2067,42 +2071,48 @@ func actorPingPongMainPlanFromStackIR(
 	fn ir.IRFunc,
 	callABI CallABIInfo,
 ) (ActorPingPongRuntimeCallPlan, bool, error) {
+	actorSlots := runtimeabi.ActorHandleABI().RefSlots
 	if fn.Name != "main" || fn.ParamSlots != 0 || fn.ReturnSlots != 1 ||
-		fn.LocalSlots < 3 || len(fn.Instrs) != 18 {
+		fn.LocalSlots < 4 || len(fn.Instrs) != 20 {
 		return ActorPingPongRuntimeCallPlan{}, false, nil
 	}
 	in := fn.Instrs
 	if in[0].Kind != ir.IRConstI32 || in[0].Imm != actorPingPongEntryID("pong") ||
-		!actorPingPongCallShape(in[1], actorPingPongRuntimeSpawnSymbol, 1, 1, callABI) ||
+		!actorPingPongCallShape(in[1], actorPingPongRuntimeSpawnSymbol, 1, actorSlots, callABI) ||
 		!isStore(in[2], in[2].Local) ||
-		!isLoad(in[3], in[2].Local) ||
-		in[4].Kind != ir.IRConstI32 || in[4].Imm != 41 ||
-		!actorPingPongCallShape(in[5], actorPingPongRuntimeSendSymbol, 2, 1, callABI) ||
-		!isStore(in[6], in[6].Local) ||
-		!actorPingPongCallShape(in[7], actorPingPongRuntimeRecvSymbol, 0, 1, callABI) ||
+		!isStore(in[3], in[3].Local) ||
+		!isLoad(in[4], in[3].Local) ||
+		!isLoad(in[5], in[2].Local) ||
+		in[6].Kind != ir.IRConstI32 || in[6].Imm != 41 ||
+		!actorPingPongCallShape(in[7], actorPingPongRuntimeSendSymbol, actorSlots+1, 1, callABI) ||
 		!isStore(in[8], in[8].Local) ||
-		!isLoad(in[9], in[8].Local) ||
-		in[10].Kind != ir.IRConstI32 || in[10].Imm != 42 ||
-		in[11].Kind != ir.IRCmpEqI32 ||
-		in[12].Kind != ir.IRJmpIfZero || in[12].Label < 0 ||
-		in[13].Kind != ir.IRConstI32 || in[13].Imm != 0 ||
-		in[14].Kind != ir.IRReturn ||
-		in[15].Kind != ir.IRLabel || in[15].Label != in[12].Label ||
-		in[16].Kind != ir.IRConstI32 || in[16].Imm != 1 ||
-		in[17].Kind != ir.IRReturn {
+		!actorPingPongCallShape(in[9], actorPingPongRuntimeRecvSymbol, 0, 1, callABI) ||
+		!isStore(in[10], in[10].Local) ||
+		!isLoad(in[11], in[10].Local) ||
+		in[12].Kind != ir.IRConstI32 || in[12].Imm != 42 ||
+		in[13].Kind != ir.IRCmpEqI32 ||
+		in[14].Kind != ir.IRJmpIfZero || in[14].Label < 0 ||
+		in[15].Kind != ir.IRConstI32 || in[15].Imm != 0 ||
+		in[16].Kind != ir.IRReturn ||
+		in[17].Kind != ir.IRLabel || in[17].Label != in[14].Label ||
+		in[18].Kind != ir.IRConstI32 || in[18].Imm != 1 ||
+		in[19].Kind != ir.IRReturn {
 		return ActorPingPongRuntimeCallPlan{}, false, nil
 	}
-	actorLocal := in[2].Local
-	sentLocal := in[6].Local
-	replyLocal := in[8].Local
-	if !distinctAllocationLoopLocals(actorLocal, sentLocal, replyLocal) {
+	actorHighLocal := in[2].Local
+	actorLocal := in[3].Local
+	sentLocal := in[8].Local
+	replyLocal := in[10].Local
+	if actorHighLocal != actorLocal+1 ||
+		!distinctAllocationLoopLocals(actorLocal, actorHighLocal, sentLocal, replyLocal) {
 		return ActorPingPongRuntimeCallPlan{}, false, nil
 	}
 	for _, local := range []struct {
 		slot int
 		name string
 	}{
-		{actorLocal, "actor handle"},
+		{actorLocal, "actor handle low"},
+		{actorHighLocal, "actor handle high"},
 		{sentLocal, "actor send result"},
 		{replyLocal, "actor recv reply"},
 	} {
@@ -2121,7 +2131,7 @@ func actorPingPongMainPlanFromStackIR(
 		ActorLocal:   actorLocal,
 		SentLocal:    sentLocal,
 		ReplyLocal:   replyLocal,
-		FailureLabel: in[12].Label,
+		FailureLabel: in[14].Label,
 		SpawnEntryID: in[0].Imm,
 	}
 	out, err := buildActorPingPongMainMachineFunction(fn.Name, callABI, plan)
@@ -2160,7 +2170,8 @@ func buildActorPingPongPongMachineFunction(
 	recvValue := VReg("recv_value")
 	expected := VReg("expected_41")
 	cmp := VReg("cmp_v_41")
-	sender := VReg("sender")
+	senderLow := VReg("sender_low")
+	senderHigh := VReg("sender_high")
 	reply := VReg("reply_42")
 	sendRet := VReg("send_status")
 	ret0 := VReg("ret0")
@@ -2198,7 +2209,7 @@ func buildActorPingPongPongMachineFunction(
 				Instrs: []Instr{
 					{
 						Op:       OpCall,
-						Defs:     []VReg{sender},
+						Defs:     []VReg{senderLow, senderHigh},
 						Call:     actorPingPongRuntimeSenderSymbol,
 						ABI:      callABI.Name,
 						Clobbers: append([]PhysReg(nil), callABI.Clobbers...),
@@ -2208,7 +2219,7 @@ func buildActorPingPongPongMachineFunction(
 					{
 						Op:       OpCall,
 						Defs:     []VReg{sendRet},
-						Uses:     []VReg{sender, reply},
+						Uses:     []VReg{senderLow, senderHigh, reply},
 						Call:     actorPingPongRuntimeSendSymbol,
 						ABI:      callABI.Name,
 						Clobbers: append([]PhysReg(nil), callABI.Clobbers...),
@@ -2244,7 +2255,8 @@ func buildActorPingPongMainMachineFunction(
 	successName := "return_success"
 	failName := "return_failure"
 	spawnID := VReg("spawn_entry_id")
-	actor := VReg("actor_handle")
+	actorLow := VReg("actor_handle_low")
+	actorHigh := VReg("actor_handle_high")
 	ping := VReg("ping_41")
 	sendRet := VReg("send_status")
 	reply := VReg("recv_reply")
@@ -2262,19 +2274,20 @@ func buildActorPingPongMainMachineFunction(
 					{Op: OpMov, Defs: []VReg{spawnID}, Imm: int64(plan.SpawnEntryID), Note: "spawn pong entry id"},
 					{
 						Op:       OpCall,
-						Defs:     []VReg{actor},
+						Defs:     []VReg{actorLow, actorHigh},
 						Uses:     []VReg{spawnID},
 						Call:     actorPingPongRuntimeSpawnSymbol,
 						ABI:      callABI.Name,
 						Clobbers: append([]PhysReg(nil), callABI.Clobbers...),
 						Note:     "actor ping-pong spawn pong",
 					},
-					{Op: OpMov, Defs: []VReg{local(plan.ActorLocal)}, Uses: []VReg{actor}},
+					{Op: OpMov, Defs: []VReg{local(plan.ActorLocal)}, Uses: []VReg{actorLow}},
+					{Op: OpMov, Defs: []VReg{local(plan.ActorLocal + 1)}, Uses: []VReg{actorHigh}},
 					{Op: OpMov, Defs: []VReg{ping}, Imm: 41, Note: "ping scalar"},
 					{
 						Op:       OpCall,
 						Defs:     []VReg{sendRet},
-						Uses:     []VReg{local(plan.ActorLocal), ping},
+						Uses:     []VReg{local(plan.ActorLocal), local(plan.ActorLocal + 1), ping},
 						Call:     actorPingPongRuntimeSendSymbol,
 						ABI:      callABI.Name,
 						Clobbers: append([]PhysReg(nil), callABI.Clobbers...),

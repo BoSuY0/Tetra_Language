@@ -1,0 +1,30 @@
+module examples.actors.system_messages.system_user_queue_isolation
+
+import lib.core.actors as actors
+
+func score_system(result: actors.SystemReceiveResult) -> Int:
+    match result:
+    case actors.SystemReceiveResult.empty:
+        return 0
+    case actors.SystemReceiveResult.message(message):
+        return 100
+    case actors.SystemReceiveResult.timeout:
+        return 101
+    case actors.SystemReceiveResult.canceled:
+        return 102
+    case actors.SystemReceiveResult.runtime_closed:
+        return 103
+    case actors.SystemReceiveResult.invalid_state(code):
+        return 200 + code
+
+func main() -> Int
+uses actors, runtime:
+    let me: actor = core.self()
+    let _queued: Int = core.send_msg(me, 41, 7)
+    let system_result: actors.SystemReceiveResult = actors.poll_system()
+    if score_system(system_result) != 0:
+        return 10
+    let user_message: actor.msg = core.recv_msg()
+    if user_message.value == 41 && user_message.tag == 7:
+        return 0
+    return 20 + user_message.tag

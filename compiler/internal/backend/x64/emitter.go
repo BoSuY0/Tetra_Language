@@ -17,6 +17,7 @@ type CodegenOptions struct {
 	RegisterWidthBits                int
 	TargetFeatures                   TargetFeatures
 	EmitRuntimeHeapTelemetry         bool
+	RuntimeHeapTelemetryV2           bool
 	RuntimeHeapTelemetryActorDomains bool
 	RuntimeHeapTelemetryDir          string
 	RuntimeHeapTelemetryProgram      string

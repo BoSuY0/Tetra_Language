@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "kind": "bounds",
+  "target": "linux-x64",
+  "totals": {
+    "removed": 5,
+    "left": 4
+  },
+  "functions": [
+    {
+      "function": "lib.core.slices.sum_i32",
+      "removed": 1,
+      "left": 0,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:19:5",
+          "kind": "i32.load",
+          "removed": true,
+          "proof_id": "proof:for-collection:value:19:5",
+          "reason": "removed_by_for_loop_range"
+        }
+      ]
+    },
+    {
+      "function": "lib.core.slices.weighted_sum_i32",
+      "removed": 1,
+      "left": 0,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:27:5",
+          "kind": "i32.load",
+          "removed": true,
+          "proof_id": "proof:for-collection:value:27:5",
+          "reason": "removed_by_for_loop_range"
+        }
+      ]
+    },
+    {
+      "function": "lib.core.slices.sum_u8",
+      "removed": 1,
+      "left": 0,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/slices.tetra:35:5",
+          "kind": "u8.load",
+          "removed": true,
+          "proof_id": "proof:for-collection:value:35:5",
+          "reason": "removed_by_for_loop_range"
+        }
+      ]
+    },
+    {
+      "function": "examples.core.data.core_slices_smoke.main",
+      "removed": 2,
+      "left": 4,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:10:9",
+          "kind": "i32.store",
+          "removed": true,
+          "proof_id": "proof:allocation-zero:literal0:xs:10:9",
+          "reason": "removed_by_allocation_literal_zero_length"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:11:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:12:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:16:9",
+          "kind": "u8.store",
+          "removed": true,
+          "proof_id": "proof:allocation-zero:literal0:bytes:16:9",
+          "reason": "removed_by_allocation_literal_zero_length"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:17:9",
+          "kind": "u8.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_slices_smoke.tetra:18:9",
+          "kind": "u8.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        }
+      ]
+    }
+  ]
+}

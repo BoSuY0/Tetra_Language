@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "kind": "bounds",
+  "target": "linux-x64",
+  "totals": {
+    "removed": 6,
+    "left": 0
+  },
+  "functions": [
+    {
+      "function": "lib.core.strings.ascii_len",
+      "removed": 1,
+      "left": 0,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:11:5",
+          "kind": "u8.load",
+          "removed": true,
+          "proof_id": "proof:for-collection:ch:11:5",
+          "reason": "removed_by_for_loop_range"
+        }
+      ]
+    },
+    {
+      "function": "lib.core.strings.ascii_sum",
+      "removed": 1,
+      "left": 0,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:17:5",
+          "kind": "u8.load",
+          "removed": true,
+          "proof_id": "proof:for-collection:ch:17:5",
+          "reason": "removed_by_for_loop_range"
+        }
+      ]
+    },
+    {
+      "function": "lib.core.filesystem.has_leading_slash",
+      "removed": 1,
+      "left": 0,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/filesystem.tetra:18:5",
+          "kind": "u8.load",
+          "removed": true,
+          "proof_id": "proof:for-collection:ch:18:5",
+          "reason": "removed_by_for_loop_range"
+        }
+      ]
+    },
+    {
+      "function": "lib.core.filesystem.ends_with_slash",
+      "removed": 1,
+      "left": 0,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/filesystem.tetra:25:5",
+          "kind": "u8.load",
+          "removed": true,
+          "proof_id": "proof:for-collection:ch:25:5",
+          "reason": "removed_by_for_loop_range"
+        }
+      ]
+    },
+    {
+      "function": "lib.core.filesystem.slash_count",
+      "removed": 1,
+      "left": 0,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/filesystem.tetra:37:5",
+          "kind": "u8.load",
+          "removed": true,
+          "proof_id": "proof:for-collection:ch:37:5",
+          "reason": "removed_by_for_loop_range"
+        }
+      ]
+    },
+    {
+      "function": "lib.core.filesystem.directory_depth",
+      "removed": 1,
+      "left": 0,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/io/filesystem.tetra:45:5",
+          "kind": "u8.load",
+          "removed": true,
+          "proof_id": "proof:for-collection:ch:45:5",
+          "reason": "removed_by_for_loop_range"
+        }
+      ]
+    }
+  ]
+}

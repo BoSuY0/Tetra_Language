@@ -1,0 +1,1289 @@
+{
+  "schema_version": 1,
+  "kind": "bounds",
+  "target": "linux-x64",
+  "totals": {
+    "removed": 8,
+    "left": 192
+  },
+  "functions": [
+    {
+      "function": "lib.core.surface.poll_event",
+      "removed": 2,
+      "left": 12,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/surface.tetra:373:39",
+          "kind": "i32.load",
+          "removed": true,
+          "proof_id": "proof:allocation-zero:literal0:event_slots:373:39",
+          "reason": "removed_by_allocation_literal_zero_length"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/surface.tetra:373:58",
+          "kind": "i32.load",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/surface.tetra:373:77",
+          "kind": "i32.load",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/surface.tetra:373:101",
+          "kind": "i32.load",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/surface.tetra:373:122",
+          "kind": "i32.load",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/surface.tetra:373:145",
+          "kind": "i32.load",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/surface.tetra:373:169",
+          "kind": "i32.load",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/surface.tetra:373:199",
+          "kind": "i32.load",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/surface.tetra:373:225",
+          "kind": "i32.load",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/surface.tetra:375:39",
+          "kind": "i32.load",
+          "removed": true,
+          "proof_id": "proof:allocation-zero:literal0:event_slots:375:39",
+          "reason": "removed_by_allocation_literal_zero_length"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/surface.tetra:375:58",
+          "kind": "i32.load",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/surface.tetra:375:77",
+          "kind": "i32.load",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/surface.tetra:375:101",
+          "kind": "i32.load",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/surface.tetra:375:218",
+          "kind": "i32.load",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        }
+      ]
+    },
+    {
+      "function": "lib.core.surface.poll_composition",
+      "removed": 1,
+      "left": 3,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/surface.tetra:412:45",
+          "kind": "i32.load",
+          "removed": true,
+          "proof_id": "proof:allocation-zero:literal0:slots:412:45",
+          "reason": "removed_by_allocation_literal_zero_length"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/surface.tetra:412:68",
+          "kind": "i32.load",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/surface.tetra:412:91",
+          "kind": "i32.load",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/surface.tetra:412:114",
+          "kind": "i32.load",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        }
+      ]
+    },
+    {
+      "function": "lib.core.strings.ascii_len",
+      "removed": 1,
+      "left": 0,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:11:5",
+          "kind": "u8.load",
+          "removed": true,
+          "proof_id": "proof:for-collection:ch:11:5",
+          "reason": "removed_by_for_loop_range"
+        }
+      ]
+    },
+    {
+      "function": "lib.core.strings.ascii_sum",
+      "removed": 1,
+      "left": 0,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:17:5",
+          "kind": "u8.load",
+          "removed": true,
+          "proof_id": "proof:for-collection:ch:17:5",
+          "reason": "removed_by_for_loop_range"
+        }
+      ]
+    },
+    {
+      "function": "lib.core.draw.clear",
+      "removed": 0,
+      "left": 4,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/draw.tetra:54:13",
+          "kind": "u8.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/draw.tetra:55:13",
+          "kind": "u8.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/draw.tetra:56:13",
+          "kind": "u8.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/draw.tetra:57:13",
+          "kind": "u8.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        }
+      ]
+    },
+    {
+      "function": "lib.core.draw.rect",
+      "removed": 0,
+      "left": 4,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/draw.tetra:72:17",
+          "kind": "u8.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/draw.tetra:73:17",
+          "kind": "u8.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/draw.tetra:74:17",
+          "kind": "u8.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/draw.tetra:75:17",
+          "kind": "u8.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        }
+      ]
+    },
+    {
+      "function": "lib.core.draw.text_string_run",
+      "removed": 1,
+      "left": 0,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/draw.tetra:129:5",
+          "kind": "u8.load",
+          "removed": true,
+          "proof_id": "proof:for-collection:ch:129:5",
+          "reason": "removed_by_for_loop_range"
+        }
+      ]
+    },
+    {
+      "function": "lib.core.component.tree_build_dispatch_path",
+      "removed": 0,
+      "left": 112,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:410:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:411:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:412:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:413:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:414:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:417:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:418:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:419:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:420:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:421:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:424:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:425:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:426:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:427:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:428:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:431:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:432:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:433:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:434:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:435:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:438:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:439:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:440:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:441:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:442:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:443:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:446:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:447:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:448:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:449:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:450:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:451:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:454:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:455:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:456:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:457:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:458:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:459:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:462:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:463:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:464:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:465:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:466:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:467:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:470:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:471:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:472:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:473:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:474:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:475:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:479:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:480:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:481:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:482:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:485:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:486:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:487:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:488:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:491:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:492:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:493:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:494:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:495:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:498:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:499:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:500:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:501:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:502:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:506:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:507:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:508:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:509:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:512:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:513:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:514:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:515:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:518:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:519:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:520:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:521:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:522:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:525:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:526:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:527:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:528:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:529:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:533:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:534:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:535:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:536:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:539:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:540:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:541:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:542:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:543:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:546:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:547:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:548:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:549:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:550:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:553:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:554:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:555:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:558:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:559:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:560:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:561:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:564:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:565:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:566:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:567:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:569:7",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        }
+      ]
+    },
+    {
+      "function": "lib.core.component.tree_build_draw_order",
+      "removed": 0,
+      "left": 57,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:574:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:575:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:576:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:577:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:578:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:579:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:580:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:581:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:582:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:583:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:584:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:585:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:586:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:587:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:588:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:589:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:590:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:591:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:594:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:595:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:596:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:597:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:598:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:599:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:600:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:601:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:602:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:603:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:604:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:605:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:608:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:609:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:610:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:611:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:612:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:613:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:614:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:615:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:616:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:617:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:618:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:621:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:622:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:623:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:624:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:625:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:626:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:627:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:628:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:629:9",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:633:7",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:634:5",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:635:5",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:636:5",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:637:5",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:638:5",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/surface/component.tetra:639:5",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        }
+      ]
+    },
+    {
+      "function": "examples.surface.runtime.surface_counter.main",
+      "removed": 2,
+      "left": 0,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/surface/runtime/surface_counter.tetra:117:302",
+          "kind": "u8.load",
+          "removed": true,
+          "proof_id": "proof:allocation-zero:literal0:text_bytes:117:302",
+          "reason": "removed_by_allocation_literal_zero_length"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/surface/runtime/surface_counter.tetra:117:318",
+          "kind": "u8.load",
+          "removed": true,
+          "proof_id": "proof:allocation-zero:literal0:text_bytes:117:318",
+          "reason": "removed_by_allocation_literal_zero_length"
+        }
+      ]
+    }
+  ]
+}

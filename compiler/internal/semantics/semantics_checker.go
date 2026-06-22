@@ -13771,8 +13771,21 @@ func resourceSourceForExpr(
 			return resourceSourceResult{}, err
 		}
 		set := true
-		for _, c := range e.Cases {
-			source, err := resourceSourceForExpr(c.Value, funcs, module, imports, state)
+		caseScopes := state.catchExprScopes[e]
+		for i, c := range e.Cases {
+			caseScopeID := regionNone
+			if i < len(caseScopes) {
+				caseScopeID = caseScopes[i]
+			}
+			if caseScopeID == regionNone {
+				caseScopeID = patternBindingScopeID(c.Pattern, state)
+			}
+			var source resourceSourceResult
+			err := withActiveScope(state, caseScopeID, func() error {
+				var err error
+				source, err = resourceSourceForExpr(c.Value, funcs, module, imports, state)
+				return err
+			})
 			if err != nil {
 				return resourceSourceResult{}, err
 			}
@@ -14176,7 +14189,7 @@ func bindResourceTreeFromExpr(
 		if err != nil {
 			return err
 		}
-		if resolved == "core.recv_typed" {
+		if resolved == "core.recv_typed" || isFreshSystemReceiveResourceReturn(resolved) {
 			bindFreshResourceTree(name, typeName, types, state)
 			return nil
 		}
@@ -14456,6 +14469,20 @@ func bindResourceTreeFromCallSummary(
 		state.bindResource(dstLeaf, source.name, true)
 	}
 	return true, nil
+}
+
+func isFreshSystemReceiveResourceReturn(resolved string) bool {
+	switch resolved {
+	case "core.actor_recv_system",
+		"core.actor_recv_system_poll",
+		"core.actor_recv_system_until",
+		"lib.core.actors.recv_system",
+		"lib.core.actors.poll_system",
+		"lib.core.actors.recv_system_until":
+		return true
+	default:
+		return false
+	}
 }
 
 func bindResourceTreeFromPathOrUnknown(
@@ -15298,17 +15325,30 @@ func resourceSourceForExprLeaf(
 		if err != nil {
 			return resourceSourceResult{}, err
 		}
-		for _, c := range e.Cases {
-			source, err := resourceSourceForExprLeaf(
-				c.Value,
-				typeName,
-				leaf,
-				funcs,
-				types,
-				module,
-				imports,
-				state,
-			)
+		caseScopes := state.catchExprScopes[e]
+		for i, c := range e.Cases {
+			caseScopeID := regionNone
+			if i < len(caseScopes) {
+				caseScopeID = caseScopes[i]
+			}
+			if caseScopeID == regionNone {
+				caseScopeID = patternBindingScopeID(c.Pattern, state)
+			}
+			var source resourceSourceResult
+			err := withActiveScope(state, caseScopeID, func() error {
+				var err error
+				source, err = resourceSourceForExprLeaf(
+					c.Value,
+					typeName,
+					leaf,
+					funcs,
+					types,
+					module,
+					imports,
+					state,
+				)
+				return err
+			})
 			if err != nil {
 				return resourceSourceResult{}, err
 			}

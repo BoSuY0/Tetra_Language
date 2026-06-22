@@ -11,6 +11,14 @@ func RequiredActorRuntimeSymbols() []string {
 	return runtimeabi.RequiredActorSymbols()
 }
 
+func RequiredActorLifecycleRuntimeSymbols() []string {
+	return runtimeabi.RequiredActorLifecycleSymbols()
+}
+
+func RequiredActorSystemReceiveRuntimeSymbols() []string {
+	return runtimeabi.RequiredActorSystemReceiveSymbols()
+}
+
 func RequiredActorTelemetryRuntimeSymbols() []string {
 	return runtimeabi.RequiredActorTelemetrySymbols()
 }
@@ -121,6 +129,22 @@ func ValidateActorRuntimeObject(rt *tobj.Object) error {
 		rt,
 		"missing actors runtime object",
 		RequiredActorRuntimeSymbols(),
+	)
+}
+
+func ValidateActorLifecycleRuntimeObject(rt *tobj.Object) error {
+	return ValidateRuntimeObjectSymbols(
+		rt,
+		"missing actor lifecycle runtime object",
+		RequiredActorLifecycleRuntimeSymbols(),
+	)
+}
+
+func ValidateActorSystemReceiveRuntimeObject(rt *tobj.Object) error {
+	return ValidateRuntimeObjectSymbols(
+		rt,
+		"missing actor system-message runtime object",
+		RequiredActorSystemReceiveRuntimeSymbols(),
 	)
 }
 

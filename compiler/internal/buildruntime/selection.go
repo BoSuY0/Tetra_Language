@@ -8,18 +8,19 @@ import (
 )
 
 type UsageProfile struct {
-	ActorStateUsed        bool
-	TasksUsed             bool
-	TaskGroupsUsed        bool
-	TypedTasksUsed        bool
-	TypedTaskMaxSlots     int
-	TimeRuntimeUsed       bool
-	FilesystemUsed        bool
-	NetUsed               bool
-	NetRuntimeSymbols     []string
-	SurfaceUsed           bool
-	DistributedActorsUsed bool
-	ActorSpawnCount       int
+	ActorSystemReceiveUsed bool
+	ActorStateUsed         bool
+	TasksUsed              bool
+	TaskGroupsUsed         bool
+	TypedTasksUsed         bool
+	TypedTaskMaxSlots      int
+	TimeRuntimeUsed        bool
+	FilesystemUsed         bool
+	NetUsed                bool
+	NetRuntimeSymbols      []string
+	SurfaceUsed            bool
+	DistributedActorsUsed  bool
+	ActorSpawnCount        int
 }
 
 func SelectRuntimeMode(
@@ -29,7 +30,8 @@ func SelectRuntimeMode(
 	switch requested {
 	case buildapi.RuntimeAuto:
 		// Default to self-host runtime when its ABI can express the program surface.
-		if usage.ActorStateUsed || usage.TasksUsed || usage.TaskGroupsUsed ||
+		if usage.ActorSystemReceiveUsed ||
+			usage.ActorStateUsed || usage.TasksUsed || usage.TaskGroupsUsed ||
 			usage.TypedTasksUsed ||
 			usage.TimeRuntimeUsed ||
 			usage.FilesystemUsed ||
@@ -42,6 +44,11 @@ func SelectRuntimeMode(
 		}
 		return buildapi.RuntimeSelfHost, nil
 	case buildapi.RuntimeSelfHost:
+		if usage.ActorSystemReceiveUsed {
+			return 0, fmt.Errorf(
+				"self-host runtime does not support actor system-message receive; use runtime=auto or runtime=builtin",
+			)
+		}
 		if usage.SurfaceUsed {
 			return 0, fmt.Errorf(
 				"self-host runtime does not support Tetra Surface; use runtime=auto or runtime=builtin",
@@ -109,7 +116,7 @@ func SelectRuntimeModeForNativeTarget(
 }
 
 func SelfHostRuntimeSupportsNativeUsage(target string, usage UsageProfile) bool {
-	if usage.SurfaceUsed || usage.DistributedActorsUsed {
+	if usage.ActorSystemReceiveUsed || usage.SurfaceUsed || usage.DistributedActorsUsed {
 		return false
 	}
 	if usage.NetUsed && !TargetSupportsNetRuntimeSymbols(target, usage.NetRuntimeSymbols) {

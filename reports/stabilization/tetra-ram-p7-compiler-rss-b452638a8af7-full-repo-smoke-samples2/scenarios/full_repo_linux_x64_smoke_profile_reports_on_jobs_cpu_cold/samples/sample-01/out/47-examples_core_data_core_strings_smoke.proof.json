@@ -1,0 +1,1450 @@
+{
+  "schema_version": 1,
+  "kind": "proof",
+  "target": "linux-x64",
+  "bounds": {
+    "schema_version": 1,
+    "kind": "bounds",
+    "target": "linux-x64",
+    "totals": {
+      "removed": 2,
+      "left": 0
+    },
+    "functions": [
+      {
+        "function": "lib.core.strings.ascii_len",
+        "removed": 1,
+        "left": 0,
+        "sites": [
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:11:5",
+            "kind": "u8.load",
+            "removed": true,
+            "proof_id": "proof:for-collection:ch:11:5",
+            "reason": "removed_by_for_loop_range"
+          }
+        ]
+      },
+      {
+        "function": "lib.core.strings.ascii_sum",
+        "removed": 1,
+        "left": 0,
+        "sites": [
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:17:5",
+            "kind": "u8.load",
+            "removed": true,
+            "proof_id": "proof:for-collection:ch:17:5",
+            "reason": "removed_by_for_loop_range"
+          }
+        ]
+      }
+    ]
+  },
+  "proofs": [
+    {
+      "proof_id": "proof:for-collection:ch:11:5",
+      "kind": "range",
+      "guard": "__for_index_11_5 < text.len",
+      "dominates": "bounds_check op1",
+      "fact": "__for_index_11_5 in [0, text.len); derivation: non_negative, less_than_len",
+      "reason": "for loop range proof",
+      "removed_bounds_check": true
+    },
+    {
+      "proof_id": "proof:for-collection:ch:17:5",
+      "kind": "range",
+      "guard": "__for_index_17_5 < text.len",
+      "dominates": "bounds_check op1",
+      "fact": "__for_index_17_5 in [0, text.len); derivation: non_negative, less_than_len",
+      "reason": "for loop range proof",
+      "removed_bounds_check": true
+    }
+  ],
+  "plir": {
+    "funcs": [
+      {
+        "name": "lib.core.strings.ascii_len",
+        "module": "lib.core.strings",
+        "summary": {
+          "public": true,
+          "param_names": [
+            "text"
+          ],
+          "param_types": [
+            "str"
+          ],
+          "param_ownership": [
+            ""
+          ],
+          "return_type": "i32"
+        },
+        "values": [
+          {
+            "id": "local:__for_end_11_5",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:9:6",
+            "region": "fn:lib.core.strings.ascii_len",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:__for_end_11_5"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "__for_end_11_5"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:__for_index_11_5",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:9:6",
+            "region": "fn:lib.core.strings.ascii_len",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:__for_index_11_5"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "__for_index_11_5"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:__for_iter_11_5",
+            "kind": "local",
+            "type": "str",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:9:6",
+            "region": "fn:lib.core.strings.ascii_len",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:__for_iter_11_5"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "__for_iter_11_5"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:ch",
+            "kind": "local",
+            "type": "u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:9:6",
+            "region": "fn:lib.core.strings.ascii_len",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:ch"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "ch"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:count",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:9:6",
+            "region": "fn:lib.core.strings.ascii_len",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:count"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "count"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "loop_index:__for_index_11_5",
+            "kind": "loop_index",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:11:5",
+            "region": "fn:lib.core.strings.ascii_len",
+            "provenance": {
+              "kind": "stack",
+              "root": "__for_index_11_5"
+            },
+            "lifetime": {
+              "birth": "loop:start",
+              "death": "loop:end",
+              "owner": "__for_index_11_5"
+            },
+            "escape": "no_escape"
+          },
+          {
+            "id": "param:text",
+            "kind": "param",
+            "type": "str",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:9:6",
+            "region": "fn:lib.core.strings.ascii_len",
+            "provenance": {
+              "kind": "param",
+              "root": "param:text"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "text"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          },
+          {
+            "id": "view:__for_iter_11_5",
+            "kind": "view",
+            "type": "str",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:11:15",
+            "region": "fn:lib.core.strings.ascii_len",
+            "provenance": {
+              "kind": "param",
+              "root": "param:text"
+            },
+            "lifetime": {
+              "birth": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:11:15",
+              "death": "loop:end",
+              "owner": "text"
+            },
+            "borrow": "immutable",
+            "escape": "no_escape"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "assign",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:10:5",
+            "inputs": [
+              "0"
+            ],
+            "outputs": [
+              "count"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op1",
+            "kind": "for_slice",
+            "block": "for_header:0",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:11:5",
+            "inputs": [
+              "view:__for_iter_11_5",
+              "loop_index:__for_index_11_5"
+            ],
+            "outputs": [
+              "local:ch"
+            ],
+            "note": "range: 0..text.len"
+          },
+          {
+            "id": "op2",
+            "kind": "assign",
+            "block": "for_body:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:12:9",
+            "inputs": [
+              "count + 1"
+            ],
+            "outputs": [
+              "count"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op3",
+            "kind": "return",
+            "block": "for_after:2",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:13:7",
+            "inputs": [
+              "count"
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "pure_call",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:9:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f1",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:9:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f2",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:9:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f3",
+            "kind": "no_mem_write",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:9:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f4",
+            "kind": "no_unknown_escape",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:9:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f5",
+            "kind": "provenance_known",
+            "value_id": "local:__for_iter_11_5",
+            "reason": "checked parameter/local memory value"
+          },
+          {
+            "id": "f6",
+            "kind": "region_alive",
+            "value_id": "local:__for_iter_11_5",
+            "region": "fn:lib.core.strings.ascii_len",
+            "reason": "function region is alive"
+          },
+          {
+            "id": "f7",
+            "kind": "provenance_known",
+            "value_id": "param:text",
+            "reason": "checked parameter/local memory value"
+          },
+          {
+            "id": "f8",
+            "kind": "region_alive",
+            "value_id": "param:text",
+            "region": "fn:lib.core.strings.ascii_len",
+            "reason": "function region is alive"
+          },
+          {
+            "id": "f9",
+            "kind": "len_stable",
+            "value_id": "param:text",
+            "reason": "safe code cannot mutate slice/string metadata"
+          },
+          {
+            "id": "f10",
+            "kind": "borrowed_imm",
+            "value_id": "param:text"
+          },
+          {
+            "id": "f11",
+            "kind": "provenance_known",
+            "value_id": "view:__for_iter_11_5",
+            "reason": "for collection iterable view preserves source provenance"
+          },
+          {
+            "id": "f12",
+            "kind": "region_alive",
+            "value_id": "view:__for_iter_11_5",
+            "region": "fn:lib.core.strings.ascii_len"
+          },
+          {
+            "id": "f13",
+            "kind": "borrowed_imm",
+            "value_id": "view:__for_iter_11_5"
+          },
+          {
+            "id": "f14",
+            "kind": "no_escape",
+            "value_id": "view:__for_iter_11_5",
+            "reason": "for collection iterable view may not escape its owner"
+          },
+          {
+            "id": "f15",
+            "kind": "index_in_range",
+            "value_id": "loop_index:__for_index_11_5",
+            "range": "0..text.len",
+            "proof_id": "proof:for-collection:ch:11:5",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:11:5",
+            "reason": "for collection loop index is dominated by index < iterable.len guard",
+            "uses": [
+              "view:__for_iter_11_5"
+            ]
+          },
+          {
+            "id": "f16",
+            "kind": "len_stable",
+            "value_id": "view:__for_iter_11_5",
+            "reason": "for collection iterable is copied into hidden slice header"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "succs": [
+              "for_header:0"
+            ],
+            "ops": [
+              "op0"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:9:6"
+          },
+          {
+            "id": "for_header:0",
+            "kind": "for_header",
+            "preds": [
+              "entry",
+              "for_body:1"
+            ],
+            "succs": [
+              "for_after:2",
+              "for_body:1"
+            ],
+            "ops": [
+              "op1"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:11:5"
+          },
+          {
+            "id": "for_body:1",
+            "kind": "for_body",
+            "preds": [
+              "for_header:0"
+            ],
+            "succs": [
+              "for_header:0"
+            ],
+            "ops": [
+              "op2"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:11:5"
+          },
+          {
+            "id": "for_after:2",
+            "kind": "for_after",
+            "exit": true,
+            "preds": [
+              "for_header:0"
+            ],
+            "ops": [
+              "op3"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:11:5"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          },
+          {
+            "block": "for_header:0",
+            "dominators": [
+              "entry",
+              "for_header:0"
+            ]
+          },
+          {
+            "block": "for_body:1",
+            "dominators": [
+              "entry",
+              "for_body:1",
+              "for_header:0"
+            ]
+          },
+          {
+            "block": "for_after:2",
+            "dominators": [
+              "entry",
+              "for_after:2",
+              "for_header:0"
+            ]
+          }
+        ],
+        "proof_guards": [
+          {
+            "id": "proof:for-collection:ch:11:5",
+            "kind": "range",
+            "block": "for_body:1",
+            "op_id": "op1",
+            "condition": "__for_index_11_5 < text.len",
+            "reason": "for loop range proof",
+            "dominates": [
+              {
+                "proof_id": "proof:for-collection:ch:11:5",
+                "block": "for_body:1",
+                "op_id": "op1",
+                "use_kind": "bounds_check",
+                "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:11:5"
+              }
+            ]
+          }
+        ],
+        "proof_uses": [
+          {
+            "proof_id": "proof:for-collection:ch:11:5",
+            "block": "for_body:1",
+            "op_id": "op1",
+            "use_kind": "bounds_check",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:11:5"
+          }
+        ],
+        "proof_terms": [
+          {
+            "id": "proof:for-collection:ch:11:5",
+            "kind": "bounds_check",
+            "subject_base_id": "text",
+            "index_value_id": "loop_index:__for_index_11_5",
+            "operation": "index_load",
+            "range": "0..text.len",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:11:5",
+            "facts_used": [
+              "non_negative",
+              "less_than_len"
+            ]
+          }
+        ],
+        "range_facts": [
+          {
+            "value": "loop_index:__for_index_11_5",
+            "lower": {
+              "kind": "const"
+            },
+            "upper": {
+              "kind": "symbol",
+              "symbol": "text.len"
+            },
+            "inclusive_lower": true,
+            "inclusive_upper": false,
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:11:5",
+            "proof_id": "proof:for-collection:ch:11:5",
+            "reason": "for loop range proof",
+            "derivation": [
+              "non_negative",
+              "less_than_len"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "lib.core.strings.ascii_sum",
+        "module": "lib.core.strings",
+        "summary": {
+          "public": true,
+          "param_names": [
+            "text"
+          ],
+          "param_types": [
+            "str"
+          ],
+          "param_ownership": [
+            ""
+          ],
+          "return_type": "i32"
+        },
+        "values": [
+          {
+            "id": "local:__for_end_17_5",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:15:8",
+            "region": "fn:lib.core.strings.ascii_sum",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:__for_end_17_5"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "__for_end_17_5"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:__for_index_17_5",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:15:8",
+            "region": "fn:lib.core.strings.ascii_sum",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:__for_index_17_5"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "__for_index_17_5"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:__for_iter_17_5",
+            "kind": "local",
+            "type": "str",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:15:8",
+            "region": "fn:lib.core.strings.ascii_sum",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:__for_iter_17_5"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "__for_iter_17_5"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:ch",
+            "kind": "local",
+            "type": "u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:15:8",
+            "region": "fn:lib.core.strings.ascii_sum",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:ch"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "ch"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:total",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:15:8",
+            "region": "fn:lib.core.strings.ascii_sum",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:total"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "total"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "loop_index:__for_index_17_5",
+            "kind": "loop_index",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:17:5",
+            "region": "fn:lib.core.strings.ascii_sum",
+            "provenance": {
+              "kind": "stack",
+              "root": "__for_index_17_5"
+            },
+            "lifetime": {
+              "birth": "loop:start",
+              "death": "loop:end",
+              "owner": "__for_index_17_5"
+            },
+            "escape": "no_escape"
+          },
+          {
+            "id": "param:text",
+            "kind": "param",
+            "type": "str",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:15:8",
+            "region": "fn:lib.core.strings.ascii_sum",
+            "provenance": {
+              "kind": "param",
+              "root": "param:text"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "text"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          },
+          {
+            "id": "view:__for_iter_17_5",
+            "kind": "view",
+            "type": "str",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:17:15",
+            "region": "fn:lib.core.strings.ascii_sum",
+            "provenance": {
+              "kind": "param",
+              "root": "param:text"
+            },
+            "lifetime": {
+              "birth": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:17:15",
+              "death": "loop:end",
+              "owner": "text"
+            },
+            "borrow": "immutable",
+            "escape": "no_escape"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "assign",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:16:5",
+            "inputs": [
+              "0"
+            ],
+            "outputs": [
+              "total"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op1",
+            "kind": "for_slice",
+            "block": "for_header:0",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:17:5",
+            "inputs": [
+              "view:__for_iter_17_5",
+              "loop_index:__for_index_17_5"
+            ],
+            "outputs": [
+              "local:ch"
+            ],
+            "note": "range: 0..text.len"
+          },
+          {
+            "id": "op2",
+            "kind": "assign",
+            "block": "for_body:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:18:9",
+            "inputs": [
+              "total + ch"
+            ],
+            "outputs": [
+              "total"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op3",
+            "kind": "return",
+            "block": "for_after:2",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:19:7",
+            "inputs": [
+              "total"
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "pure_call",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:15:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f1",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:15:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f2",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:15:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f3",
+            "kind": "no_mem_write",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:15:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f4",
+            "kind": "no_unknown_escape",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:15:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f5",
+            "kind": "provenance_known",
+            "value_id": "local:__for_iter_17_5",
+            "reason": "checked parameter/local memory value"
+          },
+          {
+            "id": "f6",
+            "kind": "region_alive",
+            "value_id": "local:__for_iter_17_5",
+            "region": "fn:lib.core.strings.ascii_sum",
+            "reason": "function region is alive"
+          },
+          {
+            "id": "f7",
+            "kind": "provenance_known",
+            "value_id": "param:text",
+            "reason": "checked parameter/local memory value"
+          },
+          {
+            "id": "f8",
+            "kind": "region_alive",
+            "value_id": "param:text",
+            "region": "fn:lib.core.strings.ascii_sum",
+            "reason": "function region is alive"
+          },
+          {
+            "id": "f9",
+            "kind": "len_stable",
+            "value_id": "param:text",
+            "reason": "safe code cannot mutate slice/string metadata"
+          },
+          {
+            "id": "f10",
+            "kind": "borrowed_imm",
+            "value_id": "param:text"
+          },
+          {
+            "id": "f11",
+            "kind": "provenance_known",
+            "value_id": "view:__for_iter_17_5",
+            "reason": "for collection iterable view preserves source provenance"
+          },
+          {
+            "id": "f12",
+            "kind": "region_alive",
+            "value_id": "view:__for_iter_17_5",
+            "region": "fn:lib.core.strings.ascii_sum"
+          },
+          {
+            "id": "f13",
+            "kind": "borrowed_imm",
+            "value_id": "view:__for_iter_17_5"
+          },
+          {
+            "id": "f14",
+            "kind": "no_escape",
+            "value_id": "view:__for_iter_17_5",
+            "reason": "for collection iterable view may not escape its owner"
+          },
+          {
+            "id": "f15",
+            "kind": "index_in_range",
+            "value_id": "loop_index:__for_index_17_5",
+            "range": "0..text.len",
+            "proof_id": "proof:for-collection:ch:17:5",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:17:5",
+            "reason": "for collection loop index is dominated by index < iterable.len guard",
+            "uses": [
+              "view:__for_iter_17_5"
+            ]
+          },
+          {
+            "id": "f16",
+            "kind": "len_stable",
+            "value_id": "view:__for_iter_17_5",
+            "reason": "for collection iterable is copied into hidden slice header"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "succs": [
+              "for_header:0"
+            ],
+            "ops": [
+              "op0"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:15:8"
+          },
+          {
+            "id": "for_header:0",
+            "kind": "for_header",
+            "preds": [
+              "entry",
+              "for_body:1"
+            ],
+            "succs": [
+              "for_after:2",
+              "for_body:1"
+            ],
+            "ops": [
+              "op1"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:17:5"
+          },
+          {
+            "id": "for_body:1",
+            "kind": "for_body",
+            "preds": [
+              "for_header:0"
+            ],
+            "succs": [
+              "for_header:0"
+            ],
+            "ops": [
+              "op2"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:17:5"
+          },
+          {
+            "id": "for_after:2",
+            "kind": "for_after",
+            "exit": true,
+            "preds": [
+              "for_header:0"
+            ],
+            "ops": [
+              "op3"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:17:5"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          },
+          {
+            "block": "for_header:0",
+            "dominators": [
+              "entry",
+              "for_header:0"
+            ]
+          },
+          {
+            "block": "for_body:1",
+            "dominators": [
+              "entry",
+              "for_body:1",
+              "for_header:0"
+            ]
+          },
+          {
+            "block": "for_after:2",
+            "dominators": [
+              "entry",
+              "for_after:2",
+              "for_header:0"
+            ]
+          }
+        ],
+        "proof_guards": [
+          {
+            "id": "proof:for-collection:ch:17:5",
+            "kind": "range",
+            "block": "for_body:1",
+            "op_id": "op1",
+            "condition": "__for_index_17_5 < text.len",
+            "reason": "for loop range proof",
+            "dominates": [
+              {
+                "proof_id": "proof:for-collection:ch:17:5",
+                "block": "for_body:1",
+                "op_id": "op1",
+                "use_kind": "bounds_check",
+                "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:17:5"
+              }
+            ]
+          }
+        ],
+        "proof_uses": [
+          {
+            "proof_id": "proof:for-collection:ch:17:5",
+            "block": "for_body:1",
+            "op_id": "op1",
+            "use_kind": "bounds_check",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:17:5"
+          }
+        ],
+        "proof_terms": [
+          {
+            "id": "proof:for-collection:ch:17:5",
+            "kind": "bounds_check",
+            "subject_base_id": "text",
+            "index_value_id": "loop_index:__for_index_17_5",
+            "operation": "index_load",
+            "range": "0..text.len",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:17:5",
+            "facts_used": [
+              "non_negative",
+              "less_than_len"
+            ]
+          }
+        ],
+        "range_facts": [
+          {
+            "value": "loop_index:__for_index_17_5",
+            "lower": {
+              "kind": "const"
+            },
+            "upper": {
+              "kind": "symbol",
+              "symbol": "text.len"
+            },
+            "inclusive_lower": true,
+            "inclusive_upper": false,
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:17:5",
+            "proof_id": "proof:for-collection:ch:17:5",
+            "reason": "for loop range proof",
+            "derivation": [
+              "non_negative",
+              "less_than_len"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "lib.core.strings.is_empty",
+        "module": "lib.core.strings",
+        "summary": {
+          "public": true,
+          "param_names": [
+            "text"
+          ],
+          "param_types": [
+            "str"
+          ],
+          "param_ownership": [
+            ""
+          ],
+          "return_type": "bool"
+        },
+        "values": [
+          {
+            "id": "param:text",
+            "kind": "param",
+            "type": "str",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:21:8",
+            "region": "fn:lib.core.strings.is_empty",
+            "provenance": {
+              "kind": "param",
+              "root": "param:text"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "text"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:22:12",
+            "inputs": [
+              "text"
+            ],
+            "note": "lib.core.strings.ascii_len"
+          },
+          {
+            "id": "op1",
+            "kind": "return",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:22:5",
+            "inputs": [
+              ""
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "pure_call",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:21:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f1",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:21:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f2",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:21:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f3",
+            "kind": "no_mem_write",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:21:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f4",
+            "kind": "no_unknown_escape",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:21:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f5",
+            "kind": "provenance_known",
+            "value_id": "param:text",
+            "reason": "checked parameter/local memory value"
+          },
+          {
+            "id": "f6",
+            "kind": "region_alive",
+            "value_id": "param:text",
+            "region": "fn:lib.core.strings.is_empty",
+            "reason": "function region is alive"
+          },
+          {
+            "id": "f7",
+            "kind": "len_stable",
+            "value_id": "param:text",
+            "reason": "safe code cannot mutate slice/string metadata"
+          },
+          {
+            "id": "f8",
+            "kind": "borrowed_imm",
+            "value_id": "param:text"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "exit": true,
+            "ops": [
+              "op0",
+              "op1"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:21:8"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "examples.core.data.core_strings_smoke.main",
+        "module": "examples.core.data.core_strings_smoke",
+        "summary": {
+          "public": true,
+          "return_type": "i32"
+        },
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_strings_smoke.tetra:7:8",
+            "inputs": [
+              "string:1:*"
+            ],
+            "note": "lib.core.strings.ascii_len"
+          },
+          {
+            "id": "op1",
+            "kind": "guard",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_strings_smoke.tetra:7:5",
+            "inputs": [
+              ""
+            ]
+          },
+          {
+            "id": "op2",
+            "kind": "return",
+            "block": "if_then:0",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_strings_smoke.tetra:8:9",
+            "inputs": [
+              "10"
+            ]
+          },
+          {
+            "id": "op3",
+            "kind": "call",
+            "block": "if_join:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_strings_smoke.tetra:9:11",
+            "inputs": [
+              "string:0:empty"
+            ],
+            "note": "lib.core.strings.is_empty"
+          },
+          {
+            "id": "op4",
+            "kind": "guard",
+            "block": "if_join:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_strings_smoke.tetra:9:7",
+            "inputs": [
+              ""
+            ]
+          },
+          {
+            "id": "op5",
+            "kind": "return",
+            "block": "if_then:2",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_strings_smoke.tetra:10:9",
+            "inputs": [
+              "20"
+            ]
+          },
+          {
+            "id": "op6",
+            "kind": "call",
+            "block": "if_join:3",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_strings_smoke.tetra:11:10",
+            "inputs": [
+              "string:1:*"
+            ],
+            "note": "lib.core.strings.is_empty"
+          },
+          {
+            "id": "op7",
+            "kind": "guard",
+            "block": "if_join:3",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_strings_smoke.tetra:11:7",
+            "inputs": [
+              ""
+            ]
+          },
+          {
+            "id": "op8",
+            "kind": "return",
+            "block": "if_then:4",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_strings_smoke.tetra:12:9",
+            "inputs": [
+              "30"
+            ]
+          },
+          {
+            "id": "op9",
+            "kind": "call",
+            "block": "if_join:5",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_strings_smoke.tetra:13:14",
+            "inputs": [
+              "string:1:*"
+            ],
+            "note": "lib.core.strings.ascii_sum"
+          },
+          {
+            "id": "op10",
+            "kind": "return",
+            "block": "if_join:5",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_strings_smoke.tetra:13:7",
+            "inputs": [
+              ""
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "pure_call",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_strings_smoke.tetra:6:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f1",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_strings_smoke.tetra:6:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f2",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_strings_smoke.tetra:6:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f3",
+            "kind": "no_mem_write",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_strings_smoke.tetra:6:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f4",
+            "kind": "no_unknown_escape",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_strings_smoke.tetra:6:6",
+            "reason": "semantics checker enforced declared effects"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "succs": [
+              "if_join:1",
+              "if_then:0"
+            ],
+            "ops": [
+              "op0",
+              "op1"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_strings_smoke.tetra:6:6"
+          },
+          {
+            "id": "if_then:0",
+            "kind": "if_then",
+            "preds": [
+              "entry"
+            ],
+            "succs": [
+              "if_join:1"
+            ],
+            "ops": [
+              "op2"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_strings_smoke.tetra:7:5"
+          },
+          {
+            "id": "if_join:1",
+            "kind": "if_join",
+            "preds": [
+              "entry",
+              "if_then:0"
+            ],
+            "succs": [
+              "if_join:3",
+              "if_then:2"
+            ],
+            "ops": [
+              "op3",
+              "op4"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_strings_smoke.tetra:7:5"
+          },
+          {
+            "id": "if_then:2",
+            "kind": "if_then",
+            "preds": [
+              "if_join:1"
+            ],
+            "succs": [
+              "if_join:3"
+            ],
+            "ops": [
+              "op5"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_strings_smoke.tetra:9:7"
+          },
+          {
+            "id": "if_join:3",
+            "kind": "if_join",
+            "preds": [
+              "if_join:1",
+              "if_then:2"
+            ],
+            "succs": [
+              "if_join:5",
+              "if_then:4"
+            ],
+            "ops": [
+              "op6",
+              "op7"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_strings_smoke.tetra:9:7"
+          },
+          {
+            "id": "if_then:4",
+            "kind": "if_then",
+            "preds": [
+              "if_join:3"
+            ],
+            "succs": [
+              "if_join:5"
+            ],
+            "ops": [
+              "op8"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_strings_smoke.tetra:11:7"
+          },
+          {
+            "id": "if_join:5",
+            "kind": "if_join",
+            "exit": true,
+            "preds": [
+              "if_join:3",
+              "if_then:4"
+            ],
+            "ops": [
+              "op9",
+              "op10"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_strings_smoke.tetra:11:7"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          },
+          {
+            "block": "if_then:0",
+            "dominators": [
+              "entry",
+              "if_then:0"
+            ]
+          },
+          {
+            "block": "if_join:1",
+            "dominators": [
+              "entry",
+              "if_join:1"
+            ]
+          },
+          {
+            "block": "if_then:2",
+            "dominators": [
+              "entry",
+              "if_join:1",
+              "if_then:2"
+            ]
+          },
+          {
+            "block": "if_join:3",
+            "dominators": [
+              "entry",
+              "if_join:1",
+              "if_join:3"
+            ]
+          },
+          {
+            "block": "if_then:4",
+            "dominators": [
+              "entry",
+              "if_join:1",
+              "if_join:3",
+              "if_then:4"
+            ]
+          },
+          {
+            "block": "if_join:5",
+            "dominators": [
+              "entry",
+              "if_join:1",
+              "if_join:3",
+              "if_join:5"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

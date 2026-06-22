@@ -217,6 +217,73 @@ func TestTypedMailboxMemoryDomainChargesOwnedRegionBytesToReceiver(t *testing.T)
 	}
 }
 
+func TestTypedMailboxDrainReclaimsOwnedRegionPayloadsExactlyOnce(t *testing.T) {
+	box := NewTypedMailbox(MailboxConfig{
+		Name:         "actor-cancel",
+		Capacity:     3,
+		ByteCapacity: 160,
+		MessageBytes: 16,
+		Backpressure: BackpressurePolicy{Mode: "blocking_recv_yield"},
+	})
+	for _, payload := range []Payload{
+		{
+			Name:       "left",
+			Kind:       PayloadOwnedRegion,
+			RegionName: "left-frame",
+			Owner:      "sender",
+			SizeBytes:  64,
+		},
+		{
+			Name:       "right",
+			Kind:       PayloadOwnedRegion,
+			RegionName: "right-frame",
+			Owner:      "sender",
+			SizeBytes:  32,
+		},
+	} {
+		if _, err := box.Send(Message{Name: "Frame.region", Payloads: []Payload{payload}}); err != nil {
+			t.Fatalf("Send(%s) failed: %v", payload.RegionName, err)
+		}
+	}
+	before := box.MemoryDomainReport()
+	if before.Mailbox.QueuedBytes != 128 || len(before.OwnedRegions) != 2 {
+		t.Fatalf(
+			"pre-drain report = mailbox:%+v owned:%+v, want queued=128 and 2 owned regions",
+			before.Mailbox,
+			before.OwnedRegions,
+		)
+	}
+
+	drained := box.Drain("cancellation")
+	if drained.Reason != "cancellation" || drained.MessagesDrained != 2 ||
+		drained.BytesReclaimed != 128 || drained.OwnedRegionBytesReclaimed != 96 {
+		t.Fatalf("Drain report = %+v, want two messages and owned-region bytes reclaimed", drained)
+	}
+	after := box.MemoryDomainReport()
+	if err := ValidateActorMemoryDomainReport(after); err != nil {
+		t.Fatalf("ValidateActorMemoryDomainReport(after): %v", err)
+	}
+	if after.Mailbox.QueuedMessages != 0 || after.Mailbox.QueuedBytes != 0 ||
+		after.Mailbox.ReclaimedBytes != 128 || after.Domain.ReleasedBytes != 128 ||
+		len(after.OwnedRegions) != 0 {
+		t.Fatalf(
+			"post-drain report = mailbox:%+v domain:%+v owned:%+v, want empty queue and reclaimed bytes",
+			after.Mailbox,
+			after.Domain,
+			after.OwnedRegions,
+		)
+	}
+
+	drainedAgain := box.Drain("cancellation")
+	if drainedAgain.MessagesDrained != 0 || drainedAgain.BytesReclaimed != 0 ||
+		drainedAgain.OwnedRegionBytesReclaimed != 0 {
+		t.Fatalf("second Drain report = %+v, want idempotent no-op", drainedAgain)
+	}
+	if box.ReclaimedBytes() != 128 {
+		t.Fatalf("ReclaimedBytes after second drain = %d, want exactly-once 128", box.ReclaimedBytes())
+	}
+}
+
 func TestValidateActorMemoryDomainReportRejectsLocalModelWithoutRuntimeBlockedReason(t *testing.T) {
 	box := NewTypedMailbox(
 		MailboxConfig{
@@ -305,6 +372,45 @@ func TestOwnedRegionMessageMovesZeroCopyAndBorrowedPayloadRequiresCopy(t *testin
 	}
 	if copied.TransferMode != TransferCopy || copied.BytesCopied != 128 || copied.ZeroCopy {
 		t.Fatalf("borrowed copied transfer report = %#v, want copy", copied)
+	}
+}
+
+func TestSchedulerDrainActorOwnedRegionsReclaimsMovedPayloadsExactlyOnce(t *testing.T) {
+	model, err := NewSchedulerModel(Config{Cores: 2, MailboxCapacity: 4})
+	if err != nil {
+		t.Fatal(err)
+	}
+	model.RegisterRegion(Region{Name: "frame", Owner: "sender", SizeBytes: 4096})
+
+	_, err = model.Send(0, 1, Message{
+		Name: "Frame.region",
+		Payloads: []Payload{{
+			Name:       "bytes",
+			Kind:       PayloadOwnedRegion,
+			RegionName: "frame",
+			Owner:      "sender",
+			SizeBytes:  4096,
+		}},
+	})
+	if err != nil {
+		t.Fatalf("owned region Send failed: %v", err)
+	}
+	if got := model.RegionOwner("frame"); got != "actor1" {
+		t.Fatalf("RegionOwner(frame) after send = %q, want actor1", got)
+	}
+
+	drained := model.DrainActorOwnedRegions("actor1", "cancellation")
+	if drained.Reason != "cancellation" || drained.ActorID != "actor1" ||
+		drained.RegionsDrained != 1 || drained.BytesReclaimed != 4096 {
+		t.Fatalf("DrainActorOwnedRegions = %+v, want one 4096-byte actor region", drained)
+	}
+	if got := model.RegionOwner("frame"); got != "" {
+		t.Fatalf("RegionOwner(frame) after drain = %q, want released", got)
+	}
+
+	drainedAgain := model.DrainActorOwnedRegions("actor1", "cancellation")
+	if drainedAgain.RegionsDrained != 0 || drainedAgain.BytesReclaimed != 0 {
+		t.Fatalf("second DrainActorOwnedRegions = %+v, want idempotent no-op", drainedAgain)
 	}
 }
 

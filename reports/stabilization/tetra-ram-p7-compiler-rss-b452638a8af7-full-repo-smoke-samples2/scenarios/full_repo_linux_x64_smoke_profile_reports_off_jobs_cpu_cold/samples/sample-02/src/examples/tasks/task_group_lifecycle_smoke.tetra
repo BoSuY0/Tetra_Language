@@ -1,0 +1,35 @@
+// Task group lifecycle smoke: open, spawn/join, close, status, and cancel state.
+func worker() -> Int
+uses runtime:
+    return 7
+
+func main() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let openStatus: Int = core.task_group_status(group)
+    if openStatus != 1:
+        return 10 + openStatus
+    let task: task.i32 = core.task_spawn_group_i32(group, "worker")
+    let result: task.result_i32 = core.task_join_result_i32(task)
+    if result.error != 0:
+        return 20 + result.error
+    if result.value != 7:
+        return 30 + result.value
+    let joinedStatus: Int = core.task_group_status(group)
+    if joinedStatus != 1:
+        return 40 + joinedStatus
+    let closeError: Int = core.task_group_close(group)
+    if closeError != 0:
+        return 50 + closeError
+    let closedStatus: Int = core.task_group_status(group)
+    if closedStatus != 3:
+        return 60 + closedStatus
+    var cancelGroup: task.group = core.task_group_open()
+    cancelGroup = core.task_group_cancel(cancelGroup)
+    let canceledStatus: Int = core.task_group_status(cancelGroup)
+    if canceledStatus != 2:
+        return 70 + canceledStatus
+    let cancelCloseError: Int = core.task_group_close(cancelGroup)
+    if cancelCloseError != 0:
+        return 80 + cancelCloseError
+    return 42

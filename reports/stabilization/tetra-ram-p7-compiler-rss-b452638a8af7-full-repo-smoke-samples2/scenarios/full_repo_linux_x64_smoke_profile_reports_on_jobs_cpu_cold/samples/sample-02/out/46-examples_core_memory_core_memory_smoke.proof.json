@@ -1,0 +1,1455 @@
+{
+  "schema_version": 1,
+  "kind": "proof",
+  "target": "linux-x64",
+  "bounds": {
+    "schema_version": 1,
+    "kind": "bounds",
+    "target": "linux-x64",
+    "totals": {
+      "removed": 0,
+      "left": 0
+    },
+    "functions": null
+  },
+  "plir": {
+    "funcs": [
+      {
+        "name": "lib.core.capability.mem",
+        "module": "lib.core.capability",
+        "summary": {
+          "public": true,
+          "return_type": "cap.mem",
+          "effects": [
+            "capability",
+            "mem"
+          ]
+        },
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "unsafe_boundary",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/capability.tetra:14:5",
+            "note": "unsafe block requires conservative provenance/escape assumptions"
+          },
+          {
+            "id": "op1",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/capability.tetra:15:16",
+            "note": "core.cap_mem"
+          },
+          {
+            "id": "op2",
+            "kind": "return",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/capability.tetra:15:9",
+            "inputs": [
+              ""
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/capability.tetra:12:6",
+            "reason": "semantics checker enforced declared effects",
+            "uses": [
+              "capability",
+              "mem"
+            ]
+          },
+          {
+            "id": "f1",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/capability.tetra:12:6",
+            "reason": "semantics checker enforced declared effects",
+            "uses": [
+              "capability",
+              "mem"
+            ]
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "exit": true,
+            "ops": [
+              "op0",
+              "op1",
+              "op2"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/capability.tetra:12:6"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "lib.core.capability.io",
+        "module": "lib.core.capability",
+        "summary": {
+          "public": true,
+          "return_type": "cap.io",
+          "effects": [
+            "capability",
+            "io"
+          ]
+        },
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "unsafe_boundary",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/capability.tetra:19:5",
+            "note": "unsafe block requires conservative provenance/escape assumptions"
+          },
+          {
+            "id": "op1",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/capability.tetra:20:16",
+            "note": "core.cap_io"
+          },
+          {
+            "id": "op2",
+            "kind": "return",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/capability.tetra:20:9",
+            "inputs": [
+              ""
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/capability.tetra:17:10",
+            "reason": "semantics checker enforced declared effects",
+            "uses": [
+              "capability",
+              "io"
+            ]
+          },
+          {
+            "id": "f1",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/capability.tetra:17:10",
+            "reason": "semantics checker enforced declared effects",
+            "uses": [
+              "capability",
+              "io"
+            ]
+          },
+          {
+            "id": "f2",
+            "kind": "no_mem_write",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/capability.tetra:17:10",
+            "reason": "semantics checker enforced declared effects",
+            "uses": [
+              "capability",
+              "io"
+            ]
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "exit": true,
+            "ops": [
+              "op0",
+              "op1",
+              "op2"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/capability.tetra:17:10"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "lib.core.memory.memset_u8",
+        "module": "lib.core.memory",
+        "summary": {
+          "public": true,
+          "param_names": [
+            "dst",
+            "v",
+            "n",
+            "mem"
+          ],
+          "param_types": [
+            "ptr",
+            "u8",
+            "i32",
+            "cap.mem"
+          ],
+          "param_ownership": [
+            "",
+            "",
+            "",
+            ""
+          ],
+          "return_type": "i32",
+          "effects": [
+            "mem"
+          ]
+        },
+        "values": [
+          {
+            "id": "local:_",
+            "kind": "local",
+            "type": "u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:13:6",
+            "region": "fn:lib.core.memory.memset_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:_"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "_"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:i",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:13:6",
+            "region": "fn:lib.core.memory.memset_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:i"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "i"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "local:p",
+            "kind": "local",
+            "type": "ptr",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:13:6",
+            "region": "fn:lib.core.memory.memset_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:p"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "p"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "param:dst",
+            "kind": "param",
+            "type": "ptr",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:13:6",
+            "region": "fn:lib.core.memory.memset_u8",
+            "provenance": {
+              "kind": "param",
+              "root": "param:dst"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "dst"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          },
+          {
+            "id": "param:mem",
+            "kind": "param",
+            "type": "cap.mem",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:13:6",
+            "region": "fn:lib.core.memory.memset_u8",
+            "provenance": {
+              "kind": "param",
+              "root": "param:mem"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "mem"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          },
+          {
+            "id": "param:n",
+            "kind": "param",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:13:6",
+            "region": "fn:lib.core.memory.memset_u8",
+            "provenance": {
+              "kind": "param",
+              "root": "param:n"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "n"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          },
+          {
+            "id": "param:v",
+            "kind": "param",
+            "type": "u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:13:6",
+            "region": "fn:lib.core.memory.memset_u8",
+            "provenance": {
+              "kind": "param",
+              "root": "param:v"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "v"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "unsafe_boundary",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:15:5",
+            "note": "unsafe block requires conservative provenance/escape assumptions"
+          },
+          {
+            "id": "op1",
+            "kind": "guard",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:16:9",
+            "inputs": [
+              "n < 0"
+            ],
+            "note": "n < 0"
+          },
+          {
+            "id": "op2",
+            "kind": "return",
+            "block": "if_then:0",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:17:13",
+            "inputs": [
+              "2"
+            ]
+          },
+          {
+            "id": "op3",
+            "kind": "assign",
+            "block": "if_join:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:18:11",
+            "inputs": [
+              "0"
+            ],
+            "outputs": [
+              "i"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op4",
+            "kind": "guard",
+            "block": "while_header:2",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:19:9",
+            "inputs": [
+              "i < n"
+            ],
+            "note": "i < n"
+          },
+          {
+            "id": "op5",
+            "kind": "unsafe_boundary",
+            "block": "while_body:3",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:20:26",
+            "inputs": [
+              "dst",
+              "i",
+              "mem"
+            ],
+            "outputs": [
+              "p"
+            ],
+            "unsafe_class": "unsafe_unknown",
+            "note": "core.ptr_add raw_pointer_bounds: checked_external_unknown base:dst offset:i"
+          },
+          {
+            "id": "op6",
+            "kind": "unsafe_boundary",
+            "block": "while_body:3",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:21:28",
+            "inputs": [
+              "p",
+              "v",
+              "mem"
+            ],
+            "outputs": [
+              "_"
+            ],
+            "unsafe_class": "unsafe_unknown",
+            "note": "core.store_u8 raw memory gateway: checked_external_unknown pointer:p width:1"
+          },
+          {
+            "id": "op7",
+            "kind": "assign",
+            "block": "while_body:3",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:22:13",
+            "inputs": [
+              "i + 1"
+            ],
+            "outputs": [
+              "i"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op8",
+            "kind": "return",
+            "block": "while_after:4",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:23:11",
+            "inputs": [
+              "0"
+            ]
+          },
+          {
+            "id": "op9",
+            "kind": "return",
+            "block": "while_after:4",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:24:7",
+            "inputs": [
+              "0"
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:13:6",
+            "reason": "semantics checker enforced declared effects",
+            "uses": [
+              "mem"
+            ]
+          },
+          {
+            "id": "f1",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:13:6",
+            "reason": "semantics checker enforced declared effects",
+            "uses": [
+              "mem"
+            ]
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "succs": [
+              "if_join:1",
+              "if_then:0"
+            ],
+            "ops": [
+              "op0",
+              "op1"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:13:6"
+          },
+          {
+            "id": "if_then:0",
+            "kind": "if_then",
+            "preds": [
+              "entry"
+            ],
+            "succs": [
+              "if_join:1"
+            ],
+            "ops": [
+              "op2"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:16:9"
+          },
+          {
+            "id": "if_join:1",
+            "kind": "if_join",
+            "preds": [
+              "entry",
+              "if_then:0"
+            ],
+            "succs": [
+              "while_header:2"
+            ],
+            "ops": [
+              "op3"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:16:9"
+          },
+          {
+            "id": "while_header:2",
+            "kind": "while_header",
+            "preds": [
+              "if_join:1",
+              "while_body:3"
+            ],
+            "succs": [
+              "while_after:4",
+              "while_body:3"
+            ],
+            "ops": [
+              "op4"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:19:9"
+          },
+          {
+            "id": "while_body:3",
+            "kind": "while_body",
+            "preds": [
+              "while_header:2"
+            ],
+            "succs": [
+              "while_header:2"
+            ],
+            "ops": [
+              "op5",
+              "op6",
+              "op7"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:19:9"
+          },
+          {
+            "id": "while_after:4",
+            "kind": "while_after",
+            "exit": true,
+            "preds": [
+              "while_header:2"
+            ],
+            "ops": [
+              "op8",
+              "op9"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:19:9"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          },
+          {
+            "block": "if_then:0",
+            "dominators": [
+              "entry",
+              "if_then:0"
+            ]
+          },
+          {
+            "block": "if_join:1",
+            "dominators": [
+              "entry",
+              "if_join:1"
+            ]
+          },
+          {
+            "block": "while_header:2",
+            "dominators": [
+              "entry",
+              "if_join:1",
+              "while_header:2"
+            ]
+          },
+          {
+            "block": "while_body:3",
+            "dominators": [
+              "entry",
+              "if_join:1",
+              "while_body:3",
+              "while_header:2"
+            ]
+          },
+          {
+            "block": "while_after:4",
+            "dominators": [
+              "entry",
+              "if_join:1",
+              "while_after:4",
+              "while_header:2"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "lib.core.memory.memcpy_u8",
+        "module": "lib.core.memory",
+        "summary": {
+          "public": true,
+          "param_names": [
+            "dst",
+            "src",
+            "n",
+            "mem"
+          ],
+          "param_types": [
+            "ptr",
+            "ptr",
+            "i32",
+            "cap.mem"
+          ],
+          "param_ownership": [
+            "",
+            "",
+            "",
+            ""
+          ],
+          "return_type": "i32",
+          "effects": [
+            "mem"
+          ]
+        },
+        "values": [
+          {
+            "id": "local:_",
+            "kind": "local",
+            "type": "u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:26:8",
+            "region": "fn:lib.core.memory.memcpy_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:_"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "_"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:b",
+            "kind": "local",
+            "type": "u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:26:8",
+            "region": "fn:lib.core.memory.memcpy_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:b"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "b"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:dp",
+            "kind": "local",
+            "type": "ptr",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:26:8",
+            "region": "fn:lib.core.memory.memcpy_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:dp"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "dp"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:i",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:26:8",
+            "region": "fn:lib.core.memory.memcpy_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:i"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "i"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "local:sp",
+            "kind": "local",
+            "type": "ptr",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:26:8",
+            "region": "fn:lib.core.memory.memcpy_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:sp"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "sp"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "param:dst",
+            "kind": "param",
+            "type": "ptr",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:26:8",
+            "region": "fn:lib.core.memory.memcpy_u8",
+            "provenance": {
+              "kind": "param",
+              "root": "param:dst"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "dst"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          },
+          {
+            "id": "param:mem",
+            "kind": "param",
+            "type": "cap.mem",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:26:8",
+            "region": "fn:lib.core.memory.memcpy_u8",
+            "provenance": {
+              "kind": "param",
+              "root": "param:mem"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "mem"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          },
+          {
+            "id": "param:n",
+            "kind": "param",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:26:8",
+            "region": "fn:lib.core.memory.memcpy_u8",
+            "provenance": {
+              "kind": "param",
+              "root": "param:n"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "n"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          },
+          {
+            "id": "param:src",
+            "kind": "param",
+            "type": "ptr",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:26:8",
+            "region": "fn:lib.core.memory.memcpy_u8",
+            "provenance": {
+              "kind": "param",
+              "root": "param:src"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "src"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "unsafe_boundary",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:28:5",
+            "note": "unsafe block requires conservative provenance/escape assumptions"
+          },
+          {
+            "id": "op1",
+            "kind": "guard",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:29:9",
+            "inputs": [
+              "n < 0"
+            ],
+            "note": "n < 0"
+          },
+          {
+            "id": "op2",
+            "kind": "return",
+            "block": "if_then:0",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:30:13",
+            "inputs": [
+              "2"
+            ]
+          },
+          {
+            "id": "op3",
+            "kind": "assign",
+            "block": "if_join:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:31:11",
+            "inputs": [
+              "0"
+            ],
+            "outputs": [
+              "i"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op4",
+            "kind": "guard",
+            "block": "while_header:2",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:32:9",
+            "inputs": [
+              "i < n"
+            ],
+            "note": "i < n"
+          },
+          {
+            "id": "op5",
+            "kind": "unsafe_boundary",
+            "block": "while_body:3",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:33:27",
+            "inputs": [
+              "src",
+              "i",
+              "mem"
+            ],
+            "outputs": [
+              "sp"
+            ],
+            "unsafe_class": "unsafe_unknown",
+            "note": "core.ptr_add raw_pointer_bounds: checked_external_unknown base:src offset:i"
+          },
+          {
+            "id": "op6",
+            "kind": "unsafe_boundary",
+            "block": "while_body:3",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:34:27",
+            "inputs": [
+              "dst",
+              "i",
+              "mem"
+            ],
+            "outputs": [
+              "dp"
+            ],
+            "unsafe_class": "unsafe_unknown",
+            "note": "core.ptr_add raw_pointer_bounds: checked_external_unknown base:dst offset:i"
+          },
+          {
+            "id": "op7",
+            "kind": "unsafe_boundary",
+            "block": "while_body:3",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:35:28",
+            "inputs": [
+              "sp",
+              "mem"
+            ],
+            "outputs": [
+              "b"
+            ],
+            "unsafe_class": "unsafe_unknown",
+            "note": "core.load_u8 raw memory gateway: checked_external_unknown pointer:sp width:1"
+          },
+          {
+            "id": "op8",
+            "kind": "unsafe_boundary",
+            "block": "while_body:3",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:36:28",
+            "inputs": [
+              "dp",
+              "b",
+              "mem"
+            ],
+            "outputs": [
+              "_"
+            ],
+            "unsafe_class": "unsafe_unknown",
+            "note": "core.store_u8 raw memory gateway: checked_external_unknown pointer:dp width:1"
+          },
+          {
+            "id": "op9",
+            "kind": "assign",
+            "block": "while_body:3",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:37:13",
+            "inputs": [
+              "i + 1"
+            ],
+            "outputs": [
+              "i"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op10",
+            "kind": "return",
+            "block": "while_after:4",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:38:11",
+            "inputs": [
+              "0"
+            ]
+          },
+          {
+            "id": "op11",
+            "kind": "return",
+            "block": "while_after:4",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:39:7",
+            "inputs": [
+              "0"
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:26:8",
+            "reason": "semantics checker enforced declared effects",
+            "uses": [
+              "mem"
+            ]
+          },
+          {
+            "id": "f1",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:26:8",
+            "reason": "semantics checker enforced declared effects",
+            "uses": [
+              "mem"
+            ]
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "succs": [
+              "if_join:1",
+              "if_then:0"
+            ],
+            "ops": [
+              "op0",
+              "op1"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:26:8"
+          },
+          {
+            "id": "if_then:0",
+            "kind": "if_then",
+            "preds": [
+              "entry"
+            ],
+            "succs": [
+              "if_join:1"
+            ],
+            "ops": [
+              "op2"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:29:9"
+          },
+          {
+            "id": "if_join:1",
+            "kind": "if_join",
+            "preds": [
+              "entry",
+              "if_then:0"
+            ],
+            "succs": [
+              "while_header:2"
+            ],
+            "ops": [
+              "op3"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:29:9"
+          },
+          {
+            "id": "while_header:2",
+            "kind": "while_header",
+            "preds": [
+              "if_join:1",
+              "while_body:3"
+            ],
+            "succs": [
+              "while_after:4",
+              "while_body:3"
+            ],
+            "ops": [
+              "op4"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:32:9"
+          },
+          {
+            "id": "while_body:3",
+            "kind": "while_body",
+            "preds": [
+              "while_header:2"
+            ],
+            "succs": [
+              "while_header:2"
+            ],
+            "ops": [
+              "op5",
+              "op6",
+              "op7",
+              "op8",
+              "op9"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:32:9"
+          },
+          {
+            "id": "while_after:4",
+            "kind": "while_after",
+            "exit": true,
+            "preds": [
+              "while_header:2"
+            ],
+            "ops": [
+              "op10",
+              "op11"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/memory/memory.tetra:32:9"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          },
+          {
+            "block": "if_then:0",
+            "dominators": [
+              "entry",
+              "if_then:0"
+            ]
+          },
+          {
+            "block": "if_join:1",
+            "dominators": [
+              "entry",
+              "if_join:1"
+            ]
+          },
+          {
+            "block": "while_header:2",
+            "dominators": [
+              "entry",
+              "if_join:1",
+              "while_header:2"
+            ]
+          },
+          {
+            "block": "while_body:3",
+            "dominators": [
+              "entry",
+              "if_join:1",
+              "while_body:3",
+              "while_header:2"
+            ]
+          },
+          {
+            "block": "while_after:4",
+            "dominators": [
+              "entry",
+              "if_join:1",
+              "while_after:4",
+              "while_header:2"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "examples.core.memory.core_memory_smoke.main",
+        "module": "examples.core.memory.core_memory_smoke",
+        "summary": {
+          "public": true,
+          "return_type": "i32",
+          "effects": [
+            "alloc",
+            "capability",
+            "mem"
+          ]
+        },
+        "values": [
+          {
+            "id": "alloc_intent:dst",
+            "kind": "alloc_intent",
+            "type": "ptr",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_memory_smoke.tetra:12:24",
+            "region": "raw_allocation:dst",
+            "alloc": {
+              "element_type": "raw_bytes",
+              "element_size": 1,
+              "length_expr": "4",
+              "length_const_known": true,
+              "length_const": 4,
+              "zero_guard_status": "invalid_precondition",
+              "negative_guard_status": "reject_before_allocation",
+              "overflow_guard_status": "reject_before_allocation",
+              "builtin": "core.alloc_bytes",
+              "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_memory_smoke.tetra:12:24",
+              "raw_pointer_bounds_status": "allocation_base_metadata",
+              "raw_pointer_base_id": "dst",
+              "raw_pointer_base_bytes": 4,
+              "raw_slice_policy": "external_unknown"
+            },
+            "provenance": {
+              "kind": "allocation",
+              "root": "dst"
+            },
+            "unsafe_class": "unsafe_verified_root",
+            "lifetime": {
+              "birth": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_memory_smoke.tetra:12:24",
+              "owner": "dst"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "alloc_intent:src",
+            "kind": "alloc_intent",
+            "type": "ptr",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_memory_smoke.tetra:11:24",
+            "region": "raw_allocation:src",
+            "alloc": {
+              "element_type": "raw_bytes",
+              "element_size": 1,
+              "length_expr": "4",
+              "length_const_known": true,
+              "length_const": 4,
+              "zero_guard_status": "invalid_precondition",
+              "negative_guard_status": "reject_before_allocation",
+              "overflow_guard_status": "reject_before_allocation",
+              "builtin": "core.alloc_bytes",
+              "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_memory_smoke.tetra:11:24",
+              "raw_pointer_bounds_status": "allocation_base_metadata",
+              "raw_pointer_base_id": "src",
+              "raw_pointer_base_bytes": 4,
+              "raw_slice_policy": "external_unknown"
+            },
+            "provenance": {
+              "kind": "allocation",
+              "root": "src"
+            },
+            "unsafe_class": "unsafe_verified_root",
+            "lifetime": {
+              "birth": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_memory_smoke.tetra:11:24",
+              "owner": "src"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "local:c",
+            "kind": "local",
+            "type": "cap.mem",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_memory_smoke.tetra:7:6",
+            "region": "fn:examples.core.memory.core_memory_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:c"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "c"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:clear_status",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_memory_smoke.tetra:7:6",
+            "region": "fn:examples.core.memory.core_memory_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:clear_status"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "clear_status"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:copy_status",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_memory_smoke.tetra:7:6",
+            "region": "fn:examples.core.memory.core_memory_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:copy_status"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "copy_status"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:dst",
+            "kind": "local",
+            "type": "ptr",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_memory_smoke.tetra:7:6",
+            "region": "fn:examples.core.memory.core_memory_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:dst"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "dst"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:seed_status",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_memory_smoke.tetra:7:6",
+            "region": "fn:examples.core.memory.core_memory_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:seed_status"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "seed_status"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:src",
+            "kind": "local",
+            "type": "ptr",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_memory_smoke.tetra:7:6",
+            "region": "fn:examples.core.memory.core_memory_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:src"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "src"
+            },
+            "escape": "unknown"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "unsafe_boundary",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_memory_smoke.tetra:9:5",
+            "note": "unsafe block requires conservative provenance/escape assumptions"
+          },
+          {
+            "id": "op1",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_memory_smoke.tetra:10:26",
+            "note": "lib.core.capability.mem"
+          },
+          {
+            "id": "op2",
+            "kind": "alloc_intent",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_memory_smoke.tetra:11:24",
+            "inputs": [
+              "4"
+            ],
+            "outputs": [
+              "alloc_intent:src"
+            ],
+            "unsafe_class": "unsafe_verified_root",
+            "note": "alloc_bytes raw allocation-base metadata: zero invalid, negative and overflow reject before allocation"
+          },
+          {
+            "id": "op3",
+            "kind": "alloc_intent",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_memory_smoke.tetra:12:24",
+            "inputs": [
+              "4"
+            ],
+            "outputs": [
+              "alloc_intent:dst"
+            ],
+            "unsafe_class": "unsafe_verified_root",
+            "note": "alloc_bytes raw allocation-base metadata: zero invalid, negative and overflow reject before allocation"
+          },
+          {
+            "id": "op4",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_memory_smoke.tetra:15:33",
+            "inputs": [
+              "dst",
+              "0",
+              "4",
+              "c"
+            ],
+            "note": "lib.core.memory.memset_u8"
+          },
+          {
+            "id": "op5",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_memory_smoke.tetra:16:32",
+            "inputs": [
+              "src",
+              "42",
+              "4",
+              "c"
+            ],
+            "note": "lib.core.memory.memset_u8"
+          },
+          {
+            "id": "op6",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_memory_smoke.tetra:18:32",
+            "inputs": [
+              "dst",
+              "src",
+              "4",
+              "c"
+            ],
+            "note": "lib.core.memory.memcpy_u8"
+          },
+          {
+            "id": "op7",
+            "kind": "unsafe_boundary",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_memory_smoke.tetra:19:16",
+            "inputs": [
+              "dst",
+              "c"
+            ],
+            "outputs": [
+              "$return"
+            ],
+            "unsafe_class": "unsafe_checked",
+            "note": "core.load_u8 raw memory gateway: derived_allocation_offset pointer:dst offset:0 width:1"
+          },
+          {
+            "id": "op8",
+            "kind": "return",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_memory_smoke.tetra:19:9",
+            "inputs": [
+              ""
+            ]
+          },
+          {
+            "id": "op9",
+            "kind": "return",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_memory_smoke.tetra:20:7",
+            "inputs": [
+              "0"
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_memory_smoke.tetra:7:6",
+            "reason": "semantics checker enforced declared effects",
+            "uses": [
+              "alloc",
+              "capability",
+              "mem"
+            ]
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "exit": true,
+            "ops": [
+              "op0",
+              "op1",
+              "op2",
+              "op3",
+              "op4",
+              "op5",
+              "op6",
+              "op7",
+              "op8",
+              "op9"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_memory_smoke.tetra:7:6"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

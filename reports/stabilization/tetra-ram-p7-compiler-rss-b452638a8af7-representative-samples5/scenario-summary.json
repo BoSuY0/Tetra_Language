@@ -1,0 +1,344 @@
+{
+  "schema": "tetra.ram.p7-compiler-rss-summary.v2",
+  "report_comparisons": [
+    {
+      "name": "representative_surface_morph_flagship_reports_jobs_cpu_cold",
+      "source_path": "examples/surface/morph_flagship/surface_morph_rendered_studio_shell.tetra",
+      "report_off_scenario": "representative_surface_morph_flagship_reports_off_jobs_cpu_cold",
+      "report_on_scenario": "representative_surface_morph_flagship_reports_on_jobs_cpu_cold",
+      "module_count": 4,
+      "jobs": 32,
+      "warm_cache": false,
+      "report_off_sample_count": 5,
+      "report_on_sample_count": 5,
+      "report_off_rss_median_bytes": 56918016,
+      "report_on_rss_median_bytes": 58900480,
+      "report_off_rss_dispersion_bytes": 6209536,
+      "report_on_rss_dispersion_bytes": 5201920,
+      "bound_rss_bytes": 68329472,
+      "delta_bytes": 1982464,
+      "ratio": 1.0348,
+      "evaluation_status": "pass",
+      "bound_basis": "report_off_median_plus_observed_off_on_dispersion",
+      "same_host_same_config": true,
+      "report_off_rss_peak_phase": "module_codegen",
+      "report_on_rss_peak_phase": "module_codegen"
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "representative_surface_morph_flagship_reports_off_jobs_cpu_cold",
+      "source_path": "examples/surface/morph_flagship/surface_morph_rendered_studio_shell.tetra",
+      "module_count": 4,
+      "jobs": 32,
+      "reports": false,
+      "warm_cache": false,
+      "sample_count": 5,
+      "samples": [
+        {
+          "index": 1,
+          "phase_profile": "scenarios/representative_surface_morph_flagship_reports_off_jobs_cpu_cold/samples/sample-01/compiler-profile.json",
+          "executable": "scenarios/representative_surface_morph_flagship_reports_off_jobs_cpu_cold/samples/sample-01/out/app",
+          "executable_sha256": "de2370ac6fa225adc98300d8431ac7aa2f8f31c2db63c01387a2bc670db8fc88",
+          "rss_peak_bytes": 57413632,
+          "rss_peak_phase": "module_codegen",
+          "go_heap_peak_alloc_bytes": 24049064,
+          "worker_count": 4,
+          "worker_reason": "requested_jobs=32 max_jobs=4 num_cpu=32 memory_budget_bytes=unset",
+          "report_mode": "off",
+          "compiled_modules": [
+            "examples.surface.morph_flagship.surface_morph_rendered_studio_shell",
+            "lib.core.block",
+            "lib.core.morph",
+            "lib.core.surface"
+          ],
+          "lowered_modules": [
+            "examples.surface.morph_flagship.surface_morph_rendered_studio_shell",
+            "lib.core.block",
+            "lib.core.morph",
+            "lib.core.surface"
+          ]
+        },
+        {
+          "index": 2,
+          "phase_profile": "scenarios/representative_surface_morph_flagship_reports_off_jobs_cpu_cold/samples/sample-02/compiler-profile.json",
+          "executable": "scenarios/representative_surface_morph_flagship_reports_off_jobs_cpu_cold/samples/sample-02/out/app",
+          "executable_sha256": "de2370ac6fa225adc98300d8431ac7aa2f8f31c2db63c01387a2bc670db8fc88",
+          "rss_peak_bytes": 51896320,
+          "rss_peak_phase": "module_codegen",
+          "go_heap_peak_alloc_bytes": 17440632,
+          "worker_count": 4,
+          "worker_reason": "requested_jobs=32 max_jobs=4 num_cpu=32 memory_budget_bytes=unset",
+          "report_mode": "off",
+          "compiled_modules": [
+            "examples.surface.morph_flagship.surface_morph_rendered_studio_shell",
+            "lib.core.block",
+            "lib.core.morph",
+            "lib.core.surface"
+          ],
+          "lowered_modules": [
+            "examples.surface.morph_flagship.surface_morph_rendered_studio_shell",
+            "lib.core.block",
+            "lib.core.morph",
+            "lib.core.surface"
+          ]
+        },
+        {
+          "index": 3,
+          "phase_profile": "scenarios/representative_surface_morph_flagship_reports_off_jobs_cpu_cold/samples/sample-03/compiler-profile.json",
+          "executable": "scenarios/representative_surface_morph_flagship_reports_off_jobs_cpu_cold/samples/sample-03/out/app",
+          "executable_sha256": "de2370ac6fa225adc98300d8431ac7aa2f8f31c2db63c01387a2bc670db8fc88",
+          "rss_peak_bytes": 51224576,
+          "rss_peak_phase": "module_codegen",
+          "go_heap_peak_alloc_bytes": 19604384,
+          "worker_count": 4,
+          "worker_reason": "requested_jobs=32 max_jobs=4 num_cpu=32 memory_budget_bytes=unset",
+          "report_mode": "off",
+          "compiled_modules": [
+            "examples.surface.morph_flagship.surface_morph_rendered_studio_shell",
+            "lib.core.block",
+            "lib.core.morph",
+            "lib.core.surface"
+          ],
+          "lowered_modules": [
+            "examples.surface.morph_flagship.surface_morph_rendered_studio_shell",
+            "lib.core.block",
+            "lib.core.morph",
+            "lib.core.surface"
+          ]
+        },
+        {
+          "index": 4,
+          "phase_profile": "scenarios/representative_surface_morph_flagship_reports_off_jobs_cpu_cold/samples/sample-04/compiler-profile.json",
+          "executable": "scenarios/representative_surface_morph_flagship_reports_off_jobs_cpu_cold/samples/sample-04/out/app",
+          "executable_sha256": "de2370ac6fa225adc98300d8431ac7aa2f8f31c2db63c01387a2bc670db8fc88",
+          "rss_peak_bytes": 56918016,
+          "rss_peak_phase": "module_codegen",
+          "go_heap_peak_alloc_bytes": 15721976,
+          "worker_count": 4,
+          "worker_reason": "requested_jobs=32 max_jobs=4 num_cpu=32 memory_budget_bytes=unset",
+          "report_mode": "off",
+          "compiled_modules": [
+            "examples.surface.morph_flagship.surface_morph_rendered_studio_shell",
+            "lib.core.block",
+            "lib.core.morph",
+            "lib.core.surface"
+          ],
+          "lowered_modules": [
+            "examples.surface.morph_flagship.surface_morph_rendered_studio_shell",
+            "lib.core.block",
+            "lib.core.morph",
+            "lib.core.surface"
+          ]
+        },
+        {
+          "index": 5,
+          "phase_profile": "scenarios/representative_surface_morph_flagship_reports_off_jobs_cpu_cold/samples/sample-05/compiler-profile.json",
+          "executable": "scenarios/representative_surface_morph_flagship_reports_off_jobs_cpu_cold/samples/sample-05/out/app",
+          "executable_sha256": "de2370ac6fa225adc98300d8431ac7aa2f8f31c2db63c01387a2bc670db8fc88",
+          "rss_peak_bytes": 57434112,
+          "rss_peak_phase": "module_codegen",
+          "go_heap_peak_alloc_bytes": 19502680,
+          "worker_count": 4,
+          "worker_reason": "requested_jobs=32 max_jobs=4 num_cpu=32 memory_budget_bytes=unset",
+          "report_mode": "off",
+          "compiled_modules": [
+            "examples.surface.morph_flagship.surface_morph_rendered_studio_shell",
+            "lib.core.block",
+            "lib.core.morph",
+            "lib.core.surface"
+          ],
+          "lowered_modules": [
+            "examples.surface.morph_flagship.surface_morph_rendered_studio_shell",
+            "lib.core.block",
+            "lib.core.morph",
+            "lib.core.surface"
+          ]
+        }
+      ],
+      "phase_profile": "scenarios/representative_surface_morph_flagship_reports_off_jobs_cpu_cold/samples/sample-01/compiler-profile.json",
+      "executable": "scenarios/representative_surface_morph_flagship_reports_off_jobs_cpu_cold/samples/sample-01/out/app",
+      "executable_sha256": "de2370ac6fa225adc98300d8431ac7aa2f8f31c2db63c01387a2bc670db8fc88",
+      "rss_peak_bytes": 56918016,
+      "rss_median_bytes": 56918016,
+      "rss_min_bytes": 51224576,
+      "rss_max_bytes": 57434112,
+      "rss_dispersion_bytes": 6209536,
+      "rss_peak_phase": "module_codegen",
+      "go_heap_peak_alloc_bytes": 19502680,
+      "go_heap_median_alloc_bytes": 19502680,
+      "worker_count": 4,
+      "worker_reason": "requested_jobs=32 max_jobs=4 num_cpu=32 memory_budget_bytes=unset",
+      "report_mode": "off",
+      "compiled_modules": [
+        "examples.surface.morph_flagship.surface_morph_rendered_studio_shell",
+        "lib.core.block",
+        "lib.core.morph",
+        "lib.core.surface"
+      ],
+      "lowered_modules": [
+        "examples.surface.morph_flagship.surface_morph_rendered_studio_shell",
+        "lib.core.block",
+        "lib.core.morph",
+        "lib.core.surface"
+      ]
+    },
+    {
+      "name": "representative_surface_morph_flagship_reports_on_jobs_cpu_cold",
+      "source_path": "examples/surface/morph_flagship/surface_morph_rendered_studio_shell.tetra",
+      "module_count": 4,
+      "jobs": 32,
+      "reports": true,
+      "warm_cache": false,
+      "sample_count": 5,
+      "samples": [
+        {
+          "index": 1,
+          "phase_profile": "scenarios/representative_surface_morph_flagship_reports_on_jobs_cpu_cold/samples/sample-01/compiler-profile.json",
+          "executable": "scenarios/representative_surface_morph_flagship_reports_on_jobs_cpu_cold/samples/sample-01/out/app",
+          "executable_sha256": "de2370ac6fa225adc98300d8431ac7aa2f8f31c2db63c01387a2bc670db8fc88",
+          "rss_peak_bytes": 56799232,
+          "rss_peak_phase": "module_codegen",
+          "go_heap_peak_alloc_bytes": 15709440,
+          "worker_count": 4,
+          "worker_reason": "requested_jobs=32 max_jobs=4 num_cpu=32 memory_budget_bytes=unset",
+          "report_mode": "proof+bounds+alloc+memory",
+          "compiled_modules": [
+            "examples.surface.morph_flagship.surface_morph_rendered_studio_shell",
+            "lib.core.block",
+            "lib.core.morph",
+            "lib.core.surface"
+          ],
+          "lowered_modules": [
+            "examples.surface.morph_flagship.surface_morph_rendered_studio_shell",
+            "lib.core.block",
+            "lib.core.morph",
+            "lib.core.surface"
+          ]
+        },
+        {
+          "index": 2,
+          "phase_profile": "scenarios/representative_surface_morph_flagship_reports_on_jobs_cpu_cold/samples/sample-02/compiler-profile.json",
+          "executable": "scenarios/representative_surface_morph_flagship_reports_on_jobs_cpu_cold/samples/sample-02/out/app",
+          "executable_sha256": "de2370ac6fa225adc98300d8431ac7aa2f8f31c2db63c01387a2bc670db8fc88",
+          "rss_peak_bytes": 58187776,
+          "rss_peak_phase": "module_codegen",
+          "go_heap_peak_alloc_bytes": 16956600,
+          "worker_count": 4,
+          "worker_reason": "requested_jobs=32 max_jobs=4 num_cpu=32 memory_budget_bytes=unset",
+          "report_mode": "proof+bounds+alloc+memory",
+          "compiled_modules": [
+            "examples.surface.morph_flagship.surface_morph_rendered_studio_shell",
+            "lib.core.block",
+            "lib.core.morph",
+            "lib.core.surface"
+          ],
+          "lowered_modules": [
+            "examples.surface.morph_flagship.surface_morph_rendered_studio_shell",
+            "lib.core.block",
+            "lib.core.morph",
+            "lib.core.surface"
+          ]
+        },
+        {
+          "index": 3,
+          "phase_profile": "scenarios/representative_surface_morph_flagship_reports_on_jobs_cpu_cold/samples/sample-03/compiler-profile.json",
+          "executable": "scenarios/representative_surface_morph_flagship_reports_on_jobs_cpu_cold/samples/sample-03/out/app",
+          "executable_sha256": "de2370ac6fa225adc98300d8431ac7aa2f8f31c2db63c01387a2bc670db8fc88",
+          "rss_peak_bytes": 58900480,
+          "rss_peak_phase": "module_codegen",
+          "go_heap_peak_alloc_bytes": 17893296,
+          "worker_count": 4,
+          "worker_reason": "requested_jobs=32 max_jobs=4 num_cpu=32 memory_budget_bytes=unset",
+          "report_mode": "proof+bounds+alloc+memory",
+          "compiled_modules": [
+            "examples.surface.morph_flagship.surface_morph_rendered_studio_shell",
+            "lib.core.block",
+            "lib.core.morph",
+            "lib.core.surface"
+          ],
+          "lowered_modules": [
+            "examples.surface.morph_flagship.surface_morph_rendered_studio_shell",
+            "lib.core.block",
+            "lib.core.morph",
+            "lib.core.surface"
+          ]
+        },
+        {
+          "index": 4,
+          "phase_profile": "scenarios/representative_surface_morph_flagship_reports_on_jobs_cpu_cold/samples/sample-04/compiler-profile.json",
+          "executable": "scenarios/representative_surface_morph_flagship_reports_on_jobs_cpu_cold/samples/sample-04/out/app",
+          "executable_sha256": "de2370ac6fa225adc98300d8431ac7aa2f8f31c2db63c01387a2bc670db8fc88",
+          "rss_peak_bytes": 62001152,
+          "rss_peak_phase": "module_codegen",
+          "go_heap_peak_alloc_bytes": 14889720,
+          "worker_count": 4,
+          "worker_reason": "requested_jobs=32 max_jobs=4 num_cpu=32 memory_budget_bytes=unset",
+          "report_mode": "proof+bounds+alloc+memory",
+          "compiled_modules": [
+            "examples.surface.morph_flagship.surface_morph_rendered_studio_shell",
+            "lib.core.block",
+            "lib.core.morph",
+            "lib.core.surface"
+          ],
+          "lowered_modules": [
+            "examples.surface.morph_flagship.surface_morph_rendered_studio_shell",
+            "lib.core.block",
+            "lib.core.morph",
+            "lib.core.surface"
+          ]
+        },
+        {
+          "index": 5,
+          "phase_profile": "scenarios/representative_surface_morph_flagship_reports_on_jobs_cpu_cold/samples/sample-05/compiler-profile.json",
+          "executable": "scenarios/representative_surface_morph_flagship_reports_on_jobs_cpu_cold/samples/sample-05/out/app",
+          "executable_sha256": "de2370ac6fa225adc98300d8431ac7aa2f8f31c2db63c01387a2bc670db8fc88",
+          "rss_peak_bytes": 59056128,
+          "rss_peak_phase": "module_codegen",
+          "go_heap_peak_alloc_bytes": 14052144,
+          "worker_count": 4,
+          "worker_reason": "requested_jobs=32 max_jobs=4 num_cpu=32 memory_budget_bytes=unset",
+          "report_mode": "proof+bounds+alloc+memory",
+          "compiled_modules": [
+            "examples.surface.morph_flagship.surface_morph_rendered_studio_shell",
+            "lib.core.block",
+            "lib.core.morph",
+            "lib.core.surface"
+          ],
+          "lowered_modules": [
+            "examples.surface.morph_flagship.surface_morph_rendered_studio_shell",
+            "lib.core.block",
+            "lib.core.morph",
+            "lib.core.surface"
+          ]
+        }
+      ],
+      "phase_profile": "scenarios/representative_surface_morph_flagship_reports_on_jobs_cpu_cold/samples/sample-01/compiler-profile.json",
+      "executable": "scenarios/representative_surface_morph_flagship_reports_on_jobs_cpu_cold/samples/sample-01/out/app",
+      "executable_sha256": "de2370ac6fa225adc98300d8431ac7aa2f8f31c2db63c01387a2bc670db8fc88",
+      "rss_peak_bytes": 58900480,
+      "rss_median_bytes": 58900480,
+      "rss_min_bytes": 56799232,
+      "rss_max_bytes": 62001152,
+      "rss_dispersion_bytes": 5201920,
+      "rss_peak_phase": "module_codegen",
+      "go_heap_peak_alloc_bytes": 15709440,
+      "go_heap_median_alloc_bytes": 15709440,
+      "worker_count": 4,
+      "worker_reason": "requested_jobs=32 max_jobs=4 num_cpu=32 memory_budget_bytes=unset",
+      "report_mode": "proof+bounds+alloc+memory",
+      "compiled_modules": [
+        "examples.surface.morph_flagship.surface_morph_rendered_studio_shell",
+        "lib.core.block",
+        "lib.core.morph",
+        "lib.core.surface"
+      ],
+      "lowered_modules": [
+        "examples.surface.morph_flagship.surface_morph_rendered_studio_shell",
+        "lib.core.block",
+        "lib.core.morph",
+        "lib.core.surface"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,3 @@
+validator: rsstelemetry.ReadFile
+schema: tetra.local_benchmark.process_rss_telemetry.v2
+result: pass

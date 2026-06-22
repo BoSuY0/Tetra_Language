@@ -1,0 +1,25 @@
+module examples.actors.system_messages.system_sender_unchanged
+
+import lib.core.actors as actors
+
+func score(result: actors.SystemReceiveResult) -> Int:
+    match result:
+    case actors.SystemReceiveResult.empty:
+        return 0
+    case actors.SystemReceiveResult.timeout:
+        return 1
+    case actors.SystemReceiveResult.canceled:
+        return 2
+    case actors.SystemReceiveResult.runtime_closed:
+        return 3
+    case actors.SystemReceiveResult.invalid_state(code):
+        return 100 + code
+    case actors.SystemReceiveResult.message(message):
+        return 200
+
+func main() -> Int
+uses actors, runtime:
+    let before: actor = core.sender()
+    let system_result: actors.SystemReceiveResult = actors.poll_system()
+    let after: actor = core.sender()
+    return score(system_result)

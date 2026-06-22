@@ -777,9 +777,10 @@ func validMemoryProductionReport() string {
 			"ator\",\"metric\":\"estimated_os_syscalls\",\"unit\":\"syscalls\",\"eviden" +
 			"ce_class\":\"allocation_report_estimate\",\"method\":\"allocation_report_s" +
 			"ummary\",\"baseline_value\":64,\"measured_value\":1,\"improvement_ratio\":" +
-			"64.0,\"evidence\":\"allocation report schema v2 estimates 64 per_core_s" +
-			"mall_heap allocation intents inside one 64KiB chunk refill; allocati" +
-			"on_report_estimate only, not a runtime measurement\",\"ran\":true,\"pass" +
+			"64.0,\"evidence\":\"allocation report schema v2 estimates 64 process_b" +
+			"ump_small_heap_v0 allocation intents inside one 64KiB chunk refill; " +
+			"allocation_report_estimate only, not a runtime measurement or reuse " +
+			"claim\",\"ran\":true,\"pass" +
 			"\":true}"),
 		"  ],",
 		"  \"contracts\": [",

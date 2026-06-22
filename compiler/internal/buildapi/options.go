@@ -14,8 +14,11 @@ type BuildOptions struct {
 	EmitBoundsReport                 bool
 	EmitMemoryReport                 bool
 	EmitRAMContractReport            bool
+	EmitCompilerPhaseReport          bool
 	EmitRuntimeHeapTelemetry         bool
 	RuntimeHeapTelemetryActorDomains bool
+	OwnedAllocDropLowering           bool
+	CompilerPhaseReportPath          string
 	RuntimeHeapTelemetryDir          string
 	RuntimeHeapTelemetryProgram      string
 	RuntimeHeapTelemetryMain         string

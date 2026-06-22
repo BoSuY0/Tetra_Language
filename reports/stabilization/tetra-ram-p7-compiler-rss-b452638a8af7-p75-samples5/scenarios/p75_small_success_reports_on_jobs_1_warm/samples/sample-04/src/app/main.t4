@@ -1,0 +1,5 @@
+module app.main
+import bench.m2 as last
+fun main(): i32 {
+  return last.value_2(0)
+}

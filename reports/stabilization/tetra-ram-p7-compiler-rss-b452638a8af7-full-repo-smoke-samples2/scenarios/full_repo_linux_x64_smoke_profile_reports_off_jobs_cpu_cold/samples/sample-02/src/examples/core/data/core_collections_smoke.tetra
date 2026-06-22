@@ -1,0 +1,31 @@
+// Stable core collections stdlib smoke.
+module examples.core.data.core_collections_smoke
+
+import lib.core.collections as collections
+
+func main() -> Int
+uses alloc, mem:
+    var xs: []i32 = core.make_i32(5)
+    xs[0] = 7
+    xs[1] = 42
+    xs[2] = 7
+    xs[3] = 1
+    xs[4] = 0
+    let vec: collections.Vec<Int> = collections.vec_from_slice(xs)
+    let first_generic: Int = collections.vec_first_or(vec, 0)
+    let second_generic: Int = collections.vec_get_or(vec, 1, 0)
+    var keys: []i32 = core.make_i32(2)
+    var values: []i32 = core.make_i32(2)
+    keys[0] = 7
+    keys[1] = 42
+    values[0] = 11
+    values[1] = 42
+    let map: collections.HashMap<Int, Int> = collections.hash_map_from_slices(keys, values)
+    let found_generic: Int = collections.hash_map_get_i32_i32_or(map, 42, 0)
+    let has_42: Bool = collections.contains_i32(xs, 42)
+    let sevens: Int = collections.count_i32(xs, 7)
+    let first: Int = collections.first_or_i32(xs, 0)
+    let n: Int = collections.len_i32(xs)
+    if has_42 && sevens == 2 && first == 7 && n == 5 && collections.vec_len(vec) == 5 && first_generic == 7 && second_generic == 42 && collections.hash_map_len(map) == 2 && found_generic == 42:
+        return 42
+    return 1

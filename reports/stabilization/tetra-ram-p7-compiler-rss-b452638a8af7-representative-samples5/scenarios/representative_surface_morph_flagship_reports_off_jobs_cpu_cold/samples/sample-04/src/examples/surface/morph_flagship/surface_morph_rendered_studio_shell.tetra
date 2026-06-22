@@ -1,0 +1,228 @@
+// Morph-authored flagship Surface evidence for the rendered beauty pipeline.
+module examples.surface.morph_flagship.surface_morph_rendered_studio_shell
+
+import lib.core.surface as surface
+import lib.core.block as block
+import lib.core.morph as morph
+
+struct Evidence:
+    r: Int
+    b: Int
+    p: Int
+    i: Int
+    s: Int
+    t: Int
+    v: Bool
+    x: Bool
+    a: Bool
+
+func flagship_paint() -> block.PaintSpec:
+    let fill: block.PaintLayer = block.paint_layer_fill_radius(morph.theme_dark(), 0)
+    let overlay: block.PaintLayer = block.paint_layer_overlay(morph.accent(), 42, 0)
+    return block.paint_stack2(fill, overlay)
+
+func flagship_props(rect: surface.Rect, paint: block.PaintSpec) -> block.BlockProps:
+    let layout: block.LayoutSpec = block.layout_overlay(rect, 0)
+    let access: block.AccessibilitySpec = block.accessibility_region(24)
+    var props: block.BlockProps = block.props_default(rect)
+    props.layout_mode = layout.mode
+    props.paint_layers = paint.layer_count
+    props.accessibility_role = access.role
+    return props
+
+func ar(t: inout block.BlockTree, p: Int, i: Int, r: surface.Rect, l: Int) -> Int:
+    return block.tree_add_child(t, block.id(p), morph.expand_region_panel(i, p, r, l), r)
+
+func aa(t: inout block.BlockTree, p: Int, i: Int, r: surface.Rect, l: Int, h: Int, s: Bool) -> Int:
+    return block.tree_add_child(t, block.id(p), morph.expand_control_action(i, p, r, l, h, s), r)
+
+func af(t: inout block.BlockTree, p: Int, i: Int, a: Int, r: surface.Rect, b: Int, c: Int) -> Int:
+    return block.tree_add_child(t, block.id(p), morph.expand_field_text(i, p, a, r, b, c), r)
+
+func al(t: inout block.BlockTree, p: Int, i: Int, target: Int, r: surface.Rect, l: Int) -> Int:
+    return block.tree_add_child(t, block.id(p), morph.expand_label(i, p, target, r, l), r)
+
+func recipe_ok(recipe: morph.Recipe) -> Bool:
+    return morph.recipe_expands_to_block(recipe)
+
+func recipes4(a: morph.Recipe, b: morph.Recipe, c: morph.Recipe, d: morph.Recipe) -> Bool:
+    let av: Bool = recipe_ok(a)
+    let bv: Bool = recipe_ok(b)
+    let cv: Bool = recipe_ok(c)
+    let dv: Bool = recipe_ok(d)
+    return av && bv && cv && dv
+
+func ex3(a: morph.RecipeExpansion, b: morph.RecipeExpansion, c: morph.RecipeExpansion) -> Bool:
+    let av: Bool = morph.expansion_valid(a)
+    let bv: Bool = morph.expansion_valid(b)
+    let cv: Bool = morph.expansion_valid(c)
+    return av && bv && cv
+
+func all4(a: Bool, b: Bool, c: Bool, d: Bool) -> Bool:
+    return a && b && c && d
+
+func ok_ev(tree: borrow block.BlockTree, i: Int, s: Int, t: Int, v: Bool, x: Bool) -> Evidence:
+    let a: Bool = morph.accessibility_projection_ok(18, 7, 18)
+    return Evidence(r: 16, b: block.tree_len(tree), p: 9, i: i, s: s, t: t, v: v, x: x, a: a)
+
+func bad_ev(tree: borrow block.BlockTree, i: Int, s: Int, t: Int) -> Evidence:
+    let n: Int = block.tree_len(tree)
+    return Evidence(r: 0, b: n, p: 0, i: i, s: s, t: t, v: false, x: false, a: false)
+
+func flagship_root_block(rect: surface.Rect) -> block.Block:
+    let paint: block.PaintSpec = flagship_paint()
+    let props: block.BlockProps = flagship_props(rect, paint)
+    return block.make(block.id(1), block.id_none(), props)
+
+func build_ev(a: Int, p: Int, d: Bool, r: Int, c: Bool, s: Int, l: Int, e: Int, b: Bool) -> Evidence
+uses alloc, mem:
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 1180, h: 760)
+    let shell_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 1180, h: 760)
+    let nav_rect: surface.Rect = surface.Rect(x: 24, y: 80, w: 160, h: 256)
+    let toolbar_rect: surface.Rect = surface.Rect(x: 250, y: 32, w: 880, h: 44)
+    let dashboard_rect: surface.Rect = surface.Rect(x: 250, y: 92, w: 420, h: 190)
+    let command_rect: surface.Rect = surface.Rect(x: 690, y: 92, w: 360, h: 48)
+    let settings_rect: surface.Rect = surface.Rect(x: 690, y: 154, w: 360, h: 48)
+    let logs_rect: surface.Rect = surface.Rect(x: 280, y: 432, w: 360, h: 36)
+    let status_rect: surface.Rect = surface.Rect(x: 250, y: 704, w: 880, h: 32)
+    let error_rect: surface.Rect = surface.Rect(x: 656, y: 432, w: 220, h: 36)
+    let dialog_rect: surface.Rect = surface.Rect(x: 690, y: 220, w: 360, h: 74)
+    let metric_rect: surface.Rect = surface.Rect(x: 280, y: 116, w: 160, h: 72)
+    let toast_rect: surface.Rect = surface.Rect(x: 456, y: 116, w: 180, h: 72)
+    let tab_rect: surface.Rect = surface.Rect(x: 280, y: 204, w: 160, h: 36)
+    let empty_rect: surface.Rect = surface.Rect(x: 456, y: 204, w: 180, h: 36)
+    let rebuild_rect: surface.Rect = surface.Rect(x: 456, y: 316, w: 160, h: 40)
+    let profile_rect: surface.Rect = surface.Rect(x: 552, y: 248, w: 140, h: 36)
+    let state_rect: surface.Rect = surface.Rect(x: 690, y: 316, w: 220, h: 32)
+    let app_shell_recipe: morph.Recipe = morph.recipe_app_shell()
+    let nav_recipe: morph.Recipe = morph.recipe_nav_item()
+    let toolbar_recipe: morph.Recipe = morph.recipe_toolbar()
+    let tab_recipe: morph.Recipe = morph.recipe_tab_item()
+    let split_recipe: morph.Recipe = morph.recipe_split_pane()
+    let status_recipe: morph.Recipe = morph.recipe_status_bar()
+    let command_recipe: morph.Recipe = morph.recipe_command_item()
+    let settings_recipe: morph.Recipe = morph.recipe_settings_form()
+    let log_recipe: morph.Recipe = morph.recipe_log_row()
+    let metric_recipe: morph.Recipe = morph.recipe_metric_tile()
+    let toast_recipe: morph.Recipe = morph.recipe_toast_notification()
+    let dialog_recipe: morph.Recipe = morph.recipe_dialog_panel()
+    let empty_recipe: morph.Recipe = morph.recipe_empty_state()
+    let error_recipe: morph.Recipe = morph.recipe_error_panel()
+    let action_recipe: morph.Recipe = morph.recipe_control_action()
+    let region_recipe: morph.Recipe = morph.recipe_region_panel()
+    var tree: block.BlockTree = block.tree_init(24)
+    let root: Int = block.tree_add_root(tree, flagship_root_block(root_rect), root_rect)
+    let shell: Int = ar(tree, 1, 2, shell_rect, 18)
+    let nav: Int = aa(tree, 2, 3, nav_rect, 10, 1401, a == 2)
+    let toolbar: Int = aa(tree, 2, 4, toolbar_rect, 12, 1402, c)
+    let dashboard: Int = ar(tree, 2, 5, dashboard_rect, 16)
+    let command: Int = af(tree, 5, 6, 18, command_rect, 18, 8)
+    let settings: Int = af(tree, 5, 7, 18, settings_rect, 18, 8)
+    let logs: Int = aa(tree, 5, 8, logs_rect, 14, 1403, l > 0)
+    let status: Int = al(tree, 2, 9, 6, status_rect, 18)
+    let error: Int = aa(tree, 5, 10, error_rect, 13, 1404, e > 0)
+    let dialog: Int = ar(tree, 2, 11, dialog_rect, 20)
+    let metric: Int = aa(tree, 5, 12, metric_rect, 12, 1405, d)
+    let toast: Int = aa(tree, 5, 13, toast_rect, 15, 1406, r > 0)
+    let tab: Int = aa(tree, 5, 14, tab_rect, 10, 1407, a == 5)
+    let empty: Int = aa(tree, 5, 15, empty_rect, 11, 1408, false)
+    let rebuild: Int = aa(tree, 5, 16, rebuild_rect, 14, 1409, r > 0)
+    let profile: Int = aa(tree, 5, 17, profile_rect, 12, 1410, p == 3)
+    let app_state: Int = al(tree, 2, 18, 7, state_rect, 18)
+    let app_shell_expansion = morph.recipe_expansion(app_shell_recipe, block.id(2))
+    let nav_expansion = morph.recipe_expansion(nav_recipe, block.id(3))
+    let toolbar_expansion = morph.recipe_expansion(toolbar_recipe, block.id(4))
+    let tab_expansion = morph.recipe_expansion(tab_recipe, block.id(14))
+    let split_expansion = morph.recipe_expansion(split_recipe, block.id(5))
+    let status_expansion = morph.recipe_expansion(status_recipe, block.id(9))
+    let command_expansion = morph.recipe_expansion(command_recipe, block.id(6))
+    let settings_expansion = morph.recipe_expansion(settings_recipe, block.id(7))
+    let log_expansion = morph.recipe_expansion(log_recipe, block.id(8))
+    let metric_expansion = morph.recipe_expansion(metric_recipe, block.id(12))
+    let toast_expansion = morph.recipe_expansion(toast_recipe, block.id(13))
+    let dialog_expansion = morph.recipe_expansion(dialog_recipe, block.id(11))
+    let empty_expansion = morph.recipe_expansion(empty_recipe, block.id(15))
+    let error_expansion = morph.recipe_expansion(error_recipe, block.id(10))
+    let action_expansion = morph.recipe_expansion(action_recipe, block.id(16))
+    let region_expansion = morph.recipe_expansion(region_recipe, block.id(5))
+    let recipes_a: Bool = recipes4(app_shell_recipe, nav_recipe, toolbar_recipe, tab_recipe)
+    let recipes_b: Bool = recipes4(split_recipe, status_recipe, command_recipe, settings_recipe)
+    let recipes_c: Bool = recipes4(log_recipe, metric_recipe, toast_recipe, dialog_recipe)
+    let recipes_d: Bool = recipes4(empty_recipe, error_recipe, action_recipe, region_recipe)
+    let recipes_safe: Bool = all4(recipes_a, recipes_b, recipes_c, recipes_d)
+    let exp_a: Bool = ex3(app_shell_expansion, nav_expansion, toolbar_expansion)
+    let exp_b: Bool = ex3(tab_expansion, split_expansion, status_expansion)
+    let exp_c: Bool = ex3(command_expansion, settings_expansion, log_expansion)
+    let exp_d: Bool = ex3(metric_expansion, toast_expansion, dialog_expansion)
+    let exp_e: Bool = ex3(empty_expansion, error_expansion, action_expansion)
+    let exp_f: Bool = morph.expansion_valid(region_expansion)
+    let expansions_valid: Bool = all4(exp_a, exp_b, exp_c, exp_d) && exp_e && exp_f
+    let app_shell_state_count: Int = a + p + r + s + l + e
+    let blocked_dialog_count: Int = bool_count(b)
+    let interaction_count: Int = r + s + l + e + bool_count(c) + blocked_dialog_count + p
+    let valid: Int = block.tree_validate(tree)
+    let ids_a: Bool = root == 1 && shell == 2 && nav == 3 && toolbar == 4
+    let ids_b: Bool = dashboard == 5 && command == 6 && settings == 7 && logs == 8
+    let ids_c: Bool = status == 9 && error == 10 && dialog == 11 && metric == 12
+    let ids_d: Bool = toast == 13 && tab == 14 && empty == 15 && rebuild == 16
+    let ids_e: Bool = profile == 17 && app_state == 18
+    if ids_a && ids_b && ids_c && ids_d && ids_e:
+        let ic: Int = interaction_count
+        let sc: Int = app_shell_state_count
+        return ok_ev(tree, ic, sc, valid, recipes_safe, expansions_valid)
+    return bad_ev(tree, interaction_count, app_shell_state_count, valid)
+
+func bool_count(value: Bool) -> Int:
+    if value:
+        return 1
+    return 0
+
+func ready_core(evidence: Evidence) -> Bool:
+    let counts: Bool = evidence.r == 16 && evidence.b == 18 && evidence.p >= 9
+    let activity: Bool = evidence.i >= 8 && evidence.s > 0
+    let tree_ok: Bool = evidence.t == block.tree_error_ok()
+    let flags: Bool = tree_ok && evidence.v && evidence.x && evidence.a
+    return counts && activity && flags && morph.capsule_self_check()
+
+func flagship_recipe_ready(evidence: Evidence) -> Int:
+    if ready_core(evidence):
+        return 0
+    return 1
+
+func main() -> Int
+uses alloc, mem, surface:
+    let recipe_evidence: Evidence = build_ev(7, 3, true, 1, true, 1, 1, 1, true)
+    let recipe_status: Int = flagship_recipe_ready(recipe_evidence)
+    if recipe_status != 0:
+        return 1
+    var win: surface.Surface = surface.open("Tetra Studio Shell", 320, 200)
+    var before_frame: surface.Frame = surface.begin_frame(win)
+    let before_render: Int = morph.render_studio_shell_frame(false, before_frame)
+    let first_presented: Int = surface.present(before_frame)
+    let click_event: surface.Event = surface.poll_event(win)
+    let text_event: surface.Event = surface.poll_event(win)
+    var text_bytes: []u8 = core.make_u8(4)
+    let host_text_len: Int = surface.poll_event_text_len(win)
+    let copied_text_len: Int = surface.poll_event_text_into(win, text_bytes)
+    let key_event: surface.Event = surface.poll_event(win)
+    let resize_event: surface.Event = surface.poll_event(win)
+    var active: Bool = false
+    if click_event.kind == surface.event_mouse_up():
+        active = true
+    if text_event.kind == surface.event_text_input() && copied_text_len > 0:
+        active = true
+    if key_event.kind == surface.event_key_down():
+        active = true
+    if resize_event.kind == surface.event_resize():
+        win.width = resize_event.width
+        win.height = resize_event.height
+    var after_frame: surface.Frame = surface.begin_frame(win)
+    let after_render: Int = morph.render_studio_shell_frame(active, after_frame)
+    let second_presented: Int = surface.present(after_frame)
+    let closed: Int = surface.close(win)
+    let frames_ok: Bool = before_render == 0 && first_presented == 0 && after_render == 0
+    let close_ok: Bool = second_presented == 0 && closed == 0
+    let text_ok: Bool = host_text_len >= copied_text_len
+    if frames_ok && close_ok && text_ok:
+        return 0
+    return 1

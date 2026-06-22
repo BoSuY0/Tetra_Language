@@ -1,0 +1,10 @@
+// Task join wait smoke: joining actor parks while the child waits on a timer.
+func worker() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(5)
+    return core.time_now_ms()
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    return core.task_join_i32(task)

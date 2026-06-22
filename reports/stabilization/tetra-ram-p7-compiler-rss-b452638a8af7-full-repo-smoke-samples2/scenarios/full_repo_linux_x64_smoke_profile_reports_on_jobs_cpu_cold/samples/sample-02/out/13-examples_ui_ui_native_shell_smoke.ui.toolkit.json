@@ -1,0 +1,438 @@
+{
+  "schema": "tetra.ui.toolkit.v1",
+  "compatibility_schema": "tetra.ui.v0.4.0",
+  "states": [
+    {
+      "name": "ShellState",
+      "module": "",
+      "fields": [
+        {
+          "name": "label",
+          "type": "str",
+          "mutable": true,
+          "const": false,
+          "init": "\"Wave 9 Native\""
+        },
+        {
+          "name": "source",
+          "type": "i32",
+          "mutable": true,
+          "const": false,
+          "init": "0"
+        },
+        {
+          "name": "textSource",
+          "type": "str",
+          "mutable": true,
+          "const": false,
+          "init": "\"Copied from state\""
+        },
+        {
+          "name": "toggles",
+          "type": "i32",
+          "mutable": true,
+          "const": false,
+          "init": "0"
+        }
+      ]
+    }
+  ],
+  "views": [
+    {
+      "name": "ShellView",
+      "module": "",
+      "state_type": "ShellState",
+      "widget_kinds": [
+        "window",
+        "root",
+        "panel",
+        "text",
+        "label",
+        "button",
+        "input",
+        "checkbox",
+        "select",
+        "list",
+        "table",
+        "dialog",
+        "menu",
+        "menu-item",
+        "spacer",
+        "divider"
+      ],
+      "layout_kinds": [
+        "stack",
+        "row",
+        "column",
+        "grid",
+        "flex",
+        "overflow-scroll"
+      ],
+      "style_states": [
+        "enabled",
+        "disabled",
+        "visible",
+        "focused",
+        "selected",
+        "error"
+      ],
+      "accessibility_fields": [
+        "role",
+        "label",
+        "description",
+        "focus_order",
+        "state_metadata",
+        "keyboard_activation"
+      ],
+      "event_kinds": [
+        "activate",
+        "blur",
+        "change",
+        "click",
+        "error_recovery",
+        "focus",
+        "input",
+        "key",
+        "redraw",
+        "select",
+        "submit",
+        "timer"
+      ],
+      "state_binding_kinds": [
+        "scalar",
+        "list",
+        "table",
+        "two-way-input",
+        "deterministic-update-order"
+      ],
+      "widgets": [
+        {
+          "id": "ShellView.window",
+          "kind": "window",
+          "layout": {
+            "kind": "stack",
+            "mode": "window"
+          },
+          "focusable": false,
+          "accessibility": "application"
+        },
+        {
+          "id": "ShellView.root",
+          "kind": "root",
+          "parent": "ShellView.window",
+          "binding": "layout.root",
+          "layout": {
+            "kind": "column",
+            "gap": 8
+          },
+          "focusable": false,
+          "accessibility": "group"
+        },
+        {
+          "id": "ShellView.panel",
+          "kind": "panel",
+          "parent": "ShellView.root",
+          "binding": "layout.content",
+          "layout": {
+            "kind": "grid",
+            "gap": 8
+          },
+          "focusable": false,
+          "accessibility": "group"
+        },
+        {
+          "id": "ShellView.spacer",
+          "kind": "spacer",
+          "parent": "ShellView.panel",
+          "binding": "layout.spacer",
+          "layout": {
+            "kind": "flex",
+            "order": 900
+          },
+          "focusable": false,
+          "accessibility": "presentation"
+        },
+        {
+          "id": "ShellView.divider",
+          "kind": "divider",
+          "parent": "ShellView.panel",
+          "binding": "layout.divider",
+          "layout": {
+            "kind": "row",
+            "order": 901
+          },
+          "focusable": false,
+          "accessibility": "separator"
+        },
+        {
+          "id": "ShellView.binding.labelText",
+          "kind": "label",
+          "parent": "ShellView.panel",
+          "binding": "state.label",
+          "layout": {
+            "kind": "grid",
+            "order": 1,
+            "min": 1,
+            "preferred": 1
+          },
+          "focusable": false,
+          "accessibility": "label"
+        },
+        {
+          "id": "ShellView.binding.toggles",
+          "kind": "text",
+          "parent": "ShellView.panel",
+          "binding": "state.toggles",
+          "layout": {
+            "kind": "grid",
+            "order": 2,
+            "min": 1,
+            "preferred": 1
+          },
+          "focusable": false,
+          "accessibility": "text"
+        },
+        {
+          "id": "ShellView.event.compound",
+          "kind": "button",
+          "parent": "ShellView.panel",
+          "binding": "command.compound",
+          "event": "compound",
+          "command": "compound",
+          "layout": {
+            "kind": "row",
+            "order": 100
+          },
+          "focusable": true,
+          "accessibility": "button"
+        },
+        {
+          "id": "ShellView.event.copy",
+          "kind": "button",
+          "parent": "ShellView.panel",
+          "binding": "command.copy",
+          "event": "copy",
+          "command": "copy",
+          "layout": {
+            "kind": "row",
+            "order": 101
+          },
+          "focusable": true,
+          "accessibility": "button"
+        },
+        {
+          "id": "ShellView.event.copyAfterToggle",
+          "kind": "button",
+          "parent": "ShellView.panel",
+          "binding": "command.copyAfterToggle",
+          "event": "copyAfterToggle",
+          "command": "copyAfterToggle",
+          "layout": {
+            "kind": "row",
+            "order": 102
+          },
+          "focusable": true,
+          "accessibility": "button"
+        },
+        {
+          "id": "ShellView.event.rename",
+          "kind": "button",
+          "parent": "ShellView.panel",
+          "binding": "command.rename",
+          "event": "rename",
+          "command": "rename",
+          "layout": {
+            "kind": "row",
+            "order": 103
+          },
+          "focusable": true,
+          "accessibility": "button"
+        },
+        {
+          "id": "ShellView.event.reset",
+          "kind": "button",
+          "parent": "ShellView.panel",
+          "binding": "command.decrement",
+          "event": "reset",
+          "command": "decrement",
+          "layout": {
+            "kind": "row",
+            "order": 104
+          },
+          "focusable": true,
+          "accessibility": "button"
+        },
+        {
+          "id": "ShellView.event.submit",
+          "kind": "dialog",
+          "parent": "ShellView.panel",
+          "binding": "command.toggle",
+          "event": "submit",
+          "command": "toggle",
+          "layout": {
+            "kind": "row",
+            "order": 105
+          },
+          "focusable": true,
+          "accessibility": "button"
+        }
+      ],
+      "layouts": [
+        {
+          "kind": "stack",
+          "mode": "root"
+        },
+        {
+          "kind": "row",
+          "gap": 8
+        },
+        {
+          "kind": "column",
+          "gap": 8
+        },
+        {
+          "kind": "grid",
+          "gap": 8
+        },
+        {
+          "kind": "flex",
+          "min": 1,
+          "max": 1,
+          "preferred": 1
+        },
+        {
+          "kind": "overflow-scroll",
+          "overflow": "scroll"
+        }
+      ],
+      "styles": [
+        {
+          "name": "accent",
+          "type": "str",
+          "value": "\"amber\""
+        },
+        {
+          "name": "width",
+          "type": "i32",
+          "value": "80"
+        }
+      ],
+      "accessibility": [
+        {
+          "name": "description",
+          "type": "str",
+          "value": "\"Native shell preview\""
+        },
+        {
+          "name": "role",
+          "type": "str",
+          "value": "\"status\""
+        }
+      ],
+      "events": [
+        {
+          "name": "compound",
+          "command": "compound"
+        },
+        {
+          "name": "copy",
+          "command": "copy"
+        },
+        {
+          "name": "copyAfterToggle",
+          "command": "copyAfterToggle"
+        },
+        {
+          "name": "rename",
+          "command": "rename"
+        },
+        {
+          "name": "reset",
+          "command": "decrement"
+        },
+        {
+          "name": "submit",
+          "command": "toggle"
+        }
+      ],
+      "commands": [
+        {
+          "name": "compound",
+          "statement_count": 2,
+          "operations": [
+            {
+              "kind": "state_add",
+              "target": "state.toggles",
+              "value": "3"
+            },
+            {
+              "kind": "state_sub",
+              "target": "state.toggles",
+              "value": "1"
+            }
+          ]
+        },
+        {
+          "name": "copy",
+          "statement_count": 1,
+          "operations": [
+            {
+              "kind": "state_set",
+              "target": "state.label",
+              "value": "state.textSource"
+            }
+          ]
+        },
+        {
+          "name": "copyAfterToggle",
+          "statement_count": 2,
+          "operations": [
+            {
+              "kind": "state_add",
+              "target": "state.toggles",
+              "value": "2"
+            },
+            {
+              "kind": "state_set",
+              "target": "state.source",
+              "value": "state.toggles"
+            }
+          ]
+        },
+        {
+          "name": "decrement",
+          "statement_count": 1,
+          "operations": [
+            {
+              "kind": "state_sub",
+              "target": "state.toggles",
+              "value": "1"
+            }
+          ]
+        },
+        {
+          "name": "rename",
+          "statement_count": 1,
+          "operations": [
+            {
+              "kind": "state_set",
+              "target": "state.label",
+              "value": "\"Native shell renamed\""
+            }
+          ]
+        },
+        {
+          "name": "toggle",
+          "statement_count": 1,
+          "operations": [
+            {
+              "kind": "state_add",
+              "target": "state.toggles",
+              "value": "1"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

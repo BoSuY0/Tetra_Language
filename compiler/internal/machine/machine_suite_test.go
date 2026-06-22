@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 	"tetra_language/compiler/internal/ir"
+	"tetra_language/compiler/internal/runtimeabi"
 )
 
 // ---- ir_test.go ----
@@ -3076,7 +3077,7 @@ func TestActorPingPongRuntimeCallPlanFromStackIRRejectsNearMisses(t *testing.T) 
 			name: "main_recv_multi_slot",
 			fn: func() ir.IRFunc {
 				fn := actorPingPongMainStackIRFunc()
-				fn.Instrs[8] = ir.IRInstr{
+				fn.Instrs[9] = ir.IRInstr{
 					Kind:     ir.IRCall,
 					Name:     "__tetra_actor_recv_msg",
 					ArgSlots: 0,
@@ -3097,7 +3098,7 @@ func TestActorPingPongRuntimeCallPlanFromStackIRRejectsNearMisses(t *testing.T) 
 			name: "main_different_compare_literal",
 			fn: func() ir.IRFunc {
 				fn := actorPingPongMainStackIRFunc()
-				fn.Instrs[10].Imm = 43
+				fn.Instrs[12].Imm = 43
 				return fn
 			},
 		},
@@ -4950,6 +4951,7 @@ func parallelMapReduceMainStackIRFunc() ir.IRFunc {
 }
 
 func actorPingPongPongStackIRFunc() ir.IRFunc {
+	actorSlots := runtimeabi.ActorHandleABI().RefSlots
 	return ir.IRFunc{
 		Name:        "pong",
 		LocalSlots:  2,
@@ -4961,9 +4963,9 @@ func actorPingPongPongStackIRFunc() ir.IRFunc {
 			{Kind: ir.IRConstI32, Imm: 41},
 			{Kind: ir.IRCmpEqI32},
 			{Kind: ir.IRJmpIfZero, Label: 1},
-			{Kind: ir.IRCall, Name: "__tetra_actor_sender", ArgSlots: 0, RetSlots: 1},
+			{Kind: ir.IRCall, Name: "__tetra_actor_sender", ArgSlots: 0, RetSlots: actorSlots},
 			{Kind: ir.IRConstI32, Imm: 42},
-			{Kind: ir.IRCall, Name: "__tetra_actor_send", ArgSlots: 2, RetSlots: 1},
+			{Kind: ir.IRCall, Name: "__tetra_actor_send", ArgSlots: actorSlots + 1, RetSlots: 1},
 			{Kind: ir.IRStoreLocal, Local: 1},
 			{Kind: ir.IRConstI32, Imm: 0},
 			{Kind: ir.IRReturn},
@@ -4975,21 +4977,24 @@ func actorPingPongPongStackIRFunc() ir.IRFunc {
 }
 
 func actorPingPongMainStackIRFunc() ir.IRFunc {
+	actorSlots := runtimeabi.ActorHandleABI().RefSlots
 	return ir.IRFunc{
 		Name:        "main",
-		LocalSlots:  3,
+		LocalSlots:  4,
 		ReturnSlots: 1,
 		Instrs: []ir.IRInstr{
 			{Kind: ir.IRConstI32, Imm: actorPingPongEntryIDForTest("pong")},
-			{Kind: ir.IRCall, Name: "__tetra_actor_spawn", ArgSlots: 1, RetSlots: 1},
+			{Kind: ir.IRCall, Name: "__tetra_actor_spawn", ArgSlots: 1, RetSlots: actorSlots},
+			{Kind: ir.IRStoreLocal, Local: 1},
 			{Kind: ir.IRStoreLocal, Local: 0},
 			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRLoadLocal, Local: 1},
 			{Kind: ir.IRConstI32, Imm: 41},
-			{Kind: ir.IRCall, Name: "__tetra_actor_send", ArgSlots: 2, RetSlots: 1},
-			{Kind: ir.IRStoreLocal, Local: 1},
-			{Kind: ir.IRCall, Name: "__tetra_actor_recv", ArgSlots: 0, RetSlots: 1},
+			{Kind: ir.IRCall, Name: "__tetra_actor_send", ArgSlots: actorSlots + 1, RetSlots: 1},
 			{Kind: ir.IRStoreLocal, Local: 2},
-			{Kind: ir.IRLoadLocal, Local: 2},
+			{Kind: ir.IRCall, Name: "__tetra_actor_recv", ArgSlots: 0, RetSlots: 1},
+			{Kind: ir.IRStoreLocal, Local: 3},
+			{Kind: ir.IRLoadLocal, Local: 3},
 			{Kind: ir.IRConstI32, Imm: 42},
 			{Kind: ir.IRCmpEqI32},
 			{Kind: ir.IRJmpIfZero, Label: 1},

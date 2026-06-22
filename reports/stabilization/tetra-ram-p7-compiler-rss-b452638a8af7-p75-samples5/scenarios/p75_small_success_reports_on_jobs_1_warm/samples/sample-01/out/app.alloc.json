@@ -1,0 +1,29 @@
+{
+  "schema_version": 2,
+  "kind": "allocation_plan",
+  "target": "linux-x64",
+  "target_memory_claim_level": "production/host_runtime",
+  "storage_evidence_scope": "host_runtime_verified",
+  "summary": {
+    "allocation_count": 0,
+    "storage_classes": {},
+    "actual_lowering_storage_classes": {},
+    "runtime_paths": {},
+    "bytes_requested": 0,
+    "bytes_reserved": 0
+  },
+  "totals": {
+    "eliminated": 0,
+    "register": 0,
+    "stack": 0,
+    "region": 0,
+    "function_temp_region": 0,
+    "explicit_island": 0,
+    "task_region": 0,
+    "actor_move_region": 0,
+    "heap": 0,
+    "mmap_large": 0,
+    "external": 0,
+    "unknown": 0
+  }
+}

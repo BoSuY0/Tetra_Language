@@ -433,27 +433,27 @@ func validateMemory100RawMemoryContract(path string, gitHead string) []string {
 		}
 		switch name {
 		case "core.alloc_bytes":
-			issues = append(issues, requireMemory100RawEvidence(name, "source_artifacts", operation.SourceArtifacts, "compiler/internal/runtimeabi/raw_pointer_bounds_test.go")...)
+			issues = append(issues, requireMemory100RawEvidence(name, "source_artifacts", operation.SourceArtifacts, "compiler/internal/runtimeabi/runtimeabi_test/raw_pointer_bounds_test.go")...)
 			issues = append(issues, requireMemory100RawEvidence(name, "positive_tests", operation.PositiveTests, "allocation-base metadata")...)
 		case "core.ptr_add":
-			issues = append(issues, requireMemory100RawEvidence(name, "source_artifacts", operation.SourceArtifacts, "compiler/internal/runtimeabi/raw_pointer_bounds_test.go")...)
+			issues = append(issues, requireMemory100RawEvidence(name, "source_artifacts", operation.SourceArtifacts, "compiler/internal/runtimeabi/runtimeabi_test/raw_pointer_bounds_test.go")...)
 			issues = append(issues, requireMemory100RawEvidence(name, "negative_tests", operation.NegativeTests, "negative offset", "upper bound", "access-width overflow")...)
 		case "raw_slice_from_parts":
-			issues = append(issues, requireMemory100RawEvidence(name, "source_artifacts", operation.SourceArtifacts, "compiler/internal/runtimeabi/raw_pointer_bounds_test.go", "compiler/tests/semantics/memory_ideal_v5_raw_pointer_test.go")...)
+			issues = append(issues, requireMemory100RawEvidence(name, "source_artifacts", operation.SourceArtifacts, "compiler/internal/runtimeabi/runtimeabi_test/raw_pointer_bounds_test.go", "compiler/tests/semantics/semantics_memory_surface_test.go")...)
 			issues = append(issues, requireMemory100RawEvidence(name, "negative_tests", operation.NegativeTests, "outside unsafe", "negative length", "i32 byte overflow")...)
 		case "raw_load_store_metadata":
-			issues = append(issues, requireMemory100RawEvidence(name, "source_artifacts", operation.SourceArtifacts, "compiler/internal/plir/plir_test.go", "compiler/internal/lower/raw_memory_test.go", "compiler/internal/memoryfacts/from_plir_test.go")...)
+			issues = append(issues, requireMemory100RawEvidence(name, "source_artifacts", operation.SourceArtifacts, "compiler/internal/plir/plir_test/plir_test.go", "compiler/internal/lower/lower_suite_test.go", "compiler/internal/memoryfacts_test/from_plir_test.go")...)
 			issues = append(issues, requireMemory100RawEvidence(name, "positive_tests", operation.PositiveTests, "IRMemWriteI32Offset", "IRMemReadI32Offset", "raw memory gateway", "UnsafeChecked")...)
 			issues = append(issues, requireMemory100RawEvidence(name, "negative_tests", operation.NegativeTests, "checked_external_unknown", "rejected_access_width_overflow")...)
 		case "memcpy_u8":
-			issues = append(issues, requireMemory100RawEvidence(name, "source_artifacts", operation.SourceArtifacts, "lib/core/memory.tetra")...)
+			issues = append(issues, requireMemory100RawEvidence(name, "source_artifacts", operation.SourceArtifacts, "lib/core/memory/memory.tetra")...)
 			issues = append(issues, requireMemory100RawEvidence(name, "negative_tests", operation.NegativeTests, "negative length", "access-width overflow")...)
 			issues = append(issues, requireMemory100RawEvidence(name, "non_claims", operation.NonClaims, "overlapping memcpy")...)
 		case "memset_u8":
-			issues = append(issues, requireMemory100RawEvidence(name, "source_artifacts", operation.SourceArtifacts, "lib/core/memory.tetra")...)
+			issues = append(issues, requireMemory100RawEvidence(name, "source_artifacts", operation.SourceArtifacts, "lib/core/memory/memory.tetra")...)
 			issues = append(issues, requireMemory100RawEvidence(name, "negative_tests", operation.NegativeTests, "negative length", "access-width overflow")...)
 		case "cap.mem":
-			issues = append(issues, requireMemory100RawEvidence(name, "source_artifacts", operation.SourceArtifacts, "lib/core/capability.tetra")...)
+			issues = append(issues, requireMemory100RawEvidence(name, "source_artifacts", operation.SourceArtifacts, "lib/core/base/capability.tetra")...)
 			issues = append(issues, requireMemory100RawEvidence(name, "negative_tests", operation.NegativeTests, "unsafe_unknown", "overclaim")...)
 			issues = append(issues, requireMemory100RawEvidence(name, "non_claims", operation.NonClaims, "no arbitrary external pointer safety claim")...)
 		}

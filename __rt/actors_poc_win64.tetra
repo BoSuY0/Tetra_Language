@@ -52,6 +52,12 @@ var g_pending_recv: i32
 var g_main_exit: i32
 var g_pong_exit: i32
 
+func actor_ref_slot(ref: actor) -> i32:
+    var slot: i32 = 0
+    unsafe:
+        slot = core.actor_ref_slot(ref)
+    return slot
+
 func actor_slot(idx: i32) -> ptr:
     if idx == 0:
         return g_main_slot
@@ -291,31 +297,33 @@ func tetra_entry() -> i32:
     return 1
 
 @export("__tetra_actor_spawn")
-func actor_spawn(entry_id: i32) -> i32:
+func actor_spawn(entry_id: i32) -> actor:
     unsafe:
         if g_pong_spawned == 1:
-            return 1
+            return core.actor_ref_local(1, 1)
         g_pong_entry_id = entry_id
         g_pong_slot = core.alloc_bytes(8)
         var _ps: ptr = build_actor_stack(g_pong_slot)
         g_pong_status = STATUS_READY
         g_pong_spawned = 1
-        return 1
-    return 1
+        return core.actor_ref_local(1, 1)
 
 @export("__tetra_actor_send")
-func actor_send(to: i32, v: i32) -> i32:
-    var _ok: i32 = mailbox_put(to, v, 0, g_current)
+func actor_send(to: actor, v: i32) -> i32:
+    var slot: i32 = actor_ref_slot(to)
+    var _ok: i32 = mailbox_put(slot, v, 0, g_current)
     return v
 
 @export("__tetra_actor_send_msg")
-func actor_send_msg(to: i32, v: i32, tag: i32) -> i32:
-    var _ok: i32 = mailbox_put(to, v, tag, g_current)
+func actor_send_msg(to: actor, v: i32, tag: i32) -> i32:
+    var slot: i32 = actor_ref_slot(to)
+    var _ok: i32 = mailbox_put(slot, v, tag, g_current)
     return v
 
 @export("__tetra_actor_send_begin")
-func actor_send_begin(to: i32, tag: i32, slot_count: i32) -> i32:
-    return mailbox_begin_typed(to, tag, slot_count, g_current)
+func actor_send_begin(to: actor, tag: i32, slot_count: i32) -> i32:
+    var slot: i32 = actor_ref_slot(to)
+    return mailbox_begin_typed(slot, tag, slot_count, g_current)
 
 @export("__tetra_actor_send_slot")
 func actor_send_slot(index: i32, value: i32) -> i32:
@@ -395,12 +403,14 @@ func actor_recv_count() -> i32:
     return mailbox_take_count(g_pending_recv)
 
 @export("__tetra_actor_self")
-func actor_self() -> i32:
-    return g_current
+func actor_self() -> actor:
+    unsafe:
+        return core.actor_ref_local(g_current, 1)
 
 @export("__tetra_actor_sender")
-func actor_sender() -> i32:
-    return mailbox_last_sender(g_current)
+func actor_sender() -> actor:
+    unsafe:
+        return core.actor_ref_local(mailbox_last_sender(g_current), 1)
 
 @export("__tetra_actor_yield_now")
 func actor_yield_now() -> i32:

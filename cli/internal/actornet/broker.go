@@ -187,6 +187,7 @@ func (b *Broker) handleConn(conn net.Conn) {
 				DestNodeID:   frame.SourceNodeID,
 				SequenceID:   frame.SequenceID,
 				Status:       actorwire.StatusOK,
+				Payload:      []int32{1},
 			})
 			continue
 		}

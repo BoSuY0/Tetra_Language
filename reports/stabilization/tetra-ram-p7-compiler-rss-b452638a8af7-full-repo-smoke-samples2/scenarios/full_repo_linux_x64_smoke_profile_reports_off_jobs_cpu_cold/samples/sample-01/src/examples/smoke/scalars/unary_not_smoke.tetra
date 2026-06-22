@@ -1,0 +1,5 @@
+func main() -> Int:
+    let off: Bool = false
+    if !off && !0:
+        return 42
+    return 1

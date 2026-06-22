@@ -288,6 +288,30 @@ func (a *SysVUnix) EmitAllocBytes(
 	return nil
 }
 
+func (a *SysVUnix) EmitReleaseAllocation(
+	e *x64.Emitter,
+	stackDepth *int,
+	opt x64.CodegenOptions,
+	importPatches *[]x64obj.ImportPatch,
+) error {
+	_ = opt
+	_ = importPatches
+	if stackDepth == nil {
+		return fmt.Errorf("internal error: missing stackDepth")
+	}
+	if *stackDepth < 1 {
+		return fmt.Errorf("stack underflow in release_allocation")
+	}
+	*stackDepth--
+	e.PopRdi()
+	e.MovEsiFromRdiDisp(-8)
+	e.AddRsiImm32(8)
+	e.AddRdiImm32(-8)
+	e.MovEaxImm32(a.SysMunmap)
+	e.Syscall()
+	return nil
+}
+
 func (a *SysVUnix) EmitMakeSlice(
 	e *x64.Emitter,
 	kind ir.IRInstrKind,

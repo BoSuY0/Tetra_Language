@@ -430,9 +430,9 @@ func memory100ArtifactJSON(kind string, schema string, gitHead string) map[strin
 					"baseline_value":    100,
 					"measured_value":    50,
 					"improvement_ratio": 2.0,
-					"evidence": ("allocation report schema v2 estimates per_core_small_heap " +
+					"evidence": ("allocation report schema v2 estimates process_bump_small_heap_v0 " +
 						"allocation intents and 64KiB chunk refill syscalls; allocation_report_" +
-						"estimate only, not a runtime measurement"),
+						"estimate only, not a runtime measurement or reuse claim"),
 					"ran":  true,
 					"pass": true,
 				},

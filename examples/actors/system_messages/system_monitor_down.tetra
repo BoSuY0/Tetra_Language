@@ -1,0 +1,30 @@
+module examples.actors.system_messages.system_monitor_down
+
+import lib.core.actors as actors
+
+func score_system(result: actors.SystemReceiveResult) -> Int:
+    match result:
+    case actors.SystemReceiveResult.message(message):
+        match message:
+        case actors.SystemMessage.exit(exit_peer, exit_reason):
+            return 10
+        case actors.SystemMessage.down(down_monitor, down_peer, down_reason):
+            return 0
+        case actors.SystemMessage.node_down(down_node, node_reason):
+            return 20
+    case actors.SystemReceiveResult.empty:
+        return 0
+    case actors.SystemReceiveResult.timeout:
+        return 2
+    case actors.SystemReceiveResult.canceled:
+        return 3
+    case actors.SystemReceiveResult.runtime_closed:
+        return 4
+    case actors.SystemReceiveResult.invalid_state(code):
+        return 100 + code
+
+func main() -> Int
+uses actors, runtime:
+    let monitor: actor.monitor = core.actor_monitor(core.self())
+    let _removed: Int = core.actor_demonitor(monitor)
+    return score_system(actors.poll_system())

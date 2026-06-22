@@ -722,9 +722,9 @@ func requiredPassingBenchmarks() []memoryprod.BenchmarkReport {
 		BaselineValue:    64,
 		MeasuredValue:    1,
 		ImprovementRatio: 64,
-		Evidence: ("allocation report schema v2 estimates 64 per_core_small_heap " +
+		Evidence: ("allocation report schema v2 estimates 64 process_bump_small_heap_v0 " +
 			"allocation intents inside one 64KiB chunk refill; allocation_report_" +
-			"estimate only, not a runtime measurement"),
+			"estimate only, not a runtime measurement or reuse claim"),
 		Ran:  true,
 		Pass: true,
 	}}

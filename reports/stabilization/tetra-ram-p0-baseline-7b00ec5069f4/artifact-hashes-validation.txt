@@ -1,0 +1,3 @@
+validator: validate-artifact-hashes
+manifest: artifact-hashes.json
+result: pass

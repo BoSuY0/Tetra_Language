@@ -1,0 +1,11 @@
+struct Vec2:
+    x: Int
+    y: Int
+
+extension Vec2:
+    func sum(self: Vec2) -> Int:
+        return self.x + self.y
+
+func main() -> Int:
+    let v: Vec2 = Vec2(x: 40, y: 2)
+    return Vec2.sum(v)

@@ -10,7 +10,9 @@ import (
 
 const (
 	Schema                        = "tetra.runtime.heap_telemetry.v1"
+	SchemaV2                      = "tetra.runtime.heap_telemetry.v2"
 	MethodLinuxX64HeapTelemetryV1 = "tetra_linux_x64_heap_telemetry_v1"
+	MethodLinuxX64HeapTelemetryV2 = "tetra_linux_x64_heap_telemetry_v2"
 	TargetLinuxX64                = "linux-x64"
 )
 
@@ -32,6 +34,23 @@ type Sample struct {
 	AllocationPaths     map[string]uint64 `json:"allocation_paths,omitempty"`
 	DomainBytes         []DomainBytes     `json:"domain_bytes,omitempty"`
 	Notes               []string          `json:"notes,omitempty"`
+
+	AllocatorMode                    string            `json:"allocator_mode,omitempty"`
+	AllocatorStateScope              string            `json:"allocator_state_scope,omitempty"`
+	AllocatorClaims                  []string          `json:"allocator_claims,omitempty"`
+	SuccessfulAllocPayloadBytes      *uint64           `json:"successful_alloc_payload_bytes,omitempty"`
+	SuccessfulDropPayloadBytes       *uint64           `json:"successful_drop_payload_bytes,omitempty"`
+	PayloadTransferCurrentDeltaBytes int64             `json:"payload_transfer_current_delta_bytes,omitempty"`
+	PayloadLiveCurrentBytes          *uint64           `json:"payload_live_current_bytes,omitempty"`
+	FreeCount                        uint64            `json:"free_count,omitempty"`
+	ReuseCount                       uint64            `json:"reuse_count,omitempty"`
+	ReleasedTotalBytes               *uint64           `json:"released_total_bytes,omitempty"`
+	OSReleaseAttemptCount            *uint64           `json:"os_release_attempt_count,omitempty"`
+	OSReleaseSuccessCount            *uint64           `json:"os_release_success_count,omitempty"`
+	OSReleaseSuccessBytes            *uint64           `json:"os_release_success_bytes,omitempty"`
+	MetricSources                    map[string]string `json:"metric_sources,omitempty"`
+	UnsupportedMetrics               []string          `json:"unsupported_metrics,omitempty"`
+	NotSampledMetrics                []string          `json:"not_sampled_metrics,omitempty"`
 }
 
 type DomainBytes struct {
@@ -45,6 +64,10 @@ type DomainBytes struct {
 	BytesCopied          uint64 `json:"bytes_copied,omitempty"`
 	MailboxCurrentBytes  uint64 `json:"mailbox_current_bytes,omitempty"`
 	MailboxPeakBytes     uint64 `json:"mailbox_peak_bytes,omitempty"`
+	StackLiveBytes       uint64 `json:"stack_live_bytes,omitempty"`
+	StackReservedBytes   uint64 `json:"stack_reserved_bytes,omitempty"`
+	StackRetainedBytes   uint64 `json:"stack_retained_bytes,omitempty"`
+	StackReleasedBytes   uint64 `json:"stack_released_bytes,omitempty"`
 	ByteBudget           uint64 `json:"byte_budget,omitempty"`
 	OverBudgetCount      uint64 `json:"over_budget_count,omitempty"`
 	BackpressureEvents   uint64 `json:"backpressure_events,omitempty"`
@@ -64,10 +87,15 @@ func (d *DomainBytes) UnmarshalJSON(data []byte) error {
 	}
 	_, hasMailboxCurrent := raw["mailbox_current_bytes"]
 	_, hasMailboxPeak := raw["mailbox_peak_bytes"]
+	_, hasStackLive := raw["stack_live_bytes"]
+	_, hasStackReserved := raw["stack_reserved_bytes"]
+	_, hasStackRetained := raw["stack_retained_bytes"]
+	_, hasStackReleased := raw["stack_released_bytes"]
 	_, hasByteBudget := raw["byte_budget"]
 	_, hasOverBudget := raw["over_budget_count"]
 	_, hasBackpressure := raw["backpressure_events"]
 	d.ActorDomainFieldsSet = hasMailboxCurrent && hasMailboxPeak &&
+		hasStackLive && hasStackReserved && hasStackRetained && hasStackReleased &&
 		hasByteBudget && hasOverBudget && hasBackpressure
 	return nil
 }
@@ -91,18 +119,33 @@ func ReadFile(path string, artifactRoot string) (Sample, error) {
 }
 
 func Validate(sample Sample) error {
-	if sample.Schema != Schema {
-		return fmt.Errorf("heap telemetry schema = %q, want %q", sample.Schema, Schema)
+	switch sample.Schema {
+	case Schema:
+		if sample.Method != MethodLinuxX64HeapTelemetryV1 {
+			return fmt.Errorf(
+				"heap telemetry method = %q, want %q",
+				sample.Method,
+				MethodLinuxX64HeapTelemetryV1,
+			)
+		}
+	case SchemaV2:
+		if sample.Method != MethodLinuxX64HeapTelemetryV2 {
+			return fmt.Errorf(
+				"heap telemetry method = %q, want %q",
+				sample.Method,
+				MethodLinuxX64HeapTelemetryV2,
+			)
+		}
+	default:
+		return fmt.Errorf(
+			"heap telemetry schema = %q, want %q or %q",
+			sample.Schema,
+			Schema,
+			SchemaV2,
+		)
 	}
 	if sample.Target != TargetLinuxX64 {
 		return fmt.Errorf("heap telemetry target = %q, want %q", sample.Target, TargetLinuxX64)
-	}
-	if sample.Method != MethodLinuxX64HeapTelemetryV1 {
-		return fmt.Errorf(
-			"heap telemetry method = %q, want %q",
-			sample.Method,
-			MethodLinuxX64HeapTelemetryV1,
-		)
 	}
 	if strings.TrimSpace(sample.Program) == "" {
 		return fmt.Errorf("heap telemetry program is required")
@@ -167,8 +210,9 @@ func Validate(sample Sample) error {
 			if !domain.ActorDomainFieldsSet {
 				return fmt.Errorf(
 					("heap telemetry domain_bytes[%d] actor domain missing " +
-						"mailbox_current_bytes/mailbox_peak_bytes/byte_budget/" +
-						"over_budget_count/backpressure_events"),
+						"mailbox_current_bytes/mailbox_peak_bytes/stack_live_bytes/" +
+						"stack_reserved_bytes/stack_retained_bytes/stack_released_bytes/" +
+						"byte_budget/over_budget_count/backpressure_events"),
 					i,
 				)
 			}
@@ -181,24 +225,65 @@ func Validate(sample Sample) error {
 					domain.MailboxCurrentBytes,
 				)
 			}
-			if domain.CurrentBytes != domain.MailboxCurrentBytes {
+			if domain.StackReservedBytes < domain.StackLiveBytes {
 				return fmt.Errorf(
-					"heap telemetry domain_bytes[%d] current_bytes = %d, want mailbox_current_bytes %d",
+					("heap telemetry domain_bytes[%d] stack_reserved_bytes = %d below " +
+						"stack_live_bytes = %d"),
 					i,
-					domain.CurrentBytes,
-					domain.MailboxCurrentBytes,
+					domain.StackReservedBytes,
+					domain.StackLiveBytes,
 				)
 			}
-			if domain.PeakBytes != domain.MailboxPeakBytes {
+			if domain.StackReservedBytes < domain.StackRetainedBytes {
 				return fmt.Errorf(
-					"heap telemetry domain_bytes[%d] peak_bytes = %d, want mailbox_peak_bytes %d",
+					("heap telemetry domain_bytes[%d] stack_reserved_bytes = %d below " +
+						"stack_retained_bytes = %d"),
+					i,
+					domain.StackReservedBytes,
+					domain.StackRetainedBytes,
+				)
+			}
+			stackAccounted, ok := checkedAddUint64(domain.StackLiveBytes, domain.StackRetainedBytes)
+			if !ok || stackAccounted > domain.StackReservedBytes {
+				return fmt.Errorf(
+					("heap telemetry domain_bytes[%d] stack_live_bytes + " +
+						"stack_retained_bytes exceeds stack_reserved_bytes"),
+					i,
+				)
+			}
+			expectedCurrent, ok := checkedAddUint64(
+				domain.MailboxCurrentBytes,
+				domain.StackLiveBytes,
+			)
+			if !ok || domain.CurrentBytes != expectedCurrent {
+				return fmt.Errorf(
+					("heap telemetry domain_bytes[%d] current_bytes = %d, want " +
+						"mailbox_current_bytes + stack_live_bytes %d"),
+					i,
+					domain.CurrentBytes,
+					expectedCurrent,
+				)
+			}
+			minPeak, ok := checkedAddUint64(domain.MailboxPeakBytes, domain.StackReservedBytes)
+			if !ok || domain.PeakBytes < minPeak {
+				return fmt.Errorf(
+					("heap telemetry domain_bytes[%d] peak_bytes = %d below " +
+						"mailbox_peak_bytes + stack_reserved_bytes %d"),
 					i,
 					domain.PeakBytes,
-					domain.MailboxPeakBytes,
+					minPeak,
 				)
 			}
 			if domain.ByteBudget == 0 {
 				return fmt.Errorf("heap telemetry domain_bytes[%d] byte_budget is required", i)
+			}
+			if domain.ByteBudget < domain.StackReservedBytes {
+				return fmt.Errorf(
+					"heap telemetry domain_bytes[%d] byte_budget = %d below stack_reserved_bytes %d",
+					i,
+					domain.ByteBudget,
+					domain.StackReservedBytes,
+				)
 			}
 			if domain.OverBudgetCount > domain.BackpressureEvents {
 				return fmt.Errorf(
@@ -211,7 +296,159 @@ func Validate(sample Sample) error {
 			}
 		}
 	}
+	if sample.Schema == SchemaV2 {
+		if err := validateV2(sample); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+func checkedAddUint64(a uint64, b uint64) (uint64, bool) {
+	if a > ^uint64(0)-b {
+		return 0, false
+	}
+	return a + b, true
+}
+
+func validateV2(sample Sample) error {
+	if strings.TrimSpace(sample.AllocatorMode) == "" {
+		return fmt.Errorf("heap telemetry v2 allocator_mode is required")
+	}
+	if strings.TrimSpace(sample.AllocatorStateScope) == "" {
+		return fmt.Errorf("heap telemetry v2 allocator_state_scope is required")
+	}
+	if perCoreClaimed(sample) && sample.AllocatorStateScope == "process" {
+		return fmt.Errorf(
+			"heap telemetry v2 per_core allocator claim contradicts process allocator_state_scope",
+		)
+	}
+	if err := validateMetricAbsence(sample); err != nil {
+		return err
+	}
+	if err := requireRuntimeMeasuredSource(sample, "payload_live_current_bytes"); err != nil {
+		return err
+	}
+	if err := requireRuntimeMeasuredSource(sample, "released_total_bytes"); err != nil {
+		return err
+	}
+	if sample.PayloadLiveCurrentBytes == nil {
+		return fmt.Errorf("heap telemetry v2 payload_live_current_bytes is required")
+	}
+	if sample.SuccessfulAllocPayloadBytes == nil {
+		return fmt.Errorf("heap telemetry v2 successful_alloc_payload_bytes is required")
+	}
+	if sample.SuccessfulDropPayloadBytes == nil {
+		return fmt.Errorf("heap telemetry v2 successful_drop_payload_bytes is required")
+	}
+	expectedLive := int64(*sample.SuccessfulAllocPayloadBytes) -
+		int64(*sample.SuccessfulDropPayloadBytes) +
+		sample.PayloadTransferCurrentDeltaBytes
+	if expectedLive < 0 {
+		return fmt.Errorf("heap telemetry v2 payload lifecycle counters reconcile below zero")
+	}
+	if *sample.PayloadLiveCurrentBytes != uint64(expectedLive) {
+		return fmt.Errorf(
+			("heap telemetry v2 payload_live_current_bytes = %d, want successful_alloc_payload_bytes " +
+				"- successful_drop_payload_bytes + payload_transfer_current_delta_bytes = %d"),
+			*sample.PayloadLiveCurrentBytes,
+			expectedLive,
+		)
+	}
+	if sample.ReleasedTotalBytes != nil && *sample.ReleasedTotalBytes > 0 {
+		if sample.OSReleaseSuccessCount == nil || *sample.OSReleaseSuccessCount == 0 {
+			return fmt.Errorf(
+				"heap telemetry v2 released_total_bytes = %d but os_release_success_count is zero or absent",
+				*sample.ReleasedTotalBytes,
+			)
+		}
+		if sample.OSReleaseSuccessBytes == nil || *sample.OSReleaseSuccessBytes < *sample.ReleasedTotalBytes {
+			return fmt.Errorf(
+				"heap telemetry v2 released_total_bytes = %d exceeds os_release_success_bytes",
+				*sample.ReleasedTotalBytes,
+			)
+		}
+	}
+	if sample.OSReleaseAttemptCount != nil && sample.OSReleaseSuccessCount != nil &&
+		*sample.OSReleaseSuccessCount > *sample.OSReleaseAttemptCount {
+		return fmt.Errorf(
+			"heap telemetry v2 os_release_success_count = %d above os_release_attempt_count = %d",
+			*sample.OSReleaseSuccessCount,
+			*sample.OSReleaseAttemptCount,
+		)
+	}
+	if sample.FreeCount > sample.HeapAllocationCount {
+		return fmt.Errorf(
+			"heap telemetry v2 free_count = %d above heap_allocation_count = %d",
+			sample.FreeCount,
+			sample.HeapAllocationCount,
+		)
+	}
+	return nil
+}
+
+func perCoreClaimed(sample Sample) bool {
+	if strings.Contains(strings.ToLower(sample.AllocatorMode), "per_core") {
+		return true
+	}
+	for _, claim := range sample.AllocatorClaims {
+		if strings.Contains(strings.ToLower(claim), "per_core") {
+			return true
+		}
+	}
+	return false
+}
+
+func validateMetricAbsence(sample Sample) error {
+	for _, metric := range append(sample.UnsupportedMetrics, sample.NotSampledMetrics...) {
+		if v2MetricPresent(sample, metric) {
+			return fmt.Errorf(
+				"heap telemetry v2 metric %q is marked unsupported/not sampled but has a numeric value",
+				metric,
+			)
+		}
+	}
+	return nil
+}
+
+func v2MetricPresent(sample Sample, metric string) bool {
+	switch metric {
+	case "payload_live_current_bytes":
+		return sample.PayloadLiveCurrentBytes != nil
+	case "successful_alloc_payload_bytes":
+		return sample.SuccessfulAllocPayloadBytes != nil
+	case "successful_drop_payload_bytes":
+		return sample.SuccessfulDropPayloadBytes != nil
+	case "released_total_bytes":
+		return sample.ReleasedTotalBytes != nil
+	case "os_release_attempt_count":
+		return sample.OSReleaseAttemptCount != nil
+	case "os_release_success_count":
+		return sample.OSReleaseSuccessCount != nil
+	case "os_release_success_bytes":
+		return sample.OSReleaseSuccessBytes != nil
+	default:
+		return false
+	}
+}
+
+func requireRuntimeMeasuredSource(sample Sample, metric string) error {
+	if !v2MetricPresent(sample, metric) {
+		return nil
+	}
+	source := strings.TrimSpace(sample.MetricSources[metric])
+	switch source {
+	case "runtime_measured", "os_measured":
+		return nil
+	case "":
+		return fmt.Errorf("heap telemetry v2 metric_sources[%q] is required", metric)
+	default:
+		return fmt.Errorf(
+			"heap telemetry v2 metric_sources[%q] = %q, want runtime_measured or os_measured",
+			metric,
+			source,
+		)
+	}
 }
 
 func requirePathInsideRoot(path string, artifactRoot string) error {

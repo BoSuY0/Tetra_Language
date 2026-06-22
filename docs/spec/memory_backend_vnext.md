@@ -81,8 +81,10 @@ process-RSS evidence.
   is unavailable at the current linear-memory boundary.
 
 The contract preserves existing allocation paths: `heap`,
-`per_core_small_heap`, `large_mmap`, `explicit_island`, `region`,
-`stack_frame`, and `eliminated`.
+`process_bump_small_heap_v0`, `large_mmap`, `explicit_island`,
+`scoped_single_mapping_v0`, `region`, `stack_frame`, and `eliminated`.
+`per_core_small_heap` remains model-only/future evidence until emitted runtime
+code has matching per-core state and reuse.
 
 ## Nonclaims
 

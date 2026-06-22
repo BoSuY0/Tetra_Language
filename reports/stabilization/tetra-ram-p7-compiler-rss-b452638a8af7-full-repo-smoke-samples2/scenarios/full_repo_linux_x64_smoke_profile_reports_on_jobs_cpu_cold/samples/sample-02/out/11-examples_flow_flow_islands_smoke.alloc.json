@@ -1,0 +1,151 @@
+{
+  "schema_version": 2,
+  "kind": "allocation_plan",
+  "target": "linux-x64",
+  "target_memory_claim_level": "production/host_runtime",
+  "storage_evidence_scope": "host_runtime_verified",
+  "summary": {
+    "allocation_count": 1,
+    "storage_classes": {
+      "ExplicitIsland": 1
+    },
+    "actual_lowering_storage_classes": {
+      "ExplicitIsland": 1
+    },
+    "runtime_paths": {
+      "explicit_island": 1
+    },
+    "allocator_classes": {
+      "region_bump_16": 1
+    },
+    "memory_backend_classes": {
+      "region": 1
+    },
+    "memory_backend_operations": {
+      "commit": 1,
+      "footprint": 1,
+      "release": 1,
+      "reserve": 1
+    },
+    "memory_backend_evidence_classes": {
+      "allocation_report_estimate": 1
+    },
+    "bytes_requested": 3,
+    "bytes_reserved": 16,
+    "bytes_committed": 16,
+    "bytes_released": 16,
+    "regions": [
+      {
+        "region_id": "island:isl",
+        "lifetime": "island:isl:scope",
+        "storage_class": "ExplicitIsland",
+        "runtime_path": "explicit_island",
+        "allocation_count": 1,
+        "bytes_requested": 3,
+        "bytes_reserved": 16
+      }
+    ],
+    "domains": [
+      {
+        "domain_id": "domain:island:isl",
+        "kind": "island",
+        "owner_kind": "island",
+        "owner_id": "isl",
+        "lifetime": "island:isl:scope",
+        "row_count": 1,
+        "budget_bytes": 3,
+        "requested_bytes": 3,
+        "reserved_bytes": 16,
+        "committed_bytes": 16,
+        "released_bytes": 16,
+        "current_bytes": 16,
+        "peak_bytes": 16
+      }
+    ]
+  },
+  "totals": {
+    "eliminated": 0,
+    "register": 0,
+    "stack": 0,
+    "region": 0,
+    "function_temp_region": 0,
+    "explicit_island": 1,
+    "task_region": 0,
+    "actor_move_region": 0,
+    "heap": 0,
+    "mmap_large": 0,
+    "external": 0,
+    "unknown": 0
+  },
+  "functions": [
+    {
+      "name": "main",
+      "allocations": [
+        {
+          "id": "msg",
+          "site_id": "allocsite:main:msg:_home_tetra_Desktop_Projects_Tetra_Language_reports_stabilization_tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2_scenarios_full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold_samples_sample-02_src_examples_flow_flow_islands_smoke.tetra_4_28",
+          "value_id": "alloc_intent:msg",
+          "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/flow/flow_islands_smoke.tetra:4:28",
+          "builtin": "core.island_make_u8",
+          "element_type": "u8",
+          "element_size": 1,
+          "length_expr": "3",
+          "length_status": "normal_allocation",
+          "zero_guard_status": "valid_empty_no_metadata_access",
+          "negative_guard_status": "reject_before_metadata_access",
+          "overflow_guard_status": "reject_before_metadata_access",
+          "byte_size": 3,
+          "escape": "NoEscape",
+          "storage": "ExplicitIsland",
+          "planned_storage": "ExplicitIsland",
+          "actual_lowering_storage": "ExplicitIsland",
+          "reason": "user-written island scope selects explicit region storage; explicit island allocation is bounded by the island scope; P5.2 region allocator uses aligned bump allocation with bulk free at island scope exit",
+          "validation_status": "validated_explicit_island_scope",
+          "lowering_status": "explicit_island_lowering",
+          "runtime_path": "explicit_island",
+          "allocator_class": "region_bump_16",
+          "memory_backend": {
+            "schema": "tetra.memory.backend-allocation.v1",
+            "backend_class": "region",
+            "adapter": "runtime.region_bump_v1",
+            "runtime_path": "explicit_island",
+            "operations": [
+              "reserve",
+              "commit",
+              "release",
+              "footprint"
+            ],
+            "evidence_class": "allocation_report_estimate",
+            "method": "allocation_report_memory_backend_v1",
+            "reserve_bytes": 16,
+            "commit_bytes": 16,
+            "release_bytes": 16,
+            "footprint_current_bytes": 16,
+            "footprint_peak_bytes": 16
+          },
+          "bytes_requested": 3,
+          "bytes_reserved": 16,
+          "bytes_committed": 16,
+          "bytes_released": 16,
+          "region_id": "island:isl",
+          "lifetime": "island:isl:scope",
+          "debug_mode": "double_free_and_use_after_free_when_enabled",
+          "domain": {
+            "domain_id": "domain:island:isl",
+            "kind": "island",
+            "owner_kind": "island",
+            "owner_id": "isl",
+            "lifetime": "island:isl:scope",
+            "budget_bytes": 3,
+            "requested_bytes": 3,
+            "reserved_bytes": 16,
+            "committed_bytes": 16,
+            "released_bytes": 16,
+            "current_bytes": 16,
+            "peak_bytes": 16
+          }
+        }
+      ]
+    }
+  ]
+}

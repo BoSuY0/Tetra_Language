@@ -800,18 +800,18 @@ func (r *smokeRunner) runSmallHeapAllocationBenchmark(ctx context.Context) error
 	if err != nil {
 		return err
 	}
-	smallHeapRows := report.Summary.RuntimePaths["per_core_small_heap"]
+	smallHeapRows := report.Summary.RuntimePaths["process_bump_small_heap_v0"]
 	if smallHeapRows != allocationCount {
 		return fmt.Errorf(
-			"small heap allocation benchmark: per_core_small_heap rows = %d, want %d",
+			"small heap allocation benchmark: process_bump_small_heap_v0 rows = %d, want %d",
 			smallHeapRows,
 			allocationCount,
 		)
 	}
-	reusePolicyRows := report.Summary.AllocatorReusePolicies["same_core_same_size_class_free_list"]
+	reusePolicyRows := report.Summary.AllocatorReusePolicies["bump_no_reuse_v0"]
 	if reusePolicyRows != allocationCount {
 		return fmt.Errorf(
-			"small heap allocation benchmark: same-core reuse policy rows = %d, want %d",
+			"small heap allocation benchmark: bump_no_reuse_v0 rows = %d, want %d",
 			reusePolicyRows,
 			allocationCount,
 		)
@@ -846,10 +846,10 @@ func (r *smokeRunner) runSmallHeapAllocationBenchmark(ctx context.Context) error
 		MeasuredValue:    measuredSyscalls,
 		ImprovementRatio: improvement,
 		Evidence: fmt.Sprintf(
-			("allocation report schema v2 estimates %d per_core_small_heap " +
+			("allocation report schema v2 estimates %d process_bump_small_heap_v0 " +
 				"allocation intents, %d bytes reserved, and %d estimated 64KiB chunk " +
 				"refill syscall(s) instead of %d mmap-per-allocation syscall(s); " +
-				"allocation_report_estimate only, not a runtime measurement"),
+				"allocation_report_estimate only, not a runtime measurement or reuse claim"),
 			smallHeapRows,
 			report.Summary.BytesReserved,
 			measuredSyscalls,

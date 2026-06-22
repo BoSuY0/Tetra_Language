@@ -16,17 +16,32 @@ import (
 const actorCapabilityManifestSchemaV1 = "tetra.actor.capability_manifest.v1"
 
 type actorCapabilityManifest struct {
-	Schema                string                       `json:"schema"`
-	Profile               string                       `json:"profile"`
-	RequiredCapabilities  []requiredCapabilityContract `json:"required_capabilities"`
-	RequiredNonclaimTerms []string                     `json:"required_nonclaim_terms"`
-	RequiredNonclaims     []string                     `json:"required_nonclaims"`
-	ForbiddenClaims       []string                     `json:"forbidden_claims"`
-	DocsRefs              []string                     `json:"docs_refs"`
-	ValidatorRefs         []manifestRef                `json:"validator_refs"`
-	GateRefs              []manifestRef                `json:"gate_refs"`
-	ContractRefs          []releaseContractRef         `json:"contract_refs"`
-	Capabilities          []actorCapability            `json:"capabilities"`
+	Schema                 string                       `json:"schema"`
+	Profile                string                       `json:"profile"`
+	ReleaseTarget          releaseTargetContract        `json:"release_target,omitempty"`
+	FinalVerdictVocabulary []string                     `json:"final_verdict_vocabulary,omitempty"`
+	RequiredFinalVerdict   string                       `json:"required_final_verdict,omitempty"`
+	AllowedFinalClaim      string                       `json:"allowed_final_claim,omitempty"`
+	RequiredV1Capabilities []string                     `json:"required_v1_capabilities,omitempty"`
+	RequiredFinalReports   []string                     `json:"required_final_reports,omitempty"`
+	ForbiddenFinalClaims   []string                     `json:"forbidden_final_claims,omitempty"`
+	RequiredCapabilities   []requiredCapabilityContract `json:"required_capabilities"`
+	RequiredNonclaimTerms  []string                     `json:"required_nonclaim_terms"`
+	RequiredNonclaims      []string                     `json:"required_nonclaims"`
+	ForbiddenClaims        []string                     `json:"forbidden_claims"`
+	DocsRefs               []string                     `json:"docs_refs"`
+	ValidatorRefs          []manifestRef                `json:"validator_refs"`
+	GateRefs               []manifestRef                `json:"gate_refs"`
+	ContractRefs           []releaseContractRef         `json:"contract_refs"`
+	Capabilities           []actorCapability            `json:"capabilities"`
+}
+
+type releaseTargetContract struct {
+	Primary                    string   `json:"primary,omitempty"`
+	FullProductionTargets      []string `json:"full_production_targets,omitempty"`
+	CompatibilityTargets       []string `json:"compatibility_targets,omitempty"`
+	UnsupportedTargets         []string `json:"unsupported_targets,omitempty"`
+	DistributedNonclaimTargets []string `json:"distributed_nonclaim_targets,omitempty"`
 }
 
 type requiredCapabilityContract struct {
@@ -146,6 +161,7 @@ func validateActorCapabilitiesManifest(raw []byte, root string, options actorCap
 	issues = append(issues, validateRequiredTerms("required_nonclaims", manifest.RequiredNonclaims, manifest.RequiredNonclaimTerms)...)
 	issues = append(issues, validateForbiddenClaimsCatalog(manifest.ForbiddenClaims)...)
 	issues = append(issues, validateRequiredTerms("forbidden_claims", manifest.ForbiddenClaims, manifest.RequiredNonclaimTerms)...)
+	issues = append(issues, validateV1ReleaseContract(manifest)...)
 
 	validatorIDs := map[string]bool{}
 	for _, ref := range manifest.ValidatorRefs {
@@ -361,6 +377,7 @@ func validateReleaseNotes(root string, paths []string, manifest actorCapabilityM
 			continue
 		}
 		issues = append(issues, validateActorTextClaims("release notes "+path, string(raw), manifest.RequiredNonclaims, manifest.RequiredNonclaimTerms, manifest.ForbiddenClaims)...)
+		issues = append(issues, validateFinalReleaseTextClaims("release notes "+path, string(raw), manifest)...)
 		text := normalizeActorText(string(raw))
 		for _, req := range manifest.RequiredCapabilities {
 			for _, term := range req.ReleaseNoteTerms {
@@ -371,6 +388,190 @@ func validateReleaseNotes(root string, paths []string, manifest actorCapabilityM
 		}
 	}
 	return issues
+}
+
+func validateV1ReleaseContract(manifest actorCapabilityManifest) []string {
+	if !manifestHasV1ReleaseContract(manifest) {
+		return nil
+	}
+	var issues []string
+	if manifest.ReleaseTarget.Primary != "linux-x64" {
+		issues = append(issues, fmt.Sprintf("release_target.primary is %q, want linux-x64", manifest.ReleaseTarget.Primary))
+	}
+	if !stringInSet("linux-x64", manifest.ReleaseTarget.FullProductionTargets) {
+		issues = append(issues, "release_target.full_production_targets must include linux-x64")
+	}
+	for _, unsupported := range manifest.ReleaseTarget.UnsupportedTargets {
+		if stringInSet(unsupported, manifest.ReleaseTarget.FullProductionTargets) {
+			issues = append(issues, fmt.Sprintf("release target %s cannot be both full production and unsupported", unsupported))
+		}
+	}
+	wantVocabulary := []string{
+		"TETRA_V1_NATIVE_ACTOR_PLATFORM_LINUX_X64_PROD_STABLE",
+		"NEAR_READY_WITH_BLOCKERS",
+		"BETA_ONLY",
+		"EXPERIMENTAL_ONLY",
+		"FAIL",
+	}
+	if !sameStringSet(manifest.FinalVerdictVocabulary, wantVocabulary) {
+		issues = append(issues, fmt.Sprintf("final_verdict_vocabulary = %v, want %v", manifest.FinalVerdictVocabulary, wantVocabulary))
+	}
+	if manifest.RequiredFinalVerdict != "TETRA_V1_NATIVE_ACTOR_PLATFORM_LINUX_X64_PROD_STABLE" {
+		issues = append(issues, fmt.Sprintf("required_final_verdict is %q, want TETRA_V1_NATIVE_ACTOR_PLATFORM_LINUX_X64_PROD_STABLE", manifest.RequiredFinalVerdict))
+	}
+	if strings.TrimSpace(manifest.AllowedFinalClaim) == "" {
+		issues = append(issues, "allowed_final_claim is required")
+	}
+	if len(manifest.RequiredV1Capabilities) == 0 {
+		issues = append(issues, "required_v1_capabilities is required")
+	}
+	if len(manifest.RequiredFinalReports) == 0 {
+		issues = append(issues, "required_final_reports is required")
+	}
+	if len(manifest.ForbiddenFinalClaims) == 0 {
+		issues = append(issues, "forbidden_final_claims is required")
+	}
+	requiredCapabilities := map[string]bool{}
+	for _, req := range manifest.RequiredCapabilities {
+		requiredCapabilities[req.ID] = true
+	}
+	capabilities := map[string]bool{}
+	for _, cap := range manifest.Capabilities {
+		capabilities[cap.ID] = true
+	}
+	for _, id := range manifest.RequiredV1Capabilities {
+		if !requiredCapabilities[id] {
+			issues = append(issues, fmt.Sprintf("required_v1_capabilities %s is not declared in required_capabilities", id))
+		}
+		if !capabilities[id] {
+			issues = append(issues, fmt.Sprintf("required_v1_capabilities %s is not declared in capabilities", id))
+		}
+	}
+	for _, report := range manifest.RequiredFinalReports {
+		report = strings.TrimSpace(report)
+		if report == "" {
+			issues = append(issues, "required_final_reports contains an empty report")
+			continue
+		}
+		if filepath.IsAbs(report) || strings.Contains(report, "..") || strings.Contains(report, "\\") {
+			issues = append(issues, fmt.Sprintf("required_final_report %q must be a relative slash path", report))
+		}
+	}
+	return issues
+}
+
+func manifestHasV1ReleaseContract(manifest actorCapabilityManifest) bool {
+	return manifest.ReleaseTarget.Primary != "" ||
+		len(manifest.FinalVerdictVocabulary) != 0 ||
+		manifest.RequiredFinalVerdict != "" ||
+		manifest.AllowedFinalClaim != "" ||
+		len(manifest.RequiredV1Capabilities) != 0 ||
+		len(manifest.RequiredFinalReports) != 0 ||
+		len(manifest.ForbiddenFinalClaims) != 0
+}
+
+func validateFinalReleaseTextClaims(label, text string, manifest actorCapabilityManifest) []string {
+	if !manifestHasV1ReleaseContract(manifest) {
+		return nil
+	}
+	var issues []string
+	claimText := actorClaimTextWithoutAllowedNonclaims(text, manifest.RequiredNonclaims)
+	normalized := normalizeActorText(claimText)
+	finalVerdict := strings.TrimSpace(manifest.RequiredFinalVerdict)
+	if finalVerdict != "" && strings.Contains(normalized, normalizeActorText(finalVerdict)) {
+		issues = append(issues, validateRequiredV1CapabilitiesForClaim(label, finalVerdict, manifest.RequiredV1Capabilities, manifest)...)
+	}
+	if allowedClaim := strings.TrimSpace(manifest.AllowedFinalClaim); allowedClaim != "" &&
+		strings.Contains(normalized, normalizeActorText(allowedClaim)) {
+		issues = append(issues, validateRequiredV1CapabilitiesForClaim(label, "allowed final v1 claim", manifest.RequiredV1Capabilities, manifest)...)
+	}
+	if strings.Contains(normalized, "cluster membership") {
+		issues = append(issues, validateRequiredV1CapabilitiesForClaim(label, "cluster membership claim", []string{"cluster_membership"}, manifest)...)
+	}
+	if strings.Contains(normalized, "supervision") || strings.Contains(normalized, "supervisor") {
+		issues = append(issues, validateRequiredV1CapabilitiesForClaim(
+			label,
+			"supervision claim",
+			[]string{"actor_lifecycle_supervision", "supervision_restart_tree"},
+			manifest,
+		)...)
+	}
+	if hasRustCParityClaim(claimText) {
+		issues = append(issues, validateRequiredV1CapabilitiesForClaim(label, "Rust/C parity claim", []string{"benchmark_rust_c_parity"}, manifest)...)
+	}
+	if hasNativeApplicationPlatformClaim(claimText) {
+		issues = append(issues, validateRequiredV1CapabilitiesForClaim(label, "native application platform claim", []string{"native_surface_host"}, manifest)...)
+		if hasOldRealWindowProbeEvidenceClaim(claimText) {
+			issues = append(issues, fmt.Sprintf("%s native_surface_host claim uses old real-window probe evidence; final native app evidence must use the direct native Surface Host path", label))
+		}
+	}
+	for _, forbidden := range manifest.ForbiddenFinalClaims {
+		forbiddenText := normalizeActorText(forbidden)
+		if forbiddenText == "" {
+			continue
+		}
+		if strings.Contains(normalized, forbiddenText) {
+			issues = append(issues, fmt.Sprintf("%s forbidden final v1 claim %q", label, forbidden))
+		}
+	}
+	return issues
+}
+
+func actorClaimTextWithoutAllowedNonclaims(text string, allowedNonclaims []string) string {
+	normalized := normalizeActorText(text)
+	for _, allowed := range allowedNonclaims {
+		normalized = strings.ReplaceAll(normalized, normalizeActorText(allowed), " ")
+	}
+	return normalizeActorText(normalized)
+}
+
+func validateRequiredV1CapabilitiesForClaim(label, claim string, ids []string, manifest actorCapabilityManifest) []string {
+	capabilities := map[string]actorCapability{}
+	for _, cap := range manifest.Capabilities {
+		capabilities[cap.ID] = cap
+	}
+	var issues []string
+	for _, id := range ids {
+		cap, ok := capabilities[id]
+		if !ok {
+			issues = append(issues, fmt.Sprintf("%s %s requires missing capability %s", label, claim, id))
+			continue
+		}
+		if cap.Status != "current_scoped" || !stringInSet("linux-x64", cap.SupportedTargets) || len(cap.EvidenceRefs) == 0 {
+			issues = append(issues, fmt.Sprintf(
+				"%s %s requires capability %s current_scoped linux-x64 evidence; status=%q supported_targets=%v evidence_refs=%v",
+				label,
+				claim,
+				id,
+				cap.Status,
+				cap.SupportedTargets,
+				cap.EvidenceRefs,
+			))
+		}
+	}
+	return issues
+}
+
+func hasRustCParityClaim(text string) bool {
+	normalized := normalizeClaimText(text)
+	return strings.Contains(normalized, "rust c performance parity") ||
+		strings.Contains(normalized, "rust c level speed") ||
+		(strings.Contains(normalized, "rust") && strings.Contains(normalized, " c ") &&
+			(strings.Contains(normalized, "parity") || strings.Contains(normalized, "within")))
+}
+
+func hasNativeApplicationPlatformClaim(text string) bool {
+	normalized := normalizeClaimText(text)
+	return strings.Contains(normalized, "native application platform") ||
+		strings.Contains(normalized, "native app platform") ||
+		strings.Contains(normalized, "native linux application")
+}
+
+func hasOldRealWindowProbeEvidenceClaim(text string) bool {
+	normalized := normalizeClaimText(text)
+	return strings.Contains(normalized, "real window probe") ||
+		strings.Contains(normalized, "old real window") ||
+		strings.Contains(normalized, "linux x64 real window probe")
 }
 
 func resolveMaybeRelativePath(root, path string) string {
@@ -700,4 +901,9 @@ func normalizeActorText(text string) string {
 		return ' '
 	}, text)
 	return strings.Join(strings.Fields(mapped), " ")
+}
+
+func normalizeClaimText(text string) string {
+	replacer := strings.NewReplacer("-", " ", "_", " ", "/", " ")
+	return strings.Join(strings.Fields(replacer.Replace(strings.ToLower(text))), " ")
 }

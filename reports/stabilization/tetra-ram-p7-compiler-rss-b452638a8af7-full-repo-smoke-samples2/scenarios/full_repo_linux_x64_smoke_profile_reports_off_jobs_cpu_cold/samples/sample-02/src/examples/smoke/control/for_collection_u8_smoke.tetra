@@ -1,0 +1,10 @@
+func main() -> Int
+uses alloc, islands, mem:
+    var total: Int = 0
+    island(128) as isl:
+        var bytes: []u8 = core.island_make_u8(isl, 2)
+        bytes[0] = 40
+        bytes[1] = 2
+        for b in bytes:
+            total = total + b
+    return total

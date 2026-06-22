@@ -13,8 +13,8 @@ const (
 		"-count=1"
 
 	smallHeapEstimateEvidence = "allocation report schema v2 estimates 64 " +
-		"per_core_small_heap allocation intents inside one 64KiB chunk refill; " +
-		"allocation_report_estimate only, not a runtime measurement"
+		"process_bump_small_heap_v0 allocation intents inside one 64KiB chunk refill; " +
+		"allocation_report_estimate only, not a runtime measurement or reuse claim"
 	allocFailureEvidence = "linux-x64 mmap failure exits deterministically before returning " +
 		"an invalid pointer"
 	rawPointerPolicyEvidence = "allocation_base_metadata, derived_allocation_offset, " +
@@ -502,7 +502,7 @@ func TestValidateBenchmarksRejectsSmallHeapEstimateWithoutEvidenceClass(t *testi
 		MeasuredValue:    1,
 		ImprovementRatio: 64,
 		Evidence: ("allocation report schema v2 estimates 64 " +
-			"per_core_small_heap allocation intents inside one 64KiB " +
+			"process_bump_small_heap_v0 allocation intents inside one 64KiB " +
 			"chunk refill"),
 		Ran:  true,
 		Pass: true,
@@ -597,9 +597,9 @@ func validMemoryProdReportObject() Report {
 		MeasuredValue:    1,
 		ImprovementRatio: 64,
 		Evidence: ("allocation report schema v2 estimates 64 " +
-			"per_core_small_heap allocation intents inside one 64KiB " +
+			"process_bump_small_heap_v0 allocation intents inside one 64KiB " +
 			"chunk refill; allocation_report_estimate only, not a " +
-			"runtime measurement"),
+			"runtime measurement or reuse claim"),
 		Ran:  true,
 		Pass: true,
 	}}
@@ -914,15 +914,37 @@ func TestValidateBenchmarksRejectsRuntimeFreeListWordingWithoutMeasurement(t *te
 		BaselineValue:    64,
 		MeasuredValue:    1,
 		ImprovementRatio: 64,
-		Evidence: ("allocation report schema v2 shows 64 per_core_small_heap " +
+		Evidence: ("allocation report schema v2 shows 64 process_bump_small_heap_v0 " +
 			"rows with same_core_same_size_class_free_list reuse policy " +
 			"inside one 64KiB chunk refill"),
 		Ran:  true,
 		Pass: true,
 	}})
 	joined := strings.ToLower(strings.Join(issues, "; "))
-	if !strings.Contains(joined, "runtime free-list") {
-		t.Fatalf("validateBenchmarks issues = %v, want runtime free-list wording rejection", issues)
+	if !strings.Contains(joined, "runtime allocator capability") {
+		t.Fatalf("validateBenchmarks issues = %v, want runtime allocator wording rejection", issues)
+	}
+}
+
+func TestValidateBenchmarksRejectsPerCoreSmallHeapEstimateClaim(t *testing.T) {
+	issues := validateBenchmarks([]BenchmarkReport{{
+		Name:             "small heap allocation syscall reduction",
+		Kind:             "allocator",
+		Metric:           "estimated_os_syscalls",
+		Unit:             "syscalls",
+		EvidenceClass:    "allocation_report_estimate",
+		Method:           "allocation_report_summary",
+		BaselineValue:    64,
+		MeasuredValue:    1,
+		ImprovementRatio: 64,
+		Evidence: ("allocation report schema v2 estimates 64 per_core_small_heap " +
+			"allocation intents inside one 64KiB chunk refill"),
+		Ran:  true,
+		Pass: true,
+	}})
+	joined := strings.ToLower(strings.Join(issues, "; "))
+	if !strings.Contains(joined, "per_core_small_heap") {
+		t.Fatalf("validateBenchmarks issues = %v, want per_core_small_heap rejection", issues)
 	}
 }
 
@@ -935,21 +957,21 @@ func TestValidateBenchmarksRejectsOfficialFastestOrTargetParityClaims(t *testing
 		{
 			name: "official benchmark",
 			evidence: ("allocation report schema v2 estimates 64 " +
-				"per_core_small_heap allocation intents inside one 64KiB " +
+				"process_bump_small_heap_v0 allocation intents inside one 64KiB " +
 				"chunk refill; official benchmark result"),
 			want: "official benchmark",
 		},
 		{
 			name: "fastest language",
 			evidence: ("allocation report schema v2 estimates 64 " +
-				"per_core_small_heap allocation intents inside one 64KiB " +
+				"process_bump_small_heap_v0 allocation intents inside one 64KiB " +
 				"chunk refill; fastest language allocator"),
 			want: "fastest language",
 		},
 		{
 			name: "target parity",
 			evidence: ("allocation report schema v2 estimates 64 " +
-				"per_core_small_heap allocation intents inside one 64KiB " +
+				"process_bump_small_heap_v0 allocation intents inside one 64KiB " +
 				"chunk refill; proves target parity"),
 			want: "target parity",
 		},

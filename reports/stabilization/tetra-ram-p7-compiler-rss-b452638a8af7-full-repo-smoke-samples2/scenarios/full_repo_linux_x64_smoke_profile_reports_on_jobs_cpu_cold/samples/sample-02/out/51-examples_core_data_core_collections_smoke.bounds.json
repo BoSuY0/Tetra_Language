@@ -1,0 +1,227 @@
+{
+  "schema_version": 1,
+  "kind": "bounds",
+  "target": "linux-x64",
+  "totals": {
+    "removed": 13,
+    "left": 8
+  },
+  "functions": [
+    {
+      "function": "lib.core.collections.hash_map_from_slices__K_i32__V_i32",
+      "removed": 1,
+      "left": 0,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/collections.tetra:52:5",
+          "kind": "i32.load",
+          "removed": true,
+          "proof_id": "proof:for-collection:key:52:5",
+          "reason": "removed_by_for_loop_range"
+        }
+      ]
+    },
+    {
+      "function": "lib.core.collections.vec_first_or__T_i32",
+      "removed": 1,
+      "left": 0,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/collections.tetra:34:5",
+          "kind": "i32.load",
+          "removed": true,
+          "proof_id": "proof:for-collection:item:34:5",
+          "reason": "removed_by_for_loop_range"
+        }
+      ]
+    },
+    {
+      "function": "lib.core.collections.vec_from_slice__T_i32",
+      "removed": 1,
+      "left": 0,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/collections.tetra:25:5",
+          "kind": "i32.load",
+          "removed": true,
+          "proof_id": "proof:for-collection:item:25:5",
+          "reason": "removed_by_for_loop_range"
+        }
+      ]
+    },
+    {
+      "function": "lib.core.collections.vec_get_or__T_i32",
+      "removed": 1,
+      "left": 0,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/collections.tetra:43:5",
+          "kind": "i32.load",
+          "removed": true,
+          "proof_id": "proof:for-collection:item:43:5",
+          "reason": "removed_by_for_loop_range"
+        }
+      ]
+    },
+    {
+      "function": "lib.core.collections.len_i32",
+      "removed": 1,
+      "left": 0,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/collections.tetra:68:5",
+          "kind": "i32.load",
+          "removed": true,
+          "proof_id": "proof:for-collection:value:68:5",
+          "reason": "removed_by_for_loop_range"
+        }
+      ]
+    },
+    {
+      "function": "lib.core.collections.contains_i32",
+      "removed": 1,
+      "left": 0,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/collections.tetra:74:5",
+          "kind": "i32.load",
+          "removed": true,
+          "proof_id": "proof:for-collection:value:74:5",
+          "reason": "removed_by_for_loop_range"
+        }
+      ]
+    },
+    {
+      "function": "lib.core.collections.count_i32",
+      "removed": 1,
+      "left": 0,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/collections.tetra:82:5",
+          "kind": "i32.load",
+          "removed": true,
+          "proof_id": "proof:for-collection:value:82:5",
+          "reason": "removed_by_for_loop_range"
+        }
+      ]
+    },
+    {
+      "function": "lib.core.collections.first_or_i32",
+      "removed": 1,
+      "left": 0,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/collections.tetra:89:5",
+          "kind": "i32.load",
+          "removed": true,
+          "proof_id": "proof:for-collection:value:89:5",
+          "reason": "removed_by_for_loop_range"
+        }
+      ]
+    },
+    {
+      "function": "lib.core.collections.hash_map_get_i32_i32_or",
+      "removed": 1,
+      "left": 1,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/collections.tetra:97:5",
+          "kind": "i32.load",
+          "removed": true,
+          "proof_id": "proof:for-collection:item_key:97:5",
+          "reason": "removed_by_for_loop_range"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/collections.tetra:101:30",
+          "kind": "i32.load",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        }
+      ]
+    },
+    {
+      "function": "lib.core.collections.hash_map_get_u8_i32_or",
+      "removed": 1,
+      "left": 1,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/collections.tetra:109:5",
+          "kind": "u8.load",
+          "removed": true,
+          "proof_id": "proof:for-collection:item_key:109:5",
+          "reason": "removed_by_for_loop_range"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/collections.tetra:113:30",
+          "kind": "i32.load",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        }
+      ]
+    },
+    {
+      "function": "examples.core.data.core_collections_smoke.main",
+      "removed": 3,
+      "left": 6,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_collections_smoke.tetra:9:5",
+          "kind": "i32.store",
+          "removed": true,
+          "proof_id": "proof:allocation-zero:literal0:xs:9:5",
+          "reason": "removed_by_allocation_literal_zero_length"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_collections_smoke.tetra:10:5",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_collections_smoke.tetra:11:5",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_collections_smoke.tetra:12:5",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_collections_smoke.tetra:13:5",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_collections_smoke.tetra:19:5",
+          "kind": "i32.store",
+          "removed": true,
+          "proof_id": "proof:allocation-zero:literal0:keys:19:5",
+          "reason": "removed_by_allocation_literal_zero_length"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_collections_smoke.tetra:20:5",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_collections_smoke.tetra:21:5",
+          "kind": "i32.store",
+          "removed": true,
+          "proof_id": "proof:allocation-zero:literal0:values:21:5",
+          "reason": "removed_by_allocation_literal_zero_length"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/data/core_collections_smoke.tetra:22:5",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        }
+      ]
+    }
+  ]
+}

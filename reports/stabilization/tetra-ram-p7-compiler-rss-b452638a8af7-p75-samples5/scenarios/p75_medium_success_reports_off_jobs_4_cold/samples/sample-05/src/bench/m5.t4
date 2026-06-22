@@ -1,0 +1,5 @@
+module bench.m5
+import bench.m4 as prev
+fun value_5(x: i32): i32 {
+  return prev.value_4(x) + 1
+}

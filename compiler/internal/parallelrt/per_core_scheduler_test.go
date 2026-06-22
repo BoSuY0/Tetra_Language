@@ -89,6 +89,8 @@ func TestPerCoreSchedulerCoverageCoversP18PlanList(t *testing.T) {
 		"bounded typed mailboxes",
 		"TypedMailbox",
 		"Capacity",
+		"Drain",
+		"DrainActorOwnedRegions",
 	)
 	requirePerCoreFacts(
 		t,
@@ -110,6 +112,7 @@ func TestPerCoreSchedulerCoverageCoversP18PlanList(t *testing.T) {
 		"structured task groups",
 		"__tetra_task_group_open",
 		"__tetra_task_group_close",
+		"typed task joins and result getters clear target/current result slots",
 	)
 	requirePerCoreFacts(
 		t,

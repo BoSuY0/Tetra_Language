@@ -1,0 +1,85 @@
+{
+  "schema": "tetra.release-artifact-hashes.v1alpha1",
+  "root": ".",
+  "artifacts": [
+    {
+      "path": "artifact-hashes-validation.txt",
+      "sha256": "sha256:133ff261f789957d926e8b8b6a11e840f124d8356c787a64a883a78d7e9c0fc3",
+      "size": 80
+    },
+    {
+      "path": "baseline-manifest.json",
+      "sha256": "sha256:0d24fd0e2e47f8c05079226336b13999bf561a844ccf0ab10e1dbc7bc116ce32",
+      "size": 3143,
+      "schema": "tetra.ram.p0-baseline.v1"
+    },
+    {
+      "path": "command-manifest.json",
+      "sha256": "sha256:8e0623a9894635157d214873be4e3851c93b50942c8fd8d43f7893eb42e33987",
+      "size": 927,
+      "schema": "tetra.ram.p0-baseline.commands.v1"
+    },
+    {
+      "path": "host-fingerprint.json",
+      "sha256": "sha256:46ec035f80a2c3eca5fed05d11d49767b4173f84db965942f4543b7189c70877",
+      "size": 243,
+      "schema": "tetra.ram.p0-baseline.host.v1"
+    },
+    {
+      "path": "rss-telemetry-v2.json",
+      "sha256": "sha256:38433b3fa7346f780f53166ed4c8d88342fefdc5806bf61dfcf5ccab4bb45bab",
+      "size": 1942,
+      "schema": "tetra.local_benchmark.process_rss_telemetry.v2"
+    },
+    {
+      "path": "smaps/post_drain.smaps_rollup",
+      "sha256": "sha256:ac3dddec5921e89d529e77e4a18f10e8d885ddda27e5a4eeae2498d21960a930",
+      "size": 698
+    },
+    {
+      "path": "smaps/post_warmup.smaps_rollup",
+      "sha256": "sha256:603b7764602eeb80bab84a4f9c73916feab030cc3764b2d62f67ce6c5e66cf70",
+      "size": 698
+    },
+    {
+      "path": "smaps/pre_exit.smaps_rollup",
+      "sha256": "sha256:4636b32cf4003ade24ae27afb69a30e06122bf539998451288cfcf9a50afbae3",
+      "size": 698
+    },
+    {
+      "path": "smaps/startup.smaps_rollup",
+      "sha256": "sha256:84462588eb85a93116c4f338dc4cd99e61f6834dcdd9b3eb639aff8ac8784964",
+      "size": 698
+    },
+    {
+      "path": "smaps/steady_round_1.smaps_rollup",
+      "sha256": "sha256:88105f83e8262350d4c237a6af828615946235db1cd02e91c24c91843afeb4aa",
+      "size": 698
+    },
+    {
+      "path": "smaps/steady_round_2.smaps_rollup",
+      "sha256": "sha256:fbd9d4fcbfb46d554c252837ea7000d090a8d0bb5a283a7bca63bf6ac1677f81",
+      "size": 698
+    },
+    {
+      "path": "smaps/steady_round_3.smaps_rollup",
+      "sha256": "sha256:47f829df4aff8a9c63a21bd1b2da6a293d762f823ed3993a23e45e8131d7fb33",
+      "size": 698
+    },
+    {
+      "path": "smaps/steady_round_4.smaps_rollup",
+      "sha256": "sha256:3d97851b9567f13d021f90c386d5c5f0e50fdda964af8128b9037e95665922d6",
+      "size": 698
+    },
+    {
+      "path": "smaps/steady_round_5.smaps_rollup",
+      "sha256": "sha256:0e7288342e45f3102dbc30d8cea7dda95906912d2a4ba964467984dd996a2a81",
+      "size": 698
+    },
+    {
+      "path": "validator-output.txt",
+      "sha256": "sha256:daea36ce7d87b1cc5e72b6fb026779f4710bc6fbaebb9ac745471871ef2f84d6",
+      "size": 101
+    }
+  ]
+}

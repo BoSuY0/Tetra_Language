@@ -353,6 +353,7 @@ func allocationUsesHeap(alloc Allocation) bool {
 	}
 	switch RuntimePathForAllocation(alloc) {
 	case runtimeabi.AllocationPathHeap,
+		runtimeabi.AllocationPathProcessBumpSmallHeapV0,
 		runtimeabi.AllocationPathPerCoreSmallHeap,
 		runtimeabi.AllocationPathLargeMmap:
 		return true
@@ -457,6 +458,16 @@ func applyMemoryBackendEvidence(alloc *Allocation) {
 		RuntimePath: runtimePath,
 	}
 	switch runtimePath {
+	case runtimeabi.AllocationPathProcessBumpSmallHeapV0:
+		evidence.BackendClass = runtimeabi.MemoryBackendClassSmallHeap
+		evidence.Adapter = "runtime.small_heap.process_bump_v0"
+		evidence.EvidenceClass = runtimeabi.MemoryFootprintEstimated
+		evidence.Method = "allocation_report_memory_backend_v1"
+		evidence.Operations = retainedMemoryBackendOperations()
+		evidence.ReserveBytes = reserved
+		evidence.CommitBytes = reserved
+		evidence.FootprintCurrentBytes = reserved
+		evidence.FootprintPeakBytes = reserved
 	case runtimeabi.AllocationPathPerCoreSmallHeap:
 		evidence.BackendClass = runtimeabi.MemoryBackendClassSmallHeap
 		evidence.Adapter = "runtime.small_heap.per_core_v1"
@@ -473,13 +484,14 @@ func applyMemoryBackendEvidence(alloc *Allocation) {
 		evidence.Adapter = "target.large_mmap_v1"
 		evidence.EvidenceClass = runtimeabi.MemoryFootprintEstimated
 		evidence.Method = "allocation_report_memory_backend_v1"
-		evidence.Operations = estimatedMemoryBackendOperations()
+		evidence.Operations = retainedMemoryBackendOperations()
 		evidence.ReserveBytes = reserved
 		evidence.CommitBytes = reserved
-		evidence.ReleaseBytes = reserved
 		evidence.FootprintCurrentBytes = reserved
 		evidence.FootprintPeakBytes = reserved
-	case runtimeabi.AllocationPathExplicitIsland, runtimeabi.AllocationPathRegion:
+	case runtimeabi.AllocationPathExplicitIsland,
+		runtimeabi.AllocationPathScopedSingleMappingV0,
+		runtimeabi.AllocationPathRegion:
 		evidence.BackendClass = runtimeabi.MemoryBackendClassRegion
 		evidence.Adapter = "runtime.region_bump_v1"
 		evidence.EvidenceClass = runtimeabi.MemoryFootprintEstimated
@@ -539,6 +551,14 @@ func estimatedMemoryBackendOperations() []runtimeabi.MemoryBackendOperation {
 	}
 }
 
+func retainedMemoryBackendOperations() []runtimeabi.MemoryBackendOperation {
+	return []runtimeabi.MemoryBackendOperation{
+		runtimeabi.MemoryBackendReserve,
+		runtimeabi.MemoryBackendCommit,
+		runtimeabi.MemoryBackendFootprint,
+	}
+}
+
 func allocationMemoryDomain(alloc Allocation) *runtimeabi.MemoryDomain {
 	requested := int64(allocationReportBytesRequested(alloc))
 	reserved := int64(allocationReportBytesReserved(alloc))
@@ -569,7 +589,7 @@ func RuntimePathForAllocation(alloc Allocation) runtimeabi.AllocationRuntimePath
 	case StorageStack, StorageRegister:
 		return runtimeabi.AllocationPathStackFrame
 	case StorageRegion, StorageFunctionTempRegion, StorageTaskRegion, StorageActorMoveRegion:
-		return runtimeabi.AllocationPathRegion
+		return runtimeabi.AllocationPathScopedSingleMappingV0
 	case StorageExplicitIsland:
 		return runtimeabi.AllocationPathExplicitIsland
 	case StorageLargeMmap:
@@ -591,7 +611,7 @@ func applyPlannedRegionAllocatorEvidence(alloc *Allocation, fn plir.Function, by
 	alloc.Lifetime = "function:" + fn.Name
 	alloc.DebugMode = "region_reset_when_enabled"
 	if alloc.ActualLoweringStorage == StorageFunctionTempRegion {
-		alloc.RuntimePath = runtimeabi.AllocationPathRegion
+		alloc.RuntimePath = runtimeabi.AllocationPathScopedSingleMappingV0
 		alloc.AllocatorClass = "function_temp_region"
 	}
 	if alloc.ActualLoweringStorage == StorageFunctionTempRegion && byteSize > 0 {
@@ -695,17 +715,16 @@ func applyRuntimeAllocatorEvidence(alloc *Allocation, byteSize int) {
 	}
 	alloc.BytesRequested = byteSize
 	if cls, ok := runtimeabi.SmallHeapClassForBytes(int64(byteSize)); ok {
-		abi := runtimeabi.RuntimePerCoreSmallHeapABI(1)
-		alloc.RuntimePath = abi.RuntimePath
+		alloc.RuntimePath = runtimeabi.AllocationPathProcessBumpSmallHeapV0
 		alloc.AllocatorClass = cls.Name
-		alloc.AllocatorScope = "core:0"
-		alloc.AllocatorReusePolicy = abi.ReusePolicy
-		alloc.AllocatorChunkBytes = abi.ChunkBytes
+		alloc.AllocatorScope = "process"
+		alloc.AllocatorReusePolicy = "bump_no_reuse_v0"
+		alloc.AllocatorChunkBytes = runtimeabi.SmallHeapChunkBytes
 		alloc.BytesReserved = cls.MaxBytes
-		alloc.LoweringStatus = "per_core_small_heap_runtime"
-		alloc.Reason = alloc.Reason + ("; P15.2 runtime allocator uses per-core small-heap metadata," +
-			" 16-byte size classes, chunk refills, and same-core " +
-			"same-class free-list reuse for this byte class")
+		alloc.LoweringStatus = "process_bump_small_heap_v0_runtime"
+		alloc.Reason = alloc.Reason + ("; current emitted linux-x64 runtime allocator uses a " +
+			"process-global bump small heap with 16-byte size classes and 64KiB chunk refills; " +
+			"free-list reuse/reclamation is not claimed")
 		return
 	}
 	alloc.RuntimePath = runtimeabi.AllocationPathLargeMmap

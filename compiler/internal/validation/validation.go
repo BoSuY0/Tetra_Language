@@ -415,6 +415,10 @@ func validationStackEffect(instr ir.IRInstr) (pop int, push int, known bool) {
 		return 1, 1, true
 	case ir.IRIslandFree:
 		return 1, 0, true
+	case ir.IRDropOwned:
+		return 1, 1, true
+	case ir.IRReleaseAllocation:
+		return 1, 0, true
 	case ir.IRCapIO, ir.IRCapMem, ir.IRSymAddr:
 		return 0, 1, true
 	case ir.IRMemReadI32, ir.IRMemReadU8, ir.IRMemReadPtr, ir.IRMmioReadI32,

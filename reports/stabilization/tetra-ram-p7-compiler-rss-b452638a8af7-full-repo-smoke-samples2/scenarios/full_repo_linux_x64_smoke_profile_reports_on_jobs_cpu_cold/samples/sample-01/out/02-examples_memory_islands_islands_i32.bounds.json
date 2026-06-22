@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "kind": "bounds",
+  "target": "linux-x64",
+  "totals": {
+    "removed": 0,
+    "left": 2
+  },
+  "functions": [
+    {
+      "function": "main",
+      "removed": 0,
+      "left": 2,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/memory/islands/islands_i32.tetra:11:13",
+          "kind": "i32.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/memory/islands/islands_i32.tetra:15:28",
+          "kind": "i32.load",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        }
+      ]
+    }
+  ]
+}

@@ -27,6 +27,7 @@ import (
 	"tetra_language/compiler/internal/cache"
 	"tetra_language/compiler/internal/frontend"
 	"tetra_language/compiler/internal/ir"
+	"tetra_language/compiler/internal/lower"
 	"tetra_language/compiler/internal/semantics"
 	"tetra_language/compiler/internal/version"
 	ctarget "tetra_language/compiler/target"
@@ -82,6 +83,12 @@ func collectActorStateRuntimeUsagePosition(
 
 func collectActorRuntimeUsagePosition(checked *semantics.CheckedProgram) (bool, frontend.Position) {
 	return buildruntime.CollectActorRuntimeUsagePosition(checked)
+}
+
+func collectActorSystemReceiveRuntimeUsagePosition(
+	checked *semantics.CheckedProgram,
+) (bool, frontend.Position) {
+	return buildruntime.CollectActorSystemReceiveRuntimeUsagePosition(checked)
 }
 
 func collectTaskRuntimeUsage(checked *semantics.CheckedProgram) bool {
@@ -263,6 +270,9 @@ func linkNativeExecutable(
 	}
 	actorStateUsed, actorStatePos := collectActorStateRuntimeUsagePosition(checked)
 	actorRuntimeUsed, actorRuntimePos := collectActorRuntimeUsagePosition(checked)
+	actorSystemReceiveUsed, actorSystemReceivePos := collectActorSystemReceiveRuntimeUsagePosition(
+		checked,
+	)
 	tasksUsed, tasksPos := collectTaskRuntimeUsagePosition(checked)
 	taskGroupsUsed := collectTaskGroupRuntimeUsage(checked)
 	typedTasksUsed, typedTaskMaxSlots := collectTypedTaskRuntimeUsage(checked)
@@ -280,18 +290,19 @@ func linkNativeExecutable(
 		opt.RuntimeObjectPath != "",
 		buildruntime.CapabilitiesForTarget(native.triple),
 		buildruntime.RuntimeObjectPlanUsage{
-			ActorsUsed:            actorsUsed,
-			ActorRuntimeUsed:      actorRuntimeUsed,
-			ActorStateUsed:        actorStateUsed,
-			TasksUsed:             tasksUsed,
-			TaskGroupsUsed:        taskGroupsUsed,
-			TypedTasksUsed:        typedTasksUsed,
-			TimeRuntimeUsed:       timeRuntimeUsed,
-			FilesystemRuntimeUsed: filesystemRuntimeUsed,
-			NetRuntimeUsed:        netRuntimeUsed,
-			NetRuntimeSupported:   targetSupportsNetRuntimeUsage(native.triple, netRuntimeUsage),
-			SurfaceRuntimeUsed:    surfaceRuntimeUsed,
-			DistributedActorsUsed: distributedActorsUsed,
+			ActorsUsed:             actorsUsed,
+			ActorRuntimeUsed:       actorRuntimeUsed,
+			ActorSystemReceiveUsed: actorSystemReceiveUsed,
+			ActorStateUsed:         actorStateUsed,
+			TasksUsed:              tasksUsed,
+			TaskGroupsUsed:         taskGroupsUsed,
+			TypedTasksUsed:         typedTasksUsed,
+			TimeRuntimeUsed:        timeRuntimeUsed,
+			FilesystemRuntimeUsed:  filesystemRuntimeUsed,
+			NetRuntimeUsed:         netRuntimeUsed,
+			NetRuntimeSupported:    targetSupportsNetRuntimeUsage(native.triple, netRuntimeUsage),
+			SurfaceRuntimeUsed:     surfaceRuntimeUsed,
+			DistributedActorsUsed:  distributedActorsUsed,
 		},
 	)
 	timeOnlyRuntime := runtimeObjectPlan.TimeOnlyRuntime
@@ -344,6 +355,9 @@ func linkNativeExecutable(
 	}
 	if actorRuntimeUsed && !runtimeCaps.actors {
 		return targetRuntimeDiagnostic(actorRuntimePos, native.triple, "actors")
+	}
+	if actorSystemReceiveUsed && !runtimeCaps.actors {
+		return targetRuntimeDiagnostic(actorSystemReceivePos, native.triple, "actor system-message receive")
 	}
 	if actorStateUsed && !runtimeCaps.actorState {
 		return targetRuntimeDiagnostic(actorStatePos, native.triple, "actors")
@@ -448,18 +462,19 @@ func linkNativeExecutable(
 		}
 		if !runtimeObjectHandled {
 			usage := runtimeUsageProfile{
-				actorStateUsed:        actorStateUsed,
-				tasksUsed:             tasksUsed,
-				taskGroupsUsed:        taskGroupsUsed,
-				typedTasksUsed:        typedTasksUsed,
-				typedTaskMaxSlots:     typedTaskMaxSlots,
-				timeRuntimeUsed:       timeRuntimeUsed,
-				filesystemUsed:        filesystemRuntimeUsed,
-				netUsed:               netRuntimeUsed,
-				netRuntimeSymbols:     netRuntimeUsage.requiredSymbols(),
-				surfaceUsed:           surfaceRuntimeUsed,
-				distributedActorsUsed: distributedActorsUsed,
-				actorSpawnCount:       actorSpawnCount,
+				actorStateUsed:         actorStateUsed,
+				actorSystemReceiveUsed: actorSystemReceiveUsed,
+				tasksUsed:              tasksUsed,
+				taskGroupsUsed:         taskGroupsUsed,
+				typedTasksUsed:         typedTasksUsed,
+				typedTaskMaxSlots:      typedTaskMaxSlots,
+				timeRuntimeUsed:        timeRuntimeUsed,
+				filesystemUsed:         filesystemRuntimeUsed,
+				netUsed:                netRuntimeUsed,
+				netRuntimeSymbols:      netRuntimeUsage.requiredSymbols(),
+				surfaceUsed:            surfaceRuntimeUsed,
+				distributedActorsUsed:  distributedActorsUsed,
+				actorSpawnCount:        actorSpawnCount,
 			}
 			runtimeMode, err := selectRuntimeModeForNativeTarget(native.triple, opt.Runtime, usage)
 			if err != nil {
@@ -532,6 +547,11 @@ func linkNativeExecutable(
 			}
 			if err := validateActorRuntimeObject(rt); err != nil {
 				return err
+			}
+			if actorSystemReceiveUsed {
+				if err := validateActorSystemReceiveRuntimeObject(rt); err != nil {
+					return err
+				}
 			}
 			if opt.RuntimeHeapTelemetryActorDomains {
 				if err := validateActorTelemetryRuntimeObject(rt); err != nil {
@@ -628,34 +648,36 @@ func linkNativeExecutable(
 // ---- compiler_runtime_caps.go ----
 
 type runtimeUsageProfile struct {
-	actorStateUsed        bool
-	tasksUsed             bool
-	taskGroupsUsed        bool
-	typedTasksUsed        bool
-	typedTaskMaxSlots     int
-	timeRuntimeUsed       bool
-	filesystemUsed        bool
-	netUsed               bool
-	netRuntimeSymbols     []string
-	surfaceUsed           bool
-	distributedActorsUsed bool
-	actorSpawnCount       int
+	actorSystemReceiveUsed bool
+	actorStateUsed         bool
+	tasksUsed              bool
+	taskGroupsUsed         bool
+	typedTasksUsed         bool
+	typedTaskMaxSlots      int
+	timeRuntimeUsed        bool
+	filesystemUsed         bool
+	netUsed                bool
+	netRuntimeSymbols      []string
+	surfaceUsed            bool
+	distributedActorsUsed  bool
+	actorSpawnCount        int
 }
 
 func (u runtimeUsageProfile) buildRuntimeUsage() buildruntime.UsageProfile {
 	return buildruntime.UsageProfile{
-		ActorStateUsed:        u.actorStateUsed,
-		TasksUsed:             u.tasksUsed,
-		TaskGroupsUsed:        u.taskGroupsUsed,
-		TypedTasksUsed:        u.typedTasksUsed,
-		TypedTaskMaxSlots:     u.typedTaskMaxSlots,
-		TimeRuntimeUsed:       u.timeRuntimeUsed,
-		FilesystemUsed:        u.filesystemUsed,
-		NetUsed:               u.netUsed,
-		NetRuntimeSymbols:     u.netRuntimeSymbols,
-		SurfaceUsed:           u.surfaceUsed,
-		DistributedActorsUsed: u.distributedActorsUsed,
-		ActorSpawnCount:       u.actorSpawnCount,
+		ActorSystemReceiveUsed: u.actorSystemReceiveUsed,
+		ActorStateUsed:         u.actorStateUsed,
+		TasksUsed:              u.tasksUsed,
+		TaskGroupsUsed:         u.taskGroupsUsed,
+		TypedTasksUsed:         u.typedTasksUsed,
+		TypedTaskMaxSlots:      u.typedTaskMaxSlots,
+		TimeRuntimeUsed:        u.timeRuntimeUsed,
+		FilesystemUsed:         u.filesystemUsed,
+		NetUsed:                u.netUsed,
+		NetRuntimeSymbols:      u.netRuntimeSymbols,
+		SurfaceUsed:            u.surfaceUsed,
+		DistributedActorsUsed:  u.distributedActorsUsed,
+		ActorSpawnCount:        u.actorSpawnCount,
 	}
 }
 
@@ -850,6 +872,10 @@ func validateActorRuntimeObject(rt *Object) error {
 	return buildruntime.ValidateActorRuntimeObject(rt)
 }
 
+func validateActorSystemReceiveRuntimeObject(rt *Object) error {
+	return buildruntime.ValidateActorSystemReceiveRuntimeObject(rt)
+}
+
 func validateActorTelemetryRuntimeObject(rt *Object) error {
 	return buildruntime.ValidateActorTelemetryRuntimeObject(rt)
 }
@@ -1019,7 +1045,11 @@ func buildObjectFileWithStatsOpt(
 		return nil, err
 	}
 
-	funcs, err := LowerModule(checked, world.EntryModule)
+	funcs, err := lower.LowerModuleWithOptions(
+		checked,
+		world.EntryModule,
+		lowerOptionsForBuild(tgt.Triple, opt),
+	)
 	if err != nil {
 		return nil, err
 	}

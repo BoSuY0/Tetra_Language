@@ -1,0 +1,3223 @@
+{
+  "schema_version": 1,
+  "kind": "proof",
+  "target": "linux-x64",
+  "bounds": {
+    "schema_version": 1,
+    "kind": "bounds",
+    "target": "linux-x64",
+    "totals": {
+      "removed": 7,
+      "left": 5
+    },
+    "functions": [
+      {
+        "function": "lib.core.crypto.checksum_u8",
+        "removed": 1,
+        "left": 0,
+        "sites": [
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:29:5",
+            "kind": "u8.load",
+            "removed": true,
+            "proof_id": "proof:for-collection:value:29:5",
+            "reason": "removed_by_for_loop_range"
+          }
+        ]
+      },
+      {
+        "function": "lib.core.crypto.constant_time_eq_u8",
+        "removed": 2,
+        "left": 2,
+        "sites": [
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:36:5",
+            "kind": "u8.load",
+            "removed": true,
+            "proof_id": "proof:for-collection:lhs_item:36:5",
+            "reason": "removed_by_for_loop_range"
+          },
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:40:5",
+            "kind": "u8.load",
+            "removed": true,
+            "proof_id": "proof:for-collection:rhs_item:40:5",
+            "reason": "removed_by_for_loop_range"
+          },
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:48:15",
+            "kind": "u8.load",
+            "removed": false,
+            "reason": "left_missing_dominance"
+          },
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:48:25",
+            "kind": "u8.load",
+            "removed": false,
+            "reason": "left_missing_dominance"
+          }
+        ]
+      },
+      {
+        "function": "examples.core.memory.core_crypto_smoke.main",
+        "removed": 4,
+        "left": 3,
+        "sites": [
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:9:5",
+            "kind": "u8.store",
+            "removed": true,
+            "proof_id": "proof:allocation-zero:literal0:lhs:9:5",
+            "reason": "removed_by_allocation_literal_zero_length"
+          },
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:10:5",
+            "kind": "u8.store",
+            "removed": false,
+            "reason": "left_missing_dominance"
+          },
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:12:5",
+            "kind": "u8.store",
+            "removed": true,
+            "proof_id": "proof:allocation-zero:literal0:rhs:12:5",
+            "reason": "removed_by_allocation_literal_zero_length"
+          },
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:13:5",
+            "kind": "u8.store",
+            "removed": false,
+            "reason": "left_missing_dominance"
+          },
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:15:5",
+            "kind": "u8.store",
+            "removed": true,
+            "proof_id": "proof:allocation-zero:literal0:changed:15:5",
+            "reason": "removed_by_allocation_literal_zero_length"
+          },
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:16:5",
+            "kind": "u8.store",
+            "removed": false,
+            "reason": "left_missing_dominance"
+          },
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:18:5",
+            "kind": "u8.store",
+            "removed": true,
+            "proof_id": "proof:allocation-zero:literal0:shorter:18:5",
+            "reason": "removed_by_allocation_literal_zero_length"
+          }
+        ]
+      }
+    ]
+  },
+  "proofs": [
+    {
+      "proof_id": "proof:for-collection:value:29:5",
+      "kind": "range",
+      "guard": "__for_index_29_5 < values.len",
+      "dominates": "bounds_check op1",
+      "fact": "__for_index_29_5 in [0, values.len); derivation: non_negative, less_than_len",
+      "reason": "for loop range proof",
+      "removed_bounds_check": true
+    },
+    {
+      "proof_id": "proof:for-collection:lhs_item:36:5",
+      "kind": "range",
+      "guard": "__for_index_36_5 < lhs.len",
+      "dominates": "bounds_check op1",
+      "fact": "__for_index_36_5 in [0, lhs.len); derivation: non_negative, less_than_len",
+      "reason": "for loop range proof",
+      "removed_bounds_check": true
+    },
+    {
+      "proof_id": "proof:for-collection:rhs_item:40:5",
+      "kind": "range",
+      "guard": "__for_index_40_5 < rhs.len",
+      "dominates": "bounds_check op5",
+      "fact": "__for_index_40_5 in [0, rhs.len); derivation: non_negative, less_than_len",
+      "reason": "for loop range proof",
+      "removed_bounds_check": true
+    },
+    {
+      "proof_id": "proof:allocation-zero:literal0:lhs:9:5:index_store",
+      "kind": "range",
+      "guard": "0 < lhs.len && lhs.len == 2",
+      "dominates": "bounds_check op1",
+      "fact": "0 in [0, lhs.len); derivation: non_negative, less_than_len, allocation_literal_zero, allocation_length_positive",
+      "reason": "allocation literal-zero length proof",
+      "removed_bounds_check": true
+    },
+    {
+      "proof_id": "proof:allocation-zero:literal0:rhs:12:5:index_store",
+      "kind": "range",
+      "guard": "0 < rhs.len && rhs.len == 2",
+      "dominates": "bounds_check op4",
+      "fact": "0 in [0, rhs.len); derivation: non_negative, less_than_len, allocation_literal_zero, allocation_length_positive",
+      "reason": "allocation literal-zero length proof",
+      "removed_bounds_check": true
+    },
+    {
+      "proof_id": "proof:allocation-zero:literal0:changed:15:5:index_store",
+      "kind": "range",
+      "guard": "0 < changed.len && changed.len == 2",
+      "dominates": "bounds_check op7",
+      "fact": "0 in [0, changed.len); derivation: non_negative, less_than_len, allocation_literal_zero, allocation_length_positive",
+      "reason": "allocation literal-zero length proof",
+      "removed_bounds_check": true
+    },
+    {
+      "proof_id": "proof:allocation-zero:literal0:shorter:18:5:index_store",
+      "kind": "range",
+      "guard": "0 < shorter.len && shorter.len == 1",
+      "dominates": "bounds_check op10",
+      "fact": "0 in [0, shorter.len); derivation: non_negative, less_than_len, allocation_literal_zero, allocation_length_positive",
+      "reason": "allocation literal-zero length proof",
+      "removed_bounds_check": true
+    }
+  ],
+  "plir": {
+    "funcs": [
+      {
+        "name": "lib.core.crypto.interface_strength",
+        "module": "lib.core.crypto",
+        "summary": {
+          "public": true,
+          "return_type": "i32"
+        },
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "return",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:16:5",
+            "inputs": [
+              "21"
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "pure_call",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:15:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f1",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:15:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f2",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:15:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f3",
+            "kind": "no_mem_write",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:15:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f4",
+            "kind": "no_unknown_escape",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:15:6",
+            "reason": "semantics checker enforced declared effects"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "exit": true,
+            "ops": [
+              "op0"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:15:6"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "lib.core.crypto.mix_seed",
+        "module": "lib.core.crypto",
+        "summary": {
+          "public": true,
+          "param_names": [
+            "seed",
+            "value"
+          ],
+          "param_types": [
+            "i32",
+            "i32"
+          ],
+          "param_ownership": [
+            "",
+            ""
+          ],
+          "return_type": "i32"
+        },
+        "values": [
+          {
+            "id": "local:mixed",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:18:8",
+            "region": "fn:lib.core.crypto.mix_seed",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:mixed"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "mixed"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "param:seed",
+            "kind": "param",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:18:8",
+            "region": "fn:lib.core.crypto.mix_seed",
+            "provenance": {
+              "kind": "param",
+              "root": "param:seed"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "seed"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          },
+          {
+            "id": "param:value",
+            "kind": "param",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:18:8",
+            "region": "fn:lib.core.crypto.mix_seed",
+            "provenance": {
+              "kind": "param",
+              "root": "param:value"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "value"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "assign",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:19:5",
+            "inputs": [
+              "seed * 33 + value"
+            ],
+            "outputs": [
+              "mixed"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op1",
+            "kind": "guard",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:20:5",
+            "inputs": [
+              "mixed == -2147483648"
+            ],
+            "note": "mixed == -2147483648"
+          },
+          {
+            "id": "op2",
+            "kind": "return",
+            "block": "if_then:0",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:21:9",
+            "inputs": [
+              "2147483647"
+            ]
+          },
+          {
+            "id": "op3",
+            "kind": "guard",
+            "block": "if_join:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:22:7",
+            "inputs": [
+              "mixed < 0"
+            ],
+            "note": "mixed < 0"
+          },
+          {
+            "id": "op4",
+            "kind": "return",
+            "block": "if_then:2",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:23:9",
+            "inputs": [
+              "0 - mixed"
+            ]
+          },
+          {
+            "id": "op5",
+            "kind": "return",
+            "block": "if_join:3",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:24:7",
+            "inputs": [
+              "mixed % 2147483647"
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "pure_call",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:18:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f1",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:18:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f2",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:18:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f3",
+            "kind": "no_mem_write",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:18:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f4",
+            "kind": "no_unknown_escape",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:18:8",
+            "reason": "semantics checker enforced declared effects"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "succs": [
+              "if_join:1",
+              "if_then:0"
+            ],
+            "ops": [
+              "op0",
+              "op1"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:18:8"
+          },
+          {
+            "id": "if_then:0",
+            "kind": "if_then",
+            "preds": [
+              "entry"
+            ],
+            "succs": [
+              "if_join:1"
+            ],
+            "ops": [
+              "op2"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:20:5"
+          },
+          {
+            "id": "if_join:1",
+            "kind": "if_join",
+            "preds": [
+              "entry",
+              "if_then:0"
+            ],
+            "succs": [
+              "if_join:3",
+              "if_then:2"
+            ],
+            "ops": [
+              "op3"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:20:5"
+          },
+          {
+            "id": "if_then:2",
+            "kind": "if_then",
+            "preds": [
+              "if_join:1"
+            ],
+            "succs": [
+              "if_join:3"
+            ],
+            "ops": [
+              "op4"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:22:7"
+          },
+          {
+            "id": "if_join:3",
+            "kind": "if_join",
+            "exit": true,
+            "preds": [
+              "if_join:1",
+              "if_then:2"
+            ],
+            "ops": [
+              "op5"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:22:7"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          },
+          {
+            "block": "if_then:0",
+            "dominators": [
+              "entry",
+              "if_then:0"
+            ]
+          },
+          {
+            "block": "if_join:1",
+            "dominators": [
+              "entry",
+              "if_join:1"
+            ]
+          },
+          {
+            "block": "if_then:2",
+            "dominators": [
+              "entry",
+              "if_join:1",
+              "if_then:2"
+            ]
+          },
+          {
+            "block": "if_join:3",
+            "dominators": [
+              "entry",
+              "if_join:1",
+              "if_join:3"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "lib.core.crypto.checksum_u8",
+        "module": "lib.core.crypto",
+        "summary": {
+          "public": true,
+          "param_names": [
+            "values"
+          ],
+          "param_types": [
+            "[]u8"
+          ],
+          "param_ownership": [
+            ""
+          ],
+          "return_type": "i32",
+          "effects": [
+            "mem"
+          ]
+        },
+        "values": [
+          {
+            "id": "local:__for_end_29_5",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:26:8",
+            "region": "fn:lib.core.crypto.checksum_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:__for_end_29_5"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "__for_end_29_5"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:__for_index_29_5",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:26:8",
+            "region": "fn:lib.core.crypto.checksum_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:__for_index_29_5"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "__for_index_29_5"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:__for_iter_29_5",
+            "kind": "local",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:26:8",
+            "region": "fn:lib.core.crypto.checksum_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:__for_iter_29_5"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "__for_iter_29_5"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:total",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:26:8",
+            "region": "fn:lib.core.crypto.checksum_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:total"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "total"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "local:value",
+            "kind": "local",
+            "type": "u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:26:8",
+            "region": "fn:lib.core.crypto.checksum_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:value"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "value"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "loop_index:__for_index_29_5",
+            "kind": "loop_index",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:29:5",
+            "region": "fn:lib.core.crypto.checksum_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "__for_index_29_5"
+            },
+            "lifetime": {
+              "birth": "loop:start",
+              "death": "loop:end",
+              "owner": "__for_index_29_5"
+            },
+            "escape": "no_escape"
+          },
+          {
+            "id": "param:values",
+            "kind": "param",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:26:8",
+            "region": "fn:lib.core.crypto.checksum_u8",
+            "provenance": {
+              "kind": "param",
+              "root": "param:values"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "values"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          },
+          {
+            "id": "view:__for_iter_29_5",
+            "kind": "view",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:29:18",
+            "region": "fn:lib.core.crypto.checksum_u8",
+            "provenance": {
+              "kind": "param",
+              "root": "param:values"
+            },
+            "lifetime": {
+              "birth": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:29:18",
+              "death": "loop:end",
+              "owner": "values"
+            },
+            "borrow": "immutable",
+            "escape": "no_escape"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "assign",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:28:5",
+            "inputs": [
+              "0"
+            ],
+            "outputs": [
+              "total"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op1",
+            "kind": "for_slice",
+            "block": "for_header:0",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:29:5",
+            "inputs": [
+              "view:__for_iter_29_5",
+              "loop_index:__for_index_29_5"
+            ],
+            "outputs": [
+              "local:value"
+            ],
+            "note": "range: 0..values.len"
+          },
+          {
+            "id": "op2",
+            "kind": "assign",
+            "block": "for_body:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:30:9",
+            "inputs": [
+              "total + value"
+            ],
+            "outputs": [
+              "total"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op3",
+            "kind": "return",
+            "block": "for_after:2",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:31:7",
+            "inputs": [
+              "total"
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:26:8",
+            "reason": "semantics checker enforced declared effects",
+            "uses": [
+              "mem"
+            ]
+          },
+          {
+            "id": "f1",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:26:8",
+            "reason": "semantics checker enforced declared effects",
+            "uses": [
+              "mem"
+            ]
+          },
+          {
+            "id": "f2",
+            "kind": "provenance_known",
+            "value_id": "local:__for_iter_29_5",
+            "reason": "checked parameter/local memory value"
+          },
+          {
+            "id": "f3",
+            "kind": "region_alive",
+            "value_id": "local:__for_iter_29_5",
+            "region": "fn:lib.core.crypto.checksum_u8",
+            "reason": "function region is alive"
+          },
+          {
+            "id": "f4",
+            "kind": "provenance_known",
+            "value_id": "param:values",
+            "reason": "checked parameter/local memory value"
+          },
+          {
+            "id": "f5",
+            "kind": "region_alive",
+            "value_id": "param:values",
+            "region": "fn:lib.core.crypto.checksum_u8",
+            "reason": "function region is alive"
+          },
+          {
+            "id": "f6",
+            "kind": "len_stable",
+            "value_id": "param:values",
+            "reason": "safe code cannot mutate slice/string metadata"
+          },
+          {
+            "id": "f7",
+            "kind": "borrowed_imm",
+            "value_id": "param:values"
+          },
+          {
+            "id": "f8",
+            "kind": "provenance_known",
+            "value_id": "view:__for_iter_29_5",
+            "reason": "for collection iterable view preserves source provenance"
+          },
+          {
+            "id": "f9",
+            "kind": "region_alive",
+            "value_id": "view:__for_iter_29_5",
+            "region": "fn:lib.core.crypto.checksum_u8"
+          },
+          {
+            "id": "f10",
+            "kind": "borrowed_imm",
+            "value_id": "view:__for_iter_29_5"
+          },
+          {
+            "id": "f11",
+            "kind": "no_escape",
+            "value_id": "view:__for_iter_29_5",
+            "reason": "for collection iterable view may not escape its owner"
+          },
+          {
+            "id": "f12",
+            "kind": "index_in_range",
+            "value_id": "loop_index:__for_index_29_5",
+            "range": "0..values.len",
+            "proof_id": "proof:for-collection:value:29:5",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:29:5",
+            "reason": "for collection loop index is dominated by index < iterable.len guard",
+            "uses": [
+              "view:__for_iter_29_5"
+            ]
+          },
+          {
+            "id": "f13",
+            "kind": "len_stable",
+            "value_id": "view:__for_iter_29_5",
+            "reason": "for collection iterable is copied into hidden slice header"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "succs": [
+              "for_header:0"
+            ],
+            "ops": [
+              "op0"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:26:8"
+          },
+          {
+            "id": "for_header:0",
+            "kind": "for_header",
+            "preds": [
+              "entry",
+              "for_body:1"
+            ],
+            "succs": [
+              "for_after:2",
+              "for_body:1"
+            ],
+            "ops": [
+              "op1"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:29:5"
+          },
+          {
+            "id": "for_body:1",
+            "kind": "for_body",
+            "preds": [
+              "for_header:0"
+            ],
+            "succs": [
+              "for_header:0"
+            ],
+            "ops": [
+              "op2"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:29:5"
+          },
+          {
+            "id": "for_after:2",
+            "kind": "for_after",
+            "exit": true,
+            "preds": [
+              "for_header:0"
+            ],
+            "ops": [
+              "op3"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:29:5"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          },
+          {
+            "block": "for_header:0",
+            "dominators": [
+              "entry",
+              "for_header:0"
+            ]
+          },
+          {
+            "block": "for_body:1",
+            "dominators": [
+              "entry",
+              "for_body:1",
+              "for_header:0"
+            ]
+          },
+          {
+            "block": "for_after:2",
+            "dominators": [
+              "entry",
+              "for_after:2",
+              "for_header:0"
+            ]
+          }
+        ],
+        "proof_guards": [
+          {
+            "id": "proof:for-collection:value:29:5",
+            "kind": "range",
+            "block": "for_body:1",
+            "op_id": "op1",
+            "condition": "__for_index_29_5 < values.len",
+            "reason": "for loop range proof",
+            "dominates": [
+              {
+                "proof_id": "proof:for-collection:value:29:5",
+                "block": "for_body:1",
+                "op_id": "op1",
+                "use_kind": "bounds_check",
+                "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:29:5"
+              }
+            ]
+          }
+        ],
+        "proof_uses": [
+          {
+            "proof_id": "proof:for-collection:value:29:5",
+            "block": "for_body:1",
+            "op_id": "op1",
+            "use_kind": "bounds_check",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:29:5"
+          }
+        ],
+        "proof_terms": [
+          {
+            "id": "proof:for-collection:value:29:5",
+            "kind": "bounds_check",
+            "subject_base_id": "values",
+            "index_value_id": "loop_index:__for_index_29_5",
+            "operation": "index_load",
+            "range": "0..values.len",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:29:5",
+            "facts_used": [
+              "non_negative",
+              "less_than_len"
+            ]
+          }
+        ],
+        "range_facts": [
+          {
+            "value": "loop_index:__for_index_29_5",
+            "lower": {
+              "kind": "const"
+            },
+            "upper": {
+              "kind": "symbol",
+              "symbol": "values.len"
+            },
+            "inclusive_lower": true,
+            "inclusive_upper": false,
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:29:5",
+            "proof_id": "proof:for-collection:value:29:5",
+            "reason": "for loop range proof",
+            "derivation": [
+              "non_negative",
+              "less_than_len"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "lib.core.crypto.constant_time_eq_u8",
+        "module": "lib.core.crypto",
+        "summary": {
+          "public": true,
+          "param_names": [
+            "lhs",
+            "rhs"
+          ],
+          "param_types": [
+            "[]u8",
+            "[]u8"
+          ],
+          "param_ownership": [
+            "",
+            ""
+          ],
+          "return_type": "bool",
+          "effects": [
+            "mem"
+          ]
+        },
+        "values": [
+          {
+            "id": "local:__for_end_36_5",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:33:8",
+            "region": "fn:lib.core.crypto.constant_time_eq_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:__for_end_36_5"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "__for_end_36_5"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:__for_end_40_5",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:33:8",
+            "region": "fn:lib.core.crypto.constant_time_eq_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:__for_end_40_5"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "__for_end_40_5"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:__for_index_36_5",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:33:8",
+            "region": "fn:lib.core.crypto.constant_time_eq_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:__for_index_36_5"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "__for_index_36_5"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:__for_index_40_5",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:33:8",
+            "region": "fn:lib.core.crypto.constant_time_eq_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:__for_index_40_5"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "__for_index_40_5"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:__for_iter_36_5",
+            "kind": "local",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:33:8",
+            "region": "fn:lib.core.crypto.constant_time_eq_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:__for_iter_36_5"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "__for_iter_36_5"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:__for_iter_40_5",
+            "kind": "local",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:33:8",
+            "region": "fn:lib.core.crypto.constant_time_eq_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:__for_iter_40_5"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "__for_iter_40_5"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:diff",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:33:8",
+            "region": "fn:lib.core.crypto.constant_time_eq_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:diff"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "diff"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "local:i",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:33:8",
+            "region": "fn:lib.core.crypto.constant_time_eq_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:i"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "i"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "local:lhs_count",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:33:8",
+            "region": "fn:lib.core.crypto.constant_time_eq_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:lhs_count"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "lhs_count"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "local:lhs_item",
+            "kind": "local",
+            "type": "u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:33:8",
+            "region": "fn:lib.core.crypto.constant_time_eq_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:lhs_item"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "lhs_item"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:rhs_count",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:33:8",
+            "region": "fn:lib.core.crypto.constant_time_eq_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:rhs_count"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "rhs_count"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "local:rhs_item",
+            "kind": "local",
+            "type": "u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:33:8",
+            "region": "fn:lib.core.crypto.constant_time_eq_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:rhs_item"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "rhs_item"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "loop_index:__for_index_36_5",
+            "kind": "loop_index",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:36:5",
+            "region": "fn:lib.core.crypto.constant_time_eq_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "__for_index_36_5"
+            },
+            "lifetime": {
+              "birth": "loop:start",
+              "death": "loop:end",
+              "owner": "__for_index_36_5"
+            },
+            "escape": "no_escape"
+          },
+          {
+            "id": "loop_index:__for_index_40_5",
+            "kind": "loop_index",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:40:5",
+            "region": "fn:lib.core.crypto.constant_time_eq_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "__for_index_40_5"
+            },
+            "lifetime": {
+              "birth": "loop:start",
+              "death": "loop:end",
+              "owner": "__for_index_40_5"
+            },
+            "escape": "no_escape"
+          },
+          {
+            "id": "param:lhs",
+            "kind": "param",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:33:8",
+            "region": "fn:lib.core.crypto.constant_time_eq_u8",
+            "provenance": {
+              "kind": "param",
+              "root": "param:lhs"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "lhs"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          },
+          {
+            "id": "param:rhs",
+            "kind": "param",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:33:8",
+            "region": "fn:lib.core.crypto.constant_time_eq_u8",
+            "provenance": {
+              "kind": "param",
+              "root": "param:rhs"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "rhs"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          },
+          {
+            "id": "view:__for_iter_36_5",
+            "kind": "view",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:36:21",
+            "region": "fn:lib.core.crypto.constant_time_eq_u8",
+            "provenance": {
+              "kind": "param",
+              "root": "param:lhs"
+            },
+            "lifetime": {
+              "birth": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:36:21",
+              "death": "loop:end",
+              "owner": "lhs"
+            },
+            "borrow": "immutable",
+            "escape": "no_escape"
+          },
+          {
+            "id": "view:__for_iter_40_5",
+            "kind": "view",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:40:21",
+            "region": "fn:lib.core.crypto.constant_time_eq_u8",
+            "provenance": {
+              "kind": "param",
+              "root": "param:rhs"
+            },
+            "lifetime": {
+              "birth": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:40:21",
+              "death": "loop:end",
+              "owner": "rhs"
+            },
+            "borrow": "immutable",
+            "escape": "no_escape"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "assign",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:35:5",
+            "inputs": [
+              "0"
+            ],
+            "outputs": [
+              "lhs_count"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op1",
+            "kind": "for_slice",
+            "block": "for_header:0",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:36:5",
+            "inputs": [
+              "view:__for_iter_36_5",
+              "loop_index:__for_index_36_5"
+            ],
+            "outputs": [
+              "local:lhs_item"
+            ],
+            "note": "range: 0..lhs.len"
+          },
+          {
+            "id": "op2",
+            "kind": "assign",
+            "block": "for_body:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:37:9",
+            "inputs": [
+              "lhs_count + lhs_item * 0"
+            ],
+            "outputs": [
+              "lhs_count"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op3",
+            "kind": "assign",
+            "block": "for_body:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:38:9",
+            "inputs": [
+              "lhs_count + 1"
+            ],
+            "outputs": [
+              "lhs_count"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op4",
+            "kind": "assign",
+            "block": "for_after:2",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:39:7",
+            "inputs": [
+              "0"
+            ],
+            "outputs": [
+              "rhs_count"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op5",
+            "kind": "for_slice",
+            "block": "for_header:3",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:40:5",
+            "inputs": [
+              "view:__for_iter_40_5",
+              "loop_index:__for_index_40_5"
+            ],
+            "outputs": [
+              "local:rhs_item"
+            ],
+            "note": "range: 0..rhs.len"
+          },
+          {
+            "id": "op6",
+            "kind": "assign",
+            "block": "for_body:4",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:41:9",
+            "inputs": [
+              "rhs_count + rhs_item * 0"
+            ],
+            "outputs": [
+              "rhs_count"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op7",
+            "kind": "assign",
+            "block": "for_body:4",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:42:9",
+            "inputs": [
+              "rhs_count + 1"
+            ],
+            "outputs": [
+              "rhs_count"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op8",
+            "kind": "guard",
+            "block": "for_after:5",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:43:7",
+            "inputs": [
+              "lhs_count != rhs_count"
+            ],
+            "note": "lhs_count != rhs_count"
+          },
+          {
+            "id": "op9",
+            "kind": "return",
+            "block": "if_then:6",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:44:9",
+            "inputs": [
+              ""
+            ]
+          },
+          {
+            "id": "op10",
+            "kind": "assign",
+            "block": "if_join:7",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:45:7",
+            "inputs": [
+              "0"
+            ],
+            "outputs": [
+              "diff"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op11",
+            "kind": "assign",
+            "block": "if_join:7",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:46:5",
+            "inputs": [
+              "0"
+            ],
+            "outputs": [
+              "i"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op12",
+            "kind": "guard",
+            "block": "while_header:8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:47:5",
+            "inputs": [
+              "i < lhs_count"
+            ],
+            "note": "i < lhs_count"
+          },
+          {
+            "id": "op13",
+            "kind": "index_load",
+            "block": "while_body:9",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:48:15",
+            "inputs": [
+              "lhs",
+              "i"
+            ]
+          },
+          {
+            "id": "op14",
+            "kind": "index_load",
+            "block": "while_body:9",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:48:25",
+            "inputs": [
+              "rhs",
+              "i"
+            ]
+          },
+          {
+            "id": "op15",
+            "kind": "guard",
+            "block": "while_body:9",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:48:9",
+            "inputs": [
+              ""
+            ]
+          },
+          {
+            "id": "op16",
+            "kind": "assign",
+            "block": "if_then:11",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:49:13",
+            "inputs": [
+              "diff + 1"
+            ],
+            "outputs": [
+              "diff"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op17",
+            "kind": "assign",
+            "block": "if_join:12",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:50:11",
+            "inputs": [
+              "i + 1"
+            ],
+            "outputs": [
+              "i"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op18",
+            "kind": "return",
+            "block": "while_after:10",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:51:7",
+            "inputs": [
+              "diff == 0"
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:33:8",
+            "reason": "semantics checker enforced declared effects",
+            "uses": [
+              "mem"
+            ]
+          },
+          {
+            "id": "f1",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:33:8",
+            "reason": "semantics checker enforced declared effects",
+            "uses": [
+              "mem"
+            ]
+          },
+          {
+            "id": "f2",
+            "kind": "provenance_known",
+            "value_id": "local:__for_iter_36_5",
+            "reason": "checked parameter/local memory value"
+          },
+          {
+            "id": "f3",
+            "kind": "region_alive",
+            "value_id": "local:__for_iter_36_5",
+            "region": "fn:lib.core.crypto.constant_time_eq_u8",
+            "reason": "function region is alive"
+          },
+          {
+            "id": "f4",
+            "kind": "provenance_known",
+            "value_id": "local:__for_iter_40_5",
+            "reason": "checked parameter/local memory value"
+          },
+          {
+            "id": "f5",
+            "kind": "region_alive",
+            "value_id": "local:__for_iter_40_5",
+            "region": "fn:lib.core.crypto.constant_time_eq_u8",
+            "reason": "function region is alive"
+          },
+          {
+            "id": "f6",
+            "kind": "provenance_known",
+            "value_id": "param:lhs",
+            "reason": "checked parameter/local memory value"
+          },
+          {
+            "id": "f7",
+            "kind": "region_alive",
+            "value_id": "param:lhs",
+            "region": "fn:lib.core.crypto.constant_time_eq_u8",
+            "reason": "function region is alive"
+          },
+          {
+            "id": "f8",
+            "kind": "len_stable",
+            "value_id": "param:lhs",
+            "reason": "safe code cannot mutate slice/string metadata"
+          },
+          {
+            "id": "f9",
+            "kind": "borrowed_imm",
+            "value_id": "param:lhs"
+          },
+          {
+            "id": "f10",
+            "kind": "provenance_known",
+            "value_id": "param:rhs",
+            "reason": "checked parameter/local memory value"
+          },
+          {
+            "id": "f11",
+            "kind": "region_alive",
+            "value_id": "param:rhs",
+            "region": "fn:lib.core.crypto.constant_time_eq_u8",
+            "reason": "function region is alive"
+          },
+          {
+            "id": "f12",
+            "kind": "len_stable",
+            "value_id": "param:rhs",
+            "reason": "safe code cannot mutate slice/string metadata"
+          },
+          {
+            "id": "f13",
+            "kind": "borrowed_imm",
+            "value_id": "param:rhs"
+          },
+          {
+            "id": "f14",
+            "kind": "provenance_known",
+            "value_id": "view:__for_iter_36_5",
+            "reason": "for collection iterable view preserves source provenance"
+          },
+          {
+            "id": "f15",
+            "kind": "region_alive",
+            "value_id": "view:__for_iter_36_5",
+            "region": "fn:lib.core.crypto.constant_time_eq_u8"
+          },
+          {
+            "id": "f16",
+            "kind": "borrowed_imm",
+            "value_id": "view:__for_iter_36_5"
+          },
+          {
+            "id": "f17",
+            "kind": "no_escape",
+            "value_id": "view:__for_iter_36_5",
+            "reason": "for collection iterable view may not escape its owner"
+          },
+          {
+            "id": "f18",
+            "kind": "index_in_range",
+            "value_id": "loop_index:__for_index_36_5",
+            "range": "0..lhs.len",
+            "proof_id": "proof:for-collection:lhs_item:36:5",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:36:5",
+            "reason": "for collection loop index is dominated by index < iterable.len guard",
+            "uses": [
+              "view:__for_iter_36_5"
+            ]
+          },
+          {
+            "id": "f19",
+            "kind": "len_stable",
+            "value_id": "view:__for_iter_36_5",
+            "reason": "for collection iterable is copied into hidden slice header"
+          },
+          {
+            "id": "f20",
+            "kind": "provenance_known",
+            "value_id": "view:__for_iter_40_5",
+            "reason": "for collection iterable view preserves source provenance"
+          },
+          {
+            "id": "f21",
+            "kind": "region_alive",
+            "value_id": "view:__for_iter_40_5",
+            "region": "fn:lib.core.crypto.constant_time_eq_u8"
+          },
+          {
+            "id": "f22",
+            "kind": "borrowed_imm",
+            "value_id": "view:__for_iter_40_5"
+          },
+          {
+            "id": "f23",
+            "kind": "no_escape",
+            "value_id": "view:__for_iter_40_5",
+            "reason": "for collection iterable view may not escape its owner"
+          },
+          {
+            "id": "f24",
+            "kind": "index_in_range",
+            "value_id": "loop_index:__for_index_40_5",
+            "range": "0..rhs.len",
+            "proof_id": "proof:for-collection:rhs_item:40:5",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:40:5",
+            "reason": "for collection loop index is dominated by index < iterable.len guard",
+            "uses": [
+              "view:__for_iter_40_5"
+            ]
+          },
+          {
+            "id": "f25",
+            "kind": "len_stable",
+            "value_id": "view:__for_iter_40_5",
+            "reason": "for collection iterable is copied into hidden slice header"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "succs": [
+              "for_header:0"
+            ],
+            "ops": [
+              "op0"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:33:8"
+          },
+          {
+            "id": "for_header:0",
+            "kind": "for_header",
+            "preds": [
+              "entry",
+              "for_body:1"
+            ],
+            "succs": [
+              "for_after:2",
+              "for_body:1"
+            ],
+            "ops": [
+              "op1"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:36:5"
+          },
+          {
+            "id": "for_body:1",
+            "kind": "for_body",
+            "preds": [
+              "for_header:0"
+            ],
+            "succs": [
+              "for_header:0"
+            ],
+            "ops": [
+              "op2",
+              "op3"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:36:5"
+          },
+          {
+            "id": "for_after:2",
+            "kind": "for_after",
+            "preds": [
+              "for_header:0"
+            ],
+            "succs": [
+              "for_header:3"
+            ],
+            "ops": [
+              "op4"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:36:5"
+          },
+          {
+            "id": "for_header:3",
+            "kind": "for_header",
+            "preds": [
+              "for_after:2",
+              "for_body:4"
+            ],
+            "succs": [
+              "for_after:5",
+              "for_body:4"
+            ],
+            "ops": [
+              "op5"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:40:5"
+          },
+          {
+            "id": "for_body:4",
+            "kind": "for_body",
+            "preds": [
+              "for_header:3"
+            ],
+            "succs": [
+              "for_header:3"
+            ],
+            "ops": [
+              "op6",
+              "op7"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:40:5"
+          },
+          {
+            "id": "for_after:5",
+            "kind": "for_after",
+            "preds": [
+              "for_header:3"
+            ],
+            "succs": [
+              "if_join:7",
+              "if_then:6"
+            ],
+            "ops": [
+              "op8"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:40:5"
+          },
+          {
+            "id": "if_then:6",
+            "kind": "if_then",
+            "preds": [
+              "for_after:5"
+            ],
+            "succs": [
+              "if_join:7"
+            ],
+            "ops": [
+              "op9"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:43:7"
+          },
+          {
+            "id": "if_join:7",
+            "kind": "if_join",
+            "preds": [
+              "for_after:5",
+              "if_then:6"
+            ],
+            "succs": [
+              "while_header:8"
+            ],
+            "ops": [
+              "op10",
+              "op11"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:43:7"
+          },
+          {
+            "id": "while_header:8",
+            "kind": "while_header",
+            "preds": [
+              "if_join:12",
+              "if_join:7"
+            ],
+            "succs": [
+              "while_after:10",
+              "while_body:9"
+            ],
+            "ops": [
+              "op12"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:47:5"
+          },
+          {
+            "id": "while_body:9",
+            "kind": "while_body",
+            "preds": [
+              "while_header:8"
+            ],
+            "succs": [
+              "if_join:12",
+              "if_then:11"
+            ],
+            "ops": [
+              "op13",
+              "op14",
+              "op15"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:47:5"
+          },
+          {
+            "id": "while_after:10",
+            "kind": "while_after",
+            "exit": true,
+            "preds": [
+              "while_header:8"
+            ],
+            "ops": [
+              "op18"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:47:5"
+          },
+          {
+            "id": "if_then:11",
+            "kind": "if_then",
+            "preds": [
+              "while_body:9"
+            ],
+            "succs": [
+              "if_join:12"
+            ],
+            "ops": [
+              "op16"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:48:9"
+          },
+          {
+            "id": "if_join:12",
+            "kind": "if_join",
+            "preds": [
+              "if_then:11",
+              "while_body:9"
+            ],
+            "succs": [
+              "while_header:8"
+            ],
+            "ops": [
+              "op17"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:48:9"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          },
+          {
+            "block": "for_header:0",
+            "dominators": [
+              "entry",
+              "for_header:0"
+            ]
+          },
+          {
+            "block": "for_body:1",
+            "dominators": [
+              "entry",
+              "for_body:1",
+              "for_header:0"
+            ]
+          },
+          {
+            "block": "for_after:2",
+            "dominators": [
+              "entry",
+              "for_after:2",
+              "for_header:0"
+            ]
+          },
+          {
+            "block": "for_header:3",
+            "dominators": [
+              "entry",
+              "for_after:2",
+              "for_header:0",
+              "for_header:3"
+            ]
+          },
+          {
+            "block": "for_body:4",
+            "dominators": [
+              "entry",
+              "for_after:2",
+              "for_body:4",
+              "for_header:0",
+              "for_header:3"
+            ]
+          },
+          {
+            "block": "for_after:5",
+            "dominators": [
+              "entry",
+              "for_after:2",
+              "for_after:5",
+              "for_header:0",
+              "for_header:3"
+            ]
+          },
+          {
+            "block": "if_then:6",
+            "dominators": [
+              "entry",
+              "for_after:2",
+              "for_after:5",
+              "for_header:0",
+              "for_header:3",
+              "if_then:6"
+            ]
+          },
+          {
+            "block": "if_join:7",
+            "dominators": [
+              "entry",
+              "for_after:2",
+              "for_after:5",
+              "for_header:0",
+              "for_header:3",
+              "if_join:7"
+            ]
+          },
+          {
+            "block": "while_header:8",
+            "dominators": [
+              "entry",
+              "for_after:2",
+              "for_after:5",
+              "for_header:0",
+              "for_header:3",
+              "if_join:7",
+              "while_header:8"
+            ]
+          },
+          {
+            "block": "while_body:9",
+            "dominators": [
+              "entry",
+              "for_after:2",
+              "for_after:5",
+              "for_header:0",
+              "for_header:3",
+              "if_join:7",
+              "while_body:9",
+              "while_header:8"
+            ]
+          },
+          {
+            "block": "while_after:10",
+            "dominators": [
+              "entry",
+              "for_after:2",
+              "for_after:5",
+              "for_header:0",
+              "for_header:3",
+              "if_join:7",
+              "while_after:10",
+              "while_header:8"
+            ]
+          },
+          {
+            "block": "if_then:11",
+            "dominators": [
+              "entry",
+              "for_after:2",
+              "for_after:5",
+              "for_header:0",
+              "for_header:3",
+              "if_join:7",
+              "if_then:11",
+              "while_body:9",
+              "while_header:8"
+            ]
+          },
+          {
+            "block": "if_join:12",
+            "dominators": [
+              "entry",
+              "for_after:2",
+              "for_after:5",
+              "for_header:0",
+              "for_header:3",
+              "if_join:12",
+              "if_join:7",
+              "while_body:9",
+              "while_header:8"
+            ]
+          }
+        ],
+        "proof_guards": [
+          {
+            "id": "proof:for-collection:lhs_item:36:5",
+            "kind": "range",
+            "block": "for_body:1",
+            "op_id": "op1",
+            "condition": "__for_index_36_5 < lhs.len",
+            "reason": "for loop range proof",
+            "dominates": [
+              {
+                "proof_id": "proof:for-collection:lhs_item:36:5",
+                "block": "for_body:1",
+                "op_id": "op1",
+                "use_kind": "bounds_check",
+                "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:36:5"
+              }
+            ]
+          },
+          {
+            "id": "proof:for-collection:rhs_item:40:5",
+            "kind": "range",
+            "block": "for_body:4",
+            "op_id": "op5",
+            "condition": "__for_index_40_5 < rhs.len",
+            "reason": "for loop range proof",
+            "dominates": [
+              {
+                "proof_id": "proof:for-collection:rhs_item:40:5",
+                "block": "for_body:4",
+                "op_id": "op5",
+                "use_kind": "bounds_check",
+                "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:40:5"
+              }
+            ]
+          }
+        ],
+        "proof_uses": [
+          {
+            "proof_id": "proof:for-collection:lhs_item:36:5",
+            "block": "for_body:1",
+            "op_id": "op1",
+            "use_kind": "bounds_check",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:36:5"
+          },
+          {
+            "proof_id": "proof:for-collection:rhs_item:40:5",
+            "block": "for_body:4",
+            "op_id": "op5",
+            "use_kind": "bounds_check",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:40:5"
+          }
+        ],
+        "proof_terms": [
+          {
+            "id": "proof:for-collection:lhs_item:36:5",
+            "kind": "bounds_check",
+            "subject_base_id": "lhs",
+            "index_value_id": "loop_index:__for_index_36_5",
+            "operation": "index_load",
+            "range": "0..lhs.len",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:36:5",
+            "facts_used": [
+              "non_negative",
+              "less_than_len"
+            ]
+          },
+          {
+            "id": "proof:for-collection:rhs_item:40:5",
+            "kind": "bounds_check",
+            "subject_base_id": "rhs",
+            "index_value_id": "loop_index:__for_index_40_5",
+            "operation": "index_load",
+            "range": "0..rhs.len",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:40:5",
+            "facts_used": [
+              "non_negative",
+              "less_than_len"
+            ]
+          }
+        ],
+        "range_facts": [
+          {
+            "value": "loop_index:__for_index_36_5",
+            "lower": {
+              "kind": "const"
+            },
+            "upper": {
+              "kind": "symbol",
+              "symbol": "lhs.len"
+            },
+            "inclusive_lower": true,
+            "inclusive_upper": false,
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:36:5",
+            "proof_id": "proof:for-collection:lhs_item:36:5",
+            "reason": "for loop range proof",
+            "derivation": [
+              "non_negative",
+              "less_than_len"
+            ]
+          },
+          {
+            "value": "loop_index:__for_index_40_5",
+            "lower": {
+              "kind": "const"
+            },
+            "upper": {
+              "kind": "symbol",
+              "symbol": "rhs.len"
+            },
+            "inclusive_lower": true,
+            "inclusive_upper": false,
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/crypto.tetra:40:5",
+            "proof_id": "proof:for-collection:rhs_item:40:5",
+            "reason": "for loop range proof",
+            "derivation": [
+              "non_negative",
+              "less_than_len"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "examples.core.memory.core_crypto_smoke.main",
+        "module": "examples.core.memory.core_crypto_smoke",
+        "summary": {
+          "public": true,
+          "return_type": "i32",
+          "effects": [
+            "alloc",
+            "mem"
+          ]
+        },
+        "values": [
+          {
+            "id": "alloc_intent:changed",
+            "kind": "alloc_intent",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:14:25",
+            "region": "allocation:changed",
+            "alloc": {
+              "element_type": "u8",
+              "element_size": 1,
+              "length_expr": "2",
+              "length_const_known": true,
+              "length_const": 2,
+              "zero_guard_status": "valid_empty_no_allocator",
+              "negative_guard_status": "reject_before_allocation",
+              "overflow_guard_status": "reject_before_allocation",
+              "builtin": "core.make_u8",
+              "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:14:25"
+            },
+            "provenance": {
+              "kind": "allocation",
+              "root": "changed"
+            },
+            "lifetime": {
+              "birth": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:14:25",
+              "owner": "changed"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "alloc_intent:lhs",
+            "kind": "alloc_intent",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:8:21",
+            "region": "allocation:lhs",
+            "alloc": {
+              "element_type": "u8",
+              "element_size": 1,
+              "length_expr": "2",
+              "length_const_known": true,
+              "length_const": 2,
+              "zero_guard_status": "valid_empty_no_allocator",
+              "negative_guard_status": "reject_before_allocation",
+              "overflow_guard_status": "reject_before_allocation",
+              "builtin": "core.make_u8",
+              "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:8:21"
+            },
+            "provenance": {
+              "kind": "allocation",
+              "root": "lhs"
+            },
+            "lifetime": {
+              "birth": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:8:21",
+              "owner": "lhs"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "alloc_intent:rhs",
+            "kind": "alloc_intent",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:11:21",
+            "region": "allocation:rhs",
+            "alloc": {
+              "element_type": "u8",
+              "element_size": 1,
+              "length_expr": "2",
+              "length_const_known": true,
+              "length_const": 2,
+              "zero_guard_status": "valid_empty_no_allocator",
+              "negative_guard_status": "reject_before_allocation",
+              "overflow_guard_status": "reject_before_allocation",
+              "builtin": "core.make_u8",
+              "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:11:21"
+            },
+            "provenance": {
+              "kind": "allocation",
+              "root": "rhs"
+            },
+            "lifetime": {
+              "birth": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:11:21",
+              "owner": "rhs"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "alloc_intent:shorter",
+            "kind": "alloc_intent",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:17:25",
+            "region": "allocation:shorter",
+            "alloc": {
+              "element_type": "u8",
+              "element_size": 1,
+              "length_expr": "1",
+              "length_const_known": true,
+              "length_const": 1,
+              "zero_guard_status": "valid_empty_no_allocator",
+              "negative_guard_status": "reject_before_allocation",
+              "overflow_guard_status": "reject_before_allocation",
+              "builtin": "core.make_u8",
+              "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:17:25"
+            },
+            "provenance": {
+              "kind": "allocation",
+              "root": "shorter"
+            },
+            "lifetime": {
+              "birth": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:17:25",
+              "owner": "shorter"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "local:0",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:9:5",
+            "region": "fn:examples.core.memory.core_crypto_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "0"
+            },
+            "lifetime": {
+              "birth": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:9:5",
+              "owner": "0"
+            },
+            "escape": "no_escape"
+          },
+          {
+            "id": "local:changed",
+            "kind": "local",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:6:6",
+            "region": "fn:examples.core.memory.core_crypto_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:changed"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "changed"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "local:checksum",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:6:6",
+            "region": "fn:examples.core.memory.core_crypto_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:checksum"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "checksum"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:equal_match",
+            "kind": "local",
+            "type": "bool",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:6:6",
+            "region": "fn:examples.core.memory.core_crypto_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:equal_match"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "equal_match"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:length_mismatch",
+            "kind": "local",
+            "type": "bool",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:6:6",
+            "region": "fn:examples.core.memory.core_crypto_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:length_mismatch"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "length_mismatch"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:lhs",
+            "kind": "local",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:6:6",
+            "region": "fn:examples.core.memory.core_crypto_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:lhs"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "lhs"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "local:mixed",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:6:6",
+            "region": "fn:examples.core.memory.core_crypto_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:mixed"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "mixed"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:rhs",
+            "kind": "local",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:6:6",
+            "region": "fn:examples.core.memory.core_crypto_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:rhs"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "rhs"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "local:shorter",
+            "kind": "local",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:6:6",
+            "region": "fn:examples.core.memory.core_crypto_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:shorter"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "shorter"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "local:value_mismatch",
+            "kind": "local",
+            "type": "bool",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:6:6",
+            "region": "fn:examples.core.memory.core_crypto_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:value_mismatch"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "value_mismatch"
+            },
+            "escape": "unknown"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "alloc_intent",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:8:21",
+            "outputs": [
+              "alloc_intent:lhs"
+            ],
+            "note": "make<u8> length contract: zero valid, negative and overflow reject before allocation"
+          },
+          {
+            "id": "op1",
+            "kind": "index_store",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:9:5",
+            "inputs": [
+              "lhs",
+              "0"
+            ]
+          },
+          {
+            "id": "op2",
+            "kind": "index_store",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:10:5",
+            "inputs": [
+              "lhs",
+              "1"
+            ]
+          },
+          {
+            "id": "op3",
+            "kind": "alloc_intent",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:11:21",
+            "outputs": [
+              "alloc_intent:rhs"
+            ],
+            "note": "make<u8> length contract: zero valid, negative and overflow reject before allocation"
+          },
+          {
+            "id": "op4",
+            "kind": "index_store",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:12:5",
+            "inputs": [
+              "rhs",
+              "0"
+            ]
+          },
+          {
+            "id": "op5",
+            "kind": "index_store",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:13:5",
+            "inputs": [
+              "rhs",
+              "1"
+            ]
+          },
+          {
+            "id": "op6",
+            "kind": "alloc_intent",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:14:25",
+            "outputs": [
+              "alloc_intent:changed"
+            ],
+            "note": "make<u8> length contract: zero valid, negative and overflow reject before allocation"
+          },
+          {
+            "id": "op7",
+            "kind": "index_store",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:15:5",
+            "inputs": [
+              "changed",
+              "0"
+            ]
+          },
+          {
+            "id": "op8",
+            "kind": "index_store",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:16:5",
+            "inputs": [
+              "changed",
+              "1"
+            ]
+          },
+          {
+            "id": "op9",
+            "kind": "alloc_intent",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:17:25",
+            "outputs": [
+              "alloc_intent:shorter"
+            ],
+            "note": "make<u8> length contract: zero valid, negative and overflow reject before allocation"
+          },
+          {
+            "id": "op10",
+            "kind": "index_store",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:18:5",
+            "inputs": [
+              "shorter",
+              "0"
+            ]
+          },
+          {
+            "id": "op11",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:19:25",
+            "inputs": [
+              "lhs"
+            ],
+            "note": "lib.core.crypto.checksum_u8"
+          },
+          {
+            "id": "op12",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:20:48",
+            "note": "lib.core.crypto.interface_strength"
+          },
+          {
+            "id": "op13",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:20:22",
+            "inputs": [
+              "checksum"
+            ],
+            "note": "lib.core.crypto.mix_seed"
+          },
+          {
+            "id": "op14",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:21:29",
+            "inputs": [
+              "lhs",
+              "rhs"
+            ],
+            "note": "lib.core.crypto.constant_time_eq_u8"
+          },
+          {
+            "id": "op15",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:22:32",
+            "inputs": [
+              "lhs",
+              "changed"
+            ],
+            "note": "lib.core.crypto.constant_time_eq_u8"
+          },
+          {
+            "id": "op16",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:23:33",
+            "inputs": [
+              "lhs",
+              "shorter"
+            ],
+            "note": "lib.core.crypto.constant_time_eq_u8"
+          },
+          {
+            "id": "op17",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:24:97",
+            "note": "lib.core.crypto.interface_strength"
+          },
+          {
+            "id": "op18",
+            "kind": "guard",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:24:5",
+            "inputs": [
+              ""
+            ]
+          },
+          {
+            "id": "op19",
+            "kind": "return",
+            "block": "if_then:0",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:25:9",
+            "inputs": [
+              "42"
+            ]
+          },
+          {
+            "id": "op20",
+            "kind": "return",
+            "block": "if_join:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:26:7",
+            "inputs": [
+              "1"
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:6:6",
+            "reason": "semantics checker enforced declared effects",
+            "uses": [
+              "alloc",
+              "mem"
+            ]
+          },
+          {
+            "id": "f1",
+            "kind": "provenance_known",
+            "value_id": "local:changed",
+            "reason": "checked parameter/local memory value"
+          },
+          {
+            "id": "f2",
+            "kind": "region_alive",
+            "value_id": "local:changed",
+            "region": "fn:examples.core.memory.core_crypto_smoke.main",
+            "reason": "function region is alive"
+          },
+          {
+            "id": "f3",
+            "kind": "provenance_known",
+            "value_id": "local:lhs",
+            "reason": "checked parameter/local memory value"
+          },
+          {
+            "id": "f4",
+            "kind": "region_alive",
+            "value_id": "local:lhs",
+            "region": "fn:examples.core.memory.core_crypto_smoke.main",
+            "reason": "function region is alive"
+          },
+          {
+            "id": "f5",
+            "kind": "provenance_known",
+            "value_id": "local:rhs",
+            "reason": "checked parameter/local memory value"
+          },
+          {
+            "id": "f6",
+            "kind": "region_alive",
+            "value_id": "local:rhs",
+            "region": "fn:examples.core.memory.core_crypto_smoke.main",
+            "reason": "function region is alive"
+          },
+          {
+            "id": "f7",
+            "kind": "provenance_known",
+            "value_id": "local:shorter",
+            "reason": "checked parameter/local memory value"
+          },
+          {
+            "id": "f8",
+            "kind": "region_alive",
+            "value_id": "local:shorter",
+            "region": "fn:examples.core.memory.core_crypto_smoke.main",
+            "reason": "function region is alive"
+          },
+          {
+            "id": "f9",
+            "kind": "provenance_known",
+            "value_id": "alloc_intent:lhs",
+            "reason": "compiler-known allocation intent"
+          },
+          {
+            "id": "f10",
+            "kind": "len_stable",
+            "value_id": "alloc_intent:lhs",
+            "reason": "slice metadata is opaque in safe code"
+          },
+          {
+            "id": "f11",
+            "kind": "region_alive",
+            "value_id": "alloc_intent:lhs",
+            "region": "allocation:lhs"
+          },
+          {
+            "id": "f12",
+            "kind": "index_in_range",
+            "value_id": "local:0",
+            "range": "0 in [0, lhs.len)",
+            "proof_id": "proof:allocation-zero:literal0:lhs:9:5:index_store",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:9:5",
+            "reason": "allocation literal-zero length proof"
+          },
+          {
+            "id": "f13",
+            "kind": "provenance_known",
+            "value_id": "alloc_intent:rhs",
+            "reason": "compiler-known allocation intent"
+          },
+          {
+            "id": "f14",
+            "kind": "len_stable",
+            "value_id": "alloc_intent:rhs",
+            "reason": "slice metadata is opaque in safe code"
+          },
+          {
+            "id": "f15",
+            "kind": "region_alive",
+            "value_id": "alloc_intent:rhs",
+            "region": "allocation:rhs"
+          },
+          {
+            "id": "f16",
+            "kind": "index_in_range",
+            "value_id": "local:0",
+            "range": "0 in [0, rhs.len)",
+            "proof_id": "proof:allocation-zero:literal0:rhs:12:5:index_store",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:12:5",
+            "reason": "allocation literal-zero length proof"
+          },
+          {
+            "id": "f17",
+            "kind": "provenance_known",
+            "value_id": "alloc_intent:changed",
+            "reason": "compiler-known allocation intent"
+          },
+          {
+            "id": "f18",
+            "kind": "len_stable",
+            "value_id": "alloc_intent:changed",
+            "reason": "slice metadata is opaque in safe code"
+          },
+          {
+            "id": "f19",
+            "kind": "region_alive",
+            "value_id": "alloc_intent:changed",
+            "region": "allocation:changed"
+          },
+          {
+            "id": "f20",
+            "kind": "index_in_range",
+            "value_id": "local:0",
+            "range": "0 in [0, changed.len)",
+            "proof_id": "proof:allocation-zero:literal0:changed:15:5:index_store",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:15:5",
+            "reason": "allocation literal-zero length proof"
+          },
+          {
+            "id": "f21",
+            "kind": "provenance_known",
+            "value_id": "alloc_intent:shorter",
+            "reason": "compiler-known allocation intent"
+          },
+          {
+            "id": "f22",
+            "kind": "len_stable",
+            "value_id": "alloc_intent:shorter",
+            "reason": "slice metadata is opaque in safe code"
+          },
+          {
+            "id": "f23",
+            "kind": "region_alive",
+            "value_id": "alloc_intent:shorter",
+            "region": "allocation:shorter"
+          },
+          {
+            "id": "f24",
+            "kind": "index_in_range",
+            "value_id": "local:0",
+            "range": "0 in [0, shorter.len)",
+            "proof_id": "proof:allocation-zero:literal0:shorter:18:5:index_store",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:18:5",
+            "reason": "allocation literal-zero length proof"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "succs": [
+              "if_join:1",
+              "if_then:0"
+            ],
+            "ops": [
+              "op0",
+              "op1",
+              "op2",
+              "op3",
+              "op4",
+              "op5",
+              "op6",
+              "op7",
+              "op8",
+              "op9",
+              "op10",
+              "op11",
+              "op12",
+              "op13",
+              "op14",
+              "op15",
+              "op16",
+              "op17",
+              "op18"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:6:6"
+          },
+          {
+            "id": "if_then:0",
+            "kind": "if_then",
+            "preds": [
+              "entry"
+            ],
+            "succs": [
+              "if_join:1"
+            ],
+            "ops": [
+              "op19"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:24:5"
+          },
+          {
+            "id": "if_join:1",
+            "kind": "if_join",
+            "exit": true,
+            "preds": [
+              "entry",
+              "if_then:0"
+            ],
+            "ops": [
+              "op20"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:24:5"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          },
+          {
+            "block": "if_then:0",
+            "dominators": [
+              "entry",
+              "if_then:0"
+            ]
+          },
+          {
+            "block": "if_join:1",
+            "dominators": [
+              "entry",
+              "if_join:1"
+            ]
+          }
+        ],
+        "proof_guards": [
+          {
+            "id": "proof:allocation-zero:literal0:lhs:9:5:index_store",
+            "kind": "range",
+            "block": "entry",
+            "condition": "0 < lhs.len && lhs.len == 2",
+            "reason": "allocation literal-zero length proof",
+            "dominates": [
+              {
+                "proof_id": "proof:allocation-zero:literal0:lhs:9:5:index_store",
+                "block": "entry",
+                "op_id": "op1",
+                "use_kind": "bounds_check",
+                "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:9:5"
+              }
+            ]
+          },
+          {
+            "id": "proof:allocation-zero:literal0:rhs:12:5:index_store",
+            "kind": "range",
+            "block": "entry",
+            "condition": "0 < rhs.len && rhs.len == 2",
+            "reason": "allocation literal-zero length proof",
+            "dominates": [
+              {
+                "proof_id": "proof:allocation-zero:literal0:rhs:12:5:index_store",
+                "block": "entry",
+                "op_id": "op4",
+                "use_kind": "bounds_check",
+                "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:12:5"
+              }
+            ]
+          },
+          {
+            "id": "proof:allocation-zero:literal0:changed:15:5:index_store",
+            "kind": "range",
+            "block": "entry",
+            "condition": "0 < changed.len && changed.len == 2",
+            "reason": "allocation literal-zero length proof",
+            "dominates": [
+              {
+                "proof_id": "proof:allocation-zero:literal0:changed:15:5:index_store",
+                "block": "entry",
+                "op_id": "op7",
+                "use_kind": "bounds_check",
+                "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:15:5"
+              }
+            ]
+          },
+          {
+            "id": "proof:allocation-zero:literal0:shorter:18:5:index_store",
+            "kind": "range",
+            "block": "entry",
+            "condition": "0 < shorter.len && shorter.len == 1",
+            "reason": "allocation literal-zero length proof",
+            "dominates": [
+              {
+                "proof_id": "proof:allocation-zero:literal0:shorter:18:5:index_store",
+                "block": "entry",
+                "op_id": "op10",
+                "use_kind": "bounds_check",
+                "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:18:5"
+              }
+            ]
+          }
+        ],
+        "proof_uses": [
+          {
+            "proof_id": "proof:allocation-zero:literal0:lhs:9:5:index_store",
+            "block": "entry",
+            "op_id": "op1",
+            "use_kind": "bounds_check",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:9:5"
+          },
+          {
+            "proof_id": "proof:allocation-zero:literal0:rhs:12:5:index_store",
+            "block": "entry",
+            "op_id": "op4",
+            "use_kind": "bounds_check",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:12:5"
+          },
+          {
+            "proof_id": "proof:allocation-zero:literal0:changed:15:5:index_store",
+            "block": "entry",
+            "op_id": "op7",
+            "use_kind": "bounds_check",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:15:5"
+          },
+          {
+            "proof_id": "proof:allocation-zero:literal0:shorter:18:5:index_store",
+            "block": "entry",
+            "op_id": "op10",
+            "use_kind": "bounds_check",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:18:5"
+          }
+        ],
+        "proof_terms": [
+          {
+            "id": "proof:allocation-zero:literal0:lhs:9:5:index_store",
+            "kind": "bounds_check",
+            "subject_base_id": "lhs",
+            "index_value_id": "local:0",
+            "operation": "index_store",
+            "range": "0 in [0, lhs.len)",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:9:5",
+            "facts_used": [
+              "non_negative",
+              "less_than_len",
+              "allocation_literal_zero",
+              "allocation_length_positive"
+            ]
+          },
+          {
+            "id": "proof:allocation-zero:literal0:rhs:12:5:index_store",
+            "kind": "bounds_check",
+            "subject_base_id": "rhs",
+            "index_value_id": "local:0",
+            "operation": "index_store",
+            "range": "0 in [0, rhs.len)",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:12:5",
+            "facts_used": [
+              "non_negative",
+              "less_than_len",
+              "allocation_literal_zero",
+              "allocation_length_positive"
+            ]
+          },
+          {
+            "id": "proof:allocation-zero:literal0:changed:15:5:index_store",
+            "kind": "bounds_check",
+            "subject_base_id": "changed",
+            "index_value_id": "local:0",
+            "operation": "index_store",
+            "range": "0 in [0, changed.len)",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:15:5",
+            "facts_used": [
+              "non_negative",
+              "less_than_len",
+              "allocation_literal_zero",
+              "allocation_length_positive"
+            ]
+          },
+          {
+            "id": "proof:allocation-zero:literal0:shorter:18:5:index_store",
+            "kind": "bounds_check",
+            "subject_base_id": "shorter",
+            "index_value_id": "local:0",
+            "operation": "index_store",
+            "range": "0 in [0, shorter.len)",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:18:5",
+            "facts_used": [
+              "non_negative",
+              "less_than_len",
+              "allocation_literal_zero",
+              "allocation_length_positive"
+            ]
+          }
+        ],
+        "range_facts": [
+          {
+            "value": "local:0",
+            "lower": {
+              "kind": "const"
+            },
+            "upper": {
+              "kind": "symbol",
+              "symbol": "lhs.len"
+            },
+            "inclusive_lower": true,
+            "inclusive_upper": false,
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:9:5",
+            "proof_id": "proof:allocation-zero:literal0:lhs:9:5:index_store",
+            "reason": "allocation literal-zero length proof",
+            "derivation": [
+              "non_negative",
+              "less_than_len",
+              "allocation_literal_zero",
+              "allocation_length_positive"
+            ]
+          },
+          {
+            "value": "local:0",
+            "lower": {
+              "kind": "const"
+            },
+            "upper": {
+              "kind": "symbol",
+              "symbol": "rhs.len"
+            },
+            "inclusive_lower": true,
+            "inclusive_upper": false,
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:12:5",
+            "proof_id": "proof:allocation-zero:literal0:rhs:12:5:index_store",
+            "reason": "allocation literal-zero length proof",
+            "derivation": [
+              "non_negative",
+              "less_than_len",
+              "allocation_literal_zero",
+              "allocation_length_positive"
+            ]
+          },
+          {
+            "value": "local:0",
+            "lower": {
+              "kind": "const"
+            },
+            "upper": {
+              "kind": "symbol",
+              "symbol": "changed.len"
+            },
+            "inclusive_lower": true,
+            "inclusive_upper": false,
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:15:5",
+            "proof_id": "proof:allocation-zero:literal0:changed:15:5:index_store",
+            "reason": "allocation literal-zero length proof",
+            "derivation": [
+              "non_negative",
+              "less_than_len",
+              "allocation_literal_zero",
+              "allocation_length_positive"
+            ]
+          },
+          {
+            "value": "local:0",
+            "lower": {
+              "kind": "const"
+            },
+            "upper": {
+              "kind": "symbol",
+              "symbol": "shorter.len"
+            },
+            "inclusive_lower": true,
+            "inclusive_upper": false,
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/core/memory/core_crypto_smoke.tetra:18:5",
+            "proof_id": "proof:allocation-zero:literal0:shorter:18:5:index_store",
+            "reason": "allocation literal-zero length proof",
+            "derivation": [
+              "non_negative",
+              "less_than_len",
+              "allocation_literal_zero",
+              "allocation_length_positive"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

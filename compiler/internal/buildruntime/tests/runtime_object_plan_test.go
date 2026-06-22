@@ -44,6 +44,12 @@ func TestDecideRuntimeObjectPlan(t *testing.T) {
 			wantRuntimeUsed: true,
 		},
 		{
+			name:            "actor system receive requires runtime",
+			target:          "linux-x64",
+			usage:           buildruntime.RuntimeObjectPlanUsage{ActorSystemReceiveUsed: true},
+			wantRuntimeUsed: true,
+		},
+		{
 			name:   "linux x86 filesystem minimal runtime",
 			target: "linux-x86",
 			usage: buildruntime.RuntimeObjectPlanUsage{

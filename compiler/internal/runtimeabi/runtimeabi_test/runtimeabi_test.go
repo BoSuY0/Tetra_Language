@@ -197,15 +197,16 @@ func TestSignatureForSymbol(t *testing.T) {
 }
 
 func TestActorRuntimeSignaturesCoverTypedMessageABI(t *testing.T) {
+	actorSlots := ActorHandleABI().RefSlots
 	tests := []struct {
 		name   string
 		params int
 		rets   int
 	}{
-		{name: "__tetra_actor_spawn", params: 1, rets: 1},
-		{name: "__tetra_actor_send", params: 2, rets: 1},
-		{name: "__tetra_actor_send_msg", params: 3, rets: 1},
-		{name: "__tetra_actor_send_begin", params: 3, rets: 1},
+		{name: "__tetra_actor_spawn", params: 1, rets: actorSlots},
+		{name: "__tetra_actor_send", params: actorSlots + 1, rets: 1},
+		{name: "__tetra_actor_send_msg", params: actorSlots + 2, rets: 1},
+		{name: "__tetra_actor_send_begin", params: actorSlots + 2, rets: 1},
 		{name: "__tetra_actor_send_slot", params: 2, rets: 1},
 		{name: "__tetra_actor_send_commit", params: 0, rets: 1},
 		{name: "__tetra_actor_recv", params: 0, rets: 1},
@@ -216,13 +217,137 @@ func TestActorRuntimeSignaturesCoverTypedMessageABI(t *testing.T) {
 		{name: "__tetra_actor_recv_begin", params: 0, rets: 1},
 		{name: "__tetra_actor_recv_slot", params: 1, rets: 1},
 		{name: "__tetra_actor_recv_count", params: 0, rets: 1},
-		{name: "__tetra_actor_self", params: 0, rets: 1},
-		{name: "__tetra_actor_sender", params: 0, rets: 1},
+		{name: "__tetra_actor_self", params: 0, rets: actorSlots},
+		{name: "__tetra_actor_sender", params: 0, rets: actorSlots},
 		{name: "__tetra_actor_yield_now", params: 0, rets: 1},
 		{name: "__tetra_actor_state_load", params: 1, rets: 1},
 		{name: "__tetra_actor_state_store", params: 2, rets: 1},
 	}
 
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := SignatureForSymbol(tt.name)
+			if !ok {
+				t.Fatalf("missing signature")
+			}
+			if got.ParamSlots != tt.params || got.ReturnSlots != tt.rets {
+				t.Fatalf(
+					"signature = params=%d returns=%d, want params=%d returns=%d",
+					got.ParamSlots,
+					got.ReturnSlots,
+					tt.params,
+					tt.rets,
+				)
+			}
+		})
+	}
+}
+
+func TestActorHandleABIContractV2(t *testing.T) {
+	contract := ActorHandleABI()
+	if contract.Version != 2 {
+		t.Fatalf("actor ABI version = %d, want 2", contract.Version)
+	}
+	if contract.RefSlots != 2 {
+		t.Fatalf("actor ref slots = %d, want 2", contract.RefSlots)
+	}
+	if contract.Layout != "actor-ref-v2" {
+		t.Fatalf("actor ABI layout = %q, want actor-ref-v2", contract.Layout)
+	}
+	if contract.LegacyOneSlotAccepted {
+		t.Fatalf("actor ABI must not accept legacy one-slot handles")
+	}
+	wantParts := []string{"kind", "node_id", "node_epoch", "slot", "generation"}
+	if !reflect.DeepEqual(contract.RequiredParts, wantParts) {
+		t.Fatalf("actor ABI parts = %#v, want %#v", contract.RequiredParts, wantParts)
+	}
+}
+
+func TestActorLifecycleStatusNamesCoverV1Contract(t *testing.T) {
+	want := []string{
+		"starting",
+		"ready",
+		"running",
+		"blocked",
+		"sleeping",
+		"waiting",
+		"stopping",
+		"exited_normal",
+		"exited_error",
+		"canceled",
+		"restarting",
+		"dead",
+	}
+	if got := ActorLifecycleStatusNames(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("actor lifecycle status names = %#v, want %#v", got, want)
+	}
+}
+
+func TestActorLifecycleRuntimeSignaturesUseOpaqueActorRefs(t *testing.T) {
+	actorSlots := ActorHandleABI().RefSlots
+	wantSymbols := []string{
+		"__tetra_actor_status",
+		"__tetra_actor_status_raw",
+		"__tetra_actor_wait",
+		"__tetra_actor_wait_until",
+		"__tetra_actor_stop",
+		"__tetra_actor_exit_reason",
+		"__tetra_actor_link",
+		"__tetra_actor_unlink",
+		"__tetra_actor_monitor",
+		"__tetra_actor_demonitor",
+		"__tetra_actor_set_trap_exit",
+	}
+	if got := RequiredActorLifecycleSymbols(); !reflect.DeepEqual(got, wantSymbols) {
+		t.Fatalf("actor lifecycle symbols = %#v, want %#v", got, wantSymbols)
+	}
+
+	tests := []struct {
+		name   string
+		params int
+		rets   int
+	}{
+		{name: "__tetra_actor_status", params: actorSlots, rets: 1},
+		{name: "__tetra_actor_status_raw", params: actorSlots, rets: 2},
+		{name: "__tetra_actor_wait", params: actorSlots, rets: 2},
+		{name: "__tetra_actor_wait_until", params: actorSlots + 1, rets: 2},
+		{name: "__tetra_actor_stop", params: actorSlots + 1, rets: 1},
+		{name: "__tetra_actor_exit_reason", params: actorSlots, rets: 1},
+		{name: "__tetra_actor_link", params: actorSlots, rets: 1},
+		{name: "__tetra_actor_unlink", params: actorSlots, rets: 1},
+		{name: "__tetra_actor_monitor", params: actorSlots, rets: 1},
+		{name: "__tetra_actor_demonitor", params: 1, rets: 1},
+		{name: "__tetra_actor_set_trap_exit", params: 1, rets: 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := SignatureForSymbol(tt.name)
+			if !ok {
+				t.Fatalf("missing signature")
+			}
+			if got.ParamSlots != tt.params || got.ReturnSlots != tt.rets {
+				t.Fatalf(
+					"signature = params=%d returns=%d, want params=%d returns=%d",
+					got.ParamSlots,
+					got.ReturnSlots,
+					tt.params,
+					tt.rets,
+				)
+			}
+		})
+	}
+}
+
+func TestActorSystemReceiveRuntimeSignatures(t *testing.T) {
+	tests := []struct {
+		name   string
+		params int
+		rets   int
+	}{
+		{name: "__tetra_actor_recv_system_begin", params: 2, rets: 1},
+		{name: "__tetra_actor_recv_system_slot", params: 1, rets: 1},
+		{name: "__tetra_actor_recv_system_count", params: 0, rets: 1},
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, ok := SignatureForSymbol(tt.name)

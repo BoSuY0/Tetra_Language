@@ -1,8 +1,9 @@
 package buildapi
 
 type BuildStats struct {
-	CompiledModules  []string
-	CacheHits        []string
-	LoweredModules   []string
-	InterfaceModules []string
+	CompiledModules          []string
+	CacheHits                []string
+	LoweredModules           []string
+	InterfaceModules         []string
+	CompilerPhaseProfilePath string
 }

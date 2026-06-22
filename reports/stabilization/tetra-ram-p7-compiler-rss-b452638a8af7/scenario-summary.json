@@ -1,0 +1,98 @@
+{
+  "schema": "tetra.ram.p7-compiler-rss-summary.v1",
+  "scenarios": [
+    {
+      "name": "large_reports_on_jobs_cpu_warm",
+      "module_count": 12,
+      "jobs": 32,
+      "reports": true,
+      "warm_cache": true,
+      "phase_profile": "scenarios/large_reports_on_jobs_cpu_warm/compiler-profile.json",
+      "executable": "scenarios/large_reports_on_jobs_cpu_warm/out/app",
+      "executable_sha256": "dd3cde40ad266a93f185d38baab08c3bac8f36b55c9dc70e09cf47f169c57630",
+      "rss_peak_bytes": 30457856,
+      "rss_peak_phase": "object_retention_link",
+      "go_heap_peak_alloc_bytes": 3063768,
+      "worker_count": 13,
+      "worker_reason": "requested_jobs=32 max_jobs=13 num_cpu=32 memory_budget_bytes=unset",
+      "report_mode": "proof+bounds+alloc+memory",
+      "cache_hits": [
+        "app.main",
+        "bench.m0",
+        "bench.m1",
+        "bench.m10",
+        "bench.m11",
+        "bench.m2",
+        "bench.m3",
+        "bench.m4",
+        "bench.m5",
+        "bench.m6",
+        "bench.m7",
+        "bench.m8",
+        "bench.m9"
+      ]
+    },
+    {
+      "name": "medium_reports_on_jobs_2_cold",
+      "module_count": 6,
+      "jobs": 2,
+      "reports": true,
+      "warm_cache": false,
+      "phase_profile": "scenarios/medium_reports_on_jobs_2_cold/compiler-profile.json",
+      "executable": "scenarios/medium_reports_on_jobs_2_cold/out/app",
+      "executable_sha256": "d3002b54deb8173702e1add06629fb8744dfa38bc54e84b8d1026ca3f589d49a",
+      "rss_peak_bytes": 27734016,
+      "rss_peak_phase": "object_retention_link",
+      "go_heap_peak_alloc_bytes": 3395952,
+      "worker_count": 2,
+      "worker_reason": "requested_jobs=2 max_jobs=7 num_cpu=32 memory_budget_bytes=unset",
+      "report_mode": "proof+bounds+alloc+memory",
+      "compiled_modules": [
+        "app.main",
+        "bench.m0",
+        "bench.m1",
+        "bench.m2",
+        "bench.m3",
+        "bench.m4",
+        "bench.m5"
+      ],
+      "lowered_modules": [
+        "app.main",
+        "bench.m0",
+        "bench.m1",
+        "bench.m2",
+        "bench.m3",
+        "bench.m4",
+        "bench.m5"
+      ]
+    },
+    {
+      "name": "small_reports_off_jobs_1_cold",
+      "module_count": 3,
+      "jobs": 1,
+      "reports": false,
+      "warm_cache": false,
+      "phase_profile": "scenarios/small_reports_off_jobs_1_cold/compiler-profile.json",
+      "executable": "scenarios/small_reports_off_jobs_1_cold/out/app",
+      "executable_sha256": "3443341e0299aab1dd810832bb5eaa4158bfdf396767bfdb5192209ea19b3c8d",
+      "rss_peak_bytes": 22503424,
+      "rss_peak_phase": "report_generation",
+      "go_heap_peak_alloc_bytes": 2427776,
+      "worker_count": 1,
+      "worker_reason": "requested_jobs=1 max_jobs=4 num_cpu=32 memory_budget_bytes=unset",
+      "report_mode": "off",
+      "compiled_modules": [
+        "app.main",
+        "bench.m0",
+        "bench.m1",
+        "bench.m2"
+      ],
+      "lowered_modules": [
+        "app.main",
+        "bench.m0",
+        "bench.m1",
+        "bench.m2"
+      ]
+    }
+  ]
+}

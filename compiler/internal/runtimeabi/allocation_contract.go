@@ -8,17 +8,19 @@ import (
 type AllocationRuntimePath string
 
 const (
-	AllocationPathPlannerSelected  AllocationRuntimePath = "planner_selected"
-	AllocationPathHeap             AllocationRuntimePath = "heap"
-	AllocationPathSmallHeapBump    AllocationRuntimePath = "small_heap_bump"
-	AllocationPathPerCoreSmallHeap AllocationRuntimePath = "per_core_small_heap"
-	AllocationPathLargeMmap        AllocationRuntimePath = "large_mmap"
-	AllocationPathExplicitIsland   AllocationRuntimePath = "explicit_island"
-	AllocationPathRegion           AllocationRuntimePath = "region"
-	AllocationPathStackFrame       AllocationRuntimePath = "stack_frame"
-	AllocationPathEliminated       AllocationRuntimePath = "eliminated"
-	AllocationPathExternal         AllocationRuntimePath = "external"
-	AllocationPathUnknown          AllocationRuntimePath = "unknown_conservative"
+	AllocationPathPlannerSelected        AllocationRuntimePath = "planner_selected"
+	AllocationPathHeap                   AllocationRuntimePath = "heap"
+	AllocationPathSmallHeapBump          AllocationRuntimePath = "small_heap_bump"
+	AllocationPathProcessBumpSmallHeapV0 AllocationRuntimePath = "process_bump_small_heap_v0"
+	AllocationPathPerCoreSmallHeap       AllocationRuntimePath = "per_core_small_heap"
+	AllocationPathLargeMmap              AllocationRuntimePath = "large_mmap"
+	AllocationPathExplicitIsland         AllocationRuntimePath = "explicit_island"
+	AllocationPathScopedSingleMappingV0  AllocationRuntimePath = "scoped_single_mapping_v0"
+	AllocationPathRegion                 AllocationRuntimePath = "region"
+	AllocationPathStackFrame             AllocationRuntimePath = "stack_frame"
+	AllocationPathEliminated             AllocationRuntimePath = "eliminated"
+	AllocationPathExternal               AllocationRuntimePath = "external"
+	AllocationPathUnknown                AllocationRuntimePath = "unknown_conservative"
 )
 
 type AllocationZeroSizeBehavior string

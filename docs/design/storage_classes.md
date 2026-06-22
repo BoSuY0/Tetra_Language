@@ -2,8 +2,8 @@
 
 Status: P2.0 report schema with P2.1/P2.2 stack-backed slices, P2.3 scalar replacement, P2.4
 explicit island validation, P2.5 copy/copy_into integration, P2.6 cross-stage allocation validation,
-the P5.0 runtime allocation contract, and P15.2 `linux-x64` per-core small-heap safe-slice runtime
-evidence.
+the P5.0 runtime allocation contract, and P0.1 truthful `linux-x64`
+process-bump small-heap safe-slice runtime evidence.
 
 Allocation storage classes are planner facts first and backend-lowering facts
 second. Reports therefore expose both `planned_storage` and
@@ -46,11 +46,11 @@ second. Reports therefore expose both `planned_storage` and
   states use this class. P5.0 freezes the heap runtime path contract: 16-byte
   minimum alignment, guarded invalid sizes before allocator access, stable
   trap/status failure behavior, and report hooks for runtime path and bytes.
-  P15.2 keeps the storage class as `Heap` while exposing the concrete
+  P0.1 keeps the storage class as `Heap` while exposing the concrete
   `linux-x64` runtime path for constant safe-slice allocations:
-  `runtime_path: per_core_small_heap` with an `allocator_class` such as
-  `small_32`, `allocator_scope: core:0`, and
-  `allocator_reuse_policy: same_core_same_size_class_free_list`, or
+  `runtime_path: process_bump_small_heap_v0` with an `allocator_class` such as
+  `small_32`, `allocator_scope: process`, and
+  `allocator_reuse_policy: bump_no_reuse_v0`, or
   `runtime_path: large_mmap` for requests beyond the 4096-byte small class.
 
 `LargeMmap`
@@ -100,11 +100,12 @@ evidence.
   and `debug_mode`. These hooks describe the aligned bump allocator and bulk
   island free; they do not imply compiler-selected implicit regions yet.
 - For P5.3 function-local temporary region rows, reports expose
-  `planned_storage: Region`, `runtime_path: region`,
+  `planned_storage: Region`, `runtime_path: scoped_single_mapping_v0`,
   `allocator_class: function_temp_region`, `region_id:
   region:<function>:temp`, `lifetime: function:<function>`, and
-  `debug_mode: region_reset_when_enabled`. Until implicit region lowering is
-  implemented, those same rows must keep `actual_lowering_storage: Heap` and
+  `debug_mode: region_reset_when_enabled` when the emitted function-temp path is
+  actually selected. This is a single-mapping scoped path, not a real arena. Rows
+  that only plan a region must keep `actual_lowering_storage: Heap` and
   `lowering_status: region_planned_heap_fallback`.
 - For P2.5 `copy_into(dst)`, no allocation record is created. The proof/PLIR
   report names the no-allocation copy-into operation, while the allocation
@@ -113,7 +114,7 @@ evidence.
 - For P2.6, allocation reports are checked against the exact plan before they
   are written. A report with mismatched totals or allocation rows is rejected
   instead of being emitted as misleading evidence.
-- For P15.2 `linux-x64` safe-slice heap rows with constant byte sizes, reports
+- For P0.1 `linux-x64` safe-slice heap rows with constant byte sizes, reports
   expose `runtime_path`, `allocator_class`, `bytes_requested`, and
   `bytes_reserved`, plus `allocator_scope`, `allocator_reuse_policy`, and
   `allocator_chunk_bytes`. P15.3 `core.alloc_bytes` rows also expose

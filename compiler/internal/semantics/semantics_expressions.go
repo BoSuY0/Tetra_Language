@@ -613,6 +613,9 @@ func checkExprWithEffects(
 		if err != nil {
 			return "", regionNone, fmt.Errorf("%s: %v", frontend.FormatPos(e.At), err)
 		}
+		if info.RuntimeOwned && !info.UserConstructible {
+			return "", regionNone, runtimeOwnedConstructionError(e.At, resolved)
+		}
 		if info.Kind != TypeStruct {
 			return "", regionNone, fmt.Errorf("%s: '%s' is not a struct", frontend.FormatPos(e.At), resolved)
 		}
@@ -984,6 +987,9 @@ func checkMatchExpr(
 		caseScopeID := regionNone
 		if i < len(caseScopes) {
 			caseScopeID = caseScopes[i]
+		}
+		if caseScopeID == regionNone {
+			caseScopeID = patternBindingScopeID(c.Pattern, state)
 		}
 		err := withActiveScope(state, caseScopeID, func() error {
 			if err := bindPatternOwnershipAliases(
@@ -6025,20 +6031,30 @@ func checkBorrowedEscape(
 		}
 	}
 	if catch, ok := expr.(*frontend.CatchExpr); ok {
-		for _, c := range catch.Cases {
-			if err := checkBorrowedEscape(
-				c.Value,
-				locals,
-				globals,
-				funcs,
-				types,
-				module,
-				imports,
-				state,
-				effects,
-				analysis,
-				format,
-			); err != nil {
+		caseScopes := state.catchExprScopes[catch]
+		for i, c := range catch.Cases {
+			caseScopeID := regionNone
+			if i < len(caseScopes) {
+				caseScopeID = caseScopes[i]
+			}
+			if caseScopeID == regionNone {
+				caseScopeID = patternBindingScopeID(c.Pattern, state)
+			}
+			if err := withActiveScope(state, caseScopeID, func() error {
+				return checkBorrowedEscape(
+					c.Value,
+					locals,
+					globals,
+					funcs,
+					types,
+					module,
+					imports,
+					state,
+					effects,
+					analysis,
+					format,
+				)
+			}); err != nil {
 				return err
 			}
 		}
@@ -6440,6 +6456,11 @@ func validateTypedActorMessageType(
 	if !ok {
 		return fmt.Errorf("unknown type '%s'", typeName)
 	}
+	if isRuntimeSystemMessageSurfaceType(typeName) || (info.RuntimeOwned && !info.ActorSendable) {
+		return fmt.Errorf(
+			"runtime system messages cannot be sent through the ordinary actor mailbox; use actor lifecycle, link, monitor, or cluster APIs",
+		)
+	}
 	if surfaceType, ok := surfaceActorTaskBoundaryValueType(typeName, types); ok {
 		return fmt.Errorf("surface value '%s' cannot cross actor/task boundary", surfaceType)
 	}
@@ -6500,6 +6521,15 @@ func validateTypedActorMessageType(
 		return typedActorUnsupportedTransferTypeError("optional wrapper", typeName)
 	default:
 		return typedActorUnsupportedTransferTypeError("non-value type", typeName)
+	}
+}
+
+func isRuntimeSystemMessageSurfaceType(typeName string) bool {
+	switch typeName {
+	case "lib.core.actors.SystemMessage", "lib.core.actors.SystemReceiveResult":
+		return true
+	default:
+		return false
 	}
 }
 
@@ -6976,6 +7006,9 @@ func checkStructConstructorCallWithEffects(
 	if err := ensureTypeVisible(resolvedType, info, module, e.At); err != nil {
 		return "", regionNone, true, err
 	}
+	if info.RuntimeOwned && !info.UserConstructible {
+		return "", regionNone, true, runtimeOwnedConstructionError(e.At, resolvedType)
+	}
 	if len(e.Args) != len(info.Fields) {
 		return "", regionNone, true, fmt.Errorf(
 			"%s: wrong field count for '%s'",
@@ -7070,6 +7103,14 @@ func checkStructConstructorCallWithEffects(
 	e.ResolvedType = resolvedType
 	state.setExprRegionTree(e, fieldTree)
 	return resolvedType, constructorRegionFromTree(fieldTree), true, nil
+}
+
+func runtimeOwnedConstructionError(pos frontend.Position, typeName string) error {
+	return fmt.Errorf(
+		"%s: runtime-owned actor handle '%s' cannot be constructed",
+		frontend.FormatPos(pos),
+		typeName,
+	)
 }
 
 func reportBarePayloadMatchExprPatterns(

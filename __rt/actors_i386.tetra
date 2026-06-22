@@ -124,6 +124,12 @@ var g_ping_task_result_s6: i32
 var g_ping_task_result_s7: i32
 var g_task_result_actor: i32
 
+func actor_ref_slot(ref: actor) -> i32:
+    var slot: i32 = 0
+    unsafe:
+        slot = core.actor_ref_slot(ref)
+    return slot
+
 func actor_slot(idx: i32) -> ptr:
     if idx == 0:
         return g_main_slot
@@ -133,7 +139,7 @@ func actor_slot(idx: i32) -> ptr:
         return g_ping_slot
     return g_pong_slot
 
-func actor_status(idx: i32) -> i32:
+func actor_slot_status(idx: i32) -> i32:
     if idx == 0:
         return g_main_status
     if idx == 1:
@@ -199,17 +205,17 @@ func set_actor_waiting_task(idx: i32, task: i32) -> i32:
 func wake_task_waiters() -> i32:
     var woke: i32 = 0
     if g_main_status == STATUS_WAITING_TASK:
-        if actor_status(g_main_waiting_task) == STATUS_DONE:
+        if actor_slot_status(g_main_waiting_task) == STATUS_DONE:
             g_main_status = STATUS_READY
             woke = 1
     if g_pong_spawned == 1:
         if g_pong_status == STATUS_WAITING_TASK:
-            if actor_status(g_pong_waiting_task) == STATUS_DONE:
+            if actor_slot_status(g_pong_waiting_task) == STATUS_DONE:
                 g_pong_status = STATUS_READY
                 woke = 1
     if g_ping_spawned == 1:
         if g_ping_status == STATUS_WAITING_TASK:
-            if actor_status(g_ping_waiting_task) == STATUS_DONE:
+            if actor_slot_status(g_ping_waiting_task) == STATUS_DONE:
                 g_ping_status = STATUS_READY
                 woke = 1
     return woke
@@ -821,7 +827,7 @@ func tetra_entry() -> i32:
     return 1
 
 @export("__tetra_actor_spawn")
-func actor_spawn(entry_id: i32) -> i32:
+func actor_spawn(entry_id: i32) -> actor:
     unsafe:
         if g_pong_spawned == 0:
             g_pong_entry_id = entry_id
@@ -831,7 +837,7 @@ func actor_spawn(entry_id: i32) -> i32:
             g_pong_waiting_task = -1
             g_pong_task_group = actor_task_group(g_current)
             g_pong_spawned = 1
-            return 1
+            return core.actor_ref_local(1, 1)
         if g_ping_spawned == 0:
             g_ping_entry_id = entry_id
             g_ping_slot = core.alloc_bytes(8)
@@ -840,23 +846,25 @@ func actor_spawn(entry_id: i32) -> i32:
             g_ping_waiting_task = -1
             g_ping_task_group = actor_task_group(g_current)
             g_ping_spawned = 1
-            return 2
-        return 0
-    return 1
+            return core.actor_ref_local(2, 1)
+        return core.actor_ref_local(0, 0)
 
 @export("__tetra_actor_send")
-func actor_send(to: i32, v: i32) -> i32:
-    var _ok: i32 = mailbox_put(to, v, 0, g_current)
+func actor_send(to: actor, v: i32) -> i32:
+    var slot: i32 = actor_ref_slot(to)
+    var _ok: i32 = mailbox_put(slot, v, 0, g_current)
     return v
 
 @export("__tetra_actor_send_msg")
-func actor_send_msg(to: i32, v: i32, tag: i32) -> i32:
-    var _ok: i32 = mailbox_put(to, v, tag, g_current)
+func actor_send_msg(to: actor, v: i32, tag: i32) -> i32:
+    var slot: i32 = actor_ref_slot(to)
+    var _ok: i32 = mailbox_put(slot, v, tag, g_current)
     return v
 
 @export("__tetra_actor_send_begin")
-func actor_send_begin(to: i32, tag: i32, slot_count: i32) -> i32:
-    return mailbox_begin_typed(to, tag, slot_count, g_current)
+func actor_send_begin(to: actor, tag: i32, slot_count: i32) -> i32:
+    var slot: i32 = actor_ref_slot(to)
+    return mailbox_begin_typed(slot, tag, slot_count, g_current)
 
 @export("__tetra_actor_send_slot")
 func actor_send_slot(index: i32, value: i32) -> i32:
@@ -967,12 +975,14 @@ func actor_recv_count() -> i32:
     return mailbox_take_count(g_pending_recv)
 
 @export("__tetra_actor_self")
-func actor_self() -> i32:
-    return g_current
+func actor_self() -> actor:
+    unsafe:
+        return core.actor_ref_local(g_current, 1)
 
 @export("__tetra_actor_sender")
-func actor_sender() -> i32:
-    return mailbox_last_sender(g_current)
+func actor_sender() -> actor:
+    unsafe:
+        return core.actor_ref_local(mailbox_last_sender(g_current), 1)
 
 @export("__tetra_actor_yield_now")
 func actor_yield_now() -> i32:
@@ -1005,10 +1015,11 @@ func actor_state_store(slot: i32, value: i32) -> i32:
 
 @export("__tetra_task_spawn_i32")
 func rt_task_spawn_i32(entry_id: i32) -> task.i32:
-    var handle: i32 = actor_spawn(entry_id)
-    if handle == 0:
+    var handle: actor = actor_spawn(entry_id)
+    var handle_slot: i32 = actor_ref_slot(handle)
+    if handle_slot == 0:
         return task.i32(value: 0, error: 1)
-    return task.i32(value: handle, error: 0)
+    return task.i32(value: handle_slot, error: 0)
 
 @export("__tetra_task_group_open")
 func rt_task_group_open() -> i32:
@@ -1042,12 +1053,13 @@ func rt_task_group_status(group: i32) -> i32:
 func rt_task_spawn_group_i32(group: i32, entry_id: i32) -> task.i32:
     if task_group_status_value(group) == 2:
         return task.i32(value: 0, error: 1)
-    var handle: i32 = actor_spawn(entry_id)
-    if handle == 0:
+    var handle: actor = actor_spawn(entry_id)
+    var handle_slot: i32 = actor_ref_slot(handle)
+    if handle_slot == 0:
         return task.i32(value: 0, error: 1)
-    if handle != 0:
-        var _group: i32 = set_actor_task_group(handle, group)
-    return task.i32(value: handle, error: 0)
+    if handle_slot != 0:
+        var _group: i32 = set_actor_task_group(handle_slot, group)
+    return task.i32(value: handle_slot, error: 0)
 
 @export("__tetra_task_join_i32")
 func rt_task_join_i32(handle: i32, error: i32) -> i32:
@@ -1057,7 +1069,7 @@ func rt_task_join_i32(handle: i32, error: i32) -> i32:
         if actor_task_group_canceled(handle) == 1:
             return 0
         var mem: cap.mem = core.cap_mem()
-        while actor_status(handle) != STATUS_DONE:
+        while actor_slot_status(handle) != STATUS_DONE:
             var _waiting: i32 = set_actor_waiting_task(g_current, handle)
             var _wake_clear: i32 = set_actor_wake_ms(g_current, 0)
             var _status: i32 = set_actor_status(g_current, STATUS_WAITING_TASK)
@@ -1094,7 +1106,7 @@ func rt_task_join_until_i32(handle: i32, error: i32, deadline: i32) -> task.resu
         if until < 0:
             until = 0
         var mem: cap.mem = core.cap_mem()
-        while actor_status(handle) != STATUS_DONE:
+        while actor_slot_status(handle) != STATUS_DONE:
             if g_time_ms >= until:
                 var _clear_timeout: i32 = set_actor_waiting_task(g_current, -1)
                 var _wake_timeout: i32 = set_actor_wake_ms(g_current, 0)
@@ -1117,7 +1129,7 @@ func rt_task_join_until_i32(handle: i32, error: i32, deadline: i32) -> task.resu
 func rt_task_poll_i32(handle: i32, error: i32) -> task.result_i32:
     if error != 0:
         return task.result_i32(value: 0, error: error)
-    if actor_status(handle) != STATUS_DONE:
+    if actor_slot_status(handle) != STATUS_DONE:
         return task.result_i32(value: 0, error: 2)
     g_task_result_actor = handle
     if handle == 0:

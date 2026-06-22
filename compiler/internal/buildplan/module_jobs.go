@@ -1,6 +1,17 @@
 package buildplan
 
-import "tetra_language/compiler/internal/format/tobj"
+import (
+	"fmt"
+
+	"tetra_language/compiler/internal/format/tobj"
+)
+
+const DefaultCompilerWorkerCostBytes int64 = 256 * 1024 * 1024
+
+type WorkerDecision struct {
+	Count  int
+	Reason string
+}
 
 type ModuleObjectMetadata struct {
 	Target          string
@@ -26,6 +37,61 @@ func EffectiveWorkerCount(requested int, maxJobs int, fallback int) int {
 		jobs = maxJobs
 	}
 	return jobs
+}
+
+func EffectiveWorkerDecision(
+	requested int,
+	maxJobs int,
+	fallback int,
+	memoryBudgetBytes int64,
+	workerCostBytes int64,
+) WorkerDecision {
+	base := EffectiveWorkerCount(requested, maxJobs, fallback)
+	if base == 0 {
+		return WorkerDecision{
+			Count: 0,
+			Reason: fmt.Sprintf(
+				"requested_jobs=%d max_jobs=%d num_cpu=%d no pending module work",
+				requested,
+				maxJobs,
+				fallback,
+			),
+		}
+	}
+	reason := fmt.Sprintf(
+		"requested_jobs=%d max_jobs=%d num_cpu=%d",
+		requested,
+		maxJobs,
+		fallback,
+	)
+	if memoryBudgetBytes <= 0 {
+		return WorkerDecision{Count: base, Reason: reason + " memory_budget_bytes=unset"}
+	}
+	cost := workerCostBytes
+	if cost <= 0 {
+		cost = DefaultCompilerWorkerCostBytes
+	}
+	budgetWorkers := int(memoryBudgetBytes / cost)
+	if budgetWorkers < 1 {
+		budgetWorkers = 1
+	}
+	if budgetWorkers > maxJobs {
+		budgetWorkers = maxJobs
+	}
+	count := base
+	if budgetWorkers < count {
+		count = budgetWorkers
+	}
+	return WorkerDecision{
+		Count: count,
+		Reason: fmt.Sprintf(
+			"%s memory_budget_bytes=%d worker_cost_bytes=%d budget_workers=%d",
+			reason,
+			memoryBudgetBytes,
+			cost,
+			budgetWorkers,
+		),
+	}
 }
 
 func ApplyModuleObjectMetadata(obj *tobj.Object, metadata ModuleObjectMetadata) {

@@ -16,6 +16,7 @@ import (
 
 const hashManifestSchema = "tetra.release-artifact-hashes.v1alpha1"
 const hashManifestArtifact = "tetra.release.v0_2_0.artifact-hashes.v1"
+const hashValidationOutputName = "artifact-hashes-validation.txt"
 const maxJSONSchemaSniffBytes = 64 * 1024
 
 type hashManifest struct {
@@ -71,6 +72,13 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	fmt.Print(validationSuccessOutput(manifestPath))
+}
+
+func validationSuccessOutput(manifestPath string) string {
+	return "validator: validate-artifact-hashes\nmanifest: " +
+		filepath.ToSlash(manifestPath) +
+		"\nresult: pass\n"
 }
 
 func resolveHashManifestPath(manifestPath string, root string, out string) (string, error) {
@@ -105,7 +113,7 @@ func buildHashManifest(root string, manifestName string) (hashManifest, error) {
 			return err
 		}
 		rel = filepath.ToSlash(rel)
-		if rel == manifestName {
+		if rel == manifestName || rel == hashValidationOutputName {
 			return nil
 		}
 		if entry.Type()&os.ModeSymlink != 0 {
@@ -322,7 +330,7 @@ func listArtifactPaths(root string, manifestName string) ([]string, error) {
 			return err
 		}
 		rel = filepath.ToSlash(rel)
-		if rel == manifestName {
+		if rel == manifestName || rel == hashValidationOutputName {
 			return nil
 		}
 		if entry.Type()&os.ModeSymlink != 0 {

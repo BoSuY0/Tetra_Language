@@ -1,0 +1,3 @@
+validator: validate-artifact-hashes
+manifest: reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-profile-stream-samples1/artifact-hashes.json
+result: pass

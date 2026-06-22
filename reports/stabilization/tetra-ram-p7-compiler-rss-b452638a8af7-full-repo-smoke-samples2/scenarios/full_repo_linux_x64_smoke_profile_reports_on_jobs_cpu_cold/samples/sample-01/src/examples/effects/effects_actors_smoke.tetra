@@ -1,0 +1,9 @@
+// v0.17 effects smoke: actor builtins require uses actors.
+func main() -> Int
+uses actors:
+    let self: actor = core.self()
+    let _sent: Int = core.send(self, 33)
+    let msg: Int = core.recv()
+    if msg == 33:
+        return 0
+    return 1

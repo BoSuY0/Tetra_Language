@@ -1,0 +1,186 @@
+{
+  "schema": "tetra.ui.v0.4.0",
+  "states": [
+    {
+      "name": "ShellState",
+      "module": "",
+      "fields": [
+        {
+          "name": "toggles",
+          "type": "i32",
+          "mutable": true,
+          "const": false,
+          "init": "0"
+        },
+        {
+          "name": "label",
+          "type": "str",
+          "mutable": true,
+          "const": false,
+          "init": "\"Wave 9 Native\""
+        },
+        {
+          "name": "source",
+          "type": "i32",
+          "mutable": true,
+          "const": false,
+          "init": "0"
+        },
+        {
+          "name": "textSource",
+          "type": "str",
+          "mutable": true,
+          "const": false,
+          "init": "\"Copied from state\""
+        }
+      ]
+    }
+  ],
+  "views": [
+    {
+      "name": "ShellView",
+      "module": "",
+      "state_type": "ShellState",
+      "bindings": [
+        {
+          "name": "toggles",
+          "type": "i32",
+          "source": "state.toggles"
+        },
+        {
+          "name": "labelText",
+          "type": "str",
+          "source": "state.label"
+        }
+      ],
+      "events": [
+        {
+          "name": "submit",
+          "command": "toggle"
+        },
+        {
+          "name": "reset",
+          "command": "decrement"
+        },
+        {
+          "name": "rename",
+          "command": "rename"
+        },
+        {
+          "name": "copy",
+          "command": "copy"
+        },
+        {
+          "name": "copyAfterToggle",
+          "command": "copyAfterToggle"
+        },
+        {
+          "name": "compound",
+          "command": "compound"
+        }
+      ],
+      "commands": [
+        {
+          "name": "toggle",
+          "statement_count": 1,
+          "operations": [
+            {
+              "kind": "state_add",
+              "target": "state.toggles",
+              "value": "1"
+            }
+          ]
+        },
+        {
+          "name": "decrement",
+          "statement_count": 1,
+          "operations": [
+            {
+              "kind": "state_sub",
+              "target": "state.toggles",
+              "value": "1"
+            }
+          ]
+        },
+        {
+          "name": "rename",
+          "statement_count": 1,
+          "operations": [
+            {
+              "kind": "state_set",
+              "target": "state.label",
+              "value": "\"Native shell renamed\""
+            }
+          ]
+        },
+        {
+          "name": "copy",
+          "statement_count": 1,
+          "operations": [
+            {
+              "kind": "state_set",
+              "target": "state.label",
+              "value": "state.textSource"
+            }
+          ]
+        },
+        {
+          "name": "copyAfterToggle",
+          "statement_count": 2,
+          "operations": [
+            {
+              "kind": "state_add",
+              "target": "state.toggles",
+              "value": "2"
+            },
+            {
+              "kind": "state_set",
+              "target": "state.source",
+              "value": "state.toggles"
+            }
+          ]
+        },
+        {
+          "name": "compound",
+          "statement_count": 2,
+          "operations": [
+            {
+              "kind": "state_add",
+              "target": "state.toggles",
+              "value": "3"
+            },
+            {
+              "kind": "state_sub",
+              "target": "state.toggles",
+              "value": "1"
+            }
+          ]
+        }
+      ],
+      "styles": [
+        {
+          "name": "width",
+          "type": "i32",
+          "value": "80"
+        },
+        {
+          "name": "accent",
+          "type": "str",
+          "value": "\"amber\""
+        }
+      ],
+      "accessibility": [
+        {
+          "name": "role",
+          "type": "str",
+          "value": "\"status\""
+        },
+        {
+          "name": "description",
+          "type": "str",
+          "value": "\"Native shell preview\""
+        }
+      ]
+    }
+  ]
+}

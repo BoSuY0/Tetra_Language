@@ -1,0 +1,39 @@
+{
+  "schema": "tetra.actor.release_contract.v1",
+  "id": "system-message-runtime-lane-linux-x64-contract",
+  "capability_id": "system_message_runtime_lane_linux_x64",
+  "target": "linux-x64",
+  "scope": "linux-x64",
+  "claims": [
+    "source-level system-message API and isolated runtime system lane implemented for Linux-x64 builtin runtime"
+  ],
+  "nonclaims": [
+    "real local link/monitor producers are completed in P06",
+    "authenticated node-down producer is completed in P10",
+    "no full Erlang/OTP actor runtime claim",
+    "no cluster membership or reconnect/retry production claim",
+    "no non-Linux distributed actor runtime support claim",
+    "no distributed zero-copy pointer or region transfer claim",
+    "no formal race proof claim"
+  ],
+  "validators": [
+    "validate-actor-system-messages",
+    "validate-actor-capabilities",
+    "actorsystem"
+  ],
+  "reports": [
+    "V1-P01-system-messages-separate-queue-partial.md",
+    "V1-P01-system-message-wake-separation-partial.md",
+    "V1-P01-system-receive-canceled-partial.md",
+    "V1-P01-system-receive-runtime-closed-partial.md",
+    "V1-P01-system-receive-payload-provenance-partial.md",
+    "V1-P01-system-event-reservation-backpressure-partial.md",
+    "V1-P01-remote-link-node-down-propagation-partial.md",
+    "actor-system-messages-linux-x64.json",
+    "artifact-hashes.json",
+    "actor-system-layout-linux-x64.json"
+  ],
+  "gate_refs": [
+    "scripts/release/v1_0/actor-system-messages-linux-x64-smoke.sh"
+  ]
+}

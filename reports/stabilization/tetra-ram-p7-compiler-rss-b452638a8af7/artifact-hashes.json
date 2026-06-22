@@ -1,0 +1,276 @@
+{
+  "schema": "tetra.release-artifact-hashes.v1alpha1",
+  "root": ".",
+  "artifacts": [
+    {
+      "path": "artifact-hashes-validation.txt",
+      "sha256": "sha256:133ff261f789957d926e8b8b6a11e840f124d8356c787a64a883a78d7e9c0fc3",
+      "size": 80
+    },
+    {
+      "path": "command-manifest.json",
+      "sha256": "sha256:e156c648faefeb42dcb7a6047a28e4d4d5419934a187a2e32c0ac567aea9c2c8",
+      "size": 871,
+      "schema": "tetra.ram.p7-compiler-rss.commands.v1"
+    },
+    {
+      "path": "compiler-rss-manifest.json",
+      "sha256": "sha256:2dc43511a4fd747452a28fd4564f67762351dea15d5f80b4065c1fe88ac738ae",
+      "size": 7750,
+      "schema": "tetra.ram.p7-compiler-rss-bundle.v1"
+    },
+    {
+      "path": "host-fingerprint.json",
+      "sha256": "sha256:88c9daf66e6d29d29ce198bf8d195e639e616b20fd997ce4d6c1232a9d8a41a2",
+      "size": 247,
+      "schema": "tetra.ram.p7-compiler-rss.host.v1"
+    },
+    {
+      "path": "scenario-summary.json",
+      "sha256": "sha256:db724cafde510157b27df540a7e0b0ef093cf42caf607633d4c0e05e14c1b05a",
+      "size": 3023,
+      "schema": "tetra.ram.p7-compiler-rss-summary.v1"
+    },
+    {
+      "path": "scenarios/large_reports_on_jobs_cpu_warm/compiler-profile.json",
+      "sha256": "sha256:b9756cddbe9a78966c686d46bacf2a2ad336f3647355fb10428c4b614e6596d5",
+      "size": 4934,
+      "schema": "tetra.compiler.phase-profile.v1"
+    },
+    {
+      "path": "scenarios/large_reports_on_jobs_cpu_warm/out/app",
+      "sha256": "sha256:dd3cde40ad266a93f185d38baab08c3bac8f36b55c9dc70e09cf47f169c57630",
+      "size": 4096
+    },
+    {
+      "path": "scenarios/large_reports_on_jobs_cpu_warm/out/app.alloc.json",
+      "sha256": "sha256:3ce6058bf3459b12765af2709177d3b2a7e55175cb753f8702ffbafa932f62c6",
+      "size": 654
+    },
+    {
+      "path": "scenarios/large_reports_on_jobs_cpu_warm/out/app.alloc.txt",
+      "sha256": "sha256:a17f2f3df96755eec64cecfa354920fcc37d6d1c52c2952258d5479b6e8edf6d",
+      "size": 448
+    },
+    {
+      "path": "scenarios/large_reports_on_jobs_cpu_warm/out/app.bounds.json",
+      "sha256": "sha256:22de58ed307ff983882ddca3721a2b73cc80dbda8aab5dee2cae9aa623b146c2",
+      "size": 143
+    },
+    {
+      "path": "scenarios/large_reports_on_jobs_cpu_warm/out/app.memory.json",
+      "sha256": "sha256:889a276fdc988f52a688c9f1b8cf8387af313384391de152acc3ddb5835461c3",
+      "size": 54592,
+      "schema": "tetra.memory-report.v1"
+    },
+    {
+      "path": "scenarios/large_reports_on_jobs_cpu_warm/out/app.proof.json",
+      "sha256": "sha256:0ab2051d786198ac964c5a176d53d86e77895bb7f8d147434818da3578874075",
+      "size": 52954
+    },
+    {
+      "path": "scenarios/large_reports_on_jobs_cpu_warm/out/warmup-app",
+      "sha256": "sha256:dd3cde40ad266a93f185d38baab08c3bac8f36b55c9dc70e09cf47f169c57630",
+      "size": 4096
+    },
+    {
+      "path": "scenarios/large_reports_on_jobs_cpu_warm/out/warmup-app.alloc.json",
+      "sha256": "sha256:3ce6058bf3459b12765af2709177d3b2a7e55175cb753f8702ffbafa932f62c6",
+      "size": 654
+    },
+    {
+      "path": "scenarios/large_reports_on_jobs_cpu_warm/out/warmup-app.alloc.txt",
+      "sha256": "sha256:a17f2f3df96755eec64cecfa354920fcc37d6d1c52c2952258d5479b6e8edf6d",
+      "size": 448
+    },
+    {
+      "path": "scenarios/large_reports_on_jobs_cpu_warm/out/warmup-app.bounds.json",
+      "sha256": "sha256:22de58ed307ff983882ddca3721a2b73cc80dbda8aab5dee2cae9aa623b146c2",
+      "size": 143
+    },
+    {
+      "path": "scenarios/large_reports_on_jobs_cpu_warm/out/warmup-app.memory.json",
+      "sha256": "sha256:889a276fdc988f52a688c9f1b8cf8387af313384391de152acc3ddb5835461c3",
+      "size": 54592,
+      "schema": "tetra.memory-report.v1"
+    },
+    {
+      "path": "scenarios/large_reports_on_jobs_cpu_warm/out/warmup-app.proof.json",
+      "sha256": "sha256:0ab2051d786198ac964c5a176d53d86e77895bb7f8d147434818da3578874075",
+      "size": 52954
+    },
+    {
+      "path": "scenarios/large_reports_on_jobs_cpu_warm/src/app/main.t4",
+      "sha256": "sha256:f2c183eff634c1c2d8ad05516054c63b7f218b57fffb5848a249c869cbccec00",
+      "size": 87
+    },
+    {
+      "path": "scenarios/large_reports_on_jobs_cpu_warm/src/bench/m0.t4",
+      "sha256": "sha256:a4d27980cee04f57a64c8a544a6833dc66dddcd3fea38076d9eb9b5440fe1a6c",
+      "size": 60
+    },
+    {
+      "path": "scenarios/large_reports_on_jobs_cpu_warm/src/bench/m1.t4",
+      "sha256": "sha256:14e73f26d0439d965464e4be2ee04f46c06d3124df090f891d7b6e8ea198d16d",
+      "size": 98
+    },
+    {
+      "path": "scenarios/large_reports_on_jobs_cpu_warm/src/bench/m10.t4",
+      "sha256": "sha256:324e3ca4684680bb1d5327ad24c512ff64d0823a415f204007948f9990fdb857",
+      "size": 100
+    },
+    {
+      "path": "scenarios/large_reports_on_jobs_cpu_warm/src/bench/m11.t4",
+      "sha256": "sha256:f1dc4307605dd625c63a2cdfd841cd46a77035b99d4f264275765b0d96fd1757",
+      "size": 102
+    },
+    {
+      "path": "scenarios/large_reports_on_jobs_cpu_warm/src/bench/m2.t4",
+      "sha256": "sha256:e19a32ab49640979e5db8ac79e4a2d55ffc0c29953bea74635bd185c2f7590c0",
+      "size": 98
+    },
+    {
+      "path": "scenarios/large_reports_on_jobs_cpu_warm/src/bench/m3.t4",
+      "sha256": "sha256:137c12a363eb7dbcb8ef1934b872408d7c9312fa9acd1b7a83054e9324eab2ab",
+      "size": 98
+    },
+    {
+      "path": "scenarios/large_reports_on_jobs_cpu_warm/src/bench/m4.t4",
+      "sha256": "sha256:5bded85c9a0903d565218400e979222a05e11afeb0a56dae4af66db576686655",
+      "size": 98
+    },
+    {
+      "path": "scenarios/large_reports_on_jobs_cpu_warm/src/bench/m5.t4",
+      "sha256": "sha256:0d7d7d6ec874116a027c9bca9e766864e4ad1cc840619872051f9d7be84412b9",
+      "size": 98
+    },
+    {
+      "path": "scenarios/large_reports_on_jobs_cpu_warm/src/bench/m6.t4",
+      "sha256": "sha256:a2c70d93553402bec5added407eecfcae17bf330d080335473ac9c4b682253dd",
+      "size": 98
+    },
+    {
+      "path": "scenarios/large_reports_on_jobs_cpu_warm/src/bench/m7.t4",
+      "sha256": "sha256:206bec69870e638835a02dbcc4824bed64e449dd4c1b7f14097242c62a92a38a",
+      "size": 98
+    },
+    {
+      "path": "scenarios/large_reports_on_jobs_cpu_warm/src/bench/m8.t4",
+      "sha256": "sha256:4a7eba0ee28833c29bb2cf123e96302cd7bd25f3eb01819598c800ce1ed016dd",
+      "size": 98
+    },
+    {
+      "path": "scenarios/large_reports_on_jobs_cpu_warm/src/bench/m9.t4",
+      "sha256": "sha256:9a69cb8a4ae150b9b471b145c60c947cdbc8c66be396af8ce7dca4fb3178bf89",
+      "size": 98
+    },
+    {
+      "path": "scenarios/medium_reports_on_jobs_2_cold/compiler-profile.json",
+      "sha256": "sha256:bea5e2cb2a9e9d7f38d17ae9c9ad3bcc23d731d7a014b5d719c0690b3ec3a0f3",
+      "size": 4895,
+      "schema": "tetra.compiler.phase-profile.v1"
+    },
+    {
+      "path": "scenarios/medium_reports_on_jobs_2_cold/out/app",
+      "sha256": "sha256:d3002b54deb8173702e1add06629fb8744dfa38bc54e84b8d1026ca3f589d49a",
+      "size": 4096
+    },
+    {
+      "path": "scenarios/medium_reports_on_jobs_2_cold/out/app.alloc.json",
+      "sha256": "sha256:3ce6058bf3459b12765af2709177d3b2a7e55175cb753f8702ffbafa932f62c6",
+      "size": 654
+    },
+    {
+      "path": "scenarios/medium_reports_on_jobs_2_cold/out/app.alloc.txt",
+      "sha256": "sha256:a17f2f3df96755eec64cecfa354920fcc37d6d1c52c2952258d5479b6e8edf6d",
+      "size": 448
+    },
+    {
+      "path": "scenarios/medium_reports_on_jobs_2_cold/out/app.bounds.json",
+      "sha256": "sha256:22de58ed307ff983882ddca3721a2b73cc80dbda8aab5dee2cae9aa623b146c2",
+      "size": 143
+    },
+    {
+      "path": "scenarios/medium_reports_on_jobs_2_cold/out/app.memory.json",
+      "sha256": "sha256:63d404e9942a3420042e0948a276bd94c97dd2c1211ed521ba10cd5da1caaed1",
+      "size": 29592,
+      "schema": "tetra.memory-report.v1"
+    },
+    {
+      "path": "scenarios/medium_reports_on_jobs_2_cold/out/app.proof.json",
+      "sha256": "sha256:e408cefacb0c179ba45c05a1df7b0faba08e4a31b19c43ff8e3178de82e98e60",
+      "size": 27979
+    },
+    {
+      "path": "scenarios/medium_reports_on_jobs_2_cold/src/app/main.t4",
+      "sha256": "sha256:cf03f17552d6b8b585eab0a355add3bc773c4abc6de0d46064d1a67e7cd88e42",
+      "size": 85
+    },
+    {
+      "path": "scenarios/medium_reports_on_jobs_2_cold/src/bench/m0.t4",
+      "sha256": "sha256:a4d27980cee04f57a64c8a544a6833dc66dddcd3fea38076d9eb9b5440fe1a6c",
+      "size": 60
+    },
+    {
+      "path": "scenarios/medium_reports_on_jobs_2_cold/src/bench/m1.t4",
+      "sha256": "sha256:14e73f26d0439d965464e4be2ee04f46c06d3124df090f891d7b6e8ea198d16d",
+      "size": 98
+    },
+    {
+      "path": "scenarios/medium_reports_on_jobs_2_cold/src/bench/m2.t4",
+      "sha256": "sha256:e19a32ab49640979e5db8ac79e4a2d55ffc0c29953bea74635bd185c2f7590c0",
+      "size": 98
+    },
+    {
+      "path": "scenarios/medium_reports_on_jobs_2_cold/src/bench/m3.t4",
+      "sha256": "sha256:137c12a363eb7dbcb8ef1934b872408d7c9312fa9acd1b7a83054e9324eab2ab",
+      "size": 98
+    },
+    {
+      "path": "scenarios/medium_reports_on_jobs_2_cold/src/bench/m4.t4",
+      "sha256": "sha256:5bded85c9a0903d565218400e979222a05e11afeb0a56dae4af66db576686655",
+      "size": 98
+    },
+    {
+      "path": "scenarios/medium_reports_on_jobs_2_cold/src/bench/m5.t4",
+      "sha256": "sha256:0d7d7d6ec874116a027c9bca9e766864e4ad1cc840619872051f9d7be84412b9",
+      "size": 98
+    },
+    {
+      "path": "scenarios/small_reports_off_jobs_1_cold/compiler-profile.json",
+      "sha256": "sha256:9bfb490eb56b595ef35df4173514c34bb6c39052fc922faccd7eb7409728137e",
+      "size": 4864,
+      "schema": "tetra.compiler.phase-profile.v1"
+    },
+    {
+      "path": "scenarios/small_reports_off_jobs_1_cold/out/app",
+      "sha256": "sha256:3443341e0299aab1dd810832bb5eaa4158bfdf396767bfdb5192209ea19b3c8d",
+      "size": 4096
+    },
+    {
+      "path": "scenarios/small_reports_off_jobs_1_cold/src/app/main.t4",
+      "sha256": "sha256:268bdd5a2ff617be04aef9a0898963496239e1a0bd3cd9c32b82b31256cc21f6",
+      "size": 85
+    },
+    {
+      "path": "scenarios/small_reports_off_jobs_1_cold/src/bench/m0.t4",
+      "sha256": "sha256:a4d27980cee04f57a64c8a544a6833dc66dddcd3fea38076d9eb9b5440fe1a6c",
+      "size": 60
+    },
+    {
+      "path": "scenarios/small_reports_off_jobs_1_cold/src/bench/m1.t4",
+      "sha256": "sha256:14e73f26d0439d965464e4be2ee04f46c06d3124df090f891d7b6e8ea198d16d",
+      "size": 98
+    },
+    {
+      "path": "scenarios/small_reports_off_jobs_1_cold/src/bench/m2.t4",
+      "sha256": "sha256:e19a32ab49640979e5db8ac79e4a2d55ffc0c29953bea74635bd185c2f7590c0",
+      "size": 98
+    },
+    {
+      "path": "validator-output.txt",
+      "sha256": "sha256:2698c52f7cf399d70c35d9a604f3e53c7d5ac3c35d234dcb79c20af78b3a8ae7",
+      "size": 88
+    }
+  ]
+}

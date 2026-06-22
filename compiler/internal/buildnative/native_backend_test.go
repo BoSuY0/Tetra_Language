@@ -79,6 +79,13 @@ func TestCodegenOptionsForTarget(t *testing.T) {
 		got.RuntimeHeapTelemetryMain != "main" {
 		t.Fatalf("CodegenOptionsForTarget telemetry fields = %#v", got)
 	}
+
+	owned := CodegenOptionsForTarget(tgt, buildapi.BuildOptions{
+		OwnedAllocDropLowering: true,
+	})
+	if !owned.RuntimeHeapTelemetryV2 {
+		t.Fatalf("CodegenOptionsForTarget did not enable runtime heap telemetry v2 for owned drop lowering")
+	}
 }
 
 func TestValidateRuntimeHeapTelemetryBuildOptions(t *testing.T) {

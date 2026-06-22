@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	compiler "tetra_language/compiler"
+	"tetra_language/compiler/internal/lower"
 )
 
 func TestEmitLibraryAllowsNoMainAndWritesTOBJ(t *testing.T) {
@@ -97,6 +98,44 @@ pub func add(a: Int, b: Int) -> Int:
 	}
 	if !emitObjectHasSymbol(obj, "math.core.add") {
 		t.Fatalf("object missing math.core.add symbol: %#v", obj.Symbols)
+	}
+}
+
+func TestLinuxX64OwnedAllocDropOptInLowersToMunmapObjectBytes(t *testing.T) {
+	src := []byte(`
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let mem: cap.mem = core.cap_mem()
+        let p: ptr = core.alloc_bytes(16)
+        let _stored: Int = core.store_i32(p, 42, mem)
+    return 0
+`)
+	prog, err := compiler.Parse(src)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	checked, err := compiler.Check(prog)
+	if err != nil {
+		t.Fatalf("check: %v", err)
+	}
+	irProg, err := lower.LowerWithOptions(checked, lower.Options{OwnedAllocDropLowering: true})
+	if err != nil {
+		t.Fatalf("lower with owned alloc drops: %v", err)
+	}
+	obj, err := compiler.CodegenObjectLinuxX64(irProg.Funcs)
+	if err != nil {
+		t.Fatalf("codegen linux x64 object: %v", err)
+	}
+	for _, want := range [][]byte{
+		{0x8B, 0x77, 0xF8},                         // mov esi, [rdi-8]
+		{0x48, 0x81, 0xC6, 0x08, 0x00, 0x00, 0x00}, // add rsi, 8
+		{0x48, 0x81, 0xC7, 0xF8, 0xFF, 0xFF, 0xFF}, // add rdi, -8
+		{0xB8, 0x0B, 0x00, 0x00, 0x00, 0x0F, 0x05}, // munmap syscall
+	} {
+		if !bytes.Contains(obj.Code, want) {
+			t.Fatalf("owned alloc drop object missing % x\ncode=% x", want, obj.Code)
+		}
 	}
 }
 

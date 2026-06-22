@@ -59,6 +59,9 @@ func BuildTagFromOptions(opt buildapi.BuildOptions, linkedObjects []buildlink.Li
 	if opt.EmitRuntimeHeapTelemetry {
 		tags = append(tags, "runtime-heap-telemetry")
 	}
+	if opt.OwnedAllocDropLowering {
+		tags = append(tags, "owned-alloc-drop-v1")
+	}
 	if opt.SurfaceHostRequired {
 		tags = append(
 			tags,

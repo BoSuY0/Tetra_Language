@@ -1,12 +1,15 @@
 package semantics
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
 	"testing"
 	"tetra_language/compiler/internal/frontend"
 	"tetra_language/compiler/internal/module"
+	"tetra_language/compiler/internal/runtimeabi"
 )
 
 // ---- actor_state_mvp_test.go ----
@@ -346,6 +349,757 @@ func TestEnsureTypeInfoArrayRejectsUnsupportedSubset(t *testing.T) {
 		!strings.Contains(err.Error(), "array element type 'str' is not supported") {
 		t.Fatalf("expected unsupported-element error, got: %v", err)
 	}
+}
+
+func TestActorTypeAndBuiltinSignaturesUseRuntimeABIContractSlots(t *testing.T) {
+	types := baseTypes()
+	wantActorSlots := runtimeabi.ActorHandleABI().RefSlots
+	actorInfo := types["actor"]
+	if actorInfo == nil {
+		t.Fatalf("missing builtin actor type")
+	}
+	if actorInfo.SlotCount != wantActorSlots {
+		t.Fatalf("actor slot count = %d, want ABI ref slots %d", actorInfo.SlotCount, wantActorSlots)
+	}
+
+	sigs, err := builtinFuncSigs(types)
+	if err != nil {
+		t.Fatalf("builtinFuncSigs: %v", err)
+	}
+	tests := []struct {
+		name        string
+		paramSlots  int
+		returnSlots int
+	}{
+		{name: "core.spawn", paramSlots: 2, returnSlots: wantActorSlots},
+		{name: "core.spawn_remote", paramSlots: 3, returnSlots: wantActorSlots},
+		{name: "core.send", paramSlots: wantActorSlots + 1, returnSlots: 1},
+		{name: "core.send_msg", paramSlots: wantActorSlots + 2, returnSlots: 1},
+		{name: "core.send_typed", paramSlots: wantActorSlots + 1, returnSlots: 1},
+		{name: "core.self", paramSlots: 0, returnSlots: wantActorSlots},
+		{name: "core.sender", paramSlots: 0, returnSlots: wantActorSlots},
+		{name: "core.actor_ref_local", paramSlots: 2, returnSlots: wantActorSlots},
+		{name: "core.actor_ref_slot", paramSlots: wantActorSlots, returnSlots: 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sig, ok := sigs[tt.name]
+			if !ok {
+				t.Fatalf("missing builtin signature")
+			}
+			if sig.ParamSlots != tt.paramSlots || sig.ReturnSlots != tt.returnSlots {
+				t.Fatalf(
+					"signature slots = params=%d returns=%d, want params=%d returns=%d",
+					sig.ParamSlots,
+					sig.ReturnSlots,
+					tt.paramSlots,
+					tt.returnSlots,
+				)
+			}
+		})
+	}
+}
+
+func TestActorLifecycleTypesAndBuiltinSignaturesUseRuntimeABIContractSlots(t *testing.T) {
+	types := baseTypes()
+	wantActorSlots := runtimeabi.ActorHandleABI().RefSlots
+	typeSlots := map[string]int{
+		"actor.status":            1,
+		"actor.status_result_raw": 2,
+		"actor.exit_reason":       1,
+		"actor.exit":              wantActorSlots + 1,
+		"actor.wait_result":       2,
+		"actor.monitor":           1,
+		"actor.spawn_options":     1,
+	}
+	for name, wantSlots := range typeSlots {
+		info := types[name]
+		if info == nil {
+			t.Fatalf("missing lifecycle type %s", name)
+		}
+		if info.SlotCount != wantSlots {
+			t.Fatalf("%s slot count = %d, want %d", name, info.SlotCount, wantSlots)
+		}
+	}
+
+	sigs, err := builtinFuncSigs(types)
+	if err != nil {
+		t.Fatalf("builtinFuncSigs: %v", err)
+	}
+	tests := []struct {
+		name        string
+		paramTypes  []string
+		paramSlots  int
+		returnSlots int
+		returnType  string
+	}{
+		{name: "core.actor_status", paramTypes: []string{"actor"}, paramSlots: wantActorSlots, returnSlots: 1, returnType: "actor.status"},
+		{name: "core.actor_status_raw", paramTypes: []string{"actor"}, paramSlots: wantActorSlots, returnSlots: 2, returnType: "actor.status_result_raw"},
+		{name: "core.actor_wait", paramTypes: []string{"actor"}, paramSlots: wantActorSlots, returnSlots: 2, returnType: "actor.wait_result"},
+		{name: "core.actor_wait_until", paramTypes: []string{"actor", "i32"}, paramSlots: wantActorSlots + 1, returnSlots: 2, returnType: "actor.wait_result"},
+		{name: "core.actor_stop", paramTypes: []string{"actor", "actor.exit_reason"}, paramSlots: wantActorSlots + 1, returnSlots: 1, returnType: "i32"},
+		{name: "core.actor_exit_reason", paramTypes: []string{"actor"}, paramSlots: wantActorSlots, returnSlots: 1, returnType: "actor.exit_reason"},
+		{name: "core.actor_link", paramTypes: []string{"actor"}, paramSlots: wantActorSlots, returnSlots: 1, returnType: "i32"},
+		{name: "core.actor_unlink", paramTypes: []string{"actor"}, paramSlots: wantActorSlots, returnSlots: 1, returnType: "i32"},
+		{name: "core.actor_monitor", paramTypes: []string{"actor"}, paramSlots: wantActorSlots, returnSlots: 1, returnType: "actor.monitor"},
+		{name: "core.actor_demonitor", paramTypes: []string{"actor.monitor"}, paramSlots: 1, returnSlots: 1, returnType: "i32"},
+		{name: "core.actor_set_trap_exit", paramTypes: []string{"i32"}, paramSlots: 1, returnSlots: 1, returnType: "i32"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sig, ok := sigs[tt.name]
+			if !ok {
+				t.Fatalf("missing builtin signature")
+			}
+			if sig.ParamSlots != tt.paramSlots || sig.ReturnSlots != tt.returnSlots ||
+				sig.ReturnType != tt.returnType {
+				t.Fatalf(
+					"signature = params:%d returns:%d type:%s, want params:%d returns:%d type:%s",
+					sig.ParamSlots,
+					sig.ReturnSlots,
+					sig.ReturnType,
+					tt.paramSlots,
+					tt.returnSlots,
+					tt.returnType,
+				)
+			}
+			if !reflect.DeepEqual(sig.ParamTypes, tt.paramTypes) {
+				t.Fatalf("%s param types = %#v, want %#v", tt.name, sig.ParamTypes, tt.paramTypes)
+			}
+			runtimeName := "__tetra_" + strings.TrimPrefix(tt.name, "core.")
+			rtSig, ok := runtimeabi.SignatureForSymbol(runtimeName)
+			if !ok {
+				t.Fatalf("missing runtime ABI signature for %s", runtimeName)
+			}
+			if rtSig.ParamSlots != tt.paramSlots || rtSig.ReturnSlots != tt.returnSlots {
+				t.Fatalf(
+					"runtime signature = params:%d returns:%d, want params:%d returns:%d",
+					rtSig.ParamSlots,
+					rtSig.ReturnSlots,
+					tt.paramSlots,
+					tt.returnSlots,
+				)
+			}
+		})
+	}
+}
+
+func TestActorLifecycleStatusIsNamedV1Enum(t *testing.T) {
+	info := baseTypes()["actor.status"]
+	if info == nil {
+		t.Fatalf("missing actor.status type")
+	}
+	if info.Kind != TypeEnum {
+		t.Fatalf("actor.status kind = %v, want enum", info.Kind)
+	}
+	want := runtimeabi.ActorLifecycleStatusNames()
+	if len(info.EnumCases) != len(want) {
+		t.Fatalf("actor.status cases = %#v, want %d cases", info.EnumCases, len(want))
+	}
+	for i, name := range want {
+		got := info.EnumCases[i]
+		if got.Name != name || got.Ordinal != int32(i) {
+			t.Fatalf("actor.status case %d = %s/%d, want %s/%d", i, got.Name, got.Ordinal, name, i)
+		}
+		if _, ok := info.CaseMap[name]; !ok {
+			t.Fatalf("actor.status missing case map entry %s", name)
+		}
+	}
+
+	src := `func score(status: actor.status) -> Int:
+    match status:
+    case actor.status.starting:
+        return 0
+    case actor.status.ready:
+        return 1
+    case actor.status.running:
+        return 2
+    case actor.status.blocked:
+        return 3
+    case actor.status.sleeping:
+        return 4
+    case actor.status.waiting:
+        return 5
+    case actor.status.stopping:
+        return 6
+    case actor.status.exited_normal:
+        return 7
+    case actor.status.exited_error:
+        return 8
+    case actor.status.canceled:
+        return 9
+    case actor.status.restarting:
+        return 10
+    case actor.status.dead:
+        return 11
+
+func main() -> Int
+uses actors:
+    return score(core.actor_status(core.self()))
+`
+	prog, err := frontend.Parse([]byte(src))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if _, err := Check(prog); err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+}
+
+func TestActorLifecycleBuiltinAliasesResolveToCoreNames(t *testing.T) {
+	for _, name := range []string{
+		"actor_status",
+		"actor_wait",
+		"actor_wait_until",
+		"actor_stop",
+		"actor_exit_reason",
+		"actor_link",
+		"actor_unlink",
+		"actor_monitor",
+		"actor_demonitor",
+		"actor_set_trap_exit",
+	} {
+		got, ok := ResolveBuiltinAlias(name)
+		want := "core." + name
+		if !ok || got != want {
+			t.Fatalf("ResolveBuiltinAlias(%q) = %q, %v; want %q, true", name, got, ok, want)
+		}
+	}
+}
+
+func TestActorSystemReceiveTypesAndBuiltinSignaturesUseRawContractSlots(t *testing.T) {
+	types := baseTypes()
+	typeSlots := map[string]int{
+		"actor.monitor":         1,
+		"actor.node":            2,
+		"actor.system_recv_raw": 8,
+	}
+	for name, wantSlots := range typeSlots {
+		info := types[name]
+		if info == nil {
+			t.Fatalf("missing system receive type %s", name)
+		}
+		if info.SlotCount != wantSlots {
+			t.Fatalf("%s slot count = %d, want %d", name, info.SlotCount, wantSlots)
+		}
+	}
+
+	raw := types["actor.system_recv_raw"]
+	wantFields := []struct {
+		name  string
+		typ   string
+		slots int
+	}{
+		{name: "status", typ: "i32", slots: 1},
+		{name: "kind", typ: "i32", slots: 1},
+		{name: "subject", typ: "actor", slots: 1},
+		{name: "monitor", typ: "actor.monitor", slots: 1},
+		{name: "node", typ: "actor.node", slots: 2},
+		{name: "reason_kind", typ: "i32", slots: 1},
+		{name: "reason_code", typ: "i32", slots: 1},
+	}
+	if raw.Kind != TypeStruct || raw.Repr != frontend.StructReprC {
+		t.Fatalf("actor.system_recv_raw kind/repr = %v/%q, want repr(C) struct", raw.Kind, raw.Repr)
+	}
+	if len(raw.Fields) != len(wantFields) {
+		t.Fatalf("actor.system_recv_raw fields = %#v, want %d fields", raw.Fields, len(wantFields))
+	}
+	for i, want := range wantFields {
+		got := raw.Fields[i]
+		if got.Name != want.name || got.TypeName != want.typ || got.SlotCount != want.slots {
+			t.Fatalf(
+				"raw field %d = {%s %s slots=%d}, want {%s %s slots=%d}",
+				i,
+				got.Name,
+				got.TypeName,
+				got.SlotCount,
+				want.name,
+				want.typ,
+				want.slots,
+			)
+		}
+	}
+
+	sigs, err := builtinFuncSigs(types)
+	if err != nil {
+		t.Fatalf("builtinFuncSigs: %v", err)
+	}
+	tests := []struct {
+		name       string
+		params     []string
+		paramSlots int
+		effects    []string
+	}{
+		{name: "core.actor_recv_system", paramSlots: 0, effects: []string{"actors", "runtime"}},
+		{name: "core.actor_recv_system_poll", paramSlots: 0, effects: []string{"actors"}},
+		{name: "core.actor_recv_system_until", params: []string{"i32"}, paramSlots: 1, effects: []string{"actors", "runtime"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sig, ok := sigs[tt.name]
+			if !ok {
+				t.Fatalf("missing builtin signature")
+			}
+			if sig.ParamSlots != tt.paramSlots || sig.ReturnSlots != 8 ||
+				sig.ReturnType != "actor.system_recv_raw" {
+				t.Fatalf(
+					"signature = params:%d returns:%d type:%s, want params:%d returns:%d type:actor.system_recv_raw",
+					sig.ParamSlots,
+					sig.ReturnSlots,
+					sig.ReturnType,
+					tt.paramSlots,
+					8,
+				)
+			}
+			if !reflect.DeepEqual(sig.ParamTypes, tt.params) {
+				t.Fatalf("%s param types = %#v, want %#v", tt.name, sig.ParamTypes, tt.params)
+			}
+			if got := builtinEffects(tt.name); !reflect.DeepEqual(got, tt.effects) {
+				t.Fatalf("%s effects = %#v, want %#v", tt.name, got, tt.effects)
+			}
+		})
+	}
+}
+
+func TestActorSystemReceiveEffectsAndOpaqueConstructionDiagnostics(t *testing.T) {
+	valid := `
+func main() -> Int
+uses actors, runtime:
+    let blocking: actor.system_recv_raw = core.actor_recv_system()
+    let poll: actor.system_recv_raw = core.actor_recv_system_poll()
+    let timed: actor.system_recv_raw = core.actor_recv_system_until(10)
+    return 0
+`
+	prog, err := frontend.Parse([]byte(valid))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if _, err := Check(prog); err != nil {
+		t.Fatalf("Check accepted system receive builtins with proper effects: %v", err)
+	}
+
+	missingRuntime := `
+func main() -> Int
+uses actors:
+    let raw: actor.system_recv_raw = core.actor_recv_system()
+    return raw.status
+`
+	if err := checkActorSystemReceiveError(t, missingRuntime); err == nil ||
+		!strings.Contains(err.Error(), "uses effect 'runtime' but does not declare it") {
+		t.Fatalf("blocking receive missing-runtime diagnostic = %v", err)
+	}
+
+	constructMonitor := `
+func main() -> Int:
+    let monitor: actor.monitor = actor.monitor{value: 1}
+    return 0
+`
+	if err := checkActorSystemReceiveError(t, constructMonitor); err == nil ||
+		!strings.Contains(err.Error(), "runtime-owned actor handle 'actor.monitor' cannot be constructed") {
+		t.Fatalf("monitor construction diagnostic = %v", err)
+	}
+
+	constructRaw := `
+func main() -> Int:
+    let raw: actor.system_recv_raw = actor.system_recv_raw{status: 0, kind: 0, subject: core.self(), monitor: core.actor_monitor(core.self()), node: actor.node{id: 0, epoch: 0}, reason_kind: 0, reason_code: 0}
+    return raw.status
+`
+	if err := checkActorSystemReceiveError(t, constructRaw); err == nil ||
+		!strings.Contains(err.Error(), "runtime-owned actor handle 'actor.system_recv_raw' cannot be constructed") {
+		t.Fatalf("raw construction diagnostic = %v", err)
+	}
+}
+
+func TestLibCoreActorsSystemReceiveSurfaceChecksAgainstRawBuiltins(t *testing.T) {
+	root, err := filepath.Abs("../../..")
+	if err != nil {
+		t.Fatalf("resolve repo root: %v", err)
+	}
+	libPath := filepath.Join(root, "lib", "core", "actors", "actors.tetra")
+	libSrc, err := os.ReadFile(libPath)
+	if err != nil {
+		t.Fatalf("read lib.core.actors: %v", err)
+	}
+	libFile, err := frontend.ParseFile(libSrc, libPath)
+	if err != nil {
+		t.Fatalf("ParseFile(lib.core.actors): %v", err)
+	}
+	appSrc := []byte(`module app.main
+import lib.core.actors as actors
+
+func main() -> Int
+uses actors, runtime:
+    let poll: actors.SystemReceiveResult = actors.poll_system()
+    let timed: actors.SystemReceiveResult = actors.recv_system_until(0)
+    return 0
+`)
+	appFile, err := frontend.ParseFile(appSrc, "app/main.tetra")
+	if err != nil {
+		t.Fatalf("ParseFile(app): %v", err)
+	}
+	world := &module.World{
+		EntryModule: appFile.Module,
+		Files:       []*frontend.FileAST{libFile, appFile},
+		ByModule: map[string]*frontend.FileAST{
+			libFile.Module: libFile,
+			appFile.Module: appFile,
+		},
+	}
+	if _, err := CheckWorldOpt(world, CheckOptions{RequireMain: true}); err != nil {
+		t.Fatalf("CheckWorldOpt: %v", err)
+	}
+}
+
+func TestLibCoreActorsSystemReceiveResultPayloadsCanBePatternMatched(t *testing.T) {
+	root, err := filepath.Abs("../../..")
+	if err != nil {
+		t.Fatalf("resolve repo root: %v", err)
+	}
+	libPath := filepath.Join(root, "lib", "core", "actors", "actors.tetra")
+	libSrc, err := os.ReadFile(libPath)
+	if err != nil {
+		t.Fatalf("read lib.core.actors: %v", err)
+	}
+	libFile, err := frontend.ParseFile(libSrc, libPath)
+	if err != nil {
+		t.Fatalf("ParseFile(lib.core.actors): %v", err)
+	}
+	appSrc := []byte(`module app.main
+import lib.core.actors as actors
+
+func score(result: actors.SystemReceiveResult) -> Int:
+    match result:
+    case actors.SystemReceiveResult.message(message):
+        match message:
+        case actors.SystemMessage.exit(exit_peer, exit_reason):
+            return 10
+        case actors.SystemMessage.down(down_monitor, down_peer, down_reason):
+            return 20
+        case actors.SystemMessage.node_down(down_node, node_reason):
+            return 30
+    case actors.SystemReceiveResult.empty:
+        return 0
+    case actors.SystemReceiveResult.timeout:
+        return 1
+    case actors.SystemReceiveResult.canceled:
+        return 2
+    case actors.SystemReceiveResult.runtime_closed:
+        return 3
+    case actors.SystemReceiveResult.invalid_state(code):
+        return code
+
+func main() -> Int
+uses actors, runtime:
+    let poll: actors.SystemReceiveResult = actors.poll_system()
+    let timed: actors.SystemReceiveResult = actors.recv_system_until(0)
+    return score(poll) + score(timed)
+`)
+	appFile, err := frontend.ParseFile(appSrc, "app/main.tetra")
+	if err != nil {
+		t.Fatalf("ParseFile(app): %v", err)
+	}
+	world := &module.World{
+		EntryModule: appFile.Module,
+		Files:       []*frontend.FileAST{libFile, appFile},
+		ByModule: map[string]*frontend.FileAST{
+			libFile.Module: libFile,
+			appFile.Module: appFile,
+		},
+	}
+	if _, err := CheckWorldOpt(world, CheckOptions{RequireMain: true}); err != nil {
+		t.Fatalf("CheckWorldOpt: %v", err)
+	}
+}
+
+func TestLibCoreActorsLifecycleSurfaceChecksAgainstRawBuiltins(t *testing.T) {
+	root, err := filepath.Abs("../../..")
+	if err != nil {
+		t.Fatalf("resolve repo root: %v", err)
+	}
+	libPath := filepath.Join(root, "lib", "core", "actors", "actors.tetra")
+	libSrc, err := os.ReadFile(libPath)
+	if err != nil {
+		t.Fatalf("read lib.core.actors: %v", err)
+	}
+	libFile, err := frontend.ParseFile(libSrc, libPath)
+	if err != nil {
+		t.Fatalf("ParseFile(lib.core.actors): %v", err)
+	}
+	appSrc := []byte(`module app.main
+import lib.core.actors as actors
+
+func score_status(result: actors.StatusResult) -> Int:
+    match result:
+    case actors.StatusResult.ok(status):
+        match status:
+        case actors.ActorStatus.starting:
+            return 0
+        case actors.ActorStatus.ready:
+            return 1
+        case actors.ActorStatus.running:
+            return 2
+        case actors.ActorStatus.blocked:
+            return 3
+        case actors.ActorStatus.sleeping:
+            return 4
+        case actors.ActorStatus.waiting:
+            return 5
+        case actors.ActorStatus.stopping:
+            return 6
+        case actors.ActorStatus.exited_normal:
+            return 7
+        case actors.ActorStatus.exited_error(code):
+            return 80 + code
+        case actors.ActorStatus.canceled:
+            return 9
+        case actors.ActorStatus.restarting:
+            return 10
+        case actors.ActorStatus.dead:
+            return 11
+        case actors.ActorStatus.unknown(code):
+            return 100 + code
+    case actors.StatusResult.invalid:
+        return 200
+    case actors.StatusResult.stale:
+        return 201
+    case actors.StatusResult.node_down:
+        return 202
+
+func score_wait(result: actors.WaitResult) -> Int:
+    match result:
+    case actors.WaitResult.exited(reason):
+        match reason:
+        case actors.ExitReason.normal:
+            return 0
+        case actors.ExitReason.shutdown(code):
+            return 10 + code
+        case actors.ExitReason.error(code):
+            return 20 + code
+        case actors.ExitReason.canceled:
+            return 30
+        case actors.ExitReason.killed:
+            return 40
+        case actors.ExitReason.node_down(code):
+            return 50 + code
+        case actors.ExitReason.protocol_error(code):
+            return 60 + code
+        case actors.ExitReason.runtime_error(code):
+            return 70 + code
+        case actors.ExitReason.unknown(kind, code):
+            return 80 + kind + code
+    case actors.WaitResult.timeout:
+        return 100
+    case actors.WaitResult.canceled:
+        return 101
+    case actors.WaitResult.invalid:
+        return 102
+    case actors.WaitResult.stale:
+        return 103
+    case actors.WaitResult.node_down:
+        return 104
+
+func score_stop(result: actors.StopResult) -> Int:
+    match result:
+    case actors.StopResult.requested:
+        return 0
+    case actors.StopResult.already_exited(reason):
+        return 10
+    case actors.StopResult.invalid:
+        return 20
+    case actors.StopResult.stale:
+        return 21
+    case actors.StopResult.node_down:
+        return 22
+
+func score_link(result: actors.LinkResult) -> Int:
+    match result:
+    case actors.LinkResult.linked:
+        return 0
+    case actors.LinkResult.already_linked:
+        return 1
+    case actors.LinkResult.target_exited(reason):
+        return 2
+    case actors.LinkResult.resource_exhausted:
+        return 3
+    case actors.LinkResult.invalid:
+        return 4
+    case actors.LinkResult.stale:
+        return 5
+    case actors.LinkResult.node_down:
+        return 6
+
+func score_monitor(result: actors.MonitorResult) -> Int:
+    match result:
+    case actors.MonitorResult.monitoring(reference):
+        return 0
+    case actors.MonitorResult.target_already_exited(reference):
+        return 1
+    case actors.MonitorResult.resource_exhausted:
+        return 2
+    case actors.MonitorResult.invalid:
+        return 3
+    case actors.MonitorResult.stale:
+        return 4
+    case actors.MonitorResult.node_down:
+        return 5
+
+func main() -> Int
+uses actors, runtime:
+    let self_ref: actor = core.self()
+    let status: actors.StatusResult = actors.status(self_ref)
+    let waited: actors.WaitResult = actors.wait_until(self_ref, 0)
+    let stopped: actors.StopResult = actors.stop(self_ref, actors.ExitReason.normal)
+    let linked: actors.LinkResult = actors.link(self_ref)
+    let unlinked: Bool = actors.unlink(self_ref)
+    let monitored: actors.MonitorResult = actors.monitor(self_ref)
+    let trapped: Bool = actors.set_trap_exit(true)
+    let _score: Int = score_status(status) + score_wait(waited) + score_stop(stopped) + score_link(linked) + score_monitor(monitored)
+    return 0
+`)
+	appFile, err := frontend.ParseFile(appSrc, "app/main.tetra")
+	if err != nil {
+		t.Fatalf("ParseFile(app): %v", err)
+	}
+	world := &module.World{
+		EntryModule: appFile.Module,
+		Files:       []*frontend.FileAST{libFile, appFile},
+		ByModule: map[string]*frontend.FileAST{
+			libFile.Module: libFile,
+			appFile.Module: appFile,
+		},
+	}
+	if _, err := CheckWorldOpt(world, CheckOptions{RequireMain: true}); err != nil {
+		t.Fatalf("CheckWorldOpt: %v", err)
+	}
+}
+
+func TestLibCoreActorsSystemMessageCannotUseOrdinaryActorMailbox(t *testing.T) {
+	root, err := filepath.Abs("../../..")
+	if err != nil {
+		t.Fatalf("resolve repo root: %v", err)
+	}
+	libPath := filepath.Join(root, "lib", "core", "actors", "actors.tetra")
+	libSrc, err := os.ReadFile(libPath)
+	if err != nil {
+		t.Fatalf("read lib.core.actors: %v", err)
+	}
+	libFile, err := frontend.ParseFile(libSrc, libPath)
+	if err != nil {
+		t.Fatalf("ParseFile(lib.core.actors): %v", err)
+	}
+	appSrc := []byte(`module app.main
+import lib.core.actors as actors
+
+func main() -> Int
+uses actors:
+    let msg: actors.SystemMessage = actors.SystemMessage.exit(core.self(), actors.ExitReason.normal)
+    return core.send_typed(core.self(), msg)
+`)
+	appFile, err := frontend.ParseFile(appSrc, "app/main.tetra")
+	if err != nil {
+		t.Fatalf("ParseFile(app): %v", err)
+	}
+	world := &module.World{
+		EntryModule: appFile.Module,
+		Files:       []*frontend.FileAST{libFile, appFile},
+		ByModule: map[string]*frontend.FileAST{
+			libFile.Module: libFile,
+			appFile.Module: appFile,
+		},
+	}
+	_, err = CheckWorldOpt(world, CheckOptions{RequireMain: true})
+	if err == nil {
+		t.Fatalf("expected system-message ordinary mailbox diagnostic")
+	}
+	if !strings.Contains(err.Error(), "runtime system messages cannot be sent through the ordinary actor mailbox") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestLibCoreActorsSystemMessageCannotUseOrdinaryTypedReceive(t *testing.T) {
+	root, err := filepath.Abs("../../..")
+	if err != nil {
+		t.Fatalf("resolve repo root: %v", err)
+	}
+	libPath := filepath.Join(root, "lib", "core", "actors", "actors.tetra")
+	libSrc, err := os.ReadFile(libPath)
+	if err != nil {
+		t.Fatalf("read lib.core.actors: %v", err)
+	}
+	libFile, err := frontend.ParseFile(libSrc, libPath)
+	if err != nil {
+		t.Fatalf("ParseFile(lib.core.actors): %v", err)
+	}
+	appSrc := []byte(`module app.main
+import lib.core.actors as actors
+
+func main() -> Int
+uses actors:
+    let msg: actors.SystemMessage = core.recv_typed<actors.SystemMessage>()
+    return 0
+`)
+	appFile, err := frontend.ParseFile(appSrc, "app/main.tetra")
+	if err != nil {
+		t.Fatalf("ParseFile(app): %v", err)
+	}
+	world := &module.World{
+		EntryModule: appFile.Module,
+		Files:       []*frontend.FileAST{libFile, appFile},
+		ByModule: map[string]*frontend.FileAST{
+			libFile.Module: libFile,
+			appFile.Module: appFile,
+		},
+	}
+	_, err = CheckWorldOpt(world, CheckOptions{RequireMain: true})
+	if err == nil {
+		t.Fatalf("expected system-message ordinary typed receive diagnostic")
+	}
+	if !strings.Contains(err.Error(), "runtime system messages cannot be sent through the ordinary actor mailbox") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestUserDefinedSystemMessageCanUseOrdinaryTypedActorMailbox(t *testing.T) {
+	src := `module main
+
+enum SystemMessage:
+    case ping(Int)
+
+func main() -> Int
+uses actors:
+    let sent: Int = core.send_typed(core.self(), SystemMessage.ping(7))
+    let received: SystemMessage = core.recv_typed<SystemMessage>()
+    match received:
+    case SystemMessage.ping(value):
+        return sent + value
+`
+	file, err := frontend.ParseFile([]byte(src), "main.tetra")
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+	world := &module.World{
+		EntryModule: file.Module,
+		Files:       []*frontend.FileAST{file},
+		ByModule: map[string]*frontend.FileAST{
+			file.Module: file,
+		},
+	}
+	if _, err := CheckWorldOpt(world, CheckOptions{RequireMain: true}); err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+}
+
+func checkActorSystemReceiveError(t *testing.T, src string) error {
+	t.Helper()
+	prog, err := frontend.Parse([]byte(src))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected Check error")
+	}
+	return err
 }
 
 func TestEnsureTypeInfoRejectsTargetLayoutOnlyNativeIntegers(t *testing.T) {

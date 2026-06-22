@@ -40,8 +40,12 @@ func TestReadFileParsesDomainBytes(t *testing.T) {
 		"current_bytes":         128,
 		"peak_bytes":            192,
 		"bytes_copied":          64,
-		"mailbox_current_bytes": 128,
-		"mailbox_peak_bytes":    192,
+		"mailbox_current_bytes": 64,
+		"mailbox_peak_bytes":    96,
+		"stack_live_bytes":      64,
+		"stack_reserved_bytes":  96,
+		"stack_retained_bytes":  0,
+		"stack_released_bytes":  0,
 		"byte_budget":           1024,
 		"over_budget_count":     3,
 		"backpressure_events":   4,
@@ -60,7 +64,9 @@ func TestReadFileParsesDomainBytes(t *testing.T) {
 		domain.RequestedBytes != 256 || domain.ReservedBytes != 512 ||
 		domain.CommittedBytes != 384 || domain.CurrentBytes != 128 ||
 		domain.PeakBytes != 192 || domain.BytesCopied != 64 ||
-		domain.MailboxCurrentBytes != 128 || domain.MailboxPeakBytes != 192 ||
+		domain.MailboxCurrentBytes != 64 || domain.MailboxPeakBytes != 96 ||
+		domain.StackLiveBytes != 64 || domain.StackReservedBytes != 96 ||
+		domain.StackRetainedBytes != 0 || domain.StackReleasedBytes != 0 ||
 		domain.ByteBudget != 1024 || domain.OverBudgetCount != 3 ||
 		domain.BackpressureEvents != 4 {
 		t.Fatalf("domain bytes = %+v, want all sidecar fields preserved", domain)
@@ -82,6 +88,29 @@ func TestReadFileRejectsActorDomainMissingBudgetBackpressureFields(t *testing.T)
 	_, err := ReadFile(path, dir)
 	if err == nil || !strings.Contains(err.Error(), "mailbox_current_bytes") {
 		t.Fatalf("ReadFile actor domain without budget fields = %v, want mailbox field rejection", err)
+	}
+}
+
+func TestReadFileRejectsActorDomainMissingStackFields(t *testing.T) {
+	dir := t.TempDir()
+	raw := validSampleMap()
+	raw["domain_bytes"] = []map[string]any{{
+		"domain_id":             "actor:pong",
+		"kind":                  "actor",
+		"current_bytes":         128,
+		"peak_bytes":            192,
+		"bytes_copied":          64,
+		"mailbox_current_bytes": 128,
+		"mailbox_peak_bytes":    192,
+		"byte_budget":           1024,
+		"over_budget_count":     3,
+		"backpressure_events":   4,
+	}}
+	path := writeSidecar(t, dir, "heap.json", raw)
+
+	_, err := ReadFile(path, dir)
+	if err == nil || !strings.Contains(err.Error(), "stack_live_bytes") {
+		t.Fatalf("ReadFile actor domain without stack fields = %v, want stack field rejection", err)
 	}
 }
 
@@ -158,6 +187,80 @@ func TestReadFileRejectsImpossibleByteInvariants(t *testing.T) {
 	}
 }
 
+func TestReadFileV2RejectsReleaseWithoutSuccessfulOSRelease(t *testing.T) {
+	dir := t.TempDir()
+	raw := validV2SampleMap()
+	raw["released_total_bytes"] = uint64(4096)
+	raw["os_release_success_count"] = uint64(0)
+	raw["os_release_success_bytes"] = uint64(0)
+	path := writeSidecar(t, dir, "heap-v2.json", raw)
+
+	_, err := ReadFile(path, dir)
+	if err == nil || !strings.Contains(err.Error(), "released_total_bytes") {
+		t.Fatalf("ReadFile v2 release without OS release = %v, want release rejection", err)
+	}
+}
+
+func TestReadFileV2RejectsLivePayloadThatDoesNotReconcile(t *testing.T) {
+	dir := t.TempDir()
+	raw := validV2SampleMap()
+	raw["successful_alloc_payload_bytes"] = uint64(1024)
+	raw["successful_drop_payload_bytes"] = uint64(256)
+	raw["payload_live_current_bytes"] = uint64(1024)
+	path := writeSidecar(t, dir, "heap-v2.json", raw)
+
+	_, err := ReadFile(path, dir)
+	if err == nil || !strings.Contains(err.Error(), "payload_live_current_bytes") {
+		t.Fatalf("ReadFile v2 unreconciled live payload = %v, want current/live rejection", err)
+	}
+}
+
+func TestReadFileV2RejectsPerCoreClaimForProcessGlobalAllocator(t *testing.T) {
+	dir := t.TempDir()
+	raw := validV2SampleMap()
+	raw["allocator_claims"] = []string{"per_core", "free_list_reuse"}
+	raw["allocator_state_scope"] = "process"
+	path := writeSidecar(t, dir, "heap-v2.json", raw)
+
+	_, err := ReadFile(path, dir)
+	if err == nil || !strings.Contains(err.Error(), "per_core") {
+		t.Fatalf("ReadFile v2 process-global per-core claim = %v, want per_core rejection", err)
+	}
+}
+
+func TestReadFileV2RejectsMeasuredFieldsFromEstimates(t *testing.T) {
+	dir := t.TempDir()
+	raw := validV2SampleMap()
+	raw["metric_sources"] = map[string]string{
+		"payload_live_current_bytes": "allocation_plan_estimate",
+		"released_total_bytes":       "runtime_measured",
+	}
+	path := writeSidecar(t, dir, "heap-v2.json", raw)
+
+	_, err := ReadFile(path, dir)
+	if err == nil || !strings.Contains(err.Error(), "allocation_plan_estimate") {
+		t.Fatalf("ReadFile v2 estimated measured field = %v, want provenance rejection", err)
+	}
+}
+
+func TestReadFileV2AcceptsUnsupportedMetricWithoutNumericZero(t *testing.T) {
+	dir := t.TempDir()
+	raw := validV2SampleMap()
+	raw["unsupported_metrics"] = []string{"os_release_success_bytes"}
+	delete(raw, "os_release_success_bytes")
+	delete(raw, "os_release_success_count")
+	delete(raw, "released_total_bytes")
+	path := writeSidecar(t, dir, "heap-v2.json", raw)
+
+	sample, err := ReadFile(path, dir)
+	if err != nil {
+		t.Fatalf("ReadFile v2 unsupported metric without numeric zero: %v", err)
+	}
+	if sample.Schema != SchemaV2 {
+		t.Fatalf("schema = %q, want %q", sample.Schema, SchemaV2)
+	}
+}
+
 func TestReadFileRejectsArtifactOutsideRoot(t *testing.T) {
 	dir := t.TempDir()
 	outside := t.TempDir()
@@ -166,6 +269,38 @@ func TestReadFileRejectsArtifactOutsideRoot(t *testing.T) {
 	_, err := ReadFile(path, dir)
 	if err == nil || !strings.Contains(err.Error(), "artifact root") {
 		t.Fatalf("ReadFile outside root = %v, want artifact root rejection", err)
+	}
+}
+
+func validV2SampleMap() map[string]any {
+	return map[string]any{
+		"schema":                         SchemaV2,
+		"target":                         TargetLinuxX64,
+		"method":                         MethodLinuxX64HeapTelemetryV2,
+		"program":                        "allocation_tetra",
+		"pid":                            1234,
+		"exit_status":                    0,
+		"allocator_mode":                 "process_bump_small_heap_v0",
+		"allocator_state_scope":          "process",
+		"successful_alloc_payload_bytes": uint64(1024),
+		"successful_drop_payload_bytes":  uint64(256),
+		"payload_live_current_bytes":     uint64(768),
+		"heap_allocation_count":          uint64(4),
+		"free_count":                     uint64(1),
+		"reuse_count":                    uint64(0),
+		"released_total_bytes":           uint64(0),
+		"os_release_attempt_count":       uint64(0),
+		"os_release_success_count":       uint64(0),
+		"os_release_success_bytes":       uint64(0),
+		"bytes_requested":                uint64(1024),
+		"bytes_reserved":                 uint64(4096),
+		"metric_sources": map[string]string{
+			"payload_live_current_bytes": "runtime_measured",
+			"released_total_bytes":       "runtime_measured",
+			"bytes_reserved":             "runtime_measured",
+		},
+		"allocation_paths": map[string]uint64{"small_heap_bump": 4},
+		"notes":            []string{"test fixture"},
 	}
 }
 

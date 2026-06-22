@@ -1,0 +1,14 @@
+struct Vec2:
+    x: Int
+
+protocol Renderable:
+    func draw(self: Vec2) -> Int
+
+extension Vec2:
+    func draw(self: Vec2) -> Int:
+        return self.x
+
+impl Vec2: Renderable
+
+func main() -> Int:
+    return Vec2.draw(Vec2(x: 42))

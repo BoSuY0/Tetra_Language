@@ -8,6 +8,7 @@ import (
 	"tetra_language/compiler/internal/ir"
 	"tetra_language/compiler/internal/module"
 	"tetra_language/compiler/internal/plir"
+	"tetra_language/compiler/internal/runtimeabi"
 	"tetra_language/compiler/internal/semantics"
 	"tetra_language/compiler/target"
 )
@@ -146,6 +147,78 @@ func lowerFunctionTempRegionProgram(t *testing.T, src string) *ir.IRProgram {
 		t.Fatalf("LowerWithOptions: %v", err)
 	}
 	return out
+}
+
+func lowerOwnedAllocDropProgram(t *testing.T, src string) *ir.IRProgram {
+	t.Helper()
+	prog, err := frontend.Parse([]byte(src))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	checked, err := semantics.Check(prog)
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	out, err := LowerWithOptions(checked, Options{OwnedAllocDropLowering: true})
+	if err != nil {
+		t.Fatalf("LowerWithOptions: %v", err)
+	}
+	return out
+}
+
+func lowerOwnedAllocDropProgramError(t *testing.T, src string) error {
+	t.Helper()
+	prog, err := frontend.Parse([]byte(src))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	checked, err := semantics.Check(prog)
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	_, err = LowerWithOptions(checked, Options{OwnedAllocDropLowering: true})
+	return err
+}
+
+func lowerOwnedAllocDropFileProgram(t *testing.T, src string) *ir.IRProgram {
+	t.Helper()
+	file, err := frontend.ParseFile([]byte(src), "owned_alloc_drop.tetra")
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+	world := &module.World{
+		EntryModule: "",
+		Files:       []*frontend.FileAST{file},
+		ByModule:    map[string]*frontend.FileAST{"": file},
+	}
+	checked, err := semantics.CheckWorld(world)
+	if err != nil {
+		t.Fatalf("CheckWorld: %v", err)
+	}
+	out, err := LowerWithOptions(checked, Options{OwnedAllocDropLowering: true})
+	if err != nil {
+		t.Fatalf("LowerWithOptions: %v", err)
+	}
+	return out
+}
+
+func lowerOwnedAllocDropFileProgramError(t *testing.T, src string) error {
+	t.Helper()
+	file, err := frontend.ParseFile([]byte(src), "owned_alloc_drop.tetra")
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+	world := &module.World{
+		EntryModule: "",
+		Files:       []*frontend.FileAST{file},
+		ByModule:    map[string]*frontend.FileAST{"": file},
+	}
+	checked, err := semantics.CheckWorld(world)
+	if err != nil {
+		t.Fatalf("CheckWorld: %v", err)
+	}
+	_, err = LowerWithOptions(checked, Options{OwnedAllocDropLowering: true})
+	return err
 }
 
 func TestLowerStackAllocationForFixedNoEscapeSlice(t *testing.T) {
@@ -459,6 +532,5871 @@ func main() -> Int:
 		t.Fatalf("fail missing function-temp region enter/make evidence: %#v", fn.Instrs)
 	}
 	assertRegionResetImmediatelyBeforeEveryReturn(t, fn)
+}
+
+func TestLowerOwnedAllocBytesDropsBeforeReturn(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let mem: cap.mem = core.cap_mem()
+        let p: ptr = core.alloc_bytes(16)
+        let _stored: Int = core.store_i32(p, 42, mem)
+    return 0
+`)
+	fn := findIRFunc(t, prog, "main")
+
+	if countInstrKind(fn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("main alloc_bytes count = %d, want 1: %#v", countInstrKind(fn, ir.IRAllocBytes), fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRDropOwned) != 1 || countInstrKind(fn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("main missing owned drop/release before return: %#v", fn.Instrs)
+	}
+	assertOwnedReleaseBeforeFirstReturnValue(t, fn)
+}
+
+func TestLowerOwnedAllocBytesInBranchDropsBeforeJoin(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func maybe(flag: Bool) -> Int
+uses alloc, capability, mem:
+    if flag:
+        unsafe:
+            let mem: cap.mem = core.cap_mem()
+            let p: ptr = core.alloc_bytes(16)
+            let _stored: Int = core.store_i32(p, 42, mem)
+    return 0
+
+func main() -> Int
+uses alloc, capability, mem:
+    return maybe(false)
+`)
+	fn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(fn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 1: %#v", countInstrKind(fn, ir.IRAllocBytes), fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRDropOwned) != 1 || countInstrKind(fn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("maybe missing owned drop/release in branch: %#v", fn.Instrs)
+	}
+	assertOwnedReleaseBeforeFirstJmpIfZeroTarget(t, fn)
+}
+
+func TestLowerOwnedAllocBytesSuppressesDropForReturnedPointer(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func ret() -> ptr
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        return p
+
+func main() -> Int:
+    return 0
+`)
+	fn := findIRFunc(t, prog, "ret")
+	if countInstrKind(fn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("ret alloc_bytes count = %d, want 1: %#v", countInstrKind(fn, ir.IRAllocBytes), fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRDropOwned) != 0 || countInstrKind(fn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("returned owned pointer must not be dropped in callee: %#v", fn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsAlwaysSomeReturnedOptionalOwnedPayloadInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func maybe() -> ptr?
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        return p
+
+func main() -> Int
+uses alloc, mem:
+    let q: ptr? = maybe()
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 1: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("returned optional owned payload must not be dropped in callee: %#v", maybeFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "maybe") != 1 {
+		t.Fatalf("main must call maybe once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned optional payload must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsMixedReturnedOptionalOwnedPayloadInCallerWhenPresent(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func maybe(flag: Bool) -> ptr?
+uses alloc, mem:
+    if flag:
+        unsafe:
+            let p: ptr = core.alloc_bytes(16)
+            return p
+    return none
+
+func main() -> Int
+uses alloc, mem:
+    let q: ptr? = maybe(true)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 1: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("returned optional owned payload must not be dropped in callee: %#v", maybeFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "maybe") != 1 {
+		t.Fatalf("main must call maybe once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned optional payload must be dropped in caller when present: %#v", mainFn.Instrs)
+	}
+	assertOwnedReleaseGuardedByLocal(t, mainFn, 1)
+}
+
+func TestLowerOwnedAllocBytesDropsRelayedMixedReturnedOptionalOwnedPayloadInCallerWhenPresent(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func maybe(flag: Bool) -> ptr?
+uses alloc, mem:
+    if flag:
+        unsafe:
+            let p: ptr = core.alloc_bytes(16)
+            return p
+    return none
+
+func relay(flag: Bool) -> ptr?
+uses alloc, mem:
+    return maybe(flag)
+
+func main() -> Int
+uses alloc, mem:
+    let q: ptr? = relay(true)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 1: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("returned optional owned payload must not be dropped in source callee: %#v", maybeFn.Instrs)
+	}
+	relayFn := findIRFunc(t, prog, "relay")
+	if countCallsNamed(relayFn.Instrs, "maybe") != 1 {
+		t.Fatalf("relay must call maybe once: %#v", relayFn.Instrs)
+	}
+	if countInstrKind(relayFn, ir.IRDropOwned) != 0 || countInstrKind(relayFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("relayed optional owned payload must not be dropped in relay callee: %#v", relayFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "relay") != 1 {
+		t.Fatalf("main must call relay once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned relayed optional payload must be dropped in caller when present: %#v", mainFn.Instrs)
+	}
+	assertOwnedReleaseGuardedByLocal(t, mainFn, 1)
+}
+
+func TestLowerOwnedAllocBytesDropsLocalRelayedMixedReturnedOptionalOwnedPayloadInCallerWhenPresent(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func maybe(flag: Bool) -> ptr?
+uses alloc, mem:
+    if flag:
+        unsafe:
+            let p: ptr = core.alloc_bytes(16)
+            return p
+    return none
+
+func relay(flag: Bool) -> ptr?
+uses alloc, mem:
+    let q: ptr? = maybe(flag)
+    return q
+
+func main() -> Int
+uses alloc, mem:
+    let q: ptr? = relay(true)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 1: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("returned optional owned payload must not be dropped in source callee: %#v", maybeFn.Instrs)
+	}
+	relayFn := findIRFunc(t, prog, "relay")
+	if countCallsNamed(relayFn.Instrs, "maybe") != 1 {
+		t.Fatalf("relay must call maybe once: %#v", relayFn.Instrs)
+	}
+	if countInstrKind(relayFn, ir.IRDropOwned) != 0 || countInstrKind(relayFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("local relayed optional owned payload must not be dropped in relay callee: %#v", relayFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "relay") != 1 {
+		t.Fatalf("main must call relay once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned local relayed optional payload must be dropped in caller when present: %#v", mainFn.Instrs)
+	}
+	assertOwnedReleaseGuardedByLocal(t, mainFn, 1)
+}
+
+func TestLowerOwnedAllocBytesSuppressesDropForThrownPointer(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func fail() -> Int throws ptr
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        throw p
+
+func main() -> Int:
+    return 0
+`)
+	fn := findIRFunc(t, prog, "fail")
+	if countInstrKind(fn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("fail alloc_bytes count = %d, want 1: %#v", countInstrKind(fn, ir.IRAllocBytes), fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRDropOwned) != 0 || countInstrKind(fn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("thrown owned pointer must not be dropped in throwing callee: %#v", fn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsBeforeTryPropagationReturn(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum E:
+    case bad
+
+func fail(flag: Bool) -> Int throws E:
+    if flag:
+        throw E.bad
+    return 7
+
+func caller(flag: Bool) -> Int throws E
+uses alloc, capability, mem:
+    var p: ptr = 0
+    unsafe:
+        let mem: cap.mem = core.cap_mem()
+        p = core.alloc_bytes(16)
+        let _stored: Int = core.store_i32(p, 42, mem)
+    return try fail(flag)
+
+func main() -> Int:
+    return 0
+`)
+	fn := findIRFunc(t, prog, "caller")
+	if countInstrKind(fn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("caller alloc_bytes count = %d, want 1: %#v", countInstrKind(fn, ir.IRAllocBytes), fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRDropOwned) != 2 || countInstrKind(fn, ir.IRReleaseAllocation) != 2 {
+		t.Fatalf("try propagation and success returns must both drop/release owned allocation: %#v", fn.Instrs)
+	}
+	assertOwnedReleaseBeforeEveryReturn(t, fn)
+}
+
+func TestLowerOwnedAllocBytesDropsPartialInlineAggregateBeforeTryPropagation(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum E:
+    case bad
+
+struct FailableBox:
+    raw: ptr
+    code: Int
+
+func fail(flag: Bool) -> Int throws E:
+    if flag:
+        throw E.bad
+    return 7
+
+func make_box(flag: Bool) -> FailableBox throws E
+uses alloc, mem:
+    unsafe:
+        return FailableBox(raw: core.alloc_bytes(16), code: try fail(flag))
+
+func main() -> Int:
+    return 0
+`)
+	fn := findIRFunc(t, prog, "make_box")
+	if countInstrKind(fn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make_box alloc_bytes count = %d, want 1: %#v", countInstrKind(fn, ir.IRAllocBytes), fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRDropOwned) != 1 || countInstrKind(fn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("partial aggregate try failure must drop/release initialized owned field: %#v", fn.Instrs)
+	}
+	assertOwnedReleaseBeforeFirstReturn(t, fn)
+}
+
+func TestLowerOwnedAllocBytesDropsNestedPartialInlineAggregateBeforeTryPropagation(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum E:
+    case bad
+
+struct PtrBox:
+    raw: ptr
+    code: Int
+
+struct Holder:
+    head: Int
+    box: PtrBox
+
+func fail(flag: Bool) -> Int throws E:
+    if flag:
+        throw E.bad
+    return 7
+
+func make_holder(flag: Bool) -> Holder throws E
+uses alloc, mem:
+    unsafe:
+        return Holder(head: 1, box: PtrBox(raw: core.alloc_bytes(16), code: try fail(flag)))
+
+func main() -> Int:
+    return 0
+`)
+	fn := findIRFunc(t, prog, "make_holder")
+	if countInstrKind(fn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make_holder alloc_bytes count = %d, want 1: %#v", countInstrKind(fn, ir.IRAllocBytes), fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRDropOwned) != 1 || countInstrKind(fn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("nested partial aggregate try failure must drop/release initialized owned field: %#v", fn.Instrs)
+	}
+	assertOwnedReleaseBeforeFirstReturn(t, fn)
+}
+
+func TestLowerOwnedAllocBytesDropsPartialInlineEnumPayloadBeforeTryPropagation(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum E:
+    case bad
+
+enum PtrResult:
+    case owned(ptr, Int)
+
+func fail(flag: Bool) -> Int throws E:
+    if flag:
+        throw E.bad
+    return 7
+
+func make_result(flag: Bool) -> PtrResult throws E
+uses alloc, mem:
+    unsafe:
+        return PtrResult.owned(core.alloc_bytes(16), try fail(flag))
+
+func main() -> Int:
+    return 0
+`)
+	fn := findIRFunc(t, prog, "make_result")
+	if countInstrKind(fn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make_result alloc_bytes count = %d, want 1: %#v", countInstrKind(fn, ir.IRAllocBytes), fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRDropOwned) != 1 || countInstrKind(fn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("partial enum payload try failure must drop/release initialized owned payload: %#v", fn.Instrs)
+	}
+	assertOwnedReleaseBeforeFirstReturn(t, fn)
+}
+
+func TestLowerOwnedAllocBytesDropsPartialInlineAggregateThrowBeforeTryPropagation(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+struct FailableBox:
+    raw: ptr
+    code: Int
+
+func fail_code(flag: Bool) -> Int throws FailableBox:
+    if flag:
+        throw FailableBox(raw: 0, code: 1)
+    return 7
+
+func fail(flag: Bool) -> Int throws FailableBox
+uses alloc, mem:
+    unsafe:
+        throw FailableBox(raw: core.alloc_bytes(16), code: try fail_code(flag))
+
+func main() -> Int
+uses alloc, mem:
+    return catch fail(true):
+    case _:
+        9
+`)
+	failFn := findIRFunc(t, prog, "fail")
+	if countInstrKind(failFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("fail alloc_bytes count = %d, want 1: %#v", countInstrKind(failFn, ir.IRAllocBytes), failFn.Instrs)
+	}
+	if countInstrKind(failFn, ir.IRDropOwned) != 1 || countInstrKind(failFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("partial aggregate throw try failure must drop/release initialized owned field: %#v", failFn.Instrs)
+	}
+	assertOwnedReleaseBeforeFirstReturn(t, failFn)
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "fail") != 1 {
+		t.Fatalf("main must call fail once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caught partial aggregate throw must be dropped in catch path: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsNestedPartialInlineAggregateThrowBeforeTryPropagation(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+struct PtrBox:
+    raw: ptr
+    code: Int
+
+struct Holder:
+    head: Int
+    box: PtrBox
+
+func fail_box(flag: Bool) -> Int throws Holder:
+    if flag:
+        throw Holder(head: 0, box: PtrBox(raw: 0, code: 1))
+    return 7
+
+func fail(flag: Bool) -> Int throws Holder
+uses alloc, mem:
+    unsafe:
+        throw Holder(head: 1, box: PtrBox(raw: core.alloc_bytes(16), code: try fail_box(flag)))
+
+func main() -> Int
+uses alloc, mem:
+    return catch fail(true):
+    case _:
+        9
+`)
+	failFn := findIRFunc(t, prog, "fail")
+	if countInstrKind(failFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("fail alloc_bytes count = %d, want 1: %#v", countInstrKind(failFn, ir.IRAllocBytes), failFn.Instrs)
+	}
+	if countInstrKind(failFn, ir.IRDropOwned) != 1 || countInstrKind(failFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("nested partial aggregate throw try failure must drop/release initialized owned field: %#v", failFn.Instrs)
+	}
+	assertOwnedReleaseBeforeFirstReturn(t, failFn)
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "fail") != 1 {
+		t.Fatalf("main must call fail once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caught nested partial aggregate throw must be dropped in catch path: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesSuppressesDropAfterLocalMoveReturn(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func ret() -> ptr
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        let q: ptr = p
+        return q
+
+func main() -> Int:
+    return 0
+`)
+	fn := findIRFunc(t, prog, "ret")
+	if countInstrKind(fn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("ret alloc_bytes count = %d, want 1: %#v", countInstrKind(fn, ir.IRAllocBytes), fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRDropOwned) != 0 || countInstrKind(fn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("moved returned owned pointer must not be dropped in callee: %#v", fn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesRejectsMovedFromLocalReturn(t *testing.T) {
+	src := `
+func ret() -> ptr
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        let q: ptr = p
+        return p
+
+func main() -> Int:
+    return 0
+`
+	err := lowerOwnedAllocDropProgramError(t, src)
+	if err == nil {
+		prog := lowerOwnedAllocDropProgram(t, src)
+		retFn := findIRFunc(t, prog, "ret")
+		t.Fatalf("LowerWithOptions error = <nil>, want use after move; ret IR: %#v", retFn.Instrs)
+	}
+	if !strings.Contains(err.Error(), "use after move") {
+		t.Fatalf("LowerWithOptions error = %v, want use after move", err)
+	}
+}
+
+func TestLowerOwnedAllocBytesRejectsAggregateUseAfterFieldMove(t *testing.T) {
+	err := lowerOwnedAllocDropProgramError(t, `
+struct PtrBox:
+    tag: Int
+    raw: ptr
+
+func ret() -> PtrBox
+uses alloc, mem:
+    var box: PtrBox = PtrBox(tag: 1, raw: 0)
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        box.raw = p
+        let q: ptr = box.raw
+        return box
+
+func main() -> Int:
+    return 0
+`)
+	if err == nil || !strings.Contains(err.Error(), "use after move") {
+		t.Fatalf("LowerWithOptions error = %v, want use after move", err)
+	}
+}
+
+func TestLowerOwnedAllocBytesRejectsMultiOwnedAggregateReturn(t *testing.T) {
+	err := lowerOwnedAllocDropProgramError(t, `
+struct PairBox:
+    left: ptr
+    right: ptr
+
+func make_pair() -> PairBox
+uses alloc, mem:
+    var pair: PairBox = PairBox(left: 0, right: 0)
+    unsafe:
+        let left: ptr = core.alloc_bytes(16)
+        let right: ptr = core.alloc_bytes(32)
+        pair.left = left
+        pair.right = right
+    return pair
+
+func main() -> Int:
+    return 0
+`)
+	if err == nil || !strings.Contains(err.Error(), "multiple owned return slots") {
+		t.Fatalf("LowerWithOptions error = %v, want multiple owned return slots diagnostic", err)
+	}
+}
+
+func TestLowerOwnedAllocBytesRejectsOwnedAggregateIndexStore(t *testing.T) {
+	err := lowerOwnedAllocDropProgramError(t, `
+struct PtrBox:
+    raw: ptr
+
+func store_index(seed: [2]PtrBox) -> Int
+uses alloc, mem:
+    var boxes: [2]PtrBox = seed
+    unsafe:
+        var box: PtrBox = PtrBox(raw: 0)
+        let p: ptr = core.alloc_bytes(16)
+        box.raw = p
+        boxes[0] = box
+    return 0
+
+func main() -> Int:
+    return 0
+`)
+	if err == nil || !strings.Contains(err.Error(), "index store") {
+		t.Fatalf("LowerWithOptions error = %v, want index store diagnostic", err)
+	}
+}
+
+func TestLowerOwnedAllocBytesRejectsCaughtOwnedPayloadIndexStore(t *testing.T) {
+	err := lowerOwnedAllocDropProgramError(t, `
+struct PtrBox:
+    raw: ptr
+
+enum PtrError:
+    case owned(ptr)
+
+func fail() -> PtrBox throws PtrError
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        throw PtrError.owned(p)
+
+func store_index(seed: [2]PtrBox) -> Int
+uses alloc, mem:
+    var boxes: [2]PtrBox = seed
+    unsafe:
+        boxes[0] = catch fail():
+        case PtrError.owned(p):
+            PtrBox(raw: p)
+    return 0
+
+func main() -> Int:
+    return 0
+`)
+	if err == nil || !strings.Contains(err.Error(), "index store") {
+		t.Fatalf("LowerWithOptions error = %v, want index store diagnostic", err)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsInlineOwnedAggregateReturnInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+struct PtrBox:
+    raw: ptr
+
+func make_box() -> PtrBox
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        return PtrBox(raw: p)
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let box: PtrBox = make_box()
+    return 0
+`)
+	makeBoxFn := findIRFunc(t, prog, "make_box")
+	if countInstrKind(makeBoxFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make_box alloc_bytes count = %d, want 1: %#v", countInstrKind(makeBoxFn, ir.IRAllocBytes), makeBoxFn.Instrs)
+	}
+	if countInstrKind(makeBoxFn, ir.IRDropOwned) != 0 || countInstrKind(makeBoxFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("inline owned aggregate return must not drop in callee: %#v", makeBoxFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "make_box") != 1 {
+		t.Fatalf("main must call make_box once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned inline aggregate return must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsInlineDirectAllocAggregateReturnInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+struct PtrBox:
+    raw: ptr
+
+func make_box() -> PtrBox
+uses alloc, mem:
+    unsafe:
+        return PtrBox(raw: core.alloc_bytes(16))
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let box: PtrBox = make_box()
+    return 0
+`)
+	makeBoxFn := findIRFunc(t, prog, "make_box")
+	if countInstrKind(makeBoxFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make_box alloc_bytes count = %d, want 1: %#v", countInstrKind(makeBoxFn, ir.IRAllocBytes), makeBoxFn.Instrs)
+	}
+	if countInstrKind(makeBoxFn, ir.IRDropOwned) != 0 || countInstrKind(makeBoxFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("inline direct allocation aggregate return must not drop in callee: %#v", makeBoxFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "make_box") != 1 {
+		t.Fatalf("main must call make_box once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned inline direct allocation aggregate return must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsInlineOwnedReturnCallAggregateReturnInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+struct PtrBox:
+    raw: ptr
+
+func make_raw() -> ptr
+uses alloc, mem:
+    unsafe:
+        return core.alloc_bytes(16)
+
+func make_box() -> PtrBox
+uses alloc, mem:
+    return PtrBox(raw: make_raw())
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let box: PtrBox = make_box()
+    return 0
+`)
+	makeRawFn := findIRFunc(t, prog, "make_raw")
+	if countInstrKind(makeRawFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make_raw alloc_bytes count = %d, want 1: %#v", countInstrKind(makeRawFn, ir.IRAllocBytes), makeRawFn.Instrs)
+	}
+	if countInstrKind(makeRawFn, ir.IRDropOwned) != 0 || countInstrKind(makeRawFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("raw factory must not drop returned pointer in callee: %#v", makeRawFn.Instrs)
+	}
+	makeBoxFn := findIRFunc(t, prog, "make_box")
+	if countCallsNamed(makeBoxFn.Instrs, "make_raw") != 1 {
+		t.Fatalf("make_box must call make_raw once: %#v", makeBoxFn.Instrs)
+	}
+	if countInstrKind(makeBoxFn, ir.IRDropOwned) != 0 || countInstrKind(makeBoxFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("inline owned-return call aggregate return must not drop in wrapper: %#v", makeBoxFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "make_box") != 1 {
+		t.Fatalf("main must call make_box once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned inline owned-return call aggregate return must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsNestedInlineOwnedAggregateReturnInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+struct PtrBox:
+    tag: Int
+    raw: ptr
+
+struct Holder:
+    head: Int
+    box: PtrBox
+
+func make_holder() -> Holder
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        return Holder(head: 1, box: PtrBox(tag: 2, raw: p))
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let holder: Holder = make_holder()
+    return 0
+`)
+	makeHolderFn := findIRFunc(t, prog, "make_holder")
+	if countInstrKind(makeHolderFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make_holder alloc_bytes count = %d, want 1: %#v", countInstrKind(makeHolderFn, ir.IRAllocBytes), makeHolderFn.Instrs)
+	}
+	if countInstrKind(makeHolderFn, ir.IRDropOwned) != 0 || countInstrKind(makeHolderFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("nested inline owned aggregate return must not drop in callee: %#v", makeHolderFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "make_holder") != 1 {
+		t.Fatalf("main must call make_holder once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned nested inline aggregate return must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsNestedInlineDirectAllocAggregateReturnInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+struct PtrBox:
+    tag: Int
+    raw: ptr
+
+struct Holder:
+    head: Int
+    box: PtrBox
+
+func make_holder() -> Holder
+uses alloc, mem:
+    unsafe:
+        return Holder(head: 1, box: PtrBox(tag: 2, raw: core.alloc_bytes(16)))
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let holder: Holder = make_holder()
+    return 0
+`)
+	makeHolderFn := findIRFunc(t, prog, "make_holder")
+	if countInstrKind(makeHolderFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make_holder alloc_bytes count = %d, want 1: %#v", countInstrKind(makeHolderFn, ir.IRAllocBytes), makeHolderFn.Instrs)
+	}
+	if countInstrKind(makeHolderFn, ir.IRDropOwned) != 0 || countInstrKind(makeHolderFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("nested inline direct allocation aggregate return must not drop in callee: %#v", makeHolderFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "make_holder") != 1 {
+		t.Fatalf("main must call make_holder once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned nested inline direct allocation aggregate return must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsNestedInlineOwnedReturnCallAggregateReturnInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+struct PtrBox:
+    tag: Int
+    raw: ptr
+
+struct Holder:
+    head: Int
+    box: PtrBox
+
+func make_raw() -> ptr
+uses alloc, mem:
+    unsafe:
+        return core.alloc_bytes(16)
+
+func make_holder() -> Holder
+uses alloc, mem:
+    return Holder(head: 1, box: PtrBox(tag: 2, raw: make_raw()))
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let holder: Holder = make_holder()
+    return 0
+`)
+	makeRawFn := findIRFunc(t, prog, "make_raw")
+	if countInstrKind(makeRawFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make_raw alloc_bytes count = %d, want 1: %#v", countInstrKind(makeRawFn, ir.IRAllocBytes), makeRawFn.Instrs)
+	}
+	if countInstrKind(makeRawFn, ir.IRDropOwned) != 0 || countInstrKind(makeRawFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("raw factory must not drop returned pointer in callee: %#v", makeRawFn.Instrs)
+	}
+	makeHolderFn := findIRFunc(t, prog, "make_holder")
+	if countCallsNamed(makeHolderFn.Instrs, "make_raw") != 1 {
+		t.Fatalf("make_holder must call make_raw once: %#v", makeHolderFn.Instrs)
+	}
+	if countInstrKind(makeHolderFn, ir.IRDropOwned) != 0 || countInstrKind(makeHolderFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("nested inline owned-return call aggregate return must not drop in wrapper: %#v", makeHolderFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "make_holder") != 1 {
+		t.Fatalf("main must call make_holder once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned nested inline owned-return call aggregate return must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsInlineOwnedAggregateThrowInCatch(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+struct PtrBox:
+    raw: ptr
+
+func fail() -> Int throws PtrBox
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        throw PtrBox(raw: p)
+
+func main() -> Int
+uses alloc, mem:
+    return catch fail():
+    case _:
+        7
+`)
+	failFn := findIRFunc(t, prog, "fail")
+	if countInstrKind(failFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("fail alloc_bytes count = %d, want 1: %#v", countInstrKind(failFn, ir.IRAllocBytes), failFn.Instrs)
+	}
+	if countInstrKind(failFn, ir.IRDropOwned) != 0 || countInstrKind(failFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("inline owned aggregate throw must not drop in callee: %#v", failFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "fail") != 1 {
+		t.Fatalf("main must call fail once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caught inline owned aggregate throw must be dropped in catch path: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsReturnedEnumOwnedPayloadInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrResult:
+    case owned(ptr)
+
+func make_result() -> PtrResult
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        return PtrResult.owned(p)
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = make_result()
+    return 0
+`)
+	makeFn := findIRFunc(t, prog, "make_result")
+	if countInstrKind(makeFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make_result alloc_bytes count = %d, want 1: %#v", countInstrKind(makeFn, ir.IRAllocBytes), makeFn.Instrs)
+	}
+	if countInstrKind(makeFn, ir.IRDropOwned) != 0 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("enum owned payload return must not drop in callee: %#v", makeFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "make_result") != 1 {
+		t.Fatalf("main must call make_result once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned enum payload return must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsInlineAllocEnumOwnedPayloadReturnInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrResult:
+    case owned(ptr)
+
+func make_result() -> PtrResult
+uses alloc, mem:
+    unsafe:
+        return PtrResult.owned(core.alloc_bytes(16))
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = make_result()
+    return 0
+`)
+	makeFn := findIRFunc(t, prog, "make_result")
+	if countInstrKind(makeFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make_result alloc_bytes count = %d, want 1: %#v", countInstrKind(makeFn, ir.IRAllocBytes), makeFn.Instrs)
+	}
+	if countInstrKind(makeFn, ir.IRDropOwned) != 0 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("inline enum owned payload return must not drop in callee: %#v", makeFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned inline enum payload return must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsLocalEnumOwnedPayload(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrResult:
+    case owned(ptr)
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = PtrResult.owned(core.alloc_bytes(16))
+    return 0
+`)
+	mainFn := findIRFunc(t, prog, "main")
+	if countInstrKind(mainFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("main alloc_bytes count = %d, want 1: %#v", countInstrKind(mainFn, ir.IRAllocBytes), mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("local enum owned payload must be dropped in owner scope: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsAssignedLocalEnumOwnedPayload(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrResult:
+    case empty
+    case owned(ptr)
+
+func main() -> Int
+uses alloc, mem:
+    var result: PtrResult = PtrResult.empty
+    unsafe:
+        result = PtrResult.owned(core.alloc_bytes(16))
+    return 0
+`)
+	mainFn := findIRFunc(t, prog, "main")
+	if countInstrKind(mainFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("main alloc_bytes count = %d, want 1: %#v", countInstrKind(mainFn, ir.IRAllocBytes), mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("assigned local enum owned payload must be dropped in owner scope: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsLocalEnumOwnedPayloadReturnInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrResult:
+    case owned(ptr)
+
+func make_result() -> PtrResult
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = PtrResult.owned(core.alloc_bytes(16))
+        return result
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = make_result()
+    return 0
+`)
+	makeFn := findIRFunc(t, prog, "make_result")
+	if countInstrKind(makeFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make_result alloc_bytes count = %d, want 1: %#v", countInstrKind(makeFn, ir.IRAllocBytes), makeFn.Instrs)
+	}
+	if countInstrKind(makeFn, ir.IRDropOwned) != 0 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("local enum payload return must not drop in callee: %#v", makeFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned local enum payload return must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsAssignedLocalEnumOwnedPayloadReturnInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrResult:
+    case empty
+    case owned(ptr)
+
+func make_result() -> PtrResult
+uses alloc, mem:
+    var result: PtrResult = PtrResult.empty
+    unsafe:
+        result = PtrResult.owned(core.alloc_bytes(16))
+        return result
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = make_result()
+    return 0
+`)
+	makeFn := findIRFunc(t, prog, "make_result")
+	if countInstrKind(makeFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make_result alloc_bytes count = %d, want 1: %#v", countInstrKind(makeFn, ir.IRAllocBytes), makeFn.Instrs)
+	}
+	if countInstrKind(makeFn, ir.IRDropOwned) != 0 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("assigned local enum payload return must not drop in callee: %#v", makeFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned assigned local enum payload return must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsBranchAssignedLocalEnumOwnedPayloadReturnInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrResult:
+    case empty
+    case owned(ptr)
+
+func make_result(flag: Bool) -> PtrResult
+uses alloc, mem:
+    var result: PtrResult = PtrResult.empty
+    unsafe:
+        if flag:
+            result = PtrResult.owned(core.alloc_bytes(16))
+        else:
+            result = PtrResult.owned(core.alloc_bytes(32))
+        return result
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = make_result(true)
+    return 0
+`)
+	makeFn := findIRFunc(t, prog, "make_result")
+	if countInstrKind(makeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("make_result alloc_bytes count = %d, want 2: %#v", countInstrKind(makeFn, ir.IRAllocBytes), makeFn.Instrs)
+	}
+	if countInstrKind(makeFn, ir.IRDropOwned) != 0 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("branch-assigned local enum payload return must not drop in callee: %#v", makeFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned branch-assigned local enum payload return must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsMatchAssignedLocalEnumOwnedPayloadReturnInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum Choice:
+    case left
+    case right
+
+enum PtrResult:
+    case empty
+    case owned(ptr)
+
+func make_result(choice: Choice) -> PtrResult
+uses alloc, mem:
+    var result: PtrResult = PtrResult.empty
+    unsafe:
+        match choice:
+        case Choice.left:
+            result = PtrResult.owned(core.alloc_bytes(16))
+        case _:
+            result = PtrResult.owned(core.alloc_bytes(32))
+        return result
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = make_result(Choice.left)
+    return 0
+`)
+	makeFn := findIRFunc(t, prog, "make_result")
+	if countInstrKind(makeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("make_result alloc_bytes count = %d, want 2: %#v", countInstrKind(makeFn, ir.IRAllocBytes), makeFn.Instrs)
+	}
+	if countInstrKind(makeFn, ir.IRDropOwned) != 0 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("match-assigned local enum payload return must not drop in callee: %#v", makeFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned match-assigned local enum payload return must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsConditionalBranchAssignedLocalEnumOwnedPayloadReturnInCallerWhenPresent(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrResult:
+    case owned(ptr)
+    case empty
+
+func make_result(flag: Int) -> PtrResult
+uses alloc, mem:
+    var result: PtrResult = PtrResult.empty
+    unsafe:
+        if flag == 1:
+            result = PtrResult.owned(core.alloc_bytes(16))
+        return result
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = make_result(1)
+    return 0
+`)
+	makeFn := findIRFunc(t, prog, "make_result")
+	if countInstrKind(makeFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make_result alloc_bytes count = %d, want 1: %#v", countInstrKind(makeFn, ir.IRAllocBytes), makeFn.Instrs)
+	}
+	if countInstrKind(makeFn, ir.IRDropOwned) != 0 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("conditional branch-assigned local enum payload return must not drop in callee: %#v", makeFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned conditional branch-assigned local enum payload return must be dropped in caller when present: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsMatchResultEnumOwnedPayloadReturnInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrResult:
+    case owned(ptr)
+
+func make_result(flag: Int) -> PtrResult
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = match flag:
+        case 0:
+            PtrResult.owned(core.alloc_bytes(16))
+        case _:
+            PtrResult.owned(core.alloc_bytes(32))
+        return result
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = make_result(1)
+    return 0
+`)
+	makeFn := findIRFunc(t, prog, "make_result")
+	if countInstrKind(makeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("make_result alloc_bytes count = %d, want 2: %#v", countInstrKind(makeFn, ir.IRAllocBytes), makeFn.Instrs)
+	}
+	if countInstrKind(makeFn, ir.IRDropOwned) != 0 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("match-result enum payload return must not drop in callee: %#v", makeFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned match-result enum payload return must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsGuardedMatchResultEnumOwnedPayloadReturnInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrResult:
+    case owned(ptr)
+
+func make_result(flag: Int, prefer: Bool) -> PtrResult
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = match flag:
+        case 0 if prefer == true:
+            PtrResult.owned(core.alloc_bytes(16))
+        case _:
+            PtrResult.owned(core.alloc_bytes(32))
+        return result
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = make_result(0, false)
+    return 0
+`)
+	makeFn := findIRFunc(t, prog, "make_result")
+	if countInstrKind(makeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("make_result alloc_bytes count = %d, want 2: %#v", countInstrKind(makeFn, ir.IRAllocBytes), makeFn.Instrs)
+	}
+	if countInstrKind(makeFn, ir.IRDropOwned) != 0 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("guarded match-result enum payload return must not drop in callee: %#v", makeFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned guarded match-result enum payload return must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsMixedMatchResultEnumOwnedPayloadReturnInCallerWhenPresent(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrResult:
+    case empty
+    case owned(ptr)
+
+func make_result(flag: Int) -> PtrResult
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = match flag:
+        case 0:
+            PtrResult.empty
+        case _:
+            PtrResult.owned(core.alloc_bytes(16))
+        return result
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = make_result(1)
+    return 0
+`)
+	makeFn := findIRFunc(t, prog, "make_result")
+	if countInstrKind(makeFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make_result alloc_bytes count = %d, want 1: %#v", countInstrKind(makeFn, ir.IRAllocBytes), makeFn.Instrs)
+	}
+	if countInstrKind(makeFn, ir.IRDropOwned) != 0 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("mixed match-result enum payload return must not drop in callee: %#v", makeFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned mixed match-result enum payload return must be dropped in caller when present: %#v", mainFn.Instrs)
+	}
+	assertOwnedReleaseGuardedByLocal(t, mainFn, 0)
+}
+
+func TestLowerOwnedAllocBytesDropsNonZeroFallbackMixedMatchResultEnumOwnedPayloadReturnInCallerWhenPresent(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrResult:
+    case owned(ptr)
+    case empty
+
+func make_result(flag: Int) -> PtrResult
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = match flag:
+        case 0:
+            PtrResult.owned(core.alloc_bytes(16))
+        case _:
+            PtrResult.empty
+        return result
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = make_result(0)
+    return 0
+`)
+	makeFn := findIRFunc(t, prog, "make_result")
+	if countInstrKind(makeFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make_result alloc_bytes count = %d, want 1: %#v", countInstrKind(makeFn, ir.IRAllocBytes), makeFn.Instrs)
+	}
+	if countInstrKind(makeFn, ir.IRDropOwned) != 0 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("nonzero fallback mixed match-result enum payload return must not drop in callee: %#v", makeFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned nonzero fallback mixed match-result enum payload return must be dropped in caller when present: %#v", mainFn.Instrs)
+	}
+	assertOwnedReleaseGuardedByLocalEq(t, mainFn, 0, 0)
+}
+
+func TestLowerOwnedAllocBytesRejectsMultiOwnedEnumPayloadThrow(t *testing.T) {
+	err := lowerOwnedAllocDropProgramError(t, `
+enum PairErr:
+    case pair(ptr, ptr)
+
+func fail() -> Int throws PairErr
+uses alloc, mem:
+    unsafe:
+        let left: ptr = core.alloc_bytes(16)
+        let right: ptr = core.alloc_bytes(32)
+        throw PairErr.pair(left, right)
+
+func main() -> Int:
+    return 0
+`)
+	if err == nil || !strings.Contains(err.Error(), "multiple owned enum payload slots") {
+		t.Fatalf("LowerWithOptions error = %v, want multiple owned enum payload slots diagnostic", err)
+	}
+}
+
+func TestLowerOwnedAllocBytesRejectsNestedMultiOwnedEnumPayloadThrow(t *testing.T) {
+	err := lowerOwnedAllocDropProgramError(t, `
+struct PairBox:
+    left: ptr
+    right: ptr
+
+enum PairErr:
+    case pair(PairBox)
+
+func fail() -> Int throws PairErr
+uses alloc, mem:
+    var pair: PairBox = PairBox(left: 0, right: 0)
+    unsafe:
+        let left: ptr = core.alloc_bytes(16)
+        let right: ptr = core.alloc_bytes(32)
+        pair.left = left
+        pair.right = right
+        throw PairErr.pair(pair)
+
+func main() -> Int:
+    return 0
+`)
+	if err == nil || !strings.Contains(err.Error(), "multiple owned enum payload slots") {
+		t.Fatalf("LowerWithOptions error = %v, want multiple owned enum payload slots diagnostic", err)
+	}
+}
+
+func TestLowerOwnedAllocBytesRejectsStaticallyMultiOwnedEnumPayloadThrowWithOneTrackedSlot(t *testing.T) {
+	err := lowerOwnedAllocDropProgramError(t, `
+struct PairBox:
+    left: ptr
+    right: ptr
+
+enum PairErr:
+    case pair(PairBox)
+
+func fail() -> Int throws PairErr
+uses alloc, mem:
+    var pair: PairBox = PairBox(left: 0, right: 0)
+    unsafe:
+        let left: ptr = core.alloc_bytes(16)
+        pair.left = left
+        throw PairErr.pair(pair)
+
+func main() -> Int:
+    return 0
+`)
+	if err == nil || !strings.Contains(err.Error(), "multiple owned enum payload slots") {
+		t.Fatalf("LowerWithOptions error = %v, want multiple owned enum payload slots diagnostic", err)
+	}
+}
+
+func TestLowerOwnedAllocBytesRejectsLocalStagedMultiOwnedEnumPayloadReturn(t *testing.T) {
+	err := lowerOwnedAllocDropProgramError(t, `
+struct PairBox:
+    left: ptr
+    right: ptr
+
+enum PairResult:
+    case pair(PairBox)
+
+func make_result() -> PairResult
+uses alloc, mem:
+    var pair: PairBox = PairBox(left: 0, right: 0)
+    unsafe:
+        let left: ptr = core.alloc_bytes(16)
+        pair.left = left
+        let result: PairResult = PairResult.pair(pair)
+        return result
+
+func main() -> Int:
+    return 0
+`)
+	if err == nil || !strings.Contains(err.Error(), "multiple owned enum payload slots") {
+		t.Fatalf("LowerWithOptions error = %v, want multiple owned enum payload slots diagnostic", err)
+	}
+}
+
+func TestLowerOwnedAllocBytesRejectsAssignedMultiOwnedEnumPayloadReturn(t *testing.T) {
+	err := lowerOwnedAllocDropProgramError(t, `
+struct PairBox:
+    left: ptr
+    right: ptr
+
+enum PairResult:
+    case pair(PairBox)
+
+func make_result() -> PairResult
+uses alloc, mem:
+    var pair: PairBox = PairBox(left: 0, right: 0)
+    var result: PairResult = PairResult.pair(PairBox(left: 0, right: 0))
+    unsafe:
+        let left: ptr = core.alloc_bytes(16)
+        pair.left = left
+        result = PairResult.pair(pair)
+        return result
+
+func main() -> Int:
+    return 0
+`)
+	if err == nil || !strings.Contains(err.Error(), "multiple owned enum payload slots") {
+		t.Fatalf("LowerWithOptions error = %v, want multiple owned enum payload slots diagnostic", err)
+	}
+}
+
+func TestLowerOwnedAllocBytesRejectsGlobalAssignedMultiOwnedEnumPayload(t *testing.T) {
+	err := lowerOwnedAllocDropFileProgramError(t, `
+struct PairBox:
+    left: ptr
+    right: ptr
+
+enum PairResult:
+    case pair(PairBox)
+
+var saved: PairResult
+
+func store() -> Int
+uses alloc, mem:
+    var pair: PairBox = PairBox(left: 0, right: 0)
+    unsafe:
+        let left: ptr = core.alloc_bytes(16)
+        pair.left = left
+        saved = PairResult.pair(pair)
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    return store()
+`)
+	if err == nil || !strings.Contains(err.Error(), "multiple owned enum payload slots") {
+		t.Fatalf("LowerWithOptions error = %v, want multiple owned enum payload slots diagnostic", err)
+	}
+}
+
+func TestLowerOwnedAllocBytesRejectsGlobalFieldAssignedMultiOwnedEnumPayload(t *testing.T) {
+	err := lowerOwnedAllocDropFileProgramError(t, `
+struct PairBox:
+    left: ptr
+    right: ptr
+
+enum PairResult:
+    case pair(PairBox)
+
+struct Saved:
+    result: PairResult
+
+var saved: Saved
+
+func store() -> Int
+uses alloc, mem:
+    var pair: PairBox = PairBox(left: 0, right: 0)
+    unsafe:
+        let left: ptr = core.alloc_bytes(16)
+        pair.left = left
+        saved.result = PairResult.pair(pair)
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    return store()
+`)
+	if err == nil || !strings.Contains(err.Error(), "multiple owned enum payload slots") {
+		t.Fatalf("LowerWithOptions error = %v, want multiple owned enum payload slots diagnostic", err)
+	}
+}
+
+func TestLowerOwnedAllocBytesRejectsMatchExprMultiOwnedEnumPayload(t *testing.T) {
+	err := lowerOwnedAllocDropProgramError(t, `
+enum PairResult:
+    case pair(ptr, ptr)
+
+func take_left() -> ptr
+uses alloc, mem:
+    unsafe:
+        let left: ptr = core.alloc_bytes(16)
+        let right: ptr = core.alloc_bytes(32)
+        return match PairResult.pair(left, right):
+        case PairResult.pair(payload_left, payload_right):
+            left
+
+func main() -> Int:
+    return 0
+`)
+	if err == nil || !strings.Contains(err.Error(), "multiple owned enum payload slots") {
+		t.Fatalf("LowerWithOptions error = %v, want multiple owned enum payload slots diagnostic", err)
+	}
+}
+
+func TestLowerOwnedAllocBytesRejectsMatchStmtMultiOwnedEnumPayload(t *testing.T) {
+	err := lowerOwnedAllocDropProgramError(t, `
+enum PairResult:
+    case pair(ptr, ptr)
+
+func take_left() -> ptr
+uses alloc, mem:
+    unsafe:
+        let left: ptr = core.alloc_bytes(16)
+        let right: ptr = core.alloc_bytes(32)
+        match PairResult.pair(left, right):
+        case PairResult.pair(payload_left, payload_right):
+            return left
+
+func main() -> Int:
+    return 0
+`)
+	if err == nil || !strings.Contains(err.Error(), "multiple owned enum payload slots") {
+		t.Fatalf("LowerWithOptions error = %v, want multiple owned enum payload slots diagnostic", err)
+	}
+}
+
+func TestLowerOwnedAllocBytesRejectsCallArgMultiOwnedEnumPayload(t *testing.T) {
+	err := lowerOwnedAllocDropProgramError(t, `
+enum PairResult:
+    case pair(ptr, ptr)
+
+func relay(result: PairResult) -> PairResult:
+    return result
+
+func make_result() -> PairResult
+uses alloc, mem:
+    unsafe:
+        let left: ptr = core.alloc_bytes(16)
+        let right: ptr = core.alloc_bytes(32)
+        return relay(PairResult.pair(left, right))
+
+func main() -> Int:
+    return 0
+`)
+	if err == nil || !strings.Contains(err.Error(), "multiple owned enum payload slots") {
+		t.Fatalf("LowerWithOptions error = %v, want multiple owned enum payload slots diagnostic", err)
+	}
+}
+
+func TestLowerOwnedAllocBytesRejectsStoredCallArgMultiOwnedEnumPayload(t *testing.T) {
+	err := lowerOwnedAllocDropProgramError(t, `
+enum PairResult:
+    case pair(ptr, ptr)
+
+func relay(result: PairResult) -> PairResult:
+    return result
+
+func make_result() -> PairResult
+uses alloc, mem:
+    let cb: fn(PairResult) -> PairResult = relay
+    unsafe:
+        let left: ptr = core.alloc_bytes(16)
+        let right: ptr = core.alloc_bytes(32)
+        return cb(PairResult.pair(left, right))
+
+func main() -> Int:
+    return 0
+`)
+	if err == nil || !strings.Contains(err.Error(), "multiple owned enum payload slots") {
+		t.Fatalf("LowerWithOptions error = %v, want multiple owned enum payload slots diagnostic", err)
+	}
+}
+
+func TestLowerOwnedAllocBytesRejectsFunctionParamCallArgMultiOwnedEnumPayload(t *testing.T) {
+	err := lowerOwnedAllocDropProgramError(t, `
+enum PairResult:
+    case pair(ptr, ptr)
+
+func relay(result: PairResult) -> PairResult:
+    return result
+
+func apply(cb: fn(PairResult) -> PairResult) -> PairResult
+uses alloc, mem:
+    unsafe:
+        let left: ptr = core.alloc_bytes(16)
+        let right: ptr = core.alloc_bytes(32)
+        return cb(PairResult.pair(left, right))
+
+func make_result() -> PairResult
+uses alloc, mem:
+    return apply(relay)
+
+func main() -> Int:
+    return 0
+`)
+	if err == nil || !strings.Contains(err.Error(), "multiple owned enum payload slots") {
+		t.Fatalf("LowerWithOptions error = %v, want multiple owned enum payload slots diagnostic", err)
+	}
+}
+
+func TestLowerOwnedAllocBytesRejectsMatchResultMultiOwnedEnumPayloadLocalReturn(t *testing.T) {
+	err := lowerOwnedAllocDropProgramError(t, `
+enum PairResult:
+    case empty
+    case pair(ptr, ptr)
+
+func make_result(flag: Int) -> PairResult
+uses alloc, mem:
+    unsafe:
+        let left: ptr = core.alloc_bytes(16)
+        let right: ptr = core.alloc_bytes(32)
+        let result: PairResult = match flag:
+        case 0:
+            PairResult.pair(left, right)
+        case _:
+            PairResult.empty
+        return result
+
+func main() -> Int:
+    return 0
+`)
+	if err == nil || !strings.Contains(err.Error(), "multiple owned enum payload slots") {
+		t.Fatalf("LowerWithOptions error = %v, want multiple owned enum payload slots diagnostic", err)
+	}
+}
+
+func TestLowerOwnedAllocBytesRejectsCatchResultMultiOwnedEnumPayloadLocalReturn(t *testing.T) {
+	err := lowerOwnedAllocDropProgramError(t, `
+enum Err:
+    case bad
+
+enum PairResult:
+    case empty
+    case pair(ptr, ptr)
+
+func fail() -> PairResult throws Err:
+    throw Err.bad
+
+func make_result() -> PairResult
+uses alloc, mem:
+    unsafe:
+        let left: ptr = core.alloc_bytes(16)
+        let right: ptr = core.alloc_bytes(32)
+        let result: PairResult = catch fail():
+        case Err.bad:
+            PairResult.pair(left, right)
+        return result
+
+func main() -> Int:
+    return 0
+`)
+	if err == nil || !strings.Contains(err.Error(), "multiple owned enum payload slots") {
+		t.Fatalf("LowerWithOptions error = %v, want multiple owned enum payload slots diagnostic", err)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsCatchResultEnumOwnedPayloadReturnInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrError:
+    case owned(ptr)
+
+enum PtrResult:
+    case owned(ptr)
+
+func fail() -> PtrResult throws PtrError
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        throw PtrError.owned(p)
+
+func make_result() -> PtrResult
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = catch fail():
+        case PtrError.owned(p):
+            PtrResult.owned(core.alloc_bytes(32))
+        return result
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = make_result()
+    return 0
+`)
+	failFn := findIRFunc(t, prog, "fail")
+	if countInstrKind(failFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("fail alloc_bytes count = %d, want 1: %#v", countInstrKind(failFn, ir.IRAllocBytes), failFn.Instrs)
+	}
+	if countInstrKind(failFn, ir.IRDropOwned) != 0 || countInstrKind(failFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("thrown enum payload must not drop in throwing callee: %#v", failFn.Instrs)
+	}
+	makeFn := findIRFunc(t, prog, "make_result")
+	if countInstrKind(makeFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make_result alloc_bytes count = %d, want 1: %#v", countInstrKind(makeFn, ir.IRAllocBytes), makeFn.Instrs)
+	}
+	if countInstrKind(makeFn, ir.IRDropOwned) != 1 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("catch result local return must only drop the original thrown payload in callee: %#v", makeFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned catch-result enum payload return must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsNonOwnedErrorCatchResultEnumOwnedPayloadReturnInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum Err:
+    case bad
+
+enum PtrResult:
+    case owned(ptr)
+
+func maybe(flag: Bool) -> PtrResult throws Err
+uses alloc, mem:
+    if flag:
+        throw Err.bad
+    unsafe:
+        return PtrResult.owned(core.alloc_bytes(16))
+
+func make_result(flag: Bool) -> PtrResult
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = catch maybe(flag):
+        case _:
+            PtrResult.owned(core.alloc_bytes(32))
+        return result
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = make_result(true)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 1: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned success transfer must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	makeFn := findIRFunc(t, prog, "make_result")
+	if countInstrKind(makeFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make_result alloc_bytes count = %d, want 1: %#v", countInstrKind(makeFn, ir.IRAllocBytes), makeFn.Instrs)
+	}
+	if countInstrKind(makeFn, ir.IRDropOwned) != 0 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("returned non-owned-error catch result must transfer without callee drop: %#v", makeFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned non-owned-error catch-result enum payload must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsGuardedNonOwnedErrorCatchResultEnumOwnedPayloadReturnInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum Err:
+    case bad
+
+enum PtrResult:
+    case owned(ptr)
+
+func maybe(flag: Bool) -> PtrResult throws Err
+uses alloc, mem:
+    if flag:
+        throw Err.bad
+    unsafe:
+        return PtrResult.owned(core.alloc_bytes(16))
+
+func make_result(flag: Bool, prefer: Bool) -> PtrResult
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = catch maybe(flag):
+        case Err.bad if prefer == true:
+            PtrResult.owned(core.alloc_bytes(32))
+        case _:
+            PtrResult.owned(core.alloc_bytes(48))
+        return result
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = make_result(true, false)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 1: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned success transfer must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	makeFn := findIRFunc(t, prog, "make_result")
+	if countInstrKind(makeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("make_result alloc_bytes count = %d, want 2: %#v", countInstrKind(makeFn, ir.IRAllocBytes), makeFn.Instrs)
+	}
+	if countInstrKind(makeFn, ir.IRDropOwned) != 0 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("guarded non-owned-error catch result must transfer without callee drop: %#v", makeFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned guarded non-owned-error catch-result enum payload must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsMixedNonOwnedErrorCatchResultEnumOwnedPayloadReturnInCallerWhenPresent(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum Err:
+    case bad
+
+enum PtrResult:
+    case empty
+    case owned(ptr)
+
+func maybe(flag: Bool) -> PtrResult throws Err
+uses alloc, mem:
+    if flag:
+        throw Err.bad
+    unsafe:
+        return PtrResult.owned(core.alloc_bytes(16))
+
+func make_result(flag: Bool) -> PtrResult
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = catch maybe(flag):
+        case _:
+            PtrResult.empty
+        return result
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = make_result(false)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 1: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned success transfer must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	makeFn := findIRFunc(t, prog, "make_result")
+	if countInstrKind(makeFn, ir.IRDropOwned) != 0 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("mixed non-owned-error catch result must transfer without callee drop: %#v", makeFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned mixed non-owned-error catch-result enum payload must be dropped in caller when present: %#v", mainFn.Instrs)
+	}
+	assertOwnedReleaseGuardedByLocal(t, mainFn, 0)
+}
+
+func TestLowerOwnedAllocBytesDropsNonZeroFallbackMixedNonOwnedErrorCatchResultEnumOwnedPayloadReturnInCallerWhenPresent(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum Err:
+    case bad
+
+enum PtrResult:
+    case owned(ptr)
+    case empty
+
+func maybe(flag: Bool) -> PtrResult throws Err
+uses alloc, mem:
+    if flag:
+        throw Err.bad
+    unsafe:
+        return PtrResult.owned(core.alloc_bytes(16))
+
+func make_result(flag: Bool) -> PtrResult
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = catch maybe(flag):
+        case _:
+            PtrResult.empty
+        return result
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = make_result(false)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 1: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned success transfer must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	makeFn := findIRFunc(t, prog, "make_result")
+	if countInstrKind(makeFn, ir.IRDropOwned) != 0 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("nonzero-fallback mixed non-owned-error catch result must transfer without callee drop: %#v", makeFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned nonzero-fallback mixed non-owned-error catch-result enum payload must be dropped in caller when present: %#v", mainFn.Instrs)
+	}
+	assertOwnedReleaseGuardedByLocalEq(t, mainFn, 0, 0)
+}
+
+func TestLowerOwnedAllocBytesDropsConditionalOwnedCallRecoveryNonOwnedErrorCatchResultEnumOwnedPayloadReturnInCallerWhenPresent(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum Err:
+    case bad
+
+enum PtrResult:
+    case owned(ptr)
+    case empty
+
+func maybe(flag: Bool) -> PtrResult throws Err
+uses alloc, mem:
+    if flag:
+        throw Err.bad
+    unsafe:
+        return PtrResult.owned(core.alloc_bytes(16))
+
+func replacement(prefer: Bool) -> PtrResult
+uses alloc, mem:
+    var result: PtrResult = PtrResult.empty
+    unsafe:
+        if prefer == true:
+            result = PtrResult.owned(core.alloc_bytes(32))
+        return result
+
+func make_result(flag: Bool, prefer: Bool) -> PtrResult
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = catch maybe(flag):
+        case Err.bad if prefer == true:
+            replacement(prefer)
+        case _:
+            PtrResult.empty
+        return result
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = make_result(true, true)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 1: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned success transfer must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	replacementFn := findIRFunc(t, prog, "replacement")
+	if countInstrKind(replacementFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("replacement alloc_bytes count = %d, want 1: %#v", countInstrKind(replacementFn, ir.IRAllocBytes), replacementFn.Instrs)
+	}
+	if countInstrKind(replacementFn, ir.IRDropOwned) != 0 || countInstrKind(replacementFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("conditional replacement result must transfer to caller, not drop in callee: %#v", replacementFn.Instrs)
+	}
+	makeFn := findIRFunc(t, prog, "make_result")
+	if countCallsNamed(makeFn.Instrs, "replacement") != 1 {
+		t.Fatalf("make_result must call replacement once: %#v", makeFn.Instrs)
+	}
+	if countInstrKind(makeFn, ir.IRDropOwned) != 0 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("conditional owned-call non-owned-error catch result must transfer without callee drop: %#v", makeFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned conditional owned-call non-owned-error catch-result enum payload must be dropped in caller when present: %#v", mainFn.Instrs)
+	}
+	assertOwnedReleaseGuardedByLocalEq(t, mainFn, 0, 0)
+}
+
+func TestLowerOwnedAllocBytesDropsConditionalBranchAssignedNonOwnedErrorCatchResultEnumOwnedPayloadReturnInCallerWhenPresent(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum Err:
+    case bad
+
+enum PtrResult:
+    case owned(ptr)
+    case empty
+
+func maybe(flag: Bool) -> PtrResult throws Err
+uses alloc, mem:
+    if flag:
+        throw Err.bad
+    unsafe:
+        return PtrResult.owned(core.alloc_bytes(16))
+
+func make_result(flag: Bool, catch_flag: Bool) -> PtrResult
+uses alloc, mem:
+    var result: PtrResult = PtrResult.empty
+    unsafe:
+        if flag == true:
+            result = catch maybe(catch_flag):
+            case _:
+                PtrResult.owned(core.alloc_bytes(32))
+        return result
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = make_result(true, true)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 1: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned success transfer must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	makeFn := findIRFunc(t, prog, "make_result")
+	if countInstrKind(makeFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make_result recovery alloc_bytes count = %d, want 1: %#v", countInstrKind(makeFn, ir.IRAllocBytes), makeFn.Instrs)
+	}
+	if countInstrKind(makeFn, ir.IRDropOwned) != 0 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("branch-assigned non-owned-error catch result must transfer without callee drop: %#v", makeFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned branch-assigned non-owned-error catch-result enum payload must be dropped in caller when present: %#v", mainFn.Instrs)
+	}
+	assertOwnedReleaseGuardedByLocalEq(t, mainFn, 0, 0)
+}
+
+func TestLowerOwnedAllocBytesDropsConditionalBranchAssignedMixedOwnedErrorCatchResultEnumOwnedPayloadReturnInCallerWhenPresent(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrError:
+    case owned(ptr)
+
+enum PtrResult:
+    case owned(ptr)
+    case empty
+
+func maybe(flag: Bool) -> PtrResult throws PtrError
+uses alloc, mem:
+    if flag:
+        unsafe:
+            let p: ptr = core.alloc_bytes(16)
+            throw PtrError.owned(p)
+    unsafe:
+        return PtrResult.owned(core.alloc_bytes(32))
+
+func make_result(flag: Bool, catch_flag: Bool) -> PtrResult
+uses alloc, mem:
+    var result: PtrResult = PtrResult.empty
+    unsafe:
+        if flag == true:
+            result = catch maybe(catch_flag):
+            case PtrError.owned(p):
+                PtrResult.empty
+        return result
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = make_result(true, false)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 2: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned error/success transfers must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	makeFn := findIRFunc(t, prog, "make_result")
+	if countInstrKind(makeFn, ir.IRDropOwned) != 1 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf(
+			"branch-assigned mixed owned-error catch result drop/release = %d/%d, want 1/1 for original caught payload recovery only: %#v",
+			countInstrKind(makeFn, ir.IRDropOwned),
+			countInstrKind(makeFn, ir.IRReleaseAllocation),
+			makeFn.Instrs,
+		)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned branch-assigned mixed owned-error catch-result enum payload must be dropped in caller when present: %#v", mainFn.Instrs)
+	}
+	assertOwnedReleaseGuardedByLocalEq(t, mainFn, 0, 0)
+}
+
+func TestLowerOwnedAllocBytesDropsMatchAssignedMixedOwnedErrorCatchResultEnumOwnedPayloadReturnInCallerWhenPresent(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum Choice:
+    case left
+    case right
+
+enum PtrError:
+    case owned(ptr)
+
+enum PtrResult:
+    case owned(ptr)
+    case empty
+
+func maybe(flag: Bool) -> PtrResult throws PtrError
+uses alloc, mem:
+    if flag:
+        unsafe:
+            let p: ptr = core.alloc_bytes(16)
+            throw PtrError.owned(p)
+    unsafe:
+        return PtrResult.owned(core.alloc_bytes(32))
+
+func make_result(choice: Choice, catch_flag: Bool) -> PtrResult
+uses alloc, mem:
+    var result: PtrResult = PtrResult.empty
+    unsafe:
+        match choice:
+        case Choice.left:
+            result = catch maybe(catch_flag):
+            case PtrError.owned(p):
+                PtrResult.empty
+        case _:
+            result = PtrResult.empty
+        return result
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = make_result(Choice.left, false)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 2: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned error/success transfers must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	makeFn := findIRFunc(t, prog, "make_result")
+	if countInstrKind(makeFn, ir.IRDropOwned) != 1 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf(
+			"match-assigned mixed owned-error catch result drop/release = %d/%d, want 1/1 for original caught payload recovery only: %#v",
+			countInstrKind(makeFn, ir.IRDropOwned),
+			countInstrKind(makeFn, ir.IRReleaseAllocation),
+			makeFn.Instrs,
+		)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned match-assigned mixed owned-error catch-result enum payload must be dropped in caller when present: %#v", mainFn.Instrs)
+	}
+	assertOwnedReleaseGuardedByLocalEq(t, mainFn, 0, 0)
+}
+
+func TestLowerOwnedAllocBytesDropsMixedOwnedErrorCatchResultEnumOwnedPayloadReturnInCallerWhenPresent(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrError:
+    case owned(ptr)
+
+enum PtrResult:
+    case owned(ptr)
+    case empty
+
+func maybe(flag: Bool) -> PtrResult throws PtrError
+uses alloc, mem:
+    if flag:
+        unsafe:
+            let p: ptr = core.alloc_bytes(16)
+            throw PtrError.owned(p)
+    unsafe:
+        return PtrResult.owned(core.alloc_bytes(32))
+
+func make_result(flag: Bool) -> PtrResult
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = catch maybe(flag):
+        case PtrError.owned(p):
+            PtrResult.empty
+        return result
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = make_result(false)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 2: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned error/success transfers must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	makeFn := findIRFunc(t, prog, "make_result")
+	if countInstrKind(makeFn, ir.IRDropOwned) != 1 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("owned-error mixed catch result must drop original caught payload exactly once: %#v", makeFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned mixed owned-error catch-result enum payload must be dropped in caller when present: %#v", mainFn.Instrs)
+	}
+	assertOwnedReleaseGuardedByLocalEq(t, mainFn, 0, 0)
+}
+
+func TestLowerOwnedAllocBytesDropsGuardedMixedOwnedErrorCatchResultEnumOwnedPayloadReturnInCallerWhenPresent(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrError:
+    case owned(ptr)
+
+enum PtrResult:
+    case owned(ptr)
+    case empty
+
+func maybe(flag: Bool) -> PtrResult throws PtrError
+uses alloc, mem:
+    if flag:
+        unsafe:
+            let p: ptr = core.alloc_bytes(16)
+            throw PtrError.owned(p)
+    unsafe:
+        return PtrResult.owned(core.alloc_bytes(32))
+
+func make_result(flag: Bool, prefer: Bool) -> PtrResult
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = catch maybe(flag):
+        case PtrError.owned(p) if prefer == true:
+            PtrResult.empty
+        case PtrError.owned(p):
+            PtrResult.empty
+        return result
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = make_result(false, true)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 2: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned error/success transfers must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	makeFn := findIRFunc(t, prog, "make_result")
+	if countInstrKind(makeFn, ir.IRDropOwned) != 2 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 2 {
+		t.Fatalf("guarded owned-error mixed catch result must drop original caught payload on guarded and fallback paths: %#v", makeFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned guarded mixed owned-error catch-result enum payload must be dropped in caller when present: %#v", mainFn.Instrs)
+	}
+	assertOwnedReleaseGuardedByLocalEq(t, mainFn, 0, 0)
+}
+
+func TestLowerOwnedAllocBytesDropsGuardedOwnedRecoveryMixedOwnedErrorCatchResultEnumOwnedPayloadReturnInCallerWhenPresent(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrError:
+    case owned(ptr)
+
+enum PtrResult:
+    case owned(ptr)
+    case empty
+
+func maybe(flag: Bool) -> PtrResult throws PtrError
+uses alloc, mem:
+    if flag:
+        unsafe:
+            let p: ptr = core.alloc_bytes(16)
+            throw PtrError.owned(p)
+    unsafe:
+        return PtrResult.owned(core.alloc_bytes(32))
+
+func make_result(flag: Bool, prefer: Bool) -> PtrResult
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = catch maybe(flag):
+        case PtrError.owned(p) if prefer == true:
+            PtrResult.owned(core.alloc_bytes(64))
+        case PtrError.owned(p):
+            PtrResult.empty
+        return result
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = make_result(false, true)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 2: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned error/success transfers must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	makeFn := findIRFunc(t, prog, "make_result")
+	if countInstrKind(makeFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("guarded recovery alloc_bytes count = %d, want 1: %#v", countInstrKind(makeFn, ir.IRAllocBytes), makeFn.Instrs)
+	}
+	if countInstrKind(makeFn, ir.IRDropOwned) != 2 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 2 {
+		t.Fatalf("guarded owned-result recovery must drop original caught payload on guarded and fallback paths only: %#v", makeFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned guarded owned-result mixed catch-result enum payload must be dropped in caller when present: %#v", mainFn.Instrs)
+	}
+	assertOwnedReleaseGuardedByLocalEq(t, mainFn, 0, 0)
+}
+
+func TestLowerOwnedAllocBytesRelaysGuardedOwnedErrorPayloadIntoMixedCatchResultEnumOwnedPayloadReturnInCallerWhenPresent(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrError:
+    case owned(ptr)
+
+enum PtrResult:
+    case owned(ptr)
+    case empty
+
+func maybe(flag: Bool) -> PtrResult throws PtrError
+uses alloc, mem:
+    if flag:
+        unsafe:
+            let p: ptr = core.alloc_bytes(16)
+            throw PtrError.owned(p)
+    unsafe:
+        return PtrResult.owned(core.alloc_bytes(32))
+
+func make_result(flag: Bool, prefer: Bool) -> PtrResult
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = catch maybe(flag):
+        case PtrError.owned(p) if prefer == true:
+            PtrResult.owned(p)
+        case PtrError.owned(p):
+            PtrResult.empty
+        return result
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = make_result(false, true)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 2: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned error/success transfers must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	makeFn := findIRFunc(t, prog, "make_result")
+	if countInstrKind(makeFn, ir.IRDropOwned) != 1 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf(
+			"guarded payload relay mixed catch-result drop/release = %d/%d, want 1/1; original caught payload must be dropped only on fallback path: %#v",
+			countInstrKind(makeFn, ir.IRDropOwned),
+			countInstrKind(makeFn, ir.IRReleaseAllocation),
+			makeFn.Instrs,
+		)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned guarded payload relay mixed catch-result enum payload must be dropped in caller when present: %#v", mainFn.Instrs)
+	}
+	assertOwnedReleaseGuardedByLocalEq(t, mainFn, 0, 0)
+}
+
+func TestLowerOwnedAllocBytesDropsGuardedConditionalOwnedCallRecoveryMixedOwnedErrorCatchResultEnumOwnedPayloadReturnInCallerWhenPresent(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrError:
+    case owned(ptr)
+
+enum PtrResult:
+    case owned(ptr)
+    case empty
+
+func maybe(flag: Bool) -> PtrResult throws PtrError
+uses alloc, mem:
+    if flag:
+        unsafe:
+            let p: ptr = core.alloc_bytes(16)
+            throw PtrError.owned(p)
+    unsafe:
+        return PtrResult.owned(core.alloc_bytes(32))
+
+func replacement(prefer: Bool) -> PtrResult
+uses alloc, mem:
+    var result: PtrResult = PtrResult.empty
+    unsafe:
+        if prefer == true:
+            result = PtrResult.owned(core.alloc_bytes(64))
+        return result
+
+func make_result(flag: Bool, prefer: Bool) -> PtrResult
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = catch maybe(flag):
+        case PtrError.owned(p) if prefer == true:
+            replacement(prefer)
+        case PtrError.owned(p):
+            PtrResult.empty
+        return result
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = make_result(false, true)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 2: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned error/success transfers must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	replacementFn := findIRFunc(t, prog, "replacement")
+	if countInstrKind(replacementFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("replacement alloc_bytes count = %d, want 1: %#v", countInstrKind(replacementFn, ir.IRAllocBytes), replacementFn.Instrs)
+	}
+	if countInstrKind(replacementFn, ir.IRDropOwned) != 0 || countInstrKind(replacementFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("conditional replacement result must transfer to caller, not drop in callee: %#v", replacementFn.Instrs)
+	}
+	makeFn := findIRFunc(t, prog, "make_result")
+	if countCallsNamed(makeFn.Instrs, "replacement") != 1 {
+		t.Fatalf("make_result must call replacement once: %#v", makeFn.Instrs)
+	}
+	if countInstrKind(makeFn, ir.IRDropOwned) != 2 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 2 {
+		t.Fatalf(
+			"guarded conditional owned-call recovery drop/release = %d/%d, want 2/2; original caught payload must be dropped on guarded and fallback paths: %#v",
+			countInstrKind(makeFn, ir.IRDropOwned),
+			countInstrKind(makeFn, ir.IRReleaseAllocation),
+			makeFn.Instrs,
+		)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned guarded conditional owned-call mixed catch-result enum payload must be dropped in caller when present: %#v", mainFn.Instrs)
+	}
+	assertOwnedReleaseGuardedByLocalEq(t, mainFn, 0, 0)
+}
+
+func TestLowerOwnedAllocBytesDropsGuardedOwnedCallRecoveryMixedOwnedErrorCatchResultEnumOwnedPayloadReturnInCallerWhenPresent(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrError:
+    case owned(ptr)
+
+enum PtrResult:
+    case owned(ptr)
+    case empty
+
+func maybe(flag: Bool) -> PtrResult throws PtrError
+uses alloc, mem:
+    if flag:
+        unsafe:
+            let p: ptr = core.alloc_bytes(16)
+            throw PtrError.owned(p)
+    unsafe:
+        return PtrResult.owned(core.alloc_bytes(32))
+
+func replacement() -> PtrResult
+uses alloc, mem:
+    unsafe:
+        return PtrResult.owned(core.alloc_bytes(64))
+
+func make_result(flag: Bool, prefer: Bool) -> PtrResult
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = catch maybe(flag):
+        case PtrError.owned(p) if prefer == true:
+            replacement()
+        case PtrError.owned(p):
+            PtrResult.empty
+        return result
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = make_result(false, true)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 2: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned error/success transfers must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	replacementFn := findIRFunc(t, prog, "replacement")
+	if countInstrKind(replacementFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("replacement alloc_bytes count = %d, want 1: %#v", countInstrKind(replacementFn, ir.IRAllocBytes), replacementFn.Instrs)
+	}
+	if countInstrKind(replacementFn, ir.IRDropOwned) != 0 || countInstrKind(replacementFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("replacement owned result must transfer to caller, not drop in callee: %#v", replacementFn.Instrs)
+	}
+	makeFn := findIRFunc(t, prog, "make_result")
+	if countCallsNamed(makeFn.Instrs, "replacement") != 1 {
+		t.Fatalf("make_result must call replacement once: %#v", makeFn.Instrs)
+	}
+	if countInstrKind(makeFn, ir.IRDropOwned) != 2 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 2 {
+		t.Fatalf("guarded owned-call recovery must drop original caught payload on guarded and fallback paths only: %#v", makeFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned guarded owned-call mixed catch-result enum payload must be dropped in caller when present: %#v", mainFn.Instrs)
+	}
+	assertOwnedReleaseGuardedByLocalEq(t, mainFn, 0, 0)
+}
+
+func TestLowerOwnedAllocBytesDropsGuardedOwnedCallRecoveryMultiCaseMixedOwnedErrorCatchResultEnumOwnedPayloadReturnInCallerWhenPresent(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrError:
+    case owned(ptr)
+    case timeout
+
+enum PtrResult:
+    case owned(ptr)
+    case empty
+
+func maybe(mode: Int) -> PtrResult throws PtrError
+uses alloc, mem:
+    if mode == 1:
+        unsafe:
+            let p: ptr = core.alloc_bytes(16)
+            throw PtrError.owned(p)
+    if mode == 2:
+        throw PtrError.timeout
+    unsafe:
+        return PtrResult.owned(core.alloc_bytes(32))
+
+func replacement() -> PtrResult
+uses alloc, mem:
+    unsafe:
+        return PtrResult.owned(core.alloc_bytes(64))
+
+func make_result(mode: Int, prefer: Bool) -> PtrResult
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = catch maybe(mode):
+        case PtrError.owned(p) if prefer == true:
+            replacement()
+        case PtrError.owned(p):
+            PtrResult.empty
+        case PtrError.timeout:
+            PtrResult.empty
+        return result
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = make_result(0, true)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 2: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned error/success transfers must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	replacementFn := findIRFunc(t, prog, "replacement")
+	if countInstrKind(replacementFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("replacement alloc_bytes count = %d, want 1: %#v", countInstrKind(replacementFn, ir.IRAllocBytes), replacementFn.Instrs)
+	}
+	if countInstrKind(replacementFn, ir.IRDropOwned) != 0 || countInstrKind(replacementFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("replacement owned result must transfer to caller, not drop in callee: %#v", replacementFn.Instrs)
+	}
+	makeFn := findIRFunc(t, prog, "make_result")
+	if countCallsNamed(makeFn.Instrs, "replacement") != 1 {
+		t.Fatalf("make_result must call replacement once: %#v", makeFn.Instrs)
+	}
+	if countInstrKind(makeFn, ir.IRDropOwned) != 2 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 2 {
+		t.Fatalf(
+			"multi-case guarded owned-call recovery drop/release = %d/%d, want 2/2; original caught owned payload must be dropped on guarded and fallback paths only: %#v",
+			countInstrKind(makeFn, ir.IRDropOwned),
+			countInstrKind(makeFn, ir.IRReleaseAllocation),
+			makeFn.Instrs,
+		)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned multi-case guarded owned-call mixed catch-result enum payload must be dropped in caller when present: %#v", mainFn.Instrs)
+	}
+	assertOwnedReleaseGuardedByLocalEq(t, mainFn, 0, 0)
+}
+
+func TestLowerOwnedAllocBytesDropsMultiCaseMixedOwnedErrorCatchResultEnumOwnedPayloadReturnInCallerWhenPresent(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrError:
+    case owned(ptr)
+    case timeout
+
+enum PtrResult:
+    case owned(ptr)
+    case empty
+
+func maybe(flag: Bool) -> PtrResult throws PtrError
+uses alloc, mem:
+    if flag:
+        unsafe:
+            let p: ptr = core.alloc_bytes(16)
+            throw PtrError.owned(p)
+    unsafe:
+        return PtrResult.owned(core.alloc_bytes(32))
+
+func make_result(flag: Bool) -> PtrResult
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = catch maybe(flag):
+        case PtrError.owned(p):
+            PtrResult.empty
+        case PtrError.timeout:
+            PtrResult.empty
+        return result
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: PtrResult = make_result(false)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 2: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned error/success transfers must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	makeFn := findIRFunc(t, prog, "make_result")
+	if countInstrKind(makeFn, ir.IRDropOwned) != 1 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("multi-case owned-error mixed catch result must drop only the original owned caught payload: %#v", makeFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned multi-case mixed owned-error catch-result enum payload must be dropped in caller when present: %#v", mainFn.Instrs)
+	}
+	assertOwnedReleaseGuardedByLocalEq(t, mainFn, 0, 0)
+}
+
+func TestLowerOwnedAllocBytesDropsThrownEnumOwnedPayloadInCatch(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrError:
+    case owned(ptr)
+
+func fail() -> Int throws PtrError
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        throw PtrError.owned(p)
+
+func main() -> Int
+uses alloc, mem:
+    return catch fail():
+    case PtrError.owned(p):
+        7
+`)
+	failFn := findIRFunc(t, prog, "fail")
+	if countInstrKind(failFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("fail alloc_bytes count = %d, want 1: %#v", countInstrKind(failFn, ir.IRAllocBytes), failFn.Instrs)
+	}
+	if countInstrKind(failFn, ir.IRDropOwned) != 0 || countInstrKind(failFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("enum owned payload throw must not drop in callee: %#v", failFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "fail") != 1 {
+		t.Fatalf("main must call fail once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 2 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 2 {
+		t.Fatalf("caught enum owned payload must be dropped on case and unmatched catch paths: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsLocalEnumOwnedPayloadThrowInCatch(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrError:
+    case owned(ptr)
+
+func fail() -> Int throws PtrError
+uses alloc, mem:
+    unsafe:
+        let err: PtrError = PtrError.owned(core.alloc_bytes(16))
+        throw err
+
+func main() -> Int
+uses alloc, mem:
+    return catch fail():
+    case PtrError.owned(p):
+        7
+`)
+	failFn := findIRFunc(t, prog, "fail")
+	if countInstrKind(failFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("fail alloc_bytes count = %d, want 1: %#v", countInstrKind(failFn, ir.IRAllocBytes), failFn.Instrs)
+	}
+	if countInstrKind(failFn, ir.IRDropOwned) != 0 || countInstrKind(failFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("local enum payload throw must not drop in callee: %#v", failFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countInstrKind(mainFn, ir.IRDropOwned) != 2 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 2 {
+		t.Fatalf("caught local enum payload must be dropped on case and unmatched catch paths: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsAssignedLocalEnumOwnedPayloadThrowInCatch(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrError:
+    case empty
+    case owned(ptr)
+
+func fail() -> Int throws PtrError
+uses alloc, mem:
+    var err: PtrError = PtrError.empty
+    unsafe:
+        err = PtrError.owned(core.alloc_bytes(16))
+        throw err
+
+func main() -> Int
+uses alloc, mem:
+    return catch fail():
+    case PtrError.owned(p):
+        7
+    case PtrError.empty:
+        0
+`)
+	failFn := findIRFunc(t, prog, "fail")
+	if countInstrKind(failFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("fail alloc_bytes count = %d, want 1: %#v", countInstrKind(failFn, ir.IRAllocBytes), failFn.Instrs)
+	}
+	if countInstrKind(failFn, ir.IRDropOwned) != 0 || countInstrKind(failFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("assigned local enum payload throw must not drop in callee: %#v", failFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countInstrKind(mainFn, ir.IRDropOwned) < 2 || countInstrKind(mainFn, ir.IRReleaseAllocation) < 2 {
+		t.Fatalf("caught assigned local enum payload must be dropped on catch paths: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesRelaysCaughtEnumOwnedPayloadToCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrError:
+    case owned(ptr)
+
+func fail() -> ptr throws PtrError
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        throw PtrError.owned(p)
+
+func relay() -> ptr
+uses alloc, mem:
+    return catch fail():
+    case PtrError.owned(p):
+        p
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let q: ptr = relay()
+    return 0
+`)
+	failFn := findIRFunc(t, prog, "fail")
+	if countInstrKind(failFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("fail alloc_bytes count = %d, want 1: %#v", countInstrKind(failFn, ir.IRAllocBytes), failFn.Instrs)
+	}
+	if countInstrKind(failFn, ir.IRDropOwned) != 0 || countInstrKind(failFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned thrown payload must not be dropped in throwing callee: %#v", failFn.Instrs)
+	}
+	relayFn := findIRFunc(t, prog, "relay")
+	if countCallsNamed(relayFn.Instrs, "fail") != 1 {
+		t.Fatalf("relay must call fail once: %#v", relayFn.Instrs)
+	}
+	if countInstrKind(relayFn, ir.IRDropOwned) != 0 || countInstrKind(relayFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("relayed caught payload must not be dropped in relay callee: %#v", relayFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "relay") != 1 {
+		t.Fatalf("main must call relay once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned catch-relayed payload must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesRelaysMultiSourceCaughtEnumOwnedPayloadToCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrError:
+    case owned(ptr)
+
+func fail(which: Bool) -> ptr throws PtrError
+uses alloc, mem:
+    if which:
+        unsafe:
+            let left: ptr = core.alloc_bytes(16)
+            throw PtrError.owned(left)
+    unsafe:
+        let right: ptr = core.alloc_bytes(32)
+        throw PtrError.owned(right)
+
+func relay(which: Bool) -> ptr
+uses alloc, mem:
+    return catch fail(which):
+    case PtrError.owned(p):
+        p
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let q: ptr = relay(true)
+    return 0
+`)
+	failFn := findIRFunc(t, prog, "fail")
+	if countInstrKind(failFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("fail alloc_bytes count = %d, want 2: %#v", countInstrKind(failFn, ir.IRAllocBytes), failFn.Instrs)
+	}
+	if countInstrKind(failFn, ir.IRDropOwned) != 0 || countInstrKind(failFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned thrown payloads must not be dropped in throwing callee: %#v", failFn.Instrs)
+	}
+	relayFn := findIRFunc(t, prog, "relay")
+	if countCallsNamed(relayFn.Instrs, "fail") != 1 {
+		t.Fatalf("relay must call fail once: %#v", relayFn.Instrs)
+	}
+	if countInstrKind(relayFn, ir.IRDropOwned) != 0 || countInstrKind(relayFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("multi-source catch relay must not drop owned result in relay callee: %#v", relayFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "relay") != 1 {
+		t.Fatalf("main must call relay once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned multi-source catch-relayed payload must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesRelaysPreallocatedLocalCatchRecoveryToCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrError:
+    case owned(ptr)
+
+func fail() -> ptr throws PtrError
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        throw PtrError.owned(p)
+
+func relay() -> ptr
+uses alloc, mem:
+    unsafe:
+        let fallback: ptr = core.alloc_bytes(64)
+        return catch fail():
+        case PtrError.owned(p):
+            fallback
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let q: ptr = relay()
+    return 0
+`)
+	failFn := findIRFunc(t, prog, "fail")
+	if countInstrKind(failFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("fail alloc_bytes count = %d, want 1: %#v", countInstrKind(failFn, ir.IRAllocBytes), failFn.Instrs)
+	}
+	if countInstrKind(failFn, ir.IRDropOwned) != 0 || countInstrKind(failFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned thrown payload must not be dropped in throwing callee: %#v", failFn.Instrs)
+	}
+	relayFn := findIRFunc(t, prog, "relay")
+	if countInstrKind(relayFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("relay fallback alloc_bytes count = %d, want 1: %#v", countInstrKind(relayFn, ir.IRAllocBytes), relayFn.Instrs)
+	}
+	if countInstrKind(relayFn, ir.IRDropOwned) != 1 || countInstrKind(relayFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("relay must drop original caught payload only, not transferred fallback: %#v", relayFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "relay") != 1 {
+		t.Fatalf("main must call relay once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned preallocated catch recovery must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesRelaysGuardedPreallocatedLocalCatchRecoveryToCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrError:
+    case owned(ptr)
+
+func fail() -> ptr throws PtrError
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        throw PtrError.owned(p)
+
+func relay(prefer: Bool) -> ptr
+uses alloc, mem:
+    unsafe:
+        let fallback: ptr = core.alloc_bytes(64)
+        return catch fail():
+        case PtrError.owned(p) if prefer == true:
+            fallback
+        case PtrError.owned(p):
+            fallback
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let q: ptr = relay(true)
+    return 0
+`)
+	failFn := findIRFunc(t, prog, "fail")
+	if countInstrKind(failFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("fail alloc_bytes count = %d, want 1: %#v", countInstrKind(failFn, ir.IRAllocBytes), failFn.Instrs)
+	}
+	if countInstrKind(failFn, ir.IRDropOwned) != 0 || countInstrKind(failFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned thrown payload must not be dropped in throwing callee: %#v", failFn.Instrs)
+	}
+	relayFn := findIRFunc(t, prog, "relay")
+	if countInstrKind(relayFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("relay fallback alloc_bytes count = %d, want 1: %#v", countInstrKind(relayFn, ir.IRAllocBytes), relayFn.Instrs)
+	}
+	if countInstrKind(relayFn, ir.IRDropOwned) != 2 || countInstrKind(relayFn, ir.IRReleaseAllocation) != 2 {
+		t.Fatalf("guarded relay must drop original caught payload on guarded/fallback paths only, not transferred fallback: %#v", relayFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "relay") != 1 {
+		t.Fatalf("main must call relay once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned guarded preallocated catch recovery must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesRelaysSuccessOrErrorPreallocatedLocalCatchRecoveryToCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrError:
+    case owned(ptr)
+
+func maybe(flag: Bool) -> ptr throws PtrError
+uses alloc, mem:
+    if flag:
+        unsafe:
+            let p: ptr = core.alloc_bytes(16)
+            throw PtrError.owned(p)
+    unsafe:
+        return core.alloc_bytes(32)
+
+func relay(flag: Bool) -> ptr
+uses alloc, mem:
+    unsafe:
+        let fallback: ptr = core.alloc_bytes(64)
+        return catch maybe(flag):
+        case PtrError.owned(p):
+            fallback
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let q: ptr = relay(false)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 2: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned throw/success transfers must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	relayFn := findIRFunc(t, prog, "relay")
+	if countInstrKind(relayFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("relay fallback alloc_bytes count = %d, want 1: %#v", countInstrKind(relayFn, ir.IRAllocBytes), relayFn.Instrs)
+	}
+	if countInstrKind(relayFn, ir.IRDropOwned) != 2 || countInstrKind(relayFn, ir.IRReleaseAllocation) != 2 {
+		t.Fatalf("relay must clean unused fallback on success and original caught payload on error only: %#v", relayFn.Instrs)
+	}
+	assertReleaseLayoutInFirstCatchSuccessBranch(t, relayFn, "layout:core.alloc_bytes:fallback")
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "relay") != 1 {
+		t.Fatalf("main must call relay once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned success-or-error preallocated catch recovery must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesRelaysDifferentPreallocatedLocalCatchRecoveryToCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrError:
+    case left(ptr)
+    case right(ptr)
+
+func fail(which: Bool) -> ptr throws PtrError
+uses alloc, mem:
+    unsafe:
+        let payload: ptr = core.alloc_bytes(16)
+        if which:
+            throw PtrError.left(payload)
+        throw PtrError.right(payload)
+
+func relay(which: Bool) -> ptr
+uses alloc, mem:
+    unsafe:
+        let leftFallback: ptr = core.alloc_bytes(64)
+        let rightFallback: ptr = core.alloc_bytes(96)
+        return catch fail(which):
+        case PtrError.left(p):
+            leftFallback
+        case PtrError.right(p):
+            rightFallback
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let q: ptr = relay(true)
+    return 0
+`)
+	failFn := findIRFunc(t, prog, "fail")
+	if countInstrKind(failFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("fail alloc_bytes count = %d, want 1: %#v", countInstrKind(failFn, ir.IRAllocBytes), failFn.Instrs)
+	}
+	if countInstrKind(failFn, ir.IRDropOwned) != 0 || countInstrKind(failFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned thrown payloads must not be dropped in throwing callee: %#v", failFn.Instrs)
+	}
+	relayFn := findIRFunc(t, prog, "relay")
+	if countInstrKind(relayFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("relay fallback alloc_bytes count = %d, want 2: %#v", countInstrKind(relayFn, ir.IRAllocBytes), relayFn.Instrs)
+	}
+	if countInstrKind(relayFn, ir.IRDropOwned) != 4 || countInstrKind(relayFn, ir.IRReleaseAllocation) != 4 {
+		t.Fatalf("relay must clean original caught payload and the unselected fallback on each error path: %#v", relayFn.Instrs)
+	}
+	assertReleaseLayoutInCatchCaseBranch(t, relayFn, 0, "layout:core.alloc_bytes:rightFallback")
+	assertReleaseLayoutInCatchCaseBranch(t, relayFn, 1, "layout:core.alloc_bytes:leftFallback")
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "relay") != 1 {
+		t.Fatalf("main must call relay once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned different-local preallocated catch recovery must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesRelaysGuardedDefaultPreallocatedLocalCatchRecoveryToCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrError:
+    case owned(ptr)
+    case timeout
+
+func fail(mode: Int) -> ptr throws PtrError
+uses alloc, mem:
+    if mode == 1:
+        unsafe:
+            let payload: ptr = core.alloc_bytes(16)
+            throw PtrError.owned(payload)
+    throw PtrError.timeout
+
+func relay(mode: Int, prefer: Bool) -> ptr
+uses alloc, mem:
+    unsafe:
+        let guardedFallback: ptr = core.alloc_bytes(64)
+        let defaultFallback: ptr = core.alloc_bytes(96)
+        return catch fail(mode):
+        case PtrError.owned(p) if prefer == true:
+            guardedFallback
+        case _:
+            defaultFallback
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let q: ptr = relay(1, false)
+    return 0
+`)
+	failFn := findIRFunc(t, prog, "fail")
+	if countInstrKind(failFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("fail alloc_bytes count = %d, want 1: %#v", countInstrKind(failFn, ir.IRAllocBytes), failFn.Instrs)
+	}
+	if countInstrKind(failFn, ir.IRDropOwned) != 0 || countInstrKind(failFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned thrown payload must not be dropped in throwing callee: %#v", failFn.Instrs)
+	}
+	relayFn := findIRFunc(t, prog, "relay")
+	if countInstrKind(relayFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("relay fallback alloc_bytes count = %d, want 2: %#v", countInstrKind(relayFn, ir.IRAllocBytes), relayFn.Instrs)
+	}
+	if countInstrKind(relayFn, ir.IRDropOwned) != 4 || countInstrKind(relayFn, ir.IRReleaseAllocation) != 4 {
+		t.Fatalf("relay must clean original caught payload only on owned default paths and unused fallbacks per path: %#v", relayFn.Instrs)
+	}
+	assertReleaseLayoutInCatchCaseBranch(t, relayFn, 0, "layout:core.alloc_bytes:defaultFallback")
+	assertReleaseLayoutInAnyCatchCaseBranch(t, relayFn, "layout:core.alloc_bytes:guardedFallback")
+	assertReleaseLayoutGuardedByTagEqInAnyBranch(t, relayFn, "layout:throw:fail:payload", 0)
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "relay") != 1 {
+		t.Fatalf("main must call relay once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned guarded default preallocated catch recovery must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesRelaysCaughtEnumOwnedPayloadOrSuccessToCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrError:
+    case owned(ptr)
+
+func maybe(flag: Bool) -> ptr throws PtrError
+uses alloc, mem:
+    if flag:
+        unsafe:
+            let p: ptr = core.alloc_bytes(16)
+            throw PtrError.owned(p)
+    unsafe:
+        return core.alloc_bytes(32)
+
+func relay(flag: Bool) -> ptr
+uses alloc, mem:
+    return catch maybe(flag):
+    case PtrError.owned(p):
+        p
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let q: ptr = relay(false)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 2: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned throw/success transfers must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	relayFn := findIRFunc(t, prog, "relay")
+	if countCallsNamed(relayFn.Instrs, "maybe") != 1 {
+		t.Fatalf("relay must call maybe once: %#v", relayFn.Instrs)
+	}
+	if countInstrKind(relayFn, ir.IRDropOwned) != 0 || countInstrKind(relayFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("catch relay must not drop owned throw/success result in relay callee: %#v", relayFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "relay") != 1 {
+		t.Fatalf("main must call relay once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned catch-relayed throw/success result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesRelaysCaughtMultiCaseEnumOwnedPayloadToCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrError:
+    case owned(ptr)
+    case fallback
+
+func make_fallback() -> ptr
+uses alloc, mem:
+    unsafe:
+        return core.alloc_bytes(64)
+
+func maybe(flag: Bool) -> ptr throws PtrError
+uses alloc, mem:
+    if flag:
+        unsafe:
+            let p: ptr = core.alloc_bytes(16)
+            throw PtrError.owned(p)
+    unsafe:
+        return core.alloc_bytes(32)
+
+func relay(flag: Bool) -> ptr
+uses alloc, mem:
+    return catch maybe(flag):
+    case PtrError.owned(p):
+        p
+    case PtrError.fallback:
+        make_fallback()
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let q: ptr = relay(false)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 2: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned throw/success transfers must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	relayFn := findIRFunc(t, prog, "relay")
+	if countCallsNamed(relayFn.Instrs, "maybe") != 1 {
+		t.Fatalf("relay must call maybe once: %#v", relayFn.Instrs)
+	}
+	if countCallsNamed(relayFn.Instrs, "make_fallback") != 1 {
+		t.Fatalf("relay must keep exhaustive fallback arm lowering: %#v", relayFn.Instrs)
+	}
+	if countInstrKind(relayFn, ir.IRDropOwned) != 0 || countInstrKind(relayFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("multi-case catch relay must not drop owned result in relay callee: %#v", relayFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "relay") != 1 {
+		t.Fatalf("main must call relay once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned multi-case catch-relayed result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesRelaysCaughtDefaultEnumOwnedPayloadToCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrError:
+    case owned(ptr)
+    case fallback
+    case timeout
+
+func make_fallback() -> ptr
+uses alloc, mem:
+    unsafe:
+        return core.alloc_bytes(64)
+
+func maybe(flag: Bool) -> ptr throws PtrError
+uses alloc, mem:
+    if flag:
+        unsafe:
+            let p: ptr = core.alloc_bytes(16)
+            throw PtrError.owned(p)
+    unsafe:
+        return core.alloc_bytes(32)
+
+func relay(flag: Bool) -> ptr
+uses alloc, mem:
+    return catch maybe(flag):
+    case PtrError.owned(p):
+        p
+    case _:
+        make_fallback()
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let q: ptr = relay(false)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 2: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned throw/success transfers must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	relayFn := findIRFunc(t, prog, "relay")
+	if countCallsNamed(relayFn.Instrs, "maybe") != 1 {
+		t.Fatalf("relay must call maybe once: %#v", relayFn.Instrs)
+	}
+	if countCallsNamed(relayFn.Instrs, "make_fallback") != 1 {
+		t.Fatalf("relay must keep default fallback arm lowering: %#v", relayFn.Instrs)
+	}
+	if countInstrKind(relayFn, ir.IRDropOwned) != 0 || countInstrKind(relayFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("default catch relay must not drop owned result in relay callee: %#v", relayFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "relay") != 1 {
+		t.Fatalf("main must call relay once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned default catch-relayed result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsCaughtOwnedPayloadInSingleOwnedDefaultFallbackToCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrError:
+    case owned(ptr)
+    case timeout
+
+func make_timeout() -> ptr
+uses alloc, mem:
+    unsafe:
+        return core.alloc_bytes(48)
+
+func make_fallback() -> ptr
+uses alloc, mem:
+    unsafe:
+        return core.alloc_bytes(64)
+
+func maybe(flag: Bool) -> ptr throws PtrError
+uses alloc, mem:
+    if flag:
+        unsafe:
+            let p: ptr = core.alloc_bytes(16)
+            throw PtrError.owned(p)
+    unsafe:
+        return core.alloc_bytes(32)
+
+func relay(flag: Bool) -> ptr
+uses alloc, mem:
+    return catch maybe(flag):
+    case PtrError.timeout:
+        make_timeout()
+    case _:
+        make_fallback()
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let q: ptr = relay(true)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 2: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned throw/success transfers must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	relayFn := findIRFunc(t, prog, "relay")
+	if countCallsNamed(relayFn.Instrs, "maybe") != 1 {
+		t.Fatalf("relay must call maybe once: %#v", relayFn.Instrs)
+	}
+	if countCallsNamed(relayFn.Instrs, "make_timeout") != 1 || countCallsNamed(relayFn.Instrs, "make_fallback") != 1 {
+		t.Fatalf("relay must keep explicit non-owned and default fallback arms: %#v", relayFn.Instrs)
+	}
+	if countInstrKind(relayFn, ir.IRDropOwned) != 1 || countInstrKind(relayFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("default fallback must drop the original owned enum payload exactly once: %#v", relayFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "relay") != 1 {
+		t.Fatalf("main must call relay once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned single-owned-default fallback result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesRelaysGuardedEnumOwnedPayloadOrDefaultFallbackToCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrError:
+    case owned(ptr)
+    case timeout
+
+func make_timeout() -> ptr
+uses alloc, mem:
+    unsafe:
+        return core.alloc_bytes(48)
+
+func make_fallback() -> ptr
+uses alloc, mem:
+    unsafe:
+        return core.alloc_bytes(64)
+
+func maybe(flag: Bool) -> ptr throws PtrError
+uses alloc, mem:
+    if flag:
+        unsafe:
+            let p: ptr = core.alloc_bytes(16)
+            throw PtrError.owned(p)
+    unsafe:
+        return core.alloc_bytes(32)
+
+func relay(flag: Bool, prefer: Bool) -> ptr
+uses alloc, mem:
+    return catch maybe(flag):
+    case PtrError.timeout:
+        make_timeout()
+    case PtrError.owned(p) if prefer == true:
+        p
+    case _:
+        make_fallback()
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let q: ptr = relay(true, false)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 2: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned throw/success transfers must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	relayFn := findIRFunc(t, prog, "relay")
+	if countCallsNamed(relayFn.Instrs, "maybe") != 1 {
+		t.Fatalf("relay must call maybe once: %#v", relayFn.Instrs)
+	}
+	if countCallsNamed(relayFn.Instrs, "make_timeout") != 1 || countCallsNamed(relayFn.Instrs, "make_fallback") != 1 {
+		t.Fatalf("relay must keep explicit non-owned and default fallback arms: %#v", relayFn.Instrs)
+	}
+	if countInstrKind(relayFn, ir.IRDropOwned) != 1 || countInstrKind(relayFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("default fallback must drop the original guarded owned enum payload exactly once: %#v", relayFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "relay") != 1 {
+		t.Fatalf("main must call relay once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned guarded-default fallback result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesRelaysCaughtGuardedEnumOwnedPayloadToCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrError:
+    case owned(ptr)
+
+func maybe(flag: Bool) -> ptr throws PtrError
+uses alloc, mem:
+    if flag:
+        unsafe:
+            let p: ptr = core.alloc_bytes(16)
+            throw PtrError.owned(p)
+    unsafe:
+        return core.alloc_bytes(32)
+
+func relay(flag: Bool, prefer: Bool) -> ptr
+uses alloc, mem:
+    return catch maybe(flag):
+    case PtrError.owned(p) if prefer == true:
+        p
+    case PtrError.owned(p):
+        p
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let q: ptr = relay(false, true)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 2: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned throw/success transfers must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	relayFn := findIRFunc(t, prog, "relay")
+	if countCallsNamed(relayFn.Instrs, "maybe") != 1 {
+		t.Fatalf("relay must call maybe once: %#v", relayFn.Instrs)
+	}
+	if countInstrKind(relayFn, ir.IRDropOwned) != 0 || countInstrKind(relayFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("guarded catch relay must not drop owned result in relay callee: %#v", relayFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "relay") != 1 {
+		t.Fatalf("main must call relay once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned guarded catch-relayed result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesRelaysCaughtGuardedEnumOwnedPayloadOrFallbackToCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrError:
+    case owned(ptr)
+
+func make_fallback() -> ptr
+uses alloc, mem:
+    unsafe:
+        return core.alloc_bytes(64)
+
+func maybe(flag: Bool) -> ptr throws PtrError
+uses alloc, mem:
+    if flag:
+        unsafe:
+            let p: ptr = core.alloc_bytes(16)
+            throw PtrError.owned(p)
+    unsafe:
+        return core.alloc_bytes(32)
+
+func relay(flag: Bool, prefer: Bool) -> ptr
+uses alloc, mem:
+    return catch maybe(flag):
+    case PtrError.owned(p) if prefer == true:
+        p
+    case PtrError.owned(p):
+        make_fallback()
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let q: ptr = relay(true, false)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 2: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned throw/success transfers must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	relayFn := findIRFunc(t, prog, "relay")
+	if countCallsNamed(relayFn.Instrs, "maybe") != 1 {
+		t.Fatalf("relay must call maybe once: %#v", relayFn.Instrs)
+	}
+	if countCallsNamed(relayFn.Instrs, "make_fallback") != 1 {
+		t.Fatalf("relay must keep same-case fallback arm lowering: %#v", relayFn.Instrs)
+	}
+	if countInstrKind(relayFn, ir.IRDropOwned) != 1 || countInstrKind(relayFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("same-case fallback arm must drop the original owned error payload exactly once: %#v", relayFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "relay") != 1 {
+		t.Fatalf("main must call relay once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned guarded fallback catch result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesRelaysCaughtGuardedEnumOwnedPayloadFallbackOrRelayToCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrError:
+    case owned(ptr)
+
+func make_fallback() -> ptr
+uses alloc, mem:
+    unsafe:
+        return core.alloc_bytes(64)
+
+func maybe(flag: Bool) -> ptr throws PtrError
+uses alloc, mem:
+    if flag:
+        unsafe:
+            let p: ptr = core.alloc_bytes(16)
+            throw PtrError.owned(p)
+    unsafe:
+        return core.alloc_bytes(32)
+
+func relay(flag: Bool, prefer: Bool) -> ptr
+uses alloc, mem:
+    return catch maybe(flag):
+    case PtrError.owned(p) if prefer == true:
+        make_fallback()
+    case PtrError.owned(p):
+        p
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let q: ptr = relay(true, true)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 2: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned throw/success transfers must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	relayFn := findIRFunc(t, prog, "relay")
+	if countCallsNamed(relayFn.Instrs, "maybe") != 1 {
+		t.Fatalf("relay must call maybe once: %#v", relayFn.Instrs)
+	}
+	if countCallsNamed(relayFn.Instrs, "make_fallback") != 1 {
+		t.Fatalf("relay must keep guarded same-case fallback arm lowering: %#v", relayFn.Instrs)
+	}
+	if countInstrKind(relayFn, ir.IRDropOwned) != 1 || countInstrKind(relayFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("guarded same-case fallback arm must drop the original owned error payload exactly once: %#v", relayFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "relay") != 1 {
+		t.Fatalf("main must call relay once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned guarded fallback-or-relay catch result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesRelaysCaughtGuardedEnumNonOwnedFallbackToCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum PtrError:
+    case owned(ptr)
+    case fallback
+
+func make_preferred() -> ptr
+uses alloc, mem:
+    unsafe:
+        return core.alloc_bytes(64)
+
+func make_fallback() -> ptr
+uses alloc, mem:
+    unsafe:
+        return core.alloc_bytes(96)
+
+func maybe(flag: Bool) -> ptr throws PtrError
+uses alloc, mem:
+    if flag:
+        unsafe:
+            let p: ptr = core.alloc_bytes(16)
+            throw PtrError.owned(p)
+    unsafe:
+        return core.alloc_bytes(32)
+
+func relay(flag: Bool, prefer: Bool) -> ptr
+uses alloc, mem:
+    return catch maybe(flag):
+    case PtrError.owned(p):
+        p
+    case PtrError.fallback if prefer == true:
+        make_preferred()
+    case PtrError.fallback:
+        make_fallback()
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let q: ptr = relay(false, true)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 2: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned throw/success transfers must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	relayFn := findIRFunc(t, prog, "relay")
+	if countCallsNamed(relayFn.Instrs, "maybe") != 1 {
+		t.Fatalf("relay must call maybe once: %#v", relayFn.Instrs)
+	}
+	if countCallsNamed(relayFn.Instrs, "make_preferred") != 1 || countCallsNamed(relayFn.Instrs, "make_fallback") != 1 {
+		t.Fatalf("relay must keep both guarded and unguarded fallback arms: %#v", relayFn.Instrs)
+	}
+	if countInstrKind(relayFn, ir.IRDropOwned) != 0 || countInstrKind(relayFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("guarded non-owned enum fallback relay must not drop owned result in relay callee: %#v", relayFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "relay") != 1 {
+		t.Fatalf("main must call relay once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned guarded non-owned enum fallback catch result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesRelaysCaughtOptionalOwnedPayloadToCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func make_fallback() -> ptr
+uses alloc, mem:
+    unsafe:
+        return core.alloc_bytes(64)
+
+func maybe(flag: Bool) -> ptr throws ptr?
+uses alloc, mem:
+    if flag:
+        unsafe:
+            let p: ptr = core.alloc_bytes(16)
+            throw p
+    unsafe:
+        return core.alloc_bytes(32)
+
+func relay(flag: Bool) -> ptr
+uses alloc, mem:
+    return catch maybe(flag):
+    case some(p):
+        p
+    case none:
+        make_fallback()
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let q: ptr = relay(false)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 2: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned optional throw/success transfers must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	relayFn := findIRFunc(t, prog, "relay")
+	if countCallsNamed(relayFn.Instrs, "maybe") != 1 {
+		t.Fatalf("relay must call maybe once: %#v", relayFn.Instrs)
+	}
+	if countCallsNamed(relayFn.Instrs, "make_fallback") != 1 {
+		t.Fatalf("relay must keep optional none fallback arm lowering: %#v", relayFn.Instrs)
+	}
+	if countInstrKind(relayFn, ir.IRDropOwned) != 0 || countInstrKind(relayFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("optional catch relay must not drop owned result in relay callee: %#v", relayFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "relay") != 1 {
+		t.Fatalf("main must call relay once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned optional catch-relayed result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesRelaysCaughtGuardedOptionalOwnedPayloadToCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func make_fallback() -> ptr
+uses alloc, mem:
+    unsafe:
+        return core.alloc_bytes(64)
+
+func maybe(flag: Bool) -> ptr throws ptr?
+uses alloc, mem:
+    if flag:
+        unsafe:
+            let p: ptr = core.alloc_bytes(16)
+            throw p
+    unsafe:
+        return core.alloc_bytes(32)
+
+func relay(flag: Bool, prefer: Bool) -> ptr
+uses alloc, mem:
+    return catch maybe(flag):
+    case some(p) if prefer == true:
+        p
+    case some(p):
+        p
+    case none:
+        make_fallback()
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let q: ptr = relay(false, true)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 2: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned guarded optional throw/success transfers must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	relayFn := findIRFunc(t, prog, "relay")
+	if countCallsNamed(relayFn.Instrs, "maybe") != 1 {
+		t.Fatalf("relay must call maybe once: %#v", relayFn.Instrs)
+	}
+	if countCallsNamed(relayFn.Instrs, "make_fallback") != 1 {
+		t.Fatalf("relay must keep guarded optional none fallback arm lowering: %#v", relayFn.Instrs)
+	}
+	if countInstrKind(relayFn, ir.IRDropOwned) != 0 || countInstrKind(relayFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("guarded optional catch relay must not drop owned result in relay callee: %#v", relayFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "relay") != 1 {
+		t.Fatalf("main must call relay once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned guarded optional catch-relayed result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesRelaysCaughtGuardedOptionalOwnedPayloadOrFallbackToCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func make_fallback() -> ptr
+uses alloc, mem:
+    unsafe:
+        return core.alloc_bytes(64)
+
+func maybe(flag: Bool) -> ptr throws ptr?
+uses alloc, mem:
+    if flag:
+        unsafe:
+            let p: ptr = core.alloc_bytes(16)
+            throw p
+    unsafe:
+        return core.alloc_bytes(32)
+
+func relay(flag: Bool, prefer: Bool) -> ptr
+uses alloc, mem:
+    return catch maybe(flag):
+    case some(p) if prefer == true:
+        p
+    case some(p):
+        make_fallback()
+    case none:
+        make_fallback()
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let q: ptr = relay(true, false)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 2: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned guarded optional throw/success transfers must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	relayFn := findIRFunc(t, prog, "relay")
+	if countCallsNamed(relayFn.Instrs, "maybe") != 1 {
+		t.Fatalf("relay must call maybe once: %#v", relayFn.Instrs)
+	}
+	if countCallsNamed(relayFn.Instrs, "make_fallback") != 2 {
+		t.Fatalf("relay must keep optional some and none fallback arm lowering: %#v", relayFn.Instrs)
+	}
+	if countInstrKind(relayFn, ir.IRDropOwned) != 1 || countInstrKind(relayFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("same-some fallback arm must drop the original owned optional payload exactly once: %#v", relayFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "relay") != 1 {
+		t.Fatalf("main must call relay once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned guarded optional fallback catch result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesRelaysCaughtGuardedOptionalOwnedPayloadFallbackOrRelayToCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func make_fallback() -> ptr
+uses alloc, mem:
+    unsafe:
+        return core.alloc_bytes(64)
+
+func maybe(flag: Bool) -> ptr throws ptr?
+uses alloc, mem:
+    if flag:
+        unsafe:
+            let p: ptr = core.alloc_bytes(16)
+            throw p
+    unsafe:
+        return core.alloc_bytes(32)
+
+func relay(flag: Bool, prefer: Bool) -> ptr
+uses alloc, mem:
+    return catch maybe(flag):
+    case some(p) if prefer == true:
+        make_fallback()
+    case some(p):
+        p
+    case none:
+        make_fallback()
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let q: ptr = relay(true, true)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 2: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned guarded optional throw/success transfers must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	relayFn := findIRFunc(t, prog, "relay")
+	if countCallsNamed(relayFn.Instrs, "maybe") != 1 {
+		t.Fatalf("relay must call maybe once: %#v", relayFn.Instrs)
+	}
+	if countCallsNamed(relayFn.Instrs, "make_fallback") != 2 {
+		t.Fatalf("relay must keep guarded optional some and none fallback arm lowering: %#v", relayFn.Instrs)
+	}
+	if countInstrKind(relayFn, ir.IRDropOwned) != 1 || countInstrKind(relayFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("guarded same-some fallback arm must drop the original owned optional payload exactly once: %#v", relayFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "relay") != 1 {
+		t.Fatalf("main must call relay once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned guarded optional fallback-or-relay catch result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesRelaysGuardedOptionalOwnedPayloadOrDefaultFallbackToCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func make_fallback() -> ptr
+uses alloc, mem:
+    unsafe:
+        return core.alloc_bytes(64)
+
+func maybe(flag: Bool) -> ptr throws ptr?
+uses alloc, mem:
+    if flag:
+        unsafe:
+            let p: ptr = core.alloc_bytes(16)
+            throw p
+    unsafe:
+        return core.alloc_bytes(32)
+
+func relay(flag: Bool, prefer: Bool) -> ptr
+uses alloc, mem:
+    return catch maybe(flag):
+    case some(p) if prefer == true:
+        make_fallback()
+    case _:
+        make_fallback()
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let q: ptr = relay(true, false)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 2: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned guarded optional throw/success transfers must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	relayFn := findIRFunc(t, prog, "relay")
+	if countCallsNamed(relayFn.Instrs, "maybe") != 1 {
+		t.Fatalf("relay must call maybe once: %#v", relayFn.Instrs)
+	}
+	if countCallsNamed(relayFn.Instrs, "make_fallback") != 2 {
+		t.Fatalf("relay must keep guarded optional and default fallback arm lowering: %#v", relayFn.Instrs)
+	}
+	if countInstrKind(relayFn, ir.IRDropOwned) != 2 || countInstrKind(relayFn, ir.IRReleaseAllocation) != 2 {
+		t.Fatalf("guarded optional default fallback arms must each drop the original owned optional payload: %#v", relayFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "relay") != 1 {
+		t.Fatalf("main must call relay once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned guarded optional default fallback catch result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesRelaysCaughtGuardedOptionalNoneFallbackToCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func make_preferred() -> ptr
+uses alloc, mem:
+    unsafe:
+        return core.alloc_bytes(64)
+
+func make_fallback() -> ptr
+uses alloc, mem:
+    unsafe:
+        return core.alloc_bytes(96)
+
+func maybe(flag: Bool) -> ptr throws ptr?
+uses alloc, mem:
+    if flag:
+        unsafe:
+            let p: ptr = core.alloc_bytes(16)
+            throw p
+    unsafe:
+        return core.alloc_bytes(32)
+
+func relay(flag: Bool, prefer: Bool) -> ptr
+uses alloc, mem:
+    return catch maybe(flag):
+    case some(p):
+        p
+    case none if prefer == true:
+        make_preferred()
+    case none:
+        make_fallback()
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let q: ptr = relay(false, true)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 2: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned optional throw/success transfers must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	relayFn := findIRFunc(t, prog, "relay")
+	if countCallsNamed(relayFn.Instrs, "maybe") != 1 {
+		t.Fatalf("relay must call maybe once: %#v", relayFn.Instrs)
+	}
+	if countCallsNamed(relayFn.Instrs, "make_preferred") != 1 || countCallsNamed(relayFn.Instrs, "make_fallback") != 1 {
+		t.Fatalf("relay must keep both guarded and unguarded none fallback arms: %#v", relayFn.Instrs)
+	}
+	if countInstrKind(relayFn, ir.IRDropOwned) != 0 || countInstrKind(relayFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("guarded optional none fallback relay must not drop owned result in relay callee: %#v", relayFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "relay") != 1 {
+		t.Fatalf("main must call relay once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned guarded none fallback catch result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsCaughtOptionalPayloadInDefaultFallbackToCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func make_none() -> ptr
+uses alloc, mem:
+    unsafe:
+        return core.alloc_bytes(48)
+
+func make_fallback() -> ptr
+uses alloc, mem:
+    unsafe:
+        return core.alloc_bytes(64)
+
+func maybe(flag: Bool) -> ptr throws ptr?
+uses alloc, mem:
+    if flag:
+        unsafe:
+            let p: ptr = core.alloc_bytes(16)
+            throw p
+    unsafe:
+        return core.alloc_bytes(32)
+
+func relay(flag: Bool) -> ptr
+uses alloc, mem:
+    return catch maybe(flag):
+    case none:
+        make_none()
+    case _:
+        make_fallback()
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let q: ptr = relay(true)
+    return 0
+`)
+	maybeFn := findIRFunc(t, prog, "maybe")
+	if countInstrKind(maybeFn, ir.IRAllocBytes) != 2 {
+		t.Fatalf("maybe alloc_bytes count = %d, want 2: %#v", countInstrKind(maybeFn, ir.IRAllocBytes), maybeFn.Instrs)
+	}
+	if countInstrKind(maybeFn, ir.IRDropOwned) != 0 || countInstrKind(maybeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned optional throw/success transfers must not be dropped in throwing callee: %#v", maybeFn.Instrs)
+	}
+	relayFn := findIRFunc(t, prog, "relay")
+	if countCallsNamed(relayFn.Instrs, "maybe") != 1 {
+		t.Fatalf("relay must call maybe once: %#v", relayFn.Instrs)
+	}
+	if countCallsNamed(relayFn.Instrs, "make_none") != 1 || countCallsNamed(relayFn.Instrs, "make_fallback") != 1 {
+		t.Fatalf("relay must keep explicit none and default fallback arms: %#v", relayFn.Instrs)
+	}
+	if countInstrKind(relayFn, ir.IRDropOwned) != 1 || countInstrKind(relayFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("default fallback must drop the original owned optional payload exactly once: %#v", relayFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "relay") != 1 {
+		t.Fatalf("main must call relay once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned optional default fallback result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesRejectsMultiOwnedInlineAggregateThrow(t *testing.T) {
+	err := lowerOwnedAllocDropProgramError(t, `
+struct PairBox:
+    left: ptr
+    right: ptr
+
+func fail() -> Int throws PairBox
+uses alloc, mem:
+    unsafe:
+        let left: ptr = core.alloc_bytes(16)
+        let right: ptr = core.alloc_bytes(32)
+        throw PairBox(left: left, right: right)
+
+func main() -> Int:
+    return 0
+`)
+	if err == nil || !strings.Contains(err.Error(), "inline owned throw") {
+		t.Fatalf("LowerWithOptions error = %v, want inline owned throw diagnostic", err)
+	}
+}
+
+func TestLowerOwnedAllocBytesClearsMovedFieldMarkerAfterAggregateOverwrite(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+struct PtrBox:
+    tag: Int
+    raw: ptr
+
+func ret() -> PtrBox
+uses alloc, mem:
+    var box: PtrBox = PtrBox(tag: 1, raw: 0)
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        box.raw = p
+        let q: ptr = box.raw
+        box = PtrBox(tag: 2, raw: 0)
+        return box
+
+func main() -> Int:
+    return 0
+`)
+	fn := findIRFunc(t, prog, "ret")
+	if countInstrKind(fn, ir.IRDropOwned) != 1 || countInstrKind(fn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("moved field owner must be cleaned up after aggregate overwrite: %#v", fn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesSuppressesDropAfterLocalStoreReturn(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func ret() -> ptr
+uses alloc, mem:
+    var q: ptr = 0
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        q = p
+    return q
+
+func main() -> Int:
+    return 0
+`)
+	fn := findIRFunc(t, prog, "ret")
+	if countInstrKind(fn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("ret alloc_bytes count = %d, want 1: %#v", countInstrKind(fn, ir.IRAllocBytes), fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRDropOwned) != 0 || countInstrKind(fn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("locally stored returned owned pointer must not be dropped in callee: %#v", fn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsOverwrittenOwnedLocalBeforeBorrowedReturn(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func make() -> ptr
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        return p
+
+func relay(borrowed: ptr) -> ptr
+uses alloc, mem:
+    var q: ptr = make()
+    q = borrowed
+    return q
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let borrowed: ptr = 0
+        let r: ptr = relay(borrowed)
+    return 0
+`)
+	relayFn := findIRFunc(t, prog, "relay")
+	if countCallsNamed(relayFn.Instrs, "make") != 1 {
+		t.Fatalf("relay must call make once: %#v", relayFn.Instrs)
+	}
+	if countInstrKind(relayFn, ir.IRDropOwned) != 1 || countInstrKind(relayFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("overwritten owned local must be dropped before borrowed overwrite/return: %#v", relayFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "relay") != 1 {
+		t.Fatalf("main must call relay once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 0 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("borrowed relay result must not be summarized as caller-owned: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsAssignedReturnedOwnedCallResultInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func make() -> ptr
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        return p
+
+func relay() -> ptr
+uses alloc, mem:
+    var q: ptr = 0
+    q = make()
+    return q
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let r: ptr = relay()
+    return 0
+`)
+	relayFn := findIRFunc(t, prog, "relay")
+	if countCallsNamed(relayFn.Instrs, "make") != 1 {
+		t.Fatalf("relay must call make once: %#v", relayFn.Instrs)
+	}
+	if countInstrKind(relayFn, ir.IRDropOwned) != 0 || countInstrKind(relayFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("relay must not drop assigned owned pointer it returns: %#v", relayFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "relay") != 1 {
+		t.Fatalf("main must call relay once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned assigned relay result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesSuppressesDropAfterGlobalStore(t *testing.T) {
+	prog := lowerOwnedAllocDropFileProgram(t, `
+var leaked: ptr = 0
+
+func store() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        leaked = p
+    return 0
+
+func main() -> Int
+uses alloc, capability, mem:
+    return store()
+`)
+	fn := findIRFunc(t, prog, "store")
+	if countInstrKind(fn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("store alloc_bytes count = %d, want 1: %#v", countInstrKind(fn, ir.IRAllocBytes), fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRStoreGlobal) == 0 {
+		t.Fatalf("store must write the transferred pointer to global storage: %#v", fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRDropOwned) != 0 || countInstrKind(fn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("global-stored owned pointer must not be dropped in source scope: %#v", fn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesSuppressesDropAfterReturnedOwnedCallStoredInGlobal(t *testing.T) {
+	prog := lowerOwnedAllocDropFileProgram(t, `
+var leaked: ptr = 0
+
+func make() -> ptr
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        return p
+
+func store() -> Int
+uses alloc, capability, mem:
+    leaked = make()
+    return 0
+
+func main() -> Int
+uses alloc, capability, mem:
+    return store()
+`)
+	fn := findIRFunc(t, prog, "store")
+	if countCallsNamed(fn.Instrs, "make") != 1 {
+		t.Fatalf("store must call make once: %#v", fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRStoreGlobal) == 0 {
+		t.Fatalf("store must write the returned owned pointer to global storage: %#v", fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRDropOwned) != 0 || countInstrKind(fn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("global-stored returned owned pointer must not be dropped in source scope: %#v", fn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesSuppressesDropAfterGlobalFieldStore(t *testing.T) {
+	prog := lowerOwnedAllocDropFileProgram(t, `
+struct PtrBox:
+    raw: ptr
+
+var box: PtrBox
+
+func store() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        box.raw = p
+    return 0
+
+func main() -> Int
+uses alloc, capability, mem:
+    return store()
+`)
+	fn := findIRFunc(t, prog, "store")
+	if countInstrKind(fn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("store alloc_bytes count = %d, want 1: %#v", countInstrKind(fn, ir.IRAllocBytes), fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRStoreGlobal) == 0 {
+		t.Fatalf("store must write the transferred pointer to global field storage: %#v", fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRDropOwned) != 0 || countInstrKind(fn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("global-field-stored owned pointer must not be dropped in source scope: %#v", fn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesSuppressesDropAfterReturnedOwnedCallStoredInGlobalField(t *testing.T) {
+	prog := lowerOwnedAllocDropFileProgram(t, `
+struct PtrBox:
+    raw: ptr
+
+var box: PtrBox
+
+func make() -> ptr
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        return p
+
+func store() -> Int
+uses alloc, capability, mem:
+    box.raw = make()
+    return 0
+
+func main() -> Int
+uses alloc, capability, mem:
+    return store()
+`)
+	fn := findIRFunc(t, prog, "store")
+	if countCallsNamed(fn.Instrs, "make") != 1 {
+		t.Fatalf("store must call make once: %#v", fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRStoreGlobal) == 0 {
+		t.Fatalf("store must write the returned owned pointer to global field storage: %#v", fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRDropOwned) != 0 || countInstrKind(fn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("global-field-stored returned owned pointer must not be dropped in source scope: %#v", fn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesSuppressesDropAfterNestedInlineAggregateGlobalStore(t *testing.T) {
+	prog := lowerOwnedAllocDropFileProgram(t, `
+struct PtrBox:
+    tag: Int
+    raw: ptr
+
+struct Holder:
+    head: Int
+    box: PtrBox
+
+var saved: Holder
+
+func store() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        saved = Holder(head: 1, box: PtrBox(tag: 2, raw: p))
+    return 0
+
+func main() -> Int
+uses alloc, capability, mem:
+    return store()
+`)
+	fn := findIRFunc(t, prog, "store")
+	if countInstrKind(fn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("store alloc_bytes count = %d, want 1: %#v", countInstrKind(fn, ir.IRAllocBytes), fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRStoreGlobal) == 0 {
+		t.Fatalf("store must write the nested aggregate to global storage: %#v", fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRDropOwned) != 0 || countInstrKind(fn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("global-stored nested aggregate owned field must not be dropped in source scope: %#v", fn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesSuppressesDropAfterNestedInlineDirectAllocAggregateGlobalStore(t *testing.T) {
+	prog := lowerOwnedAllocDropFileProgram(t, `
+struct PtrBox:
+    tag: Int
+    raw: ptr
+
+struct Holder:
+    head: Int
+    box: PtrBox
+
+var saved: Holder
+
+func store() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        saved = Holder(head: 1, box: PtrBox(tag: 2, raw: core.alloc_bytes(16)))
+    return 0
+
+func main() -> Int
+uses alloc, capability, mem:
+    return store()
+`)
+	fn := findIRFunc(t, prog, "store")
+	if countInstrKind(fn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("store alloc_bytes count = %d, want 1: %#v", countInstrKind(fn, ir.IRAllocBytes), fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRStoreGlobal) == 0 {
+		t.Fatalf("store must write the direct nested aggregate to global storage: %#v", fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRDropOwned) != 0 || countInstrKind(fn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("global-stored nested direct aggregate owned field must not be dropped in source scope: %#v", fn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesSuppressesDropAfterNestedInlineOwnedReturnCallAggregateGlobalStore(t *testing.T) {
+	prog := lowerOwnedAllocDropFileProgram(t, `
+struct PtrBox:
+    tag: Int
+    raw: ptr
+
+struct Holder:
+    head: Int
+    box: PtrBox
+
+var saved: Holder
+
+func make_raw() -> ptr
+uses alloc, mem:
+    unsafe:
+        return core.alloc_bytes(16)
+
+func store() -> Int
+uses alloc, capability, mem:
+    saved = Holder(head: 1, box: PtrBox(tag: 2, raw: make_raw()))
+    return 0
+
+func main() -> Int
+uses alloc, capability, mem:
+    return store()
+`)
+	makeRawFn := findIRFunc(t, prog, "make_raw")
+	if countInstrKind(makeRawFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make_raw alloc_bytes count = %d, want 1: %#v", countInstrKind(makeRawFn, ir.IRAllocBytes), makeRawFn.Instrs)
+	}
+	if countInstrKind(makeRawFn, ir.IRDropOwned) != 0 || countInstrKind(makeRawFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("raw factory must not drop returned pointer in callee: %#v", makeRawFn.Instrs)
+	}
+	fn := findIRFunc(t, prog, "store")
+	if countCallsNamed(fn.Instrs, "make_raw") != 1 {
+		t.Fatalf("store must call make_raw once: %#v", fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRStoreGlobal) == 0 {
+		t.Fatalf("store must write the owned-return nested aggregate to global storage: %#v", fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRDropOwned) != 0 || countInstrKind(fn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("global-stored nested owned-return aggregate field must not be dropped in source scope: %#v", fn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesRejectsNestedInlineLocalLiteralSourceReturn(t *testing.T) {
+	err := lowerOwnedAllocDropProgramError(t, `
+struct PtrBox:
+    tag: Int
+    raw: ptr
+
+struct Holder:
+    head: Int
+    box: PtrBox
+
+func ret() -> ptr
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        let holder: Holder = Holder(head: 1, box: PtrBox(tag: 2, raw: p))
+        return p
+
+func main() -> Int:
+    return 0
+`)
+	if err == nil || !strings.Contains(err.Error(), "use after move") {
+		t.Fatalf("LowerWithOptions error = %v, want nested local literal source use-after-move diagnostic", err)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsNestedInlineDirectAllocLocalLiteralInCallee(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+struct PtrBox:
+    tag: Int
+    raw: ptr
+
+struct Holder:
+    head: Int
+    box: PtrBox
+
+func store() -> Int
+uses alloc, mem:
+    unsafe:
+        let holder: Holder = Holder(head: 1, box: PtrBox(tag: 2, raw: core.alloc_bytes(16)))
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    return store()
+`)
+	fn := findIRFunc(t, prog, "store")
+	if countInstrKind(fn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("store alloc_bytes count = %d, want 1: %#v", countInstrKind(fn, ir.IRAllocBytes), fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRDropOwned) != 1 || countInstrKind(fn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("nested direct local literal owned field must be dropped in callee: %#v", fn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsAssignedNestedInlineOwnedReturnCallLocalLiteralInCallee(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+struct PtrBox:
+    tag: Int
+    raw: ptr
+
+struct Holder:
+    head: Int
+    box: PtrBox
+
+func make_raw() -> ptr
+uses alloc, mem:
+    unsafe:
+        return core.alloc_bytes(16)
+
+func store() -> Int
+uses alloc, mem:
+    var holder: Holder = Holder(head: 0, box: PtrBox(tag: 0, raw: 0))
+    holder = Holder(head: 1, box: PtrBox(tag: 2, raw: make_raw()))
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    return store()
+`)
+	makeRawFn := findIRFunc(t, prog, "make_raw")
+	if countInstrKind(makeRawFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make_raw alloc_bytes count = %d, want 1: %#v", countInstrKind(makeRawFn, ir.IRAllocBytes), makeRawFn.Instrs)
+	}
+	if countInstrKind(makeRawFn, ir.IRDropOwned) != 0 || countInstrKind(makeRawFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("raw factory must not drop returned pointer in callee: %#v", makeRawFn.Instrs)
+	}
+	fn := findIRFunc(t, prog, "store")
+	if countCallsNamed(fn.Instrs, "make_raw") != 1 {
+		t.Fatalf("store must call make_raw once: %#v", fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRDropOwned) != 1 || countInstrKind(fn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("assigned nested owned-return local literal field must be dropped in callee: %#v", fn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesSuppressesDropAfterLocalFieldStoreReturn(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+struct PtrBox:
+    raw: ptr
+
+func ret() -> ptr
+uses alloc, mem:
+    var box: PtrBox = PtrBox(raw: 0)
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        box.raw = p
+    return box.raw
+
+func main() -> Int:
+    return 0
+`)
+	fn := findIRFunc(t, prog, "ret")
+	if countInstrKind(fn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("ret alloc_bytes count = %d, want 1: %#v", countInstrKind(fn, ir.IRAllocBytes), fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRStoreLocal) == 0 {
+		t.Fatalf("ret must write the transferred pointer to local field storage: %#v", fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRDropOwned) != 0 || countInstrKind(fn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("local-field-returned owned pointer must not be dropped in callee: %#v", fn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsReturnedOwnedLocalFieldResultInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+struct PtrBox:
+    raw: ptr
+
+func ret() -> ptr
+uses alloc, mem:
+    var box: PtrBox = PtrBox(raw: 0)
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        box.raw = p
+    return box.raw
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let p: ptr = ret()
+    return 0
+`)
+	retFn := findIRFunc(t, prog, "ret")
+	if countInstrKind(retFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("ret alloc_bytes count = %d, want 1: %#v", countInstrKind(retFn, ir.IRAllocBytes), retFn.Instrs)
+	}
+	if countInstrKind(retFn, ir.IRDropOwned) != 0 || countInstrKind(retFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("local-field-returned owned pointer must not be dropped in callee: %#v", retFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "ret") != 1 {
+		t.Fatalf("main must call ret once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned local-field result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsReturnedOwnedCallStoredInLocalFieldInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+struct PtrBox:
+    raw: ptr
+
+func make() -> ptr
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        return p
+
+func ret() -> ptr
+uses alloc, mem:
+    var box: PtrBox = PtrBox(raw: 0)
+    box.raw = make()
+    return box.raw
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let p: ptr = ret()
+    return 0
+`)
+	retFn := findIRFunc(t, prog, "ret")
+	if countCallsNamed(retFn.Instrs, "make") != 1 {
+		t.Fatalf("ret must call make once: %#v", retFn.Instrs)
+	}
+	if countInstrKind(retFn, ir.IRDropOwned) != 0 || countInstrKind(retFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("local-field returned owned call result must not be dropped in callee: %#v", retFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "ret") != 1 {
+		t.Fatalf("main must call ret once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned local-field call result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsReturnedOwnedSingleSlotAggregateInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+struct PtrBox:
+    raw: ptr
+
+func make_box() -> PtrBox
+uses alloc, mem:
+    var box: PtrBox = PtrBox(raw: 0)
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        box.raw = p
+    return box
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let box: PtrBox = make_box()
+    return 0
+`)
+	makeBoxFn := findIRFunc(t, prog, "make_box")
+	if countInstrKind(makeBoxFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make_box alloc_bytes count = %d, want 1: %#v", countInstrKind(makeBoxFn, ir.IRAllocBytes), makeBoxFn.Instrs)
+	}
+	if countInstrKind(makeBoxFn, ir.IRDropOwned) != 0 || countInstrKind(makeBoxFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("returned single-slot aggregate must not be dropped in callee: %#v", makeBoxFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "make_box") != 1 {
+		t.Fatalf("main must call make_box once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned single-slot aggregate result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsInlineStructLiteralOwnedAggregateInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+struct PtrBox:
+    raw: ptr
+
+func make_box() -> PtrBox
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        let box: PtrBox = PtrBox(raw: p)
+        return box
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let box: PtrBox = make_box()
+    return 0
+`)
+	makeBoxFn := findIRFunc(t, prog, "make_box")
+	if countInstrKind(makeBoxFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make_box alloc_bytes count = %d, want 1: %#v", countInstrKind(makeBoxFn, ir.IRAllocBytes), makeBoxFn.Instrs)
+	}
+	if countInstrKind(makeBoxFn, ir.IRDropOwned) != 0 || countInstrKind(makeBoxFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("inline literal returned aggregate must not be dropped in callee: %#v", makeBoxFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "make_box") != 1 {
+		t.Fatalf("main must call make_box once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned inline literal aggregate result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsAssignedInlineStructLiteralOwnedAggregateInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+struct PtrBox:
+    raw: ptr
+
+func make_box() -> PtrBox
+uses alloc, mem:
+    var box: PtrBox = PtrBox(raw: 0)
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        box = PtrBox(raw: p)
+    return box
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let box: PtrBox = make_box()
+    return 0
+`)
+	makeBoxFn := findIRFunc(t, prog, "make_box")
+	if countInstrKind(makeBoxFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make_box alloc_bytes count = %d, want 1: %#v", countInstrKind(makeBoxFn, ir.IRAllocBytes), makeBoxFn.Instrs)
+	}
+	if countInstrKind(makeBoxFn, ir.IRDropOwned) != 0 || countInstrKind(makeBoxFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("assigned inline literal returned aggregate must not be dropped in callee: %#v", makeBoxFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "make_box") != 1 {
+		t.Fatalf("main must call make_box once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned assigned inline literal aggregate result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesSuppressesDropForUnsafeNestedAssignedInlineStructLiteralReturn(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+struct PtrBox:
+    raw: ptr
+
+func make_box() -> PtrBox
+uses alloc, mem:
+    var box: PtrBox = PtrBox(raw: 0)
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        box = PtrBox(raw: p)
+        return box
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let box: PtrBox = make_box()
+    return 0
+`)
+	makeBoxFn := findIRFunc(t, prog, "make_box")
+	if countInstrKind(makeBoxFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make_box alloc_bytes count = %d, want 1: %#v", countInstrKind(makeBoxFn, ir.IRAllocBytes), makeBoxFn.Instrs)
+	}
+	if countInstrKind(makeBoxFn, ir.IRDropOwned) != 0 || countInstrKind(makeBoxFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("unsafe nested returned aggregate must not be dropped in callee: %#v", makeBoxFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "make_box") != 1 {
+		t.Fatalf("main must call make_box once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned unsafe nested aggregate result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesSuppressesDropAfterDefaultMatchReturn(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum Choice:
+    case left
+    case right
+
+struct PtrBox:
+    raw: ptr
+
+func make_box(choice: Choice) -> PtrBox
+uses alloc, mem:
+    var box: PtrBox = PtrBox(raw: 0)
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        box = PtrBox(raw: p)
+    match choice:
+    case Choice.left:
+        return box
+    case _:
+        return box
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let box: PtrBox = make_box(Choice.left)
+    return 0
+`)
+	makeBoxFn := findIRFunc(t, prog, "make_box")
+	if countInstrKind(makeBoxFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make_box alloc_bytes count = %d, want 1: %#v", countInstrKind(makeBoxFn, ir.IRAllocBytes), makeBoxFn.Instrs)
+	}
+	if countInstrKind(makeBoxFn, ir.IRDropOwned) != 0 || countInstrKind(makeBoxFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("default match returned aggregate must not be dropped in callee: %#v", makeBoxFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "make_box") != 1 {
+		t.Fatalf("main must call make_box once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned default match aggregate result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesSuppressesDropAfterCompleteEnumMatchReturn(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum Choice:
+    case left
+    case right
+
+struct PtrBox:
+    raw: ptr
+
+func make_box(choice: Choice) -> PtrBox
+uses alloc, mem:
+    var box: PtrBox = PtrBox(raw: 0)
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        box = PtrBox(raw: p)
+    match choice:
+    case Choice.left:
+        return box
+    case Choice.right:
+        return box
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let box: PtrBox = make_box(Choice.left)
+    return 0
+`)
+	makeBoxFn := findIRFunc(t, prog, "make_box")
+	if countInstrKind(makeBoxFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make_box alloc_bytes count = %d, want 1: %#v", countInstrKind(makeBoxFn, ir.IRAllocBytes), makeBoxFn.Instrs)
+	}
+	if countInstrKind(makeBoxFn, ir.IRDropOwned) != 0 || countInstrKind(makeBoxFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("complete enum match returned aggregate must not be dropped in callee: %#v", makeBoxFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "make_box") != 1 {
+		t.Fatalf("main must call make_box once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned complete enum match aggregate result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesSuppressesDropAfterCompleteOptionalMatchReturn(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+struct PtrBox:
+    raw: ptr
+
+func make_box(choice: Bool?) -> PtrBox
+uses alloc, mem:
+    var box: PtrBox = PtrBox(raw: 0)
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        box = PtrBox(raw: p)
+    match choice:
+    case some(flag):
+        return box
+    case none:
+        return box
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let box: PtrBox = make_box(true)
+    return 0
+`)
+	makeBoxFn := findIRFunc(t, prog, "make_box")
+	if countInstrKind(makeBoxFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make_box alloc_bytes count = %d, want 1: %#v", countInstrKind(makeBoxFn, ir.IRAllocBytes), makeBoxFn.Instrs)
+	}
+	if countInstrKind(makeBoxFn, ir.IRDropOwned) != 0 || countInstrKind(makeBoxFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("complete optional match returned aggregate must not be dropped in callee: %#v", makeBoxFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "make_box") != 1 {
+		t.Fatalf("main must call make_box once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned complete optional match aggregate result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsInlineStructLiteralDirectAllocAggregateInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+struct PtrBox:
+    raw: ptr
+
+func make_box() -> PtrBox
+uses alloc, mem:
+    unsafe:
+        let box: PtrBox = PtrBox(raw: core.alloc_bytes(16))
+        return box
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let box: PtrBox = make_box()
+    return 0
+`)
+	makeBoxFn := findIRFunc(t, prog, "make_box")
+	if countInstrKind(makeBoxFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make_box alloc_bytes count = %d, want 1: %#v", countInstrKind(makeBoxFn, ir.IRAllocBytes), makeBoxFn.Instrs)
+	}
+	if countInstrKind(makeBoxFn, ir.IRDropOwned) != 0 || countInstrKind(makeBoxFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("direct inline literal returned aggregate must not be dropped in callee: %#v", makeBoxFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "make_box") != 1 {
+		t.Fatalf("main must call make_box once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned direct inline literal aggregate result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsAssignedInlineStructLiteralDirectAllocAggregateInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+struct PtrBox:
+    raw: ptr
+
+func make_box() -> PtrBox
+uses alloc, mem:
+    var box: PtrBox = PtrBox(raw: 0)
+    unsafe:
+        box = PtrBox(raw: core.alloc_bytes(16))
+    return box
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let box: PtrBox = make_box()
+    return 0
+`)
+	makeBoxFn := findIRFunc(t, prog, "make_box")
+	if countInstrKind(makeBoxFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make_box alloc_bytes count = %d, want 1: %#v", countInstrKind(makeBoxFn, ir.IRAllocBytes), makeBoxFn.Instrs)
+	}
+	if countInstrKind(makeBoxFn, ir.IRDropOwned) != 0 || countInstrKind(makeBoxFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("assigned direct inline literal returned aggregate must not be dropped in callee: %#v", makeBoxFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "make_box") != 1 {
+		t.Fatalf("main must call make_box once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned assigned direct inline literal aggregate result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsInlineStructLiteralOwnedReturnCallAggregateInCallee(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+struct PtrBox:
+    raw: ptr
+
+func make_raw() -> ptr
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        return p
+
+func store() -> Int
+uses alloc, mem:
+    unsafe:
+        let box: PtrBox = PtrBox(raw: make_raw())
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    return store()
+`)
+	makeRawFn := findIRFunc(t, prog, "make_raw")
+	if countInstrKind(makeRawFn, ir.IRDropOwned) != 0 || countInstrKind(makeRawFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("owned-return field source must not be dropped in producer callee: %#v", makeRawFn.Instrs)
+	}
+	storeFn := findIRFunc(t, prog, "store")
+	if countCallsNamed(storeFn.Instrs, "make_raw") != 1 {
+		t.Fatalf("store must call make_raw once: %#v", storeFn.Instrs)
+	}
+	if countInstrKind(storeFn, ir.IRDropOwned) != 1 || countInstrKind(storeFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("inline literal owned-return field must be dropped in storing callee: %#v", storeFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsAssignedInlineStructLiteralOwnedReturnCallAggregateInCallee(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+struct PtrBox:
+    raw: ptr
+
+func make_raw() -> ptr
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        return p
+
+func store() -> Int
+uses alloc, mem:
+    var box: PtrBox = PtrBox(raw: 0)
+    unsafe:
+        box = PtrBox(raw: make_raw())
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    return store()
+`)
+	makeRawFn := findIRFunc(t, prog, "make_raw")
+	if countInstrKind(makeRawFn, ir.IRDropOwned) != 0 || countInstrKind(makeRawFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("assigned owned-return field source must not be dropped in producer callee: %#v", makeRawFn.Instrs)
+	}
+	storeFn := findIRFunc(t, prog, "store")
+	if countCallsNamed(storeFn.Instrs, "make_raw") != 1 {
+		t.Fatalf("store must call make_raw once: %#v", storeFn.Instrs)
+	}
+	if countInstrKind(storeFn, ir.IRDropOwned) != 1 || countInstrKind(storeFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("assigned inline literal owned-return field must be dropped in storing callee: %#v", storeFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsReturnedOwnedMultiSlotAggregateInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+struct PtrBox:
+    tag: Int
+    raw: ptr
+
+func make_box() -> PtrBox
+uses alloc, mem:
+    var box: PtrBox = PtrBox(tag: 1, raw: 0)
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        box.raw = p
+    return box
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let box: PtrBox = make_box()
+    return 0
+`)
+	makeBoxFn := findIRFunc(t, prog, "make_box")
+	if countInstrKind(makeBoxFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make_box alloc_bytes count = %d, want 1: %#v", countInstrKind(makeBoxFn, ir.IRAllocBytes), makeBoxFn.Instrs)
+	}
+	if countInstrKind(makeBoxFn, ir.IRDropOwned) != 0 || countInstrKind(makeBoxFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("returned multi-slot aggregate must not be dropped in callee: %#v", makeBoxFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "make_box") != 1 {
+		t.Fatalf("main must call make_box once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned multi-slot aggregate result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesSuppressesDropAfterMultiSlotAggregateLocalMoveReturn(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+struct PtrBox:
+    tag: Int
+    raw: ptr
+
+func make_box() -> PtrBox
+uses alloc, mem:
+    var box: PtrBox = PtrBox(tag: 1, raw: 0)
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        box.raw = p
+    return box
+
+func relay() -> PtrBox
+uses alloc, mem:
+    unsafe:
+        let box: PtrBox = make_box()
+        let moved: PtrBox = box
+        return moved
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: PtrBox = relay()
+    return 0
+`)
+	makeBoxFn := findIRFunc(t, prog, "make_box")
+	if countInstrKind(makeBoxFn, ir.IRDropOwned) != 0 || countInstrKind(makeBoxFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("returned multi-slot aggregate factory must not drop in callee: %#v", makeBoxFn.Instrs)
+	}
+	relayFn := findIRFunc(t, prog, "relay")
+	if countCallsNamed(relayFn.Instrs, "make_box") != 1 {
+		t.Fatalf("relay must call make_box once: %#v", relayFn.Instrs)
+	}
+	if countInstrKind(relayFn, ir.IRDropOwned) != 0 || countInstrKind(relayFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("moved multi-slot aggregate returned from relay must not be dropped in relay: %#v", relayFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "relay") != 1 {
+		t.Fatalf("main must call relay once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned moved multi-slot aggregate result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesSuppressesDropAfterMultiSlotAggregateLocalAssignReturn(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+struct PtrBox:
+    tag: Int
+    raw: ptr
+
+func make_box() -> PtrBox
+uses alloc, mem:
+    var box: PtrBox = PtrBox(tag: 1, raw: 0)
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        box.raw = p
+    return box
+
+func relay() -> PtrBox
+uses alloc, mem:
+    unsafe:
+        let box: PtrBox = make_box()
+        var moved: PtrBox = PtrBox(tag: 0, raw: 0)
+        moved = box
+        return moved
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: PtrBox = relay()
+    return 0
+`)
+	makeBoxFn := findIRFunc(t, prog, "make_box")
+	if countInstrKind(makeBoxFn, ir.IRDropOwned) != 0 || countInstrKind(makeBoxFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("returned multi-slot aggregate factory must not drop in callee: %#v", makeBoxFn.Instrs)
+	}
+	relayFn := findIRFunc(t, prog, "relay")
+	if countCallsNamed(relayFn.Instrs, "make_box") != 1 {
+		t.Fatalf("relay must call make_box once: %#v", relayFn.Instrs)
+	}
+	if countInstrKind(relayFn, ir.IRDropOwned) != 0 || countInstrKind(relayFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("assigned multi-slot aggregate returned from relay must not be dropped in relay: %#v", relayFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "relay") != 1 {
+		t.Fatalf("main must call relay once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned assigned multi-slot aggregate result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesSuppressesDropAfterMultiSlotAggregateGlobalFieldStore(t *testing.T) {
+	prog := lowerOwnedAllocDropFileProgram(t, `
+struct PtrBox:
+    tag: Int
+    raw: ptr
+
+struct Holder:
+    head: Int
+    box: PtrBox
+
+var saved: Holder
+
+func make_box() -> PtrBox
+uses alloc, mem:
+    var box: PtrBox = PtrBox(tag: 1, raw: 0)
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        box.raw = p
+    return box
+
+func store() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let box: PtrBox = make_box()
+        saved.box = box
+    return 0
+
+func main() -> Int
+uses alloc, capability, mem:
+    return store()
+`)
+	makeBoxFn := findIRFunc(t, prog, "make_box")
+	if countInstrKind(makeBoxFn, ir.IRDropOwned) != 0 || countInstrKind(makeBoxFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("returned multi-slot aggregate factory must not drop in callee: %#v", makeBoxFn.Instrs)
+	}
+	storeFn := findIRFunc(t, prog, "store")
+	if countCallsNamed(storeFn.Instrs, "make_box") != 1 {
+		t.Fatalf("store must call make_box once: %#v", storeFn.Instrs)
+	}
+	if countInstrKind(storeFn, ir.IRStoreGlobal) == 0 {
+		t.Fatalf("store must write the transferred multi-slot aggregate to global field storage: %#v", storeFn.Instrs)
+	}
+	if countInstrKind(storeFn, ir.IRDropOwned) != 0 || countInstrKind(storeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("global-field-stored multi-slot aggregate must not be dropped in source scope: %#v", storeFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsReturnedOwnedNestedAggregateInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+struct PtrBox:
+    tag: Int
+    raw: ptr
+
+struct Holder:
+    head: Int
+    box: PtrBox
+
+func make_holder() -> Holder
+uses alloc, mem:
+    var holder: Holder = Holder(head: 1, box: PtrBox(tag: 2, raw: 0))
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        holder.box.raw = p
+    return holder
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: Holder = make_holder()
+    return 0
+`)
+	makeHolderFn := findIRFunc(t, prog, "make_holder")
+	if countInstrKind(makeHolderFn, ir.IRDropOwned) != 0 || countInstrKind(makeHolderFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("returned nested aggregate factory must not drop in callee: %#v", makeHolderFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "make_holder") != 1 {
+		t.Fatalf("main must call make_holder once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned nested aggregate result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsReturnedOwnedNestedAggregateAssignedFieldInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+struct PtrBox:
+    tag: Int
+    raw: ptr
+
+struct Holder:
+    head: Int
+    box: PtrBox
+
+func make_box() -> PtrBox
+uses alloc, mem:
+    var box: PtrBox = PtrBox(tag: 2, raw: 0)
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        box.raw = p
+    return box
+
+func make_holder() -> Holder
+uses alloc, mem:
+    var holder: Holder = Holder(head: 1, box: PtrBox(tag: 0, raw: 0))
+    unsafe:
+        let box: PtrBox = make_box()
+        holder.box = box
+    return holder
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let result: Holder = make_holder()
+    return 0
+`)
+	makeBoxFn := findIRFunc(t, prog, "make_box")
+	if countInstrKind(makeBoxFn, ir.IRDropOwned) != 0 || countInstrKind(makeBoxFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("returned nested field source factory must not drop in callee: %#v", makeBoxFn.Instrs)
+	}
+	makeHolderFn := findIRFunc(t, prog, "make_holder")
+	if countCallsNamed(makeHolderFn.Instrs, "make_box") != 1 {
+		t.Fatalf("make_holder must call make_box once: %#v", makeHolderFn.Instrs)
+	}
+	if countInstrKind(makeHolderFn, ir.IRDropOwned) != 0 || countInstrKind(makeHolderFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("returned nested aggregate assigned field must not drop in callee: %#v", makeHolderFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "make_holder") != 1 {
+		t.Fatalf("main must call make_holder once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned nested aggregate assigned field result must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsReturnedOwnedAggregateAssignedToNestedFieldBeforeReturn(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+struct PtrBox:
+    tag: Int
+    raw: ptr
+
+struct Holder:
+    head: Int
+    box: PtrBox
+
+func make_box() -> PtrBox
+uses alloc, mem:
+    var box: PtrBox = PtrBox(tag: 2, raw: 0)
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        box.raw = p
+    return box
+
+func store() -> Int
+uses alloc, mem:
+    var holder: Holder = Holder(head: 1, box: PtrBox(tag: 0, raw: 0))
+    unsafe:
+        holder.box = make_box()
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    return store()
+`)
+	makeBoxFn := findIRFunc(t, prog, "make_box")
+	if countInstrKind(makeBoxFn, ir.IRDropOwned) != 0 || countInstrKind(makeBoxFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("returned nested field source factory must not drop in callee: %#v", makeBoxFn.Instrs)
+	}
+	storeFn := findIRFunc(t, prog, "store")
+	if countCallsNamed(storeFn.Instrs, "make_box") != 1 {
+		t.Fatalf("store must call make_box once: %#v", storeFn.Instrs)
+	}
+	if countInstrKind(storeFn, ir.IRDropOwned) != 1 || countInstrKind(storeFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("nested field assigned owned-return aggregate must be dropped before return: %#v", storeFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesSuppressesCallerDropAfterConsumeCall(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func sink(raw: consume ptr) -> Int:
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        return sink(p)
+`)
+	fn := findIRFunc(t, prog, "main")
+	if countInstrKind(fn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("main alloc_bytes count = %d, want 1: %#v", countInstrKind(fn, ir.IRAllocBytes), fn.Instrs)
+	}
+	if countCallsNamed(fn.Instrs, "sink") != 1 {
+		t.Fatalf("main must pass the owned pointer to sink: %#v", fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRDropOwned) != 0 || countInstrKind(fn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("consume-call transferred owned pointer must not be dropped in caller: %#v", fn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsConsumeParamInCallee(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func sink(raw: consume ptr) -> Int:
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        return sink(p)
+`)
+	fn := findIRFunc(t, prog, "sink")
+	if len(fn.OwnedParams) != 1 {
+		t.Fatalf("sink owned params = %#v, want one consume ptr param", fn.OwnedParams)
+	}
+	if countInstrKind(fn, ir.IRDropOwned) != 1 || countInstrKind(fn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("consume ptr parameter must be dropped/released by callee: %#v", fn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsReturnedOwnedCallResultInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func make() -> ptr
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        return p
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let q: ptr = make()
+    return 0
+`)
+	makeFn := findIRFunc(t, prog, "make")
+	if countInstrKind(makeFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make alloc_bytes count = %d, want 1: %#v", countInstrKind(makeFn, ir.IRAllocBytes), makeFn.Instrs)
+	}
+	if countInstrKind(makeFn, ir.IRDropOwned) != 0 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("returned owned pointer must not be dropped in callee: %#v", makeFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "make") != 1 {
+		t.Fatalf("main must call make once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned returned pointer must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsDirectInlineAllocReturnInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func make() -> ptr
+uses alloc, mem:
+    unsafe:
+        return core.alloc_bytes(16)
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let q: ptr = make()
+    return 0
+`)
+	makeFn := findIRFunc(t, prog, "make")
+	if countInstrKind(makeFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("make alloc_bytes count = %d, want 1: %#v", countInstrKind(makeFn, ir.IRAllocBytes), makeFn.Instrs)
+	}
+	if countInstrKind(makeFn, ir.IRDropOwned) != 0 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("direct inline alloc return must not be dropped in callee: %#v", makeFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "make") != 1 {
+		t.Fatalf("main must call make once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned direct inline alloc return must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsRelayedReturnedOwnedCallResultInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func make() -> ptr
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        return p
+
+func relay() -> ptr
+uses alloc, mem:
+    return make()
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let q: ptr = relay()
+    return 0
+`)
+	makeFn := findIRFunc(t, prog, "make")
+	if countInstrKind(makeFn, ir.IRDropOwned) != 0 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("direct factory must not drop returned owned pointer in callee: %#v", makeFn.Instrs)
+	}
+	relayFn := findIRFunc(t, prog, "relay")
+	if countCallsNamed(relayFn.Instrs, "make") != 1 {
+		t.Fatalf("relay must call make once: %#v", relayFn.Instrs)
+	}
+	if countInstrKind(relayFn, ir.IRDropOwned) != 0 || countInstrKind(relayFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("relay must not drop owned pointer it returns to caller: %#v", relayFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "relay") != 1 {
+		t.Fatalf("main must call relay once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned relayed pointer must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsLocalRelayedReturnedOwnedCallResultInCaller(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func make() -> ptr
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        return p
+
+func relay() -> ptr
+uses alloc, mem:
+    let q: ptr = make()
+    return q
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let r: ptr = relay()
+    return 0
+`)
+	makeFn := findIRFunc(t, prog, "make")
+	if countInstrKind(makeFn, ir.IRDropOwned) != 0 || countInstrKind(makeFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("direct factory must not drop returned owned pointer in callee: %#v", makeFn.Instrs)
+	}
+	relayFn := findIRFunc(t, prog, "relay")
+	if countCallsNamed(relayFn.Instrs, "make") != 1 {
+		t.Fatalf("relay must call make once: %#v", relayFn.Instrs)
+	}
+	if countInstrKind(relayFn, ir.IRDropOwned) != 0 || countInstrKind(relayFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("relay must not drop owned pointer stored in q and returned: %#v", relayFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "relay") != 1 {
+		t.Fatalf("main must call relay once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("caller-owned local-relayed pointer must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesRejectsMovedFromLocalReturnInCallerContext(t *testing.T) {
+	err := lowerOwnedAllocDropProgramError(t, `
+func ret() -> ptr
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        let q: ptr = p
+        return p
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let r: ptr = ret()
+    return 0
+`)
+	if err == nil || !strings.Contains(err.Error(), "use after move") {
+		t.Fatalf("LowerWithOptions error = %v, want use after move", err)
+	}
+}
+
+func TestLowerOwnedAllocBytesDoesNotSummarizeMixedBranchReturnAsOwned(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func make() -> ptr
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        return p
+
+func choose(flag: Bool, borrowed: ptr) -> ptr
+uses alloc, mem:
+    if flag:
+        return borrowed
+    return make()
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let borrowed: ptr = 0
+        let r: ptr = choose(true, borrowed)
+    return 0
+`)
+	chooseFn := findIRFunc(t, prog, "choose")
+	if countCallsNamed(chooseFn.Instrs, "make") != 1 {
+		t.Fatalf("choose must call make on the owned path: %#v", chooseFn.Instrs)
+	}
+	if countInstrKind(chooseFn, ir.IRDropOwned) != 0 || countInstrKind(chooseFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("choose must not drop either returned path in callee: %#v", chooseFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "choose") != 1 {
+		t.Fatalf("main must call choose once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 0 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("mixed borrowed/owned branch return must not be summarized as caller-owned: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDoesNotSummarizeMixedIfLetReturnAsOwned(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func make() -> ptr
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        return p
+
+func choose(value: Int?, borrowed: ptr) -> ptr
+uses alloc, mem:
+    if let some(x) = value:
+        return borrowed
+    return make()
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let borrowed: ptr = 0
+        let r: ptr = choose(1, borrowed)
+    return 0
+`)
+	chooseFn := findIRFunc(t, prog, "choose")
+	if countCallsNamed(chooseFn.Instrs, "make") != 1 {
+		t.Fatalf("choose must call make on the owned if-let fallthrough path: %#v", chooseFn.Instrs)
+	}
+	if countInstrKind(chooseFn, ir.IRDropOwned) != 0 || countInstrKind(chooseFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("choose must not drop either returned if-let path in callee: %#v", chooseFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "choose") != 1 {
+		t.Fatalf("main must call choose once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 0 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("mixed borrowed/owned if-let return must not be summarized as caller-owned: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesSummarizesAllOwnedIfLetReturns(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func make() -> ptr
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        return p
+
+func choose(value: Int?) -> ptr
+uses alloc, mem:
+    if let some(x) = value:
+        return make()
+    return make()
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let r: ptr = choose(1)
+    return 0
+`)
+	chooseFn := findIRFunc(t, prog, "choose")
+	if countCallsNamed(chooseFn.Instrs, "make") != 2 {
+		t.Fatalf("choose must call make on both if-let paths: %#v", chooseFn.Instrs)
+	}
+	if countInstrKind(chooseFn, ir.IRDropOwned) != 0 || countInstrKind(chooseFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("choose must not drop owned pointers it returns: %#v", chooseFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "choose") != 1 {
+		t.Fatalf("main must call choose once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("all-owned if-let return must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesSummarizesAllOwnedBranchReturns(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func make() -> ptr
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        return p
+
+func choose(flag: Bool) -> ptr
+uses alloc, mem:
+    if flag:
+        return make()
+    return make()
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let r: ptr = choose(false)
+    return 0
+`)
+	chooseFn := findIRFunc(t, prog, "choose")
+	if countCallsNamed(chooseFn.Instrs, "make") != 2 {
+		t.Fatalf("choose must call make on both paths: %#v", chooseFn.Instrs)
+	}
+	if countInstrKind(chooseFn, ir.IRDropOwned) != 0 || countInstrKind(chooseFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("choose must not drop owned pointers it returns: %#v", chooseFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "choose") != 1 {
+		t.Fatalf("main must call choose once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("all-owned branch return must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDoesNotSummarizeMixedMatchReturnAsOwned(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum Choice:
+    case borrowed
+    case owned
+
+func make() -> ptr
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        return p
+
+func choose(choice: Choice, borrowed: ptr) -> ptr
+uses alloc, mem:
+    match choice:
+    case Choice.borrowed:
+        return borrowed
+    case Choice.owned:
+        return make()
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let borrowed: ptr = 0
+        let r: ptr = choose(Choice.borrowed, borrowed)
+    return 0
+`)
+	chooseFn := findIRFunc(t, prog, "choose")
+	if countCallsNamed(chooseFn.Instrs, "make") != 1 {
+		t.Fatalf("choose must call make on the owned match path: %#v", chooseFn.Instrs)
+	}
+	if countInstrKind(chooseFn, ir.IRDropOwned) != 0 || countInstrKind(chooseFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("choose must not drop either returned match path in callee: %#v", chooseFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "choose") != 1 {
+		t.Fatalf("main must call choose once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 0 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("mixed borrowed/owned match return must not be summarized as caller-owned: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesSummarizesAllOwnedMatchReturns(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum Choice:
+    case left
+    case right
+
+func make() -> ptr
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        return p
+
+func choose(choice: Choice) -> ptr
+uses alloc, mem:
+    match choice:
+    case Choice.left:
+        return make()
+    case Choice.right:
+        return make()
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let r: ptr = choose(Choice.left)
+    return 0
+`)
+	chooseFn := findIRFunc(t, prog, "choose")
+	if countCallsNamed(chooseFn.Instrs, "make") != 2 {
+		t.Fatalf("choose must call make on both match paths: %#v", chooseFn.Instrs)
+	}
+	if countInstrKind(chooseFn, ir.IRDropOwned) != 0 || countInstrKind(chooseFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("choose must not drop owned pointers it returns: %#v", chooseFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "choose") != 1 {
+		t.Fatalf("main must call choose once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("all-owned match return must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDoesNotSummarizeMixedWhileReturnAsOwned(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func make() -> ptr
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        return p
+
+func choose(flag: Bool, borrowed: ptr) -> ptr
+uses alloc, mem:
+    while flag:
+        return borrowed
+    return make()
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let borrowed: ptr = 0
+        let r: ptr = choose(true, borrowed)
+    return 0
+`)
+	chooseFn := findIRFunc(t, prog, "choose")
+	if countCallsNamed(chooseFn.Instrs, "make") != 1 {
+		t.Fatalf("choose must call make on the owned fallthrough path: %#v", chooseFn.Instrs)
+	}
+	if countInstrKind(chooseFn, ir.IRDropOwned) != 0 || countInstrKind(chooseFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("choose must not drop either returned path in callee: %#v", chooseFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "choose") != 1 {
+		t.Fatalf("main must call choose once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 0 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("mixed borrowed/owned while return must not be summarized as caller-owned: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesSummarizesAllOwnedWhileReturns(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func make() -> ptr
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        return p
+
+func choose(flag: Bool) -> ptr
+uses alloc, mem:
+    while flag:
+        return make()
+    return make()
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let r: ptr = choose(false)
+    return 0
+`)
+	chooseFn := findIRFunc(t, prog, "choose")
+	if countCallsNamed(chooseFn.Instrs, "make") != 2 {
+		t.Fatalf("choose must call make on loop and fallthrough paths: %#v", chooseFn.Instrs)
+	}
+	if countInstrKind(chooseFn, ir.IRDropOwned) != 0 || countInstrKind(chooseFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("choose must not drop owned pointers it returns: %#v", chooseFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "choose") != 1 {
+		t.Fatalf("main must call choose once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("all-owned while return must be dropped in caller: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDoesNotSummarizeMixedForRangeReturnAsOwned(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func make() -> ptr
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        return p
+
+func choose(borrowed: ptr) -> ptr
+uses alloc, mem:
+    for i in 0..<1:
+        return borrowed
+    return make()
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let borrowed: ptr = 0
+        let r: ptr = choose(borrowed)
+    return 0
+`)
+	chooseFn := findIRFunc(t, prog, "choose")
+	if countCallsNamed(chooseFn.Instrs, "make") != 1 {
+		t.Fatalf("choose must call make on the owned for-range fallthrough path: %#v", chooseFn.Instrs)
+	}
+	if countInstrKind(chooseFn, ir.IRDropOwned) != 0 || countInstrKind(chooseFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("choose must not drop either returned for-range path in callee: %#v", chooseFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "choose") != 1 {
+		t.Fatalf("main must call choose once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 0 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("mixed borrowed/owned for-range return must not be summarized as caller-owned: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesSummarizesAllOwnedForRangeReturns(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+func make() -> ptr
+uses alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        return p
+
+func choose() -> ptr
+uses alloc, mem:
+    for i in 0..<1:
+        return make()
+    return make()
+
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let r: ptr = choose()
+    return 0
+`)
+	chooseFn := findIRFunc(t, prog, "choose")
+	if countCallsNamed(chooseFn.Instrs, "make") != 2 {
+		t.Fatalf("choose must call make on loop and fallthrough paths: %#v", chooseFn.Instrs)
+	}
+	if countInstrKind(chooseFn, ir.IRDropOwned) != 0 || countInstrKind(chooseFn, ir.IRReleaseAllocation) != 0 {
+		t.Fatalf("choose must not drop owned pointers it returns: %#v", chooseFn.Instrs)
+	}
+	mainFn := findIRFunc(t, prog, "main")
+	if countCallsNamed(mainFn.Instrs, "choose") != 1 {
+		t.Fatalf("main must call choose once: %#v", mainFn.Instrs)
+	}
+	if countInstrKind(mainFn, ir.IRDropOwned) != 1 || countInstrKind(mainFn, ir.IRReleaseAllocation) != 1 {
+		t.Fatalf("all-owned for-range return must be dropped in caller: %#v", mainFn.Instrs)
+	}
 }
 
 func TestLowerExplicitIslandMakeSliceCarriesAllocationName(t *testing.T) {
@@ -1475,6 +7413,438 @@ func assertRegionResetImmediatelyBeforeEveryReturn(t *testing.T, fn ir.IRFunc) {
 			fn.Name,
 			got,
 			returns,
+			fn.Instrs,
+		)
+	}
+}
+
+func assertOwnedReleaseBeforeFirstReturnValue(t *testing.T, fn ir.IRFunc) {
+	t.Helper()
+	releaseIndex := -1
+	returnIndex := -1
+	for i, instr := range fn.Instrs {
+		if instr.Kind == ir.IRReleaseAllocation && releaseIndex < 0 {
+			releaseIndex = i
+		}
+		if instr.Kind == ir.IRReturn {
+			returnIndex = i
+			break
+		}
+	}
+	if releaseIndex < 0 {
+		t.Fatalf("%s has no IRReleaseAllocation: %#v", fn.Name, fn.Instrs)
+	}
+	if returnIndex < 0 {
+		t.Fatalf("%s has no IRReturn: %#v", fn.Name, fn.Instrs)
+	}
+	returnValueIndex := -1
+	for i := releaseIndex + 1; i < returnIndex; i++ {
+		if fn.Instrs[i].Kind == ir.IRConstI32 && fn.Instrs[i].Imm == 0 {
+			returnValueIndex = i
+			break
+		}
+	}
+	if returnValueIndex < 0 {
+		t.Fatalf(
+			"%s release index %d must precede a following return value before return %d: %#v",
+			fn.Name,
+			releaseIndex,
+			returnIndex,
+			fn.Instrs,
+		)
+	}
+}
+
+func assertOwnedReleaseBeforeFirstReturn(t *testing.T, fn ir.IRFunc) {
+	t.Helper()
+	releaseIndex := -1
+	returnIndex := -1
+	for i, instr := range fn.Instrs {
+		if instr.Kind == ir.IRReleaseAllocation && releaseIndex < 0 {
+			releaseIndex = i
+		}
+		if instr.Kind == ir.IRReturn {
+			returnIndex = i
+			break
+		}
+	}
+	if releaseIndex < 0 {
+		t.Fatalf("%s has no IRReleaseAllocation: %#v", fn.Name, fn.Instrs)
+	}
+	if returnIndex < 0 {
+		t.Fatalf("%s has no IRReturn: %#v", fn.Name, fn.Instrs)
+	}
+	if releaseIndex > returnIndex {
+		t.Fatalf(
+			"%s release index %d must precede first return %d: %#v",
+			fn.Name,
+			releaseIndex,
+			returnIndex,
+			fn.Instrs,
+		)
+	}
+}
+
+func assertOwnedReleaseBeforeEveryReturn(t *testing.T, fn ir.IRFunc) {
+	t.Helper()
+	releases := 0
+	returns := 0
+	for i, instr := range fn.Instrs {
+		if instr.Kind == ir.IRReleaseAllocation {
+			releases++
+		}
+		if instr.Kind != ir.IRReturn {
+			continue
+		}
+		if releases <= returns {
+			t.Fatalf(
+				"%s return at instruction %d has no preceding owned release for that exit: %#v",
+				fn.Name,
+				i,
+				fn.Instrs,
+			)
+		}
+		returns++
+	}
+	if returns == 0 {
+		t.Fatalf("%s has no IRReturn: %#v", fn.Name, fn.Instrs)
+	}
+}
+
+func assertOwnedReleaseBeforeFirstJmpIfZeroTarget(t *testing.T, fn ir.IRFunc) {
+	t.Helper()
+	target := -1
+	for _, instr := range fn.Instrs {
+		if instr.Kind == ir.IRJmpIfZero {
+			target = instr.Label
+			break
+		}
+	}
+	if target < 0 {
+		t.Fatalf("%s has no IRJmpIfZero: %#v", fn.Name, fn.Instrs)
+	}
+	targetIndex := -1
+	releaseIndex := -1
+	for i, instr := range fn.Instrs {
+		if instr.Kind == ir.IRReleaseAllocation && releaseIndex < 0 {
+			releaseIndex = i
+		}
+		if instr.Kind == ir.IRLabel && instr.Label == target {
+			targetIndex = i
+		}
+	}
+	if releaseIndex < 0 {
+		t.Fatalf("%s has no IRReleaseAllocation: %#v", fn.Name, fn.Instrs)
+	}
+	if targetIndex < 0 {
+		t.Fatalf("%s has no label %d: %#v", fn.Name, target, fn.Instrs)
+	}
+	if releaseIndex >= targetIndex {
+		t.Fatalf(
+			"%s release index %d must be before branch join label index %d: %#v",
+			fn.Name,
+			releaseIndex,
+			targetIndex,
+			fn.Instrs,
+		)
+	}
+}
+
+func assertReleaseLayoutInFirstCatchSuccessBranch(t *testing.T, fn ir.IRFunc, layoutID string) {
+	t.Helper()
+	successLabel := -1
+	for _, instr := range fn.Instrs {
+		if instr.Kind == ir.IRJmpIfZero {
+			successLabel = instr.Label
+			break
+		}
+	}
+	if successLabel < 0 {
+		t.Fatalf("%s has no catch success branch jump: %#v", fn.Name, fn.Instrs)
+	}
+	successIndex := -1
+	for i, instr := range fn.Instrs {
+		if instr.Kind == ir.IRLabel && instr.Label == successLabel {
+			successIndex = i
+			break
+		}
+	}
+	if successIndex < 0 {
+		t.Fatalf("%s has no catch success label %d: %#v", fn.Name, successLabel, fn.Instrs)
+	}
+	successEndJump := -1
+	releaseIndex := -1
+	for i := successIndex + 1; i < len(fn.Instrs); i++ {
+		instr := fn.Instrs[i]
+		if instr.Kind == ir.IRReleaseAllocation && instr.LayoutID == layoutID {
+			releaseIndex = i
+		}
+		if instr.Kind == ir.IRJmp {
+			successEndJump = i
+			break
+		}
+	}
+	if successEndJump < 0 {
+		t.Fatalf("%s catch success branch has no end jump after label %d: %#v", fn.Name, successLabel, fn.Instrs)
+	}
+	if releaseIndex < 0 {
+		t.Fatalf(
+			"%s catch success branch must release %s before end jump %d: %#v",
+			fn.Name,
+			layoutID,
+			successEndJump,
+			fn.Instrs,
+		)
+	}
+}
+
+func assertReleaseLayoutInCatchCaseBranch(t *testing.T, fn ir.IRFunc, caseIndex int, layoutID string) {
+	t.Helper()
+	caseLabels := catchDispatchCaseLabels(fn)
+	if caseIndex < 0 || caseIndex >= len(caseLabels) {
+		t.Fatalf("%s has %d catch case labels, need case %d: %#v", fn.Name, len(caseLabels), caseIndex, fn.Instrs)
+	}
+	caseLabel := caseLabels[caseIndex]
+	caseStart := -1
+	for i, instr := range fn.Instrs {
+		if instr.Kind == ir.IRLabel && instr.Label == caseLabel {
+			caseStart = i
+			break
+		}
+	}
+	if caseStart < 0 {
+		t.Fatalf("%s has no catch case label %d: %#v", fn.Name, caseLabel, fn.Instrs)
+	}
+	caseEndJump := -1
+	releaseIndex := -1
+	for i := caseStart + 1; i < len(fn.Instrs); i++ {
+		instr := fn.Instrs[i]
+		if instr.Kind == ir.IRReleaseAllocation && instr.LayoutID == layoutID {
+			releaseIndex = i
+		}
+		if instr.Kind == ir.IRJmp {
+			caseEndJump = i
+			break
+		}
+		if instr.Kind == ir.IRLabel {
+			break
+		}
+	}
+	if caseEndJump < 0 {
+		t.Fatalf("%s catch case %d has no end jump after label %d: %#v", fn.Name, caseIndex, caseLabel, fn.Instrs)
+	}
+	if releaseIndex < 0 {
+		t.Fatalf(
+			"%s catch case %d must release %s before end jump %d: %#v",
+			fn.Name,
+			caseIndex,
+			layoutID,
+			caseEndJump,
+			fn.Instrs,
+		)
+	}
+}
+
+func assertReleaseLayoutInAnyCatchCaseBranch(t *testing.T, fn ir.IRFunc, layoutID string) {
+	t.Helper()
+	for i, instr := range fn.Instrs {
+		if instr.Kind != ir.IRReleaseAllocation || instr.LayoutID != layoutID {
+			continue
+		}
+		if releaseIsInsideLabelToJumpBranch(fn.Instrs, i) {
+			return
+		}
+	}
+	t.Fatalf("%s must release %s inside a catch case branch: %#v", fn.Name, layoutID, fn.Instrs)
+}
+
+func assertReleaseLayoutGuardedByTagEqInAnyBranch(t *testing.T, fn ir.IRFunc, layoutID string, tagValue int32) {
+	t.Helper()
+	for releaseIndex, instr := range fn.Instrs {
+		if instr.Kind != ir.IRReleaseAllocation || instr.LayoutID != layoutID {
+			continue
+		}
+		branchStart := previousLabelIndex(fn.Instrs, releaseIndex)
+		if branchStart < 0 {
+			continue
+		}
+		guardIndex := -1
+		guardLabel := -1
+		for i := branchStart + 1; i+3 < releaseIndex; i++ {
+			if fn.Instrs[i].Kind == ir.IRLoadLocal &&
+				fn.Instrs[i+1].Kind == ir.IRConstI32 &&
+				fn.Instrs[i+1].Imm == tagValue &&
+				fn.Instrs[i+2].Kind == ir.IRCmpEqI32 &&
+				fn.Instrs[i+3].Kind == ir.IRJmpIfZero {
+				guardIndex = i
+				guardLabel = fn.Instrs[i+3].Label
+			}
+		}
+		if guardIndex < 0 {
+			continue
+		}
+		for i := releaseIndex + 1; i < len(fn.Instrs); i++ {
+			if fn.Instrs[i].Kind == ir.IRLabel && fn.Instrs[i].Label == guardLabel {
+				return
+			}
+			if fn.Instrs[i].Kind == ir.IRJmp {
+				break
+			}
+		}
+	}
+	t.Fatalf("%s release %s must be guarded by enum tag == %d inside a catch case branch: %#v", fn.Name, layoutID, tagValue, fn.Instrs)
+}
+
+func releaseIsInsideLabelToJumpBranch(instrs []ir.IRInstr, releaseIndex int) bool {
+	if previousLabelIndex(instrs, releaseIndex) < 0 {
+		return false
+	}
+	for i := releaseIndex + 1; i < len(instrs); i++ {
+		switch instrs[i].Kind {
+		case ir.IRJmp:
+			return true
+		case ir.IRLabel:
+			return false
+		}
+	}
+	return false
+}
+
+func previousLabelIndex(instrs []ir.IRInstr, before int) int {
+	for i := before - 1; i >= 0; i-- {
+		if instrs[i].Kind == ir.IRLabel {
+			return i
+		}
+	}
+	return -1
+}
+
+func catchDispatchCaseLabels(fn ir.IRFunc) []int {
+	labels := []int(nil)
+	for i := 1; i < len(fn.Instrs); i++ {
+		instr := fn.Instrs[i]
+		if instr.Kind != ir.IRJmp || fn.Instrs[i-1].Kind != ir.IRJmpIfZero {
+			continue
+		}
+		labels = append(labels, instr.Label)
+	}
+	return labels
+}
+
+func assertOwnedReleaseGuardedByLocal(t *testing.T, fn ir.IRFunc, tagLocal int) {
+	t.Helper()
+	dropIndex := -1
+	releaseIndex := -1
+	for i, instr := range fn.Instrs {
+		if instr.Kind == ir.IRDropOwned && dropIndex < 0 {
+			dropIndex = i
+		}
+		if instr.Kind == ir.IRReleaseAllocation && releaseIndex < 0 {
+			releaseIndex = i
+		}
+	}
+	if dropIndex < 0 || releaseIndex < 0 {
+		t.Fatalf("%s has no owned drop/release: %#v", fn.Name, fn.Instrs)
+	}
+	guardIndex := -1
+	guardLabel := -1
+	for i := 0; i+1 < dropIndex; i++ {
+		if fn.Instrs[i].Kind == ir.IRLoadLocal &&
+			fn.Instrs[i].Local == tagLocal &&
+			fn.Instrs[i+1].Kind == ir.IRJmpIfZero {
+			guardIndex = i
+			guardLabel = fn.Instrs[i+1].Label
+			break
+		}
+	}
+	if guardIndex < 0 {
+		t.Fatalf("%s owned release is not guarded by local%d tag: %#v", fn.Name, tagLocal, fn.Instrs)
+	}
+	labelIndex := -1
+	for i := releaseIndex + 1; i < len(fn.Instrs); i++ {
+		if fn.Instrs[i].Kind == ir.IRLabel && fn.Instrs[i].Label == guardLabel {
+			labelIndex = i
+			break
+		}
+	}
+	if labelIndex < 0 {
+		t.Fatalf(
+			"%s owned release guard at %d has no post-release label %d: %#v",
+			fn.Name,
+			guardIndex,
+			guardLabel,
+			fn.Instrs,
+		)
+	}
+	if !(guardIndex < dropIndex && dropIndex < releaseIndex && releaseIndex < labelIndex) {
+		t.Fatalf(
+			"%s owned release guard/drop/release/label order is invalid: guard=%d drop=%d release=%d label=%d instrs=%#v",
+			fn.Name,
+			guardIndex,
+			dropIndex,
+			releaseIndex,
+			labelIndex,
+			fn.Instrs,
+		)
+	}
+}
+
+func assertOwnedReleaseGuardedByLocalEq(t *testing.T, fn ir.IRFunc, tagLocal int, tagValue int32) {
+	t.Helper()
+	dropIndex := -1
+	releaseIndex := -1
+	for i, instr := range fn.Instrs {
+		if instr.Kind == ir.IRDropOwned && dropIndex < 0 {
+			dropIndex = i
+		}
+		if instr.Kind == ir.IRReleaseAllocation && releaseIndex < 0 {
+			releaseIndex = i
+		}
+	}
+	if dropIndex < 0 || releaseIndex < 0 {
+		t.Fatalf("%s has no owned drop/release: %#v", fn.Name, fn.Instrs)
+	}
+	guardIndex := -1
+	guardLabel := -1
+	for i := 0; i+3 < dropIndex; i++ {
+		if fn.Instrs[i].Kind == ir.IRLoadLocal &&
+			fn.Instrs[i].Local == tagLocal &&
+			fn.Instrs[i+1].Kind == ir.IRConstI32 &&
+			fn.Instrs[i+1].Imm == tagValue &&
+			fn.Instrs[i+2].Kind == ir.IRCmpEqI32 &&
+			fn.Instrs[i+3].Kind == ir.IRJmpIfZero {
+			guardIndex = i
+			guardLabel = fn.Instrs[i+3].Label
+			break
+		}
+	}
+	if guardIndex < 0 {
+		t.Fatalf("%s owned release is not guarded by local%d == %d tag: %#v", fn.Name, tagLocal, tagValue, fn.Instrs)
+	}
+	labelIndex := -1
+	for i := releaseIndex + 1; i < len(fn.Instrs); i++ {
+		if fn.Instrs[i].Kind == ir.IRLabel && fn.Instrs[i].Label == guardLabel {
+			labelIndex = i
+			break
+		}
+	}
+	if labelIndex < 0 {
+		t.Fatalf(
+			"%s owned release eq guard at %d has no post-release label %d: %#v",
+			fn.Name,
+			guardIndex,
+			guardLabel,
+			fn.Instrs,
+		)
+	}
+	if !(guardIndex < dropIndex && dropIndex < releaseIndex && releaseIndex < labelIndex) {
+		t.Fatalf(
+			"%s owned release eq guard/drop/release/label order is invalid: guard=%d drop=%d release=%d label=%d instrs=%#v",
+			fn.Name,
+			guardIndex,
+			dropIndex,
+			releaseIndex,
+			labelIndex,
 			fn.Instrs,
 		)
 	}
@@ -3128,6 +9498,69 @@ func main() -> Int:
 	}
 }
 
+func TestLowerOwnedAllocBytesDropsBeforeTryTypedTaskJoinPropagationReturn(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum TaskErr:
+    case boom(Int, Int)
+    case stopped
+
+func worker() -> Int throws TaskErr:
+    throw TaskErr.boom(1, 2)
+
+func caller() -> Int throws TaskErr
+uses runtime, alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        let task = core.task_spawn_i32_typed<TaskErr>("worker")
+        return try core.task_join_i32_typed<TaskErr>(task)
+
+func main() -> Int:
+    return 0
+`)
+
+	callerFn := requireIRFunc(t, prog, "caller")
+	if !hasCall(callerFn.Instrs, "__tetra_task_join_typed_5", 1) {
+		t.Fatalf("caller IR lacks staged typed-task try join call: %#v", callerFn.Instrs)
+	}
+	if countInstrKind(callerFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("caller alloc_bytes count = %d, want 1: %#v", countInstrKind(callerFn, ir.IRAllocBytes), callerFn.Instrs)
+	}
+	if countInstrKind(callerFn, ir.IRDropOwned) != 2 || countInstrKind(callerFn, ir.IRReleaseAllocation) != 2 {
+		t.Fatalf("typed task try propagation and success exits must both drop owned allocation: %#v", callerFn.Instrs)
+	}
+}
+
+func TestLowerOwnedAllocBytesDropsBeforeCompactPayloadTypedTaskJoinPropagationReturn(t *testing.T) {
+	prog := lowerOwnedAllocDropProgram(t, `
+enum TaskErr:
+    case code(Int)
+
+func worker() -> Int throws TaskErr:
+    throw TaskErr.code(7)
+
+func caller() -> Int throws TaskErr
+uses runtime, alloc, mem:
+    unsafe:
+        let p: ptr = core.alloc_bytes(16)
+        let task = core.task_spawn_i32_typed<TaskErr>("worker")
+        return try core.task_join_i32_typed<TaskErr>(task)
+
+func main() -> Int:
+    return 0
+`)
+
+	callerFn := requireIRFunc(t, prog, "caller")
+	if !hasCall(callerFn.Instrs, "__tetra_task_join_typed_4", 4) {
+		t.Fatalf("caller IR lacks compact payload typed-task try join call: %#v", callerFn.Instrs)
+	}
+	if countInstrKind(callerFn, ir.IRAllocBytes) != 1 {
+		t.Fatalf("caller alloc_bytes count = %d, want 1: %#v", countInstrKind(callerFn, ir.IRAllocBytes), callerFn.Instrs)
+	}
+	if countInstrKind(callerFn, ir.IRDropOwned) != 2 || countInstrKind(callerFn, ir.IRReleaseAllocation) != 2 {
+		t.Fatalf("compact typed task try propagation and success exits must both drop owned allocation: %#v", callerFn.Instrs)
+	}
+}
+
 func TestLowerStagedTypedTaskPolicyFailureStagesStatus(t *testing.T) {
 	prog := lowerProgramForCatchTest(t, `
 enum TaskErr:
@@ -3267,6 +9700,182 @@ uses actors, runtime:
 			t.Fatalf("main is missing %s call: %#v", name, mainFn.Instrs)
 		}
 	}
+}
+
+func TestLowerActorRefInternalBuiltins(t *testing.T) {
+	src := []byte(`
+func main() -> Int
+uses actors:
+    unsafe:
+        let peer: actor = core.actor_ref_local(7, 1)
+        return core.actor_ref_slot(peer)
+    return 0
+`)
+	prog, err := frontend.Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	checked, err := semantics.Check(prog)
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	irProg, err := Lower(checked)
+	if err != nil {
+		t.Fatalf("Lower: %v", err)
+	}
+	mainFn := findIRFuncByName(t, irProg.Funcs, "main")
+	for _, instr := range mainFn.Instrs {
+		if instr.Kind == ir.IRCall {
+			t.Fatalf("actor_ref helpers should lower without runtime calls, got %#v", instr)
+		}
+	}
+	hasStoreLocal := false
+	for _, instr := range mainFn.Instrs {
+		if instr.Kind == ir.IRStoreLocal {
+			hasStoreLocal = true
+			break
+		}
+	}
+	if !hasStoreLocal {
+		t.Fatalf("actor_ref_slot should discard the high actor slot: %#v", mainFn.Instrs)
+	}
+}
+
+func TestLowerActorLifecycleRuntimeBuiltins(t *testing.T) {
+	src := []byte(`
+func worker() -> Int:
+    return 0
+
+func main() -> Int
+uses actors:
+    let peer: actor = core.spawn("worker")
+    let _status: actor.status = core.actor_status(peer)
+    let _raw_status: actor.status_result_raw = core.actor_status_raw(peer)
+    let _waited: actor.wait_result = core.actor_wait(peer)
+    let _waited_until: actor.wait_result = core.actor_wait_until(peer, 10)
+    let reason: actor.exit_reason = core.actor_exit_reason(peer)
+    let monitor: actor.monitor = core.actor_monitor(peer)
+    let linked: Int = core.actor_link(peer)
+    let unlinked: Int = core.actor_unlink(peer)
+    let demonitored: Int = core.actor_demonitor(monitor)
+    let stopped: Int = core.actor_stop(peer, reason)
+    let trapped: Int = core.actor_set_trap_exit(1)
+    return linked + unlinked + demonitored + stopped + trapped
+`)
+	prog, err := frontend.Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	checked, err := semantics.Check(prog)
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	irProg, err := Lower(checked)
+	if err != nil {
+		t.Fatalf("Lower: %v", err)
+	}
+
+	mainFn := findIRFuncByName(t, irProg.Funcs, "main")
+	actorSlots := runtimeabi.ActorHandleABI().RefSlots
+	tests := []struct {
+		name string
+		args int
+		rets int
+	}{
+		{name: "__tetra_actor_status", args: actorSlots, rets: 1},
+		{name: "__tetra_actor_status_raw", args: actorSlots, rets: 2},
+		{name: "__tetra_actor_wait", args: actorSlots, rets: 2},
+		{name: "__tetra_actor_wait_until", args: actorSlots + 1, rets: 2},
+		{name: "__tetra_actor_exit_reason", args: actorSlots, rets: 1},
+		{name: "__tetra_actor_monitor", args: actorSlots, rets: 1},
+		{name: "__tetra_actor_link", args: actorSlots, rets: 1},
+		{name: "__tetra_actor_unlink", args: actorSlots, rets: 1},
+		{name: "__tetra_actor_demonitor", args: 1, rets: 1},
+		{name: "__tetra_actor_stop", args: actorSlots + 1, rets: 1},
+		{name: "__tetra_actor_set_trap_exit", args: 1, rets: 1},
+	}
+	for _, tt := range tests {
+		if countCall(mainFn.Instrs, tt.name, tt.args, tt.rets) != 1 {
+			t.Fatalf("main missing call %s/%d/%d: %#v", tt.name, tt.args, tt.rets, mainFn.Instrs)
+		}
+	}
+}
+
+func TestLowerActorSystemReceiveRuntimeBuiltins(t *testing.T) {
+	src := []byte(`
+func blocking() -> actor.system_recv_raw
+uses actors, runtime:
+    return core.actor_recv_system()
+
+func poll() -> actor.system_recv_raw
+uses actors:
+    return core.actor_recv_system_poll()
+
+func timed() -> actor.system_recv_raw
+uses actors, runtime:
+    return core.actor_recv_system_until(10)
+
+func main() -> Int:
+    return 0
+`)
+	prog, err := frontend.Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	checked, err := semantics.Check(prog)
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	irProg, err := Lower(checked)
+	if err != nil {
+		t.Fatalf("Lower: %v", err)
+	}
+
+	allInstrs := append(
+		append(
+			findIRFuncByName(t, irProg.Funcs, "blocking").Instrs,
+			findIRFuncByName(t, irProg.Funcs, "poll").Instrs...,
+		),
+		findIRFuncByName(t, irProg.Funcs, "timed").Instrs...,
+	)
+	if got := countCall(allInstrs, "__tetra_actor_recv_system_begin", 2, 1); got != 3 {
+		t.Fatalf("system receive begin calls = %d, want 3: %#v", got, allInstrs)
+	}
+	rawSlots := runtimeabi.ActorHandleABI().RefSlots + 7
+	if got, want := countCall(allInstrs, "__tetra_actor_recv_system_slot", 1, 1), 3*(rawSlots-1); got != want {
+		t.Fatalf("system receive slot calls = %d, want %d: %#v", got, want, allInstrs)
+	}
+	if got := countCall(allInstrs, "__tetra_actor_recv_system_count", 0, 1); got != 3 {
+		t.Fatalf("system receive count calls = %d, want 3: %#v", got, allInstrs)
+	}
+	requireConstPairBeforeCall(t, allInstrs, "__tetra_actor_recv_system_begin", 0, 0)
+	requireConstPairBeforeCall(t, allInstrs, "__tetra_actor_recv_system_begin", 1, 0)
+	requireConstPairBeforeCall(t, allInstrs, "__tetra_actor_recv_system_begin", 2, 10)
+}
+
+func requireConstPairBeforeCall(
+	t *testing.T,
+	instrs []ir.IRInstr,
+	name string,
+	first int32,
+	second int32,
+) {
+	t.Helper()
+	for i, instr := range instrs {
+		if instr.Kind != ir.IRCall || instr.Name != name {
+			continue
+		}
+		if i < 2 {
+			continue
+		}
+		a := instrs[i-2]
+		b := instrs[i-1]
+		if a.Kind == ir.IRConstI32 && a.Imm == first &&
+			b.Kind == ir.IRConstI32 && b.Imm == second {
+			return
+		}
+	}
+	t.Fatalf("missing const pair (%d,%d) before %s call: %#v", first, second, name, instrs)
 }
 
 // ---- enum_payload_test.go ----
@@ -8011,6 +14620,22 @@ func TestVerifyFuncRejectsInvalidSlotMetadata(t *testing.T) {
 			fn:   ir.IRFunc{Name: "bad_locals", ParamSlots: 2, LocalSlots: 1},
 			want: "param slots 2 exceed locals 1",
 		},
+		{
+			name: "owned_param_local_out_of_range",
+			fn: ir.IRFunc{
+				Name:       "bad_owned_param",
+				LocalSlots: 1,
+				OwnedParams: []ir.IROwnedParam{
+					{
+						Local:           1,
+						LayoutID:        "layout:consume_param:bad_owned_param:raw",
+						OwnershipDomain: ir.IROwnershipDomainHeap,
+						ReleaseKind:     ir.IRReleaseKindLinuxMmap,
+					},
+				},
+			},
+			want: "owned param local 1 out of range",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -8271,12 +14896,13 @@ func TestVerifyFuncRejectsTypedTaskRuntimeCallSignatureMismatch(t *testing.T) {
 }
 
 func TestVerifyFuncAcceptsKnownRuntimeCallSignature(t *testing.T) {
+	actorSlots := runtimeabi.ActorHandleABI().RefSlots
 	fn := ir.IRFunc{
 		Name:        "runtime_call",
-		ReturnSlots: 1,
+		ReturnSlots: actorSlots,
 		Instrs: []ir.IRInstr{
 			{Kind: ir.IRConstI32},
-			{Kind: ir.IRCall, Name: "__tetra_actor_spawn", ArgSlots: 1, RetSlots: 1},
+			{Kind: ir.IRCall, Name: "__tetra_actor_spawn", ArgSlots: 1, RetSlots: actorSlots},
 			{Kind: ir.IRReturn},
 		},
 	}
@@ -8727,6 +15353,8 @@ func TestBudgetChargeModelIsExplicit(t *testing.T) {
 		ir.IRIslandMakeSliceI32:       1,
 		ir.IRIslandFree:               1,
 		ir.IRIslandReset:              1,
+		ir.IRDropOwned:                1,
+		ir.IRReleaseAllocation:        1,
 		ir.IRCapIO:                    1,
 		ir.IRCapMem:                   1,
 		ir.IRMemReadI32:               1,

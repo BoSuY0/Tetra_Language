@@ -3157,6 +3157,23 @@ func localScopeID(name string, state *regionState) int {
 	return regionNone
 }
 
+func patternBindingScopeID(pattern frontend.Expr, state *regionState) int {
+	if state == nil || pattern == nil {
+		return regionNone
+	}
+	switch p := pattern.(type) {
+	case *frontend.SomePatternExpr:
+		return localScopeID(p.Name, state)
+	case *frontend.EnumCasePatternExpr:
+		for _, binding := range p.Bindings {
+			if id := localScopeID(binding, state); id != regionNone {
+				return id
+			}
+		}
+	}
+	return regionNone
+}
+
 func checkLocalScope(name string, state *regionState, pos frontend.Position) error {
 	if state != nil {
 		if ids := state.localScopeSets[name]; len(ids) > 0 {

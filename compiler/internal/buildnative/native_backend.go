@@ -70,6 +70,7 @@ func CodegenOptionsForTarget(tgt ctarget.Target, opt buildapi.BuildOptions) x64.
 		NativeIntWidthBits:               tgt.NativeIntWidthBits,
 		RegisterWidthBits:                tgt.RegisterWidthBits,
 		EmitRuntimeHeapTelemetry:         opt.EmitRuntimeHeapTelemetry,
+		RuntimeHeapTelemetryV2:           opt.OwnedAllocDropLowering,
 		RuntimeHeapTelemetryActorDomains: opt.RuntimeHeapTelemetryActorDomains,
 		RuntimeHeapTelemetryDir:          opt.RuntimeHeapTelemetryDir,
 		RuntimeHeapTelemetryProgram:      opt.RuntimeHeapTelemetryProgram,

@@ -1,0 +1,50 @@
+module examples.actors.system_messages.system_exit_trap
+
+import lib.core.actors as actors
+
+func score_reason(reason: actors.ExitReason) -> Int:
+    match reason:
+    case actors.ExitReason.normal:
+        return 0
+    case actors.ExitReason.shutdown(code):
+        return 10 + code
+    case actors.ExitReason.error(code):
+        return 20 + code
+    case actors.ExitReason.canceled:
+        return 30
+    case actors.ExitReason.killed:
+        return 40
+    case actors.ExitReason.node_down(code):
+        return 50 + code
+    case actors.ExitReason.protocol_error(code):
+        return 60 + code
+    case actors.ExitReason.runtime_error(code):
+        return 70 + code
+    case actors.ExitReason.unknown(kind, code):
+        return 80 + kind + code
+
+func score_system(result: actors.SystemReceiveResult) -> Int:
+    match result:
+    case actors.SystemReceiveResult.message(message):
+        match message:
+        case actors.SystemMessage.exit(exit_peer, exit_reason):
+            return score_reason(exit_reason)
+        case actors.SystemMessage.down(down_monitor, down_peer, down_reason):
+            return 100 + score_reason(down_reason)
+        case actors.SystemMessage.node_down(down_node, node_reason):
+            return 200
+    case actors.SystemReceiveResult.empty:
+        return 0
+    case actors.SystemReceiveResult.timeout:
+        return 1
+    case actors.SystemReceiveResult.canceled:
+        return 2
+    case actors.SystemReceiveResult.runtime_closed:
+        return 3
+    case actors.SystemReceiveResult.invalid_state(code):
+        return 300 + code
+
+func main() -> Int
+uses actors, runtime:
+    let _trap: Int = core.actor_set_trap_exit(1)
+    return score_system(actors.poll_system())

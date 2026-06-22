@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "kind": "bounds",
+  "target": "linux-x64",
+  "totals": {
+    "removed": 2,
+    "left": 0
+  },
+  "functions": [
+    {
+      "function": "lib.core.strings.ascii_len",
+      "removed": 1,
+      "left": 0,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:11:5",
+          "kind": "u8.load",
+          "removed": true,
+          "proof_id": "proof:for-collection:ch:11:5",
+          "reason": "removed_by_for_loop_range"
+        }
+      ]
+    },
+    {
+      "function": "lib.core.strings.ascii_sum",
+      "removed": 1,
+      "left": 0,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/base/strings.tetra:17:5",
+          "kind": "u8.load",
+          "removed": true,
+          "proof_id": "proof:for-collection:ch:17:5",
+          "reason": "removed_by_for_loop_range"
+        }
+      ]
+    }
+  ]
+}

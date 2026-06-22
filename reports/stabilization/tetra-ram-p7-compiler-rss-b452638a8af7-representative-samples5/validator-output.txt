@@ -1,0 +1,3 @@
+validator: ramcompilerrss.Run
+schema: tetra.ram.p7-compiler-rss-summary.v2
+result: pass

@@ -371,7 +371,167 @@ func CollectActorRuntimeUsagePosition(checked *semantics.CheckedProgram) (bool, 
 			case "core.spawn",
 				"core.send", "core.send_msg", "core.send_typed",
 				"core.recv", "core.recv_msg", "core.recv_poll", "core.recv_until", "core.recv_msg_until", "core.recv_typed",
-				"core.self", "core.sender", "core.yield":
+				"core.self", "core.sender", "core.yield",
+				"core.actor_status", "core.actor_status_raw", "core.actor_wait", "core.actor_wait_until",
+				"core.actor_stop", "core.actor_exit_reason", "core.actor_link", "core.actor_unlink",
+				"core.actor_monitor", "core.actor_demonitor", "core.actor_set_trap_exit":
+				mark(e.At)
+			}
+			for _, arg := range e.Args {
+				walkExpr(arg)
+			}
+		case *frontend.StructLitExpr:
+			for _, field := range e.Fields {
+				walkExpr(field.Value)
+			}
+		case *frontend.FieldAccessExpr:
+			walkExpr(e.Base)
+		case *frontend.IndexExpr:
+			walkExpr(e.Base)
+			walkExpr(e.Index)
+		case *frontend.BinaryExpr:
+			walkExpr(e.Left)
+			walkExpr(e.Right)
+		case *frontend.UnaryExpr:
+			walkExpr(e.X)
+		case *frontend.TryExpr:
+			walkExpr(e.X)
+		case *frontend.CatchExpr:
+			walkExpr(e.Call)
+			for _, c := range e.Cases {
+				if !c.Default {
+					walkExpr(c.Pattern)
+				}
+				walkExpr(c.Guard)
+				walkExpr(c.Value)
+			}
+		case *frontend.MatchExpr:
+			walkExpr(e.Value)
+			for _, c := range e.Cases {
+				if !c.Default {
+					walkExpr(c.Pattern)
+				}
+				walkExpr(c.Guard)
+				walkExpr(c.Value)
+			}
+		}
+	}
+
+	walkStmt = func(stmt frontend.Stmt) {
+		switch s := stmt.(type) {
+		case *frontend.PrintStmt:
+			walkExpr(s.Value)
+		case *frontend.ReturnStmt:
+			walkExpr(s.Value)
+		case *frontend.ThrowStmt:
+			walkExpr(s.Value)
+		case *frontend.DeferStmt:
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.LetStmt:
+			walkExpr(s.Value)
+		case *frontend.AssignStmt:
+			walkExpr(s.Target)
+			walkExpr(s.Value)
+		case *frontend.IfStmt:
+			walkExpr(s.Cond)
+			for _, inner := range s.Then {
+				walkStmt(inner)
+			}
+			for _, inner := range s.Else {
+				walkStmt(inner)
+			}
+		case *frontend.IfLetStmt:
+			walkExpr(s.Value)
+			if s.Pattern != nil {
+				walkExpr(s.Pattern)
+			}
+			for _, inner := range s.Then {
+				walkStmt(inner)
+			}
+			for _, inner := range s.Else {
+				walkStmt(inner)
+			}
+		case *frontend.WhileStmt:
+			walkExpr(s.Cond)
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.ForRangeStmt:
+			if s.Iterable != nil {
+				walkExpr(s.Iterable)
+			} else {
+				walkExpr(s.Start)
+				walkExpr(s.End)
+			}
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.MatchStmt:
+			walkExpr(s.Value)
+			for _, c := range s.Cases {
+				if !c.Default {
+					walkExpr(c.Pattern)
+				}
+				for _, inner := range c.Body {
+					walkStmt(inner)
+				}
+			}
+		case *frontend.FreeStmt:
+			walkExpr(s.Value)
+		case *frontend.UnsafeStmt:
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.IslandStmt:
+			walkExpr(s.Size)
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		}
+	}
+
+	for _, fn := range checked.Funcs {
+		if fn.Decl == nil {
+			continue
+		}
+		for _, stmt := range fn.Decl.Body {
+			walkStmt(stmt)
+		}
+	}
+	return used, first
+}
+
+func CollectActorSystemReceiveRuntimeUsagePosition(
+	checked *semantics.CheckedProgram,
+) (bool, frontend.Position) {
+	if checked == nil {
+		return false, frontend.Position{}
+	}
+	var used bool
+	var first frontend.Position
+	var walkExpr func(frontend.Expr)
+	var walkStmt func(frontend.Stmt)
+
+	mark := func(pos frontend.Position) {
+		if !used {
+			used = true
+			first = pos
+		}
+	}
+
+	walkExpr = func(expr frontend.Expr) {
+		switch e := expr.(type) {
+		case *frontend.CallExpr:
+			name := e.Name
+			if builtin, ok := semantics.ResolveBuiltinAlias(name); ok {
+				name = builtin
+			}
+			switch name {
+			case "core.actor_recv_system",
+				"core.actor_recv_system_poll",
+				"core.actor_recv_system_until":
 				mark(e.At)
 			}
 			for _, arg := range e.Args {

@@ -99,11 +99,12 @@ decisions to the same planner contract, and P2.6 validates the cross-stage stora
   the copy result does not escape the function. If the copy is returned or stored across an escape
   boundary, the planner keeps the conservative heap path.
 - With P5.3 region planning enabled, a non-escaping temporary `copy()` that does not already fit the
-  fixed-small stack lowering subset may report `planned_storage: Region`, `runtime_path: region`,
-  `allocator_class: function_temp_region`, and `region_id: region:<function>:temp`. Because implicit
-  region lowering is not implemented yet, the same row must also report
+  fixed-small stack lowering subset may report `planned_storage: Region` and
+  `region_id: region:<function>:temp`. Planned-only rows must also report
   `actual_lowering_storage: Heap`, `backend_storage: Heap`, and
-  `lowering_status: region_planned_heap_fallback`.
+  `lowering_status: region_planned_heap_fallback`. When function-temp lowering is actually emitted,
+  the runtime path is `scoped_single_mapping_v0` with `allocator_class: function_temp_region`; this
+  is not a general arena.
 - An unused `copy()` result may report `planned_storage: Eliminated`,
   `actual_lowering_storage: Eliminated`, and `lowering_status: eliminated_unused_copy`. Lowering
   still evaluates the source expression so safe view range checks are preserved, then stores a dummy

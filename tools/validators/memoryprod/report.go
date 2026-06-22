@@ -420,7 +420,7 @@ func validateBenchmarks(benchmarks []BenchmarkReport) []string {
 					fmt.Sprintf("benchmark %s unit is %q, want syscalls", name, b.Unit),
 				)
 			}
-			for _, marker := range []string{"per_core_small_heap"} {
+			for _, marker := range []string{"process_bump_small_heap_v0"} {
 				if !strings.Contains(evidence, marker) {
 					issues = append(
 						issues,
@@ -441,6 +441,7 @@ func validateBenchmarks(benchmarks []BenchmarkReport) []string {
 				}
 			}
 			for _, marker := range []string{
+				"per_core_small_heap",
 				"same_core_same_size_class_free_list",
 				"free-list",
 				"free list",
@@ -450,7 +451,7 @@ func validateBenchmarks(benchmarks []BenchmarkReport) []string {
 					issues = append(
 						issues,
 						fmt.Sprintf(
-							"benchmark %s contains runtime free-list wording %q without runtime_measured evidence",
+							"benchmark %s contains runtime allocator capability wording %q without runtime_measured evidence",
 							name,
 							marker,
 						),

@@ -1160,16 +1160,39 @@ func buildStackCallSummaries(prog *ir.IRProgram) map[string]stackCallSummary {
 		return nil
 	}
 	summaries := map[string]stackCallSummary{}
-	for _, fn := range prog.Funcs {
-		summary, ok := summarizeStackCall(fn)
-		if ok {
+	for changed := true; changed; {
+		changed = false
+		for _, fn := range prog.Funcs {
+			summary, ok := summarizeStackCall(fn, summaries)
+			if !ok {
+				continue
+			}
+			if existing, exists := summaries[fn.Name]; exists && stackCallSummaryEqual(existing, summary) {
+				continue
+			}
 			summaries[fn.Name] = summary
+			changed = true
 		}
 	}
 	return summaries
 }
 
-func summarizeStackCall(fn ir.IRFunc) (stackCallSummary, bool) {
+func stackCallSummaryEqual(a, b stackCallSummary) bool {
+	if len(a.retTags) != len(b.retTags) {
+		return false
+	}
+	for i := range a.retTags {
+		if a.retTags[i] != b.retTags[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func summarizeStackCall(
+	fn ir.IRFunc,
+	callSummaries map[string]stackCallSummary,
+) (stackCallSummary, bool) {
 	labels := map[int]int{}
 	for i, instr := range fn.Instrs {
 		if instr.Kind == ir.IRLabel {
@@ -1183,6 +1206,7 @@ func summarizeStackCall(fn ir.IRFunc) (stackCallSummary, bool) {
 	work := []stackEscapeState{{idx: 0, locals: locals}}
 	seen := map[string]bool{}
 	var merged []string
+	hasReturn := false
 	for len(work) > 0 {
 		cur := work[len(work)-1]
 		work = work[:len(work)-1]
@@ -1194,17 +1218,22 @@ func summarizeStackCall(fn ir.IRFunc) (stackCallSummary, bool) {
 			continue
 		}
 		seen[key] = true
-		next, ret, ok := stepStackCallSummaryState(fn, cur, labels)
+		next, ret, ok := stepStackCallSummaryState(fn, cur, labels, callSummaries)
 		if !ok {
 			return stackCallSummary{}, false
 		}
 		if ret != nil {
-			merged = mergeStackReturnTags(merged, ret)
+			if !hasReturn {
+				merged = append([]string(nil), ret...)
+				hasReturn = true
+			} else {
+				merged = mergeStackReturnTags(merged, ret)
+			}
 			continue
 		}
 		work = append(work, next...)
 	}
-	if merged == nil {
+	if !hasReturn {
 		return stackCallSummary{}, false
 	}
 	return stackCallSummary{retTags: merged}, true
@@ -1214,6 +1243,7 @@ func stepStackCallSummaryState(
 	fn ir.IRFunc,
 	cur stackEscapeState,
 	labels map[int]int,
+	callSummaries map[string]stackCallSummary,
 ) ([]stackEscapeState, []string, bool) {
 	instr := fn.Instrs[cur.idx]
 	stack := append([]string(nil), cur.stack...)
@@ -1229,7 +1259,15 @@ func stepStackCallSummaryState(
 	case ir.IRCall, ir.IRStoreGlobal:
 		popped, rest := popStackTags(stack, pop)
 		if firstStackParamTag(popped) != "" {
-			return nil, nil, false
+			if instr.Kind == ir.IRStoreGlobal {
+				return nil, nil, false
+			}
+			retTags, ok := stackCallReturnTags(instr, popped, callSummaries)
+			if !ok {
+				return nil, nil, false
+			}
+			stack = append(rest, retTags...)
+			break
 		}
 		stack = pushEmptyTags(rest, push)
 	case ir.IRStoreLocal:

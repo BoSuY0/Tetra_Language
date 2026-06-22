@@ -1,0 +1,40 @@
+{
+  "schema": "tetra.ram.p7-compiler-rss.commands.v1",
+  "commands": [
+    {
+      "name": "ram-p7-compiler-rss",
+      "command": [
+        "go",
+        "run",
+        "./tools/cmd/ram-p7-compiler-rss",
+        "--out-dir",
+        "reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-target-scope-validator-samples1",
+        "--samples",
+        "1"
+      ]
+    },
+    {
+      "name": "artifact-hashes-write",
+      "command": [
+        "go",
+        "run",
+        "./tools/cmd/validate-artifact-hashes",
+        "--write",
+        "--root",
+        "reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-target-scope-validator-samples1",
+        "--out",
+        "reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-target-scope-validator-samples1/artifact-hashes.json"
+      ]
+    },
+    {
+      "name": "artifact-hashes-validate",
+      "command": [
+        "go",
+        "run",
+        "./tools/cmd/validate-artifact-hashes",
+        "--manifest",
+        "reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-target-scope-validator-samples1/artifact-hashes.json"
+      ]
+    }
+  ]
+}

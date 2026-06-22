@@ -1,0 +1,5 @@
+func main() -> Int:
+    let ok: Bool = true
+    if ok && 3 > 2:
+        return 42
+    return 1

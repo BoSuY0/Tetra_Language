@@ -1,0 +1,15 @@
+module examples.projects.dogfood_cli.src.main
+
+import lib.core.math as math
+import lib.core.strings as strings
+
+func status_code() -> Int:
+    return math.add_i32(strings.ascii_sum("*"), -42)
+
+func main() -> Int
+uses io:
+    print("tetra dogfood cli: ok\n")
+    return status_code()
+
+test "cli status code":
+    expect status_code() == 0

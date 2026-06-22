@@ -1,0 +1,3 @@
+validator: validate-artifact-hashes
+manifest: reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-target-scope-validator-samples1/artifact-hashes.json
+result: pass

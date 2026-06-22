@@ -1,0 +1,453 @@
+// Pure Tetra Surface migration of examples/projects/tetra_control_center/src/main.tetra.
+module examples.surface.migration.surface_migration_tetra_control_center
+
+import lib.core.surface as surface
+import lib.core.draw as draw
+import lib.core.block as block
+import lib.core.morph as morph
+
+struct ControlCenterSurface:
+    activeScreen: Int
+    selectedProfile: Int
+    dryRunEnabled: Bool
+    refreshCount: Int
+    commandPaletteOpen: Bool
+    settingsEditCount: Int
+    selectedLog: Int
+    errorRetryCount: Int
+    blockedDialogOpen: Bool
+
+struct FlagshipRecipeEvidence:
+    recipe_count: Int
+    block_count: Int
+    product_surface_count: Int
+    interaction_count: Int
+    app_shell_state_count: Int
+    tree_status: Int
+    recipes_safe: Bool
+    expansions_valid: Bool
+    a11y_projection: Bool
+
+extension ControlCenterSurface:
+    func draw(self: borrow ControlCenterSurface, ctx: inout draw.DrawContext) -> Int
+    uses mem:
+        let dashboard_tab: surface.Rect = surface.Rect(x: 24, y: 80, w: 160, h: 36)
+        let profiles_tab: surface.Rect = surface.Rect(x: 24, y: 124, w: 160, h: 36)
+        let fans_tab: surface.Rect = surface.Rect(x: 24, y: 168, w: 160, h: 36)
+        let diagnostics_tab: surface.Rect = surface.Rect(x: 24, y: 212, w: 160, h: 36)
+        let logs_tab: surface.Rect = surface.Rect(x: 24, y: 256, w: 160, h: 36)
+        let settings_tab: surface.Rect = surface.Rect(x: 24, y: 300, w: 160, h: 36)
+        let quiet_button: surface.Rect = surface.Rect(x: 280, y: 248, w: 120, h: 36)
+        let balanced_button: surface.Rect = surface.Rect(x: 416, y: 248, w: 120, h: 36)
+        let performance_button: surface.Rect = surface.Rect(x: 552, y: 248, w: 140, h: 36)
+        let custom_button: surface.Rect = surface.Rect(x: 708, y: 248, w: 120, h: 36)
+        let dry_run_button: surface.Rect = surface.Rect(x: 280, y: 316, w: 160, h: 40)
+        let refresh_button: surface.Rect = surface.Rect(x: 456, y: 316, w: 160, h: 40)
+        let command_button: surface.Rect = surface.Rect(x: 648, y: 316, w: 160, h: 40)
+        let blocked_dialog_button: surface.Rect = surface.Rect(x: 812, y: 316, w: 180, h: 40)
+        let settings_edit_button: surface.Rect = surface.Rect(x: 280, y: 384, w: 180, h: 36)
+        let log_row_button: surface.Rect = surface.Rect(x: 280, y: 440, w: 360, h: 36)
+        let error_retry_button: surface.Rect = surface.Rect(x: 656, y: 440, w: 140, h: 36)
+        let status_bar: surface.Rect = surface.Rect(x: 250, y: 704, w: 880, h: 32)
+        let bg: surface.Color = surface.Color(r: 16, g: 18, b: 22, a: 255)
+        let nav: surface.Color = surface.Color(r: 31, g: 36, b: 43, a: 255)
+        let panel: surface.Color = surface.Color(r: 44, g: 52, b: 61, a: 255)
+        let accent: surface.Color = surface.Color(r: 76, g: 154, b: 185, a: 255)
+        let warning: surface.Color = surface.Color(r: 224, g: 163, b: 62, a: 255)
+        let text: surface.Color = surface.Color(r: 231, g: 237, b: 244, a: 255)
+        let clear_status: Int = draw.clear(ctx, bg)
+        let nav_status: Int = draw.rect(ctx, surface.Rect(x: 0, y: 0, w: 220, h: 760), nav)
+        let title_status: Int = draw.text(ctx, "Tetra Control Center", 24, 24, text)
+        let dashboard_status: Int = draw.rect_outline(ctx, dashboard_tab, text)
+        let profiles_status: Int = draw.rect_outline(ctx, profiles_tab, accent)
+        let fans_status: Int = draw.rect_outline(ctx, fans_tab, text)
+        let diagnostics_status: Int = draw.rect_outline(ctx, diagnostics_tab, text)
+        let logs_status: Int = draw.rect_outline(ctx, logs_tab, text)
+        let settings_status: Int = draw.rect_outline(ctx, settings_tab, text)
+        let body_status: Int = draw.rect(ctx, surface.Rect(x: 250, y: 32, w: 880, h: 670), panel)
+        let active_status: Int = draw.text(ctx, "activeScreenText", 280, 60, text)
+        let profile_status: Int = draw.text(ctx, "selectedProfileText", 280, 92, accent)
+        let request_status: Int = draw.text(ctx, "profileRequestText", 280, 124, text)
+        let dry_run_status: Int = draw.text(ctx, "dryRunText", 280, 156, warning)
+        let action_status: Int = draw.text(ctx, "lastActionText", 280, 188, text)
+        let quiet_status: Int = draw.rect_outline(ctx, quiet_button, text)
+        let balanced_status: Int = draw.rect_outline(ctx, balanced_button, accent)
+        let performance_status: Int = draw.rect_outline(ctx, performance_button, warning)
+        let custom_status: Int = draw.rect_outline(ctx, custom_button, text)
+        let dry_run_button_status: Int = draw.rect(ctx, dry_run_button, warning)
+        let refresh_status: Int = draw.rect(ctx, refresh_button, accent)
+        let command_status: Int = draw.rect_outline(ctx, command_button, accent)
+        let dialog_status: Int = draw.rect_outline(ctx, blocked_dialog_button, warning)
+        let settings_edit_status: Int = draw.rect_outline(ctx, settings_edit_button, text)
+        let log_row_status: Int = draw.rect_outline(ctx, log_row_button, text)
+        let error_retry_status: Int = draw.rect_outline(ctx, error_retry_button, warning)
+        let status_bar_status: Int = draw.rect(ctx, status_bar, nav)
+        let command_text_status: Int = draw.text(ctx, "commandPaletteSurface", 660, 328, text)
+        let settings_text_status: Int = draw.text(ctx, "settingsEditSurface", 292, 394, text)
+        let log_text_status: Int = draw.text(ctx, "logOutputSurface", 292, 450, text)
+        let error_text_status: Int = draw.text(ctx, "retryErrorSurface", 668, 450, text)
+        let status_text_status: Int = draw.text(ctx, "appShellStatusSurface", 268, 712, text)
+        let nav_draw: Int = clear_status + nav_status + title_status
+        let tab_draw: Int = dashboard_status + profiles_status + fans_status
+        let tab_tail_draw: Int = diagnostics_status + logs_status + settings_status
+        let content_draw: Int = body_status + active_status + profile_status
+        let content_tail: Int = request_status + dry_run_status + action_status
+        let profile_draw: Int = quiet_status + balanced_status + performance_status + custom_status
+        let action_draw: Int = dry_run_button_status + refresh_status + command_status
+        let dialog_draw: Int = dialog_status + settings_edit_status + log_row_status
+        let error_draw: Int = error_retry_status + status_bar_status
+        let text_draw: Int = command_text_status + settings_text_status + log_text_status
+        let text_tail_draw: Int = error_text_status + status_text_status
+        let state_count: Int = self.refreshCount + self.settingsEditCount + self.selectedLog
+        let retry_count: Int = self.errorRetryCount + bool_count(self.commandPaletteOpen)
+        let dialog_count: Int = bool_count(self.blockedDialogOpen)
+        let draw_head: Int = nav_draw + tab_draw + tab_tail_draw + content_draw
+        let draw_mid: Int = content_tail + profile_draw + action_draw + dialog_draw
+        let draw_tail: Int = error_draw + text_draw + text_tail_draw
+        return draw_head + draw_mid + draw_tail + state_count + retry_count + dialog_count
+    func event(self: inout ControlCenterSurface, event: surface.Event) -> Int:
+        let dashboard_tab: surface.Rect = surface.Rect(x: 24, y: 80, w: 160, h: 36)
+        let profiles_tab: surface.Rect = surface.Rect(x: 24, y: 124, w: 160, h: 36)
+        let fans_tab: surface.Rect = surface.Rect(x: 24, y: 168, w: 160, h: 36)
+        let diagnostics_tab: surface.Rect = surface.Rect(x: 24, y: 212, w: 160, h: 36)
+        let logs_tab: surface.Rect = surface.Rect(x: 24, y: 256, w: 160, h: 36)
+        let settings_tab: surface.Rect = surface.Rect(x: 24, y: 300, w: 160, h: 36)
+        let quiet_button: surface.Rect = surface.Rect(x: 280, y: 248, w: 120, h: 36)
+        let balanced_button: surface.Rect = surface.Rect(x: 416, y: 248, w: 120, h: 36)
+        let performance_button: surface.Rect = surface.Rect(x: 552, y: 248, w: 140, h: 36)
+        let custom_button: surface.Rect = surface.Rect(x: 708, y: 248, w: 120, h: 36)
+        let dry_run_button: surface.Rect = surface.Rect(x: 280, y: 316, w: 160, h: 40)
+        let refresh_button: surface.Rect = surface.Rect(x: 456, y: 316, w: 160, h: 40)
+        let command_button: surface.Rect = surface.Rect(x: 648, y: 316, w: 160, h: 40)
+        let blocked_dialog_button: surface.Rect = surface.Rect(x: 812, y: 316, w: 180, h: 40)
+        let settings_edit_button: surface.Rect = surface.Rect(x: 280, y: 384, w: 180, h: 36)
+        let log_row_button: surface.Rect = surface.Rect(x: 280, y: 440, w: 360, h: 36)
+        let error_retry_button: surface.Rect = surface.Rect(x: 656, y: 440, w: 140, h: 36)
+        if event.kind != surface.event_mouse_up():
+            return 0
+        if rect_contains(dashboard_tab, event.x, event.y):
+            self.activeScreen = 1
+            return 1
+        if rect_contains(profiles_tab, event.x, event.y):
+            self.activeScreen = 2
+            return 1
+        if rect_contains(fans_tab, event.x, event.y):
+            self.activeScreen = 3
+            return 1
+        if rect_contains(diagnostics_tab, event.x, event.y):
+            self.activeScreen = 4
+            return 1
+        if rect_contains(logs_tab, event.x, event.y):
+            self.activeScreen = 5
+            return 1
+        if rect_contains(settings_tab, event.x, event.y):
+            self.activeScreen = 6
+            return 1
+        if rect_contains(quiet_button, event.x, event.y):
+            self.selectedProfile = 1
+            return 1
+        if rect_contains(balanced_button, event.x, event.y):
+            self.selectedProfile = 2
+            return 1
+        if rect_contains(performance_button, event.x, event.y):
+            self.selectedProfile = 3
+            return 1
+        if rect_contains(custom_button, event.x, event.y):
+            self.selectedProfile = 4
+            return 1
+        if rect_contains(dry_run_button, event.x, event.y):
+            if self.dryRunEnabled:
+                self.dryRunEnabled = false
+            else:
+                self.dryRunEnabled = true
+            return 1
+        if rect_contains(refresh_button, event.x, event.y):
+            self.refreshCount = self.refreshCount + 1
+            return 1
+        if rect_contains(command_button, event.x, event.y):
+            self.commandPaletteOpen = true
+            self.activeScreen = 7
+            return 1
+        if rect_contains(blocked_dialog_button, event.x, event.y):
+            self.blockedDialogOpen = true
+            return 1
+        if rect_contains(settings_edit_button, event.x, event.y):
+            self.activeScreen = 6
+            self.settingsEditCount = self.settingsEditCount + 1
+            return 1
+        if rect_contains(log_row_button, event.x, event.y):
+            self.activeScreen = 5
+            self.selectedLog = 1
+            return 1
+        if rect_contains(error_retry_button, event.x, event.y):
+            self.activeScreen = 4
+            self.errorRetryCount = self.errorRetryCount + 1
+            return 1
+        return 0
+
+func flagship_root_block(rect: surface.Rect) -> block.Block:
+    let paint: block.PaintSpec = block.paint_stack2(block.paint_layer_fill_radius(morph.theme_dark(), 0), block.paint_layer_overlay(morph.accent(), 42, 0))
+    let props: block.BlockProps = block.props(block.layout_overlay(rect, 0), paint, block.text_none(), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_region(24), block.asset_none())
+    return block.make(block.id(1), block.id_none(), props)
+
+func build_flagship_recipe_evidence(active_screen: Int, selected_profile: Int, dry_run: Bool, refresh_count: Int, command_open: Bool, settings_edit_count: Int, selected_log: Int, error_retry_count: Int, blocked_dialog_open: Bool) -> FlagshipRecipeEvidence
+uses alloc, mem:
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 1180, h: 760)
+    let shell_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 1180, h: 760)
+    let nav_rect: surface.Rect = surface.Rect(x: 24, y: 80, w: 160, h: 256)
+    let toolbar_rect: surface.Rect = surface.Rect(x: 250, y: 32, w: 880, h: 44)
+    let dashboard_rect: surface.Rect = surface.Rect(x: 250, y: 92, w: 420, h: 190)
+    let command_rect: surface.Rect = surface.Rect(x: 690, y: 92, w: 360, h: 48)
+    let settings_rect: surface.Rect = surface.Rect(x: 690, y: 154, w: 360, h: 48)
+    let logs_rect: surface.Rect = surface.Rect(x: 280, y: 432, w: 360, h: 36)
+    let status_rect: surface.Rect = surface.Rect(x: 250, y: 704, w: 880, h: 32)
+    let error_rect: surface.Rect = surface.Rect(x: 656, y: 432, w: 220, h: 36)
+    let dialog_rect: surface.Rect = surface.Rect(x: 690, y: 220, w: 360, h: 74)
+    let metric_rect: surface.Rect = surface.Rect(x: 280, y: 116, w: 160, h: 72)
+    let toast_rect: surface.Rect = surface.Rect(x: 456, y: 116, w: 180, h: 72)
+    let tab_rect: surface.Rect = surface.Rect(x: 280, y: 204, w: 160, h: 36)
+    let empty_rect: surface.Rect = surface.Rect(x: 456, y: 204, w: 180, h: 36)
+    let rebuild_rect: surface.Rect = surface.Rect(x: 456, y: 316, w: 160, h: 40)
+    let profile_rect: surface.Rect = surface.Rect(x: 552, y: 248, w: 140, h: 36)
+    let state_rect: surface.Rect = surface.Rect(x: 690, y: 316, w: 220, h: 32)
+    let app_shell_recipe: morph.Recipe = morph.recipe_app_shell()
+    let nav_recipe: morph.Recipe = morph.recipe_nav_item()
+    let toolbar_recipe: morph.Recipe = morph.recipe_toolbar()
+    let tab_recipe: morph.Recipe = morph.recipe_tab_item()
+    let split_recipe: morph.Recipe = morph.recipe_split_pane()
+    let status_recipe: morph.Recipe = morph.recipe_status_bar()
+    let command_recipe: morph.Recipe = morph.recipe_command_item()
+    let settings_recipe: morph.Recipe = morph.recipe_settings_form()
+    let log_recipe: morph.Recipe = morph.recipe_log_row()
+    let metric_recipe: morph.Recipe = morph.recipe_metric_tile()
+    let toast_recipe: morph.Recipe = morph.recipe_toast_notification()
+    let dialog_recipe: morph.Recipe = morph.recipe_dialog_panel()
+    let empty_recipe: morph.Recipe = morph.recipe_empty_state()
+    let error_recipe: morph.Recipe = morph.recipe_error_panel()
+    let action_recipe: morph.Recipe = morph.recipe_control_action()
+    let region_recipe: morph.Recipe = morph.recipe_region_panel()
+    var tree: block.BlockTree = block.tree_init(24)
+    let root: Int = block.tree_add_root(tree, flagship_root_block(root_rect), root_rect)
+    let parent_root: block.BlockID = block.id(1)
+    let parent_shell: block.BlockID = block.id(2)
+    let parent_dashboard: block.BlockID = block.id(5)
+    let shell_block: block.Block = morph.expand_region_panel(2, 1, shell_rect, 18)
+    let shell: Int = block.tree_add_child(tree, parent_root, shell_block, shell_rect)
+    let nav_active: Bool = active_screen == 2
+    let nav_block: block.Block = morph.expand_control_action(3, 2, nav_rect, 10, 1401, nav_active)
+    let nav: Int = block.tree_add_child(tree, parent_shell, nav_block, nav_rect)
+    let tb: block.Block = morph.expand_control_action(4, 2, toolbar_rect, 12, 1402, command_open)
+    let toolbar: Int = block.tree_add_child(tree, parent_shell, tb, toolbar_rect)
+    let dashboard_block: block.Block = morph.expand_region_panel(5, 2, dashboard_rect, 16)
+    let dashboard: Int = block.tree_add_child(tree, parent_shell, dashboard_block, dashboard_rect)
+    let command_block: block.Block = morph.expand_field_text(6, 5, 18, command_rect, 18, 8)
+    let command: Int = block.tree_add_child(tree, parent_dashboard, command_block, command_rect)
+    let settings_block: block.Block = morph.expand_field_text(7, 5, 18, settings_rect, 18, 8)
+    let settings: Int = block.tree_add_child(tree, parent_dashboard, settings_block, settings_rect)
+    let log_active: Bool = selected_log > 0
+    let logs_block: block.Block = morph.expand_control_action(8, 5, logs_rect, 14, 1403, log_active)
+    let logs: Int = block.tree_add_child(tree, parent_dashboard, logs_block, logs_rect)
+    let status_block: block.Block = morph.expand_label(9, 2, 6, status_rect, 18)
+    let status: Int = block.tree_add_child(tree, parent_shell, status_block, status_rect)
+    let error_active: Bool = error_retry_count > 0
+    let eb: block.Block = morph.expand_control_action(10, 5, error_rect, 13, 1404, error_active)
+    let error: Int = block.tree_add_child(tree, parent_dashboard, eb, error_rect)
+    let dialog_block: block.Block = morph.expand_region_panel(11, 2, dialog_rect, 20)
+    let dialog: Int = block.tree_add_child(tree, parent_shell, dialog_block, dialog_rect)
+    let metric_b: block.Block = morph.expand_control_action(12, 5, metric_rect, 12, 1405, dry_run)
+    let metric: Int = block.tree_add_child(tree, parent_dashboard, metric_b, metric_rect)
+    let toast_active: Bool = refresh_count > 0
+    let tt: block.Block = morph.expand_control_action(13, 5, toast_rect, 15, 1406, toast_active)
+    let toast: Int = block.tree_add_child(tree, parent_dashboard, tt, toast_rect)
+    let tab_active: Bool = active_screen == 5
+    let tab_block: block.Block = morph.expand_control_action(14, 5, tab_rect, 10, 1407, tab_active)
+    let tab: Int = block.tree_add_child(tree, parent_dashboard, tab_block, tab_rect)
+    let empty_block: block.Block = morph.expand_control_action(15, 5, empty_rect, 11, 1408, false)
+    let empty: Int = block.tree_add_child(tree, parent_dashboard, empty_block, empty_rect)
+    let rb: block.Block = morph.expand_control_action(16, 5, rebuild_rect, 14, 1409, toast_active)
+    let rebuild: Int = block.tree_add_child(tree, parent_dashboard, rb, rebuild_rect)
+    let profile_active: Bool = selected_profile == 3
+    let pb: block.Block = morph.expand_control_action(17, 5, profile_rect, 12, 1410, profile_active)
+    let profile: Int = block.tree_add_child(tree, parent_dashboard, pb, profile_rect)
+    let app_state_block: block.Block = morph.expand_label(18, 2, 7, state_rect, 18)
+    let app_state: Int = block.tree_add_child(tree, parent_shell, app_state_block, state_rect)
+    let id2: block.BlockID = block.id(2)
+    let id3: block.BlockID = block.id(3)
+    let id4: block.BlockID = block.id(4)
+    let id5: block.BlockID = block.id(5)
+    let id6: block.BlockID = block.id(6)
+    let id7: block.BlockID = block.id(7)
+    let id8: block.BlockID = block.id(8)
+    let id9: block.BlockID = block.id(9)
+    let id10: block.BlockID = block.id(10)
+    let id11: block.BlockID = block.id(11)
+    let id12: block.BlockID = block.id(12)
+    let id13: block.BlockID = block.id(13)
+    let id14: block.BlockID = block.id(14)
+    let id15: block.BlockID = block.id(15)
+    let id16: block.BlockID = block.id(16)
+    let app_shell_expansion: morph.RecipeExpansion = morph.recipe_expansion(app_shell_recipe, id2)
+    let nav_expansion: morph.RecipeExpansion = morph.recipe_expansion(nav_recipe, id3)
+    let toolbar_expansion: morph.RecipeExpansion = morph.recipe_expansion(toolbar_recipe, id4)
+    let tab_expansion: morph.RecipeExpansion = morph.recipe_expansion(tab_recipe, id14)
+    let split_expansion: morph.RecipeExpansion = morph.recipe_expansion(split_recipe, id5)
+    let status_expansion: morph.RecipeExpansion = morph.recipe_expansion(status_recipe, id9)
+    let command_expansion: morph.RecipeExpansion = morph.recipe_expansion(command_recipe, id6)
+    let settings_expansion: morph.RecipeExpansion = morph.recipe_expansion(settings_recipe, id7)
+    let log_expansion: morph.RecipeExpansion = morph.recipe_expansion(log_recipe, id8)
+    let metric_expansion: morph.RecipeExpansion = morph.recipe_expansion(metric_recipe, id12)
+    let toast_expansion: morph.RecipeExpansion = morph.recipe_expansion(toast_recipe, id13)
+    let dialog_expansion: morph.RecipeExpansion = morph.recipe_expansion(dialog_recipe, id11)
+    let empty_expansion: morph.RecipeExpansion = morph.recipe_expansion(empty_recipe, id15)
+    let error_expansion: morph.RecipeExpansion = morph.recipe_expansion(error_recipe, id10)
+    let action_expansion: morph.RecipeExpansion = morph.recipe_expansion(action_recipe, id16)
+    let region_expansion: morph.RecipeExpansion = morph.recipe_expansion(region_recipe, id5)
+    let recipe_shell_ok: Bool = morph.recipe_expands_to_block(app_shell_recipe)
+    let recipe_nav_ok: Bool = morph.recipe_expands_to_block(nav_recipe)
+    let recipe_toolbar_ok: Bool = morph.recipe_expands_to_block(toolbar_recipe)
+    let recipe_tab_ok: Bool = morph.recipe_expands_to_block(tab_recipe)
+    let recipe_split_ok: Bool = morph.recipe_expands_to_block(split_recipe)
+    let recipe_status_ok: Bool = morph.recipe_expands_to_block(status_recipe)
+    let recipe_command_ok: Bool = morph.recipe_expands_to_block(command_recipe)
+    let recipe_settings_ok: Bool = morph.recipe_expands_to_block(settings_recipe)
+    let recipe_log_ok: Bool = morph.recipe_expands_to_block(log_recipe)
+    let recipe_metric_ok: Bool = morph.recipe_expands_to_block(metric_recipe)
+    let recipe_toast_ok: Bool = morph.recipe_expands_to_block(toast_recipe)
+    let recipe_dialog_ok: Bool = morph.recipe_expands_to_block(dialog_recipe)
+    let recipe_empty_ok: Bool = morph.recipe_expands_to_block(empty_recipe)
+    let recipe_error_ok: Bool = morph.recipe_expands_to_block(error_recipe)
+    let recipe_action_ok: Bool = morph.recipe_expands_to_block(action_recipe)
+    let recipe_region_ok: Bool = morph.recipe_expands_to_block(region_recipe)
+    let recipes_safe_a1: Bool = recipe_shell_ok && recipe_nav_ok
+    let recipes_safe_a2: Bool = recipe_toolbar_ok && recipe_tab_ok
+    let recipes_safe_a: Bool = recipes_safe_a1 && recipes_safe_a2
+    let recipes_safe_b: Bool = recipe_split_ok && recipe_status_ok && recipe_command_ok
+    let recipes_safe_c: Bool = recipe_settings_ok && recipe_log_ok && recipe_metric_ok
+    let recipes_safe_d: Bool = recipe_toast_ok && recipe_dialog_ok && recipe_empty_ok
+    let recipes_safe_e: Bool = recipe_error_ok && recipe_action_ok && recipe_region_ok
+    let recipes_safe_head: Bool = recipes_safe_a && recipes_safe_b && recipes_safe_c
+    let recipes_safe_tail: Bool = recipes_safe_d && recipes_safe_e
+    let recipes_safe: Bool = recipes_safe_head && recipes_safe_tail
+    let app_shell_ok: Bool = morph.expansion_valid(app_shell_expansion)
+    let nav_ok: Bool = morph.expansion_valid(nav_expansion)
+    let toolbar_ok: Bool = morph.expansion_valid(toolbar_expansion)
+    let tab_ok: Bool = morph.expansion_valid(tab_expansion)
+    let split_ok: Bool = morph.expansion_valid(split_expansion)
+    let status_ok: Bool = morph.expansion_valid(status_expansion)
+    let command_ok: Bool = morph.expansion_valid(command_expansion)
+    let settings_ok: Bool = morph.expansion_valid(settings_expansion)
+    let log_ok: Bool = morph.expansion_valid(log_expansion)
+    let metric_ok: Bool = morph.expansion_valid(metric_expansion)
+    let toast_ok: Bool = morph.expansion_valid(toast_expansion)
+    let dialog_ok: Bool = morph.expansion_valid(dialog_expansion)
+    let empty_ok: Bool = morph.expansion_valid(empty_expansion)
+    let error_ok: Bool = morph.expansion_valid(error_expansion)
+    let action_ok: Bool = morph.expansion_valid(action_expansion)
+    let region_ok: Bool = morph.expansion_valid(region_expansion)
+    let expansion_a: Bool = app_shell_ok && nav_ok && toolbar_ok && tab_ok
+    let expansion_b: Bool = split_ok && status_ok && command_ok && settings_ok
+    let expansion_c: Bool = log_ok && metric_ok && toast_ok && dialog_ok
+    let expansion_d: Bool = empty_ok && error_ok && action_ok && region_ok
+    let expansions_valid: Bool = expansion_a && expansion_b && expansion_c && expansion_d
+    let state_count_a: Int = active_screen + selected_profile + refresh_count
+    let state_count_b: Int = settings_edit_count + selected_log + error_retry_count
+    let app_shell_state_count: Int = state_count_a + state_count_b
+    let blocked_dialog_count: Int = bool_count(blocked_dialog_open)
+    let interaction_a: Int = refresh_count + settings_edit_count + selected_log
+    let interaction_b: Int = error_retry_count + bool_count(command_open)
+    let interaction_c: Int = blocked_dialog_count + selected_profile
+    let interaction_count: Int = interaction_a + interaction_b + interaction_c
+    let valid: Int = block.tree_validate(tree)
+    let shell_ok: Bool = root == 1 && shell == 2 && nav == 3 && toolbar == 4
+    let dashboard_ok: Bool = dashboard == 5 && command == 6 && settings == 7 && logs == 8
+    let status_ids_ok: Bool = status == 9 && error == 10 && dialog == 11
+    let metrics_ok: Bool = metric == 12 && toast == 13 && tab == 14 && empty == 15
+    let action_ids_ok: Bool = rebuild == 16 && profile == 17 && app_state == 18
+    if shell_ok && dashboard_ok && status_ids_ok && metrics_ok && action_ids_ok:
+        return FlagshipRecipeEvidence(recipe_count: 16, block_count: block.tree_len(tree), product_surface_count: 9, interaction_count: interaction_count, app_shell_state_count: app_shell_state_count, tree_status: valid, recipes_safe: recipes_safe, expansions_valid: expansions_valid, a11y_projection: morph.accessibility_projection_ok(18, 7, 18))
+    return FlagshipRecipeEvidence(recipe_count: 0, block_count: block.tree_len(tree), product_surface_count: 0, interaction_count: interaction_count, app_shell_state_count: app_shell_state_count, tree_status: valid, recipes_safe: false, expansions_valid: false, a11y_projection: false)
+
+func bool_count(value: Bool) -> Int:
+    if value:
+        return 1
+    return 0
+
+func flagship_recipe_ready(evidence: FlagshipRecipeEvidence) -> Int:
+    let count_ok: Bool = evidence.recipe_count == 16 && evidence.block_count == 18
+    let surface_ok: Bool = evidence.product_surface_count >= 9 && evidence.interaction_count >= 8
+    let state_ok: Bool = evidence.app_shell_state_count > 0
+    let tree_ok: Bool = evidence.tree_status == block.tree_error_ok()
+    let recipe_ok: Bool = evidence.recipes_safe && evidence.expansions_valid
+    let a11y_ok: Bool = evidence.a11y_projection && morph.capsule_self_check()
+    if count_ok && surface_ok && state_ok && tree_ok && recipe_ok && a11y_ok:
+        return 0
+    return 1
+
+func rect_contains(rect: surface.Rect, x: Int, y: Int) -> Bool:
+    return x >= rect.x && y >= rect.y && x < rect.x + rect.w && y < rect.y + rect.h
+
+func main() -> Int
+uses alloc, mem, surface:
+    var app: ControlCenterSurface = ControlCenterSurface(activeScreen: 1, selectedProfile: 2, dryRunEnabled: true, refreshCount: 0, commandPaletteOpen: false, settingsEditCount: 0, selectedLog: 0, errorRetryCount: 0, blockedDialogOpen: false)
+    var win: surface.Surface = surface.open("Surface Migration Control Center", 1180, 760)
+    let open_profiles: surface.Event = surface.Event(kind: surface.event_mouse_up(), x: 48, y: 140, button: 1, key: 0, width: 1180, height: 760, timestamp_ms: 1, text_len: 0)
+    let profiles_status: Int = ControlCenterSurface.event(app, open_profiles)
+    let choose_performance: surface.Event = surface.Event(kind: surface.event_mouse_up(), x: 580, y: 264, button: 1, key: 0, width: 1180, height: 760, timestamp_ms: 2, text_len: 0)
+    let performance_status: Int = ControlCenterSurface.event(app, choose_performance)
+    let toggle_dry_run: surface.Event = surface.Event(kind: surface.event_mouse_up(), x: 300, y: 336, button: 1, key: 0, width: 1180, height: 760, timestamp_ms: 3, text_len: 0)
+    let dry_run_status: Int = ControlCenterSurface.event(app, toggle_dry_run)
+    let refresh: surface.Event = surface.Event(kind: surface.event_mouse_up(), x: 480, y: 336, button: 1, key: 0, width: 1180, height: 760, timestamp_ms: 4, text_len: 0)
+    let refresh_status: Int = ControlCenterSurface.event(app, refresh)
+    let open_command: surface.Event = surface.Event(kind: surface.event_mouse_up(), x: 680, y: 336, button: 1, key: 0, width: 1180, height: 760, timestamp_ms: 5, text_len: 0)
+    let command_status: Int = ControlCenterSurface.event(app, open_command)
+    let edit_settings: surface.Event = surface.Event(kind: surface.event_mouse_up(), x: 300, y: 400, button: 1, key: 0, width: 1180, height: 760, timestamp_ms: 6, text_len: 0)
+    let settings_status: Int = ControlCenterSurface.event(app, edit_settings)
+    let select_log: surface.Event = surface.Event(kind: surface.event_mouse_up(), x: 320, y: 452, button: 1, key: 0, width: 1180, height: 760, timestamp_ms: 7, text_len: 0)
+    let log_status: Int = ControlCenterSurface.event(app, select_log)
+    let retry_error: surface.Event = surface.Event(kind: surface.event_mouse_up(), x: 680, y: 452, button: 1, key: 0, width: 1180, height: 760, timestamp_ms: 8, text_len: 0)
+    let error_status: Int = ControlCenterSurface.event(app, retry_error)
+    let open_blocked_dialog: surface.Event = surface.Event(kind: surface.event_mouse_up(), x: 840, y: 336, button: 1, key: 0, width: 1180, height: 760, timestamp_ms: 9, text_len: 0)
+    let blocked_dialog_status: Int = ControlCenterSurface.event(app, open_blocked_dialog)
+    let a: Int = app.activeScreen
+    let p: Int = app.selectedProfile
+    let d: Bool = app.dryRunEnabled
+    let rc: Int = app.refreshCount
+    let co: Bool = app.commandPaletteOpen
+    let se: Int = app.settingsEditCount
+    let sl: Int = app.selectedLog
+    let er: Int = app.errorRetryCount
+    let bd: Bool = app.blockedDialogOpen
+    let e: FlagshipRecipeEvidence = build_flagship_recipe_evidence(a, p, d, rc, co, se, sl, er, bd)
+    let recipe_status: Int = flagship_recipe_ready(e)
+    if recipe_status != 0:
+        return 2
+    var before_frame: surface.Frame = surface.begin_frame(win)
+    var before_ctx: draw.DrawContext = draw.DrawContext(frame: before_frame)
+    let before_draw: Int = ControlCenterSurface.draw(app, before_ctx)
+    let first_presented: Int = surface.present(before_ctx.frame)
+    let browser_click: surface.Event = surface.poll_event(win)
+    let browser_text: surface.Event = surface.poll_event(win)
+    var text_bytes: []u8 = core.make_u8(4)
+    let host_text_len: Int = surface.poll_event_text_len(win)
+    let copied_text_len: Int = surface.poll_event_text_into(win, text_bytes)
+    let browser_key: surface.Event = surface.poll_event(win)
+    let browser_resize: surface.Event = surface.poll_event(win)
+    let browser_click_status: Int = ControlCenterSurface.event(app, browser_click)
+    if browser_resize.kind == surface.event_resize():
+        win.width = browser_resize.width
+        win.height = browser_resize.height
+    var after_frame: surface.Frame = surface.begin_frame(win)
+    var after_ctx: draw.DrawContext = draw.DrawContext(frame: after_frame)
+    let after_draw: Int = ControlCenterSurface.draw(app, after_ctx)
+    let second_presented: Int = surface.present(after_ctx.frame)
+    let closed: Int = surface.close(win)
+    let profile_flow: Int = profiles_status + performance_status + dry_run_status
+    let action_flow: Int = refresh_status + command_status + settings_status + log_status
+    let error_flow: Int = error_status + blocked_dialog_status + before_draw + first_presented
+    let browser_flow: Int = browser_click_status + after_draw + second_presented + closed
+    let flow_status: Int = profile_flow + action_flow + error_flow + browser_flow
+    let text_ok: Bool = host_text_len >= copied_text_len
+    let event_ok: Bool = browser_text.kind >= 0 && browser_key.kind >= 0
+    if flow_status > 0 && text_ok && event_ok:
+        return 5
+    return 3

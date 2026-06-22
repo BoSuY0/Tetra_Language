@@ -200,6 +200,7 @@ func ValidatePerCoreSchedulerCoverage(report PerCoreSchedulerCoverageReport) err
 		"bounded typed mailboxes",
 		"TypedMailbox",
 		"Capacity",
+		"Drain",
 	); err != nil {
 		return err
 	}
@@ -337,15 +338,25 @@ func boundedTypedMailboxesRow() PerCoreSchedulerEvidenceRow {
 			"bounded typed mailboxes are represented by TypedMailbox",
 			"TypedMailbox Capacity is stable and positive",
 			"typed mailbox ownership metadata is preserved",
+			"TypedMailbox Drain reclaims queued owned payload bytes exactly once",
+			"SchedulerModel DrainActorOwnedRegions reclaims moved actor-owned regions exactly once",
 		},
 		Evidence: ("compiler/internal/parallelrt/scheduler_model.go::TypedMailbox; " +
+			"compiler/internal/parallelrt/scheduler_model.go::TypedMailbox.Drain; " +
+			"compiler/internal/parallelrt/scheduler_model.go::SchedulerModel." +
+			"DrainActorOwnedRegions; " +
 			"compiler/internal/parallelrt/scheduler_model_" +
 			"test.go::TestTypedMailboxPreservesCapacityBackpressureAndOwnershipMetada" +
-			"ta; compiler/compiler_suite_" +
+			"ta; compiler/internal/parallelrt/scheduler_model_" +
+			"test.go::TestTypedMailboxDrainReclaimsOwnedRegionPayloadsExactlyOnce; " +
+			"compiler/internal/parallelrt/scheduler_model_" +
+			"test.go::TestSchedulerDrainActorOwnedRegionsReclaimsMovedPayloadsExactlyOnce; " +
+			"compiler/compiler_suite_" +
 			"test.go::TestActorsTypedMailboxExplainReportIncludesMetadataAndCopyMove"),
 		Boundary: ("bounded mailbox evidence covers typed mailbox model/report " +
-			"paths and existing actor mailbox smokes; it does not add a new " +
-			"distributed mailbox protocol"),
+			"paths, drain/reclaim model evidence, scheduler ownership-ledger cleanup, " +
+			"and existing actor mailbox smokes; it does not add a new distributed " +
+			"mailbox protocol or production payload destructor table"),
 	}
 }
 
@@ -400,6 +411,7 @@ func structuredTaskGroupsRow() PerCoreSchedulerEvidenceRow {
 			"structured task groups lower to __tetra_task_group_open",
 			"structured task groups lower to __tetra_task_group_close",
 			"task_group_current and task_group_status expose group lifecycle state",
+			"typed task joins and result getters clear target/current result slots after use",
 		},
 		Evidence: ("compiler/compiler_suite_" +
 			"test.go::TestRequiredTaskGroupRuntimeSymbolsIncludeCancellationABI; " +
@@ -407,7 +419,11 @@ func structuredTaskGroupsRow() PerCoreSchedulerEvidenceRow {
 			"compiler/compiler_suite_" +
 			"test.go::TestTaskGroupCurrentVisibleInGroupTaskBuildAndRun; compiler/" +
 			"compiler_suite_" +
-			"test.go::TestTaskGroupCloseMarksOpenGroupClosedBuildAndRun"),
+			"test.go::TestTaskGroupCloseMarksOpenGroupClosedBuildAndRun; " +
+			"compiler/internal/actorsrt/actorsrt_suite_test.go::" +
+			"TestEmitTaskJoinTypedClearsTargetResultSlotsAfterJoin; " +
+			"compiler/internal/actorsrt/actorsrt_suite_test.go::" +
+			"TestEmitTaskResultGetClearsCurrentStagedSlotAfterRead"),
 		Boundary: ("task-group evidence covers current cooperative structured task " +
 			"groups; full structured concurrency guarantees across actors and " +
 			"distributed runtime remain outside this row"),

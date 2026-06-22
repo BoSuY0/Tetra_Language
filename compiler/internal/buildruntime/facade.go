@@ -53,6 +53,12 @@ func CollectActorRuntimeUsagePosition(checked *semantics.CheckedProgram) (bool, 
 	return actors.CollectActorRuntimeUsagePosition(checked)
 }
 
+func CollectActorSystemReceiveRuntimeUsagePosition(
+	checked *semantics.CheckedProgram,
+) (bool, frontend.Position) {
+	return actors.CollectActorSystemReceiveRuntimeUsagePosition(checked)
+}
+
 func CollectTaskRuntimeUsage(checked *semantics.CheckedProgram) bool {
 	return actors.CollectTaskRuntimeUsage(checked)
 }

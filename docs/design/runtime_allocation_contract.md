@@ -4,9 +4,9 @@ Status: P15.4 domain-aware allocation report evidence. This document defines the
 that P5 runtime implementations must satisfy before claiming faster heap or
 region allocation. P5.1 implements the first `linux-x64` safe-slice small heap
 path; P5.2 hardens explicit island/region allocation; P5.3 lets the planner
-name bounded function-local temporary regions while the backend still reports
-the current heap fallback; P15.2 upgrades the small safe-slice evidence to a
-per-core/thread-local allocator ABI with size-class free-list reuse; P15.3 adds
+name bounded function-local temporary regions; P0.1 truth correction names the
+active emitted small heap `process_bump_small_heap_v0` and the current
+function-temp region `scoped_single_mapping_v0`; P15.3 adds
 raw allocation-base metadata for unsafe `core.alloc_bytes` reports while keeping
 arbitrary raw pointers checked and external/unknown; P15.4 adds domain-aware
 allocation report metadata for process/default and explicit-island ownership
@@ -43,8 +43,9 @@ All runtime allocation APIs have a contract entry in
 Every contract defines:
 
 - the API name;
-- the runtime path (`heap`, `small_heap_bump`, `per_core_small_heap`, `large_mmap`,
-  `planner_selected`, `explicit_island`, or `region`);
+- the runtime path (`heap`, `process_bump_small_heap_v0`, `small_heap_bump`,
+  `per_core_small_heap`, `large_mmap`, `planner_selected`, `explicit_island`,
+  `scoped_single_mapping_v0`, or `region`);
 - minimum returned-pointer alignment;
 - zero-size behavior;
 - negative-size guard behavior;
@@ -87,18 +88,26 @@ only the region header/debug guard storage required by the current target.
   `mmap` fallback. Unsupported targets and unsafe raw allocation remain on the
   older conservative path.
 
-`small_heap_bump`
-: P5.1 `linux-x64` safe-slice fast path. The helper stores `bump` and `end`
+`process_bump_small_heap_v0`
+: Current emitted `linux-x64` safe-slice fast path. The helper stores `bump` and `end`
   pointers in writable object data, refills from the OS only when the current
   chunk is empty or full, and returns 16-byte aligned pointers. It is a no-GC
-  allocator. It remains the historical path name for pre-P15.2 evidence.
+  process-global bump allocator. It does not implement per-core state,
+  free-list reuse, per-block free, or chunk reclamation.
+
+`small_heap_bump`
+: Historical path name for pre-P0.1 evidence. New emitted-runtime evidence
+  should prefer `process_bump_small_heap_v0`.
 
 `per_core_small_heap`
-: P15.2 safe-slice allocator path. The ABI records per-core metadata
+: Model-only/future safe-slice allocator path until emitted runtime code uses it.
+  The ABI records per-core metadata
   (`bump_offset`, `chunk_refills`, free lists, allocation/free/reuse counts),
   rounds small requests into the 16-byte size classes, refills from 64 KiB
   chunks, and allows reuse only from the same core and same size class. Stale
   and double-free handles are rejected by generation metadata in the ABI model.
+  Allocation-report rows must not use this name for the active emitted
+  `linux-x64` helper until the emitted runtime has matching state and reuse.
 
 `large_mmap`
 : P5.1 safe-slice large fallback. Length checks and byte-size overflow checks
@@ -119,12 +128,15 @@ only the region header/debug guard storage required by the current target.
   also rejects negative and too-large payload sizes before the host allocator is
   called.
 
+`scoped_single_mapping_v0`
+: Current emitted function-temp region path. It maps one bounded temporary
+  allocation for the function scope and releases that mapping on reset. It is
+  not a multi-allocation arena and must not be described as mark/rewind arena
+  support.
+
 `region`
-: Compiler-owned scoped region storage. P5.3 models only the obvious
-  function-local temporary copy region. Reports name `region:<function>:temp`,
-  lifetime `function:<function>`, runtime path `region`, and the reason, while
-  also saying `actual_lowering_storage: Heap` until implicit runtime region
-  lowering exists.
+: Generic/future compiler-owned scoped region storage name. Use it only when the
+  emitted runtime actually implements the claimed arena semantics.
 
 ## Failure And Debug Behavior
 
@@ -141,6 +153,26 @@ Debug instrumentation hooks are part of the contract:
   `mprotect(PROT_NONE)`/`VirtualProtect(PAGE_NOACCESS)` where the target ABI
   supports it;
 - region paths expose reset and use-after-free instrumentation where supported.
+
+## Owned Drop / Release IR
+
+P1 introduces a typed lifecycle split in stack IR:
+
+- `IRDropOwned` represents language-level ownership destruction and consumes an
+  owned value;
+- `IRReleaseAllocation` represents the backend allocator/release action and
+  consumes the release token produced by `IRDropOwned`.
+
+Both instructions carry typed `LayoutID`, `OwnershipDomain`, and `ReleaseKind`
+fields. The P1 verifier rejects missing typed metadata, release without drop,
+drop without matching release, and double-drop/use-after-drop through locals.
+Manual `IRReleaseAllocation` lowering is wired for the Linux SysV
+`alloc_bytes` header mapping and emits `munmap` for the original mapping base
+and requested byte count plus header.
+This skeleton is intentionally not a production placement policy yet: lowering
+must add drop placement only after CFG-aware ownership analysis proves the
+source value was not moved, returned, stored into a longer-lived owner, or
+transferred across an actor/task boundary.
 
 ## Report Hooks
 
@@ -173,10 +205,11 @@ has a `summary` with allocation count, planned-storage counts,
 actual-lowering counts, runtime-path counts, requested bytes, reserved bytes,
 allocator-class counts, allocator-scope counts, allocator-reuse-policy counts,
 and per-region summaries, and validation rejects any summary that does not
-match the exact plan rows. P15.2 heap safe-slice rows use
-`runtime_path: per_core_small_heap`, `allocator_class: small_<N>`,
-`allocator_scope: core:0` for the single-threaded report model, and
-`allocator_reuse_policy: same_core_same_size_class_free_list`. P15.4 adds a
+match the exact plan rows. Current emitted heap safe-slice rows use
+`runtime_path: process_bump_small_heap_v0`, `allocator_class: small_<N>`,
+`allocator_scope: process`, and `allocator_reuse_policy: bump_no_reuse_v0`.
+They must not report released bytes or free-list reuse until the runtime
+executes those operations. P15.4 adds a
 nested `domain` object to allocation plan rows and per-domain summaries:
 default heap/small-heap/stack/register/eliminated rows are charged to
 `domain:process`, explicit islands are charged to `domain:<island-region>`,

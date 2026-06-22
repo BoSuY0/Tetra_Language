@@ -1,0 +1,63 @@
+{
+  "schema": "tetra.compiler.phase-profile.v1",
+  "target": "linux-x64",
+  "input_path": "reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_large_compile_error_reports_off_jobs_4_cold/samples/sample-05/src/app/main.t4",
+  "output_path": "reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_large_compile_error_reports_off_jobs_4_cold/samples/sample-05/out/app",
+  "report_mode": "off",
+  "requested_jobs": 4,
+  "worker_count": 0,
+  "worker_reason": "not_recorded",
+  "module_count": 13,
+  "modules_to_compile": 0,
+  "cache_hit_count": 0,
+  "compiled_module_count": 0,
+  "lowered_module_count": 0,
+  "object_count": 0,
+  "ir_function_count": 0,
+  "transient_ir_function_count": 0,
+  "allocation_plan_function_count": 0,
+  "go_heap_peak_alloc_bytes": 2536520,
+  "rss_peak_bytes": 25473024,
+  "rss_supported": true,
+  "phases": [
+    {
+      "name": "source_loading_parsing",
+      "unix_nano": 1781977027298217935,
+      "go_heap_alloc_bytes": 1597408,
+      "go_heap_sys_bytes": 15826944,
+      "rss_current_bytes": 24576000,
+      "rss_supported": true,
+      "module_count": 13,
+      "modules_to_compile": 0,
+      "cache_hit_count": 0,
+      "compiled_module_count": 0,
+      "lowered_module_count": 0,
+      "object_count": 0,
+      "ir_function_count": 0,
+      "transient_ir_function_count": 0,
+      "allocation_plan_function_count": 0
+    },
+    {
+      "name": "final_cleanup",
+      "unix_nano": 1781977027299002853,
+      "go_heap_alloc_bytes": 2536520,
+      "go_heap_sys_bytes": 15794176,
+      "rss_current_bytes": 25473024,
+      "rss_supported": true,
+      "module_count": 13,
+      "modules_to_compile": 0,
+      "cache_hit_count": 0,
+      "compiled_module_count": 0,
+      "lowered_module_count": 0,
+      "object_count": 0,
+      "ir_function_count": 0,
+      "transient_ir_function_count": 0,
+      "allocation_plan_function_count": 0
+    }
+  ],
+  "notes": [
+    "compiler phase profile records local process snapshots for P7 diagnosis",
+    "no compiler RSS reduction or cross-host RSS budget claim is made by this artifact",
+    "build ended before successful completion: /home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-p75-samples5/scenarios/p75_large_compile_error_reports_off_jobs_4_cold/samples/sample-05/src/app/main.t4:4:10: unknown function 'bench.m11.missing_value_11'"
+  ]
+}

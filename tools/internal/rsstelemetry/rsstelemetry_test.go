@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -129,6 +130,100 @@ func TestReadFileRejectsImpossibleRSSInvariants(t *testing.T) {
 	}
 }
 
+func TestReadFileV2RejectsSteadyStateWithoutRequiredPhaseSequence(t *testing.T) {
+	dir := t.TempDir()
+	raw := validRSSV2SampleMap()
+	raw["samples"] = []map[string]any{
+		{
+			"phase":         "startup",
+			"unix_nano":     int64(110),
+			"rss_bytes":     uint64(4096),
+			"mapping_count": uint64(30),
+		},
+		{
+			"phase":         "steady_round_1",
+			"unix_nano":     int64(120),
+			"rss_bytes":     uint64(4096),
+			"mapping_count": uint64(31),
+		},
+		{
+			"phase":         "pre_exit",
+			"unix_nano":     int64(130),
+			"rss_bytes":     uint64(4096),
+			"mapping_count": uint64(31),
+		},
+	}
+	path := writeRSSSidecar(t, dir, "rss-v2.json", raw)
+
+	_, err := ReadFile(path, dir)
+	if err == nil || !strings.Contains(err.Error(), "post_warmup") {
+		t.Fatalf("ReadFile v2 missing phase sequence = %v, want post_warmup rejection", err)
+	}
+}
+
+func TestReadFileV2AcceptsRequiredSteadyStatePhaseSequence(t *testing.T) {
+	dir := t.TempDir()
+	path := writeRSSSidecar(t, dir, "rss-v2.json", validRSSV2SampleMap())
+
+	sample, err := ReadFile(path, dir)
+	if err != nil {
+		t.Fatalf("ReadFile v2 phase sidecar: %v", err)
+	}
+	if sample.Schema != SchemaV2 {
+		t.Fatalf("schema = %q, want %q", sample.Schema, SchemaV2)
+	}
+}
+
+func TestReadFileV2RejectsMissingLinuxMappingCount(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		edit func(map[string]any)
+		want string
+	}{
+		{
+			name: "top level",
+			edit: func(raw map[string]any) {
+				delete(raw, "mapping_count")
+			},
+			want: "mapping_count",
+		},
+		{
+			name: "sample",
+			edit: func(raw map[string]any) {
+				samples := raw["samples"].([]map[string]any)
+				delete(samples[0], "mapping_count")
+			},
+			want: "samples[0] mapping_count",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			raw := validRSSV2SampleMap()
+			tc.edit(raw)
+			path := writeRSSSidecar(t, dir, "rss-v2.json", raw)
+
+			_, err := ReadFile(path, dir)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("ReadFile v2 missing mapping count = %v, want %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestLinuxProcessReadersCaptureCurrentProcessMappingData(t *testing.T) {
+	if runtime.GOOS != TargetOSLinux {
+		t.Skip("linux procfs readers are only available on linux")
+	}
+	pid := os.Getpid()
+	mappingCount, ok := ReadProcessMappingCount(pid)
+	if !ok || mappingCount == 0 {
+		t.Fatalf("ReadProcessMappingCount(%d) = %d, %v; want non-zero", pid, mappingCount, ok)
+	}
+	if raw, ok := ReadProcessSmapsRollup(pid); ok && !strings.Contains(string(raw), "Rss:") {
+		t.Fatalf("ReadProcessSmapsRollup(%d) missing Rss line", pid)
+	}
+}
+
 func TestReadFileRejectsArtifactOutsideRoot(t *testing.T) {
 	dir := t.TempDir()
 	outside := t.TempDir()
@@ -137,6 +232,37 @@ func TestReadFileRejectsArtifactOutsideRoot(t *testing.T) {
 	_, err := ReadFile(path, dir)
 	if err == nil || !strings.Contains(err.Error(), "artifact root") {
 		t.Fatalf("ReadFile outside root = %v, want artifact root rejection", err)
+	}
+}
+
+func validRSSV2SampleMap() map[string]any {
+	return map[string]any{
+		"schema":                 SchemaV2,
+		"method":                 MethodLinuxProcfsPhaseRSSSamplerV2,
+		"program":                "allocation_tetra",
+		"pid":                    1234,
+		"target_os":              TargetOSLinux,
+		"target_arch":            "amd64",
+		"workload_kind":          "steady_state",
+		"started_unix_nano":      int64(100),
+		"finished_unix_nano":     int64(200),
+		"exit_status":            0,
+		"sample_interval_micros": uint64(500),
+		"sample_count":           uint64(5),
+		"rss_current_bytes":      uint64(4096),
+		"rss_peak_bytes":         uint64(8192),
+		"rss_peak_source":        PeakSourceWait4RusageMaxRSS,
+		"mapping_count":          uint64(32),
+		"ru_maxrss_raw":          uint64(8),
+		"ru_maxrss_unit":         UnitKilobytes,
+		"samples": []map[string]any{
+			{"phase": "startup", "unix_nano": int64(110), "rss_bytes": uint64(4096), "mapping_count": uint64(30)},
+			{"phase": "post_warmup", "unix_nano": int64(120), "rss_bytes": uint64(4096), "mapping_count": uint64(31)},
+			{"phase": "steady_round_1", "unix_nano": int64(130), "rss_bytes": uint64(4096), "mapping_count": uint64(31)},
+			{"phase": "post_drain", "unix_nano": int64(140), "rss_bytes": uint64(4096), "mapping_count": uint64(31)},
+			{"phase": "pre_exit", "unix_nano": int64(150), "rss_bytes": uint64(4096), "mapping_count": uint64(32)},
+		},
+		"notes": []string{"test fixture"},
 	}
 }
 

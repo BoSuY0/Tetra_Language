@@ -15,79 +15,167 @@ import (
 // ---- linux_x64.go ----
 
 const (
-	schedActorsPtrOff             = 0   // u64
-	schedCapacityOff              = 8   // u32
-	schedCountOff                 = 12  // u32
-	schedRspOff                   = 16  // u64
-	schedCurrentIdxOff            = 24  // u32
-	schedMsgBaseOff               = 32  // u64
-	schedMsgBumpOff               = 40  // u64
-	schedMsgEndOff                = 48  // u64
-	schedPendingMsgOff            = 56  // u64
-	schedGroupCountOff            = 64  // u32
-	schedGroupState0Off           = 68  // u32[maxTaskGroups]
-	schedCloseGroupOff            = 100 // u32
-	schedCurrentGroupOff          = 104 // u32
-	schedSpawnGroupOff            = 108 // u32
-	schedTimeMsOff                = 112 // u32
-	schedNetFDOff                 = 116 // i32
-	schedNodeIDOff                = 120 // u32
-	schedNetStatusOff             = 124 // u32
-	schedMsgFreeOff               = 128 // u64
-	schedRecvScratchOff           = 136 // message-layout scratch for typed recv slots
-	schedMsgPoolCapacityBytesOff  = 224 // u64
-	schedMsgPoolLiveBytesOff      = 232 // u64
-	schedMsgPoolReclaimedBytesOff = 240 // u64
-	schedMsgPoolAllocFailuresOff  = 248 // u64
-	maxActors                     = 128
-	schedActorGroup0Off           = 256  // u32[maxActors]
-	schedActorWakeAt0Off          = 768  // u32[maxActors]
-	schedActorWait0Off            = 1280 // u32[maxActors]
-	schedSize                     = 1792
-	actorSizeShift                = 8 // 256 bytes
-	actorSize                     = 1 << actorSizeShift
-	actorRspOff                   = 0   // u64
-	actorStatusOff                = 8   // u32
-	actorEntryIDOff               = 12  // u32
-	actorMailboxHeadOff           = 16  // u64
-	actorMailboxTailOff           = 24  // u64
-	actorLastSenderOff            = 32  // u32
-	actorExitCodeOff              = 36  // u32
-	actorTaskCountOff             = 40  // u32
-	actorTaskSlot0Off             = 44  // u32[8]
-	actorTaskGroupOff             = 76  // u32
-	actorStateSlot0Off            = 80  // i32[8]
-	actorMailboxCountOff          = 112 // u32
-	actorMailboxBytesOff          = 120 // u64
-	actorMailboxPeakBytesOff      = 128 // u64
-	actorReclaimedBytesOff        = 136 // u64
-	actorBytesCopiedOff           = 144 // u64
-	actorCopyCountOff             = 152 // u64
-	actorByteBudgetOff            = 160 // u64
-	actorOverBudgetCountOff       = 168 // u64
-	actorBackpressureEventsOff    = 176 // u64
-	maxActorStateSlots            = 8
-	maxActorMailboxMsgs           = 256
-	maxActorMailboxBytes          = maxActorMailboxMsgs * msgSize
+	schedActorsPtrOff                     = 0   // u64
+	schedCapacityOff                      = 8   // u32
+	schedCountOff                         = 12  // u32
+	schedRspOff                           = 16  // u64
+	schedCurrentIdxOff                    = 24  // u32
+	schedMsgBaseOff                       = 32  // u64
+	schedMsgBumpOff                       = 40  // u64
+	schedMsgEndOff                        = 48  // u64
+	schedPendingMsgOff                    = 56  // u64
+	schedGroupCountOff                    = 64  // u32
+	schedGroupState0Off                   = 68  // u32[maxTaskGroups]
+	schedCloseGroupOff                    = 100 // u32
+	schedCurrentGroupOff                  = 104 // u32
+	schedSpawnGroupOff                    = 108 // u32
+	schedTimeMsOff                        = 112 // u32
+	schedNetFDOff                         = 116 // i32
+	schedNodeIDOff                        = 120 // u32
+	schedNetStatusOff                     = 124 // u32
+	schedMsgFreeOff                       = 128 // u64
+	schedRecvScratchOff                   = 136 // message-layout scratch for typed recv slots
+	schedMsgPoolCapacityBytesOff          = 224 // u64
+	schedMsgPoolLiveBytesOff              = 232 // u64
+	schedMsgPoolReclaimedBytesOff         = 240 // u64
+	schedMsgPoolAllocFailuresOff          = 248 // u64
+	maxActors                             = 128
+	schedActorGroup0Off                   = 256  // u32[maxActors]
+	schedActorWakeAt0Off                  = 768  // u32[maxActors]
+	schedActorWait0Off                    = 1280 // u32[maxActors]
+	schedRemoteGeneration0Off             = 1792 // u32[maxActors]
+	schedNodeEpoch0Off                    = 2304 // u32[maxActors], keyed by node id
+	schedMonitorNextIDOff                 = 2816 // u32
+	schedMonitorCountOff                  = 2820 // u32
+	schedMonitorID0Off                    = 2824 // u32[maxActorMonitors]
+	schedMonitorOwnerRef0Off              = 3336 // u32[maxActorMonitors], local ref low words
+	schedMonitorTargetRef0Off             = 3848 // u32[maxActorMonitors], local ref low words
+	schedMonitorTargetHigh0Off            = 4360 // u32[maxActorMonitors], v2 target high words
+	schedSystemEventBaseOff               = 4872 // u64
+	schedSystemEventBumpOff               = 4880 // u64
+	schedSystemEventEndOff                = 4888 // u64
+	schedSystemEventFreeOff               = 4896 // u64
+	schedSystemEventCapacityBytesOff      = 4904 // u64
+	schedSystemEventLiveBytesOff          = 4912 // u64
+	schedSystemEventPeakBytesOff          = 4920 // u64
+	schedSystemEventReclaimedBytesOff     = 4928 // u64
+	schedSystemEventAllocFailuresOff      = 4936 // u64
+	schedSystemEventReservedCreditsOff    = 4944 // u64
+	schedRuntimeClosingOff                = 4952 // u32
+	schedSize                             = 4960
+	actorSizeShift                        = 9 // 512 bytes
+	actorSize                             = 1 << actorSizeShift
+	actorRspOff                           = 0   // u64
+	actorStatusOff                        = 8   // u32
+	actorEntryIDOff                       = 12  // u32
+	actorMailboxHeadOff                   = 16  // u64
+	actorMailboxTailOff                   = 24  // u64
+	actorLastSenderOff                    = 32  // u32
+	actorExitCodeOff                      = 36  // u32
+	actorTaskCountOff                     = 40  // u32
+	actorTaskSlot0Off                     = 44  // u32[8]
+	actorTaskGroupOff                     = 76  // u32
+	actorStateSlot0Off                    = 80  // i32[8]
+	actorMailboxCountOff                  = 112 // u32
+	actorMailboxBytesOff                  = 120 // u64
+	actorMailboxPeakBytesOff              = 128 // u64
+	actorReclaimedBytesOff                = 136 // u64
+	actorBytesCopiedOff                   = 144 // u64
+	actorCopyCountOff                     = 152 // u64
+	actorByteBudgetOff                    = 160 // u64
+	actorOverBudgetCountOff               = 168 // u64
+	actorBackpressureEventsOff            = 176 // u64
+	actorGenerationOff                    = 184 // u32
+	actorTrapExitOff                      = 188 // u32
+	actorStackInitRspOff                  = 192 // u64
+	actorLinkCountOff                     = 200 // u32
+	actorLinkRef0Off                      = 204 // u32[maxActorLinks], v2 ref low words
+	maxActorStateSlots                    = 8
+	maxActorLinks                         = 8
+	actorLinkHigh0Off                     = actorLinkRef0Off + maxActorLinks*4 // u32[maxActorLinks], v2 ref high words
+	actorSystemMailboxHeadOff             = 272                                // u64
+	actorSystemMailboxTailOff             = 280                                // u64
+	actorSystemMailboxCountOff            = 288                                // u32
+	actorSystemMailboxReservedCreditsOff  = 292                                // u32
+	actorSystemMailboxBytesOff            = 296                                // u64
+	actorSystemMailboxPeakBytesOff        = 304                                // u64
+	actorSystemMailboxReclaimedBytesOff   = 312                                // u64
+	actorSystemMailboxOverflowAttemptsOff = 320                                // u64
+	actorSystemRecvScratch0Off            = 328                                // u64[7]
+	actorSystemRecvScratchCountOff        = 384                                // u32
+	actorSystemRecvScratchStatusOff       = 388                                // u32
+	actorWaitKindOff                      = 392                                // u32
+	actorTerminalReasonKindOff            = 396                                // u32
+	actorTerminalReasonCodeOff            = 400                                // u32
+	maxActorMonitors                      = 128
+	maxActorMailboxMsgs                   = 256
+	maxActorMailboxBytes                  = maxActorMailboxMsgs * msgSize
 
-	statusFree     = 0
-	statusReady    = 1
-	statusBlocked  = 2
-	statusDone     = 3
-	statusSleeping = 4
-	statusWaiting  = 5
+	actorGenerationInitial = 1
+	actorGenerationMax     = 0xFFFF
+	actorRefLocalHighSlot  = 0x10000000
+	actorRefRemoteHighMask = 0xF8000000
+	actorRefRemoteHighBase = 0x18000000
+	actorNodeEpochInitial  = 1
+
+	statusFree        = 0
+	statusReady       = 1
+	statusBlocked     = 2
+	statusDone        = 3
+	statusSleeping    = 4
+	statusWaiting     = 5
+	statusRunning     = 6
+	statusStarting    = 7
+	statusStopping    = 8
+	statusReclaimable = 9
+
+	actorLifecycleStatusStarting     = 0
+	actorLifecycleStatusReady        = 1
+	actorLifecycleStatusRunning      = 2
+	actorLifecycleStatusBlocked      = 3
+	actorLifecycleStatusSleeping     = 4
+	actorLifecycleStatusWaiting      = 5
+	actorLifecycleStatusStopping     = 6
+	actorLifecycleStatusExitedNormal = 7
+	actorLifecycleStatusExitedError  = 8
+	actorLifecycleStatusCanceled     = 9
+	actorLifecycleStatusRestarting   = 10
+	actorLifecycleStatusDead         = 11
 
 	maxTaskGroups     = 8
 	taskGroupFree     = 0
 	taskGroupOpen     = 1
 	taskGroupCanceled = 2
 	taskGroupClosed   = 3
+
+	actorWaitKindNone   = 0
+	actorWaitKindUser   = 1
+	actorWaitKindSystem = 2
 )
 
 const (
-	stackSize      = 64 * 1024
-	msgPoolSize    = 64 * 1024
-	schedAllocSize = schedSize + maxActors*actorSize
+	stackSize                  = 64 * 1024
+	maxRetainedDoneActorStacks = 8
+	msgPoolSize                = 64 * 1024
+	systemEventPoolSize        = 64 * 1024
+	schedAllocSize             = schedSize + maxActors*actorSize
+)
+
+const (
+	actorMemorySnapshotRecordSize                 = 104
+	actorMemorySnapshotActorIDOffset        int32 = 0
+	actorMemorySnapshotCurrentOffset        int32 = 8
+	actorMemorySnapshotPeakOffset           int32 = 16
+	actorMemorySnapshotBytesCopiedOffset    int32 = 24
+	actorMemorySnapshotByteBudgetOffset     int32 = 32
+	actorMemorySnapshotOverBudgetOffset     int32 = 40
+	actorMemorySnapshotBackpressureOffset   int32 = 48
+	actorMemorySnapshotMailboxCurrentOffset int32 = 56
+	actorMemorySnapshotMailboxPeakOffset    int32 = 64
+	actorMemorySnapshotStackLiveOffset      int32 = 72
+	actorMemorySnapshotStackReservedOffset  int32 = 80
+	actorMemorySnapshotStackRetainedOffset  int32 = 88
+	actorMemorySnapshotStackReleasedOffset  int32 = 96
 )
 
 // BuildLinuxX64 returns a runtime object that provides:
@@ -104,6 +192,7 @@ func BuildLinuxX64(entries []string) (*tobj.Object, error) {
 	return buildSysVUnixX64(
 		entries,
 		abi.SysMmap,
+		abi.SysMunmap,
 		linuxMapPrivateAnon,
 		true,
 		SurfaceHostIPCOptions{},
@@ -127,12 +216,13 @@ func BuildLinuxX64WithSurfaceHostIPC(
 	}
 	abi := x64abi.LinuxSysV()
 	const linuxMapPrivateAnon = 0x22
-	return buildSysVUnixX64(entries, abi.SysMmap, linuxMapPrivateAnon, true, opt)
+	return buildSysVUnixX64(entries, abi.SysMmap, abi.SysMunmap, linuxMapPrivateAnon, true, opt)
 }
 
 func buildSysVUnixX64(
 	entries []string,
 	sysMmap uint32,
+	sysMunmap uint32,
 	mapFlags uint32,
 	distributedActorNet bool,
 	surfaceHost SurfaceHostIPCOptions,
@@ -156,7 +246,7 @@ func buildSysVUnixX64(
 
 	if err := emitFunc(
 		"__tetra_entry",
-		func() error { return emitEntry(e, entries[0], sysMmap, mapFlags, &callPatches, &leaPatches) },
+		func() error { return emitEntry(e, entries[0], sysMmap, sysMunmap, mapFlags, &callPatches, &leaPatches) },
 	); err != nil {
 		return nil, err
 	}
@@ -290,10 +380,61 @@ func buildSysVUnixX64(
 	); err != nil {
 		return nil, err
 	}
+	if err := emitFunc(
+		"__tetra_actor_recv_system_begin",
+		func() error { return emitRecvSystemBegin(e, &callPatches) },
+	); err != nil {
+		return nil, err
+	}
+	if err := emitFunc(
+		"__tetra_actor_recv_system_slot",
+		func() error { return emitRecvSystemSlot(e) },
+	); err != nil {
+		return nil, err
+	}
+	if err := emitFunc(
+		"__tetra_actor_recv_system_count",
+		func() error { return emitRecvSystemCount(e) },
+	); err != nil {
+		return nil, err
+	}
 	if err := emitFunc("__tetra_actor_self", func() error { return emitSelf(e) }); err != nil {
 		return nil, err
 	}
 	if err := emitFunc("__tetra_actor_sender", func() error { return emitSender(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_actor_status", func() error { return emitActorStatus(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_actor_status_raw", func() error { return emitActorStatusRaw(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_actor_wait", func() error { return emitActorWait(e, &callPatches) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_actor_wait_until", func() error { return emitActorWaitUntil(e, &callPatches) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_actor_stop", func() error { return emitActorStop(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_actor_exit_reason", func() error { return emitActorExitReason(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_actor_link", func() error { return emitActorLink(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_actor_unlink", func() error { return emitActorUnlink(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_actor_monitor", func() error { return emitActorMonitor(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_actor_demonitor", func() error { return emitActorDemonitor(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_actor_set_trap_exit", func() error { return emitActorSetTrapExit(e) }); err != nil {
 		return nil, err
 	}
 	if err := emitFunc(
@@ -798,14 +939,51 @@ type leaPatch struct {
 // ---- linux_x64_emit.go ----
 
 const (
-	msgNextOff   = 0  // u64
-	msgSenderOff = 8  // u32
-	msgValueOff  = 12 // u32
-	msgTagOff    = 16 // u32
-	msgCountOff  = 20 // u32
-	msgPayload0  = 24 // u64[8]
-	msgSize      = 88
-	msgSlotSize  = 8
+	msgNextOff       = 0  // u64
+	msgSenderOff     = 8  // u32
+	msgValueOff      = 12 // u32
+	msgTagOff        = 16 // u32
+	msgCountOff      = 20 // u32
+	msgSystemKindOff = 24 // u32, runtime-only lane; ordinary send paths write actorSystemKindUser
+	msgPayload0      = 32 // u64[8]
+	msgSize          = 96
+	msgSlotSize      = 8
+)
+
+const (
+	systemEventNextOff       = 0  // u64
+	systemEventKindOff       = 8  // u32
+	systemEventFlagsOff      = 12 // u32
+	systemEventSubjectOff    = 16 // u64, raw actor subject low word for P01-SM5
+	systemEventMonitorRefOff = 24 // u64, actor.monitor-compatible raw slot
+	systemEventNodeIDOff     = 32 // u64
+	systemEventNodeEpochOff  = 40 // u64
+	systemEventReasonKindOff = 48 // u32
+	systemEventReasonCodeOff = 52 // u32
+	systemEventDedupKeyOff   = 56 // u64
+	systemEventSize          = 64
+
+	maxSystemEventReservedCredits = systemEventPoolSize / systemEventSize
+)
+
+const (
+	actorSystemKindUser     = 0
+	actorSystemKindExit     = 1
+	actorSystemKindDown     = 2
+	actorSystemKindNodeDown = 3
+
+	actorExitReasonKindNodeDown = 5
+
+	actorSystemExitPayloadSlots     = 2
+	actorSystemDownPayloadSlots     = 3
+	actorSystemNodeDownPayloadSlots = 4
+
+	actorSystemRecvStatusMessage       = 0
+	actorSystemRecvStatusEmpty         = 1
+	actorSystemRecvStatusTimeout       = 2
+	actorSystemRecvStatusCanceled      = 3
+	actorSystemRecvStatusRuntimeClosed = 4
+	actorSystemRecvStatusInvalidState  = 5
 )
 
 const (
@@ -834,6 +1012,7 @@ const (
 	actorWireFrameHello     = 1
 	actorWireFrameHelloAck  = 2
 	actorWireFrameSpawn     = 3
+	actorWireFrameSpawnAck  = 4
 	actorWireFrameSendI32   = 5
 	actorWireFrameSendMsg   = 6
 	actorWireFrameSendTyped = 7
@@ -1013,6 +1192,7 @@ func emitRecycleMessageNodeInRax(e *x64.Emitter) {
 	emitAddSchedulerU64Counter(e, schedMsgPoolLiveBytesOff, -msgSize)
 	emitAddSchedulerU64Counter(e, schedMsgPoolReclaimedBytesOff, msgSize)
 	e.PopRax()
+	emitScrubMessageNodeForRecycle(e)
 	e.MovRdiR15()
 	e.MovR8FromRdiDisp(schedMsgFreeOff)
 	e.MovRdiRax()
@@ -1021,9 +1201,118 @@ func emitRecycleMessageNodeInRax(e *x64.Emitter) {
 	e.MovMem64RdiDispRax(schedMsgFreeOff)
 }
 
+func emitScrubMessageNodeForRecycle(e *x64.Emitter) {
+	e.PushRax()
+	e.MovRdiRax()
+	e.XorEaxEax()
+	for _, off := range []int32{
+		msgSenderOff,
+		msgValueOff,
+		msgTagOff,
+		msgCountOff,
+		msgSystemKindOff,
+	} {
+		e.MovMem32RdiDispEax(off)
+	}
+	for slot := 0; slot < 8; slot++ {
+		e.MovMem64RdiDispRax(msgPayload0 + int32(slot*msgSlotSize))
+	}
+	e.PopRax()
+}
+
 func emitRecycleMessageNodeFromRspDisp(e *x64.Emitter, disp int32) {
 	e.MovRaxFromRspDisp(disp)
 	emitRecycleMessageNodeInRax(e)
+}
+
+func emitCheckedSystemEventPoolAlloc(e *x64.Emitter) int {
+	// On success, rdx is the allocated system-event pointer. This pool is
+	// intentionally distinct from ordinary user message nodes.
+	e.MovRdiR15()
+	e.MovRaxFromRdiDisp(schedSystemEventFreeOff)
+	e.TestRaxRax()
+	bumpAt := e.JzRel32()
+
+	e.MovRdxRax()
+	e.MovRdiRdx()
+	e.MovRaxFromRdiDisp(systemEventNextOff)
+	e.MovRdiR15()
+	e.MovMem64RdiDispRax(schedSystemEventFreeOff)
+	doneAt := e.JmpRel32()
+
+	bumpTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, bumpAt, bumpTo); err != nil {
+		panic(err)
+	}
+	e.MovRdiR15()
+	e.MovRaxFromRdiDisp(schedSystemEventBumpOff)
+	e.MovRdxRax()
+	e.AddRaxImm32(systemEventSize)
+	e.MovR8FromRdiDisp(schedSystemEventEndOff)
+	e.CmpRaxR8()
+	overflowAt := e.JaRel32()
+	e.MovMem64RdiDispRax(schedSystemEventBumpOff)
+	doneTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, doneAt, doneTo); err != nil {
+		panic(err)
+	}
+	emitAddSchedulerU64Counter(e, schedSystemEventLiveBytesOff, systemEventSize)
+	emitUpdateSchedulerSystemEventPeak(e)
+	return overflowAt
+}
+
+func emitUpdateSchedulerSystemEventPeak(e *x64.Emitter) {
+	e.MovRdiR15()
+	e.MovRaxFromRdiDisp(schedSystemEventLiveBytesOff)
+	e.MovR8FromRdiDisp(schedSystemEventPeakBytesOff)
+	e.CmpRaxR8()
+	updatePeakAt := e.JaRel32()
+	afterPeakAt := e.JmpRel32()
+	updatePeakTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, updatePeakAt, updatePeakTo); err != nil {
+		panic(err)
+	}
+	e.MovMem64RdiDispRax(schedSystemEventPeakBytesOff)
+	afterPeakTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, afterPeakAt, afterPeakTo); err != nil {
+		panic(err)
+	}
+}
+
+func emitRecycleSystemEventNodeInRax(e *x64.Emitter) {
+	e.PushRax()
+	emitAddSchedulerU64Counter(e, schedSystemEventLiveBytesOff, -systemEventSize)
+	emitAddSchedulerU64Counter(e, schedSystemEventReclaimedBytesOff, systemEventSize)
+	e.PopRax()
+	emitScrubSystemEventNodeForRecycle(e)
+	e.MovRdiR15()
+	e.MovR8FromRdiDisp(schedSystemEventFreeOff)
+	e.MovRdiRax()
+	e.MovMem64RdiDispR8(systemEventNextOff)
+	e.MovRdiR15()
+	e.MovMem64RdiDispRax(schedSystemEventFreeOff)
+}
+
+func emitScrubSystemEventNodeForRecycle(e *x64.Emitter) {
+	e.PushRax()
+	e.MovRdiRax()
+	e.XorEaxEax()
+	e.MovMem64RdiDispRax(systemEventNextOff)
+	e.MovMem32RdiDispEax(systemEventKindOff)
+	e.MovMem32RdiDispEax(systemEventFlagsOff)
+	e.MovMem64RdiDispRax(systemEventSubjectOff)
+	e.MovMem64RdiDispRax(systemEventMonitorRefOff)
+	e.MovMem64RdiDispRax(systemEventNodeIDOff)
+	e.MovMem64RdiDispRax(systemEventNodeEpochOff)
+	e.MovMem32RdiDispEax(systemEventReasonKindOff)
+	e.MovMem32RdiDispEax(systemEventReasonCodeOff)
+	e.MovMem64RdiDispRax(systemEventDedupKeyOff)
+	e.PopRax()
+}
+
+func emitRecycleSystemEventNodeFromRspDisp(e *x64.Emitter, disp int32) {
+	e.MovRaxFromRspDisp(disp)
+	emitRecycleSystemEventNodeInRax(e)
 }
 
 func emitCopyMessageNodeToRecvScratchFromRspDisp(e *x64.Emitter, disp int32) {
@@ -1050,6 +1339,17 @@ func emitInitSchedulerMessagePoolCounters(e *x64.Emitter) {
 	e.MovMem64RdiDispRax(schedMsgPoolAllocFailuresOff)
 }
 
+func emitInitSchedulerSystemEventPoolCounters(e *x64.Emitter) {
+	e.MovEaxImm32(systemEventPoolSize)
+	e.MovMem64RdiDispRax(schedSystemEventCapacityBytesOff)
+	e.XorEaxEax()
+	e.MovMem64RdiDispRax(schedSystemEventLiveBytesOff)
+	e.MovMem64RdiDispRax(schedSystemEventPeakBytesOff)
+	e.MovMem64RdiDispRax(schedSystemEventReclaimedBytesOff)
+	e.MovMem64RdiDispRax(schedSystemEventAllocFailuresOff)
+	e.MovMem64RdiDispRax(schedSystemEventReservedCreditsOff)
+}
+
 func emitInitActorByteCountersInRdi(e *x64.Emitter) {
 	e.XorEaxEax()
 	e.MovMem64RdiDispRax(actorMailboxBytesOff)
@@ -1063,6 +1363,26 @@ func emitInitActorByteCountersInRdi(e *x64.Emitter) {
 	e.MovMem64RdiDispRax(actorByteBudgetOff)
 }
 
+func emitInitActorSystemMailboxInRdi(e *x64.Emitter) {
+	e.XorEaxEax()
+	e.MovMem64RdiDispRax(actorSystemMailboxHeadOff)
+	e.MovMem64RdiDispRax(actorSystemMailboxTailOff)
+	e.MovMem32RdiDispImm32(actorSystemMailboxCountOff, 0)
+	e.MovMem32RdiDispImm32(actorSystemMailboxReservedCreditsOff, 0)
+	e.MovMem64RdiDispRax(actorSystemMailboxBytesOff)
+	e.MovMem64RdiDispRax(actorSystemMailboxPeakBytesOff)
+	e.MovMem64RdiDispRax(actorSystemMailboxReclaimedBytesOff)
+	e.MovMem64RdiDispRax(actorSystemMailboxOverflowAttemptsOff)
+	for slot := 0; slot < 7; slot++ {
+		e.MovMem64RdiDispRax(actorSystemRecvScratch0Off + int32(slot*8))
+	}
+	e.MovMem32RdiDispImm32(actorSystemRecvScratchCountOff, 0)
+	e.MovMem32RdiDispImm32(actorSystemRecvScratchStatusOff, actorSystemRecvStatusEmpty)
+	e.MovMem32RdiDispImm32(actorWaitKindOff, actorWaitKindNone)
+	e.MovMem32RdiDispImm32(actorTerminalReasonKindOff, 0)
+	e.MovMem32RdiDispImm32(actorTerminalReasonCodeOff, 0)
+}
+
 func emitAddSchedulerU64Counter(e *x64.Emitter, off int32, delta int32) {
 	e.MovRdiR15()
 	e.MovRaxFromRdiDisp(off)
@@ -1072,6 +1392,64 @@ func emitAddSchedulerU64Counter(e *x64.Emitter, off int32, delta int32) {
 
 func emitMessagePoolAllocationFailure(e *x64.Emitter) {
 	emitAddSchedulerU64Counter(e, schedMsgPoolAllocFailuresOff, 1)
+}
+
+func emitSystemEventPoolAllocationFailure(e *x64.Emitter) {
+	emitAddSchedulerU64Counter(e, schedSystemEventAllocFailuresOff, 1)
+}
+
+func emitReserveSystemEventCreditForActorPtrInRdi(e *x64.Emitter) {
+	e.PushRdi()
+	e.MovRdiR15()
+	e.MovRaxFromRdiDisp(schedSystemEventReservedCreditsOff)
+	e.CmpRaxImm32(maxSystemEventReservedCredits)
+	fullAt := e.JaeRel32()
+	e.AddRaxImm32(1)
+	e.MovMem64RdiDispRax(schedSystemEventReservedCreditsOff)
+	e.PopRdi()
+	e.MovEaxFromRdiDisp(actorSystemMailboxReservedCreditsOff)
+	e.AddEaxImm32(1)
+	e.MovMem32RdiDispEax(actorSystemMailboxReservedCreditsOff)
+	e.XorEaxEax()
+	doneAt := e.JmpRel32()
+
+	fullTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, fullAt, fullTo); err != nil {
+		panic(err)
+	}
+	e.PopRdi()
+	e.MovEaxImm32(0xFFFFFFFE)
+
+	doneTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, doneAt, doneTo); err != nil {
+		panic(err)
+	}
+}
+
+func emitReleaseSystemEventCreditForActorPtrInRdi(e *x64.Emitter) {
+	e.MovEaxFromRdiDisp(actorSystemMailboxReservedCreditsOff)
+	e.TestEaxEax()
+	doneAt := e.JzRel32()
+	e.AddEaxImm32(-1)
+	e.MovMem32RdiDispEax(actorSystemMailboxReservedCreditsOff)
+
+	e.PushRdi()
+	e.MovRdiR15()
+	e.MovRaxFromRdiDisp(schedSystemEventReservedCreditsOff)
+	e.TestRaxRax()
+	noSchedulerCreditAt := e.JzRel32()
+	e.AddRaxImm32(-1)
+	e.MovMem64RdiDispRax(schedSystemEventReservedCreditsOff)
+	noSchedulerCreditTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, noSchedulerCreditAt, noSchedulerCreditTo); err != nil {
+		panic(err)
+	}
+	e.PopRdi()
+
+	doneTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, doneAt, doneTo); err != nil {
+		panic(err)
+	}
 }
 
 func emitAccountMailboxEnqueueInRdi(e *x64.Emitter) {
@@ -1110,6 +1488,118 @@ func emitAccountActorByteBackpressureInRdi(e *x64.Emitter) {
 	e.MovMem64RdiDispRax(actorBackpressureEventsOff)
 }
 
+func emitIncrementSystemMailboxCount(e *x64.Emitter) {
+	e.MovEaxFromRdiDisp(actorSystemMailboxCountOff)
+	e.AddEaxImm32(1)
+	e.MovMem32RdiDispEax(actorSystemMailboxCountOff)
+}
+
+func emitDecrementSystemMailboxCount(e *x64.Emitter) {
+	e.MovEaxFromRdiDisp(actorSystemMailboxCountOff)
+	e.AddEaxImm32(-1)
+	e.MovMem32RdiDispEax(actorSystemMailboxCountOff)
+}
+
+func emitAccountSystemMailboxEnqueueInRdi(e *x64.Emitter) {
+	e.MovRaxFromRdiDisp(actorSystemMailboxBytesOff)
+	e.AddRaxImm32(systemEventSize)
+	e.MovMem64RdiDispRax(actorSystemMailboxBytesOff)
+
+	e.MovR8FromRdiDisp(actorSystemMailboxPeakBytesOff)
+	e.CmpRaxR8()
+	updatePeakAt := e.JaRel32()
+	afterPeakAt := e.JmpRel32()
+	updatePeakTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, updatePeakAt, updatePeakTo); err != nil {
+		panic(err)
+	}
+	e.MovMem64RdiDispRax(actorSystemMailboxPeakBytesOff)
+	afterPeakTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, afterPeakAt, afterPeakTo); err != nil {
+		panic(err)
+	}
+}
+
+func emitAccountSystemMailboxDequeueInRdi(e *x64.Emitter) {
+	e.MovRaxFromRdiDisp(actorSystemMailboxBytesOff)
+	e.AddRaxImm32(-systemEventSize)
+	e.MovMem64RdiDispRax(actorSystemMailboxBytesOff)
+	e.MovRaxFromRdiDisp(actorSystemMailboxReclaimedBytesOff)
+	e.AddRaxImm32(systemEventSize)
+	e.MovMem64RdiDispRax(actorSystemMailboxReclaimedBytesOff)
+	emitReleaseSystemEventCreditForActorPtrInRdi(e)
+}
+
+func emitWakeActorIfBlockedOnSystemMailboxInRdi(e *x64.Emitter) {
+	e.MovEaxFromRdiDisp(actorStatusOff)
+	e.CmpEaxImm32(statusBlocked)
+	notBlockedAt := e.JnzRel32()
+	e.MovEaxFromRdiDisp(actorWaitKindOff)
+	e.CmpEaxImm32(actorWaitKindSystem)
+	notSystemAt := e.JnzRel32()
+	e.MovMem32RdiDispImm32(actorStatusOff, statusReady)
+	e.MovMem32RdiDispImm32(actorWaitKindOff, actorWaitKindNone)
+	doneTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, notBlockedAt, doneTo); err != nil {
+		panic(err)
+	}
+	if err := x64.PatchRel32(e.Buf, notSystemAt, doneTo); err != nil {
+		panic(err)
+	}
+}
+
+func emitWakeActorIfBlockedOnUserMailboxInRdi(e *x64.Emitter) {
+	e.MovEaxFromRdiDisp(actorStatusOff)
+	e.CmpEaxImm32(statusBlocked)
+	notBlockedAt := e.JnzRel32()
+	e.MovEaxFromRdiDisp(actorWaitKindOff)
+	e.CmpEaxImm32(actorWaitKindUser)
+	notUserAt := e.JnzRel32()
+	e.MovMem32RdiDispImm32(actorStatusOff, statusReady)
+	e.MovMem32RdiDispImm32(actorWaitKindOff, actorWaitKindNone)
+	doneTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, notBlockedAt, doneTo); err != nil {
+		panic(err)
+	}
+	if err := x64.PatchRel32(e.Buf, notUserAt, doneTo); err != nil {
+		panic(err)
+	}
+}
+
+func emitEnqueueSystemEventForActorPtrInRdiNodeInRdx(e *x64.Emitter) {
+	e.PushRdi() // actor pointer
+	e.PushRdx() // system-event node
+
+	e.MovRaxFromRdiDisp(actorSystemMailboxTailOff)
+	e.TestRaxRax()
+	emptyAt := e.JzRel32()
+	e.MovRdiRax()
+	e.MovRaxRdx()
+	e.MovMem64RdiDispRax(systemEventNextOff)
+	emitMovRdiFromRspDisp(e, 8)
+	e.MovRaxRdx()
+	e.MovMem64RdiDispRax(actorSystemMailboxTailOff)
+	appendedAt := e.JmpRel32()
+
+	emptyTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, emptyAt, emptyTo); err != nil {
+		panic(err)
+	}
+	emitMovRdiFromRspDisp(e, 8)
+	e.MovRaxRdx()
+	e.MovMem64RdiDispRax(actorSystemMailboxHeadOff)
+	e.MovMem64RdiDispRax(actorSystemMailboxTailOff)
+
+	appendedTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, appendedAt, appendedTo); err != nil {
+		panic(err)
+	}
+	emitIncrementSystemMailboxCount(e)
+	emitAccountSystemMailboxEnqueueInRdi(e)
+	emitWakeActorIfBlockedOnSystemMailboxInRdi(e)
+	e.AddRspImm32(16)
+}
+
 func emitAccountMailboxDequeueInRdi(e *x64.Emitter) {
 	e.MovRaxFromRdiDisp(actorMailboxBytesOff)
 	e.AddRaxImm32(-msgSize)
@@ -1120,12 +1610,17 @@ func emitAccountMailboxDequeueInRdi(e *x64.Emitter) {
 }
 
 func emitActorMemorySnapshot(e *x64.Emitter) error {
-	// Argument: rdi points at records of 7 u64 fields:
+	// Argument: rdi points at records of u64 fields:
 	// actor_id, current_bytes, peak_bytes, bytes_copied, byte_budget,
-	// over_budget_count, backpressure_events.
-	// Returns the number of live actor records in eax.
+	// over_budget_count, backpressure_events, mailbox_current_bytes,
+	// mailbox_peak_bytes, stack_live_bytes, stack_reserved_bytes,
+	// stack_retained_bytes, stack_released_bytes.
+	// Returns the number of actor snapshot records in eax and the number of
+	// currently live actor slots in edx. Done/reusable slots may still have
+	// retained/released stack accounting records, but they are not live actors.
 	e.MovRsiRdi()
 	e.XorEcxEcx()
+	e.MovR9dImm32(0)
 
 	loopOff := len(e.Buf)
 	e.MovRdiR15()
@@ -1139,26 +1634,63 @@ func emitActorMemorySnapshot(e *x64.Emitter) error {
 		return err
 	}
 	e.MovEdxEcx()
-	e.Emit(0x48, 0x6B, 0xD1, 56) // imul rdx, rcx, 56
+	e.Emit(0x48, 0x6B, 0xD1, byte(actorMemorySnapshotRecordSize)) // imul rdx, rcx, record size
 	e.AddRdxRsi()
 	e.MovRaxRcx()
-	emitMovMem64RdxDispRax(e, 0)
+	emitMovMem64RdxDispRax(e, actorMemorySnapshotActorIDOffset)
 
 	e.MovEaxEcx()
 	actorPtrFromEaxToRdi(e)
 	e.MovR8Rdi()
+
+	e.MovEaxFromRdiDisp(actorStatusOff)
+	e.CmpEaxImm32(statusDone)
+	notLiveDoneAt := e.JzRel32()
+	e.CmpEaxImm32(statusReclaimable)
+	notLiveReclaimableAt := e.JzRel32()
+	e.CmpEaxImm32(statusFree)
+	notLiveFreeAt := e.JzRel32()
+	e.AddR9Imm32(1)
+	liveCountDoneOff := len(e.Buf)
+	for _, at := range []int{notLiveDoneAt, notLiveReclaimableAt, notLiveFreeAt} {
+		if err := x64.PatchRel32(e.Buf, at, liveCountDoneOff); err != nil {
+			return err
+		}
+	}
+
 	emitMovRaxFromR8Disp(e, actorMailboxBytesOff)
-	emitMovMem64RdxDispRax(e, 8)
+	emitMovMem64RdxDispRax(e, actorMemorySnapshotMailboxCurrentOffset)
+	if err := emitStoreActorCounterPlusLiveStack(e, actorMailboxBytesOff, actorMemorySnapshotCurrentOffset); err != nil {
+		return err
+	}
+
 	emitMovRaxFromR8Disp(e, actorMailboxPeakBytesOff)
-	emitMovMem64RdxDispRax(e, 16)
+	emitMovMem64RdxDispRax(e, actorMemorySnapshotMailboxPeakOffset)
+	if err := emitStoreActorCounterPlusReservedStack(e, actorMailboxPeakBytesOff, actorMemorySnapshotPeakOffset); err != nil {
+		return err
+	}
+
 	emitMovRaxFromR8Disp(e, actorBytesCopiedOff)
-	emitMovMem64RdxDispRax(e, 24)
-	emitMovRaxFromR8Disp(e, actorByteBudgetOff)
-	emitMovMem64RdxDispRax(e, 32)
+	emitMovMem64RdxDispRax(e, actorMemorySnapshotBytesCopiedOffset)
+	if err := emitStoreActorCounterPlusReservedStack(e, actorByteBudgetOff, actorMemorySnapshotByteBudgetOffset); err != nil {
+		return err
+	}
 	emitMovRaxFromR8Disp(e, actorOverBudgetCountOff)
-	emitMovMem64RdxDispRax(e, 40)
+	emitMovMem64RdxDispRax(e, actorMemorySnapshotOverBudgetOffset)
 	emitMovRaxFromR8Disp(e, actorBackpressureEventsOff)
-	emitMovMem64RdxDispRax(e, 48)
+	emitMovMem64RdxDispRax(e, actorMemorySnapshotBackpressureOffset)
+	if err := emitStoreActorLiveStackBytes(e, actorMemorySnapshotStackLiveOffset); err != nil {
+		return err
+	}
+	if err := emitStoreActorReservedStackBytes(e, actorMemorySnapshotStackReservedOffset); err != nil {
+		return err
+	}
+	if err := emitStoreActorRetainedStackBytes(e, actorMemorySnapshotStackRetainedOffset); err != nil {
+		return err
+	}
+	if err := emitStoreActorReleasedStackBytes(e, actorMemorySnapshotStackReleasedOffset); err != nil {
+		return err
+	}
 
 	e.AddEcxImm8(1)
 	againAt := e.JmpRel32()
@@ -1170,8 +1702,207 @@ func emitActorMemorySnapshot(e *x64.Emitter) error {
 	if err := x64.PatchRel32(e.Buf, doneAt, doneOff); err != nil {
 		return err
 	}
+	e.MovRdxR9()
 	e.MovEaxEcx()
 	e.Ret()
+	return nil
+}
+
+func emitStoreActorCounterPlusLiveStack(
+	e *x64.Emitter,
+	counterOff int32,
+	recordOff int32,
+) error {
+	e.MovEaxFromRdiDisp(actorStatusOff)
+	e.CmpEaxImm32(statusDone)
+	noStackAt := e.JzRel32()
+	e.CmpEaxImm32(statusReclaimable)
+	noStackReclaimableAt := e.JzRel32()
+	e.CmpEaxImm32(statusFree)
+	noStackFreeAt := e.JzRel32()
+	emitMovRaxFromR8Disp(e, actorStackInitRspOff)
+	e.TestRaxRax()
+	noStackReleasedAt := e.JzRel32()
+	emitMovRaxFromR8Disp(e, counterOff)
+	e.AddRaxImm32(stackSize)
+	emitMovMem64RdxDispRax(e, recordOff)
+	doneAt := e.JmpRel32()
+
+	noStackOff := len(e.Buf)
+	for _, at := range []int{noStackAt, noStackReclaimableAt, noStackFreeAt, noStackReleasedAt} {
+		if err := x64.PatchRel32(e.Buf, at, noStackOff); err != nil {
+			return err
+		}
+	}
+	emitMovRaxFromR8Disp(e, counterOff)
+	emitMovMem64RdxDispRax(e, recordOff)
+
+	doneOff := len(e.Buf)
+	return x64.PatchRel32(e.Buf, doneAt, doneOff)
+}
+
+func emitStoreActorCounterPlusReservedStack(
+	e *x64.Emitter,
+	counterOff int32,
+	recordOff int32,
+) error {
+	e.MovEaxFromRdiDisp(actorStatusOff)
+	e.CmpEaxImm32(statusFree)
+	noStackAt := e.JzRel32()
+	emitMovRaxFromR8Disp(e, actorStackInitRspOff)
+	e.TestRaxRax()
+	noStackReleasedAt := e.JzRel32()
+	emitMovRaxFromR8Disp(e, counterOff)
+	e.AddRaxImm32(stackSize)
+	emitMovMem64RdxDispRax(e, recordOff)
+	doneAt := e.JmpRel32()
+
+	noStackOff := len(e.Buf)
+	for _, at := range []int{noStackAt, noStackReleasedAt} {
+		if err := x64.PatchRel32(e.Buf, at, noStackOff); err != nil {
+			return err
+		}
+	}
+	emitMovRaxFromR8Disp(e, counterOff)
+	emitMovMem64RdxDispRax(e, recordOff)
+
+	doneOff := len(e.Buf)
+	return x64.PatchRel32(e.Buf, doneAt, doneOff)
+}
+
+func emitStoreActorLiveStackBytes(e *x64.Emitter, recordOff int32) error {
+	e.MovEaxFromRdiDisp(actorStatusOff)
+	e.CmpEaxImm32(statusDone)
+	zeroDoneAt := e.JzRel32()
+	e.CmpEaxImm32(statusReclaimable)
+	zeroReclaimableAt := e.JzRel32()
+	e.CmpEaxImm32(statusFree)
+	zeroFreeAt := e.JzRel32()
+	emitMovRaxFromR8Disp(e, actorStackInitRspOff)
+	e.TestRaxRax()
+	zeroReleasedAt := e.JzRel32()
+	e.MovEaxImm32(stackSize)
+	emitMovMem64RdxDispRax(e, recordOff)
+	doneAt := e.JmpRel32()
+
+	zeroOff := len(e.Buf)
+	for _, at := range []int{zeroDoneAt, zeroReclaimableAt, zeroFreeAt, zeroReleasedAt} {
+		if err := x64.PatchRel32(e.Buf, at, zeroOff); err != nil {
+			return err
+		}
+	}
+	e.XorEaxEax()
+	emitMovMem64RdxDispRax(e, recordOff)
+
+	doneOff := len(e.Buf)
+	return x64.PatchRel32(e.Buf, doneAt, doneOff)
+}
+
+func emitStoreActorReservedStackBytes(e *x64.Emitter, recordOff int32) error {
+	e.MovEaxFromRdiDisp(actorStatusOff)
+	e.CmpEaxImm32(statusFree)
+	zeroAt := e.JzRel32()
+	emitMovRaxFromR8Disp(e, actorStackInitRspOff)
+	e.TestRaxRax()
+	zeroReleasedAt := e.JzRel32()
+	e.MovEaxImm32(stackSize)
+	emitMovMem64RdxDispRax(e, recordOff)
+	doneAt := e.JmpRel32()
+
+	zeroOff := len(e.Buf)
+	for _, at := range []int{zeroAt, zeroReleasedAt} {
+		if err := x64.PatchRel32(e.Buf, at, zeroOff); err != nil {
+			return err
+		}
+	}
+	e.XorEaxEax()
+	emitMovMem64RdxDispRax(e, recordOff)
+
+	doneOff := len(e.Buf)
+	return x64.PatchRel32(e.Buf, doneAt, doneOff)
+}
+
+func emitStoreActorRetainedStackBytes(e *x64.Emitter, recordOff int32) error {
+	e.MovEaxFromRdiDisp(actorStatusOff)
+	e.CmpEaxImm32(statusDone)
+	retainedAt := e.JzRel32()
+	e.CmpEaxImm32(statusReclaimable)
+	retainedReclaimableAt := e.JzRel32()
+	e.XorEaxEax()
+	emitMovMem64RdxDispRax(e, recordOff)
+	doneAt := e.JmpRel32()
+
+	retainedOff := len(e.Buf)
+	for _, at := range []int{retainedAt, retainedReclaimableAt} {
+		if err := x64.PatchRel32(e.Buf, at, retainedOff); err != nil {
+			return err
+		}
+	}
+	emitMovRaxFromR8Disp(e, actorStackInitRspOff)
+	e.TestRaxRax()
+	zeroReleasedAt := e.JzRel32()
+	e.MovEaxImm32(stackSize)
+	emitMovMem64RdxDispRax(e, recordOff)
+	retainedDoneAt := e.JmpRel32()
+
+	zeroReleasedOff := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, zeroReleasedAt, zeroReleasedOff); err != nil {
+		return err
+	}
+	e.XorEaxEax()
+	emitMovMem64RdxDispRax(e, recordOff)
+
+	doneOff := len(e.Buf)
+	for _, at := range []int{doneAt, retainedDoneAt} {
+		if err := x64.PatchRel32(e.Buf, at, doneOff); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func emitStoreActorReleasedStackBytes(e *x64.Emitter, recordOff int32) error {
+	e.MovEaxFromRdiDisp(actorStatusOff)
+	e.CmpEaxImm32(statusDone)
+	doneAt := e.JzRel32()
+	e.CmpEaxImm32(statusReclaimable)
+	reclaimableAt := e.JzRel32()
+	nonDoneAt := e.JmpRel32()
+
+	doneOff := len(e.Buf)
+	for _, at := range []int{doneAt, reclaimableAt} {
+		if err := x64.PatchRel32(e.Buf, at, doneOff); err != nil {
+			return err
+		}
+	}
+	emitMovRaxFromR8Disp(e, actorStackInitRspOff)
+	e.TestRaxRax()
+	releasedAt := e.JzRel32()
+	e.XorEaxEax()
+	emitMovMem64RdxDispRax(e, recordOff)
+	doneStoreAt := e.JmpRel32()
+
+	releasedOff := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, releasedAt, releasedOff); err != nil {
+		return err
+	}
+	e.MovEaxImm32(stackSize)
+	emitMovMem64RdxDispRax(e, recordOff)
+	releasedDoneAt := e.JmpRel32()
+
+	nonDoneOff := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, nonDoneAt, nonDoneOff); err != nil {
+		return err
+	}
+	e.XorEaxEax()
+	emitMovMem64RdxDispRax(e, recordOff)
+
+	finalDoneOff := len(e.Buf)
+	for _, at := range []int{doneStoreAt, releasedDoneAt} {
+		if err := x64.PatchRel32(e.Buf, at, finalDoneOff); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -1237,12 +1968,38 @@ func emitActorDoneReturn(e *x64.Emitter) {
 	e.Ret()
 }
 
-func emitDoneActorCheckForReceiverInEcx(e *x64.Emitter) int {
+func emitDoneActorCheckForReceiverInEcx(e *x64.Emitter) []int {
 	e.MovEaxEcx()
 	actorPtrFromEaxToRdi(e)
 	e.MovEaxFromRdiDisp(actorStatusOff)
 	e.CmpEaxImm32(statusDone)
-	return e.JzRel32()
+	doneAt := e.JzRel32()
+	e.CmpEaxImm32(statusReclaimable)
+	reclaimableAt := e.JzRel32()
+	e.CmpEaxImm32(statusStopping)
+	stoppingAt := e.JzRel32()
+	e.MovEaxFromRdiDisp(actorTaskGroupOff)
+	e.TestEaxEax()
+	noGroupAt := e.JzRel32()
+	e.PushRcx()
+	e.MovEdiEax()
+	groupStatePtrFromEdi(e)
+	e.MovEaxFromRdiDisp(0)
+	e.CmpEaxImm32(taskGroupCanceled)
+	notCanceledAt := e.JnzRel32()
+	e.PopRcx()
+	canceledAt := e.JmpRel32()
+
+	notCanceledTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, notCanceledAt, notCanceledTo); err != nil {
+		panic(err)
+	}
+	e.PopRcx()
+	noGroupTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, noGroupAt, noGroupTo); err != nil {
+		panic(err)
+	}
+	return []int{doneAt, reclaimableAt, stoppingAt, canceledAt}
 }
 
 func emitIncrementMailboxCount(e *x64.Emitter) {
@@ -1294,10 +2051,107 @@ func emitMmapAnon(e *x64.Emitter, length int32, sysMmap uint32, mapFlags uint32)
 	e.Syscall()
 }
 
+func emitTrimDoneActorStacks(e *x64.Emitter, sysMunmap uint32) error {
+	e.XorEaxEax() // actor slot index
+	e.XorEdxEdx() // retained done-stack count
+
+	loopOff := len(e.Buf)
+	e.MovRdiR15()
+	e.MovEcxFromRdiDisp(schedCountOff)
+	e.CmpEaxEcx()
+	doneAt := e.JaeRel32()
+
+	e.PushRax()
+	e.PushRdx()
+	actorPtrFromEaxToRdi(e)
+	e.MovEaxFromRdiDisp(actorStatusOff)
+	e.CmpEaxImm32(statusDone)
+	doneStackAt := e.JzRel32()
+	e.CmpEaxImm32(statusReclaimable)
+	reclaimableStackAt := e.JzRel32()
+	nextAts := []int{e.JmpRel32()}
+
+	stackCandidateOff := len(e.Buf)
+	for _, at := range []int{doneStackAt, reclaimableStackAt} {
+		if err := x64.PatchRel32(e.Buf, at, stackCandidateOff); err != nil {
+			return err
+		}
+	}
+
+	e.MovRaxFromRdiDisp(actorStackInitRspOff)
+	e.TestRaxRax()
+	nextAts = append(nextAts, e.JzRel32())
+
+	e.MovEdxFromRspDisp(0)
+	e.CmpEdxImm32(maxRetainedDoneActorStacks)
+	releaseAt := e.JaeRel32()
+	e.AddEdxImm32(1)
+	e.MovEaxEdx()
+	e.MovMem32RspDispEax(0)
+	retainedAt := e.JmpRel32()
+
+	releaseOff := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, releaseAt, releaseOff); err != nil {
+		return err
+	}
+	if err := emitReleaseDoneActorStack(e, sysMunmap); err != nil {
+		return err
+	}
+
+	retainedOff := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, retainedAt, retainedOff); err != nil {
+		return err
+	}
+	for _, at := range nextAts {
+		if err := x64.PatchRel32(e.Buf, at, retainedOff); err != nil {
+			return err
+		}
+	}
+
+	e.PopRdx()
+	e.PopRax()
+	e.AddEaxImm32(1)
+	againAt := e.JmpRel32()
+	if err := x64.PatchRel32(e.Buf, againAt, loopOff); err != nil {
+		return err
+	}
+
+	doneOff := len(e.Buf)
+	return x64.PatchRel32(e.Buf, doneAt, doneOff)
+}
+
+func emitReleaseDoneActorStack(e *x64.Emitter, sysMunmap uint32) error {
+	e.PushRdi()
+	e.AddRaxImm32(-stackSize + 56)
+	e.MovRdiRax()
+	e.MovEaxImm32(stackSize)
+	e.MovRsiRax()
+	e.MovEaxImm32(sysMunmap)
+	e.Syscall()
+	e.TestRaxRax()
+	failedAt := e.JnzRel32()
+
+	e.PopRdi()
+	e.XorEaxEax()
+	e.MovMem64RdiDispRax(actorRspOff)
+	e.MovMem64RdiDispRax(actorStackInitRspOff)
+	doneAt := e.JmpRel32()
+
+	failedOff := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, failedAt, failedOff); err != nil {
+		return err
+	}
+	e.PopRdi()
+
+	doneOff := len(e.Buf)
+	return x64.PatchRel32(e.Buf, doneAt, doneOff)
+}
+
 func emitEntry(
 	e *x64.Emitter,
 	mainSymbol string,
 	sysMmap uint32,
+	sysMunmap uint32,
 	mapFlags uint32,
 	callPatches *[]callPatch,
 	leaPatches *[]leaPatch,
@@ -1325,6 +2179,9 @@ func emitEntry(
 	e.MovMem32RdiDispImm32(schedNetFDOff, 0)
 	e.MovMem32RdiDispImm32(schedNodeIDOff, 0)
 	e.MovMem32RdiDispImm32(schedNetStatusOff, 1)
+	e.MovMem32RdiDispImm32(schedRuntimeClosingOff, 0)
+	e.MovMem32RdiDispImm32(schedMonitorNextIDOff, 1)
+	e.MovMem32RdiDispImm32(schedMonitorCountOff, 0)
 
 	// Message pool
 	emitMmapAnon(e, msgPoolSize, sysMmap, mapFlags)
@@ -1337,6 +2194,17 @@ func emitEntry(
 	e.MovMem64RdiDispRax(schedMsgFreeOff)
 	emitInitSchedulerMessagePoolCounters(e)
 
+	// Runtime-owned system event pool, physically separate from user messages.
+	emitMmapAnon(e, systemEventPoolSize, sysMmap, mapFlags)
+	e.MovRdiR15()
+	e.MovMem64RdiDispRax(schedSystemEventBaseOff)
+	e.MovMem64RdiDispRax(schedSystemEventBumpOff)
+	e.AddRaxImm32(systemEventPoolSize)
+	e.MovMem64RdiDispRax(schedSystemEventEndOff)
+	e.XorEaxEax()
+	e.MovMem64RdiDispRax(schedSystemEventFreeOff)
+	emitInitSchedulerSystemEventPoolCounters(e)
+
 	// actor0 = sched.actorsPtr + 0
 	e.MovRdiR15()
 	e.MovRaxFromRdiDisp(schedActorsPtrOff)
@@ -1347,6 +2215,9 @@ func emitEntry(
 	e.MovMem32RdiDispImm32(actorStatusOff, statusReady)
 	// actor0.entryID = hash(main symbol)
 	e.MovMem32RdiDispImm32(actorEntryIDOff, int32(fnv1a32(mainSymbol)))
+	e.MovMem32RdiDispImm32(actorGenerationOff, actorGenerationInitial)
+	e.MovMem32RdiDispImm32(actorTrapExitOff, 0)
+	e.MovMem32RdiDispImm32(actorLinkCountOff, 0)
 	// actor0.mailbox = empty
 	e.XorEaxEax()
 	e.MovMem64RdiDispRax(actorMailboxHeadOff)
@@ -1357,6 +2228,7 @@ func emitEntry(
 	e.MovMem32RdiDispImm32(actorTaskGroupOff, 0)
 	e.MovMem32RdiDispImm32(actorMailboxCountOff, 0)
 	emitInitActorByteCountersInRdi(e)
+	emitInitActorSystemMailboxInRdi(e)
 	for i := 0; i < maxActorStateSlots; i++ {
 		e.MovMem32RdiDispImm32(actorStateSlot0Off+int32(i*4), 0)
 	}
@@ -1371,6 +2243,8 @@ func emitEntry(
 	e.MovRdiRdx()
 	e.MovRaxRcx()
 	e.MovMem64RdiDispRax(actorRspOff)
+	e.MovMem64RdiDispRax(actorStackInitRspOff)
+	e.MovMem32RdiDispImm32(actorStatusOff, statusRunning)
 
 	// Switch to actor0 to start execution.
 	e.MovRdiR15()
@@ -1382,6 +2256,9 @@ func emitEntry(
 
 	// Scheduler loop.
 	loopStart := len(e.Buf)
+	if err := emitTrimDoneActorStacks(e, sysMunmap); err != nil {
+		return err
+	}
 
 	// Load count into ecx.
 	e.MovRdiR15()
@@ -1422,6 +2299,10 @@ func emitEntry(
 	e.MovEaxFromRdiDisp(actorStatusOff)
 	e.CmpEaxImm32(statusReady)
 	readyAt := e.JzRel32()
+	e.CmpEaxImm32(statusStarting)
+	startingAt := e.JzRel32()
+	e.CmpEaxImm32(statusStopping)
+	stoppingAt := e.JzRel32()
 	e.CmpEaxImm32(statusSleeping)
 	sleepingAt := e.JzRel32()
 	e.CmpEaxImm32(statusBlocked)
@@ -1429,6 +2310,15 @@ func emitEntry(
 	e.CmpEaxImm32(statusWaiting)
 	waitingAt := e.JzRel32()
 	notReadyAt := e.JmpRel32()
+
+	// Stop requests become terminal during the scheduler scan, after one
+	// observable stopping window for lifecycle status queries.
+	stoppingTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, stoppingAt, stoppingTo); err != nil {
+		return err
+	}
+	e.MovMem32RdiDispImm32(actorStatusOff, statusDone)
+	stoppingDoneAt := e.JmpRel32()
 
 	// Sleeping actors become ready when their group is canceled.
 	sleepingTo := len(e.Buf)
@@ -1515,6 +2405,9 @@ func emitEntry(
 	if err := x64.PatchRel32(e.Buf, readyAt, readyTo); err != nil {
 		return err
 	}
+	if err := x64.PatchRel32(e.Buf, startingAt, readyTo); err != nil {
+		return err
+	}
 	if err := x64.PatchRel32(e.Buf, canceledReadyAt, readyTo); err != nil {
 		return err
 	}
@@ -1554,6 +2447,10 @@ func emitEntry(
 	e.MovRdiRax()
 	storeActorSavedGroupForActorPtrInRdiGroupInRdx(e)
 	e.PopRax()
+	e.PushRax()
+	e.MovRdiRax()
+	e.MovMem32RdiDispImm32(actorStatusOff, statusRunning)
+	e.PopRax()
 
 	// switch_to(&sched.rsp, &actor.rsp)
 	e.MovRdiR15()
@@ -1566,6 +2463,9 @@ func emitEntry(
 	// Not ready: restore candidate and continue loop.
 	notReadyTo := len(e.Buf)
 	if err := x64.PatchRel32(e.Buf, notReadyAt, notReadyTo); err != nil {
+		return err
+	}
+	if err := x64.PatchRel32(e.Buf, stoppingDoneAt, notReadyTo); err != nil {
 		return err
 	}
 	if err := x64.PatchRel32(e.Buf, notDueAt, notReadyTo); err != nil {
@@ -1611,6 +2511,9 @@ func emitEntry(
 		return err
 	}
 	if err := emitAdvanceClockToNextSleepingWake(e, loopStart); err != nil {
+		return err
+	}
+	if err := emitMarkRuntimeClosingAndWakeSystemWaiters(e, loopStart); err != nil {
 		return err
 	}
 
@@ -1740,6 +2643,65 @@ func emitAdvanceClockToNextSleepingWake(e *x64.Emitter, loopStart int) error {
 	return nil
 }
 
+func emitMarkRuntimeClosingAndWakeSystemWaiters(e *x64.Emitter, loopStart int) error {
+	e.MovRdiR15()
+	e.MovMem32RdiDispImm32(schedRuntimeClosingOff, 1)
+	e.MovEcxFromRdiDisp(schedCountOff)
+	e.XorEaxEax()
+	e.XorEdxEdx()
+
+	scanStart := len(e.Buf)
+	e.CmpEaxEcx()
+	doneAt := e.JaeRel32()
+	e.PushRax()
+	e.PushRcx()
+
+	e.MovEcxEax()
+	e.MovRbxRcx()
+	e.ShlRbxImm8(actorSizeShift)
+	e.MovRdiR15()
+	e.MovRaxFromRdiDisp(schedActorsPtrOff)
+	e.AddRaxRbx()
+	e.MovRdiRax()
+	e.MovEaxFromRdiDisp(actorStatusOff)
+	e.CmpEaxImm32(statusBlocked)
+	notSystemWaiterAt := e.JnzRel32()
+	e.MovEaxFromRdiDisp(actorWaitKindOff)
+	e.CmpEaxImm32(actorWaitKindSystem)
+	notSystemWaitKindAt := e.JnzRel32()
+	e.MovMem32RdiDispImm32(actorStatusOff, statusReady)
+	e.MovMem32RdiDispImm32(actorWaitKindOff, actorWaitKindNone)
+	e.AddEdxImm32(1)
+
+	continueTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, notSystemWaiterAt, continueTo); err != nil {
+		return err
+	}
+	if err := x64.PatchRel32(e.Buf, notSystemWaitKindAt, continueTo); err != nil {
+		return err
+	}
+	e.PopRcx()
+	e.PopRax()
+	e.AddEaxImm32(1)
+	nextAt := e.JmpRel32()
+	if err := x64.PatchRel32(e.Buf, nextAt, scanStart); err != nil {
+		return err
+	}
+
+	doneTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, doneAt, doneTo); err != nil {
+		return err
+	}
+	e.TestEdxEdx()
+	noSystemWaitersAt := e.JzRel32()
+	loopAt := e.JmpRel32()
+	if err := x64.PatchRel32(e.Buf, loopAt, loopStart); err != nil {
+		return err
+	}
+	noSystemWaitersTo := len(e.Buf)
+	return x64.PatchRel32(e.Buf, noSystemWaitersAt, noSystemWaitersTo)
+}
+
 func emitBlockedDeadlineWakeCheck(e *x64.Emitter) ([]int, []int, error) {
 	// Candidate actor index is saved at rsp+0 by the scheduler scan.
 	e.MovEaxFromRspDisp(0)
@@ -1846,6 +2808,14 @@ func emitActorYield(e *x64.Emitter, callPatches *[]callPatch) error {
 	// rdi = &actor.rsp (actorPtr)
 	actorPtrInRax(e)
 	e.MovRdiRax()
+	e.MovEaxFromRdiDisp(actorStatusOff)
+	e.CmpEaxImm32(statusRunning)
+	notRunningAt := e.JnzRel32()
+	e.MovMem32RdiDispImm32(actorStatusOff, statusReady)
+	notRunningTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, notRunningAt, notRunningTo); err != nil {
+		return err
+	}
 	// rsi = &sched.rsp
 	e.MovRaxR15()
 	e.MovRsiRax()
@@ -1869,12 +2839,20 @@ func emitActorYieldNow(e *x64.Emitter, callPatches *[]callPatch) error {
 
 func emitActorExit(e *x64.Emitter, callPatches *[]callPatch) error {
 	// Argument: exitCode in edi.
-	// actor.exitCode = edi; actor.status = done; yield.
+	// actor.exitCode = edi; drain pending mailbox nodes; actor.status = done; yield.
 	e.MovEdxEdi()
 	actorPtrInRax(e)
 	e.MovRdiRax()
 	e.MovEaxEdx()
 	e.MovMem32RdiDispEax(actorExitCodeOff)
+	emitDrainActorMailboxInRdi(e)
+	emitDrainActorSystemMailboxInRdi(e)
+	e.MovEdxFromRdiDisp(actorExitCodeOff)
+	if err := emitDeliverMonitorDownFromActorPtrInRdiExitCodeInEdx(e); err != nil {
+		return err
+	}
+	e.MovEdxFromRdiDisp(actorExitCodeOff)
+	emitPropagateLinkedAbnormalExitFromActorPtrInRdiExitCodeInEdx(e)
 	e.MovMem32RdiDispImm32(actorStatusOff, statusDone)
 	at := e.CallRel32()
 	*callPatches = append(*callPatches, callPatch{at: at, name: "__tetra_actor_yield"})
@@ -1882,6 +2860,693 @@ func emitActorExit(e *x64.Emitter, callPatches *[]callPatch) error {
 	e.MovEaxImm32(0)
 	e.Ret()
 	return nil
+}
+
+func emitDrainActorMailboxInRdi(e *x64.Emitter) {
+	e.PushRdi() // keep actorPtr stable while recycling nodes through scheduler state
+	loopStart := len(e.Buf)
+	e.MovRaxFromRdiDisp(actorMailboxHeadOff)
+	e.TestRaxRax()
+	doneAt := e.JzRel32()
+
+	e.PushRax() // nodePtr; saved actorPtr remains at rsp+8
+	e.MovRdiRax()
+	e.MovRaxFromRdiDisp(msgNextOff)
+	emitMovRdiFromRspDisp(e, 8)
+	e.MovMem64RdiDispRax(actorMailboxHeadOff)
+	e.PushRax() // next
+	emitDecrementMailboxCount(e)
+	emitAccountMailboxDequeueInRdi(e)
+	e.PopRax()
+	e.TestRaxRax()
+	keepTailAt := e.JnzRel32()
+	e.XorEaxEax()
+	e.MovMem64RdiDispRax(actorMailboxTailOff)
+	keepTailTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, keepTailAt, keepTailTo); err != nil {
+		panic(err)
+	}
+	e.PopRax()
+	emitRecycleMessageNodeInRax(e)
+	emitMovRdiFromRspDisp(e, 0)
+	againAt := e.JmpRel32()
+	if err := x64.PatchRel32(e.Buf, againAt, loopStart); err != nil {
+		panic(err)
+	}
+
+	doneTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, doneAt, doneTo); err != nil {
+		panic(err)
+	}
+	e.XorEaxEax()
+	e.MovMem64RdiDispRax(actorMailboxTailOff)
+	e.MovMem32RdiDispImm32(actorMailboxCountOff, 0)
+	e.MovMem64RdiDispRax(actorMailboxBytesOff)
+	e.PopRdi()
+}
+
+func emitDrainActorSystemMailboxInRdi(e *x64.Emitter) {
+	e.PushRdi()
+	loopStart := len(e.Buf)
+	e.MovRaxFromRdiDisp(actorSystemMailboxHeadOff)
+	e.TestRaxRax()
+	doneAt := e.JzRel32()
+
+	e.PushRax()
+	e.MovRdiRax()
+	e.MovRaxFromRdiDisp(systemEventNextOff)
+	emitMovRdiFromRspDisp(e, 8)
+	e.MovMem64RdiDispRax(actorSystemMailboxHeadOff)
+	e.PushRax()
+	emitDecrementSystemMailboxCount(e)
+	emitAccountSystemMailboxDequeueInRdi(e)
+	e.PopRax()
+	e.TestRaxRax()
+	keepTailAt := e.JnzRel32()
+	e.XorEaxEax()
+	e.MovMem64RdiDispRax(actorSystemMailboxTailOff)
+	keepTailTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, keepTailAt, keepTailTo); err != nil {
+		panic(err)
+	}
+	e.PopRax()
+	emitRecycleSystemEventNodeInRax(e)
+	emitMovRdiFromRspDisp(e, 0)
+	againAt := e.JmpRel32()
+	if err := x64.PatchRel32(e.Buf, againAt, loopStart); err != nil {
+		panic(err)
+	}
+
+	doneTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, doneAt, doneTo); err != nil {
+		panic(err)
+	}
+	e.XorEaxEax()
+	e.MovMem64RdiDispRax(actorSystemMailboxTailOff)
+	e.MovMem32RdiDispImm32(actorSystemMailboxCountOff, 0)
+	e.MovMem64RdiDispRax(actorSystemMailboxBytesOff)
+	e.MovMem32RdiDispImm32(actorWaitKindOff, actorWaitKindNone)
+	e.PopRdi()
+}
+
+func emitPropagateLinkedAbnormalExitFromActorPtrInRdiExitCodeInEdx(e *x64.Emitter) {
+	e.MovEaxEdx()
+	e.TestEaxEax()
+	normalExitAt := e.JzRel32()
+	e.MovR8dEdx()
+	for i := 0; i < maxActorLinks; i++ {
+		e.MovEaxFromRdiDisp(actorLinkCountOff)
+		e.CmpEaxImm32(int32(i + 1))
+		skipAt := e.JlRel32()
+
+		e.PushRdi()
+		e.MovEaxFromRdiDisp(actorLinkRef0Off + int32(i*4))
+		e.PushRax()
+		e.MovEaxFromRdiDisp(actorLinkHigh0Off + int32(i*4))
+		e.CmpEaxImm32(actorRefLocalHighSlot)
+		localHighAt := e.JzRel32()
+		e.PopRax()
+		e.PopRdi()
+		remoteLinkDoneAt := e.JmpRel32()
+
+		localHighTo := len(e.Buf)
+		if err := x64.PatchRel32(e.Buf, localHighAt, localHighTo); err != nil {
+			panic(err)
+		}
+		e.MovEaxFromRspDisp(0)
+		emitAndEaxImm32(e, 0xFFFF)
+		e.MovEdxEax()
+		e.MovEaxFromRspDisp(0)
+		emitShrEaxImm8(e, 16)
+		emitAndEaxImm32(e, 0xFFFF)
+		actorPtrFromEaxToRdi(e)
+		e.MovEaxFromRdiDisp(actorGenerationOff)
+		e.CmpEaxEdx()
+		staleAt := e.JnzRel32()
+		e.MovEaxFromRdiDisp(actorStatusOff)
+		e.CmpEaxImm32(statusDone)
+		doneAt := e.JzRel32()
+		e.MovEaxFromRdiDisp(actorTrapExitOff)
+		e.TestEaxEax()
+		trapAt := e.JnzRel32()
+		e.MovRdxR8()
+		e.MovEaxEdx()
+		e.MovMem32RdiDispEax(actorExitCodeOff)
+		emitReleaseSystemEventCreditForActorPtrInRdi(e)
+		e.MovMem32RdiDispImm32(actorStatusOff, statusDone)
+		killedAt := e.JmpRel32()
+
+		trapTo := len(e.Buf)
+		if err := x64.PatchRel32(e.Buf, trapAt, trapTo); err != nil {
+			panic(err)
+		}
+		emitDeliverLinkedTrapExitFromActorPtrInRdiExitCodeInR8d(e)
+
+		slotDoneTo := len(e.Buf)
+		for _, at := range []int{staleAt, doneAt, killedAt} {
+			if err := x64.PatchRel32(e.Buf, at, slotDoneTo); err != nil {
+				panic(err)
+			}
+		}
+		e.PopRax()
+		e.PopRdi()
+
+		skipTo := len(e.Buf)
+		if err := x64.PatchRel32(e.Buf, remoteLinkDoneAt, skipTo); err != nil {
+			panic(err)
+		}
+		if err := x64.PatchRel32(e.Buf, skipAt, skipTo); err != nil {
+			panic(err)
+		}
+	}
+	doneTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, normalExitAt, doneTo); err != nil {
+		panic(err)
+	}
+}
+
+func emitDeliverLinkedTrapExitFromActorPtrInRdiExitCodeInR8d(e *x64.Emitter) {
+	// Linked trap-exit messages are runtime-owned system events on a mailbox
+	// physically separate from ordinary user messages.
+	e.PushRdi() // trapped actor pointer
+	e.PushR8()  // exit reason
+
+	e.MovRdiR15()
+	e.MovEaxFromRdiDisp(schedCurrentIdxOff)
+	e.Emit(0xC1, 0xE0, 0x10) // shl eax, 16
+	e.PushRax()
+	actorPtrInRax(e)
+	e.MovRdiRax()
+	e.MovEdxFromRdiDisp(actorGenerationOff)
+	e.PopRax()
+	emitOrEaxEdx(e)
+	e.PushRax() // source actor low ref
+
+	overflowAt := emitCheckedSystemEventPoolAlloc(e)
+
+	e.MovRdiRdx()
+	e.XorEaxEax()
+	e.MovMem64RdiDispRax(systemEventNextOff)
+	e.MovMem32RdiDispEax(systemEventFlagsOff)
+	e.MovMem64RdiDispRax(systemEventMonitorRefOff)
+	e.MovMem64RdiDispRax(systemEventNodeIDOff)
+	e.MovMem64RdiDispRax(systemEventNodeEpochOff)
+	e.MovMem64RdiDispRax(systemEventDedupKeyOff)
+	e.MovMem32RdiDispImm32(systemEventKindOff, actorSystemKindExit)
+	e.MovEaxFromRspDisp(0)
+	e.MovMem64RdiDispRax(systemEventSubjectOff)
+	e.MovEaxFromRspDisp(8)
+	e.MovMem32RdiDispEax(systemEventReasonCodeOff)
+	e.MovMem32RdiDispImm32(systemEventReasonKindOff, 0)
+
+	e.MovRaxFromRspDisp(16)
+	e.MovRdiRax()
+	emitEnqueueSystemEventForActorPtrInRdiNodeInRdx(e)
+
+	doneAt := e.JmpRel32()
+	overflowTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, overflowAt, overflowTo); err != nil {
+		panic(err)
+	}
+	emitSystemEventPoolAllocationFailure(e)
+
+	doneTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, doneAt, doneTo); err != nil {
+		panic(err)
+	}
+	e.MovR8dFromRspDisp(8)
+	e.AddRspImm32(24)
+}
+
+func emitDeliverMonitorDownFromActorPtrInRdiExitCodeInEdx(e *x64.Emitter) error {
+	// Monitor DOWN messages use a runtime-only system lane. Ordinary user send
+	// paths cannot set msg.system_kind, so later system-message receivers can
+	// distinguish these events from user tags with the same payload values.
+	e.MovRdiR15()
+	e.MovEaxFromRdiDisp(schedCurrentIdxOff)
+	e.Emit(0xC1, 0xE0, 0x10) // shl eax, 16
+	e.PushRax()
+	actorPtrInRax(e)
+	e.MovRdiRax()
+	e.MovEdxFromRdiDisp(actorGenerationOff)
+	e.PopRax()
+	emitOrEaxEdx(e)
+	e.PushRax()
+	e.PopR8() // target actor low ref
+
+	e.MovRdiR15()
+	e.MovEaxFromRdiDisp(schedMonitorCountOff)
+	e.TestEaxEax()
+	var doneAts []int
+	doneAts = append(doneAts, e.JzRel32())
+	e.XorEcxEcx()
+
+	scanStart := len(e.Buf)
+	e.CmpEaxEcx()
+	doneAts = append(doneAts, e.JzRel32())
+	e.PushRax() // monitor count
+	e.PushRcx() // scan index
+	emitLoadSchedulerTableI32AtIndexInEcxToEax(e, schedMonitorTargetHigh0Off)
+	e.CmpEaxImm32(actorRefLocalHighSlot)
+	localTargetAt := e.JzRel32()
+	e.PopRcx()
+	e.PopRax()
+	e.AddEcxImm8(1)
+	nextAt := e.JmpRel32()
+	if err := x64.PatchRel32(e.Buf, nextAt, scanStart); err != nil {
+		return err
+	}
+
+	localTargetTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, localTargetAt, localTargetTo); err != nil {
+		return err
+	}
+	emitLoadSchedulerTableI32AtIndexInEcxToEax(e, schedMonitorTargetRef0Off)
+	e.PushR8()
+	e.PopRdx()
+	e.CmpEaxEdx()
+	foundAt := e.JzRel32()
+	e.PopRcx()
+	e.PopRax()
+	e.AddEcxImm8(1)
+	againAt := e.JmpRel32()
+	if err := x64.PatchRel32(e.Buf, againAt, scanStart); err != nil {
+		return err
+	}
+
+	foundTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, foundAt, foundTo); err != nil {
+		return err
+	}
+	e.PopRcx()
+	e.PopRax()
+	e.PushRax() // count
+	e.PushRcx() // index
+	emitLoadSchedulerTableI32AtIndexInEcxToEax(e, schedMonitorOwnerRef0Off)
+	e.PushRax() // owner ref
+	emitLoadSchedulerTableI32AtIndexInEcxToEax(e, schedMonitorID0Off)
+	e.PushRax() // monitor ref/id
+	e.PushR8()  // target ref
+	actorPtrInRax(e)
+	e.MovRdiRax()
+	e.MovEaxFromRdiDisp(actorExitCodeOff)
+	e.PushRax() // exit reason
+	// Stack: exit, target ref, monitor id, owner ref, index, count.
+
+	e.MovEaxFromRspDisp(24)
+	emitAndEaxImm32(e, 0xFFFF)
+	e.MovEdxEax()
+	e.MovEaxFromRspDisp(24)
+	emitShrEaxImm8(e, 16)
+	emitAndEaxImm32(e, 0xFFFF)
+	actorPtrFromEaxToRdi(e)
+	e.MovEaxFromRdiDisp(actorGenerationOff)
+	e.CmpEaxEdx()
+	var skipDeliveryAts []int
+	skipDeliveryAts = append(skipDeliveryAts, e.JnzRel32())
+	e.MovEaxFromRdiDisp(actorStatusOff)
+	e.CmpEaxImm32(statusDone)
+	skipDeliveryAts = append(skipDeliveryAts, e.JzRel32())
+
+	overflowAt := emitCheckedSystemEventPoolAlloc(e)
+	skipDeliveryAts = append(skipDeliveryAts, overflowAt)
+	e.MovRdiRdx()
+	e.XorEaxEax()
+	e.MovMem64RdiDispRax(systemEventNextOff)
+	e.MovMem32RdiDispEax(systemEventFlagsOff)
+	e.MovMem64RdiDispRax(systemEventNodeIDOff)
+	e.MovMem64RdiDispRax(systemEventNodeEpochOff)
+	e.MovMem64RdiDispRax(systemEventDedupKeyOff)
+	e.MovMem32RdiDispImm32(systemEventKindOff, actorSystemKindDown)
+	e.MovEaxFromRspDisp(8)
+	e.MovMem64RdiDispRax(systemEventSubjectOff)
+	e.MovEaxFromRspDisp(16)
+	e.MovMem64RdiDispRax(systemEventMonitorRefOff)
+	e.MovMem32RdiDispImm32(systemEventReasonKindOff, 0)
+	e.MovEaxFromRspDisp(0)
+	e.MovMem32RdiDispEax(systemEventReasonCodeOff)
+
+	e.MovEaxFromRspDisp(24)
+	emitShrEaxImm8(e, 16)
+	emitAndEaxImm32(e, 0xFFFF)
+	actorPtrFromEaxToRdi(e)
+	emitEnqueueSystemEventForActorPtrInRdiNodeInRdx(e)
+
+	skipDeliveryTo := len(e.Buf)
+	for _, at := range skipDeliveryAts {
+		if err := x64.PatchRel32(e.Buf, at, skipDeliveryTo); err != nil {
+			return err
+		}
+	}
+
+	e.MovEaxFromRspDisp(40)
+	e.MovEcxFromRspDisp(32)
+	e.AddEaxImm32(-1)
+	e.PushRax()
+	e.CmpEaxEcx()
+	skipCopyAt := e.JzRel32()
+	emitCopySchedulerTableI32LastIndexInEaxToIndexInEcx(e, schedMonitorID0Off)
+	emitCopySchedulerTableI32LastIndexInEaxToIndexInEcx(e, schedMonitorOwnerRef0Off)
+	emitCopySchedulerTableI32LastIndexInEaxToIndexInEcx(e, schedMonitorTargetRef0Off)
+	emitCopySchedulerTableI32LastIndexInEaxToIndexInEcx(e, schedMonitorTargetHigh0Off)
+	skipCopyTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, skipCopyAt, skipCopyTo); err != nil {
+		return err
+	}
+	e.PopRax()
+	e.MovRdiR15()
+	e.MovMem32RdiDispEax(schedMonitorCountOff)
+	e.MovEcxFromRspDisp(32)
+	e.AddRspImm32(48)
+	recheckAt := e.JmpRel32()
+	if err := x64.PatchRel32(e.Buf, recheckAt, scanStart); err != nil {
+		return err
+	}
+
+	doneTo := len(e.Buf)
+	for _, at := range doneAts {
+		if err := x64.PatchRel32(e.Buf, at, doneTo); err != nil {
+			return err
+		}
+	}
+	actorPtrInRax(e)
+	e.MovRdiRax()
+	e.MovEdxFromRdiDisp(actorExitCodeOff)
+	return nil
+}
+
+func emitDeliverRemoteMonitorNodeDownFromRspFrame(e *x64.Emitter) error {
+	// Remote monitor NODE_DOWN messages use the same runtime-only system lane
+	// as local DOWN/EXIT. The frame currently lives at rsp in
+	// __tetra_actor_net_pump; every local push in this helper adjusts frame
+	// offsets explicitly.
+	e.MovRdiR15()
+	e.MovEaxFromRdiDisp(schedMonitorCountOff)
+	e.TestEaxEax()
+	var doneAts []int
+	doneAts = append(doneAts, e.JzRel32())
+	e.XorEcxEcx()
+
+	scanStart := len(e.Buf)
+	e.CmpEaxEcx()
+	doneAts = append(doneAts, e.JzRel32())
+	e.PushRax() // monitor count
+	e.PushRcx() // scan index
+	emitLoadSchedulerTableI32AtIndexInEcxToEax(e, schedMonitorTargetHigh0Off)
+	e.PushRax() // target high
+	emitAndEaxImm32(e, actorRefRemoteHighMask)
+	e.CmpEaxImm32(actorRefRemoteHighBase)
+	remoteTargetAt := e.JzRel32()
+	e.PopRax()
+	e.PopRcx()
+	e.PopRax()
+	e.AddEcxImm8(1)
+	nextAt := e.JmpRel32()
+	if err := x64.PatchRel32(e.Buf, nextAt, scanStart); err != nil {
+		return err
+	}
+
+	remoteTargetTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, remoteTargetAt, remoteTargetTo); err != nil {
+		return err
+	}
+	e.MovEaxFromRspDisp(0)
+	emitShrEaxImm8(e, 16)
+	emitAndEaxImm32(e, 0x07FF)
+	e.PushRax()
+	emitMovzxEaxWordRspDisp(e, actorWireOffsetSrc+24)
+	e.PopRdx()
+	e.CmpEaxEdx()
+	foundAt := e.JzRel32()
+	e.PopRax()
+	e.PopRcx()
+	e.PopRax()
+	e.AddEcxImm8(1)
+	againAt := e.JmpRel32()
+	if err := x64.PatchRel32(e.Buf, againAt, scanStart); err != nil {
+		return err
+	}
+
+	foundTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, foundAt, foundTo); err != nil {
+		return err
+	}
+	// Stack: target high, index, count.
+	emitLoadSchedulerTableI32AtIndexInEcxToEax(e, schedMonitorTargetRef0Off)
+	e.PushRax() // target low
+	emitLoadSchedulerTableI32AtIndexInEcxToEax(e, schedMonitorOwnerRef0Off)
+	e.PushRax() // owner ref
+	emitLoadSchedulerTableI32AtIndexInEcxToEax(e, schedMonitorID0Off)
+	e.PushRax() // monitor ref/id
+	e.MovEaxFromRspDisp(48 + actorWireOffsetStatus)
+	e.PushRax() // status/reason
+	// Stack: status, monitor id, owner ref, target low, target high, index, count.
+
+	e.MovEaxFromRspDisp(16)
+	emitAndEaxImm32(e, 0xFFFF)
+	e.MovEdxEax()
+	e.MovEaxFromRspDisp(16)
+	emitShrEaxImm8(e, 16)
+	emitAndEaxImm32(e, 0xFFFF)
+	actorPtrFromEaxToRdi(e)
+	e.MovEaxFromRdiDisp(actorGenerationOff)
+	e.CmpEaxEdx()
+	var skipDeliveryAts []int
+	skipDeliveryAts = append(skipDeliveryAts, e.JnzRel32())
+	e.MovEaxFromRdiDisp(actorStatusOff)
+	e.CmpEaxImm32(statusDone)
+	skipDeliveryAts = append(skipDeliveryAts, e.JzRel32())
+
+	overflowAt := emitCheckedSystemEventPoolAlloc(e)
+	skipDeliveryAts = append(skipDeliveryAts, overflowAt)
+	e.MovRdiRdx()
+	e.XorEaxEax()
+	e.MovMem64RdiDispRax(systemEventNextOff)
+	e.MovMem32RdiDispEax(systemEventFlagsOff)
+	e.MovMem64RdiDispRax(systemEventDedupKeyOff)
+	e.MovMem32RdiDispImm32(systemEventKindOff, actorSystemKindNodeDown)
+	e.MovEaxFromRspDisp(24)
+	e.MovMem64RdiDispRax(systemEventSubjectOff)
+	e.MovEaxFromRspDisp(8)
+	e.MovMem64RdiDispRax(systemEventMonitorRefOff)
+	e.MovEaxFromRspDisp(32)
+	e.MovMem64RdiDispRax(systemEventNodeIDOff)
+	e.MovEaxFromRspDisp(32)
+	e.MovMem64RdiDispRax(systemEventNodeEpochOff)
+	e.MovMem32RdiDispImm32(systemEventReasonKindOff, 0)
+	e.MovEaxFromRspDisp(0)
+	e.MovMem32RdiDispEax(systemEventReasonCodeOff)
+
+	e.MovEaxFromRspDisp(16)
+	emitShrEaxImm8(e, 16)
+	emitAndEaxImm32(e, 0xFFFF)
+	actorPtrFromEaxToRdi(e)
+	emitEnqueueSystemEventForActorPtrInRdiNodeInRdx(e)
+
+	skipDeliveryTo := len(e.Buf)
+	for _, at := range skipDeliveryAts {
+		if err := x64.PatchRel32(e.Buf, at, skipDeliveryTo); err != nil {
+			return err
+		}
+	}
+
+	e.MovEaxFromRspDisp(48)
+	e.MovEcxFromRspDisp(40)
+	e.AddEaxImm32(-1)
+	e.PushRax()
+	e.CmpEaxEcx()
+	skipCopyAt := e.JzRel32()
+	emitCopySchedulerTableI32LastIndexInEaxToIndexInEcx(e, schedMonitorID0Off)
+	emitCopySchedulerTableI32LastIndexInEaxToIndexInEcx(e, schedMonitorOwnerRef0Off)
+	emitCopySchedulerTableI32LastIndexInEaxToIndexInEcx(e, schedMonitorTargetRef0Off)
+	emitCopySchedulerTableI32LastIndexInEaxToIndexInEcx(e, schedMonitorTargetHigh0Off)
+	skipCopyTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, skipCopyAt, skipCopyTo); err != nil {
+		return err
+	}
+	e.PopRax()
+	e.MovRdiR15()
+	e.MovMem32RdiDispEax(schedMonitorCountOff)
+	e.MovEcxFromRspDisp(40)
+	e.AddRspImm32(56)
+	recheckAt := e.JmpRel32()
+	if err := x64.PatchRel32(e.Buf, recheckAt, scanStart); err != nil {
+		return err
+	}
+
+	doneTo := len(e.Buf)
+	for _, at := range doneAts {
+		if err := x64.PatchRel32(e.Buf, at, doneTo); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func emitDeliverRemoteLinkedNodeDownFromRspFrame(e *x64.Emitter) error {
+	// Remote links use node_down as a terminal link signal in this P01 runtime
+	// foundation. The authenticated network producer arrives in P10/P11; this
+	// helper consumes the existing checked net-pump node_down frame.
+	for actorSlot := 0; actorSlot < maxActors; actorSlot++ {
+		e.MovEaxImm32(uint32(actorSlot))
+		actorPtrFromEaxToRdi(e)
+		e.MovEaxFromRdiDisp(actorStatusOff)
+		e.CmpEaxImm32(statusDone)
+		actorDoneAt := e.JzRel32()
+		e.XorEcxEcx()
+
+		scanStart := len(e.Buf)
+		e.MovEaxFromRdiDisp(actorLinkCountOff)
+		e.CmpEaxEcx()
+		linksDoneAt := e.JzRel32()
+
+		e.PushRdi() // actor pointer
+		e.PushRcx() // link index
+		emitLoadActorLinkTableI32AtIndexInEcxToEax(e, actorLinkHigh0Off)
+		e.PushRax() // remote actor high slot
+		emitAndEaxImm32(e, actorRefRemoteHighMask)
+		e.CmpEaxImm32(actorRefRemoteHighBase)
+		remoteLinkAt := e.JzRel32()
+		if err := emitRemoteLinkedNodeDownScanAdvance(e, scanStart); err != nil {
+			return err
+		}
+
+		remoteLinkTo := len(e.Buf)
+		if err := x64.PatchRel32(e.Buf, remoteLinkAt, remoteLinkTo); err != nil {
+			return err
+		}
+		e.MovEaxFromRspDisp(0)
+		emitShrEaxImm8(e, 16)
+		emitAndEaxImm32(e, 0x07FF)
+		e.PushRax()
+		emitMovzxEaxWordRspDisp(e, actorWireOffsetSrc+32)
+		e.PopRdx()
+		e.CmpEaxEdx()
+		nodeMatchAt := e.JzRel32()
+		if err := emitRemoteLinkedNodeDownScanAdvance(e, scanStart); err != nil {
+			return err
+		}
+
+		nodeMatchTo := len(e.Buf)
+		if err := x64.PatchRel32(e.Buf, nodeMatchAt, nodeMatchTo); err != nil {
+			return err
+		}
+		// Stack: target high, link index, actor pointer.
+		e.MovEcxFromRspDisp(8)
+		emitLoadActorLinkTableI32AtIndexInEcxToEax(e, actorLinkRef0Off)
+		e.PushRax() // target low
+		// Stack: target low, target high, link index, actor pointer.
+		e.MovRaxFromRspDisp(24)
+		e.MovRdiRax()
+		e.MovEaxFromRdiDisp(actorTrapExitOff)
+		e.TestEaxEax()
+		trapExitAt := e.JnzRel32()
+
+		emitLoadNodeDownStatusFromRspFrameDispToEax(e, actorWireOffsetStatus+32)
+		e.MovMem32RdiDispEax(actorExitCodeOff)
+		e.MovMem32RdiDispImm32(actorTerminalReasonKindOff, actorExitReasonKindNodeDown)
+		e.MovMem32RdiDispEax(actorTerminalReasonCodeOff)
+		e.MovEdxFromRspDisp(0)
+		e.MovR9dFromRspDisp(8)
+		emitRemoveLinkRefFromActorPtrInRdiRefLowInEdxHighInR9d(e)
+		e.MovMem32RdiDispImm32(actorStatusOff, statusDone)
+		handledAt := e.JmpRel32()
+
+		trapExitTo := len(e.Buf)
+		if err := x64.PatchRel32(e.Buf, trapExitAt, trapExitTo); err != nil {
+			return err
+		}
+		overflowAt := emitCheckedSystemEventPoolAlloc(e)
+
+		e.MovRdiRdx()
+		e.XorEaxEax()
+		e.MovMem64RdiDispRax(systemEventNextOff)
+		e.MovMem32RdiDispEax(systemEventFlagsOff)
+		e.MovMem64RdiDispRax(systemEventMonitorRefOff)
+		e.MovMem64RdiDispRax(systemEventDedupKeyOff)
+		e.MovMem32RdiDispImm32(systemEventKindOff, actorSystemKindExit)
+		e.MovEaxFromRspDisp(0)
+		e.MovMem64RdiDispRax(systemEventSubjectOff)
+		e.MovEaxFromRspDisp(8)
+		emitShrEaxImm8(e, 16)
+		emitAndEaxImm32(e, 0x07FF)
+		e.MovMem64RdiDispRax(systemEventNodeIDOff)
+		e.MovEaxFromRspDisp(8)
+		emitAndEaxImm32(e, 0xFFFF)
+		e.MovMem64RdiDispRax(systemEventNodeEpochOff)
+		e.MovMem32RdiDispImm32(systemEventReasonKindOff, actorExitReasonKindNodeDown)
+		emitLoadNodeDownStatusFromRspFrameDispToEax(e, actorWireOffsetStatus+32)
+		e.MovMem32RdiDispEax(systemEventReasonCodeOff)
+
+		e.MovRaxFromRspDisp(24)
+		e.MovRdiRax()
+		emitEnqueueSystemEventForActorPtrInRdiNodeInRdx(e)
+
+		e.MovRaxFromRspDisp(24)
+		e.MovRdiRax()
+		e.MovEdxFromRspDisp(0)
+		e.MovR9dFromRspDisp(8)
+		emitRemoveLinkRefFromActorPtrInRdiRefLowInEdxHighInR9dWithoutCreditRelease(e)
+		trapHandledAt := e.JmpRel32()
+
+		overflowTo := len(e.Buf)
+		if err := x64.PatchRel32(e.Buf, overflowAt, overflowTo); err != nil {
+			return err
+		}
+		emitSystemEventPoolAllocationFailure(e)
+		e.PopRax() // target low
+		e.PopRax() // target high
+		e.PopRcx() // link index
+		e.PopRdi() // actor pointer
+		e.AddEcxImm8(1)
+		overflowNextAt := e.JmpRel32()
+		if err := x64.PatchRel32(e.Buf, overflowNextAt, scanStart); err != nil {
+			return err
+		}
+
+		handledTo := len(e.Buf)
+		for _, at := range []int{handledAt, trapHandledAt} {
+			if err := x64.PatchRel32(e.Buf, at, handledTo); err != nil {
+				return err
+			}
+		}
+		e.MovEcxFromRspDisp(16)
+		e.MovRaxFromRspDisp(24)
+		e.MovRdiRax()
+		e.AddRspImm32(32)
+		recheckAt := e.JmpRel32()
+		if err := x64.PatchRel32(e.Buf, recheckAt, scanStart); err != nil {
+			return err
+		}
+
+		actorDoneTo := len(e.Buf)
+		for _, at := range []int{actorDoneAt, linksDoneAt} {
+			if err := x64.PatchRel32(e.Buf, at, actorDoneTo); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func emitRemoteLinkedNodeDownScanAdvance(e *x64.Emitter, scanStart int) error {
+	e.PopRax() // remote actor high slot
+	e.PopRcx() // link index
+	e.PopRdi() // actor pointer
+	e.AddEcxImm8(1)
+	nextAt := e.JmpRel32()
+	return x64.PatchRel32(e.Buf, nextAt, scanStart)
+}
+
+func emitLoadNodeDownStatusFromRspFrameDispToEax(e *x64.Emitter, statusDisp int32) {
+	e.MovEaxFromRspDisp(statusDisp)
+	e.TestEaxEax()
+	statusReadyAt := e.JnzRel32()
+	e.MovEaxImm32(actorWireStatusDown)
+	statusReadyTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, statusReadyAt, statusReadyTo); err != nil {
+		panic(err)
+	}
 }
 
 func emitActorTrampoline(e *x64.Emitter, callPatches *[]callPatch) error {
@@ -1946,6 +3611,7 @@ func emitTaskSpawnI32To(e *x64.Emitter, actorSpawn string, callPatches *[]callPa
 	if err := x64.PatchRel32(e.Buf, groupSpawnedAt, groupSpawnedTo); err != nil {
 		return err
 	}
+	emitShrEaxImm8(e, 16)
 	e.PopRdx()
 	storeActorGroupForHandleInRaxGroupInRdx(e)
 	e.PushRax()
@@ -1980,6 +3646,7 @@ func emitTaskSpawnI32To(e *x64.Emitter, actorSpawn string, callPatches *[]callPa
 	if err := x64.PatchRel32(e.Buf, spawnedAt, spawnedTo); err != nil {
 		return err
 	}
+	emitShrEaxImm8(e, 16)
 	e.MovEdxImm32(0)
 	e.Ret()
 	return nil
@@ -2002,6 +3669,282 @@ func actorPtrFromEaxToRdi(e *x64.Emitter) {
 	e.MovRaxFromRdiDisp(schedActorsPtrOff)
 	e.AddRaxRbx()
 	e.MovRdiRax()
+}
+
+func remoteGenerationPtrFromEaxToRdi(e *x64.Emitter) {
+	e.MovEcxEax()
+	e.MovRbxRcx()
+	e.ShlRbxImm8(2)
+	e.MovRaxR15()
+	e.AddRaxImm32(schedRemoteGeneration0Off)
+	e.AddRaxRbx()
+	e.MovRdiRax()
+}
+
+func remoteNodeEpochPtrFromEaxToRdi(e *x64.Emitter) {
+	e.MovEcxEax()
+	e.MovRbxRcx()
+	e.ShlRbxImm8(2)
+	e.MovRaxR15()
+	e.AddRaxImm32(schedNodeEpoch0Off)
+	e.AddRaxRbx()
+	e.MovRdiRax()
+}
+
+func emitLocalActorRefReturnFromSlotInEaxActorPtrInRdi(e *x64.Emitter) {
+	e.MovEcxFromRdiDisp(actorGenerationOff)
+	e.Emit(0xC1, 0xE0, 0x10) // shl eax, 16
+	emitOrEaxEcx(e)
+	e.MovEdxImm32(actorRefLocalHighSlot)
+}
+
+func emitAndEaxImm32(e *x64.Emitter, v uint32) {
+	e.Emit(0x25)
+	var buf [4]byte
+	binary.LittleEndian.PutUint32(buf[:], v)
+	e.Emit(buf[:]...)
+}
+
+func emitOrEaxImm32(e *x64.Emitter, v uint32) {
+	e.Emit(0x0D)
+	var buf [4]byte
+	binary.LittleEndian.PutUint32(buf[:], v)
+	e.Emit(buf[:]...)
+}
+
+func emitOrEdxImm32(e *x64.Emitter, v uint32) {
+	e.Emit(0x81, 0xCA)
+	var buf [4]byte
+	binary.LittleEndian.PutUint32(buf[:], v)
+	e.Emit(buf[:]...)
+}
+
+func emitShrEaxImm8(e *x64.Emitter, v byte) {
+	e.Emit(0xC1, 0xE8, v)
+}
+
+func emitOrEaxEdx(e *x64.Emitter) {
+	e.Emit(0x09, 0xD0)
+}
+
+func emitOrEaxEcx(e *x64.Emitter) {
+	e.Emit(0x09, 0xC8)
+}
+
+func emitOrEdxEax(e *x64.Emitter) {
+	e.Emit(0x09, 0xC2)
+}
+
+func emitMovEsiR8d(e *x64.Emitter) {
+	e.Emit(0x44, 0x89, 0xC6)
+}
+
+func emitMovR10dEdx(e *x64.Emitter) {
+	e.Emit(0x41, 0x89, 0xD2)
+}
+
+func emitMovR11dEcx(e *x64.Emitter) {
+	e.Emit(0x41, 0x89, 0xCB)
+}
+
+func emitDecodeLocalActorRefInRdiRsiToEcx(e *x64.Emitter) ([]int, error) {
+	var invalidAts []int
+
+	e.MovEaxEsi()
+	e.CmpEaxImm32(actorRefLocalHighSlot)
+	highOKAt := e.JzRel32()
+	invalidAts = append(invalidAts, e.JmpRel32())
+	highOKTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, highOKAt, highOKTo); err != nil {
+		return nil, err
+	}
+
+	e.MovEaxEdi()
+	e.Emit(0xC1, 0xE8, 0x10) // shr eax, 16
+	e.CmpEaxImm32(maxActors)
+	invalidAts = append(invalidAts, e.JaeRel32())
+	e.MovEcxEax()
+
+	e.MovEaxEdi()
+	emitAndEaxImm32(e, 0xFFFF)
+	e.MovEdxEax()
+	e.MovEaxEcx()
+	actorPtrFromEaxToRdi(e)
+	e.MovEaxFromRdiDisp(actorGenerationOff)
+	e.CmpEaxEdx()
+	invalidAts = append(invalidAts, e.JnzRel32())
+	return invalidAts, nil
+}
+
+func emitDecodeLocalActorRefInRdiRsiToEcxClassified(e *x64.Emitter) ([]int, []int, error) {
+	var invalidAts []int
+	var staleAts []int
+
+	e.MovEaxEsi()
+	e.CmpEaxImm32(actorRefLocalHighSlot)
+	highOKAt := e.JzRel32()
+	invalidAts = append(invalidAts, e.JmpRel32())
+	highOKTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, highOKAt, highOKTo); err != nil {
+		return nil, nil, err
+	}
+
+	e.MovEaxEdi()
+	e.Emit(0xC1, 0xE8, 0x10) // shr eax, 16
+	e.CmpEaxImm32(maxActors)
+	invalidAts = append(invalidAts, e.JaeRel32())
+	e.MovEcxEax()
+
+	e.MovEaxEdi()
+	emitAndEaxImm32(e, 0xFFFF)
+	e.MovEdxEax()
+	e.MovEaxEcx()
+	actorPtrFromEaxToRdi(e)
+	e.MovEaxFromRdiDisp(actorGenerationOff)
+	e.CmpEaxEdx()
+	staleAts = append(staleAts, e.JnzRel32())
+	return invalidAts, staleAts, nil
+}
+
+func emitDecodeRemoteActorRefInRdiRsiToLegacyHandleInEdi(e *x64.Emitter) ([]int, error) {
+	var invalidAts []int
+
+	e.MovEaxEsi()
+	emitAndEaxImm32(e, actorRefRemoteHighMask)
+	e.CmpEaxImm32(actorRefRemoteHighBase)
+	highOKAt := e.JzRel32()
+	invalidAts = append(invalidAts, e.JmpRel32())
+	highOKTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, highOKAt, highOKTo); err != nil {
+		return nil, err
+	}
+
+	e.MovEaxEsi()
+	emitShrEaxImm8(e, 16)
+	emitAndEaxImm32(e, 0x07FF)
+	e.CmpEaxImm32(maxActors - 1)
+	invalidAts = append(invalidAts, e.JaRel32())
+
+	e.MovEaxEsi()
+	emitAndEaxImm32(e, 0xFFFF)
+	e.TestEaxEax()
+	invalidAts = append(invalidAts, e.JzRel32())
+	e.PushRax()
+	e.MovEaxEsi()
+	emitShrEaxImm8(e, 16)
+	emitAndEaxImm32(e, 0x07FF)
+	e.PushRdi()
+	remoteNodeEpochPtrFromEaxToRdi(e)
+	e.MovEaxFromRdiDisp(0)
+	e.PopRdi()
+	e.PopRdx()
+	e.CmpEaxEdx()
+	invalidAts = append(invalidAts, e.JnzRel32())
+
+	e.MovEaxEdi()
+	emitAndEaxImm32(e, 0xFFFF)
+	e.TestEaxEax()
+	invalidAts = append(invalidAts, e.JzRel32())
+	e.MovEdxEax()
+	e.MovEaxEdi()
+	emitShrEaxImm8(e, 16)
+	emitAndEaxImm32(e, 0xFFFF)
+	e.CmpEaxImm32(maxActors - 1)
+	invalidAts = append(invalidAts, e.JaRel32())
+	e.PushRdi()
+	remoteGenerationPtrFromEaxToRdi(e)
+	e.MovEaxFromRdiDisp(0)
+	e.PopRdi()
+	e.CmpEaxEdx()
+	invalidAts = append(invalidAts, e.JnzRel32())
+
+	e.MovEaxEsi()
+	emitAndEaxImm32(e, 0x07FF0000)
+	emitOrEaxImm32(e, 0x80000000)
+	e.MovEdxEax()
+	e.MovEaxEdi()
+	emitShrEaxImm8(e, 16)
+	emitAndEaxImm32(e, 0xFFFF)
+	emitOrEaxEdx(e)
+	e.MovEdiEax()
+	return invalidAts, nil
+}
+
+func emitInvalidActorWaitResultReturn(e *x64.Emitter) {
+	e.MovEaxImm32(0xFFFFFFFD)
+	e.MovEdxImm32(actorLifecycleStatusDead)
+	e.Ret()
+}
+
+func emitStaleActorWaitResultReturn(e *x64.Emitter) {
+	e.MovEaxImm32(0xFFFFFFFB)
+	e.MovEdxImm32(actorLifecycleStatusDead)
+	e.Ret()
+}
+
+func emitActorWaitDoneResultReturn(e *x64.Emitter) {
+	e.MovEaxFromRdiDisp(actorExitCodeOff)
+	e.TestEaxEax()
+	errorAt := e.JnzRel32()
+	e.MovEdxImm32(actorLifecycleStatusExitedNormal)
+	e.Ret()
+
+	errorTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, errorAt, errorTo); err != nil {
+		panic(err)
+	}
+	e.MovEdxImm32(actorLifecycleStatusExitedError)
+	e.Ret()
+}
+
+func patchInvalidActorHandleReturns(e *x64.Emitter, invalidAts []int) error {
+	invalidTo := len(e.Buf)
+	for _, invalidAt := range invalidAts {
+		if err := x64.PatchRel32(e.Buf, invalidAt, invalidTo); err != nil {
+			return err
+		}
+	}
+	emitInvalidActorHandleReturn(e)
+	return nil
+}
+
+func patchInvalidActorWaitResultReturns(e *x64.Emitter, invalidAts []int) error {
+	invalidTo := len(e.Buf)
+	for _, invalidAt := range invalidAts {
+		if err := x64.PatchRel32(e.Buf, invalidAt, invalidTo); err != nil {
+			return err
+		}
+	}
+	emitInvalidActorWaitResultReturn(e)
+	return nil
+}
+
+func patchStaleActorWaitResultReturns(e *x64.Emitter, staleAts []int) error {
+	staleTo := len(e.Buf)
+	for _, staleAt := range staleAts {
+		if err := x64.PatchRel32(e.Buf, staleAt, staleTo); err != nil {
+			return err
+		}
+	}
+	emitStaleActorWaitResultReturn(e)
+	return nil
+}
+
+func emitActorStatusRawReturn(e *x64.Emitter, statusCode uint32, result uint32) {
+	e.MovEaxImm32(statusCode)
+	e.MovEdxImm32(result)
+	e.Ret()
+}
+
+func patchActorStatusRawResultReturns(e *x64.Emitter, patchAts []int, result uint32) error {
+	target := len(e.Buf)
+	for _, at := range patchAts {
+		if err := x64.PatchRel32(e.Buf, at, target); err != nil {
+			return err
+		}
+	}
+	emitActorStatusRawReturn(e, actorLifecycleStatusDead, result)
+	return nil
 }
 
 func actorGroupPtrFromEaxToRdi(e *x64.Emitter) {
@@ -3008,6 +4951,21 @@ func emitActorNodeConnect(e *x64.Emitter) error {
 	e.MovMem32RdiDispEax(schedNetFDOff)
 	e.MovEaxFromRspDisp(0x70)
 	e.MovMem32RdiDispEax(schedNodeIDOff)
+	emitMovEaxRspDisp(e, 0x20+actorWireOffsetValue)
+	emitAndEaxImm32(e, 0xFFFF)
+	e.TestEaxEax()
+	ackEpochOK := e.JnzRel32()
+	failCloseJumps = append(failCloseJumps, e.JmpRel32())
+	ackEpochOKTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, ackEpochOK, ackEpochOKTo); err != nil {
+		return err
+	}
+	e.PushRax()
+	e.MovEaxFromRspDisp(0x78)
+	remoteNodeEpochPtrFromEaxToRdi(e)
+	e.PopRax()
+	e.MovMem32RdiDispEax(0)
+	e.MovRdiR15()
 	e.MovMem32RdiDispImm32(schedNetStatusOff, 0)
 	e.XorEaxEax()
 	e.Leave()
@@ -3089,12 +5047,87 @@ func emitActorSpawnRemote(e *x64.Emitter) error {
 		return err
 	}
 
-	e.MovEaxFromRspDisp(0x60)
-	e.Emit(0xC1, 0xE0, 0x10)
-	e.Emit(0x0D, 0x00, 0x00, 0x00, 0x80)
-	e.MovEdxFromRspDisp(0x64)
-	e.Emit(0x81, 0xE2, 0xFF, 0xFF, 0x00, 0x00)
-	e.Emit(0x09, 0xD0)
+	e.Emit(0x8B, 0x7C, 0x24, 0x68)
+	emitLeaRsiRspDisp(e, 0)
+	e.MovEdxImm32(actorWireFrameSize)
+	e.MovEaxImm32(linuxSysRead)
+	e.Syscall()
+	e.CmpEaxImm32(actorWireFrameSize)
+	readOK := e.JzRel32()
+	failJumps = append(failJumps, e.JmpRel32())
+	readOKTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, readOK, readOKTo); err != nil {
+		return err
+	}
+
+	emitMovEaxRspDisp(e, actorWireOffsetMagic)
+	e.CmpEaxImm32(actorWireMagic)
+	ackMagicOK := e.JzRel32()
+	failJumps = append(failJumps, e.JmpRel32())
+	ackMagicOKTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, ackMagicOK, ackMagicOKTo); err != nil {
+		return err
+	}
+	emitMovzxEaxWordRspDisp(e, actorWireOffsetType)
+	e.CmpEaxImm32(actorWireFrameSpawnAck)
+	ackTypeOK := e.JzRel32()
+	failJumps = append(failJumps, e.JmpRel32())
+	ackTypeOKTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, ackTypeOK, ackTypeOKTo); err != nil {
+		return err
+	}
+	emitMovEaxRspDisp(e, actorWireOffsetStatus)
+	e.TestEaxEax()
+	ackStatusOK := e.JzRel32()
+	failJumps = append(failJumps, e.JmpRel32())
+	ackStatusOKTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, ackStatusOK, ackStatusOKTo); err != nil {
+		return err
+	}
+
+	emitMovzxEaxWordRspDisp(e, actorWireOffsetActor)
+	e.CmpEaxImm32(maxActors - 1)
+	failJumps = append(failJumps, e.JaRel32())
+	e.PushRax()
+	remoteGenerationPtrFromEaxToRdi(e)
+	emitMovEaxRspDisp(e, actorWireOffsetValue+8)
+	emitAndEaxImm32(e, 0xFFFF)
+	e.TestEaxEax()
+	ackGenerationOK := e.JnzRel32()
+	failJumps = append(failJumps, e.JmpRel32())
+	ackGenerationOKTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, ackGenerationOK, ackGenerationOKTo); err != nil {
+		return err
+	}
+	e.MovMem32RdiDispEax(0)
+	e.MovEcxEax()
+	e.PopRax()
+	e.Emit(0xC1, 0xE0, 0x10) // shl eax, 16
+	emitOrEaxEcx(e)
+	e.PushRax()
+	emitMovEaxRspDisp(e, actorWireOffsetValue+4+8)
+	emitAndEaxImm32(e, 0xFFFF)
+	e.TestEaxEax()
+	ackNodeEpochOK := e.JnzRel32()
+	failJumps = append(failJumps, e.JmpRel32())
+	ackNodeEpochOKTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, ackNodeEpochOK, ackNodeEpochOKTo); err != nil {
+		return err
+	}
+	e.PushRax()
+	e.MovEaxFromRspDisp(0x70)
+	remoteNodeEpochPtrFromEaxToRdi(e)
+	e.PopRax()
+	e.MovMem32RdiDispEax(0)
+	e.MovEdxFromRspDisp(0x68)
+	e.Emit(0xC1, 0xE2, 0x10) // shl edx, 16
+	emitOrEdxImm32(e, actorRefRemoteHighBase)
+	e.MovEaxFromRspDisp(0x68)
+	remoteNodeEpochPtrFromEaxToRdi(e)
+	e.MovEaxFromRdiDisp(0)
+	emitAndEaxImm32(e, 0xFFFF)
+	emitOrEdxEax(e)
+	e.PopRax()
 	e.Leave()
 	e.Ret()
 
@@ -3105,6 +5138,7 @@ func emitActorSpawnRemote(e *x64.Emitter) error {
 		}
 	}
 	e.MovEaxImm32(0xFFFFFFFF)
+	e.XorEdxEdx()
 	e.Leave()
 	e.Ret()
 	return nil
@@ -3190,6 +5224,8 @@ func emitTaskGroupClose(e *x64.Emitter, callPatches *[]callPatch) error {
 	e.MovEaxFromRdiDisp(actorStatusOff)
 	e.CmpEaxImm32(statusDone)
 	doneActorAt := e.JzRel32()
+	e.CmpEaxImm32(statusReclaimable)
+	reclaimableActorAt := e.JzRel32()
 
 	e.PopRax()
 	at := e.CallRel32()
@@ -3204,6 +5240,9 @@ func emitTaskGroupClose(e *x64.Emitter, callPatches *[]callPatch) error {
 		return err
 	}
 	if err := x64.PatchRel32(e.Buf, doneActorAt, continueTo); err != nil {
+		return err
+	}
+	if err := x64.PatchRel32(e.Buf, reclaimableActorAt, continueTo); err != nil {
 		return err
 	}
 	e.PopRax()
@@ -3284,6 +5323,7 @@ func emitTaskSpawnGroupI32(e *x64.Emitter, actorSpawn string, callPatches *[]cal
 	if err := x64.PatchRel32(e.Buf, spawnedAt, spawnedTo); err != nil {
 		return err
 	}
+	emitShrEaxImm8(e, 16)
 	e.PopRdx()
 	storeActorGroupForHandleInRaxGroupInRdx(e)
 	e.PushRax()
@@ -3349,9 +5389,54 @@ func emitSpawn(
 	leaPatches *[]leaPatch,
 ) error {
 	// Argument: entryID in edi.
-	// Returns: actor handle in eax.
+	// Returns: actor ref in edx:eax.
 	e.MovEdxEdi() // entryID -> edx
 
+	e.MovEaxImm32(1)
+	reuseScanStart := len(e.Buf)
+	e.MovRdiR15()
+	e.MovEcxFromRdiDisp(schedCountOff)
+	e.CmpEaxEcx()
+	noReusableAt := e.JaeRel32()
+	e.PushRax() // candidate slot
+	actorPtrFromEaxToRdi(e)
+	e.MovEaxFromRdiDisp(actorStatusOff)
+	e.CmpEaxImm32(statusReclaimable)
+	reclaimableAt := e.JzRel32()
+	skipCandidateAts := []int{e.JmpRel32()}
+
+	reclaimableTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, reclaimableAt, reclaimableTo); err != nil {
+		return err
+	}
+	e.MovEaxFromRdiDisp(actorGenerationOff)
+	e.CmpEaxImm32(actorGenerationMax)
+	skipCandidateAts = append(skipCandidateAts, e.JaeRel32())
+	e.PopRax()
+	e.PushRax()
+	e.PushRdx()
+	actorPtrFromEaxToRdi(e)
+	if err := emitSpawnSlotInit(e, sysMmap, mapFlags, leaPatches, true); err != nil {
+		return err
+	}
+
+	skipCandidateTo := len(e.Buf)
+	for _, at := range skipCandidateAts {
+		if err := x64.PatchRel32(e.Buf, at, skipCandidateTo); err != nil {
+			return err
+		}
+	}
+	e.PopRax()
+	e.AddEaxImm32(1)
+	retryReuseAt := e.JmpRel32()
+	if err := x64.PatchRel32(e.Buf, retryReuseAt, reuseScanStart); err != nil {
+		return err
+	}
+
+	noReusableTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, noReusableAt, noReusableTo); err != nil {
+		return err
+	}
 	e.MovRdiR15()
 	e.MovEaxFromRdiDisp(schedCapacityOff)
 	e.MovEcxFromRdiDisp(schedCountOff)
@@ -3359,6 +5444,7 @@ func emitSpawn(
 	notFullAt := e.JnzRel32()
 	// full -> return -1
 	e.MovEaxImm32(uint32(^uint32(0)))
+	e.XorEdxEdx()
 	e.Ret()
 	notFullTo := len(e.Buf)
 	if err := x64.PatchRel32(e.Buf, notFullAt, notFullTo); err != nil {
@@ -3384,12 +5470,32 @@ func emitSpawn(
 	e.AddRaxRbx()
 	e.MovRdiRax() // actorPtr
 
-	e.MovMem32RdiDispImm32(actorStatusOff, statusReady)
+	return emitSpawnSlotInit(e, sysMmap, mapFlags, leaPatches, false)
+}
+
+func emitSpawnSlotInit(
+	e *x64.Emitter,
+	sysMmap uint32,
+	mapFlags uint32,
+	leaPatches *[]leaPatch,
+	reuseGeneration bool,
+) error {
+	// Precondition: rdi=actorPtr, stack top=entryID, next stack slot=actor index.
+	e.MovMem32RdiDispImm32(actorStatusOff, statusStarting)
 
 	// actor.entryID = entryID (saved)
 	e.PopRdx()
 	e.MovEaxEdx()
 	e.MovMem32RdiDispEax(actorEntryIDOff)
+	if reuseGeneration {
+		e.MovEaxFromRdiDisp(actorGenerationOff)
+		e.AddEaxImm32(1)
+		e.MovMem32RdiDispEax(actorGenerationOff)
+	} else {
+		e.MovMem32RdiDispImm32(actorGenerationOff, actorGenerationInitial)
+	}
+	e.MovMem32RdiDispImm32(actorTrapExitOff, 0)
+	e.MovMem32RdiDispImm32(actorLinkCountOff, 0)
 
 	e.XorEaxEax()
 	e.MovMem64RdiDispRax(actorMailboxHeadOff)
@@ -3400,14 +5506,37 @@ func emitSpawn(
 	e.MovMem32RdiDispImm32(actorTaskGroupOff, 0)
 	e.MovMem32RdiDispImm32(actorMailboxCountOff, 0)
 	emitInitActorByteCountersInRdi(e)
+	emitInitActorSystemMailboxInRdi(e)
 
 	// Save actorPtr across stack init.
 	e.MovRaxRdi()
 	e.PushRax()
 
 	// Stack init (initRsp -> rcx).
-	if err := emitInitActorStack(e, sysMmap, mapFlags, leaPatches); err != nil {
-		return err
+	if reuseGeneration {
+		e.MovRaxFromRdiDisp(actorStackInitRspOff)
+		e.TestRaxRax()
+		allocateStackAt := e.JzRel32()
+		e.MovRcxRax()
+		if err := emitFillActorStackFrameInRcx(e, leaPatches); err != nil {
+			return err
+		}
+		stackReadyAt := e.JmpRel32()
+		allocateStackTo := len(e.Buf)
+		if err := x64.PatchRel32(e.Buf, allocateStackAt, allocateStackTo); err != nil {
+			return err
+		}
+		if err := emitInitActorStack(e, sysMmap, mapFlags, leaPatches); err != nil {
+			return err
+		}
+		stackReadyTo := len(e.Buf)
+		if err := x64.PatchRel32(e.Buf, stackReadyAt, stackReadyTo); err != nil {
+			return err
+		}
+	} else {
+		if err := emitInitActorStack(e, sysMmap, mapFlags, leaPatches); err != nil {
+			return err
+		}
 	}
 
 	// Restore actorPtr.
@@ -3415,6 +5544,7 @@ func emitSpawn(
 	e.MovRdiRax()
 	e.MovRaxRcx()
 	e.MovMem64RdiDispRax(actorRspOff)
+	e.MovMem64RdiDispRax(actorStackInitRspOff)
 
 	e.PushRdi()
 	e.MovRdiR15()
@@ -3430,21 +5560,30 @@ func emitSpawn(
 	e.PopRdi()
 	storeActorSavedGroupForActorPtrInRdiGroupInRdx(e)
 
-	// return newIdx
+	// return local actor ref for newIdx
 	e.PopRax()
 	storeActorGroupForHandleInRaxGroupInRdx(e)
+	e.PushRax()
+	actorPtrFromEaxToRdi(e)
+	e.PopRax()
+	emitLocalActorRefReturnFromSlotInEaxActorPtrInRdi(e)
 	e.Ret()
 	return nil
 }
 
 func emitSend(e *x64.Emitter) error {
-	// Args: rdi=to (actor handle), rsi=value (i32)
+	// Args: rdi=to.low, rsi=to.high, rdx=value (i32)
 	// Returns: eax=value.
 
-	e.CmpEdiImm32(-1)
-	invalidAt := e.JzRel32()
-	e.Emit(0xF7, 0xC7, 0x00, 0x00, 0x00, 0x80) // test edi, remote-handle high bit
+	e.MovR8dEdx()
+	e.MovEaxEsi()
+	e.CmpEaxImm32(actorRefLocalHighSlot)
 	localAt := e.JzRel32()
+	remoteInvalidAts, err := emitDecodeRemoteActorRefInRdiRsiToLegacyHandleInEdi(e)
+	if err != nil {
+		return err
+	}
+	emitMovEsiR8d(e)
 	if err := emitRemoteSendI32(e); err != nil {
 		return err
 	}
@@ -3452,9 +5591,13 @@ func emitSend(e *x64.Emitter) error {
 	if err := x64.PatchRel32(e.Buf, localAt, localTo); err != nil {
 		return err
 	}
+	invalidAts, err := emitDecodeLocalActorRefInRdiRsiToEcx(e)
+	if err != nil {
+		return err
+	}
+	emitMovEsiR8d(e)
 
-	e.MovEcxEdi() // save receiver idx in ecx
-	doneAt := emitDoneActorCheckForReceiverInEcx(e)
+	doneAts := emitDoneActorCheckForReceiverInEcx(e)
 	budgetAt := emitMailboxByteBudgetCheckForReceiverInEcx(e)
 	fullAt := emitMailboxFullCheckForReceiverInEcx(e)
 
@@ -3476,6 +5619,7 @@ func emitSend(e *x64.Emitter) error {
 	// msg.tag = 0 (legacy i32 channel)
 	e.MovMem32RdiDispImm32(msgTagOff, 0)
 	e.MovMem32RdiDispImm32(msgCountOff, 1)
+	e.MovMem32RdiDispImm32(msgSystemKindOff, actorSystemKindUser)
 	e.MovMem32RdiDispEsi(msgPayload0)
 
 	// actorPtr = sched.actorsPtr + (to<<shift)
@@ -3520,15 +5664,7 @@ func emitSend(e *x64.Emitter) error {
 	emitIncrementMailboxCount(e)
 	emitAccountMailboxEnqueueInRdi(e)
 
-	// If receiver blocked -> ready
-	e.MovEaxFromRdiDisp(actorStatusOff)
-	e.CmpEaxImm32(statusBlocked)
-	notBlockedAt := e.JnzRel32()
-	e.MovMem32RdiDispImm32(actorStatusOff, statusReady)
-	notBlockedTo := len(e.Buf)
-	if err := x64.PatchRel32(e.Buf, notBlockedAt, notBlockedTo); err != nil {
-		return err
-	}
+	emitWakeActorIfBlockedOnUserMailboxInRdi(e)
 
 	e.MovEaxEsi()
 	e.Ret()
@@ -3551,13 +5687,17 @@ func emitSend(e *x64.Emitter) error {
 	emitAccountActorByteBackpressureInRdi(e)
 	emitMailboxFullReturn(e)
 	invalidTo := len(e.Buf)
-	if err := x64.PatchRel32(e.Buf, invalidAt, invalidTo); err != nil {
-		return err
+	for _, invalidAt := range append(remoteInvalidAts, invalidAts...) {
+		if err := x64.PatchRel32(e.Buf, invalidAt, invalidTo); err != nil {
+			return err
+		}
 	}
 	emitInvalidActorHandleReturn(e)
 	doneTo := len(e.Buf)
-	if err := x64.PatchRel32(e.Buf, doneAt, doneTo); err != nil {
-		return err
+	for _, doneAt := range doneAts {
+		if err := x64.PatchRel32(e.Buf, doneAt, doneTo); err != nil {
+			return err
+		}
 	}
 	emitActorDoneReturn(e)
 	return nil
@@ -3627,13 +5767,21 @@ func emitRemoteSendI32(e *x64.Emitter) error {
 }
 
 func emitSendMsg(e *x64.Emitter) error {
-	// Args: rdi=to (actor handle), rsi=value (i32), rdx=tag (i32)
+	// Args: rdi=to.low, rsi=to.high, rdx=value (i32), rcx=tag (i32)
 	// Returns: eax=value.
 
-	e.CmpEdiImm32(-1)
-	invalidAt := e.JzRel32()
-	e.Emit(0xF7, 0xC7, 0x00, 0x00, 0x00, 0x80) // test edi, remote-handle high bit
+	e.MovR8dEdx()
+	e.MovR9Rcx()
+	e.MovEaxEsi()
+	e.CmpEaxImm32(actorRefLocalHighSlot)
 	localAt := e.JzRel32()
+	remoteInvalidAts, err := emitDecodeRemoteActorRefInRdiRsiToLegacyHandleInEdi(e)
+	if err != nil {
+		return err
+	}
+	emitMovEsiR8d(e)
+	e.PushR9()
+	e.PopRdx()
 	if err := emitRemoteSendMsg(e); err != nil {
 		return err
 	}
@@ -3641,12 +5789,16 @@ func emitSendMsg(e *x64.Emitter) error {
 	if err := x64.PatchRel32(e.Buf, localAt, localTo); err != nil {
 		return err
 	}
+	invalidAts, err := emitDecodeLocalActorRefInRdiRsiToEcx(e)
+	if err != nil {
+		return err
+	}
+	emitMovEsiR8d(e)
 
-	e.MovEcxEdi() // save receiver idx in ecx
-	doneAt := emitDoneActorCheckForReceiverInEcx(e)
+	doneAts := emitDoneActorCheckForReceiverInEcx(e)
 	budgetAt := emitMailboxByteBudgetCheckForReceiverInEcx(e)
 	fullAt := emitMailboxFullCheckForReceiverInEcx(e)
-	e.PushRdx() // preserve tag across scheduler/actor pointer loads
+	e.PushR9() // preserve tag across scheduler/actor pointer loads
 
 	overflowAt := emitCheckedMessagePoolAlloc(e)
 
@@ -3664,6 +5816,7 @@ func emitSendMsg(e *x64.Emitter) error {
 	// msg.value = esi; msg.tag = preserved stack value
 	e.MovMem32RdiDispEsi(msgValueOff)
 	e.MovMem32RdiDispImm32(msgCountOff, 1)
+	e.MovMem32RdiDispImm32(msgSystemKindOff, actorSystemKindUser)
 	e.MovMem32RdiDispEsi(msgPayload0)
 	e.PopRax()
 	e.MovMem32RdiDispEax(msgTagOff)
@@ -3710,15 +5863,7 @@ func emitSendMsg(e *x64.Emitter) error {
 	emitIncrementMailboxCount(e)
 	emitAccountMailboxEnqueueInRdi(e)
 
-	// If receiver blocked -> ready
-	e.MovEaxFromRdiDisp(actorStatusOff)
-	e.CmpEaxImm32(statusBlocked)
-	notBlockedAt := e.JnzRel32()
-	e.MovMem32RdiDispImm32(actorStatusOff, statusReady)
-	notBlockedTo := len(e.Buf)
-	if err := x64.PatchRel32(e.Buf, notBlockedAt, notBlockedTo); err != nil {
-		return err
-	}
+	emitWakeActorIfBlockedOnUserMailboxInRdi(e)
 
 	e.MovEaxEsi()
 	e.Ret()
@@ -3742,13 +5887,17 @@ func emitSendMsg(e *x64.Emitter) error {
 	emitAccountActorByteBackpressureInRdi(e)
 	emitMailboxFullReturn(e)
 	invalidTo := len(e.Buf)
-	if err := x64.PatchRel32(e.Buf, invalidAt, invalidTo); err != nil {
-		return err
+	for _, invalidAt := range append(remoteInvalidAts, invalidAts...) {
+		if err := x64.PatchRel32(e.Buf, invalidAt, invalidTo); err != nil {
+			return err
+		}
 	}
 	emitInvalidActorHandleReturn(e)
 	doneTo := len(e.Buf)
-	if err := x64.PatchRel32(e.Buf, doneAt, doneTo); err != nil {
-		return err
+	for _, doneAt := range doneAts {
+		if err := x64.PatchRel32(e.Buf, doneAt, doneTo); err != nil {
+			return err
+		}
 	}
 	emitActorDoneReturn(e)
 	return nil
@@ -3821,11 +5970,20 @@ func emitRemoteSendMsg(e *x64.Emitter) error {
 }
 
 func emitSendBegin(e *x64.Emitter) error {
-	// Args: rdi=to, rsi=tag, rdx=payload slot count.
-	e.CmpEdiImm32(-1)
-	invalidAt := e.JzRel32()
-	e.Emit(0xF7, 0xC7, 0x00, 0x00, 0x00, 0x80) // test edi, remote-handle high bit
+	// Args: rdi=to.low, rsi=to.high, rdx=tag, rcx=payload slot count.
+	emitMovR10dEdx(e)
+	emitMovR11dEcx(e)
+	e.MovEaxEsi()
+	e.CmpEaxImm32(actorRefLocalHighSlot)
 	localAt := e.JzRel32()
+	remoteInvalidAts, err := emitDecodeRemoteActorRefInRdiRsiToLegacyHandleInEdi(e)
+	if err != nil {
+		return err
+	}
+	e.PushR10()
+	e.PopRsi()
+	e.PushR11()
+	e.PopRdx()
 	if err := emitRemoteSendBegin(e); err != nil {
 		return err
 	}
@@ -3833,13 +5991,16 @@ func emitSendBegin(e *x64.Emitter) error {
 	if err := x64.PatchRel32(e.Buf, localAt, localTo); err != nil {
 		return err
 	}
+	invalidAts, err := emitDecodeLocalActorRefInRdiRsiToEcx(e)
+	if err != nil {
+		return err
+	}
 
-	e.MovEcxEdi()
-	doneAt := emitDoneActorCheckForReceiverInEcx(e)
+	doneAts := emitDoneActorCheckForReceiverInEcx(e)
 	budgetAt := emitMailboxByteBudgetCheckForReceiverInEcx(e)
 	fullAt := emitMailboxFullCheckForReceiverInEcx(e)
-	e.PushRsi()
-	e.PushRdx()
+	e.PushR10()
+	e.PushR11()
 
 	overflowAt := emitCheckedMessagePoolAlloc(e)
 
@@ -3860,6 +6021,7 @@ func emitSendBegin(e *x64.Emitter) error {
 	e.PopRax()
 	e.MovMem32RdiDispEax(msgTagOff)
 	e.MovMem32RdiDispImm32(msgValueOff, 0)
+	e.MovMem32RdiDispImm32(msgSystemKindOff, actorSystemKindUser)
 
 	// sched.pendingMsg = msgPtr for send_slot calls.
 	e.MovRdiR15()
@@ -3907,14 +6069,7 @@ func emitSendBegin(e *x64.Emitter) error {
 	emitIncrementMailboxCount(e)
 	emitAccountMailboxEnqueueInRdi(e)
 
-	e.MovEaxFromRdiDisp(actorStatusOff)
-	e.CmpEaxImm32(statusBlocked)
-	notBlockedAt := e.JnzRel32()
-	e.MovMem32RdiDispImm32(actorStatusOff, statusReady)
-	notBlockedTo := len(e.Buf)
-	if err := x64.PatchRel32(e.Buf, notBlockedAt, notBlockedTo); err != nil {
-		return err
-	}
+	emitWakeActorIfBlockedOnUserMailboxInRdi(e)
 
 	e.XorEaxEax()
 	e.Ret()
@@ -3940,13 +6095,17 @@ func emitSendBegin(e *x64.Emitter) error {
 	emitAccountActorByteBackpressureInRdi(e)
 	emitMailboxFullReturn(e)
 	invalidTo := len(e.Buf)
-	if err := x64.PatchRel32(e.Buf, invalidAt, invalidTo); err != nil {
-		return err
+	for _, invalidAt := range append(remoteInvalidAts, invalidAts...) {
+		if err := x64.PatchRel32(e.Buf, invalidAt, invalidTo); err != nil {
+			return err
+		}
 	}
 	emitInvalidActorHandleReturn(e)
 	doneTo := len(e.Buf)
-	if err := x64.PatchRel32(e.Buf, doneAt, doneTo); err != nil {
-		return err
+	for _, doneAt := range doneAts {
+		if err := x64.PatchRel32(e.Buf, doneAt, doneTo); err != nil {
+			return err
+		}
 	}
 	emitActorDoneReturn(e)
 	return nil
@@ -3973,6 +6132,7 @@ func emitRemoteSendBegin(e *x64.Emitter) error {
 	e.PopRax()
 	e.MovMem32RdiDispEax(msgSenderOff)
 	e.MovMem32RdiDispImm32(msgValueOff, 0)
+	e.MovMem32RdiDispImm32(msgSystemKindOff, actorSystemKindUser)
 
 	e.MovRdiR15()
 	e.MovRaxRdx()
@@ -4184,6 +6344,14 @@ func emitActorNetPump(e *x64.Emitter) error {
 	if err := x64.PatchRel32(e.Buf, magicOKAt, magicOKTo); err != nil {
 		return err
 	}
+	emitMovzxEaxWordRspDisp(e, actorWireOffsetVer)
+	e.CmpEaxImm32(actorWireVersion)
+	versionOKAt := e.JzRel32()
+	retJumps = append(retJumps, e.JmpRel32())
+	versionOKTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, versionOKAt, versionOKTo); err != nil {
+		return err
+	}
 	emitMovzxEaxWordRspDisp(e, actorWireOffsetType)
 	e.CmpEaxImm32(actorWireFrameSendI32)
 	sendI32At := e.JzRel32()
@@ -4197,10 +6365,18 @@ func emitActorNetPump(e *x64.Emitter) error {
 	errorAt := e.JzRel32()
 	retJumps = append(retJumps, e.JmpRel32())
 
-	failureStatusTo := len(e.Buf)
-	if err := x64.PatchRel32(e.Buf, nodeDownAt, failureStatusTo); err != nil {
+	nodeDownTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, nodeDownAt, nodeDownTo); err != nil {
 		return err
 	}
+	if err := emitDeliverRemoteMonitorNodeDownFromRspFrame(e); err != nil {
+		return err
+	}
+	if err := emitDeliverRemoteLinkedNodeDownFromRspFrame(e); err != nil {
+		return err
+	}
+
+	failureStatusTo := len(e.Buf)
 	if err := x64.PatchRel32(e.Buf, errorAt, failureStatusTo); err != nil {
 		return err
 	}
@@ -4278,6 +6454,7 @@ func emitActorNetPump(e *x64.Emitter) error {
 	e.MovMem32RdiDispEax(msgTagOff)
 	emitMovEaxRspDisp(e, 0x50)
 	e.MovMem32RdiDispEax(msgCountOff)
+	e.MovMem32RdiDispImm32(msgSystemKindOff, actorSystemKindUser)
 
 	e.MovRdiR15()
 	e.MovRaxFromRdiDisp(schedActorsPtrOff)
@@ -4318,14 +6495,7 @@ func emitActorNetPump(e *x64.Emitter) error {
 	}
 	emitIncrementMailboxCount(e)
 	emitAccountMailboxEnqueueInRdi(e)
-	e.MovEaxFromRdiDisp(actorStatusOff)
-	e.CmpEaxImm32(statusBlocked)
-	notBlockedAt := e.JnzRel32()
-	e.MovMem32RdiDispImm32(actorStatusOff, statusReady)
-	notBlockedTo := len(e.Buf)
-	if err := x64.PatchRel32(e.Buf, notBlockedAt, notBlockedTo); err != nil {
-		return err
-	}
+	emitWakeActorIfBlockedOnUserMailboxInRdi(e)
 	e.MovRdiRdx()
 	emitMovEaxRspDisp(e, 0x4C)
 	e.MovMem32RdiDispEax(msgTagOff)
@@ -5502,6 +7672,7 @@ func emitRecv(e *x64.Emitter, callPatches *[]callPatch) error {
 
 	// Empty: block and yield.
 	clearCurrentActorWakeAt(e)
+	e.MovMem32RdiDispImm32(actorWaitKindOff, actorWaitKindUser)
 	e.MovMem32RdiDispImm32(actorStatusOff, statusBlocked)
 	at = e.CallRel32()
 	*callPatches = append(*callPatches, callPatch{at: at, name: "__tetra_actor_yield"})
@@ -5570,6 +7741,7 @@ func emitRecvMsg(e *x64.Emitter, callPatches *[]callPatch) error {
 
 	// Empty: block and yield.
 	clearCurrentActorWakeAt(e)
+	e.MovMem32RdiDispImm32(actorWaitKindOff, actorWaitKindUser)
 	e.MovMem32RdiDispImm32(actorStatusOff, statusBlocked)
 	at = e.CallRel32()
 	*callPatches = append(*callPatches, callPatch{at: at, name: "__tetra_actor_yield"})
@@ -5694,6 +7866,7 @@ func emitRecvUntil(e *x64.Emitter, callPatches *[]callPatch) error {
 	setCurrentActorWakeAtFromR13(e)
 	actorPtrInRax(e)
 	e.MovRdiRax()
+	e.MovMem32RdiDispImm32(actorWaitKindOff, actorWaitKindUser)
 	e.MovMem32RdiDispImm32(actorStatusOff, statusBlocked)
 	at = e.CallRel32()
 	*callPatches = append(*callPatches, callPatch{at: at, name: "__tetra_actor_yield"})
@@ -5759,6 +7932,7 @@ func emitRecvMsgUntil(e *x64.Emitter, callPatches *[]callPatch) error {
 	setCurrentActorWakeAtFromR13(e)
 	actorPtrInRax(e)
 	e.MovRdiRax()
+	e.MovMem32RdiDispImm32(actorWaitKindOff, actorWaitKindUser)
 	e.MovMem32RdiDispImm32(actorStatusOff, statusBlocked)
 	at = e.CallRel32()
 	*callPatches = append(*callPatches, callPatch{at: at, name: "__tetra_actor_yield"})
@@ -5800,6 +7974,7 @@ func emitRecvBegin(e *x64.Emitter, callPatches *[]callPatch) error {
 	haveMsgAt := e.JnzRel32()
 
 	clearCurrentActorWakeAt(e)
+	e.MovMem32RdiDispImm32(actorWaitKindOff, actorWaitKindUser)
 	e.MovMem32RdiDispImm32(actorStatusOff, statusBlocked)
 	at = e.CallRel32()
 	*callPatches = append(*callPatches, callPatch{at: at, name: "__tetra_actor_yield"})
@@ -5875,9 +8050,232 @@ func emitRecvCount(e *x64.Emitter) error {
 	return nil
 }
 
+func emitClearActorSystemRecvScratchInRdi(e *x64.Emitter, status int32) {
+	e.MovMem32RdiDispImm32(actorSystemRecvScratchStatusOff, status)
+	e.MovMem32RdiDispImm32(actorSystemRecvScratchCountOff, 0)
+	e.XorEaxEax()
+	for slot := 0; slot < 7; slot++ {
+		e.MovMem64RdiDispRax(actorSystemRecvScratch0Off + int32(slot*8))
+	}
+}
+
+func emitStoreSystemEventU64FieldToScratch(e *x64.Emitter, eventStackDisp int32, eventOff int32, scratchSlot int) {
+	e.MovRaxFromRspDisp(eventStackDisp)
+	e.MovRdiRax()
+	e.MovRaxFromRdiDisp(eventOff)
+	e.MovRdiRdx()
+	e.MovMem64RdiDispRax(actorSystemRecvScratch0Off + int32(scratchSlot*8))
+}
+
+func emitStoreSystemEventU32FieldToScratch(e *x64.Emitter, eventStackDisp int32, eventOff int32, scratchSlot int) {
+	e.MovRaxFromRspDisp(eventStackDisp)
+	e.MovRdiRax()
+	e.MovEaxFromRdiDisp(eventOff)
+	e.MovRdiRdx()
+	e.MovMem64RdiDispRax(actorSystemRecvScratch0Off + int32(scratchSlot*8))
+}
+
+func emitCopySystemEventToActorRecvScratch(e *x64.Emitter, eventStackDisp int32) {
+	// rdx must contain the receiving actor pointer. Slots mirror
+	// actor.system_recv_raw after the status returned by begin().
+	e.MovRdiRdx()
+	e.MovMem32RdiDispImm32(actorSystemRecvScratchStatusOff, actorSystemRecvStatusMessage)
+	e.MovMem32RdiDispImm32(actorSystemRecvScratchCountOff, 7)
+	emitStoreSystemEventU32FieldToScratch(e, eventStackDisp, systemEventKindOff, 0)
+	emitStoreSystemEventU64FieldToScratch(e, eventStackDisp, systemEventSubjectOff, 1)
+	emitStoreSystemEventU64FieldToScratch(e, eventStackDisp, systemEventMonitorRefOff, 2)
+	emitStoreSystemEventU64FieldToScratch(e, eventStackDisp, systemEventNodeIDOff, 3)
+	emitStoreSystemEventU64FieldToScratch(e, eventStackDisp, systemEventNodeEpochOff, 4)
+	emitStoreSystemEventU32FieldToScratch(e, eventStackDisp, systemEventReasonKindOff, 5)
+	emitStoreSystemEventU32FieldToScratch(e, eventStackDisp, systemEventReasonCodeOff, 6)
+}
+
+func emitRecvSystemBegin(e *x64.Emitter, callPatches *[]callPatch) error {
+	if callPatches == nil {
+		return fmt.Errorf("missing callPatches")
+	}
+	e.PushRdi() // mode
+	e.PushRsi() // absolute deadline for mode 2
+
+	loopStart := len(e.Buf)
+	at := e.CallRel32()
+	*callPatches = append(*callPatches, callPatch{at: at, name: "__tetra_actor_net_pump"})
+	actorPtrInRax(e)
+	e.MovRdxRax()
+
+	e.MovRdiRdx()
+	e.MovRaxFromRdiDisp(actorSystemMailboxHeadOff)
+	e.TestRaxRax()
+	haveEventAt := e.JnzRel32()
+
+	e.MovRdiR15()
+	e.MovEaxFromRdiDisp(schedRuntimeClosingOff)
+	e.TestEaxEax()
+	notClosingAt := e.JzRel32()
+	e.MovRdiRdx()
+	emitClearActorSystemRecvScratchInRdi(e, actorSystemRecvStatusRuntimeClosed)
+	e.MovMem32RdiDispImm32(actorWaitKindOff, actorWaitKindNone)
+	e.AddRspImm32(16)
+	e.MovEaxImm32(actorSystemRecvStatusRuntimeClosed)
+	e.Ret()
+	notClosingTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, notClosingAt, notClosingTo); err != nil {
+		return err
+	}
+
+	if err := emitCurrentTaskGroupCanceledCheck(e, func() {
+		e.MovRdiRdx()
+		emitClearActorSystemRecvScratchInRdi(e, actorSystemRecvStatusCanceled)
+		e.MovMem32RdiDispImm32(actorWaitKindOff, actorWaitKindNone)
+		e.AddRspImm32(16)
+		e.MovEaxImm32(actorSystemRecvStatusCanceled)
+		e.Ret()
+	}); err != nil {
+		return err
+	}
+
+	e.MovEaxFromRspDisp(8)
+	e.CmpEaxImm32(1)
+	pollEmptyAt := e.JzRel32()
+	e.CmpEaxImm32(2)
+	timedAt := e.JzRel32()
+	e.CmpEaxImm32(0)
+	blockingAt := e.JzRel32()
+
+	e.MovRdiRdx()
+	emitClearActorSystemRecvScratchInRdi(e, actorSystemRecvStatusInvalidState)
+	e.AddRspImm32(16)
+	e.MovEaxImm32(actorSystemRecvStatusInvalidState)
+	e.Ret()
+
+	pollEmptyTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, pollEmptyAt, pollEmptyTo); err != nil {
+		return err
+	}
+	e.MovRdiRdx()
+	emitClearActorSystemRecvScratchInRdi(e, actorSystemRecvStatusEmpty)
+	e.AddRspImm32(16)
+	e.MovEaxImm32(actorSystemRecvStatusEmpty)
+	e.Ret()
+
+	timedTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, timedAt, timedTo); err != nil {
+		return err
+	}
+	e.MovRdiR15()
+	e.MovEaxFromRdiDisp(schedTimeMsOff)
+	e.MovEcxFromRspDisp(0)
+	e.CmpEaxEcx()
+	timeoutAt := e.JaeRel32()
+	e.MovR13Rcx()
+	setCurrentActorWakeAtFromR13(e)
+	e.MovRdiRdx()
+	e.MovMem32RdiDispImm32(actorWaitKindOff, actorWaitKindSystem)
+	e.MovMem32RdiDispImm32(actorStatusOff, statusBlocked)
+	at = e.CallRel32()
+	*callPatches = append(*callPatches, callPatch{at: at, name: "__tetra_actor_yield"})
+	timedLoopAt := e.JmpRel32()
+	if err := x64.PatchRel32(e.Buf, timedLoopAt, loopStart); err != nil {
+		return err
+	}
+
+	timeoutTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, timeoutAt, timeoutTo); err != nil {
+		return err
+	}
+	e.MovRdiRdx()
+	emitClearActorSystemRecvScratchInRdi(e, actorSystemRecvStatusTimeout)
+	e.MovMem32RdiDispImm32(actorWaitKindOff, actorWaitKindNone)
+	e.AddRspImm32(16)
+	e.MovEaxImm32(actorSystemRecvStatusTimeout)
+	e.Ret()
+
+	blockingTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, blockingAt, blockingTo); err != nil {
+		return err
+	}
+	clearCurrentActorWakeAt(e)
+	e.MovRdiRdx()
+	e.MovMem32RdiDispImm32(actorWaitKindOff, actorWaitKindSystem)
+	e.MovMem32RdiDispImm32(actorStatusOff, statusBlocked)
+	at = e.CallRel32()
+	*callPatches = append(*callPatches, callPatch{at: at, name: "__tetra_actor_yield"})
+	blockingLoopAt := e.JmpRel32()
+	if err := x64.PatchRel32(e.Buf, blockingLoopAt, loopStart); err != nil {
+		return err
+	}
+
+	haveEventTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, haveEventAt, haveEventTo); err != nil {
+		return err
+	}
+	e.PushRax()
+	emitCopySystemEventToActorRecvScratch(e, 0)
+
+	e.MovRaxFromRspDisp(0)
+	e.MovRdiRax()
+	e.MovRaxFromRdiDisp(systemEventNextOff)
+	e.MovRcxRax()
+
+	e.MovRdiRdx()
+	e.MovRaxRcx()
+	e.MovMem64RdiDispRax(actorSystemMailboxHeadOff)
+	e.TestRaxRax()
+	keepTailAt := e.JnzRel32()
+	e.XorEaxEax()
+	e.MovMem64RdiDispRax(actorSystemMailboxTailOff)
+	keepTailTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, keepTailAt, keepTailTo); err != nil {
+		return err
+	}
+	emitDecrementSystemMailboxCount(e)
+	emitAccountSystemMailboxDequeueInRdi(e)
+	e.MovMem32RdiDispImm32(actorWaitKindOff, actorWaitKindNone)
+	emitRecycleSystemEventNodeFromRspDisp(e, 0)
+	e.AddRspImm32(24)
+	e.MovEaxImm32(actorSystemRecvStatusMessage)
+	e.Ret()
+	return nil
+}
+
+func emitRecvSystemSlot(e *x64.Emitter) error {
+	e.MovRaxRdi()
+	e.CmpRaxImm32(7)
+	outOfRangeAt := e.JaeRel32()
+	e.ShlRaxImm8(3)
+	e.AddRaxImm32(actorSystemRecvScratch0Off)
+	e.PushRax()
+	actorPtrInRax(e)
+	e.PopRdx()
+	e.AddRaxRdx()
+	e.MovRdiRax()
+	e.MovRaxFromRdiDisp(0)
+	e.Ret()
+
+	outOfRangeTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, outOfRangeAt, outOfRangeTo); err != nil {
+		return err
+	}
+	e.XorEaxEax()
+	e.Ret()
+	return nil
+}
+
+func emitRecvSystemCount(e *x64.Emitter) error {
+	actorPtrInRax(e)
+	e.MovRdiRax()
+	e.MovEaxFromRdiDisp(actorSystemRecvScratchCountOff)
+	e.Ret()
+	return nil
+}
+
 func emitSelf(e *x64.Emitter) error {
 	e.MovRdiR15()
 	e.MovEaxFromRdiDisp(schedCurrentIdxOff)
+	e.PushRax()
+	actorPtrFromEaxToRdi(e)
+	e.PopRax()
+	emitLocalActorRefReturnFromSlotInEaxActorPtrInRdi(e)
 	e.Ret()
 	return nil
 }
@@ -5886,6 +8284,1082 @@ func emitSender(e *x64.Emitter) error {
 	actorPtrInRax(e)
 	e.MovRdiRax()
 	e.MovEaxFromRdiDisp(actorLastSenderOff)
+	e.PushRax()
+	actorPtrFromEaxToRdi(e)
+	e.PopRax()
+	emitLocalActorRefReturnFromSlotInEaxActorPtrInRdi(e)
+	e.Ret()
+	return nil
+}
+
+func emitActorStatus(e *x64.Emitter) error {
+	invalidAts, err := emitDecodeLocalActorRefInRdiRsiToEcx(e)
+	if err != nil {
+		return err
+	}
+	e.MovEaxFromRdiDisp(actorStatusOff)
+	e.CmpEaxImm32(statusStarting)
+	notStartingAt := e.JnzRel32()
+	e.MovEaxImm32(actorLifecycleStatusStarting)
+	e.Ret()
+	notStartingTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, notStartingAt, notStartingTo); err != nil {
+		return err
+	}
+
+	e.MovEaxFromRdiDisp(actorStatusOff)
+	e.CmpEaxImm32(statusFree)
+	notFreeAt := e.JnzRel32()
+	e.MovEaxImm32(actorLifecycleStatusDead)
+	e.Ret()
+	notFreeTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, notFreeAt, notFreeTo); err != nil {
+		return err
+	}
+
+	e.CmpEaxImm32(statusDone)
+	skipCanceledForDoneAt := e.JzRel32()
+	e.CmpEaxImm32(statusReclaimable)
+	skipCanceledForReclaimableAt := e.JzRel32()
+	e.CmpEaxImm32(statusStopping)
+	skipCanceledForStoppingAt := e.JzRel32()
+	e.PushRdi()
+	e.MovEaxFromRdiDisp(actorTaskGroupOff)
+	e.TestEaxEax()
+	noGroupAt := e.JzRel32()
+	e.MovEdiEax()
+	groupStatePtrFromEdi(e)
+	e.MovEaxFromRdiDisp(0)
+	e.CmpEaxImm32(taskGroupCanceled)
+	notCanceledAt := e.JnzRel32()
+	e.PopRdi()
+	e.MovEaxImm32(actorLifecycleStatusCanceled)
+	e.Ret()
+
+	restoreActorPtrTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, noGroupAt, restoreActorPtrTo); err != nil {
+		return err
+	}
+	if err := x64.PatchRel32(e.Buf, notCanceledAt, restoreActorPtrTo); err != nil {
+		return err
+	}
+	e.PopRdi()
+	skipCanceledTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, skipCanceledForDoneAt, skipCanceledTo); err != nil {
+		return err
+	}
+	if err := x64.PatchRel32(e.Buf, skipCanceledForReclaimableAt, skipCanceledTo); err != nil {
+		return err
+	}
+	if err := x64.PatchRel32(e.Buf, skipCanceledForStoppingAt, skipCanceledTo); err != nil {
+		return err
+	}
+
+	e.MovEaxFromRdiDisp(actorStatusOff)
+	e.CmpEaxImm32(statusReady)
+	notReadyAt := e.JnzRel32()
+	e.MovEaxImm32(actorLifecycleStatusReady)
+	e.Ret()
+	notReadyTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, notReadyAt, notReadyTo); err != nil {
+		return err
+	}
+
+	e.CmpEaxImm32(statusRunning)
+	notRunningAt := e.JnzRel32()
+	e.MovEaxImm32(actorLifecycleStatusRunning)
+	e.Ret()
+	notRunningTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, notRunningAt, notRunningTo); err != nil {
+		return err
+	}
+
+	e.CmpEaxImm32(statusBlocked)
+	notBlockedAt := e.JnzRel32()
+	e.MovEaxImm32(actorLifecycleStatusBlocked)
+	e.Ret()
+	notBlockedTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, notBlockedAt, notBlockedTo); err != nil {
+		return err
+	}
+
+	e.CmpEaxImm32(statusStopping)
+	notStoppingAt := e.JnzRel32()
+	e.MovEaxImm32(actorLifecycleStatusStopping)
+	e.Ret()
+	notStoppingTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, notStoppingAt, notStoppingTo); err != nil {
+		return err
+	}
+
+	e.CmpEaxImm32(statusDone)
+	doneAt := e.JzRel32()
+	e.CmpEaxImm32(statusReclaimable)
+	reclaimableAt := e.JzRel32()
+	notDoneAt := e.JmpRel32()
+	terminalTo := len(e.Buf)
+	for _, at := range []int{doneAt, reclaimableAt} {
+		if err := x64.PatchRel32(e.Buf, at, terminalTo); err != nil {
+			return err
+		}
+	}
+	e.MovEaxFromRdiDisp(actorExitCodeOff)
+	e.TestEaxEax()
+	errorExitAt := e.JnzRel32()
+	e.MovEaxImm32(actorLifecycleStatusExitedNormal)
+	e.Ret()
+	errorExitTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, errorExitAt, errorExitTo); err != nil {
+		return err
+	}
+	e.MovEaxImm32(actorLifecycleStatusExitedError)
+	e.Ret()
+	notDoneTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, notDoneAt, notDoneTo); err != nil {
+		return err
+	}
+
+	e.CmpEaxImm32(statusSleeping)
+	notSleepingAt := e.JnzRel32()
+	e.MovEaxImm32(actorLifecycleStatusSleeping)
+	e.Ret()
+	notSleepingTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, notSleepingAt, notSleepingTo); err != nil {
+		return err
+	}
+
+	e.CmpEaxImm32(statusWaiting)
+	notWaitingAt := e.JnzRel32()
+	e.MovEaxImm32(actorLifecycleStatusWaiting)
+	e.Ret()
+	notWaitingTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, notWaitingAt, notWaitingTo); err != nil {
+		return err
+	}
+
+	e.MovEaxImm32(actorLifecycleStatusDead)
+	e.Ret()
+	return patchInvalidActorHandleReturns(e, invalidAts)
+}
+
+func emitActorStatusRaw(e *x64.Emitter) error {
+	invalidAts, staleAts, err := emitDecodeLocalActorRefInRdiRsiToEcxClassified(e)
+	if err != nil {
+		return err
+	}
+	e.MovEaxFromRdiDisp(actorStatusOff)
+	e.CmpEaxImm32(statusStarting)
+	notStartingAt := e.JnzRel32()
+	emitActorStatusRawReturn(e, actorLifecycleStatusStarting, 0)
+	notStartingTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, notStartingAt, notStartingTo); err != nil {
+		return err
+	}
+
+	e.MovEaxFromRdiDisp(actorStatusOff)
+	e.CmpEaxImm32(statusFree)
+	notFreeAt := e.JnzRel32()
+	emitActorStatusRawReturn(e, actorLifecycleStatusDead, 0)
+	notFreeTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, notFreeAt, notFreeTo); err != nil {
+		return err
+	}
+
+	e.CmpEaxImm32(statusDone)
+	skipCanceledForDoneAt := e.JzRel32()
+	e.CmpEaxImm32(statusReclaimable)
+	skipCanceledForReclaimableAt := e.JzRel32()
+	e.CmpEaxImm32(statusStopping)
+	skipCanceledForStoppingAt := e.JzRel32()
+	e.PushRdi()
+	e.MovEaxFromRdiDisp(actorTaskGroupOff)
+	e.TestEaxEax()
+	noGroupAt := e.JzRel32()
+	e.MovEdiEax()
+	groupStatePtrFromEdi(e)
+	e.MovEaxFromRdiDisp(0)
+	e.CmpEaxImm32(taskGroupCanceled)
+	notCanceledAt := e.JnzRel32()
+	e.PopRdi()
+	emitActorStatusRawReturn(e, actorLifecycleStatusCanceled, 0)
+
+	restoreActorPtrTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, noGroupAt, restoreActorPtrTo); err != nil {
+		return err
+	}
+	if err := x64.PatchRel32(e.Buf, notCanceledAt, restoreActorPtrTo); err != nil {
+		return err
+	}
+	e.PopRdi()
+	skipCanceledTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, skipCanceledForDoneAt, skipCanceledTo); err != nil {
+		return err
+	}
+	if err := x64.PatchRel32(e.Buf, skipCanceledForReclaimableAt, skipCanceledTo); err != nil {
+		return err
+	}
+	if err := x64.PatchRel32(e.Buf, skipCanceledForStoppingAt, skipCanceledTo); err != nil {
+		return err
+	}
+
+	e.MovEaxFromRdiDisp(actorStatusOff)
+	e.CmpEaxImm32(statusReady)
+	notReadyAt := e.JnzRel32()
+	emitActorStatusRawReturn(e, actorLifecycleStatusReady, 0)
+	notReadyTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, notReadyAt, notReadyTo); err != nil {
+		return err
+	}
+
+	e.CmpEaxImm32(statusRunning)
+	notRunningAt := e.JnzRel32()
+	emitActorStatusRawReturn(e, actorLifecycleStatusRunning, 0)
+	notRunningTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, notRunningAt, notRunningTo); err != nil {
+		return err
+	}
+
+	e.CmpEaxImm32(statusBlocked)
+	notBlockedAt := e.JnzRel32()
+	emitActorStatusRawReturn(e, actorLifecycleStatusBlocked, 0)
+	notBlockedTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, notBlockedAt, notBlockedTo); err != nil {
+		return err
+	}
+
+	e.CmpEaxImm32(statusStopping)
+	notStoppingAt := e.JnzRel32()
+	emitActorStatusRawReturn(e, actorLifecycleStatusStopping, 0)
+	notStoppingTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, notStoppingAt, notStoppingTo); err != nil {
+		return err
+	}
+
+	e.CmpEaxImm32(statusDone)
+	doneAt := e.JzRel32()
+	e.CmpEaxImm32(statusReclaimable)
+	reclaimableAt := e.JzRel32()
+	notDoneAt := e.JmpRel32()
+	terminalTo := len(e.Buf)
+	for _, at := range []int{doneAt, reclaimableAt} {
+		if err := x64.PatchRel32(e.Buf, at, terminalTo); err != nil {
+			return err
+		}
+	}
+	e.MovEaxFromRdiDisp(actorExitCodeOff)
+	e.TestEaxEax()
+	errorExitAt := e.JnzRel32()
+	emitActorStatusRawReturn(e, actorLifecycleStatusExitedNormal, 0)
+	errorExitTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, errorExitAt, errorExitTo); err != nil {
+		return err
+	}
+	emitActorStatusRawReturn(e, actorLifecycleStatusExitedError, 0)
+	notDoneTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, notDoneAt, notDoneTo); err != nil {
+		return err
+	}
+
+	e.CmpEaxImm32(statusSleeping)
+	notSleepingAt := e.JnzRel32()
+	emitActorStatusRawReturn(e, actorLifecycleStatusSleeping, 0)
+	notSleepingTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, notSleepingAt, notSleepingTo); err != nil {
+		return err
+	}
+
+	e.CmpEaxImm32(statusWaiting)
+	notWaitingAt := e.JnzRel32()
+	emitActorStatusRawReturn(e, actorLifecycleStatusWaiting, 0)
+	notWaitingTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, notWaitingAt, notWaitingTo); err != nil {
+		return err
+	}
+
+	e.MovEdxImm32(0)
+	e.Ret()
+	if err := patchActorStatusRawResultReturns(e, invalidAts, 0xFFFFFFFD); err != nil {
+		return err
+	}
+	return patchActorStatusRawResultReturns(e, staleAts, 0xFFFFFFFB)
+}
+
+func emitActorWait(e *x64.Emitter, callPatches *[]callPatch) error {
+	if callPatches == nil {
+		return fmt.Errorf("missing callPatches")
+	}
+	invalidAts, staleAts, err := emitDecodeLocalActorRefInRdiRsiToEcxClassified(e)
+	if err != nil {
+		return err
+	}
+	e.MovEaxEcx()
+	e.MovRcxRax()
+	e.MovR12Rcx()
+
+	loop := len(e.Buf)
+	actorPtrFromR12ToRdi(e)
+	e.MovEaxFromRdiDisp(actorStatusOff)
+	e.CmpEaxImm32(statusDone)
+	doneAt := e.JzRel32()
+	e.CmpEaxImm32(statusReclaimable)
+	reclaimableAt := e.JzRel32()
+
+	e.MovRdiR15()
+	e.MovEaxFromRdiDisp(schedCurrentIdxOff)
+	actorWaitTargetPtrFromEaxToRdi(e)
+	e.MovEaxR12d()
+	e.MovMem32RdiDispEax(0)
+
+	e.MovRdiR15()
+	e.MovEaxFromRdiDisp(schedCurrentIdxOff)
+	actorWakeAtPtrFromEaxToRdi(e)
+	e.XorEaxEax()
+	e.MovMem32RdiDispEax(0)
+
+	actorPtrInRax(e)
+	e.MovRdiRax()
+	e.MovMem32RdiDispImm32(actorStatusOff, statusWaiting)
+	at := e.CallRel32()
+	*callPatches = append(*callPatches, callPatch{at: at, name: "__tetra_actor_yield"})
+	backAt := e.JmpRel32()
+	if err := x64.PatchRel32(e.Buf, backAt, loop); err != nil {
+		return err
+	}
+
+	doneTo := len(e.Buf)
+	for _, at := range []int{doneAt, reclaimableAt} {
+		if err := x64.PatchRel32(e.Buf, at, doneTo); err != nil {
+			return err
+		}
+	}
+	e.MovMem32RdiDispImm32(actorStatusOff, statusReclaimable)
+	emitActorWaitDoneResultReturn(e)
+	if err := patchInvalidActorWaitResultReturns(e, invalidAts); err != nil {
+		return err
+	}
+	return patchStaleActorWaitResultReturns(e, staleAts)
+}
+
+func emitActorWaitUntil(e *x64.Emitter, callPatches *[]callPatch) error {
+	if callPatches == nil {
+		return fmt.Errorf("missing callPatches")
+	}
+	if err := clampEdxNonNegativeIntoR13(e); err != nil {
+		return err
+	}
+	invalidAts, staleAts, err := emitDecodeLocalActorRefInRdiRsiToEcxClassified(e)
+	if err != nil {
+		return err
+	}
+	e.MovEaxEcx()
+	e.MovRcxRax()
+	e.MovR12Rcx()
+
+	loop := len(e.Buf)
+	actorPtrFromR12ToRdi(e)
+	e.MovEaxFromRdiDisp(actorStatusOff)
+	e.CmpEaxImm32(statusDone)
+	doneAt := e.JzRel32()
+	e.CmpEaxImm32(statusReclaimable)
+	reclaimableAt := e.JzRel32()
+	e.MovEdxEax()
+	e.MovRdiR15()
+	e.MovEaxFromRdiDisp(schedTimeMsOff)
+	e.MovEcxR13d()
+	e.CmpEaxEcx()
+	timeoutAt := e.JaeRel32()
+
+	e.MovRdiR15()
+	e.MovEaxFromRdiDisp(schedCurrentIdxOff)
+	actorWaitTargetPtrFromEaxToRdi(e)
+	e.MovEaxR12d()
+	e.MovMem32RdiDispEax(0)
+
+	e.MovRdiR15()
+	e.MovEaxFromRdiDisp(schedCurrentIdxOff)
+	actorWakeAtPtrFromEaxToRdi(e)
+	e.MovEaxR13d()
+	e.MovMem32RdiDispEax(0)
+
+	actorPtrInRax(e)
+	e.MovRdiRax()
+	e.MovMem32RdiDispImm32(actorStatusOff, statusWaiting)
+	at := e.CallRel32()
+	*callPatches = append(*callPatches, callPatch{at: at, name: "__tetra_actor_yield"})
+	backAt := e.JmpRel32()
+	if err := x64.PatchRel32(e.Buf, backAt, loop); err != nil {
+		return err
+	}
+
+	timeoutTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, timeoutAt, timeoutTo); err != nil {
+		return err
+	}
+	e.XorEaxEax()
+	e.Ret()
+
+	doneTo := len(e.Buf)
+	for _, at := range []int{doneAt, reclaimableAt} {
+		if err := x64.PatchRel32(e.Buf, at, doneTo); err != nil {
+			return err
+		}
+	}
+	e.MovMem32RdiDispImm32(actorStatusOff, statusReclaimable)
+	emitActorWaitDoneResultReturn(e)
+	if err := patchInvalidActorWaitResultReturns(e, invalidAts); err != nil {
+		return err
+	}
+	return patchStaleActorWaitResultReturns(e, staleAts)
+}
+
+func emitActorStop(e *x64.Emitter) error {
+	e.MovR8dEdx()
+	invalidAts, err := emitDecodeLocalActorRefInRdiRsiToEcx(e)
+	if err != nil {
+		return err
+	}
+	e.MovMem32RdiDispR8d(actorExitCodeOff)
+	e.MovMem32RdiDispImm32(actorStatusOff, statusStopping)
+	e.XorEaxEax()
+	e.Ret()
+	return patchInvalidActorHandleReturns(e, invalidAts)
+}
+
+func emitActorExitReason(e *x64.Emitter) error {
+	invalidAts, err := emitDecodeLocalActorRefInRdiRsiToEcx(e)
+	if err != nil {
+		return err
+	}
+	e.MovEaxFromRdiDisp(actorExitCodeOff)
+	e.Ret()
+	return patchInvalidActorHandleReturns(e, invalidAts)
+}
+
+func emitActorLifecycleAck(e *x64.Emitter) error {
+	invalidAts, err := emitDecodeLocalActorRefInRdiRsiToEcx(e)
+	if err != nil {
+		return err
+	}
+	e.XorEaxEax()
+	e.Ret()
+	return patchInvalidActorHandleReturns(e, invalidAts)
+}
+
+func emitActorLink(e *x64.Emitter) error {
+	var invalidAts []int
+
+	e.MovEaxEsi()
+	e.CmpEaxImm32(actorRefLocalHighSlot)
+	localAt := e.JzRel32()
+
+	e.MovR8Rdi()
+	e.PushRsi()
+	e.PopR10()
+	remoteInvalidAts, err := emitDecodeRemoteActorRefInRdiRsiToLegacyHandleInEdi(e)
+	if err != nil {
+		return err
+	}
+	invalidAts = append(invalidAts, remoteInvalidAts...)
+	actorPtrInRax(e)
+	e.MovRdiRax()
+	e.MovRdxR8()
+	e.PushR10()
+	e.PopR9()
+	emitAddLinkRefToActorPtrInRdiRefLowInEdxHighInR9d(e)
+	e.Ret()
+
+	localTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, localAt, localTo); err != nil {
+		return err
+	}
+	localInvalidAts, err := emitDecodeLocalActorRefInRdiRsiToEcx(e)
+	if err != nil {
+		return err
+	}
+	invalidAts = append(invalidAts, localInvalidAts...)
+
+	e.PushRdi()
+	e.MovEaxEcx()
+	e.Emit(0xC1, 0xE0, 0x10) // shl eax, 16
+	e.MovEdxFromRdiDisp(actorGenerationOff)
+	emitOrEaxEdx(e)
+	e.MovEdxEax()
+	e.MovR8dEdx()
+	e.PopRdi()
+
+	e.PushRdi()
+	e.MovRdiR15()
+	e.MovEaxFromRdiDisp(schedCurrentIdxOff)
+	e.PushRax()
+	actorPtrFromEaxToRdi(e)
+	e.MovEcxFromRdiDisp(actorGenerationOff)
+	e.PopRax()
+	e.Emit(0xC1, 0xE0, 0x10) // shl eax, 16
+	emitOrEaxEcx(e)
+	e.MovEdxEax()
+	e.PopRdi()
+
+	e.MovR9dImm32(actorRefLocalHighSlot)
+	emitAddLinkRefToActorPtrInRdiRefLowInEdxHighInR9d(e)
+	e.TestEaxEax()
+	firstAddFailedAt := e.JnzRel32()
+
+	actorPtrInRax(e)
+	e.MovRdiRax()
+	e.MovRdxR8()
+	e.MovR9dImm32(actorRefLocalHighSlot)
+	emitAddLinkRefToActorPtrInRdiRefLowInEdxHighInR9d(e)
+	e.Ret()
+
+	firstAddFailedTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, firstAddFailedAt, firstAddFailedTo); err != nil {
+		return err
+	}
+	e.Ret()
+	return patchInvalidActorHandleReturns(e, invalidAts)
+}
+
+func emitActorUnlink(e *x64.Emitter) error {
+	var invalidAts []int
+
+	e.MovEaxEsi()
+	e.CmpEaxImm32(actorRefLocalHighSlot)
+	localAt := e.JzRel32()
+
+	e.MovR8Rdi()
+	e.PushRsi()
+	e.PopR10()
+	remoteInvalidAts, err := emitDecodeRemoteActorRefInRdiRsiToLegacyHandleInEdi(e)
+	if err != nil {
+		return err
+	}
+	invalidAts = append(invalidAts, remoteInvalidAts...)
+	actorPtrInRax(e)
+	e.MovRdiRax()
+	e.MovRdxR8()
+	e.PushR10()
+	e.PopR9()
+	emitRemoveLinkRefFromActorPtrInRdiRefLowInEdxHighInR9d(e)
+	e.Ret()
+
+	localTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, localAt, localTo); err != nil {
+		return err
+	}
+	localInvalidAts, err := emitDecodeLocalActorRefInRdiRsiToEcx(e)
+	if err != nil {
+		return err
+	}
+	invalidAts = append(invalidAts, localInvalidAts...)
+
+	e.PushRdi()
+	e.MovEaxEcx()
+	e.Emit(0xC1, 0xE0, 0x10) // shl eax, 16
+	e.MovEdxFromRdiDisp(actorGenerationOff)
+	emitOrEaxEdx(e)
+	e.MovEdxEax()
+	e.MovR8dEdx()
+	e.PopRdi()
+
+	e.PushRdi()
+	e.MovRdiR15()
+	e.MovEaxFromRdiDisp(schedCurrentIdxOff)
+	e.PushRax()
+	actorPtrFromEaxToRdi(e)
+	e.MovEcxFromRdiDisp(actorGenerationOff)
+	e.PopRax()
+	e.Emit(0xC1, 0xE0, 0x10) // shl eax, 16
+	emitOrEaxEcx(e)
+	e.MovEdxEax()
+	e.PopRdi()
+
+	e.MovR9dImm32(actorRefLocalHighSlot)
+	emitRemoveLinkRefFromActorPtrInRdiRefLowInEdxHighInR9d(e)
+
+	actorPtrInRax(e)
+	e.MovRdiRax()
+	e.MovRdxR8()
+	e.MovR9dImm32(actorRefLocalHighSlot)
+	emitRemoveLinkRefFromActorPtrInRdiRefLowInEdxHighInR9d(e)
+	e.Ret()
+	return patchInvalidActorHandleReturns(e, invalidAts)
+}
+
+func emitAddLinkRefToActorPtrInRdiRefLowInEdxHighInR9d(e *x64.Emitter) {
+	e.MovEaxFromRdiDisp(actorLinkCountOff)
+	e.XorEcxEcx()
+	scanStart := len(e.Buf)
+	e.CmpEaxEcx()
+	insertAt := e.JzRel32()
+
+	e.PushRax()
+	e.PushRcx()
+	emitLoadActorLinkTableI32AtIndexInEcxToEax(e, actorLinkRef0Off)
+	e.CmpEaxEdx()
+	lowMatchAt := e.JzRel32()
+	e.PopRcx()
+	e.PopRax()
+	e.AddEcxImm8(1)
+	nextAt := e.JmpRel32()
+	if err := x64.PatchRel32(e.Buf, nextAt, scanStart); err != nil {
+		panic(err)
+	}
+
+	lowMatchTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, lowMatchAt, lowMatchTo); err != nil {
+		panic(err)
+	}
+	emitLoadActorLinkTableI32AtIndexInEcxToEax(e, actorLinkHigh0Off)
+	emitCmpEaxR9d(e)
+	duplicateAt := e.JzRel32()
+	e.PopRcx()
+	e.PopRax()
+	e.AddEcxImm8(1)
+	nextAfterHighAt := e.JmpRel32()
+	if err := x64.PatchRel32(e.Buf, nextAfterHighAt, scanStart); err != nil {
+		panic(err)
+	}
+
+	insertTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, insertAt, insertTo); err != nil {
+		panic(err)
+	}
+	e.CmpEaxImm32(maxActorLinks)
+	fullAt := e.JaeRel32()
+	e.PushRax()
+	emitReserveSystemEventCreditForActorPtrInRdi(e)
+	e.TestEaxEax()
+	reserveFailedAt := e.JnzRel32()
+	e.PopRax()
+	e.PushRax()
+	e.MovEcxEax()
+	emitStoreActorLinkTableI32AtIndexInEcxValueInEdx(e, actorLinkRef0Off)
+	e.PushR9()
+	e.PopRdx()
+	emitStoreActorLinkTableI32AtIndexInEcxValueInEdx(e, actorLinkHigh0Off)
+	e.PopRax()
+	e.AddEaxImm32(1)
+	e.MovMem32RdiDispEax(actorLinkCountOff)
+	e.XorEaxEax()
+	insertDoneAt := e.JmpRel32()
+
+	duplicateTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, duplicateAt, duplicateTo); err != nil {
+		panic(err)
+	}
+	e.PopRcx()
+	e.PopRax()
+	e.XorEaxEax()
+	duplicateDoneAt := e.JmpRel32()
+
+	reserveFailedTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, reserveFailedAt, reserveFailedTo); err != nil {
+		panic(err)
+	}
+	e.PopRax()
+	e.MovEaxImm32(0xFFFFFFFE)
+	reserveFailedDoneAt := e.JmpRel32()
+
+	fullTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, fullAt, fullTo); err != nil {
+		panic(err)
+	}
+	e.MovEaxImm32(0xFFFFFFFE)
+
+	doneTo := len(e.Buf)
+	for _, at := range []int{insertDoneAt, duplicateDoneAt, reserveFailedDoneAt} {
+		if err := x64.PatchRel32(e.Buf, at, doneTo); err != nil {
+			panic(err)
+		}
+	}
+}
+
+func emitRemoveLinkRefFromActorPtrInRdiRefLowInEdxHighInR9d(e *x64.Emitter) {
+	emitRemoveLinkRefFromActorPtrInRdiRefLowInEdxHighInR9dWithCredit(e, true)
+}
+
+func emitRemoveLinkRefFromActorPtrInRdiRefLowInEdxHighInR9dWithoutCreditRelease(e *x64.Emitter) {
+	emitRemoveLinkRefFromActorPtrInRdiRefLowInEdxHighInR9dWithCredit(e, false)
+}
+
+func emitRemoveLinkRefFromActorPtrInRdiRefLowInEdxHighInR9dWithCredit(
+	e *x64.Emitter,
+	releaseCredit bool,
+) {
+	e.MovEaxFromRdiDisp(actorLinkCountOff)
+	e.TestEaxEax()
+	emptyAt := e.JzRel32()
+	e.XorEcxEcx()
+	scanStart := len(e.Buf)
+	e.CmpEaxEcx()
+	notFoundAt := e.JzRel32()
+
+	e.PushRax()
+	e.PushRcx()
+	emitLoadActorLinkTableI32AtIndexInEcxToEax(e, actorLinkRef0Off)
+	e.CmpEaxEdx()
+	lowMatchAt := e.JzRel32()
+	e.PopRcx()
+	e.PopRax()
+	e.AddEcxImm8(1)
+	nextAt := e.JmpRel32()
+	if err := x64.PatchRel32(e.Buf, nextAt, scanStart); err != nil {
+		panic(err)
+	}
+
+	lowMatchTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, lowMatchAt, lowMatchTo); err != nil {
+		panic(err)
+	}
+	emitLoadActorLinkTableI32AtIndexInEcxToEax(e, actorLinkHigh0Off)
+	emitCmpEaxR9d(e)
+	foundAt := e.JzRel32()
+	e.PopRcx()
+	e.PopRax()
+	e.AddEcxImm8(1)
+	nextAfterHighAt := e.JmpRel32()
+	if err := x64.PatchRel32(e.Buf, nextAfterHighAt, scanStart); err != nil {
+		panic(err)
+	}
+
+	foundTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, foundAt, foundTo); err != nil {
+		panic(err)
+	}
+	e.PopRcx() // found index
+	e.PopRax() // original count
+	if releaseCredit {
+		e.PushRax()
+		e.PushRcx()
+		emitReleaseSystemEventCreditForActorPtrInRdi(e)
+		e.PopRcx()
+		e.PopRax()
+	}
+	e.AddEaxImm32(-1)
+	e.PushRax()
+	e.CmpEaxEcx()
+	skipCopyAt := e.JzRel32()
+	emitCopyActorLinkTableI32LastIndexInEaxToIndexInEcx(e, actorLinkRef0Off)
+	emitCopyActorLinkTableI32LastIndexInEaxToIndexInEcx(e, actorLinkHigh0Off)
+	skipCopyTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, skipCopyAt, skipCopyTo); err != nil {
+		panic(err)
+	}
+	e.PopRax()
+	e.MovMem32RdiDispEax(actorLinkCountOff)
+	foundDoneAt := e.JmpRel32()
+
+	doneTo := len(e.Buf)
+	for _, at := range []int{emptyAt, notFoundAt, foundDoneAt} {
+		if err := x64.PatchRel32(e.Buf, at, doneTo); err != nil {
+			panic(err)
+		}
+	}
+	e.XorEaxEax()
+}
+
+func emitLoadActorLinkTableI32AtIndexInEcxToEax(e *x64.Emitter, baseOff int32) {
+	e.PushRcx()
+	e.MovRaxRdi()
+	e.AddRaxImm32(baseOff)
+	e.MovRbxRcx()
+	e.ShlRbxImm8(2)
+	e.AddRaxRbx()
+	e.MovEaxFromRaxPtr()
+	e.PopRcx()
+}
+
+func emitStoreActorLinkTableI32AtIndexInEcxValueInEdx(e *x64.Emitter, baseOff int32) {
+	e.PushRcx()
+	e.MovRaxRdi()
+	e.AddRaxImm32(baseOff)
+	e.MovRbxRcx()
+	e.ShlRbxImm8(2)
+	e.AddRaxRbx()
+	e.PushRdx()
+	e.PopRcx()
+	e.MovMem32RaxPtrEcx()
+	e.PopRcx()
+}
+
+func emitCopyActorLinkTableI32LastIndexInEaxToIndexInEcx(e *x64.Emitter, baseOff int32) {
+	e.PushRax()
+	e.PushRcx()
+	e.PushRax()
+	e.PopRbx()
+	e.ShlRbxImm8(2)
+	e.MovRaxRdi()
+	e.AddRaxImm32(baseOff)
+	e.AddRaxRbx()
+	e.MovEaxFromRaxPtr()
+	e.MovEdxEax()
+	e.PopRcx()
+	e.PushRcx()
+	e.MovRbxRcx()
+	e.ShlRbxImm8(2)
+	e.MovRaxRdi()
+	e.AddRaxImm32(baseOff)
+	e.AddRaxRbx()
+	e.PushRdx()
+	e.PopRcx()
+	e.MovMem32RaxPtrEcx()
+	e.PopRcx()
+	e.PopRax()
+}
+
+func emitCmpEaxR9d(e *x64.Emitter) {
+	e.Emit(0x44, 0x39, 0xC8)
+}
+
+func emitActorMonitor(e *x64.Emitter) error {
+	var invalidAts []int
+
+	e.MovEaxEsi()
+	e.CmpEaxImm32(actorRefLocalHighSlot)
+	localAt := e.JzRel32()
+
+	e.MovR8Rdi()
+	e.PushRsi()
+	e.PopR10()
+	remoteInvalidAts, err := emitDecodeRemoteActorRefInRdiRsiToLegacyHandleInEdi(e)
+	if err != nil {
+		return err
+	}
+	invalidAts = append(invalidAts, remoteInvalidAts...)
+	targetDecodedAt := e.JmpRel32()
+
+	localTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, localAt, localTo); err != nil {
+		return err
+	}
+	localInvalidAts, err := emitDecodeLocalActorRefInRdiRsiToEcx(e)
+	if err != nil {
+		return err
+	}
+	invalidAts = append(invalidAts, localInvalidAts...)
+	e.PushRdi()
+	e.MovEaxEcx()
+	e.Emit(0xC1, 0xE0, 0x10) // shl eax, 16
+	e.MovEdxFromRdiDisp(actorGenerationOff)
+	emitOrEaxEdx(e)
+	e.MovEdxEax()
+	e.MovR8dEdx()
+	e.MovR10dImm32(actorRefLocalHighSlot)
+	e.PopRdi()
+
+	targetDecodedTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, targetDecodedAt, targetDecodedTo); err != nil {
+		return err
+	}
+
+	e.PushRdi()
+	e.MovRdiR15()
+	e.MovEaxFromRdiDisp(schedCurrentIdxOff)
+	e.PushRax()
+	actorPtrFromEaxToRdi(e)
+	e.MovEcxFromRdiDisp(actorGenerationOff)
+	e.PopRax()
+	e.Emit(0xC1, 0xE0, 0x10) // shl eax, 16
+	emitOrEaxEcx(e)
+	e.MovEdxEax()
+	e.PushRdx()
+	e.PopR9()
+	e.PopRdi()
+
+	e.MovRdiR15()
+	e.MovEaxFromRdiDisp(schedMonitorCountOff)
+	e.CmpEaxImm32(maxActorMonitors)
+	fullAt := e.JaeRel32()
+	e.MovEcxEax()
+	e.PushRcx()
+	e.MovRdiR15()
+	e.MovEaxFromRdiDisp(schedCurrentIdxOff)
+	actorPtrFromEaxToRdi(e)
+	emitReserveSystemEventCreditForActorPtrInRdi(e)
+	e.TestEaxEax()
+	reserveFailedAt := e.JnzRel32()
+	e.PopRcx()
+	e.MovRdiR15()
+
+	e.MovEaxFromRdiDisp(schedMonitorNextIDOff)
+	e.PushRax()
+	e.AddEaxImm32(1)
+	e.MovMem32RdiDispEax(schedMonitorNextIDOff)
+	e.PopRax()
+	e.PushRax()
+
+	e.MovEdxEax()
+	emitStoreSchedulerTableI32AtIndexInEcxValueInEdx(e, schedMonitorID0Off)
+	e.MovRdxR9()
+	emitStoreSchedulerTableI32AtIndexInEcxValueInEdx(e, schedMonitorOwnerRef0Off)
+	e.MovRdxR8()
+	emitStoreSchedulerTableI32AtIndexInEcxValueInEdx(e, schedMonitorTargetRef0Off)
+	e.PushR10()
+	e.PopRdx()
+	emitStoreSchedulerTableI32AtIndexInEcxValueInEdx(e, schedMonitorTargetHigh0Off)
+
+	e.MovEaxEcx()
+	e.AddEaxImm32(1)
+	e.MovMem32RdiDispEax(schedMonitorCountOff)
+	e.PopRax()
+	e.Ret()
+
+	reserveFailedTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, reserveFailedAt, reserveFailedTo); err != nil {
+		return err
+	}
+	e.PopRcx()
+	e.MovEaxImm32(0xFFFFFFFE)
+	e.Ret()
+
+	fullTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, fullAt, fullTo); err != nil {
+		return err
+	}
+	e.MovEaxImm32(0xFFFFFFFE)
+	e.Ret()
+	return patchInvalidActorHandleReturns(e, invalidAts)
+}
+
+func emitActorDemonitor(e *x64.Emitter) error {
+	var invalidAts []int
+
+	e.CmpEdiImm32(1)
+	validAt := e.JgeRel32()
+	invalidAts = append(invalidAts, e.JmpRel32())
+	validTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, validAt, validTo); err != nil {
+		return err
+	}
+
+	e.MovEdxEdi()
+	e.MovRdiR15()
+	e.MovEaxFromRdiDisp(schedMonitorCountOff)
+	e.TestEaxEax()
+	invalidAts = append(invalidAts, e.JzRel32())
+	e.XorEcxEcx()
+	scanStart := len(e.Buf)
+	e.CmpEaxEcx()
+	invalidAts = append(invalidAts, e.JzRel32())
+
+	e.PushRax()
+	e.PushRcx()
+	e.MovRaxR15()
+	e.AddRaxImm32(schedMonitorID0Off)
+	e.MovRbxRcx()
+	e.ShlRbxImm8(2)
+	e.AddRaxRbx()
+	e.PushRax()
+	e.MovEaxFromRaxPtr()
+	e.CmpEaxEdx()
+	foundAt := e.JzRel32()
+	e.PopRax()
+	e.PopRcx()
+	e.PopRax()
+	e.AddEcxImm8(1)
+	nextAt := e.JmpRel32()
+	if err := x64.PatchRel32(e.Buf, nextAt, scanStart); err != nil {
+		return err
+	}
+
+	foundTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, foundAt, foundTo); err != nil {
+		return err
+	}
+	e.PopR8()
+	e.PopRcx()
+	e.PopRax()
+	e.PushRax()
+	e.PushRcx()
+	emitLoadSchedulerTableI32AtIndexInEcxToEax(e, schedMonitorOwnerRef0Off)
+	emitShrEaxImm8(e, 16)
+	emitAndEaxImm32(e, 0xFFFF)
+	actorPtrFromEaxToRdi(e)
+	emitReleaseSystemEventCreditForActorPtrInRdi(e)
+	e.PopRcx()
+	e.PopRax()
+	e.AddEaxImm32(-1)
+	e.PushRax()
+	e.CmpEaxEcx()
+	skipCopyAt := e.JzRel32()
+	emitCopySchedulerTableI32LastIndexInEaxToIndexInEcx(e, schedMonitorID0Off)
+	emitCopySchedulerTableI32LastIndexInEaxToIndexInEcx(e, schedMonitorOwnerRef0Off)
+	emitCopySchedulerTableI32LastIndexInEaxToIndexInEcx(e, schedMonitorTargetRef0Off)
+	emitCopySchedulerTableI32LastIndexInEaxToIndexInEcx(e, schedMonitorTargetHigh0Off)
+	skipCopyTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, skipCopyAt, skipCopyTo); err != nil {
+		return err
+	}
+	e.PopRax()
+	e.MovRdiR15()
+	e.MovMem32RdiDispEax(schedMonitorCountOff)
+	e.XorEaxEax()
+	e.Ret()
+
+	invalidTo := len(e.Buf)
+	for _, invalidAt := range invalidAts {
+		if err := x64.PatchRel32(e.Buf, invalidAt, invalidTo); err != nil {
+			return err
+		}
+	}
+	emitInvalidActorHandleReturn(e)
+	return nil
+}
+
+func emitStoreSchedulerTableI32AtIndexInEcxValueInEdx(e *x64.Emitter, baseOff int32) {
+	e.PushRcx()
+	e.MovRaxR15()
+	e.AddRaxImm32(baseOff)
+	e.MovRbxRcx()
+	e.ShlRbxImm8(2)
+	e.AddRaxRbx()
+	e.PushRdx()
+	e.PopRcx()
+	e.MovMem32RaxPtrEcx()
+	e.PopRcx()
+}
+
+func emitLoadSchedulerTableI32AtIndexInEcxToEax(e *x64.Emitter, baseOff int32) {
+	e.PushRcx()
+	e.MovRaxR15()
+	e.AddRaxImm32(baseOff)
+	e.MovRbxRcx()
+	e.ShlRbxImm8(2)
+	e.AddRaxRbx()
+	e.MovEaxFromRaxPtr()
+	e.PopRcx()
+}
+
+func emitCopySchedulerTableI32LastIndexInEaxToIndexInEcx(e *x64.Emitter, baseOff int32) {
+	e.PushRax()
+	e.PushRcx()
+	e.PushRax()
+	e.PopRbx()
+	e.ShlRbxImm8(2)
+	e.MovRaxR15()
+	e.AddRaxImm32(baseOff)
+	e.AddRaxRbx()
+	e.MovEaxFromRaxPtr()
+	e.MovEdxEax()
+	e.PopRcx()
+	e.PushRcx()
+	e.MovRbxRcx()
+	e.ShlRbxImm8(2)
+	e.MovRaxR15()
+	e.AddRaxImm32(baseOff)
+	e.AddRaxRbx()
+	e.PushRdx()
+	e.PopRcx()
+	e.MovMem32RaxPtrEcx()
+	e.PopRcx()
+	e.PopRax()
+}
+
+func emitActorSetTrapExit(e *x64.Emitter) error {
+	actorPtrInRax(e)
+	e.MovRdiRax()
+	e.MovMem32RdiDispEdi(actorTrapExitOff)
+	e.XorEaxEax()
 	e.Ret()
 	return nil
 }
@@ -5981,6 +9455,10 @@ func emitInitActorStack(
 	e.AddRaxImm32(-56)
 	e.MovRcxRax() // initRsp in rcx
 
+	return emitFillActorStackFrameInRcx(e, leaPatches)
+}
+
+func emitFillActorStackFrameInRcx(e *x64.Emitter, leaPatches *[]leaPatch) error {
 	// Fill saved regs + return address.
 	e.MovRdiRcx()
 	// saved r15
@@ -6119,6 +9597,8 @@ func emitTaskJoinI32(e *x64.Emitter, result bool, callPatches *[]callPatch) erro
 	e.MovEaxFromRdiDisp(actorStatusOff)
 	e.CmpEaxImm32(statusDone)
 	doneAt := e.JzRel32()
+	e.CmpEaxImm32(statusReclaimable)
+	reclaimableAt := e.JzRel32()
 	e.CmpEaxImm32(statusWaiting)
 	targetWaitingAt := e.JzRel32()
 	if err := emitTaskCanceledCheck(
@@ -6141,10 +9621,13 @@ func emitTaskJoinI32(e *x64.Emitter, result bool, callPatches *[]callPatch) erro
 	}
 
 	doneTo := len(e.Buf)
-	if err := x64.PatchRel32(e.Buf, doneAt, doneTo); err != nil {
-		return err
+	for _, at := range []int{doneAt, reclaimableAt} {
+		if err := x64.PatchRel32(e.Buf, at, doneTo); err != nil {
+			return err
+		}
 	}
 	e.MovEaxFromRdiDisp(actorExitCodeOff)
+	e.MovMem32RdiDispImm32(actorStatusOff, statusReclaimable)
 	if result {
 		e.MovEdxImm32(0)
 	}
@@ -6181,6 +9664,8 @@ func emitTaskJoinUntilI32(e *x64.Emitter, callPatches *[]callPatch) error {
 	e.MovEaxFromRdiDisp(actorStatusOff)
 	e.CmpEaxImm32(statusDone)
 	doneAt := e.JzRel32()
+	e.CmpEaxImm32(statusReclaimable)
+	reclaimableAt := e.JzRel32()
 	e.CmpEaxImm32(statusWaiting)
 	targetWaitingAt := e.JzRel32()
 	if err := emitTaskCanceledCheck(e, func() { emitTaskJoinI32CanceledReturn(e, true) }); err != nil {
@@ -6214,10 +9699,13 @@ func emitTaskJoinUntilI32(e *x64.Emitter, callPatches *[]callPatch) error {
 	e.Ret()
 
 	doneTo := len(e.Buf)
-	if err := x64.PatchRel32(e.Buf, doneAt, doneTo); err != nil {
-		return err
+	for _, at := range []int{doneAt, reclaimableAt} {
+		if err := x64.PatchRel32(e.Buf, at, doneTo); err != nil {
+			return err
+		}
 	}
 	e.MovEaxFromRdiDisp(actorExitCodeOff)
+	e.MovMem32RdiDispImm32(actorStatusOff, statusReclaimable)
 	e.MovEdxImm32(0)
 	e.Ret()
 	return nil
@@ -6244,13 +9732,17 @@ func emitTaskPollI32(e *x64.Emitter) error {
 	e.MovEaxFromRdiDisp(actorStatusOff)
 	e.CmpEaxImm32(statusDone)
 	doneAt := e.JzRel32()
+	e.CmpEaxImm32(statusReclaimable)
+	reclaimableAt := e.JzRel32()
 	e.XorEaxEax()
 	e.MovEdxImm32(2)
 	e.Ret()
 
 	doneTo := len(e.Buf)
-	if err := x64.PatchRel32(e.Buf, doneAt, doneTo); err != nil {
-		return err
+	for _, at := range []int{doneAt, reclaimableAt} {
+		if err := x64.PatchRel32(e.Buf, at, doneTo); err != nil {
+			return err
+		}
 	}
 	e.MovEaxFromRdiDisp(actorExitCodeOff)
 	e.MovEdxImm32(0)
@@ -6307,7 +9799,10 @@ func emitTaskResultGet(e *x64.Emitter) error {
 	e.AddRaxImm32(actorTaskSlot0Off)
 	e.ShlRdxImm8(2)
 	e.AddRaxRdx()
+	e.PushRax()
 	e.MovEaxFromRaxPtr()
+	e.PopRdi()
+	e.MovMem32RdiDispImm32(0, 0)
 	e.Ret()
 
 	outOfRangeTo := len(e.Buf)
@@ -6317,6 +9812,13 @@ func emitTaskResultGet(e *x64.Emitter) error {
 	e.XorEaxEax()
 	e.Ret()
 	return nil
+}
+
+func emitClearJoinedTaskResultSlots(e *x64.Emitter, slots int) {
+	e.MovMem32RdiDispImm32(actorTaskCountOff, 0)
+	for slot := 0; slot < slots; slot++ {
+		e.MovMem32RdiDispImm32(actorTaskSlot0Off+int32(slot*4), 0)
+	}
 }
 
 func emitTaskJoinTyped(e *x64.Emitter, slots int, callPatches *[]callPatch) error {
@@ -6391,6 +9893,8 @@ func emitTaskJoinTyped(e *x64.Emitter, slots int, callPatches *[]callPatch) erro
 	e.MovEaxFromRdiDisp(actorStatusOff)
 	e.CmpEaxImm32(statusDone)
 	doneAt := e.JzRel32()
+	e.CmpEaxImm32(statusReclaimable)
+	reclaimableAt := e.JzRel32()
 	e.CmpEaxImm32(statusWaiting)
 	targetWaitingAt := e.JzRel32()
 	if err := emitTaskCanceledCheck(
@@ -6413,8 +9917,10 @@ func emitTaskJoinTyped(e *x64.Emitter, slots int, callPatches *[]callPatch) erro
 	}
 
 	doneTo := len(e.Buf)
-	if err := x64.PatchRel32(e.Buf, doneAt, doneTo); err != nil {
-		return err
+	for _, at := range []int{doneAt, reclaimableAt} {
+		if err := x64.PatchRel32(e.Buf, at, doneTo); err != nil {
+			return err
+		}
 	}
 	if staged {
 		// rdi currently points to target actor. Copy staged slots to current actor.
@@ -6432,6 +9938,10 @@ func emitTaskJoinTyped(e *x64.Emitter, slots int, callPatches *[]callPatch) erro
 			e.MovEaxEdx()
 			e.MovMem32RdiDispEax(off)
 		}
+		e.MovRaxFromRspDisp(8)
+		e.MovRdiRax()
+		emitClearJoinedTaskResultSlots(e, slots)
+		e.MovMem32RdiDispImm32(actorStatusOff, statusReclaimable)
 		e.MovRaxFromRspDisp(0)
 		e.MovRdiRax()
 		e.MovEaxFromRdiDisp(actorTaskSlot0Off + int32((slots-1)*4))
@@ -6449,6 +9959,8 @@ func emitTaskJoinTyped(e *x64.Emitter, slots int, callPatches *[]callPatch) erro
 	if slots > 3 {
 		e.MovR9dFromRdiDisp(actorTaskSlot0Off + 12)
 	}
+	emitClearJoinedTaskResultSlots(e, slots)
+	e.MovMem32RdiDispImm32(actorStatusOff, statusReclaimable)
 	e.Ret()
 	return nil
 }
@@ -6458,7 +9970,14 @@ func emitTaskJoinTyped(e *x64.Emitter, slots int, callPatches *[]callPatch) erro
 func BuildMacOSX64(entries []string) (*tobj.Object, error) {
 	abi := x64abi.MacSysV()
 	const macMapPrivateAnon = 0x1002
-	return buildSysVUnixX64(entries, abi.SysMmap, macMapPrivateAnon, false, SurfaceHostIPCOptions{})
+	return buildSysVUnixX64(
+		entries,
+		abi.SysMmap,
+		abi.SysMunmap,
+		macMapPrivateAnon,
+		false,
+		SurfaceHostIPCOptions{},
+	)
 }
 
 // ---- production_boundary.go ----
@@ -6618,13 +10137,18 @@ func currentActorRuntimeLimitsRow() ActorRuntimeBoundaryRow {
 			"mailbox backpressure recovers after drain for local legacy, tagged, and typed sends",
 			"typed mailbox backpressure does not enqueue a partial payload",
 			"message pool exhaustion returns checked -1 without enqueueing an overflow message",
-			"drained message pool entries are reclaimed after receive and can be reused",
+			"drained message pool entries are reclaimed after receive or actor exit and can be reused",
+			"recycled message nodes scrub system kind and payload slots before free-list reuse",
 			"invalid actor handle sends return checked -3 without allocating a message",
 			"done actor sends return checked -4 without allocating a message",
 			"nonzero actor entry return is exposed only as done-state send failure for later local sends",
+			"local linked abnormal exits propagate the exit reason to non-trapping linked actors",
+			"local actor_unlink removes bounded local abnormal-exit propagation",
 			"no actor status, actor join, or actor exit-code API is exposed for done actors",
+			"waited reclaimable actor slots reuse retained stack frames and reinitialize released stacks",
+			"more than 10000 lifetime spawns work under the concurrent actor cap",
 			"messages already queued in another actor mailbox remain receivable after the sender is done",
-			"done actors are not restarted and pending mailbox entries are not drained by a shutdown phase",
+			"done actors are not restarted and pending mailbox nodes drain into the message-pool free list on actor exit",
 			("blocked actors continue to depend on normal message, " +
 				"deadline, timer, or task-wait readiness when another actor " +
 				"exits"),
@@ -6639,6 +10163,15 @@ func currentActorRuntimeLimitsRow() ActorRuntimeBoundaryRow {
 			("task_join_i32 wakes on task-group cancellation with raw " +
 				"zero value; checked status requires result or timed join " +
 				"APIs"),
+			("task join, timed join, poll, and typed task join observers " +
+				"treat reclaimable target slots as terminal result states"),
+			("successful consuming task joins mark completed task actor " +
+				"slots reclaimable after result read"),
+			("more than 10000 joined task lifetime spawns work under the " +
+				"concurrent actor cap"),
+			("task_group_close treats joined reclaimable task actors as " +
+				"terminal for group-close completion"),
+			"typed task joins and result getters clear target/current result slots after use",
 			"non-timed actor receives do not expose a cancellation result in the current profile",
 			"typed actor message payloads are capped at 8 value slots",
 		},
@@ -6671,6 +10204,8 @@ func currentActorRuntimeLimitsRow() ActorRuntimeBoundaryRow {
 			"TestActorMessagePoolReclaimsDrainedMessagesBuildAndRun; " +
 			"compiler/compiler_suite_test.go::" +
 			"TestActorMessagePoolExhaustionReturnsCheckedFailure; " +
+			"compiler/internal/actorsrt/actorsrt_suite_test.go::" +
+			"TestRecycleMessageNodeScrubsPayloadSlotsBeforeFreeList; " +
 			"compiler/compiler_suite_test.go::" +
 			"TestActorInvalidHandleSendReturnsCheckedFailure; " +
 			"compiler/compiler_suite_test.go::" +
@@ -6678,10 +10213,24 @@ func currentActorRuntimeLimitsRow() ActorRuntimeBoundaryRow {
 			"compiler/compiler_suite_test.go::" +
 			"TestActorFailureNonzeroExitBecomesDoneWithoutRestartBuildAnd" +
 			"Run; compiler/compiler_suite_test.go::" +
+			"TestActorLinkPropagatesAbnormalExitBuildAndRun; " +
+			"compiler/compiler_suite_test.go::" +
+			"TestActorUnlinkStopsAbnormalExitPropagationBuildAndRun; " +
+			"compiler/internal/actorsrt/actorsrt_suite_test.go::" +
+			"TestLinuxRuntimeActorLinkUsesBidirectionalLinkTable; " +
+			"compiler/internal/actorsrt/actorsrt_suite_test.go::" +
+			"TestLinuxRuntimeActorUnlinkRemovesBidirectionalLinkTable; " +
+			"compiler/compiler_suite_test.go::" +
 			"TestActorLifecycleReceivesPendingMessageFromDoneSenderBuildA" +
 			"ndRun; compiler/compiler_suite_test.go::" +
 			"TestActorLifecycleDoneActorWithPendingMailboxDoesNotStallBlo" +
 			"ckedActorsBuildAndRun; compiler/compiler_suite_test.go::" +
+			"TestActorLifecycleDoneActorDrainsPendingMailboxIntoMessagePo" +
+			"olBuildAndRun; compiler/compiler_suite_test.go::" +
+			"TestActorLifetimeSpawnsExceedTenThousandUnderConcurrentCapB" +
+			"uildAndRun; compiler/internal/actorsrt/actorsrt_suite_test.go::" +
+			"TestLinuxRuntimeSpawnReusedReclaimableSlotsReinitializeReleased" +
+			"Stacks; compiler/compiler_suite_test.go::" +
 			"TestActorFairnessYieldingWorkersBothMakeBoundedProgressBuild" +
 			"AndRun; compiler/compiler_suite_test.go::" +
 			"TestActorStarvationTimedSleepersWakeInDeadlineOrderBuildAndR" +
@@ -6702,6 +10251,20 @@ func currentActorRuntimeLimitsRow() ActorRuntimeBoundaryRow {
 			"compiler/compiler_suite_test.go::" +
 			"TestTaskGroupCancelWakesSelect2BeforeDeadlineBuildAndRun; " +
 			"compiler/internal/actorsrt/actorsrt_suite_test.go::" +
+			"TestEmitTaskJoinEntrypointsTreatReclaimableTargetsAsDone; " +
+			"compiler/internal/actorsrt/actorsrt_suite_test.go::" +
+			"TestEmitTaskJoinEntrypointsMarkDoneTargetsReclaimableAfter" +
+			"ResultRead; compiler/compiler_suite_test.go::" +
+			"TestTaskLifetimeSpawnsExceedTenThousandUnderConcurrentCap" +
+			"BuildAndRun; compiler/internal/actorsrt/actorsrt_suite_test.go::" +
+			"TestLinuxRuntimeTaskGroupCloseTreatsReclaimableActorsAsDone; " +
+			"compiler/compiler_suite_test.go::" +
+			"TestActorSendToCanceledActorReturnsCheckedFailure; " +
+			"compiler/internal/actorsrt/actorsrt_suite_test.go::" +
+			"TestEmitTaskJoinTypedClearsTargetResultSlotsAfterJoin; " +
+			"compiler/internal/actorsrt/actorsrt_suite_test.go::" +
+			"TestEmitTaskResultGetClearsCurrentStagedSlotAfterRead; " +
+			"compiler/internal/actorsrt/actorsrt_suite_test.go::" +
 			"TestActorNetPumpIsExportedButOnlyLinuxHasRuntimePump; " +
 			"compiler/internal/actorsrt/actorsrt_suite_test.go::" +
 			"TestNonLinuxRuntimesDoNotExportDistributedActorSymbols; " +
@@ -6716,10 +10279,20 @@ func currentActorRuntimeLimitsRow() ActorRuntimeBoundaryRow {
 			"mailbox backpressure for local legacy/tagged/typed sends, " +
 			"no partial typed payload after failed backpressure, " +
 			"reusable drained message nodes with checked bounded " +
-			"message-pool exhaustion for live overload, checked " +
+			"message-pool exhaustion for live overload, payload-slot " +
+			"scrubbing before free-list reuse, stored stack " +
+			"frame reset for waited reclaimable actor slots, more than 10000 " +
+			"lifetime spawns under the concurrent cap, checked " +
 			"invalid-handle and done-actor send failures, narrow " +
 			"done-state lifecycle semantics where zero and nonzero actor " +
 			"returns are user-visible only as done for later sends, " +
+			"local linked abnormal-exit propagation and local unlink " +
+			"removal of that propagation link, " +
+			"consuming task joins marking completed task actors reclaimable " +
+			"after result read, task_group_close treating joined " +
+			"reclaimable task actors as terminal, task join/poll observers treating " +
+			"reclaimable targets as terminal done-like result states, " +
+			"typed task join/getter result-slot cleanup after successful use, " +
 			"scoped cooperative task-group cancellation wake/error " +
 			"behavior for timed actor receive and task join waiters, " +
 			"Linux-x64 distributed node_down status evidence for " +
@@ -6728,7 +10301,8 @@ func currentActorRuntimeLimitsRow() ActorRuntimeBoundaryRow {
 			"provide an unbounded mailbox, automatic retry/reconnect, " +
 			"actor close/shutdown API, actor status/join/exit-code API, " +
 			"cancellation results for non-timed actor receives, " +
-			"supervision/restart/linking/OTP lifecycle behavior, " +
+			"monitor DOWN delivery, trap-exit message delivery, " +
+			"supervision/restart/OTP lifecycle behavior, " +
 			"preemptive or production multi-threaded scheduling, " +
 			"non-Linux distributed runtime support, a full " +
 			"structured-concurrency model, or a full production actor " +
@@ -6851,14 +10425,14 @@ func validateCurrentLimitsRow(row ActorRuntimeBoundaryRow) error {
 		"return is exposed only as done-state ") +
 		"send failure"), "no actor status, actor join, or actor exit-code API", (("messages already queued " +
 		"in another actor mailbox remain ") +
-		"receivable"), "done actors are not restarted", ("blocked actors continue to depend on " +
+		"receivable"), "local linked abnormal exits propagate", "done actors are not restarted", "waited reclaimable actor slots reuse retained stack frames", ("blocked actors continue to depend on " +
 		"normal message"), (("missing-node node_down " +
 		"remains checked distributed status ") +
 		"evidence"), "no automatic retry, restart, reconnect, or supervision", ("task-group cancellation " +
 		"wakes recv_until"), (("task-group cancellation " +
 		"wakes actors already waiting on ") +
 		"task_join_result_i32"), ("task_join_i32 wakes on task-group cancellation with raw " +
-		"zero value"), "non-timed actor receives do not expose a cancellation result"} {
+		"zero value"), "task join, timed join, poll, and typed task join observers treat reclaimable target slots", "non-timed actor receives do not expose a cancellation result"} {
 		if !containsBoundaryText(row.RequiredFacts, fact) {
 			return fmt.Errorf("actor runtime boundary audit: current limits missing fact %q", fact)
 		}

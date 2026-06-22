@@ -52,13 +52,14 @@ Current implementation anchors:
   non-empty requests call a shared bump helper backed by a 64 KiB `mmap` chunk,
   large safe-slice requests use the helper's `mmap` fallback, and allocation
   rows expose runtime path, allocator class, requested bytes, and reserved
-  bytes for constant sizes. P15.2 upgrades that report contract to
-  `per_core_small_heap` rows with allocator scope, chunk size, and
-  same-core same-size-class free-list reuse policy evidence. P5.2 hardens explicit island regions:
-  island size
-  guards run before host allocator entry, each island slice bump is 16-byte
-  aligned before capacity commit, PLIR ties the allocation row to the island
-  handle region, and reports expose region id, lifetime, and debug-mode hooks.
+  bytes for constant sizes. The current emitted path is
+  `process_bump_small_heap_v0`; `per_core_small_heap` rows with allocator
+  scope, chunk size, and same-core same-size-class free-list reuse policy remain
+  model/future evidence until emitted runtime code has matching state. P5.2
+  hardens explicit island regions: island size guards run before host allocator
+  entry, each island slice bump is 16-byte aligned before capacity commit, PLIR
+  ties the allocation row to the island handle region, and reports expose region
+  id, lifetime, and debug-mode hooks.
   P5.3 adds the first implicit region planning row for non-escaping temporary
   copies that do not already fit the fixed-small stack subset: reports can say
   `planned_storage: Region` and name the function-temp region, while also

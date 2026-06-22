@@ -10,7 +10,9 @@ import (
 
 const (
 	Schema                             = "tetra.local_benchmark.process_rss_telemetry.v1"
+	SchemaV2                           = "tetra.local_benchmark.process_rss_telemetry.v2"
 	MethodLinuxProcfsWait4RSSSamplerV1 = "linux_procfs_wait4_rss_sampler_v1"
+	MethodLinuxProcfsPhaseRSSSamplerV2 = "linux_procfs_phase_rss_sampler_v2"
 	MethodLinuxProcfsStatusVmRSSV1     = "linux_procfs_status_vmrss_v1"
 	MethodLinuxWait4RusageMaxRSSV1     = "linux_wait4_rusage_maxrss_v1"
 	TargetOSLinux                      = "linux"
@@ -28,6 +30,7 @@ type Sample struct {
 	StartedUnixNano      int64       `json:"started_unix_nano,omitempty"`
 	FinishedUnixNano     int64       `json:"finished_unix_nano,omitempty"`
 	ExitStatus           int         `json:"exit_status"`
+	WorkloadKind         string      `json:"workload_kind,omitempty"`
 	SampleIntervalMicros uint64      `json:"sample_interval_micros,omitempty"`
 	SampleCount          uint64      `json:"sample_count"`
 	RSSCurrentBytes      uint64      `json:"rss_current_bytes"`
@@ -35,13 +38,16 @@ type Sample struct {
 	RSSPeakSource        string      `json:"rss_peak_source,omitempty"`
 	RUMaxRSSRaw          uint64      `json:"ru_maxrss_raw,omitempty"`
 	RUMaxRSSUnit         string      `json:"ru_maxrss_unit,omitempty"`
+	MappingCount         *uint64     `json:"mapping_count,omitempty"`
 	Samples              []RSSSample `json:"samples,omitempty"`
 	Notes                []string    `json:"notes,omitempty"`
 }
 
 type RSSSample struct {
-	UnixNano int64  `json:"unix_nano,omitempty"`
-	RSSBytes uint64 `json:"rss_bytes"`
+	Phase        string  `json:"phase,omitempty"`
+	UnixNano     int64   `json:"unix_nano,omitempty"`
+	RSSBytes     uint64  `json:"rss_bytes"`
+	MappingCount *uint64 `json:"mapping_count,omitempty"`
 }
 
 func ReadFile(path string, artifactRoot string) (Sample, error) {
@@ -63,15 +69,25 @@ func ReadFile(path string, artifactRoot string) (Sample, error) {
 }
 
 func Validate(sample Sample) error {
-	if sample.Schema != Schema {
-		return fmt.Errorf("RSS telemetry schema = %q, want %q", sample.Schema, Schema)
-	}
-	if sample.Method != MethodLinuxProcfsWait4RSSSamplerV1 {
-		return fmt.Errorf(
-			"RSS telemetry method = %q, want %q",
-			sample.Method,
-			MethodLinuxProcfsWait4RSSSamplerV1,
-		)
+	switch sample.Schema {
+	case Schema:
+		if sample.Method != MethodLinuxProcfsWait4RSSSamplerV1 {
+			return fmt.Errorf(
+				"RSS telemetry method = %q, want %q",
+				sample.Method,
+				MethodLinuxProcfsWait4RSSSamplerV1,
+			)
+		}
+	case SchemaV2:
+		if sample.Method != MethodLinuxProcfsPhaseRSSSamplerV2 {
+			return fmt.Errorf(
+				"RSS telemetry method = %q, want %q",
+				sample.Method,
+				MethodLinuxProcfsPhaseRSSSamplerV2,
+			)
+		}
+	default:
+		return fmt.Errorf("RSS telemetry schema = %q, want %q or %q", sample.Schema, Schema, SchemaV2)
 	}
 	if sample.TargetOS != TargetOSLinux {
 		return fmt.Errorf("RSS telemetry target_os = %q, want %q", sample.TargetOS, TargetOSLinux)
@@ -130,6 +146,64 @@ func Validate(sample Sample) error {
 		if point.RSSBytes == 0 {
 			return fmt.Errorf("RSS telemetry samples[%d] rss_bytes is zero", i)
 		}
+	}
+	if sample.Schema == SchemaV2 {
+		if err := validateV2(sample); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateV2(sample Sample) error {
+	if sample.TargetOS == TargetOSLinux {
+		if sample.MappingCount == nil {
+			return fmt.Errorf("RSS telemetry v2 mapping_count is required for linux")
+		}
+		for i, point := range sample.Samples {
+			if point.MappingCount == nil {
+				return fmt.Errorf(
+					"RSS telemetry v2 samples[%d] mapping_count is required for linux",
+					i,
+				)
+			}
+		}
+	}
+	if sample.WorkloadKind == "steady_state" {
+		if err := requireSteadyStatePhases(sample.Samples); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func requireSteadyStatePhases(samples []RSSSample) error {
+	required := []string{"startup", "post_warmup", "steady_round_", "post_drain", "pre_exit"}
+	requiredIndex := 0
+	for _, sample := range samples {
+		if requiredIndex >= len(required) {
+			break
+		}
+		phase := strings.TrimSpace(sample.Phase)
+		if phase == "" {
+			continue
+		}
+		want := required[requiredIndex]
+		if want == "steady_round_" {
+			if strings.HasPrefix(phase, want) {
+				requiredIndex++
+			}
+			continue
+		}
+		if phase == want {
+			requiredIndex++
+		}
+	}
+	if requiredIndex != len(required) {
+		return fmt.Errorf(
+			"RSS telemetry v2 steady_state missing required phase %q",
+			required[requiredIndex],
+		)
 	}
 	return nil
 }

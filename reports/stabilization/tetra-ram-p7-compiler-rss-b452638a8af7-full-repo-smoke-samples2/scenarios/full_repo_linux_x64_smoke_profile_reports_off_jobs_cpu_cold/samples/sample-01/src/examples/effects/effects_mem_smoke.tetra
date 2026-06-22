@@ -1,0 +1,9 @@
+// v0.17 effects smoke: unsafe raw memory requires capability/mem/alloc effects.
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let mem: cap.mem = core.cap_mem()
+        let p: ptr = core.alloc_bytes(4)
+        let _: Int = core.store_i32(p, 17, mem)
+        return core.load_i32(p, mem)
+    return 1

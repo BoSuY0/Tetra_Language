@@ -1,0 +1,786 @@
+{
+  "schema_version": 1,
+  "kind": "proof",
+  "target": "linux-x64",
+  "bounds": {
+    "schema_version": 1,
+    "kind": "bounds",
+    "target": "linux-x64",
+    "totals": {
+      "removed": 0,
+      "left": 0
+    },
+    "functions": null
+  },
+  "plir": {
+    "funcs": [
+      {
+        "name": "classify",
+        "summary": {
+          "public": true,
+          "param_names": [
+            "x"
+          ],
+          "param_types": [
+            "i32"
+          ],
+          "param_ownership": [
+            ""
+          ],
+          "return_type": "i32"
+        },
+        "values": [
+          {
+            "id": "param:x",
+            "kind": "param",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:5:8",
+            "region": "fn:classify",
+            "provenance": {
+              "kind": "param",
+              "root": "param:x"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "x"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "guard",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:6:5",
+            "inputs": [
+              "x > 10"
+            ],
+            "note": "x > 10"
+          },
+          {
+            "id": "op1",
+            "kind": "return",
+            "block": "if_then:0",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:7:9",
+            "inputs": [
+              "10"
+            ]
+          },
+          {
+            "id": "op2",
+            "kind": "return",
+            "block": "if_join:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:8:7",
+            "inputs": [
+              "x"
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "pure_call",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:5:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f1",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:5:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f2",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:5:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f3",
+            "kind": "no_mem_write",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:5:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f4",
+            "kind": "no_unknown_escape",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:5:8",
+            "reason": "semantics checker enforced declared effects"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "succs": [
+              "if_join:1",
+              "if_then:0"
+            ],
+            "ops": [
+              "op0"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:5:8"
+          },
+          {
+            "id": "if_then:0",
+            "kind": "if_then",
+            "preds": [
+              "entry"
+            ],
+            "succs": [
+              "if_join:1"
+            ],
+            "ops": [
+              "op1"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:6:5"
+          },
+          {
+            "id": "if_join:1",
+            "kind": "if_join",
+            "exit": true,
+            "preds": [
+              "entry",
+              "if_then:0"
+            ],
+            "ops": [
+              "op2"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:6:5"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          },
+          {
+            "block": "if_then:0",
+            "dominators": [
+              "entry",
+              "if_then:0"
+            ]
+          },
+          {
+            "block": "if_join:1",
+            "dominators": [
+              "entry",
+              "if_join:1"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "main",
+        "summary": {
+          "public": true,
+          "return_type": "i32"
+        },
+        "values": [
+          {
+            "id": "local:__for_end_12_5",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:10:8",
+            "region": "fn:main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:__for_end_12_5"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "__for_end_12_5"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:__match_value_24_9",
+            "kind": "local",
+            "type": "Mode",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:10:8",
+            "region": "fn:main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:__match_value_24_9"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "__match_value_24_9"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:i",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:10:8",
+            "region": "fn:main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:i"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "i"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:j",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:10:8",
+            "region": "fn:main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:j"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "j"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "local:total",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:10:8",
+            "region": "fn:main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:total"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "total"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "assign",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:11:5",
+            "inputs": [
+              "0"
+            ],
+            "outputs": [
+              "total"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op1",
+            "kind": "assign",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:13:9",
+            "inputs": [
+              "0"
+            ],
+            "outputs": [
+              "j"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op2",
+            "kind": "guard",
+            "block": "while_header:0",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:14:9",
+            "inputs": [
+              "j < 4"
+            ],
+            "note": "j < 4"
+          },
+          {
+            "id": "op3",
+            "kind": "assign",
+            "block": "while_body:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:15:13",
+            "inputs": [
+              "j + 1"
+            ],
+            "outputs": [
+              "j"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op4",
+            "kind": "guard",
+            "block": "while_body:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:16:13",
+            "inputs": [
+              "i == 1"
+            ],
+            "note": "i == 1"
+          },
+          {
+            "id": "op5",
+            "kind": "guard",
+            "block": "if_else:5",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:18:20",
+            "inputs": [
+              ""
+            ]
+          },
+          {
+            "id": "op6",
+            "kind": "call",
+            "block": "if_else:8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:21:26",
+            "inputs": [
+              "i + j"
+            ],
+            "note": "classify"
+          },
+          {
+            "id": "op7",
+            "kind": "guard",
+            "block": "while_after:2",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:22:13",
+            "inputs": [
+              "total > 35"
+            ],
+            "note": "total > 35"
+          },
+          {
+            "id": "op8",
+            "kind": "assign",
+            "block": "if_join:10",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:26:9",
+            "inputs": [
+              "total + 1"
+            ],
+            "outputs": [
+              "total"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op9",
+            "kind": "assign",
+            "block": "if_join:10",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:28:9",
+            "inputs": [
+              "total + 2"
+            ],
+            "outputs": [
+              "total"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op10",
+            "kind": "assign",
+            "block": "if_join:10",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:30:9",
+            "inputs": [
+              "total + 3"
+            ],
+            "outputs": [
+              "total"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op11",
+            "kind": "guard",
+            "block": "if_join:10",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:31:9",
+            "inputs": [
+              "total == 51"
+            ],
+            "note": "total == 51"
+          },
+          {
+            "id": "op12",
+            "kind": "return",
+            "block": "if_then:11",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:32:9",
+            "inputs": [
+              "42"
+            ]
+          },
+          {
+            "id": "op13",
+            "kind": "return",
+            "block": "if_join:12",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:33:7",
+            "inputs": [
+              "total"
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "pure_call",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:10:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f1",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:10:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f2",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:10:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f3",
+            "kind": "no_mem_write",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:10:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f4",
+            "kind": "no_unknown_escape",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:10:8",
+            "reason": "semantics checker enforced declared effects"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "succs": [
+              "while_header:0"
+            ],
+            "ops": [
+              "op0",
+              "op1"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:10:8"
+          },
+          {
+            "id": "while_header:0",
+            "kind": "while_header",
+            "preds": [
+              "entry",
+              "if_join:4"
+            ],
+            "succs": [
+              "while_after:2",
+              "while_body:1"
+            ],
+            "ops": [
+              "op2"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:14:9"
+          },
+          {
+            "id": "while_body:1",
+            "kind": "while_body",
+            "preds": [
+              "while_header:0"
+            ],
+            "succs": [
+              "if_else:5",
+              "if_then:3"
+            ],
+            "ops": [
+              "op3",
+              "op4"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:14:9"
+          },
+          {
+            "id": "while_after:2",
+            "kind": "while_after",
+            "preds": [
+              "while_header:0"
+            ],
+            "succs": [
+              "if_join:10",
+              "if_then:9"
+            ],
+            "ops": [
+              "op7"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:14:9"
+          },
+          {
+            "id": "if_then:3",
+            "kind": "if_then",
+            "preds": [
+              "while_body:1"
+            ],
+            "succs": [
+              "if_join:4"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:16:13"
+          },
+          {
+            "id": "if_join:4",
+            "kind": "if_join",
+            "preds": [
+              "if_join:7",
+              "if_then:3"
+            ],
+            "succs": [
+              "while_header:0"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:16:13"
+          },
+          {
+            "id": "if_else:5",
+            "kind": "if_else",
+            "preds": [
+              "while_body:1"
+            ],
+            "succs": [
+              "if_else:8",
+              "if_then:6"
+            ],
+            "ops": [
+              "op5"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:16:13"
+          },
+          {
+            "id": "if_then:6",
+            "kind": "if_then",
+            "preds": [
+              "if_else:5"
+            ],
+            "succs": [
+              "if_join:7"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:18:20"
+          },
+          {
+            "id": "if_join:7",
+            "kind": "if_join",
+            "preds": [
+              "if_else:8",
+              "if_then:6"
+            ],
+            "succs": [
+              "if_join:4"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:18:20"
+          },
+          {
+            "id": "if_else:8",
+            "kind": "if_else",
+            "preds": [
+              "if_else:5"
+            ],
+            "succs": [
+              "if_join:7"
+            ],
+            "ops": [
+              "op6"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:18:20"
+          },
+          {
+            "id": "if_then:9",
+            "kind": "if_then",
+            "preds": [
+              "while_after:2"
+            ],
+            "succs": [
+              "if_join:10"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:22:13"
+          },
+          {
+            "id": "if_join:10",
+            "kind": "if_join",
+            "preds": [
+              "if_then:9",
+              "while_after:2"
+            ],
+            "succs": [
+              "if_join:12",
+              "if_then:11"
+            ],
+            "ops": [
+              "op8",
+              "op9",
+              "op10",
+              "op11"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:22:13"
+          },
+          {
+            "id": "if_then:11",
+            "kind": "if_then",
+            "preds": [
+              "if_join:10"
+            ],
+            "succs": [
+              "if_join:12"
+            ],
+            "ops": [
+              "op12"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:31:9"
+          },
+          {
+            "id": "if_join:12",
+            "kind": "if_join",
+            "exit": true,
+            "preds": [
+              "if_join:10",
+              "if_then:11"
+            ],
+            "ops": [
+              "op13"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-02/src/examples/smoke/control/complex_control_flow_smoke.tetra:31:9"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          },
+          {
+            "block": "while_header:0",
+            "dominators": [
+              "entry",
+              "while_header:0"
+            ]
+          },
+          {
+            "block": "while_body:1",
+            "dominators": [
+              "entry",
+              "while_body:1",
+              "while_header:0"
+            ]
+          },
+          {
+            "block": "while_after:2",
+            "dominators": [
+              "entry",
+              "while_after:2",
+              "while_header:0"
+            ]
+          },
+          {
+            "block": "if_then:3",
+            "dominators": [
+              "entry",
+              "if_then:3",
+              "while_body:1",
+              "while_header:0"
+            ]
+          },
+          {
+            "block": "if_join:4",
+            "dominators": [
+              "entry",
+              "if_join:4",
+              "while_body:1",
+              "while_header:0"
+            ]
+          },
+          {
+            "block": "if_else:5",
+            "dominators": [
+              "entry",
+              "if_else:5",
+              "while_body:1",
+              "while_header:0"
+            ]
+          },
+          {
+            "block": "if_then:6",
+            "dominators": [
+              "entry",
+              "if_else:5",
+              "if_then:6",
+              "while_body:1",
+              "while_header:0"
+            ]
+          },
+          {
+            "block": "if_join:7",
+            "dominators": [
+              "entry",
+              "if_else:5",
+              "if_join:7",
+              "while_body:1",
+              "while_header:0"
+            ]
+          },
+          {
+            "block": "if_else:8",
+            "dominators": [
+              "entry",
+              "if_else:5",
+              "if_else:8",
+              "while_body:1",
+              "while_header:0"
+            ]
+          },
+          {
+            "block": "if_then:9",
+            "dominators": [
+              "entry",
+              "if_then:9",
+              "while_after:2",
+              "while_header:0"
+            ]
+          },
+          {
+            "block": "if_join:10",
+            "dominators": [
+              "entry",
+              "if_join:10",
+              "while_after:2",
+              "while_header:0"
+            ]
+          },
+          {
+            "block": "if_then:11",
+            "dominators": [
+              "entry",
+              "if_join:10",
+              "if_then:11",
+              "while_after:2",
+              "while_header:0"
+            ]
+          },
+          {
+            "block": "if_join:12",
+            "dominators": [
+              "entry",
+              "if_join:10",
+              "if_join:12",
+              "while_after:2",
+              "while_header:0"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

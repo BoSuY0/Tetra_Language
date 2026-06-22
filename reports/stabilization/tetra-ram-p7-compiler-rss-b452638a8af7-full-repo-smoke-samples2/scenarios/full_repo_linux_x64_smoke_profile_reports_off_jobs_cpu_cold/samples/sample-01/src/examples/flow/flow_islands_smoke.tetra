@@ -1,0 +1,9 @@
+func main() -> Int
+uses alloc, io, islands, mem:
+    island(64) as isl:
+        var msg: []UInt8 = core.island_make_u8(isl, 3)
+        msg[0] = 70
+        msg[1] = 10
+        msg[2] = 0
+        print(msg)
+    return 0

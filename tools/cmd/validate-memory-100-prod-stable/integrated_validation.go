@@ -252,8 +252,8 @@ func validateMemory100IntegratedIslandsDebugSmoke(path string, gitHead string) [
 			continue
 		}
 		foundTrap = true
-		if c.SrcPath != "examples/islands_overflow.tetra" {
-			issues = append(issues, fmt.Sprintf("integrated islands debug smoke trap src_path is %q, want examples/islands_overflow.tetra", c.SrcPath))
+		if c.SrcPath != "examples/memory/islands/islands_overflow.tetra" {
+			issues = append(issues, fmt.Sprintf("integrated islands debug smoke trap src_path is %q, want examples/memory/islands/islands_overflow.tetra", c.SrcPath))
 		}
 		if c.ExpectedExit == 0 {
 			issues = append(issues, "integrated islands debug smoke trap expected_exit must be non-zero")

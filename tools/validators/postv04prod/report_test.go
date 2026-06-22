@@ -259,10 +259,10 @@ func validMemoryReport() memoryprod.Report {
 				BaselineValue:    64,
 				MeasuredValue:    1,
 				ImprovementRatio: 64,
-				Evidence: ("allocation report schema v2 estimates 64 per_core_small_heap " +
+				Evidence: ("allocation report schema v2 estimates 64 process_bump_small_heap_v0 " +
 					"allocation intents and 1 estimated 64KiB chunk refill syscall instead " +
 					"of 64 mmap-per-allocation syscalls; allocation_report_estimate only, " +
-					"not a runtime measurement"),
+					"not a runtime measurement or reuse claim"),
 				Ran:  true,
 				Pass: true,
 			},

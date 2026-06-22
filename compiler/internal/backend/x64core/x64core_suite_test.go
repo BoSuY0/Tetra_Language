@@ -11,6 +11,7 @@ import (
 	"tetra_language/compiler/internal/backend/x64obj"
 	"tetra_language/compiler/internal/ir"
 	"tetra_language/compiler/internal/machine"
+	"tetra_language/compiler/internal/runtimeabi"
 )
 
 // ---- emit_atomic_test.go ----
@@ -235,6 +236,92 @@ func TestAtomicPointerCompareExchangeHonorsConfiguredPointerWidth(t *testing.T) 
 		x64Code,
 		[]byte{0xF0, 0x44, 0x0F, 0xB1, 0x07},
 	)
+}
+
+func TestReleaseAllocationIRDispatchEmitsLinuxMunmap(t *testing.T) {
+	fn := ir.IRFunc{
+		Name:        "__test_release_allocation",
+		ParamSlots:  0,
+		LocalSlots:  0,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 64},
+			{Kind: ir.IRAllocBytes, Name: "owned_bytes"},
+			{
+				Kind:            ir.IRDropOwned,
+				LayoutID:        "layout:owned_bytes",
+				OwnershipDomain: ir.IROwnershipDomainHeap,
+				ReleaseKind:     ir.IRReleaseKindLinuxMmap,
+			},
+			{
+				Kind:            ir.IRReleaseAllocation,
+				LayoutID:        "layout:owned_bytes",
+				OwnershipDomain: ir.IROwnershipDomainHeap,
+				ReleaseKind:     ir.IRReleaseKindLinuxMmap,
+			},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRReturn},
+		},
+	}
+
+	code := emitOneFunc(t, x64abi.LinuxSysV(), fn)
+	assertContainsBytes(t, "release allocation reads alloc_bytes header", code, []byte{0x8B, 0x77, 0xF8})
+	assertContainsBytes(
+		t,
+		"release allocation adjusts munmap length",
+		code,
+		[]byte{0x48, 0x81, 0xC6, 0x08, 0x00, 0x00, 0x00},
+	)
+	assertContainsBytes(
+		t,
+		"release allocation adjusts munmap base",
+		code,
+		[]byte{0x48, 0x81, 0xC7, 0xF8, 0xFF, 0xFF, 0xFF},
+	)
+	assertContainsBytes(
+		t,
+		"release allocation emits munmap syscall",
+		code,
+		[]byte{0xB8, 0x0B, 0x00, 0x00, 0x00, 0x0F, 0x05},
+	)
+}
+
+func TestReleaseAllocationIRDispatchRejectsUnsupportedReleaseKind(t *testing.T) {
+	fn := ir.IRFunc{
+		Name:        "__test_release_allocation_unsupported_kind",
+		ParamSlots:  0,
+		LocalSlots:  0,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 64},
+			{Kind: ir.IRAllocBytes, Name: "owned_bytes"},
+			{
+				Kind:            ir.IRDropOwned,
+				LayoutID:        "layout:owned_bytes",
+				OwnershipDomain: ir.IROwnershipDomainHeap,
+				ReleaseKind:     ir.IRReleaseKindProcessBumpNoRelease,
+			},
+			{
+				Kind:            ir.IRReleaseAllocation,
+				LayoutID:        "layout:owned_bytes",
+				OwnershipDomain: ir.IROwnershipDomainHeap,
+				ReleaseKind:     ir.IRReleaseKindProcessBumpNoRelease,
+			},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRReturn},
+		},
+	}
+
+	emitFn := NewEmitFunc(x64abi.LinuxSysV())
+	e := &x64.Emitter{}
+	var dataBlobs [][]byte
+	var leaPatches []x64obj.LeaPatch
+	var callPatches []x64obj.CallPatch
+	var importPatches []x64obj.ImportPatch
+	err := emitFn(e, fn, &dataBlobs, &leaPatches, &callPatches, &importPatches, x64.CodegenOptions{})
+	if err == nil || !strings.Contains(err.Error(), "unsupported release kind") {
+		t.Fatalf("emit error = %v, want unsupported release kind", err)
+	}
 }
 
 func TestAtomicPointerFetchAddHonorsConfiguredPointerWidth(t *testing.T) {
@@ -1263,11 +1350,17 @@ func TestRuntimeHeapTelemetryReferencesActorSnapshotOnlyWithActorDomainOption(t 
 }
 
 func TestRuntimeHeapTelemetryActorJSONIncludesMailboxBudgetBackpressureFields(t *testing.T) {
-	raw, _, template := runtimeHeapTelemetryActorJSON("app", true)
+	raw, _, template := runtimeHeapTelemetryActorJSON("app", true, false)
 	text := string(raw)
 	for _, field := range []string{
+		`"actor_snapshot_record_count"`,
+		`"actor_live_count"`,
 		`"mailbox_current_bytes"`,
 		`"mailbox_peak_bytes"`,
+		`"stack_live_bytes"`,
+		`"stack_reserved_bytes"`,
+		`"stack_retained_bytes"`,
+		`"stack_released_bytes"`,
 		`"byte_budget"`,
 		`"over_budget_count"`,
 		`"backpressure_events"`,
@@ -1287,6 +1380,43 @@ func TestRuntimeHeapTelemetryActorJSONIncludesMailboxBudgetBackpressureFields(t 
 		if off <= 0 {
 			t.Fatalf("actor heap telemetry field %s offset = %d, want populated offset", label, off)
 		}
+	}
+}
+
+func TestRuntimeHeapTelemetryStoresActorLiveCountSeparatelyFromSnapshotRecordCount(t *testing.T) {
+	artifacts := emitRuntimeHeapTelemetryMain(t, true)
+	if !bytes.Contains(
+		artifacts.code,
+		movMem64RdiDispRaxEncoding(runtimeHeapTelemetryActorCountOffset),
+	) {
+		t.Fatalf("actor heap telemetry missing snapshot record-count store from rax")
+	}
+	if !bytes.Contains(
+		artifacts.code,
+		movMem64RdiDispRdxEncoding(runtimeHeapTelemetryActorLiveCountOffset),
+	) {
+		t.Fatalf("actor heap telemetry missing live-count store from rdx")
+	}
+}
+
+func movMem64RdiDispRaxEncoding(off int32) []byte {
+	e := &x64.Emitter{}
+	e.MovMem64RdiDispRax(off)
+	return e.Buf
+}
+
+func movMem64RdiDispRdxEncoding(off int32) []byte {
+	e := &x64.Emitter{}
+	e.MovMem64RdiDispRdx(off)
+	return e.Buf
+}
+
+func TestRuntimeHeapTelemetryActorRecordLayoutAllowsStackFields(t *testing.T) {
+	if runtimeHeapTelemetryActorRecordSize != 104 {
+		t.Fatalf(
+			"runtimeHeapTelemetryActorRecordSize = %d, want 104 with stack accounting fields",
+			runtimeHeapTelemetryActorRecordSize,
+		)
 	}
 }
 
@@ -3134,7 +3264,10 @@ func TestActorPingPongRuntimeCallRegisterEmitterEmitsExactScalarShapes(t *testin
 				t.Fatalf("emitActorPingPongRuntimeCallRegisterFunction rejected %s", tc.name)
 			}
 			actorFrame := &x64.Emitter{}
-			actorFrame.SubRspImm32(int32(x64.AlignStackSize((tc.fn.LocalSlots + 2) * 8)))
+			actorScratchSlots := runtimeabi.ActorHandleABI().RefSlots + 1
+			actorFrame.SubRspImm32(
+				int32(x64.AlignStackSize((tc.fn.LocalSlots + actorScratchSlots) * 8)),
+			)
 			assertContainsBytes(t, "actor_ping_pong "+tc.name+" frame", direct.Buf, actorFrame.Buf)
 			assertCallPatchCounts(t, directCalls, tc.wantCalls)
 			assertReturnsZeroInEAX(t, "actor_ping_pong "+tc.name, direct.Buf)
@@ -3195,7 +3328,7 @@ func TestActorPingPongRuntimeCallRegisterEmitterRejectsNearMisses(t *testing.T) 
 			name: "main_recv_multi_slot",
 			fn: func() ir.IRFunc {
 				fn := actorPingPongMainStackIRFunc()
-				fn.Instrs[8] = ir.IRInstr{
+				fn.Instrs[9] = ir.IRInstr{
 					Kind:     ir.IRCall,
 					Name:     "__tetra_actor_recv_msg",
 					ArgSlots: 0,
@@ -3208,7 +3341,7 @@ func TestActorPingPongRuntimeCallRegisterEmitterRejectsNearMisses(t *testing.T) 
 			name: "main_different_branch_literal",
 			fn: func() ir.IRFunc {
 				fn := actorPingPongMainStackIRFunc()
-				fn.Instrs[10].Imm = 43
+				fn.Instrs[12].Imm = 43
 				return fn
 			},
 		},
@@ -3730,6 +3863,7 @@ func parallelMapReduceMainStackIRFunc() ir.IRFunc {
 }
 
 func actorPingPongPongStackIRFunc() ir.IRFunc {
+	actorSlots := runtimeabi.ActorHandleABI().RefSlots
 	return ir.IRFunc{
 		Name:        "pong",
 		LocalSlots:  2,
@@ -3741,9 +3875,9 @@ func actorPingPongPongStackIRFunc() ir.IRFunc {
 			{Kind: ir.IRConstI32, Imm: 41},
 			{Kind: ir.IRCmpEqI32},
 			{Kind: ir.IRJmpIfZero, Label: 1},
-			{Kind: ir.IRCall, Name: "__tetra_actor_sender", ArgSlots: 0, RetSlots: 1},
+			{Kind: ir.IRCall, Name: "__tetra_actor_sender", ArgSlots: 0, RetSlots: actorSlots},
 			{Kind: ir.IRConstI32, Imm: 42},
-			{Kind: ir.IRCall, Name: "__tetra_actor_send", ArgSlots: 2, RetSlots: 1},
+			{Kind: ir.IRCall, Name: "__tetra_actor_send", ArgSlots: actorSlots + 1, RetSlots: 1},
 			{Kind: ir.IRStoreLocal, Local: 1},
 			{Kind: ir.IRConstI32, Imm: 0},
 			{Kind: ir.IRReturn},
@@ -3755,21 +3889,24 @@ func actorPingPongPongStackIRFunc() ir.IRFunc {
 }
 
 func actorPingPongMainStackIRFunc() ir.IRFunc {
+	actorSlots := runtimeabi.ActorHandleABI().RefSlots
 	return ir.IRFunc{
 		Name:        "main",
-		LocalSlots:  3,
+		LocalSlots:  4,
 		ReturnSlots: 1,
 		Instrs: []ir.IRInstr{
 			{Kind: ir.IRConstI32, Imm: actorPingPongEntryIDForTest("pong")},
-			{Kind: ir.IRCall, Name: "__tetra_actor_spawn", ArgSlots: 1, RetSlots: 1},
+			{Kind: ir.IRCall, Name: "__tetra_actor_spawn", ArgSlots: 1, RetSlots: actorSlots},
+			{Kind: ir.IRStoreLocal, Local: 1},
 			{Kind: ir.IRStoreLocal, Local: 0},
 			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRLoadLocal, Local: 1},
 			{Kind: ir.IRConstI32, Imm: 41},
-			{Kind: ir.IRCall, Name: "__tetra_actor_send", ArgSlots: 2, RetSlots: 1},
-			{Kind: ir.IRStoreLocal, Local: 1},
-			{Kind: ir.IRCall, Name: "__tetra_actor_recv", ArgSlots: 0, RetSlots: 1},
+			{Kind: ir.IRCall, Name: "__tetra_actor_send", ArgSlots: actorSlots + 1, RetSlots: 1},
 			{Kind: ir.IRStoreLocal, Local: 2},
-			{Kind: ir.IRLoadLocal, Local: 2},
+			{Kind: ir.IRCall, Name: "__tetra_actor_recv", ArgSlots: 0, RetSlots: 1},
+			{Kind: ir.IRStoreLocal, Local: 3},
+			{Kind: ir.IRLoadLocal, Local: 3},
 			{Kind: ir.IRConstI32, Imm: 42},
 			{Kind: ir.IRCmpEqI32},
 			{Kind: ir.IRJmpIfZero, Label: 1},

@@ -33,6 +33,38 @@ func TestRuntimeObjectSignatureAndAnnotation(t *testing.T) {
 	}
 }
 
+func TestActorLifecycleRuntimeSymbolsExposeV2Signatures(t *testing.T) {
+	want := []string{
+		"__tetra_actor_status",
+		"__tetra_actor_status_raw",
+		"__tetra_actor_wait",
+		"__tetra_actor_wait_until",
+		"__tetra_actor_stop",
+		"__tetra_actor_exit_reason",
+		"__tetra_actor_link",
+		"__tetra_actor_unlink",
+		"__tetra_actor_monitor",
+		"__tetra_actor_demonitor",
+		"__tetra_actor_set_trap_exit",
+	}
+	got := RequiredActorLifecycleRuntimeSymbols()
+	if len(got) != len(want) {
+		t.Fatalf("lifecycle runtime symbols = %#v, want %#v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("lifecycle runtime symbols = %#v, want %#v", got, want)
+		}
+		sig, ok := RuntimeObjectSignature(got[i])
+		if !ok {
+			t.Fatalf("missing runtime object signature for %s", got[i])
+		}
+		if sig.ReturnSlots < 1 {
+			t.Fatalf("%s return slots = %d, want at least 1", got[i], sig.ReturnSlots)
+		}
+	}
+}
+
 func TestValidateRuntimeObjectSymbols(t *testing.T) {
 	obj := &tobj.Object{Symbols: []tobj.Symbol{
 		{Name: "__tetra_fs_exists", HasSignature: true, ParamSlots: 3, ReturnSlots: 1},

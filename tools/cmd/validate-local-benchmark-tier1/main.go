@@ -292,6 +292,10 @@ type memoryDomainByte struct {
 	BytesCopied          uint64 `json:"bytes_copied,omitempty"`
 	MailboxCurrentBytes  uint64 `json:"mailbox_current_bytes,omitempty"`
 	MailboxPeakBytes     uint64 `json:"mailbox_peak_bytes,omitempty"`
+	StackLiveBytes       uint64 `json:"stack_live_bytes,omitempty"`
+	StackReservedBytes   uint64 `json:"stack_reserved_bytes,omitempty"`
+	StackRetainedBytes   uint64 `json:"stack_retained_bytes,omitempty"`
+	StackReleasedBytes   uint64 `json:"stack_released_bytes,omitempty"`
 	ByteBudget           uint64 `json:"byte_budget,omitempty"`
 	OverBudgetCount      uint64 `json:"over_budget_count,omitempty"`
 	BackpressureEvents   uint64 `json:"backpressure_events,omitempty"`
@@ -314,10 +318,15 @@ func (d *memoryDomainByte) UnmarshalJSON(data []byte) error {
 	}
 	_, hasMailboxCurrent := raw["mailbox_current_bytes"]
 	_, hasMailboxPeak := raw["mailbox_peak_bytes"]
+	_, hasStackLive := raw["stack_live_bytes"]
+	_, hasStackReserved := raw["stack_reserved_bytes"]
+	_, hasStackRetained := raw["stack_retained_bytes"]
+	_, hasStackReleased := raw["stack_released_bytes"]
 	_, hasByteBudget := raw["byte_budget"]
 	_, hasOverBudget := raw["over_budget_count"]
 	_, hasBackpressure := raw["backpressure_events"]
 	d.ActorDomainFieldsSet = hasMailboxCurrent && hasMailboxPeak &&
+		hasStackLive && hasStackReserved && hasStackRetained && hasStackReleased &&
 		hasByteBudget && hasOverBudget && hasBackpressure
 	return nil
 }

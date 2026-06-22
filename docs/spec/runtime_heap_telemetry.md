@@ -51,6 +51,12 @@ linux-x64
 - `allocation_paths`: count by allocation path, such as `small_heap_bump`,
   `small_heap_refill`, `large_mmap`, or `alloc_bytes_mmap`.
 - `domain_bytes`: optional per-domain byte summary.
+- `actor_snapshot_record_count`: optional actor-telemetry record count when
+  actor domains are emitted; this includes live actors plus reusable/done slots
+  that still carry retained or released accounting state.
+- `actor_live_count`: optional actor-telemetry live slot count when actor
+  domains are emitted; this excludes `done` and `free` actor slots from the live
+  total.
 - `notes`: optional limitations or implementation notes.
 
 `started_unix_nano` and `finished_unix_nano` are optional because some minimal
@@ -69,6 +75,9 @@ native runtimes may not have a time source wired into the telemetry path.
 - every `domain_bytes` item must have a non-empty `domain_id` and `kind`.
 - per-domain `peak_bytes` must be greater than or equal to per-domain
   `current_bytes`.
+- when present, `actor_snapshot_record_count >= actor_live_count`;
+  reusable/done actor slots must not be counted as live actors merely because
+  they still have snapshot records for retained or released stack accounting.
 
 ## Evidence Mapping
 

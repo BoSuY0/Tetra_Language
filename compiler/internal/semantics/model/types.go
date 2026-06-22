@@ -264,17 +264,21 @@ type FieldInfo struct {
 }
 
 type TypeInfo struct {
-	Name      string
-	Kind      TypeKind
-	Public    bool
-	Repr      string
-	Fields    []FieldInfo
-	FieldMap  map[string]FieldInfo
-	SlotCount int
-	ElemType  string
-	ArrayLen  int
-	EnumCases []EnumCaseInfo
-	CaseMap   map[string]EnumCaseInfo
+	Name              string
+	Kind              TypeKind
+	Public            bool
+	Repr              string
+	Fields            []FieldInfo
+	FieldMap          map[string]FieldInfo
+	SlotCount         int
+	ElemType          string
+	ArrayLen          int
+	EnumCases         []EnumCaseInfo
+	CaseMap           map[string]EnumCaseInfo
+	RuntimeOwned      bool
+	UserConstructible bool
+	UserAssignable    bool
+	ActorSendable     bool
 }
 
 type EnumCaseInfo struct {

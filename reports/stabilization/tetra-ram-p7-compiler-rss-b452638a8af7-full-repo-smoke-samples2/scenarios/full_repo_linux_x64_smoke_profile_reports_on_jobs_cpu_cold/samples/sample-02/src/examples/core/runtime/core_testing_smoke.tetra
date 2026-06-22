@@ -1,0 +1,13 @@
+// Stable core testing stdlib smoke.
+module examples.core.runtime.core_testing_smoke
+
+import lib.core.testing as testing
+
+func main() -> Int:
+    let check_eq: Int = testing.assert_eq_i32(21 + 21, 42)
+    let check_true: Int = testing.assert_true(check_eq == 0)
+    let check_false: Int = testing.assert_false(false)
+    let status: Int = testing.combine(check_eq, testing.combine(check_true, check_false))
+    if status == 0:
+        return 42
+    return status

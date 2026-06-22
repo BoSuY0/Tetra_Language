@@ -1,0 +1,36 @@
+state ShellState:
+    var toggles: Int = 0
+    var label: String = "Wave 9 Native"
+    var source: Int = 0
+    var textSource: String = "Copied from state"
+
+view ShellView(state: ShellState):
+    bind toggles: Int = state.toggles
+    bind labelText: String = state.label
+    event submit -> toggle
+    event reset -> decrement
+    event rename -> rename
+    event copy -> copy
+    event copyAfterToggle -> copyAfterToggle
+    event compound -> compound
+    command toggle:
+        state.toggles = state.toggles + 1
+    command decrement:
+        state.toggles = state.toggles - 1
+    command rename:
+        state.label = "Native shell renamed"
+    command copy:
+        state.label = state.textSource
+    command copyAfterToggle:
+        state.toggles = state.toggles + 2
+        state.source = state.toggles
+    command compound:
+        state.toggles += 3
+        state.toggles -= 1
+    style width: Int = 80
+    style accent: String = "amber"
+    accessibility role: String = "status"
+    accessibility description: String = "Native shell preview"
+
+func main() -> Int:
+    return 0

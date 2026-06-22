@@ -164,6 +164,10 @@ type memoryDomainByte struct {
 	BytesCopied          uint64 `json:"bytes_copied,omitempty"`
 	MailboxCurrentBytes  uint64 `json:"mailbox_current_bytes"`
 	MailboxPeakBytes     uint64 `json:"mailbox_peak_bytes"`
+	StackLiveBytes       uint64 `json:"stack_live_bytes"`
+	StackReservedBytes   uint64 `json:"stack_reserved_bytes"`
+	StackRetainedBytes   uint64 `json:"stack_retained_bytes"`
+	StackReleasedBytes   uint64 `json:"stack_released_bytes"`
 	ByteBudget           uint64 `json:"byte_budget"`
 	OverBudgetCount      uint64 `json:"over_budget_count"`
 	BackpressureEvents   uint64 `json:"backpressure_events"`
@@ -209,6 +213,10 @@ func (d memoryDomainByte) MarshalJSON() ([]byte, error) {
 		commonDomainByte
 		MailboxCurrentBytes uint64 `json:"mailbox_current_bytes"`
 		MailboxPeakBytes    uint64 `json:"mailbox_peak_bytes"`
+		StackLiveBytes      uint64 `json:"stack_live_bytes"`
+		StackReservedBytes  uint64 `json:"stack_reserved_bytes"`
+		StackRetainedBytes  uint64 `json:"stack_retained_bytes"`
+		StackReleasedBytes  uint64 `json:"stack_released_bytes"`
 		ByteBudget          uint64 `json:"byte_budget"`
 		OverBudgetCount     uint64 `json:"over_budget_count"`
 		BackpressureEvents  uint64 `json:"backpressure_events"`
@@ -217,6 +225,10 @@ func (d memoryDomainByte) MarshalJSON() ([]byte, error) {
 		commonDomainByte:    common,
 		MailboxCurrentBytes: d.MailboxCurrentBytes,
 		MailboxPeakBytes:    d.MailboxPeakBytes,
+		StackLiveBytes:      d.StackLiveBytes,
+		StackReservedBytes:  d.StackReservedBytes,
+		StackRetainedBytes:  d.StackRetainedBytes,
+		StackReleasedBytes:  d.StackReleasedBytes,
 		ByteBudget:          d.ByteBudget,
 		OverBudgetCount:     d.OverBudgetCount,
 		BackpressureEvents:  d.BackpressureEvents,

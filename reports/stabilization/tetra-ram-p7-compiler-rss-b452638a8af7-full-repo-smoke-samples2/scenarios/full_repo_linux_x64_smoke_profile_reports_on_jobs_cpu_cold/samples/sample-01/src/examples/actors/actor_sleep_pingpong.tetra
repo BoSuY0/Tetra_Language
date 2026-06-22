@@ -1,0 +1,20 @@
+// Actor timer smoke: recv wakes from mailbox, sleep wakes from the timer queue.
+func delayed_pong() -> Int
+uses actors, runtime:
+    let _ticket: Int = core.recv()
+    let reply_to: actor = core.sender()
+    let _sleep: Int = core.sleep_ms(6)
+    let _sent: Int = core.send(reply_to, core.time_now_ms())
+    return 0
+
+func main() -> Int
+uses actors, runtime:
+    let pong: actor = core.spawn("delayed_pong")
+    let _sent: Int = core.send(pong, 1)
+    let value: Int = core.recv()
+    let now: Int = core.time_now_ms()
+    if value != 6:
+        return 10 + value
+    if now != 6:
+        return 20 + now
+    return 0

@@ -243,7 +243,7 @@ func classifyBackendFallback(target string, fn ir.IRFunc) backendFallbackClassif
 
 func backendCallABIUnsupported(instr ir.IRInstr, callABI machine.CallABIInfo) bool {
 	return instr.ArgSlots < 0 || instr.RetSlots < 0 || instr.ArgSlots > callABI.MaxArgSlots ||
-		instr.RetSlots > callABI.MaxRetSlots
+		instr.RetSlots > 1
 }
 
 func backendCallLooksRuntimeEffect(name string) bool {
@@ -890,7 +890,7 @@ func backendABIBoundaryForFunction(
 	switch {
 	case hasMultiSlotCall:
 		policy = "unsupported_call_multi_slot_return_stack_fallback"
-	case fn.ReturnSlots > maxRegisterReturns:
+	case fn.ReturnSlots > 1:
 		policy = "unsupported_multi_slot_return_stack_fallback"
 	case backendPath == "register":
 		policy = "single_slot_register_return"
@@ -940,10 +940,10 @@ func backendABIValueClass(returnSlots int, maxRegisterReturns int, hasMultiSlotC
 		return "callee_multi_slot_return_unverified"
 	case returnSlots == 0:
 		return "void_or_no_return"
-	case returnSlots <= maxRegisterReturns:
-		return "single_register_slot"
 	case returnSlots == 2:
 		return "unverified_header_or_pair"
+	case returnSlots <= maxRegisterReturns:
+		return "single_register_slot"
 	default:
 		return "unverified_aggregate"
 	}
@@ -963,7 +963,7 @@ func backendABIBoundaryStatus(policy string) string {
 
 func hasMultiSlotCallReturn(fn ir.IRFunc, maxRegisterReturns int) bool {
 	for _, instr := range fn.Instrs {
-		if instr.Kind == ir.IRCall && instr.RetSlots > maxRegisterReturns {
+		if instr.Kind == ir.IRCall && instr.RetSlots > 1 {
 			return true
 		}
 	}

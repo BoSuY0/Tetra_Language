@@ -1,0 +1,40 @@
+{
+  "schema": "tetra.ram.p0-baseline.commands.v1",
+  "commands": [
+    {
+      "name": "ram-p0-baseline",
+      "command": [
+        "go",
+        "run",
+        "./tools/cmd/ram-p0-baseline",
+        "--iterations",
+        "5",
+        "--work-bytes",
+        "1048576"
+      ]
+    },
+    {
+      "name": "artifact-hashes-write",
+      "command": [
+        "go",
+        "run",
+        "./tools/cmd/validate-artifact-hashes",
+        "--write",
+        "--root",
+        "reports/stabilization/tetra-ram-p0-baseline-7b00ec5069f4",
+        "--out",
+        "reports/stabilization/tetra-ram-p0-baseline-7b00ec5069f4/artifact-hashes.json"
+      ]
+    },
+    {
+      "name": "artifact-hashes-validate",
+      "command": [
+        "go",
+        "run",
+        "./tools/cmd/validate-artifact-hashes",
+        "--manifest",
+        "reports/stabilization/tetra-ram-p0-baseline-7b00ec5069f4/artifact-hashes.json"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+const base: i32 = (20 + 2) * 2
+const delta = 100 % 3
+
+func main() -> Int:
+    return base + delta - 3

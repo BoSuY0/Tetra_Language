@@ -1,0 +1,237 @@
+{
+  "schema_version": 2,
+  "kind": "allocation_plan",
+  "target": "linux-x64",
+  "target_memory_claim_level": "production/host_runtime",
+  "storage_evidence_scope": "host_runtime_verified",
+  "summary": {
+    "allocation_count": 4,
+    "storage_classes": {
+      "Stack": 4
+    },
+    "actual_lowering_storage_classes": {
+      "Stack": 4
+    },
+    "runtime_paths": {
+      "stack_frame": 4
+    },
+    "memory_backend_classes": {
+      "none": 4
+    },
+    "memory_backend_evidence_classes": {
+      "unsupported": 4
+    },
+    "bytes_requested": 7,
+    "bytes_reserved": 7,
+    "domains": [
+      {
+        "domain_id": "domain:process",
+        "kind": "process",
+        "owner_kind": "process",
+        "owner_id": "current",
+        "lifetime": "process",
+        "row_count": 4,
+        "budget_bytes": 7,
+        "requested_bytes": 7,
+        "reserved_bytes": 7
+      }
+    ]
+  },
+  "totals": {
+    "eliminated": 0,
+    "register": 0,
+    "stack": 4,
+    "region": 0,
+    "function_temp_region": 0,
+    "explicit_island": 0,
+    "task_region": 0,
+    "actor_move_region": 0,
+    "heap": 0,
+    "mmap_large": 0,
+    "external": 0,
+    "unknown": 0
+  },
+  "functions": [
+    {
+      "name": "examples.core.memory.core_crypto_smoke.main",
+      "allocations": [
+        {
+          "id": "changed",
+          "site_id": "allocsite:examples.core.memory.core_crypto_smoke.main:changed:_home_tetra_Desktop_Projects_Tetra_Language_reports_stabilization_tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2_scenarios_full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold_samples_sample-01_src_examples_core_memory_core_crypto_smoke.tetra_14_25",
+          "value_id": "alloc_intent:changed",
+          "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/memory/core_crypto_smoke.tetra:14:25",
+          "builtin": "core.make_u8",
+          "element_type": "u8",
+          "element_size": 1,
+          "length_expr": "2",
+          "length_status": "normal_allocation",
+          "zero_guard_status": "valid_empty_no_allocator",
+          "negative_guard_status": "reject_before_allocation",
+          "overflow_guard_status": "reject_before_allocation",
+          "byte_size": 2,
+          "escape": "NoEscape",
+          "storage": "Stack",
+          "planned_storage": "Stack",
+          "actual_lowering_storage": "Stack",
+          "reason": "fixed_small_read_only_local_call_no_escape: fixed-size no-escape allocation crosses only proven read-only local call summaries and is 2 bytes, within stack threshold; allocation is passed only to proven read-only local call summary parameters and does not escape in the supported v0 scan",
+          "validation_status": "validated_no_escape",
+          "lowering_status": "stack_lowering",
+          "runtime_path": "stack_frame",
+          "memory_backend": {
+            "schema": "tetra.memory.backend-allocation.v1",
+            "backend_class": "none",
+            "adapter": "no_runtime_memory_backend",
+            "runtime_path": "stack_frame",
+            "evidence_class": "unsupported",
+            "method": "no_runtime_memory_backend",
+            "unsupported_reason": "stack/register/eliminated storage does not use the runtime MemoryBackend"
+          },
+          "bytes_requested": 2,
+          "bytes_reserved": 2,
+          "domain": {
+            "domain_id": "domain:process",
+            "kind": "process",
+            "owner_kind": "process",
+            "owner_id": "current",
+            "lifetime": "process",
+            "budget_bytes": 2,
+            "requested_bytes": 2,
+            "reserved_bytes": 2
+          }
+        },
+        {
+          "id": "lhs",
+          "site_id": "allocsite:examples.core.memory.core_crypto_smoke.main:lhs:_home_tetra_Desktop_Projects_Tetra_Language_reports_stabilization_tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2_scenarios_full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold_samples_sample-01_src_examples_core_memory_core_crypto_smoke.tetra_8_21",
+          "value_id": "alloc_intent:lhs",
+          "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/memory/core_crypto_smoke.tetra:8:21",
+          "builtin": "core.make_u8",
+          "element_type": "u8",
+          "element_size": 1,
+          "length_expr": "2",
+          "length_status": "normal_allocation",
+          "zero_guard_status": "valid_empty_no_allocator",
+          "negative_guard_status": "reject_before_allocation",
+          "overflow_guard_status": "reject_before_allocation",
+          "byte_size": 2,
+          "escape": "NoEscape",
+          "storage": "Stack",
+          "planned_storage": "Stack",
+          "actual_lowering_storage": "Stack",
+          "reason": "fixed_small_read_only_local_call_no_escape: fixed-size no-escape allocation crosses only proven read-only local call summaries and is 2 bytes, within stack threshold; allocation is passed only to proven read-only local call summary parameters and does not escape in the supported v0 scan",
+          "validation_status": "validated_no_escape",
+          "lowering_status": "stack_lowering",
+          "runtime_path": "stack_frame",
+          "memory_backend": {
+            "schema": "tetra.memory.backend-allocation.v1",
+            "backend_class": "none",
+            "adapter": "no_runtime_memory_backend",
+            "runtime_path": "stack_frame",
+            "evidence_class": "unsupported",
+            "method": "no_runtime_memory_backend",
+            "unsupported_reason": "stack/register/eliminated storage does not use the runtime MemoryBackend"
+          },
+          "bytes_requested": 2,
+          "bytes_reserved": 2,
+          "domain": {
+            "domain_id": "domain:process",
+            "kind": "process",
+            "owner_kind": "process",
+            "owner_id": "current",
+            "lifetime": "process",
+            "budget_bytes": 2,
+            "requested_bytes": 2,
+            "reserved_bytes": 2
+          }
+        },
+        {
+          "id": "rhs",
+          "site_id": "allocsite:examples.core.memory.core_crypto_smoke.main:rhs:_home_tetra_Desktop_Projects_Tetra_Language_reports_stabilization_tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2_scenarios_full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold_samples_sample-01_src_examples_core_memory_core_crypto_smoke.tetra_11_21",
+          "value_id": "alloc_intent:rhs",
+          "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/memory/core_crypto_smoke.tetra:11:21",
+          "builtin": "core.make_u8",
+          "element_type": "u8",
+          "element_size": 1,
+          "length_expr": "2",
+          "length_status": "normal_allocation",
+          "zero_guard_status": "valid_empty_no_allocator",
+          "negative_guard_status": "reject_before_allocation",
+          "overflow_guard_status": "reject_before_allocation",
+          "byte_size": 2,
+          "escape": "NoEscape",
+          "storage": "Stack",
+          "planned_storage": "Stack",
+          "actual_lowering_storage": "Stack",
+          "reason": "fixed_small_read_only_local_call_no_escape: fixed-size no-escape allocation crosses only proven read-only local call summaries and is 2 bytes, within stack threshold; allocation is passed only to proven read-only local call summary parameters and does not escape in the supported v0 scan",
+          "validation_status": "validated_no_escape",
+          "lowering_status": "stack_lowering",
+          "runtime_path": "stack_frame",
+          "memory_backend": {
+            "schema": "tetra.memory.backend-allocation.v1",
+            "backend_class": "none",
+            "adapter": "no_runtime_memory_backend",
+            "runtime_path": "stack_frame",
+            "evidence_class": "unsupported",
+            "method": "no_runtime_memory_backend",
+            "unsupported_reason": "stack/register/eliminated storage does not use the runtime MemoryBackend"
+          },
+          "bytes_requested": 2,
+          "bytes_reserved": 2,
+          "domain": {
+            "domain_id": "domain:process",
+            "kind": "process",
+            "owner_kind": "process",
+            "owner_id": "current",
+            "lifetime": "process",
+            "budget_bytes": 2,
+            "requested_bytes": 2,
+            "reserved_bytes": 2
+          }
+        },
+        {
+          "id": "shorter",
+          "site_id": "allocsite:examples.core.memory.core_crypto_smoke.main:shorter:_home_tetra_Desktop_Projects_Tetra_Language_reports_stabilization_tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2_scenarios_full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold_samples_sample-01_src_examples_core_memory_core_crypto_smoke.tetra_17_25",
+          "value_id": "alloc_intent:shorter",
+          "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/memory/core_crypto_smoke.tetra:17:25",
+          "builtin": "core.make_u8",
+          "element_type": "u8",
+          "element_size": 1,
+          "length_expr": "1",
+          "length_status": "normal_allocation",
+          "zero_guard_status": "valid_empty_no_allocator",
+          "negative_guard_status": "reject_before_allocation",
+          "overflow_guard_status": "reject_before_allocation",
+          "byte_size": 1,
+          "escape": "NoEscape",
+          "storage": "Stack",
+          "planned_storage": "Stack",
+          "actual_lowering_storage": "Stack",
+          "reason": "fixed_small_read_only_local_call_no_escape: fixed-size no-escape allocation crosses only proven read-only local call summaries and is 1 bytes, within stack threshold; allocation is passed only to proven read-only local call summary parameters and does not escape in the supported v0 scan",
+          "validation_status": "validated_no_escape",
+          "lowering_status": "stack_lowering",
+          "runtime_path": "stack_frame",
+          "memory_backend": {
+            "schema": "tetra.memory.backend-allocation.v1",
+            "backend_class": "none",
+            "adapter": "no_runtime_memory_backend",
+            "runtime_path": "stack_frame",
+            "evidence_class": "unsupported",
+            "method": "no_runtime_memory_backend",
+            "unsupported_reason": "stack/register/eliminated storage does not use the runtime MemoryBackend"
+          },
+          "bytes_requested": 1,
+          "bytes_reserved": 1,
+          "domain": {
+            "domain_id": "domain:process",
+            "kind": "process",
+            "owner_kind": "process",
+            "owner_id": "current",
+            "lifetime": "process",
+            "budget_bytes": 1,
+            "requested_bytes": 1,
+            "reserved_bytes": 1
+          }
+        }
+      ]
+    }
+  ]
+}

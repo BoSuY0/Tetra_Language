@@ -1,0 +1,36 @@
+func worker() -> Int
+uses actors, runtime:
+    let _sleep: Int = core.sleep_ms(1)
+    let _sent: Int = core.send_msg(core.sender(), 13, 5)
+    return 21
+
+func main() -> Int
+uses actors, runtime:
+    let deadline: Int = core.deadline_ms(1)
+    if core.timer_ready(deadline):
+        return 10
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let early: task.result_i32 = core.task_poll_i32(task)
+    if early.error != 2:
+        return 20 + early.error
+    let yielded: Int = core.yield()
+    if yielded != 0:
+        return 40 + yielded
+    let empty: actor.recv_result_i32 = core.recv_poll()
+    if empty.error != 2:
+        return 60 + empty.error
+    let msg: actor.recv_msg_result = core.recv_msg_until(core.deadline_ms(3))
+    if msg.error != 0:
+        return 80 + msg.error
+    if msg.value != 13:
+        return 100 + msg.value
+    if msg.tag != 5:
+        return 120 + msg.tag
+    if !core.timer_ready(deadline):
+        return 140
+    let selected: task.result_i32 = core.select2_i32(task, core.deadline_ms(5))
+    if selected.error != 0:
+        return 160 + selected.error
+    if selected.value != 21:
+        return 180 + selected.value
+    return 0

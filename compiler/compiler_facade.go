@@ -284,13 +284,60 @@ func BuildFileWithStats(inputPath, outputPath, target string) (*BuildStats, erro
 func BuildFileWithStatsOpt(
 	inputPath, outputPath, target string,
 	opt BuildOptions,
-) (*BuildStats, error) {
+) (stats *BuildStats, err error) {
+	profiler := newCompilerPhaseProfiler(inputPath, outputPath, target, opt)
+	profileWritten := false
+	var build checkedBuildWorld
+	var linkedObjects []linkedObject
+	var plan moduleBuildPlan
+	var objects []*Object
+	defer func() {
+		if profiler == nil || profileWritten || err == nil {
+			return
+		}
+		profiler.addNote("build ended before successful completion: " + err.Error())
+		build = checkedBuildWorld{}
+		linkedObjects = nil
+		objects = nil
+		plan.PublicAPIHashes = nil
+		plan.ObjectsByModule = nil
+		plan.ObjectlessModules = nil
+		plan.Modules = nil
+		plan.ToCompile = nil
+		if compilerProcessMemoryRelease != nil {
+			compilerProcessMemoryRelease()
+		}
+		profiler.capture("final_cleanup", compilerPhaseProfileCounts{
+			ObjectCount:                    0,
+			SetObjectCount:                 true,
+			SourceFileCount:                0,
+			SetSourceFileCount:             true,
+			CheckedFunctionCount:           0,
+			SetCheckedFunctionCount:        true,
+			CheckedTypeCount:               0,
+			SetCheckedTypeCount:            true,
+			TransientIRFunctionCount:       0,
+			SetTransientIRFunctionCount:    true,
+			AllocationPlanFunctionCount:    0,
+			SetAllocationPlanFunctionCount: true,
+		})
+		path, writeErr := profiler.write(compilerPhaseProfilePath(outputPath, opt))
+		if writeErr == nil && stats != nil {
+			stats.CompilerPhaseProfilePath = path
+		}
+	}()
 	native, handled, stats, err := resolveExecutableBuildTarget(inputPath, outputPath, target, opt)
 	if handled || err != nil {
 		return stats, err
 	}
 
-	build, err := loadCheckedBuildWorld(inputPath, opt, !opt.InterfaceOnly, native.triple)
+	build, err = loadCheckedBuildWorldProfiled(
+		inputPath,
+		opt,
+		!opt.InterfaceOnly,
+		native.triple,
+		profiler,
+	)
 	if err != nil {
 		return nil, translateTargetExportedFFISemanticError(err, native.triple)
 	}
@@ -314,7 +361,7 @@ func BuildFileWithStatsOpt(
 		}
 		opt.RuntimeHeapTelemetryActorDomains = actorDomains
 	}
-	linkedObjects, err := prepareLinkedObjects(
+	linkedObjects, err = prepareLinkedObjects(
 		build.world,
 		build.checked,
 		opt.LinkObjectPaths,
@@ -324,7 +371,7 @@ func BuildFileWithStatsOpt(
 		return nil, err
 	}
 
-	plan, stats, err := planNativeModuleBuild(
+	plan, stats, err = planNativeModuleBuild(
 		build.world,
 		build.checked,
 		native.triple,
@@ -334,6 +381,20 @@ func BuildFileWithStatsOpt(
 	if err != nil {
 		return nil, err
 	}
+	if profiler != nil {
+		workerMax := len(plan.ToCompile)
+		if workerMax == 0 {
+			workerMax = len(plan.Modules)
+		}
+		decision := buildplan.EffectiveWorkerDecision(
+			opt.Jobs,
+			workerMax,
+			runtime.NumCPU(),
+			opt.MemoryBudgetBytes,
+			0,
+		)
+		profiler.setWorkerDecision(decision.Count, decision.Reason)
+	}
 	if err := compileNativeModulePlan(
 		build.world,
 		build.checked,
@@ -341,11 +402,13 @@ func BuildFileWithStatsOpt(
 		opt,
 		plan,
 		stats,
+		profiler,
 	); err != nil {
 		return nil, err
 	}
+	build.world = nil
 
-	objects, err := objectsFromModulePlan(plan)
+	objects, err = objectsFromModulePlan(plan)
 	if err != nil {
 		return nil, err
 	}
@@ -359,11 +422,65 @@ func BuildFileWithStatsOpt(
 	); err != nil {
 		return nil, err
 	}
+	if profiler != nil {
+		if compilerProcessMemoryRelease != nil {
+			compilerProcessMemoryRelease()
+		}
+		profiler.capture(
+			"object_retention_link",
+			withRetainedCompilerStateCounts(
+				compilerPhaseProfileCounts{
+					ModuleCount:         len(plan.Modules),
+					ModulesToCompile:    len(plan.ToCompile),
+					CacheHitCount:       len(stats.CacheHits),
+					CompiledModuleCount: len(stats.CompiledModules),
+					LoweredModuleCount:  len(stats.LoweredModules),
+					ObjectCount:         len(objects),
+					IRFunctionCount:     len(build.checked.Funcs),
+				},
+				nil,
+				build.checked,
+			),
+		)
+	}
+	objects = nil
+	linkedObjects = nil
+	plan.ObjectsByModule = nil
 	if err := emitUIArtifacts(outputPath, native.triple, build.checked); err != nil {
 		return nil, err
 	}
 	if err := emitExplainReports(outputPath, native.triple, build.checked, opt); err != nil {
 		return nil, err
+	}
+	if profiler != nil {
+		if compilerProcessMemoryRelease != nil {
+			compilerProcessMemoryRelease()
+		}
+		counts := compilerPhaseProfileCounts{
+			ModuleCount:         len(plan.Modules),
+			ModulesToCompile:    len(plan.ToCompile),
+			CacheHitCount:       len(stats.CacheHits),
+			CompiledModuleCount: len(stats.CompiledModules),
+			LoweredModuleCount:  len(stats.LoweredModules),
+			ObjectCount:         0,
+			SetObjectCount:      true,
+			IRFunctionCount:     len(build.checked.Funcs),
+		}
+		profiler.capture(
+			"report_generation",
+			withRetainedCompilerStateCounts(counts, nil, build.checked),
+		)
+		build.checked = nil
+		if compilerProcessMemoryRelease != nil {
+			compilerProcessMemoryRelease()
+		}
+		profiler.capture("final_cleanup", withRetainedCompilerStateCounts(counts, nil, nil))
+		path, err := profiler.write(compilerPhaseProfilePath(outputPath, opt))
+		if err != nil {
+			return nil, err
+		}
+		profileWritten = true
+		stats.CompilerPhaseProfilePath = path
 	}
 
 	return stats, nil
@@ -475,25 +592,27 @@ func runtimeHeapTelemetryActorDomainsForBuild(
 	}
 	actorStateUsed := collectActorStateRuntimeUsage(checked)
 	actorRuntimeUsed, _ := collectActorRuntimeUsagePosition(checked)
-	if !actorsUsed && !actorRuntimeUsed && !actorStateUsed {
+	actorSystemReceiveUsed, _ := collectActorSystemReceiveRuntimeUsagePosition(checked)
+	if !actorsUsed && !actorRuntimeUsed && !actorSystemReceiveUsed && !actorStateUsed {
 		return false, nil
 	}
 	typedTasksUsed, typedTaskMaxSlots := collectTypedTaskRuntimeUsage(checked)
 	netRuntimeUsage := collectNetRuntimeUsageProfile(checked)
 	distributedActorsUsed, _ := collectDistributedActorRuntimeUsagePosition(checked)
 	mode, err := selectRuntimeModeForNativeTarget(native.triple, opt.Runtime, runtimeUsageProfile{
-		actorStateUsed:        actorStateUsed,
-		tasksUsed:             collectTaskRuntimeUsage(checked),
-		taskGroupsUsed:        collectTaskGroupRuntimeUsage(checked),
-		typedTasksUsed:        typedTasksUsed,
-		typedTaskMaxSlots:     typedTaskMaxSlots,
-		timeRuntimeUsed:       collectTimeRuntimeUsage(checked),
-		filesystemUsed:        collectFilesystemRuntimeUsage(checked),
-		netUsed:               netRuntimeUsage.used,
-		netRuntimeSymbols:     netRuntimeUsage.requiredSymbols(),
-		surfaceUsed:           collectSurfaceRuntimeUsage(checked),
-		distributedActorsUsed: distributedActorsUsed,
-		actorSpawnCount:       actorSpawnCount,
+		actorSystemReceiveUsed: actorSystemReceiveUsed,
+		actorStateUsed:         actorStateUsed,
+		tasksUsed:              collectTaskRuntimeUsage(checked),
+		taskGroupsUsed:         collectTaskGroupRuntimeUsage(checked),
+		typedTasksUsed:         typedTasksUsed,
+		typedTaskMaxSlots:      typedTaskMaxSlots,
+		timeRuntimeUsed:        collectTimeRuntimeUsage(checked),
+		filesystemUsed:         collectFilesystemRuntimeUsage(checked),
+		netUsed:                netRuntimeUsage.used,
+		netRuntimeSymbols:      netRuntimeUsage.requiredSymbols(),
+		surfaceUsed:            collectSurfaceRuntimeUsage(checked),
+		distributedActorsUsed:  distributedActorsUsed,
+		actorSpawnCount:        actorSpawnCount,
 	})
 	if err != nil {
 		return false, err
@@ -546,6 +665,16 @@ func loadCheckedBuildWorld(
 	requireMain bool,
 	target string,
 ) (checkedBuildWorld, error) {
+	return loadCheckedBuildWorldProfiled(inputPath, opt, requireMain, target, nil)
+}
+
+func loadCheckedBuildWorldProfiled(
+	inputPath string,
+	opt BuildOptions,
+	requireMain bool,
+	target string,
+	profiler *compilerPhaseProfiler,
+) (checkedBuildWorld, error) {
 	world, err := loadWorldForBuild(inputPath, opt)
 	if err != nil {
 		return checkedBuildWorld{}, err
@@ -553,12 +682,35 @@ func loadCheckedBuildWorld(
 	if err := validateTargetExportedFFIAST(world, target); err != nil {
 		return checkedBuildWorld{}, err
 	}
+	if profiler != nil {
+		profiler.capture(
+			"source_loading_parsing",
+			withRetainedCompilerStateCounts(
+				compilerPhaseProfileCounts{ModuleCount: len(world.ByModule)},
+				world,
+				nil,
+			),
+		)
+	}
 	checked, err := semantics.CheckWorldOpt(
 		world,
 		semanticsCheckOptionsForTarget(requireMain, target),
 	)
 	if err != nil {
 		return checkedBuildWorld{}, err
+	}
+	if profiler != nil {
+		profiler.capture(
+			"semantic_analysis",
+			withRetainedCompilerStateCounts(
+				compilerPhaseProfileCounts{
+					ModuleCount:     len(world.ByModule),
+					IRFunctionCount: len(checked.Funcs),
+				},
+				world,
+				checked,
+			),
+		)
 	}
 	return checkedBuildWorld{world: world, checked: checked}, nil
 }
@@ -568,6 +720,24 @@ func semanticsCheckOptionsForTarget(requireMain bool, target string) semantics.C
 		RequireMain:              requireMain,
 		EnableILP32NativeScalars: target == "linux-x86" || target == "linux-x32",
 	}
+}
+
+func withRetainedCompilerStateCounts(
+	counts compilerPhaseProfileCounts,
+	world *World,
+	checked *semantics.CheckedProgram,
+) compilerPhaseProfileCounts {
+	counts.SetSourceFileCount = true
+	counts.SetCheckedFunctionCount = true
+	counts.SetCheckedTypeCount = true
+	if world != nil {
+		counts.SourceFileCount = len(world.Files)
+	}
+	if checked != nil {
+		counts.CheckedFunctionCount = len(checked.Funcs)
+		counts.CheckedTypeCount = len(checked.Types)
+	}
+	return counts
 }
 
 func prepareLinkedObjects(
@@ -700,12 +870,29 @@ func compileNativeModulePlan(
 	opt BuildOptions,
 	plan moduleBuildPlan,
 	stats *BuildStats,
+	profiler *compilerPhaseProfiler,
 ) error {
 	if len(plan.ToCompile) == 0 {
+		if profiler != nil {
+			counts := withRetainedCompilerStateCounts(compilerPhaseProfileCounts{
+				ModuleCount:         len(plan.Modules),
+				ModulesToCompile:    len(plan.ToCompile),
+				CacheHitCount:       len(stats.CacheHits),
+				CompiledModuleCount: len(stats.CompiledModules),
+				LoweredModuleCount:  len(stats.LoweredModules),
+				ObjectCount:         len(plan.ObjectsByModule),
+				IRFunctionCount:     len(checked.Funcs),
+			}, world, checked)
+			profiler.capture("plir_construction", counts)
+			profiler.capture("allocation_planning", counts)
+			profiler.capture("ir_lowering", counts)
+			profiler.capture("module_codegen", counts)
+		}
 		sortBuildStats(stats)
 		return nil
 	}
 	var allocationPlan *allocplan.Plan
+	allocationPlanFunctionCount := 0
 	var allocationSummaryProgram *ir.IRProgram
 	if targetSupportsStackAllocationLowering(native.triple) {
 		plirProg, err := plir.FromCheckedProgram(checked)
@@ -715,6 +902,25 @@ func compileNativeModulePlan(
 		if err := plir.VerifyProgram(plirProg); err != nil {
 			return err
 		}
+		if profiler != nil {
+			profiler.capture(
+				"plir_construction",
+				withRetainedCompilerStateCounts(
+					compilerPhaseProfileCounts{
+						ModuleCount:                    len(plan.Modules),
+						ModulesToCompile:               len(plan.ToCompile),
+						CacheHitCount:                  len(stats.CacheHits),
+						IRFunctionCount:                len(plirProg.Funcs),
+						TransientIRFunctionCount:       len(plirProg.Funcs),
+						SetTransientIRFunctionCount:    true,
+						AllocationPlanFunctionCount:    0,
+						SetAllocationPlanFunctionCount: true,
+					},
+					world,
+					checked,
+				),
+			)
+		}
 		allocationPlan, err = allocplan.FromPLIRWithOptions(
 			plirProg,
 			allocationPlanOptionsForTarget(native.triple),
@@ -722,15 +928,79 @@ func compileNativeModulePlan(
 		if err != nil {
 			return err
 		}
+		allocationPlanFunctionCount = len(plirProg.Funcs)
+		if profiler != nil {
+			profiler.capture(
+				"allocation_planning",
+				withRetainedCompilerStateCounts(
+					compilerPhaseProfileCounts{
+						ModuleCount:                    len(plan.Modules),
+						ModulesToCompile:               len(plan.ToCompile),
+						CacheHitCount:                  len(stats.CacheHits),
+						IRFunctionCount:                len(plirProg.Funcs),
+						TransientIRFunctionCount:       len(plirProg.Funcs),
+						SetTransientIRFunctionCount:    true,
+						AllocationPlanFunctionCount:    allocationPlanFunctionCount,
+						SetAllocationPlanFunctionCount: true,
+					},
+					world,
+					checked,
+				),
+			)
+		}
+		plirProg = nil
 		allocationSummaryProgram, err = lower.LowerWithOptions(
 			checked,
-			lowerOptionsForTarget(native.triple),
+			lowerOptionsForBuild(native.triple, opt),
 		)
 		if err != nil {
 			return err
 		}
+		if profiler != nil {
+			profiler.capture(
+				"ir_lowering",
+				withRetainedCompilerStateCounts(
+					compilerPhaseProfileCounts{
+						ModuleCount:                    len(plan.Modules),
+						ModulesToCompile:               len(plan.ToCompile),
+						CacheHitCount:                  len(stats.CacheHits),
+						IRFunctionCount:                len(allocationSummaryProgram.Funcs),
+						TransientIRFunctionCount:       len(allocationSummaryProgram.Funcs),
+						SetTransientIRFunctionCount:    true,
+						AllocationPlanFunctionCount:    allocationPlanFunctionCount,
+						SetAllocationPlanFunctionCount: true,
+					},
+					world,
+					checked,
+				),
+			)
+		}
+	} else if profiler != nil {
+		counts := withRetainedCompilerStateCounts(compilerPhaseProfileCounts{
+			ModuleCount:                    len(plan.Modules),
+			ModulesToCompile:               len(plan.ToCompile),
+			CacheHitCount:                  len(stats.CacheHits),
+			IRFunctionCount:                len(checked.Funcs),
+			TransientIRFunctionCount:       0,
+			SetTransientIRFunctionCount:    true,
+			AllocationPlanFunctionCount:    0,
+			SetAllocationPlanFunctionCount: true,
+		}, world, checked)
+		profiler.capture("plir_construction", counts)
+		profiler.capture("allocation_planning", counts)
+		profiler.capture("ir_lowering", counts)
 	}
-	jobs := buildplan.EffectiveWorkerCount(opt.Jobs, len(plan.ToCompile), runtime.NumCPU())
+	decision := buildplan.EffectiveWorkerDecision(
+		opt.Jobs,
+		len(plan.ToCompile),
+		runtime.NumCPU(),
+		opt.MemoryBudgetBytes,
+		0,
+	)
+	jobs := decision.Count
+	if profiler != nil {
+		profiler.setWorkerDecision(decision.Count, decision.Reason)
+	}
 
 	jobsCh := make(chan moduleBuildJob)
 	var wg sync.WaitGroup
@@ -766,7 +1036,7 @@ func compileNativeModulePlan(
 			funcs, err := lower.LowerModuleWithOptions(
 				checked,
 				job.Module,
-				lowerOptionsForTarget(native.triple),
+				lowerOptionsForBuild(native.triple, opt),
 			)
 			if err != nil {
 				setErr(err)
@@ -835,7 +1105,31 @@ func compileNativeModulePlan(
 	if err := getErr(); err != nil {
 		return err
 	}
+	allocationPlan = nil
+	allocationSummaryProgram = nil
 	sortBuildStats(stats)
+	if profiler != nil {
+		profiler.capture(
+			"module_codegen",
+			withRetainedCompilerStateCounts(
+				compilerPhaseProfileCounts{
+					ModuleCount:                    len(plan.Modules),
+					ModulesToCompile:               len(plan.ToCompile),
+					CacheHitCount:                  len(stats.CacheHits),
+					CompiledModuleCount:            len(stats.CompiledModules),
+					LoweredModuleCount:             len(stats.LoweredModules),
+					ObjectCount:                    len(plan.ObjectsByModule),
+					IRFunctionCount:                len(checked.Funcs),
+					TransientIRFunctionCount:       0,
+					SetTransientIRFunctionCount:    true,
+					AllocationPlanFunctionCount:    0,
+					SetAllocationPlanFunctionCount: true,
+				},
+				world,
+				checked,
+			),
+		)
+	}
 	return nil
 }
 

@@ -1,0 +1,8 @@
+// v0.5 task runtime smoke: cooperative i32 spawn/join MVP.
+func worker() -> Int:
+    return 42
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    return core.task_join_i32(task)

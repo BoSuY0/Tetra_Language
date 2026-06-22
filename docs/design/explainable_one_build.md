@@ -148,17 +148,18 @@ the conservative heap/runtime path.
 P5.0 freezes the future runtime-allocation report hooks in
 `compiler/internal/runtimeabi`: storage class, runtime path, bytes requested,
 bytes reserved, region id, lifetime, and debug mode. P5.1 starts using those
-hooks for constant-size `linux-x64` safe-slice heap rows. P15.2 reports show
-`runtime_path: per_core_small_heap`, an `allocator_class` such as `small_32`,
-`allocator_scope: core:0`,
-`allocator_reuse_policy: same_core_same_size_class_free_list`,
+hooks for constant-size `linux-x64` safe-slice heap rows. P0.1 truthful reports show
+`runtime_path: process_bump_small_heap_v0`, an `allocator_class` such as `small_32`,
+`allocator_scope: process`,
+`allocator_reuse_policy: bump_no_reuse_v0`,
 `bytes_requested`, and `bytes_reserved`, or `runtime_path: large_mmap` for
 large safe-slice fallback. P5.2 also fills those hooks for explicit island
 allocations with `runtime_path: explicit_island`, `allocator_class:
 region_bump_16`, 16-byte-rounded `bytes_reserved`, `region_id`, `lifetime`,
 and debug-mode evidence. P5.3 fills region-planning hooks for bounded
-function-local temporary copies, but keeps `actual_lowering_storage: Heap` in
-the same row until implicit region lowering exists. P5.4 upgrades the concrete
+function-local temporary copies. When actual function-temp lowering is enabled,
+the runtime path is `scoped_single_mapping_v0`, not a general arena; planned-only
+rows keep `actual_lowering_storage: Heap` until lowering evidence exists. P5.4 upgrades the concrete
 allocation report envelope to schema v2 and requires the runtime/storage/byte
 summary to match the exact allocation plan before the report is written.
 For x64 native P2.1 stack-lowered sites, `planned_storage` and

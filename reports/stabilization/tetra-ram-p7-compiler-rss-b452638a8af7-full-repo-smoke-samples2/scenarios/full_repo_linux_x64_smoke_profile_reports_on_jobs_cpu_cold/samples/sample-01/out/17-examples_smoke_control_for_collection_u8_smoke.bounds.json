@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "kind": "bounds",
+  "target": "linux-x64",
+  "totals": {
+    "removed": 2,
+    "left": 1
+  },
+  "functions": [
+    {
+      "function": "main",
+      "removed": 2,
+      "left": 1,
+      "sites": [
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/smoke/control/for_collection_u8_smoke.tetra:6:9",
+          "kind": "u8.store",
+          "removed": true,
+          "proof_id": "proof:allocation-zero:literal0:bytes:6:9",
+          "reason": "removed_by_allocation_literal_zero_length"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/smoke/control/for_collection_u8_smoke.tetra:7:9",
+          "kind": "u8.store",
+          "removed": false,
+          "reason": "left_missing_dominance"
+        },
+        {
+          "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/smoke/control/for_collection_u8_smoke.tetra:8:9",
+          "kind": "u8.load",
+          "removed": true,
+          "proof_id": "proof:for-collection:b:8:9",
+          "reason": "removed_by_for_loop_range"
+        }
+      ]
+    }
+  ]
+}

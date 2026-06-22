@@ -1,0 +1,11 @@
+// MMIO smoke test
+// Uses capability-gated MMIO read/write on a heap buffer.
+func main() -> i32
+uses alloc, capability, io, mem, mmio:
+    var out: i32 = 0
+    unsafe:
+        var io: cap.io = core.cap_io()
+        var p: ptr = core.alloc_bytes(4)
+        var _w: i32 = core.mmio_write_i32(p, 123, io)
+        out = core.mmio_read_i32(p, io)
+    return out

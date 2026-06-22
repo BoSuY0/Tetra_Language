@@ -618,6 +618,67 @@ func TestValidateAllocationLoweringAcceptsStackAllocationPassedToKnownNoEscapeCa
 	}
 }
 
+func TestValidateAllocationLoweringAcceptsNestedNoEscapeWriterCallSummary(t *testing.T) {
+	plan := stackU8ValidationPlan("main")
+	prog := &ir.IRProgram{Funcs: []ir.IRFunc{
+		{
+			Name:        "len_slice",
+			ParamSlots:  2,
+			LocalSlots:  2,
+			ReturnSlots: 1,
+			Instrs: []ir.IRInstr{
+				{Kind: ir.IRLoadLocal, Local: 1},
+				{Kind: ir.IRReturn},
+			},
+		},
+		{
+			Name:        "touch_slice",
+			ParamSlots:  2,
+			LocalSlots:  3,
+			ReturnSlots: 0,
+			Instrs: []ir.IRInstr{
+				{Kind: ir.IRLoadLocal, Local: 0},
+				{Kind: ir.IRLoadLocal, Local: 1},
+				{Kind: ir.IRCall, Name: "len_slice", ArgSlots: 2, RetSlots: 1},
+				{Kind: ir.IRStoreLocal, Local: 2},
+				{Kind: ir.IRReturn},
+			},
+		},
+		{
+			Name:        "write_count",
+			ParamSlots:  2,
+			LocalSlots:  2,
+			ReturnSlots: 1,
+			Instrs: []ir.IRInstr{
+				{Kind: ir.IRLoadLocal, Local: 0},
+				{Kind: ir.IRLoadLocal, Local: 1},
+				{Kind: ir.IRCall, Name: "touch_slice", ArgSlots: 2, RetSlots: 0},
+				{Kind: ir.IRLoadLocal, Local: 0},
+				{Kind: ir.IRLoadLocal, Local: 1},
+				{Kind: ir.IRConstI32, Imm: 0},
+				{Kind: ir.IRConstI32, Imm: 7},
+				{Kind: ir.IRIndexStoreU8},
+				{Kind: ir.IRConstI32, Imm: 1},
+				{Kind: ir.IRReturn},
+			},
+		},
+		{
+			Name:        "main",
+			LocalSlots:  4,
+			ReturnSlots: 1,
+			Instrs: []ir.IRInstr{
+				{Kind: ir.IRConstI32, Imm: 4},
+				{Kind: ir.IRStackSliceU8, Local: 0, ArgSlots: 4, Imm: 4, Name: "xs"},
+				{Kind: ir.IRCall, Name: "write_count", ArgSlots: 2, RetSlots: 1},
+				{Kind: ir.IRReturn},
+			},
+		},
+	}}
+	if err := ValidateAllocationLowering(plan, prog); err != nil {
+		t.Fatalf("ValidateAllocationLowering: %v", err)
+	}
+}
+
 func TestValidateAllocationLoweringRejectsReturnedStackAllocationThroughCallSummary(t *testing.T) {
 	plan := stackU8ValidationPlan("bad")
 	prog := &ir.IRProgram{Funcs: []ir.IRFunc{

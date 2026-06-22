@@ -1,0 +1,60 @@
+// Pure Tetra Surface migration of examples/projects/dogfood_web_ui/src/main.tetra.
+module examples.surface.migration.surface_migration_dogfood_web_ui
+
+import lib.core.surface as surface
+import lib.core.draw as draw
+
+struct DogfoodTodoSurface:
+    count: Int
+    selectedIndex: Int
+
+extension DogfoodTodoSurface:
+    func draw(self: borrow DogfoodTodoSurface, ctx: inout draw.DrawContext) -> Int
+    uses mem:
+        let increment_button: surface.Rect = surface.Rect(x: 24, y: 176, w: 220, h: 48)
+        let first_item: surface.Rect = surface.Rect(x: 24, y: 84, w: 140, h: 36)
+        let second_item: surface.Rect = surface.Rect(x: 24, y: 128, w: 140, h: 36)
+        let bg: surface.Color = surface.Color(r: 18, g: 24, b: 29, a: 255)
+        let panel: surface.Color = surface.Color(r: 44, g: 59, b: 70, a: 255)
+        let selected: surface.Color = surface.Color(r: 55, g: 138, b: 104, a: 255)
+        let text: surface.Color = surface.Color(r: 232, g: 239, b: 243, a: 255)
+        let clear_status: Int = draw.clear(ctx, bg)
+        let title_status: Int = draw.text(ctx, "Dogfood Web UI", 24, 24, text)
+        let count_status: Int = draw.text(ctx, "countValue", 24, 52, text)
+        let first_status: Int = draw.rect(ctx, first_item, panel)
+        let first_text_status: Int = draw.text(ctx, "item-1", first_item.x + 10, first_item.y + 12, text)
+        let second_status: Int = draw.rect(ctx, second_item, selected)
+        let second_text_status: Int = draw.text(ctx, "selectedText", second_item.x + 10, second_item.y + 12, text)
+        let button_status: Int = draw.rect(ctx, increment_button, selected)
+        let button_text_status: Int = draw.text(ctx, "Increment dogfood counter", increment_button.x + 12, increment_button.y + 18, text)
+        return clear_status + title_status + count_status + first_status + first_text_status + second_status + second_text_status + button_status + button_text_status + self.count
+    func event(self: inout DogfoodTodoSurface, event: surface.Event) -> Int:
+        let increment_button: surface.Rect = surface.Rect(x: 24, y: 176, w: 220, h: 48)
+        let second_item: surface.Rect = surface.Rect(x: 24, y: 128, w: 140, h: 36)
+        if event.kind != surface.event_mouse_up():
+            return 0
+        if rect_contains(increment_button, event.x, event.y):
+            self.count = self.count + 1
+            return 1
+        if rect_contains(second_item, event.x, event.y):
+            self.selectedIndex = 2
+            return 1
+        return 0
+
+func rect_contains(rect: surface.Rect, x: Int, y: Int) -> Bool:
+    return x >= rect.x && y >= rect.y && x < rect.x + rect.w && y < rect.y + rect.h
+
+func main() -> Int
+uses alloc, mem, surface:
+    var app: DogfoodTodoSurface = DogfoodTodoSurface(count: 0, selectedIndex: 1)
+    let win: surface.Surface = surface.open("Surface Migration Dogfood Web UI", 360, 260)
+    let click: surface.Event = surface.Event(kind: surface.event_mouse_up(), x: 48, y: 198, button: 1, key: 0, width: 360, height: 260, timestamp_ms: 1, text_len: 0)
+    let click_status: Int = DogfoodTodoSurface.event(app, click)
+    let select_second: surface.Event = surface.Event(kind: surface.event_mouse_up(), x: 44, y: 144, button: 1, key: 0, width: 360, height: 260, timestamp_ms: 2, text_len: 0)
+    let select_status: Int = DogfoodTodoSurface.event(app, select_second)
+    var frame: surface.Frame = surface.begin_frame(win)
+    var ctx: draw.DrawContext = draw.DrawContext(frame: frame)
+    let draw_status: Int = DogfoodTodoSurface.draw(app, ctx)
+    let presented: Int = surface.present(ctx.frame)
+    let closed: Int = surface.close(win)
+    return click_status + select_status + draw_status + presented + closed

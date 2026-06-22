@@ -122,9 +122,9 @@ func actorMailboxRowForMessage(
 func actorMailboxCapacityForTarget(target string) int {
 	switch target {
 	case "linux-x64", "macos-x64", "windows-x64":
-		return 64 * 1024 / 88
+		return 64 * 1024 / 96
 	default:
-		return 64 * 1024 / 88
+		return 64 * 1024 / 96
 	}
 }
 

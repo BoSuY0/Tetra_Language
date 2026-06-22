@@ -1,0 +1,26 @@
+module examples.actors.system_messages.system_poll_timeout_cancel
+
+import lib.core.actors as actors
+
+func score(result: actors.SystemReceiveResult) -> Int:
+    match result:
+    case actors.SystemReceiveResult.empty:
+        return 0
+    case actors.SystemReceiveResult.timeout:
+        return 1
+    case actors.SystemReceiveResult.canceled:
+        return 2
+    case actors.SystemReceiveResult.runtime_closed:
+        return 3
+    case actors.SystemReceiveResult.invalid_state(code):
+        return 100 + code
+    case actors.SystemReceiveResult.message(message):
+        return 200
+
+func main() -> Int
+uses actors, runtime:
+    let empty_result: actors.SystemReceiveResult = actors.poll_system()
+    let timed_result: actors.SystemReceiveResult = actors.recv_system_until(0)
+    if score(empty_result) == 0 && score(timed_result) == 1:
+        return 0
+    return 10 + score(empty_result) + score(timed_result)

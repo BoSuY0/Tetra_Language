@@ -129,20 +129,39 @@ When the actor table is full, `core.spawn(...)` returns the raw invalid handle v
 local sends to that handle return checked failure `-3`. Once an actor reaches `done`, later local
 legacy, tagged, or typed sends to that actor return checked failure `-4` before allocating a message
 node. A message already queued in another actor's mailbox remains receivable after the sender is
-done, and `core.sender()` for that receive may name a done actor. Pending mailbox entries are not
-drained or delivered after the actor reaches `done`; this is a bounded local completion state, not
-mailbox-drain shutdown. Other blocked, sleeping, or waiting actors continue according to ordinary
-message, timer, and task-wait readiness rules when one actor exits. In particular, nonzero actor
-entry returns become the same user-visible `done` state as zero returns: later local sends return
-`-4`, and there is no separate actor failure channel.
+done, and `core.sender()` for that receive may name a done actor. Pending mailbox entries are
+drained into the runtime message-pool free list when the actor reaches `done`; they are not
+delivered after completion. This is a bounded local completion state, not a shutdown API. Other
+blocked, sleeping, or waiting actors continue according to ordinary message, timer, and task-wait
+readiness rules when one actor exits. In particular, nonzero actor entry returns become the same
+user-visible `done` state as zero returns: later local sends return `-4`, and there is no separate
+actor failure channel.
 In one line: message already queued in another actor's mailbox remains receivable after the sender is done.
-In one line: Pending mailbox entries are not drained or delivered after the actor reaches `done`; this is a bounded local completion state.
+In one line: Pending mailbox entries are drained into the runtime message-pool free list when the actor reaches `done`; they are not delivered after completion.
 
-There is currently no shutdown API, no actor close handle, and no actor status, actor join, actor
-exit-code, supervision, or restart API. In one line: no actor join, actor exit-code, supervision, or restart API.
-There is also no supervision, restart, linking, or OTP-style
-lifecycle guarantee.
-In one line: no supervision, restart, linking, or OTP-style lifecycle guarantee.
+The raw core lifecycle ABI exposes `core.actor_status`,
+`core.actor_status_raw`, `core.actor_wait`, `core.actor_wait_until`,
+`core.actor_stop`, `core.actor_exit_reason`, `core.actor_link`,
+`core.actor_unlink`, `core.actor_monitor`, `core.actor_demonitor`, and
+`core.actor_set_trap_exit`. `core.actor_status_raw` returns the runtime-owned
+`actor.status_result_raw` bridge with `status_code` and `result` slots so
+`lib.core.actors.status` can distinguish `ok`, `invalid`, and `stale` without
+treating invalid actor refs as enum values. User code should prefer the stable
+`lib.core.actors` wrappers: `ActorStatus`, `StatusResult`, `WaitResult`,
+`StopResult`, `LinkResult`, `MonitorResult`, `status`, `wait`, `wait_until`,
+`stop`, `link`, `unlink`, `monitor`, `demonitor`, and `set_trap_exit`.
+Current Linux-x64 evidence covers local lifecycle status observations,
+wait/wait-until done and timeout results, invalid/stale wait refs mapping to
+public `dead` status plus `WaitResult.invalid` / `WaitResult.stale` taxonomy,
+`StatusResult.invalid` and `StatusResult.stale` for local actor status queries,
+invalid/stale preflight taxonomy for `StopResult`,
+`LinkResult`, and `MonitorResult`, local stop requests, bounded link/unlink propagation, monitor/demonitor
+cleanup, and trap-exit toggling. This is not a supervision,
+restart, remote lifecycle, or OTP-style lifecycle guarantee; several public
+result cases are reserved for later P06/P10 production semantics.
+In one line: local lifecycle wrappers now exist for the current P01 runtime
+surface, but supervision, restart, remote lifecycle completion, and OTP-style
+guarantees remain out of scope for this evidence.
 
 ## Scheduling semantics
 
@@ -172,6 +191,23 @@ In one line: no supervision, restart, linking, or OTP-style lifecycle guarantee.
   cancellation status. Non-timed actor receives such as `core.recv()` and `core.recv_msg()` do not
   expose a cancellation result in the current profile; they remain message-oriented blocking APIs.
   This is not full actor supervision or a full structured-concurrency model for every blocking API.
+- Successful `core.task_join_i32(task)`, `core.task_join_result_i32(task)`,
+  `core.task_join_until_i32(task, deadline)`, and typed task joins consume the completed task result
+  and then mark the target actor slot `reclaimable`. This lets sequential task lifetimes exceed the
+  127 child actor concurrent cap after each result is joined. `core.task_poll_i32(task)` is
+  non-consuming: it treats `done`/`reclaimable` task actors as terminal readiness but does not reclaim
+  a completed task actor slot by itself. `core.task_group_close(group)` treats joined
+  `reclaimable` task actors as terminal for group-close completion, matching already-`done` group
+  actors.
+- Successful typed task joins copy or return the target actor's typed result payload and then clear
+  that target actor's task result count and result slots before marking the target actor slot
+  `reclaimable`. Staged typed joins may still stage the copied payload in the current actor until the
+  caller reads it through the generated result getters; each generated getter clears the current
+  actor's staged slot after reading it.
+- Task join, timed join, poll, and typed task join observers treat both `done` and waited
+  `reclaimable` target actor slots as terminal result states. This is observer readiness for already
+  completed task actors, not a production mailbox payload-destructor ABI or a claim that non-consuming
+  poll drops payloads or reclaims task slots.
 
 ## Message Model
 
@@ -247,13 +283,24 @@ local runtime, not distributed scheduling or resource isolation guarantees.
 
 - Built-in x64 runtime actor table: `maxActors = 128`, including the main actor. This leaves
   capacity for 127 child actors. When the table is full, `__tetra_actor_spawn` returns the raw
-  handle value `-1` and does not create a runnable actor. The public `actor` type is still opaque. A
+  handle value `-1` and does not create a runnable actor. A completed actor remains `done` until
+  `__tetra_actor_wait` or `__tetra_actor_wait_until` observes its result; only then does the runtime
+  mark that slot reclaimable for future spawn reuse. Waited reclaimable actor slots reset stored
+  initial stack frames instead of mapping a fresh stack for that slot; raw unobserved `done` slots
+  are not reused. The current built-in runtime has smoke evidence for more than 10,000 lifetime spawns
+  under the concurrent actor cap, and successful consuming task joins have matching smoke evidence for
+  more than 10,000 sequential task lifetimes under the same concurrent cap. Group close treats joined
+  reclaimable task actors as terminal for completion. The public `actor` type is still opaque. A
   local legacy, tagged, or typed send to an invalid actor handle returns checked failure `-3` before
   allocating a message node.
 - Built-in x64 done actor send behavior: once a local actor has completed and its runtime status is
   `done`, later local legacy, tagged, or typed sends to that actor return checked failure `-4`
-  before allocating a message node. This is a bounded shutdown diagnostic, not supervision, restart,
-  linking, OTP lifecycle behavior, or mailbox-drain lifecycle management.
+  before allocating a message node. The completed actor drains any pending mailbox nodes into the
+  runtime message-pool free list before publishing `done`; those messages are not delivered. This is
+  a bounded shutdown diagnostic. The public `lib.core.actors` lifecycle wrapper surface is present
+  for status, wait, stop, link, unlink, monitor, demonitor, and trap-exit operations, with local
+  runtime evidence for the current P01 slice. It is not supervision, restart, remote lifecycle
+  completion, OTP lifecycle behavior, or a general production shutdown framework.
 - Built-in x64 per-actor mailbox depth: `maxActorMailboxMsgs = 256`. A local send to a full mailbox
   returns checked backpressure `-2` before allocating a message node. Receiving a message decrements
   the mailbox depth, so this backpressure is recoverable when the receiver drains messages. The same
@@ -263,12 +310,14 @@ local runtime, not distributed scheduling or resource isolation guarantees.
   unbounded mailbox, automatic retry, or distributed delivery guarantee.
   In short: a failed typed send does not enqueue a partial typed payload.
 - Built-in x64 runtime message pool: 64 KiB, with a bump allocator plus a free list for drained
-  message nodes. The current message node size is 88 bytes because typed mailbox payload slots are
-  stored as local 64-bit slots; this gives room for pointer-like local slice fields while keeping
-  typed payloads capped at 8 value slots by the checker. With the fixed 64 KiB pool, 744 single-slot
-  live messages fit in the pool before reclamation. When a later local send would exceed the pool
-  while those messages remain live, the built-in runtime returns checked failure `-1` and does not
-  enqueue an overflow message. Drained message nodes are reclaimed and can be reused.
+  message nodes. The current message node size is 96 bytes because typed mailbox payload slots are
+  stored as local 64-bit slots and the node carries a runtime-only system-message kind; this gives
+  room for pointer-like local slice fields while keeping typed payloads capped at 8 value slots by
+  the checker. With the fixed 64 KiB pool, 682 single-slot live messages fit in the pool before
+  reclamation. When a later local send would exceed the pool while those messages remain live, the
+  built-in runtime returns checked failure `-1` and does not enqueue an overflow message.
+  Drained message nodes are reclaimed after receive or actor completion, and scrub their runtime
+  system kind and payload slots before entering the free list.
 - Actor memory-domain accounting is evidence-only in `compiler/internal/parallelrt`:
   `tetra.actors.memory-domain.v1` records per-actor mailbox byte capacity, queued bytes, peak queued
   bytes, reclaimed bytes, message-pool/slab bytes, byte-aware backpressure status, and local

@@ -12,6 +12,31 @@ type Signature struct {
 	ReturnSlots int
 }
 
+// ActorHandleABIContract describes the compiler-owned actor reference ABI.
+type ActorHandleABIContract struct {
+	Version               int
+	RefSlots              int
+	Layout                string
+	RequiredParts         []string
+	LegacyOneSlotAccepted bool
+}
+
+func ActorHandleABI() ActorHandleABIContract {
+	return ActorHandleABIContract{
+		Version:  2,
+		RefSlots: 2,
+		Layout:   "actor-ref-v2",
+		RequiredParts: []string{
+			"kind",
+			"node_id",
+			"node_epoch",
+			"slot",
+			"generation",
+		},
+		LegacyOneSlotAccepted: false,
+	}
+}
+
 func RequiredActorSymbols() []string {
 	return []string{
 		"__tetra_entry",
@@ -32,6 +57,47 @@ func RequiredActorSymbols() []string {
 		"__tetra_actor_self",
 		"__tetra_actor_sender",
 		"__tetra_actor_yield_now",
+	}
+}
+
+func ActorLifecycleStatusNames() []string {
+	return []string{
+		"starting",
+		"ready",
+		"running",
+		"blocked",
+		"sleeping",
+		"waiting",
+		"stopping",
+		"exited_normal",
+		"exited_error",
+		"canceled",
+		"restarting",
+		"dead",
+	}
+}
+
+func RequiredActorLifecycleSymbols() []string {
+	return []string{
+		"__tetra_actor_status",
+		"__tetra_actor_status_raw",
+		"__tetra_actor_wait",
+		"__tetra_actor_wait_until",
+		"__tetra_actor_stop",
+		"__tetra_actor_exit_reason",
+		"__tetra_actor_link",
+		"__tetra_actor_unlink",
+		"__tetra_actor_monitor",
+		"__tetra_actor_demonitor",
+		"__tetra_actor_set_trap_exit",
+	}
+}
+
+func RequiredActorSystemReceiveSymbols() []string {
+	return []string{
+		"__tetra_actor_recv_system_begin",
+		"__tetra_actor_recv_system_slot",
+		"__tetra_actor_recv_system_count",
 	}
 }
 
@@ -163,17 +229,18 @@ func RequiredSurfaceSymbols() []string {
 }
 
 func SignatureForSymbol(name string) (Signature, bool) {
+	actorRefSlots := ActorHandleABI().RefSlots
 	switch name {
 	case "__tetra_entry":
 		return Signature{ParamSlots: 0, ReturnSlots: 1}, true
 	case "__tetra_actor_spawn":
-		return Signature{ParamSlots: 1, ReturnSlots: 1}, true
+		return Signature{ParamSlots: 1, ReturnSlots: actorRefSlots}, true
 	case "__tetra_actor_send":
-		return Signature{ParamSlots: 2, ReturnSlots: 1}, true
+		return Signature{ParamSlots: actorRefSlots + 1, ReturnSlots: 1}, true
 	case "__tetra_actor_send_msg":
-		return Signature{ParamSlots: 3, ReturnSlots: 1}, true
+		return Signature{ParamSlots: actorRefSlots + 2, ReturnSlots: 1}, true
 	case "__tetra_actor_send_begin":
-		return Signature{ParamSlots: 3, ReturnSlots: 1}, true
+		return Signature{ParamSlots: actorRefSlots + 2, ReturnSlots: 1}, true
 	case "__tetra_actor_send_slot":
 		return Signature{ParamSlots: 2, ReturnSlots: 1}, true
 	case "__tetra_actor_send_commit":
@@ -194,12 +261,40 @@ func SignatureForSymbol(name string) (Signature, bool) {
 		return Signature{ParamSlots: 1, ReturnSlots: 1}, true
 	case "__tetra_actor_recv_count":
 		return Signature{ParamSlots: 0, ReturnSlots: 1}, true
+	case "__tetra_actor_recv_system_begin":
+		return Signature{ParamSlots: 2, ReturnSlots: 1}, true
+	case "__tetra_actor_recv_system_slot":
+		return Signature{ParamSlots: 1, ReturnSlots: 1}, true
+	case "__tetra_actor_recv_system_count":
+		return Signature{ParamSlots: 0, ReturnSlots: 1}, true
 	case "__tetra_actor_self":
-		return Signature{ParamSlots: 0, ReturnSlots: 1}, true
+		return Signature{ParamSlots: 0, ReturnSlots: actorRefSlots}, true
 	case "__tetra_actor_sender":
-		return Signature{ParamSlots: 0, ReturnSlots: 1}, true
+		return Signature{ParamSlots: 0, ReturnSlots: actorRefSlots}, true
 	case "__tetra_actor_yield_now":
 		return Signature{ParamSlots: 0, ReturnSlots: 1}, true
+	case "__tetra_actor_status":
+		return Signature{ParamSlots: actorRefSlots, ReturnSlots: 1}, true
+	case "__tetra_actor_status_raw":
+		return Signature{ParamSlots: actorRefSlots, ReturnSlots: 2}, true
+	case "__tetra_actor_wait":
+		return Signature{ParamSlots: actorRefSlots, ReturnSlots: 2}, true
+	case "__tetra_actor_wait_until":
+		return Signature{ParamSlots: actorRefSlots + 1, ReturnSlots: 2}, true
+	case "__tetra_actor_stop":
+		return Signature{ParamSlots: actorRefSlots + 1, ReturnSlots: 1}, true
+	case "__tetra_actor_exit_reason":
+		return Signature{ParamSlots: actorRefSlots, ReturnSlots: 1}, true
+	case "__tetra_actor_link":
+		return Signature{ParamSlots: actorRefSlots, ReturnSlots: 1}, true
+	case "__tetra_actor_unlink":
+		return Signature{ParamSlots: actorRefSlots, ReturnSlots: 1}, true
+	case "__tetra_actor_monitor":
+		return Signature{ParamSlots: actorRefSlots, ReturnSlots: 1}, true
+	case "__tetra_actor_demonitor":
+		return Signature{ParamSlots: 1, ReturnSlots: 1}, true
+	case "__tetra_actor_set_trap_exit":
+		return Signature{ParamSlots: 1, ReturnSlots: 1}, true
 	case "__tetra_actor_memory_snapshot":
 		return Signature{ParamSlots: 1, ReturnSlots: 1}, true
 	case "__tetra_actor_state_load":
@@ -209,7 +304,7 @@ func SignatureForSymbol(name string) (Signature, bool) {
 	case "__tetra_actor_node_connect":
 		return Signature{ParamSlots: 2, ReturnSlots: 1}, true
 	case "__tetra_actor_spawn_remote":
-		return Signature{ParamSlots: 2, ReturnSlots: 1}, true
+		return Signature{ParamSlots: 2, ReturnSlots: actorRefSlots}, true
 	case "__tetra_actor_node_status":
 		return Signature{ParamSlots: 1, ReturnSlots: 1}, true
 	case "__tetra_task_spawn_i32":

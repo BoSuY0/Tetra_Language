@@ -20,6 +20,13 @@ Final handoff template: `docs/release/v1_0_final_handoff.md`.
 - [ ] Final v1 gate: `bash scripts/release/v1_0/gate.sh --report-dir <report-dir>`
       completes with `status: pass`, `failed_count: 0`, and artifact id
       `tetra.release.v1_0.gate-report.v1`.
+- [ ] Native actor platform final gate:
+      `bash scripts/release/v1_0/native-actor-platform-linux-x64-gate.sh --report-dir <report-dir>/native-actor-platform`
+      completes from a clean same-head checkout and returns
+      `TETRA_V1_NATIVE_ACTOR_PLATFORM_LINUX_X64_PROD_STABLE`. This row cannot be
+      satisfied by the actor foundation gate, the parallel scheduler model, the
+      loopback `actornet` smoke, old `linux-x64-real-window` probe evidence,
+      local Tier 0/Tier 1 benchmark rows, or hand-written Markdown status.
 - [ ] Scope closure: every mandatory row in `docs/spec/v1_scope.md` has same
       branch evidence for implementation, tests, docs, and artifacts.
 - [ ] Safety evidence closure: ownership, lifetime, resource, actor/task,
@@ -48,6 +55,7 @@ Each command must be run against the final `v1.0.0` candidate unless the final
 v1 gate summary cites the same command as a passing gate step.
 
 - [ ] `bash scripts/release/v1_0/gate.sh --report-dir <report-dir>`
+- [ ] `bash scripts/release/v1_0/native-actor-platform-linux-x64-gate.sh --report-dir <report-dir>/native-actor-platform`
 - [ ] `bash scripts/dev/bootstrap.sh`
 - [ ] `./tetra version`
 - [ ] `./t version`
@@ -197,6 +205,22 @@ The final handoff must cite concrete paths under one fresh `<report-dir>`.
 - [ ] `<report-dir>/artifacts/tetra-docs.md`
 - [ ] `<report-dir>/artifacts/test-all/summary.json`
 - [ ] `<report-dir>/artifacts/test-all/summary.md`
+- [ ] `<report-dir>/native-actor-platform/actor-runtime-v2.json`
+- [ ] `<report-dir>/native-actor-platform/actor-scheduler-linux-x64.json`
+- [ ] `<report-dir>/native-actor-platform/actor-mailbox-memory.json`
+- [ ] `<report-dir>/native-actor-platform/actor-structured-concurrency.json`
+- [ ] `<report-dir>/native-actor-platform/actor-supervision.json`
+- [ ] `<report-dir>/native-actor-platform/actor-cluster-membership.json`
+- [ ] `<report-dir>/native-actor-platform/actor-distributed-runtime-v2.json`
+- [ ] `<report-dir>/native-actor-platform/actor-transport-security.json`
+- [ ] `<report-dir>/native-actor-platform/actor-broker-deployment.json`
+- [ ] `<report-dir>/native-actor-platform/surface-native-host.json`
+- [ ] `<report-dir>/native-actor-platform/surface-text-filesystem-app.json`
+- [ ] `<report-dir>/native-actor-platform/flagship-native-app.json`
+- [ ] `<report-dir>/native-actor-platform/benchmark-rust-c-parity.json`
+- [ ] `<report-dir>/native-actor-platform/runtime-stress-invariants.json`
+- [ ] `<report-dir>/native-actor-platform/artifact-hashes.json`
+- [ ] `<report-dir>/native-actor-platform/final-readiness.json`
 
 ## Scope Evidence Matrix
 

@@ -1,0 +1,1723 @@
+{
+  "schema_version": 1,
+  "kind": "proof",
+  "target": "linux-x64",
+  "bounds": {
+    "schema_version": 1,
+    "kind": "bounds",
+    "target": "linux-x64",
+    "totals": {
+      "removed": 2,
+      "left": 1
+    },
+    "functions": [
+      {
+        "function": "lib.core.serialization.checksum_u8",
+        "removed": 1,
+        "left": 0,
+        "sites": [
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:35:5",
+            "kind": "u8.load",
+            "removed": true,
+            "proof_id": "proof:for-collection:value:35:5",
+            "reason": "removed_by_for_loop_range"
+          }
+        ]
+      },
+      {
+        "function": "examples.core.data.core_serialization_smoke.main",
+        "removed": 1,
+        "left": 1,
+        "sites": [
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_serialization_smoke.tetra:12:5",
+            "kind": "u8.store",
+            "removed": true,
+            "proof_id": "proof:allocation-zero:literal0:payload:12:5",
+            "reason": "removed_by_allocation_literal_zero_length"
+          },
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_serialization_smoke.tetra:13:5",
+            "kind": "u8.store",
+            "removed": false,
+            "reason": "left_missing_dominance"
+          }
+        ]
+      }
+    ]
+  },
+  "proofs": [
+    {
+      "proof_id": "proof:for-collection:value:35:5",
+      "kind": "range",
+      "guard": "__for_index_35_5 < values.len",
+      "dominates": "bounds_check op1",
+      "fact": "__for_index_35_5 in [0, values.len); derivation: non_negative, less_than_len",
+      "reason": "for loop range proof",
+      "removed_bounds_check": true
+    },
+    {
+      "proof_id": "proof:allocation-zero:literal0:payload:12:5:index_store",
+      "kind": "range",
+      "guard": "0 < payload.len && payload.len == 2",
+      "dominates": "bounds_check op4",
+      "fact": "0 in [0, payload.len); derivation: non_negative, less_than_len, allocation_literal_zero, allocation_length_positive",
+      "reason": "allocation literal-zero length proof",
+      "removed_bounds_check": true
+    }
+  ],
+  "plir": {
+    "funcs": [
+      {
+        "name": "lib.core.serialization.clamp_u8",
+        "module": "lib.core.serialization",
+        "summary": {
+          "public": true,
+          "param_names": [
+            "value"
+          ],
+          "param_types": [
+            "i32"
+          ],
+          "param_ownership": [
+            ""
+          ],
+          "return_type": "i32"
+        },
+        "values": [
+          {
+            "id": "param:value",
+            "kind": "param",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:10:6",
+            "region": "fn:lib.core.serialization.clamp_u8",
+            "provenance": {
+              "kind": "param",
+              "root": "param:value"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "value"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "guard",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:11:5",
+            "inputs": [
+              "value < 0"
+            ],
+            "note": "value < 0"
+          },
+          {
+            "id": "op1",
+            "kind": "return",
+            "block": "if_then:0",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:12:9",
+            "inputs": [
+              "0"
+            ]
+          },
+          {
+            "id": "op2",
+            "kind": "guard",
+            "block": "if_join:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:13:7",
+            "inputs": [
+              "value > 255"
+            ],
+            "note": "value > 255"
+          },
+          {
+            "id": "op3",
+            "kind": "return",
+            "block": "if_then:2",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:14:9",
+            "inputs": [
+              "255"
+            ]
+          },
+          {
+            "id": "op4",
+            "kind": "return",
+            "block": "if_join:3",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:15:7",
+            "inputs": [
+              "value"
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "pure_call",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:10:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f1",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:10:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f2",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:10:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f3",
+            "kind": "no_mem_write",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:10:6",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f4",
+            "kind": "no_unknown_escape",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:10:6",
+            "reason": "semantics checker enforced declared effects"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "succs": [
+              "if_join:1",
+              "if_then:0"
+            ],
+            "ops": [
+              "op0"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:10:6"
+          },
+          {
+            "id": "if_then:0",
+            "kind": "if_then",
+            "preds": [
+              "entry"
+            ],
+            "succs": [
+              "if_join:1"
+            ],
+            "ops": [
+              "op1"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:11:5"
+          },
+          {
+            "id": "if_join:1",
+            "kind": "if_join",
+            "preds": [
+              "entry",
+              "if_then:0"
+            ],
+            "succs": [
+              "if_join:3",
+              "if_then:2"
+            ],
+            "ops": [
+              "op2"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:11:5"
+          },
+          {
+            "id": "if_then:2",
+            "kind": "if_then",
+            "preds": [
+              "if_join:1"
+            ],
+            "succs": [
+              "if_join:3"
+            ],
+            "ops": [
+              "op3"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:13:7"
+          },
+          {
+            "id": "if_join:3",
+            "kind": "if_join",
+            "exit": true,
+            "preds": [
+              "if_join:1",
+              "if_then:2"
+            ],
+            "ops": [
+              "op4"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:13:7"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          },
+          {
+            "block": "if_then:0",
+            "dominators": [
+              "entry",
+              "if_then:0"
+            ]
+          },
+          {
+            "block": "if_join:1",
+            "dominators": [
+              "entry",
+              "if_join:1"
+            ]
+          },
+          {
+            "block": "if_then:2",
+            "dominators": [
+              "entry",
+              "if_join:1",
+              "if_then:2"
+            ]
+          },
+          {
+            "block": "if_join:3",
+            "dominators": [
+              "entry",
+              "if_join:1",
+              "if_join:3"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "lib.core.serialization.pack_u8_pair",
+        "module": "lib.core.serialization",
+        "summary": {
+          "public": true,
+          "param_names": [
+            "high",
+            "low"
+          ],
+          "param_types": [
+            "i32",
+            "i32"
+          ],
+          "param_ownership": [
+            "",
+            ""
+          ],
+          "return_type": "i32"
+        },
+        "values": [
+          {
+            "id": "local:hi",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:17:8",
+            "region": "fn:lib.core.serialization.pack_u8_pair",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:hi"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "hi"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:lo",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:17:8",
+            "region": "fn:lib.core.serialization.pack_u8_pair",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:lo"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "lo"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "param:high",
+            "kind": "param",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:17:8",
+            "region": "fn:lib.core.serialization.pack_u8_pair",
+            "provenance": {
+              "kind": "param",
+              "root": "param:high"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "high"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          },
+          {
+            "id": "param:low",
+            "kind": "param",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:17:8",
+            "region": "fn:lib.core.serialization.pack_u8_pair",
+            "provenance": {
+              "kind": "param",
+              "root": "param:low"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "low"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:18:19",
+            "inputs": [
+              "high"
+            ],
+            "note": "lib.core.serialization.clamp_u8"
+          },
+          {
+            "id": "op1",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:19:19",
+            "inputs": [
+              "low"
+            ],
+            "note": "lib.core.serialization.clamp_u8"
+          },
+          {
+            "id": "op2",
+            "kind": "return",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:20:5",
+            "inputs": [
+              "hi * 256 + lo"
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "pure_call",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:17:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f1",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:17:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f2",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:17:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f3",
+            "kind": "no_mem_write",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:17:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f4",
+            "kind": "no_unknown_escape",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:17:8",
+            "reason": "semantics checker enforced declared effects"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "exit": true,
+            "ops": [
+              "op0",
+              "op1",
+              "op2"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:17:8"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "lib.core.serialization.unpack_u8_high",
+        "module": "lib.core.serialization",
+        "summary": {
+          "public": true,
+          "param_names": [
+            "packed"
+          ],
+          "param_types": [
+            "i32"
+          ],
+          "param_ownership": [
+            ""
+          ],
+          "return_type": "i32"
+        },
+        "values": [
+          {
+            "id": "param:packed",
+            "kind": "param",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:22:8",
+            "region": "fn:lib.core.serialization.unpack_u8_high",
+            "provenance": {
+              "kind": "param",
+              "root": "param:packed"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "packed"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "guard",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:23:5",
+            "inputs": [
+              "packed < 0"
+            ],
+            "note": "packed < 0"
+          },
+          {
+            "id": "op1",
+            "kind": "return",
+            "block": "if_then:0",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:24:9",
+            "inputs": [
+              "0"
+            ]
+          },
+          {
+            "id": "op2",
+            "kind": "call",
+            "block": "if_join:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:25:14",
+            "inputs": [
+              "packed / 256"
+            ],
+            "note": "lib.core.serialization.clamp_u8"
+          },
+          {
+            "id": "op3",
+            "kind": "return",
+            "block": "if_join:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:25:7",
+            "inputs": [
+              ""
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "pure_call",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:22:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f1",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:22:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f2",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:22:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f3",
+            "kind": "no_mem_write",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:22:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f4",
+            "kind": "no_unknown_escape",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:22:8",
+            "reason": "semantics checker enforced declared effects"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "succs": [
+              "if_join:1",
+              "if_then:0"
+            ],
+            "ops": [
+              "op0"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:22:8"
+          },
+          {
+            "id": "if_then:0",
+            "kind": "if_then",
+            "preds": [
+              "entry"
+            ],
+            "succs": [
+              "if_join:1"
+            ],
+            "ops": [
+              "op1"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:23:5"
+          },
+          {
+            "id": "if_join:1",
+            "kind": "if_join",
+            "exit": true,
+            "preds": [
+              "entry",
+              "if_then:0"
+            ],
+            "ops": [
+              "op2",
+              "op3"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:23:5"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          },
+          {
+            "block": "if_then:0",
+            "dominators": [
+              "entry",
+              "if_then:0"
+            ]
+          },
+          {
+            "block": "if_join:1",
+            "dominators": [
+              "entry",
+              "if_join:1"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "lib.core.serialization.unpack_u8_low",
+        "module": "lib.core.serialization",
+        "summary": {
+          "public": true,
+          "param_names": [
+            "packed"
+          ],
+          "param_types": [
+            "i32"
+          ],
+          "param_ownership": [
+            ""
+          ],
+          "return_type": "i32"
+        },
+        "values": [
+          {
+            "id": "param:packed",
+            "kind": "param",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:27:8",
+            "region": "fn:lib.core.serialization.unpack_u8_low",
+            "provenance": {
+              "kind": "param",
+              "root": "param:packed"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "packed"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "guard",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:28:5",
+            "inputs": [
+              "packed < 0"
+            ],
+            "note": "packed < 0"
+          },
+          {
+            "id": "op1",
+            "kind": "return",
+            "block": "if_then:0",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:29:9",
+            "inputs": [
+              "0"
+            ]
+          },
+          {
+            "id": "op2",
+            "kind": "call",
+            "block": "if_join:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:30:14",
+            "inputs": [
+              "packed % 256"
+            ],
+            "note": "lib.core.serialization.clamp_u8"
+          },
+          {
+            "id": "op3",
+            "kind": "return",
+            "block": "if_join:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:30:7",
+            "inputs": [
+              ""
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "pure_call",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:27:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f1",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:27:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f2",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:27:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f3",
+            "kind": "no_mem_write",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:27:8",
+            "reason": "semantics checker enforced declared effects"
+          },
+          {
+            "id": "f4",
+            "kind": "no_unknown_escape",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:27:8",
+            "reason": "semantics checker enforced declared effects"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "succs": [
+              "if_join:1",
+              "if_then:0"
+            ],
+            "ops": [
+              "op0"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:27:8"
+          },
+          {
+            "id": "if_then:0",
+            "kind": "if_then",
+            "preds": [
+              "entry"
+            ],
+            "succs": [
+              "if_join:1"
+            ],
+            "ops": [
+              "op1"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:28:5"
+          },
+          {
+            "id": "if_join:1",
+            "kind": "if_join",
+            "exit": true,
+            "preds": [
+              "entry",
+              "if_then:0"
+            ],
+            "ops": [
+              "op2",
+              "op3"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:28:5"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          },
+          {
+            "block": "if_then:0",
+            "dominators": [
+              "entry",
+              "if_then:0"
+            ]
+          },
+          {
+            "block": "if_join:1",
+            "dominators": [
+              "entry",
+              "if_join:1"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "lib.core.serialization.checksum_u8",
+        "module": "lib.core.serialization",
+        "summary": {
+          "public": true,
+          "param_names": [
+            "values"
+          ],
+          "param_types": [
+            "[]u8"
+          ],
+          "param_ownership": [
+            ""
+          ],
+          "return_type": "i32",
+          "effects": [
+            "mem"
+          ]
+        },
+        "values": [
+          {
+            "id": "local:__for_end_35_5",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:32:8",
+            "region": "fn:lib.core.serialization.checksum_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:__for_end_35_5"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "__for_end_35_5"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:__for_index_35_5",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:32:8",
+            "region": "fn:lib.core.serialization.checksum_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:__for_index_35_5"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "__for_index_35_5"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:__for_iter_35_5",
+            "kind": "local",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:32:8",
+            "region": "fn:lib.core.serialization.checksum_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:__for_iter_35_5"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "__for_iter_35_5"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:total",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:32:8",
+            "region": "fn:lib.core.serialization.checksum_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:total"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "total"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "local:value",
+            "kind": "local",
+            "type": "u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:32:8",
+            "region": "fn:lib.core.serialization.checksum_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:value"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "value"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "loop_index:__for_index_35_5",
+            "kind": "loop_index",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:35:5",
+            "region": "fn:lib.core.serialization.checksum_u8",
+            "provenance": {
+              "kind": "stack",
+              "root": "__for_index_35_5"
+            },
+            "lifetime": {
+              "birth": "loop:start",
+              "death": "loop:end",
+              "owner": "__for_index_35_5"
+            },
+            "escape": "no_escape"
+          },
+          {
+            "id": "param:values",
+            "kind": "param",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:32:8",
+            "region": "fn:lib.core.serialization.checksum_u8",
+            "provenance": {
+              "kind": "param",
+              "root": "param:values"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "values"
+            },
+            "borrow": "immutable",
+            "escape": "unknown"
+          },
+          {
+            "id": "view:__for_iter_35_5",
+            "kind": "view",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:35:18",
+            "region": "fn:lib.core.serialization.checksum_u8",
+            "provenance": {
+              "kind": "param",
+              "root": "param:values"
+            },
+            "lifetime": {
+              "birth": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:35:18",
+              "death": "loop:end",
+              "owner": "values"
+            },
+            "borrow": "immutable",
+            "escape": "no_escape"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "assign",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:34:5",
+            "inputs": [
+              "0"
+            ],
+            "outputs": [
+              "total"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op1",
+            "kind": "for_slice",
+            "block": "for_header:0",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:35:5",
+            "inputs": [
+              "view:__for_iter_35_5",
+              "loop_index:__for_index_35_5"
+            ],
+            "outputs": [
+              "local:value"
+            ],
+            "note": "range: 0..values.len"
+          },
+          {
+            "id": "op2",
+            "kind": "assign",
+            "block": "for_body:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:36:9",
+            "inputs": [
+              "total + value"
+            ],
+            "outputs": [
+              "total"
+            ],
+            "note": "local assignment"
+          },
+          {
+            "id": "op3",
+            "kind": "return",
+            "block": "for_after:2",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:37:7",
+            "inputs": [
+              "total"
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:32:8",
+            "reason": "semantics checker enforced declared effects",
+            "uses": [
+              "mem"
+            ]
+          },
+          {
+            "id": "f1",
+            "kind": "no_heap_allocation",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:32:8",
+            "reason": "semantics checker enforced declared effects",
+            "uses": [
+              "mem"
+            ]
+          },
+          {
+            "id": "f2",
+            "kind": "provenance_known",
+            "value_id": "local:__for_iter_35_5",
+            "reason": "checked parameter/local memory value"
+          },
+          {
+            "id": "f3",
+            "kind": "region_alive",
+            "value_id": "local:__for_iter_35_5",
+            "region": "fn:lib.core.serialization.checksum_u8",
+            "reason": "function region is alive"
+          },
+          {
+            "id": "f4",
+            "kind": "provenance_known",
+            "value_id": "param:values",
+            "reason": "checked parameter/local memory value"
+          },
+          {
+            "id": "f5",
+            "kind": "region_alive",
+            "value_id": "param:values",
+            "region": "fn:lib.core.serialization.checksum_u8",
+            "reason": "function region is alive"
+          },
+          {
+            "id": "f6",
+            "kind": "len_stable",
+            "value_id": "param:values",
+            "reason": "safe code cannot mutate slice/string metadata"
+          },
+          {
+            "id": "f7",
+            "kind": "borrowed_imm",
+            "value_id": "param:values"
+          },
+          {
+            "id": "f8",
+            "kind": "provenance_known",
+            "value_id": "view:__for_iter_35_5",
+            "reason": "for collection iterable view preserves source provenance"
+          },
+          {
+            "id": "f9",
+            "kind": "region_alive",
+            "value_id": "view:__for_iter_35_5",
+            "region": "fn:lib.core.serialization.checksum_u8"
+          },
+          {
+            "id": "f10",
+            "kind": "borrowed_imm",
+            "value_id": "view:__for_iter_35_5"
+          },
+          {
+            "id": "f11",
+            "kind": "no_escape",
+            "value_id": "view:__for_iter_35_5",
+            "reason": "for collection iterable view may not escape its owner"
+          },
+          {
+            "id": "f12",
+            "kind": "index_in_range",
+            "value_id": "loop_index:__for_index_35_5",
+            "range": "0..values.len",
+            "proof_id": "proof:for-collection:value:35:5",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:35:5",
+            "reason": "for collection loop index is dominated by index < iterable.len guard",
+            "uses": [
+              "view:__for_iter_35_5"
+            ]
+          },
+          {
+            "id": "f13",
+            "kind": "len_stable",
+            "value_id": "view:__for_iter_35_5",
+            "reason": "for collection iterable is copied into hidden slice header"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "succs": [
+              "for_header:0"
+            ],
+            "ops": [
+              "op0"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:32:8"
+          },
+          {
+            "id": "for_header:0",
+            "kind": "for_header",
+            "preds": [
+              "entry",
+              "for_body:1"
+            ],
+            "succs": [
+              "for_after:2",
+              "for_body:1"
+            ],
+            "ops": [
+              "op1"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:35:5"
+          },
+          {
+            "id": "for_body:1",
+            "kind": "for_body",
+            "preds": [
+              "for_header:0"
+            ],
+            "succs": [
+              "for_header:0"
+            ],
+            "ops": [
+              "op2"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:35:5"
+          },
+          {
+            "id": "for_after:2",
+            "kind": "for_after",
+            "exit": true,
+            "preds": [
+              "for_header:0"
+            ],
+            "ops": [
+              "op3"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:35:5"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          },
+          {
+            "block": "for_header:0",
+            "dominators": [
+              "entry",
+              "for_header:0"
+            ]
+          },
+          {
+            "block": "for_body:1",
+            "dominators": [
+              "entry",
+              "for_body:1",
+              "for_header:0"
+            ]
+          },
+          {
+            "block": "for_after:2",
+            "dominators": [
+              "entry",
+              "for_after:2",
+              "for_header:0"
+            ]
+          }
+        ],
+        "proof_guards": [
+          {
+            "id": "proof:for-collection:value:35:5",
+            "kind": "range",
+            "block": "for_body:1",
+            "op_id": "op1",
+            "condition": "__for_index_35_5 < values.len",
+            "reason": "for loop range proof",
+            "dominates": [
+              {
+                "proof_id": "proof:for-collection:value:35:5",
+                "block": "for_body:1",
+                "op_id": "op1",
+                "use_kind": "bounds_check",
+                "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:35:5"
+              }
+            ]
+          }
+        ],
+        "proof_uses": [
+          {
+            "proof_id": "proof:for-collection:value:35:5",
+            "block": "for_body:1",
+            "op_id": "op1",
+            "use_kind": "bounds_check",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:35:5"
+          }
+        ],
+        "proof_terms": [
+          {
+            "id": "proof:for-collection:value:35:5",
+            "kind": "bounds_check",
+            "subject_base_id": "values",
+            "index_value_id": "loop_index:__for_index_35_5",
+            "operation": "index_load",
+            "range": "0..values.len",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:35:5",
+            "facts_used": [
+              "non_negative",
+              "less_than_len"
+            ]
+          }
+        ],
+        "range_facts": [
+          {
+            "value": "loop_index:__for_index_35_5",
+            "lower": {
+              "kind": "const"
+            },
+            "upper": {
+              "kind": "symbol",
+              "symbol": "values.len"
+            },
+            "inclusive_lower": true,
+            "inclusive_upper": false,
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/lib/core/data/serialization.tetra:35:5",
+            "proof_id": "proof:for-collection:value:35:5",
+            "reason": "for loop range proof",
+            "derivation": [
+              "non_negative",
+              "less_than_len"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "examples.core.data.core_serialization_smoke.main",
+        "module": "examples.core.data.core_serialization_smoke",
+        "summary": {
+          "public": true,
+          "return_type": "i32",
+          "effects": [
+            "alloc",
+            "mem"
+          ]
+        },
+        "values": [
+          {
+            "id": "alloc_intent:payload",
+            "kind": "alloc_intent",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_serialization_smoke.tetra:11:25",
+            "region": "allocation:payload",
+            "alloc": {
+              "element_type": "u8",
+              "element_size": 1,
+              "length_expr": "2",
+              "length_const_known": true,
+              "length_const": 2,
+              "zero_guard_status": "valid_empty_no_allocator",
+              "negative_guard_status": "reject_before_allocation",
+              "overflow_guard_status": "reject_before_allocation",
+              "builtin": "core.make_u8",
+              "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_serialization_smoke.tetra:11:25"
+            },
+            "provenance": {
+              "kind": "allocation",
+              "root": "payload"
+            },
+            "lifetime": {
+              "birth": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_serialization_smoke.tetra:11:25",
+              "owner": "payload"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "local:0",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_serialization_smoke.tetra:12:5",
+            "region": "fn:examples.core.data.core_serialization_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "0"
+            },
+            "lifetime": {
+              "birth": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_serialization_smoke.tetra:12:5",
+              "owner": "0"
+            },
+            "escape": "no_escape"
+          },
+          {
+            "id": "local:checksum",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_serialization_smoke.tetra:6:6",
+            "region": "fn:examples.core.data.core_serialization_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:checksum"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "checksum"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:hi",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_serialization_smoke.tetra:6:6",
+            "region": "fn:examples.core.data.core_serialization_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:hi"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "hi"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:lo",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_serialization_smoke.tetra:6:6",
+            "region": "fn:examples.core.data.core_serialization_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:lo"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "lo"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:packed",
+            "kind": "local",
+            "type": "i32",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_serialization_smoke.tetra:6:6",
+            "region": "fn:examples.core.data.core_serialization_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:packed"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "packed"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:payload",
+            "kind": "local",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_serialization_smoke.tetra:6:6",
+            "region": "fn:examples.core.data.core_serialization_smoke.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:payload"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "payload"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_serialization_smoke.tetra:8:23",
+            "inputs": [
+              "1",
+              "41"
+            ],
+            "note": "lib.core.serialization.pack_u8_pair"
+          },
+          {
+            "id": "op1",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_serialization_smoke.tetra:9:19",
+            "inputs": [
+              "packed"
+            ],
+            "note": "lib.core.serialization.unpack_u8_high"
+          },
+          {
+            "id": "op2",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_serialization_smoke.tetra:10:19",
+            "inputs": [
+              "packed"
+            ],
+            "note": "lib.core.serialization.unpack_u8_low"
+          },
+          {
+            "id": "op3",
+            "kind": "alloc_intent",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_serialization_smoke.tetra:11:25",
+            "outputs": [
+              "alloc_intent:payload"
+            ],
+            "note": "make<u8> length contract: zero valid, negative and overflow reject before allocation"
+          },
+          {
+            "id": "op4",
+            "kind": "index_store",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_serialization_smoke.tetra:12:5",
+            "inputs": [
+              "payload",
+              "0"
+            ]
+          },
+          {
+            "id": "op5",
+            "kind": "index_store",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_serialization_smoke.tetra:13:5",
+            "inputs": [
+              "payload",
+              "1"
+            ]
+          },
+          {
+            "id": "op6",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_serialization_smoke.tetra:14:25",
+            "inputs": [
+              "payload"
+            ],
+            "note": "lib.core.serialization.checksum_u8"
+          },
+          {
+            "id": "op7",
+            "kind": "guard",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_serialization_smoke.tetra:15:5",
+            "inputs": [
+              ""
+            ]
+          },
+          {
+            "id": "op8",
+            "kind": "return",
+            "block": "if_then:0",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_serialization_smoke.tetra:16:9",
+            "inputs": [
+              "42"
+            ]
+          },
+          {
+            "id": "op9",
+            "kind": "return",
+            "block": "if_join:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_serialization_smoke.tetra:17:7",
+            "inputs": [
+              "1"
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_serialization_smoke.tetra:6:6",
+            "reason": "semantics checker enforced declared effects",
+            "uses": [
+              "alloc",
+              "mem"
+            ]
+          },
+          {
+            "id": "f1",
+            "kind": "provenance_known",
+            "value_id": "local:payload",
+            "reason": "checked parameter/local memory value"
+          },
+          {
+            "id": "f2",
+            "kind": "region_alive",
+            "value_id": "local:payload",
+            "region": "fn:examples.core.data.core_serialization_smoke.main",
+            "reason": "function region is alive"
+          },
+          {
+            "id": "f3",
+            "kind": "provenance_known",
+            "value_id": "alloc_intent:payload",
+            "reason": "compiler-known allocation intent"
+          },
+          {
+            "id": "f4",
+            "kind": "len_stable",
+            "value_id": "alloc_intent:payload",
+            "reason": "slice metadata is opaque in safe code"
+          },
+          {
+            "id": "f5",
+            "kind": "region_alive",
+            "value_id": "alloc_intent:payload",
+            "region": "allocation:payload"
+          },
+          {
+            "id": "f6",
+            "kind": "index_in_range",
+            "value_id": "local:0",
+            "range": "0 in [0, payload.len)",
+            "proof_id": "proof:allocation-zero:literal0:payload:12:5:index_store",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_serialization_smoke.tetra:12:5",
+            "reason": "allocation literal-zero length proof"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "succs": [
+              "if_join:1",
+              "if_then:0"
+            ],
+            "ops": [
+              "op0",
+              "op1",
+              "op2",
+              "op3",
+              "op4",
+              "op5",
+              "op6",
+              "op7"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_serialization_smoke.tetra:6:6"
+          },
+          {
+            "id": "if_then:0",
+            "kind": "if_then",
+            "preds": [
+              "entry"
+            ],
+            "succs": [
+              "if_join:1"
+            ],
+            "ops": [
+              "op8"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_serialization_smoke.tetra:15:5"
+          },
+          {
+            "id": "if_join:1",
+            "kind": "if_join",
+            "exit": true,
+            "preds": [
+              "entry",
+              "if_then:0"
+            ],
+            "ops": [
+              "op9"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_serialization_smoke.tetra:15:5"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          },
+          {
+            "block": "if_then:0",
+            "dominators": [
+              "entry",
+              "if_then:0"
+            ]
+          },
+          {
+            "block": "if_join:1",
+            "dominators": [
+              "entry",
+              "if_join:1"
+            ]
+          }
+        ],
+        "proof_guards": [
+          {
+            "id": "proof:allocation-zero:literal0:payload:12:5:index_store",
+            "kind": "range",
+            "block": "entry",
+            "condition": "0 < payload.len && payload.len == 2",
+            "reason": "allocation literal-zero length proof",
+            "dominates": [
+              {
+                "proof_id": "proof:allocation-zero:literal0:payload:12:5:index_store",
+                "block": "entry",
+                "op_id": "op4",
+                "use_kind": "bounds_check",
+                "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_serialization_smoke.tetra:12:5"
+              }
+            ]
+          }
+        ],
+        "proof_uses": [
+          {
+            "proof_id": "proof:allocation-zero:literal0:payload:12:5:index_store",
+            "block": "entry",
+            "op_id": "op4",
+            "use_kind": "bounds_check",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_serialization_smoke.tetra:12:5"
+          }
+        ],
+        "proof_terms": [
+          {
+            "id": "proof:allocation-zero:literal0:payload:12:5:index_store",
+            "kind": "bounds_check",
+            "subject_base_id": "payload",
+            "index_value_id": "local:0",
+            "operation": "index_store",
+            "range": "0 in [0, payload.len)",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_serialization_smoke.tetra:12:5",
+            "facts_used": [
+              "non_negative",
+              "less_than_len",
+              "allocation_literal_zero",
+              "allocation_length_positive"
+            ]
+          }
+        ],
+        "range_facts": [
+          {
+            "value": "local:0",
+            "lower": {
+              "kind": "const"
+            },
+            "upper": {
+              "kind": "symbol",
+              "symbol": "payload.len"
+            },
+            "inclusive_lower": true,
+            "inclusive_upper": false,
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/scenarios/full_repo_linux_x64_smoke_profile_reports_on_jobs_cpu_cold/samples/sample-01/src/examples/core/data/core_serialization_smoke.tetra:12:5",
+            "proof_id": "proof:allocation-zero:literal0:payload:12:5:index_store",
+            "reason": "allocation literal-zero length proof",
+            "derivation": [
+              "non_negative",
+              "less_than_len",
+              "allocation_literal_zero",
+              "allocation_length_positive"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -13,6 +13,7 @@ examples/.tetra_cache/
 # Local agent/orchestration state
 .orchestrator/
 .workflow/
+.tmp/
 
 # Local release/security evidence
 /security-review.md
@@ -25,7 +26,13 @@ dumps/
 bin/
 dist/
 out/
-reports/
+reports/*
+!reports/stabilization/
+reports/stabilization/*
+!reports/stabilization/tetra-ram-p0-baseline-*/
+!reports/stabilization/tetra-ram-p0-baseline-*/**
+!reports/stabilization/tetra-ram-p7-compiler-rss-*/
+!reports/stabilization/tetra-ram-p7-compiler-rss-*/**
 /app
 /app.exe
 /app.wasm

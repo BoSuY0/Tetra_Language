@@ -1,0 +1,14 @@
+func main() -> i32
+uses alloc, capability, mem:
+    var out: i32 = 1
+    unsafe:
+        var mem: cap.mem = core.cap_mem()
+        var p: ptr = core.alloc_bytes(8)
+        var q: ptr = core.ptr_add(p, 4, mem)
+        var _: i32 = core.store_i32(q, 123, mem)
+        var v: i32 = core.load_i32(q, mem)
+        if v == 123:
+            out = 77
+        else:
+            out = 1
+    return out

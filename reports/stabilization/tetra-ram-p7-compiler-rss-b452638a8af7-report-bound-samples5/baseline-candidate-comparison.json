@@ -1,0 +1,379 @@
+{
+  "schema": "tetra.ram.p7-compiler-rss-baseline-comparison.v1",
+  "baseline_dir": "reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-samples5",
+  "candidate_dir": "reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-report-bound-samples5",
+  "baseline_git_head": "b452638a8af710988ca7c795101b7926d3dedf11",
+  "candidate_git_head": "b452638a8af710988ca7c795101b7926d3dedf11",
+  "command": [
+    "go",
+    "run",
+    "./tools/cmd/ram-p7-compiler-rss",
+    "--compare-baseline-dir",
+    "reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-samples5",
+    "--compare-candidate-dir",
+    "reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-report-bound-samples5",
+    "--compare-out",
+    "reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-report-bound-samples5/baseline-candidate-comparison.json"
+  ],
+  "same_host_same_config": true,
+  "min_samples": 5,
+  "overall_status": "pass",
+  "bound_basis": "baseline_median_plus_observed_baseline_candidate_dispersion",
+  "scenarios": [
+    {
+      "name": "compile_error_reports_off_jobs_1_cold",
+      "module_count": 3,
+      "jobs": 1,
+      "reports": false,
+      "warm_cache": false,
+      "expect_compile_error": true,
+      "baseline_sample_count": 5,
+      "candidate_sample_count": 5,
+      "baseline_rss_median_bytes": 25239552,
+      "candidate_rss_median_bytes": 23764992,
+      "baseline_rss_dispersion_bytes": 122880,
+      "candidate_rss_dispersion_bytes": 81920,
+      "bound_rss_bytes": 25444352,
+      "delta_bytes": -1474560,
+      "ratio": 0.9416,
+      "evaluation_status": "improved",
+      "bound_basis": "baseline_median_plus_observed_baseline_candidate_dispersion",
+      "baseline_rss_peak_phase": "final_cleanup",
+      "candidate_rss_peak_phase": "final_cleanup",
+      "phase_comparisons": [
+        {
+          "name": "final_cleanup",
+          "baseline_sample_count": 5,
+          "candidate_sample_count": 5,
+          "baseline_rss_median_bytes": 25239552,
+          "candidate_rss_median_bytes": 23764992,
+          "delta_bytes": -1474560,
+          "ratio": 0.9416
+        },
+        {
+          "name": "source_loading_parsing",
+          "baseline_sample_count": 5,
+          "candidate_sample_count": 5,
+          "baseline_rss_median_bytes": 25161728,
+          "candidate_rss_median_bytes": 22925312,
+          "delta_bytes": -2236416,
+          "ratio": 0.9111
+        }
+      ]
+    },
+    {
+      "name": "large_reports_on_jobs_cpu_warm",
+      "module_count": 12,
+      "jobs": 32,
+      "reports": true,
+      "warm_cache": true,
+      "baseline_sample_count": 5,
+      "candidate_sample_count": 5,
+      "baseline_rss_median_bytes": 25591808,
+      "candidate_rss_median_bytes": 24420352,
+      "baseline_rss_dispersion_bytes": 2748416,
+      "candidate_rss_dispersion_bytes": 454656,
+      "bound_rss_bytes": 28794880,
+      "delta_bytes": -1171456,
+      "ratio": 0.9542,
+      "evaluation_status": "improved",
+      "bound_basis": "baseline_median_plus_observed_baseline_candidate_dispersion",
+      "baseline_rss_peak_phase": "source_loading_parsing",
+      "candidate_rss_peak_phase": "object_retention_link",
+      "phase_comparisons": [
+        {
+          "name": "object_retention_link",
+          "baseline_sample_count": 5,
+          "candidate_sample_count": 5,
+          "baseline_rss_median_bytes": 25358336,
+          "candidate_rss_median_bytes": 24420352,
+          "delta_bytes": -937984,
+          "ratio": 0.963
+        },
+        {
+          "name": "module_codegen",
+          "baseline_sample_count": 5,
+          "candidate_sample_count": 5,
+          "baseline_rss_median_bytes": 25358336,
+          "candidate_rss_median_bytes": 24395776,
+          "delta_bytes": -962560,
+          "ratio": 0.962
+        },
+        {
+          "name": "ir_lowering",
+          "baseline_sample_count": 5,
+          "candidate_sample_count": 5,
+          "baseline_rss_median_bytes": 25358336,
+          "candidate_rss_median_bytes": 24387584,
+          "delta_bytes": -970752,
+          "ratio": 0.9617
+        },
+        {
+          "name": "allocation_planning",
+          "baseline_sample_count": 5,
+          "candidate_sample_count": 5,
+          "baseline_rss_median_bytes": 25358336,
+          "candidate_rss_median_bytes": 24371200,
+          "delta_bytes": -987136,
+          "ratio": 0.9611
+        },
+        {
+          "name": "plir_construction",
+          "baseline_sample_count": 5,
+          "candidate_sample_count": 5,
+          "baseline_rss_median_bytes": 25358336,
+          "candidate_rss_median_bytes": 24354816,
+          "delta_bytes": -1003520,
+          "ratio": 0.9604
+        },
+        {
+          "name": "semantic_analysis",
+          "baseline_sample_count": 5,
+          "candidate_sample_count": 5,
+          "baseline_rss_median_bytes": 25354240,
+          "candidate_rss_median_bytes": 23953408,
+          "delta_bytes": -1400832,
+          "ratio": 0.9447
+        },
+        {
+          "name": "final_cleanup",
+          "baseline_sample_count": 5,
+          "candidate_sample_count": 5,
+          "baseline_rss_median_bytes": 25149440,
+          "candidate_rss_median_bytes": 23449600,
+          "delta_bytes": -1699840,
+          "ratio": 0.9324
+        },
+        {
+          "name": "report_generation",
+          "baseline_sample_count": 5,
+          "candidate_sample_count": 5,
+          "baseline_rss_median_bytes": 25149440,
+          "candidate_rss_median_bytes": 23433216,
+          "delta_bytes": -1716224,
+          "ratio": 0.9318
+        },
+        {
+          "name": "source_loading_parsing",
+          "baseline_sample_count": 5,
+          "candidate_sample_count": 5,
+          "baseline_rss_median_bytes": 25591808,
+          "candidate_rss_median_bytes": 22986752,
+          "delta_bytes": -2605056,
+          "ratio": 0.8982
+        }
+      ]
+    },
+    {
+      "name": "medium_reports_on_jobs_2_cold",
+      "module_count": 6,
+      "jobs": 2,
+      "reports": true,
+      "warm_cache": false,
+      "baseline_sample_count": 5,
+      "candidate_sample_count": 5,
+      "baseline_rss_median_bytes": 25378816,
+      "candidate_rss_median_bytes": 26353664,
+      "baseline_rss_dispersion_bytes": 831488,
+      "candidate_rss_dispersion_bytes": 634880,
+      "bound_rss_bytes": 26845184,
+      "delta_bytes": 974848,
+      "ratio": 1.0384,
+      "evaluation_status": "flat",
+      "bound_basis": "baseline_median_plus_observed_baseline_candidate_dispersion",
+      "baseline_rss_peak_phase": "report_generation",
+      "candidate_rss_peak_phase": "object_retention_link",
+      "phase_comparisons": [
+        {
+          "name": "object_retention_link",
+          "baseline_sample_count": 5,
+          "candidate_sample_count": 5,
+          "baseline_rss_median_bytes": 25190400,
+          "candidate_rss_median_bytes": 26353664,
+          "delta_bytes": 1163264,
+          "ratio": 1.0462
+        },
+        {
+          "name": "module_codegen",
+          "baseline_sample_count": 5,
+          "candidate_sample_count": 5,
+          "baseline_rss_median_bytes": 25178112,
+          "candidate_rss_median_bytes": 26333184,
+          "delta_bytes": 1155072,
+          "ratio": 1.0459
+        },
+        {
+          "name": "ir_lowering",
+          "baseline_sample_count": 5,
+          "candidate_sample_count": 5,
+          "baseline_rss_median_bytes": 25169920,
+          "candidate_rss_median_bytes": 24895488,
+          "delta_bytes": -274432,
+          "ratio": 0.9891
+        },
+        {
+          "name": "allocation_planning",
+          "baseline_sample_count": 5,
+          "candidate_sample_count": 5,
+          "baseline_rss_median_bytes": 25157632,
+          "candidate_rss_median_bytes": 24784896,
+          "delta_bytes": -372736,
+          "ratio": 0.9852
+        },
+        {
+          "name": "plir_construction",
+          "baseline_sample_count": 5,
+          "candidate_sample_count": 5,
+          "baseline_rss_median_bytes": 25145344,
+          "candidate_rss_median_bytes": 24772608,
+          "delta_bytes": -372736,
+          "ratio": 0.9852
+        },
+        {
+          "name": "semantic_analysis",
+          "baseline_sample_count": 5,
+          "candidate_sample_count": 5,
+          "baseline_rss_median_bytes": 25067520,
+          "candidate_rss_median_bytes": 24375296,
+          "delta_bytes": -692224,
+          "ratio": 0.9724
+        },
+        {
+          "name": "source_loading_parsing",
+          "baseline_sample_count": 5,
+          "candidate_sample_count": 5,
+          "baseline_rss_median_bytes": 24915968,
+          "candidate_rss_median_bytes": 23494656,
+          "delta_bytes": -1421312,
+          "ratio": 0.943
+        },
+        {
+          "name": "final_cleanup",
+          "baseline_sample_count": 5,
+          "candidate_sample_count": 5,
+          "baseline_rss_median_bytes": 25378816,
+          "candidate_rss_median_bytes": 23793664,
+          "delta_bytes": -1585152,
+          "ratio": 0.9375
+        },
+        {
+          "name": "report_generation",
+          "baseline_sample_count": 5,
+          "candidate_sample_count": 5,
+          "baseline_rss_median_bytes": 25378816,
+          "candidate_rss_median_bytes": 23793664,
+          "delta_bytes": -1585152,
+          "ratio": 0.9375
+        }
+      ]
+    },
+    {
+      "name": "small_reports_off_jobs_1_cold",
+      "module_count": 3,
+      "jobs": 1,
+      "reports": false,
+      "warm_cache": false,
+      "baseline_sample_count": 5,
+      "candidate_sample_count": 5,
+      "baseline_rss_median_bytes": 24006656,
+      "candidate_rss_median_bytes": 25001984,
+      "baseline_rss_dispersion_bytes": 3551232,
+      "candidate_rss_dispersion_bytes": 1982464,
+      "bound_rss_bytes": 29540352,
+      "delta_bytes": 995328,
+      "ratio": 1.0415,
+      "evaluation_status": "flat",
+      "bound_basis": "baseline_median_plus_observed_baseline_candidate_dispersion",
+      "baseline_rss_peak_phase": "final_cleanup",
+      "candidate_rss_peak_phase": "object_retention_link",
+      "phase_comparisons": [
+        {
+          "name": "module_codegen",
+          "baseline_sample_count": 5,
+          "candidate_sample_count": 5,
+          "baseline_rss_median_bytes": 23797760,
+          "candidate_rss_median_bytes": 24989696,
+          "delta_bytes": 1191936,
+          "ratio": 1.0501
+        },
+        {
+          "name": "object_retention_link",
+          "baseline_sample_count": 5,
+          "candidate_sample_count": 5,
+          "baseline_rss_median_bytes": 23822336,
+          "candidate_rss_median_bytes": 25001984,
+          "delta_bytes": 1179648,
+          "ratio": 1.0495
+        },
+        {
+          "name": "ir_lowering",
+          "baseline_sample_count": 5,
+          "candidate_sample_count": 5,
+          "baseline_rss_median_bytes": 24006656,
+          "candidate_rss_median_bytes": 24526848,
+          "delta_bytes": 520192,
+          "ratio": 1.0217
+        },
+        {
+          "name": "allocation_planning",
+          "baseline_sample_count": 5,
+          "candidate_sample_count": 5,
+          "baseline_rss_median_bytes": 23998464,
+          "candidate_rss_median_bytes": 24440832,
+          "delta_bytes": 442368,
+          "ratio": 1.0184
+        },
+        {
+          "name": "plir_construction",
+          "baseline_sample_count": 5,
+          "candidate_sample_count": 5,
+          "baseline_rss_median_bytes": 23994368,
+          "candidate_rss_median_bytes": 24436736,
+          "delta_bytes": 442368,
+          "ratio": 1.0184
+        },
+        {
+          "name": "semantic_analysis",
+          "baseline_sample_count": 5,
+          "candidate_sample_count": 5,
+          "baseline_rss_median_bytes": 23973888,
+          "candidate_rss_median_bytes": 24035328,
+          "delta_bytes": 61440,
+          "ratio": 1.0026
+        },
+        {
+          "name": "final_cleanup",
+          "baseline_sample_count": 5,
+          "candidate_sample_count": 5,
+          "baseline_rss_median_bytes": 23842816,
+          "candidate_rss_median_bytes": 23605248,
+          "delta_bytes": -237568,
+          "ratio": 0.99
+        },
+        {
+          "name": "report_generation",
+          "baseline_sample_count": 5,
+          "candidate_sample_count": 5,
+          "baseline_rss_median_bytes": 23834624,
+          "candidate_rss_median_bytes": 23592960,
+          "delta_bytes": -241664,
+          "ratio": 0.9899
+        },
+        {
+          "name": "source_loading_parsing",
+          "baseline_sample_count": 5,
+          "candidate_sample_count": 5,
+          "baseline_rss_median_bytes": 23805952,
+          "candidate_rss_median_bytes": 23150592,
+          "delta_bytes": -655360,
+          "ratio": 0.9725
+        }
+      ]
+    }
+  ],
+  "candidate_only_scenarios": [
+    "large_reports_off_jobs_cpu_warm",
+    "medium_reports_off_jobs_2_cold",
+    "small_reports_on_jobs_1_cold"
+  ]
+}

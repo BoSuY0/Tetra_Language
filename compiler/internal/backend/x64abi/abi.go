@@ -44,6 +44,12 @@ type ABI interface {
 		opt x64.CodegenOptions,
 		importPatches *[]x64obj.ImportPatch,
 	) error
+	EmitReleaseAllocation(
+		e *x64.Emitter,
+		stackDepth *int,
+		opt x64.CodegenOptions,
+		importPatches *[]x64obj.ImportPatch,
+	) error
 	EmitMakeSlice(
 		e *x64.Emitter,
 		kind ir.IRInstrKind,

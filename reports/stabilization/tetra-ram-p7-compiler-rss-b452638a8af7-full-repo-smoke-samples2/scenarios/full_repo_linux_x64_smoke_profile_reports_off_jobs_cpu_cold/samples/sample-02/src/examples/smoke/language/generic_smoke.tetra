@@ -1,0 +1,5 @@
+func id<T>(x: T) -> T:
+    return x
+
+func main() -> Int:
+    return id(42)

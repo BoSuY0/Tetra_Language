@@ -93,6 +93,54 @@ func TestResolveHashManifestPathAcceptsRootOutValidationForm(t *testing.T) {
 	}
 }
 
+func TestValidationSuccessOutputIsStructuredEvidence(t *testing.T) {
+	got := validationSuccessOutput("reports/example/artifact-hashes.json")
+	for _, want := range []string{
+		"validator: validate-artifact-hashes\n",
+		"manifest: reports/example/artifact-hashes.json\n",
+		"result: pass\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("validation success output = %q, missing %q", got, want)
+		}
+	}
+}
+
+func TestArtifactHashManifestIgnoresValidationSidecar(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "summary.json"), []byte(`{"schema":"example"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(root, hashValidationOutputName),
+		[]byte("validator: validate-artifact-hashes\nresult: pass\n"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	manifest, err := buildHashManifest(root, "artifact-hashes.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, artifact := range manifest.Artifacts {
+		if artifact.Path == hashValidationOutputName {
+			t.Fatalf("validation sidecar should not be hashed: %#v", manifest.Artifacts)
+		}
+	}
+	raw, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifestPath := filepath.Join(root, "artifact-hashes.json")
+	if err := os.WriteFile(manifestPath, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateHashManifest(manifestPath); err != nil {
+		t.Fatalf("validate hash manifest with sidecar: %v", err)
+	}
+}
+
 func TestArtifactHashManifestRejectsModifiedArtifact(t *testing.T) {
 	root := t.TempDir()
 	path := filepath.Join(root, "known_issues.md")

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"tetra_language/compiler/internal/semantics"
@@ -40,6 +41,15 @@ func TestCacheKeyIncludesCompilerCacheABI(t *testing.T) {
 			"cacheKey mismatch without compiler cache ABI discriminator: got %s want %s",
 			got,
 			want,
+		)
+	}
+}
+
+func TestCompilerCacheABIVersionDocumentsActorRefV2ABI(t *testing.T) {
+	if !strings.Contains(compilerCacheABIVersion, "actor-ref-v2") {
+		t.Fatalf(
+			"compilerCacheABIVersion = %q, want actor-ref-v2 ABI discriminator",
+			compilerCacheABIVersion,
 		)
 	}
 }

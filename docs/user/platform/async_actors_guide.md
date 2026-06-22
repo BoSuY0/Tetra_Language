@@ -119,9 +119,11 @@ Actor lifecycle is intentionally narrow. A spawned actor runs until its entry fu
 becomes `done`; zero and nonzero actor entry returns use the same user-visible state. Later local
 sends to that actor return checked failure `-4`. Messages already delivered to another actor remain
 receivable even if their sender is now done. Messages still sitting in a done actor's own mailbox
-are not drained by a shutdown phase. There is no actor status, actor join, actor exit-code, actor
-close API, supervision tree, restart behavior, linking, or OTP-style lifecycle contract in the
-current runtime.
+are drained into the runtime message-pool free list when that actor becomes `done`; they are not
+delivered after completion. `core.actor_link(peer)` provides bounded local abnormal-exit propagation
+for nonzero linked exits. There is no actor status, actor join, actor exit-code, actor close API,
+supervision tree, restart behavior, monitor DOWN delivery, trap-exit message delivery, or OTP-style
+lifecycle contract in the current runtime.
 
 The current actor scheduler is single-threaded and cooperative. Executable runtime tests cover
 bounded progress for yielding runnable actors and deterministic deadline-order wake for sleeping

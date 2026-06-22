@@ -1,0 +1,53 @@
+{
+  "schema": "tetra.ram.p7-compiler-rss-target-scope.v1",
+  "host_target": "linux/amd64",
+  "compiler_target": "linux-x64",
+  "supported_targets": [
+    {
+      "target": "linux-x64",
+      "status": "host_rss_measured",
+      "reason": "compiler-process phase profiles record process RSS on linux/amd64 hosts for the linux-x64 compiler target"
+    }
+  ],
+  "non_claim_targets": [
+    {
+      "target": "windows-x64",
+      "status": "non_claim",
+      "reason": "not measured by this linux/amd64 process RSS harness; Windows reserve/commit/release semantics need target-specific evidence"
+    },
+    {
+      "target": "macos-x64",
+      "status": "non_claim",
+      "reason": "not measured by this linux/amd64 process RSS harness; macOS RSS/release semantics need target-specific evidence"
+    },
+    {
+      "target": "macos-arm64",
+      "status": "non_claim",
+      "reason": "not measured by this linux/amd64 process RSS harness; macOS arm64 RSS/release semantics need target-specific evidence"
+    },
+    {
+      "target": "linux-x86",
+      "status": "non_claim",
+      "reason": "not measured by this linux/amd64 process RSS harness; 32-bit size arithmetic and release semantics need target-specific evidence"
+    },
+    {
+      "target": "linux-x32",
+      "status": "non_claim",
+      "reason": "not measured by this linux/amd64 process RSS harness; x32 size arithmetic and release semantics need target-specific evidence"
+    },
+    {
+      "target": "wasm32-wasi",
+      "status": "non_claim",
+      "reason": "not measured by this linux/amd64 process RSS harness; WASM linear-memory high-water semantics need target-specific evidence"
+    },
+    {
+      "target": "wasm32-web",
+      "status": "non_claim",
+      "reason": "not measured by this linux/amd64 process RSS harness; browser/WASM linear-memory semantics need target-specific evidence"
+    }
+  ],
+  "notes": [
+    "Linux-only compiler RSS evidence must not be used as a cross-target memory lifecycle claim.",
+    "Targets listed as non_claim may still have build-only compiler support outside this RSS evidence bundle."
+  ]
+}

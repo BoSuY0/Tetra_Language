@@ -1,6 +1,79 @@
 {
   "schema": "tetra.actor.capability_manifest.v1",
   "profile": "actor-runtime-foundation",
+  "release_target": {
+    "primary": "linux-x64",
+    "full_production_targets": [
+      "linux-x64"
+    ],
+    "compatibility_targets": [
+      "macos-x64 local actors",
+      "windows-x64 local actors"
+    ],
+    "unsupported_targets": [
+      "macos-x64 distributed actors",
+      "windows-x64 distributed actors",
+      "wasm distributed actors"
+    ],
+    "distributed_nonclaim_targets": [
+      "macos-x64",
+      "windows-x64",
+      "wasm"
+    ]
+  },
+  "final_verdict_vocabulary": [
+    "TETRA_V1_NATIVE_ACTOR_PLATFORM_LINUX_X64_PROD_STABLE",
+    "NEAR_READY_WITH_BLOCKERS",
+    "BETA_ONLY",
+    "EXPERIMENTAL_ONLY",
+    "FAIL"
+  ],
+  "required_final_verdict": "TETRA_V1_NATIVE_ACTOR_PLATFORM_LINUX_X64_PROD_STABLE",
+  "allowed_final_claim": "Tetra v1 provides a production-stable Linux-x64 native application platform with a multi-core actor runtime, supervision trees, authenticated distributed actors, broker-authoritative cluster membership, structured concurrency, app-grade filesystem and Surface integration, within the documented v1 scope.",
+  "required_v1_capabilities": [
+    "production_multithreaded_scheduler",
+    "actor_lifecycle_supervision",
+    "supervision_restart_tree",
+    "cluster_membership",
+    "reconnect_retry_tls_auth",
+    "distributed_region_serialization",
+    "full_structured_concurrency",
+    "production_broker_deployment",
+    "native_surface_host",
+    "app_grade_text_filesystem_package",
+    "flagship_native_reference_app",
+    "benchmark_rust_c_parity",
+    "runtime_stress_invariants",
+    "strict_aggregate_release_gate"
+  ],
+  "required_final_reports": [
+    "actor-runtime-v2.json",
+    "actor-scheduler-linux-x64.json",
+    "actor-mailbox-memory.json",
+    "actor-structured-concurrency.json",
+    "actor-supervision.json",
+    "actor-cluster-membership.json",
+    "actor-distributed-runtime-v2.json",
+    "actor-transport-security.json",
+    "actor-broker-deployment.json",
+    "surface-native-host.json",
+    "surface-text-filesystem-app.json",
+    "flagship-native-app.json",
+    "benchmark-rust-c-parity.json",
+    "runtime-stress-invariants.json",
+    "artifact-hashes.json",
+    "final-readiness.json"
+  ],
+  "forbidden_final_claims": [
+    "full Erlang/OTP replacement",
+    "exactly-once messaging",
+    "zero-copy distributed pointers",
+    "all-platform distributed actors",
+    "formally race-free runtime",
+    "faster than C or Rust generally",
+    "fastest native UI platform",
+    "zero-memory-overhead runtime"
+  ],
   "required_capabilities": [
     {
       "id": "local_actor_runtime",
@@ -34,6 +107,13 @@
         "actor-runtime-foundation-manifest.json",
         "distributed-actors-linux-x64/distributed-actors-linux-x64.json",
         "parallel-production-linux-x64/parallel-production-linux-x64.json"
+      ]
+    },
+    {
+      "id": "system_message_runtime_lane_linux_x64",
+      "status": "current_scoped",
+      "supported_targets": [
+        "linux-x64"
       ]
     },
     {
@@ -103,6 +183,36 @@
       "id": "production_broker_deployment",
       "status": "blocked",
       "supported_targets": []
+    },
+    {
+      "id": "native_surface_host",
+      "status": "blocked",
+      "supported_targets": []
+    },
+    {
+      "id": "app_grade_text_filesystem_package",
+      "status": "blocked",
+      "supported_targets": []
+    },
+    {
+      "id": "flagship_native_reference_app",
+      "status": "blocked",
+      "supported_targets": []
+    },
+    {
+      "id": "benchmark_rust_c_parity",
+      "status": "blocked",
+      "supported_targets": []
+    },
+    {
+      "id": "runtime_stress_invariants",
+      "status": "blocked",
+      "supported_targets": []
+    },
+    {
+      "id": "strict_aggregate_release_gate",
+      "status": "blocked",
+      "supported_targets": []
     }
   ],
   "required_nonclaim_terms": [
@@ -149,8 +259,20 @@
       "path": "tools/validators/actorprod"
     },
     {
+      "id": "validate-actor-system-messages",
+      "path": "tools/cmd/validate-actor-system-messages"
+    },
+    {
+      "id": "validate-actor-capabilities",
+      "path": "tools/cmd/validate-actor-capabilities"
+    },
+    {
       "id": "actordist",
       "path": "tools/validators/actordist"
+    },
+    {
+      "id": "actorsystem",
+      "path": "tools/validators/actorsystem"
     }
   ],
   "gate_refs": [
@@ -180,12 +302,17 @@
       "path": ".github/workflows/release-packages.yml",
       "claim_check": true,
       "release_note_check": true
+    },
+    {
+      "id": "actor-system-messages-linux-x64-smoke",
+      "path": "scripts/release/v1_0/actor-system-messages-linux-x64-smoke.sh",
+      "claim_check": true
     }
   ],
   "contract_refs": [
     {
       "id": "actor-runtime-foundation-linux-x64-contract",
-      "path": "scripts/release/post_v0_4/contracts/actor-runtime-foundation-linux-x64.json",
+      "path": "docs/contracts/actors/actor-runtime-foundation-linux-x64.release-contract.v1.json",
       "capability_id": "actor_runtime_foundation_linux_x64",
       "claim_check": true,
       "nonclaim_check": true,
@@ -201,6 +328,23 @@
         "scripts/release/post_v0_4/actor-runtime-foundation-linux-x64-gate.sh",
         "scripts/release/v0_4_0/distributed-actors-linux-x64-smoke.sh",
         "scripts/release/post_v0_4/parallel-production-linux-x64-smoke.sh"
+      ]
+    },
+    {
+      "id": "system-message-runtime-lane-linux-x64-contract",
+      "path": "docs/contracts/actors/system-message-runtime-lane-linux-x64.release-contract.v1.json",
+      "capability_id": "system_message_runtime_lane_linux_x64",
+      "claim_check": true,
+      "nonclaim_check": true,
+      "target_check": true,
+      "validator_check": true,
+      "required_reports": [
+        "actor-system-messages-linux-x64.json",
+        "artifact-hashes.json",
+        "actor-system-layout-linux-x64.json"
+      ],
+      "required_gate_refs": [
+        "scripts/release/v1_0/actor-system-messages-linux-x64-smoke.sh"
       ]
     }
   ],
@@ -289,6 +433,44 @@
       "docs_refs": [
         "docs/audits/actor-runtime-production-boundary-v1.md",
         "docs/spec/actors.md"
+      ]
+    },
+    {
+      "id": "system_message_runtime_lane_linux_x64",
+      "status": "current_scoped",
+      "supported_targets": [
+        "linux-x64"
+      ],
+      "runtime_boundary": "P01 source-level system-message API and isolated Linux x64 builtin-runtime lane",
+      "claims": [
+        "source-level system-message API and isolated runtime system lane implemented for Linux-x64 builtin runtime"
+      ],
+      "nonclaims": [
+        "real local link/monitor producers are completed in P06",
+        "authenticated node-down producer is completed in P10",
+        "no full Erlang/OTP actor runtime claim",
+        "no cluster membership or reconnect/retry production claim",
+        "no non-Linux distributed actor runtime support claim",
+        "no distributed zero-copy pointer or region transfer claim",
+        "no formal race proof claim"
+      ],
+      "evidence_refs": [
+        "compiler/internal/actorsrt/actorsrt_suite_test.go",
+        "compiler/internal/semantics/semantics_suite_test.go",
+        "tools/cmd/validate-actor-system-messages/main.go",
+        "tools/validators/actorsystem/report.go",
+        "scripts/release/v1_0/actor-system-messages-linux-x64-smoke.sh",
+        "compiler/cmd/actor-system-layout-report/main.go",
+        "compiler/internal/actorsrt/layout_report.go"
+      ],
+      "validator_refs": [
+        "validate-actor-system-messages",
+        "validate-actor-capabilities",
+        "actorsystem"
+      ],
+      "docs_refs": [
+        "docs/design/actor_system_messages_v1.md",
+        "lib/core/actors/actors.tetra"
       ]
     },
     {
@@ -537,6 +719,140 @@
         "external network hardening",
         "security review",
         "release-gated deployment smoke"
+      ]
+    },
+    {
+      "id": "native_surface_host",
+      "status": "blocked",
+      "supported_targets": [],
+      "claims": [],
+      "nonclaims": [],
+      "evidence_refs": [],
+      "validator_refs": [],
+      "docs_refs": [
+        "docs/spec/surface/native_surface_host_v1.md",
+        "docs/spec/surface/surface_v1.md",
+        "docs/checklists/v1_0_release_gate.md"
+      ],
+      "promotion_requirements": [
+        "direct native Surface Host execution path",
+        "headless Weston deterministic input",
+        "live app-produced frames",
+        "real host event injection",
+        "clean app and host shutdown",
+        "same-head native host report and artifact hashes",
+        "validator rejection of old real-window probe evidence"
+      ]
+    },
+    {
+      "id": "app_grade_text_filesystem_package",
+      "status": "blocked",
+      "supported_targets": [],
+      "claims": [],
+      "nonclaims": [],
+      "evidence_refs": [],
+      "validator_refs": [],
+      "docs_refs": [
+        "docs/spec/surface/surface_v1.md",
+        "docs/spec/surface/native_surface_host_v1.md",
+        "docs/checklists/v1_0_release_gate.md"
+      ],
+      "promotion_requirements": [
+        "real glyph metrics and bounded glyph cache",
+        "UTF-8 text editing evidence",
+        "filesystem capability model",
+        "bounded blocking-I/O pool",
+        "package manifest and deterministic hashes",
+        "crash diagnostics with redaction",
+        "extracted-package smoke without source tree or Go toolchain"
+      ]
+    },
+    {
+      "id": "flagship_native_reference_app",
+      "status": "blocked",
+      "supported_targets": [],
+      "claims": [],
+      "nonclaims": [],
+      "evidence_refs": [],
+      "validator_refs": [],
+      "docs_refs": [
+        "docs/spec/surface/surface_v1.md",
+        "docs/checklists/v1_0_release_gate.md"
+      ],
+      "promotion_requirements": [
+        "real native Wayland flagship app",
+        "project/file tree",
+        "editable real-glyph text field",
+        "open/save/autosave/watch",
+        "supervised service tree",
+        "cluster membership UI evidence",
+        "failure injection and restart trace",
+        "packaged execution smoke"
+      ]
+    },
+    {
+      "id": "benchmark_rust_c_parity",
+      "status": "blocked",
+      "supported_targets": [],
+      "claims": [],
+      "nonclaims": [],
+      "evidence_refs": [],
+      "validator_refs": [],
+      "docs_refs": [
+        "docs/spec/zero_heap_benchmark_policy.md",
+        "docs/spec/runtime/actors.md",
+        "docs/checklists/v1_0_release_gate.md"
+      ],
+      "promotion_requirements": [
+        "equivalent C/Rust/Tetra implementations",
+        "pinned compiler commands",
+        "Tier 2 cross-machine benchmark report",
+        "raw artifacts for every row",
+        "threshold validator",
+        "claim text generated or checked against evidence tier"
+      ]
+    },
+    {
+      "id": "runtime_stress_invariants",
+      "status": "blocked",
+      "supported_targets": [],
+      "claims": [],
+      "nonclaims": [],
+      "evidence_refs": [],
+      "validator_refs": [],
+      "docs_refs": [
+        "docs/spec/runtime/actors.md",
+        "docs/checklists/v1_0_release_gate.md"
+      ],
+      "promotion_requirements": [
+        "generated runtime stress campaign",
+        "wire and serializer fuzz targets",
+        "membership and IPC fuzz targets",
+        "security negative campaign",
+        "runtime invariant counters",
+        "short PR-gated fuzz and longer scheduled soak evidence"
+      ]
+    },
+    {
+      "id": "strict_aggregate_release_gate",
+      "status": "blocked",
+      "supported_targets": [],
+      "claims": [],
+      "nonclaims": [],
+      "evidence_refs": [],
+      "validator_refs": [],
+      "docs_refs": [
+        "docs/checklists/v1_0_release_gate.md",
+        "docs/spec/v1_scope.md",
+        "docs/spec/flow/v1_scope.md"
+      ],
+      "promotion_requirements": [
+        "scripts/release/v1_0/native-actor-platform-linux-x64-gate.sh",
+        "fresh same-head required reports",
+        "package smoke from extracted artifact",
+        "clean checkout validator",
+        "remote required CI evidence",
+        "final-readiness validator returning the required verdict"
       ]
     }
   ]

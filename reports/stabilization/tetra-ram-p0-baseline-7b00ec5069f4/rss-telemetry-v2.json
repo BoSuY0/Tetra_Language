@@ -1,0 +1,77 @@
+{
+  "schema": "tetra.local_benchmark.process_rss_telemetry.v2",
+  "method": "linux_procfs_phase_rss_sampler_v2",
+  "program": "ram-p0-baseline",
+  "pid": 442141,
+  "target_os": "linux",
+  "target_arch": "amd64",
+  "started_unix_nano": 1781859705292562458,
+  "finished_unix_nano": 1781859705299603190,
+  "exit_status": 0,
+  "workload_kind": "steady_state",
+  "sample_count": 9,
+  "rss_current_bytes": 7626752,
+  "rss_peak_bytes": 9814016,
+  "rss_peak_source": "procfs_phase_samples_max_v2",
+  "mapping_count": 29,
+  "samples": [
+    {
+      "phase": "startup",
+      "unix_nano": 1781859705292746955,
+      "rss_bytes": 6930432,
+      "mapping_count": 29
+    },
+    {
+      "phase": "post_warmup",
+      "unix_nano": 1781859705293261211,
+      "rss_bytes": 9064448,
+      "mapping_count": 29
+    },
+    {
+      "phase": "steady_round_1",
+      "unix_nano": 1781859705294694725,
+      "rss_bytes": 9555968,
+      "mapping_count": 29
+    },
+    {
+      "phase": "steady_round_2",
+      "unix_nano": 1781859705295624490,
+      "rss_bytes": 9814016,
+      "mapping_count": 29
+    },
+    {
+      "phase": "steady_round_3",
+      "unix_nano": 1781859705296629505,
+      "rss_bytes": 9158656,
+      "mapping_count": 29
+    },
+    {
+      "phase": "steady_round_4",
+      "unix_nano": 1781859705297562358,
+      "rss_bytes": 9261056,
+      "mapping_count": 29
+    },
+    {
+      "phase": "steady_round_5",
+      "unix_nano": 1781859705298436388,
+      "rss_bytes": 9420800,
+      "mapping_count": 29
+    },
+    {
+      "phase": "post_drain",
+      "unix_nano": 1781859705299502904,
+      "rss_bytes": 7626752,
+      "mapping_count": 29
+    },
+    {
+      "phase": "pre_exit",
+      "unix_nano": 1781859705299602255,
+      "rss_bytes": 7626752,
+      "mapping_count": 29
+    }
+  ],
+  "notes": [
+    "baseline harness measures its own controlled fixed-live-set workload",
+    "no allocator reuse, release, or target parity improvement is claimed"
+  ]
+}

@@ -71,6 +71,14 @@ type Region struct {
 	Name         string
 	Owner        string
 	BorrowedRefs int
+	SizeBytes    int
+}
+
+type ActorOwnedRegionDrainReport struct {
+	Reason         string `json:"reason"`
+	ActorID        string `json:"actor_id"`
+	RegionsDrained int    `json:"regions_drained"`
+	BytesReclaimed int    `json:"bytes_reclaimed"`
 }
 
 func NewSchedulerModel(cfg Config) (*SchedulerModel, error) {
@@ -168,6 +176,31 @@ func (m *SchedulerModel) RegionOwner(name string) string {
 		return ""
 	}
 	return m.regions[name].Owner
+}
+
+func (m *SchedulerModel) DrainActorOwnedRegions(
+	actor string,
+	reason string,
+) ActorOwnedRegionDrainReport {
+	report := ActorOwnedRegionDrainReport{
+		Reason:  strings.TrimSpace(reason),
+		ActorID: actorIDFromName(actor),
+	}
+	if report.Reason == "" {
+		report.Reason = "drain"
+	}
+	if m == nil {
+		return report
+	}
+	for name, region := range m.regions {
+		if actorIDFromName(region.Owner) != report.ActorID {
+			continue
+		}
+		report.RegionsDrained++
+		report.BytesReclaimed += positiveBytes(region.SizeBytes)
+		delete(m.regions, name)
+	}
+	return report
 }
 
 func (m *SchedulerModel) Send(fromCore int, toCore int, msg Message) (TransferReport, error) {
@@ -599,6 +632,13 @@ type ActorMailboxMemoryReport struct {
 	BackpressureMode string `json:"backpressure_mode"`
 }
 
+type ActorMailboxDrainReport struct {
+	Reason                    string `json:"reason"`
+	MessagesDrained           int    `json:"messages_drained"`
+	BytesReclaimed            int    `json:"bytes_reclaimed"`
+	OwnedRegionBytesReclaimed int    `json:"owned_region_bytes_reclaimed"`
+}
+
 type ActorMessagePoolReport struct {
 	SlabBytes         int `json:"slab_bytes"`
 	LiveBytes         int `json:"live_bytes"`
@@ -690,6 +730,32 @@ func (m *TypedMailbox) Receive() (Message, bool) {
 		m.lastBackpressureErr = nil
 	}
 	return entry.message, true
+}
+
+func (m *TypedMailbox) Drain(reason string) ActorMailboxDrainReport {
+	report := ActorMailboxDrainReport{Reason: strings.TrimSpace(reason)}
+	if report.Reason == "" {
+		report.Reason = "drain"
+	}
+	if m == nil || len(m.messages) == 0 {
+		return report
+	}
+	for _, entry := range m.messages {
+		report.MessagesDrained++
+		report.BytesReclaimed += positiveBytes(entry.bytes)
+		report.OwnedRegionBytesReclaimed += ownedRegionPayloadBytes(entry.message)
+	}
+	for i := range m.messages {
+		m.messages[i] = queuedMailboxMessage{}
+	}
+	m.messages = nil
+	m.queuedBytes = 0
+	m.reclaimedBytes += report.BytesReclaimed
+	if m.lastBackpressureErr == ErrMailboxFull {
+		m.lastBackpressure = "available"
+		m.lastBackpressureErr = nil
+	}
+	return report
 }
 
 func (m *TypedMailbox) Capacity() int {
@@ -1035,6 +1101,9 @@ func classifyPayload(
 			return "", 0, false, ErrRegionHasLiveBorrowedAliases
 		}
 		region.Owner = targetOwner
+		if payload.SizeBytes > 0 {
+			region.SizeBytes = payload.SizeBytes
+		}
 		scheduler.regions[payload.RegionName] = region
 		return TransferZeroCopyMove, 0, true, nil
 	case PayloadUnsafePtr:
@@ -1077,6 +1146,16 @@ func sumOwnedRegionBytes(regions []ActorOwnedRegionReport) int {
 	total := 0
 	for _, region := range regions {
 		total += positiveBytes(region.Bytes)
+	}
+	return total
+}
+
+func ownedRegionPayloadBytes(msg Message) int {
+	total := 0
+	for _, payload := range msg.Payloads {
+		if payload.Kind == PayloadOwnedRegion {
+			total += positiveBytes(payload.SizeBytes)
+		}
 	}
 	return total
 }

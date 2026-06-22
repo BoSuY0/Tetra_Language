@@ -37,6 +37,35 @@ func TestEffectiveWorkerCount(t *testing.T) {
 	}
 }
 
+func TestEffectiveWorkerDecisionHonorsMemoryBudget(t *testing.T) {
+	decision := EffectiveWorkerDecision(
+		4,
+		6,
+		8,
+		128*1024*1024,
+		256*1024*1024,
+	)
+	if decision.Count != 1 {
+		t.Fatalf("Count = %d, want 1; reason=%s", decision.Count, decision.Reason)
+	}
+	if decision.Reason == "" {
+		t.Fatalf("Reason is empty")
+	}
+}
+
+func TestEffectiveWorkerDecisionKeepsRequestedWhenBudgetAllows(t *testing.T) {
+	decision := EffectiveWorkerDecision(
+		3,
+		6,
+		8,
+		1024*1024*1024,
+		256*1024*1024,
+	)
+	if decision.Count != 3 {
+		t.Fatalf("Count = %d, want 3; reason=%s", decision.Count, decision.Reason)
+	}
+}
+
 func TestApplyModuleObjectMetadata(t *testing.T) {
 	var srcHash [32]byte
 	srcHash[0] = 0x11

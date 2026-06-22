@@ -158,6 +158,17 @@ func TestLinuxRuntimeRoutesRemoteHandleSendToBroker(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse broker port: %v", err)
 	}
+	peer := dialTestNode(t, broker.Addr())
+	defer peer.Close()
+	writeTestFrame(t, peer, actorwire.Frame{
+		Type:         actorwire.FrameHello,
+		SourceNodeID: 2,
+		DestNodeID:   2,
+	})
+	if got := readTestFrame(t, peer); got.Type != actorwire.FrameHelloAck ||
+		got.Status != actorwire.StatusOK {
+		t.Fatalf("peer hello ack = %+v, want hello_ack ok", got)
+	}
 
 	tmp := t.TempDir()
 	srcPath := filepath.Join(tmp, "remote_send_broker.tetra")
@@ -189,23 +200,52 @@ uses actors, runtime:
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, outPath)
-	output, err := cmd.CombinedOutput()
-	if ctx.Err() == context.DeadlineExceeded {
-		t.Fatalf("runtime smoke timed out")
-	}
-	if err != nil {
-		t.Fatalf("runtime smoke failed: %v output=%q", err, string(output))
-	}
-
-	deadline := time.Now().Add(2 * time.Second)
-	for {
-		if report := broker.Report(); report.DroppedFrames > 0 {
+	done := make(chan error, 1)
+	go func() {
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			done <- &runtimeSmokeError{err: err, output: string(output)}
 			return
 		}
-		if time.Now().After(deadline) {
-			t.Fatalf("broker did not observe remote frames; report=%+v", broker.Report())
+		done <- nil
+	}()
+
+	spawn := readTestFrame(t, peer)
+	if spawn.Type != actorwire.FrameSpawnReq || spawn.SourceNodeID != 1 || spawn.DestNodeID != 2 {
+		t.Fatalf("spawn frame = %+v, want spawn_req from node 1 to node 2", spawn)
+	}
+	writeTestFrame(t, peer, spawnAckFrame(spawn, 3, 1, 1))
+
+	sent := readTestFrame(t, peer)
+	if sent.Type != actorwire.FrameSendI32 ||
+		sent.SourceNodeID != 1 ||
+		sent.DestNodeID != 2 ||
+		sent.ActorID != 3 ||
+		len(sent.Payload) != 1 ||
+		sent.Payload[0] != 7 {
+		t.Fatalf("send frame = %+v, want send_i32 7 to actor 3", sent)
+	}
+	tagged := readTestFrame(t, peer)
+	if tagged.Type != actorwire.FrameSendMsg ||
+		tagged.SourceNodeID != 1 ||
+		tagged.DestNodeID != 2 ||
+		tagged.ActorID != 3 ||
+		tagged.Tag != 99 ||
+		len(tagged.Payload) != 1 ||
+		tagged.Payload[0] != 8 {
+		t.Fatalf("tagged frame = %+v, want send_msg tag 99 payload 8 to actor 3", tagged)
+	}
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("runtime smoke failed: %v", err)
 		}
-		time.Sleep(10 * time.Millisecond)
+	case <-ctx.Done():
+		t.Fatalf("runtime smoke timed out")
+	}
+	if report := broker.Report(); report.RoutedFrames < 3 {
+		t.Fatalf("broker routed frames = %d, want at least 3", report.RoutedFrames)
 	}
 }
 
@@ -288,6 +328,7 @@ uses actors, runtime:
 	if spawn.Type != actorwire.FrameSpawnReq || spawn.SourceNodeID != 1 || spawn.DestNodeID != 2 {
 		t.Fatalf("spawn frame = %+v, want spawn_req from node 1 to node 2", spawn)
 	}
+	writeTestFrame(t, conn, spawnAckFrame(spawn, 3, 1, 1))
 	typed := readTestFrame(t, conn)
 	if typed.Type != actorwire.FrameSendTyped ||
 		typed.SourceNodeID != 1 ||
@@ -909,7 +950,7 @@ func TestLinuxRuntimeInboundOverflowSetsNodeDownStatus(t *testing.T) {
 	srcPath := filepath.Join(tmp, "remote_overflow_sets_node_down.tetra")
 	if err := os.WriteFile(srcPath, []byte(`
 val MAILBOX_CAPACITY: i32 = 256
-val THIRD_ACTOR_LIVE_MESSAGES: i32 = 232
+val THIRD_ACTOR_LIVE_MESSAGES: i32 = 170
 
 func sleeper() -> Int
 uses runtime:
@@ -1150,6 +1191,19 @@ func helloAckFrame(nodeID uint16) actorwire.Frame {
 		SourceNodeID: nodeID,
 		DestNodeID:   nodeID,
 		Status:       actorwire.StatusOK,
+		Payload:      []int32{1},
+	}
+}
+
+func spawnAckFrame(req actorwire.Frame, actorID, generation, nodeEpoch uint16) actorwire.Frame {
+	return actorwire.Frame{
+		Type:         actorwire.FrameSpawnAck,
+		SourceNodeID: req.DestNodeID,
+		DestNodeID:   req.SourceNodeID,
+		SequenceID:   req.SequenceID,
+		ActorID:      actorID,
+		Status:       actorwire.StatusOK,
+		Payload:      []int32{int32(generation), int32(nodeEpoch)},
 	}
 }
 

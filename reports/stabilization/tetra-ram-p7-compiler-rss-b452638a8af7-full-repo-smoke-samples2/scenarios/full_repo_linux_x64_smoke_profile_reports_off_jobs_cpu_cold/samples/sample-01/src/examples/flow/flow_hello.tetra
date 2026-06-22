@@ -1,0 +1,8 @@
+func greeting() -> String:
+    return "Hello from Flow!\n"
+
+func main() -> Int
+uses io:
+    let msg: String = greeting()
+    print(msg)
+    return 0

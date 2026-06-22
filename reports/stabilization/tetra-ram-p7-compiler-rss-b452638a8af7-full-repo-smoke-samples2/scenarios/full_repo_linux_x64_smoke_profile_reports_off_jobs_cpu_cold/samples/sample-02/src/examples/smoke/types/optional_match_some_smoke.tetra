@@ -1,0 +1,13 @@
+func maybe(flag: Bool) -> Int?:
+    if flag:
+        return 42
+    else:
+        return none
+
+func main() -> Int:
+    let value: Int? = maybe(true)
+    match value:
+    case some(x):
+        return x
+    case none:
+        return 0

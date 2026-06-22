@@ -7,6 +7,7 @@ import (
 	"strings"
 	"tetra_language/compiler/internal/frontend"
 	"tetra_language/compiler/internal/module"
+	"tetra_language/compiler/internal/runtimeabi"
 	semanticsexpressions "tetra_language/compiler/internal/semantics/expressions"
 	"tetra_language/compiler/internal/semantics/model"
 	semanticsworld "tetra_language/compiler/internal/semantics/world"
@@ -48,6 +49,30 @@ func builtinFuncSigs(types map[string]*TypeInfo) (map[string]FuncSig, error) {
 		return nil, err
 	}
 	actorRecvMsgResult, err := ensureTypeInfo("actor.recv_msg_result", types)
+	if err != nil {
+		return nil, err
+	}
+	actorStatusInfo, err := ensureTypeInfo("actor.status", types)
+	if err != nil {
+		return nil, err
+	}
+	actorStatusRawInfo, err := ensureTypeInfo("actor.status_result_raw", types)
+	if err != nil {
+		return nil, err
+	}
+	actorExitReasonInfo, err := ensureTypeInfo("actor.exit_reason", types)
+	if err != nil {
+		return nil, err
+	}
+	actorWaitResultInfo, err := ensureTypeInfo("actor.wait_result", types)
+	if err != nil {
+		return nil, err
+	}
+	actorMonitorInfo, err := ensureTypeInfo("actor.monitor", types)
+	if err != nil {
+		return nil, err
+	}
+	actorSystemRecvRawInfo, err := ensureTypeInfo("actor.system_recv_raw", types)
 	if err != nil {
 		return nil, err
 	}
@@ -1018,6 +1043,20 @@ func builtinFuncSigs(types map[string]*TypeInfo) (map[string]FuncSig, error) {
 			ReturnSlots:       1,
 			ReturnRegionParam: regionNone,
 		},
+		"core.actor_ref_local": {
+			ParamTypes:        []string{"i32", "i32"},
+			ParamSlots:        2,
+			ReturnType:        actorInfo.Name,
+			ReturnSlots:       actorInfo.SlotCount,
+			ReturnRegionParam: regionNone,
+		},
+		"core.actor_ref_slot": {
+			ParamTypes:        []string{"actor"},
+			ParamSlots:        actorInfo.SlotCount,
+			ReturnType:        "i32",
+			ReturnSlots:       1,
+			ReturnRegionParam: regionNone,
+		},
 		"core.spawn": {
 			ParamTypes:        []string{"str"},
 			ParamSlots:        2,
@@ -1034,21 +1073,21 @@ func builtinFuncSigs(types map[string]*TypeInfo) (map[string]FuncSig, error) {
 		},
 		"core.send": {
 			ParamTypes:        []string{"actor", "i32"},
-			ParamSlots:        2,
+			ParamSlots:        actorInfo.SlotCount + 1,
 			ReturnType:        "i32",
 			ReturnSlots:       1,
 			ReturnRegionParam: regionNone,
 		},
 		"core.send_msg": {
 			ParamTypes:        []string{"actor", "i32", "i32"},
-			ParamSlots:        3,
+			ParamSlots:        actorInfo.SlotCount + 2,
 			ReturnType:        "i32",
 			ReturnSlots:       1,
 			ReturnRegionParam: regionNone,
 		},
 		"core.send_typed": {
 			ParamTypes:        []string{"actor", "enum"},
-			ParamSlots:        2,
+			ParamSlots:        actorInfo.SlotCount + 1,
 			ReturnType:        "i32",
 			ReturnSlots:       1,
 			ReturnRegionParam: regionNone,
@@ -1107,6 +1146,104 @@ func builtinFuncSigs(types map[string]*TypeInfo) (map[string]FuncSig, error) {
 			ParamSlots:        0,
 			ReturnType:        actorInfo.Name,
 			ReturnSlots:       actorInfo.SlotCount,
+			ReturnRegionParam: regionNone,
+		},
+		"core.actor_status": {
+			ParamTypes:        []string{"actor"},
+			ParamSlots:        actorInfo.SlotCount,
+			ReturnType:        actorStatusInfo.Name,
+			ReturnSlots:       actorStatusInfo.SlotCount,
+			ReturnRegionParam: regionNone,
+		},
+		"core.actor_status_raw": {
+			ParamTypes:        []string{"actor"},
+			ParamSlots:        actorInfo.SlotCount,
+			ReturnType:        actorStatusRawInfo.Name,
+			ReturnSlots:       actorStatusRawInfo.SlotCount,
+			ReturnRegionParam: regionNone,
+		},
+		"core.actor_wait": {
+			ParamTypes:        []string{"actor"},
+			ParamSlots:        actorInfo.SlotCount,
+			ReturnType:        actorWaitResultInfo.Name,
+			ReturnSlots:       actorWaitResultInfo.SlotCount,
+			ReturnRegionParam: regionNone,
+		},
+		"core.actor_wait_until": {
+			ParamTypes:        []string{"actor", "i32"},
+			ParamSlots:        actorInfo.SlotCount + 1,
+			ReturnType:        actorWaitResultInfo.Name,
+			ReturnSlots:       actorWaitResultInfo.SlotCount,
+			ReturnRegionParam: regionNone,
+		},
+		"core.actor_stop": {
+			ParamTypes:        []string{"actor", actorExitReasonInfo.Name},
+			ParamSlots:        actorInfo.SlotCount + actorExitReasonInfo.SlotCount,
+			ReturnType:        "i32",
+			ReturnSlots:       1,
+			ReturnRegionParam: regionNone,
+		},
+		"core.actor_exit_reason": {
+			ParamTypes:        []string{"actor"},
+			ParamSlots:        actorInfo.SlotCount,
+			ReturnType:        actorExitReasonInfo.Name,
+			ReturnSlots:       actorExitReasonInfo.SlotCount,
+			ReturnRegionParam: regionNone,
+		},
+		"core.actor_link": {
+			ParamTypes:        []string{"actor"},
+			ParamSlots:        actorInfo.SlotCount,
+			ReturnType:        "i32",
+			ReturnSlots:       1,
+			ReturnRegionParam: regionNone,
+		},
+		"core.actor_unlink": {
+			ParamTypes:        []string{"actor"},
+			ParamSlots:        actorInfo.SlotCount,
+			ReturnType:        "i32",
+			ReturnSlots:       1,
+			ReturnRegionParam: regionNone,
+		},
+		"core.actor_monitor": {
+			ParamTypes:        []string{"actor"},
+			ParamSlots:        actorInfo.SlotCount,
+			ReturnType:        actorMonitorInfo.Name,
+			ReturnSlots:       actorMonitorInfo.SlotCount,
+			ReturnRegionParam: regionNone,
+		},
+		"core.actor_demonitor": {
+			ParamTypes:        []string{actorMonitorInfo.Name},
+			ParamSlots:        actorMonitorInfo.SlotCount,
+			ReturnType:        "i32",
+			ReturnSlots:       1,
+			ReturnRegionParam: regionNone,
+		},
+		"core.actor_set_trap_exit": {
+			ParamTypes:        []string{"i32"},
+			ParamSlots:        1,
+			ReturnType:        "i32",
+			ReturnSlots:       1,
+			ReturnRegionParam: regionNone,
+		},
+		"core.actor_recv_system": {
+			ParamTypes:        nil,
+			ParamSlots:        0,
+			ReturnType:        actorSystemRecvRawInfo.Name,
+			ReturnSlots:       actorSystemRecvRawInfo.SlotCount,
+			ReturnRegionParam: regionNone,
+		},
+		"core.actor_recv_system_poll": {
+			ParamTypes:        nil,
+			ParamSlots:        0,
+			ReturnType:        actorSystemRecvRawInfo.Name,
+			ReturnSlots:       actorSystemRecvRawInfo.SlotCount,
+			ReturnRegionParam: regionNone,
+		},
+		"core.actor_recv_system_until": {
+			ParamTypes:        []string{"i32"},
+			ParamSlots:        1,
+			ReturnType:        actorSystemRecvRawInfo.Name,
+			ReturnSlots:       actorSystemRecvRawInfo.SlotCount,
 			ReturnRegionParam: regionNone,
 		},
 		"core.consent_token": {
@@ -1408,7 +1545,8 @@ func builtinNeedsUnsafe(name string, argRegions []int) bool {
 		"core.load_ptr", "core.store_ptr", "core.store_arch_ptr",
 		"core.ptr_add",
 		"core.mmio_read_i32", "core.mmio_write_i32",
-		"core.sym_addr", "core.ctx_switch":
+		"core.sym_addr", "core.ctx_switch",
+		"core.actor_ref_local", "core.actor_ref_slot":
 		return true
 	case "core.island_make_u8",
 		"core.island_make_u16",
@@ -1575,6 +1713,28 @@ func ResolveBuiltinAlias(name string) (string, bool) {
 		return "core.actor_dispatch", true
 	case "actor_main_entry_id":
 		return "core.actor_main_entry_id", true
+	case "actor_status":
+		return "core.actor_status", true
+	case "actor_status_raw":
+		return "core.actor_status_raw", true
+	case "actor_wait":
+		return "core.actor_wait", true
+	case "actor_wait_until":
+		return "core.actor_wait_until", true
+	case "actor_stop":
+		return "core.actor_stop", true
+	case "actor_exit_reason":
+		return "core.actor_exit_reason", true
+	case "actor_link":
+		return "core.actor_link", true
+	case "actor_unlink":
+		return "core.actor_unlink", true
+	case "actor_monitor":
+		return "core.actor_monitor", true
+	case "actor_demonitor":
+		return "core.actor_demonitor", true
+	case "actor_set_trap_exit":
+		return "core.actor_set_trap_exit", true
 	case "consent_token":
 		return "core.consent_token", true
 	case "secret_seal_i32":
@@ -1598,6 +1758,9 @@ func ResolveBuiltinAlias(name string) (string, bool) {
 		"core.task_poll_i32", "core.select2_i32",
 		"core.send_msg", "core.recv_msg", "core.recv_poll", "core.recv_until", "core.recv_msg_until", "core.send_typed", "core.recv_typed",
 		"core.actor_dispatch", "core.actor_main_entry_id", "core.actor_node_connect", "core.actor_node_status", "core.spawn_remote",
+		"core.actor_status", "core.actor_status_raw", "core.actor_wait", "core.actor_wait_until", "core.actor_stop", "core.actor_exit_reason",
+		"core.actor_link", "core.actor_unlink", "core.actor_monitor", "core.actor_demonitor", "core.actor_set_trap_exit",
+		"core.actor_recv_system", "core.actor_recv_system_poll", "core.actor_recv_system_until",
 		"core.consent_token", "core.secret_seal_i32", "core.secret_unseal_i32":
 		return name, true
 	default:
@@ -2483,6 +2646,17 @@ func DescribeBuiltins() ([]BuiltinManifest, error) {
 		"recv_typed",
 		"actor_dispatch",
 		"actor_main_entry_id",
+		"actor_status",
+		"actor_status_raw",
+		"actor_wait",
+		"actor_wait_until",
+		"actor_stop",
+		"actor_exit_reason",
+		"actor_link",
+		"actor_unlink",
+		"actor_monitor",
+		"actor_demonitor",
+		"actor_set_trap_exit",
 		"consent_token",
 		"secret_seal_i32",
 		"secret_unseal_i32",
@@ -2682,12 +2856,15 @@ func builtinEffects(name string) []string {
 		"core.task_poll_i32",
 		"core.select2_i32":
 		effects = []string{"runtime"}
-	case "core.recv_until", "core.recv_msg_until":
+	case "core.recv_until", "core.recv_msg_until", "core.actor_recv_system", "core.actor_recv_system_until":
 		effects = []string{"actors", "runtime"}
-	case "core.recv_poll":
+	case "core.recv_poll", "core.actor_recv_system_poll":
 		effects = []string{"actors"}
 	case "core.actor_dispatch", "core.actor_main_entry_id",
-		"core.spawn", "core.send", "core.send_msg", "core.recv", "core.recv_msg", "core.send_typed", "core.recv_typed", "core.self", "core.sender":
+		"core.actor_ref_local", "core.actor_ref_slot",
+		"core.spawn", "core.send", "core.send_msg", "core.recv", "core.recv_msg", "core.send_typed", "core.recv_typed", "core.self", "core.sender",
+		"core.actor_status", "core.actor_status_raw", "core.actor_wait", "core.actor_wait_until", "core.actor_stop", "core.actor_exit_reason",
+		"core.actor_link", "core.actor_unlink", "core.actor_monitor", "core.actor_demonitor", "core.actor_set_trap_exit":
 		effects = []string{"actors"}
 	case "core.actor_node_connect", "core.actor_node_status", "core.spawn_remote":
 		effects = []string{"actors", "runtime"}
@@ -4411,26 +4588,63 @@ func makeStructTypeInfo(name string, fields []FieldInfo) *TypeInfo {
 	}
 }
 
+func makeBuiltinEnumTypeInfo(name string, caseNames []string) *TypeInfo {
+	caseMap := make(map[string]EnumCaseInfo, len(caseNames))
+	cases := make([]EnumCaseInfo, 0, len(caseNames))
+	for i, caseName := range caseNames {
+		info := EnumCaseInfo{Name: caseName, Ordinal: int32(i), SlotCount: 0}
+		caseMap[caseName] = info
+		cases = append(cases, info)
+	}
+	return &TypeInfo{
+		Name:      name,
+		Kind:      TypeEnum,
+		Public:    true,
+		SlotCount: 1,
+		EnumCases: cases,
+		CaseMap:   caseMap,
+	}
+}
+
 func baseTypes() map[string]*TypeInfo {
+	actorRefSlots := runtimeabi.ActorHandleABI().RefSlots
 	types := map[string]*TypeInfo{
-		"i32":           {Name: "i32", Kind: TypeI32, SlotCount: 1},
-		"i64":           {Name: "i64", Kind: TypeI64, SlotCount: 1, Public: true},
-		"u8":            {Name: "u8", Kind: TypeU8, SlotCount: 1, Public: true},
-		"u16":           {Name: "u16", Kind: TypeU8, SlotCount: 1, Public: true},
-		"c_int":         {Name: "c_int", Kind: TypeI32, SlotCount: 1, Public: true},
-		"c_uint":        {Name: "c_uint", Kind: TypeI32, SlotCount: 1, Public: true},
-		"bool":          {Name: "bool", Kind: TypeBool, SlotCount: 1, Public: true},
-		"ptr":           {Name: "ptr", Kind: TypePtr, SlotCount: 1, Public: true},
-		"fnptr":         {Name: "fnptr", Kind: TypePtr, SlotCount: FnPtrSlotCount, Public: true},
-		"str":           makeStrTypeInfo(),
-		"actor":         {Name: "actor", Kind: TypeActor, SlotCount: 1, Public: true},
-		"task.error":    {Name: "task.error", Kind: TypeI32, SlotCount: 1, Public: true},
-		"task.group":    {Name: "task.group", Kind: TypeI32, SlotCount: 1, Public: true},
-		"island":        {Name: "island", Kind: TypeIsland, SlotCount: 1, Public: true},
-		"cap.io":        {Name: "cap.io", Kind: TypeCap, SlotCount: 1, Public: true},
-		"cap.mem":       {Name: "cap.mem", Kind: TypeCap, SlotCount: 1, Public: true},
-		"consent.token": {Name: "consent.token", Kind: TypeCap, SlotCount: 1, Public: true},
-		"secret.i32":    {Name: "secret.i32", Kind: TypeStruct, SlotCount: 1, Public: true},
+		"i32":          {Name: "i32", Kind: TypeI32, SlotCount: 1},
+		"i64":          {Name: "i64", Kind: TypeI64, SlotCount: 1, Public: true},
+		"u8":           {Name: "u8", Kind: TypeU8, SlotCount: 1, Public: true},
+		"u16":          {Name: "u16", Kind: TypeU8, SlotCount: 1, Public: true},
+		"c_int":        {Name: "c_int", Kind: TypeI32, SlotCount: 1, Public: true},
+		"c_uint":       {Name: "c_uint", Kind: TypeI32, SlotCount: 1, Public: true},
+		"bool":         {Name: "bool", Kind: TypeBool, SlotCount: 1, Public: true},
+		"ptr":          {Name: "ptr", Kind: TypePtr, SlotCount: 1, Public: true},
+		"fnptr":        {Name: "fnptr", Kind: TypePtr, SlotCount: FnPtrSlotCount, Public: true},
+		"str":          makeStrTypeInfo(),
+		"actor":        {Name: "actor", Kind: TypeActor, SlotCount: actorRefSlots, Public: true},
+		"actor.status": makeBuiltinEnumTypeInfo("actor.status", runtimeabi.ActorLifecycleStatusNames()),
+		"actor.exit_reason": {
+			Name:      "actor.exit_reason",
+			Kind:      TypeI32,
+			SlotCount: 1,
+			Public:    true,
+		},
+		"actor.monitor": {
+			Name:              "actor.monitor",
+			Kind:              TypeI32,
+			SlotCount:         1,
+			Public:            true,
+			RuntimeOwned:      true,
+			UserConstructible: false,
+			UserAssignable:    false,
+			ActorSendable:     false,
+		},
+		"actor.spawn_options": {Name: "actor.spawn_options", Kind: TypeI32, SlotCount: 1, Public: true},
+		"task.error":          {Name: "task.error", Kind: TypeI32, SlotCount: 1, Public: true},
+		"task.group":          {Name: "task.group", Kind: TypeI32, SlotCount: 1, Public: true},
+		"island":              {Name: "island", Kind: TypeIsland, SlotCount: 1, Public: true},
+		"cap.io":              {Name: "cap.io", Kind: TypeCap, SlotCount: 1, Public: true},
+		"cap.mem":             {Name: "cap.mem", Kind: TypeCap, SlotCount: 1, Public: true},
+		"consent.token":       {Name: "consent.token", Kind: TypeCap, SlotCount: 1, Public: true},
+		"secret.i32":          {Name: "secret.i32", Kind: TypeStruct, SlotCount: 1, Public: true},
 	}
 	types["i32"].Public = true
 	types["task.i32"] = makeStructTypeInfo("task.i32", []FieldInfo{
@@ -4454,12 +4668,54 @@ func baseTypes() map[string]*TypeInfo {
 		{Name: "tag", TypeName: "i32"},
 		{Name: "error", TypeName: "task.error"},
 	})
+	types["actor.wait_result"] = makeStructTypeInfo("actor.wait_result", []FieldInfo{
+		{Name: "reason", TypeName: "actor.exit_reason"},
+		{Name: "status", TypeName: "actor.status"},
+	})
+	types["actor.status_result_raw"] = makeStructTypeInfo("actor.status_result_raw", []FieldInfo{
+		{Name: "status_code", TypeName: "i32"},
+		{Name: "result", TypeName: "i32"},
+	})
+	types["actor.status_result_raw"].RuntimeOwned = true
+	types["actor.status_result_raw"].UserConstructible = false
+	types["actor.status_result_raw"].UserAssignable = false
+	types["actor.status_result_raw"].ActorSendable = false
+	types["actor.exit"] = makeStructTypeInfo("actor.exit", []FieldInfo{
+		{Name: "target", TypeName: "actor", SlotCount: actorRefSlots},
+		{Name: "reason", TypeName: "actor.exit_reason"},
+	})
+	types["actor.node"] = makeStructTypeInfo("actor.node", []FieldInfo{
+		{Name: "id", TypeName: "i32"},
+		{Name: "epoch", TypeName: "i32"},
+	})
+	types["actor.node"].RuntimeOwned = true
+	types["actor.node"].UserConstructible = false
+	types["actor.node"].UserAssignable = false
+	types["actor.node"].ActorSendable = false
+	types["actor.system_recv_raw"] = makeStructTypeInfo("actor.system_recv_raw", []FieldInfo{
+		{Name: "status", TypeName: "i32"},
+		{Name: "kind", TypeName: "i32"},
+		{Name: "subject", TypeName: "actor", SlotCount: 1},
+		{Name: "monitor", TypeName: "actor.monitor"},
+		{Name: "node", TypeName: "actor.node", SlotCount: 2},
+		{Name: "reason_kind", TypeName: "i32"},
+		{Name: "reason_code", TypeName: "i32"},
+	})
+	types["actor.system_recv_raw"].RuntimeOwned = true
+	types["actor.system_recv_raw"].UserConstructible = false
+	types["actor.system_recv_raw"].UserAssignable = false
+	types["actor.system_recv_raw"].ActorSendable = false
 	for _, name := range []string{
 		"task.i32",
 		"task.result_i32",
 		"actor.msg",
 		"actor.recv_result_i32",
 		"actor.recv_msg_result",
+		"actor.wait_result",
+		"actor.status_result_raw",
+		"actor.exit",
+		"actor.node",
+		"actor.system_recv_raw",
 	} {
 		types[name].Repr = frontend.StructReprC
 	}
@@ -4801,6 +5057,7 @@ func checkedConstI32(v int64) (int64, bool, bool) {
 func isInt32Like(name string) bool {
 	return name == "i32" || name == "u8" || name == "u16" || name == "c_int" || name == "c_uint" ||
 		name == "task.error" ||
+		name == "actor.exit_reason" ||
 		IsILP32NativeScalarType(name)
 }
 
@@ -4973,6 +5230,9 @@ func typeActorTaskSendable(typeName string, types map[string]*TypeInfo, seen map
 	if !ok {
 		return false
 	}
+	if info.RuntimeOwned && !info.ActorSendable {
+		return false
+	}
 	switch info.Kind {
 	case TypeI32, TypeI64, TypeU8, TypeBool, TypeActor:
 		return true
@@ -5014,6 +5274,9 @@ func typeActorTaskSendabilityUnsafeReason(
 	info, ok := types[typeName]
 	if !ok {
 		return fmt.Sprintf("unknown type '%s'", typeName)
+	}
+	if info.RuntimeOwned && !info.ActorSendable {
+		return fmt.Sprintf("runtime-owned type '%s' cannot cross actor/task boundary", typeName)
 	}
 	switch info.Kind {
 	case TypeI32, TypeI64, TypeU8, TypeBool, TypeActor:

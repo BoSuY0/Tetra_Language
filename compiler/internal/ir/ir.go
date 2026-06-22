@@ -14,8 +14,16 @@ type IRFunc struct {
 	ParamSlots  int
 	LocalSlots  int
 	ReturnSlots int
+	OwnedParams []IROwnedParam
 	Policy      IRPolicy
 	Instrs      []IRInstr
+}
+
+type IROwnedParam struct {
+	Local           int
+	LayoutID        string
+	OwnershipDomain IROwnershipDomain
+	ReleaseKind     IRReleaseKind
 }
 
 type IRPolicy struct {
@@ -86,6 +94,9 @@ const (
 	IRIslandMakeSliceI32
 	IRIslandFree
 	IRIslandReset
+	// Owned-value destruction model
+	IRDropOwned
+	IRReleaseAllocation
 	// Capabilities + MMIO
 	IRCapIO
 	IRCapMem
@@ -189,6 +200,8 @@ const (
 // ISLAND_NEW -> pop1 push1
 // ISLAND_MAKE_SLICE -> pop2 push2
 // ISLAND_FREE -> pop1
+// DROP_OWNED -> pop1 push1 (release token)
+// RELEASE_ALLOCATION -> pop1
 // CAP -> push1
 // MEM_READ -> pop2 push1
 // MEM_WRITE -> pop3 push1
@@ -237,14 +250,39 @@ const (
 // ATOMIC_FETCH_*_I8/I16 -> pop3 push1
 
 type IRInstr struct {
-	Kind     IRInstrKind
-	Imm      int32
-	Local    int
-	Label    int
-	Name     string
-	ArgSlots int
-	RetSlots int
-	ProofID  string
-	Str      []byte
-	Pos      frontend.Position
+	Kind                   IRInstrKind
+	Imm                    int32
+	Local                  int
+	Label                  int
+	Name                   string
+	ArgSlots               int
+	RetSlots               int
+	OwnedReturnSlot        int
+	OwnedReturnConditional bool
+	OwnsErrorSlot          bool
+	OwnedErrorSlot         int
+	ProofID                string
+	LayoutID               string
+	OwnershipDomain        IROwnershipDomain
+	ReleaseKind            IRReleaseKind
+	Str                    []byte
+	Pos                    frontend.Position
 }
+
+type IROwnershipDomain string
+
+const (
+	IROwnershipDomainHeap   IROwnershipDomain = "heap"
+	IROwnershipDomainRegion IROwnershipDomain = "region"
+	IROwnershipDomainIsland IROwnershipDomain = "island"
+	IROwnershipDomainTask   IROwnershipDomain = "task"
+	IROwnershipDomainActor  IROwnershipDomain = "actor"
+)
+
+type IRReleaseKind string
+
+const (
+	IRReleaseKindLinuxMmap             IRReleaseKind = "linux_mmap"
+	IRReleaseKindProcessBumpNoRelease  IRReleaseKind = "process_bump_no_release"
+	IRReleaseKindScopedSingleMappingV0 IRReleaseKind = "scoped_single_mapping_v0"
+)

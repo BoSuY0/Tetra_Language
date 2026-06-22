@@ -657,6 +657,28 @@ func TestSysVAllocBytesEmitsDeterministicMmapFailureGuard(t *testing.T) {
 	}
 }
 
+func TestSysVReleaseAllocationMunmapsAllocBytesHeaderMapping(t *testing.T) {
+	e := &x64.Emitter{}
+	stackDepth := 1
+	if err := LinuxSysV().EmitReleaseAllocation(e, &stackDepth, x64.CodegenOptions{}, nil); err != nil {
+		t.Fatalf("EmitReleaseAllocation: %v", err)
+	}
+	if stackDepth != 0 {
+		t.Fatalf("stack depth = %d, want 0", stackDepth)
+	}
+	for _, want := range [][]byte{
+		{0x5F},             // pop rdi
+		{0x8B, 0x77, 0xF8}, // mov esi, [rdi-8]
+		{0x48, 0x81, 0xC6, 0x08, 0x00, 0x00, 0x00}, // add rsi, 8
+		{0x48, 0x81, 0xC7, 0xF8, 0xFF, 0xFF, 0xFF}, // add rdi, -8
+		{0xB8, 0x0B, 0x00, 0x00, 0x00, 0x0F, 0x05}, // munmap syscall
+	} {
+		if !bytes.Contains(e.Buf, want) {
+			t.Fatalf("release allocation missing bytes\n got=% x\nwant contains=% x", e.Buf, want)
+		}
+	}
+}
+
 func hasImportPatch(patches []x64obj.ImportPatch, name string) bool {
 	for _, patch := range patches {
 		if patch.Name == name {

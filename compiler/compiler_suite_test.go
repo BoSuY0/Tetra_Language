@@ -375,7 +375,7 @@ actor Slots:
         return s8
 
 func main() -> Int
-uses actors:
+uses actors, runtime:
     let _peer: actor = core.spawn("Slots.run")
     return 0
 `, "actor 'Slots' state supports at most 8 slots, got 9")
@@ -406,7 +406,7 @@ actor Slots:
         return s8
 
 func main() -> Int
-uses actors:
+uses actors, runtime:
     let _peer: actor = core.spawn("Slots.run")
     return 0
 `), 0644); err != nil {
@@ -473,7 +473,7 @@ func TestActorMessagePoolBudgetAtDocumentedCapacityBuildAndRun(t *testing.T) {
 	}
 
 	src := `
-val MESSAGE_POOL_SAFE_MESSAGES: i32 = 744
+val MESSAGE_POOL_SAFE_MESSAGES: i32 = 682
 val MAILBOX_CAPACITY: i32 = 256
 
 func main() -> Int
@@ -516,7 +516,7 @@ func TestActorMessagePoolExhaustionReturnsCheckedFailure(t *testing.T) {
 
 	src := `
 val MAILBOX_CAPACITY: i32 = 256
-val THIRD_ACTOR_LIVE_MESSAGES: i32 = 232
+val THIRD_ACTOR_LIVE_MESSAGES: i32 = 170
 
 func sleeper() -> Int
 uses runtime:
@@ -687,7 +687,7 @@ func TestActorMessagePoolExhaustionCoversTaggedMessages(t *testing.T) {
 
 	src := `
 val MAILBOX_CAPACITY: i32 = 256
-val THIRD_ACTOR_LIVE_MESSAGES: i32 = 232
+val THIRD_ACTOR_LIVE_MESSAGES: i32 = 170
 
 func sleeper() -> Int
 uses runtime:
@@ -745,7 +745,7 @@ enum Telemetry:
     case item(Int)
 
 val MAILBOX_CAPACITY: i32 = 256
-val THIRD_ACTOR_LIVE_MESSAGES: i32 = 232
+val THIRD_ACTOR_LIVE_MESSAGES: i32 = 170
 
 func sleeper() -> Int
 uses runtime:
@@ -1095,6 +1095,1334 @@ uses actors, runtime:
 	}
 }
 
+func TestActorSendToStoppingActorReturnsCheckedFailure(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+enum Signal:
+    case item(Int)
+
+func target() -> Int:
+    return 0
+
+func main() -> Int
+uses actors, runtime:
+    let peer: actor = core.spawn("target")
+    let reason: actor.exit_reason = core.actor_exit_reason(peer)
+    let stopped: Int = core.actor_stop(peer, reason)
+    if stopped != 0:
+        return 10 + stopped
+    let sent: Int = core.send(peer, 1)
+    if sent != -4:
+        return 20
+    let tagged: Int = core.send_msg(peer, 2, 7)
+    if tagged != -4:
+        return 30
+    let typed: Int = core.send_typed(peer, Signal.item(3))
+    if typed != -4:
+        return 40
+    return 0
+`
+	stdout, exitCode := buildAndRunWithOptions(t, src, BuildOptions{Runtime: RuntimeBuiltin})
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, want checked stopping actor send-path failures", exitCode)
+	}
+}
+
+func TestActorSendToCanceledActorReturnsCheckedFailure(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+enum Signal:
+    case item(Int)
+
+func parked() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(100)
+    return 0
+
+func worker() -> Int
+uses actors, runtime:
+    let peer: actor = core.spawn("parked")
+    let current: task.group = core.task_group_current()
+    let _canceled: task.group = core.task_group_cancel(current)
+    let sent: Int = core.send(peer, 1)
+    if sent != -4:
+        return 20
+    let tagged: Int = core.send_msg(peer, 2, 7)
+    if tagged != -4:
+        return 30
+    let typed: Int = core.send_typed(peer, Signal.item(3))
+    if typed != -4:
+        return 40
+    return 0
+
+func main() -> Int
+uses actors, runtime:
+    var group: task.group = core.task_group_open()
+    let task: task.i32 = core.task_spawn_group_i32(group, "worker")
+    let result: task.result_i32 = core.task_join_result_i32(task)
+    let _closed: Int = core.task_group_close(group)
+    if result.error != 0:
+        return 50 + result.error
+    return result.value
+`
+	stdout, exitCode, timedOut := buildAndRunWithOptionsTimeout(
+		t,
+		src,
+		BuildOptions{Runtime: RuntimeBuiltin},
+		2*time.Second,
+	)
+	if timedOut {
+		t.Fatalf("program timed out; task_group_close should treat joined reclaimable task actors as done")
+	}
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, want checked canceled actor send-path failures", exitCode)
+	}
+}
+
+func TestActorSlotReuseInvalidatesStaleHandleBuildAndRun(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+func done() -> Int:
+    return 0
+
+func main() -> Int
+uses actors, runtime:
+    let first: actor = core.spawn("done")
+    let _first_settle: Int = core.sleep_ms(2)
+    let _first_waited: actor.wait_result = core.actor_wait(first)
+    let second: actor = core.spawn("done")
+    let stale_send: Int = core.send(first, 1)
+    if stale_send != -3:
+        return 20
+    let _second_settle: Int = core.sleep_ms(1)
+    let done_send: Int = core.send(second, 2)
+    if done_send != -4:
+        return 30
+    return 0
+`
+	stdout, exitCode := buildAndRunWithOptions(t, src, BuildOptions{Runtime: RuntimeBuiltin})
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, want stale reused actor handle rejected", exitCode)
+	}
+}
+
+func TestActorDoneSlotsRequireWaitBeforeReuseBuildAndRun(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+func status_code(status: actor.status) -> Int:
+    match status:
+    case actor.status.starting:
+        return 0
+    case actor.status.ready:
+        return 1
+    case actor.status.running:
+        return 2
+    case actor.status.blocked:
+        return 3
+    case actor.status.sleeping:
+        return 4
+    case actor.status.waiting:
+        return 5
+    case actor.status.stopping:
+        return 6
+    case actor.status.exited_normal:
+        return 7
+    case actor.status.exited_error:
+        return 8
+    case actor.status.canceled:
+        return 9
+    case actor.status.restarting:
+        return 10
+    case actor.status.dead:
+        return 11
+
+func done() -> Int:
+    return 0
+
+func main() -> Int
+uses actors, runtime:
+    var spawned: Int = 0
+    while spawned < 127:
+        let _peer: actor = core.spawn("done")
+        spawned = spawned + 1
+
+    let _settle: Int = core.sleep_ms(5)
+    let overflow: actor = core.spawn("done")
+    let overflow_wait: actor.wait_result = core.actor_wait(overflow)
+    let overflow_status: Int = status_code(overflow_wait.status)
+    if overflow_status != 11:
+        return 20 + overflow_status
+    return 0
+`
+	stdout, exitCode, timedOut := buildAndRunWithOptionsTimeout(
+		t,
+		src,
+		BuildOptions{Runtime: RuntimeBuiltin},
+		2*time.Second,
+	)
+	if timedOut {
+		t.Fatalf("actor done-slot reclaimability smoke timed out; stdout=%q", stdout)
+	}
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf(
+			"exit code = %d, want done-but-unwaited actor slots not reused before wait",
+			exitCode,
+		)
+	}
+}
+
+func TestActorWaitBlocksUntilTargetDoneBuildAndRun(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+func slow_exit() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(5)
+    return 7
+
+func main() -> Int
+uses actors:
+    let peer: actor = core.spawn("slow_exit")
+    let _waited: actor.wait_result = core.actor_wait(peer)
+    let after_wait: Int = core.send(peer, 1)
+    if after_wait != -4:
+        return 20
+    return 0
+`
+	stdout, exitCode, timedOut := buildAndRunWithOptionsTimeout(
+		t,
+		src,
+		BuildOptions{Runtime: RuntimeBuiltin},
+		2*time.Second,
+	)
+	if timedOut {
+		t.Fatalf("actor_wait smoke timed out; stdout=%q", stdout)
+	}
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, want actor_wait to return after target exits", exitCode)
+	}
+}
+
+func TestActorWaitResultStatusUsesPublicLifecycleEnumBuildAndRun(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+func status_code(status: actor.status) -> Int:
+    match status:
+    case actor.status.starting:
+        return 0
+    case actor.status.ready:
+        return 1
+    case actor.status.running:
+        return 2
+    case actor.status.blocked:
+        return 3
+    case actor.status.sleeping:
+        return 4
+    case actor.status.waiting:
+        return 5
+    case actor.status.stopping:
+        return 6
+    case actor.status.exited_normal:
+        return 7
+    case actor.status.exited_error:
+        return 8
+    case actor.status.canceled:
+        return 9
+    case actor.status.restarting:
+        return 10
+    case actor.status.dead:
+        return 11
+
+func done() -> Int:
+    return 0
+
+func fail() -> Int:
+    return 9
+
+func main() -> Int
+uses actors:
+    let normal: actor = core.spawn("done")
+    let normal_result: actor.wait_result = core.actor_wait(normal)
+    let normal_status: Int = status_code(normal_result.status)
+    if normal_status != 7:
+        return 20 + normal_status
+
+    let failed: actor = core.spawn("fail")
+    let failed_result: actor.wait_result = core.actor_wait(failed)
+    let failed_status: Int = status_code(failed_result.status)
+    if failed_status != 8:
+        return 60 + failed_status
+    return 0
+`
+	stdout, exitCode, timedOut := buildAndRunWithOptionsTimeout(
+		t,
+		src,
+		BuildOptions{Runtime: RuntimeBuiltin},
+		2*time.Second,
+	)
+	if timedOut {
+		t.Fatalf("actor_wait result status smoke timed out; stdout=%q", stdout)
+	}
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, want actor_wait result to expose public lifecycle statuses", exitCode)
+	}
+}
+
+func TestActorWaitInvalidAndStaleRefsReturnDeadStatusBuildAndRun(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+func status_code(status: actor.status) -> Int:
+    match status:
+    case actor.status.starting:
+        return 0
+    case actor.status.ready:
+        return 1
+    case actor.status.running:
+        return 2
+    case actor.status.blocked:
+        return 3
+    case actor.status.sleeping:
+        return 4
+    case actor.status.waiting:
+        return 5
+    case actor.status.stopping:
+        return 6
+    case actor.status.exited_normal:
+        return 7
+    case actor.status.exited_error:
+        return 8
+    case actor.status.canceled:
+        return 9
+    case actor.status.restarting:
+        return 10
+    case actor.status.dead:
+        return 11
+
+func sleeper() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(100)
+    return 0
+
+func done() -> Int:
+    return 0
+
+func main() -> Int
+uses actors, runtime:
+    var spawned: Int = 0
+    while spawned < 127:
+        let _peer: actor = core.spawn("sleeper")
+        spawned = spawned + 1
+
+    let invalid: actor = core.spawn("sleeper")
+    let invalid_wait: actor.wait_result = core.actor_wait(invalid)
+    let invalid_status: Int = status_code(invalid_wait.status)
+    if invalid_status != 11:
+        return 20 + invalid_status
+
+    let _advance: Int = core.sleep_ms(100)
+    let first: actor = core.spawn("done")
+    let _first_settle: Int = core.sleep_ms(2)
+    let _first_waited: actor.wait_result = core.actor_wait(first)
+    let _second: actor = core.spawn("done")
+    let stale_wait: actor.wait_result = core.actor_wait(first)
+    let stale_status: Int = status_code(stale_wait.status)
+    if stale_status != 11:
+        return 40 + stale_status
+    return 0
+`
+	stdout, exitCode, timedOut := buildAndRunWithOptionsTimeout(
+		t,
+		src,
+		BuildOptions{Runtime: RuntimeBuiltin},
+		2*time.Second,
+	)
+	if timedOut {
+		t.Fatalf("actor_wait invalid/stale status smoke timed out; stdout=%q", stdout)
+	}
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, want invalid and stale actor_wait results to expose dead status", exitCode)
+	}
+}
+
+func TestLibCoreActorsLifecycleWrappersBuildAndRun(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+module main
+
+import lib.core.actors as actors
+
+func slow() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(25)
+    return 0
+
+func done() -> Int:
+    return 0
+
+func fail() -> Int:
+    return 9
+
+func status_score(result: actors.StatusResult) -> Int:
+    match result:
+    case actors.StatusResult.ok(status):
+        match status:
+        case actors.ActorStatus.starting:
+            return 0
+        case actors.ActorStatus.ready:
+            return 1
+        case actors.ActorStatus.running:
+            return 2
+        case actors.ActorStatus.blocked:
+            return 3
+        case actors.ActorStatus.sleeping:
+            return 4
+        case actors.ActorStatus.waiting:
+            return 5
+        case actors.ActorStatus.stopping:
+            return 6
+        case actors.ActorStatus.exited_normal:
+            return 7
+        case actors.ActorStatus.exited_error(code):
+            return 80 + code
+        case actors.ActorStatus.canceled:
+            return 9
+        case actors.ActorStatus.restarting:
+            return 10
+        case actors.ActorStatus.dead:
+            return 11
+        case actors.ActorStatus.unknown(code):
+            return 100 + code
+    case actors.StatusResult.invalid:
+        return 200
+    case actors.StatusResult.stale:
+        return 201
+    case actors.StatusResult.node_down:
+        return 202
+
+func wait_score(result: actors.WaitResult) -> Int:
+    match result:
+    case actors.WaitResult.exited(reason):
+        match reason:
+        case actors.ExitReason.normal:
+            return 0
+        case actors.ExitReason.shutdown(code):
+            return 10 + code
+        case actors.ExitReason.error(code):
+            return 20 + code
+        case actors.ExitReason.canceled:
+            return 30
+        case actors.ExitReason.killed:
+            return 40
+        case actors.ExitReason.node_down(code):
+            return 50 + code
+        case actors.ExitReason.protocol_error(code):
+            return 60 + code
+        case actors.ExitReason.runtime_error(code):
+            return 70 + code
+        case actors.ExitReason.unknown(kind, code):
+            return 80 + kind + code
+    case actors.WaitResult.timeout:
+        return 100
+    case actors.WaitResult.canceled:
+        return 101
+    case actors.WaitResult.invalid:
+        return 102
+    case actors.WaitResult.stale:
+        return 103
+    case actors.WaitResult.node_down:
+        return 104
+
+func stop_score(result: actors.StopResult) -> Int:
+    match result:
+    case actors.StopResult.requested:
+        return 0
+    case actors.StopResult.already_exited(reason):
+        return 10
+    case actors.StopResult.invalid:
+        return 20
+    case actors.StopResult.stale:
+        return 21
+    case actors.StopResult.node_down:
+        return 22
+
+func link_score(result: actors.LinkResult) -> Int:
+    match result:
+    case actors.LinkResult.linked:
+        return 0
+    case actors.LinkResult.already_linked:
+        return 1
+    case actors.LinkResult.target_exited(reason):
+        return 2
+    case actors.LinkResult.resource_exhausted:
+        return 3
+    case actors.LinkResult.invalid:
+        return 4
+    case actors.LinkResult.stale:
+        return 5
+    case actors.LinkResult.node_down:
+        return 6
+
+func monitor_score(result: actors.MonitorResult) -> Int
+uses actors:
+    match result:
+    case actors.MonitorResult.monitoring(reference):
+        if actors.demonitor(reference, false):
+            return 0
+        return 40
+    case actors.MonitorResult.target_already_exited(reference):
+        if actors.demonitor(reference, false):
+            return 1
+        return 41
+    case actors.MonitorResult.resource_exhausted:
+        return 2
+    case actors.MonitorResult.invalid:
+        return 3
+    case actors.MonitorResult.stale:
+        return 4
+    case actors.MonitorResult.node_down:
+        return 5
+
+func main() -> Int
+uses actors, runtime:
+    let self_status: Int = status_score(actors.status(core.self()))
+    if self_status != 2:
+        return 10 + self_status
+
+    let normal: actor = core.spawn("done")
+    let normal_wait: Int = wait_score(actors.wait(normal))
+    if normal_wait != 0:
+        return 40 + normal_wait
+
+    let failed: actor = core.spawn("fail")
+    let failed_wait: Int = wait_score(actors.wait(failed))
+    if failed_wait != 29:
+        return 80 + failed_wait
+
+    let timed_peer: actor = core.spawn("slow")
+    let timed_wait: Int = wait_score(actors.wait_until(timed_peer, core.deadline_ms(1)))
+    if timed_wait != 100:
+        return 120 + timed_wait
+    let _timed_done: actors.WaitResult = actors.wait(timed_peer)
+
+    let stoppable: actor = core.spawn("slow")
+    let stopped: Int = stop_score(actors.stop(stoppable, actors.ExitReason.normal))
+    if stopped != 0:
+        return 160 + stopped
+
+    let done_peer: actor = core.spawn("done")
+    let _settle: Int = core.sleep_ms(3)
+    let already_done: Int = stop_score(actors.stop(done_peer, actors.ExitReason.normal))
+    if already_done != 10:
+        return 200 + already_done
+
+    let linked_peer: actor = core.spawn("slow")
+    let linked: Int = link_score(actors.link(linked_peer))
+    if linked != 0:
+        return 220 + linked
+    if !actors.unlink(linked_peer):
+        return 230
+
+    let monitored_peer: actor = core.spawn("slow")
+    let monitored: Int = monitor_score(actors.monitor(monitored_peer))
+    if monitored != 0:
+        return 240 + monitored
+
+    if !actors.set_trap_exit(true):
+        return 250
+    if !actors.set_trap_exit(false):
+        return 251
+
+    return 0
+`
+	stdout, exitCode, timedOut := buildAndRunWithOptionsTimeout(
+		t,
+		src,
+		BuildOptions{
+			Runtime:         RuntimeBuiltin,
+			DependencyRoots: []ModuleRoot{{Root: projectRoot(t)}},
+		},
+		2*time.Second,
+	)
+	if timedOut {
+		t.Fatalf("lib.core.actors lifecycle wrapper smoke timed out; stdout=%q", stdout)
+	}
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, want lib.core.actors lifecycle wrappers to map current runtime results", exitCode)
+	}
+}
+
+func TestLibCoreActorsStatusResultInvalidAndStaleBuildAndRun(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+module main
+
+import lib.core.actors as actors
+
+func done() -> Int:
+    return 0
+
+func slow() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(200)
+    return 0
+
+func status_result_code(result: actors.StatusResult) -> Int:
+    match result:
+    case actors.StatusResult.ok(status):
+        return 0
+    case actors.StatusResult.invalid:
+        return 1
+    case actors.StatusResult.stale:
+        return 2
+    case actors.StatusResult.node_down:
+        return 3
+
+func main() -> Int
+uses actors, runtime:
+    let first: actor = core.spawn("done")
+    let _first_waited: actors.WaitResult = actors.wait(first)
+    let second: actor = core.spawn("done")
+    let stale_status: Int = status_result_code(actors.status(first))
+    if stale_status != 2:
+        return 10 + stale_status
+    let _second_waited: actors.WaitResult = actors.wait(second)
+
+    var spawned: Int = 0
+    while spawned < 127:
+        let _peer: actor = core.spawn("slow")
+        spawned = spawned + 1
+    let invalid: actor = core.spawn("slow")
+    let invalid_status: Int = status_result_code(actors.status(invalid))
+    if invalid_status != 1:
+        return 30 + invalid_status
+    return 0
+`
+	stdout, exitCode, timedOut := buildAndRunWithOptionsTimeout(
+		t,
+		src,
+		BuildOptions{
+			Runtime:         RuntimeBuiltin,
+			DependencyRoots: []ModuleRoot{{Root: projectRoot(t)}},
+		},
+		2*time.Second,
+	)
+	if timedOut {
+		t.Fatalf("lib.core.actors status invalid/stale smoke timed out; stdout=%q", stdout)
+	}
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, want StatusResult.invalid/stale from lib.core.actors.status", exitCode)
+	}
+}
+
+func TestLibCoreActorsLifecycleWrappersInvalidAndStaleTaxonomyBuildAndRun(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+module main
+
+import lib.core.actors as actors
+
+func done() -> Int:
+    return 0
+
+func slow() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(200)
+    return 0
+
+func stop_result_code(result: actors.StopResult) -> Int:
+    match result:
+    case actors.StopResult.requested:
+        return 0
+    case actors.StopResult.already_exited(reason):
+        return 4
+    case actors.StopResult.invalid:
+        return 1
+    case actors.StopResult.stale:
+        return 2
+    case actors.StopResult.node_down:
+        return 3
+
+func link_result_code(result: actors.LinkResult) -> Int:
+    match result:
+    case actors.LinkResult.linked:
+        return 0
+    case actors.LinkResult.already_linked:
+        return 5
+    case actors.LinkResult.target_exited(reason):
+        return 4
+    case actors.LinkResult.resource_exhausted:
+        return 6
+    case actors.LinkResult.invalid:
+        return 1
+    case actors.LinkResult.stale:
+        return 2
+    case actors.LinkResult.node_down:
+        return 3
+
+func monitor_result_code(result: actors.MonitorResult) -> Int
+uses actors:
+    match result:
+    case actors.MonitorResult.monitoring(reference):
+        let removed_live: Bool = actors.demonitor(reference, false)
+        return 0
+    case actors.MonitorResult.target_already_exited(reference):
+        let removed_done: Bool = actors.demonitor(reference, false)
+        return 4
+    case actors.MonitorResult.resource_exhausted:
+        return 6
+    case actors.MonitorResult.invalid:
+        return 1
+    case actors.MonitorResult.stale:
+        return 2
+    case actors.MonitorResult.node_down:
+        return 3
+
+func main() -> Int
+uses actors, runtime:
+    let first: actor = core.spawn("done")
+    let _first_waited: actors.WaitResult = actors.wait(first)
+    let second: actor = core.spawn("done")
+
+    let stale_stop: Int = stop_result_code(actors.stop(first, actors.ExitReason.normal))
+    if stale_stop != 2:
+        return 10 + stale_stop
+    let stale_link: Int = link_result_code(actors.link(first))
+    if stale_link != 2:
+        return 20 + stale_link
+    let stale_monitor: Int = monitor_result_code(actors.monitor(first))
+    if stale_monitor != 2:
+        return 30 + stale_monitor
+    let _second_waited: actors.WaitResult = actors.wait(second)
+
+    var spawned: Int = 0
+    while spawned < 127:
+        let _peer: actor = core.spawn("slow")
+        spawned = spawned + 1
+    let invalid: actor = core.spawn("slow")
+
+    let invalid_stop: Int = stop_result_code(actors.stop(invalid, actors.ExitReason.normal))
+    if invalid_stop != 1:
+        return 40 + invalid_stop
+    let invalid_link: Int = link_result_code(actors.link(invalid))
+    if invalid_link != 1:
+        return 50 + invalid_link
+    let invalid_monitor: Int = monitor_result_code(actors.monitor(invalid))
+    if invalid_monitor != 1:
+        return 60 + invalid_monitor
+    return 0
+`
+	stdout, exitCode, timedOut := buildAndRunWithOptionsTimeout(
+		t,
+		src,
+		BuildOptions{
+			Runtime:         RuntimeBuiltin,
+			DependencyRoots: []ModuleRoot{{Root: projectRoot(t)}},
+		},
+		2*time.Second,
+	)
+	if timedOut {
+		t.Fatalf("lib.core.actors lifecycle taxonomy smoke timed out; stdout=%q", stdout)
+	}
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, want StopResult/LinkResult/MonitorResult invalid/stale taxonomy", exitCode)
+	}
+}
+
+func TestLibCoreActorsWaitInvalidAndStaleTaxonomyBuildAndRun(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+module main
+
+import lib.core.actors as actors
+
+func done() -> Int:
+    return 0
+
+func slow() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(200)
+    return 0
+
+func wait_result_code(result: actors.WaitResult) -> Int:
+    match result:
+    case actors.WaitResult.exited(reason):
+        return 0
+    case actors.WaitResult.timeout:
+        return 4
+    case actors.WaitResult.canceled:
+        return 5
+    case actors.WaitResult.invalid:
+        return 1
+    case actors.WaitResult.stale:
+        return 2
+    case actors.WaitResult.node_down:
+        return 3
+
+func main() -> Int
+uses actors, runtime:
+    let first: actor = core.spawn("done")
+    let _first_waited: actors.WaitResult = actors.wait(first)
+    let second: actor = core.spawn("done")
+
+    let stale_wait: Int = wait_result_code(actors.wait(first))
+    if stale_wait != 2:
+        return 10 + stale_wait
+    let stale_wait_until: Int = wait_result_code(actors.wait_until(first, 0))
+    if stale_wait_until != 2:
+        return 20 + stale_wait_until
+    let _second_waited: actors.WaitResult = actors.wait(second)
+
+    var spawned: Int = 0
+    while spawned < 127:
+        let _peer: actor = core.spawn("slow")
+        spawned = spawned + 1
+    let invalid: actor = core.spawn("slow")
+
+    let invalid_wait: Int = wait_result_code(actors.wait(invalid))
+    if invalid_wait != 1:
+        return 30 + invalid_wait
+    let invalid_wait_until: Int = wait_result_code(actors.wait_until(invalid, 0))
+    if invalid_wait_until != 1:
+        return 40 + invalid_wait_until
+    return 0
+`
+	stdout, exitCode, timedOut := buildAndRunWithOptionsTimeout(
+		t,
+		src,
+		BuildOptions{
+			Runtime:         RuntimeBuiltin,
+			DependencyRoots: []ModuleRoot{{Root: projectRoot(t)}},
+		},
+		2*time.Second,
+	)
+	if timedOut {
+		t.Fatalf("lib.core.actors wait taxonomy smoke timed out; stdout=%q", stdout)
+	}
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, want WaitResult invalid/stale taxonomy", exitCode)
+	}
+}
+
+func TestActorWaitUntilTimesOutBeforeTargetDoneBuildAndRun(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+func slow_exit() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(10)
+    return 7
+
+func main() -> Int
+uses actors, runtime:
+    let peer: actor = core.spawn("slow_exit")
+    let _early: actor.wait_result = core.actor_wait_until(peer, core.deadline_ms(3))
+    let after_timeout: Int = core.time_now_ms()
+    if after_timeout != 3:
+        return 10 + after_timeout
+    let still_alive_send: Int = core.send(peer, 1)
+    if still_alive_send != 1:
+        return 30
+    let _final: actor.wait_result = core.actor_wait(peer)
+    let done_send: Int = core.send(peer, 2)
+    if done_send != -4:
+        return 40
+    return 0
+`
+	stdout, exitCode, timedOut := buildAndRunWithOptionsTimeout(
+		t,
+		src,
+		BuildOptions{Runtime: RuntimeBuiltin},
+		2*time.Second,
+	)
+	if timedOut {
+		t.Fatalf("actor_wait_until smoke timed out; stdout=%q", stdout)
+	}
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, want actor_wait_until to time out before target exits", exitCode)
+	}
+}
+
+func TestActorStatusEnumReadyAndExitedBuildAndRun(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+func status_code(status: actor.status) -> Int:
+    match status:
+    case actor.status.starting:
+        return 0
+    case actor.status.ready:
+        return 1
+    case actor.status.running:
+        return 2
+    case actor.status.blocked:
+        return 3
+    case actor.status.sleeping:
+        return 4
+    case actor.status.waiting:
+        return 5
+    case actor.status.stopping:
+        return 6
+    case actor.status.exited_normal:
+        return 7
+    case actor.status.exited_error:
+        return 8
+    case actor.status.canceled:
+        return 9
+    case actor.status.restarting:
+        return 10
+    case actor.status.dead:
+        return 11
+
+func done() -> Int:
+    return 0
+
+func fail() -> Int:
+    return 9
+
+func main() -> Int
+uses actors, runtime:
+    let self_status: Int = status_code(core.actor_status(core.self()))
+    if self_status != 2:
+        return 20 + self_status
+    let normal: actor = core.spawn("done")
+    let failed: actor = core.spawn("fail")
+    let _settle: Int = core.sleep_ms(2)
+    let normal_status: Int = status_code(core.actor_status(normal))
+    if normal_status != 7:
+        return 40 + normal_status
+    let failed_status: Int = status_code(core.actor_status(failed))
+    if failed_status != 8:
+        return 60 + failed_status
+    return 0
+`
+	stdout, exitCode := buildAndRunWithOptions(t, src, BuildOptions{Runtime: RuntimeBuiltin})
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, want actor_status v1 enum mapping with running self", exitCode)
+	}
+}
+
+func TestActorStatusRunningSurvivesYieldBuildAndRun(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+func status_code(status: actor.status) -> Int:
+    match status:
+    case actor.status.running:
+        return 2
+    case actor.status.ready:
+        return 1
+    case actor.status.blocked:
+        return 3
+    case actor.status.waiting:
+        return 5
+    case actor.status.dead:
+        return 11
+    case actor.status.starting:
+        return 0
+    case actor.status.sleeping:
+        return 4
+    case actor.status.stopping:
+        return 6
+    case actor.status.exited_normal:
+        return 7
+    case actor.status.exited_error:
+        return 8
+    case actor.status.canceled:
+        return 9
+    case actor.status.restarting:
+        return 10
+
+func main() -> Int
+uses actors, runtime:
+    let before: Int = status_code(core.actor_status(core.self()))
+    if before != 2:
+        return 20 + before
+    let _yielded: Int = core.yield()
+    let after: Int = status_code(core.actor_status(core.self()))
+    if after != 2:
+        return 40 + after
+    return 0
+`
+	stdout, exitCode := buildAndRunWithOptions(t, src, BuildOptions{Runtime: RuntimeBuiltin})
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, want current actor to observe running before and after yield", exitCode)
+	}
+}
+
+func TestActorStatusStartingBeforeFirstDispatchBuildAndRun(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+func status_code(status: actor.status) -> Int:
+    match status:
+    case actor.status.starting:
+        return 0
+    case actor.status.ready:
+        return 1
+    case actor.status.running:
+        return 2
+    case actor.status.blocked:
+        return 3
+    case actor.status.sleeping:
+        return 4
+    case actor.status.waiting:
+        return 5
+    case actor.status.stopping:
+        return 6
+    case actor.status.exited_normal:
+        return 7
+    case actor.status.exited_error:
+        return 8
+    case actor.status.canceled:
+        return 9
+    case actor.status.restarting:
+        return 10
+    case actor.status.dead:
+        return 11
+
+func done() -> Int:
+    return 0
+
+func main() -> Int
+uses actors, runtime:
+    let peer: actor = core.spawn("done")
+    let initial: Int = status_code(core.actor_status(peer))
+    if initial != 0:
+        return 20 + initial
+    let _yielded: Int = core.yield()
+    let after: Int = status_code(core.actor_status(peer))
+    if after != 7:
+        return 40 + after
+    return 0
+`
+	stdout, exitCode := buildAndRunWithOptions(t, src, BuildOptions{Runtime: RuntimeBuiltin})
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, want spawned actor to start as starting then exit normally", exitCode)
+	}
+}
+
+func TestActorStatusStoppingAfterActorStopBuildAndRun(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+func status_code(status: actor.status) -> Int:
+    match status:
+    case actor.status.starting:
+        return 0
+    case actor.status.ready:
+        return 1
+    case actor.status.running:
+        return 2
+    case actor.status.blocked:
+        return 3
+    case actor.status.sleeping:
+        return 4
+    case actor.status.waiting:
+        return 5
+    case actor.status.stopping:
+        return 6
+    case actor.status.exited_normal:
+        return 7
+    case actor.status.exited_error:
+        return 8
+    case actor.status.canceled:
+        return 9
+    case actor.status.restarting:
+        return 10
+    case actor.status.dead:
+        return 11
+
+func target() -> Int:
+    return 0
+
+func main() -> Int
+uses actors, runtime:
+    let peer: actor = core.spawn("target")
+    let reason: actor.exit_reason = core.actor_exit_reason(peer)
+    let requested: Int = core.actor_stop(peer, reason)
+    if requested != 0:
+        return 10 + requested
+    let stopping: Int = status_code(core.actor_status(peer))
+    if stopping != 6:
+        return 20 + stopping
+    let _yielded: Int = core.yield()
+    let after: Int = status_code(core.actor_status(peer))
+    if after != 7:
+        return 40 + after
+    return 0
+`
+	stdout, exitCode := buildAndRunWithOptions(t, src, BuildOptions{Runtime: RuntimeBuiltin})
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, want actor_stop to expose stopping then finalize normal exit", exitCode)
+	}
+}
+
+func TestActorStatusCanceledAfterTaskGroupCancelBuildAndRun(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+func status_code(status: actor.status) -> Int:
+    match status:
+    case actor.status.starting:
+        return 0
+    case actor.status.ready:
+        return 1
+    case actor.status.running:
+        return 2
+    case actor.status.blocked:
+        return 3
+    case actor.status.sleeping:
+        return 4
+    case actor.status.waiting:
+        return 5
+    case actor.status.stopping:
+        return 6
+    case actor.status.exited_normal:
+        return 7
+    case actor.status.exited_error:
+        return 8
+    case actor.status.canceled:
+        return 9
+    case actor.status.restarting:
+        return 10
+    case actor.status.dead:
+        return 11
+
+func worker() -> Int
+uses actors, runtime:
+    let group: task.group = core.task_group_current()
+    let _canceled: task.group = core.task_group_cancel(group)
+    return status_code(core.actor_status(core.self()))
+
+func main() -> Int
+uses actors, runtime:
+    var group: task.group = core.task_group_open()
+    let task: task.i32 = core.task_spawn_group_i32(group, "worker")
+    let result: task.result_i32 = core.task_join_result_i32(task)
+    let _closed: Int = core.task_group_close(group)
+    if result.error != 0:
+        return 20 + result.error
+    if result.value != 9:
+        return 40 + result.value
+    return 0
+`
+	stdout, exitCode := buildAndRunWithOptions(t, src, BuildOptions{Runtime: RuntimeBuiltin})
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, want task-group cancellation to expose actor.status.canceled", exitCode)
+	}
+}
+
+func TestActorMonitorRefsAreUniqueAndDemonitorableBuildAndRun(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+func idle() -> Int:
+    return 0
+
+func main() -> Int
+uses actors:
+    let peer: actor = core.spawn("idle")
+    let first: actor.monitor = core.actor_monitor(peer)
+    let second: actor.monitor = core.actor_monitor(peer)
+    if first == second:
+        return 20
+    let removed_first: Int = core.actor_demonitor(first)
+    if removed_first != 0:
+        return 30
+    let removed_second: Int = core.actor_demonitor(second)
+    if removed_second != 0:
+        return 40
+    return 0
+`
+	stdout, exitCode := buildAndRunWithOptions(t, src, BuildOptions{Runtime: RuntimeBuiltin})
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, want unique monitor refs and successful demonitor cleanup", exitCode)
+	}
+}
+
+func TestActorLinkPropagatesAbnormalExitBuildAndRun(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+func waits_then_fails() -> Int
+uses actors:
+    let _wake: Int = core.recv()
+    return 9
+
+func main() -> Int
+uses actors, runtime:
+    let peer: actor = core.spawn("waits_then_fails")
+    let linked: Int = core.actor_link(peer)
+    if linked != 0:
+        return 20 + linked
+    let wake: Int = core.send(peer, 1)
+    if wake != 1:
+        return 30
+    let _settle: Int = core.sleep_ms(5)
+    return 0
+`
+	stdout, exitCode, timedOut := buildAndRunWithOptionsTimeout(
+		t,
+		src,
+		BuildOptions{Runtime: RuntimeBuiltin},
+		2*time.Second,
+	)
+	if timedOut {
+		t.Fatalf("actor_link smoke timed out; stdout=%q", stdout)
+	}
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 9 {
+		t.Fatalf("exit code = %d, want linked abnormal exit to propagate reason 9", exitCode)
+	}
+}
+
+func TestActorUnlinkStopsAbnormalExitPropagationBuildAndRun(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+func waits_then_fails() -> Int
+uses actors:
+    let _wake: Int = core.recv()
+    return 9
+
+func main() -> Int
+uses actors, runtime:
+    let peer: actor = core.spawn("waits_then_fails")
+    let linked: Int = core.actor_link(peer)
+    if linked != 0:
+        return 20 + linked
+    let unlinked: Int = core.actor_unlink(peer)
+    if unlinked != 0:
+        return 40 + unlinked
+    let wake: Int = core.send(peer, 1)
+    if wake != 1:
+        return 60
+    let _settle: Int = core.sleep_ms(5)
+    return 0
+`
+	stdout, exitCode, timedOut := buildAndRunWithOptionsTimeout(
+		t,
+		src,
+		BuildOptions{Runtime: RuntimeBuiltin},
+		2*time.Second,
+	)
+	if timedOut {
+		t.Fatalf("actor_unlink smoke timed out; stdout=%q", stdout)
+	}
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, want actor_unlink to remove abnormal exit propagation", exitCode)
+	}
+}
+
 func TestActorFailureNonzeroExitBecomesDoneWithoutRestartBuildAndRun(t *testing.T) {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
 		t.Skip("linux/amd64 only")
@@ -1248,6 +2576,173 @@ uses actors, runtime:
 	}
 }
 
+func TestActorLifecycleDoneActorDrainsPendingMailboxIntoMessagePoolBuildAndRun(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+val MAILBOX_CAPACITY: i32 = 256
+val THIRD_ACTOR_LIVE_MESSAGES: i32 = 170
+
+func exits_without_receiving() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(2)
+    return 0
+
+func sleeper() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(100)
+    return 0
+
+func main() -> Int
+uses actors, runtime:
+    let done_with_pending: actor = core.spawn("exits_without_receiving")
+    var queued: Int = 0
+    while queued < MAILBOX_CAPACITY:
+        let ack: Int = core.send(done_with_pending, queued)
+        if ack != queued:
+            return 10
+        queued = queued + 1
+
+    let _settle_done: Int = core.sleep_ms(5)
+    let done_send: Int = core.send(done_with_pending, 900)
+    if done_send != -4:
+        return 20
+
+    let peer_a: actor = core.spawn("sleeper")
+    let peer_b: actor = core.spawn("sleeper")
+    let peer_c: actor = core.spawn("sleeper")
+
+    var sent_a: Int = 0
+    while sent_a < MAILBOX_CAPACITY:
+        let ack_a: Int = core.send(peer_a, sent_a)
+        if ack_a != sent_a:
+            return 30
+        sent_a = sent_a + 1
+
+    var sent_b: Int = 0
+    while sent_b < MAILBOX_CAPACITY:
+        let ack_b: Int = core.send(peer_b, sent_b)
+        if ack_b != sent_b:
+            return 40
+        sent_b = sent_b + 1
+
+    var sent_c: Int = 0
+    while sent_c < THIRD_ACTOR_LIVE_MESSAGES:
+        let ack_c: Int = core.send(peer_c, sent_c)
+        if ack_c != sent_c:
+            return 50
+        sent_c = sent_c + 1
+
+    let overflow: Int = core.send(peer_c, 123)
+    if overflow != -1:
+        return 60
+    return 0
+`
+	stdout, exitCode := buildAndRunWithOptions(t, src, BuildOptions{Runtime: RuntimeBuiltin})
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf(
+			"exit code = %d, want done actor pending mailbox nodes reclaimed into message pool",
+			exitCode,
+		)
+	}
+}
+
+func TestActorLifetimeSpawnsExceedTenThousandUnderConcurrentCapBuildAndRun(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+val TOTAL_LIFETIME_SPAWNS: i32 = 10001
+
+func done() -> Int:
+    return 0
+
+func main() -> Int
+uses actors:
+    var spawned: Int = 0
+    while spawned < TOTAL_LIFETIME_SPAWNS:
+        let peer: actor = core.spawn("done")
+        let _waited: actor.wait_result = core.actor_wait(peer)
+        let done_send: Int = core.send(peer, spawned)
+        if done_send == -3:
+            return 20
+        if done_send != -4:
+            return 30
+        spawned = spawned + 1
+    return 0
+`
+	stdout, exitCode, timedOut := buildAndRunWithOptionsTimeout(
+		t,
+		src,
+		BuildOptions{Runtime: RuntimeBuiltin},
+		5*time.Second,
+	)
+	if timedOut {
+		t.Fatalf("program timed out; actor lifetime spawn soak should stay under the concurrent cap")
+	}
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf(
+			"exit code = %d, want more than 10000 lifetime spawns under the concurrent cap",
+			exitCode,
+		)
+	}
+}
+
+func TestTaskLifetimeSpawnsExceedTenThousandUnderConcurrentCapBuildAndRun(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+val TOTAL_TASK_LIFETIME_SPAWNS: i32 = 10001
+
+func worker() -> Int:
+    return 1
+
+func main() -> Int
+uses runtime:
+    var spawned: Int = 0
+    var total: Int = 0
+    while spawned < TOTAL_TASK_LIFETIME_SPAWNS:
+        let task: task.i32 = core.task_spawn_i32("worker")
+        let result: task.result_i32 = core.task_join_result_i32(task)
+        if result.error != 0:
+            return 20 + result.error
+        total = total + result.value
+        spawned = spawned + 1
+    if total != TOTAL_TASK_LIFETIME_SPAWNS:
+        return 40
+    return 0
+`
+	stdout, exitCode, timedOut := buildAndRunWithOptionsTimeout(
+		t,
+		src,
+		BuildOptions{Runtime: RuntimeBuiltin},
+		5*time.Second,
+	)
+	if timedOut {
+		t.Fatalf("program timed out; joined task lifetime spawn soak should stay under the concurrent cap")
+	}
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf(
+			"exit code = %d, want more than 10000 joined task lifetime spawns under the concurrent cap",
+			exitCode,
+		)
+	}
+}
+
 func TestActorRejectedSendsDoNotConsumeMessagePool(t *testing.T) {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
 		t.Skip("linux/amd64 only")
@@ -1258,7 +2753,8 @@ enum Signal:
     case item(Int)
 
 val MAILBOX_CAPACITY: i32 = 256
-val THIRD_ACTOR_LIVE_MESSAGES: i32 = 232
+val THIRD_ACTOR_LIVE_MESSAGES: i32 = 170
+val SLEEPERS_AFTER_DONE_REUSE: i32 = 124
 
 func sleeper() -> Int
 uses runtime:
@@ -1291,7 +2787,7 @@ uses actors, runtime:
         return 30
 
     var spawned: Int = 0
-    while spawned < 123:
+    while spawned < SLEEPERS_AFTER_DONE_REUSE:
         let _actor: actor = core.spawn("sleeper")
         spawned = spawned + 1
     let failed: actor = core.spawn("sleeper")
@@ -1346,7 +2842,7 @@ func TestActorRuntimeCapacityLimitsDocumented(t *testing.T) {
 		"backpressure is recoverable when the receiver drains messages",
 		"does not enqueue a partial typed payload",
 		"64 KiB",
-		"744",
+		"682",
 		"single-slot",
 		"checked failure",
 		"`-1`",
@@ -1357,9 +2853,12 @@ func TestActorRuntimeCapacityLimitsDocumented(t *testing.T) {
 		"`-3`",
 		"done actor",
 		"`-4`",
+		"Waited reclaimable actor slots reset stored",
+		"initial stack frames instead of mapping a fresh stack",
+		"more than 10,000 lifetime spawns",
 		"nonzero actor entry returns become the same user-visible `done`",
-		"no actor status,",
-		"actor join, actor exit-code, supervision, or restart API",
+		"public `lib.core.actors` lifecycle wrapper surface is present",
+		"not supervision, restart",
 		"Missing-node/node_down is status/failure evidence only",
 		"`node_down`",
 		"does not imply automatic retry, reconnect, restart,",
@@ -1372,10 +2871,23 @@ func TestActorRuntimeCapacityLimitsDocumented(t *testing.T) {
 		"`done`",
 		"message already queued in another actor's mailbox remains receivable after the",
 		"sender is done",
-		"Pending mailbox entries are not drained or delivered after the actor reaches",
-		"`done`; this is a bounded local completion state",
-		"no shutdown API",
-		"supervision, restart, linking, or OTP-style lifecycle guarantee",
+		"Pending mailbox entries are drained into the runtime message-pool free list when the actor reaches",
+		"`done`; they are not delivered after completion",
+		"not a shutdown API",
+		"bounded link/unlink",
+		"monitor/demonitor",
+		"cleanup, and trap-exit toggling",
+		"local lifecycle wrappers now exist",
+		"Task join, timed join, poll, and typed task join observers",
+		"`reclaimable` target actor slots as terminal result states",
+		"Successful `core.task_join_i32(task)`, `core.task_join_result_i32(task)`",
+		"mark the target actor slot `reclaimable`",
+		"`core.task_poll_i32(task)`",
+		"non-consuming: it treats",
+		"`core.task_group_close(group)` treats joined",
+		"reclaimable task actors as terminal",
+		"more than 10,000 sequential task lifetimes",
+		"supervision, restart, remote lifecycle completion",
 		"8 state slots",
 		"rejects programs that require more than 8 actor-state slots before lowering",
 	} {
@@ -3328,7 +4840,7 @@ uses actors, alloc, islands, mem:
 	for _, want := range []string{
 		`"mailboxes"`,
 		`"message_schema": "Telemetry"`,
-		`"capacity": 744`,
+		`"capacity": 682`,
 		`"backpressure": "blocking_recv_yield"`,
 		`"transfer_mode": "copy"`,
 		`"ownership": "copy"`,
@@ -9560,6 +11072,10 @@ func TestBuildTagFromOptionsIncludesLinkedObjectContentDeterministically(t *test
 	if got == "" || !strings.Contains(got, "debug-info") || !strings.Contains(got, "link=") {
 		t.Fatalf("build tag = %q, want debug/link components", got)
 	}
+	ownedDrop := buildTagFromOptions(BuildOptions{OwnedAllocDropLowering: true}, nil)
+	if !strings.Contains(ownedDrop, "owned-alloc-drop-v1") {
+		t.Fatalf("owned alloc drop build tag = %q, want owned-alloc-drop-v1", ownedDrop)
+	}
 	if reordered := buildTagFromOptions(base, secondOrder); reordered != got {
 		t.Fatalf("linked object build tag should be order independent: %q vs %q", got, reordered)
 	}
@@ -9644,6 +11160,7 @@ func TestPipelineNativeModulePlanInvalidatesWhenLinkedObjectContentChanges(t *te
 		opt,
 		plan1,
 		stats1,
+		nil,
 	); err != nil {
 		t.Fatalf("compile first plan: %v", err)
 	}
@@ -9725,6 +11242,7 @@ func TestPipelineNativeModulePlanCacheStages(t *testing.T) {
 		opt,
 		plan1,
 		stats1,
+		nil,
 	); err != nil {
 		t.Fatalf("compile first plan: %v", err)
 	}
@@ -9753,6 +11271,7 @@ func TestPipelineNativeModulePlanCacheStages(t *testing.T) {
 		opt,
 		plan2,
 		stats2,
+		nil,
 	); err != nil {
 		t.Fatalf("compile cached plan: %v", err)
 	}
@@ -9770,6 +11289,455 @@ func TestPipelineNativeModulePlanCacheStages(t *testing.T) {
 	if len(objects) != 2 {
 		t.Fatalf("cached objects len = %d, want 2", len(objects))
 	}
+}
+
+func TestP7CompilerPhaseProfileMemoryBudgetReducesWorkerCount(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	tmp := t.TempDir()
+	writeTestFiles(t, tmp, map[string]string{
+		"engine/math.t4": "module engine.math\nfun add_one(x: i32): i32 {\n  return x + 1\n}\n",
+		"engine/render.t4": ("module engine.render\nimport engine.math as m\n" +
+			"fun draw(x: i32): i32 {\n  return m.add_one(x)\n}\n"),
+		"app/game.t4": ("module app.game\nimport engine.render as r\nfun main(): i32 " +
+			"{\n  return r.draw(41)\n}\n"),
+	})
+	entry := filepath.Join(tmp, filepath.FromSlash("app/game.t4"))
+	outPath := filepath.Join(tmp, "game")
+	profilePath := filepath.Join(tmp, "compiler-profile.json")
+	if _, err := BuildFileWithStatsOpt(entry, outPath, "linux-x64", BuildOptions{
+		Jobs:                    4,
+		MemoryBudgetBytes:       64 * 1024 * 1024,
+		EmitCompilerPhaseReport: true,
+		CompilerPhaseReportPath: profilePath,
+	}); err != nil {
+		t.Fatalf("BuildFileWithStatsOpt: %v", err)
+	}
+	raw, err := os.ReadFile(profilePath)
+	if err != nil {
+		t.Fatalf("read compiler phase profile: %v", err)
+	}
+	var profile struct {
+		MemoryBudgetBytes int64  `json:"memory_budget_bytes"`
+		WorkerCount       int    `json:"worker_count"`
+		WorkerReason      string `json:"worker_reason"`
+	}
+	if err := json.Unmarshal(raw, &profile); err != nil {
+		t.Fatalf("parse compiler phase profile: %v\n%s", err, raw)
+	}
+	if profile.MemoryBudgetBytes != 64*1024*1024 ||
+		profile.WorkerCount != 1 ||
+		!strings.Contains(profile.WorkerReason, "memory_budget_bytes") {
+		t.Fatalf("memory-budget worker decision = %+v\n%s", profile, raw)
+	}
+}
+
+func TestP7NativeExecutableHashStableAcrossWorkerCounts(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	tmp := t.TempDir()
+	writeTestFiles(t, tmp, map[string]string{
+		"engine/math.t4": "module engine.math\nfun add(x: i32, y: i32): i32 {\n  return x + y\n}\n",
+		"engine/logic.t4": ("module engine.logic\nimport engine.math as m\n" +
+			"fun twice_plus_one(x: i32): i32 {\n  return m.add(x, x) + 1\n}\n"),
+		"engine/render.t4": ("module engine.render\nimport engine.logic as l\n" +
+			"fun draw(x: i32): i32 {\n  return l.twice_plus_one(x)\n}\n"),
+		"app/game.t4": ("module app.game\nimport engine.render as r\nfun main(): i32 " +
+			"{\n  return r.draw(20)\n}\n"),
+	})
+	entry := filepath.Join(tmp, filepath.FromSlash("app/game.t4"))
+	var want [32]byte
+	for i, jobs := range []int{1, 2, 4} {
+		if err := os.RemoveAll(filepath.Join(tmp, ".tetra_cache")); err != nil {
+			t.Fatalf("clear module cache before jobs=%d build: %v", jobs, err)
+		}
+		outPath := filepath.Join(tmp, "out", fmt.Sprintf("game-jobs-%d", jobs))
+		if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
+			t.Fatalf("mkdir output dir for jobs=%d build: %v", jobs, err)
+		}
+		stats, err := BuildFileWithStatsOpt(entry, outPath, "linux-x64", BuildOptions{Jobs: jobs})
+		if err != nil {
+			t.Fatalf("BuildFileWithStatsOpt jobs=%d: %v", jobs, err)
+		}
+		if len(stats.CacheHits) != 0 {
+			t.Fatalf("jobs=%d build used cache hits after cache clear: %#v", jobs, stats.CacheHits)
+		}
+		testkit.AssertModules(t, stats.CompiledModules, []string{
+			"app.game",
+			"engine.logic",
+			"engine.math",
+			"engine.render",
+		})
+		raw, err := os.ReadFile(outPath)
+		if err != nil {
+			t.Fatalf("read executable jobs=%d: %v", jobs, err)
+		}
+		got := sha256.Sum256(raw)
+		if i == 0 {
+			want = got
+			continue
+		}
+		if got != want {
+			t.Fatalf("jobs=%d executable hash = %x, want jobs=1 hash %x", jobs, got, want)
+		}
+	}
+}
+
+func TestP7JSONReportHashesStableAcrossWorkerCounts(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	tmp := t.TempDir()
+	writeTestFiles(t, tmp, map[string]string{
+		"engine/math.t4": "module engine.math\nfun add(x: i32, y: i32): i32 {\n  return x + y\n}\n",
+		"engine/logic.t4": ("module engine.logic\nimport engine.math as m\n" +
+			"fun twice_plus_one(x: i32): i32 {\n  return m.add(x, x) + 1\n}\n"),
+		"engine/render.t4": ("module engine.render\nimport engine.logic as l\n" +
+			"fun draw(x: i32): i32 {\n  return l.twice_plus_one(x)\n}\n"),
+		"app/game.t4": ("module app.game\nimport engine.render as r\nfun main(): i32 " +
+			"{\n  return r.draw(20)\n}\n"),
+	})
+	entry := filepath.Join(tmp, filepath.FromSlash("app/game.t4"))
+	reportSuffixes := []string{".proof.json", ".bounds.json", ".alloc.json", ".memory.json"}
+	want := make(map[string][32]byte, len(reportSuffixes))
+	for i, jobs := range []int{1, 2, 4} {
+		if err := os.RemoveAll(filepath.Join(tmp, ".tetra_cache")); err != nil {
+			t.Fatalf("clear module cache before jobs=%d report build: %v", jobs, err)
+		}
+		outPath := filepath.Join(tmp, "out", fmt.Sprintf("game-reports-jobs-%d", jobs))
+		if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
+			t.Fatalf("mkdir output dir for jobs=%d report build: %v", jobs, err)
+		}
+		stats, err := BuildFileWithStatsOpt(entry, outPath, "linux-x64", BuildOptions{
+			Jobs:             jobs,
+			EmitProof:        true,
+			EmitBoundsReport: true,
+			EmitAllocReport:  true,
+			EmitMemoryReport: true,
+		})
+		if err != nil {
+			t.Fatalf("BuildFileWithStatsOpt jobs=%d reports: %v", jobs, err)
+		}
+		if len(stats.CacheHits) != 0 {
+			t.Fatalf("jobs=%d report build used cache hits after cache clear: %#v", jobs, stats.CacheHits)
+		}
+		for _, suffix := range reportSuffixes {
+			raw, err := os.ReadFile(outPath + suffix)
+			if err != nil {
+				t.Fatalf("read %s for jobs=%d: %v", suffix, jobs, err)
+			}
+			got := sha256.Sum256(raw)
+			if i == 0 {
+				want[suffix] = got
+				continue
+			}
+			if got != want[suffix] {
+				t.Fatalf(
+					"jobs=%d %s hash = %x, want jobs=1 hash %x",
+					jobs,
+					suffix,
+					got,
+					want[suffix],
+				)
+			}
+		}
+	}
+}
+
+func TestP7ReportBuildReleasesTransientMemoryBeforeProfileSnapshot(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	tmp := t.TempDir()
+	writeTestFiles(t, tmp, map[string]string{
+		"engine/math.t4": "module engine.math\nfun add(x: i32, y: i32): i32 {\n  return x + y\n}\n",
+		"app/game.t4": ("module app.game\nimport engine.math as m\nfun main(): i32 " +
+			"{\n  return m.add(20, 22)\n}\n"),
+	})
+	entry := filepath.Join(tmp, filepath.FromSlash("app/game.t4"))
+	outPath := filepath.Join(tmp, "out", "game")
+	if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
+		t.Fatalf("mkdir output dir: %v", err)
+	}
+	profilePath := filepath.Join(tmp, "compiler-profile.json")
+	releaseCalls := 0
+	originalRelease := compilerProcessMemoryRelease
+	compilerProcessMemoryRelease = func() { releaseCalls++ }
+	t.Cleanup(func() { compilerProcessMemoryRelease = originalRelease })
+
+	if _, err := BuildFileWithStatsOpt(entry, outPath, "linux-x64", BuildOptions{
+		Jobs:                    1,
+		EmitProof:               true,
+		EmitBoundsReport:        true,
+		EmitAllocReport:         true,
+		EmitMemoryReport:        true,
+		EmitCompilerPhaseReport: true,
+		CompilerPhaseReportPath: profilePath,
+	}); err != nil {
+		t.Fatalf("BuildFileWithStatsOpt reports: %v", err)
+	}
+	if releaseCalls != 3 {
+		t.Fatalf(
+			"compilerProcessMemoryRelease calls = %d, want pre-object-retention, post-report, and pre-final-cleanup releases",
+			releaseCalls,
+		)
+	}
+	raw, err := os.ReadFile(profilePath)
+	if err != nil {
+		t.Fatalf("read compiler phase profile: %v", err)
+	}
+	var profile struct {
+		Phases []struct {
+			Name string `json:"name"`
+		} `json:"phases"`
+	}
+	if err := json.Unmarshal(raw, &profile); err != nil {
+		t.Fatalf("parse compiler phase profile: %v\n%s", err, raw)
+	}
+	foundReportGeneration := false
+	for _, phase := range profile.Phases {
+		if phase.Name == "report_generation" {
+			foundReportGeneration = true
+			break
+		}
+	}
+	if !foundReportGeneration {
+		t.Fatalf("profile missing report_generation after post-report release: %s", raw)
+	}
+}
+
+func TestP7FailedProfiledBuildReleasesMemoryBeforeFinalCleanupSnapshot(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	tmp := t.TempDir()
+	writeTestFiles(t, tmp, map[string]string{
+		"app/game.t4": "module app.game\nfun main(): i32 {\n  return missing_symbol\n}\n",
+	})
+	entry := filepath.Join(tmp, filepath.FromSlash("app/game.t4"))
+	outPath := filepath.Join(tmp, "out", "game")
+	if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
+		t.Fatalf("mkdir output dir: %v", err)
+	}
+	profilePath := filepath.Join(tmp, "failed-compiler-profile.json")
+	releaseCalls := 0
+	originalRelease := compilerProcessMemoryRelease
+	compilerProcessMemoryRelease = func() { releaseCalls++ }
+	t.Cleanup(func() { compilerProcessMemoryRelease = originalRelease })
+
+	_, err := BuildFileWithStatsOpt(entry, outPath, "linux-x64", BuildOptions{
+		Jobs:                    1,
+		EmitCompilerPhaseReport: true,
+		CompilerPhaseReportPath: profilePath,
+	})
+	if err == nil {
+		t.Fatal("BuildFileWithStatsOpt succeeded, want semantic failure")
+	}
+	if releaseCalls != 1 {
+		t.Fatalf(
+			"compilerProcessMemoryRelease calls = %d, want failed-build pre-final-cleanup release",
+			releaseCalls,
+		)
+	}
+	raw, readErr := os.ReadFile(profilePath)
+	if readErr != nil {
+		t.Fatalf("read failed compiler phase profile: %v", readErr)
+	}
+	var profile struct {
+		Notes  []string `json:"notes"`
+		Phases []struct {
+			Name                 string `json:"name"`
+			SourceFileCount      int    `json:"source_file_count"`
+			CheckedFunctionCount int    `json:"checked_function_count"`
+			CheckedTypeCount     int    `json:"checked_type_count"`
+		} `json:"phases"`
+	}
+	if err := json.Unmarshal(raw, &profile); err != nil {
+		t.Fatalf("parse failed compiler phase profile: %v\n%s", err, raw)
+	}
+	foundNote := false
+	for _, note := range profile.Notes {
+		if strings.Contains(note, "build ended before successful completion") {
+			foundNote = true
+			break
+		}
+	}
+	if !foundNote {
+		t.Fatalf("failed profile missing failure note: %s", raw)
+	}
+	foundFinalCleanup := false
+	var finalCleanup struct {
+		Name                 string `json:"name"`
+		SourceFileCount      int    `json:"source_file_count"`
+		CheckedFunctionCount int    `json:"checked_function_count"`
+		CheckedTypeCount     int    `json:"checked_type_count"`
+	}
+	for _, phase := range profile.Phases {
+		if phase.Name == "final_cleanup" {
+			foundFinalCleanup = true
+			finalCleanup = phase
+			break
+		}
+	}
+	if !foundFinalCleanup {
+		t.Fatalf("failed profile missing final_cleanup after failure release: %s", raw)
+	}
+	if finalCleanup.SourceFileCount != 0 ||
+		finalCleanup.CheckedFunctionCount != 0 ||
+		finalCleanup.CheckedTypeCount != 0 {
+		t.Fatalf("failed final_cleanup retained counts = %+v, want zero after failure cleanup", finalCleanup)
+	}
+}
+
+func TestP7WriteReportStreamsJSONToTemporaryFileAndRenames(t *testing.T) {
+	_, currentFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	raw, err := os.ReadFile(filepath.Join(filepath.Dir(currentFile), "compiler_reports.go"))
+	if err != nil {
+		t.Fatalf("read compiler_reports.go: %v", err)
+	}
+	body := functionBodyFromSourceForTest(t, string(raw), "writeReport")
+	for _, forbidden := range []string{"bytes.Buffer", "os.WriteFile"} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("writeReport still uses buffered report emission via %s:\n%s", forbidden, body)
+		}
+	}
+	for _, want := range []string{"os.CreateTemp(", "json.NewEncoder(f)", "os.Rename(", "os.Remove("} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("writeReport missing streaming marker %q:\n%s", want, body)
+		}
+	}
+}
+
+func TestP7CompilerPhaseProfileStreamsJSONToTemporaryFileAndRenames(t *testing.T) {
+	_, currentFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	raw, err := os.ReadFile(filepath.Join(filepath.Dir(currentFile), "compiler_phase_profile.go"))
+	if err != nil {
+		t.Fatalf("read compiler_phase_profile.go: %v", err)
+	}
+	body := functionBodyForNeedleFromSourceForTest(
+		t,
+		string(raw),
+		"func (p *compilerPhaseProfiler) write(",
+	)
+	for _, forbidden := range []string{"json.MarshalIndent", "os.WriteFile"} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf(
+				"compilerPhaseProfiler.write still uses buffered profile emission via %s:\n%s",
+				forbidden,
+				body,
+			)
+		}
+	}
+	if !strings.Contains(body, "writeReport(outPath, p.report)") {
+		t.Fatalf("compilerPhaseProfiler.write must reuse streaming writeReport:\n%s", body)
+	}
+}
+
+func TestP7EmitPLIROnlyReturnsBeforeAllocPlanAndIRReportIntermediates(t *testing.T) {
+	_, currentFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	raw, err := os.ReadFile(filepath.Join(filepath.Dir(currentFile), "compiler_reports.go"))
+	if err != nil {
+		t.Fatalf("read compiler_reports.go: %v", err)
+	}
+	body := functionBodyFromSourceForTest(t, string(raw), "emitExplainReports")
+	fastPath := strings.Index(body, "if plirOnly {")
+	if fastPath < 0 {
+		t.Fatal("emitExplainReports missing PLIR-only fast path before heavy report intermediates")
+	}
+	for _, heavy := range []string{"allocplan.FromPLIRWithOptions", "lower.LowerWithOptions"} {
+		pos := strings.Index(body, heavy)
+		if pos < 0 {
+			t.Fatalf("emitExplainReports missing expected heavy report intermediate %q", heavy)
+		}
+		if fastPath > pos {
+			t.Fatalf(
+				"PLIR-only fast path appears after %s, so EmitPLIR still builds unnecessary report intermediates",
+				heavy,
+			)
+		}
+	}
+}
+
+type p7FailingJSONReport struct{}
+
+func (p7FailingJSONReport) MarshalJSON() ([]byte, error) {
+	return nil, fmt.Errorf("forced P7 report encode failure")
+}
+
+func TestP7WriteReportRemovesTemporaryFileAfterFailure(t *testing.T) {
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "alloc-report.json")
+	original := []byte("{\"version\":\"original\"}\n")
+	if err := os.WriteFile(path, original, 0o644); err != nil {
+		t.Fatalf("write original report: %v", err)
+	}
+
+	err := writeReport(path, p7FailingJSONReport{})
+	if err == nil {
+		t.Fatal("writeReport succeeded with failing JSON marshaler")
+	}
+	raw, readErr := os.ReadFile(path)
+	if readErr != nil {
+		t.Fatalf("read original report after failed write: %v", readErr)
+	}
+	if !bytes.Equal(raw, original) {
+		t.Fatalf("failed write clobbered original report:\ngot  %q\nwant %q", raw, original)
+	}
+	matches, globErr := filepath.Glob(filepath.Join(tmp, filepath.Base(path)+".*.tmp"))
+	if globErr != nil {
+		t.Fatalf("glob temporary reports: %v", globErr)
+	}
+	if len(matches) != 0 {
+		t.Fatalf("writeReport left temporary files after failure: %v", matches)
+	}
+}
+
+func functionBodyFromSourceForTest(t *testing.T, source string, name string) string {
+	t.Helper()
+	return functionBodyForNeedleFromSourceForTest(t, source, "func "+name+"(")
+}
+
+func functionBodyForNeedleFromSourceForTest(t *testing.T, source string, needle string) string {
+	t.Helper()
+	start := strings.Index(source, needle)
+	if start < 0 {
+		t.Fatalf("source missing %s", needle)
+	}
+	open := strings.Index(source[start:], "{")
+	if open < 0 {
+		t.Fatalf("%s missing opening brace", needle)
+	}
+	open += start
+	depth := 0
+	for i := open; i < len(source); i++ {
+		switch source[i] {
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return source[open+1 : i]
+			}
+		}
+	}
+	t.Fatalf("%s missing closing brace", needle)
+	return ""
 }
 
 // ---- compiler_targets_cache_test.go ----
@@ -11688,6 +13656,11 @@ func TestRequiredDistributedActorRuntimeSymbols(t *testing.T) {
 	for _, name := range requiredDistributedActorRuntimeSymbols() {
 		got[name] = struct{}{}
 	}
+	wantReturnSlots := map[string]int{
+		"__tetra_actor_node_connect": 1,
+		"__tetra_actor_spawn_remote": runtimeabi.ActorHandleABI().RefSlots,
+		"__tetra_actor_node_status":  1,
+	}
 	for _, name := range []string{
 		"__tetra_actor_node_connect",
 		"__tetra_actor_spawn_remote",
@@ -11700,8 +13673,8 @@ func TestRequiredDistributedActorRuntimeSymbols(t *testing.T) {
 		if !ok {
 			t.Fatalf("missing runtime signature for %q", name)
 		}
-		if sig.returnSlots != 1 {
-			t.Fatalf("%s return slots = %d, want 1", name, sig.returnSlots)
+		if sig.returnSlots != wantReturnSlots[name] {
+			t.Fatalf("%s return slots = %d, want %d", name, sig.returnSlots, wantReturnSlots[name])
 		}
 	}
 }
@@ -23449,6 +25422,86 @@ uses actors:
 	requireActorHeapTelemetryDomainWithBytes(t, sidecar)
 }
 
+func TestLinuxX64RuntimeHeapTelemetryActorStackTrimReleasesExcessDoneStacks(t *testing.T) {
+	src := strings.Join([]string{
+		"func done() -> i32:",
+		"    return 0",
+		"",
+		"func main() -> i32",
+		"uses actors:",
+		"    let _a00: actor = core.spawn(\"done\")",
+		"    let _a01: actor = core.spawn(\"done\")",
+		"    let _a02: actor = core.spawn(\"done\")",
+		"    let _a03: actor = core.spawn(\"done\")",
+		"    let _a04: actor = core.spawn(\"done\")",
+		"    let _a05: actor = core.spawn(\"done\")",
+		"    let _a06: actor = core.spawn(\"done\")",
+		"    let _a07: actor = core.spawn(\"done\")",
+		"    let _a08: actor = core.spawn(\"done\")",
+		"    let _a09: actor = core.spawn(\"done\")",
+		"    let _a10: actor = core.spawn(\"done\")",
+		"    let _a11: actor = core.spawn(\"done\")",
+		"    let _a12: actor = core.spawn(\"done\")",
+		"    let _a13: actor = core.spawn(\"done\")",
+		"    let _a14: actor = core.spawn(\"done\")",
+		"    let _a15: actor = core.spawn(\"done\")",
+		"    let _w00: actor.wait_result = core.actor_wait(_a00)",
+		"    let _w01: actor.wait_result = core.actor_wait(_a01)",
+		"    let _w02: actor.wait_result = core.actor_wait(_a02)",
+		"    let _w03: actor.wait_result = core.actor_wait(_a03)",
+		"    let _w04: actor.wait_result = core.actor_wait(_a04)",
+		"    let _w05: actor.wait_result = core.actor_wait(_a05)",
+		"    let _w06: actor.wait_result = core.actor_wait(_a06)",
+		"    let _w07: actor.wait_result = core.actor_wait(_a07)",
+		"    let _w08: actor.wait_result = core.actor_wait(_a08)",
+		"    let _w09: actor.wait_result = core.actor_wait(_a09)",
+		"    let _w10: actor.wait_result = core.actor_wait(_a10)",
+		"    let _w11: actor.wait_result = core.actor_wait(_a11)",
+		"    let _w12: actor.wait_result = core.actor_wait(_a12)",
+		"    let _w13: actor.wait_result = core.actor_wait(_a13)",
+		"    let _w14: actor.wait_result = core.actor_wait(_a14)",
+		"    let _w15: actor.wait_result = core.actor_wait(_a15)",
+		"    let _b00: actor = core.spawn(\"done\")",
+		"    let _b01: actor = core.spawn(\"done\")",
+		"    let _b02: actor = core.spawn(\"done\")",
+		"    let _b03: actor = core.spawn(\"done\")",
+		"    let _b04: actor = core.spawn(\"done\")",
+		"    let _b05: actor = core.spawn(\"done\")",
+		"    let _b06: actor = core.spawn(\"done\")",
+		"    let _b07: actor = core.spawn(\"done\")",
+		"    let _b08: actor = core.spawn(\"done\")",
+		"    let _b09: actor = core.spawn(\"done\")",
+		"    let _b10: actor = core.spawn(\"done\")",
+		"    let _b11: actor = core.spawn(\"done\")",
+		"    let _b12: actor = core.spawn(\"done\")",
+		"    let _b13: actor = core.spawn(\"done\")",
+		"    let _b14: actor = core.spawn(\"done\")",
+		"    let _b15: actor = core.spawn(\"done\")",
+		"    let _bw00: actor.wait_result = core.actor_wait(_b00)",
+		"    let _bw01: actor.wait_result = core.actor_wait(_b01)",
+		"    let _bw02: actor.wait_result = core.actor_wait(_b02)",
+		"    let _bw03: actor.wait_result = core.actor_wait(_b03)",
+		"    let _bw04: actor.wait_result = core.actor_wait(_b04)",
+		"    let _bw05: actor.wait_result = core.actor_wait(_b05)",
+		"    let _bw06: actor.wait_result = core.actor_wait(_b06)",
+		"    let _bw07: actor.wait_result = core.actor_wait(_b07)",
+		"    let _bw08: actor.wait_result = core.actor_wait(_b08)",
+		"    let _bw09: actor.wait_result = core.actor_wait(_b09)",
+		"    let _bw10: actor.wait_result = core.actor_wait(_b10)",
+		"    let _bw11: actor.wait_result = core.actor_wait(_b11)",
+		"    let _bw12: actor.wait_result = core.actor_wait(_b12)",
+		"    let _bw13: actor.wait_result = core.actor_wait(_b13)",
+		"    let _bw14: actor.wait_result = core.actor_wait(_b14)",
+		"    let _bw15: actor.wait_result = core.actor_wait(_b15)",
+		"    return 0",
+		"",
+	}, "\n")
+	sidecar := buildRunReadHeapTelemetrySidecarWithOptions(t, src, "heap-actor-stack-trim-smoke", BuildOptions{Runtime: RuntimeBuiltin})
+	requireHeapTelemetrySidecarIdentity(t, sidecar, "heap-actor-stack-trim-smoke")
+	requireActorHeapTelemetryStackTrimmed(t, sidecar)
+	requireActorHeapTelemetryLiveCountSeparatesDoneSlots(t, sidecar)
+}
+
 func buildRunReadHeapTelemetrySidecar(t *testing.T, src string, outputName string) map[string]any {
 	t.Helper()
 	return buildRunReadHeapTelemetrySidecarWithOptions(t, src, outputName, BuildOptions{})
@@ -23536,7 +25589,25 @@ func requireActorHeapTelemetryDomainWithBytes(t *testing.T, sidecar map[string]a
 		}
 		peak := numberValue(domain["peak_bytes"])
 		copied := numberValue(domain["bytes_copied"])
-		if peak > 0 && copied > 0 {
+		stackLive, hasStackLive := domain["stack_live_bytes"]
+		stackReserved, hasStackReserved := domain["stack_reserved_bytes"]
+		stackRetained, hasStackRetained := domain["stack_retained_bytes"]
+		stackReleased, hasStackReleased := domain["stack_released_bytes"]
+		if !hasStackLive || !hasStackReserved || !hasStackRetained || !hasStackReleased {
+			t.Fatalf("actor heap telemetry domain missing stack byte fields: %#v", domain)
+		}
+		current := numberValue(domain["current_bytes"])
+		mailboxCurrent := numberValue(domain["mailbox_current_bytes"])
+		stackLiveBytes := numberValue(stackLive)
+		if current < mailboxCurrent+stackLiveBytes {
+			t.Fatalf(
+				"actor heap telemetry current_bytes = %v below mailbox_current_bytes + stack_live_bytes in %#v",
+				current,
+				domain,
+			)
+		}
+		if numberValue(stackReserved)+numberValue(stackRetained)+numberValue(stackReleased) > 0 &&
+			peak > 0 && copied > 0 {
 			return
 		}
 	}
@@ -23544,6 +25615,56 @@ func requireActorHeapTelemetryDomainWithBytes(t *testing.T, sidecar map[string]a
 		"heap telemetry sidecar missing actor domain with nonzero peak_bytes and bytes_copied: %#v",
 		sidecar["domain_bytes"],
 	)
+}
+
+func requireActorHeapTelemetryStackTrimmed(t *testing.T, sidecar map[string]any) {
+	t.Helper()
+	const stackSizeBytes = 64 * 1024
+	const warmDoneStacks = 8
+	var retained float64
+	var released float64
+	var actorDomains int
+	for _, domain := range heapTelemetryDomains(t, sidecar) {
+		if domain["kind"] != "actor" ||
+			!strings.HasPrefix(stringValue(domain["domain_id"]), "domain:actor:") {
+			continue
+		}
+		actorDomains++
+		retained += numberValue(domain["stack_retained_bytes"])
+		released += numberValue(domain["stack_released_bytes"])
+	}
+	if actorDomains < warmDoneStacks+2 {
+		t.Fatalf("actor domains = %d, want a completed actor wave in %#v", actorDomains, sidecar)
+	}
+	if released < stackSizeBytes {
+		t.Fatalf("stack_released_bytes total = %v, want at least one released actor stack", released)
+	}
+	if retained > warmDoneStacks*stackSizeBytes {
+		t.Fatalf(
+			"stack_retained_bytes total = %v, want bounded warm pool <= %d",
+			retained,
+			warmDoneStacks*stackSizeBytes,
+		)
+	}
+}
+
+func requireActorHeapTelemetryLiveCountSeparatesDoneSlots(t *testing.T, sidecar map[string]any) {
+	t.Helper()
+	recordCount, hasRecordCount := sidecar["actor_snapshot_record_count"].(float64)
+	liveCount, hasLiveCount := sidecar["actor_live_count"].(float64)
+	if !hasRecordCount || !hasLiveCount {
+		t.Fatalf(
+			"actor heap telemetry missing actor_snapshot_record_count/actor_live_count: %#v",
+			sidecar,
+		)
+	}
+	if recordCount <= liveCount {
+		t.Fatalf(
+			"actor_snapshot_record_count = %v, actor_live_count = %v; want reusable/done slots excluded from live count",
+			recordCount,
+			liveCount,
+		)
+	}
 }
 
 func heapTelemetryDomains(t *testing.T, sidecar map[string]any) []map[string]any {

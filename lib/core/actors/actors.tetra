@@ -1,0 +1,402 @@
+module lib.core.actors
+
+pub enum ExitReason:
+    case normal
+    case shutdown(Int)
+    case error(Int)
+    case canceled
+    case killed
+    case node_down(Int)
+    case protocol_error(Int)
+    case runtime_error(Int)
+    case unknown(Int, Int)
+
+pub enum NodeDownReason:
+    case graceful_leave
+    case lease_expired
+    case connection_lost
+    case authentication_failed
+    case protocol_mismatch
+    case control_plane_unavailable
+    case unknown(Int)
+
+pub enum SystemMessage:
+    case exit(actor, ExitReason)
+    case down(actor.monitor, actor, ExitReason)
+    case node_down(actor.node, NodeDownReason)
+
+pub enum SystemReceiveResult:
+    case message(SystemMessage)
+    case empty
+    case timeout
+    case canceled
+    case runtime_closed
+    case invalid_state(Int)
+
+pub enum ActorStatus:
+    case starting
+    case ready
+    case running
+    case blocked
+    case sleeping
+    case waiting
+    case stopping
+    case exited_normal
+    case exited_error(Int)
+    case canceled
+    case restarting
+    case dead
+    case unknown(Int)
+
+pub enum StatusResult:
+    case ok(ActorStatus)
+    case invalid
+    case stale
+    case node_down
+
+pub enum WaitResult:
+    case exited(ExitReason)
+    case timeout
+    case canceled
+    case invalid
+    case stale
+    case node_down
+
+pub enum StopResult:
+    case requested
+    case already_exited(ExitReason)
+    case invalid
+    case stale
+    case node_down
+
+pub enum LinkResult:
+    case linked
+    case already_linked
+    case target_exited(ExitReason)
+    case resource_exhausted
+    case invalid
+    case stale
+    case node_down
+
+pub enum MonitorResult:
+    case monitoring(actor.monitor)
+    case target_already_exited(actor.monitor)
+    case resource_exhausted
+    case invalid
+    case stale
+    case node_down
+
+func decode_exit_reason(kind: Int, code: Int) -> ExitReason:
+    if kind == 0 && code == 0:
+        return ExitReason.normal
+    if kind == 1:
+        return ExitReason.shutdown(code)
+    if kind == 2:
+        return ExitReason.error(code)
+    if kind == 3:
+        return ExitReason.canceled
+    if kind == 4:
+        return ExitReason.killed
+    if kind == 5:
+        return ExitReason.node_down(code)
+    if kind == 6:
+        return ExitReason.protocol_error(code)
+    if kind == 7:
+        return ExitReason.runtime_error(code)
+    if kind == 0:
+        return ExitReason.error(code)
+    return ExitReason.unknown(kind, code)
+
+func decode_actor_status_code(target: actor, code: Int) -> ActorStatus
+uses actors:
+    if code == 0:
+        return ActorStatus.starting
+    if code == 1:
+        return ActorStatus.ready
+    if code == 2:
+        return ActorStatus.running
+    if code == 3:
+        return ActorStatus.blocked
+    if code == 4:
+        return ActorStatus.sleeping
+    if code == 5:
+        return ActorStatus.waiting
+    if code == 6:
+        return ActorStatus.stopping
+    if code == 7:
+        return ActorStatus.exited_normal
+    if code == 8:
+        return ActorStatus.exited_error(core.actor_exit_reason(target))
+    if code == 9:
+        return ActorStatus.canceled
+    if code == 10:
+        return ActorStatus.restarting
+    if code == 11:
+        return ActorStatus.dead
+    return ActorStatus.unknown(code)
+
+func decode_wait_result(raw: actor.wait_result) -> WaitResult:
+    match raw.status:
+    case actor.status.exited_normal:
+        return WaitResult.exited(decode_exit_reason(0, raw.reason))
+    case actor.status.exited_error:
+        return WaitResult.exited(decode_exit_reason(0, raw.reason))
+    case actor.status.canceled:
+        return WaitResult.canceled
+    case actor.status.dead:
+        if raw.reason == -3:
+            return WaitResult.invalid
+        return WaitResult.stale
+    case actor.status.starting:
+        return WaitResult.timeout
+    case actor.status.ready:
+        return WaitResult.timeout
+    case actor.status.running:
+        return WaitResult.timeout
+    case actor.status.blocked:
+        return WaitResult.timeout
+    case actor.status.sleeping:
+        return WaitResult.timeout
+    case actor.status.waiting:
+        return WaitResult.timeout
+    case actor.status.stopping:
+        return WaitResult.timeout
+    case actor.status.restarting:
+        return WaitResult.timeout
+
+func encode_exit_reason(reason: ExitReason) -> actor.exit_reason:
+    match reason:
+    case ExitReason.normal:
+        return 0
+    case ExitReason.shutdown(code):
+        return code
+    case ExitReason.error(code):
+        return code
+    case ExitReason.canceled:
+        return -4
+    case ExitReason.killed:
+        return -9
+    case ExitReason.node_down(code):
+        return code
+    case ExitReason.protocol_error(code):
+        return code
+    case ExitReason.runtime_error(code):
+        return code
+    case ExitReason.unknown(kind, code):
+        return code
+
+func bool_to_int(value: Bool) -> Int:
+    if value:
+        return 1
+    return 0
+
+func request_stop(target: actor, reason: ExitReason) -> StopResult
+uses actors:
+    let requested: Int = core.actor_stop(target, encode_exit_reason(reason))
+    if requested == 0:
+        return StopResult.requested
+    return StopResult.invalid
+
+func request_link(target: actor) -> LinkResult
+uses actors:
+    let linked: Int = core.actor_link(target)
+    if linked == 0:
+        return LinkResult.linked
+    if linked == -2:
+        return LinkResult.resource_exhausted
+    return LinkResult.invalid
+
+func decode_node_down_reason(kind: Int, code: Int) -> NodeDownReason:
+    if kind == 0:
+        return NodeDownReason.graceful_leave
+    if kind == 1:
+        return NodeDownReason.lease_expired
+    if kind == 2:
+        return NodeDownReason.connection_lost
+    if kind == 3:
+        return NodeDownReason.authentication_failed
+    if kind == 4:
+        return NodeDownReason.protocol_mismatch
+    if kind == 5:
+        return NodeDownReason.control_plane_unavailable
+    return NodeDownReason.unknown(code)
+
+func decode_message(raw: actor.system_recv_raw) -> SystemMessage:
+    if raw.kind == 1:
+        return SystemMessage.exit(raw.subject, decode_exit_reason(raw.reason_kind, raw.reason_code))
+    if raw.kind == 2:
+        return SystemMessage.down(raw.monitor, raw.subject, decode_exit_reason(raw.reason_kind, raw.reason_code))
+    return SystemMessage.node_down(raw.node, decode_node_down_reason(raw.reason_kind, raw.reason_code))
+
+func decode_receive_result(raw: actor.system_recv_raw) -> SystemReceiveResult:
+    if raw.status == 0:
+        return SystemReceiveResult.message(decode_message(raw))
+    if raw.status == 1:
+        return SystemReceiveResult.empty
+    if raw.status == 2:
+        return SystemReceiveResult.timeout
+    if raw.status == 3:
+        return SystemReceiveResult.canceled
+    if raw.status == 4:
+        return SystemReceiveResult.runtime_closed
+    return SystemReceiveResult.invalid_state(raw.status)
+
+pub func recv_system() -> SystemReceiveResult
+uses actors, runtime:
+    return decode_receive_result(core.actor_recv_system())
+
+pub func poll_system() -> SystemReceiveResult
+uses actors:
+    return decode_receive_result(core.actor_recv_system_poll())
+
+pub func recv_system_until(deadline: Int) -> SystemReceiveResult
+uses actors, runtime:
+    return decode_receive_result(core.actor_recv_system_until(deadline))
+
+pub func status(target: actor) -> StatusResult
+uses actors:
+    let raw: actor.status_result_raw = core.actor_status_raw(target)
+    if raw.result == 0:
+        return StatusResult.ok(decode_actor_status_code(target, raw.status_code))
+    if raw.result == -5:
+        return StatusResult.stale
+    if raw.result == -6:
+        return StatusResult.node_down
+    return StatusResult.invalid
+
+pub func wait(target: actor) -> WaitResult
+uses actors, runtime:
+    return decode_wait_result(core.actor_wait(target))
+
+pub func wait_until(target: actor, deadline: Int) -> WaitResult
+uses actors, runtime:
+    return decode_wait_result(core.actor_wait_until(target, deadline))
+
+pub func stop(target: actor, reason: ExitReason) -> StopResult
+uses actors:
+    let before: StatusResult = status(target)
+    match before:
+    case StatusResult.invalid:
+        return StopResult.invalid
+    case StatusResult.stale:
+        return StopResult.stale
+    case StatusResult.node_down:
+        return StopResult.node_down
+    case StatusResult.ok(state):
+        match state:
+        case ActorStatus.exited_normal:
+            return StopResult.already_exited(decode_exit_reason(0, core.actor_exit_reason(target)))
+        case ActorStatus.exited_error(code):
+            return StopResult.already_exited(decode_exit_reason(0, core.actor_exit_reason(target)))
+        case ActorStatus.dead:
+            return StopResult.stale
+        case ActorStatus.starting:
+            return request_stop(target, reason)
+        case ActorStatus.ready:
+            return request_stop(target, reason)
+        case ActorStatus.running:
+            return request_stop(target, reason)
+        case ActorStatus.blocked:
+            return request_stop(target, reason)
+        case ActorStatus.sleeping:
+            return request_stop(target, reason)
+        case ActorStatus.waiting:
+            return request_stop(target, reason)
+        case ActorStatus.stopping:
+            return StopResult.requested
+        case ActorStatus.canceled:
+            return StopResult.requested
+        case ActorStatus.restarting:
+            return request_stop(target, reason)
+        case ActorStatus.unknown(code):
+            return request_stop(target, reason)
+
+pub func link(target: actor) -> LinkResult
+uses actors:
+    let before: StatusResult = status(target)
+    match before:
+    case StatusResult.invalid:
+        return LinkResult.invalid
+    case StatusResult.stale:
+        return LinkResult.stale
+    case StatusResult.node_down:
+        return LinkResult.node_down
+    case StatusResult.ok(state):
+        match state:
+        case ActorStatus.exited_normal:
+            return LinkResult.target_exited(decode_exit_reason(0, core.actor_exit_reason(target)))
+        case ActorStatus.exited_error(code):
+            return LinkResult.target_exited(decode_exit_reason(0, core.actor_exit_reason(target)))
+        case ActorStatus.dead:
+            return LinkResult.stale
+        case ActorStatus.starting:
+            return request_link(target)
+        case ActorStatus.ready:
+            return request_link(target)
+        case ActorStatus.running:
+            return request_link(target)
+        case ActorStatus.blocked:
+            return request_link(target)
+        case ActorStatus.sleeping:
+            return request_link(target)
+        case ActorStatus.waiting:
+            return request_link(target)
+        case ActorStatus.stopping:
+            return LinkResult.target_exited(decode_exit_reason(0, core.actor_exit_reason(target)))
+        case ActorStatus.canceled:
+            return LinkResult.target_exited(ExitReason.canceled)
+        case ActorStatus.restarting:
+            return request_link(target)
+        case ActorStatus.unknown(code):
+            return request_link(target)
+
+pub func unlink(target: actor) -> Bool
+uses actors:
+    return core.actor_unlink(target) == 0
+
+pub func monitor(target: actor) -> MonitorResult
+uses actors:
+    let before: StatusResult = status(target)
+    match before:
+    case StatusResult.invalid:
+        return MonitorResult.invalid
+    case StatusResult.stale:
+        return MonitorResult.stale
+    case StatusResult.node_down:
+        return MonitorResult.node_down
+    case StatusResult.ok(state):
+        match state:
+        case ActorStatus.exited_normal:
+            return MonitorResult.target_already_exited(core.actor_monitor(target))
+        case ActorStatus.exited_error(code):
+            return MonitorResult.target_already_exited(core.actor_monitor(target))
+        case ActorStatus.dead:
+            return MonitorResult.stale
+        case ActorStatus.starting:
+            return MonitorResult.monitoring(core.actor_monitor(target))
+        case ActorStatus.ready:
+            return MonitorResult.monitoring(core.actor_monitor(target))
+        case ActorStatus.running:
+            return MonitorResult.monitoring(core.actor_monitor(target))
+        case ActorStatus.blocked:
+            return MonitorResult.monitoring(core.actor_monitor(target))
+        case ActorStatus.sleeping:
+            return MonitorResult.monitoring(core.actor_monitor(target))
+        case ActorStatus.waiting:
+            return MonitorResult.monitoring(core.actor_monitor(target))
+        case ActorStatus.stopping:
+            return MonitorResult.target_already_exited(core.actor_monitor(target))
+        case ActorStatus.canceled:
+            return MonitorResult.target_already_exited(core.actor_monitor(target))
+        case ActorStatus.restarting:
+            return MonitorResult.monitoring(core.actor_monitor(target))
+        case ActorStatus.unknown(code):
+            return MonitorResult.monitoring(core.actor_monitor(target))
+
+pub func demonitor(reference: actor.monitor, flush: Bool) -> Bool
+uses actors:
+    return core.actor_demonitor(reference) == 0
+
+pub func set_trap_exit(enabled: Bool) -> Bool
+uses actors:
+    return core.actor_set_trap_exit(bool_to_int(enabled)) == 0

@@ -1,0 +1,13 @@
+func maybe(flag: Bool) -> Int?:
+    if flag:
+        return 42
+    else:
+        return none
+
+func unwrap(value: Int?) -> Int:
+    if let x = value:
+        return x
+    return 0
+
+func main() -> Int:
+    return unwrap(maybe(true))

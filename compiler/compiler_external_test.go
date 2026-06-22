@@ -1,6 +1,7 @@
 package compiler_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -231,6 +232,59 @@ uses alloc, mem:
 	t.Fatalf("alloc report missing main/xs stack allocation: %+v", alloc.Functions)
 }
 
+func TestBuildOwnedAllocDropOptInExecutableContainsMunmapAndRuns(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "app.tetra")
+	outPath := filepath.Join(dir, "app")
+	src := `
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let mem: cap.mem = core.cap_mem()
+        let p: ptr = core.alloc_bytes(16)
+        let _stored: Int = core.store_i32(p, 7, mem)
+    return 7
+`
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	if _, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, "linux-x64", compiler.BuildOptions{
+		Jobs:                   1,
+		OwnedAllocDropLowering: true,
+	}); err != nil {
+		t.Fatalf("BuildFileWithStatsOpt: %v", err)
+	}
+	exe, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read executable: %v", err)
+	}
+	for _, want := range [][]byte{
+		{0x8B, 0x77, 0xF8},
+		{0x48, 0x81, 0xC7, 0xF8, 0xFF, 0xFF, 0xFF},
+		{0xB8, 0x0B, 0x00, 0x00, 0x00, 0x0F, 0x05},
+	} {
+		if !bytes.Contains(exe, want) {
+			t.Fatalf("owned alloc drop executable missing % x", want)
+		}
+	}
+	cmd := exec.Command(outPath)
+	runOut, runErr := cmd.CombinedOutput()
+	if string(runOut) != "" {
+		t.Fatalf("runtime stdout mismatch: %q", runOut)
+	}
+	exitErr, ok := runErr.(*exec.ExitError)
+	if !ok {
+		t.Fatalf("runtime exit = %v, want exit status 7", runErr)
+	}
+	if exitErr.ExitCode() != 7 {
+		t.Fatalf("runtime exit code = %d, want 7", exitErr.ExitCode())
+	}
+}
+
 func TestBuildAllocReportScopesStackStorageEvidencePerTarget(t *testing.T) {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
 		t.Skip("linux/amd64 only")
@@ -419,7 +473,7 @@ uses alloc, mem:
 	}
 	if alloc.Summary.StorageClasses["FunctionTempRegion"] == 0 ||
 		alloc.Summary.ActualLoweringStorageClasses["FunctionTempRegion"] == 0 ||
-		alloc.Summary.RuntimePaths["region"] == 0 {
+		alloc.Summary.RuntimePaths["scoped_single_mapping_v0"] == 0 {
 		t.Fatalf("function-temp region summary missing storage/runtime counts: %+v", alloc.Summary)
 	}
 	if len(alloc.Summary.Regions) == 0 {
@@ -429,7 +483,7 @@ uses alloc, mem:
 		if region.RegionID == "region:main:temp" &&
 			region.Lifetime == "function:main" &&
 			region.StorageClass == "FunctionTempRegion" &&
-			region.RuntimePath == "region" &&
+			region.RuntimePath == "scoped_single_mapping_v0" &&
 			region.AllocationCount == 1 {
 			goto foundRegion
 		}
@@ -454,7 +508,7 @@ foundRegion:
 					site,
 				)
 			}
-			if site.RuntimePath != "region" || site.AllocatorClass != "function_temp_region" || site.RegionID != "region:main:temp" || site.Lifetime != "function:main" {
+			if site.RuntimePath != "scoped_single_mapping_v0" || site.AllocatorClass != "function_temp_region" || site.RegionID != "region:main:temp" || site.Lifetime != "function:main" {
 				t.Fatalf("function-temp runtime report site = %+v, want region evidence", site)
 			}
 			text, err := os.ReadFile(outPath + ".alloc.txt")
@@ -465,7 +519,7 @@ foundRegion:
 				"planned_storage: FunctionTempRegion",
 				"actual_lowering_storage: FunctionTempRegion",
 				"lowering_status: function_temp_region_lowering",
-				"runtime_path: region",
+				"runtime_path: scoped_single_mapping_v0",
 				"allocator_class: function_temp_region",
 				"region_id: region:main:temp",
 				"lifetime: function:main",
@@ -2024,6 +2078,321 @@ uses alloc, mem:
 		if !strings.Contains(layoutText, want) {
 			t.Fatalf("layout report missing %q:\n%s", want, layoutText)
 		}
+	}
+}
+
+func TestBuildCompilerPhaseProfileRecordsP7PhaseRSS(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "app.tetra")
+	outPath := filepath.Join(dir, "app")
+	src := `
+func main() -> Int
+uses alloc, mem:
+    var xs: []i32 = make_i32(4)
+    xs[0] = 10
+    xs[1] = 11
+    xs[2] = 12
+    xs[3] = 9
+    return xs[0] + xs[1] + xs[2] + xs[3]
+`
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	stats, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, "linux-x64", compiler.BuildOptions{
+		Jobs:                    2,
+		Explain:                 true,
+		EmitCompilerPhaseReport: true,
+	})
+	if err != nil {
+		t.Fatalf("BuildFileWithStatsOpt: %v", err)
+	}
+	profilePath := outPath + ".compiler-profile.json"
+	if stats.CompilerPhaseProfilePath != profilePath {
+		t.Fatalf(
+			"CompilerPhaseProfilePath = %q, want %q",
+			stats.CompilerPhaseProfilePath,
+			profilePath,
+		)
+	}
+	raw, err := os.ReadFile(profilePath)
+	if err != nil {
+		t.Fatalf("read compiler phase profile: %v", err)
+	}
+	var profile struct {
+		Schema          string `json:"schema"`
+		Target          string `json:"target"`
+		ReportMode      string `json:"report_mode"`
+		RequestedJobs   int    `json:"requested_jobs"`
+		WorkerCount     int    `json:"worker_count"`
+		WorkerReason    string `json:"worker_reason"`
+		RSSPeakBytes    uint64 `json:"rss_peak_bytes"`
+		GoHeapPeakBytes uint64 `json:"go_heap_peak_alloc_bytes"`
+		Phases          []struct {
+			Name             string `json:"name"`
+			UnixNano         int64  `json:"unix_nano"`
+			GoHeapAllocBytes uint64 `json:"go_heap_alloc_bytes"`
+			RSSCurrentBytes  uint64 `json:"rss_current_bytes"`
+			ModuleCount      int    `json:"module_count"`
+		} `json:"phases"`
+	}
+	if err := json.Unmarshal(raw, &profile); err != nil {
+		t.Fatalf("parse compiler phase profile: %v\n%s", err, raw)
+	}
+	if profile.Schema != "tetra.compiler.phase-profile.v1" ||
+		profile.Target != "linux-x64" ||
+		profile.ReportMode != "explain" ||
+		profile.RequestedJobs != 2 ||
+		profile.WorkerCount <= 0 ||
+		profile.WorkerReason == "" ||
+		profile.RSSPeakBytes == 0 ||
+		profile.GoHeapPeakBytes == 0 {
+		t.Fatalf("unexpected compiler phase profile header: %+v", profile)
+	}
+	seen := map[string]bool{}
+	for _, phase := range profile.Phases {
+		seen[phase.Name] = true
+		if phase.UnixNano == 0 ||
+			phase.GoHeapAllocBytes == 0 ||
+			phase.RSSCurrentBytes == 0 ||
+			phase.ModuleCount == 0 {
+			t.Fatalf("phase missing P7 memory/count fields: %+v", phase)
+		}
+	}
+	for _, phase := range []string{
+		"source_loading_parsing",
+		"semantic_analysis",
+		"plir_construction",
+		"allocation_planning",
+		"ir_lowering",
+		"module_codegen",
+		"object_retention_link",
+		"report_generation",
+		"final_cleanup",
+	} {
+		if !seen[phase] {
+			t.Fatalf("compiler phase profile missing phase %q: %s", phase, raw)
+		}
+	}
+}
+
+func TestP7CompilerPhaseProfileDropsObjectReferencesBeforeReports(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "app.tetra")
+	outPath := filepath.Join(dir, "app")
+	src := `
+func helper(x: Int) -> Int:
+    return x + 1
+
+func main() -> Int:
+    return helper(41)
+`
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	if _, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, "linux-x64", compiler.BuildOptions{
+		Explain:                 true,
+		EmitCompilerPhaseReport: true,
+	}); err != nil {
+		t.Fatalf("BuildFileWithStatsOpt: %v", err)
+	}
+	raw, err := os.ReadFile(outPath + ".compiler-profile.json")
+	if err != nil {
+		t.Fatalf("read compiler phase profile: %v", err)
+	}
+	var profile struct {
+		Phases []struct {
+			Name        string `json:"name"`
+			ObjectCount int    `json:"object_count"`
+		} `json:"phases"`
+	}
+	if err := json.Unmarshal(raw, &profile); err != nil {
+		t.Fatalf("parse compiler phase profile: %v\n%s", err, raw)
+	}
+	phaseObjects := map[string]int{}
+	for _, phase := range profile.Phases {
+		phaseObjects[phase.Name] = phase.ObjectCount
+	}
+	if got := phaseObjects["object_retention_link"]; got <= 0 {
+		t.Fatalf("object_retention_link object_count = %d, want retained objects before link release", got)
+	}
+	for _, phase := range []string{"report_generation", "final_cleanup"} {
+		if got := phaseObjects[phase]; got != 0 {
+			t.Fatalf("%s object_count = %d, want 0 after link releases object references", phase, got)
+		}
+	}
+}
+
+func TestP7CompilerPhaseProfileReleasesTransientIRBeforeModuleCodegen(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "app.tetra")
+	outPath := filepath.Join(dir, "app")
+	src := `
+func helper(x: Int) -> Int:
+    return x + 1
+
+func main() -> Int:
+    return helper(41)
+`
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	if _, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, "linux-x64", compiler.BuildOptions{
+		Explain:                 true,
+		EmitCompilerPhaseReport: true,
+	}); err != nil {
+		t.Fatalf("BuildFileWithStatsOpt: %v", err)
+	}
+	raw, err := os.ReadFile(outPath + ".compiler-profile.json")
+	if err != nil {
+		t.Fatalf("read compiler phase profile: %v", err)
+	}
+	var profile struct {
+		Phases []struct {
+			Name                        string `json:"name"`
+			TransientIRFunctionCount    int    `json:"transient_ir_function_count"`
+			AllocationPlanFunctionCount int    `json:"allocation_plan_function_count"`
+		} `json:"phases"`
+	}
+	if err := json.Unmarshal(raw, &profile); err != nil {
+		t.Fatalf("parse compiler phase profile: %v\n%s", err, raw)
+	}
+	byPhase := map[string]struct {
+		TransientIRFunctionCount    int
+		AllocationPlanFunctionCount int
+	}{}
+	for _, phase := range profile.Phases {
+		byPhase[phase.Name] = struct {
+			TransientIRFunctionCount    int
+			AllocationPlanFunctionCount int
+		}{
+			TransientIRFunctionCount:    phase.TransientIRFunctionCount,
+			AllocationPlanFunctionCount: phase.AllocationPlanFunctionCount,
+		}
+	}
+	if got := byPhase["plir_construction"].TransientIRFunctionCount; got <= 0 {
+		t.Fatalf("plir_construction transient_ir_function_count = %d, want retained PLIR functions", got)
+	}
+	if got := byPhase["allocation_planning"].AllocationPlanFunctionCount; got <= 0 {
+		t.Fatalf(
+			"allocation_planning allocation_plan_function_count = %d, want retained allocation plan functions\n%s",
+			got,
+			raw,
+		)
+	}
+	if got := byPhase["ir_lowering"].TransientIRFunctionCount; got <= 0 {
+		t.Fatalf("ir_lowering transient_ir_function_count = %d, want retained lowering summary functions", got)
+	}
+	for _, phase := range []string{
+		"module_codegen",
+		"object_retention_link",
+		"report_generation",
+		"final_cleanup",
+	} {
+		counts, ok := byPhase[phase]
+		if !ok {
+			t.Fatalf("missing phase %q in compiler profile: %s", phase, raw)
+		}
+		if counts.TransientIRFunctionCount != 0 || counts.AllocationPlanFunctionCount != 0 {
+			t.Fatalf(
+				"%s transient counts = %+v, want no retained transient IR/allocation plan after module codegen",
+				phase,
+				counts,
+			)
+		}
+	}
+}
+
+func TestP7CompilerPhaseProfileReleasesSemanticStateAtFinalCleanup(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "app.tetra")
+	outPath := filepath.Join(dir, "app")
+	src := `
+func helper(x: Int) -> Int:
+    return x + 1
+
+func main() -> Int:
+    return helper(41)
+`
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	if _, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, "linux-x64", compiler.BuildOptions{
+		Explain:                 true,
+		EmitCompilerPhaseReport: true,
+	}); err != nil {
+		t.Fatalf("BuildFileWithStatsOpt: %v", err)
+	}
+	raw, err := os.ReadFile(outPath + ".compiler-profile.json")
+	if err != nil {
+		t.Fatalf("read compiler phase profile: %v", err)
+	}
+	var profile struct {
+		Phases []struct {
+			Name                 string `json:"name"`
+			SourceFileCount      int    `json:"source_file_count"`
+			CheckedFunctionCount int    `json:"checked_function_count"`
+			CheckedTypeCount     int    `json:"checked_type_count"`
+		} `json:"phases"`
+	}
+	if err := json.Unmarshal(raw, &profile); err != nil {
+		t.Fatalf("parse compiler phase profile: %v\n%s", err, raw)
+	}
+	byPhase := map[string]struct {
+		SourceFileCount      int
+		CheckedFunctionCount int
+		CheckedTypeCount     int
+	}{}
+	for _, phase := range profile.Phases {
+		byPhase[phase.Name] = struct {
+			SourceFileCount      int
+			CheckedFunctionCount int
+			CheckedTypeCount     int
+		}{
+			SourceFileCount:      phase.SourceFileCount,
+			CheckedFunctionCount: phase.CheckedFunctionCount,
+			CheckedTypeCount:     phase.CheckedTypeCount,
+		}
+	}
+	semanticCounts, ok := byPhase["semantic_analysis"]
+	if !ok {
+		t.Fatalf("missing semantic_analysis phase in compiler profile: %s", raw)
+	}
+	if semanticCounts.SourceFileCount <= 0 ||
+		semanticCounts.CheckedFunctionCount <= 0 ||
+		semanticCounts.CheckedTypeCount <= 0 {
+		t.Fatalf("semantic_analysis retained counts = %+v, want source and checked graph counts", semanticCounts)
+	}
+	reportCounts, ok := byPhase["report_generation"]
+	if !ok {
+		t.Fatalf("missing report_generation phase in compiler profile: %s", raw)
+	}
+	if reportCounts.CheckedFunctionCount <= 0 || reportCounts.CheckedTypeCount <= 0 {
+		t.Fatalf("report_generation retained counts = %+v, want checked graph retained for reports", reportCounts)
+	}
+	finalCounts, ok := byPhase["final_cleanup"]
+	if !ok {
+		t.Fatalf("missing final_cleanup phase in compiler profile: %s", raw)
+	}
+	if finalCounts.SourceFileCount != 0 ||
+		finalCounts.CheckedFunctionCount != 0 ||
+		finalCounts.CheckedTypeCount != 0 {
+		t.Fatalf("final_cleanup retained counts = %+v, want released source and checked graph state", finalCounts)
 	}
 }
 

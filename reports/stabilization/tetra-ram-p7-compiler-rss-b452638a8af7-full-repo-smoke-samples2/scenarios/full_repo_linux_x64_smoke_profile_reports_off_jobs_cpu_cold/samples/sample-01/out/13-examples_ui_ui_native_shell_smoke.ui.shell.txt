@@ -1,0 +1,63 @@
+Tetra Native UI Shell
+schema: tetra.ui.v0.4.0
+runtime: native shell command dispatch
+
+state ShellState
+  var toggles: i32 = 0
+  var label: str = "Wave 9 Native"
+  var source: i32 = 0
+  var textSource: str = "Copied from state"
+
+view ShellView (state: ShellState)
+  bind toggles: i32 = 0
+  bind labelText: str = Wave 9 Native
+  event submit -> toggle
+  event reset -> decrement
+  event rename -> rename
+  event copy -> copy
+  event copyAfterToggle -> copyAfterToggle
+  event compound -> compound
+  command toggle (1 stmt)
+    op state_add state.toggles 1
+  command decrement (1 stmt)
+    op state_sub state.toggles 1
+  command rename (1 stmt)
+    op state_set state.label "Native shell renamed"
+  command copy (1 stmt)
+    op state_set state.label state.textSource
+  command copyAfterToggle (2 stmt)
+    op state_add state.toggles 2
+    op state_set state.source state.toggles
+  command compound (2 stmt)
+    op state_add state.toggles 3
+    op state_sub state.toggles 1
+  dispatch submit -> toggle
+    state.toggles = 1
+  bind toggles: i32 = 1
+  bind labelText: str = Wave 9 Native
+  dispatch reset -> decrement
+    state.toggles = 0
+  bind toggles: i32 = 0
+  bind labelText: str = Wave 9 Native
+  dispatch rename -> rename
+    state.label = Native shell renamed
+  bind toggles: i32 = 0
+  bind labelText: str = Native shell renamed
+  dispatch copy -> copy
+    state.label = Copied from state
+  bind toggles: i32 = 0
+  bind labelText: str = Copied from state
+  dispatch copyAfterToggle -> copyAfterToggle
+    state.toggles = 2
+    state.source = 2
+  bind toggles: i32 = 2
+  bind labelText: str = Copied from state
+  dispatch compound -> compound
+    state.toggles = 5
+    state.toggles = 4
+  bind toggles: i32 = 4
+  bind labelText: str = Copied from state
+  style width: i32 = 80
+  style accent: str = "amber"
+  accessibility role: str = "status"
+  accessibility description: str = "Native shell preview"

@@ -120,11 +120,11 @@ cross-stage storage evidence:
   conservative heap path.
 - With P5.3 region planning enabled, a non-escaping temporary `copy()` that
   does not already fit the fixed-small stack lowering subset may report
-  `planned_storage: Region`, `runtime_path: region`, `allocator_class:
-  function_temp_region`, and `region_id: region:<function>:temp`. Because
-  implicit region lowering is not implemented yet, the same row must also
-  report `actual_lowering_storage: Heap`, `backend_storage: Heap`, and
-  `lowering_status: region_planned_heap_fallback`.
+  `planned_storage: Region` and `region_id: region:<function>:temp`. Planned-only
+  rows must report `actual_lowering_storage: Heap`, `backend_storage: Heap`, and
+  `lowering_status: region_planned_heap_fallback`. When function-temp lowering is
+  actually emitted, the runtime path is `scoped_single_mapping_v0` with
+  `allocator_class: function_temp_region`; this is not a general arena.
 - An unused `copy()` result may report `planned_storage: Eliminated`,
   `actual_lowering_storage: Eliminated`, and `lowering_status:
   eliminated_unused_copy`. Lowering still evaluates the source expression so

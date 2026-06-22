@@ -560,7 +560,7 @@ func validateMemoryBackendClassForRuntimePath(
 	backendClass string,
 ) error {
 	switch runtimePath {
-	case "per_core_small_heap", "small_heap_bump":
+	case "process_bump_small_heap_v0", "per_core_small_heap", "small_heap_bump":
 		if backendClass != "small_heap" {
 			return fmt.Errorf(
 				"%s backend_class = %q, want small_heap for %s",
@@ -577,7 +577,7 @@ func validateMemoryBackendClassForRuntimePath(
 				backendClass,
 			)
 		}
-	case "explicit_island", "region":
+	case "explicit_island", "scoped_single_mapping_v0", "region":
 		if backendClass != "region" {
 			return fmt.Errorf(
 				"%s backend_class = %q, want region for %s",
@@ -651,7 +651,7 @@ func allocationReportRowUsesHeap(
 		}
 	}
 	switch runtimePath {
-	case "heap", "per_core_small_heap", "large_mmap":
+	case "heap", "process_bump_small_heap_v0", "per_core_small_heap", "large_mmap":
 		return true
 	default:
 		return false
@@ -1298,12 +1298,13 @@ func validateRuntimeMeasuredDomainByte(
 		if !domain.ActorDomainFieldsSet {
 			return fmt.Errorf(
 				("%s actor runtime domain missing mailbox_current_bytes/mailbox_peak_bytes/" +
-					"byte_budget/over_budget_count/backpressure_events"),
+					"stack_live_bytes/stack_reserved_bytes/stack_retained_bytes/" +
+					"stack_released_bytes/byte_budget/over_budget_count/backpressure_events"),
 				prefix,
 			)
 		}
 		if !observed.ActorDomainFieldsSet {
-			return fmt.Errorf("%s sidecar actor domain missing mailbox_current_bytes", prefix)
+			return fmt.Errorf("%s sidecar actor domain missing mailbox_current_bytes/stack_live_bytes", prefix)
 		}
 	}
 	for _, item := range []struct {
@@ -1319,6 +1320,10 @@ func validateRuntimeMeasuredDomainByte(
 		{"bytes_copied", domain.BytesCopied, observed.BytesCopied},
 		{"mailbox_current_bytes", domain.MailboxCurrentBytes, observed.MailboxCurrentBytes},
 		{"mailbox_peak_bytes", domain.MailboxPeakBytes, observed.MailboxPeakBytes},
+		{"stack_live_bytes", domain.StackLiveBytes, observed.StackLiveBytes},
+		{"stack_reserved_bytes", domain.StackReservedBytes, observed.StackReservedBytes},
+		{"stack_retained_bytes", domain.StackRetainedBytes, observed.StackRetainedBytes},
+		{"stack_released_bytes", domain.StackReleasedBytes, observed.StackReleasedBytes},
 		{"byte_budget", domain.ByteBudget, observed.ByteBudget},
 		{"over_budget_count", domain.OverBudgetCount, observed.OverBudgetCount},
 		{"backpressure_events", domain.BackpressureEvents, observed.BackpressureEvents},
@@ -1330,6 +1335,9 @@ func validateRuntimeMeasuredDomainByte(
 			continue
 		}
 		if domain.Kind != "actor" && strings.HasPrefix(item.label, "mailbox_") {
+			continue
+		}
+		if domain.Kind != "actor" && strings.HasPrefix(item.label, "stack_") {
 			continue
 		}
 		if item.got != item.want {

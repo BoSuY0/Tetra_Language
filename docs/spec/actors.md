@@ -133,17 +133,36 @@ Once an actor reaches `done`, later local legacy, tagged, or typed sends to
 that actor return checked failure `-4` before allocating a message node. A
 message already queued in another actor's mailbox remains receivable after the
 sender is done, and `core.sender()` for that receive may name a done actor.
-Pending mailbox entries are not drained or delivered after the actor reaches
-`done`; this is a bounded local completion state, not mailbox-drain shutdown.
-Other blocked, sleeping, or waiting actors continue according to ordinary
-message, timer, and task-wait readiness rules when one actor exits.
-In particular, nonzero actor entry returns become the same user-visible `done`
-state as zero returns: later local sends return `-4`, and there is no separate
-actor failure channel.
+Pending mailbox entries are drained into the runtime message-pool free list
+when the actor reaches `done`; they are not delivered after completion. This is
+a bounded local completion state, not a shutdown API. Other blocked, sleeping,
+or waiting actors continue according to ordinary message, timer, and task-wait
+readiness rules when one actor exits. In particular, nonzero actor entry
+returns become the same user-visible `done` state as zero returns: later local
+sends return `-4`, and there is no separate actor failure channel.
 
-There is currently no shutdown API, no actor close handle, and no actor status,
-actor join, actor exit-code, supervision, or restart API. There is also no
-supervision, restart, linking, or OTP-style lifecycle guarantee.
+The raw core lifecycle ABI exposes `core.actor_status`,
+`core.actor_status_raw`, `core.actor_wait`, `core.actor_wait_until`,
+`core.actor_stop`, `core.actor_exit_reason`, `core.actor_link`,
+`core.actor_unlink`, `core.actor_monitor`, `core.actor_demonitor`, and
+`core.actor_set_trap_exit`. `core.actor_status_raw` returns the
+runtime-owned `actor.status_result_raw` bridge with `status_code` and `result`
+slots so `lib.core.actors.status` can distinguish `ok`, `invalid`, and
+`stale` without treating invalid actor refs as enum values. User code should
+prefer the stable
+`lib.core.actors` wrappers: `ActorStatus`, `StatusResult`, `WaitResult`,
+`StopResult`, `LinkResult`, `MonitorResult`, `status`, `wait`,
+`wait_until`, `stop`, `link`, `unlink`, `monitor`, `demonitor`, and
+`set_trap_exit`. Current Linux-x64 evidence covers local lifecycle status
+observations, wait/wait-until done and timeout results, invalid/stale wait
+refs mapping to public `dead` status plus `WaitResult.invalid` /
+`WaitResult.stale` taxonomy, `StatusResult.invalid` and `StatusResult.stale`
+for local actor status queries, invalid/stale preflight taxonomy for
+`StopResult`, `LinkResult`, and `MonitorResult`, local stop requests, bounded
+link/unlink propagation, monitor/demonitor cleanup, and trap-exit toggling.
+This is not a supervision, restart, remote lifecycle, or OTP-style lifecycle
+guarantee; several public result cases are reserved for later P06/P10
+production semantics.
 
 ## Scheduling semantics
 
@@ -181,6 +200,13 @@ supervision, restart, linking, or OTP-style lifecycle guarantee.
   and `core.recv_msg()` do not expose a cancellation result in the current
   profile; they remain message-oriented blocking APIs. This is not full actor
   supervision or a full structured-concurrency model for every blocking API.
+- Successful `core.task_join_i32(task)`, `core.task_join_result_i32(task)`,
+  `core.task_join_until_i32(task, deadline)`, and typed task joins consume the
+  completed task result and then mark the target actor slot `reclaimable`.
+  `core.task_poll_i32(task)` is non-consuming: it treats `done`/`reclaimable`
+  task actors as terminal readiness but does not reclaim a completed task actor
+  slot by itself. `core.task_group_close(group)` treats joined `reclaimable`
+  task actors as terminal for group-close completion.
 
 ## Message Model
 
@@ -273,14 +299,31 @@ isolation guarantees.
 - Built-in x64 runtime actor table: `maxActors = 128`, including the main
   actor. This leaves capacity for 127 child actors. When the table is full,
   `__tetra_actor_spawn` returns the raw handle value `-1` and does not create a
-  runnable actor. The public `actor` type is still opaque. A local legacy,
-  tagged, or typed send to an invalid actor handle returns checked failure
-  `-3` before allocating a message node.
+  runnable actor. A completed actor remains `done` until `__tetra_actor_wait`
+  or `__tetra_actor_wait_until` observes its result; only then does the runtime
+  mark that slot reclaimable for future spawn reuse. Waited reclaimable actor
+  slots reset stored initial stack frames instead of mapping a fresh stack for
+  that slot; raw unobserved `done` slots are not reused. The public `actor`
+  type is still opaque. A local legacy, tagged, or typed send to an invalid
+  actor handle returns checked failure `-3` before allocating a message node.
+- Builtin task join, timed join, and typed task join consume completed task
+  results and then mark the target actor slot `reclaimable`, so successful
+  sequential task lifetimes can exceed the 127 child actor concurrent cap. Task
+  poll is non-consuming: it treats waited reclaimable target actor slots as
+  terminal result states, matching `done` result reads, but does not reclaim a
+  completed task actor slot by itself. Group close treats joined reclaimable
+  task actors as terminal for completion. This is not a production mailbox
+  payload-destructor ABI or payload-drop claim.
 - Built-in x64 done actor send behavior: once a local actor has completed and
   its runtime status is `done`, later local legacy, tagged, or typed sends to
-  that actor return checked failure `-4` before allocating a message node. This
-  is a bounded shutdown diagnostic, not supervision, restart, linking, OTP
-  lifecycle behavior, or mailbox-drain lifecycle management.
+  that actor return checked failure `-4` before allocating a message node. The
+  completed actor drains any pending mailbox nodes into the runtime message-pool
+  free list before publishing `done`; those messages are not delivered. This is
+  a bounded shutdown diagnostic. The public `lib.core.actors` lifecycle wrapper
+  surface is present for status, wait, stop, link, unlink, monitor, demonitor,
+  and trap-exit operations, with local runtime evidence for the current P01
+  slice. It is not supervision, restart, remote lifecycle completion, OTP
+  lifecycle behavior, or a general production shutdown framework.
 - Built-in x64 per-actor mailbox depth: `maxActorMailboxMsgs = 256`. A local
   send to a full mailbox returns checked backpressure `-2` before allocating a
   message node. Receiving a message decrements the mailbox depth, so this
@@ -290,14 +333,15 @@ isolation guarantees.
   local mailbox policy, not a generic unbounded mailbox, automatic retry, or
   distributed delivery guarantee.
 - Built-in x64 runtime message pool: 64 KiB, with a bump allocator plus a
-  free list for drained message nodes. The current message node size is 88
-  bytes because typed mailbox payload slots are stored as local 64-bit slots;
-  this gives room for pointer-like local slice fields while keeping typed
-  payloads capped at 8 value slots by the checker. With the fixed 64 KiB pool,
-  744 single-slot live messages fit in the pool before reclamation. When a
-  later local send would exceed the pool while those messages remain live, the
-  built-in runtime returns checked failure `-1` and does not enqueue an
-  overflow message. Drained message nodes are reclaimed and can be reused.
+  free list for drained message nodes. The current message node size is 96
+  bytes because typed mailbox payload slots are stored as local 64-bit slots
+  and the node carries a runtime-only system-message kind; this gives room for
+  pointer-like local slice fields while keeping typed payloads capped at 8
+  value slots by the checker. With the fixed 64 KiB pool, 682 single-slot live
+  messages fit in the pool before reclamation. When a later local send would
+  exceed the pool while those messages remain live, the built-in runtime
+  returns checked failure `-1` and does not enqueue an overflow message.
+  Drained message nodes are reclaimed and can be reused.
 - Built-in x64 runtime actor state: 8 state slots per actor, each one `i32`
   storage cell. The checker enforces this limit for actor declarations and
   rejects programs that require more than 8 actor-state slots before lowering

@@ -16,7 +16,7 @@ import (
 	"tetra_language/compiler/internal/version"
 )
 
-const compilerCacheABIVersion = "linux-x64-memory-runtime-abi-v7-empty-string-surface-planned"
+const compilerCacheABIVersion = "linux-x64-memory-runtime-abi-v8-actor-ref-v2"
 
 func cacheDir(root, target string) string {
 	return filepath.Join(root, ".tetra_cache", target)

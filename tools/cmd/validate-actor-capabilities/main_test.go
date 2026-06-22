@@ -94,6 +94,94 @@ func TestValidateActorCapabilityRejectsFoundationTargetDrift(t *testing.T) {
 	}
 }
 
+func TestValidateActorCapabilityRequiresSystemMessageLaneScopedClaim(t *testing.T) {
+	var manifest actorCapabilityManifest
+	if err := json.Unmarshal([]byte(validActorCapabilitiesManifestJSON(t)), &manifest); err != nil {
+		t.Fatal(err)
+	}
+
+	const capabilityID = "system_message_runtime_lane_linux_x64"
+	const claim = "source-level system-message API and isolated runtime system lane implemented for Linux-x64 builtin runtime"
+	requiredNonclaims := []string{
+		"real local link/monitor producers are completed in P06",
+		"authenticated node-down producer is completed in P10",
+		"no full Erlang/OTP actor runtime claim",
+		"no cluster membership or reconnect/retry production claim",
+	}
+
+	var req *requiredCapabilityContract
+	for index := range manifest.RequiredCapabilities {
+		if manifest.RequiredCapabilities[index].ID == capabilityID {
+			req = &manifest.RequiredCapabilities[index]
+			break
+		}
+	}
+	if req == nil {
+		t.Fatalf("required capability %s missing", capabilityID)
+	}
+	if req.Status != "current_scoped" || !sameStringSet(req.SupportedTargets, []string{"linux-x64"}) {
+		t.Fatalf(
+			"required capability %s = status %q targets %v, want current_scoped linux-x64",
+			capabilityID,
+			req.Status,
+			req.SupportedTargets,
+		)
+	}
+
+	var cap *actorCapability
+	for index := range manifest.Capabilities {
+		if manifest.Capabilities[index].ID == capabilityID {
+			cap = &manifest.Capabilities[index]
+			break
+		}
+	}
+	if cap == nil {
+		t.Fatalf("capability %s missing", capabilityID)
+	}
+	if cap.Status != "current_scoped" || !sameStringSet(cap.SupportedTargets, []string{"linux-x64"}) {
+		t.Fatalf(
+			"capability %s = status %q targets %v, want current_scoped linux-x64",
+			capabilityID,
+			cap.Status,
+			cap.SupportedTargets,
+		)
+	}
+	if !stringInSet(claim, cap.Claims) {
+		t.Fatalf("capability %s missing scoped claim %q", capabilityID, claim)
+	}
+	for _, nonclaim := range requiredNonclaims {
+		if !stringInSet(nonclaim, cap.Nonclaims) {
+			t.Fatalf("capability %s missing nonclaim %q", capabilityID, nonclaim)
+		}
+	}
+	for _, ref := range []string{
+		"validate-actor-system-messages",
+		"validate-actor-capabilities",
+	} {
+		if !stringInSet(ref, cap.ValidatorRefs) {
+			t.Fatalf("capability %s missing validator_ref %s", capabilityID, ref)
+		}
+	}
+	for _, ref := range []string{
+		"docs/design/actor_system_messages_v1.md",
+		"lib/core/actors/actors.tetra",
+		"compiler/internal/actorsrt/actorsrt_suite_test.go",
+	} {
+		if !stringInSet(ref, cap.EvidenceRefs) && !stringInSet(ref, cap.DocsRefs) {
+			t.Fatalf("capability %s missing evidence/docs ref %s", capabilityID, ref)
+		}
+	}
+
+	const contractPath = "docs/contracts/actors/system-message-runtime-lane-linux-x64.release-contract.v1.json"
+	for _, ref := range manifest.ContractRefs {
+		if ref.CapabilityID == capabilityID && ref.Path == contractPath &&
+			ref.ClaimCheck && ref.NonclaimCheck && ref.TargetCheck && ref.ValidatorCheck {
+			return
+		}
+	}
+	t.Fatalf("manifest missing checked release contract ref for %s at %s", capabilityID, contractPath)
+}
+
 func TestValidateActorCapabilityRejectsMissingReferencedFile(t *testing.T) {
 	root := repoRoot(t)
 	raw := strings.Replace(validActorCapabilitiesManifestJSON(t), `"docs/spec/actors.md"`, `"docs/spec/missing-actors.md"`, 1)
@@ -185,6 +273,85 @@ func TestValidateActorCapabilityRejectsReleaseNotesMissingManifestTerms(t *testi
 	}
 	if !strings.Contains(err.Error(), "release notes") || !strings.Contains(err.Error(), "missing required nonclaim term") {
 		t.Fatalf("error = %v, want release notes missing required nonclaim term", err)
+	}
+}
+
+func TestValidateActorCapabilityRejectsFullV1VerdictWhileSchedulerBlocked(t *testing.T) {
+	err := validateCanonicalActorManifestWithReleaseNotes(
+		t,
+		actorV1ReleaseNotesBase()+
+			"\nFinal verdict: TETRA_V1_NATIVE_ACTOR_PLATFORM_LINUX_X64_PROD_STABLE.\n",
+	)
+	if err == nil {
+		t.Fatalf("expected full v1 verdict to fail while required capabilities are blocked")
+	}
+	for _, want := range []string{
+		"TETRA_V1_NATIVE_ACTOR_PLATFORM_LINUX_X64_PROD_STABLE",
+		"production_multithreaded_scheduler",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error = %v, want %q", err, want)
+		}
+	}
+}
+
+func TestValidateActorCapabilityRejectsClusterClaimWithoutMembershipReport(t *testing.T) {
+	err := validateCanonicalActorManifestWithReleaseNotes(
+		t,
+		actorV1ReleaseNotesBase()+
+			"\nTetra v1 now provides broker-authoritative cluster membership for distributed actors.\n",
+	)
+	if err == nil {
+		t.Fatalf("expected cluster claim without membership report to fail")
+	}
+	if !strings.Contains(err.Error(), "cluster_membership") {
+		t.Fatalf("error = %v, want cluster_membership capability rejection", err)
+	}
+}
+
+func TestValidateActorCapabilityRejectsSupervisionClaimWithoutLifecycleReports(t *testing.T) {
+	err := validateCanonicalActorManifestWithReleaseNotes(
+		t,
+		actorV1ReleaseNotesBase()+
+			"\nTetra v1 now provides actor lifecycle supervision and supervision restart trees.\n",
+	)
+	if err == nil {
+		t.Fatalf("expected supervision claim without lifecycle and restart reports to fail")
+	}
+	for _, want := range []string{"actor_lifecycle_supervision", "supervision_restart_tree"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error = %v, want %q", err, want)
+		}
+	}
+}
+
+func TestValidateActorCapabilityRejectsRustCParityFromLocalTierEvidence(t *testing.T) {
+	err := validateCanonicalActorManifestWithReleaseNotes(
+		t,
+		actorV1ReleaseNotesBase()+
+			"\nTetra v1 reaches Rust/C performance parity from Tier 0/Tier 1 local actor evidence.\n",
+	)
+	if err == nil {
+		t.Fatalf("expected Rust/C parity wording from local-only evidence to fail")
+	}
+	if !strings.Contains(err.Error(), "benchmark_rust_c_parity") {
+		t.Fatalf("error = %v, want benchmark_rust_c_parity capability rejection", err)
+	}
+}
+
+func TestValidateActorCapabilityRejectsNativeAppClaimUsingOldRealWindowProbe(t *testing.T) {
+	err := validateCanonicalActorManifestWithReleaseNotes(
+		t,
+		actorV1ReleaseNotesBase()+
+			"\nTetra v1 provides the native application platform through linux-x64 real-window probe evidence.\n",
+	)
+	if err == nil {
+		t.Fatalf("expected native app claim using old real-window probe evidence to fail")
+	}
+	for _, want := range []string{"native_surface_host", "old real-window probe"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error = %v, want %q", err, want)
+		}
 	}
 }
 
@@ -405,6 +572,32 @@ func actorCapabilitiesFixtureWithoutCapability(t *testing.T, id string) string {
 		t.Fatal(err)
 	}
 	return string(raw)
+}
+
+func validateCanonicalActorManifestWithReleaseNotes(t *testing.T, notesText string) error {
+	t.Helper()
+	root := repoRoot(t)
+	manifest := filepath.Join(root, "docs", "contracts", "actors", "actor-capability-manifest.v1.json")
+	notes := filepath.Join(t.TempDir(), "release-notes.md")
+	if err := os.WriteFile(notes, []byte(notesText), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return validateActorCapabilitiesManifestFileWithOptions(
+		manifest,
+		root,
+		actorCapabilityValidationOptions{ReleaseNotes: []string{notes}},
+	)
+}
+
+func actorV1ReleaseNotesBase() string {
+	return strings.Join([]string{
+		minimalRequiredNonclaimsText(),
+		"actor runtime foundation evidence",
+		"strict Linux-x64 gate",
+		"actor-runtime-foundation-manifest.json",
+		"distributed-actors-linux-x64/distributed-actors-linux-x64.json",
+		"parallel-production-linux-x64/parallel-production-linux-x64.json",
+	}, "\n")
 }
 
 func actorCapabilitiesFixtureWithRequiredCapability(t *testing.T, id string) string {

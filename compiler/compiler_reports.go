@@ -1,11 +1,11 @@
 package compiler
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"tetra_language/compiler/internal/allocplan"
@@ -79,14 +79,33 @@ func buildActorTransferReport(
 }
 
 func writeReport(path string, data any) error {
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
+	f, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
+	if err != nil {
+		return err
+	}
+	tmpPath := f.Name()
+	cleanup := true
+	defer func() {
+		if cleanup {
+			_ = os.Remove(tmpPath)
+		}
+	}()
+
+	enc := json.NewEncoder(f)
 	enc.SetEscapeHTML(false)
 	enc.SetIndent("", "  ")
 	if err := enc.Encode(data); err != nil {
+		_ = f.Close()
 		return err
 	}
-	return os.WriteFile(path, buf.Bytes(), 0o644)
+	if err := f.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		return err
+	}
+	cleanup = false
+	return nil
 }
 
 func formatExplainText(
@@ -141,6 +160,12 @@ func lowerOptionsForTarget(target string) lower.Options {
 	}
 }
 
+func lowerOptionsForBuild(target string, opt BuildOptions) lower.Options {
+	out := lowerOptionsForTarget(target)
+	out.OwnedAllocDropLowering = opt.OwnedAllocDropLowering
+	return out
+}
+
 func targetSupportsStackAllocationLowering(target string) bool {
 	switch target {
 	case "linux-x64", "macos-x64", "windows-x64":
@@ -178,6 +203,20 @@ func buildBoundsReport(
 
 // ---- reports_emit.go ----
 
+func writePLIRReports(outputPath string, plirProg *plir.Program) error {
+	if err := writeReport(outputPath+".plir.json", plirProg); err != nil {
+		return err
+	}
+	if err := os.WriteFile(
+		outputPath+".plir.txt",
+		[]byte(plir.FormatText(plirProg)),
+		0o644,
+	); err != nil {
+		return err
+	}
+	return nil
+}
+
 func emitExplainReports(
 	outputPath string,
 	target string,
@@ -190,12 +229,19 @@ func emitExplainReports(
 		!ramContractRequested(opt) {
 		return nil
 	}
+	plirOnly := opt.EmitPLIR && !opt.Explain && !opt.EmitProof && !opt.EmitBoundsReport &&
+		!opt.EmitAllocReport &&
+		!opt.EmitMemoryReport &&
+		!ramContractRequested(opt)
 	plirProg, err := plir.FromCheckedProgram(checked)
 	if err != nil {
 		return err
 	}
 	if err := plir.VerifyProgram(plirProg); err != nil {
 		return err
+	}
+	if plirOnly {
+		return writePLIRReports(outputPath, plirProg)
 	}
 	allocPlan, err := allocplan.FromPLIRWithOptions(
 		plirProg,
@@ -204,7 +250,7 @@ func emitExplainReports(
 	if err != nil {
 		return err
 	}
-	irProg, err := lower.LowerWithOptions(checked, lowerOptionsForTarget(target))
+	irProg, err := lower.LowerWithOptions(checked, lowerOptionsForBuild(target, opt))
 	if err != nil {
 		return err
 	}
@@ -216,14 +262,7 @@ func emitExplainReports(
 	}
 	bounds := buildBoundsReport(irProg, checked, target)
 	if opt.Explain || opt.EmitPLIR {
-		if err := writeReport(outputPath+".plir.json", plirProg); err != nil {
-			return err
-		}
-		if err := os.WriteFile(
-			outputPath+".plir.txt",
-			[]byte(plir.FormatText(plirProg)),
-			0o644,
-		); err != nil {
+		if err := writePLIRReports(outputPath, plirProg); err != nil {
 			return err
 		}
 	}
@@ -516,6 +555,7 @@ func buildBackendRuntimeObjectPlan(
 	}
 	actorStateUsed, _ := collectActorStateRuntimeUsagePosition(checked)
 	actorRuntimeUsed, _ := collectActorRuntimeUsagePosition(checked)
+	actorSystemReceiveUsed, _ := collectActorSystemReceiveRuntimeUsagePosition(checked)
 	tasksUsed, _ := collectTaskRuntimeUsagePosition(checked)
 	taskGroupsUsed := collectTaskGroupRuntimeUsage(checked)
 	typedTasksUsed, _ := collectTypedTaskRuntimeUsage(checked)
@@ -526,18 +566,19 @@ func buildBackendRuntimeObjectPlan(
 	distributedActorsUsed, _ := collectDistributedActorRuntimeUsagePosition(checked)
 
 	usage := buildruntime.RuntimeObjectPlanUsage{
-		ActorsUsed:            actorsUsed,
-		ActorRuntimeUsed:      actorRuntimeUsed,
-		ActorStateUsed:        actorStateUsed,
-		TasksUsed:             tasksUsed,
-		TaskGroupsUsed:        taskGroupsUsed,
-		TypedTasksUsed:        typedTasksUsed,
-		TimeRuntimeUsed:       timeRuntimeUsed,
-		FilesystemRuntimeUsed: filesystemRuntimeUsed,
-		NetRuntimeUsed:        netRuntimeUsage.used,
-		NetRuntimeSupported:   targetSupportsNetRuntimeUsage(target, netRuntimeUsage),
-		SurfaceRuntimeUsed:    surfaceRuntimeUsed,
-		DistributedActorsUsed: distributedActorsUsed,
+		ActorsUsed:             actorsUsed,
+		ActorRuntimeUsed:       actorRuntimeUsed,
+		ActorSystemReceiveUsed: actorSystemReceiveUsed,
+		ActorStateUsed:         actorStateUsed,
+		TasksUsed:              tasksUsed,
+		TaskGroupsUsed:         taskGroupsUsed,
+		TypedTasksUsed:         typedTasksUsed,
+		TimeRuntimeUsed:        timeRuntimeUsed,
+		FilesystemRuntimeUsed:  filesystemRuntimeUsed,
+		NetRuntimeUsed:         netRuntimeUsage.used,
+		NetRuntimeSupported:    targetSupportsNetRuntimeUsage(target, netRuntimeUsage),
+		SurfaceRuntimeUsed:     surfaceRuntimeUsed,
+		DistributedActorsUsed:  distributedActorsUsed,
 	}
 	decision := buildruntime.DecideRuntimeObjectPlan(
 		target,
@@ -572,6 +613,9 @@ func runtimeObjectFeaturesForUsage(usage buildruntime.RuntimeObjectPlanUsage) []
 	features := map[string]struct{}{}
 	if usage.ActorRuntimeUsed {
 		features["actor_runtime"] = struct{}{}
+	}
+	if usage.ActorSystemReceiveUsed {
+		features["actor_system_receive_runtime"] = struct{}{}
 	}
 	if usage.ActorStateUsed {
 		features["actor_state_runtime"] = struct{}{}

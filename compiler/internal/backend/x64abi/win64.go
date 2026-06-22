@@ -266,6 +266,34 @@ func (a *Win64) EmitAllocBytes(
 	return nil
 }
 
+func (a *Win64) EmitReleaseAllocation(
+	e *x64.Emitter,
+	stackDepth *int,
+	opt x64.CodegenOptions,
+	importPatches *[]x64obj.ImportPatch,
+) error {
+	_ = opt
+	if stackDepth == nil || importPatches == nil {
+		return fmt.Errorf("internal error: missing stackDepth/importPatches")
+	}
+	if *stackDepth < 1 {
+		return fmt.Errorf("stack underflow in release_allocation")
+	}
+	*stackDepth--
+	e.PopRcx()
+	frameBytes := int32(32)
+	if (*stackDepth)%2 != 0 {
+		frameBytes += 8
+	}
+	e.SubRspImm32(frameBytes)
+	e.MovEdxImm32(0)
+	e.MovR8dImm32(0x8000)
+	at := e.CallRipDisp32()
+	*importPatches = append(*importPatches, x64obj.ImportPatch{At: at, Name: winImportVirtualFree})
+	e.AddRspImm32(frameBytes)
+	return nil
+}
+
 func (a *Win64) EmitMakeSlice(
 	e *x64.Emitter,
 	kind ir.IRInstrKind,

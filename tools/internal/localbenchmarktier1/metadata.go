@@ -218,6 +218,10 @@ func runtimeDomainMemoryEvidence(
 		if domain.Kind == "actor" && domain.ActorDomainFieldsSet {
 			reportDomain.MailboxCurrentBytes = domain.MailboxCurrentBytes
 			reportDomain.MailboxPeakBytes = domain.MailboxPeakBytes
+			reportDomain.StackLiveBytes = domain.StackLiveBytes
+			reportDomain.StackReservedBytes = domain.StackReservedBytes
+			reportDomain.StackRetainedBytes = domain.StackRetainedBytes
+			reportDomain.StackReleasedBytes = domain.StackReleasedBytes
 			reportDomain.ByteBudget = domain.ByteBudget
 			reportDomain.OverBudgetCount = domain.OverBudgetCount
 			reportDomain.BackpressureEvents = domain.BackpressureEvents

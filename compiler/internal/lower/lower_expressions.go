@@ -15,6 +15,7 @@ import (
 	lowerlets "tetra_language/compiler/internal/lower/lets"
 	lowerrangeproof "tetra_language/compiler/internal/lower/rangeproof"
 	corerangeproof "tetra_language/compiler/internal/rangeproof"
+	"tetra_language/compiler/internal/runtimeabi"
 	"tetra_language/compiler/internal/semantics"
 )
 
@@ -158,6 +159,93 @@ func (l *lowerer) inferExprType(expr frontend.Expr) (string, error) {
 	default:
 		return "", lowerUnsupportedError(expr.Pos(), "unsupported expression kind %T", expr)
 	}
+}
+
+func (l *lowerer) actorRefSlots() int {
+	if info, ok := l.types["actor"]; ok && info != nil && info.SlotCount > 0 {
+		return info.SlotCount
+	}
+	return runtimeabi.ActorHandleABI().RefSlots
+}
+
+func (l *lowerer) actorSystemReceiveRawSlots() int {
+	if info, ok := l.types["actor.system_recv_raw"]; ok && info != nil && info.SlotCount > 0 {
+		return info.SlotCount
+	}
+	return l.actorRefSlots() + 7
+}
+
+func (l *lowerer) lowerActorSystemReceiveCall(
+	e *frontend.CallExpr,
+	mode int32,
+	hasDeadline bool,
+) (int, error) {
+	wantArgs := 0
+	if hasDeadline {
+		wantArgs = 1
+	}
+	if len(e.Args) != wantArgs {
+		return 0, fmt.Errorf(
+			"%s: %s expects %d arguments",
+			frontend.FormatPos(e.At),
+			strings.TrimPrefix(e.Name, "core."),
+			wantArgs,
+		)
+	}
+	rawSlots := l.actorSystemReceiveRawSlots()
+	base := l.allocScratchSlots(rawSlots)
+	l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: mode, Pos: e.At})
+	if hasDeadline {
+		slots, err := l.lowerExprAs(e.Args[0], "i32")
+		if err != nil {
+			return 0, err
+		}
+		if slots != 1 {
+			return 0, fmt.Errorf(
+				"%s: actor_recv_system_until expects one deadline slot",
+				frontend.FormatPos(e.Args[0].Pos()),
+			)
+		}
+	} else {
+		l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: e.At})
+	}
+	l.emit(
+		ir.IRInstr{
+			Kind:     ir.IRCall,
+			Name:     "__tetra_actor_recv_system_begin",
+			ArgSlots: 2,
+			RetSlots: 1,
+			Pos:      e.At,
+		},
+	)
+	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: base, Pos: e.At})
+	for slot := 0; slot < rawSlots-1; slot++ {
+		l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: int32(slot), Pos: e.At})
+		l.emit(
+			ir.IRInstr{
+				Kind:     ir.IRCall,
+				Name:     "__tetra_actor_recv_system_slot",
+				ArgSlots: 1,
+				RetSlots: 1,
+				Pos:      e.At,
+			},
+		)
+		l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: base + 1 + slot, Pos: e.At})
+	}
+	l.emit(
+		ir.IRInstr{
+			Kind:     ir.IRCall,
+			Name:     "__tetra_actor_recv_system_count",
+			ArgSlots: 0,
+			RetSlots: 1,
+			Pos:      e.At,
+		},
+	)
+	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: l.ensureDiscardLocal(), Pos: e.At})
+	for slot := 0; slot < rawSlots; slot++ {
+		l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: base + slot, Pos: e.At})
+	}
+	return rawSlots, nil
 }
 
 func (l *lowerer) lowerStructConstructorCall(
@@ -418,6 +506,244 @@ func (l *lowerer) lowerStructLiteralExpr(
 		total += slots
 	}
 	return total, nil
+}
+
+func (l *lowerer) lowerPartialOwnedStructExitExpr(
+	expr frontend.Expr,
+	expectedType string,
+) (int, int, bool, error) {
+	if !l.ownedAllocDropLowering || !exprContainsTryExpr(expr) {
+		return 0, -1, false, nil
+	}
+	lit, ok := expr.(*frontend.StructLitExpr)
+	if !ok || lit == nil {
+		return 0, -1, false, nil
+	}
+	cleanup, ownedSlot, hasOwnedField := l.ownedAllocCleanupForStructLiteralField(lit, expectedType)
+	if !hasOwnedField || ownedSlot < 0 {
+		return 0, -1, false, nil
+	}
+	info, ok := l.types[expectedType]
+	if !ok || info == nil || info.Kind != semantics.TypeStruct || info.SlotCount <= 0 {
+		return 0, -1, false, nil
+	}
+	for _, field := range info.Fields {
+		if field.FunctionTypeValue {
+			return 0, -1, false, nil
+		}
+	}
+
+	fieldMap := make(map[string]frontend.Expr, len(lit.Fields))
+	for _, field := range lit.Fields {
+		fieldMap[field.Name] = field.Value
+	}
+
+	base := l.allocScratchSlots(info.SlotCount)
+	returnedOwnedLocal := -1
+	registeredScratchCleanup := false
+	for _, field := range info.Fields {
+		value, ok := fieldMap[field.Name]
+		if !ok {
+			return 0, -1, true, fmt.Errorf(
+				"%s: missing field '%s'",
+				frontend.FormatPos(lit.At),
+				field.Name,
+			)
+		}
+		slots := 0
+		fieldOwnedLocal := -1
+		if exprContainsTryExpr(value) {
+			nestedSlots, nestedOwnedLocal, handled, err := l.lowerPartialOwnedExitExpr(value, field.TypeName)
+			if err != nil {
+				return 0, -1, true, err
+			}
+			if handled {
+				slots = nestedSlots
+				fieldOwnedLocal = nestedOwnedLocal
+			}
+		}
+		if slots == 0 {
+			var err error
+			slots, err = l.lowerExprAs(value, field.TypeName)
+			if err != nil {
+				return 0, -1, true, err
+			}
+		}
+		if slots != field.SlotCount {
+			return 0, -1, true, fmt.Errorf(
+				"%s: slot mismatch for field '%s'",
+				frontend.FormatPos(lit.At),
+				field.Name,
+			)
+		}
+		for slot := field.SlotCount - 1; slot >= 0; slot-- {
+			l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: base + field.Offset + slot, Pos: value.Pos()})
+		}
+		if ownedSlot < field.Offset || ownedSlot >= field.Offset+field.SlotCount {
+			continue
+		}
+		if fieldOwnedLocal >= 0 {
+			returnedOwnedLocal = fieldOwnedLocal
+			continue
+		}
+		if cleanup.local >= 0 {
+			returnedOwnedLocal = cleanup.local
+			continue
+		}
+		if registeredScratchCleanup {
+			continue
+		}
+		returnedOwnedLocal = base + ownedSlot
+		cleanup.local = returnedOwnedLocal
+		cleanup.scopeDepth = l.ownedLocalScopeDepthForLocal(returnedOwnedLocal)
+		l.ownedAllocCleanups = append(l.ownedAllocCleanups, cleanup)
+		registeredScratchCleanup = true
+	}
+
+	for slot := 0; slot < info.SlotCount; slot++ {
+		l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: base + slot, Pos: lit.At})
+	}
+	return info.SlotCount, returnedOwnedLocal, true, nil
+}
+
+func (l *lowerer) lowerPartialOwnedEnumExitExpr(
+	expr frontend.Expr,
+	expectedType string,
+) (int, int, bool, error) {
+	if !l.ownedAllocDropLowering || !exprContainsTryExpr(expr) {
+		return 0, -1, false, nil
+	}
+	call, ok := expr.(*frontend.CallExpr)
+	if !ok || call == nil {
+		return 0, -1, false, nil
+	}
+	typeName, caseInfo, ok := enumCaseConstructorInfo(call, expectedType, l.types)
+	if !ok || typeName != expectedType {
+		return 0, -1, false, nil
+	}
+	cleanup, ownedSlot, hasOwnedPayload := l.ownedAllocCleanupForEnumConstructorPayload(call, expectedType)
+	if !hasOwnedPayload || ownedSlot < 0 {
+		return 0, -1, false, nil
+	}
+	info, ok := l.types[expectedType]
+	if !ok || info == nil || info.Kind != semantics.TypeEnum || info.SlotCount <= 0 {
+		return 0, -1, false, nil
+	}
+	for _, isFunctionPayload := range caseInfo.PayloadFunctionTypes {
+		if isFunctionPayload {
+			return 0, -1, false, nil
+		}
+	}
+	if len(call.Args) != len(caseInfo.PayloadTypes) {
+		return 0, -1, true, fmt.Errorf(
+			"%s: enum case '%s.%s' expects %d payload argument(s), got %d",
+			frontend.FormatPos(call.At),
+			expectedType,
+			caseInfo.Name,
+			len(caseInfo.PayloadTypes),
+			len(call.Args),
+		)
+	}
+
+	base := l.allocScratchSlots(info.SlotCount)
+	returnedOwnedLocal := -1
+	registeredScratchCleanup := false
+
+	l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: caseInfo.Ordinal, Pos: call.At})
+	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: base, Pos: call.At})
+
+	payloadOffset := 1
+	for i, arg := range call.Args {
+		if i >= len(caseInfo.PayloadSlots) {
+			return 0, -1, true, fmt.Errorf(
+				"%s: enum case '%s.%s' payload %d layout missing",
+				frontend.FormatPos(arg.Pos()),
+				expectedType,
+				caseInfo.Name,
+				i+1,
+			)
+		}
+		payloadType := caseInfo.PayloadTypes[i]
+		payloadSlots := caseInfo.PayloadSlots[i]
+		slots := 0
+		payloadOwnedLocal := -1
+		if exprContainsTryExpr(arg) {
+			nestedSlots, nestedOwnedLocal, handled, err := l.lowerPartialOwnedExitExpr(arg, payloadType)
+			if err != nil {
+				return 0, -1, true, err
+			}
+			if handled {
+				slots = nestedSlots
+				payloadOwnedLocal = nestedOwnedLocal
+			}
+		}
+		if slots == 0 {
+			var err error
+			slots, err = l.lowerExprAs(arg, payloadType)
+			if err != nil {
+				return 0, -1, true, err
+			}
+		}
+		if slots != payloadSlots {
+			return 0, -1, true, fmt.Errorf(
+				"%s: enum case '%s.%s' payload %d slot mismatch",
+				frontend.FormatPos(arg.Pos()),
+				expectedType,
+				caseInfo.Name,
+				i+1,
+			)
+		}
+		for slot := payloadSlots - 1; slot >= 0; slot-- {
+			l.emit(ir.IRInstr{
+				Kind:  ir.IRStoreLocal,
+				Local: base + payloadOffset + slot,
+				Pos:   arg.Pos(),
+			})
+		}
+		if ownedSlot >= payloadOffset && ownedSlot < payloadOffset+payloadSlots {
+			if payloadOwnedLocal >= 0 {
+				returnedOwnedLocal = payloadOwnedLocal
+			} else if cleanup.local >= 0 {
+				returnedOwnedLocal = cleanup.local
+			} else if !registeredScratchCleanup {
+				returnedOwnedLocal = base + ownedSlot
+				cleanup.local = returnedOwnedLocal
+				cleanup.scopeDepth = l.ownedLocalScopeDepthForLocal(returnedOwnedLocal)
+				l.ownedAllocCleanups = append(l.ownedAllocCleanups, cleanup)
+				registeredScratchCleanup = true
+			}
+		}
+		payloadOffset += payloadSlots
+	}
+	padding := info.SlotCount - payloadOffset
+	if padding < 0 {
+		return 0, -1, true, fmt.Errorf(
+			"%s: enum case '%s.%s' payload layout exceeds enum layout",
+			frontend.FormatPos(call.At),
+			expectedType,
+			caseInfo.Name,
+		)
+	}
+	for slot := 0; slot < padding; slot++ {
+		l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: call.At})
+		l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: base + payloadOffset + slot, Pos: call.At})
+	}
+
+	for slot := 0; slot < info.SlotCount; slot++ {
+		l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: base + slot, Pos: call.At})
+	}
+	return info.SlotCount, returnedOwnedLocal, true, nil
+}
+
+func (l *lowerer) lowerPartialOwnedExitExpr(
+	expr frontend.Expr,
+	expectedType string,
+) (int, int, bool, error) {
+	slots, ownedLocal, handled, err := l.lowerPartialOwnedStructExitExpr(expr, expectedType)
+	if err != nil || handled {
+		return slots, ownedLocal, handled, err
+	}
+	return l.lowerPartialOwnedEnumExitExpr(expr, expectedType)
 }
 
 func (l *lowerer) lowerEnumCaseConstructorCall(
@@ -690,6 +1016,14 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 			)
 			return 1, nil
 		}
+		if err := l.rejectMovedOwnedLocalUse(lvalueInfo{
+			Base:      info.Base,
+			SlotCount: info.SlotCount,
+			TypeName:  info.TypeName,
+			Name:      e.Name,
+		}, e.At); err != nil {
+			return 0, err
+		}
 		for i := 0; i < info.SlotCount; i++ {
 			l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: info.Base + i, Pos: e.At})
 		}
@@ -721,6 +1055,9 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 				l.emit(ir.IRInstr{Kind: ir.IRLoadGlobal, Local: target.Base + i, Pos: e.At})
 			}
 			return target.SlotCount, nil
+		}
+		if err := l.rejectMovedOwnedLocalUse(target, e.At); err != nil {
+			return 0, err
 		}
 		for i := 0; i < target.SlotCount; i++ {
 			l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: target.Base + i, Pos: e.At})
@@ -877,7 +1214,11 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 			}
 		}
 		l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 1, Pos: e.At})
+		if err := l.emitDeferredFramesSince(0, e.At); err != nil {
+			return 0, err
+		}
 		l.emitCleanup(e.At)
+		l.emitOwnedAllocCleanup(e.At)
 		l.emitFunctionTempRegionReset(e.At)
 		l.emit(ir.IRInstr{Kind: ir.IRReturn, Pos: e.At})
 
@@ -1245,6 +1586,7 @@ func (l *lowerer) lowerCallExpr(e *frontend.CallExpr) (int, error) {
 		if len(e.Args) != 1 {
 			return 0, fmt.Errorf("%s: spawn expects 1 argument", frontend.FormatPos(e.At))
 		}
+		actorSlots := l.actorRefSlots()
 		lit, ok := e.Args[0].(*frontend.StringLitExpr)
 		if !ok {
 			return 0, fmt.Errorf("%s: spawn expects a string literal", frontend.FormatPos(e.At))
@@ -1262,15 +1604,16 @@ func (l *lowerer) lowerCallExpr(e *frontend.CallExpr) (int, error) {
 				Kind:     ir.IRCall,
 				Name:     "__tetra_actor_spawn",
 				ArgSlots: 1,
-				RetSlots: 1,
+				RetSlots: actorSlots,
 				Pos:      e.At,
 			},
 		)
-		return 1, nil
+		return actorSlots, nil
 	case "core.spawn_remote":
 		if len(e.Args) != 2 {
 			return 0, fmt.Errorf("%s: spawn_remote expects 2 arguments", frontend.FormatPos(e.At))
 		}
+		actorSlots := l.actorRefSlots()
 		nodeSlots, err := l.lowerExpr(e.Args[0])
 		if err != nil {
 			return 0, err
@@ -1304,11 +1647,11 @@ func (l *lowerer) lowerCallExpr(e *frontend.CallExpr) (int, error) {
 				Kind:     ir.IRCall,
 				Name:     "__tetra_actor_spawn_remote",
 				ArgSlots: 2,
-				RetSlots: 1,
+				RetSlots: actorSlots,
 				Pos:      e.At,
 			},
 		)
-		return 1, nil
+		return actorSlots, nil
 	case "core.task_spawn_i32":
 		if len(e.Args) != 1 {
 			return 0, fmt.Errorf("%s: task_spawn_i32 expects 1 argument", frontend.FormatPos(e.At))
@@ -1713,18 +2056,21 @@ func (l *lowerer) lowerCallExpr(e *frontend.CallExpr) (int, error) {
 		if len(e.Args) != 2 {
 			return 0, fmt.Errorf("%s: send_typed expects 2 arguments", frontend.FormatPos(e.At))
 		}
+		actorSlots := l.actorRefSlots()
 		targetSlots, err := l.lowerExpr(e.Args[0])
 		if err != nil {
 			return 0, err
 		}
-		if targetSlots != 1 {
+		if targetSlots != actorSlots {
 			return 0, fmt.Errorf(
 				"%s: send_typed expects actor target",
 				frontend.FormatPos(e.Args[0].Pos()),
 			)
 		}
-		targetLocal := l.allocScratchSlots(1)
-		l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: targetLocal, Pos: e.At})
+		targetLocal := l.allocScratchSlots(actorSlots)
+		for slot := actorSlots - 1; slot >= 0; slot-- {
+			l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: targetLocal + slot, Pos: e.At})
+		}
 		msgType, err := l.inferExprType(e.Args[1])
 		if err != nil {
 			return 0, err
@@ -1750,7 +2096,9 @@ func (l *lowerer) lowerCallExpr(e *frontend.CallExpr) (int, error) {
 		for slot := info.SlotCount - 1; slot >= 0; slot-- {
 			l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: msgBase + slot, Pos: e.At})
 		}
-		l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: targetLocal, Pos: e.At})
+		for slot := 0; slot < actorSlots; slot++ {
+			l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: targetLocal + slot, Pos: e.At})
+		}
 		l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: msgBase, Pos: e.At})
 		l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: typedActorMessageTagBase(msgType), Pos: e.At})
 		l.emit(ir.IRInstr{Kind: ir.IRAddI32, Pos: e.At})
@@ -1759,7 +2107,7 @@ func (l *lowerer) lowerCallExpr(e *frontend.CallExpr) (int, error) {
 			ir.IRInstr{
 				Kind:     ir.IRCall,
 				Name:     "__tetra_actor_send_begin",
-				ArgSlots: 3,
+				ArgSlots: actorSlots + 2,
 				RetSlots: 1,
 				Pos:      e.At,
 			},
@@ -1805,30 +2153,32 @@ func (l *lowerer) lowerCallExpr(e *frontend.CallExpr) (int, error) {
 		if len(e.Args) != 0 {
 			return 0, fmt.Errorf("%s: self expects 0 arguments", frontend.FormatPos(e.At))
 		}
+		actorSlots := l.actorRefSlots()
 		l.emit(
 			ir.IRInstr{
 				Kind:     ir.IRCall,
 				Name:     "__tetra_actor_self",
 				ArgSlots: 0,
-				RetSlots: 1,
+				RetSlots: actorSlots,
 				Pos:      e.At,
 			},
 		)
-		return 1, nil
+		return actorSlots, nil
 	case "core.sender":
 		if len(e.Args) != 0 {
 			return 0, fmt.Errorf("%s: sender expects 0 arguments", frontend.FormatPos(e.At))
 		}
+		actorSlots := l.actorRefSlots()
 		l.emit(
 			ir.IRInstr{
 				Kind:     ir.IRCall,
 				Name:     "__tetra_actor_sender",
 				ArgSlots: 0,
-				RetSlots: 1,
+				RetSlots: actorSlots,
 				Pos:      e.At,
 			},
 		)
-		return 1, nil
+		return actorSlots, nil
 	case "core.sym_addr":
 		if len(e.Args) != 1 {
 			return 0, fmt.Errorf("%s: sym_addr expects 1 argument", frontend.FormatPos(e.At))
@@ -1846,12 +2196,23 @@ func (l *lowerer) lowerCallExpr(e *frontend.CallExpr) (int, error) {
 		}
 		l.emit(ir.IRInstr{Kind: ir.IRSymAddr, Name: name, Pos: e.At})
 		return 1, nil
+	case "core.actor_recv_system":
+		return l.lowerActorSystemReceiveCall(e, 0, false)
+	case "core.actor_recv_system_poll":
+		return l.lowerActorSystemReceiveCall(e, 1, false)
+	case "core.actor_recv_system_until":
+		return l.lowerActorSystemReceiveCall(e, 2, true)
 	}
 	total := 0
 	callSig, hasCallSig := l.funcs[e.Name]
 	for i, arg := range e.Args {
 		var slots int
 		var err error
+		if hasCallSig && i < len(callSig.ParamTypes) {
+			if err := l.rejectLocalStagedOwnedEnumPayloadValue(arg, callSig.ParamTypes[i], arg.Pos()); err != nil {
+				return 0, err
+			}
+		}
 		if hasCallSig && i < len(callSig.ParamFunctionTypes) && callSig.ParamFunctionTypes[i] {
 			slots, err = l.lowerFunctionTypedArgument(arg)
 		} else if hasCallSig && i < len(callSig.ParamTypes) {
@@ -1879,6 +2240,27 @@ func (l *lowerer) lowerCallExpr(e *frontend.CallExpr) (int, error) {
 			return 0, fmt.Errorf("%s: cap_mem expects 0 arguments", frontend.FormatPos(e.At))
 		}
 		l.emit(ir.IRInstr{Kind: ir.IRCapMem, Pos: e.At})
+		return 1, nil
+	case "core.actor_ref_local":
+		if total != 2 {
+			return 0, fmt.Errorf(
+				"%s: actor_ref_local expects slot and generation arguments",
+				frontend.FormatPos(e.At),
+			)
+		}
+		return l.actorRefSlots(), nil
+	case "core.actor_ref_slot":
+		actorSlots := l.actorRefSlots()
+		if total != actorSlots {
+			return 0, fmt.Errorf(
+				"%s: actor_ref_slot expects actor handle",
+				frontend.FormatPos(e.At),
+			)
+		}
+		discard := l.ensureDiscardLocal()
+		for slot := actorSlots - 1; slot >= 1; slot-- {
+			l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: discard, Pos: e.At})
+		}
 		return 1, nil
 	case "core.alloc_bytes":
 		if total != 1 {
@@ -2872,28 +3254,193 @@ func (l *lowerer) lowerCallExpr(e *frontend.CallExpr) (int, error) {
 		)
 		return 1, nil
 	case "core.send":
-		if total != 2 {
+		actorSlots := l.actorRefSlots()
+		if total != actorSlots+1 {
 			return 0, fmt.Errorf("%s: send expects 2 arguments", frontend.FormatPos(e.At))
 		}
 		l.emit(
 			ir.IRInstr{
 				Kind:     ir.IRCall,
 				Name:     "__tetra_actor_send",
-				ArgSlots: 2,
+				ArgSlots: actorSlots + 1,
 				RetSlots: 1,
 				Pos:      e.At,
 			},
 		)
 		return 1, nil
 	case "core.send_msg":
-		if total != 3 {
+		actorSlots := l.actorRefSlots()
+		if total != actorSlots+2 {
 			return 0, fmt.Errorf("%s: send_msg expects 3 arguments", frontend.FormatPos(e.At))
 		}
 		l.emit(
 			ir.IRInstr{
 				Kind:     ir.IRCall,
 				Name:     "__tetra_actor_send_msg",
-				ArgSlots: 3,
+				ArgSlots: actorSlots + 2,
+				RetSlots: 1,
+				Pos:      e.At,
+			},
+		)
+		return 1, nil
+	case "core.actor_status":
+		actorSlots := l.actorRefSlots()
+		if total != actorSlots {
+			return 0, fmt.Errorf("%s: actor_status expects 1 argument", frontend.FormatPos(e.At))
+		}
+		l.emit(
+			ir.IRInstr{
+				Kind:     ir.IRCall,
+				Name:     "__tetra_actor_status",
+				ArgSlots: actorSlots,
+				RetSlots: 1,
+				Pos:      e.At,
+			},
+		)
+		return 1, nil
+	case "core.actor_status_raw":
+		actorSlots := l.actorRefSlots()
+		if total != actorSlots {
+			return 0, fmt.Errorf("%s: actor_status_raw expects 1 argument", frontend.FormatPos(e.At))
+		}
+		l.emit(
+			ir.IRInstr{
+				Kind:     ir.IRCall,
+				Name:     "__tetra_actor_status_raw",
+				ArgSlots: actorSlots,
+				RetSlots: 2,
+				Pos:      e.At,
+			},
+		)
+		return 2, nil
+	case "core.actor_wait":
+		actorSlots := l.actorRefSlots()
+		if total != actorSlots {
+			return 0, fmt.Errorf("%s: actor_wait expects 1 argument", frontend.FormatPos(e.At))
+		}
+		l.emit(
+			ir.IRInstr{
+				Kind:     ir.IRCall,
+				Name:     "__tetra_actor_wait",
+				ArgSlots: actorSlots,
+				RetSlots: 2,
+				Pos:      e.At,
+			},
+		)
+		return 2, nil
+	case "core.actor_wait_until":
+		actorSlots := l.actorRefSlots()
+		if total != actorSlots+1 {
+			return 0, fmt.Errorf("%s: actor_wait_until expects 2 arguments", frontend.FormatPos(e.At))
+		}
+		l.emit(
+			ir.IRInstr{
+				Kind:     ir.IRCall,
+				Name:     "__tetra_actor_wait_until",
+				ArgSlots: actorSlots + 1,
+				RetSlots: 2,
+				Pos:      e.At,
+			},
+		)
+		return 2, nil
+	case "core.actor_stop":
+		actorSlots := l.actorRefSlots()
+		if total != actorSlots+1 {
+			return 0, fmt.Errorf("%s: actor_stop expects 2 arguments", frontend.FormatPos(e.At))
+		}
+		l.emit(
+			ir.IRInstr{
+				Kind:     ir.IRCall,
+				Name:     "__tetra_actor_stop",
+				ArgSlots: actorSlots + 1,
+				RetSlots: 1,
+				Pos:      e.At,
+			},
+		)
+		return 1, nil
+	case "core.actor_exit_reason":
+		actorSlots := l.actorRefSlots()
+		if total != actorSlots {
+			return 0, fmt.Errorf("%s: actor_exit_reason expects 1 argument", frontend.FormatPos(e.At))
+		}
+		l.emit(
+			ir.IRInstr{
+				Kind:     ir.IRCall,
+				Name:     "__tetra_actor_exit_reason",
+				ArgSlots: actorSlots,
+				RetSlots: 1,
+				Pos:      e.At,
+			},
+		)
+		return 1, nil
+	case "core.actor_link":
+		actorSlots := l.actorRefSlots()
+		if total != actorSlots {
+			return 0, fmt.Errorf("%s: actor_link expects 1 argument", frontend.FormatPos(e.At))
+		}
+		l.emit(
+			ir.IRInstr{
+				Kind:     ir.IRCall,
+				Name:     "__tetra_actor_link",
+				ArgSlots: actorSlots,
+				RetSlots: 1,
+				Pos:      e.At,
+			},
+		)
+		return 1, nil
+	case "core.actor_unlink":
+		actorSlots := l.actorRefSlots()
+		if total != actorSlots {
+			return 0, fmt.Errorf("%s: actor_unlink expects 1 argument", frontend.FormatPos(e.At))
+		}
+		l.emit(
+			ir.IRInstr{
+				Kind:     ir.IRCall,
+				Name:     "__tetra_actor_unlink",
+				ArgSlots: actorSlots,
+				RetSlots: 1,
+				Pos:      e.At,
+			},
+		)
+		return 1, nil
+	case "core.actor_monitor":
+		actorSlots := l.actorRefSlots()
+		if total != actorSlots {
+			return 0, fmt.Errorf("%s: actor_monitor expects 1 argument", frontend.FormatPos(e.At))
+		}
+		l.emit(
+			ir.IRInstr{
+				Kind:     ir.IRCall,
+				Name:     "__tetra_actor_monitor",
+				ArgSlots: actorSlots,
+				RetSlots: 1,
+				Pos:      e.At,
+			},
+		)
+		return 1, nil
+	case "core.actor_demonitor":
+		if total != 1 {
+			return 0, fmt.Errorf("%s: actor_demonitor expects 1 argument", frontend.FormatPos(e.At))
+		}
+		l.emit(
+			ir.IRInstr{
+				Kind:     ir.IRCall,
+				Name:     "__tetra_actor_demonitor",
+				ArgSlots: 1,
+				RetSlots: 1,
+				Pos:      e.At,
+			},
+		)
+		return 1, nil
+	case "core.actor_set_trap_exit":
+		if total != 1 {
+			return 0, fmt.Errorf("%s: actor_set_trap_exit expects 1 argument", frontend.FormatPos(e.At))
+		}
+		l.emit(
+			ir.IRInstr{
+				Kind:     ir.IRCall,
+				Name:     "__tetra_actor_set_trap_exit",
+				ArgSlots: 1,
 				RetSlots: 1,
 				Pos:      e.At,
 			},
@@ -2946,6 +3493,7 @@ func (l *lowerer) lowerCallExpr(e *frontend.CallExpr) (int, error) {
 		if !ok {
 			return 0, fmt.Errorf("%s: unknown function '%s'", frontend.FormatPos(e.At), e.Name)
 		}
+		consumedOwnedLocals := l.consumedOwnedAllocLocals(e.Args, sig.ParamOwnership)
 		writebacks := []inoutWriteback(nil)
 		if sig.ThrowsType == "" {
 			var err error
@@ -2955,16 +3503,51 @@ func (l *lowerer) lowerCallExpr(e *frontend.CallExpr) (int, error) {
 			}
 		}
 		abiReturnSlots := sig.ReturnSlots + inoutWritebackSlotCount(writebacks)
+		callInstr := ir.IRInstr{
+			Kind:     ir.IRCall,
+			Name:     e.Name,
+			ArgSlots: total,
+			RetSlots: abiReturnSlots,
+			Pos:      e.At,
+		}
+		if summary, ok := l.ownedThrowSummaryForCallName(e.Name); ok && sig.ThrowsType != "" &&
+			abiReturnSlots == sig.ReturnSlots &&
+			summary.errorSlot >= 0 {
+			successSlots, errorSlots, compact, err := throwingLayout(sig.ReturnType, sig.ThrowsType, l.types)
+			if err != nil {
+				return 0, err
+			}
+			if summary.errorSlot < errorSlots {
+				ownedErrorSlot := summary.errorSlot
+				if !compact {
+					ownedErrorSlot += successSlots
+				}
+				if ownedErrorSlot >= 0 && ownedErrorSlot < sig.ReturnSlots-1 {
+					callInstr.OwnsErrorSlot = true
+					callInstr.OwnedErrorSlot = ownedErrorSlot
+					callInstr.LayoutID = summary.layoutID
+					callInstr.OwnershipDomain = summary.domain
+					callInstr.ReleaseKind = summary.releaseKind
+				}
+			}
+		} else if summary, ok := l.ownedReturnSummaryForCallName(e.Name); ok &&
+			abiReturnSlots == sig.ReturnSlots &&
+			summary.returnSlot >= 0 &&
+			summary.returnSlot < sig.ReturnSlots {
+			callInstr.OwnedReturnSlot = summary.returnSlot
+			callInstr.OwnedReturnConditional = summary.conditional
+			callInstr.LayoutID = summary.layoutID
+			callInstr.OwnershipDomain = summary.domain
+			callInstr.ReleaseKind = summary.releaseKind
+		}
 		l.emit(
-			ir.IRInstr{
-				Kind:     ir.IRCall,
-				Name:     e.Name,
-				ArgSlots: total,
-				RetSlots: abiReturnSlots,
-				Pos:      e.At,
-			},
+			callInstr,
 		)
 		l.emitInoutWritebacks(writebacks, e.At)
+		for _, local := range consumedOwnedLocals {
+			l.markMovedOwnedLocal(local, -1)
+			l.forgetOwnedAllocCleanupLocal(local)
+		}
 		return sig.ReturnSlots, nil
 	}
 }
@@ -3532,6 +4115,9 @@ func (l *lowerer) lowerMatchExpr(e *frontend.MatchExpr) (int, error) {
 	if !ok {
 		return 0, fmt.Errorf("%s: unknown match expression result local", frontend.FormatPos(e.At))
 	}
+	if err := l.rejectLocalStagedOwnedEnumPayloadValue(e.Value, info.TypeName, e.At); err != nil {
+		return 0, err
+	}
 	valueSlots, err := l.lowerExpr(e.Value)
 	if err != nil {
 		return 0, err
@@ -3667,6 +4253,9 @@ func (l *lowerer) lowerMatchExpr(e *frontend.MatchExpr) (int, error) {
 			}
 			l.emit(ir.IRInstr{Kind: ir.IRJmpIfZero, Label: guardFailLabels[i], Pos: c.Guard.Pos()})
 		}
+		if err := l.rejectLocalStagedOwnedEnumPayloadValue(c.Value, e.ResultType, c.At); err != nil {
+			return 0, err
+		}
 		slots, err := l.lowerExprAs(c.Value, e.ResultType)
 		if err != nil {
 			return 0, err
@@ -3750,6 +4339,40 @@ func (l *lowerer) lowerCatchExpr(e *frontend.CatchExpr) (int, error) {
 	}
 	if callSuccessSlots != resultInfo.SlotCount || callErrorSlots != errorInfo.SlotCount {
 		return 0, fmt.Errorf("%s: catch slot mismatch", frontend.FormatPos(e.At))
+	}
+	ownedErrorCleanup := ownedAllocCleanup{}
+	hasOwnedErrorCleanup := false
+	ownedCatchRelayCleanup, ownedCatchRelayResultSlot, hasOwnedCatchRelayCleanup := l.ownedAllocCleanupForCatchRelayResult(e)
+	ownedCatchRelaySourcePlan := catchRelayLocalCleanupPlan{}
+	hasOwnedCatchRelaySourcePlan := false
+	ownedCatchRelayAlwaysThrows := false
+	ownedCatchResultCleanup, _, hasOwnedCatchResultCleanup := l.ownedAllocCleanupForNonOwnedErrorCatchResult(e)
+	if !hasOwnedCatchResultCleanup {
+		ownedCatchResultCleanup, _, hasOwnedCatchResultCleanup = l.ownedAllocCleanupForOwnedErrorMixedCatchResult(e)
+	}
+	if summary, ok := l.ownedThrowSummaryForCallExpr(call); ok {
+		ownedCatchRelayAlwaysThrows = summary.alwaysThrows
+		if ownedReturnStorageType(e.ResultType, l.types) && !hasOwnedCatchRelayCleanup && !hasOwnedCatchResultCleanup {
+			return 0, fmt.Errorf(
+				"%s: catch of owned thrown value returning owned-capable result requires typed ownership summaries",
+				frontend.FormatPos(e.At),
+			)
+		}
+		if summary.errorSlot >= 0 && summary.errorSlot < errorInfo.SlotCount {
+			ownedErrorCleanup = ownedAllocCleanup{
+				local:       errorInfo.Base + summary.errorSlot,
+				layoutID:    summary.layoutID,
+				domain:      summary.domain,
+				releaseKind: summary.releaseKind,
+			}
+			hasOwnedErrorCleanup = true
+		}
+		if hasOwnedCatchRelayCleanup {
+			if sourcePlan, ok := l.catchRelayLocalCleanupPlan(e, ownedCatchRelayResultSlot); ok {
+				ownedCatchRelaySourcePlan = sourcePlan
+				hasOwnedCatchRelaySourcePlan = true
+			}
+		}
 	}
 	var slots int
 	var err error
@@ -3865,6 +4488,11 @@ func (l *lowerer) lowerCatchExpr(e *frontend.CatchExpr) (int, error) {
 	if defaultLabel >= 0 {
 		l.emit(ir.IRInstr{Kind: ir.IRJmp, Label: defaultLabel, Pos: e.At})
 	} else {
+		if hasOwnedErrorCleanup {
+			if !hasOwnedCatchRelayCleanup && !hasOwnedCatchResultCleanup {
+				l.emitOwnedAllocCleanupFor(ownedErrorCleanup, e.At)
+			}
+		}
 		l.emit(ir.IRInstr{Kind: ir.IRJmp, Label: endLabel, Pos: e.At})
 	}
 	for i, c := range e.Cases {
@@ -3885,6 +4513,9 @@ func (l *lowerer) lowerCatchExpr(e *frontend.CatchExpr) (int, error) {
 			}
 			l.emit(ir.IRInstr{Kind: ir.IRJmpIfZero, Label: guardFailLabels[i], Pos: c.Guard.Pos()})
 		}
+		if err := l.rejectLocalStagedOwnedEnumPayloadValue(c.Value, e.ResultType, c.At); err != nil {
+			return 0, err
+		}
 		slots, err := l.lowerExprAs(c.Value, e.ResultType)
 		if err != nil {
 			return 0, err
@@ -3897,6 +4528,29 @@ func (l *lowerer) lowerCatchExpr(e *frontend.CatchExpr) (int, error) {
 		}
 		for slot := resultInfo.SlotCount - 1; slot >= 0; slot-- {
 			l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: resultInfo.Base + slot, Pos: c.At})
+		}
+		if hasOwnedErrorCleanup {
+			errorCleanupSlot := ownedErrorCleanup.local - errorInfo.Base
+			if (!hasOwnedCatchRelayCleanup && !hasOwnedCatchResultCleanup) ||
+				catchCaseNeedsOwnedErrorCleanup(c, e.ErrorType, e.ResultType, errorCleanupSlot, l.types) ||
+				(c.Default &&
+					(defaultCoversOnlySingleOwnedEnumPayload(e.Cases, e.ErrorType, errorCleanupSlot, l.types) ||
+						defaultCoversOnlyOptionalSomeOwnedPayload(e.Cases, e.ErrorType, errorCleanupSlot, l.types))) {
+				l.emitOwnedAllocCleanupFor(ownedErrorCleanup, c.At)
+			} else if c.Default {
+				if caseInfo, ok := defaultCoversSingleOwnedEnumPayloadCaseAllowingNonOwned(
+					e.Cases,
+					e.ErrorType,
+					errorCleanupSlot,
+					"",
+					l.types,
+				); ok {
+					l.emitOwnedAllocCleanupForEnumTag(ownedErrorCleanup, errorInfo.Base, caseInfo.Ordinal, c.At)
+				}
+			}
+		}
+		if hasOwnedCatchRelaySourcePlan {
+			l.emitCatchRelayUnselectedLocalCleanups(ownedCatchRelaySourcePlan, i, c.At)
 		}
 		l.emit(ir.IRInstr{Kind: ir.IRJmp, Label: endLabel, Pos: c.At})
 	}
@@ -3916,9 +4570,23 @@ func (l *lowerer) lowerCatchExpr(e *frontend.CatchExpr) (int, error) {
 	for slot := resultInfo.SlotCount - 1; slot >= 0; slot-- {
 		l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: resultInfo.Base + slot, Pos: e.At})
 	}
+	if hasOwnedCatchRelaySourcePlan && !ownedCatchRelayAlwaysThrows {
+		l.emitCatchRelayAllLocalCleanups(ownedCatchRelaySourcePlan, e.At)
+	}
 	l.emit(ir.IRInstr{Kind: ir.IRJmp, Label: endLabel, Pos: e.At})
 
 	l.emit(ir.IRInstr{Kind: ir.IRLabel, Label: endLabel, Pos: e.At})
+	if hasOwnedCatchRelayCleanup {
+		if hasOwnedCatchRelaySourcePlan {
+			l.forgetCatchRelayLocalCleanups(ownedCatchRelaySourcePlan)
+		}
+		l.forgetOwnedAllocCleanupLocal(ownedCatchRelayCleanup.local)
+		l.ownedAllocCleanups = append(l.ownedAllocCleanups, ownedCatchRelayCleanup)
+	}
+	if hasOwnedCatchResultCleanup {
+		l.forgetOwnedAllocCleanupLocal(ownedCatchResultCleanup.local)
+		l.ownedAllocCleanups = append(l.ownedAllocCleanups, ownedCatchResultCleanup)
+	}
 	for slot := 0; slot < resultInfo.SlotCount; slot++ {
 		l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: resultInfo.Base + slot, Pos: e.At})
 	}

@@ -64,6 +64,79 @@ func TestSelfHostActorsRuntimePoC(t *testing.T) {
 	}
 }
 
+func TestActorRefLocalRoundTripRuntime(t *testing.T) {
+	if runtime.GOARCH != "amd64" {
+		t.Skip("amd64 only")
+	}
+	tgt, ok := target.Host()
+	if !ok {
+		t.Skipf("unsupported host: %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+
+	tmp := t.TempDir()
+	srcPath := filepath.Join(tmp, "actor_ref_roundtrip.tetra")
+	if err := os.WriteFile(srcPath, []byte(`
+func main() -> i32
+uses actors:
+    var slot: i32 = 0
+    unsafe:
+        let peer: actor = core.actor_ref_local(7, 1)
+        slot = core.actor_ref_slot(peer)
+    return slot
+`), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	outPath := filepath.Join(tmp, "actor_ref_roundtrip"+tgt.ExeExt)
+	if _, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, tgt.Triple, compiler.BuildOptions{}); err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	_, exitCode := runBinary(t, outPath)
+	if exitCode != 7 {
+		t.Fatalf("exit code = %d, want 7", exitCode)
+	}
+}
+
+func TestActorRefParameterRoundTripRuntime(t *testing.T) {
+	if runtime.GOARCH != "amd64" {
+		t.Skip("amd64 only")
+	}
+	tgt, ok := target.Host()
+	if !ok {
+		t.Skipf("unsupported host: %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+
+	tmp := t.TempDir()
+	srcPath := filepath.Join(tmp, "actor_ref_param_roundtrip.tetra")
+	if err := os.WriteFile(srcPath, []byte(`
+func slot_of(peer: actor) -> i32
+uses actors:
+    var slot: i32 = 0
+    unsafe:
+        slot = core.actor_ref_slot(peer)
+    return slot
+
+func main() -> i32
+uses actors:
+    var result: i32 = 0
+    unsafe:
+        let peer: actor = core.actor_ref_local(7, 1)
+        result = slot_of(peer)
+    return result
+`), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	outPath := filepath.Join(tmp, "actor_ref_param_roundtrip"+tgt.ExeExt)
+	if _, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, tgt.Triple, compiler.BuildOptions{}); err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	_, exitCode := runBinary(t, outPath)
+	if exitCode != 7 {
+		t.Fatalf("exit code = %d, want 7", exitCode)
+	}
+}
+
 func runBinary(t *testing.T, path string) (string, int) {
 	t.Helper()
 

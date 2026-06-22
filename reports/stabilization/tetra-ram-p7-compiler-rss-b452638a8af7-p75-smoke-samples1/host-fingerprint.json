@@ -1,0 +1,10 @@
+{
+  "schema": "tetra.ram.p7-compiler-rss.host.v1",
+  "hostname": "tetra-4",
+  "goos": "linux",
+  "goarch": "amd64",
+  "num_cpu": 32,
+  "kernel_release": "7.0.5-2-cachyos",
+  "os_release": "CachyOS",
+  "cpu_model": "Intel(R) Core(TM) i9-14900HX"
+}

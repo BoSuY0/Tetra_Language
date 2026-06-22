@@ -1,0 +1,5 @@
+// v0.17 effects smoke: print requires uses io.
+func main() -> Int
+uses io:
+    print("effects io\n")
+    return 0

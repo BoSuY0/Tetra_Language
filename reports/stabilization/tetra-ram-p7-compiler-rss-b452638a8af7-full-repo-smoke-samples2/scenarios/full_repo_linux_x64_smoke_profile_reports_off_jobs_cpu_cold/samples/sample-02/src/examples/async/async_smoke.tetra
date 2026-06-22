@@ -1,0 +1,9 @@
+async func answer() -> Int:
+    return 42
+
+async func caller() -> Int:
+    let value: Int = await answer()
+    return value
+
+func main() -> Int:
+    return 42

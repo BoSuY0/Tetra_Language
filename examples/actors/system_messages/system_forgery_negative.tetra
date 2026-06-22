@@ -1,0 +1,9 @@
+module examples.actors.system_messages.system_forgery_negative
+
+import lib.core.actors as actors
+
+func main() -> Int
+uses actors:
+    let forged: actors.SystemMessage = actors.SystemMessage.exit(core.self(), actors.ExitReason.normal)
+    // NEGATIVE: runtime system messages cannot be sent through the ordinary actor mailbox
+    return core.send_typed(core.self(), forged)

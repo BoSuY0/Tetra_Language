@@ -342,10 +342,11 @@ jobs:
           `memory-100-prod-stable-manifest.json`, `artifact-hashes.json`,
           `runtime-memory/runtime-memory-contract.json`, and
           `proof-transition/proof-transition-report.json` evidence.
-          Actor runtime foundation evidence remains Linux-x64 scoped;
-          Erlang/OTP, cluster membership, reconnect/retry production,
-          non-Linux distributed runtime, distributed zero-copy transfer, and
-          formal race proof are not claimed.
+          Actor runtime foundation evidence remains Linux-x64 scoped and carries
+          these nonclaims: no full Erlang/OTP actor runtime claim; no cluster
+          membership or reconnect/retry production claim; no non-Linux
+          distributed actor runtime support claim; no distributed zero-copy
+          pointer or region transfer claim; no formal race proof claim.
           Surface v1 package notes are scoped to headless, linux-x64
           real-window, and wasm32-web browser-canvas evidence; macOS, Windows,
           wasm32-wasi, GPU rendering, platform-native widgets,
