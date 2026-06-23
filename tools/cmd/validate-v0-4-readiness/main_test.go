@@ -474,6 +474,7 @@ func TestValidateReadinessAcceptsNativeUIRuntimeEvidenceShape(t *testing.T) {
 		"tools/validators/nativeui/report.go",
 		"docs/spec/core/current_supported_surface.md",
 		"docs/spec/ui/ui_v0.4.0.md",
+		"docs/user/surface/wasm_ui_guide.md",
 		"reports/v0.4.0/native-ui-linux-x64.json",
 	)
 	writeReadinessEvidenceFile(
