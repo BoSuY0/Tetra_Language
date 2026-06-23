@@ -12,6 +12,7 @@ review_set:
 - `docs/reviews/memory-core-v2/d004-readiness-path-root-cause-review.md`
 - `docs/reviews/memory-core-v2/ci-context-causality-review.md`
 - `docs/reviews/memory-core-v2/cli-package-timeout-analysis.md`
+- `docs/reviews/memory-core-v2/workspace-package-timeout-analysis.md`
 
 summary:
 - blocker: 0
@@ -52,6 +53,19 @@ validation_timeout:
   independent_package_runs: 5/5
   in_process_count_5: pass
   corrected_acceptance_protocol: focused_count_100_plus_package_repetitions
+
+workspace_validation_timeout:
+  command: go test -buildvcs=false ./tools/scriptstest/test_all ./tools/scriptstest/workspace -count=20
+  classification: cumulative_suite_timeout
+  repository_defect: false
+  finding_created: false
+  projected_duration_seconds: 2123
+  default_timeout_seconds: 600
+  corrected_protocol:
+    test_all: count_20_separate
+    workspace_independent_runs: 5
+    workspace_in_process_count: 5
+    broad_fanin_repetitions: 5
 
 ## blocker
 
