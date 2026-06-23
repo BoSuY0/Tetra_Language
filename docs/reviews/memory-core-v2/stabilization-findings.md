@@ -11,6 +11,7 @@ review_set:
 - `docs/reviews/memory-core-v2/d003-linux-x32-root-cause-review.md`
 - `docs/reviews/memory-core-v2/d004-readiness-path-root-cause-review.md`
 - `docs/reviews/memory-core-v2/ci-context-causality-review.md`
+- `docs/reviews/memory-core-v2/cli-package-timeout-analysis.md`
 
 summary:
 - blocker: 0
@@ -41,6 +42,16 @@ resolution_commits:
 - D-004: `f28953df325cd87cb8378b3c9b7952238b6d3e13`
 - D-001: tracked as nonblocking test-infrastructure hardening; no Memory Core
   v2 code, gate, schema, or documentation fix required by the review.
+
+validation_timeout:
+  command: go test -buildvcs=false ./cli/cmd/tetra -count=50
+  classification: cumulative_suite_timeout
+  repository_defect: false
+  d005_created: false
+  exact_test_count_100: pass
+  independent_package_runs: 5/5
+  in_process_count_5: pass
+  corrected_acceptance_protocol: focused_count_100_plus_package_repetitions
 
 ## blocker
 
