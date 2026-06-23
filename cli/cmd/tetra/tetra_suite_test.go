@@ -9330,6 +9330,8 @@ func TestTargetMetadataCheck(t *testing.T) {
 			return "", exec.ErrNotFound
 		})
 		defer restore()
+		restoreHost := stubLinuxX32HostSupport(false)
+		defer restoreHost()
 
 		check := targetMetadataCheck()
 		if check.Status != "pass" {
@@ -9357,14 +9359,8 @@ func TestTargetMetadataCheck(t *testing.T) {
 			if x32.RunUnsupportedReason != "" {
 				t.Fatalf("linux-x32 supported host-probed metadata = %#v", x32)
 			}
-		} else if !strings.Contains(
-			x32.RunUnsupportedReason,
-			"host does not support Linux x32 ABI execution",
-		) || !strings.Contains(
-			x32.RunUnsupportedReason,
-			"no host fallback",
-		) {
-			t.Fatalf("linux-x32 unsupported host-probed metadata = %#v", x32)
+		} else {
+			requireLinuxX32HostUnsupportedReason(t, x32.RunUnsupportedReason)
 		}
 	})
 
@@ -14819,6 +14815,9 @@ func TestTargetsCommandText(t *testing.T) {
 }
 
 func TestTargetsCommandJSON(t *testing.T) {
+	restoreHost := stubLinuxX32HostSupport(false)
+	defer restoreHost()
+
 	type targetMeta struct {
 		Triple                   string   `json:"triple"`
 		Status                   string   `json:"status"`
@@ -15116,14 +15115,8 @@ func TestTargetsCommandJSON(t *testing.T) {
 			if got.RunUnsupportedReason != "" {
 				t.Fatalf("linux-x32 supported host-probed metadata = %#v", got)
 			}
-		} else if !strings.Contains(
-			got.RunUnsupportedReason,
-			"host does not support Linux x32 ABI execution",
-		) || !strings.Contains(
-			got.RunUnsupportedReason,
-			"no host fallback",
-		) {
-			t.Fatalf("linux-x32 unsupported host-probed metadata = %#v", got)
+		} else {
+			requireLinuxX32HostUnsupportedReason(t, got.RunUnsupportedReason)
 		}
 	}
 	for _, triple := range []string{"wasm32-wasi", "wasm32-web"} {
@@ -17048,9 +17041,7 @@ func TestRunCommandJSONDiagnosticsForLinuxX32HostUnsupported(t *testing.T) {
 	}
 	for _, want := range []string{
 		"cannot run target linux-x32",
-		"host " + runtime.GOOS + "/" + runtime.GOARCH + " does not support Linux x32 ABI execution",
-		"no host fallback",
-		"probe command: tetra test --diagnostics=json --target x32 --format=json <runner-smoke.tetra>",
+		expectedLinuxX32HostUnsupportedReason(t),
 	} {
 		if !strings.Contains(diag.Message, want) {
 			t.Fatalf("diagnostic missing %q: %#v", want, diag)
@@ -19543,9 +19534,7 @@ func TestTestCommandJSONDiagnosticsForBuildOnlyRuntimeUnsupported(t *testing.T) 
 	}
 	for _, want := range []string{
 		"cannot run tests for target linux-x32",
-		"host " + runtime.GOOS + "/" + runtime.GOARCH + " does not support Linux x32 ABI execution",
-		"no host fallback",
-		"probe command: tetra test --diagnostics=json --target x32 --format=json <runner-smoke.tetra>",
+		expectedLinuxX32HostUnsupportedReason(t),
 	} {
 		if !strings.Contains(diag.Message, want) {
 			t.Fatalf("diagnostic missing %q: %#v", want, diag)
@@ -20975,6 +20964,23 @@ func stubLinuxX32HostSupport(supported bool) func() {
 	linuxX32HostSupport = func() bool { return supported }
 	return func() {
 		linuxX32HostSupport = old
+	}
+}
+
+func expectedLinuxX32HostUnsupportedReason(t *testing.T) string {
+	t.Helper()
+	tgt, err := ctarget.Parse("linux-x32")
+	if err != nil {
+		t.Fatalf("parse linux-x32 target: %v", err)
+	}
+	return buildOnlyNativeRunUnsupportedReason(tgt)
+}
+
+func requireLinuxX32HostUnsupportedReason(t *testing.T, got string) {
+	t.Helper()
+	want := expectedLinuxX32HostUnsupportedReason(t)
+	if got != want {
+		t.Fatalf("linux-x32 unsupported reason = %q, want %q", got, want)
 	}
 }
 
