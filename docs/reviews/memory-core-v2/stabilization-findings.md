@@ -7,11 +7,12 @@ review_set:
 - `docs/reviews/memory-core-v2/runtime-domain-review.md`
 - `docs/reviews/memory-core-v2/optimizer-proof-review.md`
 - `docs/reviews/memory-core-v2/integration-review.md`
+- `docs/reviews/memory-core-v2/test-infrastructure-determinism-review.md`
 
 summary:
 - blocker: 0
 - critical: 0
-- high: 1
+- high: 3
 - medium: 3
 - low: 2
 - informational: 0
@@ -22,7 +23,7 @@ resolution_summary:
 - resolved_low: 1
 - open_blocker: 0
 - open_critical: 0
-- open_high: 0
+- open_high: 2
 - open_medium: 0
 - open_low: 1
 - open_informational: 0
@@ -33,6 +34,8 @@ resolution_commits:
 - C-001: `0b165d6fed08893e70932bdc50fb03d699ecc2e6`
 - C-002: `0b165d6fed08893e70932bdc50fb03d699ecc2e6`
 - D-002: `69f8827199583219aa1b8b97368ab692a1aa7d29`
+- D-003: investigating; no fix commit.
+- D-004: investigating; no fix commit.
 - D-001: tracked as nonblocking test-infrastructure hardening; no Memory Core
   v2 code, gate, schema, or documentation fix required by the review.
 
@@ -45,6 +48,88 @@ None.
 None.
 
 ## high
+
+### D-003: linux-x32 unsupported reason contract mismatch
+
+source_review: `docs/reviews/memory-core-v2/test-infrastructure-determinism-review.md`
+package: `cli/cmd/tetra`
+status: investigating
+severity: high
+merge_blocking: true
+reproduced_in_required_ci: true
+ci_runs:
+- 28020556066
+- 28020557965
+
+finding:
+The required `full-platform-ui-runtime` fan-in failed in both push and
+pull_request workflows during `baseline-tests`. The first failing command is
+`go test ./compiler/... ./cli/... ./tools/... -count=1` from
+`scripts/release/full_platform/ui-runtime-gate.sh`. Both logs show
+`cli/cmd/tetra` failures in `TestTargetMetadataCheck/wasi_runner_available` and
+`TestTargetsCommandJSON` for the `linux-x32` unsupported-runner reason.
+
+observed_failure:
+- package: `tetra_language/cli/cmd/tetra`
+- tests:
+  `TestTargetMetadataCheck/wasi_runner_available`,
+  `TestTargetsCommandJSON`
+- observed value includes:
+  `RunUnsupportedReason:"host linux/amd64 does not support Linux x32 ABI execution; no host fallback is allowed; probe command: tetra test --diagnostics=json --target x32 --format=json <runner-smoke.tetra>"`
+
+classification:
+Investigating. D-003 is independent from D-004. This entry records the observed
+CI failure and does not assert a root cause or resolution.
+
+reproduction:
+- `gh run view 28020556066 --job 82935734296 --log-failed`
+- `gh run view 28020557965 --job 82936970947 --log-failed`
+- `rg -n -- 'TestTargetMetadataCheck|TestTargetsCommandJSON|linux-x32 unsupported host-probed metadata' /tmp/mcv2-push-fanin-failed.log /tmp/mcv2-pr-fanin-failed.log`
+
+next_diagnostics:
+Identify the canonical linux-x32 unsupported reason contract, the production
+source of the observed value, the test expectation source, and whether host
+qualification is part of the stable API or human-readable detail.
+
+### D-004: v0.4 readiness WASM UI guide path resolution failure
+
+source_review: `docs/reviews/memory-core-v2/test-infrastructure-determinism-review.md`
+package: `tools/cmd/validate-v0-4-readiness`
+status: investigating
+severity: high
+merge_blocking: true
+reproduced_in_required_ci: true
+ci_runs:
+- 28020556066
+- 28020557965
+
+finding:
+The required `full-platform-ui-runtime` fan-in failed in both push and
+pull_request workflows during `baseline-tests`. The first failing command is
+`go test ./compiler/... ./cli/... ./tools/... -count=1` from
+`scripts/release/full_platform/ui-runtime-gate.sh`. Both logs show
+`tools/cmd/validate-v0-4-readiness/TestValidateReadinessAcceptsNativeUIRuntimeEvidenceShape`
+failing because the required guide path is reported as not readable.
+
+observed_failure:
+- package: `tetra_language/tools/cmd/validate-v0-4-readiness`
+- test: `TestValidateReadinessAcceptsNativeUIRuntimeEvidenceShape`
+- observed error:
+  `expected native UI runtime-shaped evidence to pass readiness: decision ui.native-runtime evidence.docs path docs/user/surface/wasm_ui_guide.md is not readable`
+
+classification:
+Investigating. D-004 is independent from D-003. This entry records the observed
+CI failure and does not assert a root cause or resolution.
+
+reproduction:
+- `gh run view 28020556066 --job 82935734296 --log-failed`
+- `gh run view 28020557965 --job 82936970947 --log-failed`
+- `rg -n -- 'TestValidateReadinessAcceptsNativeUIRuntimeEvidenceShape|wasm_ui_guide.md is not readable' /tmp/mcv2-push-fanin-failed.log /tmp/mcv2-pr-fanin-failed.log`
+
+next_diagnostics:
+Identify the process cwd, repository root detection, requested path, resolved
+path, checkout file state, fixture file state, and whether the failure comes
+from path/root/fixture behavior rather than file permissions.
 
 ### D-002: Windows full-platform UI runtime CI cannot checkout committed report evidence with long paths
 
