@@ -11,12 +11,13 @@ review_set:
 summary:
 - blocker: 0
 - critical: 0
-- high: 0
+- high: 1
 - medium: 3
 - low: 2
 - informational: 0
 
 resolution_summary:
+- resolved_high: 1
 - resolved_medium: 3
 - resolved_low: 1
 - open_blocker: 0
@@ -31,6 +32,7 @@ resolution_commits:
 - B-001: `b2a8df25d9bad30864d1c01aa669251474bcf732`
 - C-001: `0b165d6fed08893e70932bdc50fb03d699ecc2e6`
 - C-002: `0b165d6fed08893e70932bdc50fb03d699ecc2e6`
+- D-002: `69f8827199583219aa1b8b97368ab692a1aa7d29`
 - D-001: tracked as nonblocking test-infrastructure hardening; no Memory Core
   v2 code, gate, schema, or documentation fix required by the review.
 
@@ -44,7 +46,28 @@ None.
 
 ## high
 
-None.
+### D-002: Windows full-platform UI runtime CI cannot checkout committed report evidence with long paths
+
+source_review: GitHub Actions run `28019874499`
+status: resolved
+fix_commit: `69f8827199583219aa1b8b97368ab692a1aa7d29`
+
+finding:
+The pushed Draft PR branch failed the `full-platform-ui-runtime` Windows target
+job before test execution. `actions/checkout@v4` could not create tracked
+`reports/stabilization/tetra-ram-p7-compiler-rss-b452638a8af7-full-repo-smoke-samples2/...`
+files because their paths exceed Git for Windows default filename limits.
+
+reproduction:
+- `gh run view 28019874499 --log-failed`
+- Observe `windows-2025` checkout errors containing `Filename too long` before
+  any build, test, or artifact upload step starts.
+
+required_fix:
+Enable `git config --global core.longpaths true` before `actions/checkout@v4`
+for Windows full-platform UI runtime target-host jobs in both the standalone
+workflow and the mirrored `ci.yml` workflow. Add workflow regression tests that
+assert this ordering remains before checkout.
 
 ## medium
 
