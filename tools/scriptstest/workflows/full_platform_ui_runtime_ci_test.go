@@ -86,6 +86,24 @@ func TestFullPlatformUIRuntimeWorkflowFetchesHistoryForDocVerification(t *testin
 	}
 }
 
+func TestFullPlatformUIRuntimeWorkflowEnablesWindowsLongPathsBeforeCheckout(t *testing.T) {
+	path := filepath.Join(repoRoot(t), ".github", "workflows", "full-platform-ui-runtime.yml")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read full-platform UI runtime workflow: %v", err)
+	}
+	targetHostSection := workflowJobSection(string(raw), "target-host-ui-runtime:")
+	assertOrderedFragments(
+		t,
+		targetHostSection,
+		"Enable Git long paths on Windows",
+		"if: runner.os == 'Windows'",
+		"shell: pwsh",
+		"git config --global core.longpaths true",
+		"uses: actions/checkout@v4",
+	)
+}
+
 func TestFullPlatformUIRuntimeWorkflowAggregatesTargetHostReports(t *testing.T) {
 	path := filepath.Join(repoRoot(t), ".github", "workflows", "full-platform-ui-runtime.yml")
 	raw, err := os.ReadFile(path)
@@ -117,6 +135,24 @@ func TestFullPlatformUIRuntimeWorkflowAggregatesTargetHostReports(t *testing.T) 
 			t.Fatalf("full-platform UI runtime workflow missing aggregation detail %q", want)
 		}
 	}
+}
+
+func TestMainCIWorkflowEnablesWindowsLongPathsBeforeFullPlatformCheckout(t *testing.T) {
+	path := filepath.Join(repoRoot(t), ".github", "workflows", "ci.yml")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read CI workflow: %v", err)
+	}
+	targetHostSection := workflowJobSection(string(raw), "full-platform-ui-runtime-target-host:")
+	assertOrderedFragments(
+		t,
+		targetHostSection,
+		"Enable Git long paths on Windows",
+		"if: runner.os == 'Windows'",
+		"shell: pwsh",
+		"git config --global core.longpaths true",
+		"uses: actions/checkout@v4",
+	)
 }
 
 func TestFullPlatformUIRuntimeWorkflowAllowsCurrentGitHubMacOSIntelLabel(t *testing.T) {
