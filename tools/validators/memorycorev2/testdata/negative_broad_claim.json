@@ -48,8 +48,20 @@
     {
       "target": "wasm32-wasi",
       "operation": "reserve",
+      "supported": true,
+      "evidence": "compiler/internal/runtimeabi memory backend tests"
+    },
+    {
+      "target": "wasm32-wasi",
+      "operation": "commit",
+      "supported": true,
+      "evidence": "compiler/internal/runtimeabi memory backend tests"
+    },
+    {
+      "target": "wasm32-wasi",
+      "operation": "release",
       "supported": false,
-      "unsupported_reason": "runtime memory backend operation is not implemented for wasm32-wasi"
+      "unsupported_reason": "linear memory supports growth but not host reservation release or RSS"
     }
   ],
   "optimizer_memory_rewrites": 4,

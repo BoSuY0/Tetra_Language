@@ -27,6 +27,21 @@ func TestMemoryCoreV2ValidateReportRejectsNegativeFixture(t *testing.T) {
 	}
 }
 
+func TestMemoryCoreV2ValidateReportAcceptsPartialWasmBackendSupport(t *testing.T) {
+	raw := string(readFixture(t, "positive.json"))
+	if !strings.Contains(raw, `"operation": "reserve",
+      "supported": true`) ||
+		!strings.Contains(raw, `"operation": "commit",
+      "supported": true`) ||
+		!strings.Contains(raw, `"operation": "release",
+      "supported": false`) {
+		t.Fatalf("positive fixture must record partial wasm reserve/commit support and release nonclaim")
+	}
+	if err := ValidateReport([]byte(raw), Options{CurrentGitHead: testHead}); err != nil {
+		t.Fatalf("ValidateReport with partial wasm backend support failed: %v", err)
+	}
+}
+
 func TestMemoryCoreV2ValidateReportRejectsRequiredGuards(t *testing.T) {
 	tests := []struct {
 		name string
@@ -65,9 +80,9 @@ func TestMemoryCoreV2ValidateReportRejectsRequiredGuards(t *testing.T) {
 			name: "unsupported backend marked supported",
 			edit: func(raw string) string {
 				return strings.Replace(raw, `"target": "wasm32-wasi",
-      "operation": "reserve",
+      "operation": "release",
       "supported": false,`, `"target": "wasm32-wasi",
-      "operation": "reserve",
+      "operation": "release",
       "supported": true,`, 1)
 			},
 			want: "unsupported",

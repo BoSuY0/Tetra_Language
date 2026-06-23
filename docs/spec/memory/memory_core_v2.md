@@ -92,8 +92,10 @@ island_routes_total`.
 | Target | Backend memory operations | Current support |
 | --- | --- | --- |
 | `linux-x64` | `reserve`, `commit`, `decommit`, `release` | supported through runtime ABI backend events |
-| `wasm32-wasi` | runtime memory backend operations | unsupported nonclaim |
-| `wasm32-web` | runtime memory backend operations | unsupported nonclaim |
+| `wasm32-wasi` | `reserve`, `commit` | supported through linear-memory growth evidence |
+| `wasm32-wasi` | `decommit`, `release`, `trim`, `footprint` | unsupported nonclaim |
+| `wasm32-web` | `reserve`, `commit` | supported through linear-memory growth evidence |
+| `wasm32-web` | `decommit`, `release`, `trim`, `footprint` | unsupported nonclaim |
 | other targets | runtime memory backend operations | unsupported unless target evidence is added |
 
 Supported rows require executable backend or runtime tests. Unsupported rows must

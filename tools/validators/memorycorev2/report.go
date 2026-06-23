@@ -395,15 +395,21 @@ func requiredLinuxOperations() []string {
 }
 
 func isSupportedBackendOperation(target string, operation string) bool {
-	if target != "linux-x64" {
-		return false
-	}
-	switch operation {
-	case "reserve", "commit", "decommit", "release":
-		return true
+	switch target {
+	case "linux-x64":
+		switch operation {
+		case "reserve", "commit", "decommit", "release":
+			return true
+		}
+	case "wasm32-wasi", "wasm32-web":
+		switch operation {
+		case "reserve", "commit":
+			return true
+		}
 	default:
 		return false
 	}
+	return false
 }
 
 func validateOptimizerProofs(report Report) []string {
