@@ -16,6 +16,24 @@ summary:
 - low: 2
 - informational: 0
 
+resolution_summary:
+- resolved_medium: 3
+- resolved_low: 1
+- open_blocker: 0
+- open_critical: 0
+- open_high: 0
+- open_medium: 0
+- open_low: 1
+- open_informational: 0
+
+resolution_commits:
+- A-001: `33f8609665df2997e228eb8218ba95fe1637e260`
+- B-001: `b2a8df25d9bad30864d1c01aa669251474bcf732`
+- C-001: `0b165d6fed08893e70932bdc50fb03d699ecc2e6`
+- C-002: `0b165d6fed08893e70932bdc50fb03d699ecc2e6`
+- D-001: tracked as nonblocking test-infrastructure hardening; no Memory Core
+  v2 code, gate, schema, or documentation fix required by the review.
+
 ## blocker
 
 None.
@@ -33,6 +51,8 @@ None.
 ### A-001: Public multi-module lowering bypasses the canonical Memory Core v2 pipeline
 
 source_review: `docs/reviews/memory-core-v2/compiler-soundness-review.md`
+status: resolved
+fix_commit: `33f8609665df2997e228eb8218ba95fe1637e260`
 
 finding:
 `compiler/compiler_facade.go` exposes `LowerModules(checked []*CheckedProgram)`
@@ -58,6 +78,8 @@ programs without the canonical allocation plan/evidence path.
 ### B-001: Release evidence marks `wasm32-wasi reserve` unsupported while runtime ABI supports WASM reserve/commit
 
 source_review: `docs/reviews/memory-core-v2/runtime-domain-review.md`
+status: resolved
+fix_commit: `b2a8df25d9bad30864d1c01aa669251474bcf732`
 
 finding:
 `MemoryBackendSupportMatrix("wasm32-wasi")` marks `reserve` and `commit`
@@ -85,6 +107,8 @@ included and use an actually unsupported WASM operation such as `release`,
 ### C-001: Manager proof-decision validation does not itself prove that nonempty proof IDs are canonical
 
 source_review: `docs/reviews/memory-core-v2/optimizer-proof-review.md`
+status: resolved
+fix_commit: `0b165d6fed08893e70932bdc50fb03d699ecc2e6`
 
 finding:
 `validateMemoryDecisionEvidence` rejects `rewrite_applied` memory decisions
@@ -114,6 +138,8 @@ Add a regression test for a pass that emits a bogus nonempty proof ID.
 ### C-002: Standalone `opt.Manager.Run` disables canonical memory proof resolution for proof-sensitive passes
 
 source_review: `docs/reviews/memory-core-v2/optimizer-proof-review.md`
+status: resolved
+fix_commit: `0b165d6fed08893e70932bdc50fb03d699ecc2e6`
 
 finding:
 `Manager.Run` delegates to `RunWithOptions` with empty options, creating a
@@ -139,6 +165,8 @@ absent.
 ### D-001: Broad workspace/scriptstest runs showed transient environment coupling outside the Memory Core v2 gate path
 
 source_review: `docs/reviews/memory-core-v2/integration-review.md`
+status: open_nonblocking
+tracking: test-infrastructure hardening outside the Memory Core v2 release gate
 
 finding:
 Broad `go test` runs intermittently failed in `tools/scriptstest` fake-repo or
