@@ -131,12 +131,16 @@ fields are:
 - `optimizer_rewrites_with_proof_ids`
 - `negative_guards`
 - `nonclaims`
-- `final_signoff`
+- `implementation_complete`
+- `release_security_signoff_status`
+- `release_security_signoff_path`
 
 The validator rejects missing digests, report-only state, route-count mismatch,
 optimizer rewrites without proof IDs, unsupported backend operations marked
 supported, incomplete shadow-model parity, broad unsupported claims, and final
-signoff while any requirement failed.
+implementation completion while any requirement failed. `release_security_signoff_status`
+tracks the release-only human review gate; `pending_human_review` is valid Memory
+Core v2 implementation evidence and must not be treated as release approval.
 
 ## Explicit Nonclaims
 

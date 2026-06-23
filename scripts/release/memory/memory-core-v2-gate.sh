@@ -208,7 +208,7 @@ write_evidence_report() {
       "evidence": "tools/validators/memorycorev2/testdata/negative_broad_claim.json"
     },
     {
-      "name": "final-signoff-failed-requirement",
+      "name": "implementation-complete-failed-requirement",
       "status": "pass",
       "evidence": "tools/validators/memorycorev2/report_test.go"
     }
@@ -220,7 +220,9 @@ write_evidence_report() {
     "no all-target memory support claim",
     "no all-target backend runtime claim"
   ],
-  "final_signoff": true
+  "implementation_complete": true,
+  "release_security_signoff_status": "pending_human_review",
+  "release_security_signoff_path": "/home/tetra/security-review-v0.4.0-template.md"
 }
 JSON
 }

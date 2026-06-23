@@ -38,7 +38,10 @@ type Report struct {
 	OptimizerRewritesWithProofIDs   int                       `json:"optimizer_rewrites_with_proof_ids"`
 	NegativeGuards                  []NegativeGuard           `json:"negative_guards"`
 	NonClaims                       []string                  `json:"nonclaims"`
-	FinalSignoff                    bool                      `json:"final_signoff"`
+	ImplementationComplete          *bool                     `json:"implementation_complete,omitempty"`
+	ReleaseSecuritySignoffStatus    string                    `json:"release_security_signoff_status,omitempty"`
+	ReleaseSecuritySignoffPath      string                    `json:"release_security_signoff_path,omitempty"`
+	LegacyFinalSignoff              *bool                     `json:"final_signoff,omitempty"`
 }
 
 type BackendOperationSupport struct {
@@ -74,15 +77,50 @@ func ValidateReport(raw []byte, opt Options) error {
 	issues = append(issues, validateBuildPathRequirements(report)...)
 	issues = append(issues, validateBackendSupport(report.BackendOperationSupport)...)
 	issues = append(issues, validateOptimizerProofs(report)...)
-	issues = append(issues, validateNegativeGuards(report.NegativeGuards, report.FinalSignoff)...)
+	implementationComplete, implementationIssues := implementationVerdict(report)
+	issues = append(issues, implementationIssues...)
+	issues = append(issues, validateNegativeGuards(report.NegativeGuards, implementationComplete)...)
 	issues = append(issues, validateNonClaims(report.NonClaims)...)
-	if !report.FinalSignoff {
-		issues = append(issues, "final_signoff must be true for Memory Core v2 evidence")
+	if !implementationComplete {
+		issues = append(issues, "implementation_complete must be true for Memory Core v2 evidence")
 	}
 	if len(issues) > 0 {
 		return errors.New(strings.Join(issues, "; "))
 	}
 	return nil
+}
+
+func implementationVerdict(report Report) (bool, []string) {
+	var issues []string
+	var implementationComplete bool
+	if report.ImplementationComplete != nil {
+		implementationComplete = *report.ImplementationComplete
+	}
+	if report.LegacyFinalSignoff != nil {
+		if report.ImplementationComplete != nil && *report.LegacyFinalSignoff != implementationComplete {
+			issues = append(issues, "legacy final_signoff must match implementation_complete")
+		}
+		if report.ImplementationComplete == nil {
+			implementationComplete = *report.LegacyFinalSignoff
+		}
+	}
+	if report.ImplementationComplete == nil && report.LegacyFinalSignoff == nil {
+		issues = append(issues, "implementation_complete is required")
+	}
+	status := strings.TrimSpace(report.ReleaseSecuritySignoffStatus)
+	if status == "" {
+		issues = append(issues, "release_security_signoff_status is required")
+	} else {
+		switch status {
+		case "pending_human_review", "approved", "not_required":
+		default:
+			issues = append(issues, fmt.Sprintf("release_security_signoff_status is %q", status))
+		}
+	}
+	if (status == "approved" || status == "pending_human_review") && strings.TrimSpace(report.ReleaseSecuritySignoffPath) == "" {
+		issues = append(issues, "release_security_signoff_path is required when security signoff is pending or approved")
+	}
+	return implementationComplete, issues
 }
 
 func ValidateReportFile(path string, opt Options) error {
@@ -337,16 +375,16 @@ func validateOptimizerProofs(report Report) []string {
 	return issues
 }
 
-func validateNegativeGuards(guards []NegativeGuard, finalSignoff bool) []string {
+func validateNegativeGuards(guards []NegativeGuard, implementationComplete bool) []string {
 	required := map[string]bool{
-		"missing-digest":                       false,
-		"report-only-state":                    false,
-		"route-count-mismatch":                 false,
-		"proofless-optimizer-rewrite":          false,
-		"unsupported-backend-marked-supported": false,
-		"memorymodel-parity-incomplete":        false,
-		"broad-claim":                          false,
-		"final-signoff-failed-requirement":     false,
+		"missing-digest":                             false,
+		"report-only-state":                          false,
+		"route-count-mismatch":                       false,
+		"proofless-optimizer-rewrite":                false,
+		"unsupported-backend-marked-supported":       false,
+		"memorymodel-parity-incomplete":              false,
+		"broad-claim":                                false,
+		"implementation-complete-failed-requirement": false,
 	}
 	var issues []string
 	seen := map[string]bool{}
@@ -391,8 +429,8 @@ func validateNegativeGuards(guards []NegativeGuard, finalSignoff bool) []string 
 		issues = append(issues, fmt.Sprintf("missing negative guard %s", name))
 		failed = true
 	}
-	if finalSignoff && failed {
-		issues = append(issues, "final_signoff=true is invalid while a negative guard requirement failed")
+	if implementationComplete && failed {
+		issues = append(issues, "implementation_complete=true is invalid while a negative guard requirement failed")
 	}
 	return issues
 }

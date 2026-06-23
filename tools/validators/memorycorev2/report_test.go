@@ -80,13 +80,13 @@ func TestMemoryCoreV2ValidateReportRejectsRequiredGuards(t *testing.T) {
 			want: "memorymodel",
 		},
 		{
-			name: "failed requirement signed off",
+			name: "failed requirement with implementation complete",
 			edit: func(raw string) string {
 				return strings.Replace(raw, `"status": "pass",
       "evidence": "negative fixture proves the validator rejects report-only state"`, `"status": "fail",
       "evidence": "negative fixture proves the validator rejects report-only state"`, 1)
 			},
-			want: "final_signoff",
+			want: "implementation_complete",
 		},
 	}
 	raw := string(readFixture(t, "positive.json"))
@@ -100,6 +100,31 @@ func TestMemoryCoreV2ValidateReportRejectsRequiredGuards(t *testing.T) {
 				t.Fatalf("error = %v, want %q", err, tc.want)
 			}
 		})
+	}
+}
+
+func TestMemoryCoreV2ValidateReportAcceptsLegacyFinalSignoffAlias(t *testing.T) {
+	raw := string(readFixture(t, "positive.json"))
+	raw = strings.Replace(raw, `  "implementation_complete": true,
+  "release_security_signoff_status": "pending_human_review",
+  "release_security_signoff_path": "/home/tetra/security-review-v0.4.0-template.md"`, `  "release_security_signoff_status": "pending_human_review",
+  "release_security_signoff_path": "/home/tetra/security-review-v0.4.0-template.md",
+  "final_signoff": true`, 1)
+	if err := ValidateReport([]byte(raw), Options{CurrentGitHead: testHead}); err != nil {
+		t.Fatalf("ValidateReport with legacy final_signoff alias failed: %v", err)
+	}
+}
+
+func TestMemoryCoreV2ValidateReportRequiresReleaseSignoffStatus(t *testing.T) {
+	raw := string(readFixture(t, "positive.json"))
+	raw = strings.Replace(raw, `  "release_security_signoff_status": "pending_human_review",
+  "release_security_signoff_path": "/home/tetra/security-review-v0.4.0-template.md"`, `  "release_security_signoff_path": "/home/tetra/security-review-v0.4.0-template.md"`, 1)
+	err := ValidateReport([]byte(raw), Options{CurrentGitHead: testHead})
+	if err == nil {
+		t.Fatalf("expected missing release signoff status to fail")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "release_security_signoff_status") {
+		t.Fatalf("error = %v, want release_security_signoff_status", err)
 	}
 }
 

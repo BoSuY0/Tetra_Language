@@ -88,9 +88,9 @@
       "evidence": "negative fixture proves the validator rejects broad unsupported claims"
     },
     {
-      "name": "final-signoff-failed-requirement",
+      "name": "implementation-complete-failed-requirement",
       "status": "pass",
-      "evidence": "negative fixture proves the validator rejects final signoff when any requirement failed"
+      "evidence": "negative fixture proves the validator rejects implementation_complete when any requirement failed"
     }
   ],
   "nonclaims": [
@@ -100,5 +100,7 @@
     "no all-target memory support claim",
     "no all-target backend runtime claim"
   ],
-  "final_signoff": true
+  "implementation_complete": true,
+  "release_security_signoff_status": "pending_human_review",
+  "release_security_signoff_path": "/home/tetra/security-review-v0.4.0-template.md"
 }
