@@ -2547,6 +2547,10 @@ func RegisteredPasses() []Pass {
 	}
 }
 
+// Run is the legacy optimizer entry point for noncanonical tests and callers
+// that do not participate in Memory Core evidence. Memory Core v2 production
+// paths must use RunWithOptions with Options.MemoryFacts so proof-sensitive
+// rewrites are resolved against the canonical memory snapshot.
 func (m Manager) Run(prog *ir.IRProgram, passes ...Pass) (Report, error) {
 	return m.RunWithOptions(prog, Options{}, passes...)
 }
@@ -2603,7 +2607,7 @@ func (m Manager) runSelected(
 			row.Decisions = append([]PassDecision(nil), pass.Decisions()...)
 		}
 		row.MemoryDelta = passCtx.memoryDelta
-		if err := validateMemoryDecisionEvidence(pass, row); err != nil {
+		if err := validateMemoryDecisionEvidence(pass, row, memoryCtx); err != nil {
 			report.Passes = append(report.Passes, row)
 			return report, fmt.Errorf("%s memory decision evidence failed: %w", pass.Name, err)
 		}
@@ -2880,7 +2884,7 @@ func RequiredP17ReportRows() []string {
 	}
 }
 
-func validateMemoryDecisionEvidence(pass Pass, row PassReport) error {
+func validateMemoryDecisionEvidence(pass Pass, row PassReport, memoryCtx *MemoryContext) error {
 	for _, decision := range row.Decisions {
 		if decision.DecisionCode == DecisionCodeRewriteApplied &&
 			decision.RewriteCategory != "" &&
@@ -2891,12 +2895,115 @@ func validateMemoryDecisionEvidence(pass Pass, row PassReport) error {
 				decision.Site,
 			)
 		}
+		if decision.DecisionCode == DecisionCodeRewriteApplied &&
+			decision.RewriteCategory != "" &&
+			memoryCtx != nil &&
+			memoryCtx.Enabled {
+			if err := validateCanonicalRewriteProofs(pass, decision, memoryCtx); err != nil {
+				return err
+			}
+		}
 	}
 	if len(pass.InvalidatedProofKinds) > 0 && performedMemoryRewrite(row.Decisions) &&
 		len(row.MemoryDelta.Invalidate) == 0 {
 		return fmt.Errorf("invalidating memory rewrite missing memoryfacts invalidation delta")
 	}
 	return nil
+}
+
+func validateCanonicalRewriteProofs(
+	pass Pass,
+	decision PassDecision,
+	memoryCtx *MemoryContext,
+) error {
+	proofIDs := cleanProofIDs(decision.ProofIDs)
+	if len(proofIDs) == 0 {
+		return nil
+	}
+	proofFactIDs := cleanStrings(decision.ProofFactIDs)
+	proofFactIDSet := map[string]struct{}{}
+	for _, factID := range proofFactIDs {
+		proofFactIDSet[factID] = struct{}{}
+	}
+	kind := canonicalRewriteProofKind(pass, decision)
+	for _, proofID := range proofIDs {
+		proof, ok := resolveCanonicalRewriteProof(memoryCtx, decision.Caller, proofID, kind)
+		if !ok {
+			return fmt.Errorf(
+				"memory rewrite %q at site %d has noncanonical proof id %q",
+				decision.RewriteCategory,
+				decision.Site,
+				proofID,
+			)
+		}
+		if _, ok := proofFactIDSet[string(proof.FactID)]; !ok {
+			return fmt.Errorf(
+				"memory rewrite %q at site %d missing canonical proof fact id %q",
+				decision.RewriteCategory,
+				decision.Site,
+				proof.FactID,
+			)
+		}
+	}
+	return nil
+}
+
+func resolveCanonicalRewriteProof(
+	memoryCtx *MemoryContext,
+	function string,
+	proofID string,
+	kind memoryfacts.ProofKind,
+) (memoryfacts.ProofEvidence, bool) {
+	if memoryCtx == nil || !memoryCtx.Enabled {
+		return memoryfacts.ProofEvidence{}, false
+	}
+	if kind != "" {
+		return memoryCtx.Snapshot.ResolveProof(memoryfacts.ProofQuery{
+			FunctionID: strings.TrimSpace(function),
+			ProofID:    proofID,
+			Kind:       kind,
+		})
+	}
+	for _, fact := range memoryCtx.Snapshot.FactsForProof(memoryfacts.ProofKey{
+		FunctionID: strings.TrimSpace(function),
+		ProofID:    proofID,
+	}) {
+		if fact.ValidationState != memoryfacts.ValidationPass ||
+			strings.TrimSpace(fact.ValidatorName) == "" ||
+			fact.ProvenanceClass == memoryfacts.ProvenanceUnsafeUnknown ||
+			fact.UnsafeClass == memoryfacts.UnsafeUnknown ||
+			fact.ProofKind == "" {
+			continue
+		}
+		return memoryfacts.ProofEvidence{
+			FactID:        fact.ID,
+			ProofID:       fact.ProofID,
+			Kind:          fact.ProofKind,
+			SubjectBaseID: fact.ProofSubjectBaseID,
+			Operation:     fact.ProofOperation,
+			IslandID:      fact.IslandID,
+			Epoch:         fact.Epoch,
+			ValidatorName: fact.ValidatorName,
+			SourceStage:   fact.SourceStage,
+		}, true
+	}
+	return memoryfacts.ProofEvidence{}, false
+}
+
+func canonicalRewriteProofKind(pass Pass, decision PassDecision) memoryfacts.ProofKind {
+	if len(pass.RequiredProofKinds) == 1 {
+		return pass.RequiredProofKinds[0]
+	}
+	switch decision.RewriteCategory {
+	case RewriteBoundsCheckRemoval, RewriteLICM, RewriteRuntimeCheckErasure:
+		return memoryfacts.ProofBounds
+	case RewriteNoAliasRewrite:
+		return memoryfacts.ProofNoAlias
+	case RewriteTrustedAllocation, RewriteScalarReplacement:
+		return memoryfacts.ProofNoEscape
+	default:
+		return ""
+	}
 }
 
 func performedMemoryRewrite(decisions []PassDecision) bool {

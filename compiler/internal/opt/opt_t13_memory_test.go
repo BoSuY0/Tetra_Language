@@ -158,6 +158,54 @@ func TestT13ManagerRejectsMemoryRewriteDecisionWithoutProofID(t *testing.T) {
 	}
 }
 
+func TestT13ManagerRejectsMemoryRewriteDecisionWithNoncanonicalProofID(t *testing.T) {
+	pass := p17ContractTestPass("bad-memory-proof-id")
+	pass.RequiredProofKinds = []memoryfacts.ProofKind{memoryfacts.ProofBounds}
+	pass.Decisions = func() []PassDecision {
+		return []PassDecision{{
+			Action:          "rewrote",
+			Caller:          "main",
+			Site:            8,
+			Reason:          "bogus proof id",
+			DecisionCode:    DecisionCodeRewriteApplied,
+			RewriteCategory: RewriteBoundsCheckRemoval,
+			ProofIDs:        []string{"proof:bogus"},
+		}}
+	}
+
+	_, err := NewManager().RunWithOptions(
+		validTinyProgram(),
+		Options{MemoryFacts: t13MemorySnapshot(t, t13BoundsProofFact())},
+		pass,
+	)
+	if err == nil || !strings.Contains(err.Error(), "noncanonical proof id") {
+		t.Fatalf("RunWithOptions error = %v, want noncanonical proof id rejection", err)
+	}
+}
+
+func TestT13ManagerRunIsNoncanonicalForMemoryProofResolution(t *testing.T) {
+	report, err := NewManager().Run(validTinyProgram(), p17ContractTestPass("noncanonical-run"))
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if report.MemorySnapshotBefore != "" || report.MemorySnapshotAfter != "" {
+		t.Fatalf("Run memory snapshots = %q/%q, want empty noncanonical run", report.MemorySnapshotBefore, report.MemorySnapshotAfter)
+	}
+
+	snapshot := t13MemorySnapshot(t, t13BoundsProofFact())
+	canonical, err := NewManager().RunWithOptions(
+		validTinyProgram(),
+		Options{MemoryFacts: snapshot},
+		p17ContractTestPass("canonical-run"),
+	)
+	if err != nil {
+		t.Fatalf("RunWithOptions: %v", err)
+	}
+	if canonical.MemorySnapshotBefore != snapshot.Digest() || canonical.MemorySnapshotAfter == "" {
+		t.Fatalf("RunWithOptions memory snapshots = %q/%q, want canonical digest %q", canonical.MemorySnapshotBefore, canonical.MemorySnapshotAfter, snapshot.Digest())
+	}
+}
+
 func TestT13ManagerRejectsInvalidatingRewriteWithoutDelta(t *testing.T) {
 	pass := p17ContractTestPass("bad-invalidating-memory-decision")
 	pass.InvalidatedProofKinds = []memoryfacts.ProofKind{memoryfacts.ProofNoAlias}
