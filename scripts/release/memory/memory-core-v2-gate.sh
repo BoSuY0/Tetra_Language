@@ -49,6 +49,11 @@ if [[ -z "$report_dir" ]]; then
   report_dir="reports/memory-core-v2-gate-$(date -u +%Y%m%d-%H%M%S)"
 fi
 
+dirty_worktree=false
+if [[ -n "$(git status --porcelain=v1 --untracked-files=all)" ]]; then
+  dirty_worktree=true
+fi
+
 if [[ (-e "$report_dir" || -L "$report_dir") && ! -d "$report_dir" ]]; then
   echo "memory_core_v2_gate: refusing non-directory report path: $report_dir" >&2
   exit 2
@@ -107,10 +112,12 @@ json_escape() {
 write_evidence_report() {
   local out="$1"
   local git_head="$2"
+  local dirty_worktree="$3"
   local program_hash
   local graph_hash
   local plan_hash
   local lowering_hash
+  local implementation_commit="cc39d0d5337dfb31cf42dce0cfaf565b7c324297"
 
   program_hash="$(hash_text "$git_head:memory-core-v2")"
   graph_hash="$(hash_paths compiler/internal/memoryfacts compiler/internal/memorypipeline)"
@@ -121,6 +128,9 @@ write_evidence_report() {
 {
   "schema": "tetra.memory-core-v2.evidence.v1",
   "git_head": "$(json_escape "$git_head")",
+  "implementation_commit": "$implementation_commit",
+  "evidence_closure_commit": "$(json_escape "$git_head")",
+  "dirty_worktree": $dirty_worktree,
   "target": "linux-x64",
   "program_id": "program:sha256:$program_hash",
   "memory_graph_digest": "memory-graph:sha256:$graph_hash",
@@ -221,8 +231,13 @@ write_evidence_report() {
     "no all-target backend runtime claim"
   ],
   "implementation_complete": true,
-  "release_security_signoff_status": "pending_human_review",
-  "release_security_signoff_path": "/home/tetra/security-review-v0.4.0-template.md"
+  "implementation_security_signoff_required": false,
+  "memory_core_gate": "pass",
+  "v0_4_0_signoff_status": "not_applicable_existing_release",
+  "release_target": "v0.5.0_candidate",
+  "release_security_review_status": "pending_final_rc",
+  "human_security_review": "required_on_final_v0_5_0_rc_head",
+  "existing_v0_4_0_tag_must_not_move": true
 }
 JSON
 }
@@ -274,7 +289,7 @@ run_step "claim scanner" \
 
 git_head="$(git rev-parse --verify HEAD)"
 evidence_report="$report_dir/memory-core-v2-evidence.json"
-write_evidence_report "$evidence_report" "$git_head"
+write_evidence_report "$evidence_report" "$git_head" "$dirty_worktree"
 
 run_step "evidence report validation" \
   go run ./tools/cmd/validate-memory-core-v2 \

@@ -1,6 +1,9 @@
 {
   "schema": "tetra.memory-core-v2.evidence.v1",
   "git_head": "0123456789abcdef0123456789abcdef01234567",
+  "implementation_commit": "cc39d0d5337dfb31cf42dce0cfaf565b7c324297",
+  "evidence_closure_commit": "0123456789abcdef0123456789abcdef01234567",
+  "dirty_worktree": false,
   "target": "linux-x64",
   "program_id": "program:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "memory_graph_digest": "memory-graph:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -101,6 +104,11 @@
     "no all-target backend runtime claim"
   ],
   "implementation_complete": true,
-  "release_security_signoff_status": "pending_human_review",
-  "release_security_signoff_path": "/home/tetra/security-review-v0.4.0-template.md"
+  "implementation_security_signoff_required": false,
+  "memory_core_gate": "pass",
+  "v0_4_0_signoff_status": "not_applicable_existing_release",
+  "release_target": "v0.5.0_candidate",
+  "release_security_review_status": "pending_final_rc",
+  "human_security_review": "required_on_final_v0_5_0_rc_head",
+  "existing_v0_4_0_tag_must_not_move": true
 }

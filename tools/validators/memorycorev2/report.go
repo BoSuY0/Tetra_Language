@@ -13,35 +13,46 @@ import (
 )
 
 const SchemaV1 = "tetra.memory-core-v2.evidence.v1"
+const ImplementationCommit = "cc39d0d5337dfb31cf42dce0cfaf565b7c324297"
 
 type Options struct {
 	CurrentGitHead string
 }
 
 type Report struct {
-	Schema                          string                    `json:"schema"`
-	GitHead                         string                    `json:"git_head"`
-	Target                          string                    `json:"target"`
-	ProgramID                       string                    `json:"program_id"`
-	MemoryGraphDigest               string                    `json:"memory_graph_digest"`
-	ModulePlanDigests               map[string]string         `json:"module_plan_digests"`
-	ModuleLoweringDigests           map[string]string         `json:"module_lowering_digests"`
-	NormalBuildStateBuilt           bool                      `json:"normal_build_state_built"`
-	ReportFlagDecisionParity        bool                      `json:"report_flag_decision_parity"`
-	CacheAttestationChecked         bool                      `json:"cache_attestation_checked"`
-	IslandRoutesTotal               int                       `json:"island_routes_total"`
-	IslandRoutesDirect              int                       `json:"island_routes_direct"`
-	MemoryModelOutcomesTotal        int                       `json:"memorymodel_outcomes_total"`
-	MemoryModelOutcomesRealPipeline int                       `json:"memorymodel_outcomes_real_pipeline"`
-	BackendOperationSupport         []BackendOperationSupport `json:"backend_operation_support"`
-	OptimizerMemoryRewrites         int                       `json:"optimizer_memory_rewrites"`
-	OptimizerRewritesWithProofIDs   int                       `json:"optimizer_rewrites_with_proof_ids"`
-	NegativeGuards                  []NegativeGuard           `json:"negative_guards"`
-	NonClaims                       []string                  `json:"nonclaims"`
-	ImplementationComplete          *bool                     `json:"implementation_complete,omitempty"`
-	ReleaseSecuritySignoffStatus    string                    `json:"release_security_signoff_status,omitempty"`
-	ReleaseSecuritySignoffPath      string                    `json:"release_security_signoff_path,omitempty"`
-	LegacyFinalSignoff              *bool                     `json:"final_signoff,omitempty"`
+	Schema                                string                    `json:"schema"`
+	GitHead                               string                    `json:"git_head"`
+	ImplementationCommit                  string                    `json:"implementation_commit"`
+	EvidenceClosureCommit                 string                    `json:"evidence_closure_commit"`
+	DirtyWorktree                         *bool                     `json:"dirty_worktree,omitempty"`
+	Target                                string                    `json:"target"`
+	ProgramID                             string                    `json:"program_id"`
+	MemoryGraphDigest                     string                    `json:"memory_graph_digest"`
+	ModulePlanDigests                     map[string]string         `json:"module_plan_digests"`
+	ModuleLoweringDigests                 map[string]string         `json:"module_lowering_digests"`
+	NormalBuildStateBuilt                 bool                      `json:"normal_build_state_built"`
+	ReportFlagDecisionParity              bool                      `json:"report_flag_decision_parity"`
+	CacheAttestationChecked               bool                      `json:"cache_attestation_checked"`
+	IslandRoutesTotal                     int                       `json:"island_routes_total"`
+	IslandRoutesDirect                    int                       `json:"island_routes_direct"`
+	MemoryModelOutcomesTotal              int                       `json:"memorymodel_outcomes_total"`
+	MemoryModelOutcomesRealPipeline       int                       `json:"memorymodel_outcomes_real_pipeline"`
+	BackendOperationSupport               []BackendOperationSupport `json:"backend_operation_support"`
+	OptimizerMemoryRewrites               int                       `json:"optimizer_memory_rewrites"`
+	OptimizerRewritesWithProofIDs         int                       `json:"optimizer_rewrites_with_proof_ids"`
+	NegativeGuards                        []NegativeGuard           `json:"negative_guards"`
+	NonClaims                             []string                  `json:"nonclaims"`
+	ImplementationComplete                *bool                     `json:"implementation_complete,omitempty"`
+	ImplementationSecuritySignoffRequired *bool                     `json:"implementation_security_signoff_required,omitempty"`
+	MemoryCoreGate                        string                    `json:"memory_core_gate,omitempty"`
+	ReleaseSecuritySignoffStatus          string                    `json:"release_security_signoff_status,omitempty"`
+	ReleaseSecuritySignoffPath            string                    `json:"release_security_signoff_path,omitempty"`
+	V040SignoffStatus                     string                    `json:"v0_4_0_signoff_status,omitempty"`
+	ReleaseTarget                         string                    `json:"release_target,omitempty"`
+	ReleaseSecurityReviewStatus           string                    `json:"release_security_review_status,omitempty"`
+	HumanSecurityReview                   string                    `json:"human_security_review,omitempty"`
+	ExistingV040TagMustNotMove            *bool                     `json:"existing_v0_4_0_tag_must_not_move,omitempty"`
+	LegacyFinalSignoff                    *bool                     `json:"final_signoff,omitempty"`
 }
 
 type BackendOperationSupport struct {
@@ -107,18 +118,45 @@ func implementationVerdict(report Report) (bool, []string) {
 	if report.ImplementationComplete == nil && report.LegacyFinalSignoff == nil {
 		issues = append(issues, "implementation_complete is required")
 	}
+	if report.ImplementationSecuritySignoffRequired == nil {
+		issues = append(issues, "implementation_security_signoff_required is required")
+	} else if *report.ImplementationSecuritySignoffRequired {
+		issues = append(issues, "implementation_security_signoff_required must be false for this implementation milestone")
+	}
+	if gate := strings.TrimSpace(report.MemoryCoreGate); gate != "pass" {
+		issues = append(issues, fmt.Sprintf("memory_core_gate is %q, want pass", gate))
+	}
 	status := strings.TrimSpace(report.ReleaseSecuritySignoffStatus)
-	if status == "" {
-		issues = append(issues, "release_security_signoff_status is required")
-	} else {
+	if status != "" {
 		switch status {
-		case "pending_human_review", "approved", "not_required":
+		case "pending_human_review", "approved":
 		default:
 			issues = append(issues, fmt.Sprintf("release_security_signoff_status is %q", status))
+		}
+		if status == "not_required" {
+			issues = append(issues, "release_security_signoff_status=not_required must not be used for this milestone")
 		}
 	}
 	if (status == "approved" || status == "pending_human_review") && strings.TrimSpace(report.ReleaseSecuritySignoffPath) == "" {
 		issues = append(issues, "release_security_signoff_path is required when security signoff is pending or approved")
+	}
+	if status == "" && strings.TrimSpace(report.ReleaseSecuritySignoffPath) != "" {
+		issues = append(issues, "release_security_signoff_path requires release_security_signoff_status")
+	}
+	if report.V040SignoffStatus != "not_applicable_existing_release" {
+		issues = append(issues, fmt.Sprintf("v0_4_0_signoff_status is %q", report.V040SignoffStatus))
+	}
+	if report.ReleaseTarget != "v0.5.0_candidate" {
+		issues = append(issues, fmt.Sprintf("release_target is %q", report.ReleaseTarget))
+	}
+	if report.ReleaseSecurityReviewStatus != "pending_final_rc" {
+		issues = append(issues, fmt.Sprintf("release_security_review_status is %q", report.ReleaseSecurityReviewStatus))
+	}
+	if report.HumanSecurityReview != "required_on_final_v0_5_0_rc_head" {
+		issues = append(issues, fmt.Sprintf("human_security_review is %q", report.HumanSecurityReview))
+	}
+	if report.ExistingV040TagMustNotMove == nil || !*report.ExistingV040TagMustNotMove {
+		issues = append(issues, "existing_v0_4_0_tag_must_not_move must be true")
 	}
 	return implementationComplete, issues
 }
@@ -162,6 +200,20 @@ func validateEnvelope(report Report, opt Options) []string {
 	}
 	if !gitHeadPattern.MatchString(report.GitHead) {
 		issues = append(issues, "git_head must be a 40-character lowercase hex commit")
+	}
+	if report.ImplementationCommit != ImplementationCommit {
+		issues = append(issues, fmt.Sprintf("implementation_commit is %q, want %s", report.ImplementationCommit, ImplementationCommit))
+	}
+	if !gitHeadPattern.MatchString(report.EvidenceClosureCommit) {
+		issues = append(issues, "evidence_closure_commit must be a 40-character lowercase hex commit")
+	}
+	if report.EvidenceClosureCommit != report.GitHead {
+		issues = append(issues, "evidence_closure_commit must match git_head")
+	}
+	if report.DirtyWorktree == nil {
+		issues = append(issues, "dirty_worktree is required")
+	} else if *report.DirtyWorktree {
+		issues = append(issues, "dirty_worktree must be false")
 	}
 	if head := strings.TrimSpace(opt.CurrentGitHead); head != "" && report.GitHead != head {
 		issues = append(
