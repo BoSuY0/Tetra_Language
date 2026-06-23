@@ -158,7 +158,38 @@ func LowerModule(checked *CheckedProgram, module string) ([]IRFunc, error) {
 }
 
 func LowerModules(checked *CheckedProgram) (map[string][]IRFunc, error) {
-	return lower.LowerModules(checked)
+	state, err := memorypipeline.Build(checked, memorypipeline.Options{
+		AllocPlan: allocationPlanOptionsForTarget(""),
+	})
+	if err != nil {
+		return nil, err
+	}
+	result, err := lower.LowerPlannedProgram(checked, state.Plan, lower.Options{})
+	if err != nil {
+		return nil, err
+	}
+	if err := state.ApplyLowering(result.Program, result.Evidence); err != nil {
+		return nil, err
+	}
+	moduleNames := make([]string, 0, len(checked.Funcs))
+	seen := map[string]bool{}
+	for _, fn := range checked.Funcs {
+		if seen[fn.Module] {
+			continue
+		}
+		seen[fn.Module] = true
+		moduleNames = append(moduleNames, fn.Module)
+	}
+	sort.Strings(moduleNames)
+	modules := make(map[string][]IRFunc, len(moduleNames))
+	for _, module := range moduleNames {
+		funcs, err := result.ModuleFuncs(module)
+		if err != nil {
+			return nil, err
+		}
+		modules[module] = funcs
+	}
+	return modules, nil
 }
 
 func LowerUI(checked *CheckedProgram) (*UILoweredBundle, error) {
@@ -4124,7 +4155,7 @@ func FeatureRegistry() []FeatureInfo {
 				"formalcore.ValidateSpec, differential.CheckBackendMatrix, " +
 				"compiler.Parse, compiler.Check, BuildPLIR, " +
 				"plir.VerifyProgram, validation.CheckBoundsProofsWithPLIR, " +
-					"memorypipeline.Build, allocplan.Build, validation.ValidateAllocationLowering, " +
+				"memorypipeline.Build, allocplan.Build, validation.ValidateAllocationLowering, " +
 				"runtimeabi.NewRawAllocationBounds, " +
 				"runtimeabi.DeriveRawPointerBounds, and " +
 				"runtimeabi.RawSliceBoundsFromParts; validator rejects " +
