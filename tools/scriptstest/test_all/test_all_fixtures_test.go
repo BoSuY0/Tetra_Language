@@ -152,8 +152,113 @@ func testAllFakeRepo(t *testing.T, failFmt bool) string {
 	}
 	goScript := `#!/usr/bin/env bash
 set -euo pipefail
+fake_go_original_argv=("$@")
+fake_go_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P 2>/dev/null || true)"
+fake_go_repo_root=""
+if [[ -n "$fake_go_script_dir" ]]; then
+  fake_go_repo_root="$(cd "$fake_go_script_dir/.." && pwd -P 2>/dev/null || true)"
+fi
+fake_go_trace_file=""
+if [[ -n "$fake_go_repo_root" ]]; then
+  mkdir -p "$fake_go_repo_root/.test-all-trace" 2>/dev/null || true
+  fake_go_trace_file="$(mktemp "$fake_go_repo_root/.test-all-trace/go.XXXXXX.trace" 2>/dev/null || true)"
+fi
+trace_command="${1:-}"
+trace_package=""
+trace_list_mode=0
+trace_list_pattern=""
+trace_selected_list_case=""
+trace_list_result=""
+trace_emitted_line_count=0
+trace_target_host_report_env_present=0
+if [[ -n "${TETRA_WINDOWS_UI_RUNTIME_REPORT:-}" ||
+  -n "${TETRA_MACOS_UI_RUNTIME_REPORT:-}" ]]; then
+  trace_target_host_report_env_present=1
+fi
+fake_go_cwd_relative() {
+  local cwd
+  cwd="$(pwd -P 2>/dev/null || true)"
+  if [[ -n "$fake_go_repo_root" && "$cwd" == "$fake_go_repo_root" ]]; then
+    printf '.'
+  elif [[ -n "$fake_go_repo_root" && "$cwd" == "$fake_go_repo_root/"* ]]; then
+    printf '%s' "${cwd#"$fake_go_repo_root/"}"
+  else
+    printf '<outside-fake-repo>'
+  fi
+}
+fake_go_argv() {
+  local first=1
+  local arg
+  for arg in "$@"; do
+    if [[ "$first" == 0 ]]; then
+      printf ' '
+    fi
+    first=0
+    printf '%q' "$(fake_go_sanitize_arg "$arg")"
+  done
+}
+fake_go_sanitize_arg() {
+  local arg="$1"
+  local upper="${arg^^}"
+  case "$upper" in
+    *AUTHORIZATION*|*CREDENTIAL*|*PASSWORD*|*SECRET*|*TOKEN*)
+      printf '<redacted>'
+      return 0
+      ;;
+  esac
+  if [[ -n "$fake_go_repo_root" && "$arg" == "$fake_go_repo_root" ]]; then
+    printf '<fake-repo-path>'
+  elif [[ -n "$fake_go_repo_root" && "$arg" == "$fake_go_repo_root/"* ]]; then
+    printf '<fake-repo-path>'
+  else
+    printf '%s' "$arg"
+  fi
+}
+fake_go_write_trace() {
+  local exit_code="$1"
+  shift || true
+  [[ -n "$fake_go_trace_file" ]] || return 0
+  {
+    printf 'schema=test_all_fake_go_trace_v1\n'
+    printf 'pid=%s\n' "$$"
+    printf 'ppid=%s\n' "$PPID"
+    printf 'cwd_relative_to_fake_repo=%s\n' "$(fake_go_cwd_relative)"
+    printf 'argv='
+    fake_go_argv "$@"
+    printf '\n'
+    printf 'command=%s\n' "$trace_command"
+    printf 'package=%s\n' "$trace_package"
+    printf 'list_mode=%s\n' "$trace_list_mode"
+    printf 'list_pattern=%s\n' "$trace_list_pattern"
+    printf 'skip_unsafe_present=%s\n' "$([[ -n "${TETRA_FAKE_SKIP_UNSAFE_PROMOTION_LIST:-}" ]] && printf 1 || printf 0)"
+    printf 'skip_bounds_present=%s\n' "$([[ -n "${TETRA_FAKE_SKIP_BOUNDS_PROOF_LIST:-}" ]] && printf 1 || printf 0)"
+    printf 'skip_host_leak_present=%s\n' "$([[ -n "${TETRA_FAKE_SKIP_HOST_LEAK_LIST:-}" ]] && printf 1 || printf 0)"
+    printf 'skip_memory_fuzz_present=%s\n' "$([[ -n "${TETRA_FAKE_SKIP_MEMORY_FUZZ_ORACLE_LIST:-}" ]] && printf 1 || printf 0)"
+    printf 'skip_ram_contract_present=%s\n' "$([[ -n "${TETRA_FAKE_SKIP_RAM_CONTRACT_LIST:-}" ]] && printf 1 || printf 0)"
+    printf 'target_host_report_env_present=%s\n' "$trace_target_host_report_env_present"
+    printf 'selected_list_case=%s\n' "$trace_selected_list_case"
+    printf 'list_result=%s\n' "$trace_list_result"
+    printf 'emitted_line_count=%s\n' "$trace_emitted_line_count"
+    printf 'exit_code=%s\n' "$exit_code"
+  } >"$fake_go_trace_file" 2>/dev/null || true
+}
+trap 'fake_go_write_trace "$?" "${fake_go_original_argv[@]}"' EXIT
+emit_fake_go_list() {
+  trace_selected_list_case="$1"
+  shift
+  trace_list_result=normal
+  trace_emitted_line_count="$#"
+  printf '%s\n' "$@"
+}
 if [[ -n "${TETRA_FAKE_GO_LOG:-}" ]]; then
   printf '%s\n' "$*" >>"$TETRA_FAKE_GO_LOG"
+fi
+if [[ "${TETRA_FAKE_FORBID_TARGET_HOST_REPORT_ENV:-}" == "1" ]]; then
+  if [[ -n "${TETRA_WINDOWS_UI_RUNTIME_REPORT:-}" ||
+    -n "${TETRA_MACOS_UI_RUNTIME_REPORT:-}" ]]; then
+    echo "target-host report env leaked into fake go" >&2
+    exit 44
+  fi
 fi
 emit_tetra_api_metadata() {
   printf '%s' '<!-- tetra-api-metadata: {"schema":"tetra.api.v1alpha1",'
@@ -381,29 +486,44 @@ if [[ "${1:-}" == "test" ]]; then
     esac
   done
   if [[ "$list_mode" == true ]]; then
+    trace_package="$pkg"
+    trace_list_mode=1
+    trace_list_pattern="$list_pattern"
     if [[ "${TETRA_FAKE_SKIP_UNSAFE_PROMOTION_LIST:-}" == "1" ]] &&
       [[ "$list_pattern" == *Unsafe* ]]; then
+      trace_selected_list_case=skip_unsafe_control
+      trace_list_result=skipped_by_explicit_control
       exit 0
     fi
     if [[ "${TETRA_FAKE_SKIP_BOUNDS_PROOF_LIST:-}" == "1" ]]; then
       case "$list_pattern" in
-        *Bounds*|*Proof*|*Unchecked*) exit 0 ;;
+        *Bounds*|*Proof*|*Unchecked*)
+          trace_selected_list_case=skip_bounds_control
+          trace_list_result=skipped_by_explicit_control
+          exit 0
+          ;;
       esac
     fi
     if [[ "${TETRA_FAKE_SKIP_MEMORY_FUZZ_ORACLE_LIST:-}" == "1" ]] &&
       [[ "$pkg" == "./tools/cmd/memory-fuzz-short" ]]; then
+      trace_selected_list_case=skip_memory_fuzz_control
+      trace_list_result=skipped_by_explicit_control
       exit 0
     fi
 		if [[ "${TETRA_FAKE_SKIP_HOST_LEAK_LIST:-}" == "1" && "$pkg" == "./cli/internal/actornet" ]]; then
+			trace_selected_list_case=skip_host_leak_control
+			trace_list_result=skipped_by_explicit_control
 			exit 0
 		fi
     if [[ "${TETRA_FAKE_SKIP_RAM_CONTRACT_LIST:-}" == "1" ]] &&
       [[ "$pkg" == "./tools/cmd/ram-contract-fuzz-short" ]]; then
+      trace_selected_list_case=skip_ram_contract_control
+      trace_list_result=skipped_by_explicit_control
       exit 0
     fi
     case "$pkg" in
       ./compiler/internal/memoryfacts)
-        printf '%s\n' \
+        emit_fake_go_list "$pkg" \
           TestMemoryFactsRejectsUnsafeUnknownToSafeKnown \
           TestMemoryFactsRejectsDirectSafeBorrowedFromUnsafeUnknown \
           TestMemoryFactsRejectsDirectSafeOwnedFromUnsafeUnknown \
@@ -420,8 +540,8 @@ if [[ "${1:-}" == "test" ]]; then
           TestValidateMemoryReportRejectsV6BoundsRowsWithoutParent \
           TestValidateMemoryReportRejectsBareBoundsCheckEliminatedWithoutProofID
         ;;
-      ./tools/cmd/validate-memory-report)
-        printf '%s\n' \
+      ./compiler/cmd/validate-memory-report)
+        emit_fake_go_list "$pkg" \
           TestValidateMemoryReportRejectsSafeKnownFromUnsafeUnknown \
           TestValidateMemoryReportRejectsUnsafeUnknownOptimizationClaim \
           TestValidateMemoryReportRejectsUnsafeCheckedGenericPromotion \
@@ -432,7 +552,7 @@ if [[ "${1:-}" == "test" ]]; then
           TestValidateMemoryReportRejectsBareBoundsCheckEliminatedWithoutProofID
         ;;
       ./compiler)
-        printf '%s\n' \
+        emit_fake_go_list "$pkg" \
           TestMemoryFuzzOracleReportCoversMPC15CategoriesAndInvariants \
           TestClassifyMemoryFuzzOracleObservation \
           TestValidateMemoryFuzzOracleReportRejectsDrift \
@@ -441,24 +561,24 @@ if [[ "${1:-}" == "test" ]]; then
           TestBuildBoundsAndProofReportsShowWhileRangeReason
         ;;
       ./compiler/internal/validation)
-        printf '%s\n' \
+        emit_fake_go_list "$pkg" \
           TestCheckBoundsProofsRejectsRemovedCheckWithoutProofID \
           TestCheckBoundsProofsWithPLIRRejectsUnknownLiveProof \
           TestValidateTranslationRejectsMissingProofIDAfterTransform
         ;;
       ./compiler/internal/plir)
-        printf '%s\n' \
+        emit_fake_go_list "$pkg" \
           TestVerifierRejectsUnknownProofUse \
           TestVerifierRejectsNonDominatingProofUse
         ;;
       ./compiler/internal/lower)
-        printf '%s\n' \
+        emit_fake_go_list "$pkg" \
           TestForSliceLoopUsesProofTaggedUncheckedIndexLoad \
           TestWhileLessThanLenUsesProofTaggedUncheckedIndexLoad \
           TestCopyLoopSourceLoadUsesProofTaggedUncheckedIndexLoad
         ;;
       ./tools/cmd/validate-memory-fuzz-oracle)
-        printf '%s\n' \
+        emit_fake_go_list "$pkg" \
           TestValidateMemoryFuzzOracleReportFileAcceptsCompilerReport \
           TestValidateMemoryFuzzOracleReportFileAcceptsTier1ArtifactBundle \
           TestValidateMemoryFuzzOracleReportFileRejectsInvalidReport \
@@ -467,40 +587,45 @@ if [[ "${1:-}" == "test" ]]; then
           TestValidateMemoryFuzzOracleReportFileRejectsMissingValidatorProvenance
         ;;
       ./tools/cmd/memory-fuzz-short)
-        printf '%s\n' \
+        emit_fake_go_list "$pkg" \
           TestRunMemoryFuzzShortWritesValidatedArtifacts \
           TestRunMemoryFuzzShortRejectsUnsupportedTier \
           TestRunMemoryFuzzShortRejectsStaleReportDir
         ;;
       ./tools/cmd/ram-contract-fuzz-short)
-        printf '%s\n' \
+        emit_fake_go_list "$pkg" \
           TestRunRAMContractFuzzShortWritesValidatedArtifacts \
           TestRunRAMContractFuzzShortRejectsStaleReportDir
         ;;
       ./tools/cmd/validate-ram-contract-fuzz-oracle)
-        printf '%s\n' \
+        emit_fake_go_list "$pkg" \
           TestValidateRAMContractFuzzOracleAcceptsArtifactBundle \
           TestValidateRAMContractFuzzOracleRejectsMissingReport
         ;;
       ./tools/cmd/validate-ram-contract-report)
-        printf '%s\n' \
+        emit_fake_go_list "$pkg" \
           TestValidateRAMContractReportFileAcceptsCompilerReport \
           TestValidateRAMContractReportRejectsMissingBlocker
         ;;
       ./compiler/internal/ramcontract)
-        printf '%s\n' \
+        emit_fake_go_list "$pkg" \
           TestRAMContractFromAllocPlanTracksRowsAndBlockers \
           TestRAMContractRejectsMissingBlockerExplanation \
           TestRAMContractEnforcementFailsForHeap
         ;;
       ./cli/internal/actornet)
-        printf '%s\n' \
+        emit_fake_go_list "$pkg" \
           TestBrokerCloseReopenWithoutGoroutineLeak \
           TestBrokerCloseWithoutCancelStopsServeWatcher \
           TestBrokerRoutesFramesBetweenLoopbackNodesAndWritesReport \
           TestBrokerReportsNodeDownForMissingDestination
         ;;
     esac
+    if [[ -z "$trace_list_result" ]]; then
+      trace_selected_list_case=unknown_package
+      trace_list_result=unknown_package
+      trace_emitted_line_count=0
+    fi
     exit 0
   fi
 fi

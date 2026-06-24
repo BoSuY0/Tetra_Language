@@ -474,6 +474,7 @@ func TestValidateReadinessAcceptsNativeUIRuntimeEvidenceShape(t *testing.T) {
 		"tools/validators/nativeui/report.go",
 		"docs/spec/core/current_supported_surface.md",
 		"docs/spec/ui/ui_v0.4.0.md",
+		"docs/user/surface/wasm_ui_guide.md",
 		"reports/v0.4.0/native-ui-linux-x64.json",
 	)
 	writeReadinessEvidenceFile(
@@ -918,6 +919,45 @@ func TestValidateReadinessRejectsRuntimeTargetWithNonSupportedStatus(t *testing.
 	}
 	if !strings.Contains(err.Error(), "target wasm32-web status = planned, want supported") {
 		t.Fatalf("unexpected readiness error: %v", err)
+	}
+}
+
+func TestValidateReadinessAllowsPendingReleaseArtifactsOnlyInPreflight(t *testing.T) {
+	chdirReadinessEvidenceRoot(t,
+		"compiler/internal/frontend/frontend_core.go",
+		"docs/spec/core/current_supported_surface.md",
+	)
+	inputs := readinessInputs{
+		ExpectedVersion: "v0.4.0",
+		Manifest:        []byte(`{"compiler_version":"v0.4.0"}`),
+		Features: readinessFeaturesJSON("v0.4.0", readinessFeature{
+			ID:     "language.callable-level1",
+			Status: "current",
+			Since:  "v0.4.0",
+		}),
+		Targets: readinessTargetsJSON(),
+		ScopeDecisions: readinessScopeDecisionsJSON(
+			"linux-x64-production-scope-selected",
+			featureDecision("language.callable-level1", decisionEvidence{
+				Implementation:      []string{"compiler/internal/frontend/frontend_core.go"},
+				Tests:               []string{"go test ./compiler -run Callable -count=1"},
+				Docs:                []string{"docs/spec/core/current_supported_surface.md"},
+				ReleaseGateEvidence: []string{"reports/v0.4.0/__pending_preflight_only_test__.json"},
+			}),
+		),
+	}
+
+	err := validateReadiness(inputs)
+	if err == nil {
+		t.Fatalf("expected final readiness mode to reject missing release artifact")
+	}
+	if !strings.Contains(err.Error(), "reports/v0.4.0/__pending_preflight_only_test__.json is not readable") {
+		t.Fatalf("unexpected final readiness error: %v", err)
+	}
+
+	inputs.AllowPendingReleaseArtifacts = true
+	if err := validateReadiness(inputs); err != nil {
+		t.Fatalf("expected preflight mode to allow pending release artifacts: %v", err)
 	}
 }
 

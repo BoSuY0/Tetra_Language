@@ -96,4 +96,4 @@ This artifact is not exhaustive fuzzing, a full program-correctness proof, a ful
 safety claim, a performance claim, a runtime behavior change, or a safe-program semantics change.
 `MEM-FUZZ-012` also makes no arbitrary unsafe safety claim, no full runtime/ABI/target parity proof,
 no clean-release claim under a dirty worktree, no replacement for MemoryFactGraph validators, and no
-"Memory 100%" claim.
+all-encompassing memory readiness claim.

@@ -14,12 +14,16 @@ type WorkerDecision struct {
 }
 
 type ModuleObjectMetadata struct {
-	Target          string
-	Module          string
-	CompilerVersion string
-	PublicAPIHash   string
-	SrcHash         [32]byte
-	WorldSigHash    [32]byte
+	Target               string
+	Module               string
+	CompilerVersion      string
+	PublicAPIHash        string
+	MemoryPlanSchema     string
+	MemoryPlanDigest     string
+	MemoryLoweringSchema string
+	MemoryLoweringDigest string
+	SrcHash              [32]byte
+	WorldSigHash         [32]byte
 }
 
 func EffectiveWorkerCount(requested int, maxJobs int, fallback int) int {
@@ -102,6 +106,10 @@ func ApplyModuleObjectMetadata(obj *tobj.Object, metadata ModuleObjectMetadata) 
 	obj.Module = metadata.Module
 	obj.CompilerVersion = metadata.CompilerVersion
 	obj.PublicAPIHash = metadata.PublicAPIHash
+	obj.MemoryPlanSchema = metadata.MemoryPlanSchema
+	obj.MemoryPlanDigest = metadata.MemoryPlanDigest
+	obj.MemoryLoweringSchema = metadata.MemoryLoweringSchema
+	obj.MemoryLoweringDigest = metadata.MemoryLoweringDigest
 	obj.SrcHash = metadata.SrcHash
 	obj.WorldSigHash = metadata.WorldSigHash
 }

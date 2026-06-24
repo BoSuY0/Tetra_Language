@@ -1,5 +1,7 @@
 package islandkernel
 
+import "tetra_language/compiler/internal/memoryfacts"
+
 type Decision string
 
 const (
@@ -29,10 +31,11 @@ type MemoryRef struct {
 	BaseID      string
 	IslandID    string
 	Epoch       uint64
-	Provenance  string
+	OwnerID     string
+	Provenance  memoryfacts.ProvenanceClass
 	Bounds      Bounds
-	AliasState  string
-	UnsafeClass string
+	AliasState  memoryfacts.AliasState
+	UnsafeClass memoryfacts.UnsafeClass
 }
 
 type Token struct {
@@ -44,7 +47,7 @@ type Token struct {
 
 type Proof struct {
 	ID            string
-	Kind          string
+	Kind          memoryfacts.ProofKind
 	SubjectBaseID string
 	IslandID      string
 	Epoch         uint64
@@ -66,6 +69,12 @@ type BoundaryRequest struct {
 	Transfer string
 }
 
+type StoragePlanRequest struct {
+	Ref          MemoryRef
+	Escape       memoryfacts.EscapeState
+	StorageProof Proof
+}
+
 type TokenRequest struct {
 	Token       Token
 	LiveBorrows int
@@ -85,8 +94,8 @@ type ProofRequest struct {
 
 type StorageRequest struct {
 	Ref             MemoryRef
-	PlannedStorage  string
-	ActualStorage   string
+	PlannedStorage  memoryfacts.StorageClass
+	ActualStorage   memoryfacts.StorageClass
 	Proof           Proof
 	EscapesLifetime bool
 }
@@ -96,20 +105,21 @@ type UnsafeRequest struct {
 }
 
 const (
-	ProvenanceOwned         = "owned_value"
-	ProvenanceBorrowedView  = "borrowed_view"
-	ProvenanceUnsafeUnknown = "unsafe_unknown"
+	ProvenanceOwned         = memoryfacts.ProvenanceSafeOwned
+	ProvenanceBorrowedView  = memoryfacts.ProvenanceSafeBorrowed
+	ProvenanceUnsafeUnknown = memoryfacts.ProvenanceUnsafeUnknown
 
-	AliasUniqueLocal = "unique_local"
+	AliasUniqueLocal = memoryfacts.AliasUnique
 
-	UnsafeUnknown      = "unsafe_unknown"
-	UnsafeVerifiedRoot = "unsafe_verified_root"
+	UnsafeSafe         = memoryfacts.UnsafeSafe
+	UnsafeUnknown      = memoryfacts.UnsafeUnknown
+	UnsafeVerifiedRoot = memoryfacts.UnsafeVerifiedRoot
 
 	ExternalUnsafeIsland = "external_unsafe_island"
 
-	ProofBounds  = "bounds"
-	ProofNoAlias = "noalias"
-	ProofStorage = "storage"
+	ProofBounds  = memoryfacts.ProofBounds
+	ProofNoAlias = memoryfacts.ProofNoAlias
+	ProofStorage = memoryfacts.ProofStorage
 
 	OperationIndexLoad             = "index_load"
 	OperationNoAlias               = "noalias"
@@ -120,8 +130,15 @@ const (
 	TransferMoved        = "moved"
 	TransferSerialized   = "serialized"
 
-	StorageHeap           = "Heap"
-	StorageExplicitIsland = "ExplicitIsland"
+	EscapeNoEscape = memoryfacts.EscapeNoEscape
+	EscapeReturn   = memoryfacts.EscapeReturn
+	EscapeGlobal   = memoryfacts.EscapeGlobal
+	EscapeActor    = memoryfacts.EscapeActor
+	EscapeTask     = memoryfacts.EscapeTask
+	EscapeUnsafe   = memoryfacts.EscapeUnsafe
+
+	StorageHeap           = memoryfacts.StorageHeap
+	StorageExplicitIsland = memoryfacts.StorageExplicitIsland
 )
 
 func CanBorrow(req BorrowRequest) Result {
@@ -250,6 +267,50 @@ func CanEliminateBoundsCheck(req ProofRequest) Result {
 	return reject("bounds.missing_proof", "bounds check elimination requires a verified proof")
 }
 
+func CanPlanExplicitIsland(req StoragePlanRequest) Result {
+	if unsafeOrExternal(req.Ref) {
+		return reject(
+			"plan.unsafe_external",
+			"unsafe or external memory cannot authorize explicit island planning",
+		)
+	}
+	if req.Escape != "" && req.Escape != memoryfacts.EscapeNoEscape {
+		return reject(
+			"plan.escape_not_island",
+			"explicit island storage requires no-escape allocation evidence",
+		)
+	}
+	if req.Ref.Provenance != memoryfacts.ProvenanceSafeOwned &&
+		req.Ref.Provenance != memoryfacts.ProvenanceSafeKnown {
+		return conservative(
+			"plan.provenance_required",
+			"explicit island storage requires owned/safe provenance evidence",
+		)
+	}
+	if req.Ref.BaseID == "" || req.Ref.IslandID == "" || req.Ref.Epoch == 0 ||
+		req.Ref.OwnerID == "" {
+		return conservative(
+			"plan.missing_identity",
+			"explicit island storage requires base, island, epoch, and owner evidence",
+		)
+	}
+	if !proofMatches(
+		req.StorageProof,
+		req.Ref,
+		memoryfacts.ProofStorage,
+		OperationExplicitIslandStorage,
+	) {
+		return conservative(
+			"plan.storage_proof_required",
+			"explicit island storage requires a verified storage proof for this island epoch",
+		)
+	}
+	return accept(
+		"plan.explicit_island",
+		"owned no-escape allocation has exact island identity, epoch, owner, and storage proof",
+	)
+}
+
 func CanLowerAsExplicitIsland(req StorageRequest) Result {
 	if unsafeOrExternal(req.Ref) {
 		return reject(
@@ -365,7 +426,12 @@ func boundaryDecision(req BoundaryRequest, boundary string) Result {
 	}
 }
 
-func proofMatches(proof Proof, ref MemoryRef, kind string, operation string) bool {
+func proofMatches(
+	proof Proof,
+	ref MemoryRef,
+	kind memoryfacts.ProofKind,
+	operation string,
+) bool {
 	return proof.ID != "" &&
 		proof.Verified &&
 		proof.Kind == kind &&
@@ -384,12 +450,12 @@ func storageProofRef(req StorageRequest) MemoryRef {
 }
 
 func isBorrowed(ref MemoryRef) bool {
-	return ref.Provenance == ProvenanceBorrowedView
+	return ref.Provenance == memoryfacts.ProvenanceSafeBorrowed
 }
 
 func unsafeOrExternal(ref MemoryRef) bool {
-	return ref.Provenance == ProvenanceUnsafeUnknown ||
-		ref.UnsafeClass == UnsafeUnknown ||
+	return ref.Provenance == memoryfacts.ProvenanceUnsafeUnknown ||
+		ref.UnsafeClass == memoryfacts.UnsafeUnknown ||
 		ref.IslandID == ExternalUnsafeIsland
 }
 

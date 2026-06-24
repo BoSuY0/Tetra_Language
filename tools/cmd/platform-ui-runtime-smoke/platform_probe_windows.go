@@ -4,6 +4,7 @@ package main
 
 import (
 	"fmt"
+	"runtime"
 	"syscall"
 	"unsafe"
 )
@@ -63,6 +64,9 @@ func runPlatformWindowProbe(target string) (platformWindowProbeResult, error) {
 			target,
 		)
 	}
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
 	user32 := syscall.NewLazyDLL("user32.dll")
 	kernel32 := syscall.NewLazyDLL("kernel32.dll")
 	getModuleHandle := kernel32.NewProc("GetModuleHandleW")

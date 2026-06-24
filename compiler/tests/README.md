@@ -63,6 +63,9 @@ Verification: `cd compiler && go test ./... -count=1`.
   public compiler facade from outside `package compiler`.
 - `compiler_suite_test.go`: merged root package suite for package-private
   compiler facade, report, gate, runtime, and target integration coverage.
+- `compiler_t13_optimizer_test.go`: Memory Core v2 optimizer production wiring
+  checks package-private compiler release-optimization state transitions before
+  that evidence has a public report command.
 - `distributed_actor_runtime_test.go`: distributed actor runtime usage,
   required-symbol, target-support, and builtin-runtime build checks still
   exercise package-private compiler collection and runtime validation helpers.

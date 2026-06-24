@@ -122,6 +122,51 @@ func Summarize(plan *Plan) ReportSummary {
 	return summary
 }
 
+func MemoryDomains(plan *Plan) []runtimeabi.MemoryDomain {
+	if plan == nil {
+		return nil
+	}
+	byKey := map[string]runtimeabi.MemoryDomain{}
+	for _, fn := range plan.Functions {
+		for _, alloc := range fn.Allocations {
+			if alloc.Domain == nil {
+				continue
+			}
+			domain := *alloc.Domain
+			key := string(domain.Kind) + "\x00" + domain.DomainID + "\x00" +
+				domain.ParentDomainID + "\x00" + domain.OwnerKind + "\x00" +
+				domain.OwnerID + "\x00" + domain.Lifetime
+			existing := byKey[key]
+			if existing.DomainID == "" {
+				byKey[key] = domain
+				continue
+			}
+			existing.BudgetBytes += domain.BudgetBytes
+			existing.RequestedBytes += domain.RequestedBytes
+			existing.ReservedBytes += domain.ReservedBytes
+			existing.CommittedBytes += domain.CommittedBytes
+			existing.ReleasedBytes += domain.ReleasedBytes
+			existing.CurrentBytes += domain.CurrentBytes
+			if domain.PeakBytes > existing.PeakBytes {
+				existing.PeakBytes = domain.PeakBytes
+			}
+			existing.CopyCount += domain.CopyCount
+			existing.BytesCopied += domain.BytesCopied
+			byKey[key] = existing
+		}
+	}
+	keys := make([]string, 0, len(byKey))
+	for key := range byKey {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	out := make([]runtimeabi.MemoryDomain, 0, len(keys))
+	for _, key := range keys {
+		out = append(out, byKey[key])
+	}
+	return out
+}
+
 func allocationReportBytesRequested(alloc Allocation) int {
 	if alloc.BytesRequested > 0 {
 		return alloc.BytesRequested

@@ -94,12 +94,8 @@ jobs:
             --run=true \
             --islands-debug \
             --report "smoke_${target}_islands_debug.json"
-          go run ./tools/cmd/smoke-report-to-checklist \
-            --validate-only \
-            --report "smoke_${target}.json"
-          go run ./tools/cmd/smoke-report-to-checklist \
-            --validate-only \
-            --report "smoke_${target}_islands_debug.json"
+          go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "smoke_${target}.json"
+          go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "smoke_${target}_islands_debug.json"
 
       - name: Smoke summary
         shell: bash
@@ -267,9 +263,7 @@ jobs:
             --manifest docs/generated/manifest.json \
             --scope-decisions docs/release/v0_4/data/v0_4_0_scope_decisions.json
           go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
-          go run ./tools/cmd/validate-v0-4-completion-audit \
-            --audit docs/release/v0_4/v0_4_0_completion_audit.md \
-            --expected-status achieved
+          go run ./tools/cmd/validate-v0-4-completion-audit --audit docs/release/v0_4/v0_4_0_completion_audit.md --expected-status achieved
 
       - name: Upload v0.4.0 release readiness report
         if: always()
@@ -336,8 +330,7 @@ jobs:
             exit 1
           fi
           export WAYLAND_DISPLAY=wayland-surface-product-slice-ci
-          bash scripts/release/surface/surface-product-slice-gate.sh \
-            --report-dir reports/surface-product-slice-ci
+          bash scripts/release/surface/surface-product-slice-gate.sh --report-dir reports/surface-product-slice-ci
 
       - name: Upload Surface product-slice reports
         if: always()
@@ -366,8 +359,7 @@ jobs:
       - name: Surface Morph gate
         shell: bash
         run: |
-          bash scripts/release/surface/morph-gate.sh \
-            --report-dir reports/surface-morph-gate
+          bash scripts/release/surface/morph-gate.sh --report-dir reports/surface-morph-gate
 
       - name: Surface product gate
         shell: bash
@@ -386,14 +378,12 @@ jobs:
       - name: Safe view lifetime gate
         shell: bash
         run: |
-          bash scripts/release/safe-view-lifetime/gate.sh \
-            --report-dir reports/safe-view-lifetime
+          bash scripts/release/safe-view-lifetime/gate.sh --report-dir reports/safe-view-lifetime
 
       - name: Surface API stability gate
         shell: bash
         run: |
-          bash scripts/release/surface/api-stability-gate.sh \
-            --report-dir reports/surface-api-stability-v1
+          bash scripts/release/surface/api-stability-gate.sh --report-dir reports/surface-api-stability-v1
 
       - name: Full tests
         shell: bash
@@ -419,22 +409,10 @@ jobs:
           export GOTMPDIR="${PWD}/.cache/go-tmp-surface-final-readiness-ci"
           mkdir -p "$GOCACHE" "$GOTMPDIR"
           mkdir -p reports/surface-ui-production-final
-          go run ./tools/cmd/validate-surface-final-readiness --write \
-            --report-dir reports/surface-ui-production-final \
-            --product-report-dir reports/surface-product-v1 \
-            --expected-scope surface-v1-linux-web \
-            --current-git-head "${GITHUB_SHA}"
-          go run ./tools/cmd/validate-artifact-hashes \
-            --write \
-            --root reports/surface-ui-production-final \
-            --out reports/surface-ui-production-final/artifact-hashes.json
-          go run ./tools/cmd/validate-artifact-hashes \
-            --manifest reports/surface-ui-production-final/artifact-hashes.json
-          go run ./tools/cmd/validate-surface-final-readiness \
-            --report-dir reports/surface-ui-production-final \
-            --expected-scope surface-v1-linux-web \
-            --require-clean \
-            --require-package
+          go run ./tools/cmd/validate-surface-final-readiness --write --report-dir reports/surface-ui-production-final --product-report-dir reports/surface-product-v1 --expected-scope surface-v1-linux-web --current-git-head "${GITHUB_SHA}"
+          go run ./tools/cmd/validate-artifact-hashes --write --root reports/surface-ui-production-final --out reports/surface-ui-production-final/artifact-hashes.json
+          go run ./tools/cmd/validate-artifact-hashes --manifest reports/surface-ui-production-final/artifact-hashes.json
+          go run ./tools/cmd/validate-surface-final-readiness --report-dir reports/surface-ui-production-final --expected-scope surface-v1-linux-web --require-clean --require-package
 
       - name: Upload release reports
         if: always()
@@ -507,8 +485,7 @@ jobs:
           export GOCACHE="${PWD}/.cache/go-build-actor-runtime-foundation-ci"
           export GOTMPDIR="${PWD}/.cache/go-tmp-actor-runtime-foundation-ci"
           mkdir -p "$GOCACHE" "$GOTMPDIR"
-          bash scripts/release/post_v0_4/actor-runtime-foundation-linux-x64-gate.sh \
-            --report-dir reports/actor-runtime-foundation/final
+          bash scripts/release/post_v0_4/actor-runtime-foundation-linux-x64-gate.sh --report-dir reports/actor-runtime-foundation/final
 
       - name: Upload actor runtime foundation reports
         if: always()
@@ -518,10 +495,11 @@ jobs:
           path: |
             reports/actor-runtime-foundation/final/actor-runtime-foundation-manifest.json
             reports/actor-runtime-foundation/final/artifact-hashes.json
-            reports/actor-runtime-foundation/final/distributed-actors-linux-x64/distributed-actors-linux-x64.json # line-length: ignore
-            reports/actor-runtime-foundation/final/distributed-actors-linux-x64/artifact-hashes.json # line-length: ignore
-            reports/actor-runtime-foundation/final/parallel-production-linux-x64/parallel-production-linux-x64.json # line-length: ignore
-            reports/actor-runtime-foundation/final/parallel-production-linux-x64/artifact-hashes.json # line-length: ignore
+            reports/actor-runtime-foundation/final/distributed-actors-linux-x64/distributed-actors-linux-x64.json
+            reports/actor-runtime-foundation/final/distributed-actors-linux-x64/artifact-hashes.json
+            reports/actor-runtime-foundation/final/parallel-production-linux-x64/parallel-production-linux-x64.json
+            reports/actor-runtime-foundation/final/parallel-production-linux-x64/artifact-hashes.json
+            reports/actor-runtime-foundation/final/parallel-production-linux-x64/parallelrt-evidence.raw.json
             reports/actor-runtime-foundation/final/logs/*.log
 
   ram-contract-release-readiness-linux:
@@ -549,8 +527,7 @@ jobs:
           export GOCACHE="${PWD}/.cache/go-build-ram-contract-ci"
           export GOTMPDIR="${PWD}/.cache/go-tmp-ram-contract-ci"
           mkdir -p "$GOCACHE" "$GOTMPDIR"
-          bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh \
-            --report-dir reports/ram-contract-release
+          bash scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh --report-dir reports/ram-contract-release
 
       - name: Upload RAM contract release reports
         if: always()
@@ -610,15 +587,10 @@ jobs:
       - name: Validate TechEmpower report schemas
         shell: bash
         run: |
-          go run ./tools/cmd/validate-techempower-report \
-            --report docs/benchmarks/techempower_local_smoke_skip_db_report.json \
-            --allow-skip-db
-          go run ./tools/cmd/validate-techempower-report \
-            --report docs/benchmarks/techempower_scram_single_query_local_report.json
-          go run ./tools/cmd/validate-techempower-report \
-            --report docs/benchmarks/techempower_scram_single_query_matrix_local_report.json
-          go run ./tools/cmd/validate-techempower-report \
-            --report docs/benchmarks/techempower_scram_endpoint_matrix_local_report.json
+          go run ./tools/cmd/validate-techempower-report --report docs/benchmarks/techempower_local_smoke_skip_db_report.json --allow-skip-db
+          go run ./tools/cmd/validate-techempower-report --report docs/benchmarks/techempower_scram_single_query_local_report.json
+          go run ./tools/cmd/validate-techempower-report --report docs/benchmarks/techempower_scram_single_query_matrix_local_report.json
+          go run ./tools/cmd/validate-techempower-report --report docs/benchmarks/techempower_scram_endpoint_matrix_local_report.json
 
   full-platform-ui-runtime-target-host:
     if: github.event_name != 'schedule'
@@ -635,6 +607,11 @@ jobs:
             target: macos-x64
             report: macos-ui-runtime.json
     steps:
+      - name: Enable Git long paths on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: git config --global core.longpaths true
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
@@ -642,6 +619,16 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.25.x"
+
+      - name: Windows UI OS-thread affinity regression
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          go test -buildvcs=false \
+            ./tools/cmd/platform-ui-runtime-smoke \
+            -run '^TestWindowsPlatformProbeCompletesUnderSchedulerPressure$' \
+            -count=20 \
+            -timeout=10m
 
       - name: Build CLI
         shell: bash
@@ -656,9 +643,7 @@ jobs:
       - name: Target-host UI runtime smoke
         shell: bash
         run: |
-          go run ./tools/cmd/platform-ui-runtime-smoke \
-            --target "${{ matrix.target }}" \
-            --report "${{ matrix.report }}"
+          go run ./tools/cmd/platform-ui-runtime-smoke --target "${{ matrix.target }}" --report "${{ matrix.report }}"
 
       - name: Validate target-host UI runtime report
         shell: bash
@@ -667,16 +652,10 @@ jobs:
           expected_git_head="$(git rev-parse HEAD)"
           case "${{ matrix.target }}" in
             windows-x64)
-              go run ./tools/cmd/validate-windows-ui-runtime \
-                --report windows-ui-runtime.json \
-                --expected-version "$expected_version" \
-                --expected-git-head "$expected_git_head"
+              go run ./tools/cmd/validate-windows-ui-runtime --report windows-ui-runtime.json --expected-version "$expected_version" --expected-git-head "$expected_git_head"
               ;;
             macos-x64)
-              go run ./tools/cmd/validate-macos-ui-runtime \
-                --report macos-ui-runtime.json \
-                --expected-version "$expected_version" \
-                --expected-git-head "$expected_git_head"
+              go run ./tools/cmd/validate-macos-ui-runtime --report macos-ui-runtime.json --expected-version "$expected_version" --expected-git-head "$expected_git_head"
               ;;
             *)
               echo "unexpected target ${{ matrix.target }}" >&2
@@ -723,8 +702,7 @@ jobs:
       - name: Full-platform UI runtime gate
         shell: bash
         run: |
-          bash scripts/release/full_platform/ui-runtime-gate.sh \
-            --report-dir reports/full-platform-ui-runtime
+          bash scripts/release/full_platform/ui-runtime-gate.sh --report-dir reports/full-platform-ui-runtime
 
       - name: Upload full-platform UI runtime gate report
         if: always()
@@ -749,10 +727,7 @@ jobs:
       - name: Coverage
         shell: bash
         run: |
-          go test ./compiler/... ./cli/... ./tools/... \
-            -covermode=atomic \
-            -coverprofile=coverage.out \
-            -count=1
+          go test ./compiler/... ./cli/... ./tools/... -covermode=atomic -coverprofile=coverage.out -count=1
           go tool cover -func=coverage.out | tee coverage.txt
 
       - name: Upload coverage report

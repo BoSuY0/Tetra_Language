@@ -383,13 +383,17 @@ func (b *builder) walkExpr(expr frontend.Expr, targetName string) {
 				inputs = append(inputs, input)
 			}
 		}
-		if targetName != "" && len(inputs) > 0 {
+		if len(inputs) > 0 {
+			var outputs []string
+			if targetName != "" {
+				outputs = []string{targetName}
+			}
 			b.addOperation(
 				Operation{
 					Kind:    OpAggregate,
 					Source:  sourceString(e.At),
 					Inputs:  inputs,
-					Outputs: []string{targetName},
+					Outputs: outputs,
 					Note:    "struct aggregate",
 				},
 			)

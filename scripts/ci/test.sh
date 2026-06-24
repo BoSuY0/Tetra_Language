@@ -30,8 +30,7 @@ Runs the canonical Go test suite:
 
 Focused targets:
 - --frontend-focused:
-  - go test ./compiler/internal/frontend ./compiler
-    -run 'Lex|Parser|Flow|Diagnostic|Stabilization' -count=1
+  - go test ./compiler/internal/frontend ./compiler -run 'Lex|Parser|Flow|Diagnostic|Stabilization' -count=1
   - go test ./compiler/internal/backend/wasm32_web -count=1
 USAGE
 }

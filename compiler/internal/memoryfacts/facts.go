@@ -10,6 +10,7 @@ const (
 	StagePLIR                  SourceStage = "plir"
 	StageAllocPlan             SourceStage = "allocplan"
 	StageLowering              SourceStage = "lowering"
+	StageOptimization          SourceStage = "optimization"
 	StageValidation            SourceStage = "validation"
 )
 
@@ -84,6 +85,27 @@ const (
 	StorageExternal            StorageClass = "External"
 )
 
+type DomainKind string
+
+const (
+	DomainProcess  DomainKind = "process"
+	DomainTask     DomainKind = "task"
+	DomainActor    DomainKind = "actor"
+	DomainIsland   DomainKind = "island"
+	DomainRequest  DomainKind = "request"
+	DomainExternal DomainKind = "external"
+)
+
+type TransferKind string
+
+const (
+	TransferUnknown  TransferKind = ""
+	TransferMove     TransferKind = "move"
+	TransferCopy     TransferKind = "copy"
+	TransferBorrowed TransferKind = "borrowed"
+	TransferUnsafe   TransferKind = "unsafe_contract"
+)
+
 type ValidationState string
 
 const (
@@ -137,6 +159,17 @@ type Fact struct {
 	ProvenanceClass       ProvenanceClass `json:"provenance_class,omitempty"`
 	RegionID              string          `json:"region_id,omitempty"`
 	OwnerID               string          `json:"owner_id,omitempty"`
+	DomainKind            DomainKind      `json:"domain_kind,omitempty"`
+	DomainID              string          `json:"domain_id,omitempty"`
+	DomainOwnerID         string          `json:"domain_owner_id,omitempty"`
+	TransferKind          TransferKind    `json:"transfer_kind,omitempty"`
+	TransferProofID       string          `json:"transfer_proof_id,omitempty"`
+	SourceConsumed        bool            `json:"source_consumed,omitempty"`
+	LiveBorrowCrossing    bool            `json:"live_borrow_crossing,omitempty"`
+	DestinationActive     bool            `json:"destination_active,omitempty"`
+	LifetimeBirth         string          `json:"lifetime_birth,omitempty"`
+	LifetimeDeath         string          `json:"lifetime_death,omitempty"`
+	LifetimeOwner         string          `json:"lifetime_owner,omitempty"`
 	ParamIndex            *int            `json:"param_index,omitempty"`
 	ParamPath             string          `json:"param_path,omitempty"`
 	BorrowState           BorrowState     `json:"borrow_state,omitempty"`
@@ -148,7 +181,7 @@ type Fact struct {
 	StoragePlan           StorageClass    `json:"storage_plan,omitempty"`
 	ActualLoweringStorage StorageClass    `json:"actual_lowering_storage,omitempty"`
 	ProofID               string          `json:"proof_id,omitempty"`
-	ProofKind             string          `json:"proof_kind,omitempty"`
+	ProofKind             ProofKind       `json:"proof_kind,omitempty"`
 	ProofSubjectBaseID    string          `json:"proof_subject_base_id,omitempty"`
 	ProofIndexValueID     string          `json:"proof_index_value_id,omitempty"`
 	ProofOperation        string          `json:"proof_operation,omitempty"`
@@ -158,7 +191,8 @@ type Fact struct {
 	ParentFactID          FactID          `json:"parent_fact_id,omitempty"`
 	DerivedFactIDs        []FactID        `json:"derived_fact_ids,omitempty"`
 	LoweredArtifactID     string          `json:"lowered_artifact_id,omitempty"`
-	Claim                 string          `json:"claim,omitempty"`
+	Claim                 Claim           `json:"claim,omitempty"`
+	DecisionCode          string          `json:"decision_code,omitempty"`
 	Reason                string          `json:"reason,omitempty"`
 	ValidatorName         string          `json:"validator_name,omitempty"`
 	CostClass             CostClass       `json:"cost_class,omitempty"`

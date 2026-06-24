@@ -294,7 +294,7 @@ JS
 }
 
 smoke_list="$tmp_dir/wasm32-web-smoke-list.json"
-./tetra smoke --list --target wasm32-web --format=json > "$smoke_list"
+./tetra smoke --list --target wasm32-web --format=json >"$smoke_list"
 go run ./tools/cmd/validate-smoke-list --report "$smoke_list"
 
 wait_for_server_port() {

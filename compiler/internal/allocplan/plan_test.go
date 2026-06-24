@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"tetra_language/compiler/internal/frontend"
+	"tetra_language/compiler/internal/memoryfacts"
+	"tetra_language/compiler/internal/memoryfacts/fromplir"
 	"tetra_language/compiler/internal/module"
 	"tetra_language/compiler/internal/plir"
 	"tetra_language/compiler/internal/runtimeabi"
@@ -34,9 +36,9 @@ func allocationPlan(t *testing.T, src string) *Plan {
 	if err := plir.VerifyProgram(plirProg); err != nil {
 		t.Fatalf("PLIR VerifyProgram: %v", err)
 	}
-	plan, err := FromPLIR(plirProg)
+	plan, err := buildPlanFromProgram(plirProg, Options{})
 	if err != nil {
-		t.Fatalf("FromPLIR: %v", err)
+		t.Fatalf("buildPlanFromProgram: %v", err)
 	}
 	return plan
 }
@@ -50,9 +52,9 @@ func allocationPlanWithOptions(t *testing.T, src string, opt Options) *Plan {
 	if err := plir.VerifyProgram(plirProg); err != nil {
 		t.Fatalf("PLIR VerifyProgram: %v", err)
 	}
-	plan, err := FromPLIRWithOptions(plirProg, opt)
+	plan, err := buildPlanFromProgram(plirProg, opt)
 	if err != nil {
-		t.Fatalf("FromPLIRWithOptions: %v", err)
+		t.Fatalf("buildPlanbuildPlanFromProgram: %v", err)
 	}
 	return plan
 }
@@ -74,15 +76,30 @@ func allocationPlanFile(t *testing.T, src string) *Plan {
 	if err := plir.VerifyProgram(plirProg); err != nil {
 		t.Fatalf("PLIR VerifyProgram: %v", err)
 	}
-	plan, err := FromPLIR(plirProg)
+	plan, err := buildPlanFromProgram(plirProg, Options{})
 	if err != nil {
-		t.Fatalf("FromPLIR: %v", err)
+		t.Fatalf("buildPlanFromProgram: %v", err)
 	}
 	return plan
 }
 
+func buildPlanFromProgram(prog *plir.Program, opt Options) (*Plan, error) {
+	graph, err := fromplir.Build("program:test", prog)
+	if err != nil {
+		return nil, err
+	}
+	if err := graph.AdvanceTo(memoryfacts.StagePLIR); err != nil {
+		return nil, err
+	}
+	snapshot, err := graph.Snapshot()
+	if err != nil {
+		return nil, err
+	}
+	return Build(Input{Program: prog, Snapshot: snapshot, Options: opt})
+}
+
 func TestPlannerClassifiesLocalAndReturnedAllocations(t *testing.T) {
-	plan := allocationPlan(t, `
+	plan := allocationPlanWithOptions(t, `
 func local() -> Int
 uses alloc, mem:
     var xs: []u8 = make_u8(4)
@@ -97,7 +114,7 @@ uses alloc, mem:
 func main() -> Int
 uses alloc, mem:
     return local()
-`)
+`, Options{EnableStackLowering: true})
 
 	local := findAllocation(t, plan, "local", "xs")
 	if local.Escape != EscapeNoEscape || local.Storage != StorageStack {
@@ -109,26 +126,18 @@ uses alloc, mem:
 	if local.Builtin != "core.make_u8" {
 		t.Fatalf("local builtin = %q, want core.make_u8", local.Builtin)
 	}
-	if local.PlannedStorage != StorageStack || local.ActualLoweringStorage != StorageHeap {
-		t.Fatalf(
-			"local planned/actual storage = %q/%q, want Stack/Heap",
-			local.PlannedStorage,
-			local.ActualLoweringStorage,
-		)
-	}
-	if local.ValidationStatus == "" || local.LoweringStatus == "" {
+	assertPlannedPending(t, local, StorageStack)
+	if local.ValidationStatus == "" {
 		t.Fatalf("local validation/lowering status missing: %+v", local)
-	}
-	if local.BackendStorage != StorageHeap {
-		t.Fatalf("local backend storage = %q, want conservative heap note", local.BackendStorage)
 	}
 	ret := findAllocation(t, plan, "ret", "xs")
 	if ret.Escape != EscapeReturn || ret.Storage != StorageHeap {
 		t.Fatalf("returned allocation = %+v, want EscapesReturn/Heap", ret)
 	}
+	assertPlannedPending(t, ret, StorageHeap)
 }
 
-func TestPlannerReportsActualStackLoweringWhenEnabled(t *testing.T) {
+func TestPlannerKeepsStackLoweringPendingWhenEnabled(t *testing.T) {
 	plirProg, err := plir.FromCheckedProgram(checkedProgram(t, `
 func local() -> Int
 uses alloc, mem:
@@ -148,36 +157,23 @@ uses alloc, mem:
 	if err != nil {
 		t.Fatalf("FromCheckedProgram: %v", err)
 	}
-	plan, err := FromPLIRWithOptions(plirProg, Options{EnableStackLowering: true})
+	plan, err := buildPlanFromProgram(plirProg, Options{EnableStackLowering: true})
 	if err != nil {
-		t.Fatalf("FromPLIRWithOptions: %v", err)
+		t.Fatalf("buildPlanbuildPlanFromProgram: %v", err)
 	}
 
 	local := findAllocation(t, plan, "local", "xs")
-	if local.PlannedStorage != StorageStack || local.ActualLoweringStorage != StorageStack {
+	assertPlannedPending(t, local, StorageStack)
+	if !strings.Contains(local.Reason, "fixed_i32_no_escape") {
 		t.Fatalf(
-			"local planned/actual storage = %q/%q, want Stack/Stack",
-			local.PlannedStorage,
-			local.ActualLoweringStorage,
-		)
-	}
-	if local.LoweringStatus != "stack_lowering" ||
-		!strings.Contains(local.Reason, "fixed_i32_no_escape") {
-		t.Fatalf(
-			"local lowering status/reason = %q/%q, want stack lowering evidence",
+			"local lowering status/reason = %q/%q, want stack planning evidence",
 			local.LoweringStatus,
 			local.Reason,
 		)
 	}
 
 	ret := findAllocation(t, plan, "ret", "xs")
-	if ret.PlannedStorage != StorageHeap || ret.ActualLoweringStorage != StorageHeap {
-		t.Fatalf(
-			"returned planned/actual storage = %q/%q, want Heap/Heap",
-			ret.PlannedStorage,
-			ret.ActualLoweringStorage,
-		)
-	}
+	assertPlannedPending(t, ret, StorageHeap)
 }
 
 func TestPlannerLargeNoEscapeI32SliceUsesStackWhenStackLoweringEnabled(t *testing.T) {
@@ -204,17 +200,8 @@ uses alloc, mem:
 			if xs.ByteSize != 16384 {
 				t.Fatalf("large i32 allocation bytes = %d, want 16384: %+v", xs.ByteSize, xs)
 			}
-			if xs.PlannedStorage != StorageStack || xs.ActualLoweringStorage != StorageStack {
-				t.Fatalf(
-					"large i32 planned/actual storage = %q/%q, want Stack/Stack: %+v",
-					xs.PlannedStorage,
-					xs.ActualLoweringStorage,
-					xs,
-				)
-			}
-			if got := RuntimePathForAllocation(xs); got != runtimeabi.AllocationPathStackFrame {
-				t.Fatalf("large i32 runtime path = %q, want stack_frame: %+v", got, xs)
-			}
+			assertPlannedPending(t, xs, StorageStack)
+			assertRuntimePending(t, xs)
 			if contains(xs.HeapReasonCodes, HeapReasonLargeObject) ||
 				contains(xs.ReasonCodes, HeapReasonLargeObject) {
 				t.Fatalf(
@@ -241,17 +228,8 @@ uses alloc, mem:
 	if xs.Escape != EscapeNoEscape {
 		t.Fatalf("large u8 allocation escape = %q, want NoEscape: %+v", xs.Escape, xs)
 	}
-	if xs.PlannedStorage != StorageHeap || xs.ActualLoweringStorage != StorageHeap {
-		t.Fatalf(
-			"large u8 planned/actual storage = %q/%q, want Heap/Heap: %+v",
-			xs.PlannedStorage,
-			xs.ActualLoweringStorage,
-			xs,
-		)
-	}
-	if got := RuntimePathForAllocation(xs); got != runtimeabi.AllocationPathLargeMmap {
-		t.Fatalf("large u8 runtime path = %q, want large_mmap: %+v", got, xs)
-	}
+	assertPlannedPending(t, xs, StorageHeap)
+	assertRuntimePending(t, xs)
 	if !contains(xs.HeapReasonCodes, HeapReasonLargeObject) {
 		t.Fatalf(
 			"large u8 heap reason codes = %v, want %s: %+v",
@@ -262,7 +240,7 @@ uses alloc, mem:
 	}
 }
 
-func TestPlannerReportsSmallHeapRuntimeAllocatorClass(t *testing.T) {
+func TestPlannerDoesNotPredictSmallHeapRuntimeAllocatorClass(t *testing.T) {
 	plan := allocationPlanWithOptions(t, `
 func ret_small() -> []u8
 uses alloc, mem:
@@ -280,34 +258,13 @@ uses alloc, mem:
 `, Options{EnableSmallHeapRuntime: true})
 
 	small := findAllocation(t, plan, "ret_small", "xs")
-	if small.RuntimePath != runtimeabi.AllocationPathProcessBumpSmallHeapV0 ||
-		small.AllocatorClass != "small_32" {
+	assertPlannedPending(t, small, StorageHeap)
+	assertRuntimePending(t, small)
+	if small.BytesRequested != 17 || small.BytesReserved != 17 {
 		t.Fatalf(
-			"small allocation runtime evidence = %+v, want process_bump_small_heap_v0/small_32",
-			small,
-		)
-	}
-	if small.BytesRequested != 17 || small.BytesReserved != 32 {
-		t.Fatalf(
-			"small allocation bytes = requested %d reserved %d, want 17/32",
+			"small allocation bytes = requested %d reserved %d, want planned 17/17",
 			small.BytesRequested,
 			small.BytesReserved,
-		)
-	}
-	if small.BytesCommitted != 32 || small.BytesReleased != 0 {
-		t.Fatalf(
-			"small allocation backend bytes = committed %d released %d, want 32/0",
-			small.BytesCommitted,
-			small.BytesReleased,
-		)
-	}
-	if small.MemoryBackend == nil ||
-		small.MemoryBackend.BackendClass != runtimeabi.MemoryBackendClassSmallHeap ||
-		small.MemoryBackend.Adapter != "runtime.small_heap.process_bump_v0" ||
-		small.MemoryBackend.EvidenceClass != runtimeabi.MemoryFootprintEstimated {
-		t.Fatalf(
-			"small allocation memory backend evidence = %+v, want process bump small heap estimate",
-			small.MemoryBackend,
 		)
 	}
 	if small.Domain == nil || small.Domain.DomainID != "domain:process" ||
@@ -315,10 +272,8 @@ uses alloc, mem:
 		t.Fatalf("small allocation domain = %+v, want process domain", small.Domain)
 	}
 	large := findAllocation(t, plan, "ret_large", "xs")
-	if large.RuntimePath != runtimeabi.AllocationPathLargeMmap ||
-		large.AllocatorClass != "large_mmap" {
-		t.Fatalf("large allocation runtime evidence = %+v, want large_mmap", large)
-	}
+	assertPlannedPending(t, large, StorageHeap)
+	assertRuntimePending(t, large)
 	if large.BytesRequested != 5000 || large.BytesReserved != 5000 {
 		t.Fatalf(
 			"large allocation bytes = requested %d reserved %d, want 5000/5000",
@@ -326,22 +281,12 @@ uses alloc, mem:
 			large.BytesReserved,
 		)
 	}
-	if large.MemoryBackend == nil ||
-		large.MemoryBackend.BackendClass != runtimeabi.MemoryBackendClassLargeBackend ||
-		large.MemoryBackend.Adapter != "target.large_mmap_v1" ||
-		large.MemoryBackend.EvidenceClass != runtimeabi.MemoryFootprintEstimated ||
-		large.MemoryBackend.ReleaseBytes != 0 {
-		t.Fatalf(
-			"large allocation memory backend evidence = %+v, want large mmap reserve/commit estimate without release",
-			large.MemoryBackend,
-		)
-	}
-	if !strings.Contains(FormatText(plan), "allocator_class: small_32") {
-		t.Fatalf("FormatText missing small heap allocator class:\n%s", FormatText(plan))
+	if strings.Contains(FormatText(plan), "allocator_class: small_32") {
+		t.Fatalf("FormatText predicted small heap allocator class:\n%s", FormatText(plan))
 	}
 }
 
-func TestPlannerReportsProcessBumpSmallHeapAllocatorEvidence(t *testing.T) {
+func TestPlannerKeepsProcessBumpSmallHeapEvidencePending(t *testing.T) {
 	plan := allocationPlanWithOptions(t, `
 func ret_small() -> []u8
 uses alloc, mem:
@@ -354,81 +299,22 @@ uses alloc, mem:
 `, Options{EnableSmallHeapRuntime: true})
 
 	small := findAllocation(t, plan, "ret_small", "xs")
-	if small.RuntimePath != runtimeabi.AllocationPathProcessBumpSmallHeapV0 {
-		t.Fatalf(
-			"small allocation runtime_path = %q, want %q: %+v",
-			small.RuntimePath,
-			runtimeabi.AllocationPathProcessBumpSmallHeapV0,
-			small,
-		)
-	}
-	if small.AllocatorClass != "small_32" {
-		t.Fatalf(
-			"small allocation allocator_class = %q, want small_32: %+v",
-			small.AllocatorClass,
-			small,
-		)
-	}
-	if small.AllocatorScope != "process" {
-		t.Fatalf(
-			"small allocation allocator_scope = %q, want process: %+v",
-			small.AllocatorScope,
-			small,
-		)
-	}
-	if small.AllocatorReusePolicy != "bump_no_reuse_v0" {
-		t.Fatalf(
-			"small allocation reuse policy = %q, want bump_no_reuse_v0: %+v",
-			small.AllocatorReusePolicy,
-			small,
-		)
-	}
-	if small.AllocatorChunkBytes != runtimeabi.SmallHeapChunkBytes {
-		t.Fatalf(
-			"small allocation chunk bytes = %d, want %d: %+v",
-			small.AllocatorChunkBytes,
-			runtimeabi.SmallHeapChunkBytes,
-			small,
-		)
-	}
+	assertPlannedPending(t, small, StorageHeap)
+	assertRuntimePending(t, small)
 
 	summary := Summarize(plan)
-	if summary.RuntimePaths[string(runtimeabi.AllocationPathProcessBumpSmallHeapV0)] != 1 {
+	if summary.RuntimePaths[string(runtimeabi.AllocationPathUnknown)] != 1 {
+		t.Fatalf("runtime path summary = %+v, want pending unknown count", summary.RuntimePaths)
+	}
+	if len(summary.AllocatorClasses) != 0 || len(summary.AllocatorScopes) != 0 ||
+		len(summary.AllocatorReusePolicies) != 0 {
+		t.Fatalf("allocator summaries should be empty in planned state: %+v", summary)
+	}
+	if summary.BytesCommitted != 0 || summary.BytesReleased != 0 {
 		t.Fatalf(
-			"runtime path summary = %+v, want process_bump_small_heap_v0 count",
-			summary.RuntimePaths,
-		)
-	}
-	if summary.AllocatorClasses["small_32"] != 1 {
-		t.Fatalf("allocator class summary = %+v, want small_32 count", summary.AllocatorClasses)
-	}
-	if summary.AllocatorScopes["process"] != 1 {
-		t.Fatalf("allocator scope summary = %+v, want process count", summary.AllocatorScopes)
-	}
-	if summary.AllocatorReusePolicies["bump_no_reuse_v0"] != 1 {
-		t.Fatalf(
-			"allocator reuse summary = %+v, want bump_no_reuse_v0 count",
-			summary.AllocatorReusePolicies,
-		)
-	}
-	if summary.BytesCommitted != 32 || summary.BytesReleased != 0 {
-		t.Fatalf(
-			"backend byte summary = committed %d released %d, want 32/0",
+			"backend byte summary = committed %d released %d, want 0/0 before lowering",
 			summary.BytesCommitted,
 			summary.BytesReleased,
-		)
-	}
-	if summary.MemoryBackendClasses[string(runtimeabi.MemoryBackendClassSmallHeap)] != 1 {
-		t.Fatalf(
-			"memory backend class summary = %+v, want small_heap count",
-			summary.MemoryBackendClasses,
-		)
-	}
-	if summary.MemoryBackendOperations[string(runtimeabi.MemoryBackendCommit)] != 1 ||
-		summary.MemoryBackendOperations[string(runtimeabi.MemoryBackendFootprint)] != 1 {
-		t.Fatalf(
-			"memory backend operation summary = %+v, want commit/footprint counts without release",
-			summary.MemoryBackendOperations,
 		)
 	}
 	if len(summary.Domains) != 1 || summary.Domains[0].DomainID != "domain:process" ||
@@ -437,19 +323,10 @@ uses alloc, mem:
 	}
 	text := FormatText(plan)
 	for _, want := range []string{
-		"runtime_path: process_bump_small_heap_v0",
-		"allocator_class: small_32",
-		"allocator_scope: process",
-		"allocator_reuse_policy: bump_no_reuse_v0",
-		"allocator_chunk_bytes: 65536",
-		"memory_backend: small_heap",
-		"memory_backend_ops: commit,footprint,reserve",
-		"bytes_committed: 32",
+		"runtime_path: unknown_conservative",
+		"lowering_status: pending",
 		"domain_id: domain:process",
-		"memory_backend_classes:small_heap=1",
-		"memory_backend_operations:commit=1,footprint=1,reserve=1",
-		"allocator_reuse_policies:bump_no_reuse_v0=1",
-		"domains:domain:process=17/32",
+		"domains:domain:process=17/17",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("FormatText missing %q:\n%s", want, text)
@@ -498,14 +375,8 @@ uses alloc, capability, mem:
 			raw,
 		)
 	}
-	if raw.RuntimePath != runtimeabi.AllocationPathProcessBumpSmallHeapV0 {
-		t.Fatalf(
-			("raw allocation runtime path = %q, want small heap optimization " +
-				"to be visible without trusting arbitrary pointers: %+v"),
-			raw.RuntimePath,
-			raw,
-		)
-	}
+	assertPlannedPending(t, raw, StorageHeap)
+	assertRuntimePending(t, raw)
 
 	summary := Summarize(plan)
 	if summary.RawPointerBoundsStatuses[string(runtimeabi.RawPointerBoundsAllocationBase)] != 1 {
@@ -546,43 +417,17 @@ uses alloc, islands, mem:
 `)
 
 	island := findAllocation(t, plan, "main", "xs")
-	if island.Storage != StorageExplicitIsland ||
-		island.ActualLoweringStorage != StorageExplicitIsland {
+	assertPlannedPending(t, island, StorageExplicitIsland)
+	assertRuntimePending(t, island)
+	if island.BytesRequested != 17 || island.BytesReserved != 17 {
 		t.Fatalf(
-			"island storage = %s/%s, want explicit island lowering",
-			island.Storage,
-			island.ActualLoweringStorage,
-		)
-	}
-	if island.RuntimePath != runtimeabi.AllocationPathExplicitIsland ||
-		island.AllocatorClass != "region_bump_16" {
-		t.Fatalf("island runtime evidence = %+v, want explicit_island/region_bump_16", island)
-	}
-	if island.BytesRequested != 17 || island.BytesReserved != 32 {
-		t.Fatalf(
-			"island bytes = requested %d reserved %d, want 17/32",
+			"island bytes = requested %d reserved %d, want planned 17/17",
 			island.BytesRequested,
 			island.BytesReserved,
 		)
 	}
-	if island.BytesCommitted != 32 || island.BytesReleased != 32 {
-		t.Fatalf(
-			"island backend bytes = committed %d released %d, want 32/32",
-			island.BytesCommitted,
-			island.BytesReleased,
-		)
-	}
-	if island.MemoryBackend == nil ||
-		island.MemoryBackend.BackendClass != runtimeabi.MemoryBackendClassRegion ||
-		island.MemoryBackend.Adapter != "runtime.region_bump_v1" ||
-		island.MemoryBackend.EvidenceClass != runtimeabi.MemoryFootprintEstimated {
-		t.Fatalf(
-			"island memory backend evidence = %+v, want region allocation estimate",
-			island.MemoryBackend,
-		)
-	}
-	if island.RegionID != "island:isl" || island.Lifetime == "" || island.DebugMode == "" {
-		t.Fatalf("island report hooks missing region/lifetime/debug evidence: %+v", island)
+	if island.RegionID != "island:isl" || island.Lifetime == "" {
+		t.Fatalf("island report hooks missing region/lifetime evidence: %+v", island)
 	}
 	if island.Domain == nil || island.Domain.DomainID != "domain:island:isl" ||
 		island.Domain.Kind != runtimeabi.DomainIsland {
@@ -590,13 +435,10 @@ uses alloc, islands, mem:
 	}
 	text := FormatText(plan)
 	for _, want := range []string{
-		"runtime_path: explicit_island",
-		"allocator_class: region_bump_16",
-		"memory_backend: region",
+		"runtime_path: unknown_conservative",
+		"lowering_status: pending",
 		"region_id: island:isl",
-		"bytes_reserved: 32",
-		"bytes_committed: 32",
-		"bytes_released: 32",
+		"bytes_reserved: 17",
 		"domain_id: domain:island:isl",
 	} {
 		if !strings.Contains(text, want) {
@@ -672,14 +514,18 @@ uses alloc, mem:
 		{fn: "overflow", status: LengthStatusRejectedOverflow},
 	} {
 		alloc := findAllocation(t, plan, tc.fn, "xs")
-		if alloc.LengthStatus != tc.status || alloc.ActualLoweringStorage != StorageExplicitIsland {
-			t.Fatalf("%s allocation = %+v, want %s actual ExplicitIsland", tc.fn, alloc, tc.status)
+		if alloc.LengthStatus != tc.status {
+			t.Fatalf("%s allocation = %+v, want %s", tc.fn, alloc, tc.status)
 		}
-		if alloc.RuntimePath != runtimeabi.AllocationPathExplicitIsland ||
-			alloc.RegionID != "island:isl" ||
-			alloc.Lifetime == "" {
+		wantStorage := StorageExplicitIsland
+		if tc.status == LengthStatusValidEmpty {
+			wantStorage = StorageEliminated
+		}
+		assertPlannedPending(t, alloc, wantStorage)
+		if wantStorage == StorageExplicitIsland &&
+			(alloc.RegionID != "island:isl" || alloc.Lifetime == "") {
 			t.Fatalf(
-				"%s explicit island metadata = %+v, want runtime path, region, and lifetime",
+				"%s explicit island metadata = %+v, want region and lifetime",
 				tc.fn,
 				alloc,
 			)
@@ -703,35 +549,12 @@ uses alloc, mem:
 
 	copied := findAllocation(t, plan, "local_copy", "copied")
 	want := StorageFunctionTempRegion
-	if copied.PlannedStorage != want || copied.ActualLoweringStorage != StorageHeap {
+	assertPlannedPending(t, copied, want)
+	assertRuntimePending(t, copied)
+	if copied.RegionID != "region:local_copy:temp" {
 		t.Fatalf(
-			"temporary copy planned/actual storage = %q/%q, want FunctionTempRegion/Heap fallback: %+v",
-			copied.PlannedStorage,
-			copied.ActualLoweringStorage,
+			"temporary copy planned evidence = %+v, want planned function temp id",
 			copied,
-		)
-	}
-	if copied.RuntimePath != runtimeabi.AllocationPathHeap ||
-		copied.RegionID != "region:local_copy:temp" {
-		t.Fatalf(
-			"temporary copy fallback evidence = %+v, want heap runtime path with planned function temp id",
-			copied,
-		)
-	}
-	if copied.AllocatorClass != "" {
-		t.Fatalf(
-			"temporary copy fallback allocator class = %q, want no region allocator claim: %+v",
-			copied.AllocatorClass,
-			copied,
-		)
-	}
-	if copied.MemoryBackend == nil ||
-		copied.MemoryBackend.BackendClass != runtimeabi.MemoryBackendClassConservativeHeap ||
-		copied.MemoryBackend.EvidenceClass != runtimeabi.MemoryFootprintBlocked ||
-		copied.MemoryBackend.BlockedReason == "" {
-		t.Fatalf(
-			"temporary copy fallback memory backend evidence = %+v, want blocked conservative heap",
-			copied.MemoryBackend,
 		)
 	}
 	if copied.Lifetime != "function:local_copy" || copied.DebugMode == "" {
@@ -740,9 +563,8 @@ uses alloc, mem:
 	text := FormatText(plan)
 	for _, want := range []string{
 		"planned_storage: FunctionTempRegion",
-		"actual_lowering_storage: Heap",
-		"runtime_path: heap",
-		"backend_storage: Heap",
+		"actual_lowering_storage: UnknownConservative",
+		"runtime_path: unknown_conservative",
 		"region_id: region:local_copy:temp",
 		"reason: function-local temporary copy",
 	} {
@@ -768,42 +590,16 @@ uses alloc, mem:
 
 	copied := findAllocation(t, plan, "local_copy", "copied")
 	want := StorageFunctionTempRegion
-	if copied.PlannedStorage != want || copied.ActualLoweringStorage != want {
-		t.Fatalf(
-			"temporary copy planned/actual storage = %q/%q, want FunctionTempRegion/FunctionTempRegion: %+v",
-			copied.PlannedStorage,
-			copied.ActualLoweringStorage,
-			copied,
-		)
-	}
-	if copied.LoweringStatus != "function_temp_region_lowering" {
-		t.Fatalf(
-			"temporary copy lowering status = %q, want function_temp_region_lowering: %+v",
-			copied.LoweringStatus,
-			copied,
-		)
-	}
-	if copied.RuntimePath != runtimeabi.AllocationPathScopedSingleMappingV0 ||
-		copied.AllocatorClass != "function_temp_region" ||
-		copied.RegionID != "region:local_copy:temp" {
-		t.Fatalf("temporary copy region report evidence = %+v, want function temp region", copied)
-	}
-	if copied.MemoryBackend == nil ||
-		copied.MemoryBackend.BackendClass != runtimeabi.MemoryBackendClassRegion ||
-		copied.MemoryBackend.Adapter != "runtime.region_bump_v1" ||
-		copied.MemoryBackend.EvidenceClass != runtimeabi.MemoryFootprintEstimated {
-		t.Fatalf(
-			"temporary copy region memory backend evidence = %+v, want region estimate",
-			copied.MemoryBackend,
-		)
+	assertPlannedPending(t, copied, want)
+	assertRuntimePending(t, copied)
+	if copied.RegionID != "region:local_copy:temp" {
+		t.Fatalf("temporary copy region plan = %+v, want function temp region id", copied)
 	}
 	text := FormatText(plan)
 	for _, want := range []string{
 		"planned_storage: FunctionTempRegion",
-		"actual_lowering_storage: FunctionTempRegion",
-		"runtime_path: scoped_single_mapping_v0",
-		"allocator_class: function_temp_region",
-		"memory_backend: region",
+		"actual_lowering_storage: UnknownConservative",
+		"runtime_path: unknown_conservative",
 		"function_temp_region:1",
 	} {
 		if !strings.Contains(text, want) {
@@ -827,21 +623,8 @@ uses alloc, mem:
 
 	copied := findAllocation(t, plan, "local_copy", "copied")
 	want := StorageFunctionTempRegion
-	if copied.PlannedStorage != want || copied.ActualLoweringStorage != StorageHeap {
-		t.Fatalf(
-			"temporary copy planned/actual storage = %q/%q, want FunctionTempRegion/Heap fallback: %+v",
-			copied.PlannedStorage,
-			copied.ActualLoweringStorage,
-			copied,
-		)
-	}
-	if copied.RuntimePath != runtimeabi.AllocationPathHeap || copied.AllocatorClass != "" {
-		t.Fatalf(
-			("temporary copy heap fallback evidence = %+v, want heap runtime " +
-				"path without region allocator class"),
-			copied,
-		)
-	}
+	assertPlannedPending(t, copied, want)
+	assertRuntimePending(t, copied)
 }
 
 func TestPlannerLimitsFunctionTempRegionToOneAllocationPerFunction(t *testing.T) {
@@ -861,13 +644,8 @@ uses alloc, mem:
 
 	copiedA := findAllocation(t, plan, "local_copy", "copied_a")
 	copiedB := findAllocation(t, plan, "local_copy", "copied_b")
-	if copiedA.PlannedStorage != StorageFunctionTempRegion ||
-		copiedA.ActualLoweringStorage != StorageFunctionTempRegion {
-		t.Fatalf("first temporary copy = %+v, want FunctionTempRegion/FunctionTempRegion", copiedA)
-	}
-	if copiedB.PlannedStorage != StorageHeap || copiedB.ActualLoweringStorage != StorageHeap {
-		t.Fatalf("second temporary copy = %+v, want Heap/Heap conservative fallback", copiedB)
-	}
+	assertPlannedPending(t, copiedA, StorageFunctionTempRegion)
+	assertPlannedPending(t, copiedB, StorageHeap)
 }
 
 func TestPlannerDoesNotSelectDeadRegionForReturnedCopy(t *testing.T) {
@@ -920,14 +698,14 @@ func TestPlannerDoesNotUseFunctionTempRegionForActorSend(t *testing.T) {
 			Note:    "core.send actor boundary",
 		}},
 	}}}
-	plan, err := FromPLIRWithOptions(prog, Options{EnableRegionPlanning: true})
+	plan, err := buildPlanFromProgram(prog, Options{EnableRegionPlanning: true})
 	if err != nil {
-		t.Fatalf("FromPLIRWithOptions: %v", err)
+		t.Fatalf("buildPlanbuildPlanFromProgram: %v", err)
 	}
 	msg := findAllocation(t, plan, "send_msg", "msg")
 	if msg.PlannedStorage == StorageRegion || msg.PlannedStorage == StorageFunctionTempRegion ||
-		msg.Escape != EscapeActor {
-		t.Fatalf("actor send allocation = %+v, want non-region actor escape", msg)
+		msg.Escape != EscapeUnknown {
+		t.Fatalf("named actor call allocation = %+v, want non-region conservative escape", msg)
 	}
 	if msg.PlannedStorage != StorageHeap {
 		t.Fatalf(
@@ -962,21 +740,21 @@ func TestPlannerDoesNotUseFunctionTempRegionForUnknownCallRetainedCopy(t *testin
 			Note:   "unknown external call may retain argument",
 		}},
 	}}}
-	plan, err := FromPLIRWithOptions(
+	plan, err := buildPlanFromProgram(
 		prog,
 		Options{EnableRegionPlanning: true, EnableRegionLowering: true},
 	)
 	if err != nil {
-		t.Fatalf("FromPLIRWithOptions: %v", err)
+		t.Fatalf("buildPlanbuildPlanFromProgram: %v", err)
 	}
 	copied := findAllocation(t, plan, "unknown_retained_copy", "copied")
-	if copied.Escape != EscapeCallUnknown || copied.PlannedStorage != StorageHeap ||
-		copied.ActualLoweringStorage != StorageHeap {
+	if copied.Escape != EscapeUnknown || copied.PlannedStorage != StorageHeap {
 		t.Fatalf(
-			"unknown-call retained copy = %+v, want EscapesCallUnknown Heap/Heap fallback",
+			"unknown-call retained copy = %+v, want typed unknown Heap plan",
 			copied,
 		)
 	}
+	assertPlannedPending(t, copied, StorageHeap)
 }
 
 func TestPlannerStackLowersNonEscapingCopyOfFixedLocalView(t *testing.T) {
@@ -1027,21 +805,13 @@ uses alloc, mem:
 	if err != nil {
 		t.Fatalf("FromCheckedProgram: %v", err)
 	}
-	plan, err := FromPLIRWithOptions(plirProg, Options{EnableStackLowering: true})
+	plan, err := buildPlanFromProgram(plirProg, Options{EnableStackLowering: true})
 	if err != nil {
-		t.Fatalf("FromPLIRWithOptions: %v", err)
+		t.Fatalf("buildPlanbuildPlanFromProgram: %v", err)
 	}
 
 	copied := findAllocation(t, plan, "local_copy", "copied")
-	if copied.PlannedStorage != StorageEliminated ||
-		copied.ActualLoweringStorage != StorageEliminated {
-		t.Fatalf(
-			"local copied planned/actual storage = %q/%q, want Eliminated/Eliminated: %+v",
-			copied.PlannedStorage,
-			copied.ActualLoweringStorage,
-			copied,
-		)
-	}
+	assertPlannedPending(t, copied, StorageEliminated)
 	if copied.LengthStatus != LengthStatusNormal || copied.ByteSize != 2 {
 		t.Fatalf(
 			"local copied length/bytes = %q/%d, want normal bytes=2: %+v",
@@ -1050,54 +820,29 @@ uses alloc, mem:
 			copied,
 		)
 	}
-	if copied.LoweringStatus != "scalar_replacement" ||
-		!strings.Contains(copied.Reason, "scalar_replacement_copy_fixed_constant_indices") {
+	if !strings.Contains(copied.Reason, "scalar_replacement_copy_fixed_constant_indices") {
 		t.Fatalf(
-			"local copied lowering/reason = %q/%q, want scalar replacement copy evidence",
+			"local copied lowering/reason = %q/%q, want scalar replacement copy plan",
 			copied.LoweringStatus,
 			copied.Reason,
 		)
 	}
 	source := findAllocation(t, plan, "local_copy", "xs")
-	if source.PlannedStorage != StorageStack || source.ActualLoweringStorage != StorageStack {
-		t.Fatalf(
-			"local source planned/actual storage = %q/%q, want Stack/Stack:\n%s\nPLIR:\n%s",
-			source.PlannedStorage,
-			source.ActualLoweringStorage,
-			FormatText(plan),
-			plir.FormatText(plirProg),
-		)
-	}
+	assertPlannedPending(t, source, StorageStack)
 
 	ret := findAllocation(t, plan, "escaping_copy", "$return")
-	if ret.PlannedStorage != StorageHeap || ret.ActualLoweringStorage != StorageHeap {
-		t.Fatalf(
-			"escaping copy planned/actual storage = %q/%q, want Heap/Heap: %+v",
-			ret.PlannedStorage,
-			ret.ActualLoweringStorage,
-			ret,
-		)
-	}
+	assertPlannedPending(t, ret, StorageHeap)
 
 	for _, fnName := range []string{"dynamic_copy", "aliased_copy", "raw_exposed_copy"} {
 		copied := findAllocation(t, plan, fnName, "copied")
-		if copied.PlannedStorage == StorageEliminated ||
-			copied.ActualLoweringStorage == StorageEliminated {
+		if copied.PlannedStorage == StorageEliminated {
 			t.Fatalf(
 				"%s copied allocation was scalar-eliminated despite dynamic/alias/raw exposure: %+v",
 				fnName,
 				copied,
 			)
 		}
-		if copied.PlannedStorage != StorageStack || copied.ActualLoweringStorage != StorageStack {
-			t.Fatalf(
-				"%s copied planned/actual storage = %q/%q, want Stack/Stack fallback: %+v",
-				fnName,
-				copied.PlannedStorage,
-				copied.ActualLoweringStorage,
-				copied,
-			)
-		}
+		assertPlannedPending(t, copied, StorageStack)
 	}
 }
 
@@ -1120,38 +865,15 @@ uses alloc, islands, mem:
 	if err != nil {
 		t.Fatalf("FromCheckedProgram: %v", err)
 	}
-	plan, err := FromPLIRWithOptions(plirProg, Options{EnableStackLowering: true})
+	plan, err := buildPlanFromProgram(plirProg, Options{EnableStackLowering: true})
 	if err != nil {
-		t.Fatalf("FromPLIRWithOptions: %v", err)
+		t.Fatalf("buildPlanbuildPlanFromProgram: %v", err)
 	}
 
 	island := findAllocation(t, plan, "copy_from_island", "xs")
-	if island.PlannedStorage != StorageExplicitIsland ||
-		island.ActualLoweringStorage != StorageExplicitIsland {
-		t.Fatalf(
-			"island planned/actual storage = %q/%q, want ExplicitIsland/ExplicitIsland: %+v",
-			island.PlannedStorage,
-			island.ActualLoweringStorage,
-			island,
-		)
-	}
-	if island.ValidationStatus != "validated_explicit_island_scope" ||
-		island.LoweringStatus != "explicit_island_lowering" {
-		t.Fatalf(
-			"island validation/lowering status = %q/%q, want explicit island evidence",
-			island.ValidationStatus,
-			island.LoweringStatus,
-		)
-	}
+	assertPlannedPending(t, island, StorageExplicitIsland)
 	copied := findAllocation(t, plan, "copy_from_island", "$return")
-	if copied.PlannedStorage != StorageHeap || copied.ActualLoweringStorage != StorageHeap {
-		t.Fatalf(
-			"copy planned/actual storage = %q/%q, want Heap/Heap: %+v",
-			copied.PlannedStorage,
-			copied.ActualLoweringStorage,
-			copied,
-		)
-	}
+	assertPlannedPending(t, copied, StorageHeap)
 	if copied.Builtin != "core.slice_copy_u8" || copied.Escape != EscapeReturn {
 		t.Fatalf("copy allocation = %+v, want returned owned slice copy", copied)
 	}
@@ -1187,57 +909,32 @@ uses alloc, mem:
 	if err != nil {
 		t.Fatalf("FromCheckedProgram: %v", err)
 	}
-	plan, err := FromPLIRWithOptions(plirProg, Options{EnableStackLowering: true})
+	plan, err := buildPlanFromProgram(plirProg, Options{EnableStackLowering: true})
 	if err != nil {
-		t.Fatalf("FromPLIRWithOptions: %v", err)
+		t.Fatalf("buildPlanbuildPlanFromProgram: %v", err)
 	}
 
 	scalar := findAllocation(t, plan, "scalar", "xs")
-	if scalar.PlannedStorage != StorageEliminated ||
-		scalar.ActualLoweringStorage != StorageEliminated {
+	assertPlannedPending(t, scalar, StorageEliminated)
+	if !strings.Contains(scalar.Reason, "scalar_replacement_fixed_constant_indices") {
 		t.Fatalf(
-			"scalar planned/actual storage = %q/%q, want Eliminated/Eliminated: %+v",
-			scalar.PlannedStorage,
-			scalar.ActualLoweringStorage,
-			scalar,
-		)
-	}
-	if scalar.LoweringStatus != "scalar_replacement" ||
-		!strings.Contains(scalar.Reason, "scalar_replacement_fixed_constant_indices") {
-		t.Fatalf(
-			"scalar lowering/reason = %q/%q, want scalar replacement evidence",
+			"scalar lowering/reason = %q/%q, want scalar replacement plan",
 			scalar.LoweringStatus,
 			scalar.Reason,
 		)
 	}
 
 	dynamic := findAllocation(t, plan, "dynamic", "xs")
-	if dynamic.PlannedStorage == StorageEliminated ||
-		dynamic.ActualLoweringStorage == StorageEliminated {
+	if dynamic.PlannedStorage == StorageEliminated {
 		t.Fatalf("dynamic-index allocation was scalar-eliminated: %+v", dynamic)
 	}
-	if dynamic.PlannedStorage != StorageStack || dynamic.ActualLoweringStorage != StorageStack {
-		t.Fatalf(
-			"dynamic planned/actual storage = %q/%q, want Stack/Stack fallback:\n%s",
-			dynamic.PlannedStorage,
-			dynamic.ActualLoweringStorage,
-			FormatText(plan),
-		)
-	}
+	assertPlannedPending(t, dynamic, StorageStack)
 
 	printed := findAllocation(t, plan, "printed", "xs")
-	if printed.PlannedStorage == StorageEliminated ||
-		printed.ActualLoweringStorage == StorageEliminated {
+	if printed.PlannedStorage == StorageEliminated {
 		t.Fatalf("printed slice was scalar-eliminated despite observable slice use: %+v", printed)
 	}
-	if printed.PlannedStorage != StorageStack || printed.ActualLoweringStorage != StorageStack {
-		t.Fatalf(
-			"printed planned/actual storage = %q/%q, want Stack/Stack fallback:\n%s",
-			printed.PlannedStorage,
-			printed.ActualLoweringStorage,
-			FormatText(plan),
-		)
-	}
+	assertPlannedPending(t, printed, StorageStack)
 }
 
 func TestPlannerDoesNotTreatReadOnlyLookupCallAsEscapesCallUnknown(t *testing.T) {
@@ -1272,13 +969,6 @@ uses alloc, mem:
 			strings.Contains(alloc.Reason, "without interprocedural escape facts") {
 			t.Fatalf("%s allocation reason still reports unknown call escape: %q", id, alloc.Reason)
 		}
-		if !strings.Contains(alloc.Reason, "read-only local call summary") {
-			t.Fatalf(
-				"%s allocation reason = %q, want read-only local call summary evidence",
-				id,
-				alloc.Reason,
-			)
-		}
 	}
 }
 
@@ -1304,16 +994,7 @@ uses alloc, mem:
 	if buf.Storage != StorageStack {
 		t.Fatalf("buf storage = %q, want Stack: %+v", buf.Storage, buf)
 	}
-	if buf.ActualLoweringStorage != StorageStack {
-		t.Fatalf(
-			"buf actual lowering storage = %q, want Stack: %+v",
-			buf.ActualLoweringStorage,
-			buf,
-		)
-	}
-	if !strings.Contains(buf.Reason, "inout writer noescape summary") {
-		t.Fatalf("buf reason = %q, want local inout writer noescape summary evidence", buf.Reason)
-	}
+	assertPlannedPending(t, buf, StorageStack)
 	if contains(buf.ReasonCodes, HeapReasonUnknownCall) ||
 		contains(buf.HeapReasonCodes, HeapReasonUnknownCall) {
 		t.Fatalf(
@@ -1334,16 +1015,16 @@ func TestPlannerKeepsEscapingInoutWriterSummariesConservative(t *testing.T) {
 	}{
 		{
 			name:       "returns_slice",
-			wantEscape: EscapeCallUnknown,
-			wantReason: HeapReasonUnknownCall,
+			wantEscape: EscapeUnknown,
+			wantReason: HeapReasonDynamicLifetime,
 			ops: []plir.Operation{
 				{Kind: plir.OpReturn, Inputs: []string{"dst"}, Note: "returns inout slice"},
 			},
 		},
 		{
 			name:       "returns_alias",
-			wantEscape: EscapeCallUnknown,
-			wantReason: HeapReasonUnknownCall,
+			wantEscape: EscapeUnknown,
+			wantReason: HeapReasonDynamicLifetime,
 			ops: []plir.Operation{
 				{
 					Kind:    plir.OpAssign,
@@ -1356,8 +1037,8 @@ func TestPlannerKeepsEscapingInoutWriterSummariesConservative(t *testing.T) {
 		},
 		{
 			name:       "stores_global",
-			wantEscape: EscapeCallUnknown,
-			wantReason: HeapReasonUnknownCall,
+			wantEscape: EscapeUnknown,
+			wantReason: HeapReasonDynamicLifetime,
 			ops: []plir.Operation{
 				{
 					Kind:    plir.OpGlobalStore,
@@ -1369,8 +1050,8 @@ func TestPlannerKeepsEscapingInoutWriterSummariesConservative(t *testing.T) {
 		},
 		{
 			name:       "unknown_call",
-			wantEscape: EscapeCallUnknown,
-			wantReason: HeapReasonUnknownCall,
+			wantEscape: EscapeUnknown,
+			wantReason: HeapReasonDynamicLifetime,
 			ops: []plir.Operation{
 				{
 					Kind:   plir.OpCall,
@@ -1381,8 +1062,8 @@ func TestPlannerKeepsEscapingInoutWriterSummariesConservative(t *testing.T) {
 		},
 		{
 			name:       "unsafe_boundary",
-			wantEscape: EscapeCallUnknown,
-			wantReason: HeapReasonUnknownCall,
+			wantEscape: EscapeUnknown,
+			wantReason: HeapReasonDynamicLifetime,
 			ops: []plir.Operation{
 				{
 					Kind:        plir.OpUnsafe,
@@ -1394,8 +1075,8 @@ func TestPlannerKeepsEscapingInoutWriterSummariesConservative(t *testing.T) {
 		},
 		{
 			name:       "actor_send",
-			wantEscape: EscapeActor,
-			wantReason: HeapReasonActorBoundary,
+			wantEscape: EscapeUnknown,
+			wantReason: HeapReasonDynamicLifetime,
 			ops: []plir.Operation{
 				{
 					Kind:   plir.OpActorSend,
@@ -1422,19 +1103,19 @@ func TestPlannerKeepsEscapingInoutWriterSummariesConservative(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			callee := "writer_" + tc.name
 			caller := "caller_" + tc.name
-			plan, err := FromPLIRWithOptions(&plir.Program{Funcs: []plir.Function{
+			plan, err := buildPlanFromProgram(&plir.Program{Funcs: []plir.Function{
 				syntheticInoutWriterCallee(callee, tc.ops),
 				syntheticInoutWriterCaller(caller, callee),
 			}}, Options{EnableStackLowering: true})
 			if err != nil {
-				t.Fatalf("FromPLIRWithOptions: %v", err)
+				t.Fatalf("buildPlanbuildPlanFromProgram: %v", err)
 			}
 
 			buf := findAllocation(t, plan, caller, "buf")
-			if buf.Escape != tc.wantEscape || buf.Storage != StorageHeap ||
-				buf.ActualLoweringStorage != StorageHeap {
-				t.Fatalf("%s buf allocation = %+v, want %s/Heap/Heap", tc.name, buf, tc.wantEscape)
+			if buf.Escape != tc.wantEscape || buf.Storage != StorageHeap {
+				t.Fatalf("%s buf allocation = %+v, want %s/Heap plan", tc.name, buf, tc.wantEscape)
 			}
+			assertPlannedPending(t, buf, StorageHeap)
 			if strings.Contains(buf.Reason, "inout writer noescape summary") {
 				t.Fatalf("%s buf reason accepted unsafe writer summary: %q", tc.name, buf.Reason)
 			}
@@ -1452,7 +1133,7 @@ func TestPlannerKeepsEscapingInoutWriterSummariesConservative(t *testing.T) {
 }
 
 func TestPlannerClassifiesReadOnlyCallUnsafeAndIslandAllocations(t *testing.T) {
-	plan := allocationPlan(t, `
+	plan := allocationPlanWithOptions(t, `
 func consume(xs: []u8) -> Int
 uses mem:
     return xs.len
@@ -1479,20 +1160,16 @@ uses alloc, islands, mem:
 func main() -> Int
 uses alloc, islands, mem:
     return read_only_call() + unsafe_boundary() + islanded()
-`)
+`, Options{EnableStackLowering: true})
 
 	call := findAllocation(t, plan, "read_only_call", "xs")
-	if call.Escape != EscapeNoEscape || call.Storage != StorageStack ||
-		call.ActualLoweringStorage != StorageHeap {
+	if call.Escape != EscapeNoEscape || call.Storage != StorageStack {
 		t.Fatalf(
-			("read-only-call allocation = %+v, want NoEscape planned Stack " +
-				"with conservative actual Heap when stack lowering is disabled"),
+			"read-only-call allocation = %+v, want NoEscape planned Stack",
 			call,
 		)
 	}
-	if !strings.Contains(call.Reason, "read-only local call summary") {
-		t.Fatalf("read-only-call reason = %q, want summary evidence", call.Reason)
-	}
+	assertPlannedPending(t, call, StorageStack)
 	stackPlan := allocationPlanWithOptions(t, `
 func consume(xs: []u8) -> Int
 uses mem:
@@ -1508,20 +1185,13 @@ uses alloc, mem:
     return read_only_call()
 `, Options{EnableStackLowering: true})
 	stacked := findAllocation(t, stackPlan, "read_only_call", "xs")
-	if stacked.Escape != EscapeNoEscape || stacked.Storage != StorageStack ||
-		stacked.ActualLoweringStorage != StorageStack {
+	if stacked.Escape != EscapeNoEscape || stacked.Storage != StorageStack {
 		t.Fatalf(
-			"read-only-call stack lowering = %+v, want NoEscape Stack/Stack when stack lowering is enabled",
+			"read-only-call stack plan = %+v, want NoEscape Stack",
 			stacked,
 		)
 	}
-	if stacked.LoweringStatus != "stack_lowering" {
-		t.Fatalf(
-			"read-only-call lowering status = %q, want stack_lowering: %+v",
-			stacked.LoweringStatus,
-			stacked,
-		)
-	}
+	assertPlannedPending(t, stacked, StorageStack)
 	unsafeAlloc := findAllocation(t, plan, "unsafe_boundary", "xs")
 	if unsafeAlloc.Escape != EscapeUnsafe || unsafeAlloc.Storage != StorageHeap {
 		t.Fatalf("unsafe allocation = %+v, want EscapesUnsafe/Heap", unsafeAlloc)
@@ -1533,9 +1203,8 @@ uses alloc, mem:
 	dump := FormatText(plan)
 	for _, want := range []string{
 		"planned_storage: Stack",
-		"read-only local call summary",
 		"planned_storage: ExplicitIsland",
-		"actual_lowering_storage: ExplicitIsland",
+		"actual_lowering_storage: UnknownConservative",
 	} {
 		if !strings.Contains(dump, want) {
 			t.Fatalf("FormatText missing %q:\n%s", want, dump)
@@ -1595,13 +1264,7 @@ uses alloc, mem:
 		if alloc.Escape == EscapeNoEscape || alloc.Storage != StorageHeap {
 			t.Fatalf("%s allocation = %+v, want conservative heap fallback", tc.fn, alloc)
 		}
-		if !strings.Contains(alloc.Reason, "without interprocedural escape facts") {
-			t.Fatalf(
-				"%s reason = %q, want conservative interprocedural fallback evidence",
-				tc.fn,
-				alloc.Reason,
-			)
-		}
+		assertPlannedPending(t, alloc, StorageHeap)
 	}
 }
 
@@ -1679,18 +1342,19 @@ func TestPlannerKeepsLocalActorTaskCallSummariesConservative(t *testing.T) {
 					}},
 				},
 			}}
-			plan, err := FromPLIR(prog)
+			plan, err := buildPlanFromProgram(prog, Options{})
 			if err != nil {
-				t.Fatalf("FromPLIR: %v", err)
+				t.Fatalf("buildPlanbuildPlanFromProgram: %v", err)
 			}
 			alloc := findAllocation(t, plan, "caller_"+tc.name, "xs")
-			if alloc.Escape != EscapeCallUnknown || alloc.Storage != StorageHeap {
+			if alloc.Escape != EscapeUnknown || alloc.Storage != StorageHeap {
 				t.Fatalf(
-					"%s local boundary allocation = %+v, want EscapesCallUnknown/Heap",
+					"%s local boundary allocation = %+v, want conservative Unknown/Heap",
 					tc.name,
 					alloc,
 				)
 			}
+			assertPlannedPending(t, alloc, StorageHeap)
 		})
 	}
 }
@@ -1724,13 +1388,13 @@ uses alloc, mem:
 		t.Fatalf("global store allocation = %+v, want EscapesGlobal/Heap", global)
 	}
 	aggregate := findAllocation(t, plan, "local_box", "xs")
-	if aggregate.Escape != EscapeAggregate || aggregate.Storage != StorageHeap {
-		t.Fatalf("aggregate allocation = %+v, want EscapesAggregate/Heap", aggregate)
+	if aggregate.Escape != EscapeUnknown || aggregate.Storage != StorageHeap {
+		t.Fatalf("aggregate allocation = %+v, want conservative Unknown/Heap", aggregate)
 	}
 }
 
 func TestPlannerClassifiesSyntheticBoundaryEscapeKinds(t *testing.T) {
-	plan, err := FromPLIR(&plir.Program{Funcs: []plir.Function{
+	plan, err := buildPlanFromProgram(&plir.Program{Funcs: []plir.Function{
 		syntheticEscapeFunction(
 			"closure",
 			plir.Operation{
@@ -1756,22 +1420,22 @@ func TestPlannerClassifiesSyntheticBoundaryEscapeKinds(t *testing.T) {
 				Note:   "core.send_typed sends actor payload",
 			},
 		),
-	}})
+	}}, Options{})
 	if err != nil {
-		t.Fatalf("FromPLIR: %v", err)
+		t.Fatalf("buildPlanbuildPlanFromProgram: %v", err)
 	}
 
 	closure := findAllocation(t, plan, "closure", "xs")
-	if closure.Escape != EscapeClosure || closure.Storage != StorageHeap {
-		t.Fatalf("closure allocation = %+v, want EscapesClosure/Heap", closure)
+	if closure.Escape != EscapeUnknown || closure.Storage != StorageHeap {
+		t.Fatalf("closure allocation = %+v, want conservative Unknown/Heap", closure)
 	}
 	task := findAllocation(t, plan, "task", "xs")
 	if task.Escape != EscapeTask || task.Storage != StorageHeap {
 		t.Fatalf("task allocation = %+v, want EscapesTask/Heap", task)
 	}
 	actor := findAllocation(t, plan, "actor", "xs")
-	if actor.Escape != EscapeActor || actor.Storage != StorageHeap {
-		t.Fatalf("actor allocation = %+v, want EscapesActor/Heap", actor)
+	if actor.Escape != EscapeUnknown || actor.Storage != StorageHeap {
+		t.Fatalf("actor allocation = %+v, want conservative Unknown/Heap without typed actor op", actor)
 	}
 }
 
@@ -1966,27 +1630,21 @@ uses alloc, mem:
 	if err != nil {
 		t.Fatalf("FromCheckedProgram: %v", err)
 	}
-	plan, err := FromPLIRWithOptions(plirProg, Options{EnableStackLowering: true})
+	plan, err := buildPlanFromProgram(plirProg, Options{EnableStackLowering: true})
 	if err != nil {
-		t.Fatalf("FromPLIRWithOptions: %v", err)
+		t.Fatalf("buildPlanbuildPlanFromProgram: %v", err)
 	}
 
 	unused := findAllocation(t, plan, "unused_copy", "unused")
-	if unused.Escape != EscapeNoEscape || unused.Storage != StorageEliminated ||
-		unused.ActualLoweringStorage != StorageEliminated {
-		t.Fatalf("unused copy allocation = %+v, want NoEscape/Eliminated actual Eliminated", unused)
+	if unused.Escape != EscapeNoEscape {
+		t.Fatalf("unused copy escape = %+v, want NoEscape", unused)
 	}
-	if unused.LoweringStatus != "eliminated_unused_copy" {
-		t.Fatalf(
-			"unused copy lowering status = %q, want eliminated_unused_copy",
-			unused.LoweringStatus,
-		)
-	}
+	assertPlannedPending(t, unused, StorageEliminated)
 	if !strings.Contains(unused.Reason, "copy result is unused") {
 		t.Fatalf("unused copy reason = %q", unused.Reason)
 	}
 	used := findAllocation(t, plan, "used_copy", "copied")
-	if used.Storage == StorageEliminated || used.ActualLoweringStorage == StorageEliminated {
+	if used.Storage == StorageEliminated {
 		t.Fatalf("used copy allocation = %+v, must not be eliminated", used)
 	}
 }
@@ -2005,4 +1663,41 @@ func findAllocation(t *testing.T, plan *Plan, fnName string, allocID string) All
 	}
 	t.Fatalf("missing allocation %s in function %s: %+v", allocID, fnName, plan)
 	return Allocation{}
+}
+
+func assertPlannedPending(t *testing.T, alloc Allocation, want StorageClass) {
+	t.Helper()
+	if alloc.Storage != want || alloc.PlannedStorage != want ||
+		alloc.ActualLoweringStorage != StorageUnknownConservative ||
+		alloc.LoweringStatus != "pending" {
+		t.Fatalf(
+			"allocation %s planned state = storage %q planned %q actual %q lowering %q, want %s/%s/%s/pending: %+v",
+			alloc.ID,
+			alloc.Storage,
+			alloc.PlannedStorage,
+			alloc.ActualLoweringStorage,
+			alloc.LoweringStatus,
+			want,
+			want,
+			StorageUnknownConservative,
+			alloc,
+		)
+	}
+}
+
+func assertRuntimePending(t *testing.T, alloc Allocation) {
+	t.Helper()
+	if got := RuntimePathForAllocation(alloc); got != runtimeabi.AllocationPathUnknown {
+		t.Fatalf("allocation %s runtime path = %q, want pending unknown: %+v", alloc.ID, got, alloc)
+	}
+	if alloc.MemoryBackend != nil {
+		t.Fatalf("allocation %s has memory backend evidence before lowering: %+v", alloc.ID, alloc)
+	}
+	if alloc.AllocatorClass != "" || alloc.AllocatorScope != "" ||
+		alloc.AllocatorReusePolicy != "" || alloc.AllocatorChunkBytes != 0 {
+		t.Fatalf("allocation %s has allocator evidence before lowering: %+v", alloc.ID, alloc)
+	}
+	if alloc.BytesCommitted != 0 || alloc.BytesReleased != 0 {
+		t.Fatalf("allocation %s has backend bytes before lowering: %+v", alloc.ID, alloc)
+	}
 }

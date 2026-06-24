@@ -5,7 +5,7 @@ active release profile has moved past this version; retagging this historical li
 would still require a fresh passing gate
 report in the same branch state.
 
-Canonical scope: `docs/spec/v0_3_scope.md`.
+Canonical scope: `docs/spec/flow/v0_3_scope.md`.
 Current truth before promotion: `docs/spec/current_supported_surface.md`.
 Artifact policy: `docs/release/artifact_policy.md`.
 Security review gate: `docs/checklists/security_review_gate.md`.
@@ -53,8 +53,7 @@ running package tests. `TETRA_SECURITY_REVIEW_SIGNOFF`,
 test behavior.
 
 The macOS and Windows runtime smoke reports are host-gated inputs, not
-Linux-produced cross-target build evidence. The release gate validates both host-gated reports
-before archiving either runtime evidence artifact; only after
+Linux-produced cross-target build evidence. The release gate validates both host-gated reports before archiving either runtime evidence artifact; only after
 both pass does it copy them into
 `<report-dir>/artifacts/macos-runtime-smoke.json` and
 `<report-dir>/artifacts/windows-runtime-smoke.json`. Release-state validation
@@ -74,9 +73,7 @@ To keep canonical artifact hashes cycle-safe, the final canonical
 `artifacts/security-review.md` and its detached attestation
 `artifacts/security-review.md.sha256`. The detached hash artifact must attest
 the final archived `artifacts/security-review.md` from the same run.
-During the pre-signoff release-state refresh, release-state records not-yet-archived signoff
-evidence as `deferred`; the final source of truth for signoff validity is
-`bash scripts/release/v0_3_0/security-review.sh --signoff <report-dir>/artifacts/security-review.md`
+During the pre-signoff release-state refresh, release-state records not-yet-archived signoff evidence as `deferred`; the final source of truth for signoff validity is `bash scripts/release/v0_3_0/security-review.sh --signoff <report-dir>/artifacts/security-review.md`
 after the gate has written `summary.json`, `artifact-hashes.json`, and
 `artifacts/release-state.json`.
 

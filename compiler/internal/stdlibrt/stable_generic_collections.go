@@ -294,7 +294,7 @@ func stableGenericCollectionsAllocationReportsRow() StableGenericCollectionsEvid
 			"allocation-plan reports already cover those slice constructors and their storage classes",
 			"stable generic collection helpers perform no internal allocation",
 		},
-		Evidence: ("compiler/internal/allocplan/plan.go::FromPLIRWithOptions; " +
+		Evidence: ("compiler/internal/memorypipeline/state.go::Build; compiler/internal/allocplan/build.go::Build; " +
 			"compiler/compiler_reports.go::allocationPlanReport; lib/core/data/" +
 			"collections.tetra"),
 		Boundary: ("report linkage only; this row does not add a new allocator, " +

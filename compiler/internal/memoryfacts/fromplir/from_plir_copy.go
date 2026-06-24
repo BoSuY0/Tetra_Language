@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	. "tetra_language/compiler/internal/memoryfacts"
 	"tetra_language/compiler/internal/plir"
 )
 

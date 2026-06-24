@@ -68,6 +68,8 @@ not convert artifacts into truth: reports are projections of compiler-owned fact
 
 Required quick gate command:
 
+`scripts/ci/test-all.sh --quick --keep-going`
+
 ```bash
 bash scripts/ci/test-all.sh \
   --quick \

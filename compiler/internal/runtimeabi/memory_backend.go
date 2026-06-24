@@ -2,12 +2,24 @@ package runtimeabi
 
 import (
 	"fmt"
+	"os"
+	"strconv"
+	"strings"
 
 	"tetra_language/compiler/internal/runtimeabi/smallheap"
 )
 
 const MemoryBackendContractSchemaV1 = "tetra.memory.backend-contract.v1"
 const MemoryBackendAllocationEvidenceSchemaV1 = "tetra.memory.backend-allocation.v1"
+
+const (
+	MemoryBackendReserveSymbol   = "__tetra_memory_reserve_v1"
+	MemoryBackendCommitSymbol    = "__tetra_memory_commit_v1"
+	MemoryBackendDecommitSymbol  = "__tetra_memory_decommit_v1"
+	MemoryBackendReleaseSymbol   = "__tetra_memory_release_v1"
+	MemoryBackendTrimSymbol      = "__tetra_memory_trim_v1"
+	MemoryBackendFootprintSymbol = "__tetra_memory_footprint_v1"
+)
 
 type MemoryBackendOperation string
 
@@ -121,6 +133,8 @@ type PerCoreSmallHeapCoreReport struct {
 
 type PerCoreSmallHeapAllocator struct {
 	allocator *smallheap.PerCoreSmallHeapAllocator
+	backend   *MemoryBackendRuntime
+	chunks    map[string]struct{}
 }
 
 func RuntimePerCoreSmallHeapABI(coreCount int) PerCoreSmallHeapABI {
@@ -132,7 +146,23 @@ func NewPerCoreSmallHeapAllocator(abi PerCoreSmallHeapABI) (*PerCoreSmallHeapAll
 	if err != nil {
 		return nil, err
 	}
-	return &PerCoreSmallHeapAllocator{allocator: allocator}, nil
+	ledger, err := NewMemoryDomainLedger(DefaultProcessMemoryDomain(0, 0))
+	if err != nil {
+		return nil, err
+	}
+	backend, err := NewMemoryBackendRuntime(MemoryBackendRuntimeOptions{
+		Target:   "linux-x64",
+		Ledger:   ledger,
+		DomainID: "domain:process",
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &PerCoreSmallHeapAllocator{
+		allocator: allocator,
+		backend:   backend,
+		chunks:    map[string]struct{}{},
+	}, nil
 }
 
 func (allocator *PerCoreSmallHeapAllocator) Alloc(
@@ -148,14 +178,26 @@ func (allocator *PerCoreSmallHeapAllocator) Alloc(
 	if err != nil {
 		return PerCoreSmallHeapHandle{}, err
 	}
-	return perCoreSmallHeapHandleFromLeaf(handle), nil
+	out := perCoreSmallHeapHandleFromLeaf(handle)
+	if err := allocator.recordSmallHeapAlloc(out); err != nil {
+		return PerCoreSmallHeapHandle{}, err
+	}
+	return out, nil
 }
 
 func (allocator *PerCoreSmallHeapAllocator) Free(handle PerCoreSmallHeapHandle) error {
 	if allocator == nil || allocator.allocator == nil {
 		return fmt.Errorf("per-core small heap allocator: allocator is nil")
 	}
-	return allocator.allocator.Free(perCoreSmallHeapHandleToLeaf(handle))
+	if err := allocator.allocator.Free(perCoreSmallHeapHandleToLeaf(handle)); err != nil {
+		return err
+	}
+	if allocator.backend != nil {
+		if err := allocator.backend.RecordAllocationFree(handle.Domain.DomainID, int64(handle.RequestedBytes)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (allocator *PerCoreSmallHeapAllocator) Report() PerCoreSmallHeapReport {
@@ -163,6 +205,39 @@ func (allocator *PerCoreSmallHeapAllocator) Report() PerCoreSmallHeapReport {
 		return PerCoreSmallHeapReport{RuntimePath: AllocationPathPerCoreSmallHeap}
 	}
 	return perCoreSmallHeapReportFromLeaf(allocator.allocator.Report())
+}
+
+func (allocator *PerCoreSmallHeapAllocator) LedgerSnapshot() []MemoryDomain {
+	if allocator == nil || allocator.backend == nil || allocator.backend.ledger == nil {
+		return nil
+	}
+	return allocator.backend.ledger.Snapshot()
+}
+
+func (allocator *PerCoreSmallHeapAllocator) MemoryBackendEvents() []MemoryBackendRuntimeEvent {
+	if allocator == nil || allocator.backend == nil {
+		return nil
+	}
+	return allocator.backend.Events()
+}
+
+func (allocator *PerCoreSmallHeapAllocator) recordSmallHeapAlloc(
+	handle PerCoreSmallHeapHandle,
+) error {
+	if allocator == nil || allocator.backend == nil {
+		return nil
+	}
+	chunkKey := fmt.Sprintf("%d:%d", handle.CoreID, handle.ChunkID)
+	if _, seen := allocator.chunks[chunkKey]; !seen {
+		if err := allocator.backend.Reserve(handle.Domain.DomainID, int64(SmallHeapChunkBytes)); err != nil {
+			return err
+		}
+		if err := allocator.backend.Commit(handle.Domain.DomainID, int64(SmallHeapChunkBytes)); err != nil {
+			return err
+		}
+		allocator.chunks[chunkKey] = struct{}{}
+	}
+	return allocator.backend.RecordAllocation(handle.Domain.DomainID, int64(handle.RequestedBytes))
 }
 
 func perCoreSmallHeapABIToLeaf(abi PerCoreSmallHeapABI) smallheap.PerCoreSmallHeapABI {
@@ -267,55 +342,69 @@ func perCoreSmallHeapReportFromLeaf(
 
 func smallHeapDomainToLeaf(domain MemoryDomain) smallheap.MemoryDomain {
 	return smallheap.MemoryDomain{
-		DomainID:       domain.DomainID,
-		ParentDomainID: domain.ParentDomainID,
-		Kind:           smallheap.MemoryDomainKind(domain.Kind),
-		OwnerKind:      domain.OwnerKind,
-		OwnerID:        domain.OwnerID,
-		Lifetime:       domain.Lifetime,
-		BudgetBytes:    domain.BudgetBytes,
-		RequestedBytes: domain.RequestedBytes,
-		ReservedBytes:  domain.ReservedBytes,
-		CommittedBytes: domain.CommittedBytes,
-		ReleasedBytes:  domain.ReleasedBytes,
-		CurrentBytes:   domain.CurrentBytes,
-		PeakBytes:      domain.PeakBytes,
-		CopyCount:      domain.CopyCount,
-		BytesCopied:    domain.BytesCopied,
+		DomainID:         domain.DomainID,
+		ParentDomainID:   domain.ParentDomainID,
+		Kind:             smallheap.MemoryDomainKind(domain.Kind),
+		OwnerKind:        domain.OwnerKind,
+		OwnerID:          domain.OwnerID,
+		Lifetime:         domain.Lifetime,
+		BudgetBytes:      domain.BudgetBytes,
+		RequestedBytes:   domain.RequestedBytes,
+		ReservedBytes:    domain.ReservedBytes,
+		CommittedBytes:   domain.CommittedBytes,
+		ReleasedBytes:    domain.ReleasedBytes,
+		State:            smallheap.MemoryDomainState(domain.State),
+		Epoch:            domain.Epoch,
+		DecommittedBytes: domain.DecommittedBytes,
+		CurrentBytes:     domain.CurrentBytes,
+		PeakBytes:        domain.PeakBytes,
+		CopyCount:        domain.CopyCount,
+		BytesCopied:      domain.BytesCopied,
 	}
 }
 
 func smallHeapDomainFromLeaf(domain smallheap.MemoryDomain) MemoryDomain {
 	return MemoryDomain{
-		DomainID:       domain.DomainID,
-		ParentDomainID: domain.ParentDomainID,
-		Kind:           MemoryDomainKind(domain.Kind),
-		OwnerKind:      domain.OwnerKind,
-		OwnerID:        domain.OwnerID,
-		Lifetime:       domain.Lifetime,
-		BudgetBytes:    domain.BudgetBytes,
-		RequestedBytes: domain.RequestedBytes,
-		ReservedBytes:  domain.ReservedBytes,
-		CommittedBytes: domain.CommittedBytes,
-		ReleasedBytes:  domain.ReleasedBytes,
-		CurrentBytes:   domain.CurrentBytes,
-		PeakBytes:      domain.PeakBytes,
-		CopyCount:      domain.CopyCount,
-		BytesCopied:    domain.BytesCopied,
+		DomainID:         domain.DomainID,
+		ParentDomainID:   domain.ParentDomainID,
+		Kind:             MemoryDomainKind(domain.Kind),
+		OwnerKind:        domain.OwnerKind,
+		OwnerID:          domain.OwnerID,
+		Lifetime:         domain.Lifetime,
+		BudgetBytes:      domain.BudgetBytes,
+		RequestedBytes:   domain.RequestedBytes,
+		ReservedBytes:    domain.ReservedBytes,
+		CommittedBytes:   domain.CommittedBytes,
+		ReleasedBytes:    domain.ReleasedBytes,
+		State:            MemoryDomainState(domain.State),
+		Epoch:            domain.Epoch,
+		DecommittedBytes: domain.DecommittedBytes,
+		CurrentBytes:     domain.CurrentBytes,
+		PeakBytes:        domain.PeakBytes,
+		CopyCount:        domain.CopyCount,
+		BytesCopied:      domain.BytesCopied,
 	}
 }
 
 type MemoryBackendContract struct {
-	Schema                 string                       `json:"schema"`
-	Target                 string                       `json:"target"`
-	Operations             []MemoryBackendOperation     `json:"operations"`
-	MinAlignmentBytes      int                          `json:"min_alignment_bytes"`
-	ReserveGranularity     int                          `json:"reserve_granularity_bytes"`
-	CommitGranularity      int                          `json:"commit_granularity_bytes"`
-	FootprintEvidenceClass MemoryFootprintEvidenceClass `json:"footprint_evidence_class"`
-	FootprintMethod        string                       `json:"footprint_method"`
-	UnsupportedReason      string                       `json:"unsupported_reason,omitempty"`
-	NonClaims              []string                     `json:"non_claims,omitempty"`
+	Schema                 string                          `json:"schema"`
+	Target                 string                          `json:"target"`
+	Operations             []MemoryBackendOperation        `json:"operations"`
+	OperationSupport       []MemoryBackendOperationSupport `json:"operation_support"`
+	MinAlignmentBytes      int                             `json:"min_alignment_bytes"`
+	ReserveGranularity     int                             `json:"reserve_granularity_bytes"`
+	CommitGranularity      int                             `json:"commit_granularity_bytes"`
+	FootprintEvidenceClass MemoryFootprintEvidenceClass    `json:"footprint_evidence_class"`
+	FootprintMethod        string                          `json:"footprint_method"`
+	UnsupportedReason      string                          `json:"unsupported_reason,omitempty"`
+	NonClaims              []string                        `json:"non_claims,omitempty"`
+}
+
+type MemoryBackendOperationSupport struct {
+	Operation         MemoryBackendOperation `json:"operation"`
+	Supported         bool                   `json:"supported"`
+	Method            string                 `json:"method,omitempty"`
+	UnsupportedReason string                 `json:"unsupported_reason,omitempty"`
 }
 
 type MemoryBackendAllocationEvidence struct {
@@ -346,11 +435,38 @@ type MemoryFootprintSample struct {
 	BlockedReason     string                       `json:"blocked_reason,omitempty"`
 }
 
+type MemoryBackendRuntimeEvent struct {
+	Target    string                 `json:"target"`
+	Operation MemoryBackendOperation `json:"operation"`
+	DomainID  string                 `json:"domain_id"`
+	Bytes     int64                  `json:"bytes,omitempty"`
+	Method    string                 `json:"method"`
+}
+
+type MemoryBackendTelemetryHook func(MemoryBackendRuntimeEvent) error
+
+type MemoryBackendRuntimeOptions struct {
+	Target   string
+	Ledger   *MemoryDomainLedger
+	DomainID string
+	Hook     MemoryBackendTelemetryHook
+}
+
+type MemoryBackendRuntime struct {
+	contract MemoryBackendContract
+	ledger   *MemoryDomainLedger
+	domainID string
+	hook     MemoryBackendTelemetryHook
+	events   []MemoryBackendRuntimeEvent
+}
+
 func RuntimeMemoryBackendContract(target string) MemoryBackendContract {
+	support := MemoryBackendSupportMatrix(target)
 	contract := MemoryBackendContract{
 		Schema:             MemoryBackendContractSchemaV1,
 		Target:             target,
-		Operations:         RequiredMemoryBackendOperations(),
+		Operations:         supportedMemoryBackendOperations(support),
+		OperationSupport:   support,
 		MinAlignmentBytes:  SmallHeapAlignment,
 		ReserveGranularity: 4096,
 		CommitGranularity:  4096,
@@ -363,10 +479,10 @@ func RuntimeMemoryBackendContract(target string) MemoryBackendContract {
 	switch target {
 	case "linux-x64":
 		contract.FootprintEvidenceClass = MemoryFootprintMeasured
-		contract.FootprintMethod = "linux_proc_status"
+		contract.FootprintMethod = "linux_proc_self_status_vmrss_vmhwm"
 	case "wasm32-wasi", "wasm32-web":
 		contract.FootprintEvidenceClass = MemoryFootprintUnsupported
-		contract.FootprintMethod = "linear_memory_adapter"
+		contract.FootprintMethod = "unsupported_host_footprint"
 		contract.UnsupportedReason = ("host RSS is unavailable for the current linear memory " +
 			"target boundary")
 	default:
@@ -376,6 +492,52 @@ func RuntimeMemoryBackendContract(target string) MemoryBackendContract {
 			"current memory backend contract")
 	}
 	return contract
+}
+
+func MemoryBackendSupportMatrix(target string) []MemoryBackendOperationSupport {
+	switch target {
+	case "linux-x64":
+		return []MemoryBackendOperationSupport{
+			{Operation: MemoryBackendReserve, Supported: true, Method: "linux_mmap_private_anonymous_prot_none"},
+			{Operation: MemoryBackendCommit, Supported: true, Method: "linux_mprotect_read_write"},
+			{Operation: MemoryBackendDecommit, Supported: true, Method: "linux_madvise_dontneed_mprotect_none"},
+			{Operation: MemoryBackendRelease, Supported: true, Method: "linux_munmap"},
+			{Operation: MemoryBackendTrim, Supported: true, Method: "linux_allocator_trim_v1"},
+			{Operation: MemoryBackendFootprint, Supported: true, Method: "linux_proc_self_status_vmrss_vmhwm"},
+		}
+	case "wasm32-wasi", "wasm32-web":
+		reason := "linear memory supports growth but not host reservation release or RSS"
+		return []MemoryBackendOperationSupport{
+			{Operation: MemoryBackendReserve, Supported: true, Method: "wasm_memory_grow_combined_reserve_commit"},
+			{Operation: MemoryBackendCommit, Supported: true, Method: "wasm_memory_grow_combined_reserve_commit"},
+			{Operation: MemoryBackendDecommit, UnsupportedReason: reason},
+			{Operation: MemoryBackendRelease, UnsupportedReason: reason},
+			{Operation: MemoryBackendTrim, UnsupportedReason: reason},
+			{Operation: MemoryBackendFootprint, UnsupportedReason: "host RSS is unavailable across the WASM boundary"},
+		}
+	default:
+		reason := "target memory backend adapter is not implemented"
+		return []MemoryBackendOperationSupport{
+			{Operation: MemoryBackendReserve, UnsupportedReason: reason},
+			{Operation: MemoryBackendCommit, UnsupportedReason: reason},
+			{Operation: MemoryBackendDecommit, UnsupportedReason: reason},
+			{Operation: MemoryBackendRelease, UnsupportedReason: reason},
+			{Operation: MemoryBackendTrim, UnsupportedReason: reason},
+			{Operation: MemoryBackendFootprint, UnsupportedReason: reason},
+		}
+	}
+}
+
+func supportedMemoryBackendOperations(
+	support []MemoryBackendOperationSupport,
+) []MemoryBackendOperation {
+	ops := make([]MemoryBackendOperation, 0, len(support))
+	for _, row := range support {
+		if row.Supported {
+			ops = append(ops, row.Operation)
+		}
+	}
+	return ops
 }
 
 func RequiredMemoryBackendOperations() []MemoryBackendOperation {
@@ -389,13 +551,39 @@ func RequiredMemoryBackendOperations() []MemoryBackendOperation {
 	}
 }
 
+func RequiredMemoryBackendSymbols() []string {
+	return []string{
+		MemoryBackendReserveSymbol,
+		MemoryBackendCommitSymbol,
+		MemoryBackendDecommitSymbol,
+		MemoryBackendReleaseSymbol,
+		MemoryBackendTrimSymbol,
+		MemoryBackendFootprintSymbol,
+	}
+}
+
 func (contract MemoryBackendContract) SupportsOperation(op MemoryBackendOperation) bool {
+	row, ok := contract.OperationSupportFor(op)
+	if ok {
+		return row.Supported
+	}
 	for _, candidate := range contract.Operations {
 		if candidate == op {
 			return true
 		}
 	}
 	return false
+}
+
+func (contract MemoryBackendContract) OperationSupportFor(
+	op MemoryBackendOperation,
+) (MemoryBackendOperationSupport, bool) {
+	for _, row := range contract.OperationSupport {
+		if row.Operation == op {
+			return row, true
+		}
+	}
+	return MemoryBackendOperationSupport{}, false
 }
 
 func ValidateMemoryBackendContract(contract MemoryBackendContract) error {
@@ -421,14 +609,8 @@ func ValidateMemoryBackendContract(contract MemoryBackendContract) error {
 			contract.Target,
 		)
 	}
-	for _, op := range RequiredMemoryBackendOperations() {
-		if !contract.SupportsOperation(op) {
-			return fmt.Errorf(
-				"memory backend contract %s: missing operation %s",
-				contract.Target,
-				op,
-			)
-		}
+	if err := validateMemoryBackendSupportRows(contract); err != nil {
+		return err
 	}
 	sample := MemoryFootprintSample{
 		Target:            contract.Target,
@@ -445,6 +627,330 @@ func ValidateMemoryBackendContract(contract MemoryBackendContract) error {
 		return fmt.Errorf("memory backend contract %s: footprint policy: %w", contract.Target, err)
 	}
 	return nil
+}
+
+func validateMemoryBackendSupportRows(contract MemoryBackendContract) error {
+	if len(contract.OperationSupport) != len(RequiredMemoryBackendOperations()) {
+		return fmt.Errorf(
+			"memory backend contract %s: operation support rows = %d, want %d",
+			contract.Target,
+			len(contract.OperationSupport),
+			len(RequiredMemoryBackendOperations()),
+		)
+	}
+	seen := map[MemoryBackendOperation]MemoryBackendOperationSupport{}
+	for _, row := range contract.OperationSupport {
+		if !isKnownMemoryBackendOperation(row.Operation) {
+			return fmt.Errorf(
+				"memory backend contract %s: unknown operation %q",
+				contract.Target,
+				row.Operation,
+			)
+		}
+		if _, exists := seen[row.Operation]; exists {
+			return fmt.Errorf(
+				"memory backend contract %s: duplicate operation support row %s",
+				contract.Target,
+				row.Operation,
+			)
+		}
+		if row.Supported {
+			if strings.TrimSpace(row.Method) == "" {
+				return fmt.Errorf(
+					"memory backend contract %s: supported operation %s requires method",
+					contract.Target,
+					row.Operation,
+				)
+			}
+			if strings.TrimSpace(row.UnsupportedReason) != "" {
+				return fmt.Errorf(
+					"memory backend contract %s: supported operation %s must not include unsupported_reason",
+					contract.Target,
+					row.Operation,
+				)
+			}
+		} else if strings.TrimSpace(row.UnsupportedReason) == "" {
+			return fmt.Errorf(
+				"memory backend contract %s: unsupported operation %s requires unsupported_reason",
+				contract.Target,
+				row.Operation,
+			)
+		}
+		seen[row.Operation] = row
+	}
+	for _, op := range RequiredMemoryBackendOperations() {
+		row, ok := seen[op]
+		if !ok {
+			return fmt.Errorf(
+				"memory backend contract %s: missing operation support row %s",
+				contract.Target,
+				op,
+			)
+		}
+		if contract.Target == "linux-x64" && !row.Supported {
+			return fmt.Errorf(
+				"memory backend contract %s: linux-x64 operation %s must be supported",
+				contract.Target,
+				op,
+			)
+		}
+	}
+	if len(contract.Operations) != len(supportedMemoryBackendOperations(contract.OperationSupport)) {
+		return fmt.Errorf(
+			"memory backend contract %s: operations must mirror supported rows",
+			contract.Target,
+		)
+	}
+	for _, op := range contract.Operations {
+		row, ok := seen[op]
+		if !ok || !row.Supported {
+			return fmt.Errorf(
+				"memory backend contract %s: operation %s is not a supported row",
+				contract.Target,
+				op,
+			)
+		}
+	}
+	return nil
+}
+
+func NewMemoryBackendRuntime(options MemoryBackendRuntimeOptions) (*MemoryBackendRuntime, error) {
+	target := strings.TrimSpace(options.Target)
+	if target == "" {
+		target = "linux-x64"
+	}
+	domainID := strings.TrimSpace(options.DomainID)
+	if domainID == "" {
+		domainID = "domain:process"
+	}
+	contract := RuntimeMemoryBackendContract(target)
+	if err := ValidateMemoryBackendContract(contract); err != nil {
+		return nil, err
+	}
+	return &MemoryBackendRuntime{
+		contract: contract,
+		ledger:   options.Ledger,
+		domainID: domainID,
+		hook:     options.Hook,
+	}, nil
+}
+
+func (backend *MemoryBackendRuntime) Contract() MemoryBackendContract {
+	if backend == nil {
+		return MemoryBackendContract{}
+	}
+	return backend.contract
+}
+
+func (backend *MemoryBackendRuntime) Events() []MemoryBackendRuntimeEvent {
+	if backend == nil {
+		return nil
+	}
+	out := make([]MemoryBackendRuntimeEvent, len(backend.events))
+	copy(out, backend.events)
+	return out
+}
+
+func (backend *MemoryBackendRuntime) Reserve(domainID string, bytes int64) error {
+	return backend.applyBackendOperation(MemoryBackendReserve, domainID, bytes, DomainEventReserve)
+}
+
+func (backend *MemoryBackendRuntime) Commit(domainID string, bytes int64) error {
+	return backend.applyBackendOperation(MemoryBackendCommit, domainID, bytes, DomainEventCommit)
+}
+
+func (backend *MemoryBackendRuntime) Decommit(domainID string, bytes int64) error {
+	return backend.applyBackendOperation(MemoryBackendDecommit, domainID, bytes, DomainEventDecommit)
+}
+
+func (backend *MemoryBackendRuntime) Release(domainID string, bytes int64) error {
+	return backend.applyBackendOperation(MemoryBackendRelease, domainID, bytes, DomainEventRelease)
+}
+
+func (backend *MemoryBackendRuntime) Trim(domainID string, bytes int64) error {
+	return backend.applyBackendOperation(MemoryBackendTrim, domainID, bytes, DomainEventTrim)
+}
+
+func (backend *MemoryBackendRuntime) RecordAllocation(domainID string, bytes int64) error {
+	if backend == nil || backend.ledger == nil {
+		return nil
+	}
+	id := backend.resolveDomainID(domainID)
+	if err := backend.ledger.Apply(MemoryDomainEvent{
+		Kind:     DomainEventRequest,
+		DomainID: id,
+		Bytes:    bytes,
+	}); err != nil {
+		return err
+	}
+	return backend.ledger.Apply(MemoryDomainEvent{
+		Kind:     DomainEventAllocate,
+		DomainID: id,
+		Bytes:    bytes,
+	})
+}
+
+func (backend *MemoryBackendRuntime) RecordAllocationFree(domainID string, bytes int64) error {
+	if backend == nil || backend.ledger == nil {
+		return nil
+	}
+	return backend.ledger.Apply(MemoryDomainEvent{
+		Kind:     DomainEventFree,
+		DomainID: backend.resolveDomainID(domainID),
+		Bytes:    bytes,
+	})
+}
+
+func (backend *MemoryBackendRuntime) applyBackendOperation(
+	op MemoryBackendOperation,
+	domainID string,
+	bytes int64,
+	ledgerEvent MemoryDomainEventKind,
+) error {
+	if backend == nil {
+		return fmt.Errorf("memory backend runtime: backend is nil")
+	}
+	if bytes <= 0 {
+		return fmt.Errorf("memory backend runtime %s: bytes must be positive", op)
+	}
+	row, ok := backend.contract.OperationSupportFor(op)
+	if !ok {
+		return fmt.Errorf("memory backend runtime %s: support row missing", op)
+	}
+	if !row.Supported {
+		return fmt.Errorf(
+			"memory backend runtime %s: unsupported: %s",
+			op,
+			row.UnsupportedReason,
+		)
+	}
+	id := backend.resolveDomainID(domainID)
+	event := MemoryBackendRuntimeEvent{
+		Target:    backend.contract.Target,
+		Operation: op,
+		DomainID:  id,
+		Bytes:     bytes,
+		Method:    row.Method,
+	}
+	if backend.hook != nil {
+		if err := backend.hook(event); err != nil {
+			return err
+		}
+	}
+	backend.events = append(backend.events, event)
+	if backend.ledger == nil {
+		return nil
+	}
+	return backend.ledger.Apply(MemoryDomainEvent{
+		Kind:     ledgerEvent,
+		DomainID: id,
+		Bytes:    bytes,
+	})
+}
+
+func (backend *MemoryBackendRuntime) resolveDomainID(domainID string) string {
+	if strings.TrimSpace(domainID) != "" {
+		return domainID
+	}
+	if backend == nil || backend.domainID == "" {
+		return "domain:process"
+	}
+	return backend.domainID
+}
+
+func MeasureMemoryFootprint(target string) MemoryFootprintSample {
+	contract := RuntimeMemoryBackendContract(target)
+	switch target {
+	case "linux-x64":
+		current, peak, err := readLinuxProcSelfStatusFootprint()
+		if err != nil {
+			return MemoryFootprintSample{
+				Target:        target,
+				EvidenceClass: MemoryFootprintBlocked,
+				Method:        contract.FootprintMethod,
+				BlockedReason: err.Error(),
+			}
+		}
+		return MemoryFootprintSample{
+			Target:        target,
+			EvidenceClass: MemoryFootprintMeasured,
+			Method:        contract.FootprintMethod,
+			CurrentBytes:  current,
+			PeakBytes:     peak,
+		}
+	case "wasm32-wasi", "wasm32-web":
+		return MemoryFootprintSample{
+			Target:            target,
+			EvidenceClass:     MemoryFootprintUnsupported,
+			Method:            contract.FootprintMethod,
+			UnsupportedReason: contract.UnsupportedReason,
+		}
+	default:
+		return MemoryFootprintSample{
+			Target:            target,
+			EvidenceClass:     MemoryFootprintUnsupported,
+			Method:            contract.FootprintMethod,
+			UnsupportedReason: contract.UnsupportedReason,
+		}
+	}
+}
+
+func readLinuxProcSelfStatusFootprint() (int64, int64, error) {
+	data, err := os.ReadFile("/proc/self/status")
+	if err != nil {
+		return 0, 0, fmt.Errorf("linux footprint: read /proc/self/status: %w", err)
+	}
+	current, peak, err := parseLinuxProcStatusFootprint(string(data))
+	if err != nil {
+		return 0, 0, err
+	}
+	if current <= 0 || peak <= 0 {
+		return 0, 0, fmt.Errorf("linux footprint: VmRSS/VmHWM must be positive")
+	}
+	if peak < current {
+		return 0, 0, fmt.Errorf("linux footprint: VmHWM is below VmRSS")
+	}
+	return current, peak, nil
+}
+
+func parseLinuxProcStatusFootprint(status string) (int64, int64, error) {
+	var current int64
+	var peak int64
+	for _, line := range strings.Split(status, "\n") {
+		switch {
+		case strings.HasPrefix(line, "VmRSS:"):
+			bytes, err := parseProcStatusKiBLine(line)
+			if err != nil {
+				return 0, 0, fmt.Errorf("linux footprint: VmRSS: %w", err)
+			}
+			current = bytes
+		case strings.HasPrefix(line, "VmHWM:"):
+			bytes, err := parseProcStatusKiBLine(line)
+			if err != nil {
+				return 0, 0, fmt.Errorf("linux footprint: VmHWM: %w", err)
+			}
+			peak = bytes
+		}
+	}
+	if current == 0 || peak == 0 {
+		return 0, 0, fmt.Errorf("linux footprint: missing VmRSS or VmHWM in /proc/self/status")
+	}
+	return current, peak, nil
+}
+
+func parseProcStatusKiBLine(line string) (int64, error) {
+	fields := strings.Fields(line)
+	if len(fields) < 3 || fields[2] != "kB" {
+		return 0, fmt.Errorf("expected '<field>: <value> kB', got %q", line)
+	}
+	kib, err := strconv.ParseInt(fields[1], 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	if kib <= 0 {
+		return 0, fmt.Errorf("kilobytes must be positive")
+	}
+	return kib * 1024, nil
 }
 
 func ValidateMemoryBackendAllocationEvidence(evidence MemoryBackendAllocationEvidence) error {

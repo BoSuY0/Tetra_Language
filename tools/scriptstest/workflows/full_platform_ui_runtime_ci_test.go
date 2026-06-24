@@ -86,6 +86,24 @@ func TestFullPlatformUIRuntimeWorkflowFetchesHistoryForDocVerification(t *testin
 	}
 }
 
+func TestFullPlatformUIRuntimeWorkflowEnablesWindowsLongPathsBeforeCheckout(t *testing.T) {
+	path := filepath.Join(repoRoot(t), ".github", "workflows", "full-platform-ui-runtime.yml")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read full-platform UI runtime workflow: %v", err)
+	}
+	targetHostSection := workflowJobSection(string(raw), "target-host-ui-runtime:")
+	assertOrderedFragments(
+		t,
+		targetHostSection,
+		"Enable Git long paths on Windows",
+		"if: runner.os == 'Windows'",
+		"shell: pwsh",
+		"git config --global core.longpaths true",
+		"uses: actions/checkout@v4",
+	)
+}
+
 func TestFullPlatformUIRuntimeWorkflowAggregatesTargetHostReports(t *testing.T) {
 	path := filepath.Join(repoRoot(t), ".github", "workflows", "full-platform-ui-runtime.yml")
 	raw, err := os.ReadFile(path)
@@ -116,6 +134,86 @@ func TestFullPlatformUIRuntimeWorkflowAggregatesTargetHostReports(t *testing.T) 
 		if !strings.Contains(text, want) {
 			t.Fatalf("full-platform UI runtime workflow missing aggregation detail %q", want)
 		}
+	}
+}
+
+func TestMainCIWorkflowEnablesWindowsLongPathsBeforeFullPlatformCheckout(t *testing.T) {
+	path := filepath.Join(repoRoot(t), ".github", "workflows", "ci.yml")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read CI workflow: %v", err)
+	}
+	targetHostSection := workflowJobSection(string(raw), "full-platform-ui-runtime-target-host:")
+	assertOrderedFragments(
+		t,
+		targetHostSection,
+		"Enable Git long paths on Windows",
+		"if: runner.os == 'Windows'",
+		"shell: pwsh",
+		"git config --global core.longpaths true",
+		"uses: actions/checkout@v4",
+	)
+}
+
+func TestFullPlatformUIRuntimeWorkflowsRunWindowsThreadAffinityRegression(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		path string
+		job  string
+	}{
+		{
+			name: "standalone",
+			path: filepath.Join(repoRoot(t), ".github", "workflows", "full-platform-ui-runtime.yml"),
+			job:  "target-host-ui-runtime:",
+		},
+		{
+			name: "mirrored-ci",
+			path: filepath.Join(repoRoot(t), ".github", "workflows", "ci.yml"),
+			job:  "full-platform-ui-runtime-target-host:",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw, err := os.ReadFile(tc.path)
+			if err != nil {
+				t.Fatalf("read workflow: %v", err)
+			}
+			section := workflowJobSection(string(raw), tc.job)
+			for _, want := range []string{
+				"timeout-minutes: 45",
+				"Windows UI OS-thread affinity regression",
+				"if: runner.os == 'Windows'",
+				"go test -buildvcs=false \\",
+				"./tools/cmd/platform-ui-runtime-smoke \\",
+				"-run '^TestWindowsPlatformProbeCompletesUnderSchedulerPressure$' \\",
+				"-count=20 \\",
+				"-timeout=10m",
+			} {
+				if !strings.Contains(section, want) {
+					t.Fatalf("%s workflow missing Windows thread-affinity detail %q", tc.name, want)
+				}
+			}
+			assertOrderedFragments(
+				t,
+				section,
+				"uses: actions/setup-go@v5",
+				"Windows UI OS-thread affinity regression",
+				"Target-host UI runtime smoke",
+			)
+			regressionIndex := strings.Index(section, "Windows UI OS-thread affinity regression")
+			if regressionIndex < 0 {
+				t.Fatalf("%s workflow missing Windows thread-affinity step", tc.name)
+			}
+			regressionSection := section[regressionIndex:]
+			assertOrderedFragments(
+				t,
+				regressionSection,
+				"if: runner.os == 'Windows'",
+				"-run '^TestWindowsPlatformProbeCompletesUnderSchedulerPressure$'",
+				"-count=20",
+				"-timeout=10m",
+				"Target-host UI runtime smoke",
+			)
+		})
 	}
 }
 

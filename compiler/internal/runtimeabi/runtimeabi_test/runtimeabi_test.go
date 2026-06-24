@@ -116,6 +116,18 @@ func TestRequiredRuntimeSymbolSets(t *testing.T) {
 				"__tetra_surface_request_redraw",
 			},
 		},
+		{
+			name: "memory_backend",
+			got:  RequiredMemoryBackendSymbols(),
+			want: []string{
+				"__tetra_memory_reserve_v1",
+				"__tetra_memory_commit_v1",
+				"__tetra_memory_decommit_v1",
+				"__tetra_memory_release_v1",
+				"__tetra_memory_trim_v1",
+				"__tetra_memory_footprint_v1",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -173,6 +185,12 @@ func TestSignatureForSymbol(t *testing.T) {
 		{name: "__tetra_surface_present_rgba", params: 6, rets: 1},
 		{name: "__tetra_surface_now_ms", params: 0, rets: 1},
 		{name: "__tetra_surface_request_redraw", params: 1, rets: 1},
+		{name: "__tetra_memory_reserve_v1", params: 1, rets: 1},
+		{name: "__tetra_memory_commit_v1", params: 2, rets: 1},
+		{name: "__tetra_memory_decommit_v1", params: 2, rets: 1},
+		{name: "__tetra_memory_release_v1", params: 2, rets: 1},
+		{name: "__tetra_memory_trim_v1", params: 0, rets: 1},
+		{name: "__tetra_memory_footprint_v1", params: 0, rets: 2},
 		{name: "__tetra_task_join_typed_4", params: 4, rets: 4},
 		{name: "__tetra_task_join_typed_5", params: 5, rets: 1},
 	}

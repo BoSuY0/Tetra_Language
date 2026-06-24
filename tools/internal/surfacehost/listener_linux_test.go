@@ -26,12 +26,7 @@ func TestListenAndServeUnixRecordsPeerPID(t *testing.T) {
 	go func() {
 		errCh <- ListenAndServeUnix(ctx, socketPath, reporting)
 	}()
-	waitForSocketFile(t, socketPath)
-
-	conn, err := net.DialUnix("unix", nil, &net.UnixAddr{Name: socketPath, Net: "unix"})
-	if err != nil {
-		t.Fatalf("dial Surface host socket: %v", err)
-	}
+	conn := dialSurfaceHostUnix(t, socketPath)
 	if err := WriteRequest(conn, Request{
 		Op:        OpOpen,
 		RequestID: 1,
@@ -54,16 +49,22 @@ func TestListenAndServeUnixRecordsPeerPID(t *testing.T) {
 	}
 }
 
-func waitForSocketFile(t *testing.T, path string) {
+func dialSurfaceHostUnix(t *testing.T, path string) *net.UnixConn {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)
+	var lastErr error
 	for time.Now().Before(deadline) {
 		if info, err := os.Stat(path); err == nil && !info.IsDir() {
-			return
+			conn, err := net.DialUnix("unix", nil, &net.UnixAddr{Name: path, Net: "unix"})
+			if err == nil {
+				return conn
+			}
+			lastErr = err
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	t.Fatalf("timed out waiting for socket %s", path)
+	t.Fatalf("timed out dialing Surface host socket %s: %v", path, lastErr)
+	return nil
 }
 
 func shortTestSocketPath(t *testing.T) string {

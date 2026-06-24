@@ -1,3 +1,13 @@
+// Stable actor runtime helpers for the current linux-x64 actor foundation slice.
+// Effects: actors, runtime
+// ```tetra doctest
+// func actors_doctest(status: lib.core.actors.ActorStatus) -> Int:
+//     match status:
+//     case lib.core.actors.ActorStatus.ready:
+//         return 1
+//     case _:
+//         return 0
+// ```
 module lib.core.actors
 
 pub enum ExitReason:

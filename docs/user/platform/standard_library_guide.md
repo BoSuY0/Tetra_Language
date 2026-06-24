@@ -27,12 +27,50 @@ stdlib modules render as `lib.core.<name>`, experimental stdlib modules render a
 `lib.experimental.<name>`, and smoke files that declare modules render as names like
 `examples.core.data.core_math_smoke`.
 
+- stable stdlib modules render as `lib.core.<name>`
+- experimental stdlib modules render as `lib.experimental.<name>`
+
 Generated docs use a portable file path for source files without a module declaration. Those entries
 remain spelled with slashes, such as `examples/flow/flow_hello.tetra`. Treat dotted `examples.*`
 headings as module names and `examples/...` headings as file paths; both forms can appear in one
 generated docs run.
 
 ## Stable Module Choices
+
+| Need | Import | Example | Effects |
+| --- | --- | --- | --- |
+| Actor status/result helpers | `import lib.core.actors as actors` | `examples/core_actors_smoke.tetra` | `actors, runtime` |
+| Async helper functions | `import lib.core.async as async` | `examples/async/core_async_smoke.tetra` | none |
+| Capability tokens for host-like surfaces | `import lib.core.capability as cap` | `examples/core/memory/core_memory_smoke.tetra` | `capability, io, mem` |
+| Integer helpers and small arithmetic choices | `import lib.core.math as math` | `examples/core/data/core_math_smoke.tetra` | none |
+| ASCII length, ASCII sum, and empty checks (`ascii_len`, `ascii_sum`, `is_empty`) | `import lib.core.strings as strings` | `examples/core/data/core_strings_smoke.tetra` | none |
+| Synchronization status helpers | `import lib.core.sync as sync` | `examples/core/runtime/core_sync_smoke.tetra` | none |
+| Test status helpers | `import lib.core.testing as testing` | `examples/core/runtime/core_testing_smoke.tetra` | none |
+| Time duration/status helpers | `import lib.core.time as time` | `examples/core/platform/core_time_smoke.tetra` | none |
+| Experimental Surface Block System data model | `import lib.core.block as block` | `examples/core/surface/core_block_smoke.tetra` | `alloc, mem` |
+| Generic collection views and `[]i32` scans | `import lib.core.collections as collections` | `examples/core/data/core_collections_smoke.tetra` | `mem` |
+| Crypto interface helpers | `import lib.core.crypto as crypto` | `examples/core/memory/core_crypto_smoke.tetra` | `mem` |
+| JSON byte-buffer response helpers | `import lib.core.json as json` | `examples/core/data/core_json_smoke.tetra` | `mem` |
+| Tiny serialization combinators | `import lib.core.serialization as serialization` | `examples/core/data/core_serialization_smoke.tetra` | `mem` |
+| Slice summation helpers (`sum_i32`, `weighted_sum_i32`, `sum_u8`) | `import lib.core.slices as slices` | `examples/core/data/core_slices_smoke.tetra` | `mem` |
+| Bounded Surface string tables, locale fallback, formatting hooks, and RTL placeholder nonclaims | `import lib.core.i18n as i18n` | `examples/core/surface_app/core_i18n_smoke.tetra` | none |
+| Filesystem path helpers and host-backed `exists` | `import lib.core.filesystem as filesystem` | `examples/core/platform/core_filesystem_smoke.tetra` | `io` |
+| HTTP/1.1 String/byte-buffer request routing, request-head framing, and response byte-buffer helpers | `import lib.core.http as http` | `examples/core/platform/core_http_smoke.tetra` | `mem` |
+| Capability-gated IO helpers | `import lib.core.io as io` | `examples/core/platform/core_io_smoke.tetra` | `capability, io, mmio` |
+| Linux TCP socket client/server I/O helpers | `import lib.core.net as net` | `examples/core/platform/core_net_smoke.tetra` | `io, mem` |
+| Networking endpoint policy helpers | `import lib.core.networking as networking` | `examples/core/platform/core_networking_smoke.tetra` | none |
+| PostgreSQL wire-frame byte-buffer helpers | `import lib.core.postgres as pg` | `examples/core/runtime/core_postgres_smoke.tetra` | `mem` |
+| Explicit memory capability wrappers | `import lib.core.memory as memory` | `examples/core/memory/core_memory_smoke.tetra` | `mem` |
+| Experimental Surface Morph Capsule recipe layer | `import lib.core.morph as morph` | `examples/core/surface/core_morph_smoke.tetra` | `mem` |
+| Experimental Tetra Surface accessibility metadata helpers | `import lib.core.accessibility as accessibility` | `examples/core/surface/core_accessibility_smoke.tetra` | none |
+| Planned Tetra Surface static component helpers | `import lib.core.component as component` | `examples/core/surface/core_component_smoke.tetra` | none |
+| Planned Tetra Surface software draw helpers | `import lib.core.draw as draw` | `examples/core/surface/core_draw_smoke.tetra` | `mem` |
+| Planned Tetra Surface host/frame/event wrappers | `import lib.core.surface as surface` | `examples/core/surface_app/core_surface_smoke.tetra` | `alloc, mem, surface` |
+| Caller-owned UTF-8 text buffer helpers | `import lib.core.text as text` | `examples/core/surface_app/core_text_smoke.tetra` | none |
+| Stable Surface v1 widget style and theme helpers | `import lib.core.style as style` | `examples/core/surface/core_style_smoke.tetra` | none |
+| Caller-owned Surface app command/reducer helpers | `import lib.core.surface_app as appmodel` | `examples/core/surface_app/core_surface_app_smoke.tetra` | none |
+| Scoped Linux Surface app-shell state helpers | `import lib.core.surface_app_shell as shell` | `examples/core/surface_app/core_surface_app_shell_smoke.tetra` | none |
+| Experimental Tetra Surface minimal widget helpers | `import lib.core.widgets as widgets` | `examples/core/surface_app/core_widgets_smoke.tetra` | none |
 
 Entries:
 
@@ -625,6 +663,7 @@ boundary. This module promises deterministic endpoint policy helpers only.
 
 `lib.core.networking` remains endpoint policy only. It is intentionally separate from the
 Tetra-source transport/database surface for the TechEmpower-compatible web stack: the current
+`lib.core.net` is a stable linux-x64 TCP socket client/server I/O slice. The current
 `lib.core.net` slice provides real linux-x64 TCP socket
 open/bind/connect/listen/accept/read/recv/write/send/nonblocking/close helpers,
 `SO_REUSEPORT`/`TCP_NODELAY`, plus epoll add/mod/delete and wait-one readiness, including
@@ -634,8 +673,8 @@ future `lib.core.net` expansion and higher-level `lib.core.postgres` driver laye
 startup/simple-query/prepared-frame byte-buffer helpers. Importing `lib.core.networking` is
 therefore safe for configuration defaults, but it must not be used as evidence that the current
 stdlib can run a production TCP server, parse full HTTP header maps or request bodies, or talk to a
-database. HTTP String and byte-buffer request-line routing, request-head framing, and response
-byte-buffer helpers are available separately through `lib.core.http`; JSON response byte-buffer
+database. HTTP String and byte-buffer request-line routing, request-head framing, and response byte-buffer helpers
+are available separately through `lib.core.http`; JSON response byte-buffer
 helpers are available separately through `lib.core.json`.
 
 For `lib.core.net`, loopback bind/connect ports must be in `0..65535`; `0` remains the

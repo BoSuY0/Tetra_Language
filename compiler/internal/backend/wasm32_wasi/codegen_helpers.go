@@ -105,7 +105,8 @@ func wasmStackEffect(instr ir.IRInstr) (int, int, bool) {
 		return 1, 0, true
 	case ir.IRReturn:
 		return 0, 0, true
-	case ir.IRMakeSliceU8, ir.IRMakeSliceU16, ir.IRMakeSliceI32:
+	case ir.IRMakeSliceU8, ir.IRMakeSliceU16, ir.IRMakeSliceI32,
+		ir.IRStackSliceU8, ir.IRStackSliceU16, ir.IRStackSliceI32:
 		return 1, 2, true
 	case ir.IRRawSliceFromParts:
 		return 3, 2, true
@@ -137,6 +138,21 @@ func wasmStackEffect(instr ir.IRInstr) (int, int, bool) {
 
 func wasmUnsupportedInstrError(fnName string, kind ir.IRInstrKind) error {
 	return fmt.Errorf("wasm backend: unsupported IR instruction %d in function '%s'", kind, fnName)
+}
+
+func wasmZeroStackSliceSentinel(instr ir.IRInstr) bool {
+	switch instr.Kind {
+	case ir.IRStackSliceU8, ir.IRStackSliceU16, ir.IRStackSliceI32:
+		return instr.Local < 0 && instr.ArgSlots == 0 && instr.Imm == 0
+	default:
+		return false
+	}
+}
+
+func emitWasmZeroSliceSentinel(body *bytes.Buffer) {
+	body.WriteByte(0x1a) // drop length operand
+	writeI32Const(body, 0)
+	writeI32Const(body, 0)
 }
 
 func wasmDataGlobalIndex(fnName string, heapGlobalIndex uint32, slot int) (uint32, error) {

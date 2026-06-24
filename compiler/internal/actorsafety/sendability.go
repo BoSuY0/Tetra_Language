@@ -1,6 +1,11 @@
 package actorsafety
 
-import "fmt"
+import (
+	"fmt"
+
+	"tetra_language/compiler/internal/islandkernel"
+	"tetra_language/compiler/internal/runtimeabi"
+)
 
 type ValueKind string
 
@@ -43,6 +48,22 @@ type Event struct {
 	Site  string
 }
 
+type OwnershipTransferRequest struct {
+	Value               Value
+	Mode                SendMode
+	SourceDomainID      string
+	DestinationDomainID string
+	Bytes               int64
+	Site                string
+}
+
+type OwnershipTransferDecision struct {
+	Mode           SendMode
+	Event          runtimeabi.MemoryDomainEvent
+	SourceConsumed bool
+	BytesCopied    int64
+}
+
 type Mailbox struct {
 	Name         string
 	Message      string
@@ -53,6 +74,49 @@ type Mailbox struct {
 type Checker struct {
 	values map[string]Value
 	moved  map[string]string
+}
+
+func PlanOwnershipTransfer(req OwnershipTransferRequest) (OwnershipTransferDecision, error) {
+	if req.Bytes <= 0 {
+		return OwnershipTransferDecision{}, fmt.Errorf("actor sendability: transfer bytes must be positive")
+	}
+	checker := NewChecker([]Value{req.Value})
+	if err := checker.Check([]Event{{
+		Kind:  EventSend,
+		Value: req.Value.Name,
+		Mode:  req.Mode,
+		Site:  req.Site,
+	}}); err != nil {
+		return OwnershipTransferDecision{}, err
+	}
+	decision := OwnershipTransferDecision{Mode: req.Mode}
+	switch req.Mode {
+	case SendMove:
+		decision.SourceConsumed = true
+		decision.Event = runtimeabi.MemoryDomainEvent{
+			Kind:          runtimeabi.DomainEventMove,
+			DomainID:      req.SourceDomainID,
+			DestinationID: req.DestinationDomainID,
+			Bytes:         req.Bytes,
+			ReasonCode:    "domain.move.owned",
+		}
+	case SendCopy:
+		decision.BytesCopied = req.Bytes
+		decision.Event = runtimeabi.MemoryDomainEvent{
+			Kind:          runtimeabi.DomainEventCopy,
+			DomainID:      req.SourceDomainID,
+			DestinationID: req.DestinationDomainID,
+			Bytes:         req.Bytes,
+			ReasonCode:    "domain.copy.serialized",
+		}
+	default:
+		return OwnershipTransferDecision{}, fmt.Errorf(
+			"actor sendability: %s unsupported transfer mode %q",
+			site(req.Site),
+			req.Mode,
+		)
+	}
+	return decision, nil
 }
 
 func NewChecker(values []Value) Checker {
@@ -124,6 +188,14 @@ func (c Checker) checkSend(value Value, event Event) error {
 		)
 	case ValueOwnedRegion:
 		if event.Mode == SendMove {
+			if decision := islandkernel.CanMoveIsland(islandMoveTokenRequest(value)); decision.Decision != islandkernel.Accept {
+				return fmt.Errorf(
+					"actor sendability: %s owned region %q move rejected by islandkernel: %s",
+					site(event.Site),
+					value.Name,
+					decision.Reason.Code,
+				)
+			}
 			return nil
 		}
 		return fmt.Errorf(
@@ -134,6 +206,16 @@ func (c Checker) checkSend(value Value, event Event) error {
 	case ValueBorrowed:
 		if event.Mode == SendCopy {
 			return nil
+		}
+		actorDecision := islandkernel.CanSendToActor(islandBoundaryRequest(value))
+		taskDecision := islandkernel.CanSendToTask(islandBoundaryRequest(value))
+		if actorDecision.Decision == islandkernel.Reject ||
+			taskDecision.Decision == islandkernel.Reject {
+			return fmt.Errorf(
+				"actor sendability: %s cannot send borrowed view across actor boundary; use .copy() for %q",
+				site(event.Site),
+				value.Name,
+			)
 		}
 		return fmt.Errorf(
 			"actor sendability: %s cannot send borrowed view across actor boundary; use .copy() for %q",
@@ -162,6 +244,29 @@ func (c Checker) checkSend(value Value, event Event) error {
 			value.Name,
 			value.Kind,
 		)
+	}
+}
+
+func islandMoveTokenRequest(value Value) islandkernel.TokenRequest {
+	return islandkernel.TokenRequest{
+		Token: islandkernel.Token{
+			IslandID: "island:" + value.Name,
+			Epoch:    0,
+			OwnerID:  "actor:" + value.Name,
+		},
+	}
+}
+
+func islandBoundaryRequest(value Value) islandkernel.BoundaryRequest {
+	return islandkernel.BoundaryRequest{
+		Ref: islandkernel.MemoryRef{
+			BaseID:     value.Name,
+			IslandID:   "island:" + value.Name,
+			Epoch:      0,
+			OwnerID:    "actor:" + value.Name,
+			Provenance: islandkernel.ProvenanceBorrowedView,
+		},
+		Transfer: islandkernel.TransferBorrowedView,
 	}
 }
 

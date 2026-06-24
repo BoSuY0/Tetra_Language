@@ -160,6 +160,40 @@ func TestIslandKernelRequiredDecisionQuestions(t *testing.T) {
 			code: "bounds.missing_proof",
 		},
 		{
+			name: "explicit island planning accepts owned noescape proof",
+			got: CanPlanExplicitIsland(StoragePlanRequest{
+				Ref: MemoryRef{
+					BaseID:      "alloc:a",
+					IslandID:    "island:a",
+					Epoch:       7,
+					OwnerID:     "fn:main",
+					Provenance:  ProvenanceOwned,
+					UnsafeClass: UnsafeSafe,
+				},
+				Escape:       EscapeNoEscape,
+				StorageProof: storageProof,
+			}),
+			want: Accept,
+			code: "plan.explicit_island",
+		},
+		{
+			name: "explicit island planning rejects stale proof epoch",
+			got: CanPlanExplicitIsland(StoragePlanRequest{
+				Ref: MemoryRef{
+					BaseID:      "alloc:a",
+					IslandID:    "island:a",
+					Epoch:       8,
+					OwnerID:     "fn:main",
+					Provenance:  ProvenanceOwned,
+					UnsafeClass: UnsafeSafe,
+				},
+				Escape:       EscapeNoEscape,
+				StorageProof: storageProof,
+			}),
+			want: Conservative,
+			code: "plan.storage_proof_required",
+		},
+		{
 			name: "explicit island lowering accepts no escape with storage proof",
 			got: CanLowerAsExplicitIsland(StorageRequest{
 				Ref:             liveRef,
@@ -253,6 +287,69 @@ func TestIslandKernelDecisionMetadata(t *testing.T) {
 	}
 }
 
+func TestCanPlanExplicitIslandRejectsMissingIdentityOwnerAndUnsafe(t *testing.T) {
+	proof := Proof{
+		ID:            "proof:storage:a",
+		Kind:          ProofStorage,
+		SubjectBaseID: "alloc:a",
+		IslandID:      "island:a",
+		Epoch:         1,
+		Operation:     OperationExplicitIslandStorage,
+		Verified:      true,
+	}
+	tests := []struct {
+		name string
+		req  StoragePlanRequest
+		want Decision
+		code string
+	}{
+		{
+			name: "missing owner is conservative",
+			req: StoragePlanRequest{
+				Ref: MemoryRef{
+					BaseID: "alloc:a", IslandID: "island:a", Epoch: 1,
+					Provenance: ProvenanceOwned, UnsafeClass: UnsafeSafe,
+				},
+				Escape:       EscapeNoEscape,
+				StorageProof: proof,
+			},
+			want: Conservative,
+			code: "plan.missing_identity",
+		},
+		{
+			name: "escaping value rejects",
+			req: StoragePlanRequest{
+				Ref: MemoryRef{
+					BaseID: "alloc:a", IslandID: "island:a", Epoch: 1, OwnerID: "owner:a",
+					Provenance: ProvenanceOwned, UnsafeClass: UnsafeSafe,
+				},
+				Escape:       EscapeReturn,
+				StorageProof: proof,
+			},
+			want: Reject,
+			code: "plan.escape_not_island",
+		},
+		{
+			name: "unsafe root rejects",
+			req: StoragePlanRequest{
+				Ref: MemoryRef{
+					BaseID: "alloc:a", IslandID: "island:a", Epoch: 1, OwnerID: "owner:a",
+					Provenance: ProvenanceUnsafeUnknown, UnsafeClass: UnsafeUnknown,
+				},
+				Escape:       EscapeNoEscape,
+				StorageProof: proof,
+			},
+			want: Reject,
+			code: "plan.unsafe_external",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			requireDecision(t, CanPlanExplicitIsland(test.req), test.want, test.code)
+		})
+	}
+}
+
 func TestIslandKernelRejectsExternalUnsafeTrustedStoragePromotion(t *testing.T) {
 	externalRef := MemoryRef{
 		BaseID:      "raw",
@@ -315,6 +412,53 @@ func TestIslandKernelDangerousDecisionRouteCoverage(t *testing.T) {
 		if !slices.Contains(route.EvidenceTokens, decision) && route.KernelFunction != decision {
 			t.Fatalf("route %q does not name its kernel decision in evidence: %+v", decision, route)
 		}
+	}
+
+	if len(RequiredDangerousDecisions()) != 16 {
+		t.Fatalf("required dangerous decisions = %d, want 16", len(RequiredDangerousDecisions()))
+	}
+	for _, route := range routes {
+		if route.Strategy != RouteThroughIslandKernel {
+			t.Fatalf("route %q strategy = %q, want direct islandkernel", route.Decision, route.Strategy)
+		}
+		if len(route.ProductionCallTokens) == 0 {
+			t.Fatalf("route %q missing production call tokens", route.Decision)
+		}
+	}
+}
+
+func TestValidateDangerousDecisionRoutesRejectsNonDirectOrMissingProductionCall(t *testing.T) {
+	route := DangerousDecisionRoute{
+		Decision:            "CanPlanExplicitIsland",
+		Question:            "May this allocation plan explicit island storage?",
+		Strategy:            RouteNotApplicable,
+		KernelFunction:      "CanPlanExplicitIsland",
+		SourceFiles:         []string{"compiler/internal/allocplan/build.go"},
+		TestFiles:           []string{"compiler/internal/islandkernel/kernel_test.go"},
+		EvidenceTokens:      []string{"CanPlanExplicitIsland"},
+		NonApplicableReason: "old planner branch",
+	}
+	err := ValidateDangerousDecisionRoutes(
+		[]DangerousDecisionRoute{route},
+		func(string) bool { return true },
+		func(string, string) bool { return true },
+	)
+	if err == nil || !strings.Contains(err.Error(), "must route through islandkernel") {
+		t.Fatalf("ValidateDangerousDecisionRoutes non-direct error = %v", err)
+	}
+
+	route.Strategy = RouteThroughIslandKernel
+	route.NonApplicableReason = ""
+	route.ProductionCallTokens = []string{"islandkernel.CanPlanExplicitIsland"}
+	err = ValidateDangerousDecisionRoutes(
+		[]DangerousDecisionRoute{route},
+		func(string) bool { return true },
+		func(path string, token string) bool {
+			return strings.Contains(path, "kernel_test.go") && token == "islandkernel.CanPlanExplicitIsland"
+		},
+	)
+	if err == nil || !strings.Contains(err.Error(), "production call token") {
+		t.Fatalf("ValidateDangerousDecisionRoutes production-token error = %v", err)
 	}
 }
 

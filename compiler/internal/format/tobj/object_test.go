@@ -11,14 +11,18 @@ import (
 	"testing"
 )
 
-func TestObjectRoundTripPreservesV4MetadataSymbolsAndRelocs(t *testing.T) {
+func TestObjectRoundTripPreservesV5MetadataSymbolsAndRelocs(t *testing.T) {
 	obj := &Object{
-		Target:          "linux-x64",
-		Module:          "app.main",
-		CompilerVersion: "0.4.0-test",
-		PublicAPIHash:   "api-hash",
-		SrcHash:         sha256.Sum256([]byte("source")),
-		WorldSigHash:    sha256.Sum256([]byte("world")),
+		Target:               "linux-x64",
+		Module:               "app.main",
+		CompilerVersion:      "0.4.0-test",
+		PublicAPIHash:        "api-hash",
+		MemoryPlanSchema:     MemoryPlanSchemaV2,
+		MemoryPlanDigest:     "memory-plan:sha256:abc",
+		MemoryLoweringSchema: MemoryLoweringSchemaV2,
+		MemoryLoweringDigest: "lowering:sha256:def",
+		SrcHash:              sha256.Sum256([]byte("source")),
+		WorldSigHash:         sha256.Sum256([]byte("world")),
 		Code: []byte{
 			0x90,
 			0x90,
@@ -372,10 +376,10 @@ func TestReadObjectRejectsInvalidMagicAndBoolEncoding(t *testing.T) {
 	if err := writeU8(&raw, objectVersion); err != nil {
 		t.Fatalf("write version: %v", err)
 	}
-	for _, s := range []string{"linux-x64", "app.main", "0.4.0-test", "api-hash"} {
-		if err := writeString(&raw, s); err != nil {
-			t.Fatalf("write string %q: %v", s, err)
-		}
+		for _, s := range []string{"linux-x64", "app.main", "0.4.0-test", "api-hash", MemoryPlanSchemaV2, "plan-digest", MemoryLoweringSchemaV2, "lowering-digest"} {
+			if err := writeString(&raw, s); err != nil {
+				t.Fatalf("write string %q: %v", s, err)
+			}
 		if s == "app.main" {
 			raw.Write(make([]byte, 64))
 		}
@@ -808,10 +812,10 @@ func writeObjectHeaderForTest(t *testing.T, raw *bytes.Buffer) {
 		}
 	}
 	raw.Write(make([]byte, 64))
-	for _, s := range []string{"0.4.0-test", "api-hash"} {
-		if err := writeString(raw, s); err != nil {
-			t.Fatalf("write string %q: %v", s, err)
-		}
+		for _, s := range []string{"0.4.0-test", "api-hash", MemoryPlanSchemaV2, "plan-digest", MemoryLoweringSchemaV2, "lowering-digest"} {
+			if err := writeString(raw, s); err != nil {
+				t.Fatalf("write string %q: %v", s, err)
+			}
 	}
 }
 

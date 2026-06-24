@@ -160,6 +160,27 @@ func TestPerCoreSmallHeapAllocatorReusesFreedSameClassBlocks(t *testing.T) {
 			report.Cores[0].FreeListBlocks,
 		)
 	}
+	events := allocator.MemoryBackendEvents()
+	var reserveCommit int
+	for _, event := range events {
+		if event.Operation == MemoryBackendReserve || event.Operation == MemoryBackendCommit {
+			reserveCommit++
+		}
+	}
+	if reserveCommit != 2 {
+		t.Fatalf("reserve/commit events = %d in %+v, want one chunk reserve+commit despite reuse", reserveCommit, events)
+	}
+	snapshot := allocator.LedgerSnapshot()
+	if len(snapshot) != 1 {
+		t.Fatalf("ledger snapshot = %+v, want process domain", snapshot)
+	}
+	if snapshot[0].ReservedBytes != SmallHeapChunkBytes ||
+		snapshot[0].CommittedBytes != SmallHeapChunkBytes {
+		t.Fatalf("ledger domain = %+v, want one reserved/committed chunk", snapshot[0])
+	}
+	if snapshot[0].CurrentBytes != int64(reused.RequestedBytes) {
+		t.Fatalf("ledger current bytes = %d, want live reused request %d", snapshot[0].CurrentBytes, reused.RequestedBytes)
+	}
 }
 
 func TestPerCoreSmallHeapAllocatorStressDoesNotBehaveLikeMmapPerAllocation(t *testing.T) {

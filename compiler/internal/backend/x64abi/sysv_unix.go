@@ -15,6 +15,7 @@ type SysVUnix struct {
 	SysMmap     uint32
 	SysMunmap   uint32
 	SysMprotect uint32
+	SysMadvise  uint32
 }
 
 func LinuxSysV() *SysVUnix {
@@ -24,6 +25,7 @@ func LinuxSysV() *SysVUnix {
 		SysMmap:     9,
 		SysMunmap:   11,
 		SysMprotect: 10,
+		SysMadvise:  28,
 	}
 }
 
@@ -35,6 +37,7 @@ func LinuxX32SysV() *SysVUnix {
 		SysMmap:     x32SyscallBit + 9,
 		SysMunmap:   x32SyscallBit + 11,
 		SysMprotect: x32SyscallBit + 10,
+		SysMadvise:  x32SyscallBit + 28,
 	}
 }
 
@@ -45,6 +48,7 @@ func MacSysV() *SysVUnix {
 		SysMmap:     0x20000C5,
 		SysMunmap:   0x2000049,
 		SysMprotect: 0x200000A,
+		SysMadvise:  0x200004B,
 	}
 }
 
@@ -270,16 +274,19 @@ func (a *SysVUnix) EmitAllocBytes(
 	}
 	e.PushRsi()
 	e.AddRsiImm32(8)
-	e.MovEdiImm32(0)
-	e.MovEdxImm32(3)
-	e.MovR10dImm32(0x22)
-	e.MovR8dImm32(0xFFFFFFFF)
-	e.MovR9dImm32(0)
-	e.MovEaxImm32(a.SysMmap)
-	e.Syscall()
+	e.PushRsi()
+	a.EmitMemoryReserve(e)
 	if err := a.emitMmapFailureGuard(e, *stackDepth); err != nil {
 		return err
 	}
+	e.PopRsi()
+	e.PushRax()
+	e.MovRdiRax()
+	a.EmitMemoryCommit(e)
+	if err := a.emitStatusFailureGuard(e, *stackDepth); err != nil {
+		return err
+	}
+	e.PopRax()
 	e.PopRsi()
 	e.MovMem32RaxPtrEsi()
 	e.AddRaxImm32(8)
@@ -307,8 +314,7 @@ func (a *SysVUnix) EmitReleaseAllocation(
 	e.MovEsiFromRdiDisp(-8)
 	e.AddRsiImm32(8)
 	e.AddRdiImm32(-8)
-	e.MovEaxImm32(a.SysMunmap)
-	e.Syscall()
+	a.EmitMemoryRelease(e)
 	return nil
 }
 
@@ -345,16 +351,19 @@ func (a *SysVUnix) EmitMakeSlice(
 		e.ShlRaxImm8(1)
 	}
 	e.MovRsiRax()
-	e.MovEdiImm32(0)
-	e.MovEdxImm32(3)
-	e.MovR10dImm32(0x22)
-	e.MovR8dImm32(0xFFFFFFFF)
-	e.MovR9dImm32(0)
-	e.MovEaxImm32(a.SysMmap)
-	e.Syscall()
+	e.PushRsi()
+	a.EmitMemoryReserve(e)
 	if err := a.emitMmapFailureGuard(e, *stackDepth); err != nil {
 		return err
 	}
+	e.PopRsi()
+	e.PushRax()
+	e.MovRdiRax()
+	a.EmitMemoryCommit(e)
+	if err := a.emitStatusFailureGuard(e, *stackDepth); err != nil {
+		return err
+	}
+	e.PopRax()
 	*stackDepth--
 	e.PopRcx()
 	e.PushRax()
@@ -416,16 +425,23 @@ func (a *SysVUnix) EmitIslandNew(
 	e.MovRsiRax()
 	e.PushRax()
 	*stackDepth++
-	e.MovEdiImm32(0)
-	e.MovEdxImm32(3)
-	e.MovR10dImm32(0x22)
-	e.MovR8dImm32(0xFFFFFFFF)
-	e.MovR9dImm32(0)
-	e.MovEaxImm32(a.SysMmap)
-	e.Syscall()
+	a.EmitMemoryReserve(e)
 	if err := a.emitMmapFailureGuard(e, *stackDepth); err != nil {
 		return err
 	}
+	e.PopRsi()
+	*stackDepth--
+	e.PushRsi()
+	*stackDepth++
+	e.PushRax()
+	*stackDepth++
+	e.MovRdiRax()
+	a.EmitMemoryCommit(e)
+	if err := a.emitStatusFailureGuard(e, *stackDepth); err != nil {
+		return err
+	}
+	e.PopRax()
+	*stackDepth--
 	*stackDepth--
 	e.PopRcx()
 	e.MovMem32RaxPtrImm32(0, headerSize)
@@ -559,6 +575,52 @@ func (a *SysVUnix) emitMmapFailureGuard(e *x64.Emitter, stackSlots int) error {
 	return nil
 }
 
+func (a *SysVUnix) emitStatusFailureGuard(e *x64.Emitter, stackSlots int) error {
+	e.TestRaxRax()
+	okAt := e.JzRel32()
+	if err := a.EmitExit(e, 2, stackSlots, nil); err != nil {
+		return err
+	}
+	okOff := len(e.Buf)
+	return x64.PatchRel32(e.Buf, okAt, okOff)
+}
+
+func (a *SysVUnix) EmitMemoryReserve(e *x64.Emitter) {
+	e.MovEdiImm32(0)
+	e.MovEdxImm32(0)
+	e.MovR10dImm32(0x22)
+	e.MovR8dImm32(0xFFFFFFFF)
+	e.MovR9dImm32(0)
+	e.MovEaxImm32(a.SysMmap)
+	e.Syscall()
+}
+
+func (a *SysVUnix) EmitMemoryCommit(e *x64.Emitter) {
+	e.MovEdxImm32(3)
+	e.MovEaxImm32(a.SysMprotect)
+	e.Syscall()
+}
+
+func (a *SysVUnix) EmitMemoryDecommit(e *x64.Emitter) {
+	if a.SysMadvise != 0 {
+		e.PushRdi()
+		e.PushRsi()
+		e.MovEdxImm32(4)
+		e.MovEaxImm32(a.SysMadvise)
+		e.Syscall()
+		e.PopRsi()
+		e.PopRdi()
+	}
+	e.MovEdxImm32(0)
+	e.MovEaxImm32(a.SysMprotect)
+	e.Syscall()
+}
+
+func (a *SysVUnix) EmitMemoryRelease(e *x64.Emitter) {
+	e.MovEaxImm32(a.SysMunmap)
+	e.Syscall()
+}
+
 func (a *SysVUnix) EmitIslandFree(
 	e *x64.Emitter,
 	stackDepth *int,
@@ -591,14 +653,11 @@ func (a *SysVUnix) EmitIslandFree(
 		e.SubEaxImm32(x64.IslandsDebugPageSize)
 		e.MovRsiRax()
 		e.AddRdiImm32(x64.IslandsDebugPageSize)
-		e.MovEdxImm32(0)
-		e.MovEaxImm32(a.SysMprotect)
-		e.Syscall()
+		a.EmitMemoryDecommit(e)
 		return nil
 	}
 	e.MovEsiFromRdiDisp(8)
-	e.MovEaxImm32(a.SysMunmap)
-	e.Syscall()
+	a.EmitMemoryRelease(e)
 	return nil
 }
 

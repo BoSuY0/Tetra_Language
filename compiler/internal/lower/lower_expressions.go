@@ -2266,31 +2266,61 @@ func (l *lowerer) lowerCallExpr(e *frontend.CallExpr) (int, error) {
 		if total != 1 {
 			return 0, fmt.Errorf("%s: alloc_bytes expects 1 argument", frontend.FormatPos(e.At))
 		}
-		l.emit(ir.IRInstr{Kind: ir.IRAllocBytes, Pos: e.At})
+		l.emit(
+			ir.IRInstr{
+				Kind: ir.IRAllocBytes,
+				Name: l.allocationNameForAnyBuiltinCall(e.Name, e.At),
+				Pos:  e.At,
+			},
+		)
 		return 1, nil
 	case "core.make_u8":
 		if total != 1 {
 			return 0, fmt.Errorf("%s: make_u8 expects 1 argument", frontend.FormatPos(e.At))
 		}
-		l.emit(ir.IRInstr{Kind: ir.IRMakeSliceU8, Pos: e.At})
+		l.emit(
+			ir.IRInstr{
+				Kind: ir.IRMakeSliceU8,
+				Name: l.allocationNameForAnyBuiltinCall(e.Name, e.At),
+				Pos:  e.At,
+			},
+		)
 		return 2, nil
 	case "core.make_u16":
 		if total != 1 {
 			return 0, fmt.Errorf("%s: make_u16 expects 1 argument", frontend.FormatPos(e.At))
 		}
-		l.emit(ir.IRInstr{Kind: ir.IRMakeSliceU16, Pos: e.At})
+		l.emit(
+			ir.IRInstr{
+				Kind: ir.IRMakeSliceU16,
+				Name: l.allocationNameForAnyBuiltinCall(e.Name, e.At),
+				Pos:  e.At,
+			},
+		)
 		return 2, nil
 	case "core.make_i32":
 		if total != 1 {
 			return 0, fmt.Errorf("%s: make_i32 expects 1 argument", frontend.FormatPos(e.At))
 		}
-		l.emit(ir.IRInstr{Kind: ir.IRMakeSliceI32, Pos: e.At})
+		l.emit(
+			ir.IRInstr{
+				Kind: ir.IRMakeSliceI32,
+				Name: l.allocationNameForAnyBuiltinCall(e.Name, e.At),
+				Pos:  e.At,
+			},
+		)
 		return 2, nil
 	case "core.make_bool":
 		if total != 1 {
 			return 0, fmt.Errorf("%s: make_bool expects 1 argument", frontend.FormatPos(e.At))
 		}
-		l.emit(ir.IRInstr{Kind: ir.IRMakeSliceI32, Pos: e.At})
+		l.emit(
+			ir.IRInstr{
+				Kind: ir.IRMakeSliceI32,
+				Name: l.allocationNameForAnyBuiltinCall(e.Name, e.At),
+				Pos:  e.At,
+			},
+		)
 		return 2, nil
 	case "core.raw_slice_u8_from_parts",
 		"core.raw_slice_u16_from_parts",
@@ -3590,8 +3620,8 @@ func (l *lowerer) lowerUnusedCopyLet(
 		return false, 0, nil
 	}
 	alloc, ok := l.allocationPlan[name]
-	if !ok || alloc.ActualLoweringStorage != allocplan.StorageEliminated ||
-		alloc.LoweringStatus != "eliminated_unused_copy" {
+	if !ok || allocationStorageForLowering(alloc) != allocplan.StorageEliminated ||
+		!allocationDecisionHasDetail(alloc, "unused_copy") {
 		return false, 0, nil
 	}
 	sourceSlots, err := l.lowerExpr(call.Args[0])
@@ -3641,8 +3671,8 @@ func (l *lowerer) lowerScalarReplacementLet(
 	}
 	isCopy := !isMake
 	alloc, ok := l.allocationPlan[name]
-	if !ok || alloc.ActualLoweringStorage != allocplan.StorageEliminated ||
-		alloc.LoweringStatus != "scalar_replacement" {
+	if !ok || allocationStorageForLowering(alloc) != allocplan.StorageEliminated ||
+		!allocationDecisionHasDetail(alloc, "scalar_replacement") {
 		return false, 0, nil
 	}
 	if alloc.ElementSize <= 0 || alloc.ByteSize <= 0 || alloc.ByteSize%alloc.ElementSize != 0 {
@@ -3795,7 +3825,7 @@ func (l *lowerer) lowerFunctionTempRegionCopyLet(
 		return false, 0, nil
 	}
 	alloc, ok := l.allocationPlan[name]
-	if !ok || alloc.ActualLoweringStorage != allocplan.StorageFunctionTempRegion {
+	if !ok || allocationStorageForLowering(alloc) != allocplan.StorageFunctionTempRegion {
 		return false, 0, nil
 	}
 	_, loadKind, storeKind, ok := copyElementIRKinds(elem, l.types)
@@ -3837,7 +3867,7 @@ func (l *lowerer) lowerFunctionTempRegionCopyLet(
 		dstLen,
 		loadKind,
 		storeKind,
-		copyLoopBoundsProofID(call.Name, call.At),
+		copyLoopBoundsProofID(name, call.At),
 		pos,
 	)
 	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: dstPtr, Pos: pos})
@@ -3867,7 +3897,11 @@ func (l *lowerer) lowerExplicitIslandAllocationLet(
 		return false, 0, nil
 	}
 	alloc, ok := l.allocationPlan[name]
-	if !ok || alloc.ActualLoweringStorage != allocplan.StorageExplicitIsland {
+	if !ok {
+		return false, 0, nil
+	}
+	storage := allocationStorageForLowering(alloc)
+	if storage != allocplan.StorageExplicitIsland && storage != allocplan.StorageEliminated {
 		return false, 0, nil
 	}
 	islandSlots, err := l.lowerExpr(call.Args[0])
@@ -3881,6 +3915,9 @@ func (l *lowerer) lowerExplicitIslandAllocationLet(
 			call.Name,
 		)
 	}
+	if storage == allocplan.StorageEliminated {
+		l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: l.ensureDiscardLocal(), Pos: pos})
+	}
 	lengthSlots, err := l.lowerExpr(call.Args[1])
 	if err != nil {
 		return false, 0, err
@@ -3891,6 +3928,14 @@ func (l *lowerer) lowerExplicitIslandAllocationLet(
 			frontend.FormatPos(pos),
 			call.Name,
 		)
+	}
+	if storage == allocplan.StorageEliminated {
+		stackKind, ok := stackSliceKindForIslandSliceKind(kind)
+		if !ok {
+			return false, 0, nil
+		}
+		l.emit(ir.IRInstr{Kind: stackKind, Local: -1, ArgSlots: 0, Imm: 0, Name: name, Pos: pos})
+		return true, 2, nil
 	}
 	l.emit(ir.IRInstr{Kind: kind, Name: name, Pos: pos})
 	return true, 2, nil
@@ -3933,7 +3978,7 @@ func (l *lowerer) lowerStackCopyLet(
 		return false, 0, nil
 	}
 	alloc, ok := l.allocationPlan[name]
-	if !ok || alloc.ActualLoweringStorage != allocplan.StorageStack || alloc.ByteSize <= 0 ||
+	if !ok || allocationStorageForLowering(alloc) != allocplan.StorageStack || alloc.ByteSize <= 0 ||
 		alloc.ElementSize <= 0 {
 		return false, 0, nil
 	}
@@ -3987,7 +4032,7 @@ func (l *lowerer) lowerStackCopyLet(
 		dstLen,
 		loadKind,
 		storeKind,
-		copyLoopBoundsProofID(name, pos),
+		copyLoopBoundsProofID(name, call.At),
 		pos,
 	)
 	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: dstPtr, Pos: pos})
@@ -4016,8 +4061,8 @@ func (l *lowerer) lowerStackAllocationLet(
 	if !ok {
 		return false, 0, nil
 	}
-	if alloc.ActualLoweringStorage != allocplan.StorageStack &&
-		alloc.ActualLoweringStorage != allocplan.StorageEliminated {
+	storage := allocationStorageForLowering(alloc)
+	if storage != allocplan.StorageStack && storage != allocplan.StorageEliminated {
 		return false, 0, nil
 	}
 	length, known := l.proofConstIntValue(call.Args[0])
@@ -4035,7 +4080,7 @@ func (l *lowerer) lowerStackAllocationLet(
 	if lengthSlots != 1 {
 		return false, 0, fmt.Errorf("%s: allocation length must be i32", frontend.FormatPos(pos))
 	}
-	if alloc.ActualLoweringStorage == allocplan.StorageEliminated {
+	if storage == allocplan.StorageEliminated {
 		if length != 0 {
 			return false, 0, fmt.Errorf(
 				"%s: eliminated allocation %q has non-zero length %d",
@@ -4085,6 +4130,19 @@ func islandSliceKindByBuiltin(name string) (ir.IRInstrKind, bool) {
 	return lowerlets.IslandSliceKindByBuiltin(name)
 }
 
+func stackSliceKindForIslandSliceKind(kind ir.IRInstrKind) (ir.IRInstrKind, bool) {
+	switch kind {
+	case ir.IRIslandMakeSliceU8:
+		return ir.IRStackSliceU8, true
+	case ir.IRIslandMakeSliceU16:
+		return ir.IRStackSliceU16, true
+	case ir.IRIslandMakeSliceI32:
+		return ir.IRStackSliceI32, true
+	default:
+		return 0, false
+	}
+}
+
 func (l *lowerer) allocationNameForBuiltinCall(
 	name string,
 	pos frontend.Position,
@@ -4096,11 +4154,56 @@ func (l *lowerer) allocationNameForBuiltinCall(
 	source := frontend.FormatPos(pos)
 	for id, alloc := range l.allocationPlan {
 		if alloc.Builtin == name && alloc.Source == source &&
-			alloc.ActualLoweringStorage == storage {
+			allocationStorageForLowering(alloc) == storage {
 			return id
 		}
 	}
 	return ""
+}
+
+func (l *lowerer) allocationNameForAnyBuiltinCall(name string, pos frontend.Position) string {
+	if len(l.allocationPlan) == 0 {
+		return ""
+	}
+	source := frontend.FormatPos(pos)
+	matches := make([]string, 0, 1)
+	for id, alloc := range l.allocationPlan {
+		if alloc.Builtin == name && alloc.Source == source {
+			matches = append(matches, id)
+		}
+	}
+	if len(matches) != 1 {
+		return ""
+	}
+	return matches[0]
+}
+
+func allocationStorageForLowering(alloc allocplan.Allocation) allocplan.StorageClass {
+	if alloc.ActualLoweringStorage != "" &&
+		alloc.ActualLoweringStorage != allocplan.StorageUnknownConservative &&
+		alloc.LoweringStatus != "pending" {
+		return alloc.ActualLoweringStorage
+	}
+	if alloc.PlannedStorage != "" {
+		return alloc.PlannedStorage
+	}
+	return alloc.Storage
+}
+
+func allocationDecisionHasDetail(alloc allocplan.Allocation, detail string) bool {
+	if strings.Contains(alloc.DecisionCode, ":"+detail) {
+		return true
+	}
+	switch detail {
+	case "scalar_replacement":
+		return alloc.LoweringStatus == "scalar_replacement" ||
+			strings.Contains(alloc.Reason, "scalar_replacement")
+	case "unused_copy":
+		return alloc.LoweringStatus == "eliminated_unused_copy" ||
+			strings.Contains(alloc.Reason, "copy result is unused")
+	default:
+		return false
+	}
 }
 
 func (l *lowerer) lowerMatchExpr(e *frontend.MatchExpr) (int, error) {
@@ -4819,6 +4922,10 @@ func (l *lowerer) rawPtrOffsetAliasFromExpr(expr frontend.Expr) (rawPtrOffsetLoc
 	if prior, ok := l.rawPtrOffsetLocals[baseInfo.Base]; ok {
 		alias = prior
 	}
+	if bytes, ok := l.rawPtrAllocationBytes[alias.BaseLocal]; ok && bytes > 0 {
+		alias.BaseBytes = bytes
+		alias.HasBaseBytes = true
+	}
 	switch offset := call.Args[1].(type) {
 	case *frontend.NumberExpr:
 		if alias.HasOffsetImm {
@@ -4846,6 +4953,11 @@ func (l *lowerer) rawPtrOffsetAliasFromExpr(expr frontend.Expr) (rawPtrOffsetLoc
 
 func (l *lowerer) rememberRawPtrOffsetAlias(local int, expr frontend.Expr) {
 	l.clearRawPtrOffsetAliasesForLocal(local)
+	if bytes, ok := rawAllocBytesConst(expr); ok {
+		l.rawPtrAllocationBytes[local] = bytes
+		return
+	}
+	delete(l.rawPtrAllocationBytes, local)
 	alias, ok := l.rawPtrOffsetAliasFromExpr(expr)
 	if !ok {
 		delete(l.rawPtrOffsetLocals, local)
@@ -4856,11 +4968,31 @@ func (l *lowerer) rememberRawPtrOffsetAlias(local int, expr frontend.Expr) {
 
 func (l *lowerer) clearRawPtrOffsetAliasesForLocal(local int) {
 	delete(l.rawPtrOffsetLocals, local)
+	delete(l.rawPtrAllocationBytes, local)
 	for aliasLocal, alias := range l.rawPtrOffsetLocals {
 		if alias.BaseLocal == local || (!alias.HasOffsetImm && alias.OffsetLocal == local) {
 			delete(l.rawPtrOffsetLocals, aliasLocal)
 		}
 	}
+}
+
+func rawAllocBytesConst(expr frontend.Expr) (int64, bool) {
+	call, ok := expr.(*frontend.CallExpr)
+	if !ok || len(call.Args) != 1 {
+		return 0, false
+	}
+	name := call.Name
+	if builtin, ok := semantics.ResolveBuiltinAlias(name); ok {
+		name = builtin
+	}
+	if name != "core.alloc_bytes" {
+		return 0, false
+	}
+	n, ok := call.Args[0].(*frontend.NumberExpr)
+	if !ok || n.Value <= 0 {
+		return 0, false
+	}
+	return int64(n.Value), true
 }
 
 func (l *lowerer) lowerRawOffsetAlias(alias rawPtrOffsetLocal, pos frontend.Position) {
@@ -4877,6 +5009,11 @@ func (l *lowerer) lowerRawOffsetAddress(expr frontend.Expr, pos frontend.Positio
 		if info, ok := l.locals[id.Name]; ok {
 			if alias, ok := l.rawPtrOffsetLocals[info.Base]; ok {
 				l.lowerRawOffsetAlias(alias, pos)
+				return true, nil
+			}
+			if _, ok := l.rawPtrAllocationBytes[info.Base]; ok {
+				l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: info.Base, Pos: pos})
+				l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: pos})
 				return true, nil
 			}
 		}
@@ -5393,8 +5530,19 @@ func (l *lowerer) lowerCopyBuiltinFromStack(
 	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: srcLen, Pos: pos})
 	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: srcPtr, Pos: pos})
 
+	allocName := l.allocationNameForAnyBuiltinCall(name, pos)
+	proofName := allocName
+	if proofName == "" {
+		proofName = name
+	}
 	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: srcLen, Pos: pos})
-	l.emit(ir.IRInstr{Kind: makeKind, Pos: pos})
+	l.emit(
+		ir.IRInstr{
+			Kind: makeKind,
+			Name: allocName,
+			Pos:  pos,
+		},
+	)
 	dstLen := l.allocScratchSlots(1)
 	dstPtr := l.allocScratchSlots(1)
 	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: dstLen, Pos: pos})
@@ -5407,7 +5555,7 @@ func (l *lowerer) lowerCopyBuiltinFromStack(
 		dstLen,
 		loadKind,
 		storeKind,
-		copyLoopBoundsProofID(name, pos),
+		copyLoopBoundsProofID(proofName, pos),
 		pos,
 	)
 	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: dstPtr, Pos: pos})

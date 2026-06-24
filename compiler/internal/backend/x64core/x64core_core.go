@@ -2746,7 +2746,7 @@ func emitSmallHeapMakeSliceEnabled(
 		return false
 	}
 	sysv, ok := abi.(*x64abi.SysVUnix)
-	return ok && sysv.SysMmap == 9 && sysv.SysExit == 60
+	return ok && sysv.SysMmap == 9 && sysv.SysMprotect == 10 && sysv.SysExit == 60
 }
 
 func emitFunctionTempRegionMakeSlice(
@@ -2760,7 +2760,8 @@ func emitFunctionTempRegionMakeSlice(
 ) error {
 	_ = importPatches
 	sysv, ok := abi.(*x64abi.SysVUnix)
-	if !ok || sysv.SysMmap != 9 || sysv.SysMunmap != 11 || sysv.SysExit != 60 {
+	if !ok || sysv.SysMmap != 9 || sysv.SysMunmap != 11 || sysv.SysMprotect != 10 ||
+		sysv.SysExit != 60 {
 		return fmt.Errorf("function-temp region lowering: unsupported ABI")
 	}
 	if stackDepth == nil {
@@ -2796,16 +2797,23 @@ func emitFunctionTempRegionMakeSlice(
 	e.PushRax()
 	*stackDepth++
 	e.MovRsiRax()
-	e.MovEdiImm32(0)
-	e.MovEdxImm32(3)
-	e.MovR10dImm32(0x22)
-	e.MovR8dImm32(0xFFFFFFFF)
-	e.MovR9dImm32(0)
-	e.MovEaxImm32(sysv.SysMmap)
-	e.Syscall()
+	sysv.EmitMemoryReserve(e)
 	if err := emitSysVMmapFailureGuard(e, sysv, *stackDepth); err != nil {
 		return err
 	}
+	e.PopRsi()
+	*stackDepth--
+	e.PushRsi()
+	*stackDepth++
+	e.PushRax()
+	*stackDepth++
+	e.MovRdiRax()
+	sysv.EmitMemoryCommit(e)
+	if err := emitSysVStatusFailureGuard(e, sysv, *stackDepth); err != nil {
+		return err
+	}
+	e.PopRax()
+	*stackDepth--
 	*stackDepth--
 	e.PopRcx()
 	e.MovMem64RbpDispRcx(sizeOffset)
@@ -2868,8 +2876,7 @@ func emitFunctionTempRegionReset(
 	e.MovRdiRax()
 	e.MovRaxFromRbpDisp(sizeOffset)
 	e.MovRsiRax()
-	e.MovEaxImm32(sysv.SysMunmap)
-	e.Syscall()
+	sysv.EmitMemoryRelease(e)
 	e.MovMem64RbpDispImm(baseOffset, 0)
 	e.MovMem64RbpDispImm(sizeOffset, 0)
 	doneOff := len(e.Buf)
@@ -2895,6 +2902,16 @@ func emitSysVMmapFailureGuard(e *x64.Emitter, abi *x64abi.SysVUnix, stackSlots i
 		return err
 	}
 	return nil
+}
+
+func emitSysVStatusFailureGuard(e *x64.Emitter, abi *x64abi.SysVUnix, stackSlots int) error {
+	e.TestRaxRax()
+	okAt := e.JzRel32()
+	if err := abi.EmitExit(e, 2, stackSlots, nil); err != nil {
+		return err
+	}
+	okOff := len(e.Buf)
+	return x64.PatchRel32(e.Buf, okAt, okOff)
 }
 
 func emitSmallHeapMakeSlice(
@@ -3010,15 +3027,19 @@ func emitSmallHeapAllocatorHelper(
 	e.MovEdiImm32(0)
 	e.MovEaxImm32(runtimeabi.SmallHeapChunkBytes)
 	e.MovRsiRax()
-	e.MovEdxImm32(3)
-	e.MovR10dImm32(0x22)
-	e.MovR8dImm32(0xFFFFFFFF)
-	e.MovR9dImm32(0)
-	e.MovEaxImm32(sysv.SysMmap)
-	e.Syscall()
+	e.PushRsi()
+	sysv.EmitMemoryReserve(e)
 	if err := emitSmallHeapMmapFailureGuard(e, abi, stackDepth, importPatches); err != nil {
 		return err
 	}
+	e.PopRsi()
+	e.PushRax()
+	e.MovRdiRax()
+	sysv.EmitMemoryCommit(e)
+	if err := emitSmallHeapStatusFailureGuard(e, abi, stackDepth, importPatches); err != nil {
+		return err
+	}
+	e.PopRax()
 	e.PopRdi()
 	e.PopRsi()
 	e.MovRdxRax()
@@ -3030,16 +3051,19 @@ func emitSmallHeapAllocatorHelper(
 	e.Ret()
 
 	largeOff := len(e.Buf)
-	e.MovEdiImm32(0)
-	e.MovEdxImm32(3)
-	e.MovR10dImm32(0x22)
-	e.MovR8dImm32(0xFFFFFFFF)
-	e.MovR9dImm32(0)
-	e.MovEaxImm32(sysv.SysMmap)
-	e.Syscall()
+	e.PushRsi()
+	sysv.EmitMemoryReserve(e)
 	if err := emitSmallHeapMmapFailureGuard(e, abi, stackDepth, importPatches); err != nil {
 		return err
 	}
+	e.PopRsi()
+	e.PushRax()
+	e.MovRdiRax()
+	sysv.EmitMemoryCommit(e)
+	if err := emitSmallHeapStatusFailureGuard(e, abi, stackDepth, importPatches); err != nil {
+		return err
+	}
+	e.PopRax()
 	e.Ret()
 
 	if err := x64.PatchRel32(e.Buf, largeAt, largeOff); err != nil {
@@ -3075,6 +3099,21 @@ func emitSmallHeapMmapFailureGuard(
 		return err
 	}
 	return nil
+}
+
+func emitSmallHeapStatusFailureGuard(
+	e *x64.Emitter,
+	abi x64abi.ABI,
+	stackDepth int,
+	importPatches *[]x64obj.ImportPatch,
+) error {
+	e.TestRaxRax()
+	okAt := e.JzRel32()
+	if err := abi.EmitExit(e, 2, stackDepth, importPatches); err != nil {
+		return err
+	}
+	okOff := len(e.Buf)
+	return x64.PatchRel32(e.Buf, okAt, okOff)
 }
 
 const (

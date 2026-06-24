@@ -6,14 +6,13 @@ import (
 
 	"tetra_language/compiler/internal/allocplan"
 	. "tetra_language/compiler/internal/memoryfacts"
-	. "tetra_language/compiler/internal/memoryfacts/fromplir"
 	"tetra_language/compiler/internal/plir"
 )
 
-func TestFromPLIRAndAllocPlanProjectsRepresentationMetadataFact(t *testing.T) {
-	graph, err := FromPLIRAndAllocPlan("program", nil, nil)
+func TestBuildGraphFromPLIRAndPlanProjectsRepresentationMetadataFact(t *testing.T) {
+	graph, err := BuildGraphFromPLIRAndPlan("program", nil, nil)
 	if err != nil {
-		t.Fatalf("FromPLIRAndAllocPlan representation metadata: %v", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan representation metadata: %v", err)
 	}
 	report := BuildReportFromGraph(graph)
 	row, ok := reportRowByClaim(report, "safe_representation_metadata: not_user_assignable")
@@ -33,7 +32,7 @@ func TestFromPLIRAndAllocPlanProjectsRepresentationMetadataFact(t *testing.T) {
 	}
 }
 
-func TestFromPLIRAndAllocPlanProjectsIslandMemoryRefFields(t *testing.T) {
+func TestBuildGraphFromPLIRAndPlanProjectsIslandMemoryRefFields(t *testing.T) {
 	prog := &plir.Program{Funcs: []plir.Function{{
 		Name: "main",
 		Values: []plir.Value{{
@@ -57,9 +56,9 @@ func TestFromPLIRAndAllocPlanProjectsIslandMemoryRefFields(t *testing.T) {
 		}},
 	}}}
 
-	graph, err := FromPLIRAndAllocPlan("program", prog, nil)
+	graph, err := BuildGraphFromPLIRAndPlan("program", prog, nil)
 	if err != nil {
-		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan: %v", err)
 	}
 	report := BuildReportFromGraph(graph)
 	row, ok := reportRowByClaim(report, "provenance_known")
@@ -79,7 +78,7 @@ func TestFromPLIRAndAllocPlanProjectsIslandMemoryRefFields(t *testing.T) {
 	}
 }
 
-func TestFromPLIRAndAllocPlanProjectsIslandEpochAdvancedFact(t *testing.T) {
+func TestBuildGraphFromPLIRAndPlanProjectsIslandEpochAdvancedFact(t *testing.T) {
 	prog := &plir.Program{Funcs: []plir.Function{{
 		Name: "main",
 		Facts: []plir.Fact{{
@@ -93,9 +92,9 @@ func TestFromPLIRAndAllocPlanProjectsIslandEpochAdvancedFact(t *testing.T) {
 		}},
 	}}}
 
-	graph, err := FromPLIRAndAllocPlan("program", prog, nil)
+	graph, err := BuildGraphFromPLIRAndPlan("program", prog, nil)
 	if err != nil {
-		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan: %v", err)
 	}
 	report := BuildReportFromGraph(graph)
 	row, ok := reportRowByClaim(report, "island_epoch_advanced")
@@ -115,7 +114,7 @@ func TestFromPLIRAndAllocPlanProjectsIslandEpochAdvancedFact(t *testing.T) {
 	}
 }
 
-func TestFromPLIRAndAllocPlanRejectsModuleBoundaryMissingFunctionSummary(t *testing.T) {
+func TestBuildGraphFromPLIRAndPlanRejectsModuleBoundaryMissingFunctionSummary(t *testing.T) {
 	prog := &plir.Program{Funcs: []plir.Function{{
 		Name:   "externBridge",
 		Module: "ffi",
@@ -149,17 +148,17 @@ func TestFromPLIRAndAllocPlanRejectsModuleBoundaryMissingFunctionSummary(t *test
 		},
 	}}}
 
-	_, err := FromPLIRAndAllocPlan("program", prog, nil)
+	_, err := BuildGraphFromPLIRAndPlan("program", prog, nil)
 	if err == nil || !strings.Contains(err.Error(), "summary completeness") ||
 		!strings.Contains(err.Error(), "FunctionSummary") {
 		t.Fatalf(
-			"FromPLIRAndAllocPlan error = %v, want missing FunctionSummary completeness rejection",
+			"BuildGraphFromPLIRAndPlan error = %v, want missing FunctionSummary completeness rejection",
 			err,
 		)
 	}
 }
 
-func TestFromPLIRAndAllocPlanEmitsBorrowCopyVocabulary(t *testing.T) {
+func TestBuildGraphFromPLIRAndPlanEmitsBorrowCopyVocabulary(t *testing.T) {
 	prog := &plir.Program{Funcs: []plir.Function{{
 		Name: "main",
 		Values: []plir.Value{
@@ -281,9 +280,9 @@ func TestFromPLIRAndAllocPlanEmitsBorrowCopyVocabulary(t *testing.T) {
 		}},
 	}}}
 
-	graph, err := FromPLIRAndAllocPlan("program", prog, plan)
+	graph, err := BuildGraphFromPLIRAndPlan("program", prog, plan)
 	if err != nil {
-		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan: %v", err)
 	}
 	report := BuildReportFromGraph(graph)
 	for _, want := range []string{
@@ -376,9 +375,9 @@ func TestMemoryIdealB03ProjectsCopyIntoOverlapAndCapacityFacts(t *testing.T) {
 		},
 	}}}
 
-	graph, err := FromPLIRAndAllocPlan("program", prog, nil)
+	graph, err := BuildGraphFromPLIRAndPlan("program", prog, nil)
 	if err != nil {
-		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan: %v", err)
 	}
 	report := BuildReportFromGraph(graph)
 	lengthRow, ok := reportRowByClaim(report, "copy_into_destination_length_check")
@@ -488,9 +487,9 @@ func TestMemoryIdealB03CopyIntoDistinctOwnedAndUnknownBuffers(t *testing.T) {
 		},
 	}}}
 
-	graph, err := FromPLIRAndAllocPlan("program", prog, nil)
+	graph, err := BuildGraphFromPLIRAndPlan("program", prog, nil)
 	if err != nil {
-		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan: %v", err)
 	}
 	report := BuildReportFromGraph(graph)
 	distinctRow, ok := reportRowByClaimAndSource(
@@ -534,7 +533,7 @@ func TestMemoryIdealB03CopyIntoDistinctOwnedAndUnknownBuffers(t *testing.T) {
 	}
 }
 
-func TestFromPLIRAndAllocPlanProjectsSliceViewDynamicBoundsChecks(t *testing.T) {
+func TestBuildGraphFromPLIRAndPlanProjectsSliceViewDynamicBoundsChecks(t *testing.T) {
 	prog := &plir.Program{Funcs: []plir.Function{{
 		Name: "main",
 		Values: []plir.Value{
@@ -654,9 +653,9 @@ func TestFromPLIRAndAllocPlanProjectsSliceViewDynamicBoundsChecks(t *testing.T) 
 		},
 	}}}
 
-	graph, err := FromPLIRAndAllocPlan("program", prog, nil)
+	graph, err := BuildGraphFromPLIRAndPlan("program", prog, nil)
 	if err != nil {
-		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan: %v", err)
 	}
 	report := BuildReportFromGraph(graph)
 	if got := countReportClaim(report, "bounds_check_retained_dynamic"); got != 2 {
@@ -686,7 +685,7 @@ func TestFromPLIRAndAllocPlanProjectsSliceViewDynamicBoundsChecks(t *testing.T) 
 	}
 }
 
-func TestFromPLIRAndAllocPlanDoesNotValidateStackHeapFallback(t *testing.T) {
+func TestBuildGraphFromPLIRAndPlanDoesNotValidateStackHeapFallback(t *testing.T) {
 	plan := &allocplan.Plan{Functions: []allocplan.FunctionPlan{{
 		Name: "main",
 		Allocations: []allocplan.Allocation{{
@@ -704,9 +703,9 @@ func TestFromPLIRAndAllocPlanDoesNotValidateStackHeapFallback(t *testing.T) {
 		}},
 	}}}
 
-	graph, err := FromPLIRAndAllocPlan("program", nil, plan)
+	graph, err := BuildGraphFromPLIRAndPlan("program", nil, plan)
 	if err != nil {
-		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan: %v", err)
 	}
 	report := BuildReportFromGraph(graph)
 	for _, row := range report.Rows {
@@ -725,7 +724,7 @@ func TestFromPLIRAndAllocPlanDoesNotValidateStackHeapFallback(t *testing.T) {
 	t.Fatalf("missing allocplan stack heap-fallback row: %+v", report.Rows)
 }
 
-func TestFromPLIRAndAllocPlanDoesNotValidateFunctionTempRegionHeapFallback(t *testing.T) {
+func TestBuildGraphFromPLIRAndPlanDoesNotValidateFunctionTempRegionHeapFallback(t *testing.T) {
 	plan := &allocplan.Plan{Functions: []allocplan.FunctionPlan{{
 		Name: "main",
 		Allocations: []allocplan.Allocation{{
@@ -742,9 +741,9 @@ func TestFromPLIRAndAllocPlanDoesNotValidateFunctionTempRegionHeapFallback(t *te
 			LoweringStatus:        "conservative_heap_fallback",
 		}},
 	}}}
-	graph, err := FromPLIRAndAllocPlan("program", nil, plan)
+	graph, err := BuildGraphFromPLIRAndPlan("program", nil, plan)
 	if err != nil {
-		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan: %v", err)
 	}
 	report := BuildReportFromGraph(graph)
 	for _, row := range report.Rows {
@@ -764,7 +763,7 @@ func TestFromPLIRAndAllocPlanDoesNotValidateFunctionTempRegionHeapFallback(t *te
 	t.Fatalf("missing allocplan FunctionTempRegion heap-fallback row: %+v", report.Rows)
 }
 
-func TestFromPLIRAndAllocPlanKeepsTaskActorRegionStorageEvidenceOnly(t *testing.T) {
+func TestBuildGraphFromPLIRAndPlanKeepsTaskActorRegionStorageEvidenceOnly(t *testing.T) {
 	tests := []struct {
 		name              string
 		storage           allocplan.StorageClass
@@ -807,9 +806,9 @@ func TestFromPLIRAndAllocPlanKeepsTaskActorRegionStorageEvidenceOnly(t *testing.
 				}},
 			}}}
 
-			graph, err := FromPLIRAndAllocPlan("program", nil, plan)
+			graph, err := BuildGraphFromPLIRAndPlan("program", nil, plan)
 			if err != nil {
-				t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+				t.Fatalf("BuildGraphFromPLIRAndPlan: %v", err)
 			}
 			report := BuildReportFromGraph(graph)
 			for _, row := range report.Rows {
@@ -835,7 +834,7 @@ func TestFromPLIRAndAllocPlanKeepsTaskActorRegionStorageEvidenceOnly(t *testing.
 	}
 }
 
-func TestFromPLIRAndAllocPlanKeepsUnvalidatedAllocPlanCostsNonZero(t *testing.T) {
+func TestBuildGraphFromPLIRAndPlanKeepsUnvalidatedAllocPlanCostsNonZero(t *testing.T) {
 	plan := &allocplan.Plan{Functions: []allocplan.FunctionPlan{{
 		Name: "main",
 		Allocations: []allocplan.Allocation{
@@ -864,9 +863,9 @@ func TestFromPLIRAndAllocPlanKeepsUnvalidatedAllocPlanCostsNonZero(t *testing.T)
 		},
 	}}}
 
-	graph, err := FromPLIRAndAllocPlan("program", nil, plan)
+	graph, err := BuildGraphFromPLIRAndPlan("program", nil, plan)
 	if err != nil {
-		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan: %v", err)
 	}
 	report := BuildReportFromGraph(graph)
 	for _, sourceFactID := range []FactID{"allocplan:main:raw-root", "allocplan:main:stack-temp"} {
@@ -891,7 +890,7 @@ func TestFromPLIRAndAllocPlanKeepsUnvalidatedAllocPlanCostsNonZero(t *testing.T)
 	}
 }
 
-func TestFromPLIRAndAllocPlanRejectsHeapFallbackWithoutReason(t *testing.T) {
+func TestBuildGraphFromPLIRAndPlanRejectsHeapFallbackWithoutReason(t *testing.T) {
 	plan := &allocplan.Plan{Functions: []allocplan.FunctionPlan{{
 		Name: "main",
 		Allocations: []allocplan.Allocation{{
@@ -909,13 +908,13 @@ func TestFromPLIRAndAllocPlanRejectsHeapFallbackWithoutReason(t *testing.T) {
 		}},
 	}}}
 
-	_, err := FromPLIRAndAllocPlan("program", nil, plan)
+	_, err := BuildGraphFromPLIRAndPlan("program", nil, plan)
 	if err == nil || !strings.Contains(err.Error(), "reason") {
-		t.Fatalf("FromPLIRAndAllocPlan error = %v, want heap fallback reason rejection", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan error = %v, want heap fallback reason rejection", err)
 	}
 }
 
-func TestFromPLIRAndAllocPlanKeepsUnsafeUnknownBorrowConservative(t *testing.T) {
+func TestBuildGraphFromPLIRAndPlanKeepsUnsafeUnknownBorrowConservative(t *testing.T) {
 	prog := &plir.Program{Funcs: []plir.Function{{
 		Name: "main",
 		Values: []plir.Value{{
@@ -947,9 +946,9 @@ func TestFromPLIRAndAllocPlanKeepsUnsafeUnknownBorrowConservative(t *testing.T) 
 		},
 	}}}
 
-	graph, err := FromPLIRAndAllocPlan("program", prog, nil)
+	graph, err := BuildGraphFromPLIRAndPlan("program", prog, nil)
 	if err != nil {
-		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan: %v", err)
 	}
 	report := BuildReportFromGraph(graph)
 	if reportHasClaim(report, "borrow_owner") || reportHasClaim(report, "borrow_source_fact_id") {
@@ -963,7 +962,7 @@ func TestFromPLIRAndAllocPlanKeepsUnsafeUnknownBorrowConservative(t *testing.T) 
 	}
 }
 
-func TestFromPLIRAndAllocPlanEmitsInoutAliasVocabulary(t *testing.T) {
+func TestBuildGraphFromPLIRAndPlanEmitsInoutAliasVocabulary(t *testing.T) {
 	prog := &plir.Program{Funcs: []plir.Function{{
 		Name: "mutate",
 		Values: []plir.Value{{
@@ -1011,9 +1010,9 @@ func TestFromPLIRAndAllocPlanEmitsInoutAliasVocabulary(t *testing.T) {
 		},
 	}}}
 
-	graph, err := FromPLIRAndAllocPlan("program", prog, nil)
+	graph, err := BuildGraphFromPLIRAndPlan("program", prog, nil)
 	if err != nil {
-		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan: %v", err)
 	}
 	report := BuildReportFromGraph(graph)
 	for _, want := range []string{
@@ -1105,9 +1104,9 @@ func TestMemoryIdealV0ProjectsBorrowAggregateAndOptionalFacts(t *testing.T) {
 		},
 	}}}
 
-	graph, err := FromPLIRAndAllocPlan("program", prog, nil)
+	graph, err := BuildGraphFromPLIRAndPlan("program", prog, nil)
 	if err != nil {
-		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan: %v", err)
 	}
 	report := BuildReportFromGraph(graph)
 	for _, want := range []string{"aggregate_contains_borrow", "optional_contains_borrow"} {
@@ -1200,9 +1199,9 @@ func TestMemoryIdealV1ProjectsEnumPayloadAndGenericWrapperFacts(t *testing.T) {
 		},
 	}}}
 
-	graph, err := FromPLIRAndAllocPlan("program", prog, nil)
+	graph, err := BuildGraphFromPLIRAndPlan("program", prog, nil)
 	if err != nil {
-		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan: %v", err)
 	}
 	report := BuildReportFromGraph(graph)
 	for _, want := range []string{"enum_payload_contains_borrow", "generic_wrapper_contains_borrow"} {
@@ -1313,9 +1312,9 @@ func TestMemoryIdealV2ProjectsFunctionValueAndCallbackFacts(t *testing.T) {
 		},
 	}}}
 
-	graph, err := FromPLIRAndAllocPlan("program", prog, nil)
+	graph, err := BuildGraphFromPLIRAndPlan("program", prog, nil)
 	if err != nil {
-		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan: %v", err)
 	}
 	report := BuildReportFromGraph(graph)
 	for _, tc := range []struct {
@@ -1348,7 +1347,7 @@ func TestMemoryIdealV2ProjectsFunctionValueAndCallbackFacts(t *testing.T) {
 	}
 }
 
-func TestFromPLIRAndAllocPlanProjectsCallbackInoutBoundaryWithoutNoAlias(t *testing.T) {
+func TestBuildGraphFromPLIRAndPlanProjectsCallbackInoutBoundaryWithoutNoAlias(t *testing.T) {
 	prog := &plir.Program{Funcs: []plir.Function{{
 		Name: "callbackBoundary",
 		Values: []plir.Value{{
@@ -1397,9 +1396,9 @@ func TestFromPLIRAndAllocPlanProjectsCallbackInoutBoundaryWithoutNoAlias(t *test
 		},
 	}}}
 
-	graph, err := FromPLIRAndAllocPlan("program", prog, nil)
+	graph, err := BuildGraphFromPLIRAndPlan("program", prog, nil)
 	if err != nil {
-		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan: %v", err)
 	}
 	report := BuildReportFromGraph(graph)
 	if got := countReportClaim(report, "no_alias"); got != 0 {
@@ -1423,7 +1422,7 @@ func TestFromPLIRAndAllocPlanProjectsCallbackInoutBoundaryWithoutNoAlias(t *test
 	}
 }
 
-func TestFromPLIRAndAllocPlanProjectsUnknownExternalNoAliasBoundaryWithoutNoAlias(t *testing.T) {
+func TestBuildGraphFromPLIRAndPlanProjectsUnknownExternalNoAliasBoundaryWithoutNoAlias(t *testing.T) {
 	prog := &plir.Program{Funcs: []plir.Function{{
 		Name: "externalBoundary",
 		Values: []plir.Value{{
@@ -1472,9 +1471,9 @@ func TestFromPLIRAndAllocPlanProjectsUnknownExternalNoAliasBoundaryWithoutNoAlia
 		},
 	}}}
 
-	graph, err := FromPLIRAndAllocPlan("program", prog, nil)
+	graph, err := BuildGraphFromPLIRAndPlan("program", prog, nil)
 	if err != nil {
-		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan: %v", err)
 	}
 	report := BuildReportFromGraph(graph)
 	if got := countReportClaim(report, "no_alias"); got != 0 {
@@ -1548,9 +1547,9 @@ func TestMemoryIdealV2UnknownCallbackTargetDoesNotEmitTrustedBorrowFacts(t *test
 		},
 	}}}
 
-	graph, err := FromPLIRAndAllocPlan("program", prog, nil)
+	graph, err := BuildGraphFromPLIRAndPlan("program", prog, nil)
 	if err != nil {
-		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan: %v", err)
 	}
 	report := BuildReportFromGraph(graph)
 	for _, claim := range []string{"function_value_contains_borrow", "callback_arg_contains_borrow"} {
@@ -1659,9 +1658,9 @@ func TestMemoryIdealV3ProjectsInterfaceProtocolFacts(t *testing.T) {
 		},
 	}}}
 
-	graph, err := FromPLIRAndAllocPlan("program", prog, nil)
+	graph, err := BuildGraphFromPLIRAndPlan("program", prog, nil)
 	if err != nil {
-		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan: %v", err)
 	}
 	report := BuildReportFromGraph(graph)
 	for _, tc := range []struct {
@@ -1743,9 +1742,9 @@ func TestMemoryIdealV3UnknownDynamicDispatchDoesNotEmitTrustedInterfaceFacts(t *
 		},
 	}}}
 
-	graph, err := FromPLIRAndAllocPlan("program", prog, nil)
+	graph, err := BuildGraphFromPLIRAndPlan("program", prog, nil)
 	if err != nil {
-		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan: %v", err)
 	}
 	report := BuildReportFromGraph(graph)
 	if reportHasClaim(report, "interface_value_contains_borrow") {
@@ -1881,9 +1880,9 @@ func TestMemoryIdealV4ProjectsAsyncTaskActorBoundaryFacts(t *testing.T) {
 		},
 	}}}
 
-	graph, err := FromPLIRAndAllocPlan("program", prog, nil)
+	graph, err := BuildGraphFromPLIRAndPlan("program", prog, nil)
 	if err != nil {
-		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan: %v", err)
 	}
 	report := BuildReportFromGraph(graph)
 	for _, tc := range []struct {
@@ -1974,9 +1973,9 @@ func TestMemoryIdealV4UnknownTaskActorTargetDoesNotEmitTrustedBoundaryFacts(t *t
 		},
 	}}}
 
-	graph, err := FromPLIRAndAllocPlan("program", prog, nil)
+	graph, err := BuildGraphFromPLIRAndPlan("program", prog, nil)
 	if err != nil {
-		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan: %v", err)
 	}
 	report := BuildReportFromGraph(graph)
 	for _, claim := range []string{

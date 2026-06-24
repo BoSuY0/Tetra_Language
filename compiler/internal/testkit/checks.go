@@ -6,6 +6,7 @@ import (
 
 	"tetra_language/compiler/internal/frontend"
 	"tetra_language/compiler/internal/lower"
+	"tetra_language/compiler/internal/memorypipeline"
 	"tetra_language/compiler/internal/module"
 	"tetra_language/compiler/internal/semantics"
 )
@@ -33,8 +34,15 @@ func CheckFileProgram(src string) error {
 	if err != nil {
 		return err
 	}
-	_, err = lower.Lower(checked)
-	return err
+	state, err := memorypipeline.Build(checked, memorypipeline.Options{})
+	if err != nil {
+		return err
+	}
+	result, err := lower.LowerPlannedProgram(checked, state.Plan, lower.Options{})
+	if err != nil {
+		return err
+	}
+	return state.ApplyLowering(result.Program, result.Evidence)
 }
 
 func CheckFileSemanticProgram(src string) error {

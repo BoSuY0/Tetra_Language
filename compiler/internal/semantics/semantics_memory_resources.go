@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 	"tetra_language/compiler/internal/frontend"
+	"tetra_language/compiler/internal/islandkernel"
 	semanticspolicy "tetra_language/compiler/internal/semantics/policy"
 	semanticsregions "tetra_language/compiler/internal/semantics/regions"
 )
@@ -52,6 +53,15 @@ func classifyCallableEscape(
 		escapeKind = CallableEscapeThread
 	}
 	for _, capture := range captures {
+		captureDecision := islandkernel.CanCaptureClosure(islandKernelCallableCaptureRequest(capture))
+		if captureDecision.Decision != islandkernel.Accept {
+			return "", false, lifetimeDiagnosticf(
+				capture.At,
+				"closure capture '%s' rejected by island kernel (%s)",
+				capture.Name,
+				captureDecision.Reason.Code,
+			)
+		}
 		if capture.Mutable {
 			return "", false, unsupportedCallableMutableCaptureEscapeError(
 				capture.At,
@@ -71,6 +81,23 @@ func classifyCallableEscape(
 		}
 	}
 	return escapeKind, true, nil
+}
+
+func islandKernelCallableCaptureRequest(capture frontend.ClosureCapture) islandkernel.EscapeRequest {
+	name := strings.TrimSpace(capture.Name)
+	if name == "" {
+		name = "<anonymous-capture>"
+	}
+	return islandkernel.EscapeRequest{
+		Ref: islandkernel.MemoryRef{
+			BaseID:      name,
+			IslandID:    "callable-capture:" + name,
+			Epoch:       1,
+			OwnerID:     "callable",
+			Provenance:  islandkernel.ProvenanceOwned,
+			UnsafeClass: islandkernel.UnsafeSafe,
+		},
+	}
 }
 
 func surfaceEphemeralCallableCapture(
@@ -2335,6 +2362,7 @@ func (s *regionState) enterIsland(name string) error {
 	}
 	s.activateScope(id)
 	s.regionVars[name] = id
+	s.bindResource(name, "", true)
 	return nil
 }
 

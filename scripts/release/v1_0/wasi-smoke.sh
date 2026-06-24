@@ -100,7 +100,7 @@ JS
 }
 
 smoke_list="$tmp_dir/wasm32-wasi-smoke-list.json"
-./tetra smoke --list --target wasm32-wasi --format=json > "$smoke_list"
+./tetra smoke --list --target wasm32-wasi --format=json >"$smoke_list"
 go run ./tools/cmd/validate-smoke-list --report "$smoke_list"
 
 artifact_report="$tmp_dir/wasm32-wasi-artifact-preflight.json"

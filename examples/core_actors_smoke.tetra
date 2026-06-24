@@ -1,0 +1,12 @@
+// Stable core actors stdlib smoke.
+module examples.core_actors_smoke
+
+import lib.core.actors as actors
+
+func main() -> Int:
+    let status: actors.ActorStatus = actors.ActorStatus.ready
+    match status:
+    case actors.ActorStatus.ready:
+        return 42
+    case _:
+        return 1

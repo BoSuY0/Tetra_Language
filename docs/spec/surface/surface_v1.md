@@ -120,7 +120,7 @@ deterministic command order `fill`, `gradient`, `image_fill`, `border`, `radius_
 `overlay`, `outline`, `text`, and `icon`. The report-level `renderer` block uses schema
 `tetra.surface.renderer-feature.v1` with the `software-rgba` backend, `rgba8` color format,
 compositor layers, dirty rects, invalidations, bounded cache stats, deterministic frame checksums,
-and explicit rejection of unsupported GPU, blur, and backdrop-blur production claims. This is a
+and explicit rejection of unsupported renderer acceleration claims for GPU paths, blur, and backdrop-blur. This is a
 production-baseline shape for the current software renderer evidence; it is not a GPU renderer
 claim, not a browser/CSS compositor claim, and not broad Electron renderer parity.
 
@@ -450,7 +450,7 @@ hardened `lib.core.component` tree API. It defines ordinary Tetra structs for `T
 `TextBox`, `Row`, `Column`, and `Panel` plus helper functions such as `add_panel`, `add_column`,
 `add_text`, `add_textbox`, `add_row`, `add_button`, layout helpers, `hit_test`,
 `textbox_text_input`, and `button_key_event`. These helpers are library code, not compiler-known
-widgets, platform widgets, DOM widgets, user JavaScript, or a production toolkit claim.
+widgets. They make no platform-widget, DOM-widget, user-JavaScript, or production-toolkit claim.
 
 `examples/surface/toolkit/surface_toolkit_form.tetra` proves reuse of that module with this shape:
 

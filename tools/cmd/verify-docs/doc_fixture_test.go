@@ -290,7 +290,7 @@ func validMemoryIslandsFinalProductionReadinessAuditBody() string {
 		"`git rev-parse HEAD`",
 		"`go test -buildvcs=false ./compiler/... ./cli/... ./tools/... -count=1`",
 		("`go test -race -buildvcs=false ./compiler/internal/islandkernel " +
-			"./compiler/internal/memoryfacts ./compiler/internal/memorymodel ./" +
+			"./compiler/internal/memoryfacts ./compiler/internal/memoryfacts_test ./" +
 			"compiler/internal/semantics ./compiler/internal/plir ./compiler/" +
 			"internal/validation ./cli/internal/actornet -count=1`"),
 		("`bash scripts/release/post_v0_4/memory-production-linux-x64-" +

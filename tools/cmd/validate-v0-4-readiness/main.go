@@ -16,12 +16,13 @@ import (
 )
 
 type readinessInputs struct {
-	ExpectedVersion string
-	Manifest        []byte
-	Features        []byte
-	Targets         []byte
-	ScopeDecisions  []byte
-	RuntimeReports  map[string][]byte
+	ExpectedVersion              string
+	Manifest                     []byte
+	Features                     []byte
+	Targets                      []byte
+	ScopeDecisions               []byte
+	RuntimeReports               map[string][]byte
+	AllowPendingReleaseArtifacts bool
 }
 
 type manifestReport struct {
@@ -115,6 +116,11 @@ func main() {
 		"docs/release/v0_4/data/v0_4_0_scope_decisions.json",
 		"v0.4.0 scope decisions JSON",
 	)
+	allowPendingReleaseArtifacts := flag.Bool(
+		"allow-pending-release-artifacts",
+		false,
+		"allow reports/ release-gate artifacts to be pending during preflight; final validation must omit this flag",
+	)
 	flag.Var(
 		&runtimeReports,
 		"runtime-report",
@@ -129,6 +135,7 @@ func main() {
 		*targetsPath,
 		*scopePath,
 		runtimeReports,
+		*allowPendingReleaseArtifacts,
 	)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "validate-v0-4-readiness: %v\n", err)
@@ -158,6 +165,7 @@ func (r *runtimeReportFlags) Set(value string) error {
 func readInputs(
 	expectedVersion, manifestPath, featuresPath, targetsPath, scopePath string,
 	runtimeReportSpecs []string,
+	allowPendingReleaseArtifacts bool,
 ) (readinessInputs, error) {
 	read := func(path, label string) ([]byte, error) {
 		if path == "" {
@@ -204,12 +212,13 @@ func readInputs(
 		runtimeReports[target] = raw
 	}
 	return readinessInputs{
-		ExpectedVersion: expectedVersion,
-		Manifest:        manifest,
-		Features:        features,
-		Targets:         targets,
-		ScopeDecisions:  scope,
-		RuntimeReports:  runtimeReports,
+		ExpectedVersion:              expectedVersion,
+		Manifest:                     manifest,
+		Features:                     features,
+		Targets:                      targets,
+		ScopeDecisions:               scope,
+		RuntimeReports:               runtimeReports,
+		AllowPendingReleaseArtifacts: allowPendingReleaseArtifacts,
 	}, nil
 }
 
@@ -302,7 +311,7 @@ func validateReadiness(inputs readinessInputs) error {
 	for _, decision := range scope.Decisions {
 		switch {
 		case decision.Kind == "feature" && decision.Decision == "implement":
-			issues = append(issues, validateDecisionEvidence(decision.ID, decision.Evidence)...)
+			issues = append(issues, validateDecisionEvidence(decision.ID, decision.Evidence, inputs.AllowPendingReleaseArtifacts)...)
 			status, ok := featureStatus[decision.ID]
 			if !ok {
 				issues = append(
@@ -321,7 +330,7 @@ func validateReadiness(inputs readinessInputs) error {
 				issues = append(issues, fmt.Sprintf("feature %s missing since", decision.ID))
 			}
 		case decision.Kind == "target-runtime" && decision.Decision == "implement-production-runtime":
-			issues = append(issues, validateDecisionEvidence(decision.ID, decision.Evidence)...)
+			issues = append(issues, validateDecisionEvidence(decision.ID, decision.Evidence, inputs.AllowPendingReleaseArtifacts)...)
 			target, ok := targetByTriple[decision.ID]
 			if !ok {
 				issues = append(
@@ -523,7 +532,7 @@ func requiredNativeRuntimeSmokeCases() []string {
 	}
 }
 
-func validateDecisionEvidence(id string, evidence decisionEvidence) []string {
+func validateDecisionEvidence(id string, evidence decisionEvidence, allowPendingReleaseArtifacts bool) []string {
 	var issues []string
 	required := []struct {
 		name   string
@@ -547,6 +556,7 @@ func validateDecisionEvidence(id string, evidence decisionEvidence) []string {
 	releaseIssues, hasReportArtifact := validateReleaseGateEvidence(
 		id,
 		evidence.ReleaseGateEvidence,
+		allowPendingReleaseArtifacts,
 	)
 	issues = append(issues, releaseIssues...)
 	if len(nonEmptyStrings(evidence.ReleaseGateEvidence)) > 0 && !hasReportArtifact {
@@ -559,18 +569,18 @@ func validateDecisionEvidence(id string, evidence decisionEvidence) []string {
 		)
 	}
 	if id == actorDistributedRuntimeDecision {
-		issues = append(issues, validateActorDistributedRuntimeEvidence(evidence)...)
+		issues = append(issues, validateActorDistributedRuntimeEvidence(evidence, allowPendingReleaseArtifacts)...)
 	}
 	if id == nativeUIRuntimeDecision {
-		issues = append(issues, validateNativeUIRuntimeEvidence(evidence)...)
+		issues = append(issues, validateNativeUIRuntimeEvidence(evidence, allowPendingReleaseArtifacts)...)
 	}
 	return issues
 }
 
-func validateNativeUIRuntimeEvidence(evidence decisionEvidence) []string {
+func validateNativeUIRuntimeEvidence(evidence decisionEvidence, allowPendingReleaseArtifacts bool) []string {
 	hasRuntimeImplementation := hasNativeUIRuntimeImplementationEvidence(evidence.Implementation)
 	hasRuntimeTests := hasNativeUIRuntimeTestEvidence(evidence.Tests)
-	hasRuntimeGateArtifact := hasNativeUIRuntimeGateArtifact(evidence.ReleaseGateEvidence)
+	hasRuntimeGateArtifact := hasNativeUIRuntimeGateArtifact(evidence.ReleaseGateEvidence, allowPendingReleaseArtifacts)
 	hasSidecarEvidence := hasNativeUISidecarOrMetadataEvidence(evidence)
 
 	var issues []string
@@ -631,7 +641,7 @@ func validateNativeUIRuntimeEvidence(evidence decisionEvidence) []string {
 			),
 		)
 	}
-	issues = append(issues, validateNativeUIRuntimeGateArtifacts(evidence.ReleaseGateEvidence)...)
+	issues = append(issues, validateNativeUIRuntimeGateArtifacts(evidence.ReleaseGateEvidence, allowPendingReleaseArtifacts)...)
 	return issues
 }
 
@@ -722,11 +732,14 @@ func hasNativeUIRuntimeDocsEvidence(values []string) bool {
 	return hasSurface && hasUIDocs
 }
 
-func hasNativeUIRuntimeGateArtifact(values []string) bool {
+func hasNativeUIRuntimeGateArtifact(values []string, allowPendingReleaseArtifacts bool) bool {
 	for _, value := range nonEmptyStrings(values) {
 		normalized := normalizeEvidenceValue(value)
 		if !strings.HasPrefix(normalized, "reports/") {
 			continue
+		}
+		if allowPendingReleaseArtifacts && isPendingNativeUIRuntimeArtifact(normalized) {
+			return true
 		}
 		raw, err := readFileFromRepoRoot(normalized)
 		if err != nil {
@@ -744,7 +757,7 @@ func hasNativeUIRuntimeGateArtifact(values []string) bool {
 	return false
 }
 
-func validateNativeUIRuntimeGateArtifacts(values []string) []string {
+func validateNativeUIRuntimeGateArtifacts(values []string, allowPendingReleaseArtifacts bool) []string {
 	var issues []string
 	for _, value := range nonEmptyStrings(values) {
 		normalized := normalizeEvidenceValue(value)
@@ -753,6 +766,9 @@ func validateNativeUIRuntimeGateArtifacts(values []string) []string {
 		}
 		raw, err := readFileFromRepoRoot(normalized)
 		if err != nil {
+			if allowPendingReleaseArtifacts && isPendingNativeUIRuntimeArtifact(normalized) {
+				continue
+			}
 			continue
 		}
 		lower := strings.ToLower(string(raw))
@@ -804,6 +820,12 @@ func validateNativeUIRuntimeGateArtifacts(values []string) []string {
 	return issues
 }
 
+func isPendingNativeUIRuntimeArtifact(path string) bool {
+	return strings.HasPrefix(path, "reports/") &&
+		strings.Contains(path, "native-ui-linux-x64") &&
+		strings.HasSuffix(path, ".json")
+}
+
 func hasNativeUISidecarOrMetadataEvidence(evidence decisionEvidence) bool {
 	for _, values := range [][]string{
 		evidence.Implementation,
@@ -853,12 +875,12 @@ func isNativeUISidecarOrMetadataEvidenceValue(value string) bool {
 	return false
 }
 
-func validateActorDistributedRuntimeEvidence(evidence decisionEvidence) []string {
+func validateActorDistributedRuntimeEvidence(evidence decisionEvidence, allowPendingReleaseArtifacts bool) []string {
 	hasRuntimeImplementation := hasActorDistributedRuntimeImplementationEvidence(
 		evidence.Implementation,
 	)
 	hasRuntimeTests := hasActorDistributedRuntimeTestEvidence(evidence.Tests)
-	hasRuntimeGateArtifact := hasActorDistributedRuntimeGateArtifact(evidence.ReleaseGateEvidence)
+	hasRuntimeGateArtifact := hasActorDistributedRuntimeGateArtifact(evidence.ReleaseGateEvidence, allowPendingReleaseArtifacts)
 	hasTransportEvidence := hasActorTransportEvidence(evidence)
 
 	var issues []string
@@ -918,7 +940,7 @@ func validateActorDistributedRuntimeEvidence(evidence decisionEvidence) []string
 	}
 	issues = append(
 		issues,
-		validateActorDistributedRuntimeGateArtifacts(evidence.ReleaseGateEvidence)...)
+		validateActorDistributedRuntimeGateArtifacts(evidence.ReleaseGateEvidence, allowPendingReleaseArtifacts)...)
 	return issues
 }
 
@@ -1022,7 +1044,7 @@ func hasActorDistributedRuntimeDocsEvidence(values []string) bool {
 	return hasSurface && hasActorDocs
 }
 
-func hasActorDistributedRuntimeGateArtifact(values []string) bool {
+func hasActorDistributedRuntimeGateArtifact(values []string, allowPendingReleaseArtifacts bool) bool {
 	for _, value := range nonEmptyStrings(values) {
 		normalized := normalizeEvidenceValue(value)
 		if !strings.HasPrefix(normalized, "reports/") {
@@ -1030,6 +1052,9 @@ func hasActorDistributedRuntimeGateArtifact(values []string) bool {
 		}
 		if isActorTransportEvidenceValue(normalized) {
 			continue
+		}
+		if allowPendingReleaseArtifacts && isPendingActorDistributedRuntimeArtifact(normalized) {
+			return true
 		}
 		raw, err := readFileFromRepoRoot(normalized)
 		if err != nil {
@@ -1046,7 +1071,7 @@ func hasActorDistributedRuntimeGateArtifact(values []string) bool {
 	return false
 }
 
-func validateActorDistributedRuntimeGateArtifacts(values []string) []string {
+func validateActorDistributedRuntimeGateArtifacts(values []string, allowPendingReleaseArtifacts bool) []string {
 	var issues []string
 	for _, value := range nonEmptyStrings(values) {
 		normalized := normalizeEvidenceValue(value)
@@ -1055,6 +1080,9 @@ func validateActorDistributedRuntimeGateArtifacts(values []string) []string {
 		}
 		raw, err := readFileFromRepoRoot(normalized)
 		if err != nil {
+			if allowPendingReleaseArtifacts && isPendingActorDistributedRuntimeArtifact(normalized) {
+				continue
+			}
 			continue
 		}
 		if isActorTransportEvidenceValue(normalized) ||
@@ -1093,6 +1121,12 @@ func validateActorDistributedRuntimeGateArtifacts(values []string) []string {
 		}
 	}
 	return issues
+}
+
+func isPendingActorDistributedRuntimeArtifact(path string) bool {
+	return strings.HasPrefix(path, "reports/") &&
+		strings.Contains(path, "distributed-actors-linux-x64") &&
+		strings.HasSuffix(path, ".json")
 }
 
 func hasActorTransportEvidence(evidence decisionEvidence) bool {
@@ -1185,7 +1219,7 @@ func isEvidenceCommand(value string) bool {
 	return false
 }
 
-func validateReleaseGateEvidence(id string, paths []string) ([]string, bool) {
+func validateReleaseGateEvidence(id string, paths []string, allowPendingReleaseArtifacts bool) ([]string, bool) {
 	var issues []string
 	hasReportArtifact := false
 	for _, rawPath := range nonEmptyStrings(paths) {
@@ -1204,6 +1238,10 @@ func validateReleaseGateEvidence(id string, paths []string) ([]string, bool) {
 		}
 		info, err := statFromRepoRoot(path)
 		if err != nil {
+			if allowPendingReleaseArtifacts && strings.HasPrefix(path, "reports/") {
+				hasReportArtifact = true
+				continue
+			}
 			issues = append(
 				issues,
 				fmt.Sprintf(

@@ -97,10 +97,7 @@ if [[ -z "${WAYLAND_DISPLAY:-}" && -z "${DISPLAY:-}" ]]; then
 	exit 1
 fi
 
-go run ./tools/cmd/surface-runtime-smoke \
-	--mode linux-x64-release-app-shell \
-	--source examples/surface/toolkit/surface_linux_app_shell_notes.tetra \
-	--report "$report_path"
+go run ./tools/cmd/surface-runtime-smoke --mode linux-x64-release-app-shell --source examples/surface/toolkit/surface_linux_app_shell_notes.tetra --report "$report_path"
 go run ./tools/cmd/validate-surface-runtime --report "$report_path" --release linux-app-shell
 go run ./tools/cmd/validate-surface-security-report --report "$report_path"
 go run ./tools/cmd/validate-surface-performance-budget --report "$report_path"

@@ -6,15 +6,15 @@ This matrix prevents linux-x64 memory production evidence from being reused as a
 Each row separates artifact production from runtime execution, diagnostics, lowering, ABI/alignment
 evidence, and the maximum memory claim level currently allowed for that target.
 
-| Target      | Build | Lower | Run                        | Raw diagnostics | Region lowering | Alignment semantics | Claim level                 |
-| ----------- | ----- | ----- | -------------------------- | --------------- | --------------- | ------------------- | --------------------------- |
-| linux-x64   | yes   | yes   | yes                        | yes             | yes/partial     | yes                 | production/host_runtime     |
-| linux-x86   | yes   | yes   | no/host-dependent          | partial         | partial         | partial             | build_lower_only            |
-| linux-x32   | yes   | yes   | no/host-dependent          | partial         | partial         | special             | build_lower_only            |
-| macos-x64   | yes   | yes   | host-required              | host-required   | host-required   | host-required       | build_lower_only unless run |
-| windows-x64 | yes   | yes   | host-required              | host-required   | host-required   | host-required       | build_lower_only unless run |
-| wasm32-wasi | yes   | yes   | runner-smoke if available  | safe-only       | limited         | wasm rules          | artifact/runtime tiered     |
-| wasm32-web  | yes   | yes   | browser-smoke if available | safe-only       | limited         | wasm rules          | artifact/runtime tiered     |
+| Target | Build | Lower | Run | Raw diagnostics | Region lowering | Alignment semantics | Claim level |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| linux-x64 | yes | yes | yes | yes | yes/partial | yes | production/host_runtime |
+| linux-x86 | yes | yes | no/host-dependent | partial | partial | partial | build_lower_only |
+| linux-x32 | yes | yes | no/host-dependent | partial | partial | special | build_lower_only |
+| macos-x64 | yes | yes | host-required | host-required | host-required | host-required | build_lower_only unless run |
+| windows-x64 | yes | yes | host-required | host-required | host-required | host-required | build_lower_only unless run |
+| wasm32-wasi | yes | yes | runner-smoke if available | safe-only | limited | wasm rules | artifact/runtime tiered |
+| wasm32-web | yes | yes | browser-smoke if available | safe-only | limited | wasm rules | artifact/runtime tiered |
 
 ## Claim Rules
 

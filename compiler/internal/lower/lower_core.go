@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
 	"tetra_language/compiler/internal/allocplan"
 	"tetra_language/compiler/internal/frontend"
 	"tetra_language/compiler/internal/ir"
 	lowermodel "tetra_language/compiler/internal/lower/model"
 	lowertasks "tetra_language/compiler/internal/lower/tasks"
-	"tetra_language/compiler/internal/plir"
 	corerangeproof "tetra_language/compiler/internal/rangeproof"
 	"tetra_language/compiler/internal/runtimeabi"
 	"tetra_language/compiler/internal/semantics"
@@ -247,72 +247,19 @@ func Lower(checked *semantics.CheckedProgram) (*ir.IRProgram, error) {
 }
 
 func LowerWithOptions(checked *semantics.CheckedProgram, opt Options) (*ir.IRProgram, error) {
-	if checked == nil {
-		return nil, fmt.Errorf("missing checked program")
-	}
-	if len(checked.Funcs) == 0 {
-		return nil, fmt.Errorf("expected at least one function")
-	}
-	plirProg, err := plir.FromCheckedProgram(checked)
-	if err != nil {
-		return nil, err
-	}
-	if err := plir.VerifyProgram(plirProg); err != nil {
-		return nil, err
-	}
-	allocationPlan, err := allocplan.FromPLIRWithOptions(plirProg, allocationPlannerOptions(opt))
-	if err != nil {
-		return nil, err
-	}
-	allocationsByFunction := allocationPlanByFunction(allocationPlan)
-	callBoundaryProofs := corerangeproof.CollectHashLookupCallBoundaryLenProofs(checked)
-	helperSummaryProofs := corerangeproof.CollectHelperSummaryProofs(checked)
-	helperOffsetProofs := corerangeproof.CollectHelperOffsetProofs(checked)
-	ownedReturnSummaries := collectOwnedReturnSummaries(checked, opt)
-	ownedThrowSummaries := collectOwnedThrowSummaries(checked, opt, ownedReturnSummaries)
+	return nil, fmt.Errorf("lower: LowerWithOptions requires an explicit allocation plan; use LowerPlannedProgram or LowerWithPlan")
+}
 
-	prog := ir.IRProgram{MainIndex: checked.MainIndex, MainName: checked.MainName}
-	wrappers := collectTypedTaskWrappers(checked, "")
-	stagedTargets := collectStagedTypedTaskTargets(wrappers)
-	callableTargets := collectFunctionTypedParamTargets(checked, "")
-	for _, fn := range checked.Funcs {
-		irFunc, err := lowerCheckedFuncWithOptions(
-			fn,
-			checked.Types,
-			checked.FuncSigs,
-			checked.GlobalsByModule[fn.Module],
-			stagedTargets[fn.Name],
-			callableTargets[fn.Name],
-			ownedReturnSummaries,
-			ownedThrowSummaries,
-			opt,
-			allocationsByFunction[fn.Name],
-			callBoundaryProofs[fn.Name],
-			helperSummaryProofs[fn.Name],
-			helperOffsetProofs[fn.Name],
-		)
-		if err != nil {
-			return nil, err
-		}
-		if err := VerifyFunc(irFunc); err != nil {
-			return nil, err
-		}
-		prog.Funcs = append(prog.Funcs, irFunc)
-	}
-	for _, wrapper := range wrappers {
-		irFunc, err := lowerTypedTaskWrapper(wrapper)
-		if err != nil {
-			return nil, err
-		}
-		if err := VerifyFunc(irFunc); err != nil {
-			return nil, err
-		}
-		prog.Funcs = append(prog.Funcs, irFunc)
-	}
-	if err := VerifyProgram(&prog); err != nil {
+func LowerWithPlan(
+	checked *semantics.CheckedProgram,
+	plan *allocplan.Plan,
+	opt Options,
+) (*ir.IRProgram, error) {
+	result, err := LowerPlannedProgram(checked, plan, opt)
+	if err != nil {
 		return nil, err
 	}
-	return &prog, nil
+	return result.Program, nil
 }
 
 func LowerModule(checked *semantics.CheckedProgram, module string) ([]ir.IRFunc, error) {
@@ -324,68 +271,20 @@ func LowerModuleWithOptions(
 	module string,
 	opt Options,
 ) ([]ir.IRFunc, error) {
-	if checked == nil {
-		return nil, fmt.Errorf("missing checked program")
-	}
-	plirProg, err := plir.FromCheckedProgram(checked)
+	return nil, fmt.Errorf("lower: LowerModuleWithOptions requires an explicit allocation plan; use LowerModuleWithPlan")
+}
+
+func LowerModuleWithPlan(
+	checked *semantics.CheckedProgram,
+	module string,
+	plan *allocplan.Plan,
+	opt Options,
+) ([]ir.IRFunc, error) {
+	result, err := LowerPlannedProgram(checked, plan, opt)
 	if err != nil {
 		return nil, err
 	}
-	if err := plir.VerifyProgram(plirProg); err != nil {
-		return nil, err
-	}
-	allocationPlan, err := allocplan.FromPLIRWithOptions(plirProg, allocationPlannerOptions(opt))
-	if err != nil {
-		return nil, err
-	}
-	allocationsByFunction := allocationPlanByFunction(allocationPlan)
-	callBoundaryProofs := corerangeproof.CollectHashLookupCallBoundaryLenProofs(checked)
-	helperSummaryProofs := corerangeproof.CollectHelperSummaryProofs(checked)
-	helperOffsetProofs := corerangeproof.CollectHelperOffsetProofs(checked)
-	ownedReturnSummaries := collectOwnedReturnSummaries(checked, opt)
-	ownedThrowSummaries := collectOwnedThrowSummaries(checked, opt, ownedReturnSummaries)
-	var out []ir.IRFunc
-	wrappers := collectTypedTaskWrappers(checked, module)
-	stagedTargets := collectStagedTypedTaskTargets(wrappers)
-	callableTargets := collectFunctionTypedParamTargets(checked, "")
-	for _, fn := range checked.Funcs {
-		if fn.Module != module {
-			continue
-		}
-		irFunc, err := lowerCheckedFuncWithOptions(
-			fn,
-			checked.Types,
-			checked.FuncSigs,
-			checked.GlobalsByModule[fn.Module],
-			stagedTargets[fn.Name],
-			callableTargets[fn.Name],
-			ownedReturnSummaries,
-			ownedThrowSummaries,
-			opt,
-			allocationsByFunction[fn.Name],
-			callBoundaryProofs[fn.Name],
-			helperSummaryProofs[fn.Name],
-			helperOffsetProofs[fn.Name],
-		)
-		if err != nil {
-			return nil, err
-		}
-		if err := VerifyFunc(irFunc); err != nil {
-			return nil, err
-		}
-		out = append(out, irFunc)
-	}
-	for _, wrapper := range wrappers {
-		irFunc, err := lowerTypedTaskWrapper(wrapper)
-		if err != nil {
-			return nil, err
-		}
-		if err := VerifyFunc(irFunc); err != nil {
-			return nil, err
-		}
-		out = append(out, irFunc)
-	}
-	return out, nil
+	return result.ModuleFuncs(module)
 }
 
 func allocationPlanByFunction(plan *allocplan.Plan) map[string]map[string]allocplan.Allocation {
@@ -3797,7 +3696,10 @@ func lowerCheckedFuncWithOptions(
 		movedOwnedLocals:           map[int]int{},
 		nonOwnedEnumLocalTags:      map[int]int32{},
 		scalarSlices:               map[string]scalarSliceLocal{},
+		islandSliceLocals:          map[string]string{},
 		rawPtrOffsetLocals:         map[int]rawPtrOffsetLocal{},
+		rawPtrAllocationBytes:      map[int]int64{},
+		islandLocalAliases:         map[string]string{},
 		zeroLocals:                 map[string]bool{},
 		constIntLocals:             map[string]int64{},
 		lenBoundLocals:             map[string]string{},
@@ -4213,6 +4115,7 @@ func (l *lowerer) lowerStmtPrepared(stmt frontend.Stmt) error {
 		}
 		l.emit(ir.IRInstr{Kind: ir.IRWrite, Pos: s.At})
 	case *frontend.FreeStmt:
+		l.emitClearIslandSliceLocalsForFreeExpr(s.Value, s.At)
 		slots, err := l.lowerExpr(s.Value)
 		if err != nil {
 			return err
@@ -4487,10 +4390,14 @@ func (l *lowerer) lowerStmtPrepared(stmt frontend.Stmt) error {
 		}
 		l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: info.Base, Pos: s.At})
 		l.cleanupIslands = append(l.cleanupIslands, info.Base)
+		l.cleanupIslandSliceLocals = append(l.cleanupIslandSliceLocals, islandScopedSliceLocalNames(s.Body))
 		if err := l.lowerBlock(s.Body, s.At); err != nil {
 			return err
 		}
 		l.cleanupIslands = l.cleanupIslands[:len(l.cleanupIslands)-1]
+		names := l.cleanupIslandSliceLocals[len(l.cleanupIslandSliceLocals)-1]
+		l.cleanupIslandSliceLocals = l.cleanupIslandSliceLocals[:len(l.cleanupIslandSliceLocals)-1]
+		l.emitClearIslandScopedSliceLocals(names, s.At)
 		l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: info.Base, Pos: s.At})
 		l.emit(ir.IRInstr{Kind: ir.IRIslandFree, Pos: s.At})
 	case *frontend.LetStmt:
@@ -4617,6 +4524,8 @@ func (l *lowerer) lowerStmtPrepared(stmt frontend.Stmt) error {
 		l.rememberOwnedAllocCleanupForLet(s.Name, info, s.Value)
 		l.rememberNonOwnedEnumLocalTag(info, s.Value)
 		l.rememberRangeMetadataForLocal(s.Name, s.Value)
+		l.rememberIslandSliceLocalForLet(s.Name, info, s.Value)
+		l.rememberIslandLocalAliasForLet(s.Name, info, s.Value)
 		if info.SlotCount == 1 {
 			l.rememberRawPtrOffsetAlias(info.Base, s.Value)
 		}
@@ -4841,8 +4750,14 @@ func (l *lowerer) lowerStmtPrepared(stmt frontend.Stmt) error {
 		}
 		if !target.Global {
 			if id, ok := s.Target.(*frontend.IdentExpr); ok {
+				delete(l.islandSliceLocals, id.Name)
+				delete(l.islandLocalAliases, id.Name)
 				delete(l.scalarSlices, id.Name)
 				l.rememberRangeMetadataForLocal(id.Name, s.Value)
+				if info, ok := l.locals[id.Name]; ok && info.Base == target.Base {
+					l.rememberIslandSliceLocalForLet(id.Name, info, s.Value)
+					l.rememberIslandLocalAliasForLet(id.Name, info, s.Value)
+				}
 				l.invalidateWhileRangeProofForLocal(id.Name)
 			}
 		}
@@ -5303,8 +5218,11 @@ type lowerer struct {
 	ownedThrowSummaries        map[string]ownedThrowSummary
 	ownedParams                []ir.IROwnedParam
 	scalarSlices               map[string]scalarSliceLocal
+	islandSliceLocals          map[string]string
 	rawPtrOffsetLocals         map[int]rawPtrOffsetLocal
+	rawPtrAllocationBytes      map[int]int64
 	preparedStringFields       map[string]bool
+	islandLocalAliases         map[string]string
 	zeroLocals                 map[string]bool
 	constIntLocals             map[string]int64
 	lenBoundLocals             map[string]string
@@ -5317,6 +5235,7 @@ type lowerer struct {
 	stackHeight                int
 	nextLabel                  int
 	cleanupIslands             []int
+	cleanupIslandSliceLocals   [][]string
 	deferFrames                []deferFrame
 	loopStack                  []loopLabels
 }
@@ -5565,6 +5484,8 @@ type rawPtrOffsetLocal struct {
 	OffsetLocal  int
 	OffsetImm    int32
 	HasOffsetImm bool
+	BaseBytes    int64
+	HasBaseBytes bool
 }
 
 type typedTaskWrapper = lowertasks.Wrapper
@@ -5752,6 +5673,7 @@ func (l *lowerer) emitCleanupSince(start int, pos frontend.Position) {
 			break
 		}
 		base := l.cleanupIslands[i]
+		l.emitClearIslandScopedSliceLocalsAtCleanupIndex(i, pos)
 		l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: base, Pos: pos})
 		l.emit(ir.IRInstr{Kind: ir.IRIslandFree, Pos: pos})
 	}
@@ -5767,9 +5689,232 @@ func (l *lowerer) emitCleanupRawSince(start int, pos frontend.Position) {
 			break
 		}
 		base := l.cleanupIslands[i]
+		l.emitClearIslandScopedSliceLocalsRawAtCleanupIndex(i, pos)
 		l.emitRaw(ir.IRInstr{Kind: ir.IRLoadLocal, Local: base, Pos: pos})
 		l.emitRaw(ir.IRInstr{Kind: ir.IRIslandFree, Pos: pos})
 	}
+}
+
+func (l *lowerer) emitClearIslandScopedSliceLocalsAtCleanupIndex(index int, pos frontend.Position) {
+	if index < 0 || index >= len(l.cleanupIslandSliceLocals) {
+		return
+	}
+	l.emitClearIslandScopedSliceLocals(l.cleanupIslandSliceLocals[index], pos)
+}
+
+func (l *lowerer) emitClearIslandScopedSliceLocalsRawAtCleanupIndex(index int, pos frontend.Position) {
+	if index < 0 || index >= len(l.cleanupIslandSliceLocals) {
+		return
+	}
+	l.emitClearIslandScopedSliceLocalsRaw(l.cleanupIslandSliceLocals[index], pos)
+}
+
+func (l *lowerer) emitClearIslandScopedSliceLocals(names []string, pos frontend.Position) {
+	for _, name := range names {
+		info, ok := l.locals[name]
+		if !ok || info.SlotCount < 2 || !isSliceLikeType(info.TypeName) {
+			continue
+		}
+		l.emitZeroSlots(info.SlotCount, pos)
+		for slot := info.SlotCount - 1; slot >= 0; slot-- {
+			l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: info.Base + slot, Pos: pos})
+		}
+	}
+}
+
+func (l *lowerer) emitClearIslandScopedSliceLocalsRaw(names []string, pos frontend.Position) {
+	for _, name := range names {
+		info, ok := l.locals[name]
+		if !ok || info.SlotCount < 2 || !isSliceLikeType(info.TypeName) {
+			continue
+		}
+		l.emitZeroSlotsRaw(info.SlotCount, pos)
+		for slot := info.SlotCount - 1; slot >= 0; slot-- {
+			l.emitRaw(ir.IRInstr{Kind: ir.IRStoreLocal, Local: info.Base + slot, Pos: pos})
+		}
+	}
+}
+
+func (l *lowerer) rememberIslandSliceLocalForLet(
+	name string,
+	info semantics.LocalInfo,
+	expr frontend.Expr,
+) {
+	if l.islandSliceLocals == nil || !isSliceLikeType(info.TypeName) {
+		return
+	}
+	source, ok := islandMakeSourceLocalName(expr)
+	if !ok {
+		return
+	}
+	l.islandSliceLocals[name] = l.canonicalIslandLocalName(source)
+}
+
+func (l *lowerer) rememberIslandLocalAliasForLet(
+	name string,
+	info semantics.LocalInfo,
+	expr frontend.Expr,
+) {
+	if l.islandLocalAliases == nil || info.TypeName != "island" || info.SlotCount != 1 {
+		return
+	}
+	source, ok := islandAliasSourceLocalName(expr, l.imports, l.funcs)
+	if !ok {
+		return
+	}
+	l.islandLocalAliases[name] = l.canonicalIslandLocalName(source)
+}
+
+func (l *lowerer) emitClearIslandSliceLocalsForFreeExpr(expr frontend.Expr, pos frontend.Position) {
+	path, ok := islandLocalPath(expr)
+	if !ok || len(l.islandSliceLocals) == 0 {
+		return
+	}
+	source := l.canonicalIslandLocalName(path)
+	names := make([]string, 0, len(l.islandSliceLocals))
+	for name, island := range l.islandSliceLocals {
+		if l.canonicalIslandLocalName(island) == source {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	l.emitClearIslandScopedSliceLocals(names, pos)
+	for _, name := range names {
+		delete(l.islandSliceLocals, name)
+	}
+}
+
+func (l *lowerer) canonicalIslandLocalName(name string) string {
+	seen := map[string]bool{}
+	for name != "" && l.islandLocalAliases != nil {
+		next, ok := l.islandLocalAliases[name]
+		if !ok || next == "" || seen[name] {
+			break
+		}
+		seen[name] = true
+		name = next
+	}
+	return name
+}
+
+func islandMakeSourceLocalName(expr frontend.Expr) (string, bool) {
+	call, ok := expr.(*frontend.CallExpr)
+	if !ok || call == nil || len(call.Args) < 2 {
+		return "", false
+	}
+	name := call.Name
+	if target, ok := semantics.ResolveBuiltinAlias(name); ok {
+		name = target
+	}
+	switch name {
+	case "core.island_make_u8",
+		"core.island_make_u16",
+		"core.island_make_i32",
+		"core.island_make_bool":
+	default:
+		return "", false
+	}
+	return islandLocalPath(call.Args[0])
+}
+
+func islandAliasSourceLocalName(
+	expr frontend.Expr,
+	imports map[string]string,
+	funcs map[string]semantics.FuncSig,
+) (string, bool) {
+	id, ok := expr.(*frontend.IdentExpr)
+	if ok && id != nil && id.Name != "" {
+		return id.Name, true
+	}
+	if path, ok := islandLocalPath(expr); ok {
+		return path, true
+	}
+	call, ok := expr.(*frontend.CallExpr)
+	if !ok || call == nil {
+		return "", false
+	}
+	target, ok := importedFunctionTargetFromExpr(call, imports, funcs)
+	if !ok {
+		target = call.Name
+	}
+	sig, ok := funcs[target]
+	if !ok || sig.ReturnResourceParam < 0 || sig.ReturnResourceParam >= len(call.Args) {
+		return "", false
+	}
+	return islandLocalPath(call.Args[sig.ReturnResourceParam])
+}
+
+func islandLocalPath(expr frontend.Expr) (string, bool) {
+	switch e := expr.(type) {
+	case *frontend.IdentExpr:
+		if e != nil && e.Name != "" {
+			return e.Name, true
+		}
+	case *frontend.FieldAccessExpr:
+		if e != nil && e.Field != "" {
+			base, ok := islandLocalPath(e.Base)
+			if ok {
+				return base + "." + e.Field, true
+			}
+		}
+	}
+	return "", false
+}
+
+func islandScopedSliceLocalNames(stmts []frontend.Stmt) []string {
+	seen := map[string]bool{}
+	var out []string
+	var visit func([]frontend.Stmt)
+	visit = func(block []frontend.Stmt) {
+		for _, stmt := range block {
+			switch s := stmt.(type) {
+			case *frontend.LetStmt:
+				if !seen[s.Name] {
+					seen[s.Name] = true
+					out = append(out, s.Name)
+				}
+			case *frontend.IfStmt:
+				visit(s.Then)
+				visit(s.Else)
+			case *frontend.IfLetStmt:
+				if !seen[s.Name] {
+					seen[s.Name] = true
+					out = append(out, s.Name)
+				}
+				visit(s.Then)
+				visit(s.Else)
+			case *frontend.WhileStmt:
+				visit(s.Body)
+				case *frontend.ForRangeStmt:
+					if s.Iterable != nil && s.IterableLocal != "" && !seen[s.IterableLocal] {
+						seen[s.IterableLocal] = true
+						out = append(out, s.IterableLocal)
+					}
+					if !seen[s.Name] {
+						seen[s.Name] = true
+						out = append(out, s.Name)
+				}
+				visit(s.Body)
+			case *frontend.MatchStmt:
+				for _, c := range s.Cases {
+					visit(c.Body)
+				}
+			case *frontend.UnsafeStmt:
+				visit(s.Body)
+			case *frontend.IslandStmt:
+				visit(s.Body)
+			case *frontend.DeferStmt:
+				visit(s.Body)
+			}
+		}
+	}
+	visit(stmts)
+	sort.Strings(out)
+	return out
+}
+
+func isSliceLikeType(typeName string) bool {
+	return strings.HasPrefix(typeName, "[]") || typeName == "str" || typeName == "String"
 }
 
 func (l *lowerer) emitOwnedAllocCleanup(pos frontend.Position) {
@@ -7909,23 +8054,26 @@ func VerifyProgram(prog *ir.IRProgram) error {
 		return irVerifierError("ir verifier: missing program")
 	}
 	if len(prog.Funcs) > 0 {
-		if prog.MainIndex < 0 || prog.MainIndex >= len(prog.Funcs) {
-			return irVerifierError(
-				"ir verifier: main index %d out of bounds (funcs=%d)",
-				prog.MainIndex,
-				len(prog.Funcs),
-			)
-		}
-		if prog.MainName == "" {
-			return irVerifierError("ir verifier: missing main name")
-		}
-		if got := prog.Funcs[prog.MainIndex].Name; got != prog.MainName {
-			return irVerifierError(
-				"ir verifier: main metadata mismatch: index %d names %q, want %q",
-				prog.MainIndex,
-				got,
-				prog.MainName,
-			)
+		hasMainMetadata := prog.MainIndex >= 0 || prog.MainName != ""
+		if hasMainMetadata {
+			if prog.MainIndex < 0 || prog.MainIndex >= len(prog.Funcs) {
+				return irVerifierError(
+					"ir verifier: main index %d out of bounds (funcs=%d)",
+					prog.MainIndex,
+					len(prog.Funcs),
+				)
+			}
+			if prog.MainName == "" {
+				return irVerifierError("ir verifier: missing main name")
+			}
+			if got := prog.Funcs[prog.MainIndex].Name; got != prog.MainName {
+				return irVerifierError(
+					"ir verifier: main metadata mismatch: index %d names %q, want %q",
+					prog.MainIndex,
+					got,
+					prog.MainName,
+				)
+			}
 		}
 	}
 	funcSigs := make(map[string]ir.IRFunc, len(prog.Funcs))

@@ -3,16 +3,10 @@ package fromplir
 import (
 	"fmt"
 
-	"tetra_language/compiler/internal/allocplan"
-	. "tetra_language/compiler/internal/memoryfacts"
 	"tetra_language/compiler/internal/plir"
 )
 
-func FromPLIRAndAllocPlan(
-	programID string,
-	prog *plir.Program,
-	plan *allocplan.Plan,
-) (*Graph, error) {
+func Build(programID string, prog *plir.Program) (*Graph, error) {
 	graph := NewGraph(programID)
 	if err := addRepresentationMetadataFact(graph); err != nil {
 		return nil, err
@@ -22,11 +16,6 @@ func FromPLIRAndAllocPlan(
 			return nil, err
 		}
 		if err := addPLIRFacts(graph, prog); err != nil {
-			return nil, err
-		}
-	}
-	if plan != nil {
-		if err := addAllocPlanFacts(graph, plan, allocMemoryRefsFromPLIR(prog)); err != nil {
 			return nil, err
 		}
 	}
@@ -43,6 +32,31 @@ func validatePLIRFunctionSummaryCompleteness(prog *plir.Program) error {
 		}
 	}
 	return nil
+}
+
+func plirFactRequiresValue(kind plir.FactKind) bool {
+	switch kind {
+	case plir.FactLenStable, plir.FactIndexInRange, plir.FactRegionAlive,
+		plir.FactNoEscape, plir.FactNoAlias, plir.FactNonNull,
+		plir.FactMaybeNull, plir.FactAligned, plir.FactProvenanceKnown,
+		plir.FactProvenanceUnknown, plir.FactOwned, plir.FactBorrowedImm,
+		plir.FactBorrowedMut, plir.FactMoved, plir.FactDerivedWindow:
+		return true
+	default:
+		return false
+	}
+}
+
+func suppressRawVerifiedRootGenericFact(fact plir.Fact, value plir.Value) bool {
+	if value.Alloc == nil || value.Alloc.Builtin != "core.alloc_bytes" {
+		return false
+	}
+	switch fact.Kind {
+	case plir.FactProvenanceKnown, plir.FactRegionAlive:
+		return true
+	default:
+		return false
+	}
 }
 
 func addRepresentationMetadataFact(graph *Graph) error {
@@ -62,6 +76,7 @@ func addRepresentationMetadataFact(graph *Graph) error {
 }
 
 func addPLIRFacts(graph *Graph, prog *plir.Program) error {
+	callSummaries := buildAllocationReadOnlyCallSummaries(prog)
 	for _, fn := range prog.Funcs {
 		values := map[string]plir.Value{}
 		for _, value := range fn.Values {
@@ -159,6 +174,9 @@ func addPLIRFacts(graph *Graph, prog *plir.Program) error {
 					return err
 				}
 			}
+		}
+		if err := addAllocationIntentSummaryFacts(graph, fn, values, callSummaries); err != nil {
+			return err
 		}
 		if err := addFunctionSummaryFacts(graph, fn, values, factIDs); err != nil {
 			return err

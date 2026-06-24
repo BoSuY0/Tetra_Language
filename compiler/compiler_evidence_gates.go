@@ -24,6 +24,7 @@ import (
 	"tetra_language/compiler/internal/httprt"
 	"tetra_language/compiler/internal/ir"
 	"tetra_language/compiler/internal/memoryfacts"
+	"tetra_language/compiler/internal/memorypipeline"
 	"tetra_language/compiler/internal/netrt"
 	"tetra_language/compiler/internal/opt"
 	"tetra_language/compiler/internal/parallelrt"
@@ -34,7 +35,6 @@ import (
 	"tetra_language/compiler/internal/semantics"
 	"tetra_language/compiler/internal/stdlibrt"
 	"tetra_language/compiler/internal/validation"
-	"tetra_language/compiler/memoryvocab"
 	ctarget "tetra_language/compiler/target"
 )
 
@@ -4864,7 +4864,7 @@ func BuildP23FormalCoreV1Report() (FormalCoreV1Report, error) {
 				"Allocation length contract",
 				"current_supported_subset",
 				[]string{
-					("allocplan.FromPLIR classifies zero, normal, negative, and " +
+					("memorypipeline.Build plus allocplan.Build classify zero, normal, negative, and " +
 						"overflow allocation length contract rows before storage " +
 						"evidence is trusted."),
 					("The allocation witness requires rejected_negative_length " +
@@ -5211,14 +5211,11 @@ uses alloc, mem:
 	if err != nil {
 		return FormalCoreV1Witness{}, err
 	}
-	plirProg, err := BuildPLIR(checked)
+	state, err := memorypipeline.Build(checked, memorypipeline.Options{})
 	if err != nil {
 		return FormalCoreV1Witness{}, err
 	}
-	plan, err := allocplan.FromPLIR(plirProg)
-	if err != nil {
-		return FormalCoreV1Witness{}, err
-	}
+	plan := state.Plan
 	var empty, normal, negative, overflow bool
 	for _, fn := range plan.Functions {
 		for _, allocation := range fn.Allocations {
@@ -7103,7 +7100,7 @@ func BuildMemoryFuzzOracleReport() (MemoryFuzzOracleReport, error) {
 		Requirements: []MemoryFuzzRequirementRow{
 			memoryFuzzRequirementRow(
 				MemoryFuzzRequirementTier1V0V11Coverage,
-				memoryvocab.FuzzStatusValidatedNarrow,
+				memoryfacts.FuzzStatusValidatedNarrow,
 				("Tier 1 short CI smoke covers deterministic v0-v11 memory " +
 					"oracle cases across the supported compiler-visible memory " +
 					"surfaces"),
@@ -7112,7 +7109,7 @@ func BuildMemoryFuzzOracleReport() (MemoryFuzzOracleReport, error) {
 			),
 			memoryFuzzRequirementRow(
 				MemoryFuzzRequirementCrashMiscompileArtifacts,
-				memoryvocab.FuzzStatusValidatedNarrow,
+				memoryfacts.FuzzStatusValidatedNarrow,
 				("compiler crash and miscompile classifications require " +
 					"reducer or reproducer artifact slots before evidence " +
 					"promotion"),
@@ -7123,25 +7120,25 @@ func BuildMemoryFuzzOracleReport() (MemoryFuzzOracleReport, error) {
 			),
 			memoryFuzzRequirementRow(
 				MemoryFuzzRequirementBlockingMemoryFailures,
-				memoryvocab.FuzzStatusReleaseBlocking,
+				memoryfacts.FuzzStatusReleaseBlocking,
 				("unsafe_unknown optimized as safe, missing bounds proof id, " +
 					"trusted storage under escape, and report validation failure " +
 					"block release promotion"),
 				("go test ./compiler/internal/memoryfacts " +
-					"./tools/cmd/validate-memory-report -run " +
+					"./compiler/cmd/validate-memory-report -run " +
 					"'Unsafe|Bounds|Storage|Validate' -count=1"),
 				"blocking cases preserve MemoryFactGraph truth and do not replace validators",
 			),
 			memoryFuzzRequirementRow(
 				MemoryFuzzRequirementTier2NightlySeedTriage,
-				memoryvocab.FuzzStatusBoundaryRecorded,
+				memoryfacts.FuzzStatusBoundaryRecorded,
 				"Tier 2 nightly fuzz preserves seeds, unstable triage, and minimized repro expectations",
 				"bash scripts/dev/fuzz-nightly.sh --short --out-dir reports/fuzz-nightly-smoke",
 				"Tier 2 is longer/nightly boundary evidence, not mandatory Tier 1 evidence",
 			),
 			memoryFuzzRequirementRow(
 				MemoryFuzzRequirementTier3ReleasePassOrClassify,
-				memoryvocab.FuzzStatusReleaseBlocking,
+				memoryfacts.FuzzStatusReleaseBlocking,
 				("Tier 3 release-blocking focused memory fuzz must pass or " +
 					"classify every failure before release promotion"),
 				("go run ./tools/cmd/validate-memory-fuzz-oracle --report " +
@@ -7276,7 +7273,7 @@ func BuildMemoryFuzzOracleReport() (MemoryFuzzOracleReport, error) {
 				},
 				[]string{
 					("go test ./compiler/internal/memoryfacts " +
-						"./tools/cmd/validate-memory-report -run " +
+						"./compiler/cmd/validate-memory-report -run " +
 						"'ValidateMemoryReport|Cost|Unsafe' -count=1"),
 				},
 				[]string{
@@ -7320,21 +7317,21 @@ func BuildMemoryFuzzOracleReport() (MemoryFuzzOracleReport, error) {
 				MemoryFuzzInvariantReportsValidateAgainstFactGraph,
 				("memory reports validate against MemoryFactGraph during " +
 					"compiler report emission and CLI validation"),
-				"go test ./compiler/internal/memoryfacts ./tools/cmd/validate-memory-report -count=1",
+				"go test ./compiler/internal/memoryfacts ./compiler/cmd/validate-memory-report -count=1",
 			),
 			memoryFuzzInvariantRow(
 				MemoryFuzzInvariantReportsPreserveMemoryCostModel,
 				("memory report rows preserve cost_class and " +
 					"normal_build_check rules from the MPC-14 cost model"),
 				("go test ./compiler/internal/memoryfacts " +
-					"./tools/cmd/validate-memory-report -run " +
+					"./compiler/cmd/validate-memory-report -run " +
 					"'Cost|Dynamic|Unsafe' -count=1"),
 			),
 		},
 		GeneratorSurfaces: []MemoryFuzzGeneratorSurfaceRow{
 			{
 				Tier:   MemoryFuzzGeneratorTier1SupportedNow,
-				Status: memoryvocab.FuzzStatusCovered,
+				Status: memoryfacts.FuzzStatusCovered,
 				Surface: []string{
 					"slices",
 					"Strings",
@@ -7350,7 +7347,7 @@ func BuildMemoryFuzzOracleReport() (MemoryFuzzOracleReport, error) {
 			},
 			{
 				Tier:   MemoryFuzzGeneratorTier2SupportedNarrow,
-				Status: memoryvocab.FuzzStatusBoundaryRecorded,
+				Status: memoryfacts.FuzzStatusBoundaryRecorded,
 				Surface: []string{
 					"generics",
 					"function-typed borrowed returns",
@@ -7363,7 +7360,7 @@ func BuildMemoryFuzzOracleReport() (MemoryFuzzOracleReport, error) {
 			},
 			{
 				Tier:   MemoryFuzzGeneratorTier3ConservativeRejected,
-				Status: memoryvocab.FuzzStatusBoundaryRecorded,
+				Status: memoryfacts.FuzzStatusBoundaryRecorded,
 				Surface: []string{
 					"arbitrary unsafe pointers",
 					"unknown external calls",
@@ -7375,7 +7372,7 @@ func BuildMemoryFuzzOracleReport() (MemoryFuzzOracleReport, error) {
 			},
 			{
 				Tier:   MemoryFuzzGeneratorTier4Future,
-				Status: memoryvocab.FuzzStatusFuture,
+				Status: memoryfacts.FuzzStatusFuture,
 				Surface: []string{
 					"full FFI lifetime",
 					"full actor zero-copy runtime",
@@ -7409,7 +7406,7 @@ func BuildMemoryFuzzOracleReport() (MemoryFuzzOracleReport, error) {
 				MemoryFuzzBlockingReportValidationFailure,
 				"memory report validation failure remains release-blocking before artifact promotion",
 				("go test ./compiler/internal/memoryfacts " +
-					"./tools/cmd/validate-memory-report -run " +
+					"./compiler/cmd/validate-memory-report -run " +
 					"'ValidateMemoryReport|Cost|Unsafe' -count=1"),
 				"report rows are projections and cannot reconstruct MemoryFactGraph truth",
 			),
@@ -7417,7 +7414,7 @@ func BuildMemoryFuzzOracleReport() (MemoryFuzzOracleReport, error) {
 		TierPolicies: []MemoryFuzzTierPolicyRow{
 			{
 				Tier:           MemoryFuzzTier1ShortCI,
-				Status:         memoryvocab.FuzzStatusCovered,
+				Status:         memoryfacts.FuzzStatusCovered,
 				SeedsPreserved: true,
 				Evidence: []string{
 					"Tier 1 uses deterministic v0-v11 smoke cases and writes release-evidence artifacts",
@@ -7431,7 +7428,7 @@ func BuildMemoryFuzzOracleReport() (MemoryFuzzOracleReport, error) {
 			},
 			{
 				Tier:                        MemoryFuzzTier2Nightly,
-				Status:                      memoryvocab.FuzzStatusBoundaryRecorded,
+				Status:                      memoryfacts.FuzzStatusBoundaryRecorded,
 				SeedsPreserved:              true,
 				UnstableTriageRequired:      true,
 				MinimizedReproducerRequired: true,
@@ -7448,7 +7445,7 @@ func BuildMemoryFuzzOracleReport() (MemoryFuzzOracleReport, error) {
 			},
 			{
 				Tier:                                   MemoryFuzzTier3ReleaseFocused,
-				Status:                                 memoryvocab.FuzzStatusReleaseBlocking,
+				Status:                                 memoryfacts.FuzzStatusReleaseBlocking,
 				SeedsPreserved:                         true,
 				UnstableTriageRequired:                 true,
 				MinimizedReproducerRequired:            true,
@@ -7549,7 +7546,7 @@ func memoryFuzzOracleRow(
 		Name:           name,
 		Tier:           tier,
 		ExpectedResult: result,
-		Status:         memoryvocab.FuzzStatusCovered,
+		Status:         memoryfacts.FuzzStatusCovered,
 		Evidence:       evidence,
 		Tests:          tests,
 		Boundaries:     boundaries,
@@ -7563,7 +7560,7 @@ func memoryFuzzInvariantRow(
 ) MemoryFuzzInvariantRow {
 	return MemoryFuzzInvariantRow{
 		ID:       id,
-		Status:   memoryvocab.FuzzStatusCovered,
+		Status:   memoryfacts.FuzzStatusCovered,
 		Evidence: []string{evidence},
 		Tests:    []string{test},
 		Boundaries: []string{
@@ -7693,7 +7690,7 @@ func memoryFuzzSliceCoverageRows() []MemoryFuzzSliceCoverageRow {
 				MemoryFuzzInvariantReportsPreserveMemoryCostModel,
 			},
 			("go test ./compiler/internal/memoryfacts " +
-				"./tools/cmd/validate-memory-report -run " +
+				"./compiler/cmd/validate-memory-report -run " +
 				"'Report|Cost|NormalBuild' -count=1"),
 		),
 		memoryFuzzSliceCoverageRow(
@@ -7726,8 +7723,8 @@ func memoryFuzzSliceCoverageRows() []MemoryFuzzSliceCoverageRow {
 				MemoryFuzzInvariantNoBorrowedEscape,
 				MemoryFuzzInvariantNoStackRegionStorageWhenEscaped,
 			},
-			("go test ./compiler/internal/memoryfacts " +
-				"./compiler/internal/memorymodel -run " +
+			("go test ./compiler/internal/memoryfacts_test " +
+				"./compiler/tests/semantics -run " +
 				"'Async|Task|Actor|Cancel' -count=1"),
 		),
 		memoryFuzzSliceCoverageRow(
@@ -7745,8 +7742,8 @@ func memoryFuzzSliceCoverageRows() []MemoryFuzzSliceCoverageRow {
 				MemoryFuzzInvariantNoBorrowedEscape,
 				MemoryFuzzInvariantNoUnsafeUnknownToSafeKnown,
 			},
-			("go test ./compiler/internal/memoryfacts " +
-				"./compiler/internal/memorymodel -run " +
+			("go test ./compiler/internal/memoryfacts_test " +
+				"./compiler/tests/semantics -run " +
 				"'Dynamic|Protocol|Witness|Conformance' -count=1"),
 		),
 	}
@@ -7761,7 +7758,7 @@ func memoryFuzzSliceCoverageRow(
 ) MemoryFuzzSliceCoverageRow {
 	return MemoryFuzzSliceCoverageRow{
 		SliceID:          sliceID,
-		Status:           memoryvocab.FuzzStatusCovered,
+		Status:           memoryfacts.FuzzStatusCovered,
 		Surface:          surface,
 		OracleCategories: categories,
 		Invariants:       invariants,
@@ -7784,7 +7781,7 @@ func memoryFuzzBlockingCaseRow(
 ) MemoryFuzzBlockingCaseRow {
 	return MemoryFuzzBlockingCaseRow{
 		ID:            id,
-		Status:        memoryvocab.FuzzStatusBlocksRelease,
+		Status:        memoryfacts.FuzzStatusBlocksRelease,
 		BlocksRelease: true,
 		Evidence:      []string{evidence},
 		Tests:         []string{test},
@@ -7857,11 +7854,11 @@ func validateMemoryFuzzRequirements(rows []MemoryFuzzRequirementRow) []string {
 	seen := map[MemoryFuzzRequirementID]bool{}
 	var issues []string
 	expected := map[MemoryFuzzRequirementID]string{
-		MemoryFuzzRequirementTier1V0V11Coverage:         memoryvocab.FuzzStatusValidatedNarrow,
-		MemoryFuzzRequirementCrashMiscompileArtifacts:   memoryvocab.FuzzStatusValidatedNarrow,
-		MemoryFuzzRequirementBlockingMemoryFailures:     memoryvocab.FuzzStatusReleaseBlocking,
-		MemoryFuzzRequirementTier2NightlySeedTriage:     memoryvocab.FuzzStatusBoundaryRecorded,
-		MemoryFuzzRequirementTier3ReleasePassOrClassify: memoryvocab.FuzzStatusReleaseBlocking,
+		MemoryFuzzRequirementTier1V0V11Coverage:         memoryfacts.FuzzStatusValidatedNarrow,
+		MemoryFuzzRequirementCrashMiscompileArtifacts:   memoryfacts.FuzzStatusValidatedNarrow,
+		MemoryFuzzRequirementBlockingMemoryFailures:     memoryfacts.FuzzStatusReleaseBlocking,
+		MemoryFuzzRequirementTier2NightlySeedTriage:     memoryfacts.FuzzStatusBoundaryRecorded,
+		MemoryFuzzRequirementTier3ReleasePassOrClassify: memoryfacts.FuzzStatusReleaseBlocking,
 	}
 	for _, row := range rows {
 		if !knownMemoryFuzzRequirementID(row.ID) {
@@ -7921,7 +7918,7 @@ func validateMemoryFuzzSliceCoverage(rows []MemoryFuzzSliceCoverageRow) []string
 				fmt.Sprintf("unknown slice coverage status %q for %s", row.Status, row.SliceID),
 			)
 		}
-		if row.Status != memoryvocab.FuzzStatusCovered {
+		if row.Status != memoryfacts.FuzzStatusCovered {
 			issues = append(
 				issues,
 				fmt.Sprintf("slice coverage %s status = %q, want covered", row.SliceID, row.Status),
@@ -8016,7 +8013,7 @@ func validateMemoryFuzzOracleRows(rows []MemoryFuzzOracleRow) []string {
 				fmt.Sprintf("unknown oracle row status %q for %s", row.Status, row.Category),
 			)
 		}
-		if row.Status != memoryvocab.FuzzStatusCovered {
+		if row.Status != memoryfacts.FuzzStatusCovered {
 			issues = append(
 				issues,
 				fmt.Sprintf(
@@ -8081,7 +8078,7 @@ func validateMemoryFuzzInvariants(rows []MemoryFuzzInvariantRow) []string {
 				fmt.Sprintf("unknown invariant status %q for %s", row.Status, row.ID),
 			)
 		}
-		if row.Status != memoryvocab.FuzzStatusCovered {
+		if row.Status != memoryfacts.FuzzStatusCovered {
 			issues = append(
 				issues,
 				fmt.Sprintf("invariant %s status = %q, want covered", row.ID, row.Status),
@@ -8168,7 +8165,7 @@ func validateMemoryFuzzBlockingCases(rows []MemoryFuzzBlockingCaseRow) []string 
 				fmt.Sprintf("unknown blocking case status %q for %s", row.Status, row.ID),
 			)
 		}
-		if row.Status != memoryvocab.FuzzStatusBlocksRelease {
+		if row.Status != memoryfacts.FuzzStatusBlocksRelease {
 			issues = append(
 				issues,
 				fmt.Sprintf(
@@ -8226,14 +8223,14 @@ func validateMemoryFuzzTierPolicies(rows []MemoryFuzzTierPolicyRow) []string {
 		}
 		switch row.Tier {
 		case MemoryFuzzTier1ShortCI:
-			if row.Status != memoryvocab.FuzzStatusCovered {
+			if row.Status != memoryfacts.FuzzStatusCovered {
 				issues = append(
 					issues,
 					fmt.Sprintf("Tier 1 short CI smoke status = %q, want covered", row.Status),
 				)
 			}
 		case MemoryFuzzTier2Nightly:
-			if row.Status != memoryvocab.FuzzStatusBoundaryRecorded {
+			if row.Status != memoryfacts.FuzzStatusBoundaryRecorded {
 				issues = append(
 					issues,
 					fmt.Sprintf(
@@ -8252,7 +8249,7 @@ func validateMemoryFuzzTierPolicies(rows []MemoryFuzzTierPolicyRow) []string {
 				issues = append(issues, "Tier 2 nightly fuzz minimized repro is required")
 			}
 		case MemoryFuzzTier3ReleaseFocused:
-			if row.Status != memoryvocab.FuzzStatusReleaseBlocking {
+			if row.Status != memoryfacts.FuzzStatusReleaseBlocking {
 				issues = append(
 					issues,
 					fmt.Sprintf(
@@ -8519,7 +8516,7 @@ func knownMemoryFuzzGeneratorSurfaceTier(tier MemoryFuzzGeneratorSurfaceTier) bo
 }
 
 func knownMemoryFuzzStatus(status string) bool {
-	return memoryvocab.KnownMemoryFuzzStatus(status)
+	return memoryfacts.KnownMemoryFuzzStatus(status)
 }
 
 func expectedMemoryFuzzOracleResult(category MemoryFuzzOracleCategory) MemoryFuzzOracleResult {

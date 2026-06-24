@@ -6,7 +6,6 @@ import (
 
 	"tetra_language/compiler/internal/allocplan"
 	. "tetra_language/compiler/internal/memoryfacts"
-	. "tetra_language/compiler/internal/memoryfacts/fromplir"
 	"tetra_language/compiler/internal/plir"
 	"tetra_language/compiler/internal/runtimeabi"
 )
@@ -172,9 +171,9 @@ func TestMemoryIdealV10ProjectsAsyncCancellationBoundaryFacts(t *testing.T) {
 		},
 	}}}
 
-	graph, err := FromPLIRAndAllocPlan("program", prog, nil)
+	graph, err := BuildGraphFromPLIRAndPlan("program", prog, nil)
 	if err != nil {
-		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan: %v", err)
 	}
 	report := BuildReportFromGraph(graph)
 	for _, tc := range []struct {
@@ -395,9 +394,9 @@ func TestMemoryIdealV11ProjectsDynamicProtocolWitnessFacts(t *testing.T) {
 		},
 	}}}
 
-	graph, err := FromPLIRAndAllocPlan("program", prog, nil)
+	graph, err := BuildGraphFromPLIRAndPlan("program", prog, nil)
 	if err != nil {
-		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan: %v", err)
 	}
 	report := BuildReportFromGraph(graph)
 	for _, tc := range []struct {
@@ -508,9 +507,9 @@ func TestMemoryIdealV0ProjectsNarrowInoutNoAliasFacts(t *testing.T) {
 		},
 	}}}
 
-	graph, err := FromPLIRAndAllocPlan("program", prog, nil)
+	graph, err := BuildGraphFromPLIRAndPlan("program", prog, nil)
 	if err != nil {
-		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan: %v", err)
 	}
 	report := BuildReportFromGraph(graph)
 	for _, want := range []string{
@@ -529,7 +528,7 @@ func TestMemoryIdealV0ProjectsNarrowInoutNoAliasFacts(t *testing.T) {
 	}
 }
 
-func TestFromPLIRAndAllocPlanEmitsFunctionSummaryVocabulary(t *testing.T) {
+func TestBuildGraphFromPLIRAndPlanEmitsFunctionSummaryVocabulary(t *testing.T) {
 	prog := &plir.Program{Funcs: []plir.Function{
 		{
 			Name: "returnBorrow",
@@ -778,9 +777,9 @@ func TestFromPLIRAndAllocPlanEmitsFunctionSummaryVocabulary(t *testing.T) {
 		},
 	}}
 
-	graph, err := FromPLIRAndAllocPlan("program", prog, nil)
+	graph, err := BuildGraphFromPLIRAndPlan("program", prog, nil)
 	if err != nil {
-		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan: %v", err)
 	}
 	report := BuildReportFromGraph(graph)
 	for _, want := range []string{
@@ -830,7 +829,7 @@ func TestFromPLIRAndAllocPlanEmitsFunctionSummaryVocabulary(t *testing.T) {
 	}
 }
 
-func TestFromPLIRAndAllocPlanKeepsUnsafeUnknownSummaryFactsConservative(t *testing.T) {
+func TestBuildGraphFromPLIRAndPlanKeepsUnsafeUnknownSummaryFactsConservative(t *testing.T) {
 	prog := &plir.Program{Funcs: []plir.Function{{
 		Name: "unsafeSummary",
 		Values: []plir.Value{
@@ -875,9 +874,9 @@ func TestFromPLIRAndAllocPlanKeepsUnsafeUnknownSummaryFactsConservative(t *testi
 		},
 	}}}
 
-	graph, err := FromPLIRAndAllocPlan("program", prog, nil)
+	graph, err := BuildGraphFromPLIRAndPlan("program", prog, nil)
 	if err != nil {
-		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan: %v", err)
 	}
 	report := BuildReportFromGraph(graph)
 	for _, claim := range []string{"may_consume_param", "may_mutate_inout"} {
@@ -893,7 +892,7 @@ func TestFromPLIRAndAllocPlanKeepsUnsafeUnknownSummaryFactsConservative(t *testi
 	}
 }
 
-func TestFromPLIRAndAllocPlanSummaryFactIDsDoNotCollideForDistinctPaths(t *testing.T) {
+func TestBuildGraphFromPLIRAndPlanSummaryFactIDsDoNotCollideForDistinctPaths(t *testing.T) {
 	prog := &plir.Program{Funcs: []plir.Function{{
 		Name: "pathSummary",
 		Summary: &plir.FunctionSummary{
@@ -905,16 +904,16 @@ func TestFromPLIRAndAllocPlanSummaryFactIDsDoNotCollideForDistinctPaths(t *testi
 		},
 	}}}
 
-	graph, err := FromPLIRAndAllocPlan("program", prog, nil)
+	graph, err := BuildGraphFromPLIRAndPlan("program", prog, nil)
 	if err != nil {
-		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan: %v", err)
 	}
 	if got := countReportClaim(BuildReportFromGraph(graph), "may_return_region"); got != 2 {
 		t.Fatalf("may_return_region rows = %d, want 2", got)
 	}
 }
 
-func TestFromPLIRAndAllocPlanEmitsUnsafeGatewayVocabulary(t *testing.T) {
+func TestBuildGraphFromPLIRAndPlanEmitsUnsafeGatewayVocabulary(t *testing.T) {
 	prog := &plir.Program{Funcs: []plir.Function{{
 		Name: "main",
 		Values: []plir.Value{
@@ -1102,9 +1101,9 @@ func TestFromPLIRAndAllocPlanEmitsUnsafeGatewayVocabulary(t *testing.T) {
 		}},
 	}}}
 
-	graph, err := FromPLIRAndAllocPlan("program", prog, plan)
+	graph, err := BuildGraphFromPLIRAndPlan("program", prog, plan)
 	if err != nil {
-		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan: %v", err)
 	}
 	report := BuildReportFromGraph(graph)
 	for _, tc := range []struct {
@@ -1359,9 +1358,9 @@ func TestMemoryIdealV5ProjectsRawPointerUnsafeContractFacts(t *testing.T) {
 		}},
 	}}}
 
-	graph, err := FromPLIRAndAllocPlan("program", prog, plan)
+	graph, err := BuildGraphFromPLIRAndPlan("program", prog, plan)
 	if err != nil {
-		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan: %v", err)
 	}
 	report := BuildReportFromGraph(graph)
 	for _, tc := range []struct {
@@ -1532,9 +1531,9 @@ func TestMemoryIdealV7ProjectsFFICallExternalFacts(t *testing.T) {
 		},
 	}}}
 
-	graph, err := FromPLIRAndAllocPlan("program", prog, nil)
+	graph, err := BuildGraphFromPLIRAndPlan("program", prog, nil)
 	if err != nil {
-		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan: %v", err)
 	}
 	report := BuildReportFromGraph(graph)
 	for _, tc := range []struct {
@@ -1621,15 +1620,15 @@ func TestMemoryIdealV7ProjectsFFICallExternalFacts(t *testing.T) {
 	}
 }
 
-func TestFromPLIRAndAllocPlanRejectsFactForMissingValue(t *testing.T) {
+func TestBuildGraphFromPLIRAndPlanRejectsFactForMissingValue(t *testing.T) {
 	prog := &plir.Program{Funcs: []plir.Function{{
 		Name:  "main",
 		Facts: []plir.Fact{{ID: "f_missing", Kind: plir.FactBorrowedImm, ValueID: "view:missing"}},
 	}}}
 
-	_, err := FromPLIRAndAllocPlan("program", prog, nil)
+	_, err := BuildGraphFromPLIRAndPlan("program", prog, nil)
 	if err == nil || !strings.Contains(err.Error(), "missing value_id") {
-		t.Fatalf("FromPLIRAndAllocPlan error = %v, want missing value_id rejection", err)
+		t.Fatalf("BuildGraphFromPLIRAndPlan error = %v, want missing value_id rejection", err)
 	}
 }
 

@@ -84,8 +84,8 @@ if rg -n '^import lib\.experimental(\.|$)' examples/surface_release_*.tetra; the
 fi
 
 docs_path="$artifacts_dir/tetra-docs.md"
-go run -buildvcs=false ./cli/cmd/tetra doc lib/core examples >"$docs_path"
-go run -buildvcs=false ./tools/cmd/validate-api-docs --docs "$docs_path"
+./tetra doc lib/core examples >"$docs_path"
+go run ./tools/cmd/validate-api-docs --docs "$docs_path"
 
 for module in "${stable_modules[@]}"; do
 	if ! rg -n "^## ${module}$" "$docs_path" >/dev/null; then

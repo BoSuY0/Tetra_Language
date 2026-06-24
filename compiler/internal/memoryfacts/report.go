@@ -8,8 +8,6 @@ import (
 	"io"
 	"sort"
 	"strings"
-
-	"tetra_language/compiler/memoryvocab"
 )
 
 const ReportSchemaV1 = "tetra.memory-report.v1"
@@ -36,6 +34,14 @@ type ReportRow struct {
 	ClaimLevel            ClaimLevel      `json:"claim_level,omitempty"`
 	ProvenanceClass       ProvenanceClass `json:"provenance_class,omitempty"`
 	OwnerID               string          `json:"owner_id,omitempty"`
+	DomainKind            DomainKind      `json:"domain_kind,omitempty"`
+	DomainID              string          `json:"domain_id,omitempty"`
+	DomainOwnerID         string          `json:"domain_owner_id,omitempty"`
+	TransferKind          TransferKind    `json:"transfer_kind,omitempty"`
+	TransferProofID       string          `json:"transfer_proof_id,omitempty"`
+	SourceConsumed        bool            `json:"source_consumed,omitempty"`
+	LiveBorrowCrossing    bool            `json:"live_borrow_crossing,omitempty"`
+	DestinationActive     bool            `json:"destination_active,omitempty"`
 	ParamIndex            *int            `json:"param_index,omitempty"`
 	ParamPath             string          `json:"param_path,omitempty"`
 	BorrowState           BorrowState     `json:"borrow_state,omitempty"`
@@ -265,6 +271,14 @@ func rowFromFact(fact Fact) ReportRow {
 		ClaimLevel:            level,
 		ProvenanceClass:       fact.ProvenanceClass,
 		OwnerID:               fact.OwnerID,
+		DomainKind:            fact.DomainKind,
+		DomainID:              fact.DomainID,
+		DomainOwnerID:         fact.DomainOwnerID,
+		TransferKind:          fact.TransferKind,
+		TransferProofID:       fact.TransferProofID,
+		SourceConsumed:        fact.SourceConsumed,
+		LiveBorrowCrossing:    fact.LiveBorrowCrossing,
+		DestinationActive:     fact.DestinationActive,
 		ParamIndex:            fact.ParamIndex,
 		ParamPath:             fact.ParamPath,
 		BorrowState:           fact.BorrowState,
@@ -367,6 +381,56 @@ func validateReportProjectionRow(index int, row ReportRow, expected ReportRow) [
 		expected.ProvenanceClass,
 	)
 	issues = appendProjectionMismatch(issues, index, "owner_id", row.OwnerID, expected.OwnerID)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"domain_kind",
+		row.DomainKind,
+		expected.DomainKind,
+	)
+	issues = appendProjectionMismatch(issues, index, "domain_id", row.DomainID, expected.DomainID)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"domain_owner_id",
+		row.DomainOwnerID,
+		expected.DomainOwnerID,
+	)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"transfer_kind",
+		row.TransferKind,
+		expected.TransferKind,
+	)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"transfer_proof_id",
+		row.TransferProofID,
+		expected.TransferProofID,
+	)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"source_consumed",
+		row.SourceConsumed,
+		expected.SourceConsumed,
+	)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"live_borrow_crossing",
+		row.LiveBorrowCrossing,
+		expected.LiveBorrowCrossing,
+	)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"destination_active",
+		row.DestinationActive,
+		expected.DestinationActive,
+	)
 	if !sameOptionalInt(row.ParamIndex, expected.ParamIndex) {
 		issues = append(
 			issues,
@@ -601,7 +665,7 @@ func validateReportRow(index int, row ReportRow) []string {
 			),
 		)
 	}
-	if memoryvocab.ZeroCostProvenClaimDisallowed(
+	if ZeroCostProvenClaimDisallowed(
 		row.Claim,
 		string(row.CostClass),
 		string(row.ClaimLevel),
@@ -666,14 +730,14 @@ func validateReportRow(index int, row ReportRow) []string {
 		}
 	}
 	if row.ClaimLevel == ClaimValidated &&
-		memoryvocab.IslandKernelClaimValidatorMismatch(row.Claim, row.ValidatorName) {
+		IslandKernelClaimValidatorMismatch(row.Claim, row.ValidatorName) {
 		issues = append(
 			issues,
 			fmt.Sprintf(
 				"%s: validated island claim %q requires validator_name %q",
 				prefix,
 				row.Claim,
-				memoryvocab.RequiredIslandKernelClaimValidator(row.Claim),
+				RequiredIslandKernelClaimValidator(row.Claim),
 			),
 		)
 	}
@@ -888,7 +952,7 @@ func islandBackedReportRow(row ReportRow) bool {
 }
 
 func reportRowRequiresArtifact(row ReportRow) bool {
-	return memoryvocab.RowRequiresArtifact(
+	return RowRequiresArtifact(
 		string(row.PlannedStorage),
 		string(row.ActualLoweringStorage),
 		row.Claim,

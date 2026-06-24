@@ -10,22 +10,29 @@ import (
 
 const (
 	objectMagic   = "TOBJ"
-	objectVersion = 4
+	objectVersion = 5
+
+	MemoryPlanSchemaV2     = "tetra.memory-plan.v2"
+	MemoryLoweringSchemaV2 = "tetra.memory-lowering.v2"
 
 	maxSignatureSlotValue = int64(^uint32(0))
 )
 
 type Object struct {
-	Target          string
-	Module          string
-	CompilerVersion string
-	PublicAPIHash   string
-	SrcHash         [32]byte
-	WorldSigHash    [32]byte
-	Code            []byte
-	Data            []byte
-	Symbols         []Symbol
-	Relocs          []Reloc
+	Target               string
+	Module               string
+	CompilerVersion      string
+	PublicAPIHash        string
+	MemoryPlanSchema     string
+	MemoryPlanDigest     string
+	MemoryLoweringSchema string
+	MemoryLoweringDigest string
+	SrcHash              [32]byte
+	WorldSigHash         [32]byte
+	Code                 []byte
+	Data                 []byte
+	Symbols              []Symbol
+	Relocs               []Reloc
 }
 
 type Symbol struct {
@@ -98,6 +105,18 @@ func writeObject(w io.Writer, obj *Object) error {
 	if err := writeString(w, obj.PublicAPIHash); err != nil {
 		return err
 	}
+	if err := writeString(w, obj.MemoryPlanSchema); err != nil {
+		return err
+	}
+	if err := writeString(w, obj.MemoryPlanDigest); err != nil {
+		return err
+	}
+	if err := writeString(w, obj.MemoryLoweringSchema); err != nil {
+		return err
+	}
+	if err := writeString(w, obj.MemoryLoweringDigest); err != nil {
+		return err
+	}
 	if err := writeU32(w, uint32(len(obj.Code))); err != nil {
 		return err
 	}
@@ -168,7 +187,7 @@ func readObject(r io.Reader) (*Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	if version != 2 && version != 3 && version != objectVersion {
+	if version != 2 && version != 3 && version != 4 && version != objectVersion {
 		return nil, fmt.Errorf("unsupported object version %d", version)
 	}
 	target, err := readString(r)
@@ -195,6 +214,28 @@ func readObject(r io.Reader) (*Object, error) {
 			return nil, err
 		}
 		publicAPIHash, err = readString(r)
+		if err != nil {
+			return nil, err
+		}
+	}
+	memoryPlanSchema := ""
+	memoryPlanDigest := ""
+	memoryLoweringSchema := ""
+	memoryLoweringDigest := ""
+	if version >= 5 {
+		memoryPlanSchema, err = readString(r)
+		if err != nil {
+			return nil, err
+		}
+		memoryPlanDigest, err = readString(r)
+		if err != nil {
+			return nil, err
+		}
+		memoryLoweringSchema, err = readString(r)
+		if err != nil {
+			return nil, err
+		}
+		memoryLoweringDigest, err = readString(r)
 		if err != nil {
 			return nil, err
 		}
@@ -305,16 +346,20 @@ func readObject(r io.Reader) (*Object, error) {
 		relocs = append(relocs, reloc)
 	}
 	return &Object{
-		Target:          target,
-		Module:          module,
-		CompilerVersion: compilerVersion,
-		PublicAPIHash:   publicAPIHash,
-		SrcHash:         srcHash,
-		WorldSigHash:    worldSig,
-		Code:            code,
-		Data:            data,
-		Symbols:         symbols,
-		Relocs:          relocs,
+		Target:               target,
+		Module:               module,
+		CompilerVersion:      compilerVersion,
+		PublicAPIHash:        publicAPIHash,
+		MemoryPlanSchema:     memoryPlanSchema,
+		MemoryPlanDigest:     memoryPlanDigest,
+		MemoryLoweringSchema: memoryLoweringSchema,
+		MemoryLoweringDigest: memoryLoweringDigest,
+		SrcHash:              srcHash,
+		WorldSigHash:         worldSig,
+		Code:                 code,
+		Data:                 data,
+		Symbols:              symbols,
+		Relocs:               relocs,
 	}, nil
 }
 

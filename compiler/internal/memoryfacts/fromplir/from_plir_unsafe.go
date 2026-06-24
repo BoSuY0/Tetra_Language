@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"tetra_language/compiler/internal/allocplan"
-	. "tetra_language/compiler/internal/memoryfacts"
 	"tetra_language/compiler/internal/plir"
 )
 
@@ -145,6 +143,29 @@ func ownerFromOperationInput(op plir.Operation, index int) string {
 		return ""
 	}
 	return normalizeOwnerID(op.Inputs[index])
+}
+
+func ownerFromTypedTaskOperationInput(op plir.Operation) string {
+	for _, input := range op.Inputs {
+		if !typedDomainOwnerInput(input, "task") {
+			continue
+		}
+		return normalizeOwnerID(input)
+	}
+	return ""
+}
+
+func typedDomainOwnerInput(input string, domain string) bool {
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return false
+	}
+	if strings.HasPrefix(input, domain+":") ||
+		strings.HasPrefix(input, "param:") ||
+		strings.HasPrefix(input, "local:") {
+		return true
+	}
+	return false
 }
 
 func normalizeOwnerID(owner string) string {
@@ -445,32 +466,6 @@ func costClassForUnsafeOperationClaim(
 		"raw_slice_verified_allocation_root",
 		"unsafe_contract_runtime_checkable":
 		return CostDynamicCheckRequired
-	default:
-		return CostInstrumentationOnly
-	}
-}
-
-func costClassForAllocFact(claim string, alloc allocplan.Allocation) CostClass {
-	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(claim)), "rejected_") {
-		return CostUnsupportedRejected
-	}
-	if allocPlanRuntimeProofRequiredStorage(alloc.PlannedStorage, alloc.ActualLoweringStorage) {
-		return CostConservativeFallback
-	}
-	if alloc.ActualLoweringStorage == allocplan.StorageHeap &&
-		alloc.PlannedStorage != "" &&
-		alloc.PlannedStorage != allocplan.StorageHeap {
-		return CostConservativeFallback
-	}
-	if !allocPlanValidationPasses(alloc) {
-		return CostInstrumentationOnly
-	}
-	if alloc.Builtin == "core.alloc_bytes" && claim == "allocation_base_metadata" {
-		return CostZeroCostProven
-	}
-	switch claim {
-	case "storage_lowering":
-		return CostZeroCostProven
 	default:
 		return CostInstrumentationOnly
 	}

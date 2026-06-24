@@ -11933,7 +11933,7 @@ func renderCounterFrameRGBA(count int, focused bool) rgbaFrame {
 	button := rect{X: 32, Y: 80, W: 160, H: 48}
 
 	clearRGBA(frame, bg)
-	textMaskRGBA(frame, 32, 28, 5, fg)
+	textStringRGBA(frame, 32, 28, "Count", fg)
 	rectRGBA(frame, button, accent)
 	if count > 0 {
 		rectRGBA(frame, rect{X: 88, Y: 28, W: 24, H: 7}, fg)

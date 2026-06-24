@@ -109,6 +109,18 @@ island runtime semantics).
 - Required effects: `mem`.
 - Capability argument: `cap.mem`.
 
+### `core.actor_ref_local`
+
+- Unsafe policy: conditional.
+- Required effects: `actors`.
+- Capability argument: actor runtime ownership must already be proven by the caller/runtime path.
+
+### `core.actor_ref_slot`
+
+- Unsafe policy: conditional.
+- Required effects: `actors`.
+- Capability argument: actor runtime ownership must already be proven by the caller/runtime path.
+
 ### `core.load_ptr` / `core.store_ptr`
 
 - Unsafe policy: always.

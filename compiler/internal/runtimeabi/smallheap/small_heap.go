@@ -19,34 +19,42 @@ type MemoryDomainKind string
 
 const DomainProcess MemoryDomainKind = "process"
 
+type MemoryDomainState string
+
+const (
+	DomainStateActive MemoryDomainState = "active"
+	DomainStateClosed MemoryDomainState = "closed"
+)
+
 type MemoryDomain struct {
-	DomainID       string           `json:"domain_id"`
-	ParentDomainID string           `json:"parent_domain_id,omitempty"`
-	Kind           MemoryDomainKind `json:"kind"`
-	OwnerKind      string           `json:"owner_kind"`
-	OwnerID        string           `json:"owner_id"`
-	Lifetime       string           `json:"lifetime"`
-	BudgetBytes    int64            `json:"budget_bytes,omitempty"`
-	RequestedBytes int64            `json:"requested_bytes,omitempty"`
-	ReservedBytes  int64            `json:"reserved_bytes,omitempty"`
-	CommittedBytes int64            `json:"committed_bytes,omitempty"`
-	ReleasedBytes  int64            `json:"released_bytes,omitempty"`
-	CurrentBytes   int64            `json:"current_bytes,omitempty"`
-	PeakBytes      int64            `json:"peak_bytes,omitempty"`
-	CopyCount      int              `json:"copy_count,omitempty"`
-	BytesCopied    int64            `json:"bytes_copied,omitempty"`
+	DomainID         string            `json:"domain_id"`
+	ParentDomainID   string            `json:"parent_domain_id,omitempty"`
+	Kind             MemoryDomainKind  `json:"kind"`
+	OwnerKind        string            `json:"owner_kind"`
+	OwnerID          string            `json:"owner_id"`
+	Lifetime         string            `json:"lifetime"`
+	BudgetBytes      int64             `json:"budget_bytes,omitempty"`
+	RequestedBytes   int64             `json:"requested_bytes,omitempty"`
+	ReservedBytes    int64             `json:"reserved_bytes,omitempty"`
+	CommittedBytes   int64             `json:"committed_bytes,omitempty"`
+	ReleasedBytes    int64             `json:"released_bytes,omitempty"`
+	State            MemoryDomainState `json:"state,omitempty"`
+	Epoch            uint64            `json:"epoch,omitempty"`
+	DecommittedBytes int64             `json:"decommitted_bytes,omitempty"`
+	CurrentBytes     int64             `json:"current_bytes,omitempty"`
+	PeakBytes        int64             `json:"peak_bytes,omitempty"`
+	CopyCount        int               `json:"copy_count,omitempty"`
+	BytesCopied      int64             `json:"bytes_copied,omitempty"`
 }
 
 func DefaultProcessMemoryDomain(requested int64, reserved int64) MemoryDomain {
 	return MemoryDomain{
-		DomainID:       "domain:process",
-		Kind:           DomainProcess,
-		OwnerKind:      "process",
-		OwnerID:        "current",
-		Lifetime:       "process",
-		BudgetBytes:    requested,
-		RequestedBytes: requested,
-		ReservedBytes:  reserved,
+		DomainID:  "domain:process",
+		Kind:      DomainProcess,
+		OwnerKind: "process",
+		OwnerID:   "current",
+		Lifetime:  "process",
+		State:     DomainStateActive,
 	}
 }
 
@@ -262,10 +270,9 @@ func (allocator *PerCoreSmallHeapAllocator) Alloc(
 		handle.Generation++
 		handle.RequestedBytes = int(bytes)
 		handle.ReservedBytes = cls.MaxBytes
-		handle.Domain = DefaultProcessMemoryDomain(
-			int64(handle.RequestedBytes),
-			int64(handle.ReservedBytes),
-		)
+		handle.Domain = DefaultProcessMemoryDomain(0, 0)
+		handle.Domain.RequestedBytes = int64(handle.RequestedBytes)
+		handle.Domain.ReservedBytes = int64(handle.ReservedBytes)
 		handle.Reused = true
 		allocator.live[handle.BlockID] = handle.Generation
 		core.recordAllocation(handle)
@@ -287,8 +294,10 @@ func (allocator *PerCoreSmallHeapAllocator) Alloc(
 		RequestedBytes: int(bytes),
 		ReservedBytes:  cls.MaxBytes,
 		ClassName:      cls.Name,
-		Domain:         DefaultProcessMemoryDomain(bytes, int64(cls.MaxBytes)),
+		Domain:         DefaultProcessMemoryDomain(0, 0),
 	}
+	handle.Domain.RequestedBytes = bytes
+	handle.Domain.ReservedBytes = int64(cls.MaxBytes)
 	core.bumpOffset += cls.MaxBytes
 	allocator.live[handle.BlockID] = handle.Generation
 	core.recordAllocation(handle)
@@ -334,10 +343,9 @@ func (allocator *PerCoreSmallHeapAllocator) Report() PerCoreSmallHeapReport {
 		report.Cores = append(report.Cores, coreReport)
 	}
 	report.TotalMmapCalls = report.TotalChunkRefills
-	report.Domain = DefaultProcessMemoryDomain(
-		int64(report.BytesRequested),
-		int64(report.BytesReserved),
-	)
+	report.Domain = DefaultProcessMemoryDomain(0, 0)
+	report.Domain.RequestedBytes = int64(report.BytesRequested)
+	report.Domain.ReservedBytes = int64(report.BytesReserved)
 	report.EstimatedMmapPerAllocation = report.TotalAllocations > 0 &&
 		report.TotalMmapCalls >= report.TotalAllocations
 	return report
@@ -365,10 +373,12 @@ func (core perCoreSmallHeapCore) report() PerCoreSmallHeapCoreReport {
 		BytesRequested:     core.bytesRequested,
 		BytesReserved:      core.bytesReserved,
 		FragmentationBytes: core.fragmentationBytes,
-		Domain: DefaultProcessMemoryDomain(
-			int64(core.bytesRequested),
-			int64(core.bytesReserved),
-		),
+		Domain: func() MemoryDomain {
+			domain := DefaultProcessMemoryDomain(0, 0)
+			domain.RequestedBytes = int64(core.bytesRequested)
+			domain.ReservedBytes = int64(core.bytesReserved)
+			return domain
+		}(),
 		FreeListBlocks: freeListBlocks,
 	}
 }

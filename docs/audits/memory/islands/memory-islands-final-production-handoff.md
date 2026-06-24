@@ -15,16 +15,14 @@ Current completion evidence after the P20 validator and handoff changes lives un
 
 ## Actor Handoff
 
-Actor handoff readiness: actor phase may start as a separate Actor Runtime Production Foundation
-plan.
+Actor handoff readiness: actor phase may start as a separate actor runtime production foundation plan.
 
 Actor runtime production status: not started in this plan.
 
 Actor phase preconditions:
 
 - production actor gate must prove scheduler, mailbox backpressure, message exhaustion/reclamation,
-  race-safety, cross-target distributed runtime gates, structured concurrency, and fake-evidence
-  rejection.
+  race-safety, cross-target distributed runtime gates, structured concurrency, and fake-evidence rejection.
 - `docs/audits/runtime/actors/actor-runtime-production-boundary-v1.md` remains the actor production
   boundary.
 - `MEMISL-P10` memory-boundary handoff evidence is an input, not actor runtime completion.

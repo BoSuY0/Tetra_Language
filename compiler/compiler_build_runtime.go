@@ -25,9 +25,9 @@ import (
 	"tetra_language/compiler/internal/buildruntime"
 	"tetra_language/compiler/internal/buildwasm"
 	"tetra_language/compiler/internal/cache"
+	"tetra_language/compiler/internal/format/tobj"
 	"tetra_language/compiler/internal/frontend"
 	"tetra_language/compiler/internal/ir"
-	"tetra_language/compiler/internal/lower"
 	"tetra_language/compiler/internal/semantics"
 	"tetra_language/compiler/internal/version"
 	ctarget "tetra_language/compiler/target"
@@ -1045,11 +1045,19 @@ func buildObjectFileWithStatsOpt(
 		return nil, err
 	}
 
-	funcs, err := lower.LowerModuleWithOptions(
-		checked,
-		world.EntryModule,
-		lowerOptionsForBuild(tgt.Triple, opt),
-	)
+	memoryState, err := buildMemoryStateForTarget(checked, tgt.Triple)
+	if err != nil {
+		return nil, err
+	}
+	memoryPlanDigest, err := memoryState.ModulePlanDigest(world.EntryModule)
+	if err != nil {
+		return nil, err
+	}
+	loweringResult, err := lowerMemoryStateForBuild(checked, memoryState, tgt.Triple, opt, nil)
+	if err != nil {
+		return nil, err
+	}
+	funcs, err := loweringResult.ModuleFuncs(world.EntryModule)
 	if err != nil {
 		return nil, err
 	}
@@ -1112,6 +1120,13 @@ func buildObjectFileWithStatsOpt(
 	}
 	obj.Module = moduleName
 	obj.CompilerVersion = version.CompilerVersion
+	obj.MemoryPlanSchema = tobj.MemoryPlanSchemaV2
+	obj.MemoryLoweringSchema = tobj.MemoryLoweringSchemaV2
+	obj.MemoryPlanDigest = memoryPlanDigest
+	obj.MemoryLoweringDigest, err = loweringResult.ModuleLoweringDigest(moduleName)
+	if err != nil {
+		return nil, err
+	}
 	file := world.ByModule[world.EntryModule]
 	if file != nil {
 		obj.SrcHash = sha256.Sum256(file.Src)
@@ -1181,8 +1196,16 @@ func buildWASM32WASIWithStatsOpt(
 		CompiledModules: make([]string, 0, len(modules)),
 		LoweredModules:  make([]string, 0, len(modules)),
 	}
+	memoryState, err := buildMemoryStateForTarget(checked, tgt.Triple)
+	if err != nil {
+		return nil, err
+	}
+	loweringResult, err := lowerMemoryStateForBuild(checked, memoryState, tgt.Triple, opt, nil)
+	if err != nil {
+		return nil, err
+	}
 	for _, module := range modules {
-		moduleFuncs, err := LowerModule(checked, module)
+		moduleFuncs, err := loweringResult.ModuleFuncs(module)
 		if err != nil {
 			return nil, err
 		}
@@ -1214,7 +1237,14 @@ func buildWASM32WASIWithStatsOpt(
 	if err := emitUIArtifacts(outputPath, tgt.Triple, checked); err != nil {
 		return nil, err
 	}
-	if err := emitExplainReports(outputPath, tgt.Triple, checked, opt); err != nil {
+	if err := emitExplainReports(
+		outputPath,
+		tgt.Triple,
+		checked,
+		opt,
+		memoryState,
+		loweringResult,
+	); err != nil {
 		return nil, err
 	}
 	return stats, nil
@@ -1269,8 +1299,16 @@ func buildWASM32WEBWithStatsOpt(
 		CompiledModules: make([]string, 0, len(modules)),
 		LoweredModules:  make([]string, 0, len(modules)),
 	}
+	memoryState, err := buildMemoryStateForTarget(checked, tgt.Triple)
+	if err != nil {
+		return nil, err
+	}
+	loweringResult, err := lowerMemoryStateForBuild(checked, memoryState, tgt.Triple, opt, nil)
+	if err != nil {
+		return nil, err
+	}
 	for _, module := range modules {
-		moduleFuncs, err := LowerModule(checked, module)
+		moduleFuncs, err := loweringResult.ModuleFuncs(module)
 		if err != nil {
 			return nil, err
 		}
@@ -1308,7 +1346,14 @@ func buildWASM32WEBWithStatsOpt(
 	if err := emitUIArtifacts(outputPath, tgt.Triple, checked); err != nil {
 		return nil, err
 	}
-	if err := emitExplainReports(outputPath, tgt.Triple, checked, opt); err != nil {
+	if err := emitExplainReports(
+		outputPath,
+		tgt.Triple,
+		checked,
+		opt,
+		memoryState,
+		loweringResult,
+	); err != nil {
 		return nil, err
 	}
 	return stats, nil

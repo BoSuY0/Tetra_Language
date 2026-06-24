@@ -248,14 +248,14 @@ func TestWriteRAMMeasurementReportCapturesMemStatsSnapshots(t *testing.T) {
 	}
 }
 
-func TestSmallHeapBenchmarkSourceCreatesEscapingSmallHeapCandidates(t *testing.T) {
+func TestSmallHeapBenchmarkSourceCreatesSmallHeapRuntimeCandidates(t *testing.T) {
 	src := smallHeapBenchmarkSource(3, 32)
 	for _, want := range []string{
 		"func make_00() -> []u8",
 		"var xs: []u8 = make_u8(32)",
 		"return xs",
-		"let xs_02: []u8 = make_02()",
-		"return xs_00.len + xs_01.len + xs_02.len",
+		"let keep_02: []u8 = make_02()",
+		"return keep_00.len + keep_01.len + keep_02.len",
 	} {
 		if !strings.Contains(src, want) {
 			t.Fatalf("smallHeapBenchmarkSource missing %q:\n%s", want, src)

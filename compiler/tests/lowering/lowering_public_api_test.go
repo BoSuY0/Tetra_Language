@@ -3,6 +3,7 @@ package compiler_test
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	compiler "tetra_language/compiler"
@@ -76,6 +77,42 @@ uses runtime:
 				fn.ReturnSlots,
 			)
 		}
+	}
+}
+
+func TestLowerModulesMatchesCanonicalMemoryPipeline(t *testing.T) {
+	src := []byte(`
+func copied_len(xs: []u8) -> Int
+uses alloc, mem:
+    let copied: []u8 = xs.copy()
+    return copied.len
+
+func main() -> Int
+uses alloc, mem:
+    var xs: []u8 = core.make_u8(4)
+    xs[0] = 7
+    return copied_len(xs) + xs[0]
+`)
+	prog, err := compiler.Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	checked, err := compiler.Check(prog)
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	canonical, err := compiler.Lower(checked)
+	if err != nil {
+		t.Fatalf("Lower: %v", err)
+	}
+	modules, err := compiler.LowerModules(checked)
+	if err != nil {
+		t.Fatalf("LowerModules: %v", err)
+	}
+	moduleName := checked.Funcs[0].Module
+	got := modules[moduleName]
+	if !reflect.DeepEqual(got, canonical.Funcs) {
+		t.Fatalf("LowerModules[%q] diverged from canonical Lower output\nmodules=%#v\ncanonical=%#v", moduleName, got, canonical.Funcs)
 	}
 }
 

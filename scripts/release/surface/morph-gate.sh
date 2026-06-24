@@ -49,16 +49,8 @@ fi
 mkdir -p "$GOCACHE"
 
 report_dir_arg="${report_dir%/}"
-go run ./tools/cmd/run-gate \
-	--contract "$gate_contract" \
-	--report-dir "$report_dir_arg" \
-	--dry-run >/dev/null
-report_dir="$(
-  surface_release_require_fresh_report_dir \
-    "$report_dir_arg" \
-    "$repo_root" \
-    "surface_morph_gate:"
-)"
+go run ./tools/cmd/run-gate --contract "$gate_contract" --report-dir "$report_dir_arg" --dry-run >/dev/null
+report_dir="$(surface_release_require_fresh_report_dir "$report_dir_arg" "$repo_root" "surface_morph_gate:")"
 headless_report_dir="$report_dir_arg/headless"
 
 format_command() {
@@ -104,13 +96,8 @@ if [[ -n "$formatted_args" ]]; then
 fi
 
 bash scripts/release/surface/surface-headless-morph-smoke.sh --report-dir "$headless_report_dir"
-go run ./tools/cmd/validate-surface-morph-report \
-	--report "$report_dir/headless/surface-headless-morph.json" \
-	--same-commit "$git_head"
-go run ./tools/cmd/validate-surface-token-graph \
-	--contract docs/spec/surface/surface_token_graph_contract.json \
-	--report "$report_dir/headless/surface-headless-morph.json" \
-	--root "$repo_root"
+go run ./tools/cmd/validate-surface-morph-report --report "$report_dir/headless/surface-headless-morph.json" --same-commit "$git_head"
+go run ./tools/cmd/validate-surface-token-graph --contract docs/spec/surface/surface_token_graph_contract.json --report "$report_dir/headless/surface-headless-morph.json" --root "$repo_root"
 
 required_reports=(
 	"headless/surface-headless-morph.json"
@@ -124,7 +111,7 @@ for report in "${required_reports[@]}"; do
 done
 
 summary_path="$report_dir/surface-morph-gate-summary.json"
-cat >"$summary_path" <<JSON
+cat > "$summary_path" <<JSON
 {
   "schema": "tetra.surface.morph.gate.v1",
   "status": "current",
@@ -174,13 +161,8 @@ cat >"$summary_path" <<JSON
 }
 JSON
 
-go run ./tools/cmd/validate-surface-morph-gate-summary \
-	--summary "$report_dir/surface-morph-gate-summary.json" \
-	--same-commit "$git_head"
-go run ./tools/cmd/validate-artifact-hashes \
-	--write \
-	--root "$report_dir" \
-	--out "$report_dir/artifact-hashes.json"
+go run ./tools/cmd/validate-surface-morph-gate-summary --summary "$report_dir/surface-morph-gate-summary.json" --same-commit "$git_head"
+go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"
 go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-hashes.json"
 
 final_required_reports=(

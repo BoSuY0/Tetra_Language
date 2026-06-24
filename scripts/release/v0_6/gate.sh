@@ -50,9 +50,9 @@ echo "$short_version"
 echo "== Formatter/test/smoke =="
 ./tetra fmt --check examples lib __rt compiler/selfhostrt
 go run ./tools/cmd/validate-flow-only examples lib __rt compiler/selfhostrt
-./tetra targets --format=json > "$tmp_dir/targets.json"
+./tetra targets --format=json >"$tmp_dir/targets.json"
 go run ./tools/cmd/validate-targets --report "$tmp_dir/targets.json"
-./tetra doctor --format=json > "$tmp_dir/doctor.json"
+./tetra doctor --format=json >"$tmp_dir/doctor.json"
 go run ./tools/cmd/validate-doctor --report "$tmp_dir/doctor.json"
 ./tetra check examples/flow/flow_hello.tetra
 check_json_diagnostic_case "invalid-diagnostic" "unknown function" << 'TETRA'
@@ -76,7 +76,7 @@ wasm_out="$tmp_dir/flow_hello.wasm"
 ./tetra build --target wasm32-wasi -o "$wasm_out" examples/smoke/basic/hello.tetra > "$tmp_dir/wasm-target-build.out" 2> "$tmp_dir/wasm-target-build.err"
 test -s "$wasm_out"
 test "$(od -An -tx1 -N4 "$wasm_out" | tr -d ' \n')" = "0061736d"
-./tetra smoke --list --format=json > "$tmp_dir/smoke-list.json"
+./tetra smoke --list --format=json >"$tmp_dir/smoke-list.json"
 go run ./tools/cmd/validate-smoke-list --report "$tmp_dir/smoke-list.json"
 ./tetra test examples
 ./tetra test --report=json examples > "$tmp_dir/tetra-test-report.json"
@@ -117,7 +117,7 @@ grep -q '"capabilities"' "$tmp_dir/lsp-stdio.out"
 grep -q '"textDocument/publishDiagnostics"' "$tmp_dir/lsp-stdio.out"
 
 echo "== Generated API docs =="
-./tetra doc examples > "$tmp_dir/tetra-docs.md"
+./tetra doc examples >"$tmp_dir/tetra-docs.md"
 go run ./tools/cmd/validate-api-docs --docs "$tmp_dir/tetra-docs.md"
 go run ./tools/cmd/gen-docs examples > "$tmp_dir/api-docs.md"
 go run ./tools/cmd/validate-api-docs --docs "$tmp_dir/api-docs.md"

@@ -163,8 +163,8 @@ TextBox text routing, Button action routing, resize relayout, and changed RGBA f
 `examples/surface/toolkit/surface_toolkit_form.tetra` adds the first reusable toolkit layer on top
 of that helper API. It imports `lib.core.widgets`, builds a
 Panel/Column/Text/TextBox/Row/Button/StatusText form with ordinary Tetra structs, and proves click
-focus, text editing, Submit/Reset actions, status updates, resize relayout, and changed frames
-without DOM UI, user JS, platform widgets, or production toolkit claims.
+focus, text editing, Submit/Reset actions, status updates, resize relayout, and changed frames.
+It makes no DOM UI, no user JS, no platform-widget layer, and no production-toolkit claim.
 `examples/surface/toolkit/surface_accessibility_settings.tetra` adds the first accessibility
 metadata tree over the same toolkit. It imports `lib.core.accessibility` and `lib.core.widgets`,
 builds a Panel/Column settings form with labels, TextBoxes, Save/Reset Buttons, and StatusText, and
@@ -578,9 +578,9 @@ moves focus `TextBox -> SubmitButton -> ResetButton -> TextBox`; text bytes inse
 TextBox owns focus; Submit/Reset actions are keyboard-routed through the focused root-to-leaf tree
 path; the reset button clears the TextBox through a routed tree event; resize relayout widens the
 TextBox from 288 to 368 pixels and preserves the focused node. This remains experimental
-semi-dynamic child-list evidence with a hardened helper API, not a production widget toolkit, final
-trait-object child list, the stricter `production-text-input-v1` gate, rich text, bidi shaping, or
-platform accessibility tree.
+semi-dynamic child-list evidence with a hardened helper API. It is not a production widget toolkit,
+not a final trait-object child list, and not the stricter `production-text-input-v1` gate. It makes
+no rich text, no bidi shaping, and no platform accessibility tree claim.
 
 The minimal toolkit evidence entrypoints are:
 
@@ -747,8 +747,9 @@ let path_len: Int = component.tree_build_dispatch_path(tree, target, path_slots)
 
 The current helper API is an experimental foundation for a future toolkit. It now has a minimal
 experimental reusable `lib.core.widgets` layer, but it still does not provide production `Button` or
-`TextBox` widgets, trait-object child lists, witness-table dispatch, the stricter
-`production-text-input-v1` gate, rich text, bidi shaping, or platform accessibility integration.
+`TextBox` widgets, trait-object child lists, or witness-table dispatch. It is not the stricter
+`production-text-input-v1` gate and makes no rich text, no bidi shaping, and no platform
+accessibility integration claim.
 
 The static component fixture is `examples/surface/runtime/surface_component_counter.tetra`. It
 composes `CounterApp` and `CounterButton` as ordinary structs with `measure`, `layout`, `draw`,
@@ -777,8 +778,9 @@ testing, root-to-leaf pointer dispatch paths, exact
 `TextBox -> SubmitButton -> ResetButton -> TextBox` focus cycling, focused TextBox text insertion,
 keyboard-routed Submit/Reset Button actions, and resize relayout. Source tests reject app-side
 writes to structural tree fields, and API reports prove `manual_bookkeeping:false`. This is
-experimental component-tree helper evidence, not a full dynamic trait-object list, full String/IME
-editor, rich text, bidi shaping, platform accessibility integration, or production browser evidence.
+experimental component-tree helper evidence, not a full dynamic trait-object list and not full
+String/IME editor evidence. It makes no rich text, no bidi shaping, no platform accessibility
+integration, and no production browser evidence claim.
 Linux-x64 real-window counter evidence is covered separately by
 `examples/surface/runtime/surface_window_counter.tetra`; wasm32-web browser canvas/input counter
 evidence is covered separately by `examples/surface/runtime/surface_browser_counter.tetra`.

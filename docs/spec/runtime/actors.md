@@ -367,13 +367,13 @@ cancel/join handles.
 
 ### Distributed Runtime Target Matrix
 
-| Target        | Distributed actor runtime status | Current evidence                                                                  | Promotion requirement                                                                 |
-| ------------- | -------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `linux-x64`   | current scoped                   | executable `tetra.actors.distributed-runtime.v1` smoke plus actor foundation gate | keep same-commit distributed smoke, artifact hashes, and foundation validator green   |
-| `macos-x64`   | unsupported / nonclaim           | no distributed actor symbols; actor net pump is no-op                             | add target runtime, smoke, validator, docs, and package gate before any support claim |
-| `windows-x64` | unsupported / nonclaim           | no distributed actor symbols; actor net pump is no-op                             | add target runtime, smoke, validator, docs, and package gate before any support claim |
-| `wasm32-wasi` | unsupported / nonclaim           | no distributed actor runtime gate                                                 | add target runtime, smoke, validator, docs, and package gate before any support claim |
-| `wasm32-web`  | unsupported / nonclaim           | no distributed actor runtime gate                                                 | add target runtime, smoke, validator, docs, and package gate before any support claim |
+| Target | Distributed actor runtime status | Current evidence | Promotion requirement |
+| --- | --- | --- | --- |
+| `linux-x64` | current scoped | executable `tetra.actors.distributed-runtime.v1` smoke plus actor foundation gate | keep same-commit distributed smoke, artifact hashes, and foundation validator green |
+| `macos-x64` | unsupported / nonclaim | no distributed actor symbols; actor net pump is no-op | add target runtime, smoke, validator, docs, and package gate before any support claim |
+| `windows-x64` | unsupported / nonclaim | no distributed actor symbols; actor net pump is no-op | add target runtime, smoke, validator, docs, and package gate before any support claim |
+| `wasm32-wasi` | unsupported / nonclaim | no distributed actor runtime gate | add target runtime, smoke, validator, docs, and package gate before any support claim |
+| `wasm32-web` | unsupported / nonclaim | no distributed actor runtime gate | add target runtime, smoke, validator, docs, and package gate before any support claim |
 
 Missing-node/node_down is status/failure evidence only. When the loopback broker reports a missing
 destination with `node_down`, the Linux-x64 runtime can surface that as

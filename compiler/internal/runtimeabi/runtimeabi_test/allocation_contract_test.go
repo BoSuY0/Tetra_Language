@@ -133,9 +133,11 @@ func TestRuntimeAllocationContractDistinguishesAllocBytesAndIsland(t *testing.T)
 func TestRuntimeAllocationMemoryDomainHelpers(t *testing.T) {
 	process := DefaultProcessMemoryDomain(17, 32)
 	if process.DomainID != "domain:process" || process.Kind != DomainProcess ||
-		process.RequestedBytes != 17 ||
-		process.ReservedBytes != 32 {
-		t.Fatalf("process domain = %+v, want process domain with requested/reserved bytes", process)
+		process.State != DomainStateActive ||
+		process.RequestedBytes != 0 ||
+		process.ReservedBytes != 0 ||
+		process.BudgetBytes != 0 {
+		t.Fatalf("process domain = %+v, want active root process domain with zero counters", process)
 	}
 	if err := ValidateMemoryDomain(process); err != nil {
 		t.Fatalf("ValidateMemoryDomain(process): %v", err)
@@ -144,7 +146,11 @@ func TestRuntimeAllocationMemoryDomainHelpers(t *testing.T) {
 	island := IslandMemoryDomain("island:isl", "island:isl:scope", 17, 32)
 	if island.DomainID != "domain:island:isl" || island.Kind != DomainIsland ||
 		island.OwnerID != "isl" ||
-		island.Lifetime != "island:isl:scope" {
+		island.Lifetime != "island:isl:scope" ||
+		island.State != DomainStateActive ||
+		island.BudgetBytes != 0 ||
+		island.RequestedBytes != 17 ||
+		island.ReservedBytes != 32 {
 		t.Fatalf("island domain = %+v, want island domain bound to region/lifetime", island)
 	}
 	if err := ValidateMemoryDomain(island); err != nil {

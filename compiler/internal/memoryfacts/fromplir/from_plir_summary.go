@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	. "tetra_language/compiler/internal/memoryfacts"
 	"tetra_language/compiler/internal/plir"
 )
 
@@ -285,11 +284,13 @@ func addOperationSummaryFacts(
 				return err
 			}
 		case plir.OpActorSend:
-			owner := ownerFromOperationInput(op, 1)
-			if _, err := graph.AddFact(
-				functionSummaryFact(fn.Name, op.ID, "may_escape_to_actor", op.Source, plir.Value{}, ProvenanceSafeKnown, UnsafeSafe, EscapeActor, AliasUnknown, owner, ("operation transfers " +
-					"payload across actor boundary")),
-			); err != nil {
+			owner := ownerFromOperationInput(op, 0)
+			fact := functionSummaryFact(fn.Name, op.ID, "may_escape_to_actor", op.Source, plir.Value{}, ProvenanceSafeKnown, UnsafeSafe, EscapeActor, AliasUnknown, owner, ("operation transfers " +
+				"payload across actor boundary"))
+			fact.DomainKind = DomainActor
+			fact.DomainOwnerID = owner
+			fact.DestinationActive = owner != ""
+			if _, err := graph.AddFact(fact); err != nil {
 				return err
 			}
 		case plir.OpClosure:
@@ -302,10 +303,13 @@ func addOperationSummaryFacts(
 			}
 		case plir.OpCall:
 			if isTaskEscapeOperation(op) {
-				if _, err := graph.AddFact(
-					functionSummaryFact(fn.Name, op.ID, "may_escape_to_task", op.Source, plir.Value{}, ProvenanceSafeKnown, UnsafeSafe, EscapeTask, AliasUnknown, strings.Join(op.Inputs, ","), ("operation may transfer " +
-						"work or handles across task boundary")),
-				); err != nil {
+				owner := ownerFromTypedTaskOperationInput(op)
+				fact := functionSummaryFact(fn.Name, op.ID, "may_escape_to_task", op.Source, plir.Value{}, ProvenanceSafeKnown, UnsafeSafe, EscapeTask, AliasUnknown, owner, ("operation may transfer " +
+					"work or handles across task boundary"))
+				fact.DomainKind = DomainTask
+				fact.DomainOwnerID = owner
+				fact.DestinationActive = owner != ""
+				if _, err := graph.AddFact(fact); err != nil {
 					return err
 				}
 			}
