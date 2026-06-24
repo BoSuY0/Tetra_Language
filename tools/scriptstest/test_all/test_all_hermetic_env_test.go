@@ -2,6 +2,7 @@ package testall
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 const (
@@ -482,19 +484,88 @@ func TestTestAllFailureEvidenceDoesNotExposeAmbientSecret(t *testing.T) {
 	}
 }
 
+func TestTestAllNormalPassAssertionEmitsFailureEvidence(t *testing.T) {
+	if os.Getenv("TETRA_TEST_ALL_ASSERT_EVIDENCE_HELPER") == "1" {
+		root := testAllFakeRepo(t, false)
+		assertTestAllRunPasses(
+			t,
+			root,
+			"--quick",
+			[]string{"TETRA_FAKE_SKIP_MEMORY_FUZZ_ORACLE_LIST=1"},
+		)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(
+		ctx,
+		os.Args[0],
+		"-test.run",
+		"^TestTestAllNormalPassAssertionEmitsFailureEvidence$",
+	)
+	cmd.Env = append(os.Environ(), "TETRA_TEST_ALL_ASSERT_EVIDENCE_HELPER=1")
+	out, err := cmd.CombinedOutput()
+	if ctx.Err() == context.DeadlineExceeded {
+		t.Fatalf("helper subprocess timed out\n%s", out)
+	}
+	if err == nil {
+		t.Fatalf("expected helper subprocess to fail\n%s", out)
+	}
+
+	for _, want := range []string{
+		"test_all_mode=quick",
+		"memory fuzz oracle artifact gate",
+		"failed_step_count=1",
+		"skip_memory_fuzz_present=1",
+		"list_result=skipped_by_explicit_control",
+		"report_artifact_manifest",
+		"memory-fuzz-tier1/memory-fuzz-oracle.json",
+	} {
+		if !strings.Contains(string(out), want) {
+			t.Fatalf("helper output missing %q:\n%s", want, out)
+		}
+	}
+}
+
 func assertTestAllNormalRunPasses(t *testing.T, root string, mode string) {
 	t.Helper()
+	assertTestAllRunPasses(t, root, mode, nil)
+}
+
+func assertTestAllRunPasses(t *testing.T, root string, mode string, explicitEnv []string) {
+	t.Helper()
 	reportDir := filepath.Join(root, "report-"+strings.TrimPrefix(mode, "--"))
-	out, err := runTestAll(t, root, nil, mode, "--json-only", "--report-dir", reportDir)
+	traceDir := filepath.Join(root, ".test-all-trace")
+	if err := os.RemoveAll(traceDir); err != nil {
+		t.Fatalf("reset test_all fake-go trace directory: %v", err)
+	}
+	if err := os.MkdirAll(traceDir, 0o755); err != nil {
+		t.Fatalf("create test_all fake-go trace directory: %v", err)
+	}
+	out, err := runTestAll(t, root, explicitEnv, mode, "--json-only", "--report-dir", reportDir)
 	if err != nil {
-		t.Fatalf("test_all %s should pass with ambient controls ignored: %v\n%s", mode, err, out)
+		evidence := collectUnexpectedTestAllFailureForMode(t, root, reportDir, out, mode)
+		t.Fatalf(
+			"test_all %s should pass with ambient controls ignored: %v\n"+
+				"summary:\n%s\n"+
+				"diagnostics:\n%s",
+			mode,
+			err,
+			out,
+			evidence,
+		)
 	}
 	summary := decodeTestAllSummary(t, out)
 	if summary.Status != "pass" || summary.FailedCount != 0 {
-		t.Fatalf("summary status/counts = %q/%d, want pass/0: %#v",
+		evidence := collectUnexpectedTestAllFailureForMode(t, root, reportDir, out, mode)
+		t.Fatalf("summary status/counts = %q/%d, want pass/0: %#v\nsummary:\n%s\ndiagnostics:\n%s",
 			summary.Status,
 			summary.FailedCount,
 			summary.Steps,
+			out,
+			evidence,
 		)
 	}
 }

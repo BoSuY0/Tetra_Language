@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -33,6 +34,16 @@ type testAllSummary struct {
 const testAllFormatterStepName = "formatter check examples lib runtime"
 
 const testAllDiagnosticLogLimit = 64 * 1024
+
+const testAllDiagnosticManifestMaxFiles = 256
+
+const testAllDiagnosticManifestMaxPathLength = 512
+
+var testAllMemoryFuzzExpectedArtifacts = []string{
+	"memory-fuzz-tier1/memory-fuzz-oracle.json",
+	"memory-fuzz-tier1/summary.md",
+	"memory-fuzz-tier1/summary.json",
+}
 
 func hasTestAllStep(summary testAllSummary, name string) bool {
 	for _, step := range summary.Steps {
@@ -260,8 +271,22 @@ func collectUnexpectedTestAllFailure(
 	rawSummary []byte,
 ) string {
 	t.Helper()
+	return collectUnexpectedTestAllFailureForMode(t, root, reportDir, rawSummary, "")
+}
+
+func collectUnexpectedTestAllFailureForMode(
+	t *testing.T,
+	root string,
+	reportDir string,
+	rawSummary []byte,
+	mode string,
+) string {
+	t.Helper()
 	var out strings.Builder
 	out.WriteString("test_all unexpected failure evidence\n")
+	if mode != "" {
+		fmt.Fprintf(&out, "test_all_mode=%s\n", strings.TrimPrefix(mode, "--"))
+	}
 	out.WriteString("summary:\n")
 	out.WriteString(redactTestAllDiagnostic(root, string(rawSummary)))
 	if len(rawSummary) == 0 || rawSummary[len(rawSummary)-1] != '\n' {
@@ -272,6 +297,7 @@ func collectUnexpectedTestAllFailure(
 	if err := json.Unmarshal(rawSummary, &summary); err != nil {
 		fmt.Fprintf(&out, "summary_decode_error=%v\n", err)
 		appendFakeGoTraceDiagnostics(t, &out, root)
+		appendReportArtifactManifest(&out, root, reportDir)
 		return out.String()
 	}
 
@@ -319,6 +345,7 @@ func collectUnexpectedTestAllFailure(
 		}
 	}
 	appendFakeGoTraceDiagnostics(t, &out, root)
+	appendReportArtifactManifest(&out, root, reportDir)
 	return out.String()
 }
 
@@ -396,6 +423,134 @@ func appendFakeGoTraceDiagnostics(t *testing.T, out *strings.Builder, root strin
 			out.WriteByte('\n')
 		}
 	}
+}
+
+func appendReportArtifactManifest(out *strings.Builder, root string, reportDir string) {
+	out.WriteString("report_artifact_manifest:\n")
+	absReportDir, err := filepath.Abs(reportDir)
+	if err != nil {
+		fmt.Fprintf(out, "  status=cannot_resolve_report_dir: %s\n", redactTestAllDiagnostic(root, err.Error()))
+		appendMemoryFuzzExpectedArtifactManifest(out, root, reportDir)
+		return
+	}
+	info, err := os.Lstat(absReportDir)
+	if err != nil {
+		fmt.Fprintf(out, "  status=unavailable: %s\n", redactTestAllDiagnostic(root, err.Error()))
+		appendMemoryFuzzExpectedArtifactManifest(out, root, reportDir)
+		return
+	}
+	if !info.IsDir() {
+		out.WriteString("  status=unavailable: report_dir_not_directory\n")
+		appendMemoryFuzzExpectedArtifactManifest(out, root, reportDir)
+		return
+	}
+
+	type manifestEntry struct {
+		path   string
+		size   int64
+		sha256 string
+		err    string
+	}
+	var entries []manifestEntry
+	truncated := false
+	walkErr := filepath.WalkDir(absReportDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if path == absReportDir {
+			return nil
+		}
+		if len(entries) >= testAllDiagnosticManifestMaxFiles {
+			truncated = true
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if d.Type()&os.ModeSymlink != 0 {
+			return nil
+		}
+		if d.IsDir() {
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil || !info.Mode().IsRegular() {
+			return nil
+		}
+		rel, err := filepath.Rel(absReportDir, path)
+		if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+			return nil
+		}
+		rel = filepath.ToSlash(filepath.Clean(rel))
+		if len(rel) > testAllDiagnosticManifestMaxPathLength {
+			truncated = true
+			return nil
+		}
+		size, sha, err := hashDiagnosticFile(path)
+		entry := manifestEntry{path: rel, size: size, sha256: sha}
+		if err != nil {
+			entry.err = redactTestAllDiagnostic(root, err.Error())
+		}
+		entries = append(entries, entry)
+		return nil
+	})
+	if walkErr != nil {
+		fmt.Fprintf(out, "  walk_status=%s\n", redactTestAllDiagnostic(root, walkErr.Error()))
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].path < entries[j].path })
+	fmt.Fprintf(out, "  file_count=%d\n", len(entries))
+	if truncated {
+		out.WriteString("  truncated=true\n")
+	}
+	for _, entry := range entries {
+		if entry.err != "" {
+			fmt.Fprintf(out, "  path=%s present=true read_error=%s\n", entry.path, entry.err)
+			continue
+		}
+		fmt.Fprintf(out, "  path=%s present=true size=%d sha256=%s\n", entry.path, entry.size, entry.sha256)
+	}
+	appendMemoryFuzzExpectedArtifactManifest(out, root, reportDir)
+}
+
+func appendMemoryFuzzExpectedArtifactManifest(out *strings.Builder, root string, reportDir string) {
+	out.WriteString("memory_fuzz_expected_artifacts:\n")
+	for _, rel := range testAllMemoryFuzzExpectedArtifacts {
+		path := filepath.Join(reportDir, filepath.FromSlash(rel))
+		info, err := os.Lstat(path)
+		if os.IsNotExist(err) {
+			fmt.Fprintf(out, "  path=%s present=false\n", rel)
+			continue
+		}
+		if err != nil {
+			fmt.Fprintf(out, "  path=%s present=unknown error=%s\n", rel, redactTestAllDiagnostic(root, err.Error()))
+			continue
+		}
+		if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+			fmt.Fprintf(out, "  path=%s present=false non_regular=true\n", rel)
+			continue
+		}
+		size, sha, err := hashDiagnosticFile(path)
+		if err != nil {
+			fmt.Fprintf(out, "  path=%s present=unknown error=%s\n", rel, redactTestAllDiagnostic(root, err.Error()))
+			continue
+		}
+		fmt.Fprintf(out, "  path=%s present=true size=%d sha256=%s\n", rel, size, sha)
+	}
+}
+
+func hashDiagnosticFile(path string) (int64, string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return 0, "", err
+	}
+	defer file.Close()
+
+	hash := sha256.New()
+	size, err := io.Copy(hash, file)
+	if err != nil {
+		return size, "", err
+	}
+	return size, fmt.Sprintf("%x", hash.Sum(nil)), nil
 }
 
 func readDiagnosticFilePreview(path string, limit int64) (string, string, bool, error) {
