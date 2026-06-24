@@ -22,13 +22,13 @@ review_set:
 summary:
 - blocker: 0
 - critical: 0
-- high: 5
+- high: 6
 - medium: 3
 - low: 1
 - informational: 0
 
 resolution_summary:
-- resolved_high: 3
+- resolved_high: 4
 - resolved_medium: 3
 - resolved_low: 1
 - open_blocker: 0
@@ -48,6 +48,7 @@ resolution_commits:
 - D-004: `f28953df325cd87cb8378b3c9b7952238b6d3e13`
 - D-005: `a93dede994b29a86af5efde3434951410e737a34`
 - D-001: `9d0c1420620d600d2575d950e3bd33277d29b48f`
+- D-006: `17d8d946b19196bc9bf4f53d49e10d82cab0cc5d`
 
 validation_timeout:
   command: go test -buildvcs=false ./cli/cmd/tetra -count=50
@@ -151,9 +152,9 @@ root_cause_reviews:
 - `docs/reviews/memory-core-v2/d001-testall-environment-contract-review.md`
 - `docs/reviews/memory-core-v2/d001-post-fix-ci-causality-review.md`
 package: `tools/scriptstest/test_all`
-status: resolved_pending_external_ci
+status: resolved_environment_isolation
 severity: high
-merge_blocking: true
+merge_blocking: false
 previous_fix_commit: `9ca65b6b820e477059513a31ebc190f5062f84b5`
 previous_fix_result: partial_mitigation
 final_fix_commit: `9d0c1420620d600d2575d950e3bd33277d29b48f`
@@ -232,8 +233,66 @@ resolution_evidence:
 - GREEN: `go test -buildvcs=false ./tools/scriptstest/test_all -run '^(TestTestAllHermeticEnvRejectsAmbientControlMatrix|TestTestAllExplicitFailureControlsAreIsolated|TestTestAllFakeRepoIgnoresAmbientTargetHostReports|TestTestAllHermeticRunsDoNotCrossContaminate|TestTestAllHermeticEnvHasUniqueDeterministicKeys|TestTestAllQuickFailsWhenHostLeakBlockerSuiteMissing|TestTestAllFullRunsDocsManifestDiffStep|TestTestAllFullValidatesCrossTargetSmokeReports)$' -count=100 -shuffle=on -timeout=30m`
 - GREEN: `go test -race -buildvcs=false ./tools/scriptstest/test_all -run 'Hermetic|Ambient|ExplicitFailureControls|CrossContaminate' -count=10 -timeout=30m`
 - GREEN: `go test ./tools/scriptstest/test_all -count=20 -shuffle=on -timeout=30m`
-- PENDING: actual PR-style merge fan-in repetitions, full local suite, Memory
-  Core gate, and external push/PR fan-in for the final D-001 fix SHA.
+- CLOSED: environment-isolation component resolved by commit
+  `9d0c1420620d600d2575d950e3bd33277d29b48f`.
+- NOTE: subsequent fan-in failures were classified as D-006, not a reopening of
+  D-001.
+
+### D-006: blocker test-name membership check can falsely reject emitted names
+
+package: `scripts/ci/test-all.sh`
+test_package: `tools/scriptstest/test_all`
+status: resolved_pending_external_ci
+severity: high
+merge_blocking: true_until_external_ci_green
+ci_runs:
+- 28117865238
+- 28117860546
+ci_jobs:
+- 83262211010
+- 83262197432
+diagnostic_commits:
+- `e1221e264e3369703c5adb67344b788f93adb1e7`
+- `38c0991d5b33b1f42960023be4d593e93a997de2`
+- `eec9719d124d92cf4cb37d4224d43213de001c89`
+fix_commit: `17d8d946b19196bc9bf4f53d49e10d82cab0cc5d`
+d001_status: resolved_environment_isolation
+
+finding:
+The runner-level observability commit captured required test-name membership
+failures where fake `go test -list` selected the normal fixture branch,
+reported skip controls disabled for the relevant blocker, emitted the expected
+list, and then `scripts/ci/test-all.sh` still reported
+`missing required ... test`.
+
+root_cause:
+`grep -q` exited after finding the required test name, while the upstream
+`printf` could receive SIGPIPE; `set -o pipefail` converted that successful
+membership result into a failed pipeline.
+
+fix:
+Commit `17d8d946b19196bc9bf4f53d49e10d82cab0cc5d` replaces the
+`printf '%s\n' "$list_out" | grep -qx "$name"` membership pipeline with a
+Bash-only exact-line scanner, `line_list_contains_exact`, used by
+`require_named_go_test_names` and therefore by all blocker test-name membership
+wrappers.
+
+before_after:
+- Before: a required test name at the beginning of a large `go test -list`
+  output could be reported missing when `grep -q` closed the pipe early and
+  `pipefail` propagated the upstream SIGPIPE.
+- After: membership is checked in-process line by line, with no external grep
+  pipeline and no SIGPIPE-sensitive upstream writer.
+
+resolution_evidence:
+- RED: `go test -buildvcs=false ./tools/scriptstest/test_all -run '^TestTestAllRequiredNameMembershipIsPipefailSafe$' -count=1 -timeout=5m`
+  failed with `missing required unsafe promotion blocker test:
+  ./compiler/internal/memoryfacts
+  TestMemoryFactsRejectsUnsafeUnknownToSafeKnown`.
+- GREEN: `go test -buildvcs=false ./tools/scriptstest/test_all -run '^TestTestAllRequiredNameMembershipIsPipefailSafe$' -count=1 -timeout=5m`
+  passed after replacing the pipeline.
+- PENDING: final local validation matrix and external push/PR fan-in on the
+  D-006 fix SHA.
 
 ### D-003: linux-x32 unsupported reason contract mismatch
 
