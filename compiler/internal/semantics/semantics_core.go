@@ -4492,6 +4492,8 @@ const (
 	FnPtrEnvSlotCount       = model.FnPtrEnvSlotCount
 	FnPtrSlotCount          = model.FnPtrSlotCount
 	CallableHandleSlotCount = model.CallableHandleSlotCount
+	SummaryParamNone        = model.SummaryParamNone
+	SummaryParamUnknown     = model.SummaryParamUnknown
 
 	CallableEscapeLocalSnapshot = model.CallableEscapeLocalSnapshot
 	CallableEscapeHeap          = model.CallableEscapeHeap

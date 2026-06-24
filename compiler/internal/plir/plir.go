@@ -660,9 +660,9 @@ func (b *builder) functionSummary() *FunctionSummary {
 		ThrowsType:            sig.ThrowsType,
 		Effects:               append([]string(nil), sig.Effects...),
 		TouchesMutableGlobals: sig.TouchesMutableGlobals,
-		ReturnRegionUnknown:   sig.ReturnRegionParam < -1 && len(sig.ReturnRegionSummary) == 0,
+		ReturnRegionUnknown:   sig.ReturnRegionParam < semantics.SummaryParamNone && len(sig.ReturnRegionSummary) == 0,
 		ReturnRegionSummary:   cloneIntMap(sig.ReturnRegionSummary),
-		ReturnResourceUnknown: sig.ReturnResourceParam < -1 && len(sig.ReturnResourceSummary) == 0,
+		ReturnResourceUnknown: sig.ReturnResourceParam < semantics.SummaryParamNone && len(sig.ReturnResourceSummary) == 0,
 		ReturnResourceSummary: cloneResourceSummary(sig.ReturnResourceSummary),
 		ThrowResourceSummary:  cloneResourceSummary(sig.ThrowResourceSummary),
 	}

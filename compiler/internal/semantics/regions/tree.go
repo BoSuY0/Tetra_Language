@@ -1,8 +1,10 @@
 package regions
 
+import "tetra_language/compiler/internal/semantics/model"
+
 const (
-	None                = -1
-	Unknown             = -2
+	None                = model.SummaryParamNone
+	Unknown             = model.SummaryParamUnknown
 	ParamStart          = -3
 	ExplicitBorrowStart = -1000000
 )
