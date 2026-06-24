@@ -2,7 +2,10 @@ package testall
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -28,6 +31,8 @@ type testAllSummary struct {
 }
 
 const testAllFormatterStepName = "formatter check examples lib runtime"
+
+const testAllDiagnosticLogLimit = 64 * 1024
 
 func hasTestAllStep(summary testAllSummary, name string) bool {
 	for _, step := range summary.Steps {
@@ -246,6 +251,213 @@ func decodeTestAllSummary(t *testing.T, raw []byte) testAllSummary {
 		t.Fatalf("decode summary: %v\n%s", err, string(raw))
 	}
 	return summary
+}
+
+func collectUnexpectedTestAllFailure(
+	t *testing.T,
+	root string,
+	reportDir string,
+	rawSummary []byte,
+) string {
+	t.Helper()
+	var out strings.Builder
+	out.WriteString("test_all unexpected failure evidence\n")
+	out.WriteString("summary:\n")
+	out.WriteString(redactTestAllDiagnostic(root, string(rawSummary)))
+	if len(rawSummary) == 0 || rawSummary[len(rawSummary)-1] != '\n' {
+		out.WriteByte('\n')
+	}
+
+	var summary testAllSummary
+	if err := json.Unmarshal(rawSummary, &summary); err != nil {
+		fmt.Fprintf(&out, "summary_decode_error=%v\n", err)
+		appendFakeGoTraceDiagnostics(t, &out, root)
+		return out.String()
+	}
+
+	var failed []struct {
+		Name     string
+		ExitCode *int
+		Command  string
+		Log      string
+	}
+	for _, step := range summary.Steps {
+		if step.Status != "fail" {
+			continue
+		}
+		failed = append(failed, struct {
+			Name     string
+			ExitCode *int
+			Command  string
+			Log      string
+		}{
+			Name:     step.Name,
+			ExitCode: step.ExitCode,
+			Command:  step.Command,
+			Log:      step.Log,
+		})
+	}
+	fmt.Fprintf(&out, "failed_step_count=%d\n", len(failed))
+	for _, step := range failed {
+		out.WriteString("failed_step:\n")
+		fmt.Fprintf(&out, "  name=%s\n", step.Name)
+		if step.ExitCode == nil {
+			out.WriteString("  exit_code=<nil>\n")
+		} else {
+			fmt.Fprintf(&out, "  exit_code=%d\n", *step.ExitCode)
+		}
+		fmt.Fprintf(&out, "  command=%s\n", redactTestAllDiagnostic(root, step.Command))
+		fmt.Fprintf(&out, "  log=%s\n", step.Log)
+		content, status := readTestAllStepLogForDiagnostic(root, reportDir, step.Log)
+		fmt.Fprintf(&out, "  log_status=%s\n", status)
+		if content != "" {
+			out.WriteString("  log_content:\n")
+			out.WriteString(indentDiagnostic(redactTestAllDiagnostic(root, content), "    "))
+			if content[len(content)-1] != '\n' {
+				out.WriteByte('\n')
+			}
+		}
+	}
+	appendFakeGoTraceDiagnostics(t, &out, root)
+	return out.String()
+}
+
+func readTestAllStepLogForDiagnostic(root, reportDir, relLog string) (string, string) {
+	if relLog == "" {
+		return "", "missing log path"
+	}
+	if filepath.IsAbs(relLog) {
+		return "", "rejected unsafe log path: absolute path"
+	}
+	cleanLog := filepath.Clean(relLog)
+	if cleanLog == "." || cleanLog == ".." || strings.HasPrefix(cleanLog, ".."+string(os.PathSeparator)) {
+		return "", "rejected unsafe log path: escapes report dir"
+	}
+	absReportDir, err := filepath.Abs(reportDir)
+	if err != nil {
+		return "", "cannot resolve report dir: " + err.Error()
+	}
+	candidate := filepath.Join(reportDir, cleanLog)
+	absCandidate, err := filepath.Abs(candidate)
+	if err != nil {
+		return "", "cannot resolve log path: " + err.Error()
+	}
+	rel, err := filepath.Rel(absReportDir, absCandidate)
+	if err != nil {
+		return "", "cannot verify log path: " + err.Error()
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return "", "rejected unsafe log path: escapes report dir"
+	}
+	content, sha, truncated, err := readDiagnosticFilePreview(absCandidate, testAllDiagnosticLogLimit)
+	if err != nil {
+		return "", "cannot read log: " + redactTestAllDiagnostic(root, err.Error())
+	}
+	status := fmt.Sprintf("read sha256=%s bytes=%d", sha, len(content))
+	if truncated {
+		status += " truncated=true"
+	}
+	return content, status
+}
+
+func appendFakeGoTraceDiagnostics(t *testing.T, out *strings.Builder, root string) {
+	t.Helper()
+	traceDir := filepath.Join(root, ".test-all-trace")
+	entries, err := os.ReadDir(traceDir)
+	if err != nil {
+		fmt.Fprintf(out, "fake_go_trace_status=unavailable: %v\n", err)
+		return
+	}
+	var names []string
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".trace") {
+			continue
+		}
+		names = append(names, entry.Name())
+	}
+	sort.Strings(names)
+	fmt.Fprintf(out, "fake_go_trace_count=%d\n", len(names))
+	for _, name := range names {
+		path := filepath.Join(traceDir, name)
+		content, sha, truncated, err := readDiagnosticFilePreview(path, testAllDiagnosticLogLimit)
+		out.WriteString("fake_go_trace:\n")
+		fmt.Fprintf(out, "  file=%s\n", name)
+		if err != nil {
+			fmt.Fprintf(out, "  status=read_error: %v\n", err)
+			continue
+		}
+		fmt.Fprintf(out, "  status=read sha256=%s bytes=%d", sha, len(content))
+		if truncated {
+			out.WriteString(" truncated=true")
+		}
+		out.WriteByte('\n')
+		out.WriteString(indentDiagnostic(redactTestAllDiagnostic(root, content), "    "))
+		if content != "" && content[len(content)-1] != '\n' {
+			out.WriteByte('\n')
+		}
+	}
+}
+
+func readDiagnosticFilePreview(path string, limit int64) (string, string, bool, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", "", false, err
+	}
+	defer file.Close()
+
+	hash := sha256.New()
+	raw, err := io.ReadAll(io.LimitReader(io.TeeReader(file, hash), limit+1))
+	if err != nil {
+		return "", "", false, err
+	}
+	truncated := int64(len(raw)) > limit
+	if truncated {
+		raw = raw[:limit]
+	}
+	if _, err := io.Copy(hash, file); err != nil {
+		return "", "", false, err
+	}
+	return string(raw), fmt.Sprintf("%x", hash.Sum(nil)), truncated, nil
+}
+
+func redactTestAllDiagnostic(root string, input string) string {
+	out := strings.ReplaceAll(input, filepath.Clean(root), "<fake-repo>")
+	if absRoot, err := filepath.Abs(root); err == nil {
+		out = strings.ReplaceAll(out, absRoot, "<fake-repo>")
+	}
+	lines := strings.SplitAfter(out, "\n")
+	for i, line := range lines {
+		upper := strings.ToUpper(line)
+		for _, marker := range []string{
+			"AUTHORIZATION",
+			"CREDENTIAL",
+			"PASSWORD",
+			"SECRET",
+			"TOKEN",
+		} {
+			if strings.Contains(upper, marker) {
+				lines[i] = "<redacted sensitive line>\n"
+				break
+			}
+		}
+	}
+	return strings.Join(lines, "")
+}
+
+func indentDiagnostic(input string, prefix string) string {
+	if input == "" {
+		return prefix + "<empty>\n"
+	}
+	lines := strings.SplitAfter(input, "\n")
+	var out strings.Builder
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		out.WriteString(prefix)
+		out.WriteString(line)
+	}
+	return out.String()
 }
 
 func copyFile(src, dst string, mode os.FileMode) error {

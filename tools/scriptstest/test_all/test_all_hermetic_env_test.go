@@ -175,7 +175,12 @@ func TestTestAllFakeRepoIgnoresAmbientTargetHostReports(t *testing.T) {
 		reportDir,
 	)
 	if err != nil {
-		t.Fatalf("test_all full should ignore ambient target-host reports: %v\n%s", err, out)
+		t.Fatalf(
+			"test_all full should ignore ambient target-host reports: %v\n%s\n%s",
+			err,
+			out,
+			collectUnexpectedTestAllFailure(t, root, reportDir, out),
+		)
 	}
 	summary := decodeTestAllSummary(t, out)
 	if summary.Status != "pass" || summary.FailedCount != 0 {
@@ -353,6 +358,130 @@ func TestTestAllHermeticEnvHasUniqueDeterministicKeys(t *testing.T) {
 	}
 }
 
+func TestTestAllUnexpectedFailureEvidenceIncludesBlockerLog(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	reportDir := filepath.Join(root, "report")
+	out, err := runTestAll(
+		t,
+		root,
+		[]string{"TETRA_FAKE_SKIP_UNSAFE_PROMOTION_LIST=1"},
+		"--quick",
+		"--json-only",
+		"--report-dir",
+		reportDir,
+	)
+	if err == nil {
+		t.Fatalf("expected unsafe blocker failure\n%s", out)
+	}
+	evidence := collectUnexpectedTestAllFailure(t, root, reportDir, out)
+	for _, want := range []string{
+		"unsafe promotion blocker suite",
+		"missing required unsafe promotion blocker test: ./compiler/internal/memoryfacts TestMemoryFactsRejectsUnsafeUnknownToSafeKnown",
+		"package=./compiler/internal/memoryfacts",
+		"list_pattern=UnsafeUnknown|UnsafeVerified|Promotion",
+		"skip_unsafe_present=1",
+		"list_result=skipped_by_explicit_control",
+	} {
+		if !strings.Contains(evidence, want) {
+			t.Fatalf("failure evidence missing %q:\n%s", want, evidence)
+		}
+	}
+}
+
+func TestTestAllNormalFakeGoTraceShowsNoSkipControls(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	reportDir := filepath.Join(root, "report")
+	out, err := runTestAll(t, root, nil, "--quick", "--json-only", "--report-dir", reportDir)
+	if err != nil {
+		t.Fatalf("test_all quick failed: %v\n%s", err, out)
+	}
+	evidence := collectUnexpectedTestAllFailure(t, root, reportDir, out)
+	for _, want := range []string{
+		"skip_unsafe_present=0",
+		"skip_bounds_present=0",
+		"skip_host_leak_present=0",
+		"skip_memory_fuzz_present=0",
+		"skip_ram_contract_present=0",
+		"package=./compiler/internal/memoryfacts",
+		"list_pattern=UnsafeUnknown|UnsafeVerified|Promotion",
+		"package=./compiler/internal/validation",
+		"list_pattern=Bounds|Proof|Unchecked",
+		"list_result=normal",
+	} {
+		if !strings.Contains(evidence, want) {
+			t.Fatalf("normal fake-go trace missing %q:\n%s", want, evidence)
+		}
+	}
+	for _, sequence := range [][]string{
+		{
+			"package=./compiler/internal/memoryfacts",
+			"list_pattern=UnsafeUnknown|UnsafeVerified|Promotion",
+			"list_result=normal",
+			"emitted_line_count=15",
+		},
+		{
+			"package=./compiler/internal/validation",
+			"list_pattern=Bounds|Proof|Unchecked",
+			"list_result=normal",
+			"emitted_line_count=3",
+		},
+	} {
+		if !containsAllInOrder(evidence, sequence...) {
+			t.Fatalf("normal list trace missing ordered fields %v:\n%s", sequence, evidence)
+		}
+	}
+}
+
+func TestTestAllFailureEvidenceRejectsEscapingLogPath(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	reportDir := filepath.Join(root, "report")
+	if err := os.MkdirAll(reportDir, 0o755); err != nil {
+		t.Fatalf("create report dir: %v", err)
+	}
+	secret := filepath.Join(root, "secret")
+	if err := os.WriteFile(secret, []byte("do not read\n"), 0o644); err != nil {
+		t.Fatalf("write secret: %v", err)
+	}
+	rawSummary := []byte(`{
+		"status":"fail",
+		"failed_count":1,
+		"steps":[
+			{"name":"escaping step","status":"fail","exit_code":1,"command":"fake","log":"../../secret"}
+		]
+	}`)
+	evidence := collectUnexpectedTestAllFailure(t, root, reportDir, rawSummary)
+	if !strings.Contains(evidence, "rejected unsafe log path") {
+		t.Fatalf("failure evidence did not reject escaping path:\n%s", evidence)
+	}
+	if strings.Contains(evidence, "do not read") {
+		t.Fatalf("failure evidence read file outside report dir:\n%s", evidence)
+	}
+}
+
+func TestTestAllFailureEvidenceDoesNotExposeAmbientSecret(t *testing.T) {
+	sentinel := "sentinel-secret-value-for-test-all-observability"
+	t.Setenv("TETRA_TEST_SECRET_SENTINEL", sentinel)
+
+	root := testAllFakeRepo(t, false)
+	reportDir := filepath.Join(root, "report")
+	out, err := runTestAll(
+		t,
+		root,
+		[]string{"TETRA_FAKE_SKIP_UNSAFE_PROMOTION_LIST=1"},
+		"--quick",
+		"--json-only",
+		"--report-dir",
+		reportDir,
+	)
+	if err == nil {
+		t.Fatalf("expected unsafe blocker failure\n%s", out)
+	}
+	evidence := collectUnexpectedTestAllFailure(t, root, reportDir, out)
+	if strings.Contains(evidence, sentinel) {
+		t.Fatalf("failure evidence exposed ambient secret:\n%s", evidence)
+	}
+}
+
 func assertTestAllNormalRunPasses(t *testing.T, root string, mode string) {
 	t.Helper()
 	reportDir := filepath.Join(root, "report-"+strings.TrimPrefix(mode, "--"))
@@ -444,4 +573,16 @@ func testAllEnvMap(t *testing.T, env []string) map[string]string {
 		out[key] = value
 	}
 	return out
+}
+
+func containsAllInOrder(s string, needles ...string) bool {
+	offset := 0
+	for _, needle := range needles {
+		next := strings.Index(s[offset:], needle)
+		if next < 0 {
+			return false
+		}
+		offset += next + len(needle)
+	}
+	return true
 }

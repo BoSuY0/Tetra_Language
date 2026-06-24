@@ -448,7 +448,11 @@ func TestTestAllStabilizationToolingSummaryRequiresFocusedArtifacts(t *testing.T
 	}
 	summary := decodeTestAllSummary(t, out)
 	if summary.Status != "fail" || summary.FailedCount != 1 {
-		t.Fatalf("summary = %#v", summary)
+		t.Fatalf(
+			"summary = %#v\n%s",
+			summary,
+			collectUnexpectedTestAllFailure(t, root, reportDir, out),
+		)
 	}
 	var sawToolingFailure bool
 	for _, step := range summary.Steps {
@@ -457,7 +461,11 @@ func TestTestAllStabilizationToolingSummaryRequiresFocusedArtifacts(t *testing.T
 		}
 	}
 	if !sawToolingFailure {
-		t.Fatalf("summary missing failing tooling summary step: %#v", summary.Steps)
+		t.Fatalf(
+			"summary missing failing tooling summary step: %#v\n%s",
+			summary.Steps,
+			collectUnexpectedTestAllFailure(t, root, reportDir, out),
+		)
 	}
 	logRaw, err := os.ReadFile(
 		filepath.Join(reportDir, testAllStepLog(t, summary, "tooling summary aggregation")),
@@ -485,7 +493,12 @@ func TestTestAllStabilizationRunsFocusedGates(t *testing.T) {
 		reportDir,
 	)
 	if err != nil {
-		t.Fatalf("test_all stabilization failed: %v\n%s", err, out)
+		t.Fatalf(
+			"test_all stabilization failed: %v\n%s\n%s",
+			err,
+			out,
+			collectUnexpectedTestAllFailure(t, root, reportDir, out),
+		)
 	}
 	summary := decodeTestAllSummary(t, out)
 	if summary.Status != "pass" {
