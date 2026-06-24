@@ -40,6 +40,16 @@ jobs:
         with:
           go-version: "1.25.x"
 
+      - name: Windows UI OS-thread affinity regression
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          go test -buildvcs=false \
+            ./tools/cmd/platform-ui-runtime-smoke \
+            -run '^TestWindowsPlatformProbeCompletesUnderSchedulerPressure$' \
+            -count=20 \
+            -timeout=10m
+
       - name: Build CLI
         shell: bash
         run: |

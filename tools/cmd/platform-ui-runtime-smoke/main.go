@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"tetra_language/compiler"
 	"tetra_language/tools/validators/platformui"
@@ -112,9 +114,18 @@ type platformWindowProbeResult struct {
 
 var platformWindowProbe = runPlatformWindowProbe
 
-type processPlatformRuntimeRunner struct{}
+const (
+	defaultPlatformRuntimeBuildTimeout = 5 * time.Minute
+	defaultPlatformRuntimeChildTimeout = time.Minute
+)
 
-func (processPlatformRuntimeRunner) Run(target string) (platformRuntimeRun, error) {
+type processPlatformRuntimeRunner struct {
+	buildTimeout   time.Duration
+	childTimeout   time.Duration
+	commandContext func(context.Context, string, ...string) *exec.Cmd
+}
+
+func (r processPlatformRuntimeRunner) Run(target string) (platformRuntimeRun, error) {
 	repoRoot, err := repoRootFromWD()
 	if err != nil {
 		return platformRuntimeRun{}, err
@@ -130,12 +141,25 @@ func (processPlatformRuntimeRunner) Run(target string) (platformRuntimeRun, erro
 	}
 	exePath := filepath.Join(tmpDir, exeName)
 	buildArgs := []string{"build", "-o", exePath, "./tools/cmd/platform-ui-runtime-smoke"}
-	buildCmd := exec.Command("go", buildArgs...)
+	buildTimeout := r.effectiveBuildTimeout()
+	buildCtx, buildCancel := context.WithTimeout(context.Background(), buildTimeout)
+	buildCmd := r.command(buildCtx, "go", buildArgs...)
 	buildCmd.Dir = repoRoot
 	buildRaw, err := buildCmd.CombinedOutput()
+	buildTimedOut := buildCtx.Err() == context.DeadlineExceeded
+	buildCancel()
 	result := platformRuntimeRun{
 		BuildPath:     "go " + strings.Join(buildArgs, " "),
 		BuildExitCode: exitCodeFromError(err),
+	}
+	if buildTimedOut {
+		if result.BuildExitCode == 0 {
+			result.BuildExitCode = 1
+		}
+		return result, fmt.Errorf(
+			"build platform UI runtime child timed out after %s",
+			buildTimeout,
+		)
 	}
 	if err != nil {
 		return result, fmt.Errorf(
@@ -145,15 +169,28 @@ func (processPlatformRuntimeRunner) Run(target string) (platformRuntimeRun, erro
 		)
 	}
 	childArgs := []string{"--child-runtime", "--target", target}
-	childCmd := exec.Command(exePath, childArgs...)
+	childTimeout := r.effectiveChildTimeout()
+	childCtx, childCancel := context.WithTimeout(context.Background(), childTimeout)
+	childCmd := r.command(childCtx, exePath, childArgs...)
 	childCmd.Dir = repoRoot
 	var childStdout bytes.Buffer
 	var childStderr bytes.Buffer
 	childCmd.Stdout = &childStdout
 	childCmd.Stderr = &childStderr
-	err = childCmd.Run()
 	result.AppPath = exePath + " " + strings.Join(childArgs, " ")
+	err = childCmd.Run()
+	childTimedOut := childCtx.Err() == context.DeadlineExceeded
+	childCancel()
 	result.AppExitCode = exitCodeFromError(err)
+	if childTimedOut {
+		if result.AppExitCode == 0 {
+			result.AppExitCode = 1
+		}
+		return result, fmt.Errorf(
+			"run platform UI runtime child timed out after %s",
+			childTimeout,
+		)
+	}
 	if childStdout.Len() > 0 {
 		var evidence childRuntimeEvidence
 		dec := json.NewDecoder(bytes.NewReader(childStdout.Bytes()))
@@ -174,6 +211,31 @@ func (processPlatformRuntimeRunner) Run(target string) (platformRuntimeRun, erro
 		return result, fmt.Errorf("decode platform UI runtime child evidence: empty stdout")
 	}
 	return result, nil
+}
+
+func (r processPlatformRuntimeRunner) effectiveBuildTimeout() time.Duration {
+	if r.buildTimeout > 0 {
+		return r.buildTimeout
+	}
+	return defaultPlatformRuntimeBuildTimeout
+}
+
+func (r processPlatformRuntimeRunner) effectiveChildTimeout() time.Duration {
+	if r.childTimeout > 0 {
+		return r.childTimeout
+	}
+	return defaultPlatformRuntimeChildTimeout
+}
+
+func (r processPlatformRuntimeRunner) command(
+	ctx context.Context,
+	name string,
+	args ...string,
+) *exec.Cmd {
+	if r.commandContext != nil {
+		return r.commandContext(ctx, name, args...)
+	}
+	return exec.CommandContext(ctx, name, args...)
 }
 
 func repoRootFromWD() (string, error) {

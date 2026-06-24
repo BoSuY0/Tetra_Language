@@ -1,9 +1,13 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"os"
+	"os/exec"
 	"strings"
 	"testing"
+	"time"
 
 	"tetra_language/tools/validators/platformui"
 )
@@ -141,6 +145,84 @@ func TestBuildPlatformUIRuntimeReportFailsWhenOSBackedWindowProbeFails(t *testin
 	}
 	if !strings.Contains(report.RuntimeTrace, "platform-window-api:error") {
 		t.Fatalf("runtime_trace = %q, want platform-window-api:error", report.RuntimeTrace)
+	}
+}
+
+func TestPlatformRuntimeChildTimeoutIsBounded(t *testing.T) {
+	runner := processPlatformRuntimeRunner{
+		buildTimeout: 5 * time.Second,
+		childTimeout: 100 * time.Millisecond,
+		commandContext: func(ctx context.Context, name string, args ...string) *exec.Cmd {
+			mode := "child"
+			if name == "go" {
+				mode = "build"
+			}
+			cmd := exec.CommandContext(
+				ctx,
+				os.Args[0],
+				"-test.run=^TestPlatformRuntimeTimeoutHelper$",
+			)
+			cmd.Env = append(
+				os.Environ(),
+				"TETRA_PLATFORM_RUNTIME_TIMEOUT_HELPER=1",
+				"TETRA_PLATFORM_RUNTIME_TIMEOUT_HELPER_MODE="+mode,
+			)
+			return cmd
+		},
+	}
+	start := time.Now()
+	report, exitCode := buildPlatformUIRuntimeReportWithRunner(
+		"windows-x64",
+		hostRuntime{GOOS: "windows", GOARCH: "amd64"},
+		runner,
+	)
+	elapsed := time.Since(start)
+	if elapsed > 5*time.Second {
+		t.Fatalf("child timeout returned after %s, want under 5s", elapsed)
+	}
+	if exitCode == 0 {
+		t.Fatalf("exit code = 0, want nonzero: %#v", report)
+	}
+	if report.Status != "fail" {
+		t.Fatalf("status = %q, want fail", report.Status)
+	}
+	if !strings.Contains(report.Blocker, "timed out") ||
+		!strings.Contains(report.Blocker, "run platform UI runtime child timed out after 100ms") {
+		t.Fatalf("blocker = %q, want child timeout", report.Blocker)
+	}
+	if len(report.Processes) < 2 {
+		t.Fatalf("processes = %#v, want build and app processes", report.Processes)
+	}
+	app := report.Processes[1]
+	if app.Path == "" {
+		t.Fatal("app process path is empty, want child AppPath")
+	}
+	if app.ExitCode == nil || *app.ExitCode == 0 {
+		t.Fatalf("app exit code = %v, want nonzero", app.ExitCode)
+	}
+	if app.Pass {
+		t.Fatal("app process pass = true, want false")
+	}
+	raw := marshalReportForTest(t, report)
+	if !json.Valid(raw) {
+		t.Fatalf("timeout report is not JSON: %s", raw)
+	}
+}
+
+func TestPlatformRuntimeTimeoutHelper(t *testing.T) {
+	if os.Getenv("TETRA_PLATFORM_RUNTIME_TIMEOUT_HELPER") != "1" {
+		return
+	}
+	switch os.Getenv("TETRA_PLATFORM_RUNTIME_TIMEOUT_HELPER_MODE") {
+	case "build":
+		return
+	case "child":
+		time.Sleep(10 * time.Second)
+	default:
+		t.Fatalf(
+			"unknown TETRA_PLATFORM_RUNTIME_TIMEOUT_HELPER_MODE %q",
+			os.Getenv("TETRA_PLATFORM_RUNTIME_TIMEOUT_HELPER_MODE"),
+		)
 	}
 }
 

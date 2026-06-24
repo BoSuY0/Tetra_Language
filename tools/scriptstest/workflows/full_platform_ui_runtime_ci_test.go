@@ -155,6 +155,68 @@ func TestMainCIWorkflowEnablesWindowsLongPathsBeforeFullPlatformCheckout(t *test
 	)
 }
 
+func TestFullPlatformUIRuntimeWorkflowsRunWindowsThreadAffinityRegression(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		path string
+		job  string
+	}{
+		{
+			name: "standalone",
+			path: filepath.Join(repoRoot(t), ".github", "workflows", "full-platform-ui-runtime.yml"),
+			job:  "target-host-ui-runtime:",
+		},
+		{
+			name: "mirrored-ci",
+			path: filepath.Join(repoRoot(t), ".github", "workflows", "ci.yml"),
+			job:  "full-platform-ui-runtime-target-host:",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw, err := os.ReadFile(tc.path)
+			if err != nil {
+				t.Fatalf("read workflow: %v", err)
+			}
+			section := workflowJobSection(string(raw), tc.job)
+			for _, want := range []string{
+				"timeout-minutes: 45",
+				"Windows UI OS-thread affinity regression",
+				"if: runner.os == 'Windows'",
+				"go test -buildvcs=false \\",
+				"./tools/cmd/platform-ui-runtime-smoke \\",
+				"-run '^TestWindowsPlatformProbeCompletesUnderSchedulerPressure$' \\",
+				"-count=20 \\",
+				"-timeout=10m",
+			} {
+				if !strings.Contains(section, want) {
+					t.Fatalf("%s workflow missing Windows thread-affinity detail %q", tc.name, want)
+				}
+			}
+			assertOrderedFragments(
+				t,
+				section,
+				"uses: actions/setup-go@v5",
+				"Windows UI OS-thread affinity regression",
+				"Target-host UI runtime smoke",
+			)
+			regressionIndex := strings.Index(section, "Windows UI OS-thread affinity regression")
+			if regressionIndex < 0 {
+				t.Fatalf("%s workflow missing Windows thread-affinity step", tc.name)
+			}
+			regressionSection := section[regressionIndex:]
+			assertOrderedFragments(
+				t,
+				regressionSection,
+				"if: runner.os == 'Windows'",
+				"-run '^TestWindowsPlatformProbeCompletesUnderSchedulerPressure$'",
+				"-count=20",
+				"-timeout=10m",
+				"Target-host UI runtime smoke",
+			)
+		})
+	}
+}
+
 func TestFullPlatformUIRuntimeWorkflowAllowsCurrentGitHubMacOSIntelLabel(t *testing.T) {
 	path := filepath.Join(repoRoot(t), ".github", "actionlint.yaml")
 	raw, err := os.ReadFile(path)
