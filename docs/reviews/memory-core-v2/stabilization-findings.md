@@ -14,13 +14,15 @@ review_set:
 - `docs/reviews/memory-core-v2/cli-package-timeout-analysis.md`
 - `docs/reviews/memory-core-v2/workspace-package-timeout-analysis.md`
 - `docs/reviews/memory-core-v2/d005-windows-ui-thread-affinity-review.md`
+- `docs/reviews/memory-core-v2/pr-fanin-baseline-causality-review.md`
+- `docs/reviews/memory-core-v2/pr-merge-dump-vcs-differential-review.md`
 
 summary:
 - blocker: 0
 - critical: 0
-- high: 4
+- high: 5
 - medium: 3
-- low: 2
+- low: 1
 - informational: 0
 
 resolution_summary:
@@ -29,9 +31,9 @@ resolution_summary:
 - resolved_low: 1
 - open_blocker: 0
 - open_critical: 0
-- open_high: 1
+- open_high: 2
 - open_medium: 0
-- open_low: 1
+- open_low: 0
 - open_informational: 0
 
 resolution_commits:
@@ -43,8 +45,7 @@ resolution_commits:
 - D-003: `7e9184aaa2c220590d67f3d369d9598b62861088`
 - D-004: `f28953df325cd87cb8378b3c9b7952238b6d3e13`
 - D-005: `a93dede994b29a86af5efde3434951410e737a34`
-- D-001: tracked as nonblocking test-infrastructure hardening; no Memory Core
-  v2 code, gate, schema, or documentation fix required by the review.
+- D-001: `9ca65b6b820e477059513a31ebc190f5062f84b5`
 
 validation_timeout:
   command: go test -buildvcs=false ./cli/cmd/tetra -count=50
@@ -138,6 +139,74 @@ resolution_evidence:
 - GREEN: `go test -buildvcs=false ./... -count=1`
 - GREEN: `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`
 - PENDING: external push/PR Windows jobs for the D-005 fix SHA.
+
+### D-001: Broad workspace/scriptstest runs showed transient environment coupling outside the Memory Core v2 gate path
+
+source_review: `docs/reviews/memory-core-v2/integration-review.md`
+root_cause_reviews:
+- `docs/reviews/memory-core-v2/pr-fanin-baseline-causality-review.md`
+- `docs/reviews/memory-core-v2/pr-merge-dump-vcs-differential-review.md`
+package: `tools/scriptstest/test_all`
+status: resolved_pending_external_ci
+severity: high
+merge_blocking: true
+ci_run_id: 28082310881
+ci_job_id: 83140236906
+failing_step: `Full-platform UI runtime gate`
+nested_step: `baseline-tests`
+failing_package: `tools/scriptstest/test_all`
+failing_test: `TestTestAllQuickFailsWhenUnsafePromotionBlockerSuiteMissing`
+downstream_test: `TestTestAllAllowsDashPrefixedFreshReportDir`
+causal_dimension: `test_state_ambient_env_inheritance`
+fix_commit: `9ca65b6b820e477059513a31ebc190f5062f84b5`
+
+finding:
+The PR-side `full-platform-ui-runtime` fan-in gate failed during
+`baseline-tests`, specifically in `tools/scriptstest/test_all`. The first
+failure expected a single intentional fake blocker but saw two failing
+test-all steps: `unsafe promotion blocker suite` and `RAM contract fuzz oracle
+artifact gate`.
+
+root_cause:
+The fake-repo test helpers `runTestAll`, `runTestAllSplit`, and
+`runTestAllFromWorkingDir` inherited ambient process env from `os.Environ()`.
+That allowed test-only `TETRA_FAKE_*` or `TETRA_FAIL_*` controls to leak into
+fake `test-all` subprocesses. On the actual PR merge tree, clean env and
+PR-like `CI/GITHUB_*` env passed, while ambient
+`TETRA_FAKE_SKIP_UNSAFE_PROMOTION_LIST=1` plus
+`TETRA_FAKE_SKIP_RAM_CONTRACT_LIST=1` reproduced both observed CI failures.
+
+matrix:
+- `dump_tree_content`: rejected; dump-present and dump-absent package runs
+  passed.
+- `merge_commit_shape_or_vcs_metadata`: rejected; single-parent and two-parent
+  matrix runs passed.
+- `go_vcs_metadata`: rejected; exact tests passed with buildvcs enabled and
+  disabled.
+- `github_pr_environment`: rejected; actual PR merge passed with PR-like
+  `CI/GITHUB_*` environment.
+- `test_state_ambient_env_inheritance`: confirmed.
+
+fix:
+Commit `9ca65b6b820e477059513a31ebc190f5062f84b5` filters inherited
+`TETRA_FAKE_*` and `TETRA_FAIL_*` entries before constructing fake-repo
+subprocess environments, then appends each test's explicit env slice so
+intentional negative tests still exercise the fake controls.
+
+before_after:
+- Before: ambient fake controls could turn a focused negative `test_all` test
+  into a multi-blocker failure and break PR fan-in.
+- After: ambient fake controls are ignored by default fake-repo runs, while
+  explicit per-test fake controls remain active.
+
+resolution_evidence:
+- RED: actual PR merge with ambient
+  `TETRA_FAKE_SKIP_UNSAFE_PROMOTION_LIST=1` and
+  `TETRA_FAKE_SKIP_RAM_CONTRACT_LIST=1` reproduced
+  `summary status/counts = "fail"/2, want fail/1`.
+- GREEN: `go test ./tools/scriptstest/test_all -run '^TestTestAllQuickFailsWhenUnsafePromotionBlockerSuiteMissing$' -count=100 -shuffle=on -timeout=30m`
+- GREEN: `go test ./tools/scriptstest/test_all -count=20 -shuffle=on -timeout=30m`
+- PENDING: external push/PR fan-in for the D-001 fix SHA.
 
 ### D-003: linux-x32 unsupported reason contract mismatch
 
@@ -398,29 +467,6 @@ Either make `Run` reject proof-sensitive passes unless `Options.MemoryFacts` is
 supplied, or clearly mark `Run` as noncanonical/test-only and add a negative
 test that proof-sensitive passes skip or fail when canonical memory facts are
 absent.
-
-### D-001: Broad workspace/scriptstest runs showed transient environment coupling outside the Memory Core v2 gate path
-
-source_review: `docs/reviews/memory-core-v2/integration-review.md`
-status: open_nonblocking
-tracking: test-infrastructure hardening outside the Memory Core v2 release gate
-
-finding:
-Broad `go test` runs intermittently failed in `tools/scriptstest` fake-repo or
-workspace scenarios, including missing `$WORK/.../_pkg_.a` import archives and
-tests that assumed a GitHub-shaped remote URL. Focused reruns of the failing
-packages/tests passed, final broad reruns passed, and clean-clone Memory Core
-v2 gates were deterministic.
-
-reproduction:
-- See the failed broad commands and passing focused/final reruns in
-  `docs/reviews/memory-core-v2/integration-review.md`.
-
-required_fix:
-No Memory Core v2 code, gate, schema, or documentation change is required by
-this review. Track as test-infrastructure hardening: make `tools/scriptstest`
-fake repos and nested Go test isolation independent of broad package execution
-order, shared temporary/cache state, and GitHub-shaped remotes.
 
 ## informational
 
