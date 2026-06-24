@@ -107,6 +107,26 @@ func TestTestAllQuickReportsUnsafePromotionBlockerSuite(t *testing.T) {
 	}
 }
 
+func TestTestAllQuickIgnoresAmbientFakeFailureControls(t *testing.T) {
+	t.Setenv("TETRA_FAKE_SKIP_UNSAFE_PROMOTION_LIST", "1")
+	t.Setenv("TETRA_FAKE_SKIP_RAM_CONTRACT_LIST", "1")
+
+	root := testAllFakeRepo(t, false)
+	reportDir := filepath.Join(root, "report")
+	out, err := runTestAll(t, root, nil, "--quick", "--json-only", "--report-dir", reportDir)
+	if err != nil {
+		t.Fatalf("test_all quick should ignore ambient fake controls: %v\n%s", err, out)
+	}
+	summary := decodeTestAllSummary(t, out)
+	if summary.Status != "pass" || summary.FailedCount != 0 {
+		t.Fatalf("summary status/counts = %q/%d, want pass/0: %#v",
+			summary.Status,
+			summary.FailedCount,
+			summary.Steps,
+		)
+	}
+}
+
 func TestTestAllQuickFailsWhenUnsafePromotionBlockerSuiteMissing(t *testing.T) {
 	root := testAllFakeRepo(t, false)
 	reportDir := filepath.Join(root, "report")

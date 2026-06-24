@@ -65,7 +65,7 @@ func runTestAll(t *testing.T, root string, env []string, args ...string) ([]byte
 	t.Helper()
 	cmd := exec.Command("bash", append([]string{"scripts/ci/test-all.sh"}, args...)...)
 	cmd.Dir = root
-	cmd.Env = append(os.Environ(), env...)
+	cmd.Env = append(filteredTestAllEnv(), env...)
 	cmd.Env = append(
 		cmd.Env,
 		"PATH="+filepath.Join(root, "bin")+string(os.PathListSeparator)+os.Getenv("PATH"),
@@ -82,7 +82,7 @@ func runTestAllSplit(
 	t.Helper()
 	cmd := exec.Command("bash", append([]string{"scripts/ci/test-all.sh"}, args...)...)
 	cmd.Dir = root
-	cmd.Env = append(os.Environ(), env...)
+	cmd.Env = append(filteredTestAllEnv(), env...)
 	cmd.Env = append(
 		cmd.Env,
 		"PATH="+filepath.Join(root, "bin")+string(os.PathListSeparator)+os.Getenv("PATH"),
@@ -106,12 +106,29 @@ func runTestAllFromWorkingDir(
 	script := filepath.Join(root, "scripts", "ci", "test-all.sh")
 	cmd := exec.Command("bash", append([]string{script}, args...)...)
 	cmd.Dir = workingDir
-	cmd.Env = append(os.Environ(), env...)
+	cmd.Env = append(filteredTestAllEnv(), env...)
 	cmd.Env = append(
 		cmd.Env,
 		"PATH="+filepath.Join(root, "bin")+string(os.PathListSeparator)+os.Getenv("PATH"),
 	)
 	return cmd.CombinedOutput()
+}
+
+func filteredTestAllEnv() []string {
+	env := os.Environ()
+	out := make([]string, 0, len(env))
+	for _, entry := range env {
+		key, _, ok := strings.Cut(entry, "=")
+		if !ok {
+			out = append(out, entry)
+			continue
+		}
+		if strings.HasPrefix(key, "TETRA_FAKE_") || strings.HasPrefix(key, "TETRA_FAIL_") {
+			continue
+		}
+		out = append(out, entry)
+	}
+	return out
 }
 
 func assertExitCode(t *testing.T, err error, want int, output string) {
