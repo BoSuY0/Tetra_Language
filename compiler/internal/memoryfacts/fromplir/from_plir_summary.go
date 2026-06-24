@@ -47,7 +47,7 @@ func addReturnSummaryFacts(
 			}
 			if plirValueIsUnsafeUnknown(value, factIDs) {
 				if _, err := graph.AddFact(
-					functionSummaryFact(fn.Name, anchor, "returns_unknown_unsafe", op.Source, value, ProvenanceUnsafeUnknown, UnsafeUnknown, EscapeConservative, AliasUnknown, "", ("returned value has " +
+					functionSummaryFactFor(fn, anchor, "returns_unknown_unsafe", op.Source, value, ProvenanceUnsafeUnknown, UnsafeUnknown, EscapeConservative, AliasUnknown, "", ("returned value has " +
 						"unknown or external unsafe provenance")),
 				); err != nil {
 					return err
@@ -56,7 +56,7 @@ func addReturnSummaryFacts(
 			}
 			if returnValueIsOwnedAllocation(value, factIDs) {
 				if _, err := graph.AddFact(
-					functionSummaryFact(fn.Name, anchor, "returns_owned_new_allocation", op.Source, value, ProvenanceSafeOwned, UnsafeSafe, EscapeReturn, AliasUnknown, ownerForPLIRValue(value), ("return value owns fresh " +
+					functionSummaryFactFor(fn, anchor, "returns_owned_new_allocation", op.Source, value, ProvenanceSafeOwned, UnsafeSafe, EscapeReturn, AliasUnknown, ownerForPLIRValue(value), ("return value owns fresh " +
 						"compiler-visible allocation provenance")),
 				); err != nil {
 					return err
@@ -85,8 +85,8 @@ func addReturnSummaryFacts(
 						)
 					}
 				}
-				fact := functionSummaryFact(
-					fn.Name,
+				fact := functionSummaryFactFor(
+					fn,
 					anchor,
 					"returns_borrow_from_param",
 					op.Source,
@@ -114,6 +114,11 @@ func addDeclaredSummaryFacts(graph *Graph, fn plir.Function) error {
 	if summary == nil {
 		return nil
 	}
+	if _, err := graph.AddFact(
+		functionSummaryFactFor(fn, "contract", "function_contract", summarySite(fn), plir.Value{}, ProvenanceSafeKnown, UnsafeSafe, EscapeUnknown, AliasUnknown, "", "function summary projects canonical semantic contract"),
+	); err != nil {
+		return err
+	}
 	for leaf, paramIndex := range summary.ReturnRegionSummary {
 		owner := summaryParamOwner(summary, paramIndex)
 		reason := fmt.Sprintf(
@@ -124,8 +129,8 @@ func addDeclaredSummaryFacts(graph *Graph, fn plir.Function) error {
 		if owner != "" {
 			reason = fmt.Sprintf("%s (%s)", reason, owner)
 		}
-		fact := functionSummaryFact(
-			fn.Name,
+		fact := functionSummaryFactFor(
+			fn,
 			"return_region:"+leaf,
 			"may_return_region",
 			summarySite(fn),
@@ -145,7 +150,7 @@ func addDeclaredSummaryFacts(graph *Graph, fn plir.Function) error {
 	}
 	if summary.ReturnRegionUnknown {
 		if _, err := graph.AddFact(
-			functionSummaryFact(fn.Name, "return_region_unknown", "may_return_region", summarySite(fn), plir.Value{}, ProvenanceUnsafeUnknown, UnsafeUnknown, EscapeConservative, AliasUnknown, "", ("return region summary " +
+			functionSummaryFactFor(fn, "return_region_unknown", "may_return_region", summarySite(fn), plir.Value{}, ProvenanceUnsafeUnknown, UnsafeUnknown, EscapeConservative, AliasUnknown, "", ("return region summary " +
 				"is unknown and remains conservative")),
 		); err != nil {
 			return err
@@ -163,8 +168,8 @@ func addDeclaredSummaryFacts(graph *Graph, fn plir.Function) error {
 			if owner != "" {
 				reason = fmt.Sprintf("%s (%s)", reason, owner)
 			}
-			fact := functionSummaryFact(
-				fn.Name,
+			fact := functionSummaryFactFor(
+				fn,
 				fmt.Sprintf(
 					"return_resource:%s:%d:%s",
 					leaf,
@@ -190,7 +195,7 @@ func addDeclaredSummaryFacts(graph *Graph, fn plir.Function) error {
 	}
 	if summary.ReturnResourceUnknown {
 		if _, err := graph.AddFact(
-			functionSummaryFact(fn.Name, "return_resource_unknown", "returns_unknown_unsafe", summarySite(fn), plir.Value{}, ProvenanceUnsafeUnknown, UnsafeUnknown, EscapeConservative, AliasUnknown, "", ("returned resource " +
+			functionSummaryFactFor(fn, "return_resource_unknown", "returns_unknown_unsafe", summarySite(fn), plir.Value{}, ProvenanceUnsafeUnknown, UnsafeUnknown, EscapeConservative, AliasUnknown, "", ("returned resource " +
 				"provenance is unknown and remains conservative")),
 		); err != nil {
 			return err
@@ -208,8 +213,8 @@ func addDeclaredSummaryFacts(graph *Graph, fn plir.Function) error {
 			if owner != "" {
 				reason = fmt.Sprintf("%s (%s)", reason, owner)
 			}
-			fact := functionSummaryFact(
-				fn.Name,
+			fact := functionSummaryFactFor(
+				fn,
 				fmt.Sprintf(
 					"throw_resource:%s:%d:%s",
 					leaf,
@@ -235,14 +240,14 @@ func addDeclaredSummaryFacts(graph *Graph, fn plir.Function) error {
 	}
 	if len(summary.Effects) > 0 {
 		if _, err := graph.AddFact(
-			functionSummaryFact(fn.Name, "effects", "requires_effects", summarySite(fn), plir.Value{}, ProvenanceSafeKnown, UnsafeSafe, EscapeUnknown, AliasUnknown, "", "function declares effects: "+strings.Join(summary.Effects, ", ")),
+			functionSummaryFactFor(fn, "effects", "requires_effects", summarySite(fn), plir.Value{}, ProvenanceSafeKnown, UnsafeSafe, EscapeUnknown, AliasUnknown, "", "function declares effects: "+strings.Join(summary.Effects, ", ")),
 		); err != nil {
 			return err
 		}
 	}
 	if summaryRequiresCapabilities(summary) {
 		if _, err := graph.AddFact(
-			functionSummaryFact(fn.Name, "capabilities", "requires_capabilities", summarySite(fn), plir.Value{}, ProvenanceSafeKnown, UnsafeSafe, EscapeUnknown, AliasUnknown, "", ("function effects "+
+			functionSummaryFactFor(fn, "capabilities", "requires_capabilities", summarySite(fn), plir.Value{}, ProvenanceSafeKnown, UnsafeSafe, EscapeUnknown, AliasUnknown, "", ("function effects "+
 				"require capability-gated operations: ")+strings.Join(summary.Effects, ", ")),
 		); err != nil {
 			return err
@@ -250,7 +255,7 @@ func addDeclaredSummaryFacts(graph *Graph, fn plir.Function) error {
 	}
 	if summaryRequiresCapMemAuthorization(summary) {
 		if _, err := graph.AddFact(
-			functionSummaryFact(fn.Name, "cap_mem_authorization", "cap_mem_authorization_only", summarySite(fn), plir.Value{}, ProvenanceUnsafeChecked, UnsafeChecked, EscapeUnknown, AliasUnknown, "", ("cap.mem authorizes raw " +
+			functionSummaryFactFor(fn, "cap_mem_authorization", "cap_mem_authorization_only", summarySite(fn), plir.Value{}, ProvenanceUnsafeChecked, UnsafeChecked, EscapeUnknown, AliasUnknown, "", ("cap.mem authorizes raw " +
 				"operations only; it does not prove pointer validity, bounds, ownership, " +
 				"noalias, or safe provenance")),
 		); err != nil {
@@ -259,7 +264,7 @@ func addDeclaredSummaryFacts(graph *Graph, fn plir.Function) error {
 	}
 	if summary.TouchesMutableGlobals {
 		if _, err := graph.AddFact(
-			functionSummaryFact(fn.Name, "touches_mutable_globals", "may_store_global", summarySite(fn), plir.Value{}, ProvenanceSafeKnown, UnsafeSafe, EscapeGlobal, AliasUnknown, "", ("semantics summary " +
+			functionSummaryFactFor(fn, "touches_mutable_globals", "may_store_global", summarySite(fn), plir.Value{}, ProvenanceSafeKnown, UnsafeSafe, EscapeGlobal, AliasUnknown, "", ("semantics summary " +
 				"records mutable global access")),
 		); err != nil {
 			return err
@@ -279,13 +284,13 @@ func addOperationSummaryFacts(
 		case plir.OpGlobalStore:
 			owner := ownerFromOperationInput(op, 0)
 			if _, err := graph.AddFact(
-				functionSummaryFact(fn.Name, op.ID, "may_store_global", op.Source, plir.Value{}, ProvenanceSafeKnown, UnsafeSafe, EscapeGlobal, AliasUnknown, owner, "operation stores into global state"),
+				functionSummaryFactFor(fn, op.ID, "may_store_global", op.Source, plir.Value{}, ProvenanceSafeKnown, UnsafeSafe, EscapeGlobal, AliasUnknown, owner, "operation stores into global state"),
 			); err != nil {
 				return err
 			}
 		case plir.OpActorSend:
 			owner := ownerFromOperationInput(op, 0)
-			fact := functionSummaryFact(fn.Name, op.ID, "may_escape_to_actor", op.Source, plir.Value{}, ProvenanceSafeKnown, UnsafeSafe, EscapeActor, AliasUnknown, owner, ("operation transfers " +
+			fact := functionSummaryFactFor(fn, op.ID, "may_escape_to_actor", op.Source, plir.Value{}, ProvenanceSafeKnown, UnsafeSafe, EscapeActor, AliasUnknown, owner, ("operation transfers " +
 				"payload across actor boundary"))
 			fact.DomainKind = DomainActor
 			fact.DomainOwnerID = owner
@@ -296,7 +301,7 @@ func addOperationSummaryFacts(
 		case plir.OpClosure:
 			owner := strings.Join(op.Inputs, ",")
 			if _, err := graph.AddFact(
-				functionSummaryFact(fn.Name, op.ID, "may_capture_in_closure", op.Source, plir.Value{}, ProvenanceSafeKnown, UnsafeSafe, EscapeConservative, AliasUnknown, owner, ("closure captures " +
+				functionSummaryFactFor(fn, op.ID, "may_capture_in_closure", op.Source, plir.Value{}, ProvenanceSafeKnown, UnsafeSafe, EscapeConservative, AliasUnknown, owner, ("closure captures " +
 					"visible environment values")),
 			); err != nil {
 				return err
@@ -304,7 +309,7 @@ func addOperationSummaryFacts(
 		case plir.OpCall:
 			if isTaskEscapeOperation(op) {
 				owner := ownerFromTypedTaskOperationInput(op)
-				fact := functionSummaryFact(fn.Name, op.ID, "may_escape_to_task", op.Source, plir.Value{}, ProvenanceSafeKnown, UnsafeSafe, EscapeTask, AliasUnknown, owner, ("operation may transfer " +
+				fact := functionSummaryFactFor(fn, op.ID, "may_escape_to_task", op.Source, plir.Value{}, ProvenanceSafeKnown, UnsafeSafe, EscapeTask, AliasUnknown, owner, ("operation may transfer " +
 					"work or handles across task boundary"))
 				fact.DomainKind = DomainTask
 				fact.DomainOwnerID = owner
@@ -324,7 +329,7 @@ func addOperationSummaryFacts(
 			}
 			if isUnknownExternalCallOperation(op) {
 				if _, err := graph.AddFact(
-					functionSummaryFact(fn.Name, op.ID, "unknown_external_call_conservative", op.Source, plir.Value{}, ProvenanceUnsafeUnknown, UnsafeUnknown, EscapeConservative, AliasUnknown, strings.Join(op.Inputs, ","), ("callee summary is " +
+					functionSummaryFactFor(fn, op.ID, "unknown_external_call_conservative", op.Source, plir.Value{}, ProvenanceUnsafeUnknown, UnsafeUnknown, EscapeConservative, AliasUnknown, strings.Join(op.Inputs, ","), ("callee summary is " +
 						"unknown, so memory/resource effects remain conservative")),
 				); err != nil {
 					return err
@@ -678,7 +683,7 @@ func addFactKindSummaryFacts(
 				ProvenanceSafeOwned,
 			)
 			if _, err := graph.AddFact(
-				functionSummaryFact(fn.Name, "consume:"+value.ID, "may_consume_param", nonEmpty(value.Source, summarySite(fn)), value, provenance, unsafeClass, escapeStateForPLIRValue(value), AliasUnknown, ownerForPLIRValue(value), ("consume parameter may " +
+				functionSummaryFactFor(fn, "consume:"+value.ID, "may_consume_param", nonEmpty(value.Source, summarySite(fn)), value, provenance, unsafeClass, escapeStateForPLIRValue(value), AliasUnknown, ownerForPLIRValue(value), ("consume parameter may " +
 					"be moved by this function")),
 			); err != nil {
 				return err
@@ -699,7 +704,7 @@ func addFactKindSummaryFacts(
 					ProvenanceSafeOwned,
 				)
 				if _, err := graph.AddFact(
-					functionSummaryFact(fn.Name, pf.ID, "may_consume_param", pf.Source, value, provenance, unsafeClass, escapeStateForPLIRValue(value), AliasUnknown, ownerForPLIRValue(value), ("parameter may be " +
+					functionSummaryFactFor(fn, pf.ID, "may_consume_param", pf.Source, value, provenance, unsafeClass, escapeStateForPLIRValue(value), AliasUnknown, ownerForPLIRValue(value), ("parameter may be " +
 						"consumed or moved by this function")),
 				); err != nil {
 					return err
@@ -717,7 +722,7 @@ func addFactKindSummaryFacts(
 					alias = AliasUnknownConservative
 				}
 				if _, err := graph.AddFact(
-					functionSummaryFact(fn.Name, pf.ID, "may_mutate_inout", pf.Source, value, provenance, unsafeClass, escapeStateForPLIRValue(value), alias, ownerForPLIRValue(value), ("inout parameter may be " +
+					functionSummaryFactFor(fn, pf.ID, "may_mutate_inout", pf.Source, value, provenance, unsafeClass, escapeStateForPLIRValue(value), alias, ownerForPLIRValue(value), ("inout parameter may be " +
 						"mutated under exclusive-borrow evidence")),
 				); err != nil {
 					return err
@@ -763,6 +768,37 @@ func functionSummaryFact(
 		Claim:            claim,
 		Reason:           reason,
 	}
+}
+
+func functionSummaryFactFor(
+	fn plir.Function,
+	anchor, claim, site string,
+	value plir.Value,
+	provenance ProvenanceClass,
+	unsafeClass UnsafeClass,
+	escape EscapeState,
+	alias AliasState,
+	owner string,
+	reason string,
+) Fact {
+	fact := functionSummaryFact(
+		fn.Name,
+		anchor,
+		claim,
+		site,
+		value,
+		provenance,
+		unsafeClass,
+		escape,
+		alias,
+		owner,
+		reason,
+	)
+	if fn.Summary != nil {
+		fact.ContractSchema = fn.Summary.ContractSchema
+		fact.ContractDigest = fn.Summary.ContractDigest
+	}
+	return fact
 }
 
 func summaryFactID(functionID, anchor, claim string) FactID {
@@ -1100,7 +1136,7 @@ func addPointerRetentionFactsForValues(
 			continue
 		}
 		if _, err := graph.AddFact(
-			functionSummaryFact(fn.Name, "retain:"+value.ID, "may_retain_pointer", nonEmpty(value.Source, summarySite(fn)), value, ProvenanceUnsafeUnknown, UnsafeUnknown, EscapeConservative, AliasUnknown, ownerForPLIRValue(value), ("pointer value may " +
+			functionSummaryFactFor(fn, "retain:"+value.ID, "may_retain_pointer", nonEmpty(value.Source, summarySite(fn)), value, ProvenanceUnsafeUnknown, UnsafeUnknown, EscapeConservative, AliasUnknown, ownerForPLIRValue(value), ("pointer value may " +
 				"escape or be retained outside a proven safe owner")),
 		); err != nil {
 			return err

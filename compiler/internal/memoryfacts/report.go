@@ -20,6 +20,8 @@ type Report struct {
 type ReportRow struct {
 	ProgramID             string          `json:"program_id,omitempty"`
 	FunctionID            string          `json:"function_id,omitempty"`
+	ContractSchema        string          `json:"contract_schema,omitempty"`
+	ContractDigest        string          `json:"contract_digest,omitempty"`
 	ValueID               string          `json:"value_id,omitempty"`
 	IslandID              string          `json:"island_id,omitempty"`
 	Epoch                 int             `json:"epoch,omitempty"`
@@ -257,6 +259,8 @@ func rowFromFact(fact Fact) ReportRow {
 	return ReportRow{
 		ProgramID:             fact.ProgramID,
 		FunctionID:            fact.FunctionID,
+		ContractSchema:        fact.ContractSchema,
+		ContractDigest:        fact.ContractDigest,
 		ValueID:               fact.ValueID,
 		IslandID:              fact.IslandID,
 		Epoch:                 fact.Epoch,
@@ -324,6 +328,20 @@ func validateReportProjectionRow(index int, row ReportRow, expected ReportRow) [
 		"function_id",
 		row.FunctionID,
 		expected.FunctionID,
+	)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"contract_schema",
+		row.ContractSchema,
+		expected.ContractSchema,
+	)
+	issues = appendProjectionMismatch(
+		issues,
+		index,
+		"contract_digest",
+		row.ContractDigest,
+		expected.ContractDigest,
 	)
 	issues = appendProjectionMismatch(issues, index, "value_id", row.ValueID, expected.ValueID)
 	issues = appendProjectionMismatch(issues, index, "island_id", row.IslandID, expected.IslandID)

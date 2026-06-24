@@ -148,6 +148,8 @@ type Fact struct {
 	ID                    FactID          `json:"fact_id"`
 	ProgramID             string          `json:"program_id,omitempty"`
 	FunctionID            string          `json:"function_id,omitempty"`
+	ContractSchema        string          `json:"contract_schema,omitempty"`
+	ContractDigest        string          `json:"contract_digest,omitempty"`
 	BlockID               string          `json:"block_id,omitempty"`
 	ValueID               string          `json:"value_id,omitempty"`
 	IslandID              string          `json:"island_id,omitempty"`

@@ -98,6 +98,7 @@ const (
 	ClaimMayEscapeToTask                  = "may_escape_to_task"
 	ClaimUnknownExternalCallConservative  = "unknown_external_call_conservative"
 	ClaimMayRetainPointer                 = "may_retain_pointer"
+	ClaimFunctionContract                 = "function_contract"
 
 	ClaimBorrowOwner                           = "borrow_owner"
 	ClaimBorrowSourceFactID                    = "borrow_source_fact_id"
@@ -324,6 +325,7 @@ var reportClaims = []string{
 	ClaimMayEscapeToTask,
 	ClaimUnknownExternalCallConservative,
 	ClaimMayRetainPointer,
+	ClaimFunctionContract,
 	ClaimBorrowOwner,
 	ClaimBorrowSourceFactID,
 	ClaimAggregateContainsBorrow,

@@ -4483,6 +4483,15 @@ type FuncSig = model.FuncSig
 type ResourceProvenance = model.ResourceProvenance
 type ReturnRegionSummary = model.ReturnRegionSummary
 type ReturnResourceSummary = model.ReturnResourceSummary
+type FunctionContractV1 = model.FunctionContractV1
+type ParamContractV1 = model.ParamContractV1
+type ResultContractV1 = model.ResultContractV1
+type ThrowsContractV1 = model.ThrowsContractV1
+type FunctionPolicyContractV1 = model.FunctionPolicyContractV1
+type CallableTypeContractV1 = model.CallableTypeContractV1
+type CallableValueContractV1 = model.CallableValueContractV1
+type FunctionFieldContractV1 = model.FunctionFieldContractV1
+type ClosureCaptureContractV1 = model.ClosureCaptureContractV1
 type CheckedStruct = model.CheckedStruct
 type CheckedEnum = model.CheckedEnum
 type CheckedProtocol = model.CheckedProtocol
@@ -4494,6 +4503,8 @@ type TypeInfo = model.TypeInfo
 type EnumCaseInfo = model.EnumCaseInfo
 
 const (
+	FunctionContractSchemaV1 = model.FunctionContractSchemaV1
+
 	FnPtrEnvSlotCount       = model.FnPtrEnvSlotCount
 	FnPtrSlotCount          = model.FnPtrSlotCount
 	CallableHandleSlotCount = model.CallableHandleSlotCount
@@ -4522,6 +4533,14 @@ const (
 
 	MaxActorStateSlots = model.MaxActorStateSlots
 )
+
+func ProjectFunctionContractV1(name string, sig FuncSig) (FunctionContractV1, error) {
+	return model.ProjectFunctionContractV1(name, sig)
+}
+
+func FunctionContractDigest(name string, sig FuncSig) (string, error) {
+	return model.FunctionContractDigest(name, sig)
+}
 
 func makeSliceTypeInfo(name, elem string) *TypeInfo {
 	fieldMap := map[string]FieldInfo{

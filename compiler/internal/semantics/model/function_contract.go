@@ -230,7 +230,7 @@ func ProjectFunctionContractV1(name string, sig FuncSig) (FunctionContractV1, er
 		Params:  projectParams(sig),
 		Result: ResultContractV1{
 			Type:            sig.ReturnType,
-			Ownership:       normalizeOwnership(sig.ReturnOwnership),
+			Ownership:       projectResultOwnership(sig),
 			Callable:        projectReturnCallable(sig),
 			RegionUnknown:   sig.ReturnRegionParam == SummaryParamUnknown && len(sig.ReturnRegionSummary) == 0,
 			RegionSummary:   projectRegionSummary(sig),
@@ -257,6 +257,37 @@ func ProjectFunctionContractV1(name string, sig FuncSig) (FunctionContractV1, er
 	}
 	contract.Digest = digest
 	return contract, nil
+}
+
+func projectResultOwnership(sig FuncSig) string {
+	if strings.TrimSpace(sig.ReturnOwnership) != "" {
+		return normalizeOwnership(sig.ReturnOwnership)
+	}
+	if borrowedRegionSummaryType(sig.ReturnType) &&
+		(len(sig.ReturnRegionSummary) > 0 ||
+			(sig.ReturnRegionParam >= 0 && sig.ReturnRegionParam < len(sig.ParamTypes))) {
+		return "borrow"
+	}
+	return normalizeOwnership(sig.ReturnOwnership)
+}
+
+func borrowedRegionSummaryType(typeName string) bool {
+	typeName = strings.TrimSpace(typeName)
+	baseName := summaryTypeBaseName(typeName)
+	return typeName == "String" ||
+		strings.HasPrefix(typeName, "[]") ||
+		strings.Contains(strings.ToLower(baseName), "resource")
+}
+
+func summaryTypeBaseName(typeName string) string {
+	typeName = strings.TrimSpace(typeName)
+	if generic := strings.Index(typeName, "<"); generic >= 0 {
+		typeName = typeName[:generic]
+	}
+	if dot := strings.LastIndex(typeName, "."); dot >= 0 {
+		return typeName[dot+1:]
+	}
+	return typeName
 }
 
 func FunctionContractDigest(name string, sig FuncSig) (string, error) {

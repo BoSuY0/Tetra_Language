@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
-	"strings"
 
 	"tetra_language/compiler/internal/layoutopt"
 	corerangeproof "tetra_language/compiler/internal/rangeproof"
@@ -31,6 +30,8 @@ type Function struct {
 }
 
 type FunctionSummary struct {
+	ContractSchema        string                          `json:"contract_schema,omitempty"`
+	ContractDigest        string                          `json:"contract_digest,omitempty"`
 	Generic               bool                            `json:"generic,omitempty"`
 	Public                bool                            `json:"public,omitempty"`
 	Async                 bool                            `json:"async,omitempty"`
@@ -52,6 +53,71 @@ type FunctionSummary struct {
 type ResourceProvenance struct {
 	ParamIndex int    `json:"param_index"`
 	ParamPath  string `json:"param_path,omitempty"`
+}
+
+func FunctionSummaryFromFuncSig(
+	functionName string,
+	sig semantics.FuncSig,
+) (*FunctionSummary, error) {
+	contract, err := semantics.ProjectFunctionContractV1(functionName, sig)
+	if err != nil {
+		return nil, err
+	}
+	summary := &FunctionSummary{
+		ContractSchema:        contract.Schema,
+		ContractDigest:        contract.Digest,
+		Generic:               contract.Generic,
+		Public:                contract.Public,
+		Async:                 contract.Async,
+		ParamNames:            make([]string, 0, len(contract.Params)),
+		ParamTypes:            make([]string, 0, len(contract.Params)),
+		ParamOwnership:        make([]string, 0, len(contract.Params)),
+		ReturnType:            contract.Result.Type,
+		ReturnOwnership:       contract.Result.Ownership,
+		ReturnRegionUnknown:   contract.Result.RegionUnknown,
+		ReturnRegionSummary:   cloneContractRegionSummary(contract.Result.RegionSummary),
+		ReturnResourceUnknown: contract.Result.ResourceUnknown,
+		ReturnResourceSummary: cloneContractResourceSummary(contract.Result.ResourceSummary),
+		Effects:               append([]string(nil), contract.Effects...),
+		TouchesMutableGlobals: contract.TouchesMutableGlobals,
+	}
+	for _, param := range contract.Params {
+		summary.ParamNames = append(summary.ParamNames, param.Name)
+		summary.ParamTypes = append(summary.ParamTypes, param.Type)
+		summary.ParamOwnership = append(summary.ParamOwnership, param.Ownership)
+	}
+	if contract.Throws != nil {
+		summary.ThrowsType = contract.Throws.Type
+		summary.ThrowResourceSummary = cloneContractResourceSummary(contract.Throws.ResourceSummary)
+	}
+	return summary, nil
+}
+
+func cloneContractRegionSummary(in map[string]int) map[string]int {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]int, len(in))
+	for key, value := range in {
+		out[key] = value
+	}
+	return out
+}
+
+func cloneContractResourceSummary(in map[string][]semantics.ResourceProvenance) map[string][]ResourceProvenance {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string][]ResourceProvenance, len(in))
+	for leaf, provenances := range in {
+		for _, provenance := range provenances {
+			out[leaf] = append(out[leaf], ResourceProvenance{
+				ParamIndex: provenance.ParamIndex,
+				ParamPath:  provenance.ParamPath,
+			})
+		}
+	}
+	return out
 }
 
 func (f Function) HasFact(kind FactKind) bool {
@@ -402,7 +468,11 @@ func FromCheckedProgram(checked *semantics.CheckedProgram) (*Program, error) {
 		if err := l.build(); err != nil {
 			return nil, err
 		}
-		out.Funcs = append(out.Funcs, l.function())
+		plirFn, err := l.function()
+		if err != nil {
+			return nil, err
+		}
+		out.Funcs = append(out.Funcs, plirFn)
 	}
 	return out, nil
 }
@@ -616,16 +686,20 @@ func effectOptimizationFactKind(name string) (FactKind, bool) {
 	}
 }
 
-func (b *builder) function() Function {
+func (b *builder) function() (Function, error) {
 	values := make([]Value, 0, len(b.values))
 	for _, value := range b.values {
 		values = append(values, value)
 	}
 	sort.Slice(values, func(i, j int) bool { return values[i].ID < values[j].ID })
+	summary, err := b.functionSummary()
+	if err != nil {
+		return Function{}, err
+	}
 	fn := Function{
 		Name:        b.fn.Name,
 		Module:      b.fn.Module,
-		Summary:     b.functionSummary(),
+		Summary:     summary,
 		Values:      values,
 		Ops:         b.ops,
 		Facts:       b.facts,
@@ -637,75 +711,20 @@ func (b *builder) function() Function {
 	}
 	b.attachProofUses(&fn)
 	fn.Dominators = DominatorRows(fn)
-	return fn
+	return fn, nil
 }
 
-func (b *builder) functionSummary() *FunctionSummary {
+func (b *builder) functionSummary() (*FunctionSummary, error) {
 	if b == nil || b.funcs == nil {
-		return nil
+		return nil, nil
 	}
 	sig, ok := b.funcs[b.fn.Name]
 	if !ok {
-		return nil
+		return nil, nil
 	}
-	summary := &FunctionSummary{
-		Generic:               sig.Generic,
-		Public:                sig.Public,
-		Async:                 sig.Async,
-		ParamNames:            append([]string(nil), sig.ParamNames...),
-		ParamTypes:            append([]string(nil), sig.ParamTypes...),
-		ParamOwnership:        append([]string(nil), sig.ParamOwnership...),
-		ReturnType:            sig.ReturnType,
-		ReturnOwnership:       summaryReturnOwnership(sig),
-		ThrowsType:            sig.ThrowsType,
-		Effects:               append([]string(nil), sig.Effects...),
-		TouchesMutableGlobals: sig.TouchesMutableGlobals,
-		ReturnRegionUnknown:   sig.ReturnRegionParam < semantics.SummaryParamNone && len(sig.ReturnRegionSummary) == 0,
-		ReturnRegionSummary:   cloneIntMap(sig.ReturnRegionSummary),
-		ReturnResourceUnknown: sig.ReturnResourceParam < semantics.SummaryParamNone && len(sig.ReturnResourceSummary) == 0,
-		ReturnResourceSummary: cloneResourceSummary(sig.ReturnResourceSummary),
-		ThrowResourceSummary:  cloneResourceSummary(sig.ThrowResourceSummary),
+	summary, err := FunctionSummaryFromFuncSig(b.fn.Name, sig)
+	if err != nil {
+		return nil, fmt.Errorf("plir: function summary %q: %w", b.fn.Name, err)
 	}
-	return summary
-}
-
-func summaryReturnOwnership(sig semantics.FuncSig) string {
-	if strings.TrimSpace(sig.ReturnOwnership) != "" {
-		return sig.ReturnOwnership
-	}
-	if !borrowedRegionSummaryType(sig.ReturnType) {
-		return ""
-	}
-	if len(sig.ReturnRegionSummary) > 0 ||
-		(sig.ReturnRegionParam >= 0 && sig.ReturnRegionParam < len(sig.ParamTypes)) {
-		return "borrow"
-	}
-	return ""
-}
-
-func cloneIntMap(in map[string]int) map[string]int {
-	if len(in) == 0 {
-		return nil
-	}
-	out := make(map[string]int, len(in))
-	for key, value := range in {
-		out[key] = value
-	}
-	return out
-}
-
-func cloneResourceSummary(in semantics.ReturnResourceSummary) map[string][]ResourceProvenance {
-	if len(in) == 0 {
-		return nil
-	}
-	out := make(map[string][]ResourceProvenance, len(in))
-	for leaf, provenances := range in {
-		for _, provenance := range provenances {
-			out[leaf] = append(out[leaf], ResourceProvenance{
-				ParamIndex: provenance.ParamIndex,
-				ParamPath:  provenance.ParamPath,
-			})
-		}
-	}
-	return out
+	return summary, nil
 }

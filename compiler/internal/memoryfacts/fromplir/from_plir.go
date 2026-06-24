@@ -30,6 +30,21 @@ func validatePLIRFunctionSummaryCompleteness(prog *plir.Program) error {
 		if err := plir.VerifyFunctionSummaryCompleteness(fn); err != nil {
 			return err
 		}
+		if fn.Summary == nil {
+			continue
+		}
+		if fn.Summary.ContractSchema == "" {
+			return fmt.Errorf(
+				"memoryfacts: plir function %s summary missing contract schema",
+				fn.Name,
+			)
+		}
+		if fn.Summary.ContractDigest == "" {
+			return fmt.Errorf(
+				"memoryfacts: plir function %s summary missing contract digest",
+				fn.Name,
+			)
+		}
 	}
 	return nil
 }

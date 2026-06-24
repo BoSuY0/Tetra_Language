@@ -29,8 +29,8 @@ func addAllocationIntentSummaryFacts(
 		allocName := allocationNameForPLIRValue(value.ID)
 		escape, reason := classifyAllocationEscapeForPLIR(fn, allocName, value, callSummaries)
 		transfer := boundaryTransferEvidenceForAllocation(fn, allocName, value)
-		fact := functionSummaryFact(
-			fn.Name,
+		fact := functionSummaryFactFor(
+			fn,
 			"alloc_escape:"+value.ID,
 			claimForAllocationEscape(value, escape),
 			nonEmpty(value.Source, summarySite(fn)),

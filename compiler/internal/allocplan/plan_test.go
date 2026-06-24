@@ -1301,10 +1301,12 @@ func TestPlannerKeepsLocalActorTaskCallSummariesConservative(t *testing.T) {
 				{
 					Name: calleeName,
 					Summary: &plir.FunctionSummary{
-						ParamNames: []string{"xs"},
-						ParamTypes: []string{"[]u8"},
-						ReturnType: "i32",
-						Effects:    []string{"mem"},
+						ContractSchema: "tetra.semantic.function-contract.v1",
+						ContractDigest: "synthetic:" + calleeName,
+						ParamNames:     []string{"xs"},
+						ParamTypes:     []string{"[]u8"},
+						ReturnType:     "i32",
+						Effects:        []string{"mem"},
 					},
 					Values: []plir.Value{{
 						ID:         "param:xs",
@@ -1491,6 +1493,8 @@ func syntheticInoutWriterCallee(name string, ops []plir.Operation) plir.Function
 	return plir.Function{
 		Name: name,
 		Summary: &plir.FunctionSummary{
+			ContractSchema: "tetra.semantic.function-contract.v1",
+			ContractDigest: "synthetic:" + name,
 			ParamNames:     []string{"dst"},
 			ParamTypes:     []string{"[]u8"},
 			ParamOwnership: []string{"inout"},

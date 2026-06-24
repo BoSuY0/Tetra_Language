@@ -121,7 +121,7 @@ func main() -> Int:
 	}
 }
 
-func TestFunctionSummaryKeepsOwnedSliceReturnOwnershipEmpty(t *testing.T) {
+func TestFunctionSummaryKeepsOwnedSliceReturnOwnershipCanonical(t *testing.T) {
 	prog := checkedPLIRProgram(t, `
 func owned_bytes() -> []u8
 uses alloc, mem:
@@ -134,8 +134,8 @@ func main() -> Int:
 	if fn.Summary == nil {
 		t.Fatalf("owned_bytes missing FunctionSummary")
 	}
-	if got := fn.Summary.ReturnOwnership; got != "" {
-		t.Fatalf("FunctionSummary.ReturnOwnership = %q, want empty ownership", got)
+	if got := fn.Summary.ReturnOwnership; got != "owned" {
+		t.Fatalf("FunctionSummary.ReturnOwnership = %q, want owned", got)
 	}
 }
 
