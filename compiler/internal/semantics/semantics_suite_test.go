@@ -3280,33 +3280,6 @@ func TestClearConsumedTreeClearsAliasForConsumedBasePath(t *testing.T) {
 	}
 }
 
-func TestMergeOwnershipAliasesIntersectsOnlyMatchingMappings(t *testing.T) {
-	left := map[string]string{
-		"common":   "root",
-		"leftOnly": "msg",
-	}
-	right := map[string]string{
-		"common":    "root",
-		"rightOnly": "other",
-	}
-	merged := mergeOwnershipAliases(left, right)
-	if got := len(merged); got != 1 {
-		t.Fatalf("expected exactly one merged alias, got %d (%v)", got, merged)
-	}
-	if _, ok := merged["common"]; !ok {
-		t.Fatalf("expected 'common' to remain after merge, got %v", merged)
-	}
-	if merged["common"] != "root" {
-		t.Fatalf("expected 'common' to map to 'root', got %q", merged["common"])
-	}
-	if _, ok := merged["leftOnly"]; ok {
-		t.Fatalf("did not expect 'leftOnly' in merged aliases: %v", merged)
-	}
-	if _, ok := merged["rightOnly"]; ok {
-		t.Fatalf("did not expect 'rightOnly' in merged aliases: %v", merged)
-	}
-}
-
 func TestMergeFlowWithLabelsIntersectsOwnershipAliases(t *testing.T) {
 	state := newRegionState(nil)
 	left := flowSnapshot{
@@ -3362,6 +3335,30 @@ func TestMergeFlowWithLabelsIntersectsOwnershipAliases(t *testing.T) {
 	}
 	if _, ok := state.ownershipAliases["rightOnly"]; ok {
 		t.Fatalf("did not expect rightOnly alias after merge: %v", state.ownershipAliases)
+	}
+}
+
+func TestWhileLoopConsumeRequiresFixedPointHeader(t *testing.T) {
+	src := []byte(`
+func take(value: consume Int) -> Int:
+    return value
+
+func main() -> Int:
+    let value = 1
+    while 1:
+        let _ = take(value)
+    return 0
+`)
+	prog, err := frontend.Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected loop fixed-point consumed value error")
+	}
+	if !strings.Contains(err.Error(), "may have been consumed after ownership join") {
+		t.Fatalf("error = %v, want loop fixed-point maybe-consumed diagnostic", err)
 	}
 }
 

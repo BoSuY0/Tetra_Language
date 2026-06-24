@@ -1109,10 +1109,15 @@ func checkMatchExpr(
 			mergedFlow = caseFlow
 			mergedSet = true
 		} else {
-			state.regionVars = mergeRegionVars(mergedVars, caseVars)
-			mergeFlowWithLabels(state, mergedFlow, caseFlow, "previous cases", fmt.Sprintf("case %d", i+1))
-			mergedVars = copyRegionVars(state.regionVars)
-			mergedFlow = snapshotFlow(state)
+			mergedVars, mergedFlow = mergeExpressionFlowWithLabels(
+				state,
+				mergedVars,
+				mergedFlow,
+				caseVars,
+				caseFlow,
+				"previous cases",
+				fmt.Sprintf("case %d", i+1),
+			)
 		}
 	}
 	if mergedSet {
@@ -1391,16 +1396,15 @@ func checkCatchExpr(
 		}
 		caseVars := copyRegionVars(state.regionVars)
 		caseFlow := snapshotFlow(state)
-		state.regionVars = mergeRegionVars(mergedVars, caseVars)
-		mergeFlowWithLabels(
+		mergedVars, mergedFlow = mergeExpressionFlowWithLabels(
 			state,
+			mergedVars,
 			mergedFlow,
+			caseVars,
 			caseFlow,
 			"previous cases",
 			fmt.Sprintf("case %d", i+1),
 		)
-		mergedVars = copyRegionVars(state.regionVars)
-		mergedFlow = snapshotFlow(state)
 	}
 	state.regionVars = mergedVars
 	restoreFlow(state, mergedFlow)

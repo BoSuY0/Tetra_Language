@@ -2,6 +2,7 @@ package semantics
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -4620,48 +4621,6 @@ func copyStringMap(src map[string]string) map[string]string {
 	return dst
 }
 
-func mergeBorrowedPtrAliases(a, b map[string]string) map[string]string {
-	if len(a) == 0 && len(b) == 0 {
-		return make(map[string]string)
-	}
-	merged := make(map[string]string)
-	for name, owner := range a {
-		if owner == "" {
-			continue
-		}
-		merged[name] = owner
-	}
-	for name, owner := range b {
-		if owner == "" {
-			continue
-		}
-		if existing, exists := merged[name]; exists {
-			if owner < existing {
-				merged[name] = owner
-			}
-			continue
-		}
-		merged[name] = owner
-	}
-	return merged
-}
-
-func mergeOwnershipAliases(a, b map[string]string) map[string]string {
-	if len(a) == 0 && len(b) == 0 {
-		return make(map[string]string)
-	}
-	merged := make(map[string]string)
-	for name, source := range a {
-		if source == "" {
-			continue
-		}
-		if rightSource, ok := b[name]; ok && rightSource == source {
-			merged[name] = source
-		}
-	}
-	return merged
-}
-
 func copyRegionConflictMap(src map[string]regionConflict) map[string]regionConflict {
 	if len(src) == 0 {
 		return make(map[string]regionConflict)
@@ -4763,88 +4722,6 @@ func copyResourceFinalization(src resourceFinalization) resourceFinalization {
 	return dst
 }
 
-func mergeConsumedVars(a, b map[string]frontend.Position) map[string]frontend.Position {
-	if len(a) == 0 && len(b) == 0 {
-		return make(map[string]frontend.Position)
-	}
-	merged := make(map[string]frontend.Position)
-	for name, left := range a {
-		if right, ok := b[name]; ok {
-			merged[name] = earliestPosition(left, right)
-			continue
-		}
-		merged[name] = left
-	}
-	for name, right := range b {
-		if _, exists := merged[name]; !exists {
-			merged[name] = right
-		}
-	}
-	return merged
-}
-
-func mergeMaybeConsumedVars(
-	a, b flowSnapshot,
-	leftLabel, rightLabel string,
-) map[string]ownershipJoinConflict {
-	// SAFE-003 incremental subset: model local consume states as SSA-like edge
-	// joins. A value consumed on only some incoming edges remains unusable, but
-	// diagnostics now distinguish maybe-consumed joins from linear local flow.
-	merged := make(map[string]ownershipJoinConflict)
-	names := make(map[string]struct{})
-	for name := range a.consumedVars {
-		names[name] = struct{}{}
-	}
-	for name := range b.consumedVars {
-		names[name] = struct{}{}
-	}
-	for name := range a.maybeConsumedVars {
-		names[name] = struct{}{}
-	}
-	for name := range b.maybeConsumedVars {
-		names[name] = struct{}{}
-	}
-	for name := range names {
-		leftConsumed, leftMaybe, leftPos, leftConflict := ownershipSnapshotConsumed(a, name)
-		rightConsumed, rightMaybe, rightPos, rightConflict := ownershipSnapshotConsumed(b, name)
-		if !leftConsumed && !rightConsumed {
-			continue
-		}
-		if leftConsumed && rightConsumed && !leftMaybe && !rightMaybe {
-			continue
-		}
-		conflict := ownershipJoinConflict{
-			leftLabel:     leftLabel,
-			leftConsumed:  leftConsumed,
-			leftPos:       leftPos,
-			rightLabel:    rightLabel,
-			rightConsumed: rightConsumed,
-			rightPos:      rightPos,
-		}
-		if leftMaybe {
-			conflict.leftConsumed = true
-			conflict.leftPos = ownershipJoinConflictPosition(leftConflict)
-		}
-		if rightMaybe {
-			conflict.rightConsumed = true
-			conflict.rightPos = ownershipJoinConflictPosition(rightConflict)
-		}
-		merged[name] = conflict
-	}
-	return merged
-}
-
-func ownershipSnapshotConsumed(
-	snap flowSnapshot,
-	name string,
-) (bool, bool, frontend.Position, ownershipJoinConflict) {
-	if conflict, ok := snap.maybeConsumedVars[name]; ok {
-		return true, true, ownershipJoinConflictPosition(conflict), conflict
-	}
-	pos, ok := snap.consumedVars[name]
-	return ok, false, pos, ownershipJoinConflict{}
-}
-
 func ownershipJoinConflictPosition(conflict ownershipJoinConflict) frontend.Position {
 	switch {
 	case conflict.leftConsumed && conflict.rightConsumed:
@@ -4856,247 +4733,6 @@ func ownershipJoinConflictPosition(conflict ownershipJoinConflict) frontend.Posi
 	default:
 		return frontend.Position{}
 	}
-}
-
-func mergeConsumedResources(a, b map[int]frontend.Position) map[int]frontend.Position {
-	if len(a) == 0 && len(b) == 0 {
-		return make(map[int]frontend.Position)
-	}
-	merged := make(map[int]frontend.Position)
-	for id, left := range a {
-		if right, ok := b[id]; ok {
-			merged[id] = earliestPosition(left, right)
-			continue
-		}
-		merged[id] = left
-	}
-	for id, right := range b {
-		if _, exists := merged[id]; !exists {
-			merged[id] = right
-		}
-	}
-	return merged
-}
-
-func mergeFinalizedResources(
-	a, b map[int]resourceFinalization,
-	leftLabel, rightLabel string,
-) map[int]resourceFinalization {
-	if len(a) == 0 && len(b) == 0 {
-		return make(map[int]resourceFinalization)
-	}
-	merged := make(map[int]resourceFinalization)
-	ids := make(map[int]struct{})
-	for id := range a {
-		ids[id] = struct{}{}
-	}
-	for id := range b {
-		ids[id] = struct{}{}
-	}
-	for id := range ids {
-		left, leftOK := a[id]
-		right, rightOK := b[id]
-		if final, ok := mergeResourceFinalizationValues(
-			left,
-			leftOK,
-			right,
-			rightOK,
-			leftLabel,
-			rightLabel,
-		); ok {
-			merged[id] = final
-		}
-	}
-	return merged
-}
-
-func mergeResourceFinalizationValues(
-	left resourceFinalization,
-	leftOK bool,
-	right resourceFinalization,
-	rightOK bool,
-	leftLabel, rightLabel string,
-) (resourceFinalization, bool) {
-	if !leftOK && !rightOK {
-		return resourceFinalization{}, false
-	}
-	states := make(map[string]frontend.Position)
-	mayBeAvailable := !leftOK || !rightOK
-	addFinalizationStates(states, left)
-	addFinalizationStates(states, right)
-	if leftOK && left.mayBeAvailable {
-		mayBeAvailable = true
-	}
-	if rightOK && right.mayBeAvailable {
-		mayBeAvailable = true
-	}
-	if len(states) == 0 {
-		return resourceFinalization{}, false
-	}
-	if len(states) == 1 && !mayBeAvailable && !left.maybe && !right.maybe {
-		for state, pos := range states {
-			return resourceFinalization{state: state, pos: pos}, true
-		}
-	}
-	return resourceFinalization{
-		state:          firstResourceFinalizationState(states),
-		pos:            earliestResourceFinalizationPosition(states),
-		maybe:          true,
-		mayBeAvailable: mayBeAvailable,
-		states:         states,
-	}, true
-}
-
-func addFinalizationStates(dst map[string]frontend.Position, final resourceFinalization) {
-	for state, pos := range resourceFinalizationStatePositions(final) {
-		if existing, ok := dst[state]; ok {
-			dst[state] = earliestPosition(existing, pos)
-			continue
-		}
-		dst[state] = pos
-	}
-}
-
-func firstResourceFinalizationState(states map[string]frontend.Position) string {
-	first := ""
-	for state := range states {
-		if first == "" || state < first {
-			first = state
-		}
-	}
-	return first
-}
-
-func earliestResourceFinalizationPosition(states map[string]frontend.Position) frontend.Position {
-	var earliest frontend.Position
-	for _, pos := range states {
-		earliest = earliestPosition(earliest, pos)
-	}
-	return earliest
-}
-
-func mergeUnknownResources(a, b map[int]bool) map[int]bool {
-	if len(a) == 0 && len(b) == 0 {
-		return make(map[int]bool)
-	}
-	merged := make(map[int]bool)
-	for id, unknown := range a {
-		if unknown {
-			merged[id] = true
-		}
-	}
-	for id, unknown := range b {
-		if unknown {
-			merged[id] = true
-		}
-	}
-	return merged
-}
-
-func mergeAwaitInvalidatedBorrowRegions(a, b map[int]frontend.Position) map[int]frontend.Position {
-	if len(a) == 0 && len(b) == 0 {
-		return make(map[int]frontend.Position)
-	}
-	merged := copyPositionByIntMap(a)
-	for regionID, pos := range b {
-		if existing, exists := merged[regionID]; exists {
-			merged[regionID] = earliestPosition(existing, pos)
-			continue
-		}
-		merged[regionID] = pos
-	}
-	return merged
-}
-
-func mergeResourceVars(
-	state *regionState,
-	a, b map[string]int,
-	consumed map[int]frontend.Position,
-	finalized map[int]resourceFinalization,
-	unknown map[int]bool,
-	leftLabel, rightLabel string,
-) map[string]int {
-	if len(a) == 0 && len(b) == 0 {
-		return make(map[string]int)
-	}
-	merged := make(map[string]int)
-	for name, left := range a {
-		right, ok := b[name]
-		if !ok {
-			merged[name] = left
-			continue
-		}
-		if left == right {
-			merged[name] = left
-			continue
-		}
-		merged[name] = mergeResourceIDs(
-			state,
-			left,
-			right,
-			consumed,
-			finalized,
-			unknown,
-			leftLabel,
-			rightLabel,
-		)
-	}
-	for name, right := range b {
-		if _, exists := merged[name]; !exists {
-			merged[name] = right
-		}
-	}
-	return merged
-}
-
-func mergeResourceIDs(
-	state *regionState,
-	left int,
-	right int,
-	consumed map[int]frontend.Position,
-	finalized map[int]resourceFinalization,
-	unknown map[int]bool,
-	leftLabel, rightLabel string,
-) int {
-	if state == nil {
-		return left
-	}
-	merged := state.allocateResourceID()
-	leftParam, leftParamOK := state.resourceParamIndex[left]
-	rightParam, rightParamOK := state.resourceParamIndex[right]
-	leftPath := state.resourceParamPath[left]
-	rightPath := state.resourceParamPath[right]
-	if unknown[left] || unknown[right] {
-		unknown[merged] = true
-	} else if leftParamOK && rightParamOK && leftParam == rightParam && leftPath == rightPath {
-		state.resourceParamIndex[merged] = leftParam
-		state.resourceParamPath[merged] = leftPath
-	} else {
-		unknown[merged] = true
-	}
-	leftConsumed, leftConsumedOK := consumed[left]
-	rightConsumed, rightConsumedOK := consumed[right]
-	switch {
-	case leftConsumedOK && rightConsumedOK:
-		consumed[merged] = earliestPosition(leftConsumed, rightConsumed)
-	case leftConsumedOK:
-		consumed[merged] = leftConsumed
-	case rightConsumedOK:
-		consumed[merged] = rightConsumed
-	}
-	leftFinal, leftFinalOK := finalized[left]
-	rightFinal, rightFinalOK := finalized[right]
-	if final, ok := mergeResourceFinalizationValues(
-		leftFinal,
-		leftFinalOK,
-		rightFinal,
-		rightFinalOK,
-		leftLabel,
-		rightLabel,
-	); ok {
-		finalized[merged] = final
-	}
-	return merged
 }
 
 func earliestPosition(a, b frontend.Position) frontend.Position {
@@ -13921,11 +13557,14 @@ type flowSnapshot struct {
 	ownershipAliases       map[string]string
 	borrowedPtrAliases     map[string]string
 	ownedRegionSliceOwners map[string]string
+	unknownVars            map[string]bool
+	unknownConflicts       map[string]regionConflict
 	awaitInvalidatedBorrow map[int]frontend.Position
 	consumedResources      map[int]frontend.Position
 	resourceVars           map[string]int
 	unknownResources       map[int]bool
 	finalizedResources     map[int]resourceFinalization
+	deferCaptureFrames     []map[string]frontend.Position
 }
 
 type loopFlowExit struct {
@@ -13948,11 +13587,14 @@ func snapshotFlow(state *regionState) flowSnapshot {
 		ownershipAliases:       copyStringMap(state.ownershipAliases),
 		borrowedPtrAliases:     copyStringMap(state.borrowedPtrAliases),
 		ownedRegionSliceOwners: copyStringMap(state.ownedRegionSliceOwners),
+		unknownVars:            copyBoolMap(state.unknownVars),
+		unknownConflicts:       copyRegionConflictMap(state.unknownConflicts),
 		awaitInvalidatedBorrow: copyPositionByIntMap(state.awaitInvalidatedBorrow),
 		consumedResources:      copyConsumedResources(state.consumedResources),
 		resourceVars:           copyResourceVars(state.resourceVars),
 		unknownResources:       copyUnknownResources(state.unknownResources),
 		finalizedResources:     copyFinalizedResources(state.finalizedResources),
+		deferCaptureFrames:     copyDeferCaptureFrames(state.deferCaptureFrames),
 	}
 }
 
@@ -13963,11 +13605,14 @@ func restoreFlow(state *regionState, snap flowSnapshot) {
 	state.ownershipAliases = copyStringMap(snap.ownershipAliases)
 	state.borrowedPtrAliases = copyStringMap(snap.borrowedPtrAliases)
 	state.ownedRegionSliceOwners = copyStringMap(snap.ownedRegionSliceOwners)
+	state.unknownVars = copyBoolMap(snap.unknownVars)
+	state.unknownConflicts = copyRegionConflictMap(snap.unknownConflicts)
 	state.awaitInvalidatedBorrow = copyPositionByIntMap(snap.awaitInvalidatedBorrow)
 	state.consumedResources = copyConsumedResources(snap.consumedResources)
 	state.resourceVars = copyResourceVars(snap.resourceVars)
 	state.unknownResources = copyUnknownResources(snap.unknownResources)
 	state.finalizedResources = copyFinalizedResources(snap.finalizedResources)
+	state.deferCaptureFrames = copyDeferCaptureFrames(snap.deferCaptureFrames)
 }
 
 func mergeFlow(state *regionState, a, b flowSnapshot) {
@@ -13975,53 +13620,383 @@ func mergeFlow(state *regionState, a, b flowSnapshot) {
 }
 
 func mergeFlowWithLabels(state *regionState, a, b flowSnapshot, leftLabel, rightLabel string) {
-	if !a.reachable && !b.reachable {
-		restoreFlow(state, a)
-		state.reachable = false
-		return
-	}
-	if !a.reachable {
-		restoreFlow(state, b)
-		return
-	}
-	if !b.reachable {
-		restoreFlow(state, a)
-		return
-	}
-	consumedResources := mergeConsumedResources(a.consumedResources, b.consumedResources)
-	finalizedResources := mergeFinalizedResources(
-		a.finalizedResources,
-		b.finalizedResources,
+	joined := semanticsflow.JoinWithLabels(
+		canonicalFlowStateFromSnapshot(state, nil, a),
+		canonicalFlowStateFromSnapshot(state, nil, b),
 		leftLabel,
 		rightLabel,
+		flowJoinOptions(state),
 	)
-	unknownResources := mergeUnknownResources(a.unknownResources, b.unknownResources)
-	state.reachable = true
-	state.consumedVars = mergeConsumedVars(a.consumedVars, b.consumedVars)
-	state.maybeConsumedVars = mergeMaybeConsumedVars(a, b, leftLabel, rightLabel)
-	state.ownershipAliases = mergeOwnershipAliases(a.ownershipAliases, b.ownershipAliases)
-	state.borrowedPtrAliases = mergeBorrowedPtrAliases(a.borrowedPtrAliases, b.borrowedPtrAliases)
-	state.ownedRegionSliceOwners = mergeOwnershipAliases(
-		a.ownedRegionSliceOwners,
-		b.ownedRegionSliceOwners,
-	)
-	state.awaitInvalidatedBorrow = mergeAwaitInvalidatedBorrowRegions(
-		a.awaitInvalidatedBorrow,
-		b.awaitInvalidatedBorrow,
-	)
-	state.consumedResources = consumedResources
-	state.unknownResources = unknownResources
-	state.finalizedResources = finalizedResources
-	state.resourceVars = mergeResourceVars(
-		state,
-		a.resourceVars,
-		b.resourceVars,
-		consumedResources,
-		finalizedResources,
-		unknownResources,
-		leftLabel,
-		rightLabel,
-	)
+	restoreFlow(state, flowSnapshotFromCanonical(joined))
+}
+
+func canonicalFlowStateFromSnapshot(
+	state *regionState,
+	vars map[string]int,
+	snap flowSnapshot,
+) semanticsflow.FlowState {
+	flow := semanticsflow.NewReachableState()
+	flow.Reachable = snap.reachable
+	flow.Availability = canonicalAvailabilityMap(snap)
+	flow.OwnershipAliases = copyStringMap(snap.ownershipAliases)
+	flow.BorrowedPointerOwners = copyStringMap(snap.borrowedPtrAliases)
+	flow.RegionBindings = canonicalRegionBindings(vars)
+	flow.RegionConflicts = canonicalRegionConflicts(snap.unknownConflicts)
+	flow.ResourceIdentities = canonicalResourceIdentities(state, snap)
+	flow.ResourceAvailability = canonicalResourceAvailability(snap.consumedResources)
+	flow.ResourceFinalization = canonicalResourceFinalizations(snap.finalizedResources)
+	flow.OwnedRegionSliceOwners = copyStringMap(snap.ownedRegionSliceOwners)
+	flow.AwaitInvalidatedBorrows = copyPositionByIntMap(snap.awaitInvalidatedBorrow)
+	flow.PendingDeferCaptures = copyDeferCaptureFrames(snap.deferCaptureFrames)
+	return flow
+}
+
+func restoreCanonicalFlowState(state *regionState, flow semanticsflow.FlowState) {
+	if state == nil {
+		return
+	}
+	snap := flowSnapshotFromCanonical(flow)
+	restoreFlow(state, snap)
+	state.regionVars = regionVarsFromCanonical(flow.RegionBindings)
+	state.unknownVars = unknownVarsFromCanonical(flow.RegionBindings)
+	state.unknownConflicts = regionConflictsFromCanonical(flow.RegionConflicts)
+	restoreResourceProvenanceFromCanonical(state, flow.ResourceIdentities)
+}
+
+func flowSnapshotFromCanonical(flow semanticsflow.FlowState) flowSnapshot {
+	consumed, maybe := consumedVarsFromCanonical(flow.Availability)
+	return flowSnapshot{
+		reachable:              flow.Reachable,
+		consumedVars:           consumed,
+		maybeConsumedVars:      maybe,
+		ownershipAliases:       copyStringMap(flow.OwnershipAliases),
+		borrowedPtrAliases:     copyStringMap(flow.BorrowedPointerOwners),
+		ownedRegionSliceOwners: copyStringMap(flow.OwnedRegionSliceOwners),
+		unknownVars:            unknownVarsFromCanonical(flow.RegionBindings),
+		unknownConflicts:       regionConflictsFromCanonical(flow.RegionConflicts),
+		awaitInvalidatedBorrow: copyPositionByIntMap(flow.AwaitInvalidatedBorrows),
+		consumedResources:      consumedResourcesFromCanonical(flow.ResourceAvailability),
+		resourceVars:           resourceVarsFromCanonical(flow.ResourceIdentities),
+		unknownResources:       unknownResourcesFromCanonical(flow.ResourceIdentities),
+		finalizedResources:     resourceFinalizationsFromCanonical(flow.ResourceFinalization),
+		deferCaptureFrames:     copyDeferCaptureFrames(flow.PendingDeferCaptures),
+	}
+}
+
+func flowJoinOptions(state *regionState) semanticsflow.JoinOptions {
+	return semanticsflow.JoinOptions{
+		AllocateResourceID: func(merge semanticsflow.ResourceMerge) int {
+			if state == nil {
+				return 0
+			}
+			return state.allocateResourceID()
+		},
+	}
+}
+
+func canonicalAvailabilityMap(snap flowSnapshot) map[string]semanticsflow.Availability {
+	out := map[string]semanticsflow.Availability{}
+	names := make(map[string]struct{})
+	for name := range snap.consumedVars {
+		names[name] = struct{}{}
+	}
+	for name := range snap.maybeConsumedVars {
+		names[name] = struct{}{}
+	}
+	for name := range names {
+		if conflict, ok := snap.maybeConsumedVars[name]; ok {
+			out[name] = semanticsflow.Availability{
+				Kind:          semanticsflow.AvailabilityMaybeConsumed,
+				Pos:           ownershipJoinConflictPosition(conflict),
+				LeftLabel:     conflict.leftLabel,
+				LeftConsumed:  conflict.leftConsumed,
+				LeftPos:       conflict.leftPos,
+				RightLabel:    conflict.rightLabel,
+				RightConsumed: conflict.rightConsumed,
+				RightPos:      conflict.rightPos,
+			}
+			continue
+		}
+		out[name] = semanticsflow.Availability{
+			Kind: semanticsflow.AvailabilityConsumed,
+			Pos:  snap.consumedVars[name],
+		}
+	}
+	return out
+}
+
+func consumedVarsFromCanonical(
+	availability map[string]semanticsflow.Availability,
+) (map[string]frontend.Position, map[string]ownershipJoinConflict) {
+	consumed := make(map[string]frontend.Position)
+	maybe := make(map[string]ownershipJoinConflict)
+	for name, state := range availability {
+		switch state.Kind {
+		case semanticsflow.AvailabilityConsumed:
+			consumed[name] = state.Pos
+		case semanticsflow.AvailabilityMaybeConsumed:
+			pos := state.Pos
+			if pos.Line == 0 {
+				pos = earliestPosition(state.LeftPos, state.RightPos)
+			}
+			consumed[name] = pos
+			maybe[name] = ownershipJoinConflict{
+				leftLabel:     state.LeftLabel,
+				leftConsumed:  state.LeftConsumed,
+				leftPos:       state.LeftPos,
+				rightLabel:    state.RightLabel,
+				rightConsumed: state.RightConsumed,
+				rightPos:      state.RightPos,
+			}
+		}
+	}
+	return consumed, maybe
+}
+
+func canonicalRegionBindings(vars map[string]int) map[string]semanticsflow.RegionBinding {
+	out := map[string]semanticsflow.RegionBinding{}
+	for name, regionID := range vars {
+		switch regionID {
+		case regionNone:
+			continue
+		case regionUnknown:
+			out[name] = semanticsflow.RegionBinding{Kind: semanticsflow.RegionUnknown}
+		default:
+			out[name] = semanticsflow.RegionBinding{
+				Kind:     semanticsflow.RegionExact,
+				RegionID: regionID,
+			}
+		}
+	}
+	return out
+}
+
+func regionVarsFromCanonical(bindings map[string]semanticsflow.RegionBinding) map[string]int {
+	out := make(map[string]int)
+	for name, binding := range bindings {
+		switch binding.Kind {
+		case semanticsflow.RegionExact:
+			out[name] = binding.RegionID
+		case semanticsflow.RegionUnknown:
+			out[name] = regionUnknown
+		}
+	}
+	return out
+}
+
+func unknownVarsFromCanonical(bindings map[string]semanticsflow.RegionBinding) map[string]bool {
+	out := make(map[string]bool)
+	for name, binding := range bindings {
+		if binding.Kind == semanticsflow.RegionUnknown {
+			out[name] = true
+		}
+	}
+	return out
+}
+
+func canonicalRegionConflicts(
+	conflicts map[string]regionConflict,
+) map[string]semanticsflow.RegionConflict {
+	out := map[string]semanticsflow.RegionConflict{}
+	for name, conflict := range conflicts {
+		out[name] = semanticsflow.RegionConflict{
+			LeftLabel:   conflict.leftLabel,
+			LeftKind:    canonicalRegionKind(conflict.leftRegion),
+			LeftRegion:  conflict.leftRegion,
+			RightLabel:  conflict.rightLabel,
+			RightKind:   canonicalRegionKind(conflict.rightRegion),
+			RightRegion: conflict.rightRegion,
+		}
+	}
+	return out
+}
+
+func regionConflictsFromCanonical(
+	conflicts map[string]semanticsflow.RegionConflict,
+) map[string]regionConflict {
+	out := map[string]regionConflict{}
+	for name, conflict := range conflicts {
+		out[name] = regionConflict{
+			leftLabel:   conflict.LeftLabel,
+			leftRegion:  regionIDFromCanonicalConflict(conflict.LeftKind, conflict.LeftRegion),
+			rightLabel:  conflict.RightLabel,
+			rightRegion: regionIDFromCanonicalConflict(conflict.RightKind, conflict.RightRegion),
+		}
+	}
+	return out
+}
+
+func canonicalRegionKind(regionID int) semanticsflow.RegionBindingKind {
+	switch regionID {
+	case regionNone:
+		return semanticsflow.RegionNone
+	case regionUnknown:
+		return semanticsflow.RegionUnknown
+	default:
+		return semanticsflow.RegionExact
+	}
+}
+
+func regionIDFromCanonicalConflict(kind semanticsflow.RegionBindingKind, regionID int) int {
+	switch kind {
+	case semanticsflow.RegionExact:
+		return regionID
+	case semanticsflow.RegionUnknown:
+		return regionUnknown
+	default:
+		return regionNone
+	}
+}
+
+func canonicalResourceIdentities(
+	state *regionState,
+	snap flowSnapshot,
+) map[string]semanticsflow.ResourceIdentity {
+	out := map[string]semanticsflow.ResourceIdentity{}
+	for name, id := range snap.resourceVars {
+		identity := semanticsflow.ResourceIdentity{
+			ID:      id,
+			Unknown: snap.unknownResources[id],
+		}
+		if state != nil {
+			if index, ok := state.resourceParamIndex[id]; ok {
+				identity.HasParam = true
+				identity.ParamIndex = index
+				identity.ParamPath = state.resourceParamPath[id]
+			}
+		}
+		out[name] = identity
+	}
+	return out
+}
+
+func resourceVarsFromCanonical(
+	identities map[string]semanticsflow.ResourceIdentity,
+) map[string]int {
+	out := make(map[string]int)
+	for name, identity := range identities {
+		if identity.ID != 0 {
+			out[name] = identity.ID
+		}
+	}
+	return out
+}
+
+func unknownResourcesFromCanonical(
+	identities map[string]semanticsflow.ResourceIdentity,
+) map[int]bool {
+	out := make(map[int]bool)
+	for _, identity := range identities {
+		if identity.ID != 0 && identity.Unknown {
+			out[identity.ID] = true
+		}
+	}
+	return out
+}
+
+func restoreResourceProvenanceFromCanonical(
+	state *regionState,
+	identities map[string]semanticsflow.ResourceIdentity,
+) {
+	if state == nil {
+		return
+	}
+	for _, identity := range identities {
+		if identity.ID == 0 || !identity.HasParam {
+			continue
+		}
+		state.resourceParamIndex[identity.ID] = identity.ParamIndex
+		state.resourceParamPath[identity.ID] = identity.ParamPath
+	}
+}
+
+func canonicalResourceAvailability(
+	consumed map[int]frontend.Position,
+) map[int]semanticsflow.Availability {
+	out := map[int]semanticsflow.Availability{}
+	for id, pos := range consumed {
+		out[id] = semanticsflow.Availability{
+			Kind: semanticsflow.AvailabilityConsumed,
+			Pos:  pos,
+		}
+	}
+	return out
+}
+
+func consumedResourcesFromCanonical(
+	availability map[int]semanticsflow.Availability,
+) map[int]frontend.Position {
+	out := make(map[int]frontend.Position)
+	for id, state := range availability {
+		switch state.Kind {
+		case semanticsflow.AvailabilityConsumed:
+			out[id] = state.Pos
+		case semanticsflow.AvailabilityMaybeConsumed:
+			out[id] = state.Pos
+		}
+	}
+	return out
+}
+
+func canonicalResourceFinalizations(
+	finalized map[int]resourceFinalization,
+) map[int]semanticsflow.ResourceFinalization {
+	out := map[int]semanticsflow.ResourceFinalization{}
+	for id, final := range finalized {
+		kind := semanticsflow.FinalizationExact
+		if final.maybe {
+			kind = semanticsflow.FinalizationMaybe
+		}
+		out[id] = semanticsflow.ResourceFinalization{
+			Kind:           kind,
+			State:          final.state,
+			Pos:            final.pos,
+			MayBeAvailable: final.mayBeAvailable,
+			States:         copyPositionMap(final.states),
+		}
+	}
+	return out
+}
+
+func resourceFinalizationsFromCanonical(
+	finalized map[int]semanticsflow.ResourceFinalization,
+) map[int]resourceFinalization {
+	out := make(map[int]resourceFinalization)
+	for id, final := range finalized {
+		if final.Kind == semanticsflow.FinalizationLive {
+			continue
+		}
+		out[id] = resourceFinalization{
+			state:          final.State,
+			pos:            final.Pos,
+			maybe:          final.Kind == semanticsflow.FinalizationMaybe,
+			mayBeAvailable: final.MayBeAvailable,
+			states:         copyPositionMap(final.States),
+		}
+	}
+	return out
+}
+
+func copyPositionMap(src map[string]frontend.Position) map[string]frontend.Position {
+	if len(src) == 0 {
+		return nil
+	}
+	dst := make(map[string]frontend.Position, len(src))
+	for key, pos := range src {
+		dst[key] = pos
+	}
+	return dst
+}
+
+func copyDeferCaptureFrames(src []map[string]frontend.Position) []map[string]frontend.Position {
+	if len(src) == 0 {
+		return nil
+	}
+	dst := make([]map[string]frontend.Position, len(src))
+	for i := range src {
+		dst[i] = copyPositionMap(src[i])
+	}
+	return dst
 }
 
 func pushLoopFlowFrame(state *regionState) {
@@ -14096,6 +14071,25 @@ func mergeLoopFlowExits(state *regionState, analysis *functionAnalysisState, exi
 	}
 }
 
+func canonicalLoopFlowExits(state *regionState, exits []loopFlowExit) semanticsflow.FlowState {
+	if len(exits) == 0 {
+		return semanticsflow.FlowState{Reachable: false}
+	}
+	merged := canonicalFlowStateFromSnapshot(state, exits[0].vars, exits[0].flow)
+	labels := []string{exits[0].label}
+	for _, exit := range exits[1:] {
+		merged = semanticsflow.JoinWithLabels(
+			merged,
+			canonicalFlowStateFromSnapshot(state, exit.vars, exit.flow),
+			strings.Join(labels, "/"),
+			exit.label,
+			flowJoinOptions(state),
+		)
+		labels = append(labels, exit.label)
+	}
+	return merged
+}
+
 func mergeControlFlowWithLabels(
 	state *regionState,
 	analysis *functionAnalysisState,
@@ -14123,11 +14117,38 @@ func mergeControlFlowWithLabels(
 		restoreFlow(state, leftFlow)
 		analysis.restoreSecretTaint(leftTaint)
 	default:
-		state.regionVars = mergeRegionVars(leftVars, rightVars)
-		mergeFlowWithLabels(state, leftFlow, rightFlow, leftLabel, rightLabel)
+		joined := semanticsflow.JoinWithLabels(
+			canonicalFlowStateFromSnapshot(state, leftVars, leftFlow),
+			canonicalFlowStateFromSnapshot(state, rightVars, rightFlow),
+			leftLabel,
+			rightLabel,
+			flowJoinOptions(state),
+		)
+		restoreCanonicalFlowState(state, joined)
 		analysis.restoreSecretTaint(mergeSecretTaintMaps(leftTaint, rightTaint))
 		recordMergeConflicts(state, leftVars, rightVars, leftLabel, rightLabel)
 	}
+}
+
+func mergeExpressionFlowWithLabels(
+	state *regionState,
+	leftVars map[string]int,
+	leftFlow flowSnapshot,
+	rightVars map[string]int,
+	rightFlow flowSnapshot,
+	leftLabel string,
+	rightLabel string,
+) (map[string]int, flowSnapshot) {
+	joined := semanticsflow.JoinWithLabels(
+		canonicalFlowStateFromSnapshot(state, leftVars, leftFlow),
+		canonicalFlowStateFromSnapshot(state, rightVars, rightFlow),
+		leftLabel,
+		rightLabel,
+		flowJoinOptions(state),
+	)
+	restoreCanonicalFlowState(state, joined)
+	recordMergeConflicts(state, leftVars, rightVars, leftLabel, rightLabel)
+	return copyRegionVars(state.regionVars), snapshotFlow(state)
 }
 
 type resourceSourceResult struct {
@@ -17844,47 +17865,79 @@ func checkStmts(
 			before := copyRegionVars(state.regionVars)
 			beforeFlow := snapshotFlow(state)
 			beforeTaint := analysis.copySecretTaint()
-			state.regionVars = copyRegionVars(before)
-			restoreFlow(state, beforeFlow)
-			analysis.restoreSecretTaint(beforeTaint)
-			state.loopDepth++
-			pushLoopFlowFrame(state)
-			if err := withActiveScope(state, bodyScopeID, func() error {
-				return analysis.withSecretControl(condSecretTainted, func() error {
-					return checkStmts(
-						s.Body,
-						locals,
-						globals,
-						funcs,
-						types,
-						module,
-						imports,
-						returnType,
-						borrowedParams,
-						inoutParams,
-						state,
-						effects,
-						analysis,
-					)
-				})
-			}); err != nil {
-				popLoopFlowFrame(state)
-				state.loopDepth--
+			var loopFrame loopFlowFrame
+			var bodyVars map[string]int
+			var bodyFlow flowSnapshot
+			var bodyTaint map[string]bool
+			entryFlow := canonicalFlowStateFromSnapshot(state, before, beforeFlow)
+			converged, _, err := semanticsflow.FixedPointLoop(
+				entryFlow,
+				func(header semanticsflow.FlowState) (semanticsflow.FlowState, error) {
+					restoreCanonicalFlowState(state, header)
+					analysis.restoreSecretTaint(beforeTaint)
+					state.loopDepth++
+					pushLoopFlowFrame(state)
+					if err := withActiveScope(state, bodyScopeID, func() error {
+						return analysis.withSecretControl(condSecretTainted, func() error {
+							return checkStmts(
+								s.Body,
+								locals,
+								globals,
+								funcs,
+								types,
+								module,
+								imports,
+								returnType,
+								borrowedParams,
+								inoutParams,
+								state,
+								effects,
+								analysis,
+							)
+						})
+					}); err != nil {
+						popLoopFlowFrame(state)
+						state.loopDepth--
+						return semanticsflow.FlowState{}, err
+					}
+					loopFrame = popLoopFlowFrame(state)
+					state.loopDepth--
+					bodyVars = copyRegionVars(state.regionVars)
+					bodyFlow = snapshotFlow(state)
+					bodyTaint = analysis.copySecretTaint()
+					backEdges := []loopFlowExit{}
+					if bodyFlow.reachable {
+						backEdges = append(
+							backEdges,
+							loopFlowExit{
+								label: "body",
+								vars:  bodyVars,
+								flow:  bodyFlow,
+								taint: bodyTaint,
+							},
+						)
+					}
+					backEdges = append(backEdges, loopFrame.continues...)
+					return canonicalLoopFlowExits(state, backEdges), nil
+				},
+				semanticsflow.LoopOptions{
+					MaxIterations: 32,
+					JoinOptions:   flowJoinOptions(state),
+				},
+			)
+			if err != nil {
+				if errors.Is(err, semanticsflow.ErrFlowFixedPointNonConvergence) {
+					return fmt.Errorf("%s: flow fixed point did not converge", frontend.FormatPos(s.At))
+				}
 				return err
 			}
-			loopFrame := popLoopFlowFrame(state)
-			state.loopDepth--
-			bodyVars := copyRegionVars(state.regionVars)
-			bodyFlow := snapshotFlow(state)
-			bodyTaint := analysis.copySecretTaint()
-			exits := []loopFlowExit{{label: "before", vars: before, flow: beforeFlow, taint: beforeTaint}}
-			if bodyFlow.reachable {
-				exits = append(
-					exits,
-					loopFlowExit{label: "body", vars: bodyVars, flow: bodyFlow, taint: bodyTaint},
-				)
-			}
-			exits = append(exits, loopFrame.continues...)
+			restoreCanonicalFlowState(state, converged)
+			exits := []loopFlowExit{{
+				label: "loop",
+				vars:  copyRegionVars(state.regionVars),
+				flow:  snapshotFlow(state),
+				taint: beforeTaint,
+			}}
 			exits = append(exits, loopFrame.breaks...)
 			mergeLoopFlowExits(state, analysis, exits)
 			markUnknownRegions(state)
@@ -17955,45 +18008,77 @@ func checkStmts(
 			before := copyRegionVars(state.regionVars)
 			beforeFlow := snapshotFlow(state)
 			beforeTaint := analysis.copySecretTaint()
-			state.regionVars = copyRegionVars(before)
-			restoreFlow(state, beforeFlow)
-			analysis.restoreSecretTaint(beforeTaint)
-			state.loopDepth++
-			pushLoopFlowFrame(state)
-			if err := withActiveScope(state, bodyScopeID, func() error {
-				return checkStmts(
-					s.Body,
-					locals,
-					globals,
-					funcs,
-					types,
-					module,
-					imports,
-					returnType,
-					borrowedParams,
-					inoutParams,
-					state,
-					effects,
-					analysis,
-				)
-			}); err != nil {
-				popLoopFlowFrame(state)
-				state.loopDepth--
+			var loopFrame loopFlowFrame
+			var bodyVars map[string]int
+			var bodyFlow flowSnapshot
+			var bodyTaint map[string]bool
+			entryFlow := canonicalFlowStateFromSnapshot(state, before, beforeFlow)
+			converged, _, err := semanticsflow.FixedPointLoop(
+				entryFlow,
+				func(header semanticsflow.FlowState) (semanticsflow.FlowState, error) {
+					restoreCanonicalFlowState(state, header)
+					analysis.restoreSecretTaint(beforeTaint)
+					state.loopDepth++
+					pushLoopFlowFrame(state)
+					if err := withActiveScope(state, bodyScopeID, func() error {
+						return checkStmts(
+							s.Body,
+							locals,
+							globals,
+							funcs,
+							types,
+							module,
+							imports,
+							returnType,
+							borrowedParams,
+							inoutParams,
+							state,
+							effects,
+							analysis,
+						)
+					}); err != nil {
+						popLoopFlowFrame(state)
+						state.loopDepth--
+						return semanticsflow.FlowState{}, err
+					}
+					loopFrame = popLoopFlowFrame(state)
+					state.loopDepth--
+					bodyVars = copyRegionVars(state.regionVars)
+					bodyFlow = snapshotFlow(state)
+					bodyTaint = analysis.copySecretTaint()
+					backEdges := []loopFlowExit{}
+					if bodyFlow.reachable {
+						backEdges = append(
+							backEdges,
+							loopFlowExit{
+								label: "body",
+								vars:  bodyVars,
+								flow:  bodyFlow,
+								taint: bodyTaint,
+							},
+						)
+					}
+					backEdges = append(backEdges, loopFrame.continues...)
+					return canonicalLoopFlowExits(state, backEdges), nil
+				},
+				semanticsflow.LoopOptions{
+					MaxIterations: 32,
+					JoinOptions:   flowJoinOptions(state),
+				},
+			)
+			if err != nil {
+				if errors.Is(err, semanticsflow.ErrFlowFixedPointNonConvergence) {
+					return fmt.Errorf("%s: flow fixed point did not converge", frontend.FormatPos(s.At))
+				}
 				return err
 			}
-			loopFrame := popLoopFlowFrame(state)
-			state.loopDepth--
-			bodyVars := copyRegionVars(state.regionVars)
-			bodyFlow := snapshotFlow(state)
-			bodyTaint := analysis.copySecretTaint()
-			exits := []loopFlowExit{{label: "before", vars: before, flow: beforeFlow, taint: beforeTaint}}
-			if bodyFlow.reachable {
-				exits = append(
-					exits,
-					loopFlowExit{label: "body", vars: bodyVars, flow: bodyFlow, taint: bodyTaint},
-				)
-			}
-			exits = append(exits, loopFrame.continues...)
+			restoreCanonicalFlowState(state, converged)
+			exits := []loopFlowExit{{
+				label: "loop",
+				vars:  copyRegionVars(state.regionVars),
+				flow:  snapshotFlow(state),
+				taint: beforeTaint,
+			}}
 			exits = append(exits, loopFrame.breaks...)
 			mergeLoopFlowExits(state, analysis, exits)
 			markUnknownRegions(state)
