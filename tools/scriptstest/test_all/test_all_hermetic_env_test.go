@@ -202,59 +202,55 @@ func TestTestAllHermeticRunsDoNotCrossContaminate(t *testing.T) {
 	hostLog := filepath.Join(hostRoot, "fake-go-host.log")
 	boundsLog := filepath.Join(boundsRoot, "fake-go-bounds.log")
 
-	hostCmd := newTestAllCommand(
-		t,
-		hostRoot,
-		hostRoot,
-		"scripts/ci/test-all.sh",
-		[]string{
-			"TETRA_FAKE_SKIP_HOST_LEAK_LIST=1",
-			"TETRA_FAKE_GO_LOG=" + hostLog,
-		},
-		"--quick",
-		"--keep-going",
-		"--json-only",
-		"--report-dir",
-		hostReport,
-	)
-	boundsCmd := newTestAllCommand(
-		t,
-		boundsRoot,
-		boundsRoot,
-		"scripts/ci/test-all.sh",
-		[]string{
-			"TETRA_FAKE_SKIP_BOUNDS_PROOF_LIST=1",
-			"TETRA_FAKE_GO_LOG=" + boundsLog,
-		},
-		"--quick",
-		"--keep-going",
-		"--json-only",
-		"--report-dir",
-		boundsReport,
-	)
+	hostEnv := testAllHermeticEnv(t, hostRoot, []string{
+		"TETRA_FAKE_SKIP_HOST_LEAK_LIST=1",
+		"TETRA_FAKE_GO_LOG=" + hostLog,
+	})
+	boundsEnv := testAllHermeticEnv(t, boundsRoot, []string{
+		"TETRA_FAKE_SKIP_BOUNDS_PROOF_LIST=1",
+		"TETRA_FAKE_GO_LOG=" + boundsLog,
+	})
 
-	assertDistinctEnvValue(t, hostCmd.Env, boundsCmd.Env, "HOME")
-	assertDistinctEnvValue(t, hostCmd.Env, boundsCmd.Env, "GOCACHE")
-	assertDistinctEnvValue(t, hostCmd.Env, boundsCmd.Env, "GOTMPDIR")
-	assertDistinctEnvValue(t, hostCmd.Env, boundsCmd.Env, "TMPDIR")
+	assertDistinctEnvValue(t, hostEnv, boundsEnv, "HOME")
+	assertDistinctEnvValue(t, hostEnv, boundsEnv, "GOCACHE")
+	assertDistinctEnvValue(t, hostEnv, boundsEnv, "GOTMPDIR")
+	assertDistinctEnvValue(t, hostEnv, boundsEnv, "TMPDIR")
 
 	type result struct {
 		name string
 		out  []byte
 		err  error
 	}
+	type invocation struct {
+		name      string
+		root      string
+		env       []string
+		reportDir string
+	}
 	results := make(chan result, 2)
 	var wg sync.WaitGroup
-	for name, cmd := range map[string]*exec.Cmd{
-		"host":   hostCmd,
-		"bounds": boundsCmd,
+	for _, run := range []invocation{
+		{name: "host", root: hostRoot, env: hostEnv, reportDir: hostReport},
+		{name: "bounds", root: boundsRoot, env: boundsEnv, reportDir: boundsReport},
 	} {
 		wg.Add(1)
-		go func(name string, cmd *exec.Cmd) {
+		go func(run invocation) {
 			defer wg.Done()
-			out, err := cmd.CombinedOutput()
-			results <- result{name: name, out: out, err: err}
-		}(name, cmd)
+			obs := executeObservedTestAllWithEnv(
+				t,
+				run.root,
+				run.root,
+				"scripts/ci/test-all.sh",
+				run.env,
+				false,
+				"--quick",
+				"--keep-going",
+				"--json-only",
+				"--report-dir",
+				run.reportDir,
+			)
+			results <- result{name: run.name, out: obs.Combined, err: obs.Err}
+		}(run)
 	}
 	wg.Wait()
 	close(results)
@@ -537,13 +533,6 @@ func assertTestAllNormalRunPasses(t *testing.T, root string, mode string) {
 func assertTestAllRunPasses(t *testing.T, root string, mode string, explicitEnv []string) {
 	t.Helper()
 	reportDir := filepath.Join(root, "report-"+strings.TrimPrefix(mode, "--"))
-	traceDir := filepath.Join(root, ".test-all-trace")
-	if err := os.RemoveAll(traceDir); err != nil {
-		t.Fatalf("reset test_all fake-go trace directory: %v", err)
-	}
-	if err := os.MkdirAll(traceDir, 0o755); err != nil {
-		t.Fatalf("create test_all fake-go trace directory: %v", err)
-	}
 	out, err := runTestAll(t, root, explicitEnv, mode, "--json-only", "--report-dir", reportDir)
 	if err != nil {
 		evidence := collectUnexpectedTestAllFailureForMode(t, root, reportDir, out, mode)

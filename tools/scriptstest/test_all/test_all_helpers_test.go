@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -35,6 +36,14 @@ const testAllFormatterStepName = "formatter check examples lib runtime"
 
 const testAllDiagnosticLogLimit = 64 * 1024
 
+const testAllDiagnosticTraceLimit = 16 * 1024
+
+const testAllDiagnosticBundleLimit = 256 * 1024
+
+const testAllDiagnosticStderrLimit = 32 * 1024
+
+const testAllDiagnosticMaxTraces = 64
+
 const testAllDiagnosticManifestMaxFiles = 256
 
 const testAllDiagnosticManifestMaxPathLength = 512
@@ -43,6 +52,22 @@ var testAllMemoryFuzzExpectedArtifacts = []string{
 	"memory-fuzz-tier1/memory-fuzz-oracle.json",
 	"memory-fuzz-tier1/summary.md",
 	"memory-fuzz-tier1/summary.json",
+}
+
+var testAllInvocationCounter atomic.Uint64
+
+type testAllRunObservation struct {
+	Root       string
+	WorkingDir string
+	Mode       string
+	ReportDir  string
+	Args       []string
+	Stdout     []byte
+	Stderr     []byte
+	Combined   []byte
+	Err        error
+	Summary    *testAllSummary
+	Evidence   string
 }
 
 func hasTestAllStep(summary testAllSummary, name string) bool {
@@ -80,8 +105,16 @@ func readReleaseV06GateScript(t *testing.T) ([]byte, error) {
 
 func runTestAll(t *testing.T, root string, env []string, args ...string) ([]byte, error) {
 	t.Helper()
-	cmd := newTestAllCommand(t, root, root, "scripts/ci/test-all.sh", env, args...)
-	return cmd.CombinedOutput()
+	obs := executeObservedTestAll(
+		t,
+		root,
+		root,
+		"scripts/ci/test-all.sh",
+		env,
+		false,
+		args...,
+	)
+	return obs.Combined, obs.Err
 }
 
 func runTestAllSplit(
@@ -91,13 +124,16 @@ func runTestAllSplit(
 	args ...string,
 ) ([]byte, []byte, error) {
 	t.Helper()
-	cmd := newTestAllCommand(t, root, root, "scripts/ci/test-all.sh", env, args...)
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-	return stdout.Bytes(), stderr.Bytes(), err
+	obs := executeObservedTestAll(
+		t,
+		root,
+		root,
+		"scripts/ci/test-all.sh",
+		env,
+		true,
+		args...,
+	)
+	return obs.Stdout, obs.Stderr, obs.Err
 }
 
 func runTestAllFromWorkingDir(
@@ -109,8 +145,280 @@ func runTestAllFromWorkingDir(
 ) ([]byte, error) {
 	t.Helper()
 	script := filepath.Join(root, "scripts", "ci", "test-all.sh")
-	cmd := newTestAllCommand(t, root, workingDir, script, env, args...)
-	return cmd.CombinedOutput()
+	obs := executeObservedTestAll(t, root, workingDir, script, env, false, args...)
+	return obs.Combined, obs.Err
+}
+
+func executeObservedTestAll(
+	t *testing.T,
+	root string,
+	workingDir string,
+	script string,
+	env []string,
+	split bool,
+	args ...string,
+) testAllRunObservation {
+	t.Helper()
+	cmdEnv := testAllHermeticEnv(t, root, env)
+	return executeObservedTestAllWithEnv(t, root, workingDir, script, cmdEnv, split, args...)
+}
+
+func executeObservedTestAllWithEnv(
+	t *testing.T,
+	root string,
+	workingDir string,
+	script string,
+	cmdEnv []string,
+	split bool,
+	args ...string,
+) testAllRunObservation {
+	t.Helper()
+	prepareTestAllInvocationTrace(t, root)
+	cmd := newTestAllCommandWithEnv(t, workingDir, script, cmdEnv, args...)
+	if split {
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+		err := cmd.Run()
+		return observeTestAllInvocation(
+			t,
+			root,
+			workingDir,
+			args,
+			append([]byte{}, stdout.Bytes()...),
+			append([]byte{}, stderr.Bytes()...),
+			nil,
+			err,
+		)
+	}
+	combined, err := cmd.CombinedOutput()
+	return observeTestAllInvocation(
+		t,
+		root,
+		workingDir,
+		args,
+		nil,
+		nil,
+		append([]byte{}, combined...),
+		err,
+	)
+}
+
+func prepareTestAllInvocationTrace(t *testing.T, root string) string {
+	t.Helper()
+	traceDir := filepath.Join(root, ".test-all-trace")
+	if err := os.RemoveAll(traceDir); err != nil {
+		t.Fatalf("reset test_all fake-go trace directory %s: %v", traceDir, err)
+	}
+	if err := os.MkdirAll(traceDir, 0o755); err != nil {
+		t.Fatalf("create test_all fake-go trace directory %s: %v", traceDir, err)
+	}
+	return traceDir
+}
+
+func observeTestAllInvocation(
+	t *testing.T,
+	root string,
+	workingDir string,
+	args []string,
+	stdout []byte,
+	stderr []byte,
+	combined []byte,
+	runErr error,
+) testAllRunObservation {
+	t.Helper()
+	invocationID := testAllInvocationCounter.Add(1)
+	mode, reportDir := parseTestAllInvocation(args)
+	rawSummary := combined
+	if combined == nil {
+		rawSummary = stdout
+	}
+
+	summaryDecodeStatus := "empty"
+	summaryDecodeError := ""
+	var summary *testAllSummary
+	if len(rawSummary) > 0 {
+		var decoded testAllSummary
+		if err := json.Unmarshal(rawSummary, &decoded); err != nil {
+			summaryDecodeStatus = "failed"
+			summaryDecodeError = err.Error()
+		} else {
+			summaryDecodeStatus = "ok"
+			summary = &decoded
+		}
+	}
+
+	requiresEvidence := runErr != nil
+	if summary != nil && (summary.Status != "pass" || summary.FailedCount != 0) {
+		requiresEvidence = true
+	}
+
+	obs := testAllRunObservation{
+		Root:       root,
+		WorkingDir: workingDir,
+		Mode:       mode,
+		ReportDir:  reportDir,
+		Args:       append([]string(nil), args...),
+		Stdout:     append([]byte(nil), stdout...),
+		Stderr:     append([]byte(nil), stderr...),
+		Combined:   append([]byte(nil), combined...),
+		Err:        runErr,
+		Summary:    summary,
+	}
+	if requiresEvidence {
+		obs.Evidence = buildTestAllRunnerEvidence(
+			t,
+			invocationID,
+			obs,
+			rawSummary,
+			summaryDecodeStatus,
+			summaryDecodeError,
+		)
+		t.Logf("\n%s", obs.Evidence)
+	}
+	return obs
+}
+
+func parseTestAllInvocation(args []string) (mode string, reportDir string) {
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		switch arg {
+		case "--quick":
+			mode = "quick"
+		case "--full":
+			mode = "full"
+		case "--stabilization":
+			mode = "stabilization"
+		case "--report-dir":
+			if i+1 < len(args) {
+				reportDir = args[i+1]
+				i++
+			}
+		default:
+			if value, ok := strings.CutPrefix(arg, "--report-dir="); ok {
+				reportDir = value
+			}
+		}
+	}
+	return mode, reportDir
+}
+
+func buildTestAllRunnerEvidence(
+	t *testing.T,
+	invocationID uint64,
+	obs testAllRunObservation,
+	rawSummary []byte,
+	summaryDecodeStatus string,
+	summaryDecodeError string,
+) string {
+	t.Helper()
+	var out strings.Builder
+	out.WriteString("test_all_runner_observation\n")
+	fmt.Fprintf(&out, "test_all_invocation_id=%d\n", invocationID)
+	fmt.Fprintf(&out, "test_all_mode=%s\n", diagnosticValue(obs.Mode, "unspecified"))
+	fmt.Fprintf(&out, "working_dir_relative=%s\n", diagnosticRelativePath(obs.Root, obs.WorkingDir))
+	fmt.Fprintf(&out, "report_dir_relative=%s\n", diagnosticRelativePath(obs.Root, obs.ReportDir))
+	fmt.Fprintf(&out, "run_error=%s\n", diagnosticError(obs.Root, obs.Err))
+	fmt.Fprintf(&out, "summary_decode_status=%s\n", summaryDecodeStatus)
+	if summaryDecodeError != "" {
+		fmt.Fprintf(&out, "summary_decode_error=%s\n", redactTestAllDiagnostic(obs.Root, summaryDecodeError))
+	}
+	if obs.Summary == nil {
+		out.WriteString("summary_status=<unknown>\n")
+		out.WriteString("summary_failed_count=<unknown>\n")
+	} else {
+		fmt.Fprintf(&out, "summary_status=%s\n", obs.Summary.Status)
+		fmt.Fprintf(&out, "summary_failed_count=%d\n", obs.Summary.FailedCount)
+	}
+	if obs.Combined == nil {
+		appendDiagnosticBytePreview(&out, obs.Root, "split_stderr_preview", obs.Stderr, testAllDiagnosticStderrLimit)
+	} else if summaryDecodeStatus == "failed" {
+		appendDiagnosticBytePreview(&out, obs.Root, "combined_output_preview", rawSummary, testAllDiagnosticStderrLimit)
+	}
+	out.WriteString(collectUnexpectedTestAllFailureForMode(
+		t,
+		obs.Root,
+		obs.ReportDir,
+		rawSummary,
+		obs.Mode,
+	))
+	return boundTestAllDiagnosticBundle(out.String())
+}
+
+func diagnosticValue(value string, fallback string) string {
+	if value == "" {
+		return fallback
+	}
+	return value
+}
+
+func diagnosticError(root string, err error) string {
+	if err == nil {
+		return "<nil>"
+	}
+	return redactTestAllDiagnostic(root, err.Error())
+}
+
+func diagnosticRelativePath(root string, path string) string {
+	if path == "" {
+		return "<empty>"
+	}
+	absRoot, err := filepath.Abs(root)
+	if err != nil {
+		return "<unresolved>"
+	}
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return "<unresolved>"
+	}
+	rel, err := filepath.Rel(absRoot, absPath)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return "<outside-fake-repo>"
+	}
+	return filepath.ToSlash(filepath.Clean(rel))
+}
+
+func appendDiagnosticBytePreview(
+	out *strings.Builder,
+	root string,
+	label string,
+	raw []byte,
+	limit int64,
+) {
+	hash := sha256.Sum256(raw)
+	fmt.Fprintf(out, "%s_bytes=%d\n", label, len(raw))
+	fmt.Fprintf(out, "%s_sha256=%x\n", label, hash[:])
+	out.WriteString(label)
+	out.WriteString(":\n")
+	preview := raw
+	truncated := int64(len(preview)) > limit
+	if truncated {
+		preview = preview[:limit]
+	}
+	if len(preview) == 0 {
+		out.WriteString("  <empty>\n")
+	} else {
+		out.WriteString(indentDiagnostic(redactTestAllDiagnostic(root, string(preview)), "  "))
+		if preview[len(preview)-1] != '\n' {
+			out.WriteByte('\n')
+		}
+	}
+	if truncated {
+		fmt.Fprintf(out, "%s_truncated=true\n", label)
+	}
+}
+
+func boundTestAllDiagnosticBundle(input string) string {
+	if len(input) <= testAllDiagnosticBundleLimit {
+		return input
+	}
+	const marker = "\ndiagnostics_truncated=true\n"
+	limit := testAllDiagnosticBundleLimit - len(marker)
+	if limit < 0 {
+		return marker
+	}
+	return input[:limit] + marker
 }
 
 func newTestAllCommand(
@@ -122,13 +430,30 @@ func newTestAllCommand(
 	args ...string,
 ) *exec.Cmd {
 	t.Helper()
+	return newTestAllCommandWithEnv(
+		t,
+		workingDir,
+		script,
+		testAllHermeticEnv(t, root, env),
+		args...,
+	)
+}
+
+func newTestAllCommandWithEnv(
+	t *testing.T,
+	workingDir string,
+	script string,
+	cmdEnv []string,
+	args ...string,
+) *exec.Cmd {
+	t.Helper()
 	bashPath, err := exec.LookPath("bash")
 	if err != nil {
 		t.Fatalf("find bash: %v", err)
 	}
 	cmd := exec.Command(bashPath, append([]string{script}, args...)...)
 	cmd.Dir = workingDir
-	cmd.Env = testAllHermeticEnv(t, root, env)
+	cmd.Env = cmdEnv
 	return cmd
 }
 
@@ -404,9 +729,13 @@ func appendFakeGoTraceDiagnostics(t *testing.T, out *strings.Builder, root strin
 	}
 	sort.Strings(names)
 	fmt.Fprintf(out, "fake_go_trace_count=%d\n", len(names))
+	if len(names) > testAllDiagnosticMaxTraces {
+		names = names[:testAllDiagnosticMaxTraces]
+		out.WriteString("fake_go_trace_truncated=true\n")
+	}
 	for _, name := range names {
 		path := filepath.Join(traceDir, name)
-		content, sha, truncated, err := readDiagnosticFilePreview(path, testAllDiagnosticLogLimit)
+		content, sha, truncated, err := readDiagnosticFilePreview(path, testAllDiagnosticTraceLimit)
 		out.WriteString("fake_go_trace:\n")
 		fmt.Fprintf(out, "  file=%s\n", name)
 		if err != nil {
@@ -427,6 +756,11 @@ func appendFakeGoTraceDiagnostics(t *testing.T, out *strings.Builder, root strin
 
 func appendReportArtifactManifest(out *strings.Builder, root string, reportDir string) {
 	out.WriteString("report_artifact_manifest:\n")
+	if reportDir == "" {
+		out.WriteString("  status=unavailable: report_dir_missing\n")
+		appendMemoryFuzzExpectedArtifactManifest(out, root, reportDir)
+		return
+	}
 	absReportDir, err := filepath.Abs(reportDir)
 	if err != nil {
 		fmt.Fprintf(out, "  status=cannot_resolve_report_dir: %s\n", redactTestAllDiagnostic(root, err.Error()))
@@ -515,6 +849,10 @@ func appendReportArtifactManifest(out *strings.Builder, root string, reportDir s
 func appendMemoryFuzzExpectedArtifactManifest(out *strings.Builder, root string, reportDir string) {
 	out.WriteString("memory_fuzz_expected_artifacts:\n")
 	for _, rel := range testAllMemoryFuzzExpectedArtifacts {
+		if reportDir == "" {
+			fmt.Fprintf(out, "  path=%s present=false report_dir_missing=true\n", rel)
+			continue
+		}
 		path := filepath.Join(reportDir, filepath.FromSlash(rel))
 		info, err := os.Lstat(path)
 		if os.IsNotExist(err) {

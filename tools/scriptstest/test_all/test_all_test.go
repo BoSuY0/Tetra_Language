@@ -2,7 +2,6 @@ package testall
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -564,9 +563,8 @@ func TestTestAllWorkflowLivesInCIEntryPoint(t *testing.T) {
 	}
 	ciText := string(ciRaw)
 	assertNoLegacyMention(t, ciText, "scripts/test_all.sh", "scripts/ci/test-all.sh help")
-	cmd := exec.Command("bash", ciPath, "--help")
-	cmd.Dir = root
-	helpOut, err := cmd.CombinedOutput()
+	helpRoot := testAllFakeRepo(t, false)
+	helpOut, err := runTestAll(t, helpRoot, nil, "--help")
 	if err != nil {
 		t.Fatalf("scripts/ci/test-all.sh --help failed: %v\n%s", err, helpOut)
 	}
@@ -586,9 +584,7 @@ func TestTestAllWorkflowLivesInCIEntryPoint(t *testing.T) {
 	}
 	reportParent := t.TempDir()
 	reportDir := filepath.Join(reportParent, "test-all-help-report")
-	cmd = exec.Command("bash", ciPath, "--report-dir", reportDir, "--help")
-	cmd.Dir = root
-	helpOut, err = cmd.CombinedOutput()
+	helpOut, err = runTestAll(t, helpRoot, nil, "--report-dir", reportDir, "--help")
 	if err != nil {
 		t.Fatalf("scripts/ci/test-all.sh --report-dir DIR --help failed: %v\n%s", err, helpOut)
 	}
