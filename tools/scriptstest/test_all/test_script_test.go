@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -59,11 +60,13 @@ exit 0
 		t.Fatal(err)
 	}
 
-	cmd := exec.Command("bash", "scripts/ci/test.sh", "--frontend-focused")
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(),
-		"PATH="+binDir+string(os.PathListSeparator)+os.Getenv("PATH"),
-		"TETRA_TEST_GO_LOG="+goLog,
+	cmd := newTestAllCommand(
+		t,
+		root,
+		root,
+		"scripts/ci/test.sh",
+		[]string{"TETRA_TEST_GO_LOG=" + goLog},
+		"--frontend-focused",
 	)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -191,9 +194,7 @@ esac
 		t.Fatal(err)
 	}
 
-	cmd := exec.Command("bash", "scripts/ci/test.sh", "--frontend-focused")
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "PATH="+binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	cmd := newTestAllCommand(t, root, root, "scripts/ci/test.sh", nil, "--frontend-focused")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("frontend-focused target failed: %v\n%s", err, out)
@@ -277,11 +278,13 @@ exit 0
 		t.Fatal(err)
 	}
 
-	cmd := exec.Command("bash", "scripts/ci/test.sh", "--frontend-focused")
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(),
-		"PATH="+binDir+string(os.PathListSeparator)+os.Getenv("PATH"),
-		"TETRA_TEST_GOFMT_LOG="+gofmtLog,
+	cmd := newTestAllCommand(
+		t,
+		root,
+		root,
+		"scripts/ci/test.sh",
+		[]string{"TETRA_TEST_GOFMT_LOG=" + gofmtLog},
+		"--frontend-focused",
 	)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -352,11 +355,42 @@ func Test_cheatsheet_docs_example_eco_pack_unpack(t *testing.T) {
 	}
 	cmd := exec.Command("bash", script)
 	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "TMPDIR="+t.TempDir())
+	cmd.Env = repoDocsExampleEnv(t, root)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("cheatsheet eco pack/unpack docs example failed: %v\n%s", err, out)
 	}
+}
+
+func repoDocsExampleEnv(t *testing.T, root string) []string {
+	t.Helper()
+	tmp := t.TempDir()
+	env := map[string]string{
+		"GOENV":       "off",
+		"GOFLAGS":     "",
+		"GOTELEMETRY": "off",
+		"GOWORK":      filepath.Join(root, "go.work"),
+		"LANG":        "C",
+		"LC_ALL":      "C",
+		"PATH":        os.Getenv("PATH"),
+		"TEMP":        tmp,
+		"TMP":         tmp,
+		"TMPDIR":      tmp,
+		"TZ":          "UTC",
+	}
+	if home := os.Getenv("HOME"); home != "" {
+		env["HOME"] = home
+	}
+	keys := make([]string, 0, len(env))
+	for key := range env {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	out := make([]string, 0, len(keys))
+	for _, key := range keys {
+		out = append(out, key+"="+env[key])
+	}
+	return out
 }
 
 func Test_stdlib_standard_library_guide_tetra_doc_examples_invariant(t *testing.T) {

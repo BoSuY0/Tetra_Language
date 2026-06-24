@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -63,13 +64,7 @@ func readReleaseV06GateScript(t *testing.T) ([]byte, error) {
 
 func runTestAll(t *testing.T, root string, env []string, args ...string) ([]byte, error) {
 	t.Helper()
-	cmd := exec.Command("bash", append([]string{"scripts/ci/test-all.sh"}, args...)...)
-	cmd.Dir = root
-	cmd.Env = append(filteredTestAllEnv(), env...)
-	cmd.Env = append(
-		cmd.Env,
-		"PATH="+filepath.Join(root, "bin")+string(os.PathListSeparator)+os.Getenv("PATH"),
-	)
+	cmd := newTestAllCommand(t, root, root, "scripts/ci/test-all.sh", env, args...)
 	return cmd.CombinedOutput()
 }
 
@@ -80,13 +75,7 @@ func runTestAllSplit(
 	args ...string,
 ) ([]byte, []byte, error) {
 	t.Helper()
-	cmd := exec.Command("bash", append([]string{"scripts/ci/test-all.sh"}, args...)...)
-	cmd.Dir = root
-	cmd.Env = append(filteredTestAllEnv(), env...)
-	cmd.Env = append(
-		cmd.Env,
-		"PATH="+filepath.Join(root, "bin")+string(os.PathListSeparator)+os.Getenv("PATH"),
-	)
+	cmd := newTestAllCommand(t, root, root, "scripts/ci/test-all.sh", env, args...)
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -104,29 +93,140 @@ func runTestAllFromWorkingDir(
 ) ([]byte, error) {
 	t.Helper()
 	script := filepath.Join(root, "scripts", "ci", "test-all.sh")
-	cmd := exec.Command("bash", append([]string{script}, args...)...)
-	cmd.Dir = workingDir
-	cmd.Env = append(filteredTestAllEnv(), env...)
-	cmd.Env = append(
-		cmd.Env,
-		"PATH="+filepath.Join(root, "bin")+string(os.PathListSeparator)+os.Getenv("PATH"),
-	)
+	cmd := newTestAllCommand(t, root, workingDir, script, env, args...)
 	return cmd.CombinedOutput()
 }
 
-func filteredTestAllEnv() []string {
-	env := os.Environ()
-	out := make([]string, 0, len(env))
-	for _, entry := range env {
-		key, _, ok := strings.Cut(entry, "=")
-		if !ok {
-			out = append(out, entry)
-			continue
+func newTestAllCommand(
+	t *testing.T,
+	root string,
+	workingDir string,
+	script string,
+	env []string,
+	args ...string,
+) *exec.Cmd {
+	t.Helper()
+	bashPath, err := exec.LookPath("bash")
+	if err != nil {
+		t.Fatalf("find bash: %v", err)
+	}
+	cmd := exec.Command(bashPath, append([]string{script}, args...)...)
+	cmd.Dir = workingDir
+	cmd.Env = testAllHermeticEnv(t, root, env)
+	return cmd
+}
+
+var testAllAllowedExplicitEnvKeys = map[string]struct{}{
+	"TETRA_FAIL_FMT":                           {},
+	"TETRA_FAIL_SAFETY_READINESS":              {},
+	"TETRA_FAIL_SUMMARY_VALIDATOR":             {},
+	"TETRA_FAKE_FORBID_TARGET_HOST_REPORT_ENV": {},
+	"TETRA_FAKE_GO_LOG":                        {},
+	"TETRA_FAKE_SKIP_BOUNDS_PROOF_LIST":        {},
+	"TETRA_FAKE_SKIP_HOST_LEAK_LIST":           {},
+	"TETRA_FAKE_SKIP_MEMORY_FUZZ_ORACLE_LIST":  {},
+	"TETRA_FAKE_SKIP_RAM_CONTRACT_LIST":        {},
+	"TETRA_FAKE_SKIP_UNSAFE_PROMOTION_LIST":    {},
+	"TETRA_FAKE_SKIP_WEB_UI_SMOKE_REPORT":      {},
+	"TETRA_FAKE_SMOKE_REPORT_FAIL":             {},
+	"TETRA_FAKE_TETRA_VERSION":                 {},
+	"TETRA_FAKE_ZERO_DOCTOR_REPORT":            {},
+	"TETRA_TEST_ALL_RELEASE_ARTIFACT":          {},
+	"TETRA_TEST_ALL_RELEASE_VERSION":           {},
+	"TETRA_TEST_GO_LOG":                        {},
+	"TETRA_TEST_GOFMT_LOG":                     {},
+}
+
+var testAllProtectedEnvKeys = map[string]struct{}{
+	"BASH_ENV":       {},
+	"ENV":            {},
+	"GOENV":          {},
+	"GOFLAGS":        {},
+	"GOCACHE":        {},
+	"GOTMPDIR":       {},
+	"GOWORK":         {},
+	"HOME":           {},
+	"PATH":           {},
+	"TEMP":           {},
+	"TMP":            {},
+	"TMPDIR":         {},
+	"XDG_CACHE_HOME": {},
+}
+
+func testAllHermeticEnv(t *testing.T, repoRoot string, explicit []string) []string {
+	t.Helper()
+	runRoot := t.TempDir()
+	dirs := map[string]string{
+		"HOME":           filepath.Join(runRoot, "home"),
+		"XDG_CACHE_HOME": filepath.Join(runRoot, "xdg-cache"),
+		"GOCACHE":        filepath.Join(runRoot, "go-cache"),
+		"GOTMPDIR":       filepath.Join(runRoot, "go-tmp"),
+		"TMPDIR":         filepath.Join(runRoot, "tmp"),
+		"TMP":            filepath.Join(runRoot, "tmp"),
+		"TEMP":           filepath.Join(runRoot, "tmp"),
+	}
+	for _, dir := range dirs {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatalf("create hermetic env dir %s: %v", dir, err)
 		}
-		if strings.HasPrefix(key, "TETRA_FAKE_") || strings.HasPrefix(key, "TETRA_FAIL_") {
-			continue
+	}
+
+	pathValue := filepath.Join(repoRoot, "bin")
+	if hostPath := os.Getenv("PATH"); hostPath != "" {
+		pathValue += string(os.PathListSeparator) + hostPath
+	}
+	env := map[string]string{
+		"GOENV":          "off",
+		"GOFLAGS":        "",
+		"GOTELEMETRY":    "off",
+		"GOWORK":         "off",
+		"HOME":           dirs["HOME"],
+		"LANG":           "C",
+		"LC_ALL":         "C",
+		"PATH":           pathValue,
+		"TEMP":           dirs["TEMP"],
+		"TMP":            dirs["TMP"],
+		"TMPDIR":         dirs["TMPDIR"],
+		"TZ":             "UTC",
+		"XDG_CACHE_HOME": dirs["XDG_CACHE_HOME"],
+		"GOCACHE":        dirs["GOCACHE"],
+		"GOTMPDIR":       dirs["GOTMPDIR"],
+	}
+	if runtime.GOOS == "windows" {
+		for _, key := range []string{"SystemRoot", "ComSpec", "PATHEXT"} {
+			if value := os.Getenv(key); value != "" {
+				env[key] = value
+			}
 		}
-		out = append(out, entry)
+	}
+
+	seenExplicit := map[string]struct{}{}
+	for _, entry := range explicit {
+		key, value, ok := strings.Cut(entry, "=")
+		if !ok || key == "" {
+			t.Fatalf("malformed test_all environment entry %q; want KEY=VALUE", entry)
+		}
+		if _, dup := seenExplicit[key]; dup {
+			t.Fatalf("duplicate test_all explicit environment key %q", key)
+		}
+		seenExplicit[key] = struct{}{}
+		if _, protected := testAllProtectedEnvKeys[key]; protected {
+			t.Fatalf("test_all explicit environment key %q is protected", key)
+		}
+		if _, allowed := testAllAllowedExplicitEnvKeys[key]; !allowed {
+			t.Fatalf("test_all explicit environment key %q is not in the allowlist", key)
+		}
+		env[key] = value
+	}
+
+	keys := make([]string, 0, len(env))
+	for key := range env {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	out := make([]string, 0, len(keys))
+	for _, key := range keys {
+		out = append(out, key+"="+env[key])
 	}
 	return out
 }

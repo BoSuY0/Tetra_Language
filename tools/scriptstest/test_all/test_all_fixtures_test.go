@@ -155,6 +155,13 @@ set -euo pipefail
 if [[ -n "${TETRA_FAKE_GO_LOG:-}" ]]; then
   printf '%s\n' "$*" >>"$TETRA_FAKE_GO_LOG"
 fi
+if [[ "${TETRA_FAKE_FORBID_TARGET_HOST_REPORT_ENV:-}" == "1" ]]; then
+  if [[ -n "${TETRA_WINDOWS_UI_RUNTIME_REPORT:-}" ||
+    -n "${TETRA_MACOS_UI_RUNTIME_REPORT:-}" ]]; then
+    echo "target-host report env leaked into fake go" >&2
+    exit 44
+  fi
+fi
 emit_tetra_api_metadata() {
   printf '%s' '<!-- tetra-api-metadata: {"schema":"tetra.api.v1alpha1",'
   printf '%s' '"api_hash":"sha256:ede46e5e34948c25f6ec38b0b963a2d8d42f5aa'
