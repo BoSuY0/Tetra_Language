@@ -923,7 +923,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				if err != nil {
 					return nil, err
 				}
-				checked.FuncSigs[fullName] = FuncSig{
+				sig, err := buildGenericFuncSig(fullName, funcSigSpec{
 					Generic:                      true,
 					Public:                       declarationIsPublic(file, fn.Public),
 					HasNoAlloc:                   policy.hasNoAlloc,
@@ -951,7 +951,11 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 					ReturnResourceParam:          regionNone,
 					ReturnResourcePath:           "",
 					Effects:                      effects,
+				}, types)
+				if err != nil {
+					return nil, err
 				}
+				checked.FuncSigs[fullName] = sig
 				continue
 			}
 			retName, err := resolveTypeName(&fn.ReturnType, module, imports)
@@ -1065,7 +1069,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			if err != nil {
 				return nil, err
 			}
-			checked.FuncSigs[fullName] = FuncSig{
+			sig, err := buildDeclaredFuncSig(fullName, funcSigSpec{
 				Public:                        declarationIsPublic(file, fn.Public),
 				HasNoAlloc:                    policy.hasNoAlloc,
 				HasNoBlock:                    policy.hasNoBlock,
@@ -1099,7 +1103,11 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				ReturnResourceParam:           initialReturnResourceParam(retName, types),
 				ReturnResourcePath:            "",
 				Effects:                       effects,
+			}, types)
+			if err != nil {
+				return nil, err
 			}
+			checked.FuncSigs[fullName] = sig
 		}
 	}
 
@@ -5946,6 +5954,7 @@ func resolveCallSigForInference(
 	module string,
 	imports map[string]string,
 ) (FuncSig, error) {
+	var zero FuncSig
 	resolved := ""
 	if builtin, ok := ResolveBuiltinAlias(call.Name); ok {
 		resolved = builtin
@@ -5954,16 +5963,16 @@ func resolveCallSigForInference(
 	} else {
 		name, err := resolveKnownCallName(call.Name, funcs, module, imports, call.At)
 		if err != nil {
-			return FuncSig{}, err
+			return zero, err
 		}
 		resolved = name
 	}
 	sig, ok := funcs[resolved]
 	if !ok {
-		return FuncSig{}, fmt.Errorf("unknown function '%s'", resolved)
+		return zero, fmt.Errorf("unknown function '%s'", resolved)
 	}
 	if sig.Generic {
-		return FuncSig{}, fmt.Errorf(
+		return zero, fmt.Errorf(
 			"generic function '%s' could not be monomorphized; use inferable value arguments",
 			call.Name,
 		)
@@ -7117,13 +7126,18 @@ func validateFunctionTypeNamedSymbolBinding(
 			return "", unsupportedFunctionTypedLocalInitializerSourceError(init.At, name)
 		}
 		if localInfo.FunctionValue == "" {
-			validationSig := FuncSig{
-				ParamTypes:      append([]string(nil), localInfo.FunctionParamTypes...),
-				ParamOwnership:  append([]string(nil), localInfo.FunctionParamOwnership...),
-				ReturnType:      localInfo.FunctionReturnType,
-				ReturnOwnership: localInfo.FunctionReturnOwnership,
-				ThrowsType:      localInfo.FunctionThrowsType,
-				Effects:         append([]string(nil), localInfo.FunctionEffects...),
+			validationSig, err := buildInterfaceFuncSig(name, funcSigSpec{
+				ParamTypes:          append([]string(nil), localInfo.FunctionParamTypes...),
+				ParamOwnership:      append([]string(nil), localInfo.FunctionParamOwnership...),
+				ReturnType:          localInfo.FunctionReturnType,
+				ReturnOwnership:     localInfo.FunctionReturnOwnership,
+				ThrowsType:          localInfo.FunctionThrowsType,
+				ReturnRegionParam:   regionNone,
+				ReturnResourceParam: regionNone,
+				Effects:             append([]string(nil), localInfo.FunctionEffects...),
+			}, types)
+			if err != nil {
+				return "", err
 			}
 			if err := validateFunctionTypeSymbolSignature(
 				name,
@@ -7486,10 +7500,14 @@ func validateFunctionTypedAssignmentValue(
 		if ok && fieldInfo.FunctionValue == "" && functionFieldInfoHasTargetSet(
 			fieldInfo,
 		) && allowCapturedLocalStorage {
+			fieldSig, err := functionFieldInfoSig(fieldInfo)
+			if err != nil {
+				return err
+			}
 			return validateFunctionInfoAssignable(
 				targetName,
 				targetInfo,
-				functionFieldInfoSig(fieldInfo),
+				fieldSig,
 				v.At,
 			)
 		}
@@ -7505,13 +7523,9 @@ func validateFunctionTypedAssignmentValue(
 			}
 			return unsupportedFunctionTypedAssignmentSourceError(v.At, targetName)
 		}
-		fieldSig := FuncSig{
-			ParamTypes:      append([]string(nil), fieldInfo.FunctionParamTypes...),
-			ParamOwnership:  append([]string(nil), fieldInfo.FunctionParamOwnership...),
-			ReturnType:      fieldInfo.FunctionReturnType,
-			ReturnOwnership: fieldInfo.FunctionReturnOwnership,
-			ThrowsType:      fieldInfo.FunctionThrowsType,
-			Effects:         append([]string(nil), fieldInfo.FunctionEffects...),
+		fieldSig, err := functionFieldInfoSig(fieldInfo)
+		if err != nil {
+			return err
 		}
 		return validateFunctionInfoAssignable(targetName, targetInfo, fieldSig, v.At)
 	}
@@ -7548,26 +7562,36 @@ func validateFunctionTypedAssignmentValue(
 		}
 		if sourceInfo.FunctionTypeValue && sourceInfo.FunctionValue == "" &&
 			allowCapturedLocalStorage {
-			sourceSig := FuncSig{
-				ParamTypes:      append([]string(nil), sourceInfo.FunctionParamTypes...),
-				ParamOwnership:  append([]string(nil), sourceInfo.FunctionParamOwnership...),
-				ReturnType:      sourceInfo.FunctionReturnType,
-				ReturnOwnership: sourceInfo.FunctionReturnOwnership,
-				ThrowsType:      sourceInfo.FunctionThrowsType,
-				Effects:         append([]string(nil), sourceInfo.FunctionEffects...),
+			sourceSig, err := buildInterfaceFuncSig(targetName, funcSigSpec{
+				ParamTypes:          append([]string(nil), sourceInfo.FunctionParamTypes...),
+				ParamOwnership:      append([]string(nil), sourceInfo.FunctionParamOwnership...),
+				ReturnType:          sourceInfo.FunctionReturnType,
+				ReturnOwnership:     sourceInfo.FunctionReturnOwnership,
+				ThrowsType:          sourceInfo.FunctionThrowsType,
+				ReturnRegionParam:   regionNone,
+				ReturnResourceParam: regionNone,
+				Effects:             append([]string(nil), sourceInfo.FunctionEffects...),
+			}, types)
+			if err != nil {
+				return err
 			}
 			return validateFunctionInfoAssignable(targetName, targetInfo, sourceSig, id.At)
 		}
 		if !sourceInfo.FunctionTypeValue || sourceInfo.FunctionValue == "" {
 			return unsupportedFunctionTypedAssignmentSourceError(id.At, targetName)
 		}
-		sourceSig := FuncSig{
-			ParamTypes:      append([]string(nil), sourceInfo.FunctionParamTypes...),
-			ParamOwnership:  append([]string(nil), sourceInfo.FunctionParamOwnership...),
-			ReturnType:      sourceInfo.FunctionReturnType,
-			ReturnOwnership: sourceInfo.FunctionReturnOwnership,
-			ThrowsType:      sourceInfo.FunctionThrowsType,
-			Effects:         append([]string(nil), sourceInfo.FunctionEffects...),
+		sourceSig, err := buildInterfaceFuncSig(targetName, funcSigSpec{
+			ParamTypes:          append([]string(nil), sourceInfo.FunctionParamTypes...),
+			ParamOwnership:      append([]string(nil), sourceInfo.FunctionParamOwnership...),
+			ReturnType:          sourceInfo.FunctionReturnType,
+			ReturnOwnership:     sourceInfo.FunctionReturnOwnership,
+			ThrowsType:          sourceInfo.FunctionThrowsType,
+			ReturnRegionParam:   regionNone,
+			ReturnResourceParam: regionNone,
+			Effects:             append([]string(nil), sourceInfo.FunctionEffects...),
+		}, types)
+		if err != nil {
+			return err
 		}
 		return validateFunctionInfoAssignable(targetName, targetInfo, sourceSig, id.At)
 	}
@@ -8608,36 +8632,42 @@ func validateFunctionTypedClosureAssignment(
 			len(explicitParams),
 		)
 	}
-	closureSig := FuncSig{
-		ParamTypes:      make([]string, 0, len(explicitParams)),
-		ParamOwnership:  paramDeclOwnership(explicitParams),
-		ReturnType:      "",
-		ReturnOwnership: closure.Decl.ReturnOwnership,
-	}
+	paramTypes := make([]string, 0, len(explicitParams))
 	for _, param := range explicitParams {
 		typeName, err := resolveTypeName(&param.Type, module, imports)
 		if err != nil {
 			return err
 		}
-		closureSig.ParamTypes = append(closureSig.ParamTypes, typeName)
+		paramTypes = append(paramTypes, typeName)
 	}
 	returnType, err := resolveTypeName(&closure.Decl.ReturnType, module, imports)
 	if err != nil {
 		return err
 	}
-	closureSig.ReturnType = returnType
+	throwsType := ""
 	if closure.Decl.HasThrows {
-		throwsType, err := resolveTypeName(&closure.Decl.Throws, module, imports)
+		throwsType, err = resolveTypeName(&closure.Decl.Throws, module, imports)
 		if err != nil {
 			return err
 		}
-		closureSig.ThrowsType = throwsType
 	}
 	closureEffects, err := normalizeEffects(closure.Decl.Uses, closure.Decl.Pos)
 	if err != nil {
 		return err
 	}
-	closureSig.Effects = closureEffects
+	closureSig, err := buildInterfaceFuncSig(targetName, funcSigSpec{
+		ParamTypes:          paramTypes,
+		ParamOwnership:      paramDeclOwnership(explicitParams),
+		ReturnType:          returnType,
+		ReturnOwnership:     closure.Decl.ReturnOwnership,
+		ThrowsType:          throwsType,
+		ReturnRegionParam:   regionNone,
+		ReturnResourceParam: regionNone,
+		Effects:             closureEffects,
+	}, types)
+	if err != nil {
+		return err
+	}
 	if err := validateFunctionInfoAssignableWithContext(
 		targetName,
 		targetInfo,
@@ -8797,13 +8827,18 @@ func validateFunctionTypedReturnCallAssignment(
 			}
 		}
 	}
-	returnedSig := FuncSig{
-		ParamTypes:      append([]string(nil), callSig.ReturnFunctionParams...),
-		ParamOwnership:  append([]string(nil), callSig.ReturnFunctionParamOwnership...),
-		ReturnType:      callSig.ReturnFunctionReturn,
-		ReturnOwnership: callSig.ReturnFunctionReturnOwnership,
-		ThrowsType:      callSig.ReturnFunctionThrows,
-		Effects:         append([]string(nil), callSig.ReturnFunctionEffects...),
+	returnedSig, err := buildInterfaceFuncSig(targetName, funcSigSpec{
+		ParamTypes:          append([]string(nil), callSig.ReturnFunctionParams...),
+		ParamOwnership:      append([]string(nil), callSig.ReturnFunctionParamOwnership...),
+		ReturnType:          callSig.ReturnFunctionReturn,
+		ReturnOwnership:     callSig.ReturnFunctionReturnOwnership,
+		ThrowsType:          callSig.ReturnFunctionThrows,
+		ReturnRegionParam:   regionNone,
+		ReturnResourceParam: regionNone,
+		Effects:             append([]string(nil), callSig.ReturnFunctionEffects...),
+	}, types)
+	if err != nil {
+		return err
 	}
 	return validateFunctionInfoAssignable(targetName, targetInfo, returnedSig, call.At)
 }
@@ -11361,10 +11396,14 @@ func collectLocals(
 							FunctionThrowsType:      functionThrowsType,
 							FunctionEffects:         append([]string(nil), functionEffects...),
 						}
+						fieldSig, err := functionFieldInfoSig(fieldInfo)
+						if err != nil {
+							return err
+						}
 						if err := validateFunctionInfoAssignable(
 							s.Name,
 							targetInfo,
-							functionFieldInfoSig(fieldInfo),
+							fieldSig,
 							init.At,
 						); err != nil {
 							return err
@@ -11423,10 +11462,14 @@ func collectLocals(
 							s.Name,
 						)
 					}
+					fieldSig, err := functionFieldInfoSig(fieldInfo)
+					if err != nil {
+						return err
+					}
 					if err := validateFunctionTypeSymbolSignature(
 						s.Name,
 						s.Type,
-						functionFieldInfoSig(fieldInfo),
+						fieldSig,
 						module,
 						imports,
 						init.At,
@@ -15649,13 +15692,18 @@ func checkReturnStmt(
 				return unsupportedFunctionValueEscapeError(s.At, id.Name)
 			}
 			if localInfo.FunctionValue == "" {
-				validationSig := FuncSig{
-					ParamTypes:      append([]string(nil), localInfo.FunctionParamTypes...),
-					ParamOwnership:  append([]string(nil), localInfo.FunctionParamOwnership...),
-					ReturnType:      localInfo.FunctionReturnType,
-					ReturnOwnership: localInfo.FunctionReturnOwnership,
-					ThrowsType:      localInfo.FunctionThrowsType,
-					Effects:         append([]string(nil), localInfo.FunctionEffects...),
+				validationSig, err := buildInterfaceFuncSig(id.Name, funcSigSpec{
+					ParamTypes:          append([]string(nil), localInfo.FunctionParamTypes...),
+					ParamOwnership:      append([]string(nil), localInfo.FunctionParamOwnership...),
+					ReturnType:          localInfo.FunctionReturnType,
+					ReturnOwnership:     localInfo.FunctionReturnOwnership,
+					ThrowsType:          localInfo.FunctionThrowsType,
+					ReturnRegionParam:   regionNone,
+					ReturnResourceParam: regionNone,
+					Effects:             append([]string(nil), localInfo.FunctionEffects...),
+				}, types)
+				if err != nil {
+					return err
 				}
 				if err := validateReturnedFunctionSignature(
 					callerSig,
@@ -15814,13 +15862,18 @@ func checkReturnStmt(
 				}
 				return unsupportedFunctionTypedGlobalTargetError(s.At, id.Name)
 			}
-			validationSig := FuncSig{
-				ParamTypes:      append([]string(nil), globalInfo.FunctionParamTypes...),
-				ParamOwnership:  append([]string(nil), globalInfo.FunctionParamOwnership...),
-				ReturnType:      globalInfo.FunctionReturnType,
-				ReturnOwnership: globalInfo.FunctionReturnOwnership,
-				ThrowsType:      globalInfo.FunctionThrowsType,
-				Effects:         append([]string(nil), globalInfo.FunctionEffects...),
+			validationSig, err := buildInterfaceFuncSig(id.Name, funcSigSpec{
+				ParamTypes:          append([]string(nil), globalInfo.FunctionParamTypes...),
+				ParamOwnership:      append([]string(nil), globalInfo.FunctionParamOwnership...),
+				ReturnType:          globalInfo.FunctionReturnType,
+				ReturnOwnership:     globalInfo.FunctionReturnOwnership,
+				ThrowsType:          globalInfo.FunctionThrowsType,
+				ReturnRegionParam:   regionNone,
+				ReturnResourceParam: regionNone,
+				Effects:             append([]string(nil), globalInfo.FunctionEffects...),
+			}, types)
+			if err != nil {
+				return err
 			}
 			if err := validateReturnedFunctionSignature(
 				callerSig,
@@ -15897,9 +15950,13 @@ func checkReturnStmt(
 						s.Value,
 					))
 				}
+				fieldSig, err := functionFieldInfoSig(fieldInfo)
+				if err != nil {
+					return err
+				}
 				if err := validateReturnedFunctionSignature(
 					callerSig,
-					functionFieldInfoSig(fieldInfo),
+					fieldSig,
 					s.At,
 					callbackArgumentName(s.Value),
 				); err != nil {

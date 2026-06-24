@@ -1415,12 +1415,13 @@ var noblockForbiddenCallEffects = semanticspolicy.NoblockForbiddenCallEffects
 var realtimeForbiddenCallEffects = semanticspolicy.RealtimeForbiddenCallEffects
 
 func currentCallerSignature(effects *effectContext, funcs map[string]FuncSig) (FuncSig, bool) {
+	var zero FuncSig
 	if effects == nil || effects.funcName == "" {
-		return FuncSig{}, false
+		return zero, false
 	}
 	sig, ok := funcs[effects.funcName]
 	if !ok {
-		return FuncSig{}, false
+		return zero, false
 	}
 	return sig, true
 }
@@ -1635,12 +1636,18 @@ func resolveCallbackArgumentType(
 		}
 		callbackSig, ok := funcs[closure.Name]
 		if !ok {
-			callbackSig = FuncSig{
-				ParamTypes:     append([]string(nil), targetInfo.FunctionParamTypes...),
-				ParamOwnership: append([]string(nil), targetInfo.FunctionParamOwnership...),
-				ReturnType:     targetInfo.FunctionReturnType,
-				Effects:        append([]string(nil), targetInfo.FunctionEffects...),
+			builtSig, err := buildInterfaceFuncSig(callbackArgumentName(arg), funcSigSpec{
+				ParamTypes:          append([]string(nil), targetInfo.FunctionParamTypes...),
+				ParamOwnership:      append([]string(nil), targetInfo.FunctionParamOwnership...),
+				ReturnType:          targetInfo.FunctionReturnType,
+				ReturnRegionParam:   regionNone,
+				ReturnResourceParam: regionNone,
+				Effects:             append([]string(nil), targetInfo.FunctionEffects...),
+			}, types)
+			if err != nil {
+				return "", "", err
 			}
+			callbackSig = builtSig
 		}
 		if !deferEffectValidation {
 			if err := validateCallbackClauseCompatibility(
@@ -1692,12 +1699,17 @@ func resolveCallbackArgumentType(
 		); err != nil {
 			return "", "", err
 		}
-		returnedSig := FuncSig{
-			ParamTypes:     append([]string(nil), callSig.ReturnFunctionParams...),
-			ParamOwnership: append([]string(nil), callSig.ReturnFunctionParamOwnership...),
-			ReturnType:     callSig.ReturnFunctionReturn,
-			ThrowsType:     callSig.ReturnFunctionThrows,
-			Effects:        append([]string(nil), callSig.ReturnFunctionEffects...),
+		returnedSig, err := buildInterfaceFuncSig(callbackArgumentName(call), funcSigSpec{
+			ParamTypes:          append([]string(nil), callSig.ReturnFunctionParams...),
+			ParamOwnership:      append([]string(nil), callSig.ReturnFunctionParamOwnership...),
+			ReturnType:          callSig.ReturnFunctionReturn,
+			ThrowsType:          callSig.ReturnFunctionThrows,
+			ReturnRegionParam:   regionNone,
+			ReturnResourceParam: regionNone,
+			Effects:             append([]string(nil), callSig.ReturnFunctionEffects...),
+		}, types)
+		if err != nil {
+			return "", "", err
 		}
 		if err := validateCallbackSignature(
 			returnedSig,
@@ -1731,13 +1743,18 @@ func resolveCallbackArgumentType(
 			if err != nil {
 				return "", "", err
 			}
-			callbackSig := FuncSig{
-				ParamTypes:     append([]string(nil), fieldInfo.FunctionParamTypes...),
-				ParamOwnership: append([]string(nil), fieldInfo.FunctionParamOwnership...),
-				ParamSlots:     paramSlots,
-				ReturnType:     fieldInfo.FunctionReturnType,
-				ThrowsType:     fieldInfo.FunctionThrowsType,
-				Effects:        append([]string(nil), fieldInfo.FunctionEffects...),
+			callbackSig, err := buildInterfaceFuncSig(callbackArgumentName(arg), funcSigSpec{
+				ParamTypes:          append([]string(nil), fieldInfo.FunctionParamTypes...),
+				ParamOwnership:      append([]string(nil), fieldInfo.FunctionParamOwnership...),
+				ParamSlots:          paramSlots,
+				ReturnType:          fieldInfo.FunctionReturnType,
+				ThrowsType:          fieldInfo.FunctionThrowsType,
+				ReturnRegionParam:   regionNone,
+				ReturnResourceParam: regionNone,
+				Effects:             append([]string(nil), fieldInfo.FunctionEffects...),
+			}, types)
+			if err != nil {
+				return "", "", err
 			}
 			if err := validateCallbackSignatureForField(
 				callbackSig,
@@ -1915,13 +1932,18 @@ func resolveCallbackArgumentType(
 			if err != nil {
 				return "", "", err
 			}
-			callbackSig := FuncSig{
-				ParamTypes:     append([]string(nil), localInfo.FunctionParamTypes...),
-				ParamOwnership: append([]string(nil), localInfo.FunctionParamOwnership...),
-				ParamSlots:     paramSlots,
-				ReturnType:     localInfo.FunctionReturnType,
-				ThrowsType:     localInfo.FunctionThrowsType,
-				Effects:        append([]string(nil), localInfo.FunctionEffects...),
+			callbackSig, err := buildInterfaceFuncSig(id.Name, funcSigSpec{
+				ParamTypes:          append([]string(nil), localInfo.FunctionParamTypes...),
+				ParamOwnership:      append([]string(nil), localInfo.FunctionParamOwnership...),
+				ParamSlots:          paramSlots,
+				ReturnType:          localInfo.FunctionReturnType,
+				ThrowsType:          localInfo.FunctionThrowsType,
+				ReturnRegionParam:   regionNone,
+				ReturnResourceParam: regionNone,
+				Effects:             append([]string(nil), localInfo.FunctionEffects...),
+			}, types)
+			if err != nil {
+				return "", "", err
 			}
 			if err := validateCallbackSignatureForLocal(
 				callbackSig,
@@ -3611,12 +3633,17 @@ func checkCallExprWithEffects(
 					if err != nil {
 						return "", regionNone, err
 					}
-					declaredSig := FuncSig{
-						ParamTypes:     append([]string(nil), local.FunctionParamTypes...),
-						ParamOwnership: append([]string(nil), local.FunctionParamOwnership...),
-						ParamSlots:     paramSlots,
-						ReturnType:     local.FunctionReturnType,
-						Effects:        append([]string(nil), local.FunctionEffects...),
+					declaredSig, err := buildInterfaceFuncSig(e.Name, funcSigSpec{
+						ParamTypes:          append([]string(nil), local.FunctionParamTypes...),
+						ParamOwnership:      append([]string(nil), local.FunctionParamOwnership...),
+						ParamSlots:          paramSlots,
+						ReturnType:          local.FunctionReturnType,
+						ReturnRegionParam:   regionNone,
+						ReturnResourceParam: regionNone,
+						Effects:             append([]string(nil), local.FunctionEffects...),
+					}, types)
+					if err != nil {
+						return "", regionNone, err
 					}
 					semanticCallPhrase := fmt.Sprintf("call to '%s'", e.Name)
 					if local.FunctionEnumPayload {
@@ -7525,10 +7552,14 @@ func validateFunctionTypeStructFieldBinding(
 			directSnapshotAlias = fieldInfo.FunctionDirectSnapshotAlias
 			escapeKind = fieldInfo.FunctionEscapeKind
 			handleValue = fieldInfo.FunctionHandleValue
+			fieldSig, err := functionFieldInfoSig(fieldInfo)
+			if err != nil {
+				return FunctionFieldInfo{}, err
+			}
 			if err := validateFunctionInfoAssignable(
 				localName+"."+field.Name,
 				functionFieldLocalInfo(field),
-				functionFieldInfoSig(fieldInfo),
+				fieldSig,
 				value.At,
 			); err != nil {
 				return FunctionFieldInfo{}, err
@@ -8912,15 +8943,17 @@ func functionFieldInfoHasTargetSet(info FunctionFieldInfo) bool {
 		info.FunctionTouchesMutableGlobals
 }
 
-func functionFieldInfoSig(info FunctionFieldInfo) FuncSig {
-	return FuncSig{
-		ParamTypes:      append([]string(nil), info.FunctionParamTypes...),
-		ParamOwnership:  append([]string(nil), info.FunctionParamOwnership...),
-		ReturnType:      info.FunctionReturnType,
-		ReturnOwnership: info.FunctionReturnOwnership,
-		ThrowsType:      info.FunctionThrowsType,
-		Effects:         append([]string(nil), info.FunctionEffects...),
-	}
+func functionFieldInfoSig(info FunctionFieldInfo) (FuncSig, error) {
+	return buildInterfaceFuncSig("function-field", funcSigSpec{
+		ParamTypes:          append([]string(nil), info.FunctionParamTypes...),
+		ParamOwnership:      append([]string(nil), info.FunctionParamOwnership...),
+		ReturnType:          info.FunctionReturnType,
+		ReturnOwnership:     info.FunctionReturnOwnership,
+		ThrowsType:          info.FunctionThrowsType,
+		ReturnRegionParam:   regionNone,
+		ReturnResourceParam: regionNone,
+		Effects:             append([]string(nil), info.FunctionEffects...),
+	}, nil)
 }
 
 func functionFieldMapsEqual(a, b map[string]FunctionFieldInfo) bool {
@@ -9025,13 +9058,18 @@ func validateFunctionTypeReturnCallBinding(
 			)
 		}
 	}
-	returnedSig := FuncSig{
-		ParamTypes:      append([]string(nil), callSig.ReturnFunctionParams...),
-		ParamOwnership:  append([]string(nil), callSig.ReturnFunctionParamOwnership...),
-		ReturnType:      callSig.ReturnFunctionReturn,
-		ReturnOwnership: callSig.ReturnFunctionReturnOwnership,
-		ThrowsType:      callSig.ReturnFunctionThrows,
-		Effects:         append([]string(nil), callSig.ReturnFunctionEffects...),
+	returnedSig, err := buildInterfaceFuncSig(name, funcSigSpec{
+		ParamTypes:          append([]string(nil), callSig.ReturnFunctionParams...),
+		ParamOwnership:      append([]string(nil), callSig.ReturnFunctionParamOwnership...),
+		ReturnType:          callSig.ReturnFunctionReturn,
+		ReturnOwnership:     callSig.ReturnFunctionReturnOwnership,
+		ThrowsType:          callSig.ReturnFunctionThrows,
+		ReturnRegionParam:   regionNone,
+		ReturnResourceParam: regionNone,
+		Effects:             append([]string(nil), callSig.ReturnFunctionEffects...),
+	}, nil)
+	if err != nil {
+		return "", err
 	}
 	if err := validateFunctionTypeSymbolSignature(
 		name,
@@ -9076,26 +9114,27 @@ func resolveFunctionTypedGlobalFieldAccess(
 	globals map[string]GlobalInfo,
 	funcs map[string]FuncSig,
 ) (GlobalInfo, FuncSig, bool, error) {
+	var zero FuncSig
 	name := callbackArgumentName(value)
 	global, ok := globals[name]
 	if !ok {
-		return GlobalInfo{}, FuncSig{}, false, nil
+		return GlobalInfo{}, zero, false, nil
 	}
 	if !global.FunctionTypeValue || global.FunctionValue == "" {
 		if global.Mutable {
-			return GlobalInfo{}, FuncSig{}, true, unsupportedImportedMutableFunctionTypedGlobalUseError(
+			return GlobalInfo{}, zero, true, unsupportedImportedMutableFunctionTypedGlobalUseError(
 				value.At,
 				name,
 			)
 		}
-		return GlobalInfo{}, FuncSig{}, true, unsupportedFunctionTypedGlobalTargetError(
+		return GlobalInfo{}, zero, true, unsupportedFunctionTypedGlobalTargetError(
 			value.At,
 			name,
 		)
 	}
 	sig, ok := funcs[global.FunctionValue]
 	if !ok {
-		return GlobalInfo{}, FuncSig{}, true, fmt.Errorf(
+		return GlobalInfo{}, zero, true, fmt.Errorf(
 			"%s: unknown function symbol '%s'",
 			frontend.FormatPos(value.At),
 			global.FunctionValue,
@@ -9111,17 +9150,18 @@ func resolveImportedFunctionGlobalInitializer(
 	imports map[string]string,
 	types map[string]*TypeInfo,
 ) (string, FuncSig, bool, error) {
+	var zero FuncSig
 	base, ok := value.Base.(*frontend.IdentExpr)
 	if !ok {
-		return "", FuncSig{}, false, nil
+		return "", zero, false, nil
 	}
 	importedModule, ok := imports[base.Name]
 	if !ok || importedModule == "" {
-		return "", FuncSig{}, false, nil
+		return "", zero, false, nil
 	}
 	file := world.ByModule[importedModule]
 	if file == nil {
-		return "", FuncSig{}, false, nil
+		return "", zero, false, nil
 	}
 	var target *frontend.FuncDecl
 	for _, fn := range file.Funcs {
@@ -9131,15 +9171,15 @@ func resolveImportedFunctionGlobalInitializer(
 		}
 	}
 	if target == nil {
-		return "", FuncSig{}, false, nil
+		return "", zero, false, nil
 	}
 	name := importedModule + "." + target.Name
 	sig, err := funcSigFromDeclForGlobalInitializer(file, target, importedModule, types)
 	if err != nil {
-		return "", FuncSig{}, false, err
+		return "", zero, false, err
 	}
 	if err := ensureFuncVisible(name, sig, currentModule, value.At); err != nil {
-		return "", FuncSig{}, false, err
+		return "", zero, false, err
 	}
 	return name, sig, true, nil
 }
@@ -9150,26 +9190,27 @@ func funcSigFromDeclForGlobalInitializer(
 	currentModule string,
 	types map[string]*TypeInfo,
 ) (FuncSig, error) {
+	var zero FuncSig
 	if err := validateFunctionParamNames(fn); err != nil {
-		return FuncSig{}, err
+		return zero, err
 	}
 	imports, err := collectImportAliases(file)
 	if err != nil {
-		return FuncSig{}, err
+		return zero, err
 	}
 	effects, err := normalizeEffects(fn.Uses, fn.Pos)
 	if err != nil {
-		return FuncSig{}, err
+		return zero, err
 	}
 	retName, err := resolveTypeName(&fn.ReturnType, currentModule, imports)
 	if err != nil {
-		return FuncSig{}, err
+		return zero, err
 	}
 	throwsType := ""
 	if fn.HasThrows {
 		throwsType, err = resolveTypeName(&fn.Throws, currentModule, imports)
 		if err != nil {
-			return FuncSig{}, err
+			return zero, err
 		}
 	}
 	paramTypes := make([]string, 0, len(fn.Params))
@@ -9178,24 +9219,31 @@ func funcSigFromDeclForGlobalInitializer(
 		param := &fn.Params[i]
 		resolved, err := resolveTypeName(&param.Type, currentModule, imports)
 		if err != nil {
-			return FuncSig{}, err
+			return zero, err
 		}
 		if _, err := ensureTypeInfo(resolved, types); err != nil {
-			return FuncSig{}, fmt.Errorf("%s: %v", frontend.FormatPos(param.At), err)
+			return zero, fmt.Errorf("%s: %v", frontend.FormatPos(param.At), err)
 		}
 		paramTypes = append(paramTypes, resolved)
 		paramOwnership = append(paramOwnership, param.Ownership)
 	}
-	return FuncSig{
-		Generic:         len(fn.TypeParams) > 0,
-		Public:          declarationIsPublic(file, fn.Public),
-		ParamTypes:      paramTypes,
-		ParamOwnership:  paramOwnership,
-		ReturnType:      retName,
-		ReturnOwnership: fn.ReturnOwnership,
-		ThrowsType:      throwsType,
-		Effects:         effects,
-	}, nil
+	spec := funcSigSpec{
+		Generic:             len(fn.TypeParams) > 0,
+		Public:              declarationIsPublic(file, fn.Public),
+		ParamTypes:          paramTypes,
+		ParamOwnership:      paramOwnership,
+		ReturnType:          retName,
+		ReturnOwnership:     fn.ReturnOwnership,
+		ThrowsType:          throwsType,
+		ReturnRegionParam:   regionNone,
+		ReturnResourceParam: initialReturnResourceParam(retName, types),
+		Effects:             effects,
+	}
+	name := currentModule + "." + fn.Name
+	if spec.Generic {
+		return buildGenericFuncSig(name, spec, types)
+	}
+	return buildDeclaredFuncSig(name, spec, types)
 }
 
 func enumPayloadFunctionKey(ordinal int32, index int) string {
@@ -9311,10 +9359,14 @@ func validateFunctionTypeEnumPayloadBinding(
 			directSnapshotAlias = fieldInfo.FunctionDirectSnapshotAlias
 			escapeKind = fieldInfo.FunctionEscapeKind
 			handleValue = fieldInfo.FunctionHandleValue
+			fieldSig, err := functionFieldInfoSig(fieldInfo)
+			if err != nil {
+				return FunctionFieldInfo{}, err
+			}
 			if err := validateFunctionInfoAssignable(
 				label,
 				enumPayloadLocalInfo(caseInfo, index),
-				functionFieldInfoSig(fieldInfo),
+				fieldSig,
 				value.At,
 			); err != nil {
 				return FunctionFieldInfo{}, err
@@ -9357,10 +9409,14 @@ func validateFunctionTypeEnumPayloadBinding(
 				)
 			}
 			if fieldTargetInfoOK {
+				fieldSig, err := functionFieldInfoSig(fieldTargetInfo)
+				if err != nil {
+					return FunctionFieldInfo{}, err
+				}
 				if err := validateFunctionInfoAssignable(
 					label,
 					enumPayloadLocalInfo(caseInfo, index),
-					functionFieldInfoSig(fieldTargetInfo),
+					fieldSig,
 					value.At,
 				); err != nil {
 					return FunctionFieldInfo{}, err

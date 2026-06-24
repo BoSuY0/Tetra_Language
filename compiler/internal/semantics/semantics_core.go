@@ -134,7 +134,7 @@ func builtinFuncSigs(types map[string]*TypeInfo) (map[string]FuncSig, error) {
 		return nil, err
 	}
 
-	sigs := map[string]FuncSig{
+	specs := map[string]funcSigSpec{
 		"core.alloc_bytes": {
 			ParamTypes:        []string{"i32"},
 			ParamSlots:        1,
@@ -1268,13 +1268,18 @@ func builtinFuncSigs(types map[string]*TypeInfo) (map[string]FuncSig, error) {
 			ReturnRegionParam: regionNone,
 		},
 	}
-	addAtomicBuiltinSigs(sigs, capMem.Name)
-	for name, sig := range sigs {
-		sig.ReturnResourceParam = regionNone
+	addAtomicBuiltinSpecs(specs, capMem.Name)
+	sigs := make(map[string]FuncSig, len(specs))
+	for name, spec := range specs {
+		spec.ReturnResourceParam = regionNone
 		if name == "core.task_group_cancel" {
-			sig.ReturnResourceParam = 0
+			spec.ReturnResourceParam = 0
 		}
-		sig.Effects = builtinEffects(name)
+		spec.Effects = builtinEffects(name)
+		sig, err := buildBuiltinFuncSig(name, spec, types)
+		if err != nil {
+			return nil, err
+		}
 		sigs[name] = sig
 	}
 	return sigs, nil
@@ -1305,11 +1310,11 @@ var atomicBuiltinReadModifyWriteOrders = []string{
 }
 var atomicBuiltinFenceOrders = []string{"relaxed", "acquire", "release", "acq_rel", "seq_cst"}
 
-func addAtomicBuiltinSigs(sigs map[string]FuncSig, capMem string) {
+func addAtomicBuiltinSpecs(specs map[string]funcSigSpec, capMem string) {
 	for _, valueType := range atomicBuiltinValueTypes {
 		for _, order := range atomicBuiltinLoadOrders {
 			name := "core.atomic_load_" + valueType.Suffix + "_" + order
-			sigs[name] = FuncSig{
+			specs[name] = funcSigSpec{
 				ParamTypes:        []string{"ptr", capMem},
 				ParamSlots:        2,
 				ReturnType:        valueType.TypeName,
@@ -1319,7 +1324,7 @@ func addAtomicBuiltinSigs(sigs map[string]FuncSig, capMem string) {
 		}
 		for _, order := range atomicBuiltinStoreOrders {
 			name := "core.atomic_store_" + valueType.Suffix + "_" + order
-			sigs[name] = FuncSig{
+			specs[name] = funcSigSpec{
 				ParamTypes:        []string{"ptr", valueType.TypeName, capMem},
 				ParamSlots:        3,
 				ReturnType:        valueType.TypeName,
@@ -1337,7 +1342,7 @@ func addAtomicBuiltinSigs(sigs map[string]FuncSig, capMem string) {
 		} {
 			for _, order := range atomicBuiltinReadModifyWriteOrders {
 				name := "core.atomic_" + op + "_" + valueType.Suffix + "_" + order
-				sigs[name] = FuncSig{
+				specs[name] = funcSigSpec{
 					ParamTypes:        []string{"ptr", valueType.TypeName, capMem},
 					ParamSlots:        3,
 					ReturnType:        valueType.TypeName,
@@ -1348,7 +1353,7 @@ func addAtomicBuiltinSigs(sigs map[string]FuncSig, capMem string) {
 		}
 		for _, order := range atomicBuiltinReadModifyWriteOrders {
 			name := "core.atomic_compare_exchange_" + valueType.Suffix + "_" + order
-			sigs[name] = FuncSig{
+			specs[name] = funcSigSpec{
 				ParamTypes:        []string{"ptr", valueType.TypeName, valueType.TypeName, capMem},
 				ParamSlots:        4,
 				ReturnType:        valueType.TypeName,
@@ -1358,7 +1363,7 @@ func addAtomicBuiltinSigs(sigs map[string]FuncSig, capMem string) {
 		}
 		for _, order := range atomicBuiltinReadModifyWriteOrders {
 			name := "core.atomic_compare_exchange_weak_" + valueType.Suffix + "_" + order
-			sigs[name] = FuncSig{
+			specs[name] = funcSigSpec{
 				ParamTypes:        []string{"ptr", valueType.TypeName, valueType.TypeName, capMem},
 				ParamSlots:        4,
 				ReturnType:        valueType.TypeName,
@@ -1369,7 +1374,7 @@ func addAtomicBuiltinSigs(sigs map[string]FuncSig, capMem string) {
 	}
 	for _, order := range atomicBuiltinFenceOrders {
 		name := "core.atomic_fence_" + order
-		sigs[name] = FuncSig{
+		specs[name] = funcSigSpec{
 			ParamTypes:        []string{capMem},
 			ParamSlots:        1,
 			ReturnType:        "i32",
