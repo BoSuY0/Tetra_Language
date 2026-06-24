@@ -16,6 +16,8 @@ review_set:
 - `docs/reviews/memory-core-v2/d005-windows-ui-thread-affinity-review.md`
 - `docs/reviews/memory-core-v2/pr-fanin-baseline-causality-review.md`
 - `docs/reviews/memory-core-v2/pr-merge-dump-vcs-differential-review.md`
+- `docs/reviews/memory-core-v2/d001-testall-environment-contract-review.md`
+- `docs/reviews/memory-core-v2/d001-post-fix-ci-causality-review.md`
 
 summary:
 - blocker: 0
@@ -45,7 +47,7 @@ resolution_commits:
 - D-003: `7e9184aaa2c220590d67f3d369d9598b62861088`
 - D-004: `f28953df325cd87cb8378b3c9b7952238b6d3e13`
 - D-005: `a93dede994b29a86af5efde3434951410e737a34`
-- D-001: `9ca65b6b820e477059513a31ebc190f5062f84b5`
+- D-001: `9d0c1420620d600d2575d950e3bd33277d29b48f`
 
 validation_timeout:
   command: go test -buildvcs=false ./cli/cmd/tetra -count=50
@@ -140,41 +142,51 @@ resolution_evidence:
 - GREEN: `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`
 - PENDING: external push/PR Windows jobs for the D-005 fix SHA.
 
-### D-001: Broad workspace/scriptstest runs showed transient environment coupling outside the Memory Core v2 gate path
+### D-001: test-all fake repos inherited ambient runner state
 
 source_review: `docs/reviews/memory-core-v2/integration-review.md`
 root_cause_reviews:
 - `docs/reviews/memory-core-v2/pr-fanin-baseline-causality-review.md`
 - `docs/reviews/memory-core-v2/pr-merge-dump-vcs-differential-review.md`
+- `docs/reviews/memory-core-v2/d001-testall-environment-contract-review.md`
+- `docs/reviews/memory-core-v2/d001-post-fix-ci-causality-review.md`
 package: `tools/scriptstest/test_all`
 status: resolved_pending_external_ci
 severity: high
 merge_blocking: true
-ci_run_id: 28082310881
-ci_job_id: 83140236906
+previous_fix_commit: `9ca65b6b820e477059513a31ebc190f5062f84b5`
+previous_fix_result: partial_mitigation
+final_fix_commit: `9d0c1420620d600d2575d950e3bd33277d29b48f`
+push_failure_run: 28086494161
+push_failure_job: 83153880490
+pr_failure_run: 28086496364
+pr_failure_job: 83153905910
+previous_pr_failure_run: 28082310881
+previous_pr_failure_job: 83140236906
 failing_step: `Full-platform UI runtime gate`
 nested_step: `baseline-tests`
 failing_package: `tools/scriptstest/test_all`
-failing_test: `TestTestAllQuickFailsWhenUnsafePromotionBlockerSuiteMissing`
-downstream_test: `TestTestAllAllowsDashPrefixedFreshReportDir`
-causal_dimension: `test_state_ambient_env_inheritance`
-fix_commit: `9ca65b6b820e477059513a31ebc190f5062f84b5`
+failing_tests:
+- `TestTestAllQuickFailsWhenHostLeakBlockerSuiteMissing`
+- `TestTestAllFullRunsDocsManifestDiffStep`
+- `TestTestAllFullValidatesCrossTargetSmokeReports`
+causal_dimension: `ambient_subprocess_environment_inheritance`
+d006_created: false
+merge_blocking_state: true_until_external_ci_green
 
 finding:
-The PR-side `full-platform-ui-runtime` fan-in gate failed during
-`baseline-tests`, specifically in `tools/scriptstest/test_all`. The first
-failure expected a single intentional fake blocker but saw two failing
-test-all steps: `unsafe promotion blocker suite` and `RAM contract fuzz oracle
-artifact gate`.
+The earlier D-001 fix in commit `9ca65b6...` filtered inherited
+`TETRA_FAKE_*` and `TETRA_FAIL_*` variables, but new push and pull_request
+fan-in failures proved that this was only a partial mitigation. The fake-repo
+subprocesses still inherited non-denylisted runner state through `os.Environ()`.
 
 root_cause:
-The fake-repo test helpers `runTestAll`, `runTestAllSplit`, and
-`runTestAllFromWorkingDir` inherited ambient process env from `os.Environ()`.
-That allowed test-only `TETRA_FAKE_*` or `TETRA_FAIL_*` controls to leak into
-fake `test-all` subprocesses. On the actual PR merge tree, clean env and
-PR-like `CI/GITHUB_*` env passed, while ambient
-`TETRA_FAKE_SKIP_UNSAFE_PROMOTION_LIST=1` plus
-`TETRA_FAKE_SKIP_RAM_CONTRACT_LIST=1` reproduced both observed CI failures.
+Fake-repo subprocesses used an inherit-all-minus-denylist environment instead
+of a constructed hermetic environment. The remaining ambient channels included
+shell startup variables, Go/Git/cache/temp state, CI/GitHub metadata, and
+target-host report path variables. The three latest failing tests are witnesses:
+they observed extra or premature blocker-suite failures rather than independent
+defects in host-leak, docs-manifest, or cross-target smoke validation.
 
 matrix:
 - `dump_tree_content`: rejected; dump-present and dump-absent package runs
@@ -185,28 +197,43 @@ matrix:
   disabled.
 - `github_pr_environment`: rejected; actual PR merge passed with PR-like
   `CI/GITHUB_*` environment.
-- `test_state_ambient_env_inheritance`: confirmed.
+- `test_state_ambient_env_inheritance`: confirmed by the prior D-001 matrix.
+- `ambient_subprocess_environment_inheritance`: confirmed by post-fix CI.
 
 fix:
-Commit `9ca65b6b820e477059513a31ebc190f5062f84b5` filters inherited
-`TETRA_FAKE_*` and `TETRA_FAIL_*` entries before constructing fake-repo
-subprocess environments, then appends each test's explicit env slice so
-intentional negative tests still exercise the fake controls.
+Commit `9d0c1420620d600d2575d950e3bd33277d29b48f` removes `os.Environ()` as
+the fake-repo child environment base and constructs a hermetic environment from
+explicitly allowed keys. It sets isolated `HOME`, `XDG_CACHE_HOME`, `GOCACHE`,
+`GOTMPDIR`, `TMPDIR`, `TMP`, and `TEMP`; pins `GOENV=off`, `GOWORK=off`, empty
+`GOFLAGS`, `GOTELEMETRY=off`, `LANG=C`, `LC_ALL=C`, and `TZ=UTC`; puts
+`<fake repo>/bin` first in `PATH`; rejects malformed, duplicate, unknown, or
+protected explicit env keys; and keeps intentional fake controls functional only
+through per-test explicit env.
 
 before_after:
-- Before: ambient fake controls could turn a focused negative `test_all` test
-  into a multi-blocker failure and break PR fan-in.
-- After: ambient fake controls are ignored by default fake-repo runs, while
-  explicit per-test fake controls remain active.
+- Before: fake-repo runs inherited nearly all runner state, so ambient shell,
+  Go/Git, report-path, cache, or temp channels could alter blocker-suite
+  behavior.
+- After: fake-repo runs receive a constructed environment; ambient `TETRA_*`,
+  shell startup, CI/GitHub, target-host report, and Go/Git state do not enter
+  the child process unless explicitly allowed for that test.
 
 resolution_evidence:
-- RED: actual PR merge with ambient
-  `TETRA_FAKE_SKIP_UNSAFE_PROMOTION_LIST=1` and
-  `TETRA_FAKE_SKIP_RAM_CONTRACT_LIST=1` reproduced
+- RED: push run `28086494161`, job `83153880490`,
+  `TestTestAllQuickFailsWhenHostLeakBlockerSuiteMissing` saw
   `summary status/counts = "fail"/2, want fail/1`.
+- RED: pull_request run `28086496364`, job `83153905910`,
+  `TestTestAllFullRunsDocsManifestDiffStep` failed first at
+  `unsafe promotion blocker suite`.
+- RED: pull_request run `28086496364`, job `83153905910`,
+  `TestTestAllFullValidatesCrossTargetSmokeReports` failed first at
+  `bounds proof blocker suite`.
 - GREEN: `go test ./tools/scriptstest/test_all -run '^TestTestAllQuickFailsWhenUnsafePromotionBlockerSuiteMissing$' -count=100 -shuffle=on -timeout=30m`
+- GREEN: `go test -buildvcs=false ./tools/scriptstest/test_all -run '^(TestTestAllHermeticEnvRejectsAmbientControlMatrix|TestTestAllExplicitFailureControlsAreIsolated|TestTestAllFakeRepoIgnoresAmbientTargetHostReports|TestTestAllHermeticRunsDoNotCrossContaminate|TestTestAllHermeticEnvHasUniqueDeterministicKeys|TestTestAllQuickFailsWhenHostLeakBlockerSuiteMissing|TestTestAllFullRunsDocsManifestDiffStep|TestTestAllFullValidatesCrossTargetSmokeReports)$' -count=100 -shuffle=on -timeout=30m`
+- GREEN: `go test -race -buildvcs=false ./tools/scriptstest/test_all -run 'Hermetic|Ambient|ExplicitFailureControls|CrossContaminate' -count=10 -timeout=30m`
 - GREEN: `go test ./tools/scriptstest/test_all -count=20 -shuffle=on -timeout=30m`
-- PENDING: external push/PR fan-in for the D-001 fix SHA.
+- PENDING: actual PR-style merge fan-in repetitions, full local suite, Memory
+  Core gate, and external push/PR fan-in for the final D-001 fix SHA.
 
 ### D-003: linux-x32 unsupported reason contract mismatch
 
