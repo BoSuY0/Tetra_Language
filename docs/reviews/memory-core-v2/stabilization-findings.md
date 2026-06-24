@@ -13,11 +13,12 @@ review_set:
 - `docs/reviews/memory-core-v2/ci-context-causality-review.md`
 - `docs/reviews/memory-core-v2/cli-package-timeout-analysis.md`
 - `docs/reviews/memory-core-v2/workspace-package-timeout-analysis.md`
+- `docs/reviews/memory-core-v2/d005-windows-ui-thread-affinity-review.md`
 
 summary:
 - blocker: 0
 - critical: 0
-- high: 3
+- high: 4
 - medium: 3
 - low: 2
 - informational: 0
@@ -28,7 +29,7 @@ resolution_summary:
 - resolved_low: 1
 - open_blocker: 0
 - open_critical: 0
-- open_high: 0
+- open_high: 1
 - open_medium: 0
 - open_low: 1
 - open_informational: 0
@@ -41,6 +42,7 @@ resolution_commits:
 - D-002: `69f8827199583219aa1b8b97368ab692a1aa7d29`
 - D-003: `7e9184aaa2c220590d67f3d369d9598b62861088`
 - D-004: `f28953df325cd87cb8378b3c9b7952238b6d3e13`
+- D-005: `a93dede994b29a86af5efde3434951410e737a34`
 - D-001: tracked as nonblocking test-infrastructure hardening; no Memory Core
   v2 code, gate, schema, or documentation fix required by the review.
 
@@ -76,6 +78,66 @@ None.
 None.
 
 ## high
+
+### D-005: Windows platform UI probe violates Win32 OS-thread affinity
+
+source_review: `docs/reviews/memory-core-v2/d005-windows-ui-thread-affinity-review.md`
+package: `tools/cmd/platform-ui-runtime-smoke`
+status: resolved_pending_external_ci
+severity: high
+merge_blocking: true
+affected_target: `windows-x64`
+ci_run_id: 28052545600
+ci_job_id: 83046625456
+failing_step: `Target-host UI runtime smoke`
+fix_commit: `a93dede994b29a86af5efde3434951410e737a34`
+
+finding:
+The PR-side `full-platform-ui-runtime` Windows target-host job timed out at the
+job-level `45m` boundary while running one production platform UI smoke command:
+`go run ./tools/cmd/platform-ui-runtime-smoke --target "windows-x64" --report
+"windows-ui-runtime.json"`. The runner cancelled the process with
+`exit status 0xc000013a`; `windows-ui-runtime.json` was not created, so the
+PR-side fan-in gate was skipped.
+
+root_cause:
+The Windows probe created HWNDs and then executed synchronous User32 lifecycle
+calls without `runtime.LockOSThread`. Because Go can move an unlocked goroutine
+between OS threads, later `SendMessageW`, `PeekMessageW`, `DispatchMessageW`,
+`RedrawWindow`, `DestroyWindow`, or `UnregisterClassW` calls could execute from
+a different OS thread than the window owner. That violates the Win32
+thread-affinity/message-queue contract and can turn synchronous messaging into a
+cross-thread wait with no active owner-thread message pump.
+
+fix:
+Commit `a93dede994b29a86af5efde3434951410e737a34` pins the Windows probe to one
+OS thread for the full User32 lifecycle and adds fail-closed internal deadlines:
+`5m0s` for the nested platform runtime build and `1m0s` for the nested child
+runtime execution. The workflows now run a Windows-only
+`TestWindowsPlatformProbeCompletesUnderSchedulerPressure` stress regression
+before the production smoke in both mirrored full-platform workflows.
+
+before_after:
+- Before: the PR Windows smoke could run until the GitHub Actions job timeout,
+  produce no `windows-ui-runtime.json`, and skip PR fan-in.
+- After: the Win32 lifecycle is pinned to one OS thread. If the nested build or
+  child process stalls, the outer command returns before the workflow timeout,
+  writes a failed platform UI report, records a blocker, and exits nonzero.
+
+resolution_evidence:
+- `gh run view 28052545600 --job 83046625456 --log`
+- `git diff --name-status 3b8c02b0579cbd778a628f7f3245d7badef956e5 refs/remotes/origin/pr-6-merge -- tools/cmd/platform-ui-runtime-smoke .github/workflows/full-platform-ui-runtime.yml .github/workflows/ci.yml`
+- `git rev-parse 3b8c02b0579cbd778a628f7f3245d7badef956e5:tools/cmd/platform-ui-runtime-smoke/platform_probe_windows.go`
+- `git rev-parse refs/remotes/origin/pr-6-merge:tools/cmd/platform-ui-runtime-smoke/platform_probe_windows.go`
+- GREEN: `go test -buildvcs=false ./tools/cmd/platform-ui-runtime-smoke ./tools/validators/platformui -count=20`
+- GREEN: `GOOS=windows GOARCH=amd64 go test -buildvcs=false -c -o /tmp/platform-ui-runtime-smoke.test.exe ./tools/cmd/platform-ui-runtime-smoke`
+- GREEN: `GOOS=windows GOARCH=amd64 go build -o /tmp/platform-ui-runtime-smoke.exe ./tools/cmd/platform-ui-runtime-smoke`
+- GREEN: `go test -buildvcs=false ./tools/scriptstest/workflows -run 'FullPlatformUIRuntime|WindowsUI|ThreadAffinity' -count=20`
+- GREEN: `go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7`
+- GREEN: `go test -buildvcs=false ./compiler/... ./cli/... ./tools/... -count=1`
+- GREEN: `go test -buildvcs=false ./... -count=1`
+- GREEN: `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`
+- PENDING: external push/PR Windows jobs for the D-005 fix SHA.
 
 ### D-003: linux-x32 unsupported reason contract mismatch
 
