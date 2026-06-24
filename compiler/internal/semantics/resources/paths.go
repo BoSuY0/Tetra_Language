@@ -1,11 +1,6 @@
 package resources
 
-import (
-	"fmt"
-	"strings"
-
-	"tetra_language/compiler/internal/frontend"
-)
+import "tetra_language/compiler/internal/frontend"
 
 func PathForExpr(expr frontend.Expr) (string, bool) {
 	base, fields, ok := splitFieldPath(expr)
@@ -27,28 +22,12 @@ func FieldPath(prefix string, field string) string {
 }
 
 func EnumPayloadPath(prefix string, ordinal int32, index int) string {
-	return FieldPath(prefix, fmt.Sprintf("$case%d.payload%d", ordinal, index))
-}
-
-func JoinPath(prefix string, leaf string) string {
-	if leaf == "" {
-		return prefix
-	}
-	if prefix == "" {
-		return leaf
-	}
-	return prefix + "." + leaf
+	return Path(prefix).EnumPayload(ordinal, index).String()
 }
 
 func LeafTail(leaf string, head string) (string, bool) {
-	if leaf == head {
-		return "", true
-	}
-	prefix := head + "."
-	if strings.HasPrefix(leaf, prefix) {
-		return strings.TrimPrefix(leaf, prefix), true
-	}
-	return "", false
+	tail, ok := Path(leaf).RelativeTo(Path(head))
+	return tail.String(), ok
 }
 
 func splitFieldPath(expr frontend.Expr) (string, []string, bool) {

@@ -2142,9 +2142,8 @@ func (s *regionState) clearResourceTree(prefix string) {
 		return
 	}
 	delete(s.resourceVars, prefix)
-	prefixDot := prefix + "."
 	for name := range s.resourceVars {
-		if strings.HasPrefix(name, prefixDot) {
+		if resourcePathContains(prefix, name) {
 			delete(s.resourceVars, name)
 		}
 	}
@@ -2158,9 +2157,8 @@ func (s *regionState) clearRegionTree(prefix string) {
 	delete(s.unknownVars, prefix)
 	delete(s.unknownConflicts, prefix)
 	s.clearOwnedRegionSliceOwnerTree(prefix)
-	prefixDot := prefix + "."
 	for name := range s.regionVars {
-		if strings.HasPrefix(name, prefixDot) {
+		if resourcePathContains(prefix, name) {
 			delete(s.regionVars, name)
 			delete(s.unknownVars, name)
 			delete(s.unknownConflicts, name)

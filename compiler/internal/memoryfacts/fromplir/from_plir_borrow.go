@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"tetra_language/compiler/internal/plir"
+	semanticsresources "tetra_language/compiler/internal/semantics/resources"
 )
 
 func addBorrowMetadataFacts(graph *Graph, parent Fact, value plir.Value, op plir.Operation) error {
@@ -66,8 +67,8 @@ func addBorrowAggregateV0Facts(
 		return nil
 	}
 	paramPath := ""
-	if strings.HasPrefix(ownerPath, owner+".") {
-		paramPath = strings.TrimPrefix(ownerPath, owner+".")
+	if relative, ok := ownerPathRelativeTo(ownerPath, owner); ok && relative != "" {
+		paramPath = relative
 	}
 	claim, ok := memoryIdealBorrowWrapperClaim(value, op, parent, paramPath)
 	if !ok {
@@ -385,6 +386,11 @@ func addBorrowAggregateV0Facts(
 		return err
 	}
 	return graph.MarkValidated(id, borrowWrapperValidatorName(claim))
+}
+
+func ownerPathRelativeTo(path string, owner string) (string, bool) {
+	relative, ok := semanticsresources.Path(path).RelativeTo(semanticsresources.Path(owner))
+	return relative.String(), ok
 }
 
 func memoryIdealBorrowWrapperClaim(

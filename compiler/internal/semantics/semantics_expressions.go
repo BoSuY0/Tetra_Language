@@ -9,6 +9,7 @@ import (
 	semanticsexpressions "tetra_language/compiler/internal/semantics/expressions"
 	semanticsgenerics "tetra_language/compiler/internal/semantics/generics"
 	semanticspolicy "tetra_language/compiler/internal/semantics/policy"
+	semanticsresources "tetra_language/compiler/internal/semantics/resources"
 )
 
 // ---- exprs.go ----
@@ -5136,66 +5137,21 @@ func splitOwnershipPath(expr frontend.Expr) (string, []string, frontend.Position
 	}
 }
 
-func splitOwnershipPathSegments(path string) []string {
-	if path == "" {
-		return nil
-	}
-	segments := make([]string, 0, 4)
-	start := 0
-	depth := 0
-	for i := 0; i <= len(path); i++ {
-		if i == len(path) || (path[i] == '.' && depth == 0) {
-			if i >= start {
-				segments = append(segments, path[start:i])
-			}
-			start = i + 1
-			continue
-		}
-		switch path[i] {
-		case '[':
-			depth++
-		case ']':
-			if depth > 0 {
-				depth--
-			}
-		}
-	}
-	return segments
-}
-
-func ownershipPathSegmentsMatch(left string, right string) bool {
-	if left == right {
-		return true
-	}
-	if left == "[_]" || right == "[_]" {
-		return true
-	}
-	return false
-}
-
 func ownershipPathPrefix(prefix string, path string) bool {
 	if prefix == "" || path == "" {
 		return false
 	}
-	prefixParts := splitOwnershipPathSegments(prefix)
-	pathParts := splitOwnershipPathSegments(path)
-	if len(prefixParts) == 0 || len(prefixParts) > len(pathParts) {
-		return false
-	}
-	for i := 0; i < len(prefixParts); i++ {
-		if !ownershipPathSegmentsMatch(prefixParts[i], pathParts[i]) {
-			return false
-		}
-	}
-	return true
+	prefixPath := semanticsresources.Path(prefix)
+	pathPath := semanticsresources.Path(path)
+	return prefixPath == pathPath || prefixPath.IsAncestorOf(pathPath)
 }
 
 func ownershipPathParent(prefix string) string {
-	parts := splitOwnershipPathSegments(prefix)
-	if len(parts) <= 1 {
+	parent, ok := semanticsresources.Path(prefix).Parent()
+	if !ok {
 		return ""
 	}
-	return strings.Join(parts[:len(parts)-1], ".")
+	return parent.String()
 }
 
 func splitOwnershipIndexSegment(index frontend.Expr) string {
@@ -7853,7 +7809,11 @@ func enumPayloadFieldKey(fieldPath, payloadKey string) string {
 }
 
 func enumPayloadFieldMatchesPrefix(fieldKey, prefix string) bool {
-	return strings.HasPrefix(fieldKey, prefix+"#") || strings.HasPrefix(fieldKey, prefix+".")
+	if strings.HasPrefix(fieldKey, prefix+"#") {
+		return true
+	}
+	relative, ok := semanticsresources.Path(fieldKey).RelativeTo(semanticsresources.Path(prefix))
+	return ok && relative != ""
 }
 
 func declaredEnumPayloadFieldsForStructType(

@@ -3927,7 +3927,7 @@ func applyInterfaceFunctionReturnMetadata(
 			fieldPath := callbackArgumentName(ret.Value)
 			if fieldPath != "" {
 				for _, name := range sig.ParamNames {
-					if !strings.HasPrefix(fieldPath, name+".") {
+					if fieldPath == name || !ownershipPathPrefix(name, fieldPath) {
 						continue
 					}
 					if sig.ReturnFunctionParamName != fieldPath {
@@ -4138,7 +4138,7 @@ func interfaceFunctionReturnParamRef(
 		return ""
 	}
 	for _, name := range sig.ParamNames {
-		if strings.HasPrefix(fieldPath, name+".") {
+		if fieldPath != name && ownershipPathPrefix(name, fieldPath) {
 			return fieldPath
 		}
 	}
@@ -7765,7 +7765,7 @@ func rejectBorrowedFunctionCaptures(captures []frontend.ClosureCapture, state *r
 	}
 	for _, capture := range captures {
 		for path, regionID := range state.regionVars {
-			if path != capture.Name && !strings.HasPrefix(path, capture.Name+".") {
+			if path != capture.Name && !ownershipPathPrefix(capture.Name, path) {
 				continue
 			}
 			if _, borrowed := state.borrowedParamOwner(regionID); !borrowed {
@@ -9752,7 +9752,7 @@ func bindBorrowedPtrAliasFromExpr(
 	}
 	if info, ok := types[typeName]; ok && info.Kind == TypeOptional {
 		bindBorrowedPtrAliasFromExpr(
-			resourceFieldPath(name, "$elem"),
+			resourceElementPath(name),
 			info.ElemType,
 			expr,
 			types,
@@ -9764,12 +9764,11 @@ func bindBorrowedPtrAliasFromExpr(
 		return
 	}
 	if sourcePath, ok := resourcePathForExpr(expr); ok {
-		prefix := sourcePath + "."
 		for path, owner := range state.borrowedPtrAliases {
-			if owner == "" || !strings.HasPrefix(path, prefix) {
+			suffix, ok := resourcePathRelativeTo(path, sourcePath)
+			if owner == "" || !ok || suffix == "" {
 				continue
 			}
-			suffix := strings.TrimPrefix(path, prefix)
 			state.bindBorrowedPtrAlias(joinResourcePath(name, suffix), owner)
 		}
 		return
@@ -14207,7 +14206,7 @@ func bindResourceTreeFromExpr(
 		if sourcePrefix, ok := resourcePathForExpr(expr); ok &&
 			resourceTreeHasPath(sourcePrefix, info.ElemType, types, state) {
 			copyResourceTreeFromPath(
-				resourceFieldPath(name, "$elem"),
+				resourceElementPath(name),
 				sourcePrefix,
 				info.ElemType,
 				types,
@@ -14453,7 +14452,7 @@ func bindOwnedRegionSliceOwnerFromExpr(
 			return nil
 		}
 		return bindOwnedRegionSliceOwnerFromExpr(
-			resourceFieldPath(name, "$elem"),
+			resourceElementPath(name),
 			info.ElemType,
 			call.Args[0],
 			types,
@@ -14617,7 +14616,7 @@ func bindPatternResourceLocals(
 		}
 		bindResourceTreeFromPathOrUnknown(
 			fallbackName,
-			resourceFieldPath(scrutineePath, "$elem"),
+			resourceElementPath(scrutineePath),
 			info.ElemType,
 			types,
 			state,
@@ -14631,7 +14630,7 @@ func bindPatternResourceLocals(
 		}
 		bindResourceTreeFromPathOrUnknown(
 			p.Name,
-			resourceFieldPath(scrutineePath, "$elem"),
+			resourceElementPath(scrutineePath),
 			info.ElemType,
 			types,
 			state,
@@ -14681,13 +14680,13 @@ func bindPatternOwnershipAliases(
 		if fallbackName == "" || info.Kind != TypeOptional {
 			return nil
 		}
-		state.bindOwnershipAlias(fallbackName, resourceFieldPath(scrutineePath, "$elem"))
+		state.bindOwnershipAlias(fallbackName, resourceElementPath(scrutineePath))
 		return nil
 	}
 	switch p := pattern.(type) {
 	case *frontend.SomePatternExpr:
 		if info.Kind == TypeOptional {
-			state.bindOwnershipAlias(p.Name, resourceFieldPath(scrutineePath, "$elem"))
+			state.bindOwnershipAlias(p.Name, resourceElementPath(scrutineePath))
 		}
 	case *frontend.EnumCasePatternExpr:
 		caseType, caseInfo, found, err := resolveEnumCasePattern(p, types, module, imports)
@@ -14730,7 +14729,7 @@ func bindPatternBorrowedPtrAliases(
 		}
 		copyBorrowedPtrAliasesFromPath(
 			fallbackName,
-			resourceFieldPath(scrutineePath, "$elem"),
+			resourceElementPath(scrutineePath),
 			info.ElemType,
 			types,
 			state,
@@ -14742,7 +14741,7 @@ func bindPatternBorrowedPtrAliases(
 		if info.Kind == TypeOptional {
 			copyBorrowedPtrAliasesFromPath(
 				p.Name,
-				resourceFieldPath(scrutineePath, "$elem"),
+				resourceElementPath(scrutineePath),
 				info.ElemType,
 				types,
 				state,
@@ -14814,7 +14813,7 @@ func bindPatternRegionLocals(
 		}
 		copyRegionTreeFromPath(
 			fallbackName,
-			resourceFieldPath(scrutineePath, "$elem"),
+			resourceElementPath(scrutineePath),
 			info.ElemType,
 			types,
 			state,
@@ -14828,7 +14827,7 @@ func bindPatternRegionLocals(
 		}
 		copyRegionTreeFromPath(
 			p.Name,
-			resourceFieldPath(scrutineePath, "$elem"),
+			resourceElementPath(scrutineePath),
 			info.ElemType,
 			types,
 			state,
@@ -14984,7 +14983,7 @@ func resourceLeafPathsVisiting(
 			resourceLeafPathsVisiting(
 				info.ElemType,
 				types,
-				resourceFieldPath(prefix, "$elem"),
+				resourceElementPath(prefix),
 				visiting,
 			)...)
 	}
@@ -15046,7 +15045,7 @@ func ptrLeafPathsVisiting(
 			ptrLeafPathsVisiting(
 				info.ElemType,
 				types,
-				resourceFieldPath(prefix, "$elem"),
+				resourceElementPath(prefix),
 				visiting,
 			)...)
 	}
@@ -15065,8 +15064,26 @@ func resourceEnumPayloadPath(prefix string, ordinal int32, index int) string {
 	return semanticsresources.EnumPayloadPath(prefix, ordinal, index)
 }
 
+func resourceElementPath(prefix string) string {
+	return semanticsresources.Path(prefix).Element().String()
+}
+
 func joinResourcePath(prefix string, leaf string) string {
-	return semanticsresources.JoinPath(prefix, leaf)
+	return semanticsresources.JoinPath(
+		semanticsresources.Path(prefix),
+		semanticsresources.Path(leaf),
+	).String()
+}
+
+func resourcePathContains(prefix string, path string) bool {
+	prefixPath := semanticsresources.Path(prefix)
+	pathPath := semanticsresources.Path(path)
+	return prefixPath == pathPath || prefixPath.IsAncestorOf(pathPath)
+}
+
+func resourcePathRelativeTo(path string, prefix string) (string, bool) {
+	relative, ok := semanticsresources.Path(path).RelativeTo(semanticsresources.Path(prefix))
+	return relative.String(), ok
 }
 
 func resourceSourceForPath(path string, state *regionState) resourceSourceResult {

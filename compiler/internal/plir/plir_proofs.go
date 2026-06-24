@@ -9,6 +9,7 @@ import (
 	"tetra_language/compiler/internal/frontend"
 	"tetra_language/compiler/internal/rangeproof"
 	"tetra_language/compiler/internal/semantics"
+	semanticsresources "tetra_language/compiler/internal/semantics/resources"
 )
 
 const moduloRangeProofKeyPrefix = "\x00modulo-range:"
@@ -511,7 +512,9 @@ func proofPathMatchesMutation(proofPath string, mutatedPath string) bool {
 	if proofPath == "" || mutatedPath == "" {
 		return false
 	}
-	return proofPath == mutatedPath || strings.HasPrefix(proofPath, mutatedPath+".")
+	proof := semanticsresources.Path(proofPath)
+	mutated := semanticsresources.Path(mutatedPath)
+	return proof == mutated || proof.IsDescendantOf(mutated)
 }
 
 func (b *builder) activeProofForIndex(index *frontend.IndexExpr) (rangeProof, bool) {

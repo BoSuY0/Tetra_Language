@@ -8,6 +8,7 @@ import (
 
 	"tetra_language/compiler/internal/plir"
 	"tetra_language/compiler/internal/runtimeabi"
+	semanticsresources "tetra_language/compiler/internal/semantics/resources"
 )
 
 type allocationRuntimePath = runtimeabi.AllocationRuntimePath
@@ -768,7 +769,9 @@ func allInputsAreAllocationLen(inputs []string, allocName string) bool {
 }
 
 func allocationInputUses(input string, allocName string) bool {
-	return input == allocName || strings.HasPrefix(input, allocName+".")
+	allocPath := semanticsresources.Path(allocName)
+	inputPath := semanticsresources.Path(input)
+	return allocPath == inputPath || allocPath.IsAncestorOf(inputPath)
 }
 
 func isFunctionTempRegionCandidate(value plir.Value) bool {

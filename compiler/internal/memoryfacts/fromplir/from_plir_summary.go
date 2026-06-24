@@ -988,8 +988,8 @@ func returnedBorrowSource(
 		return returnedBorrowSourceInfo{}, false
 	}
 	info := returnedBorrowSourceInfo{Owner: owner}
-	if strings.HasPrefix(ownerPath, owner+".") {
-		info.ParamPath = strings.TrimPrefix(ownerPath, owner+".")
+	if relative, ok := ownerPathRelativeTo(ownerPath, owner); ok && relative != "" {
+		info.ParamPath = relative
 	}
 	if index, ok := summaryParamIndex(fn.Summary, owner); ok {
 		info.ParamIndex = paramIndexPtr(index)
