@@ -446,6 +446,20 @@ check_safety_readiness() {
   go test ./compiler/... -run 'Ownership|Borrow|Consume|Inout|Lifetime|Resource|Island|Actor|Task|Unsafe|Capability|Effect|Privacy|Consent|Budget|MMIO|Mem' -count=1 || return 1
 }
 
+line_list_contains_exact() {
+  local text="$1"
+  local expected="$2"
+  local line
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" == "$expected" ]]; then
+      return 0
+    fi
+  done <<< "$text"
+
+  return 1
+}
+
 require_named_go_test_names() {
   local label="$1"
   shift
@@ -458,7 +472,7 @@ require_named_go_test_names() {
   fi
   local name
   for name in "$@"; do
-    if ! printf '%s\n' "$list_out" | grep -qx "$name"; then
+    if ! line_list_contains_exact "$list_out" "$name"; then
       echo "missing required $label test: $package $name" >&2
       return 1
     fi

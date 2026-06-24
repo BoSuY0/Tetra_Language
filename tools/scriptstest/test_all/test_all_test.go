@@ -1,6 +1,7 @@
 package testall
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -124,6 +125,93 @@ func TestTestAllQuickIgnoresAmbientFakeFailureControls(t *testing.T) {
 			summary.Steps,
 		)
 	}
+}
+
+func TestTestAllRequiredNameMembershipIsPipefailSafe(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	installLargeMemoryFactsListWrapper(t, root)
+
+	reportDir := filepath.Join(root, "report-membership")
+	out, err := runTestAll(
+		t,
+		root,
+		nil,
+		"--quick",
+		"--json-only",
+		"--report-dir",
+		reportDir,
+	)
+	if err != nil {
+		t.Fatalf("test_all quick membership run failed: %v\n%s", err, out)
+	}
+	summary := decodeTestAllSummary(t, out)
+	if summary.Status != "pass" || summary.FailedCount != 0 {
+		t.Fatalf(
+			"membership summary status/counts = %q/%d, want pass/0: %#v",
+			summary.Status,
+			summary.FailedCount,
+			summary.Steps,
+		)
+	}
+}
+
+func installLargeMemoryFactsListWrapper(t *testing.T, root string) {
+	t.Helper()
+	goPath := filepath.Join(root, "bin", "go")
+	realGoPath := filepath.Join(root, "bin", "go-real")
+	if err := os.Rename(goPath, realGoPath); err != nil {
+		t.Fatalf("rename fake go for membership wrapper: %v", err)
+	}
+
+	var script strings.Builder
+	script.WriteString("#!/usr/bin/env bash\n")
+	script.WriteString("set -euo pipefail\n")
+	script.WriteString("if [[ \"${1:-}\" == \"test\" && \"${2:-}\" == \"./compiler/internal/memoryfacts\" ]]; then\n")
+	script.WriteString("  list_mode=0\n")
+	script.WriteString("  for arg in \"$@\"; do\n")
+	script.WriteString("    case \"$arg\" in\n")
+	script.WriteString("      -list|-list=*) list_mode=1 ;;\n")
+	script.WriteString("    esac\n")
+	script.WriteString("  done\n")
+	script.WriteString("  if [[ \"$list_mode\" == \"1\" ]]; then\n")
+	script.WriteString("    printf '%s\\n' TestMemoryFactsRejectsUnsafeUnknownToSafeKnown\n")
+	for i := 0; i < 8000; i++ {
+		script.WriteString(fmt.Sprintf("    printf 'TetraPipefailFiller%05d\\n'\n", i))
+	}
+	for _, name := range []string{
+		"TestMemoryFactsRejectsDirectSafeBorrowedFromUnsafeUnknown",
+		"TestMemoryFactsRejectsDirectSafeOwnedFromUnsafeUnknown",
+		"TestMemoryFactsRejectsUnsafeUnknownNoAliasAndBoundsProofClaims",
+		"TestMemoryFactsRejectsUnsafeCheckedGenericPromotions",
+		"TestMemoryFactsRejectsUnsafeVerifiedRootGenericClaims",
+		"TestMemoryFactsRejectsValidatedUnsafeUnknownTrustedStorage",
+		"TestValidateMemoryReportRejectsUnsafeUnknownOptimizationClaims",
+		"TestValidateMemoryReportRejectsUnsafeCheckedGenericPromotions",
+		"TestValidateMemoryReportRejectsUnsafeVerifiedRootGenericClaims",
+		"TestValidateMemoryReportRejectsValidatedUnsafeUnknownTrustedStorage",
+		"TestMemoryIdealV6ProjectsBoundsProofFacts",
+		"TestMemoryIdealV6ProjectsMissingProofRejection",
+		"TestValidateMemoryReportRejectsV6BoundsRowsWithoutParent",
+		"TestValidateMemoryReportRejectsBareBoundsCheckEliminatedWithoutProofID",
+	} {
+		script.WriteString("    printf '%s\\n' ")
+		script.WriteString(shellSingleQuote(name))
+		script.WriteString("\n")
+	}
+	script.WriteString("    exit 0\n")
+	script.WriteString("  fi\n")
+	script.WriteString("fi\n")
+	script.WriteString("exec ")
+	script.WriteString(shellSingleQuote(realGoPath))
+	script.WriteString(" \"$@\"\n")
+
+	if err := os.WriteFile(goPath, []byte(script.String()), 0o755); err != nil {
+		t.Fatalf("write membership fake go wrapper: %v", err)
+	}
+}
+
+func shellSingleQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "'\"'\"'") + "'"
 }
 
 func TestTestAllQuickFailsWhenUnsafePromotionBlockerSuiteMissing(t *testing.T) {
