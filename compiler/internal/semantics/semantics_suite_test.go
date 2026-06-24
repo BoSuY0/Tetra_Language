@@ -3362,6 +3362,509 @@ func main() -> Int:
 	}
 }
 
+func TestPartialMoveReinitializeChildAfterWholeConsume(t *testing.T) {
+	requireTetraCheckPass(t, `
+struct Pair:
+    left: Int
+    right: Int
+
+func takePair(value: consume Pair) -> Int:
+    return value.left + value.right
+
+func main() -> Int:
+    var pair: Pair = Pair(left: 1, right: 2)
+    let _moved = takePair(pair)
+    pair.left = 3
+    return pair.left
+`)
+}
+
+func TestPartialMoveRejectsWholeUseUntilAllChildrenReinitialized(t *testing.T) {
+	requireTetraOwnershipError(t, `
+struct Pair:
+    left: Int
+    right: Int
+
+func takePair(value: consume Pair) -> Int:
+    return value.left + value.right
+
+func main() -> Int:
+    var pair: Pair = Pair(left: 1, right: 2)
+    let _moved = takePair(pair)
+    pair.left = 3
+    return takePair(pair)
+`, "cannot use consumed value", "pair.right")
+}
+
+func TestPartialMoveWholeUseAfterAllChildrenReinitialized(t *testing.T) {
+	requireTetraCheckPass(t, `
+struct Pair:
+    left: Int
+    right: Int
+
+func takePair(value: consume Pair) -> Int:
+    return value.left + value.right
+
+func main() -> Int:
+    var pair: Pair = Pair(left: 1, right: 2)
+    let _moved = takePair(pair)
+    pair.left = 3
+    pair.right = 4
+    return takePair(pair)
+`)
+}
+
+func TestPartialMoveMatrixSameModuleOwnershipPaths(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+	}{
+		{
+			name: "struct child consume leaves sibling available",
+			src: `
+struct Pair:
+    left: Int
+    right: Int
+
+func take(value: consume Int) -> Int:
+    return value
+
+func main() -> Int:
+    var pair: Pair = Pair(left: 1, right: 2)
+    let moved = take(pair.left)
+    return pair.right + moved
+`,
+		},
+		{
+			name: "struct child exact reinitialize restores whole",
+			src: `
+struct Pair:
+    left: Int
+    right: Int
+
+func take(value: consume Int) -> Int:
+    return value
+
+func takePair(value: consume Pair) -> Int:
+    return value.left + value.right
+
+func main() -> Int:
+    var pair: Pair = Pair(left: 1, right: 2)
+    let _moved = take(pair.left)
+    pair.left = 3
+    return takePair(pair)
+`,
+		},
+		{
+			name: "ancestor reinitialize clears child consumption",
+			src: `
+struct Pair:
+    left: Int
+    right: Int
+
+func take(value: consume Int) -> Int:
+    return value
+
+func takePair(value: consume Pair) -> Int:
+    return value.left + value.right
+
+func main() -> Int:
+    var pair: Pair = Pair(left: 1, right: 2)
+    let _moved = take(pair.left)
+    pair = Pair(left: 3, right: 4)
+    return takePair(pair)
+`,
+		},
+		{
+			name: "nested struct child reinitialize after nested whole consume",
+			src: `
+struct Inner:
+    value: Int
+    other: Int
+
+struct Outer:
+    inner: Inner
+    flag: Int
+
+func takeInner(value: consume Inner) -> Int:
+    return value.value + value.other
+
+func main() -> Int:
+    var outer: Outer = Outer(inner: Inner(value: 1, other: 2), flag: 3)
+    let _moved = takeInner(outer.inner)
+    outer.inner.value = 4
+    return outer.inner.value + outer.flag
+`,
+		},
+		{
+			name: "optional payload none reinitialize removes old payload state",
+			src: `
+struct Pair:
+    left: Int
+    right: Int
+
+func takePair(value: consume Pair) -> Int:
+    return value.left + value.right
+
+func main() -> Int:
+    var holder: Pair? = Pair(left: 1, right: 2)
+    if let some(payload) = holder:
+        let _moved = takePair(payload)
+    holder = none
+    holder = Pair(left: 3, right: 4)
+    if let some(next) = holder:
+        return takePair(next)
+    return 0
+`,
+		},
+		{
+			name: "enum payload whole reinitialize clears old payload state",
+			src: `
+struct Pair:
+    left: Int
+    right: Int
+
+enum Choice:
+    case left(Pair)
+    case right(Pair)
+
+func takePair(value: consume Pair) -> Int:
+    return value.left + value.right
+
+func main() -> Int:
+    var choice: Choice = Choice.left(Pair(left: 1, right: 2))
+    match choice:
+    case Choice.left(payload):
+        let _moved = takePair(payload)
+    case Choice.right(payload):
+        let _keep = payload.left
+    choice = Choice.right(Pair(left: 3, right: 4))
+    match choice:
+    case Choice.left(payload):
+        return payload.left
+    case Choice.right(payload):
+        return takePair(payload)
+`,
+		},
+		{
+			name: "generic monomorphized struct child reinitialize",
+			src: `
+struct Box<T>:
+    value: T
+    other: Int
+
+func takeBox(value: consume Box<Int>) -> Int:
+    return value.value + value.other
+
+func main() -> Int:
+    var box: Box<Int> = Box<Int>(value: 1, other: 2)
+    let _moved = takeBox(box)
+    box.value = 3
+    return box.value
+`,
+		},
+		{
+			name: "callable struct field reinitialize",
+			src: `
+struct Handler:
+    cb: fn(Int) -> Int
+    other: Int
+
+func inc(value: Int) -> Int:
+    return value + 1
+
+func takeHandler(value: consume Handler) -> Int:
+    return value.cb(1) + value.other
+
+func main() -> Int:
+    var handler: Handler = Handler(cb: inc, other: 2)
+    let _moved = takeHandler(handler)
+    handler.cb = inc
+    return handler.cb(1)
+`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			requireTetraCheckPass(t, tc.src)
+		})
+	}
+}
+
+func TestPartialMoveMatrixRejectsInvalidUses(t *testing.T) {
+	cases := []struct {
+		name  string
+		src   string
+		wants []string
+	}{
+		{
+			name: "struct child reuse rejected",
+			src: `
+struct Pair:
+    left: Int
+    right: Int
+
+func take(value: consume Int) -> Int:
+    return value
+
+func main() -> Int:
+    var pair: Pair = Pair(left: 1, right: 2)
+    let _moved = take(pair.left)
+    return pair.left
+`,
+			wants: []string{"cannot use consumed value", "pair.left"},
+		},
+		{
+			name: "struct whole use rejected after child consume",
+			src: `
+struct Pair:
+    left: Int
+    right: Int
+
+func take(value: consume Int) -> Int:
+    return value
+
+func takePair(value: consume Pair) -> Int:
+    return value.left + value.right
+
+func main() -> Int:
+    var pair: Pair = Pair(left: 1, right: 2)
+    let _moved = take(pair.left)
+    return takePair(pair)
+`,
+			wants: []string{"cannot use consumed value", "pair.left"},
+		},
+		{
+			name: "branch maybe-consumed child rejected",
+			src: `
+struct Pair:
+    left: Int
+    right: Int
+
+func take(value: consume Int) -> Int:
+    return value
+
+func main() -> Int:
+    var pair: Pair = Pair(left: 1, right: 2)
+    if 1:
+        let _moved = take(pair.left)
+    return pair.left
+`,
+			wants: []string{"may have been consumed after ownership join", "pair.left"},
+		},
+		{
+			name: "loop maybe-consumed child rejected",
+			src: `
+struct Pair:
+    left: Int
+    right: Int
+
+func take(value: consume Int) -> Int:
+    return value
+
+func main() -> Int:
+    var pair: Pair = Pair(left: 1, right: 2)
+    while 1:
+        let _moved = take(pair.left)
+    return pair.left
+`,
+			wants: []string{"may have been consumed after ownership join", "pair.left"},
+		},
+		{
+			name: "throw after consume rejected at invalid use",
+			src: `
+struct Pair:
+    left: Int
+    right: Int
+
+enum Boom:
+    case oops(Int)
+
+func take(value: consume Int) -> Int:
+    return value
+
+func fail() -> Int throws Boom:
+    var pair: Pair = Pair(left: 1, right: 2)
+    let _moved = take(pair.left)
+    throw Boom.oops(pair.left)
+
+func main() -> Int:
+    return try fail()
+`,
+			wants: []string{"cannot use consumed value", "pair.left"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			requireTetraOwnershipError(t, tc.src, tc.wants...)
+		})
+	}
+}
+
+func TestPartialMoveStateResourceAndSyntheticPaths(t *testing.T) {
+	state := newRegionState(nil)
+	state.markConsumed("root.$case0.payload0.left", frontend.Position{Line: 3, Col: 5})
+	if err := state.checkNotConsumed("root.$case1.payload0.left", frontend.Position{}); err != nil {
+		t.Fatalf("sibling enum payload aliases consumed path: %v", err)
+	}
+	if err := state.checkNotConsumed("root.$case0.payload0.left", frontend.Position{}); err == nil {
+		t.Fatalf("expected matching enum payload to remain consumed")
+	}
+
+	state.clearConsumedTree("root.$case0.payload0.left")
+	if err := state.checkNotConsumed("root.$case0.payload0.left", frontend.Position{}); err != nil {
+		t.Fatalf("exact enum payload child reinit did not clear matching path: %v", err)
+	}
+
+	state.markConsumed("maybe.$elem.value", frontend.Position{Line: 4, Col: 5})
+	state.clearConsumedTree("maybe")
+	if err := state.checkNotConsumed("maybe.$elem.value", frontend.Position{}); err != nil {
+		t.Fatalf("whole optional reinit did not clear prior payload state: %v", err)
+	}
+}
+
+func TestPartialMoveCrossModuleInterfaceOnlyMatrix(t *testing.T) {
+	api := []byte(`module lib.api
+
+pub struct Pair:
+    left: Int
+    right: Int
+
+pub struct Box<T>:
+    value: T
+    other: Int
+
+pub enum Choice:
+    case left(Pair)
+    case right(Pair)
+
+pub func takePair(value: consume Pair) -> Int:
+    return value.left + value.right
+
+pub func takeBox(value: consume Box<Int>) -> Int:
+    return value.value + value.other
+`)
+	pass := []byte(`module app.main
+import lib.api as api
+
+func main() -> Int:
+    var pair: api.Pair = api.Pair(left: 1, right: 2)
+    let _pair_moved = api.takePair(pair)
+    pair.left = 3
+    pair.right = 4
+
+    var box: api.Box<Int> = api.Box<Int>(value: 5, other: 6)
+    let _box_moved = api.takeBox(box)
+    box.value = 7
+
+    var choice: api.Choice = api.Choice.left(api.Pair(left: 8, right: 9))
+    match choice:
+    case api.Choice.left(payload):
+        let _choice_moved = api.takePair(payload)
+    case api.Choice.right(payload):
+        let _keep = payload.left
+    choice = api.Choice.right(api.Pair(left: 10, right: 11))
+    match choice:
+    case api.Choice.left(payload):
+        return payload.left
+    case api.Choice.right(payload):
+        return api.takePair(payload) + pair.left + box.value
+`)
+	reject := []byte(`module app.main
+import lib.api as api
+
+func main() -> Int:
+    var pair: api.Pair = api.Pair(left: 1, right: 2)
+    let _pair_moved = api.takePair(pair)
+    pair.left = 3
+    return api.takePair(pair)
+`)
+
+	requireTetraWorldCheckPass(t, api, pass)
+	requireTetraWorldOwnershipError(t, api, reject, "cannot use consumed value", "pair.right")
+}
+
+func requireTetraCheckPass(t *testing.T, src string) {
+	t.Helper()
+	prog, err := frontend.Parse([]byte(src))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if _, err := Check(prog); err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+}
+
+func requireTetraWorldCheckPass(t *testing.T, apiSrc []byte, appSrc []byte) {
+	t.Helper()
+	if _, err := checkPartialMoveWorld(apiSrc, appSrc); err != nil {
+		t.Fatalf("CheckWorld: %v", err)
+	}
+}
+
+func requireTetraWorldOwnershipError(t *testing.T, apiSrc []byte, appSrc []byte, wants ...string) {
+	t.Helper()
+	_, err := checkPartialMoveWorld(apiSrc, appSrc)
+	if err == nil {
+		t.Fatalf("expected ownership diagnostic")
+	}
+	if diagnosticCode(err) != DiagnosticCodeSafetyOwnership {
+		t.Fatalf("diagnostic code = %q, want %q; error = %v", diagnosticCode(err), DiagnosticCodeSafetyOwnership, err)
+	}
+	for _, want := range wants {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error = %v, want substring %q", err, want)
+		}
+	}
+}
+
+func checkPartialMoveWorld(apiSrc []byte, appSrc []byte) (*CheckedProgram, error) {
+	api, err := frontend.ParseFile(apiSrc, "lib/api.t4i")
+	if err != nil {
+		return nil, err
+	}
+	app, err := frontend.ParseFile(appSrc, "app/main.t4")
+	if err != nil {
+		return nil, err
+	}
+	return CheckWorldOpt(&module.World{
+		EntryModule:      "app.main",
+		Files:            []*frontend.FileAST{api, app},
+		InterfaceModules: map[string]bool{"lib.api": true},
+		ByModule: map[string]*frontend.FileAST{
+			"lib.api":  api,
+			"app.main": app,
+		},
+	}, CheckOptions{RequireMain: true})
+}
+
+func requireTetraOwnershipError(t *testing.T, src string, wants ...string) {
+	t.Helper()
+	prog, err := frontend.Parse([]byte(src))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected ownership diagnostic")
+	}
+	if diagnosticCode(err) != DiagnosticCodeSafetyOwnership {
+		t.Fatalf("diagnostic code = %q, want %q; error = %v", diagnosticCode(err), DiagnosticCodeSafetyOwnership, err)
+	}
+	for _, want := range wants {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error = %v, want substring %q", err, want)
+		}
+	}
+}
+
+func diagnosticCode(err error) string {
+	if diag, ok := err.(*diagnosticError); ok {
+		return diag.code
+	}
+	return ""
+}
+
 // ---- representation_metadata_test.go ----
 
 func TestRepresentationMetadataRegistryCoversMemoryIdealV0Names(t *testing.T) {

@@ -6268,11 +6268,96 @@ func markConsumedResourceValue(
 	if state == nil || name == "" {
 		return
 	}
-	if !typeContainsResourceHandle(typeName, types) {
-		state.markConsumed(name, pos)
+	markConsumedOwnershipPath(name, typeName, types, state, pos)
+}
+
+func markConsumedOwnershipPath(
+	prefix string,
+	typeName string,
+	types map[string]*TypeInfo,
+	state *regionState,
+	pos frontend.Position,
+) {
+	if state == nil || prefix == "" {
 		return
 	}
-	markConsumedResourcePath(name, typeName, types, state, pos)
+	leaves := ownershipLeafPaths(typeName, types, "")
+	if len(leaves) == 0 {
+		state.markConsumed(prefix, pos)
+		return
+	}
+	for _, leaf := range leaves {
+		state.markConsumed(joinResourcePath(prefix, leaf), pos)
+	}
+}
+
+func ownershipLeafPaths(typeName string, types map[string]*TypeInfo, prefix string) []string {
+	return ownershipLeafPathsVisiting(typeName, types, prefix, map[string]bool{})
+}
+
+func ownershipLeafPathsVisiting(
+	typeName string,
+	types map[string]*TypeInfo,
+	prefix string,
+	visiting map[string]bool,
+) []string {
+	if typeName == "" || isResourceHandleType(typeName) {
+		return []string{prefix}
+	}
+	info, ok := types[typeName]
+	if !ok {
+		return []string{prefix}
+	}
+	if visiting[typeName] {
+		return []string{prefix}
+	}
+	visiting[typeName] = true
+	defer delete(visiting, typeName)
+	var out []string
+	switch info.Kind {
+	case TypeStruct:
+		for _, field := range info.Fields {
+			out = append(
+				out,
+				ownershipLeafPathsVisiting(
+					field.TypeName,
+					types,
+					resourceFieldPath(prefix, field.Name),
+					visiting,
+				)...,
+			)
+		}
+	case TypeEnum:
+		for _, c := range info.EnumCases {
+			for i, payload := range c.PayloadTypes {
+				out = append(
+					out,
+					ownershipLeafPathsVisiting(
+						payload,
+						types,
+						resourceEnumPayloadPath(prefix, c.Ordinal, i),
+						visiting,
+					)...,
+				)
+			}
+		}
+	case TypeArray, TypeOptional:
+		out = append(
+			out,
+			ownershipLeafPathsVisiting(
+				info.ElemType,
+				types,
+				resourceElementPath(prefix),
+				visiting,
+			)...,
+		)
+	default:
+		return []string{prefix}
+	}
+	if len(out) == 0 {
+		return []string{prefix}
+	}
+	return out
 }
 
 func markConsumedResourcePath(

@@ -3226,6 +3226,94 @@ func withActiveScope(state *regionState, scopeID int, run func() error) error {
 		return run()
 	}
 	state.activateScope(scopeID)
-	defer state.deactivateScope(scopeID)
+	defer func() {
+		state.deactivateScope(scopeID)
+		state.clearInactiveLocalFlow()
+	}()
 	return run()
+}
+
+func (s *regionState) clearInactiveLocalFlow() {
+	if s == nil {
+		return
+	}
+	for name := range s.localScopes {
+		if s.localNameActive(name) {
+			continue
+		}
+		s.clearLocalFlowTree(name)
+	}
+}
+
+func (s *regionState) localNameActive(name string) bool {
+	if ids := s.localScopeSets[name]; len(ids) > 0 {
+		for id := range ids {
+			if s.isScopeActive(id) {
+				return true
+			}
+		}
+		return false
+	}
+	scopeID := localScopeID(name, s)
+	return scopeID == regionNone || s.isScopeActive(scopeID)
+}
+
+func (s *regionState) clearLocalFlowTree(name string) {
+	if s == nil || name == "" {
+		return
+	}
+	for path := range s.regionVars {
+		if scopedLocalPath(name, path) {
+			delete(s.regionVars, path)
+		}
+	}
+	for path := range s.unknownVars {
+		if scopedLocalPath(name, path) {
+			delete(s.unknownVars, path)
+		}
+	}
+	for path := range s.unknownConflicts {
+		if scopedLocalPath(name, path) {
+			delete(s.unknownConflicts, path)
+		}
+	}
+	for path := range s.consumedVars {
+		if scopedLocalPath(name, path) {
+			delete(s.consumedVars, path)
+		}
+	}
+	for path := range s.maybeConsumedVars {
+		if scopedLocalPath(name, path) {
+			delete(s.maybeConsumedVars, path)
+		}
+	}
+	for path, source := range s.ownershipAliases {
+		if scopedLocalPath(name, path) || scopedLocalPath(name, source) {
+			delete(s.ownershipAliases, path)
+		}
+	}
+	for path, owner := range s.borrowedPtrAliases {
+		if scopedLocalPath(name, path) || scopedLocalPath(name, owner) {
+			delete(s.borrowedPtrAliases, path)
+		}
+	}
+	for path, owner := range s.ownedRegionSliceOwners {
+		if scopedLocalPath(name, path) || scopedLocalPath(name, owner) {
+			delete(s.ownedRegionSliceOwners, path)
+		}
+	}
+	for path := range s.resourceVars {
+		if scopedLocalPath(name, path) {
+			delete(s.resourceVars, path)
+		}
+	}
+	for id, path := range s.resourceParamPath {
+		if scopedLocalPath(name, path) {
+			delete(s.resourceParamPath, id)
+		}
+	}
+}
+
+func scopedLocalPath(name string, path string) bool {
+	return path == name || ownershipPathPrefix(name, path)
 }
